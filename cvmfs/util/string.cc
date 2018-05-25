@@ -110,9 +110,12 @@ string StringifyTime(const time_t seconds, const bool utc) {
   const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   char buffer[21];
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#pragma GCC diagnostic push
   snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d", timestamp.tm_mday,
            months[timestamp.tm_mon], timestamp.tm_year + 1900,
            timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec);
+#pragma GCC diagnostic pop
 
   return string(buffer);
 }
@@ -130,11 +133,14 @@ std::string RfcTimestamp() {
   gmtime_r(&now, &timestamp);
 
   char buffer[30];
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#pragma GCC diagnostic push
   snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
            day_of_week[timestamp.tm_wday], timestamp.tm_mday,
            months[timestamp.tm_mon], timestamp.tm_year + 1900,
            timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
            timestamp.tm_zone);
+#pragma GCC diagnostic pop
   return string(buffer);
 }
 
@@ -148,6 +154,8 @@ std::string IsoTimestamp() {
   gmtime_r(&now, &timestamp);
 
   char buffer[17];
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#pragma GCC diagnostic push
   snprintf(buffer, sizeof(buffer), "%04d%02d%02dT%02d%02d%02dZ",
            timestamp.tm_year + 1900,
            timestamp.tm_mon + 1,
@@ -155,6 +163,7 @@ std::string IsoTimestamp() {
            timestamp.tm_hour,
            timestamp.tm_min,
            timestamp.tm_sec);
+#pragma GCC diagnostic pop
   return string(buffer);
 }
 
