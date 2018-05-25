@@ -1,3 +1,5 @@
+0.3.0:
+
 0.2.6:
   * Key file parsing is more robust w.r.t whitespace and tabs (CVM-1535)
   * Application is now installed in /usr/libexec/cvmfs-gateway while
