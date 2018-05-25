@@ -22,6 +22,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/006-buildkernel                          \
                                    src/007-testjobs                             \
                                    src/008-default_domain                       \
+                                   src/009-tar                                  \
                                    src/016-dnsunreachable                       \
                                    src/017-dnstimeout                           \
                                    src/024-reload-during-asetup                 \
