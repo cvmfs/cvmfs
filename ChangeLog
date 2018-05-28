@@ -1,4 +1,5 @@
 2.5.1:
+  * Update BNL and FNAL stratum 1 aliases (CVM-1556)
   * Improved check for OSXFUSE in "cvmfs_config chksetup" (CVM-1550)
   * Fix potential deadlock when uploading files to repository GW (CVM-1555)
   * Reduce number of temporary files when publishing through GW (CVM-1548)
