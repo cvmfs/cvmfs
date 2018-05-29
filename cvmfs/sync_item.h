@@ -37,7 +37,6 @@ enum SyncItemType {
   kItemNew,
   kItemMarker,
   kItemUnknown,
-  kItemTarfile
 };
 
 class SyncUnion;
@@ -57,7 +56,6 @@ class SyncUnion;
 class SyncItem {
   // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem).
   // SyncUnionTarball can create SyncItemTar and SyncItemDummyDir.
-  friend class SyncUnion;
 
  public:
   SyncItem();
@@ -130,7 +128,7 @@ class SyncItem {
    *       count to 1 if MaskHardlink() has been called before (cf. OverlayFS)
    * @return  a DirectoryEntry structure to be written into a catalog
    */
-  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const = 0;
 
   inline std::string GetRelativePath() const {
     return (relative_parent_path_.empty()) ?
@@ -166,8 +164,8 @@ class SyncItem {
     return relative_parent_path_;
   }
 
-  virtual IngestionSource *CreateIngestionSource() const;
-  virtual void IsPlaceholderDirectory() const { assert(false); }
+  virtual IngestionSource *CreateIngestionSource() const = 0;
+  virtual void IsPlaceholderDirectory() const = 0;
   void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   bool operator==(const SyncItem &other) const {
@@ -207,14 +205,7 @@ class SyncItem {
    * @param expected_type  the file type to be checked against
    * @return               true if file type matches the expected type
    */
-  inline bool IsType(const SyncItemType expected_type) const {
-    if (filename_.substr(0, 12) == ".cvmfsgraft-") {
-      scratch_type_ = kItemMarker;
-    } else if (scratch_type_ == kItemUnknown || scratch_type_ == kItemTarfile) {
-      scratch_type_ = GetScratchFiletype();
-    }
-    return scratch_type_ == expected_type;
-  }
+  virtual bool IsType(const SyncItemType expected_type) const = 0;
 
   /**
    * Checks if the SyncItem _was_ the given file type (file, dir, symlink, ...)
@@ -255,14 +246,24 @@ class SyncItem {
     platform_stat64 stat;
   };
 
+  static void StatGeneric(const std::string  &path,
+                          EntryStat          *info,
+                          const bool          refresh);
+  SyncItemType GetGenericFiletype(const EntryStat &stat) const;
+  void CheckMarkerFiles();
+
   mutable SyncItemType rdonly_type_;
   mutable EntryStat scratch_stat_;
 
+  std::string filename_;
+  ssize_t graft_size_;
+
+  // The hash of regular file's content
+  shash::Any content_hash_;
+
+  mutable SyncItemType scratch_type_;
+
  private:
-  SyncItemType GetGenericFiletype(const EntryStat &stat) const;
-
-  void CheckMarkerFiles();
-
   void CheckCatalogMarker();
 
   std::string GetGraftMarkerPath() const;
@@ -282,18 +283,11 @@ class SyncItem {
 
   bool external_data_;
   std::string relative_parent_path_;
-  std::string filename_;
 
   /**
    * Chunklist from graft. Not initialized by default to save memory.
    */
   FileChunkList *graft_chunklist_;
-  ssize_t graft_size_;
-
-  mutable SyncItemType scratch_type_;
-
-  // The hash of regular file's content
-  shash::Any content_hash_;
 
   // The compression algorithm for the file
   zlib::Algorithms compression_algorithm_;
@@ -305,15 +299,30 @@ class SyncItem {
   inline void StatUnion(const bool refresh = false) const {
     StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  virtual void StatScratch(const bool refresh = false) const {
-    StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
-  }
-  static void StatGeneric(const std::string  &path,
-                          EntryStat          *info,
-                          const bool          refresh);
+  virtual void StatScratch(const bool refresh = false) const = 0;
 };
 
 typedef std::map<std::string, SharedPtr<SyncItem> > SyncItemList;
+
+class SyncItemNative : public SyncItem {
+  friend class SyncUnion;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual IngestionSource *CreateIngestionSource() const;
+  virtual void IsPlaceholderDirectory() const { assert(false); }
+  virtual SyncItemType GetScratchFiletype() const;
+  virtual bool IsType(const SyncItemType expected_type) const;
+  virtual void StatScratch(const bool refresh = false) const {
+    StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
+  }
+
+ protected:
+  SyncItemNative(const std::string &relative_parent_path,
+                 const std::string &filename, const SyncUnion *union_engine,
+                 const SyncItemType entry_type)
+      : SyncItem(relative_parent_path, filename, union_engine, entry_type) {
+    CheckMarkerFiles();
+  }
+};
 
 }  // namespace publish
 
