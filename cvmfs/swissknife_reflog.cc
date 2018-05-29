@@ -223,7 +223,9 @@ void RootChainWalker::WalkCatalogsInHistory(const HistoryTN *history) {
 
   CatalogList bin_hashes;
   const bool bin_success = history->ListRecycleBin(&bin_hashes);
-  assert(bin_success);
+  if (!bin_success) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "  Warning: 'recycle bin' table missing");
+  }
 
   WalkListedCatalogs(tag_hashes);
   WalkListedCatalogs(bin_hashes);
