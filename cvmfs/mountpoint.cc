@@ -837,6 +837,20 @@ bool FileSystem::SetupNfsMaps() {
     boot_status_ = loader::kFailNfsMaps;
     return false;
   }
+
+  string optarg;
+  if (options_mgr_->GetValue("CVMFS_NFS_INTERLEAVED_INODES", &optarg)) {
+    vector<string> tokens = SplitString(optarg, '%');
+    if (tokens.size() != 2) {
+      boot_error_ =
+        "invalid format for CVMFS_NFS_INTERLEAVED_INODES: " + optarg;
+      boot_status_ = loader::kFailNfsMaps;
+      return false;
+    }
+    nfs_maps_->SetInodeResidue(String2Uint64(tokens[1]),
+                               String2Uint64(tokens[0]));
+  }
+
   return true;
 
 #else

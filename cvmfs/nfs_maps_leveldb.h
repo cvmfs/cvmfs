@@ -32,6 +32,7 @@ class NfsMapsLeveldb : public NfsMaps {
   virtual ~NfsMapsLeveldb();
   virtual uint64_t GetInode(const PathString &path);
   virtual bool GetPath(const uint64_t inode, PathString *path);
+  virtual void SetInodeResidue(unsigned residue_class, unsigned remainder);
   virtual void Spawn() { spawned_ = true; }
   virtual std::string GetStatistics();
 
@@ -85,6 +86,9 @@ class NfsMapsLeveldb : public NfsMaps {
   uint64_t seq_;
   pthread_mutex_t *lock_;
   bool spawned_;
+
+  unsigned inode_residue_class_;
+  unsigned inode_remainder_;
 
   perf::Counter *n_db_added_;
 };

@@ -12,6 +12,7 @@
 
 #include <string>
 
+#include "logging.h"
 #include "shortstring.h"
 #include "util/single_copy.h"
 
@@ -20,6 +21,15 @@ class NfsMaps : SingleCopy {
   virtual ~NfsMaps() { }
   virtual uint64_t GetInode(const PathString &path) = 0;
   virtual bool GetPath(const uint64_t inode, PathString *path) = 0;
+
+  /**
+   * Ensures that NFS maps inodes have the form an+b so that we can have
+   * non-overlapping inodes for independent repositories.
+   */
+  virtual void SetInodeResidue(unsigned residue_class, unsigned remainder) {
+    LogCvmfs(kLogNfsMaps, kLogSyslogWarn,
+             "Warning: interleaved inode mode unsupported");
+  }
 
   virtual void Spawn() { }
   virtual std::string GetStatistics() { return ""; }

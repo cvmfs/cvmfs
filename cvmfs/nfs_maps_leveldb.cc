@@ -29,6 +29,7 @@
 #include "statistics.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -176,6 +177,20 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(
   return maps.Release();
 }
 
+void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class, unsigned remainder)
+{
+  MutexLockGuard lock_guard(lock_);
+  if (residue_class < 2) {
+    inode_residue_class_ = 1;
+    inode_remainder_ = 0;
+  } else {
+    inode_residue_class_ = residue_class;
+    inode_remainder_ = remainder % residue_class;
+    seq_ = ((seq_ / inode_residue_class_) + 1)
+           * inode_residue_class_ + inode_remainder_;
+  }
+}
+
 
 uint64_t NfsMapsLeveldb::FindInode(const shash::Md5 &path) {
   leveldb::Status status;
@@ -219,7 +234,8 @@ uint64_t NfsMapsLeveldb::GetInode(const PathString &path) {
   }
 
   // Issue new inode
-  inode = seq_++;
+  inode = seq_;
+  seq_ += inode_residue_class_;
   PutPath2Inode(md5_path, inode);
   PutInode2Path(inode, path);
   pthread_mutex_unlock(lock_);
@@ -286,6 +302,8 @@ NfsMapsLeveldb::NfsMapsLeveldb()
   , seq_(0)
   , lock_(NULL)
   , spawned_(false)
+  , inode_residue_class_(1)
+  , inode_remainder_(0)
   , n_db_added_(NULL)
 {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
