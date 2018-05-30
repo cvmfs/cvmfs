@@ -2,7 +2,7 @@
 
 export LC_ALL=C
 
-script_location=$(dirname $(readlink --canonicalize $0))
+script_location=$(portable_dirname $0)
 . ${script_location}/../../test_functions
 
 # splits onelined CSV strings and prints the desired field offset
@@ -291,6 +291,16 @@ install_ruby_gem() {
   echo -n "Installing Ruby gem '$gem_name' (version: $gem_version) ... "
   pkg_mgr_output=$($gem_install_cmd 2>&1)
   check_package_manager_response $? $pkg_mgr_name "$pkg_mgr_output"
+}
+
+
+install_homebrew() {
+  local pkgs="$@"
+  for pkg in $pkgs ; do
+    if [ "x$(brew info $pkg | grep 'Not installed' | wc -l | xargs)" == "x1" ]; then
+      brew install $pkg
+    fi
+  done
 }
 
 
