@@ -51,8 +51,10 @@
 #include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps.h"
+#ifdef CVMFS_NFS_SUPPORT
+#include "nfs_maps_leveldb.h"
+#include "nfs_maps_sqlite.h"
 #endif
 #include "options.h"
 #include "platform.h"
@@ -341,7 +343,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , nfs_mode_(kNfsNone)
   , cache_mgr_(NULL)
   , uuid_cache_(NULL)
-  , has_nfs_maps_(false)
+  , nfs_maps_(NULL)
   , has_custom_sqlitevfs_(false)
 {
   assert(!g_alive);
@@ -367,10 +369,7 @@ FileSystem::~FileSystem() {
     sqlite::UnregisterVfsRdOnly();
 
   delete uuid_cache_;
-#ifdef CVMFS_NFS_SUPPORT
-  if (has_nfs_maps_)
-    nfs_maps::Fini();
-#endif
+  delete nfs_maps_;
   delete cache_mgr_;
 
   if (sqlite3_temp_directory) {
@@ -819,18 +818,27 @@ bool FileSystem::SetupNfsMaps() {
   }
 
   // TODO(jblomer): make this a manager class
-  bool retval =
-    nfs_maps::Init(inode_cache_dir,
-                   catalog::ClientCatalogManager::kInodeOffset + 1,
-                   found_previous_crash_,
-                   IsHaNfsSource());
-  if (!retval) {
+  if (IsHaNfsSource()) {
+    nfs_maps_ = NfsMapsSqlite::Create(
+      inode_cache_dir,
+      catalog::ClientCatalogManager::kInodeOffset + 1,
+      found_previous_crash_,
+      statistics_);
+  } else {
+    nfs_maps_ = NfsMapsLeveldb::Create(
+      inode_cache_dir,
+      catalog::ClientCatalogManager::kInodeOffset + 1,
+      found_previous_crash_,
+      statistics_);
+  }
+
+  if (nfs_maps_ == NULL) {
     boot_error_ = "Failed to initialize NFS maps";
     boot_status_ = loader::kFailNfsMaps;
     return false;
   }
+  return true;
 
-  return has_nfs_maps_ = true;
 #else
   return true;
 #endif

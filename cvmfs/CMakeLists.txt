@@ -108,8 +108,8 @@ set (CVMFS2_DEBUG_SOURCES
   cvmfs.cc
   fuse_evict.cc
   fuse_remount.cc
-  nfs_maps.cc
-  nfs_shared_maps.cc
+  nfs_maps_leveldb.cc
+  nfs_maps_sqlite.cc
   quota_listener.cc
   talk.cc
 )

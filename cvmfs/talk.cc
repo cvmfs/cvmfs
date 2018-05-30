@@ -518,7 +518,7 @@ void *TalkManager::MainResponder(void *data) {
 
       if (file_system->IsNfsSource()) {
         result += "\nNFS Map Statistics:\n";
-        result += nfs_maps::GetStatistics();
+        result += file_system->nfs_maps()->GetStatistics();
       }
 
       result += "SQlite Statistics:\n";
