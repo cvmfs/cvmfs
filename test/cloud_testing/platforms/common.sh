@@ -304,6 +304,16 @@ install_homebrew() {
 }
 
 
+install_test_s3() {
+  sudo curl -o /usr/local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio
+  sudo curl -o /usr/local/bin/mc    https://dl.minio.io/client/mc/release/linux-amd64/mc
+  sudo chmod +x /usr/local/bin/minio
+  sudo chmod +x /usr/local/bin/mc
+
+  return 0
+}
+
+
 attach_user_group() {
   local groupname=$1
   local username
@@ -341,27 +351,61 @@ download_gateway_package() {
 #
 
 
-create_fakes3_config() {
-  [ ! -f $FAKE_S3_CONFIG ] || sudo rm -f $FAKE_S3_CONFIG
-  sudo tee $FAKE_S3_CONFIG > /dev/null << EOF
+create_test_s3_config() {
+  [ ! -f $TEST_S3_CONFIG ] || sudo rm -f $TEST_S3_CONFIG
+  sudo tee $TEST_S3_CONFIG > /dev/null << EOF
 CVMFS_S3_HOST=localhost
-CVMFS_S3_PORT=$FAKE_S3_PORT
+CVMFS_S3_PORT=$TEST_S3_PORT
 CVMFS_S3_ACCESS_KEY=not
 CVMFS_S3_SECRET_KEY=important
 CVMFS_S3_BUCKETS_PER_ACCOUNT=1
 CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10
-CVMFS_S3_BUCKET=$FAKE_S3_BUCKET
+CVMFS_S3_BUCKET=$TEST_S3_BUCKET
 EOF
+
+  sudo tee $TEST_S3_STORAGE/config/config.json > /dev/null << EOF
+{
+	"version": "23",
+	"credential": {
+		"accessKey": "not",
+		"secretKey": "important"
+	}
+}
+EOF
+
+  sudo tee $TEST_S3_STORAGE/mc_config/config.json > /dev/null << EOF
+{
+	"version": "9",
+	"hosts": {
+		"cvmfs": {
+			"url": "http://localhost:13337",
+			"accessKey": "not",
+			"secretKey": "important",
+			"api": "S3v4",
+			"lookup": "auto"
+		}
+	}
+}
+EOF
+
 }
 
 
-start_fakes3() {
+start_test_s3() {
   local logfile=$1
 
-  [ ! -d $FAKE_S3_STORAGE ] || sudo rm -fR $FAKE_S3_STORAGE > /dev/null 2>&1 || return 1
-  sudo mkdir -p $FAKE_S3_STORAGE                            > /dev/null 2>&1 || return 2
-  create_fakes3_config                                      > /dev/null 2>&1 || return 3
-  run_background_service $logfile "sudo fakes3 --port $FAKE_S3_PORT --root $FAKE_S3_STORAGE"
+  [ ! -d $TEST_S3_STORAGE ] || sudo rm -fR $TEST_S3_STORAGE > /dev/null 2>&1 || return 1
+  sudo mkdir -p $TEST_S3_STORAGE/{config,mc_config,data}    > /dev/null 2>&1 || return 2
+  create_test_s3_config                                     > /dev/null 2>&1 || return 3
+  run_background_service $logfile "sudo minio server --address :$TEST_S3_PORT --config-dir $TEST_S3_STORAGE/config $TEST_S3_STORAGE/data"
+}
+
+
+create_test_s3_bucket() {
+  if [ "x$(mc -C $TEST_S3_STORAGE/mc_config ls cvmfs/$TEST_S3_BUCKET)" != "x0" ]; then
+    mc -C $TEST_S3_STORAGE/mc_config mb cvmfs/$TEST_S3_BUCKET
+    mc -C $TEST_S3_STORAGE/mc_config policy public cvmfs/$TEST_S3_BUCKET
+  fi
 }
 
 

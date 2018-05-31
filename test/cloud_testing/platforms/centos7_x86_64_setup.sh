@@ -55,8 +55,8 @@ install_from_repo tree
 # traffic shaping
 install_from_repo trickle
 
-# install ruby gem for FakeS3
-install_ruby_gem fakes3
+# Install the test S3 provider
+install_test_s3
 
 # building preloader
 install_from_repo cmake

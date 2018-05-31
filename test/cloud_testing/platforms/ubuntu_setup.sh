@@ -82,6 +82,9 @@ install_from_repo cmake        || die "fail (installing cmake)"
 install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
 install_from_repo python-dev   || die "fail (installing python-dev)"
 
+# Install the test S3 provider
+install_test_s3 || die "fail (installing test S3)"
+
 # install 'jq' (on 12.04 this needs the precise-backports repo)
 if [ x"$(lsb_release -cs)" = x"precise" ]; then
   echo -n "enabling precise-backports... "

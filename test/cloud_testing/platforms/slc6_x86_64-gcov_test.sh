@@ -24,8 +24,8 @@ done
 
 CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client.log"
 SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server.log"
-TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
-FAKE_S3_LOGFILE="${LOG_DIRECTORY}/fake_s3.log"
+S3_TEST_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
+TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3_instance.log"
 
 XUNIT_OUTPUT_SUFFIX=".xunit.xml"
 
@@ -101,18 +101,18 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               || retval=1
 
 
-# echo -n "starting FakeS3 service... "
+# echo -n "starting the test S3 provider... "
 # s3_retval=0
-# fakes3_pid=$(start_fakes3 $FAKE_S3_LOGFILE) || { s3_retval=1; retval=1; echo "fail"; }
-# echo "done ($fakes3_pid)"
+# test_s3_pid=$(start_test_s3 $TEST_S3_LOGFILE) || { s3_retval=1; retval=1; echo "fail"; }
+# echo "done ($test_s3_pid)"
 
 # if [ $s3_retval -eq 0 ]; then
-#   echo "running CernVM-FS server test cases against FakeS3..."
-#   CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                                      \
-#   CVMFS_TEST_HTTP_BASE=$FAKE_S3_URL                                         \
+#   echo "running CernVM-FS server test cases against the test S3 provider..."
+#   CVMFS_TEST_S3_CONFIG=$TEST_S3_CONFIG                                      \
+#   CVMFS_TEST_HTTP_BASE=$TEST_S3_URL                                         \
 #   CVMFS_TEST_SERVER_CACHE='/srv/cache'                                      \
 #   CVMFS_TEST_CLASS_NAME=S3ServerIntegrationTests                            \
-#   ./run.sh $TEST_S3_LOGFILE -o ${TEST_S3_LOGFILE}${XUNIT_OUTPUT_SUFFIX}     \
+#   ./run.sh $S3_TEST_LOGFILE -o ${S3_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}     \
 #                             -x src/518-hardlinkstresstest                   \
 #                                src/519-importlegacyrepo                     \
 #                                src/522-missingchunkfailover                 \
@@ -134,8 +134,8 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 #                                --                                           \
 #                                src/5* || retval=1
 
-#   echo -n "killing FakeS3... "
-#   sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
+#   echo -n "Stopping the test S3 provider... "
+#   sudo kill -2 $test_s3_pid && echo "done" || echo "fail"
 # fi
 
 exit $retval
