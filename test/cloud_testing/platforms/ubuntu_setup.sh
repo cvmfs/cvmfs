@@ -102,6 +102,15 @@ if [ "x$(lsb_release -cs)" = "xxenial" ]; then
   dpkg -s autofs
 fi
 
+# On Ubuntu 16.04 install the repository gateway
+if [ "x$(lsb_release -cs)" = "xxenial" ]; then
+  echo "Installing repository gateway"
+  package_map=pkgmap.pkgmap.ubuntu1604_x86_64
+  gateway_package=$(download_gateway_package ${GATEWAY_BUILD_URL} $package_map)
+  install_deb $gateway_package
+  sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
+fi
+
 # setting up the AUFS kernel module
 echo -n "loading AUFS kernel module..."
 sudo modprobe aufs || die "fail"

@@ -322,6 +322,19 @@ set_nofile_limit() {
   echo "root soft nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
 }
 
+download_gateway_package() {
+  local gateway_build_url=$1
+  local package_map=$2
+  local package_map_url=$1/pkgmap/$2
+
+  curl -o /tmp/package_map $package_map_url
+  local cvmfs_gateway_package_url=${gateway_build_url}/$(tail -1 package_map | cut -d'=' -f2)
+  local cvmfs_gateway_package_file_name=$(echo $cvmfs_gateway_package_url | awk -F'/' {'print $NF'})
+  curl -o /tmp/$cvmfs_gateway_package_file_name $cvmfs_gateway_package_url
+
+  echo "/tmp/$cvmfs_gateway_package_file_name"
+}
+
 
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #

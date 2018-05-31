@@ -22,6 +22,7 @@ script_location=$(portable_dirname $0)
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
 #  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
 #  LOG_DIRECTORY         location of the test log files to be created
+#  GATEWAY_BUILD_URL     location of the repository gateway build to install
 #
 
 SERVER_PACKAGE=""
@@ -31,9 +32,10 @@ UNITTEST_PACKAGE=""
 CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
 LOG_DIRECTORY=""
+GATEWAY_BUILD_URL=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:d:k:t:g:l:" option; do
+while getopts "s:c:d:k:t:g:l:w:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
@@ -55,6 +57,9 @@ while getopts "s:c:d:k:t:g:l:" option; do
       ;;
     l)
       LOG_DIRECTORY=$OPTARG
+      ;;
+    w)
+      GATEWAY_BUILD_URL=$OPTARG
       ;;
     ?)
       shift $(($OPTIND-2))

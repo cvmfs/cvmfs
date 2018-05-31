@@ -2361,57 +2361,12 @@ find_or_build_cvmfs_preload() {
 }
 
 
-#####################################
-##### CVMFS Repository Gateway ######
-#####################################
-
-
 # Sets up the CVMFS repository gateway application
 set_up_repository_gateway() {
     echo "Setting up repository gateway"
 
-    local package_url_root=$CVMFS_GATEWAY_URL
-
-    # Choose which package to download and install based on platform
-    if [ -f /etc/debian_version ]; then
-        if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-            package_map_url=${package_url_root}/pkgmap/pkgmap.ubuntu1604_x86_64
-        fi
-    elif is_el6; then
-        package_map_url=${package_url_root}/pkgmap/pkgmap.slc6_x86_64
-    elif is_el7; then
-        package_map_url=${package_url_root}/pkgmap/pkgmap.cc7_x86_64
-    fi
-
-    if [ x"$package_map_url" = x"" ]; then
-        echo "Platform not supported. Exiting"
-        exit 1
-    fi
-
-    echo "  Installing the cvmfs_gateway application"
-    pushd /tmp
-
-    echo "Package map URL: ${package_map_url}"
-    curl -o package_map $package_map_url
-
-    local cvmfs_gateway_package_url=${package_url_root}/$(tail -1 package_map | cut -d'=' -f2)
-    echo "    Using package: $cvmfs_gateway_package_url"
-
-    local cvmfs_gateway_package_file_name=$(echo $cvmfs_gateway_package_url | awk -F'/' {'print $NF'})
-
-    if [ ! -f "/tmp/$cvmfs_gateway_package_file_name" ]; then
-        curl -o $cvmfs_gateway_package_file_name $cvmfs_gateway_package_url
-    fi
-
-    if [ -f /etc/debian_version ]; then
-        if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-            sudo dpkg -i /tmp/$cvmfs_gateway_package_file_name
-        fi
-    else
-        sudo yum install -y /tmp/$cvmfs_gateway_package_file_name
-    fi
-
-    popd
+    echo "  Stopping repository gateway"
+    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
 
     echo "  Writing configuration files"
     sudo bash -c 'cat <<EOF > /etc/cvmfs/gateway/repo.json
@@ -2437,11 +2392,8 @@ EOF'
 plain_text key1 secret1
 EOF'
 
-    echo "  Creating Mnesia schema"
-    sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
-
     echo "  Creating test repo"
-    sudo -E cvmfs_server mkfs -o `whoami` test.repo.org
+    create_repo test.repo.org `whoami`
 
     echo "  Modifying test repo configuration"
     sudo sed -i -e 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
@@ -2449,6 +2401,6 @@ EOF'
     sudo bash -c 'echo "TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE=local,/srv/cvmfs/test.repo.org/data/txn,/srv/cvmfs/test.repo.org" >> /etc/cvmfs/repositories.d/test.repo.org/server.conf'
     sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 
-    echo "  Starting repository gateway application"
+    echo "  Starting repository gateway"
     sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
 }
