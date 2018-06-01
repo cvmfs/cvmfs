@@ -109,8 +109,8 @@ fi
 if [ "x$(lsb_release -cs)" = "xxenial" ]; then
   echo "Installing repository gateway"
   package_map=pkgmap.ubuntu1604_x86_64
-  gateway_package=$(download_gateway_package ${GATEWAY_BUILD_URL} $package_map)
-  install_deb $gateway_package
+  download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+  install_deb $(cat gateway_package_name)
   sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
 fi
 

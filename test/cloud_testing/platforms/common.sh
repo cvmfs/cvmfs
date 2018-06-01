@@ -337,12 +337,34 @@ download_gateway_package() {
   local package_map_file=$2
   local package_map_url=$gateway_build_url/pkgmap/$package_map_file
 
-  curl -s -o /tmp/package_map $package_map_url
-  local cvmfs_gateway_package_url=${gateway_build_url}/$(tail -1 /tmp/package_map | cut -d'=' -f2)
-  local cvmfs_gateway_package_file_name=$(echo $cvmfs_gateway_package_url | awk -F'/' {'print $NF'})
-  curl -s -o /tmp/$cvmfs_gateway_package_file_name $cvmfs_gateway_package_url
+  echo "Downloading package map from: $package_map_url"
+  curl -s -o gateway_package_map $package_map_url
 
-  echo "/tmp/$cvmfs_gateway_package_file_name"
+  local ret=$?
+
+  if [ "x$ret" != "x0" ]; then
+    echo "Could not download cvmfs-gateway package map"
+    return 1;
+  fi
+
+  local cvmfs_gateway_package_url=${gateway_build_url}/$(tail -1 gateway_package_map | cut -d'=' -f2)
+  local cvmfs_gateway_package_file_name=$(echo $cvmfs_gateway_package_url | awk -F'/' {'print $NF'})
+
+  rm -f gateway_package_map
+
+  echo "Downloading cvmfs-gateway package from: $cvmfs_gateway_package_url"
+  curl -s $cvmfs_gateway_package_url > $cvmfs_gateway_package_file_name
+
+  ret=$?
+
+  if [ "x$ret" != "x0" ]; then
+    echo "Could not download cvmfs-gateway package"
+    return 2;
+  fi
+
+  echo $cvmfs_gateway_package_file_name > gateway_package_name
+
+  return 0;
 }
 
 
