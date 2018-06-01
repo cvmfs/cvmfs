@@ -108,7 +108,7 @@ fi
 # On Ubuntu 16.04 install the repository gateway
 if [ "x$(lsb_release -cs)" = "xxenial" ]; then
   echo "Installing repository gateway"
-  package_map=pkgmap.pkgmap.ubuntu1604_x86_64
+  package_map=pkgmap.ubuntu1604_x86_64
   gateway_package=$(download_gateway_package ${GATEWAY_BUILD_URL} $package_map)
   install_deb $gateway_package
   sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
