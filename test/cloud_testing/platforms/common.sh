@@ -425,8 +425,8 @@ start_test_s3() {
 
 create_test_s3_bucket() {
   if [ "x$(mc -C $TEST_S3_STORAGE/mc_config ls cvmfs/$TEST_S3_BUCKET)" != "x0" ]; then
-    mc -C $TEST_S3_STORAGE/mc_config mb cvmfs/$TEST_S3_BUCKET
-    mc -C $TEST_S3_STORAGE/mc_config policy public cvmfs/$TEST_S3_BUCKET
+    sudo mc -C $TEST_S3_STORAGE/mc_config mb cvmfs/$TEST_S3_BUCKET
+    sudo mc -C $TEST_S3_STORAGE/mc_config policy public cvmfs/$TEST_S3_BUCKET
   fi
 }
 
