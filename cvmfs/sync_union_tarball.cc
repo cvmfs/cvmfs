@@ -151,18 +151,7 @@ void SyncUnionTarball::Traverse() {
   }
 }
 
-void SyncUnionTarball::LogEntry(struct archive_entry *entry) {
-  printf("Filename: %s\n", archive_entry_pathname(entry));
-  printf("inode: %ld\n", archive_entry_ino64(entry));
-  printf("device: %lu\n", archive_entry_dev(entry));
-  printf("nlink: %d\n", archive_entry_nlink(entry));
-  printf("link to: %s\n", archive_entry_hardlink(entry));
-  printf("\n");
-}
-
 void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
-  LogEntry(entry);
-
   std::string archive_file_path(archive_entry_pathname(entry));
   std::string complete_path(base_directory_ + "/" + archive_file_path);
 
