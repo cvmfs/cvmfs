@@ -44,6 +44,6 @@ class SyncItemTar : public SyncItem {
   Signal *read_archive_signal_;
 };
 
-} // namespace publish
+}  // namespace publish
 
 #endif  // CVMFS_SYNC_ITEM_TAR_H_
