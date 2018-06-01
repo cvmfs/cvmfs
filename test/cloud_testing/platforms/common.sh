@@ -334,13 +334,13 @@ set_nofile_limit() {
 
 download_gateway_package() {
   local gateway_build_url=$1
-  local package_map=$2
-  local package_map_url=$1/pkgmap/$2
+  local package_map_file=$2
+  local package_map_url=$gateway_build_url/pkgmap/$package_map_file
 
-  curl -o /tmp/package_map $package_map_url
-  local cvmfs_gateway_package_url=${gateway_build_url}/$(tail -1 package_map | cut -d'=' -f2)
+  curl -s -o /tmp/package_map $package_map_url
+  local cvmfs_gateway_package_url=${gateway_build_url}/$(tail -1 /tmp/package_map | cut -d'=' -f2)
   local cvmfs_gateway_package_file_name=$(echo $cvmfs_gateway_package_url | awk -F'/' {'print $NF'})
-  curl -o /tmp/$cvmfs_gateway_package_file_name $cvmfs_gateway_package_url
+  curl -s -o /tmp/$cvmfs_gateway_package_file_name $cvmfs_gateway_package_url
 
   echo "/tmp/$cvmfs_gateway_package_file_name"
 }
