@@ -420,6 +420,7 @@ start_test_s3() {
   sudo mkdir -p $TEST_S3_STORAGE/{config,mc_config,data}    > /dev/null 2>&1 || return 2
   create_test_s3_config                                     > /dev/null 2>&1 || return 3
   run_background_service $logfile "sudo minio server --address :$TEST_S3_PORT --config-dir $TEST_S3_STORAGE/config $TEST_S3_STORAGE/data"
+  sleep 5
 }
 
 
