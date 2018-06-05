@@ -225,7 +225,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (file_system_->IsNfsSource()) {
     // NFS mode
     PathString path;
-    bool retval = nfs_maps::GetPath(ino, &path);
+    bool retval = file_system_->nfs_maps()->GetPath(ino, &path);
     if (!retval) {
       *dirent = dirent_negative;
       return false;
@@ -295,7 +295,7 @@ static bool GetDirentForPath(const PathString &path,
   if (retval) {
     if (file_system_->IsNfsSource()) {
       // Fix inode
-      dirent->set_inode(nfs_maps::GetInode(path));
+      dirent->set_inode(file_system_->nfs_maps()->GetInode(path));
     } else {
       if (live_inode != 0)
         dirent->set_inode(live_inode);
@@ -321,7 +321,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   if (file_system_->IsNfsSource()) {
     // NFS mode, just a lookup
     LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - lookup in NFS maps", ino);
-    if (nfs_maps::GetPath(ino, path)) {
+    if (file_system_->nfs_maps()->GetPath(ino, path)) {
       mount_point_->path_cache()->Insert(ino, *path);
       return true;
     }
@@ -1876,8 +1876,8 @@ static void Spawn() {
   }
   cvmfs::mount_point_->tracer()->Spawn();
   cvmfs::talk_mgr_->Spawn();
-  if (cvmfs::file_system_->IsNfsSource())
-    nfs_maps::Spawn();
+  if (cvmfs::file_system_->nfs_maps() != NULL)
+    cvmfs::file_system_->nfs_maps()->Spawn();
 
   cvmfs::file_system_->cache_mgr()->Spawn();
 }
