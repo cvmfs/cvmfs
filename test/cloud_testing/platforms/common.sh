@@ -419,15 +419,16 @@ start_test_s3() {
   [ ! -d $TEST_S3_STORAGE ] || sudo rm -fR $TEST_S3_STORAGE > /dev/null 2>&1 || return 1
   sudo mkdir -p $TEST_S3_STORAGE/{config,mc_config,data}    > /dev/null 2>&1 || return 2
   create_test_s3_config                                     > /dev/null 2>&1 || return 3
-  run_background_service $logfile "sudo minio server --address :$TEST_S3_PORT --config-dir $TEST_S3_STORAGE/config $TEST_S3_STORAGE/data"
+  local service_pid=$(run_background_service $logfile "sudo /usr/local/bin/minio server --address :$TEST_S3_PORT --config-dir $TEST_S3_STORAGE/config $TEST_S3_STORAGE/data")
   sleep 5
+  echo $service_pid
 }
 
 
 create_test_s3_bucket() {
-  if [ "x$(sudo mc -C $TEST_S3_STORAGE/mc_config ls cvmfs/$TEST_S3_BUCKET)" != "x0" ]; then
-    sudo mc -C $TEST_S3_STORAGE/mc_config mb cvmfs/$TEST_S3_BUCKET
-    sudo mc -C $TEST_S3_STORAGE/mc_config policy public cvmfs/$TEST_S3_BUCKET
+  if [ "x$(sudo /usr/local/bin/mc -C $TEST_S3_STORAGE/mc_config ls cvmfs/$TEST_S3_BUCKET)" != "x0" ]; then
+    sudo /usr/local/bin/mc -C $TEST_S3_STORAGE/mc_config mb cvmfs/$TEST_S3_BUCKET
+    sudo /usr/local/bin/mc -C $TEST_S3_STORAGE/mc_config policy public cvmfs/$TEST_S3_BUCKET
   fi
 }
 
