@@ -31,6 +31,8 @@ const size_t kMaxPathLength = 256;
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+const int kPrivateFileMode = S_IWUSR | S_IRUSR;
+const int kPrivateDirMode = S_IXUSR | S_IWUSR | S_IRUSR;
 
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
@@ -93,6 +95,7 @@ bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid);
 bool GetGidOf(const std::string &groupname, gid_t *gid);
 mode_t GetUmask();
 bool AddGroup2Persona(const gid_t gid);
+std::string GetHomeDirectory();
 
 int SetLimitNoFile(unsigned limit_nofile);
 

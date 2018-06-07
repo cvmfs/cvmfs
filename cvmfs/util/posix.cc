@@ -1010,6 +1010,26 @@ bool AddGroup2Persona(const gid_t gid) {
 }
 
 
+std::string GetHomeDirectory() {
+  uid_t uid = getuid();
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(uid, &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return "";
+  }
+  std::string home_dir = result->pw_dir;
+  free(buf);
+  return home_dir;
+}
+
+
 /**
  * Sets soft and hard limit for maximum number of open file descriptors.
  * Returns 0 on success, -1 on failure, -2 if running under valgrind.
@@ -1460,7 +1480,7 @@ bool SafeReadToString(int fd, std::string *final_result) {
 bool SafeWriteToFile(const std::string &content,
                      const std::string &path,
                      int mode) {
-  int fd = open(path.c_str(), O_WRONLY | O_CREAT, mode);
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
   if (fd < 0) return false;
   bool retval = SafeWrite(fd, content.data(), content.size());
   close(fd);
