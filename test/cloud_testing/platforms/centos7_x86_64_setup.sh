@@ -79,6 +79,6 @@ sudo systemctl restart httpd || die "failure in final Apache restart"
 # Install repository gateway
 echo "Installing repository gateway"
 package_map=pkgmap.cc7_x86_64
-gateway_package=$(download_gateway_package ${GATEWAY_BUILD_URL} $package_map)
-install_rpm $gateway_package
+download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+install_rpm $(cat gateway_package)
 sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
