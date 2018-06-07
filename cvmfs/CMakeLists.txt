@@ -174,7 +174,10 @@ set (CVMFS_FSCK_SOURCES
 set (CVMFS_CLI_SOURCES
   cli/enter.cc
   logging.cc
+  options.cc
+  sanitizer.cc
   util/posix.cc
+  util/string.cc
 )
 
 set (CVMFS_SWISSKNIFE_SOURCES
