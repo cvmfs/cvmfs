@@ -143,6 +143,12 @@ TEST_F(T_Util, GetUidOf) {
 }
 
 
+TEST_F(T_Util, GetHomeDirectory) {
+  EXPECT_FALSE(GetHomeDirectory().empty());
+  EXPECT_TRUE(DirectoryExists(GetHomeDirectory()));
+}
+
+
 TEST_F(T_Util, GetGidOf) {
 #ifdef __APPLE__
   const std::string group_name = "wheel";
