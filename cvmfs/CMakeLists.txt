@@ -171,6 +171,11 @@ set (CVMFS_FSCK_SOURCES
   util/string.cc
 )
 
+set (CVMFS_CLI_SOURCES
+  cli/enter.cc
+  logging.cc
+  util/posix.cc
+)
 
 set (CVMFS_SWISSKNIFE_SOURCES
   backoff.cc
@@ -689,6 +694,13 @@ if (BUILD_OCTOPUS)
                         ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
 endif (BUILD_OCTOPUS)
+
+
+if (BUILD_CLI)
+  add_executable (cvmfs ${CVMFS_CLI_SOURCES})
+  set_target_properties (cvmfs PROPERTIES COMPILE_FLAGS "${CVMFS_CLI_CFLAGS}" LINK_FLAGS "${CVMFS_CLI_LD_FLAGS}")
+  target_link_libraries (cvmfs ${RT_LIBRARY} pthread)
+endif (BUILD_CLI)
 
 
 if (BUILD_SERVER)
