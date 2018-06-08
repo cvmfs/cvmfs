@@ -96,8 +96,6 @@ string StringifyDouble(const double value) {
   return string(buffer);
 }
 
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-#pragma GCC diagnostic push
 /**
  * Converts seconds since UTC 0 into something readable
  */
@@ -118,11 +116,8 @@ string StringifyTime(const time_t seconds, const bool utc) {
 
   return string(buffer);
 }
-#pragma GCC diagnostic pop
 
 
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-#pragma GCC diagnostic push
 /**
  * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
  */
@@ -143,11 +138,8 @@ std::string RfcTimestamp() {
            timestamp.tm_zone);
   return string(buffer);
 }
-#pragma GCC diagnostic pop
 
 
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-#pragma GCC diagnostic push
 /**
  * Current time in format YYYYMMDDTHHMMSSZ.  Used in AWS4 requests.
  */
@@ -166,7 +158,6 @@ std::string IsoTimestamp() {
            timestamp.tm_sec);
   return string(buffer);
 }
-#pragma GCC diagnostic pop
 
 
 string StringifyTimeval(const timeval value) {

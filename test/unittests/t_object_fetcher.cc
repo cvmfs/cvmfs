@@ -329,8 +329,6 @@ class T_ObjectFetcher : public ::testing::Test {
     signature_manager.Fini();
   }
 
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-#pragma GCC diagnostic push
   std::string MakeWhitelistTimestamp(const time_t timestamp) const {
     struct tm ti;
     localtime_r(&timestamp, &ti);
@@ -346,7 +344,6 @@ class T_ObjectFetcher : public ::testing::Test {
 
     return string(result);
   }
-#pragma GCC diagnostic pop
 
   void InitializeExternalManagers() {
     download_manager_.Init(1, true,
