@@ -30,7 +30,6 @@ CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
 CVMFS_TEST_HTTP_BASE=${CVMFS_TEST_HTTP_BASE:=}
 CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}   # backward compatibility! use CVMFS_TEST_HTTP_BASE instead
-CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
 
 # These OPT variables are for the benchmark options under the benchmarks folder
 CVMFS_OPT_WARM_CACHE=${CVMFS_OPT_WARM_CACHE:=yes}
@@ -609,18 +608,6 @@ has_repo() {
 }
 
 
-apply_server_cache_config() {
-  local repo=$1
-  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
-  [ x"$CVMFS_TEST_SERVER_CACHE" != x"" ] || return 0
-
-  local cache_base=$(echo "$CVMFS_TEST_SERVER_CACHE" | sed 's/\//\\\//g')
-  # will take effect _after_ the first publish operation...
-  sudo sed -i "s/^\(CVMFS_CACHE_BASE\)=.*\$/\1=${cache_base}/"     $client_conf || return 1
-  sudo sed -i "s/^\(CVMFS_RELOAD_SOCKETS\)=.*\$/\1=${cache_base}/" $client_conf || return 2
-}
-
-
 create_repo() {
   local repo=$1
   local uid=$2
@@ -665,7 +652,6 @@ create_repo() {
                             "$@" $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
-  apply_server_cache_config $repo || return 103
 
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a $client_conf
@@ -754,8 +740,6 @@ import_repo() {
     unionfs=" -f $CVMFS_TEST_UNIONFS"
   fi
   sudo -E cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
-
-  apply_server_cache_config $repo || return 103
 }
 
 

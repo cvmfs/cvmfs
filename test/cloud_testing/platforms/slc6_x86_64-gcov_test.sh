@@ -89,7 +89,6 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 
 
 echo "running CernVM-FS server test cases..."
-CVMFS_TEST_SERVER_CACHE='/srv/cache'                                          \
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
@@ -110,7 +109,6 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 #   echo "running CernVM-FS server test cases against the test S3 provider..."
 #   CVMFS_TEST_S3_CONFIG=$TEST_S3_CONFIG                                      \
 #   CVMFS_TEST_HTTP_BASE=$TEST_S3_URL                                         \
-#   CVMFS_TEST_SERVER_CACHE='/srv/cache'                                      \
 #   CVMFS_TEST_CLASS_NAME=S3ServerIntegrationTests                            \
 #   ./run.sh $S3_TEST_LOGFILE -o ${S3_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}     \
 #                             -x src/518-hardlinkstresstest                   \
