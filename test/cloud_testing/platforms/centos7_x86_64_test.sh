@@ -106,4 +106,4 @@ fi
 #                                    migration_tests/*                              \
 #                                 || retval=1
 
-# exit $retval
+exit $retval
