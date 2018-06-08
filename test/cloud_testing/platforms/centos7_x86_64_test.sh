@@ -16,37 +16,37 @@ echo -n "starting apache... "
 sudo systemctl start httpd > /dev/null 2>&1 || die "fail"
 echo "OK"
 
-# running unit test suite
-# run_unittests --gtest_shuffle \
-#               --gtest_death_test_use_fork || retval=1
+running unit test suite
+run_unittests --gtest_shuffle \
+              --gtest_death_test_use_fork || retval=1
 
 cd ${SOURCE_DIRECTORY}/test
-# echo "running CernVM-FS client test cases..."
-# CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
-# ./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-#                               -x src/005-asetup                               \
-#                                  src/004-davinci                              \
-#                                  src/007-testjobs                             \
-#                                  --                                           \
-#                                  src/0*                                       \
-#                               || retval=1
+echo "running CernVM-FS client test cases..."
+CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
+./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                              -x src/005-asetup                               \
+                                 src/004-davinci                              \
+                                 src/007-testjobs                             \
+                                 --                                           \
+                                 src/0*                                       \
+                              || retval=1
 
 
-# echo "running CernVM-FS server test cases..."
-# CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
-# CVMFS_TEST_UNIONFS=overlayfs                                                  \
-# ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-#                               -x src/518-hardlinkstresstest                   \
-#                                  src/585-xattrs                               \
-#                                  src/600-securecvmfs                          \
-#                                  src/602-libcvmfs                             \
-#                                  src/628-pythonwrappedcvmfsserver             \
-#                                  --                                           \
-#                                  src/5*                                       \
-#                                  src/6*                                       \
-#                                  src/7*                                       \
-#                                  src/8*                                       \
-#                               || retval=1
+echo "running CernVM-FS server test cases..."
+CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
+CVMFS_TEST_UNIONFS=overlayfs                                                  \
+./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                              -x src/518-hardlinkstresstest                   \
+                                 src/585-xattrs                               \
+                                 src/600-securecvmfs                          \
+                                 src/602-libcvmfs                             \
+                                 src/628-pythonwrappedcvmfsserver             \
+                                 --                                           \
+                                 src/5*                                       \
+                                 src/6*                                       \
+                                 src/7*                                       \
+                                 src/8*                                       \
+                              || retval=1
 
 echo -n "starting the test S3 provider... "
 s3_retval=0
@@ -89,9 +89,10 @@ if [ $s3_retval -eq 0 ]; then
                                src/614-geoservice                           \
                                src/622-gracefulrmfs                         \
                                src/626-cacheexpiry                          \
-                               src/700-overlayfsvalidation                  \
                                --                                           \
-                               src/500*                                     \
+                               src/5*                                       \
+                               src/6*                                       \
+                               src/8*                                       \
                                || retval=1
 
   echo -n "Stopping the test S3 provider... "
@@ -99,10 +100,10 @@ if [ $s3_retval -eq 0 ]; then
 fi
 
 
-# echo "running CernVM-FS migration test cases..."
-# CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
-# ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-#                                    migration_tests/*                              \
-#                                 || retval=1
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
 
 exit $retval
