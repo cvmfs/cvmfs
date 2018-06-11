@@ -20,7 +20,7 @@ SyncItemTar::SyncItemTar(const std::string &relative_parent_path,
                          struct archive_entry *entry,
                          Signal *read_archive_signal,
                          const SyncUnion *union_engine)
-    : SyncItem(relative_parent_path, filename, union_engine, kItemTarfile),
+    : SyncItem(relative_parent_path, filename, union_engine, kItemUnknown),
       archive_(archive),
       archive_entry_(entry),
       obtained_tar_stat_(false),
@@ -72,6 +72,13 @@ SyncItemType SyncItemTar::GetScratchFiletype() const {
   }
 }
 
+bool SyncItemTar::IsType(const SyncItemType expected_type) const {
+  if (scratch_type_ == kItemUnknown) {
+    scratch_type_ = GetScratchFiletype();
+  }
+  return scratch_type_ == expected_type;
+}
+
 platform_stat64 SyncItemTar::GetStatFromTar() const {
   assert(archive_entry_);
   if (obtained_tar_stat_) return tar_stat_;
@@ -104,6 +111,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
 
   dirent.linkcount_ = this->tar_stat_.st_nlink;
+  if (dirent.linkcount_ < 1) dirent.linkcount_ = 1;
 
   dirent.mode_ = this->tar_stat_.st_mode;
   dirent.uid_ = this->tar_stat_.st_uid;
@@ -116,13 +124,9 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   dirent.name_.Assign(this->filename().data(), this->filename().length());
 
-  /* TODO(simone) manage case for symlinks in tar file */
   if (this->IsSymlink()) {
-    char slnk[PATH_MAX + 1];
-    const ssize_t length =
-        readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
-    assert(length >= 0);
-    dirent.symlink_.Assign(slnk, length);
+    std::string symlink(archive_entry_symlink(archive_entry_));
+    dirent.symlink_.Assign(symlink.c_str(), symlink.length());
   }
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {

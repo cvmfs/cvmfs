@@ -22,13 +22,12 @@ class SyncItemTar : public SyncItem {
   friend class SyncUnionTarball;
 
  public:
-  SyncItemType GetScratchFiletype() const;
-  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
-
-  void StatScratch(const bool refresh = false) const;
-
-  IngestionSource *CreateIngestionSource() const;
-  void IsPlaceholderDirectory() const { rdonly_type_ = kItemDir; }
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual IngestionSource *CreateIngestionSource() const;
+  virtual void IsPlaceholderDirectory() const { rdonly_type_ = kItemDir; }
+  virtual SyncItemType GetScratchFiletype() const;
+  virtual bool IsType(const SyncItemType expected_type) const;
+  virtual void StatScratch(const bool refresh = false) const;
 
  protected:
   SyncItemTar(const std::string &relative_parent_path,
