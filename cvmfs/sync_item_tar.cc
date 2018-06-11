@@ -103,8 +103,10 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   // inode and parent inode is determined at runtime of client
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
 
-  dirent.linkcount_ = this->tar_stat_.st_nlink;
-  if (dirent.linkcount_ < 1) dirent.linkcount_ = 1;
+  // tarfiles do not keep information about the linkcount, so it should always
+  // appear as zero
+  assert(this->tar_stat_.st_nlink == 0);
+  dirent.linkcount_ = 1;
 
   dirent.mode_ = this->tar_stat_.st_mode;
   dirent.uid_ = this->tar_stat_.st_uid;
