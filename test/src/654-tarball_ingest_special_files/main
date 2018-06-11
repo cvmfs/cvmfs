@@ -115,20 +115,41 @@ cvmfs_run_test() {
     echo "*** Found also file from different owner: $file"
   fi
 
+  # below, -h checks that the file exists and that is a symbolic link
+
   file=$result_dir/to_empty_link.txt
   file_size=$(wc -c <$file)
-  if [ ! -f $file ] || [ $file_size -ne 0 ]; then
-    echo "*** Error not found link to empty file: $file"
+  original_path="empty_file.txt"
+  original=$(realpath $file)
+  if [ ! $original = "$result_dir/$original_path" ]; then
+    echo "*** Error link points to different file $file -> $original \
+ while it should be $file -> $result_dir/$original_path"
     return 7
+  else
+    echo "*** Link points correctly $file -> $result_dir/$original_path"
+  fi
+  if [ ! -h $file ] || [ $file_size -ne 0 ]; then
+    echo "*** Error not found link to empty file: $file"
+    return 8
   else
     echo "*** Found also link to empty file: $file"
   fi
 
   file=$result_dir/to_different_owner.txt
   file_size=$(wc -c <$file)
-  if [ ! -f $file ] || [ $file_size -ne 2048 ]; then
+  original_path="a/b/c/4_change_owner.txt"
+  original=$(realpath $file)
+  if [ ! $original = "$result_dir/$original_path" ]; then
+    echo "*** Error link points to different file $file -> $original \
+ while it should be $file -> $result_dir/$original_path"
+    return 9
+  else
+    echo "*** Link points correctly $file -> $result_dir/$original_path"
+  fi
+
+  if [ ! -h $file ] || [ $file_size -ne 2048 ]; then
     echo "*** Error not found link to different owner file: $file"
-    return 8
+    return 10
   else
     echo "*** Found also link to to different owner file: $file"
   fi
@@ -136,7 +157,7 @@ cvmfs_run_test() {
   file=$result_dir/fifo
   if [ ! -p $file ]; then
     echo "*** Error not found fifo: $file"
-    return 9
+    return 11
   else
     echo "*** Found also fifo: $file"
   fi
