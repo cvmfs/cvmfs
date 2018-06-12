@@ -256,7 +256,6 @@ class SyncItem {
   mutable SyncItemType rdonly_type_;
   mutable EntryStat scratch_stat_;
 
-  std::string filename_;
   ssize_t graft_size_;
 
   // The hash of regular file's content
@@ -266,6 +265,8 @@ class SyncItem {
 
  private:
   void CheckCatalogMarker();
+
+  std::string filename_;
 
   std::string GetGraftMarkerPath() const;
   void CheckGraft();

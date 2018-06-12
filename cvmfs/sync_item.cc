@@ -41,9 +41,9 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
                    const SyncUnion    *union_engine,
                    const SyncItemType entry_type) :
   rdonly_type_(kItemUnknown),
-  filename_(filename),
   graft_size_(-1),
   scratch_type_(entry_type),
+  filename_(filename),
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
@@ -110,7 +110,7 @@ SyncItemType SyncItem::GetUnionFiletype() const {
 }
 
 bool SyncItemNative::IsType(const SyncItemType expected_type) const {
-  if (filename_.substr(0, 12) == ".cvmfsgraft-") {
+  if (filename().substr(0, 12) == ".cvmfsgraft-") {
     scratch_type_ = kItemMarker;
   } else if (scratch_type_ == kItemUnknown) {
     scratch_type_ = GetScratchFiletype();
@@ -208,7 +208,7 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   dirent.is_external_file_ = this->IsExternalData();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
 
-  dirent.name_.Assign(filename_.data(), filename_.length());
+  dirent.name_.Assign(filename().data(), filename().length());
 
   if (this->IsSymlink()) {
     char slnk[PATH_MAX+1];
