@@ -103,7 +103,10 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   // inode and parent inode is determined at runtime of client
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
 
-  dirent.linkcount_ = this->tar_stat_.st_nlink;
+  // tarfiles do not keep information about the linkcount, so it should always
+  // appear as zero
+  assert(this->tar_stat_.st_nlink == 0);
+  dirent.linkcount_ = 1;
 
   dirent.mode_ = this->tar_stat_.st_mode;
   dirent.uid_ = this->tar_stat_.st_uid;
@@ -116,13 +119,9 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   dirent.name_.Assign(this->filename().data(), this->filename().length());
 
-  /* TODO(simone) manage case for symlinks in tar file */
   if (this->IsSymlink()) {
-    char slnk[PATH_MAX + 1];
-    const ssize_t length =
-        readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
-    assert(length >= 0);
-    dirent.symlink_.Assign(slnk, length);
+    std::string symlink(archive_entry_symlink(archive_entry_));
+    dirent.symlink_.Assign(symlink.c_str(), symlink.length());
   }
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
