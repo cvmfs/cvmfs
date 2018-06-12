@@ -196,7 +196,7 @@ class SyncItem {
 
   SyncItemType GetRdOnlyFiletype() const;
   SyncItemType GetUnionFiletype() const;
-  
+
   virtual SyncItemType GetScratchFiletype() const = 0;
 
   /**
