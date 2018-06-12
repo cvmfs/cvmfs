@@ -107,7 +107,7 @@ void SyncUnionTarball::Traverse() {
     }
   }
 
-  /* we are simplying deleting entity from  the repo*/
+  // we are simplying deleting entity from  the repo
   if (NULL == src) return;
 
   struct archive_entry *entry = archive_entry_new();
