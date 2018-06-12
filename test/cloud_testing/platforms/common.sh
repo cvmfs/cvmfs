@@ -305,8 +305,8 @@ install_homebrew() {
 
 
 install_test_s3() {
-  sudo curl -o /usr/local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio
-  sudo curl -o /usr/local/bin/mc    https://dl.minio.io/client/mc/release/linux-amd64/mc
+  sudo curl -o /usr/local/bin/minio https://ecsft.cern.ch/dist/cvmfs/builddeps/minio
+  sudo curl -o /usr/local/bin/mc    https://ecsft.cern.ch/dist/cvmfs/builddeps/mc
   sudo chmod +x /usr/local/bin/minio
   sudo chmod +x /usr/local/bin/mc
 
