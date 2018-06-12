@@ -302,6 +302,10 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
       reply_input.push_back(std::make_pair("status", "error"));
       reply_input.push_back(std::make_pair("reason", "other_error"));
       break;
+    case PayloadProcessor::kSpoolerError:
+      reply_input.push_back(std::make_pair("status", "error"));
+      reply_input.push_back(std::make_pair("reason", "spooler_error"));
+      break;
     case PayloadProcessor::kSuccess:
       reply_input.push_back(std::make_pair("status", "ok"));
       break;

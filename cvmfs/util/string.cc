@@ -117,6 +117,7 @@ string StringifyTime(const time_t seconds, const bool utc) {
   return string(buffer);
 }
 
+
 /**
  * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
  */
@@ -157,6 +158,7 @@ std::string IsoTimestamp() {
            timestamp.tm_sec);
   return string(buffer);
 }
+
 
 string StringifyTimeval(const timeval value) {
   char buffer[64];

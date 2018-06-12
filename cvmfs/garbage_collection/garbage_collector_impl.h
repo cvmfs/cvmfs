@@ -246,6 +246,22 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
 
   traversal_.UnregisterListener(callback);
 
+  // TODO(jblomer): turn current counters into perf::Counters
+  if (configuration_.statistics) {
+    perf::Counter *ctr_preserved_catalogs =
+      configuration_.statistics->Register(
+        "gc.n_preserved_catalogs", "number of live catalogs");
+    perf::Counter *ctr_condemned_catalogs =
+      configuration_.statistics->Register(
+        "gc.n_condemned_catalogs", "number of dead catalogs");
+    perf::Counter *ctr_condemned_objects =
+      configuration_.statistics->Register(
+        "gc.n_condemned_objects", "number of deleted objects");
+    ctr_preserved_catalogs->Set(preserved_catalog_count());
+    ctr_condemned_catalogs->Set(condemned_catalog_count());
+    ctr_condemned_objects->Set(condemned_objects_count());
+  }
+
   return success;
 }
 

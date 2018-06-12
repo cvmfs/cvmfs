@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "pack.h"
 #include "upload.h"
@@ -16,9 +17,17 @@
 namespace receiver {
 
 struct FileInfo {
+  FileInfo();
+  explicit FileInfo(const ObjectPackBuild::Event& event);
+  FileInfo(const FileInfo& other);
+  FileInfo& operator=(const FileInfo& other);
+
   std::string temp_path;
   size_t total_size;
   size_t current_size;
+  shash::ContextPtr hash_context;
+  std::vector<unsigned char> hash_buffer;
+  bool skip;
 };
 
 /**
@@ -32,7 +41,7 @@ struct FileInfo {
  */
 class PayloadProcessor {
  public:
-  enum Result { kSuccess, kPathViolation, kOtherError };
+  enum Result { kSuccess, kPathViolation, kSpoolerError, kOtherError };
 
   PayloadProcessor();
   virtual ~PayloadProcessor();
@@ -48,7 +57,7 @@ class PayloadProcessor {
   // NOTE: These methods are made virtual such that they can be mocked for
   //       the purpose of unit testing
   virtual Result Initialize();
-  virtual void Finalize();
+  virtual Result Finalize();
   virtual void Upload(const std::string& source,
                       const std::string& dest);
   virtual bool WriteFile(int fd, const void* const buf, size_t buf_size);

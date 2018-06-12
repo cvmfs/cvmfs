@@ -81,46 +81,48 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   # ============================================================================
 
-  echo "starting transaction to edit repository"
+  echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
+  echo "*** putting some stuff in the new repository"
   produce_files_in $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch space for comparison"
+  echo "*** putting exactly the same stuff in the scratch space for comparison"
   produce_files_in $reference_dir || return 4
 
-  echo "creating CVMFS snapshot"
+  echo "*** creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "compare the results of cvmfs to our reference copy"
+  echo "*** compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  echo "*** init a new transaction to change something in repository $CVMFS_TEST_REPO"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository"
+  echo "*** change stuff in the repository"
   change_files_in $repo_dir || return $?
 
-  echo "change exactly the same stuff in the scratch space"
+  echo "*** change exactly the same stuff in the scratch space"
   change_files_in $reference_dir || return $?
 
-  echo "creating CVMFS snapshot"
+#return 999
+
+  echo "*** creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "compare the changed directories"
+  echo "*** compare the changed directories"
   compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
-  echo "check catalog and data integrity"
+  echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   return 0

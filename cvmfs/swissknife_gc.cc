@@ -145,7 +145,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.object_fetcher          = &object_fetcher;
   config.reflog                  = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
-
+  config.statistics              = statistics();
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,

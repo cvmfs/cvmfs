@@ -28,11 +28,10 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/0*                                       \
                               || retval=1
 
-# ToDo: not yet possible because there are no external cache managers for previous versions
-#echo "running CernVM-FS migration test cases..."
-#CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
-#./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-#                                   migration_tests/*                              \
-#                                || retval=1
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
 
 exit $retval

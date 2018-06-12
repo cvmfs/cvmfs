@@ -106,7 +106,15 @@ SyncItemType SyncItem::GetScratchFiletype() const {
   return GetGenericFiletype(scratch_stat_);
 }
 
+SyncItemType SyncItem::GetUnionFiletype() const {
+  StatUnion();
+  if (union_stat_.error_code == ENOENT || union_stat_.error_code == ENOTDIR)
+    return kItemUnknown;
+  return GetGenericFiletype(union_stat_);
+}
+
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
+  StatScratch(true);
   // Mark the file as whiteout entry and strip the whiteout prefix
   whiteout_ = true;
   filename_ = actual_filename;
@@ -229,6 +237,7 @@ std::string SyncItem::GetScratchPath() const {
   const string relative_path = GetRelativePath().empty() ?
                                "" : "/" + GetRelativePath();
   return union_engine_->scratch_path() + relative_path;
+  // return union_engine_->scratch_path() + filename();
 }
 
 void SyncItem::CheckMarkerFiles() {

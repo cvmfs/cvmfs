@@ -400,6 +400,13 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }  // Hardlink group > 0
     }  // Hardlink found
 
+    // For any kind of entry, the linkcount should be > 0
+    if (entries[i].linkcount() == 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Entry %s has linkcount 0.",
+               entries[i].name().c_str());
+      retval = false;
+    }
+
     // Checks depending of entry type
     if (entries[i].IsDirectory()) {
       computed_counters->self.directories++;

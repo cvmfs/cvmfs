@@ -209,7 +209,7 @@ cvmfs_server_ingest() {
 
   publish_starting $name
 
-  $user_shell "$ingest_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
+  $user_shell "$ingest_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Synchronization failed\n\nExecuted Command:\n$ingest_command";   }
 
   cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; cvmfs_server_abort -f $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
 

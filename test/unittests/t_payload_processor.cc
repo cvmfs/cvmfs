@@ -18,7 +18,7 @@ class MockPayloadProcessor : public PayloadProcessor {
 
   virtual Result Initialize() { return kSuccess; }
 
-  virtual void Finalize() {}
+  virtual Result Finalize() { return kSuccess; }
 
   virtual void Upload(const std::string& source,
                       const std::string& dest) {}

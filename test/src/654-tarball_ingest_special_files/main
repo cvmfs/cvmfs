@@ -29,8 +29,10 @@ produce_tarball() {
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/4_change_owner.txt
   chown $CVMFS_TEST_USER tarball_foo/a/b/c/4_change_owner.txt
 
-  ln -s tarball_foo/a/b/another_empty.txt tarball_foo/to_empty_link.txt
-  ln -s tarball_foo/a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
+  ln -s empty_file.txt tarball_foo/to_empty_link.txt
+  ln -s a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
+
+  mkfifo tarball_foo/fifo
 
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
@@ -59,7 +61,6 @@ cvmfs_run_test() {
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
-
 
   local result_dir=$repo_dir/$dir/tarball_foo
 
@@ -98,7 +99,7 @@ cvmfs_run_test() {
   fi
 
   for f in empty_file.txt a/b/another_empty.txt; do
-    if [ ! -f $result_dir/$f ]; then
+    if [ ! -f $result_dir/$f ] || [ $(wc -c <$result_dir/$f) -ne 0 ]; then
       echo "*** Error not found empty file: $result_dir/$f"
       return 5
     else
@@ -113,6 +114,54 @@ cvmfs_run_test() {
   else
     echo "*** Found also file from different owner: $file"
   fi
+
+  # below, -h checks that the file exists and that is a symbolic link
+
+  file=$result_dir/to_empty_link.txt
+  file_size=$(wc -c <$file)
+  original_path="empty_file.txt"
+  original=$(realpath $file)
+  if [ ! $original = "$result_dir/$original_path" ]; then
+    echo "*** Error link points to different file $file -> $original \
+ while it should be $file -> $result_dir/$original_path"
+    return 7
+  else
+    echo "*** Link points correctly $file -> $result_dir/$original_path"
+  fi
+  if [ ! -h $file ] || [ $file_size -ne 0 ]; then
+    echo "*** Error not found link to empty file: $file"
+    return 8
+  else
+    echo "*** Found also link to empty file: $file"
+  fi
+
+  file=$result_dir/to_different_owner.txt
+  file_size=$(wc -c <$file)
+  original_path="a/b/c/4_change_owner.txt"
+  original=$(realpath $file)
+  if [ ! $original = "$result_dir/$original_path" ]; then
+    echo "*** Error link points to different file $file -> $original \
+ while it should be $file -> $result_dir/$original_path"
+    return 9
+  else
+    echo "*** Link points correctly $file -> $result_dir/$original_path"
+  fi
+
+  if [ ! -h $file ] || [ $file_size -ne 2048 ]; then
+    echo "*** Error not found link to different owner file: $file"
+    return 10
+  else
+    echo "*** Found also link to to different owner file: $file"
+  fi
+
+  file=$result_dir/fifo
+  if [ ! -p $file ]; then
+    echo "*** Error not found fifo: $file"
+    return 11
+  else
+    echo "*** Found also fifo: $file"
+  fi
+
 
   return 0
 }

@@ -174,7 +174,7 @@ void SyncUnionTarball::Traverse() {
               know_directories_.end()) {
             sync_entry->IsPlaceholderDirectory();
           }
-          ProcessDirectory(sync_entry);
+          ProcessUnmaterializedDirectory(sync_entry);
           dirs_[complete_path] = sync_entry;
           know_directories_.insert(complete_path);
 
@@ -186,6 +186,10 @@ void SyncUnionTarball::Traverse() {
           if (filename == ".cvmfscatalog") {
             to_create_catalog_dirs_.insert(parent_path);
           }
+        } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() ||
+                   sync_entry->IsSocket()) {
+          ProcessFile(sync_entry);
+          read_archive_signal_->Wakeup();
         } else {
           read_archive_signal_->Wakeup();
         }
@@ -238,7 +242,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
       new SyncItemDummyDir(dirname, filename, this, kItemDir));
 
-  ProcessDirectory(dummy);
+  ProcessUnmaterializedDirectory(dummy);
   know_directories_.insert(target);
 }
 

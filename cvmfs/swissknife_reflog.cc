@@ -43,7 +43,7 @@ class RootChainWalker {
   void WalkRootCatalogs(const shash::Any &root_catalog_hash);
   void WalkHistories(const shash::Any &history_hash);
 
-  void WalkCatalogsInHistory(const HistoryTN *history);
+  bool WalkCatalogsInHistory(const HistoryTN *history);
   void WalkListedCatalogs(const CatalogList &catalog_list);
 
   template <class DatabaseT>
@@ -207,26 +207,40 @@ void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
     LogCvmfs(kLogCvmfs, kLogStdout, "History: %s",
              current_hash.ToString().c_str());
 
-    WalkCatalogsInHistory(current_history);
+    bool cancel = WalkCatalogsInHistory(current_history);
     const bool success = reflog_->AddHistory(current_hash);
     assert(success);
 
-    current_hash = current_history->previous_revision();
+    if (cancel) {
+      current_hash = shash::Any(current_hash.algorithm);
+    } else {
+      current_hash = current_history->previous_revision();
+    }
   }
 }
 
 
-void RootChainWalker::WalkCatalogsInHistory(const HistoryTN *history) {
+/**
+ * If false is returned, it indicates that the history database comes from
+ * an early pre-release of the history functionality. The WalkHistory()
+ * iteration will subsequently stop. This is necessary, for instance, to
+ * handle the cernvm-prod.cern.ch repository.
+ */
+bool RootChainWalker::WalkCatalogsInHistory(const HistoryTN *history) {
   CatalogList tag_hashes;
   const bool list_success = history->GetHashes(&tag_hashes);
   assert(list_success);
 
   CatalogList bin_hashes;
   const bool bin_success = history->ListRecycleBin(&bin_hashes);
-  assert(bin_success);
+  if (!bin_success) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "  Warning: 'recycle bin' table missing");
+  }
 
   WalkListedCatalogs(tag_hashes);
   WalkListedCatalogs(bin_hashes);
+
+  return !bin_success;
 }
 
 
