@@ -19,7 +19,6 @@
 #include "duplex_libarchive.h"
 #include "file_chunk.h"
 #include "hash.h"
-#include "ingestion/ingestion_source.h"
 #include "platform.h"
 #include "util/shared_ptr.h"
 
@@ -71,6 +70,11 @@ class SyncItem {
   inline bool IsSymlink()         const { return IsType(kItemSymlink);         }
   inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
   inline bool IsNew()             const { return WasType(kItemNew);            }
+  inline bool IsTouched() const {
+    return (GetRdOnlyFiletype() == GetUnionFiletype()) &&
+           (GetRdOnlyFiletype() == GetScratchFiletype()) &&
+           (GetUnionFiletype() == GetScratchFiletype());
+  }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
   inline bool IsFifo()            const { return IsType(kItemFifo);            }
@@ -163,7 +167,7 @@ class SyncItem {
   }
 
   virtual IngestionSource *CreateIngestionSource() const;
-  virtual void AlreadyCreatedDir() const { assert(false); }
+  virtual void IsPlaceholderDirectory() const { assert(false); }
   void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   bool operator==(const SyncItem &other) const {
@@ -172,12 +176,28 @@ class SyncItem {
   }
 
  protected:
+  /**
+   * create a new SyncItem
+   * Note: SyncItems cannot be created by any using code. SyncUnion will take
+   *       care of their creating through a factory method to make sure they
+   *       are initialised correctly (whiteout, hardlink handling, ...)
+   *
+   * @param dirPath the RELATIVE path to the file
+   * @param filename the name of the file ;-)
+   * @param entryType well...
+   */
+  SyncItem(const std::string  &relative_parent_path,
+           const std::string  &filename,
+           const SyncUnion    *union_engine,
+           const SyncItemType  entry_type);
+
   inline platform_stat64 GetUnionStat() const {
     StatUnion();
     return union_stat_.stat;
   }
 
   SyncItemType GetRdOnlyFiletype() const;
+  SyncItemType GetUnionFiletype() const;
   virtual SyncItemType GetScratchFiletype() const;
 
   /**
@@ -210,23 +230,6 @@ class SyncItem {
     return rdonly_type_ == expected_type;
   }
 
-  mutable SyncItemType rdonly_type_;
-
-  /**
-   * create a new SyncItem
-   * Note: SyncItems cannot be created by any using code. SyncUnion will take
-   *       care of their creating through a factory method to make sure they
-   *       are initialised correctly (whiteout, hardlink handling, ...)
-   *
-   * @param dirPath the RELATIVE path to the file
-   * @param filename the name of the file ;-)
-   * @param entryType well...
-   */
-  SyncItem(const std::string  &relative_parent_path,
-           const std::string  &filename,
-           const SyncUnion    *union_engine,
-           const SyncItemType  entry_type);
-
   /**
    * Structure to cache stat calls to the different file locations.
    */
@@ -252,6 +255,7 @@ class SyncItem {
     platform_stat64 stat;
   };
 
+  mutable SyncItemType rdonly_type_;
   mutable EntryStat scratch_stat_;
 
  private:

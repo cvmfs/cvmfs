@@ -100,6 +100,10 @@ CVMFS_SERVER_DEBUG=${CVMFS_SERVER_DEBUG:=0}
 CVMFS_SERVER_SWISSKNIFE="cvmfs_swissknife"
 CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
 
+# On newer Apache version, reloading is asynchonrous and not guaranteed to succeed.
+# The integration test cases set this parameter to true.
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=${CVMFS_SERVER_APACHE_RELOAD_IS_RESTART:=false}
+
 ################################################################################
 #                                                                              #
 #                              Utility Functions                               #

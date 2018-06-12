@@ -962,9 +962,7 @@ void WritableCatalogManager::ScheduleCatalogProcessing(
     // register catalog object for WritableCatalogManager::CatalogUploadCallback
     catalog_processing_map_[catalog->database_path()] = catalog;
   }
-  IngestionSource *catalog_source =
-      new FileIngestionSource(catalog->database_path());
-  spooler_->ProcessCatalog(catalog_source);
+  spooler_->ProcessCatalog(catalog->database_path());
 }
 
 
@@ -1196,9 +1194,7 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
       assert(false && "inconsistent state detected");
     }
 
-    IngestionSource *catalog_source =
-        new FileIngestionSource((*i)->database_path());
-    spooler_->ProcessCatalog(catalog_source);
+    spooler_->ProcessCatalog((*i)->database_path());
   }
   spooler_->WaitForUpload();
 

@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Ingest same tarball in same location multiple times"
+cvmfs_test_name="Ingest tarball in a repo from STDIN"
 cvmfs_test_autofs_on_startup=false
 
 produce_tarball() {
@@ -42,11 +42,9 @@ cvmfs_run_test() {
   echo "*** generating a tarball $tarfile"
   produce_tarball $tarfile
 
-  echo "*** 1. ingesting the tarball in the directory $dir"
-  cvmfs_server ingest-tarball --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
-  echo "*** 2. ingesting the tarball in the directory $dir"
-  cvmfs_server ingest-tarball --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
-  
+  echo "*** ingesting the tarball in the directory $dir"
+  cat $tarfile | cvmfs_server ingest --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return $?
+
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 

@@ -47,6 +47,7 @@ class InodeCache;
 class Md5PathCache;
 class PathCache;
 }
+class NfsMaps;
 class OptionsManager;
 namespace perf {
 class Counter;
@@ -180,6 +181,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
   perf::Counter *n_io_error() { return n_io_error_; }
   std::string name() { return name_; }
+  NfsMaps *nfs_maps() { return nfs_maps_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
   perf::Counter *no_open_files() { return no_open_files_; }
   OptionsManager *options_mgr() { return options_mgr_; }
@@ -333,9 +335,10 @@ class FileSystem : SingleCopy, public BootFactory {
   cvmfs::Uuid *uuid_cache_;
 
   /**
-   * Used internally to remember if NFS maps need to be shut down.
+   * TODO(jblomer): Move to MountPoint. Tricky because of the sqlite maps
+   * and the sqlite configuration done for the file catalogs.
    */
-  bool has_nfs_maps_;
+  NfsMaps *nfs_maps_;
   /**
    * Used internally to remember if the Sqlite memory manager need to be shut
    * down.

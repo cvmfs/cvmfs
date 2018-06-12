@@ -260,9 +260,7 @@ class T_IngestionStress : public FileSandbox {
     pipeline.Spawn();
 
     for (unsigned i = 0; i < file_paths.size(); ++i) {
-      std::string path(file_paths[i]);
-      IngestionSource *file_source = new FileIngestionSource(path);
-      pipeline.Process(file_source, use_chunking);
+      pipeline.Process(new FileIngestionSource(file_paths[i]), use_chunking);
     }
     pipeline.WaitFor();
 
@@ -469,10 +467,7 @@ TEST_F(T_IngestionStress, ProcessMultipleFilesInSeparateWavesSlow) {
   pipeline.Spawn();
 
   // first wave...
-  std::string empty_path_1(GetEmptyFile());
-  IngestionSource *source_empty_1 = new FileIngestionSource(empty_path_1);
-
-  pipeline.Process(source_empty_1, true);
+  pipeline.Process(new FileIngestionSource(GetEmptyFile()), true);
   pipeline.WaitFor();
   CheckHash(uploader_->results, GetEmptyFileBulkHash());
   uploader_->ClearResults();
@@ -480,22 +475,11 @@ TEST_F(T_IngestionStress, ProcessMultipleFilesInSeparateWavesSlow) {
   // second wave...
   // some small and medium sized files with file chunking enabled
   // one big file without file chunking
-  std::string empty_path_2(GetEmptyFile());
-  IngestionSource *source_empty_2 = new FileIngestionSource(empty_path_2);
-
-  std::string small_path_2(GetSmallFile());
-  IngestionSource *source_small_2 = new FileIngestionSource(small_path_2);
-
-  std::string big_path(GetBigFile());
-  IngestionSource *source_big = new FileIngestionSource(big_path);
-
-  std::string huge_path(GetHugeFile());
-  IngestionSource *source_huge = new FileIngestionSource(huge_path);
-
-  pipeline.Process(source_empty_2, true);
-  pipeline.Process(source_small_2, true);
-  pipeline.Process(source_big, true);
-  pipeline.Process(source_huge, false, shash::kSuffixCatalog);
+  pipeline.Process(new FileIngestionSource(GetEmptyFile()), true);
+  pipeline.Process(new FileIngestionSource(GetSmallFile()), true);
+  pipeline.Process(new FileIngestionSource(GetBigFile()), true);
+  pipeline.Process(new FileIngestionSource(GetHugeFile()), false,
+                   shash::kSuffixCatalog);
   ExpectedHashStrings hs;
   hs.push_back(GetEmptyFileBulkHash());
   hs.push_back(GetSmallFileBulkHash());
@@ -508,10 +492,8 @@ TEST_F(T_IngestionStress, ProcessMultipleFilesInSeparateWavesSlow) {
   uploader_->ClearResults();
 
   // third wave...
-  std::string small_path_3(GetSmallFile());
-  IngestionSource *source_small_3 = new FileIngestionSource(small_path_3);
-
-  pipeline.Process(source_small_3, true, shash::kSuffixCertificate);
+  pipeline.Process(new FileIngestionSource(GetSmallFile()), true,
+                   shash::kSuffixCertificate);
   pipeline.WaitFor();
   CheckHash(uploader_->results,
             GetSmallFileBulkHash(shash::kSuffixCertificate));
@@ -542,10 +524,8 @@ TEST_F(T_IngestionStress, ProcessingCallbackForSmallFile) {
   pipeline.Spawn();
   pipeline.RegisterListener(&CallbackTest::CallbackFn);
 
-  std::string small_path(GetSmallFile());
-  IngestionSource *source_small = new FileIngestionSource(small_path);
-
-  pipeline.Process(source_small, true, shash::kSuffixHistory);
+  pipeline.Process(new FileIngestionSource(GetSmallFile()), true,
+                   shash::kSuffixHistory);
   pipeline.WaitFor();
 
   shash::Any expected_content_hash(shash::kSha1,
@@ -560,10 +540,8 @@ TEST_F(T_IngestionStress, ProcessingCallbackForBigFile) {
   pipeline.Spawn();
   pipeline.RegisterListener(&CallbackTest::CallbackFn);
 
-  std::string big_path(GetBigFile());
-  IngestionSource *source_big = new FileIngestionSource(big_path);
-
-  pipeline.Process(source_big, true, shash::kSuffixCatalog);
+  pipeline.Process(new FileIngestionSource(GetBigFile()), true,
+                   shash::kSuffixCatalog);
   pipeline.WaitFor();
 
   shash::Any expected_content_hash(shash::kSha1,

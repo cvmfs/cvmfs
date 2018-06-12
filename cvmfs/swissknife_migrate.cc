@@ -8,12 +8,16 @@
 #include "swissknife_migrate.h"
 
 #include <sys/resource.h>
+#include <unistd.h>
 
 #include "catalog_rw.h"
 #include "catalog_sql.h"
 #include "catalog_virtual.h"
+#include "compression.h"
 #include "hash.h"
 #include "logging.h"
+#include "swissknife_history.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -292,6 +296,79 @@ bool CommandMigrate::ReadPersonaMaps(const std::string &uid_map_path,
 }
 
 
+void CommandMigrate::UploadHistoryClosure(
+  const upload::SpoolerResult &result,
+  Future<shash::Any> *hash)
+{
+  assert(!result.IsChunked());
+  if (result.return_code != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload history database (%d)",
+             result.return_code);
+    hash->Set(shash::Any());
+  } else {
+    hash->Set(result.content_hash);
+  }
+}
+
+
+bool CommandMigrate::UpdateUndoTags(
+  PendingCatalog *root_catalog,
+  unsigned revision,
+  time_t timestamp,
+  shash::Any *history_hash)
+{
+  string filename_old = history_upstream_->filename();
+  string filename_new = filename_old + ".new";
+  bool retval = CopyPath2Path(filename_old, filename_new);
+  if (!retval) return false;
+  UniquePtr<history::SqliteHistory> history(
+    history::SqliteHistory::OpenWritable(filename_new));
+  history->TakeDatabaseFileOwnership();
+
+  history::History::Tag tag_trunk;
+  bool exists = history->GetByName(CommandTag::kHeadTag, &tag_trunk);
+  if (exists) {
+    retval = history->Remove(CommandTag::kHeadTag);
+    if (!retval) return false;
+
+    history::History::Tag tag_trunk_previous = tag_trunk;
+    tag_trunk_previous.name = CommandTag::kPreviousHeadTag;
+    tag_trunk_previous.description = CommandTag::kPreviousHeadTagDescription;
+    history->Remove(CommandTag::kPreviousHeadTag);
+
+    tag_trunk.root_hash = root_catalog->new_catalog_hash;
+    tag_trunk.size = root_catalog->new_catalog_size;
+    tag_trunk.revision = root_catalog->new_catalog_size;
+    tag_trunk.revision = revision;
+    tag_trunk.timestamp = timestamp;
+
+    retval = history->Insert(tag_trunk_previous);
+    if (!retval) return false;
+    retval = history->Insert(tag_trunk);
+    if (!retval) return false;
+  }
+
+  history->SetPreviousRevision(manifest_upstream_->history());
+  history->DropDatabaseFileOwnership();
+  history.Destroy();
+
+  Future<shash::Any> history_hash_new;
+  upload::Spooler::CallbackPtr callback = spooler_->RegisterListener(
+    &CommandMigrate::UploadHistoryClosure, this, &history_hash_new);
+  spooler_->ProcessHistory(filename_new);
+  spooler_->WaitForUpload();
+  spooler_->UnregisterListener(callback);
+  unlink(filename_new.c_str());
+  *history_hash = history_hash_new.Get();
+  if (history_hash->IsNull()) {
+    Error("failed to upload tag database");
+    return false;
+  }
+
+  return true;
+}
+
+
 template <class MigratorT>
 bool CommandMigrate::DoMigrationAndCommit(
   const std::string                   &manifest_path,
@@ -315,6 +392,7 @@ bool CommandMigrate::DoMigrationAndCommit(
   ConvertCatalogsRecursively(root_catalog, &concurrent_migration);
   concurrent_migration.WaitForEmptyQueue();
   spooler_->WaitForUpload();
+  spooler_->UnregisterListeners();
   migration_stopwatch_.Stop();
 
   // check for possible errors during the migration process
@@ -329,19 +407,35 @@ bool CommandMigrate::DoMigrationAndCommit(
   }
 
   if (root_catalog->was_updated.Get()) {
-    // Commit the new (migrated) repository revision...
     LogCvmfs(kLogCatalog, kLogStdout,
              "\nCommitting migrated repository revision...");
-    const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash;
-    const std::string &root_catalog_path = root_catalog->root_path();
-    const size_t root_catalog_size = root_catalog->new_catalog_size;
-    manifest::Manifest manifest(root_catalog_hash, root_catalog_size,
-                                root_catalog_path);
+    manifest::Manifest manifest = *manifest_upstream_;
+    manifest.set_catalog_hash(root_catalog->new_catalog_hash);
+    manifest.set_catalog_size(root_catalog->new_catalog_size);
+    manifest.set_root_path(root_catalog->root_path());
     const catalog::Catalog* new_catalog = (root_catalog->HasNew())
                                           ? root_catalog->new_catalog
                                           : root_catalog->old_catalog;
     manifest.set_ttl(new_catalog->GetTTL());
     manifest.set_revision(new_catalog->GetRevision());
+
+    // Commit the new (migrated) repository revision...
+    if (history_upstream_.IsValid()) {
+      shash::Any history_hash(manifest_upstream_->history());
+      LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
+               "Updating repository tag database... ");
+      if (!UpdateUndoTags(root_catalog,
+                          new_catalog->GetRevision(),
+                          new_catalog->GetLastModified(),
+                          &history_hash))
+      {
+        Error("Updateing tag database failed.\nAborting...");
+        return false;
+      }
+      manifest.set_history(history_hash);
+      LogCvmfs(kLogCvmfs, kLogStdout, "%s", history_hash.ToString().c_str());
+    }
+
     if (!manifest.Export(manifest_path)) {
       Error("Manifest export failed.\nAborting...");
       return false;
@@ -425,8 +519,7 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
   data->new_catalog_size = new_catalog_size;
 
   // Schedule the compression and upload of the catalog
-  IngestionSource* catalog = new FileIngestionSource(path);
-  spooler_->ProcessCatalog(catalog);
+  spooler_->ProcessCatalog(path);
 }
 
 

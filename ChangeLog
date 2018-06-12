@@ -1,5 +1,25 @@
+2.6.0:
+  * Add support for CVMFS_NFS_INTERLEAVED_INODES (CVM-1561)
+  * Add support for ingesting tarballs (CVM-1476)
+  * Optionally print GC stats with CVMFS_SERVER_FLAGS=-+stats
+  * Fix debian packaging warnings and errors
+
+2.5.1:
+  * Update BNL and FNAL stratum 1 aliases (CVM-1556)
+  * Improved check for OSXFUSE in "cvmfs_config chksetup" (CVM-1550)
+  * Fix potential deadlock when uploading files to repository GW (CVM-1555)
+  * Reduce number of temporary files when publishing through GW (CVM-1548)
+  * Check for link count > 0 in swissknife check (CVM-1549)
+  * Linkcount is set to 1 for hardlinked files published through GW (CVM-1542)
+  * Limit queue size of the gateway spooler to 2G
+  * Store gateway receiver's temp files in $SPOOLER_TMP/receiver (CVM-1540)
+  * Handle spooler failures gracefully in the gateway receiver (CVM-1545)
+  * Fix incomplete manifest after catalog migration operations (CVM-1534)
+
 2.5.0:
-  * Fix catalog checksum destination from cwd to workspace
+  * Check for autofs in cvmfs_server rmfs only for stratum 0s (CVM-1490)
+  * React on change of DNS server on Linux (CVM-496)
+  * Fix catalog checksum destination from cwd to workspace (CVM-962)
   * Use `systemd start <mount unit>` in suid helper if applicable (CVM-1398)
   * Set httpd selinux label for GeoIP database (CVM-1454)
   * Make CVMFS_GENERATE_LEGACY_BULK_CHUNKS=false the default (CVM-1429)

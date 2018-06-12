@@ -1,0 +1,102 @@
+cvmfs_test_name="Ensure healthy manifest after catalog migration"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  cat > uid_map << EOF
+# map $CVMFS_TEST_USER to root
+$(id -ru $CVMFS_TEST_USER) 0
+EOF
+
+  cat > gid_map << EOF
+# map ${CVMFS_TEST_USER}'s group to root
+$(id -rg $CVMFS_TEST_USER) 0
+EOF
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** publish repository with tag mytag"
+  publish_repo $CVMFS_TEST_REPO -a mytag || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** check tag list"
+  cvmfs_server tag -lx $CVMFS_TEST_REPO
+  local mytag_before="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep mytag)"
+  local trunk_before="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep HEAD)"
+
+  echo "*** add meta-info"
+  local json_file="meta-info.json"
+  cat >> $json_file << EOF
+{
+  "administrator" : "CernVM Admin",
+  "email"         : "dont.send.me.spam@cern.ch",
+  "organisation"  : "CERN",
+  "description"   : "This is just a test repository"
+}
+EOF
+  cvmfs_server update-repoinfo -f $json_file $CVMFS_TEST_REPO || return 40
+  cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > meta-info.before || return 41
+  diff $json_file meta-info.before || return 42
+
+  echo -n "*** get root catalog hash before catalog-chown... "
+  local root_clg_before="$(get_current_root_catalog $CVMFS_TEST_REPO)"
+  echo "--> $root_clg_before"
+
+  echo -n "*** get revision before catalog-chown... "
+  local revision_before=$(cvmfs_swissknife info -v -r $(get_repo_url $CVMFS_TEST_REPO))
+  echo "--> $revision_before"
+
+  echo -n "*** get timestamp before catalog-chown... "
+  local timestamp_before=$(cvmfs_swissknife info -t -r $(get_repo_url $CVMFS_TEST_REPO))
+  echo "--> $timestamp_before"
+
+  echo "*** manifest before"
+  cvmfs_swissknife info -R -r $(get_repo_url $CVMFS_TEST_REPO)
+
+  echo "*** run the chown on catalog level"
+  sudo cvmfs_server catalog-chown -u uid_map -g gid_map $CVMFS_TEST_REPO || return 3
+
+  echo "*** manifest after"
+  cvmfs_swissknife info -R -r $(get_repo_url $CVMFS_TEST_REPO)
+
+  echo -n "*** get root catalog hash after catalog-chown... "
+  local root_clg_after="$(get_current_root_catalog $CVMFS_TEST_REPO)"
+  echo "--> $root_clg_after"
+
+  [ "x$root_clg_before" != "x$root_clg_after" ] || return 20
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo -n "*** check revision... "
+  local revision_after=$(cvmfs_swissknife info -v -r $(get_repo_url $CVMFS_TEST_REPO))
+  echo "--> $revision_after"
+  [ $revision_after -gt $revision_before ] || return 37
+
+  echo -n "*** check timestamp... "
+  local timestamp_after=$(cvmfs_swissknife info -t -r $(get_repo_url $CVMFS_TEST_REPO))
+  echo "--> $timestamp_after"
+  [ $timestamp_after -ge $timestamp_before ] || return 38
+
+  echo "*** check meta-info"
+  cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > meta-info.after || return 35
+  diff meta-info.after meta-info.before || return 36
+
+  echo "*** check tag list"
+  cvmfs_server tag -lx $CVMFS_TEST_REPO
+  local mytag_after="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep mytag)"
+  local trunk_after="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep HEAD)"
+  [ x"$mytag_before" = x"$mytag_after" ] || return 30
+  [ x"$trunk_before" != x"$trunk_after" ] || return 31
+
+  return 0
+}

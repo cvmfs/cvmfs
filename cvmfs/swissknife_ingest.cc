@@ -2,14 +2,30 @@
  * This file is part of the CernVM File System
  */
 
-#include "swissknife_tarball.h"
+#include "swissknife_ingest.h"
+
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "catalog_virtual.h"
+#include "logging.h"
+#include "manifest.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
+#include "util/pointer.h"
+#include "util/posix.h"
 
-int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
+/*
+ * Many of the options possible to set in the ArgumentList are not actually used
+ * by the ingest command since they are not part of its interface, hence those
+ * unused options cannot be set by the shell script. Of course if there is the
+ * necessitty those paramenters can be added and managed.
+ * At the moment this approach worked fine and didn't add much complexity,
+ * however if yet another command will need to use a similar approach it would
+ * be good to consider creating different options handler for each command.
+ */
+int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   SyncParameters params;
   params.dir_rdonly = MakeCanonicalPath(*args.find('c')->second);
   params.dir_temp = MakeCanonicalPath(*args.find('t')->second);
@@ -96,10 +112,6 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
   if (params.branched_catalog) {
     // Throw-away manifest
     manifest = new manifest::Manifest(shash::Any(), 0, "");
-  } else if (params.virtual_dir_actions !=
-             catalog::VirtualCatalog::kActionNone) {
-    manifest = this->OpenLocalManifest(params.manifest_path);
-    params.base_hash = manifest->catalog_hash();
   } else {
     if (with_gateway) {
       manifest =
@@ -124,21 +136,19 @@ int swissknife::IngestTarball::Main(const swissknife::ArgumentList &args) {
 
   publish::SyncMediator mediator(&catalog_manager, &params);
 
-  if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
-    publish::SyncUnionTarball *sync;
+  publish::SyncUnion *sync;
 
-    sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
-                                         params.tar_file, params.base_directory,
-                                         params.to_delete);
-    if (!sync->Initialize()) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Initialization of the synchronisation "
-               "engine failed");
-      return 4;
-    }
-
-    sync->Traverse();
+  sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
+                                       params.tar_file, params.base_directory,
+                                       params.to_delete);
+  if (!sync->Initialize()) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Initialization of the synchronisation "
+             "engine failed");
+    return 4;
   }
+
+  sync->Traverse();
 
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,

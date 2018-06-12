@@ -945,8 +945,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_direct_);
     curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_direct_);
   }
-  if (opt_dns_server_)
-    curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_);
+  if (!opt_dns_server_.empty())
+    curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_.c_str());
 
   if (info->probe_hosts && opt_host_chain_)
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
@@ -1482,7 +1482,7 @@ DownloadManager::DownloadManager() {
   retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
   assert(retval == 0);
 
-  opt_dns_server_ = NULL;
+  opt_dns_server_ = "";
   opt_ip_preference_ = dns::kIpPreferSystem;
   opt_timeout_proxy_ = 0;
   opt_timeout_direct_ = 0;
@@ -1766,6 +1766,12 @@ void DownloadManager::SetCredentialsAttachment(CredentialsAttachment *ca) {
   pthread_mutex_unlock(lock_options_);
 }
 
+/**
+ * Gets the DNS sever.
+ */
+std::string DownloadManager::GetDnsServer() const {
+  return opt_dns_server_;
+}
 
 /**
  * Sets a DNS server.  Only for testing as it cannot be reverted to the system
@@ -1773,11 +1779,9 @@ void DownloadManager::SetCredentialsAttachment(CredentialsAttachment *ca) {
  */
 void DownloadManager::SetDnsServer(const string &address) {
   pthread_mutex_lock(lock_options_);
-  if (opt_dns_server_)
-    free(opt_dns_server_);
-  if (address != "") {
-    opt_dns_server_ = strdup(address.c_str());
-    assert(opt_dns_server_);
+  if (!address.empty()) {
+    opt_dns_server_ = address;
+    assert(!opt_dns_server_.empty());
 
     vector<string> servers;
     servers.push_back(address);
@@ -2712,7 +2716,7 @@ DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
     clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
     clone->SetMaxIpaddrPerProxy(resolver_->throttle());
   }
-  if (opt_dns_server_)
+  if (!opt_dns_server_.empty())
     clone->SetDnsServer(opt_dns_server_);
   clone->opt_timeout_proxy_ = opt_timeout_proxy_;
   clone->opt_timeout_direct_ = opt_timeout_direct_;

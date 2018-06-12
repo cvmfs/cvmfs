@@ -33,6 +33,7 @@ set (ENV{LDFLAGS}    "${LDFLAGS}")
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
+set (CVMFS_FIX_FLAGS "")
 set (CVMFS_OPT_FLAGS "-Os")
 if (CMAKE_COMPILER_IS_GNUCC)
   message (STATUS "checking gcc version...")
@@ -51,9 +52,12 @@ if (CMAKE_COMPILER_IS_GNUCC)
       set (CVMFS_OPT_FLAGS "-O1")
     endif (${CVMFS_GCC_MINOR} LESS 2)
   endif (${CVMFS_GCC_MAJOR} EQUAL 4)
+  if (${CVMFS_GCC_MAJOR} GREATER 6)
+    set (CVMFS_FIX_FLAGS "-Wno-format-truncation")
+  endif (${CVMFS_GCC_MAJOR} GREATER 6)
 endif (CMAKE_COMPILER_IS_GNUCC)
 message (STATUS "using compiler opt flag ${CVMFS_OPT_FLAGS}")
-set (CVMFS_BASE_C_FLAGS "${CVMFS_OPT_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall")
+set (CVMFS_BASE_C_FLAGS "${CVMFS_OPT_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall ${CVMFS_FIX_FLAGS}")
 if (APPLE)
   if (${CMAKE_SYSTEM_VERSION} GREATER 14.5.0)
     set(CVMFS_BASE_C_FLAGS "${CVMFS_BASE_C_FLAGS} -mmacosx-version-min=10.11")
@@ -94,3 +98,11 @@ if (APPLE AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" AND ${CMAKE_CXX_COMPILER
   set (CVMFS_BUGGY_XCODE ON)
 endif()
 
+# Check for old Linux version that don't have a complete inotify implementation
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+  try_compile(HAS_INOTIFY_INIT1 ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/cmake/check_inotify_init1.c)
+  if(HAS_INOTIFY_INIT1)
+    message("Enable inotify support")
+    set(CVMFS_ENABLE_INOTIFY ON)
+  endif(HAS_INOTIFY_INIT1)
+endif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")

@@ -19,10 +19,11 @@
 #include <string>
 
 #include "duplex_libarchive.h"
-#include "sync_mediator.h"
 #include "util_concurrency.h"
 
 namespace publish {
+
+class AbstractSyncMediator;
 
 class SyncUnionTarball : public SyncUnion {
  public:
@@ -63,16 +64,35 @@ class SyncUnionTarball : public SyncUnion {
   struct archive *src;
   const std::string tarball_path_;
   const std::string base_directory_;
-  const std::string to_delete_; /* entity to delete */
+  const std::string to_delete_;  ///< entity to delete before to extract the tar
   std::set<std::string>
-      know_directories_; /* directory that we know already exist */
+      know_directories_;  ///< directory that we know already exist
+  
+  ///< directories where we found catalog marker, after the main traverse we
+  ///< iterate through them and we add the catalog
   std::set<std::string> to_create_catalog_dirs_;
+  
+  ///< map of all directories found, we need them since we don't know, at
+  ///< priori, where the catalog files appears
   std::map<std::string, SharedPtr<SyncItem> > dirs_;
+  
   std::map<const std::string, std::list<SharedPtr<SyncItem> > > hardlinks_;
-  Signal *read_archive_signal_;
+  Signal *read_archive_signal_;  ///< Conditional variable to keep track of when
+                                 ///< is possible to read the tar file
 
   static const size_t kBlockSize = 4096 * 4;
 
+  /**
+   * create missing directory and all the ancestors
+   * It is possible to find the leaf of the filesystem tree before than its root
+   * while
+   * traversing a tar file, however we need to have all the directories in place
+   * before adding entities. This method is called whener we find a new
+   * directory.
+   * The method create a new dummy directory and, if necessary, all of its
+   * parents.
+   * @param target the directory to create
+   */
   void CreateDirectories(const std::string &target);
   void ProcessArchiveEntry(struct archive_entry *entry);
   void LogEntry(struct archive_entry *entry);

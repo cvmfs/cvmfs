@@ -34,11 +34,11 @@
 #include <string>
 
 #include "sync_item.h"
-#include "sync_mediator.h"
 #include "util/shared_ptr.h"
 
 namespace publish {
 
+class AbstractSyncMediator;
 class SyncMediator;
 
 /**
@@ -168,6 +168,7 @@ class SyncUnion {
   virtual bool ProcessDirectory(const std::string &parent_dir,
                                 const std::string &dir_name);
   virtual bool ProcessDirectory(SharedPtr<SyncItem> entry);
+  virtual bool ProcessUnmaterializedDirectory(SharedPtr<SyncItem> entry);
 
   /**
    * Callback when a symlink is found.

@@ -12,18 +12,6 @@
 
 namespace file_watcher {
 
-struct WatchRecord {
-  WatchRecord() : file_path_(), handler_(NULL) {}
-
-  WatchRecord(const std::string& path,
-              file_watcher::EventHandler* h)
-      : file_path_(path),
-        handler_(h) {}
-
-  std::string file_path_;
-  file_watcher::EventHandler* handler_;
-};
-
 class FileWatcherKqueue : public FileWatcher {
  public:
   FileWatcherKqueue();
@@ -33,13 +21,12 @@ class FileWatcherKqueue : public FileWatcher {
   virtual bool RunEventLoop(const FileWatcher::HandlerMap& handler,
                             int read_pipe, int write_pipe);
 
+  virtual int TryRegisterFilter(const std::string& file_path);
+
  private:
   void RemoveFilter(int fd);
-  void RegisterFilter(const std::string& file_path,
-                      EventHandler* handler);
 
   int kq_;
-  std::map<int, WatchRecord> watch_records_;
 };
 
 }  // namespace file_watcher

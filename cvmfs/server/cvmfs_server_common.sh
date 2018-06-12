@@ -695,21 +695,6 @@ close_transaction() {
 
   is_in_transaction $name || return 0
 
-  remount_repo $name $use_fd_fallback
-}
-
-# remount a repository
-# Note: This function will perform remounts on /cvmfs/${name} and the underlying
-#       read-only CVMFS branch. Hence, check for open file descriptors first!
-#
-# @param name             the repository that should be remounted
-# @param use_fd_fallback  if set != 0 this will perform a violent remount of the
-#                         repository to handle potential open file descriptors
-#                         on /cvmfs/${name}
-remount_repo() {
-  local name=$1
-  local use_fd_fallback=$2
-
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
   local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
@@ -1151,7 +1136,7 @@ EOF
   # Make sure the systemd mount unit exists
   if is_systemd; then
     /usr/lib/systemd/system-generators/systemd-fstab-generator \
-      /run/systemd/generator '' '' 2>/dev/null
+      /run/systemd/generator '' '' 2>/dev/null || true
     systemctl daemon-reload
   fi
 }

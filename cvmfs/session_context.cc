@@ -5,6 +5,7 @@
 #include "session_context.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "curl/curl.h"
 #include "cvmfs_config.h"
@@ -14,7 +15,9 @@
 #include "util/string.h"
 
 namespace {
-const size_t kMaxResultQueueSize = 1000000;
+// Maximum number of jobs during a session. No limit, for practical
+// purposes.
+const uint64_t kMaxNumJobs = std::numeric_limits<uint64_t>::max();
 }
 
 namespace upload {
@@ -67,7 +70,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(kMaxResultQueueSize, kMaxResultQueueSize),
+    : upload_results_(kMaxNumJobs, kMaxNumJobs),
       api_url_(),
       session_token_(),
       key_id_(),
@@ -87,7 +90,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
                                     const std::string& session_token,
                                     const std::string& key_id,
                                     const std::string& secret,
-                                    uint64_t max_pack_size) {
+                                    uint64_t max_pack_size,
+                                    uint64_t max_queue_size) {
   bool ret = true;
 
   // Initialize session context lock
@@ -126,7 +130,7 @@ bool SessionContextBase::Initialize(const std::string& api_url,
     ret = false;
   }
 
-  ret = InitializeDerived() && ret;
+  ret = InitializeDerived(max_queue_size) && ret;
 
   return ret;
 }
@@ -161,7 +165,7 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (!commit_result) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "SessionContext: could not commit session. Aborting.");
-      abort();
+      return false;
     }
   }
 
@@ -255,16 +259,16 @@ void SessionContextBase::Dispatch() {
 
 SessionContext::SessionContext()
     : SessionContextBase(),
-      upload_jobs_(1000000, 1000000),
+      upload_jobs_(),
       worker_terminate_(),
       worker_() {}
 
-bool SessionContext::InitializeDerived() {
+bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
   atomic_init32(&worker_terminate_);
-  atomic_write32(&worker_terminate_, 0);
 
-  upload_jobs_.Drop();
+  upload_jobs_ = new FifoChannel<UploadJob*>(max_queue_size, max_queue_size);
+  upload_jobs_->Drop();
 
   int retval =
       pthread_create(&worker_, NULL, UploadLoop, reinterpret_cast<void*>(this));
@@ -305,7 +309,7 @@ Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;
   job->pack = pack;
   job->result = new Future<bool>();
-  upload_jobs_.Enqueue(job);
+  upload_jobs_->Enqueue(job);
   return job->result;
 }
 
@@ -367,13 +371,15 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   CURLcode ret = curl_easy_perform(h_curl);
   if (ret) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext - curl_easy_perform failed: %d", ret);
+             "SessionContext::DoUpload - curl_easy_perform failed: %d",
+             ret);
   }
 
   const bool ok = (reply == "{\"status\":\"ok\"}");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext - curl_easy_perform reply: %s", reply.c_str());
+             "SessionContext::DoUpload - error reply: %s",
+             reply.c_str());
   }
 
   curl_easy_cleanup(h_curl);
@@ -388,7 +394,7 @@ void* SessionContext::UploadLoop(void* data) {
   int64_t jobs_processed = 0;
   while (!ctx->ShouldTerminate()) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
-      UploadJob* job = ctx->upload_jobs_.Dequeue();
+      UploadJob* job = ctx->upload_jobs_->Dequeue();
       if (!ctx->DoUpload(job)) {
         LogCvmfs(kLogUploadGateway, kLogStderr,
                  "SessionContext: could not submit payload. Aborting.");

@@ -122,6 +122,7 @@
 #include "upload_spooler_result.h"
 #include "util/pointer.h"
 #include "util/shared_ptr.h"
+#include "util_concurrency.h"
 
 namespace upload {
 
@@ -203,32 +204,32 @@ class Spooler : public Observable<SpoolerResult> {
    * Convenience wrapper to process a catalog file. Please always use this
    * for catalog processing. It will add special flags and hash suffixes
    *
-   * @param catalo_source   the source of the catalog file to be processed
+   * @param local_path  the location of the catalog file to be processed
    */
-  void ProcessCatalog(IngestionSource* catalog_source);
+  void ProcessCatalog(const std::string &local_path);
 
   /**
    * Convenience wrapper to process a history database file. This sets the
    * processing parameters (like chunking and hash suffixes) accordingly.
    *
-   * @param history_source  the source of the history database file
+   * @param local_path  the location of the history database file
    */
-  void ProcessHistory(IngestionSource* history_source);
+  void ProcessHistory(const std::string &local_path);
 
   /**
    * Convenience wrapper to process a certificate file. This sets the
    * processing parameters (like chunking and hash suffixes) accordingly.
    *
-   * @param certificate_source  the source of the certificate file
+   * @param local_path  the location of the source of the certificate file
    */
-  void ProcessCertificate(IngestionSource* certificate_source);
+  void ProcessCertificate(const std::string &local_path);
 
   /**
    * Convenience wrapper to process a meta info file.
    *
-   * @param metainfo_source  the source of the meta info file
+   * @param local_path  the location of the meta info file
    */
-  void ProcessMetainfo(IngestionSource* metainfo_source);
+  void ProcessMetainfo(const std::string &local_path);
 
   /**
    * Deletes the given file from the repository backend storage. This is done
@@ -266,7 +267,7 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void WaitForUpload() const;
 
-  void FinalizeSession(bool commit, const std::string &old_root_hash = "",
+  bool FinalizeSession(bool commit, const std::string &old_root_hash = "",
                        const std::string &new_root_hash = "",
                        const RepositoryTag &tag = RepositoryTag()) const;
 
