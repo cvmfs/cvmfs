@@ -34,6 +34,9 @@ produce_tarball() {
 
   mkfifo tarball_foo/fifo
 
+  ln tarball_foo/empty_file.txt tarball_foo/to_empty_hardlink.txt
+  ln tarball_foo/a/1.txt tarball_foo/a_1_hardlink.txt
+
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
 
@@ -141,7 +144,7 @@ cvmfs_run_test() {
   original=$(realpath $file)
   if [ ! $original = "$result_dir/$original_path" ]; then
     echo "*** Error link points to different file $file -> $original \
- while it should be $file -> $result_dir/$original_path"
+  while it should be $file -> $result_dir/$original_path"
     return 9
   else
     echo "*** Link points correctly $file -> $result_dir/$original_path"

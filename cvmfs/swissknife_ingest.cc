@@ -182,11 +182,18 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
+
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
+
+  if (!mediator.Commit(manifest.weak_ref())) {
+    PrintError("something went wrong during sync after the fix of hardlinks");
+    return 7;
+  }
+
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
 

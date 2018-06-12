@@ -13,6 +13,7 @@
 
 #include <pthread.h>
 
+#include <list>
 #include <map>
 #include <set>
 #include <string>
@@ -46,10 +47,14 @@ class SyncUnionTarball : public SyncUnion {
    * the `dirs_` map.
    * Similarly we remember where nested catalogs should be placed in
    * `to_create_catalog_dirs_`.
-   * After we finish to uncompress the tarball we come back to iterate over
+   * After we finish to explore the tarball we come back to iterate over
    * `to_create_catalog_dirs_` and we created the nested catalogs.
+   * While we explore the tarball we also keep track of every hardlink, we will
+   * fix them later, after the mediator commit in `FixHardlink`
    */
   void Traverse();
+
+  void PostUpload();
 
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
@@ -62,12 +67,16 @@ class SyncUnionTarball : public SyncUnion {
   const std::string to_delete_;  ///< entity to delete before to extract the tar
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
-  std::set<std::string> to_create_catalog_dirs_;
+  
   ///< directories where we found catalog marker, after the main traverse we
   ///< iterate through them and we add the catalog
-  std::map<std::string, SharedPtr<SyncItem> > dirs_;
+  std::set<std::string> to_create_catalog_dirs_;
+  
   ///< map of all directories found, we need them since we don't know, at
   ///< priori, where the catalog files appears
+  std::map<std::string, SharedPtr<SyncItem> > dirs_;
+  
+  std::map<const std::string, std::list<SharedPtr<SyncItem> > > hardlinks_;
   Signal *read_archive_signal_;  ///< Conditional variable to keep track of when
                                  ///< is possible to read the tar file
 
@@ -85,6 +94,8 @@ class SyncUnionTarball : public SyncUnion {
    * @param target the directory to create
    */
   void CreateDirectories(const std::string &target);
+  void ProcessArchiveEntry(struct archive_entry *entry);
+  void LogEntry(struct archive_entry *entry);
 };  // class SyncUnionTarball
 
 }  // namespace publish

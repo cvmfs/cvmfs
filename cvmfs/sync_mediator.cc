@@ -176,6 +176,10 @@ void SyncMediator::Replace(SharedPtr<SyncItem> entry) {
   Add(entry);
 }
 
+void SyncMediator::Link(SharedPtr<SyncItem> entry, const std::string &target) {
+  catalog_manager_->Link(entry->CreateBasicCatalogDirent(),
+                         entry->relative_parent_path(), default_xattrs, target);
+}
 
 void SyncMediator::EnterDirectory(SharedPtr<SyncItem> entry) {
   if (!handle_hardlinks_) {
@@ -259,6 +263,8 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
   }
 
   params_->spooler->UnregisterListeners();
+
+  union_engine_->PostUpload();
 
   LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
   if (params_->spooler->GetNumberOfErrors() > 0) {

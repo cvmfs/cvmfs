@@ -176,4 +176,9 @@ void SyncUnion::ProcessSocket(const std::string &parent_dir,
   ProcessFile(entry);
 }
 
+void SyncUnion::Link(SharedPtr<SyncItem> entry, const std::string &target) {
+  mediator_->Link(entry, target);
+}
+
+
 }  // namespace publish

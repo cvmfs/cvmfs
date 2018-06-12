@@ -8,6 +8,7 @@
 #define TEST_UNITTESTS_MOCK_M_SYNC_MEDIATOR_H_
 
 #include <gmock/gmock.h>
+#include <string>
 
 #include "hash.h"
 #include "sync_mediator.h"
@@ -35,6 +36,8 @@ class MockSyncMediator : public AbstractSyncMediator {
   MOCK_METHOD1(Touch, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Remove, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Replace, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD2(Link,
+               void(SharedPtr<SyncItem> entry, const std::string &to_link));
   MOCK_METHOD1(AddUnmaterializedDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(EnterDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(LeaveDirectory, void(SharedPtr<SyncItem> entry));

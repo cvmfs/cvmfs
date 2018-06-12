@@ -111,6 +111,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void TouchDirectory(const DirectoryEntryBase &entry,
                       const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
+  void Link(const DirectoryEntryBase &entry, const std::string &parent_path,
+            const XattrList &xattrs, const std::string target);
 
   // Hardlink group handling
   void AddHardlinkGroup(const DirectoryEntryBaseList &entries,

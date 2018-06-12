@@ -130,6 +130,8 @@ class SyncUnion {
   bool IsInitialized() const { return initialized_; }
   virtual bool SupportsHardlinks() const { return false; }
 
+  virtual void PostUpload() {}
+
  protected:
   std::string rdonly_path_;
   std::string scratch_path_;
@@ -226,6 +228,8 @@ class SyncUnion {
    * @param entry the SyncItem corresponding to the union file to be processed
    */
   void ProcessFile(SharedPtr<SyncItem> entry);
+
+  void Link(SharedPtr<SyncItem> entry, const std::string &target);
 
  private:
   bool initialized_;
