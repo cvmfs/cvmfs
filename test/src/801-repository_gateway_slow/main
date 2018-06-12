@@ -12,18 +12,6 @@ cvmfs_test_autofs_on_startup=false
 clean_up() {
     echo "Cleaning up"
 
-    echo "  Stopping repository gateway application"
-    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
-
-    echo "  Removing Mnesia directory"
-    sudo rm -rf /var/lib/cvmfs-gateway
-
-    echo "  Removing test repository"
-    sudo -E cvmfs_server rmfs -f test.repo.org
-
-    echo "  Removing test directories"
-    rm -rf /tmp/cvmfs_receiver_commit_processor*
-
     echo "  Removing test output data"
     rm -rf /tmp/cvmfs_out
 }
