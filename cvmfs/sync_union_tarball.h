@@ -13,10 +13,10 @@
 
 #include <pthread.h>
 
+#include <list>
 #include <map>
 #include <set>
 #include <string>
-#include <list>
 
 #include "duplex_libarchive.h"
 #include "util_concurrency.h"

@@ -9,6 +9,8 @@
 
 #include <gmock/gmock.h>
 
+#include <string>
+
 #include "hash.h"
 #include "sync_mediator.h"
 #include "util/shared_ptr.h"
