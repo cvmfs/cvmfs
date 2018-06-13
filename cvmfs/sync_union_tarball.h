@@ -16,6 +16,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <list>
 
 #include "duplex_libarchive.h"
 #include "util_concurrency.h"
@@ -51,6 +52,8 @@ class SyncUnionTarball : public SyncUnion {
    */
   void Traverse();
 
+  void PostUpload();
+
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
   bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
@@ -62,12 +65,18 @@ class SyncUnionTarball : public SyncUnion {
   const std::string to_delete_;  ///< entity to delete before to extract the tar
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
-  std::set<std::string> to_create_catalog_dirs_;
+
   ///< directories where we found catalog marker, after the main traverse we
   ///< iterate through them and we add the catalog
-  std::map<std::string, SharedPtr<SyncItem> > dirs_;
+  std::set<std::string> to_create_catalog_dirs_;
+
   ///< map of all directories found, we need them since we don't know, at
   ///< priori, where the catalog files appears
+  std::map<std::string, SharedPtr<SyncItem> > dirs_;
+
+  ///< hardlink -> path of file that points to the same hardlink
+  std::map<const std::string, std::list<std::string> > hardlinks_;
+
   Signal *read_archive_signal_;  ///< Conditional variable to keep track of when
                                  ///< is possible to read the tar file
 
@@ -85,6 +94,7 @@ class SyncUnionTarball : public SyncUnion {
    * @param target the directory to create
    */
   void CreateDirectories(const std::string &target);
+  void ProcessArchiveEntry(struct archive_entry *entry);
 };  // class SyncUnionTarball
 
 }  // namespace publish

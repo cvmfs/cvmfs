@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <list>
 #include <set>
 #include <string>
 #include <vector>
@@ -146,43 +147,7 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_OK: {
-        std::string archive_file_path(archive_entry_pathname(entry));
-        std::string complete_path =
-            MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
-
-        std::string parent_path;
-        std::string filename;
-        SplitPath(complete_path, &parent_path, &filename);
-
-        CreateDirectories(parent_path);
-
-        SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
-            parent_path, filename, src, entry, read_archive_signal_, this));
-
-        if (sync_entry->IsDirectory()) {
-          if (know_directories_.find(complete_path) !=
-              know_directories_.end()) {
-            sync_entry->IsPlaceholderDirectory();
-          }
-          ProcessUnmaterializedDirectory(sync_entry);
-          dirs_[complete_path] = sync_entry;
-          know_directories_.insert(complete_path);
-
-          read_archive_signal_->Wakeup();  // We don't need to read data and we
-                                           // can read the next header
-
-        } else if (sync_entry->IsRegularFile()) {
-          ProcessFile(sync_entry);
-          if (filename == ".cvmfscatalog") {
-            to_create_catalog_dirs_.insert(parent_path);
-          }
-        } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() ||
-                   sync_entry->IsSocket()) {
-          ProcessFile(sync_entry);
-          read_archive_signal_->Wakeup();
-        } else {
-          read_archive_signal_->Wakeup();
-        }
+        ProcessArchiveEntry(entry);
         break;
       }
 
@@ -195,6 +160,74 @@ void SyncUnionTarball::Traverse() {
 
         abort();
       }
+    }
+  }
+}
+
+void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
+  std::string archive_file_path(archive_entry_pathname(entry));
+  std::string complete_path =
+      MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
+
+  std::string parent_path;
+  std::string filename;
+  SplitPath(complete_path, &parent_path, &filename);
+
+  CreateDirectories(parent_path);
+
+  SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
+      parent_path, filename, src, entry, read_archive_signal_, this));
+
+  if (NULL != archive_entry_hardlink(entry)) {
+    const std::string hardlink =
+        base_directory_ + "/" + std::string(archive_entry_hardlink(entry));
+
+    printf("Hardlink %s -> %s\n", hardlink.c_str(), complete_path.c_str());
+
+    if (hardlinks_.find(hardlink) != hardlinks_.end()) {
+      hardlinks_.find(hardlink)->second.push_back(complete_path);
+    } else {
+      std::list<std::string> to_hardlink;
+      to_hardlink.push_back(complete_path);
+      hardlinks_[hardlink] = to_hardlink;
+    }
+    read_archive_signal_->Wakeup();
+    return;
+  }
+
+  if (sync_entry->IsDirectory()) {
+    if (know_directories_.find(complete_path) != know_directories_.end()) {
+      sync_entry->IsPlaceholderDirectory();
+    }
+    ProcessUnmaterializedDirectory(sync_entry);
+    dirs_[complete_path] = sync_entry;
+    know_directories_.insert(complete_path);
+
+    read_archive_signal_->Wakeup();  // We don't need to read data and we
+                                     // can read the next header
+
+  } else if (sync_entry->IsRegularFile()) {
+    ProcessFile(sync_entry);
+    if (filename == ".cvmfscatalog") {
+      to_create_catalog_dirs_.insert(parent_path);
+    }
+  } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() ||
+             sync_entry->IsSocket()) {
+    ProcessFile(sync_entry);
+    read_archive_signal_->Wakeup();
+  } else {
+    read_archive_signal_->Wakeup();
+  }
+}
+
+void SyncUnionTarball::PostUpload() {
+  std::map<const std::string, std::list<std::string> >::iterator hardlink;
+  for (hardlink = hardlinks_.begin(); hardlink != hardlinks_.end();
+       ++hardlink) {
+    std::list<std::string>::iterator entry;
+    for (entry = hardlink->second.begin(); entry != hardlink->second.end();
+         ++entry) {
+      mediator_->Clone(*entry, hardlink->first);
     }
   }
 }

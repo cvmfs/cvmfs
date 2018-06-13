@@ -21,6 +21,8 @@ produce_tarball() {
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/2.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/3.txt
 
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/d/1.txt
+
   dd bs=1024 count=5 2>/dev/null  </dev/urandom >tarball_foo/d/e/f/foo.txt
 
   touch tarball_foo/empty_file.txt
@@ -33,6 +35,9 @@ produce_tarball() {
   ln -s a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
 
   mkfifo tarball_foo/fifo
+
+  ln tarball_foo/empty_file.txt tarball_foo/to_empty_hardlink.txt
+  ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink.txt
 
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
