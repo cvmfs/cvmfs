@@ -6,9 +6,9 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
-# running unittests
+running unittests
 run_unittests --gtest_shuffle \
-              --gtest_death_test_use_fork || retval=1
+             --gtest_death_test_use_fork || retval=1
 
 
 CVMFS_EXCLUDE=
@@ -70,6 +70,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/8*                                       \
                                 || retval=1
 fi
+
 
 # Ubuntu 12.04
 echo "running CernVM-FS migration test cases..."
