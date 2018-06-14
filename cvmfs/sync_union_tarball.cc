@@ -33,6 +33,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &base_directory,
                                    const std::string &to_delete)
     : SyncUnion(mediator, rdonly_path, "", ""),
+      src(NULL),
       tarball_path_(tarball_path),
       base_directory_(base_directory),
       to_delete_(to_delete),
@@ -43,6 +44,12 @@ SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
 
 bool SyncUnionTarball::Initialize() {
   bool result;
+
+  // We are just deleting entity from the repo
+  if (tarball_path_ == "") {
+    assert(NULL == src);
+    return SyncUnion::Initialize();
+  }
 
   src = archive_read_new();
   assert(ARCHIVE_OK == archive_read_support_format_tar(src));
@@ -99,6 +106,9 @@ void SyncUnionTarball::Traverse() {
       mediator_->Remove(sync_entry);
     }
   }
+
+  // we are simplying deleting entity from  the repo
+  if (NULL == src) return;
 
   struct archive_entry *entry = archive_entry_new();
   while (true) {

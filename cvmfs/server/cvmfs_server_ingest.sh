@@ -46,13 +46,16 @@ cvmfs_server_ingest() {
   name=$1
   name=$(echo $name | cut -d'/' -f1)
 
-  if [ x"$base_dir" = "x" ]; then
-    { cvmfs_server_abort -f $name; \
-      die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR"; }
+  if [ x"$tar_file" = "x" ] && [ x"$base_dir" = "x" ] && [ x"$to_delete" = "x" ] ; then
+    die "Please provide some parameters, use -t \$TAR_FILE to provide the tar to extract -b \$BASE_DIR to provide where to extract the tar and -d \$TO_DELETE to provide what to delete from the repository"
   fi
-  if [ x"$tar_file" = "x" ]; then
-    { cvmfs_server_abort -f $name; \
-      die "Please provide the tarball to extract, use -t \$TARBALL_PATH or --tar_file \$TARBALL_PATH"; }
+
+  if [ x"$tar_file" = "x" ] && [ ! x"$base_dir" = "x" ]; then
+    die "Please provide the tarball to extract, use -t \$TARBALL_PATH or --tar_file \$TARBALL_PATH or don't provide the base directory to simply delete entities from the repository"
+  fi
+
+  if [ ! x"$tar_file" = "x" ] && [ x"$base_dir" = "x" ]; then
+    die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR or don't provide the base directory to simply delete entities from the repository"
   fi
 
 
@@ -181,11 +184,17 @@ cvmfs_server_ingest() {
     -o $manifest                                \
     -K $CVMFS_PUBLIC_KEY                        \
     -N $name                                    \
-    -T $tar_file                                \
-    -B $base_dir                                \
     "
 
-  if [ ! -z "$to_delete" ]; then
+  if [ ! x"$tar_file" = "x" ]; then
+    ingest_command="$ingest_command -T $tar_file"
+  fi
+
+  if [ ! x"$base_dir" = "x" ]; then
+    ingest_command="$ingest_command -B $base_dir"
+  fi
+
+  if [ ! x"$to_delete" = "x" ]; then
     ingest_command="$ingest_command -D $to_delete"
   fi
 
