@@ -20,7 +20,7 @@ SyncItemTar::SyncItemTar(const std::string &relative_parent_path,
                          struct archive_entry *entry,
                          Signal *read_archive_signal,
                          const SyncUnion *union_engine)
-    : SyncItem(relative_parent_path, filename, union_engine, kItemTarfile),
+    : SyncItem(relative_parent_path, filename, union_engine, kItemUnknown),
       archive_(archive),
       archive_entry_(entry),
       obtained_tar_stat_(false),
@@ -70,6 +70,13 @@ SyncItemType SyncItemTar::GetScratchFiletype() const {
       return kItemUnknown;
       break;
   }
+}
+
+bool SyncItemTar::IsType(const SyncItemType expected_type) const {
+  if (scratch_type_ == kItemUnknown) {
+    scratch_type_ = GetScratchFiletype();
+  }
+  return scratch_type_ == expected_type;
 }
 
 platform_stat64 SyncItemTar::GetStatFromTar() const {
