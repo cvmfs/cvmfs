@@ -297,14 +297,25 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
  */
 void WritableCatalogManager::Clone(const std::string destination,
                                    const std::string source) {
-  const std::string parent = MakeRelativePath(source);
+  const std::string relative_source = MakeRelativePath(source);
 
   std::string destination_dirname;
   std::string destination_filename;
   SplitPath(destination, &destination_dirname, &destination_filename);
 
   DirectoryEntry to_dirent;
-  LookupPath(parent, kLookupSole, &to_dirent);
+  if (!LookupPath(relative_source, kLookupSole, &to_dirent)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for file '%s' cannot be found aborting",
+             source.c_str());
+    assert(false);
+  }
+  if (!to_dirent.IsRegular()) {
+     LogCvmfs(kLogCatalog, kLogStderr,
+             "Trying to clone a non regular file: '%s' aborting",
+             source.c_str());
+    assert(false);
+  }
 
   DirectoryEntry destination_dirent(to_dirent);
   destination_dirent.name_.Assign(
