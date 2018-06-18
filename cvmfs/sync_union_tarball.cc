@@ -68,6 +68,7 @@ bool SyncUnionTarball::Initialize() {
 /*
  * Libarchive is not thread aware, so we need to make sure that before
  * to read/"open" the next header in the archive the content of the
+ *
  * present header is been consumed completely.
  * Different thread read/"open" the header from the one that consumes
  * it so we opted for a Signal that is backed by a conditional variable.
@@ -182,8 +183,6 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
     const std::string hardlink =
         base_directory_ + "/" + std::string(archive_entry_hardlink(entry));
 
-    printf("Hardlink %s -> %s\n", hardlink.c_str(), complete_path.c_str());
-
     if (hardlinks_.find(hardlink) != hardlinks_.end()) {
       hardlinks_.find(hardlink)->second.push_back(complete_path);
     } else {
@@ -216,7 +215,9 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
     ProcessFile(sync_entry);
     read_archive_signal_->Wakeup();
   } else {
-    read_archive_signal_->Wakeup();
+    LogCvmfs(kLogUnionFs, kLogStderr,
+             "Fatal error found unexpected file: \n%s\n", filename.c_str());
+    abort();
   }
 }
 
