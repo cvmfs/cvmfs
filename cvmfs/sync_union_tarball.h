@@ -66,19 +66,28 @@ class SyncUnionTarball : public SyncUnion {
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
 
-  ///< directories where we found catalog marker, after the main traverse we
-  ///< iterate through them and we add the catalog
+  /** 
+   * directories where we found catalog marker, after the main traverse we
+   * iterate through them and we add the catalog
+   **/
   std::set<std::string> to_create_catalog_dirs_;
 
-  ///< map of all directories found, we need them since we don't know, at
-  ///< priori, where the catalog files appears
+  /**
+   * map of all directories found, we need them since we don't know, at priori,
+   * where the catalog files appears
+   **/
   std::map<std::string, SharedPtr<SyncItem> > dirs_;
 
-  ///< hardlink -> path of file that points to the same hardlink
+  /**
+   * map all the file that point to the same hardlink to the path of the file
+   * itself
+   **/
   std::map<const std::string, std::list<std::string> > hardlinks_;
 
-  Signal *read_archive_signal_;  ///< Conditional variable to keep track of when
-                                 ///< is possible to read the tar file
+  /**
+   * Conditional variable to keep track of when is possible to read the tar file
+   **/
+  Signal *read_archive_signal_;
 
   static const size_t kBlockSize = 4096 * 4;
 
