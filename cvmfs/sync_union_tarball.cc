@@ -206,14 +206,28 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
                                      // can read the next header
 
   } else if (sync_entry->IsRegularFile()) {
+    // inside the process pipeline we will wake up the signal
     ProcessFile(sync_entry);
     if (filename == ".cvmfscatalog") {
       to_create_catalog_dirs_.insert(parent_path);
     }
+
   } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() ||
              sync_entry->IsSocket()) {
-    ProcessFile(sync_entry);
+    // we avoid to add an entity called as a catalog marker if it is not a
+    // regular file
+    if (filename != ".cvmfscatalog") {
+      ProcessFile(sync_entry);
+    } else {
+      LogCvmfs(kLogUnionFs, kLogStderr,
+               "Found entity called as a catalog marker '%s' that however is "
+               "not a regular file, skipping it", complete_path.c_str());
+    }
+
+    // here we don't need to read data from the tar file so we can wake up
+    // immediately the signal
     read_archive_signal_->Wakeup();
+
   } else {
     LogCvmfs(kLogUnionFs, kLogStderr,
              "Fatal error found unexpected file: \n%s\n", filename.c_str());
