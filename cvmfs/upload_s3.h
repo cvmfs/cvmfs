@@ -72,6 +72,10 @@ class S3Uploader : public AbstractUploader {
  private:
   static const unsigned kDefaultPort = 80;
   static const unsigned kDefaultNumParallelUploads = 16;
+  static const unsigned kDefaultNumRetries = 3;
+  static const unsigned kDefaultTimeoutSec = 60;
+  static const unsigned kDefaultBackoffInitMs = 100;
+  static const unsigned kDefaultBackoffMaxMs = 2000;
 
   static void *MainCollectResults(void *data);
 
@@ -87,6 +91,8 @@ class S3Uploader : public AbstractUploader {
   std::string region_;
   std::string bucket_;
   int num_parallel_uploads_;
+  unsigned num_retries_;
+  unsigned timeout_sec_;
   std::string access_key_;
   std::string secret_key_;
   s3fanout::AuthzMethods authz_method_;
