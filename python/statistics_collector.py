@@ -1,8 +1,9 @@
 import time
+import datetime
 import glob
 import argparse
 
-from influxdb.influxdb08 import InfluxDBClient
+from influxdb import InfluxDBClient
 
 from parser import Parser
 
@@ -23,20 +24,30 @@ class Database:
 
     def write(self, repository, counters,
               current_time=int(time.time())):
-        client = InfluxDBClient(self.host, self.port, self.user, self.password)
+        client = InfluxDBClient(self.host, self.port, self.user, self.password, None, True, False)
+        print client.get_list_database()
         if {"name": self.database} not in client.get_list_database():
             client.create_database(self.database)
         client.switch_database(self.database)
+        ts = time.time()
+        st = datetime.datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
         json_body = [{
-                        "name": repository,
-                        "columns": ["time"],
-                        "points": [[current_time]]
+                        "measurement": "time",
+                        "tags": {
+                          "host": "cvm-perf01",
+                          "region": repository,
+                        },
+                        "time": st,
+                        "fields": {
+                          "value": current_time
+                        }
                      }]
-
-        for counter in counters.values():
-            json_body[0]["columns"].append(counter.name)
-            json_body[0]["points"][0].append(int(counter.avg()))
         client.write_points(json_body)
+        
+        for counter in counters.values():
+            json_body[0]["measurement"] = counter.name
+            json_body[0]["fields"]["value"] = int(counter.avg())
+            client.write_points(json_body)
 
 
 def parse_args():
