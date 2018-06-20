@@ -684,9 +684,12 @@ int main(int argc, char *argv[]) {
   }
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
+    DefaultOptionsTemplatingManager *opt_templ_mgr = new DefaultOptionsTemplatingManager(*repository_name_);
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
-      options_manager->ParsePath(tokens[i], false);
+      options_manager->ParsePath(tokens[i], false, *opt_templ_mgr);
     }
+    delete opt_templ_mgr;
+    opt_templ_mgr = NULL;
   } else {
     options_manager->ParseDefault(*repository_name_);
   }

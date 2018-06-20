@@ -43,7 +43,9 @@ class T_Options : public ::testing::Test {
             "#\n"
             "D=E # with a comment\n"
             "F=\"G\"\n"
-            "H='I' ");
+            "H='I' \n"
+            "FOO=abc/@fqrn@/@foo@.@bar@\n"
+            "BAR=abc@def.com");
     int result = fclose(temp_file);
     ASSERT_EQ(0, result);
     fprintf(temp_file_2, "CVMFS_CACHE_BASE=/overwritten\n");
@@ -59,15 +61,27 @@ class T_Options : public ::testing::Test {
   template <typename T> struct type {};
 
   unsigned ExpectedValues(const type<BashOptionsManager>  type_specifier) {
-    return 12u;
+    return 14u;
   }
 
   unsigned ExpectedValues(const type<SimpleOptionsParser>  type_specifier) {
-    return 12u;
+    return 14u;
   }
 
   unsigned ExpectedValues() {
     return ExpectedValues(type<OptionsT>());
+  }
+
+  std::string ExpectedTemplateResultString(const type<BashOptionsManager> type_specifier) {
+    return "abc/atlas.cern.ch/fourtytwo.@bar@";
+  }
+
+  std::string ExpectedTemplateResultString(const type<SimpleOptionsParser> type_specifier) {
+    return "abc/@fqrn@/@foo@.@bar@";
+  }
+
+  std::string ExpectedTemplateResultString() {
+    return ExpectedTemplateResultString(type<OptionsT>());
   }
 
  protected:
@@ -88,7 +102,9 @@ TYPED_TEST(T_Options, ParsePath) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
   const unsigned expected_number_elements = TestFixture::ExpectedValues();
-  options_manager.ParsePath(config_file, false);
+  OptionsTemplatingManager *opt_temp_mgr = new DefaultOptionsTemplatingManager("atlas.cern.ch");
+  opt_temp_mgr->SetVal("foo", "fourtytwo");
+  options_manager.ParsePath(config_file, false, *opt_temp_mgr);
 
   // printf("DUMP: ***\n%s\n***\n", options_manager.Dump().c_str());
   ASSERT_EQ(expected_number_elements, options_manager.GetAllKeys().size());
@@ -129,11 +145,17 @@ TYPED_TEST(T_Options, ParsePath) {
   EXPECT_EQ("G", container);
   EXPECT_TRUE(options_manager.GetValue("H", &container));
   EXPECT_EQ("I", container);
+
+  EXPECT_TRUE(options_manager.GetValue("FOO", &container));
+  EXPECT_EQ(TestFixture::ExpectedTemplateResultString(), container);
+  EXPECT_TRUE(options_manager.GetValue("BAR", &container));
+  EXPECT_EQ("abc@def.com", container);
 }
 
 TYPED_TEST(T_Options, ParsePathNoFile) {
   string fileName = "somethingThatDoesntExists";
-  TestFixture::options_manager_.ParsePath(fileName, false);
+  OptionsTemplatingManager *opt_temp_mgr = new OptionsTemplatingManager();
+  TestFixture::options_manager_.ParsePath(fileName, false, *opt_temp_mgr);
   ASSERT_EQ(0u, TestFixture::options_manager_.GetAllKeys().size());
 }
 
@@ -142,16 +164,17 @@ TYPED_TEST(T_Options, ProtectedParameter) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
   const string &config_file_2 = TestFixture::config_file_2_;
-
-  options_manager.ParsePath(config_file, false);
-  options_manager.ParsePath(config_file_2, false);
+  OptionsTemplatingManager *opt_temp_mgr = new OptionsTemplatingManager();
+  
+  options_manager.ParsePath(config_file, false, *opt_temp_mgr);
+  options_manager.ParsePath(config_file_2, false, *opt_temp_mgr);
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
   EXPECT_EQ("/overwritten", container);
 
   options_manager.ClearConfig();
-  options_manager.ParsePath(config_file, false);
+  options_manager.ParsePath(config_file, false, *opt_temp_mgr);
   options_manager.ProtectParameter("CVMFS_CACHE_BASE");
-  options_manager.ParsePath(config_file_2, false);
+  options_manager.ParsePath(config_file_2, false, *opt_temp_mgr);
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
   EXPECT_NE("/overwritten", container);
 }
@@ -159,8 +182,9 @@ TYPED_TEST(T_Options, ProtectedParameter) {
 TYPED_TEST(T_Options, GetEnvironmentSubset) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
-  options_manager.ParsePath(config_file, false);
-
+  OptionsTemplatingManager *opt_temp_mgr = new OptionsTemplatingManager();
+  options_manager.ParsePath(config_file, false, *opt_temp_mgr);
+  
   EXPECT_EQ(0U,
     options_manager.GetEnvironmentSubset("NO_SUCH_PREFIX", false).size());
   EXPECT_EQ(5U, options_manager.GetEnvironmentSubset("CVMFS", false).size());
@@ -178,7 +202,8 @@ TYPED_TEST(T_Options, GetEnvironmentSubset) {
 TYPED_TEST(T_Options, SetValue) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
-  options_manager.ParsePath(config_file, false);
+  OptionsTemplatingManager *opt_temp_mgr = new OptionsTemplatingManager();
+  options_manager.ParsePath(config_file, false, *opt_temp_mgr);
 
   string arg;
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &arg));
@@ -200,7 +225,8 @@ TYPED_TEST(T_Options, SetValue) {
 TYPED_TEST(T_Options, TaintEnvironment) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
-  options_manager.ParsePath(config_file, false);
+  OptionsTemplatingManager *opt_temp_mgr = new OptionsTemplatingManager();
+  options_manager.ParsePath(config_file, false, *opt_temp_mgr);
 
   string arg;
   EXPECT_FALSE(options_manager.GetValue("NO_SUCH_OPTION", &arg));
@@ -219,4 +245,36 @@ TYPED_TEST(T_Options, TaintEnvironment) {
   options_manager.SetValue("NO_SUCH_OPTION_NOTAINT", "xxx");
   EXPECT_TRUE(options_manager.GetValue("NO_SUCH_OPTION_NOTAINT", &arg));
   EXPECT_EQ(NULL, getenv("NO_SUCH_OPTION_NOTAINT"));
+}
+
+
+TEST(T_OptionsTemplatingManager, InsertRetrieveUpdate) {
+  OptionsTemplatingManager *opt_templ_mgr = new OptionsTemplatingManager();
+  opt_templ_mgr->SetVal("foo", "bar");
+  EXPECT_TRUE(opt_templ_mgr->HasVal("foo"));
+  EXPECT_EQ("bar", opt_templ_mgr->GetVal("foo"));
+
+  EXPECT_FALSE(opt_templ_mgr->HasVal("fourtytwo"));
+  EXPECT_EQ("@fourtytwo@", opt_templ_mgr->GetVal("fourtytwo"));
+
+  opt_templ_mgr->SetVal("foo", "foobar");
+  EXPECT_TRUE(opt_templ_mgr->HasVal("foo"));
+  EXPECT_EQ("foobar", opt_templ_mgr->GetVal("foo"));
+}
+
+TEST(T_OptionsTemplatingManager, FqrnPredefined) {
+  OptionsTemplatingManager *opt_templ_mgr = new DefaultOptionsTemplatingManager("atlas.cern.ch");
+  opt_templ_mgr->SetVal("foo", "bar");
+  EXPECT_TRUE(opt_templ_mgr->HasVal("foo"));
+  EXPECT_EQ("bar", opt_templ_mgr->GetVal("foo"));
+
+  EXPECT_FALSE(opt_templ_mgr->HasVal("fourtytwo"));
+  EXPECT_EQ("@fourtytwo@", opt_templ_mgr->GetVal("fourtytwo"));
+
+  opt_templ_mgr->SetVal("foo", "foobar");
+  EXPECT_TRUE(opt_templ_mgr->HasVal("foo"));
+  EXPECT_EQ("foobar", opt_templ_mgr->GetVal("foo"));
+
+  EXPECT_TRUE(opt_templ_mgr->HasVal("fqrn"));
+  EXPECT_EQ("atlas.cern.ch", opt_templ_mgr->GetVal("fqrn"));
 }

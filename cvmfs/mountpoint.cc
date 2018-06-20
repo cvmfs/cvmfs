@@ -12,6 +12,7 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include <algorithm>
 #include <cassert>
@@ -1125,7 +1126,7 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
   if (!mountpoint->CreateTracer())
     return mountpoint.Release();
-
+  
   mountpoint->ReEvaluateAuthz();
   mountpoint->CreateTables();
   mountpoint->SetupBehavior();
@@ -1385,7 +1386,12 @@ void MountPoint::CreateTables() {
   inode_tracker_ = new glue::InodeTracker();
 }
 
-
+/**
+ * Will create a tracer for the current mount point
+ * Tracefile path, Trace buffer size and trace buffer flush threshold can be configured by the options:
+ * CVMFS_TRACEFILE, CVMFS_TRACEBUFFER, CVMFS_TRACEBUFFER_THRESHOLD (respectively)
+ * VMFS_TRACEBUFFER and CVMFS_TRACEBUFFER_THRESHOLD will silently fallback to default values if configuration values don't exist or are invalid
+ */
 bool MountPoint::CreateTracer() {
   string optarg;
   tracer_ = new Tracer();
@@ -1395,7 +1401,20 @@ bool MountPoint::CreateTracer() {
       boot_status_ = loader::kFailOptions;
       return false;
     }
-    tracer_->Activate(kTracerBufferSize, kTracerFlushThreshold, optarg);
+    int tracebufferSize = kTracerBufferSize;
+    int tracebufferThreshold = kTracerFlushThreshold;
+
+    string tracebufferSizeOpt;
+    string tracebufferThresholdOpt;
+    if(options_mgr_->GetValue("CVMFS_TRACEBUFFER", &tracebufferSizeOpt)){
+      tracebufferSize = atoi(tracebufferSizeOpt.c_str());
+    }
+    if(options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD", &tracebufferThresholdOpt)){
+      tracebufferThreshold = atoi(tracebufferThresholdOpt.c_str());
+    }
+    LogCvmfs(kLogCvmfs, kLogDebug, "Initialising tracer with buffer size %i and threshold %i",
+      tracebufferSize, tracebufferThreshold);
+    tracer_->Activate(tracebufferSize, tracebufferThreshold, optarg);
   }
   return true;
 }

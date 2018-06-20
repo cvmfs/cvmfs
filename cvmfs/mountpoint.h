@@ -469,6 +469,10 @@ class MountPoint : SingleCopy, public BootFactory {
   void CreateFetchers();
   bool CreateCatalogManager();
   void CreateTables();
+  /**
+   * Creates and activates a tracer based on the given configuration
+   * for the current mount point
+   */
   bool CreateTracer();
   void SetupBehavior();
   void SetupDnsTuning(download::DownloadManager *manager);

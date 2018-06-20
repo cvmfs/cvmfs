@@ -80,7 +80,10 @@ bool S3Uploader::ParseSpoolerDefinition(
 
   // Parse S3 configuration
   BashOptionsManager options_manager;
-  options_manager.ParsePath(config_path, false);
+  OptionsTemplatingManager *opt_templ_mgr = new DefaultOptionsTemplatingManager(repository_alias_);
+  options_manager.ParsePath(config_path, false, *opt_templ_mgr);
+  delete opt_templ_mgr;
+  opt_templ_mgr = NULL;
   std::string parameter;
 
   if (!options_manager.GetValue("CVMFS_S3_HOST", &host_name_)) {

@@ -112,7 +112,7 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
     ConfigValue config_value;
     config_value.source = config_file;
     config_value.value = value;
-    PopulateParameter(parameter, config_value);
+    PopulateParameter(parameter, config_value, NULL);
   }
   fclose(fconfig);
   return true;
@@ -120,7 +120,8 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
 
 
 void BashOptionsManager::ParsePath(const string &config_file,
-                                   const bool external) {
+                                   const bool external,
+                                   OptionsTemplatingManager &opt_templ_mgr) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
   int retval;
   int pipe_open[2];
@@ -223,7 +224,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
     const string sh_echo = "echo $" + parameter + "\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
     GetLineFd(fd_stdout, &value.value);
-    PopulateParameter(parameter, value);
+    PopulateParameter(parameter, value, &opt_templ_mgr);
   }
 
   close(fd_stderr);
@@ -266,18 +267,18 @@ void OptionsManager::ParseDefault(const string &fqrn) {
   }
 
   protected_parameters_.clear();
-
-  ParsePath("/etc/cvmfs/default.conf", false);
+  DefaultOptionsTemplatingManager *opt_templ_mgr = new DefaultOptionsTemplatingManager(fqrn);
+  ParsePath("/etc/cvmfs/default.conf", false, *opt_templ_mgr);
   vector<string> dist_defaults =
     FindFilesBySuffix("/etc/cvmfs/default.d", ".conf");
   for (unsigned i = 0; i < dist_defaults.size(); ++i) {
-    ParsePath(dist_defaults[i], false);
+    ParsePath(dist_defaults[i], false, *opt_templ_mgr);
   }
   ProtectParameter("CVMFS_CONFIG_REPOSITORY");
   string external_config_path;
   if ((fqrn != "") && HasConfigRepository(fqrn, &external_config_path))
-    ParsePath(external_config_path + "default.conf", true);
-  ParsePath("/etc/cvmfs/default.local", false);
+    ParsePath(external_config_path + "default.conf", true, *opt_templ_mgr);
+  ParsePath("/etc/cvmfs/default.local", false, *opt_templ_mgr);
 
   if (fqrn != "") {
     string domain;
@@ -287,21 +288,24 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     domain = JoinStrings(tokens, ".");
 
     if (HasConfigRepository(fqrn, &external_config_path))
-      ParsePath(external_config_path + "domain.d/" + domain + ".conf", true);
-    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false);
-    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local", false);
+      ParsePath(external_config_path + "domain.d/" + domain + ".conf", true, *opt_templ_mgr);
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false, *opt_templ_mgr);
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local", false, *opt_templ_mgr);
 
     if (HasConfigRepository(fqrn, &external_config_path))
-      ParsePath(external_config_path + "config.d/" + fqrn + ".conf", true);
-    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false);
-    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false);
+      ParsePath(external_config_path + "config.d/" + fqrn + ".conf", true, *opt_templ_mgr);
+    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false, *opt_templ_mgr);
+    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false, *opt_templ_mgr);
   }
+  delete opt_templ_mgr;
+  opt_templ_mgr=NULL;
 }
 
 
 void OptionsManager::PopulateParameter(
   const string &param,
-  const ConfigValue val)
+  ConfigValue val,
+  OptionsTemplatingManager *opt_templ_mgr)
 {
   map<string, string>::const_iterator iter = protected_parameters_.find(param);
   if ((iter != protected_parameters_.end()) && (iter->second != val.value)) {
@@ -311,11 +315,28 @@ void OptionsManager::PopulateParameter(
              param.c_str(), iter->second.c_str(), val.value.c_str());
     return;
   }
-
+  if(opt_templ_mgr != NULL) {
+    ParseValue(&val, opt_templ_mgr);
+  }
   config_[param] = val;
   if (taint_environment_) {
     int retval = setenv(param.c_str(), val.value.c_str(), 1);
     assert(retval == 0);
+  }
+}
+
+void OptionsManager::ParseValue(ConfigValue *val, OptionsTemplatingManager *opt_templ_mgr) {
+  vector<string> tokens = SplitString(val->value, '@');
+  if (tokens.size()>2) {
+    string resStr = "";
+    for (unsigned int i = 0; i<tokens.size(); i++) {
+      if (i%2==0) {
+        resStr+=tokens[i];
+      } else {
+        resStr+=opt_templ_mgr->GetVal(tokens[i]);
+      }
+    }
+    val->value = resStr;
   }
 }
 
@@ -423,7 +444,7 @@ void OptionsManager::SetValue(const string &key, const string &value) {
   ConfigValue config_value;
   config_value.source = "@INTERNAL@";
   config_value.value = value;
-  PopulateParameter(key, config_value);
+  PopulateParameter(key, config_value, NULL);
 }
 
 
@@ -432,6 +453,24 @@ void OptionsManager::UnsetValue(const string &key) {
   config_.erase(key);
   if (taint_environment_)
     unsetenv(key.c_str());
+}
+
+const std::string DefaultOptionsTemplatingManager::fqrnTemplateIdentifier = "fqrn";
+DefaultOptionsTemplatingManager::DefaultOptionsTemplatingManager(std::string fqrn) {
+  SetVal(fqrnTemplateIdentifier,fqrn);
+}
+void OptionsTemplatingManager::SetVal(std::string name, std::string val) {
+  vars[name] = val;
+}
+std::string OptionsTemplatingManager::GetVal(std::string name) {
+  if (vars.count(name)) {
+    return vars[name];
+  } else {
+    return "@" + name + "@";
+  }
+}
+bool OptionsTemplatingManager::HasVal(std::string name) {
+  return vars.count(name);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

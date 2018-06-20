@@ -16,6 +16,25 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 /**
+ * Templating manager used for variable replacement in the config file
+ */
+class OptionsTemplatingManager{
+  public:
+    void SetVal(std::string name, std::string val);
+    std::string GetVal(std::string name);
+    bool HasVal(std::string name);
+  private:
+    std::map<std::string, std::string> vars;
+};
+
+class DefaultOptionsTemplatingManager : public OptionsTemplatingManager {
+  public:
+    DefaultOptionsTemplatingManager(std::string fqrn);
+  private:
+    static const std::string fqrnTemplateIdentifier;
+};
+
+/**
  * This is the abstract base class for the different option parsers. It parses
  * and stores the information contained in different config files, keeping
  * the last parsed file that changed each property. It stores the information
@@ -37,7 +56,8 @@ class OptionsManager {
    *                     repository. If false the configuration file is in /etc
    */
   virtual void ParsePath(const std::string &config_file,
-                         const bool external) = 0;
+                         const bool external,
+                         OptionsTemplatingManager &opt_templ_mgr) = 0;
 
   /**
    * Parses the default config files for cvmfs
@@ -140,8 +160,8 @@ class OptionsManager {
   };
 
   std::string TrimParameter(const std::string &parameter);
-  void PopulateParameter(const std::string &param, const ConfigValue val);
-
+  void PopulateParameter(const std::string &param, const ConfigValue val, OptionsTemplatingManager *opt_templ_mgr);
+  void ParseValue(ConfigValue *val, OptionsTemplatingManager *opt_templ_mgr);
   std::map<std::string, ConfigValue> config_;
   std::map<std::string, std::string> protected_parameters_;
 
@@ -162,7 +182,13 @@ class OptionsManager {
  *  "KEY=VALUE".
  *
  *  No comments (#) are allowed.
+ *  No templating variables (@foo@) are allowed.
  *
+ *  @todo (steuber) Do we need template variables here?
+ *  Seems not feasable for now due to lack of fqrn in libcvmfs_cache_options.cc:75
+ *  Cannot be added since cvmcache_options_parse seems to be called without availability of fqrn sometimes (e.g. cvmfs_cache_null.cc:282)
+ *  Or with dummy template manager not replacing fqrn?
+ * 
  *  @note In order to use this parse it is necessary to execute the program
  *        with the "-o simple_options_parsing" flag
  *  @note If using IgProf profiling tool it is necessary to use this parser in
@@ -172,7 +198,8 @@ class SimpleOptionsParser : public OptionsManager {
  public:
   virtual void ParsePath(
     const std::string &config_file,
-    const bool external __attribute__((unused)))
+    const bool external __attribute__((unused)),
+    OptionsTemplatingManager &opt_templ_mgr __attribute__((unused)))
   {
     (void) TryParsePath(config_file);
   }
@@ -189,7 +216,8 @@ class SimpleOptionsParser : public OptionsManager {
  */
 class BashOptionsManager : public OptionsManager {
  public:
-  void ParsePath(const std::string &config_file, const bool external);
+  void ParsePath(const std::string &config_file, const bool external,
+    OptionsTemplatingManager &opt_templ_mgr);
 };  // class BashOptionsManager
 
 
