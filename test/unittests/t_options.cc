@@ -72,11 +72,13 @@ class T_Options : public ::testing::Test {
     return ExpectedValues(type<OptionsT>());
   }
 
-  std::string ExpectedTemplateResultString(const type<BashOptionsManager> type_specifier) {
+  std::string ExpectedTemplateResultString(
+    const type<BashOptionsManager> type_specifier) {
     return "abc/atlas.cern.ch/fourtytwo.@bar@";
   }
 
-  std::string ExpectedTemplateResultString(const type<SimpleOptionsParser> type_specifier) {
+  std::string ExpectedTemplateResultString(
+    const type<SimpleOptionsParser> type_specifier) {
     return "abc/@fqrn@/@foo@.@bar@";
   }
 
@@ -102,7 +104,8 @@ TYPED_TEST(T_Options, ParsePath) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
   const unsigned expected_number_elements = TestFixture::ExpectedValues();
-  OptionsTemplatingManager *opt_temp_mgr = new DefaultOptionsTemplatingManager("atlas.cern.ch");
+  OptionsTemplatingManager *opt_temp_mgr =
+    new DefaultOptionsTemplatingManager("atlas.cern.ch");
   opt_temp_mgr->SetVal("foo", "fourtytwo");
   options_manager.ParsePath(config_file, false, *opt_temp_mgr);
 
@@ -165,7 +168,7 @@ TYPED_TEST(T_Options, ProtectedParameter) {
   const string &config_file = TestFixture::config_file_;
   const string &config_file_2 = TestFixture::config_file_2_;
   OptionsTemplatingManager *opt_temp_mgr = new OptionsTemplatingManager();
-  
+
   options_manager.ParsePath(config_file, false, *opt_temp_mgr);
   options_manager.ParsePath(config_file_2, false, *opt_temp_mgr);
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
@@ -184,7 +187,7 @@ TYPED_TEST(T_Options, GetEnvironmentSubset) {
   const string &config_file = TestFixture::config_file_;
   OptionsTemplatingManager *opt_temp_mgr = new OptionsTemplatingManager();
   options_manager.ParsePath(config_file, false, *opt_temp_mgr);
-  
+
   EXPECT_EQ(0U,
     options_manager.GetEnvironmentSubset("NO_SUCH_PREFIX", false).size());
   EXPECT_EQ(5U, options_manager.GetEnvironmentSubset("CVMFS", false).size());
@@ -263,7 +266,8 @@ TEST(T_OptionsTemplatingManager, InsertRetrieveUpdate) {
 }
 
 TEST(T_OptionsTemplatingManager, FqrnPredefined) {
-  OptionsTemplatingManager *opt_templ_mgr = new DefaultOptionsTemplatingManager("atlas.cern.ch");
+  OptionsTemplatingManager *opt_templ_mgr =
+    new DefaultOptionsTemplatingManager("atlas.cern.ch");
   opt_templ_mgr->SetVal("foo", "bar");
   EXPECT_TRUE(opt_templ_mgr->HasVal("foo"));
   EXPECT_EQ("bar", opt_templ_mgr->GetVal("foo"));

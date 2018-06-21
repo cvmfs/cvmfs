@@ -121,7 +121,7 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
 
 void BashOptionsManager::ParsePath(const string &config_file,
                                    const bool external,
-                                   OptionsTemplatingManager &opt_templ_mgr) {
+                                   const OptionsTemplatingManager &opt_templ_mgr) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
   int retval;
   int pipe_open[2];
@@ -267,7 +267,8 @@ void OptionsManager::ParseDefault(const string &fqrn) {
   }
 
   protected_parameters_.clear();
-  DefaultOptionsTemplatingManager *opt_templ_mgr = new DefaultOptionsTemplatingManager(fqrn);
+  DefaultOptionsTemplatingManager *opt_templ_mgr =
+    new DefaultOptionsTemplatingManager(fqrn);
   ParsePath("/etc/cvmfs/default.conf", false, *opt_templ_mgr);
   vector<string> dist_defaults =
     FindFilesBySuffix("/etc/cvmfs/default.d", ".conf");
@@ -288,17 +289,21 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     domain = JoinStrings(tokens, ".");
 
     if (HasConfigRepository(fqrn, &external_config_path))
-      ParsePath(external_config_path + "domain.d/" + domain + ".conf", true, *opt_templ_mgr);
-    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false, *opt_templ_mgr);
-    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local", false, *opt_templ_mgr);
+      ParsePath(external_config_path
+        + "domain.d/" + domain + ".conf", true, *opt_templ_mgr);
+    ParsePath("/etc/cvmfs/domain.d/"
+      + domain + ".conf", false, *opt_templ_mgr);
+    ParsePath("/etc/cvmfs/domain.d/"
+      + domain + ".local", false, *opt_templ_mgr);
 
     if (HasConfigRepository(fqrn, &external_config_path))
-      ParsePath(external_config_path + "config.d/" + fqrn + ".conf", true, *opt_templ_mgr);
+      ParsePath(external_config_path
+        + "config.d/" + fqrn + ".conf", true, *opt_templ_mgr);
     ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false, *opt_templ_mgr);
     ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false, *opt_templ_mgr);
   }
   delete opt_templ_mgr;
-  opt_templ_mgr=NULL;
+  opt_templ_mgr = NULL;
 }
 
 
@@ -315,7 +320,7 @@ void OptionsManager::PopulateParameter(
              param.c_str(), iter->second.c_str(), val.value.c_str());
     return;
   }
-  if(opt_templ_mgr != NULL) {
+  if (opt_templ_mgr != NULL) {
     ParseValue(&val, opt_templ_mgr);
   }
   config_[param] = val;
@@ -325,12 +330,14 @@ void OptionsManager::PopulateParameter(
   }
 }
 
-void OptionsManager::ParseValue(ConfigValue *val, OptionsTemplatingManager *opt_templ_mgr) {
+void OptionsManager::ParseValue(
+  ConfigValue *val,
+  OptionsTemplatingManager *opt_templ_mgr) {
   vector<string> tokens = SplitString(val->value, '@');
-  if (tokens.size()>2) {
+  if (tokens.size() > 2) {
     string resStr = "";
-    for (unsigned int i = 0; i<tokens.size(); i++) {
-      if (i%2==0) {
+    for (unsigned int i = 0; i < tokens.size(); i++) {
+      if (i%2 == 0) {
         resStr+=tokens[i];
       } else {
         resStr+=opt_templ_mgr->GetVal(tokens[i]);
@@ -455,9 +462,11 @@ void OptionsManager::UnsetValue(const string &key) {
     unsetenv(key.c_str());
 }
 
-const std::string DefaultOptionsTemplatingManager::fqrnTemplateIdentifier = "fqrn";
-DefaultOptionsTemplatingManager::DefaultOptionsTemplatingManager(std::string fqrn) {
-  SetVal(fqrnTemplateIdentifier,fqrn);
+const std::string DefaultOptionsTemplatingManager
+  ::fqrnTemplateIdentifier = "fqrn";
+DefaultOptionsTemplatingManager::DefaultOptionsTemplatingManager(
+  std::string fqrn) {
+  SetVal(fqrnTemplateIdentifier, fqrn);
 }
 void OptionsTemplatingManager::SetVal(std::string name, std::string val) {
   vars[name] = val;
