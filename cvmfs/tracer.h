@@ -36,13 +36,14 @@ class Tracer : SingleCopy {
  public:
   enum TraceEvents {
     kEventOpen = 1,
-    kEventLs,
-    kEventRead,
+    kEventOpenDir,
     kEventReadlink,
-    kEventKcache,
+    kEventKcache,//TODO: What is meant by this?
     kEventLookup,
     kEventStat,
-    kEventCrowd,
+    kEventGetAttr,
+    kEventListAttr,
+    kEventCrowd,//TODO: What is meant by this?
   };
 
   Tracer();
@@ -57,6 +58,10 @@ class Tracer : SingleCopy {
                                           const std::string &msg)
   {
     if (active_) DoTrace(event, path, msg);
+  }
+
+  bool inline __attribute__((used)) IsActive() {
+    return active_;
   }
 
  private:

@@ -180,7 +180,6 @@ static bool UseWatchdog() {
   return !loader_exports_->disable_watchdog;
 }
 
-
 std::string PrintInodeGeneration() {
   return "init-catalog-revision: " +
     StringifyInt(inode_generation_info_.initial_revision) + "  " +
@@ -338,6 +337,37 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   return true;
 }
 
+static void DoTraceInode(const int event,
+                          fuse_ino_t ino,
+                          const std::string &msg)
+{
+  PathString path;
+  bool found = GetPathForInode(ino, &path);
+  if (!found) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Tracing: Could not find path for inode %" PRIu64, uint64_t(ino));
+  } else {
+    mount_point_->tracer()->Trace(event, path, msg);
+  }
+}
+
+static void DoTraceReadLink(fuse_ino_t ino) {
+  PathString path;
+  bool retval = GetPathForInode(ino, &path);
+  assert(retval); // Should pass as we previously should have already checked whether path exists...
+  catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
+    catalog::kLookupSole | catalog::kLookupRawSymlink);
+  catalog::DirectoryEntry raw_symlink;
+  retval = mount_point_->catalog_mgr()->LookupPath(path, lookup_options, &raw_symlink);
+  path = PathString(raw_symlink.symlink().c_str());
+  mount_point_->tracer()->Trace(Tracer::kEventReadlink, path, "readlink()");
+}
+
+static void inline TraceInode(const int event,
+                                fuse_ino_t ino,
+                                const std::string &msg)
+{
+  if (mount_point_->tracer()->IsActive()) DoTraceInode(event, ino, msg);
+}
 
 /**
  * Find the inode number of a file name in a directory given by inode.
@@ -487,6 +517,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 
   fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
+  TraceInode(Tracer::kEventGetAttr, ino, "getattr()");
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %" PRIu64,
            uint64_t(ino));
 
@@ -495,7 +526,6 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, EACCES);
     return;
   }
-
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
   fuse_remounter_->fence()->Leave();
@@ -526,6 +556,9 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
+  if (mount_point_->tracer()->IsActive()) {
+    DoTraceReadLink(ino);
+  }
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
@@ -581,7 +614,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   ino = catalog_mgr->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %" PRIu64,
            uint64_t(ino));
-
+  TraceInode(Tracer::kEventOpenDir, ino, "opendir()");
   if (!CheckVoms(*fuse_ctx)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
@@ -788,6 +821,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOENT);
     return;
   }
+  mount_point_->tracer()->Trace(Tracer::kEventOpen, path, "open()");
   found = GetDirentForInode(ino, &dirent);
   if (!found) {
     fuse_remounter_->fence()->Leave();
@@ -1178,6 +1212,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   struct statvfs info;
   memset(&info, 0, sizeof(info));
 
+  TraceInode(Tracer::kEventStat, ino, "statfs()");
+
   // Unmanaged cache
   if (!file_system_->cache_mgr()->quota_mgr()->HasCapability(
        QuotaManager::kCapIntrospectSize))
@@ -1232,7 +1268,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_getxattr on inode: %" PRIu64 " for xattr: %s",
            uint64_t(ino), name);
-
+  TraceInode(Tracer::kEventGetAttr, ino, "getxattr()");
   if (!CheckVoms(*fuse_ctx)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
@@ -1501,6 +1537,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
+  TraceInode(Tracer::kEventListAttr, ino, "listxattr()");
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_listxattr on inode: %" PRIu64 ", size %u [hide xattrs %d]",
            uint64_t(ino), size, mount_point_->hide_magic_xattrs());
@@ -1689,7 +1726,7 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->statfs      = cvmfs_statfs;
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
-  cvmfs_operations->forget      = cvmfs_forget;
+  cvmfs_operations->forget      = cvmfs_forget; //TODO: (steuber) Trace?
 }
 
 // Called by cvmfs_talk when switching into read-only cache mode
