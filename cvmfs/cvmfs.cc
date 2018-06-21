@@ -344,7 +344,8 @@ static void DoTraceInode(const int event,
   PathString path;
   bool found = GetPathForInode(ino, &path);
   if (!found) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Tracing: Could not find path for inode %" PRIu64, uint64_t(ino));
+    LogCvmfs(kLogCvmfs, kLogDebug,
+      "Tracing: Could not find path for inode %" PRIu64, uint64_t(ino));
   } else {
     mount_point_->tracer()->Trace(event, path, msg);
   }
@@ -353,11 +354,13 @@ static void DoTraceInode(const int event,
 static void DoTraceReadLink(fuse_ino_t ino) {
   PathString path;
   bool retval = GetPathForInode(ino, &path);
-  assert(retval); // Should pass as we previously should have already checked whether path exists...
+  // Should pass as path needs to exist at this point:
+  assert(retval);
   catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
     catalog::kLookupSole | catalog::kLookupRawSymlink);
   catalog::DirectoryEntry raw_symlink;
-  retval = mount_point_->catalog_mgr()->LookupPath(path, lookup_options, &raw_symlink);
+  retval = mount_point_->catalog_mgr()->LookupPath(
+    path, lookup_options, &raw_symlink);
   path = PathString(raw_symlink.symlink().c_str());
   mount_point_->tracer()->Trace(Tracer::kEventReadlink, path, "readlink()");
 }
@@ -1726,7 +1729,7 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->statfs      = cvmfs_statfs;
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
-  cvmfs_operations->forget      = cvmfs_forget; //TODO: (steuber) Trace?
+  cvmfs_operations->forget      = cvmfs_forget;     // TODO(steuber):  Trace?
 }
 
 // Called by cvmfs_talk when switching into read-only cache mode

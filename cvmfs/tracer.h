@@ -38,12 +38,12 @@ class Tracer : SingleCopy {
     kEventOpen = 1,
     kEventOpenDir,
     kEventReadlink,
-    kEventKcache,//TODO: What is meant by this?
+    kEventKcache,  // TODO(steuber): What is meant by this?
     kEventLookup,
     kEventStat,
     kEventGetAttr,
     kEventListAttr,
-    kEventCrowd,//TODO: What is meant by this?
+    kEventCrowd,  // TODO(steuber): What is meant by this?
   };
 
   Tracer();
