@@ -45,7 +45,7 @@ receiver::Params MakeMergeToolParams(const std::string& name) {
   receiver::Params params;
 
   const std::string sandbox_root = GetCurrentWorkingDirectory();
-  const std::string stratum0 = sandbox_root + "/" + name + "_stratum0";
+  const std::string stratum0 = sandbox_root + "/" + name ;
   const std::string temp_dir = stratum0 + "/data/txn";
 
   params.stratum0 = "file://" + stratum0;

@@ -463,8 +463,6 @@ TEST_F(T_MountPoint, QuotaMgr) {
 
 TEST_F(T_MountPoint, MountLatest) {
   CreateMiniRepository(&options_mgr_, &repo_path_);
-
-
   ASSERT_TRUE(HasSuffix(repo_path_, "repo", false));
   UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
