@@ -227,6 +227,7 @@ class DestinationFsInterface {
    * 
    * Error if:
    * - Hash file does not exist
+   * - path already exists
    * 
    * @param[in] path The path at which the file should be hardlinked.
    * @param[in] hash The content hash of the file to hardlink
@@ -236,6 +237,9 @@ class DestinationFsInterface {
   /**
    * Method removes the hardlink at the given path
    * 
+   * Error if:
+   * - unlink not successful
+   * GetRootIterator
    * @param[in] path The path which should be removed
    */
   virtual int Unlink(const PathString &path) = 0;
