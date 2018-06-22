@@ -29,8 +29,14 @@ void Tracer::Activate(
   trace_file_ = trace_file;
   buffer_size_ = buffer_size;
   flush_threshold_ = flush_threshold;
-  assert(buffer_size_ > 1);
-  assert(0 <= flush_threshold_ && flush_threshold_ < buffer_size_);
+  if (buffer_size_ <= 1 || flush_threshold_< 0
+    || flush_threshold_ >= buffer_size_) {
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn,
+      "Tracer: Could not start tracing! "
+      + "CVMFS_TRACEBUFFER needs to be larger than one"
+      + "and 0 <= CVMFS_TRACEBUFFER_THRESHOLD < CVMFS_TRACEBUFFER");
+    return;
+  }
 
   ring_buffer_ = new BufferEntry[buffer_size_];
   commit_buffer_ = new atomic_int32[buffer_size_];
@@ -42,7 +48,7 @@ void Tracer::Activate(
   retval |= pthread_mutex_init(&sig_continue_trace_mutex_, NULL);
   retval |= pthread_cond_init(&sig_flush_, NULL);
   retval |= pthread_mutex_init(&sig_flush_mutex_, NULL);
-  assert(retval == 0);
+  assert(retval == 0);  // TODO(steuber): Should this assert be changed?
 
   active_ = true;
 }
@@ -84,6 +90,7 @@ int32_t Tracer::DoTrace(
                                      &sig_continue_trace_mutex_, &timeout);
     retval |= pthread_mutex_unlock(&sig_continue_trace_mutex_);
     assert(retval == ETIMEDOUT || retval == 0);
+    // TODO(steuber): Should this assert be changed?
   }
 
   ring_buffer_[pos].time_stamp = now;
@@ -96,6 +103,7 @@ int32_t Tracer::DoTrace(
     LockMutex(&sig_flush_mutex_);
     int err_code __attribute__((unused)) = pthread_cond_signal(&sig_flush_);
     assert(err_code == 0 && "Could not signal flush thread");
+    // TODO(steuber): Should this assert be changed?
     UnlockMutex(&sig_flush_mutex_);
   }
 
@@ -115,7 +123,7 @@ void Tracer::Flush() {
     atomic_cas32(&flush_immediately_, 0, 1);
     LockMutex(&sig_flush_mutex_);
     retval = pthread_cond_signal(&sig_flush_);
-    assert(retval == 0);
+    assert(retval == 0);  // TODO(steuber): Should this assert be changed?
     UnlockMutex(&sig_flush_mutex_);
 
     GetTimespecRel(250, &timeout);
@@ -125,6 +133,7 @@ void Tracer::Flush() {
                                      &timeout);
     retval |= pthread_mutex_unlock(&sig_continue_trace_mutex_);
     assert(retval == ETIMEDOUT || retval == 0);
+    // TODO(steuber): Should this assert be changed?
   }
 }
 
@@ -149,6 +158,7 @@ void *Tracer::MainFlush(void *data) {
   LockMutex(&tracer->sig_flush_mutex_);
   FILE *f = fopen(tracer->trace_file_.c_str(), "a");
   assert(f != NULL && "Could not open trace file");
+  // TODO(steuber): Should this assert be changed?
   struct timespec timeout;
 
   do {
@@ -163,6 +173,7 @@ void *Tracer::MainFlush(void *data) {
                                       &tracer->sig_flush_mutex_,
                                       &timeout);
       assert(retval != EINVAL);
+      // TODO(steuber): Should this assert be changed?
     }
 
     int base = atomic_read32(&tracer->flushed_) % tracer->buffer_size_;
@@ -184,18 +195,19 @@ void *Tracer::MainFlush(void *data) {
       retval |= tracer->WriteCsvFile(f, tracer->ring_buffer_[pos].msg);
       retval |= (fputc(13, f) - 13) | (fputc(10, f) - 10);
       assert(retval == 0);
+      // TODO(steuber): Should this assert be changed?
 
       atomic_dec32(&tracer->commit_buffer_[pos]);
       ++i;
     }
     retval = fflush(f);
-    assert(retval == 0);
+    assert(retval == 0);  // TODO(steuber): Should this assert be changed?
     atomic_xadd32(&tracer->flushed_, i);
     atomic_cas32(&tracer->flush_immediately_, 1, 0);
 
     LockMutex(&tracer->sig_continue_trace_mutex_);
     retval = pthread_cond_broadcast(&tracer->sig_continue_trace_);
-    assert(retval == 0);
+    assert(retval == 0);  // TODO(steuber): Should this assert be changed?
     UnlockMutex(&tracer->sig_continue_trace_mutex_);
   } while ((atomic_read32(&tracer->terminate_flush_thread_) == 0) ||
            (atomic_read32(&tracer->flushed_) <
@@ -203,7 +215,7 @@ void *Tracer::MainFlush(void *data) {
 
   UnlockMutex(&tracer->sig_flush_mutex_);
   retval = fclose(f);
-  assert(retval == 0);
+  assert(retval == 0);  // TODO(steuber): Should this assert be changed?
   return NULL;
 }
 
@@ -211,7 +223,7 @@ void *Tracer::MainFlush(void *data) {
 void Tracer::Spawn() {
   if (active_) {
     int retval = pthread_create(&thread_flush_, NULL, MainFlush, this);
-    assert(retval == 0);
+    assert(retval == 0);  // TODO(steuber): Should this assert be changed?
 
     spawned_ = true;
     DoTrace(kEventStart, PathString("Tracer", 6), "Trace buffer created");
@@ -247,17 +259,17 @@ Tracer::~Tracer() {
     atomic_inc32(&terminate_flush_thread_);
     LockMutex(&sig_flush_mutex_);
     retval = pthread_cond_signal(&sig_flush_);
-    assert(retval == 0);
+    assert(retval == 0);  // TODO(steuber): Should this assert be changed?
     UnlockMutex(&sig_flush_mutex_);
     retval = pthread_join(thread_flush_, NULL);
-    assert(retval == 0);
+    assert(retval == 0);  // TODO(steuber): Should this assert be changed?
   }
 
   retval = pthread_cond_destroy(&sig_continue_trace_);
   retval |= pthread_mutex_destroy(&sig_continue_trace_mutex_);
   retval |= pthread_cond_destroy(&sig_flush_);
   retval |= pthread_mutex_destroy(&sig_flush_mutex_);
-  assert(retval == 0);
+  assert(retval == 0);  // TODO(steuber): Should this assert be changed?
 
   delete[] ring_buffer_;
   delete[] commit_buffer_;
