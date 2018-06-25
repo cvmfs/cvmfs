@@ -73,7 +73,9 @@ void cvmcache_options_set(
 
 
 int cvmcache_options_parse(SimpleOptionsParser *opts, const char *path) {
-  bool result = opts->TryParsePath(path);
+  OptionsTemplatingManager *opt_templ_mgr = new OptionsTemplatingManager();
+  bool result = opts->TryParsePath(path, *opt_templ_mgr);
+  delete opt_templ_mgr;
   return result ? 0 : -1;
 }
 

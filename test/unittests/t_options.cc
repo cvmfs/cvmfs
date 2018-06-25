@@ -72,20 +72,6 @@ class T_Options : public ::testing::Test {
     return ExpectedValues(type<OptionsT>());
   }
 
-  std::string ExpectedTemplateResultString(
-    const type<BashOptionsManager> type_specifier) {
-    return "abc/atlas.cern.ch/fourtytwo.@bar@";
-  }
-
-  std::string ExpectedTemplateResultString(
-    const type<SimpleOptionsParser> type_specifier) {
-    return "abc/@fqrn@/@foo@.@bar@";
-  }
-
-  std::string ExpectedTemplateResultString() {
-    return ExpectedTemplateResultString(type<OptionsT>());
-  }
-
  protected:
   OptionsT     options_manager_;
   UnlinkGuard  unlink_guard_;
@@ -150,7 +136,7 @@ TYPED_TEST(T_Options, ParsePath) {
   EXPECT_EQ("I", container);
 
   EXPECT_TRUE(options_manager.GetValue("FOO", &container));
-  EXPECT_EQ(TestFixture::ExpectedTemplateResultString(), container);
+  EXPECT_EQ("abc/atlas.cern.ch/fourtytwo.@bar@", container);
   EXPECT_TRUE(options_manager.GetValue("BAR", &container));
   EXPECT_EQ("abc@def.com", container);
 }

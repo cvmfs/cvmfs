@@ -57,7 +57,7 @@ class OptionsManager {
    */
   virtual void ParsePath(const std::string &config_file,
                          const bool external,
-                         const OptionsTemplatingManager &opt_templ_mgr) = 0;
+                         OptionsTemplatingManager opt_templ_mgr) = 0;
 
   /**
    * Parses the default config files for cvmfs
@@ -185,10 +185,6 @@ class OptionsManager {
  *  No comments (#) are allowed.
  *  No templating variables (@foo@) are allowed.
  *
- *  @todo (steuber) Do we need template variables here?
- *  Seems not feasable for now due to lack of fqrn in libcvmfs_cache_options.cc:75
- *  Cannot be added since cvmcache_options_parse seems to be called without availability of fqrn sometimes (e.g. cvmfs_cache_null.cc:282)
- *  Or with dummy template manager not replacing fqrn?
  * 
  *  @note In order to use this parse it is necessary to execute the program
  *        with the "-o simple_options_parsing" flag
@@ -200,12 +196,13 @@ class SimpleOptionsParser : public OptionsManager {
   virtual void ParsePath(
     const std::string &config_file,
     const bool external __attribute__((unused)),
-    const OptionsTemplatingManager &opt_templ_mgr __attribute__((unused)))
+    OptionsTemplatingManager opt_templ_mgr)
   {
-    (void) TryParsePath(config_file);
+    (void) TryParsePath(config_file, opt_templ_mgr);
   }
   // Libcvmfs returns success or failure, the fuse module fails silently
-  bool TryParsePath(const std::string &config_file);
+  bool TryParsePath(const std::string &config_file,
+    OptionsTemplatingManager opt_templ_mgr);
 };  // class SimpleOptionsManager
 
 
@@ -218,7 +215,7 @@ class SimpleOptionsParser : public OptionsManager {
 class BashOptionsManager : public OptionsManager {
  public:
   void ParsePath(const std::string &config_file, const bool external,
-    const OptionsTemplatingManager &opt_templ_mgr);
+    OptionsTemplatingManager opt_templ_mgr);
 };  // class BashOptionsManager
 
 

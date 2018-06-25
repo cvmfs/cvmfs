@@ -72,7 +72,8 @@ string OptionsManager::TrimParameter(const string &parameter) {
 }
 
 
-bool SimpleOptionsParser::TryParsePath(const string &config_file) {
+bool SimpleOptionsParser::TryParsePath(const string &config_file,
+  OptionsTemplatingManager opt_templ_mgr) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s",
       config_file.c_str());
   string line;
@@ -112,7 +113,7 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
     ConfigValue config_value;
     config_value.source = config_file;
     config_value.value = value;
-    PopulateParameter(parameter, config_value, NULL);
+    PopulateParameter(parameter, config_value, &opt_templ_mgr);
   }
   fclose(fconfig);
   return true;
@@ -121,7 +122,7 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
 
 void BashOptionsManager::ParsePath(const string &config_file,
                                    const bool external,
-                                   const OptionsTemplatingManager &opt_templ_mgr) {
+                                   OptionsTemplatingManager opt_templ_mgr) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
   int retval;
   int pipe_open[2];
@@ -289,16 +290,15 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     domain = JoinStrings(tokens, ".");
 
     if (HasConfigRepository(fqrn, &external_config_path))
-      ParsePath(external_config_path
-        + "domain.d/" + domain + ".conf", true, *opt_templ_mgr);
-    ParsePath("/etc/cvmfs/domain.d/"
-      + domain + ".conf", false, *opt_templ_mgr);
-    ParsePath("/etc/cvmfs/domain.d/"
-      + domain + ".local", false, *opt_templ_mgr);
+      ParsePath(external_config_path+ "domain.d/" + domain + ".conf",
+        true, *opt_templ_mgr);
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false, *opt_templ_mgr);
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local", false,
+      *opt_templ_mgr);
 
     if (HasConfigRepository(fqrn, &external_config_path))
-      ParsePath(external_config_path
-        + "config.d/" + fqrn + ".conf", true, *opt_templ_mgr);
+      ParsePath(external_config_path + "config.d/" + fqrn + ".conf", true,
+        *opt_templ_mgr);
     ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false, *opt_templ_mgr);
     ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false, *opt_templ_mgr);
   }
@@ -320,9 +320,7 @@ void OptionsManager::PopulateParameter(
              param.c_str(), iter->second.c_str(), val.value.c_str());
     return;
   }
-  if (opt_templ_mgr != NULL) {
-    ParseValue(&val, opt_templ_mgr);
-  }
+  ParseValue(&val, opt_templ_mgr);
   config_[param] = val;
   if (taint_environment_) {
     int retval = setenv(param.c_str(), val.value.c_str(), 1);
@@ -330,9 +328,12 @@ void OptionsManager::PopulateParameter(
   }
 }
 
-void OptionsManager::ParseValue(
-  ConfigValue *val,
+void OptionsManager::ParseValue(ConfigValue *val,
   OptionsTemplatingManager *opt_templ_mgr) {
+  if (opt_templ_mgr == NULL) {
+    // No template manager -> nothing to do here
+    return;
+  }
   vector<string> tokens = SplitString(val->value, '@');
   if (tokens.size() > 2) {
     string resStr = "";
