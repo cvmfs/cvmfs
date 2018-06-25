@@ -330,6 +330,10 @@ void OptionsManager::PopulateParameter(
 
 void OptionsManager::ParseValue(ConfigValue *val,
   OptionsTemplatingManager *opt_templ_mgr) {
+  if (opt_templ_mgr == NULL) {
+    // No template manager -> nothing to do here
+    return;
+  }
   vector<string> tokens = SplitString(val->value, '@');
   if (tokens.size() > 2) {
     string resStr = "";
