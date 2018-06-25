@@ -133,6 +133,7 @@ class CatalogTestTool : public ServerTool {
   bool Init();
   bool Apply(const std::string& id, const DirSpec& spec);
   bool ApplyAtRootHash(const shash::Any& root_hash, const DirSpec& spec);
+  bool FindEntry(const shash::Any& root_hash, const std::string& path, catalog::DirectoryEntry *entry);
   bool LookupNestedCatalogHash(const shash::Any& root_hash,
                                const std::string& path,
                                char **nc_hash);

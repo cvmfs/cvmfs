@@ -18,6 +18,7 @@
 #include "bigvector.h"
 #include "compression.h"
 #include "hash.h"
+#include "libcvmfs.h"
 #include "platform.h"
 #include "shortstring.h"
 
@@ -192,6 +193,28 @@ class DirectoryEntryBase {
     s.st_atime = mtime_;
     s.st_mtime = mtime_;
     s.st_ctime = mtime_;
+    return s;
+  }
+
+  /**
+   * Converts to a cvmfs_stat struct. This provides the
+   * information provided by stat, but also CVMFS specific
+   * information such as hash.
+   * @return the struct cvmfs_stat for this DirectoryEntry
+   */
+  inline struct cvmfs_stat GetCVMFSStatStructure() const {
+    struct cvmfs_stat s;
+    memset(&s, 0, sizeof(s));
+    s.version = 1;
+    s.struct_size = sizeof(s);
+    s.inode = inode_;
+    s.mode = mode_;
+    s.linkcount = linkcount();
+    s.uid = uid();
+    s.gid = gid();
+    s.size = size();
+    s.mtime = mtime_;
+    s.checksum = (const void *)&checksum_;
     return s;
   }
 

@@ -294,6 +294,24 @@ int cvmfs_lstat(LibContext *ctx, const char *path, struct stat *st) {
 }
 
 
+int cvmfs_ext_stat(LibContext *ctx, const char *path, struct cvmfs_stat *cst) {
+  string lpath;
+  int rc;
+  rc = expand_path(0, ctx, path, &lpath);
+  if (rc < 0) {
+    return -1;
+  }
+  path = lpath.c_str();
+
+  rc = ctx->GetExtAttr(path, cst);
+  if (rc < 0) {
+    errno = -rc;
+    return -1;
+  }
+  return 0;
+}
+
+
 int cvmfs_listdir(
   LibContext *ctx,
   const char *path,

@@ -38,6 +38,7 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdint.h>
 
 // Legacy error codes
 #define LIBCVMFS_FAIL_OK         0
@@ -121,6 +122,25 @@ struct cvmfs_nc_attr* cvmfs_nc_attr_init();
  * @param[in] nc_attr, pointer the cvmfs_nc_attr to be destroyed
  */
 void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr);
+
+struct cvmfs_stat { 
+  // Struct definition information
+  unsigned version;
+  uint64_t struct_size;
+
+  // Actual contents of stat, mapped from DirectoryEntry
+  uint64_t inode;
+  unsigned int mode;
+  uid_t uid;
+  gid_t gid;
+  uint64_t size;
+  time_t mtime;
+  uint32_t linkcount;
+  bool has_xattrs;
+  bool is_external_file;
+  const void *checksum;
+};
+
 
 /**
  * Send syslog and debug messages to log_fn instead.  This may (and probably
@@ -322,6 +342,17 @@ int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st);
  * \return 0 on success, -1 on failure (sets errno)
  */
 int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
+
+/**
+ * Get the extended CVMFS information about a file. If the file is a symlink
+ * return info about the file it points to, not the symlink itself.
+ *
+ *
+ * @param[in] path, path of file (e.g. /dir/file, not /cvmfs/repo/dir/file)
+ * @param[out] cst, cvmfs_stat buffer in which to write the result
+ * \return 0 on success, -1 on failure
+ */
+int cvmfs_ext_stat(cvmfs_context *ctx, const char *path, struct cvmfs_stat *cst);
 
 /**
  * Get list of directory contents.  The directory contents includes "." and

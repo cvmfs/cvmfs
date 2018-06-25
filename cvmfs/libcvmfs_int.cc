@@ -50,6 +50,7 @@
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
+#include "catalog.h"
 #include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"
@@ -289,6 +290,26 @@ int LibContext::GetAttr(const char *c_path, struct stat *info) {
   }
 
   *info = dirent.GetStatStructure();
+  return 0;
+}
+
+
+int LibContext::GetExtAttr(const char *c_path, struct cvmfs_stat *info) {
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
+
+  PathString p;
+  p.Assign(c_path, strlen(c_path));
+
+  catalog::DirectoryEntry dirent;
+  const bool found = GetDirentForPath(p, &dirent);
+
+  if (!found) {
+    return -ENOENT;
+  }
+
+  *info = dirent.GetCVMFSStatStructure();
   return 0;
 }
 
