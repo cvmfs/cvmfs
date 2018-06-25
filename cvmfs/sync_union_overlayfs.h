@@ -28,7 +28,7 @@ class SyncUnionOverlayfs : public SyncUnion {
                      const std::string &union_path,
                      const std::string &scratch_path);
 
-  bool Initialize();
+  bool Initialize(perf::StatisticsTemplate* statistics = NULL);
 
   void Traverse();
   static bool ReadlinkEquals(std::string const &path,

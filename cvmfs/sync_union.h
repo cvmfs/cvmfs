@@ -33,10 +33,28 @@
 #include <set>
 #include <string>
 
+#include "statistics.h"
 #include "sync_item.h"
+#include "util/pointer.h"
 #include "util/shared_ptr.h"
 
 namespace publish {
+
+struct Counters {
+  perf::Counter *n_files_added;
+  perf::Counter *n_files_removed;
+  perf::Counter *n_files_changed;
+
+  explicit Counters(perf::StatisticsTemplate statistics) {
+    n_files_added = statistics.RegisterTemplated("n_files_added",
+        "Number of files added");
+    n_files_removed = statistics.RegisterTemplated("n_files_removed",
+        "Number of files removed");
+    n_files_changed = statistics.RegisterTemplated("n_files_changed",
+        "Number of files changed");
+  }
+};  // Counters
+
 
 class AbstractSyncMediator;
 class SyncMediator;
@@ -64,7 +82,7 @@ class SyncUnion {
    * before running anything else.
    * Note: should be up-called!
    */
-  virtual bool Initialize();
+  virtual bool Initialize(perf::StatisticsTemplate* statistics = NULL);
 
   /**
    * Main routine, process scratch space
@@ -129,6 +147,11 @@ class SyncUnion {
 
   bool IsInitialized() const { return initialized_; }
   virtual bool SupportsHardlinks() const { return false; }
+
+  /**
+   * Print number of files added/changed/removed
+   */
+  void PrintStatistics();
 
  protected:
   std::string rdonly_path_;
@@ -229,6 +252,8 @@ class SyncUnion {
 
  private:
   bool initialized_;
+
+  UniquePtr<Counters> counters_;
 };  // class SyncUnion
 
 }  // namespace publish

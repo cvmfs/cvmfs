@@ -24,10 +24,10 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
     : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
       hardlink_lower_inode_(0) {}
 
-bool SyncUnionOverlayfs::Initialize() {
+bool SyncUnionOverlayfs::Initialize(perf::StatisticsTemplate *statistics) {
   // trying to obtain CAP_SYS_ADMIN to read 'trusted' xattrs in the scratch
   // directory of an OverlayFS installation
-  return ObtainSysAdminCapability() && SyncUnion::Initialize();
+  return ObtainSysAdminCapability() && SyncUnion::Initialize(statistics);
 }
 
 bool ObtainSysAdminCapabilityInternal(cap_t caps) {
