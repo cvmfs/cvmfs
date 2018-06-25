@@ -10,11 +10,15 @@
 #include <vector>
 
 #include "catalog_mgr_rw.h"
+#include "compression.h"
 #include "directory_entry.h"
 #include "manifest.h"
+#include "options.h"
 #include "server_tool.h"
 #include "statistics.h"
 #include "upload.h"
+#include "signature.h"
+
 
 /**
  * Multiple DirSpecItem objects make up a DirSpec object
@@ -121,6 +125,8 @@ class CatalogTestTool : public ServerTool {
 
   bool Init();
   bool Apply(const std::string& id, const DirSpec& spec);
+  bool ApplyAtRootHash(const shash::Any& root_hash, const DirSpec& spec);
+  bool AddNestedCatalog(const shash::Any& root_hash, const std::string& path);
 
   bool DirSpecAtRootHash(const shash::Any& root_hash, DirSpec* spec);
 
@@ -128,11 +134,19 @@ class CatalogTestTool : public ServerTool {
 
   History history() { return history_; }
 
+  std::string repo_name() { return stratum0_; }
+  std::string public_key() { return public_key_; }
+
  private:
   static upload::Spooler* CreateSpooler(const std::string& config);
 
   static manifest::Manifest* CreateRepository(const std::string& dir,
                                               upload::Spooler* spooler);
+
+  void CreateHistory(string repo_path_, manifest::Manifest *manifest, shash::Any *history_hash);
+  void CreateManifest(string repo_path_, manifest::Manifest *manifest);
+  void CreateWhitelist(string repo_path_);
+  void CreateKeys(string repo_path_, string *public_key, shash::Any *hash_cert);
 
   static catalog::WritableCatalogManager* CreateCatalogMgr(
       const shash::Any& root_hash, const std::string stratum0,
@@ -142,11 +156,15 @@ class CatalogTestTool : public ServerTool {
   const std::string name_;
 
   std::string stratum0_;
+  std::string public_key_;
   std::string temp_dir_;
 
   UniquePtr<manifest::Manifest> manifest_;
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr_;
   UniquePtr<upload::Spooler> spooler_;
   History history_;
 };
+
+void CreateMiniRepository(SimpleOptionsParser *options_mgr_, string *repo_path_);
 
 #endif  //  CVMFS_CATALOG_TEST_TOOLS_H_
