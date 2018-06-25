@@ -1729,7 +1729,7 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->statfs      = cvmfs_statfs;
   cvmfs_operations->getxattr    = cvmfs_getxattr;
   cvmfs_operations->listxattr   = cvmfs_listxattr;
-  cvmfs_operations->forget      = cvmfs_forget;     // TODO(steuber):  Trace?
+  cvmfs_operations->forget      = cvmfs_forget;
 }
 
 // Called by cvmfs_talk when switching into read-only cache mode
