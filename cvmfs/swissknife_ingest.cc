@@ -10,6 +10,7 @@
 #include "catalog_virtual.h"
 #include "logging.h"
 #include "manifest.h"
+#include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
@@ -144,7 +145,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
                                        params.tar_file, params.base_directory,
                                        params.to_delete);
-  if (!sync->Initialize()) {
+  perf::StatisticsTemplate statistics =
+        perf::StatisticsTemplate("Publish-sync", this->statistics());
+  if (!sync->Initialize(&statistics)) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "Initialization of the synchronisation "
              "engine failed");

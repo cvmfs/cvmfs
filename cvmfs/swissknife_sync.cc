@@ -43,11 +43,13 @@
 #include "platform.h"
 #include "reflog.h"
 #include "sanitizer.h"
+#include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_aufs.h"
 #include "sync_union_overlayfs.h"
 #include "util/string.h"
+
 
 using namespace std;  // NOLINT
 
@@ -534,7 +536,6 @@ bool swissknife::CommandSync::ObtainDacReadSearchCapability() {
 
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   SyncParameters params;
-
   // Initialization
   params.dir_union = MakeCanonicalPath(*args.find('u')->second);
   params.dir_scratch = MakeCanonicalPath(*args.find('s')->second);
@@ -761,6 +762,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetTTL(params.ttl_seconds);
   }
 
+
+
+
   // Either real catalogs or virtual catalog
   if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
     publish::SyncUnion *sync;
@@ -776,14 +780,16 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 3;
     }
 
-    if (!sync->Initialize()) {
+    perf::StatisticsTemplate statistics =
+          perf::StatisticsTemplate("Publish-sync", this->statistics());
+    if (!sync->Initialize(&statistics)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Initialization of the synchronisation "
                "engine failed");
       return 4;
     }
-
     sync->Traverse();
+    sync->PrintStatistics();
   } else {
     assert(!manifest->history().IsNull());
     catalog::VirtualCatalog virtual_catalog(
@@ -818,6 +824,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
+
   if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
     return 5;
@@ -828,6 +835,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
+
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
 

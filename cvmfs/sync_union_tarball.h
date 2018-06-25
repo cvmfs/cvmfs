@@ -37,7 +37,7 @@ class SyncUnionTarball : public SyncUnion {
   /*
    * Check that the tarball is actually valid and that can be open.
    */
-  bool Initialize();
+  bool Initialize(perf::StatisticsTemplate* statistics = NULL);
 
   /*
    * We start by deleting the entity that we are request to delete.

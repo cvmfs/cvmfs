@@ -42,13 +42,12 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
 
 SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
 
-bool SyncUnionTarball::Initialize() {
+bool SyncUnionTarball::Initialize(perf::StatisticsTemplate *statistics) {
   bool result;
-
   // We are just deleting entity from the repo
   if (tarball_path_ == "") {
     assert(NULL == src);
-    return SyncUnion::Initialize();
+    return SyncUnion::Initialize(statistics);
   }
 
   src = archive_read_new();
@@ -68,7 +67,7 @@ bool SyncUnionTarball::Initialize() {
     return false;
   }
 
-  return SyncUnion::Initialize();
+  return SyncUnion::Initialize(statistics);
 }
 
 /*
