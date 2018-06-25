@@ -351,20 +351,6 @@ static void DoTraceInode(const int event,
   }
 }
 
-static void DoTraceReadLink(fuse_ino_t ino) {
-  PathString path;
-  bool retval = GetPathForInode(ino, &path);
-  // Should pass as path needs to exist at this point:
-  assert(retval);
-  catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
-    catalog::kLookupSole | catalog::kLookupRawSymlink);
-  catalog::DirectoryEntry raw_symlink;
-  retval = mount_point_->catalog_mgr()->LookupPath(
-    path, lookup_options, &raw_symlink);
-  path = PathString(raw_symlink.symlink().c_str());
-  mount_point_->tracer()->Trace(Tracer::kEventReadlink, path, "readlink()");
-}
-
 static void inline TraceInode(const int event,
                                 fuse_ino_t ino,
                                 const std::string &msg)
@@ -559,9 +545,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
-  if (mount_point_->tracer()->IsActive()) {
-    DoTraceReadLink(ino);
-  }
+  TraceInode(Tracer::kEventReadlink, ino, "readlink()");
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
