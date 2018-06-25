@@ -432,9 +432,6 @@ int LibContext::ListNestedCatalog(
   size_t listlen = 0;
   AppendStringToList(NULL, buf, &listlen, buflen);
 
-  /* Add base directory, which normally has empty string mountpoint */
-  AppendStringToList("/" , buf, &listlen, buflen);
-
   // Build listing
   catalog::Catalog *parent  = found_catalog->parent() ;
   if( parent ){
@@ -443,15 +440,14 @@ int LibContext::ListNestedCatalog(
       parents.push_back(parent);
       parent = parent->parent();
     }
-    //parents.push_back(parent);
+    parents.push_back(parent);
     while(!parents.empty()){
       AppendStringToList(parents.back()->root_prefix().c_str(),
                           buf, &listlen, buflen);
       parents.pop_back();
     }
-    AppendStringToList(found_catalog->root_prefix().c_str(), buf, &listlen, buflen);
   }
-  // Only add the current catalog if it has a parent otherwise it has already been added. */
+  AppendStringToList(found_catalog->root_prefix().c_str(), buf, &listlen, buflen);
 
   std::vector<catalog::Catalog::NestedCatalog> children = found_catalog->ListOwnNestedCatalogs();
 
