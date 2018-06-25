@@ -167,3 +167,9 @@ std::string PosixDestinationFsInterface::get_visible_path(
 }
 
 const std::string PosixDestinationFsInterface::HiddenFileDir = ".data";
+
+std::string hidden_datapath = ".data";
+
+struct DestinationFsContext {
+  std::string 
+}
