@@ -1409,8 +1409,8 @@ bool MountPoint::CreateTracer() {
     if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &tracebufferSizeOpt)) {
       tracebufferSize = atoi(tracebufferSizeOpt.c_str());
     }
-    if (options_mgr_->GetValue(
-      "CVMFS_TRACEBUFFER_THRESHOLD", &tracebufferThresholdOpt)) {
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD",
+      &tracebufferThresholdOpt)) {
       tracebufferThreshold = atoi(tracebufferThresholdOpt.c_str());
     }
     LogCvmfs(kLogCvmfs, kLogDebug,
