@@ -31,19 +31,19 @@ cvmfs_run_test() {
     sudo cvmfs_talk tracebuffer flush > /dev/null
 
     if ! (check_trace 2 opendir ""\
-        && check_trace 7 getattr ""\
-        && check_trace 5 lookup "/vc"\
-        && check_trace 5 lookup "/vc/bin"\
+        && check_trace 6 getattr ""\
+        && check_trace 4 lookup "/vc"\
+        && check_trace 4 lookup "/vc/bin"\
         && check_trace 2 opendir "/vc/bin"\
-        && check_trace 5 lookup "/README"\
+        && check_trace 4 lookup "/README"\
         && check_trace 1 open "/README"\
-        && check_trace 7 getattr "/README"\
-        && check_trace 6 statfs "/README"\
-        && check_trace 8 listxattr "/README"\
-        && check_trace 7 getxattr "/README"\
-        && check_trace 5 lookup "/glite"\
-        && check_trace 3 readlink "\$(GLITE_VERSION)"\
-        && check_trace 5 lookup "/util"\
+        && check_trace 6 getattr "/README"\
+        && check_trace 5 statfs "/README"\
+        && check_trace 7 listxattr "/README"\
+        && check_trace 6 getxattr "/README"\
+        && check_trace 4 lookup "/glite"\
+        && check_trace 3 readlink "/glite"\
+        && check_trace 4 lookup "/util"\
         && check_trace 2 opendir "/util"\
 
         ); then 
