@@ -9,75 +9,35 @@
 #include "shortstring.h"
 
 /**
- * Interface to be implemented for file systems so FsObjects work with them
- */
-class FsObjectImplementor {
- public:
-  /**
-   * Method which returns the identifier (name) of the object
-   * 
-   * @returns The identifier of the object
-   */
-  virtual NameString DoGetIdentifier() = 0;
+ * The different possible types of objects
+ */ 
+enum FsObjectType {
+  FS_FILE = 1,
+  FS_SYMLINK,
+  FS_DIRECTORY
+};
 
-  /**
-   * Method which returns the path of the object relative to the root of the
-   * desired destination.
-   * 
-   * @returns The path of the object
-   */
-  virtual PathString DoGetPath() = 0;
-
-  /**
-   * Method which returns an iterator over the subdirectory described by this
-   * object
-   * 
-   * @params[out] iterator Where the iterator should be saved
-   */
-  virtual void DoGetIterator(FsIterator *iterator) = 0;
-
-  /**
-   * Method which returns the content hash of the file described by this object
-   * 
-   * @returns The content hash of the file
-   */
-  virtual shash::Any DoGetHash() = 0;
-
-  /**
-   * Method which returns the path of the symlink described by this object
-   * 
-   * @returns THe path of the symlink
-   */
-  virtual PathString DoGetDestination() = 0;
+struct FsDestinationTraversal {
+  FsObjectImplementor fsObject;
+  FsIterator iterator;
+  DestinationFs destination;
 };
 
 /**
- * Object which represents an object in a file system.
- * This can either be a file, a symlink or a directory.
+ * Interface to be implemented for file systems so FsObjects work with them
  */
-class FsObject {
- public:
-  ~FsObject() {
-    delete fs_object_implementor_;
-  }
+struct FsObjectImplementor {
+  void *(*InitiateFsObjectStruct)();
+  void  (*DestroyFsObjectStruct)();
 
-  /**
-   * The different possible types of objects
-   */ 
-  enum FsObjectType {
-    FS_FILE = 1,
-    FS_SYMLINK,
-    FS_DIRECTORY
-  };
+  FsObjectType (GetType)(void *fs_object);
 
   /**
    * Method which returns the identifier (name) of the object
    * 
    * @returns The identifier of the object
    */
-  NameString GetIdentifier() {
-    return fs_object_implementor_->DoGetIdentifier();
-  }
+  std::string (*GetIdentifier)(void *fs_object);
 
   /**
    * Method which returns the path of the object relative to the root of the
@@ -85,86 +45,38 @@ class FsObject {
    * 
    * @returns The path of the object
    */
-  PathString GetPath() {
-    return fs_object_implementor_->DoGetPath();
-  }
-
-  /**
-   * Method which returns the type of the object.
-   * 
-   * @returns The type
-   */
-  virtual FsObjectType GetType() = 0;
-
- protected:
-  explicit FsObject(FsObjectImplementor *fs_object_implementor_param) {
-    fs_object_implementor_ = fs_object_implementor_param;
-  }
-
-  FsObjectImplementor *fs_object_implementor_;
-};
-
-class FsDir : FsObject {
- public:
-  explicit FsDir(FsObjectImplementor *fs_object_implementor_param):
-            FsObject(fs_object_implementor_param) { }
-  /**
-   * Method which returns an iterator over the subdirectory described by this
-   * object
-   * 
-   * @params[out] iterator Where the iterator should be saved
-   */
-  void GetIterator(FsIterator *iterator) {
-    fs_object_implementor_->DoGetIterator(iterator);
-  }
-
-  FsObjectType GetType() {
-    return FS_DIRECTORY;
-  }
-};
-
-class FsFile : FsObject {
- public:
-  explicit FsFile(FsObjectImplementor *fs_object_implementor_param):
-            FsObject(fs_object_implementor_param) { }
+  std::string (*GetPath)(void *fs_object);
 
   /**
    * Method which returns the content hash of the file described by this object
    * 
    * @returns The content hash of the file
    */
-  shash::Any GetHash() {
-    return fs_object_implementor_->DoGetHash();
-  }
+  shash::Any (*GetHash)(void *fs_object);
 
-  FsObjectType GetType() {
-    return FS_FILE;
-  }
-};
-
-class FsSymlink : FsObject {
- public:
-  explicit FsSymlink(FsObjectImplementor *fs_object_implementor_param):
-            FsObject(fs_object_implementor_param) { }
   /**
    * Method which returns the path of the symlink described by this object
    * 
    * @returns THe path of the symlink
    */
-  PathString GetDestination() {
-    return fs_object_implementor_->DoGetDestination();
-  }
+  std::string (*GetDestination)(void *fs_object);
 
-  FsObjectType GetType() {
-    return FS_SYMLINK;
-  }
+  /**
+   * Method which returns an iterator over the subdirectory described by this
+   * object
+   * 
+   * @params[out] iterator Where the iterator should be saved
+   */
+  void (*GetIterator)(void *iterator);
 };
 
 /**
  * Iterator which allows iteration over the contents of a directory
  */
-class FsIterator {
- public:
+struct FsIterator {
+  void *(*InitiateFsIteratorContext)();
+  void  (*DestroyFsIteratorContext)();
+
   /**
    * Method which retrieves the current iterator element.
    * If no elements are left NULL is returned.
@@ -173,14 +85,14 @@ class FsIterator {
    * 
    * @returns A pointer to the current File System object of the iterator
    */
-  virtual FsObject *GetCurrent() = 0;
+  void (GetCurrent)(void *iteratorCtx, void *fsObject);
 
   /**
    * Method which checks if there are any elements left
    * 
    * @returns True if there is an element, false if not
    */
-  virtual bool HasCurrent() = 0;
+  bool (HasCurrent)(void *iteratorCtx);
 
   /**
    * Method which sets the current element (retrievable by GetCurrent())
@@ -189,21 +101,20 @@ class FsIterator {
    * Silently fails if no more elements are available GetGurrent will then
    * return NULL
    */
-  virtual void Step() = 0;
+  void (Step)(void *iterator);
 };
 
-/**
- * Interface which represents functionality for a destination file system
- */
-class DestinationFsInterface {
- public:
+struct DestinationFs {
+  void *(*InitiateDestFsContext(const char *dest));
+  void (*DestroyDestFsContext)(void *ctx);
+
   /**
    * Method which returns an iterator over all files, symlinks and directories
    * in the root destination directory
    * 
    * @params[out] iterator Where the iterator should be saved
    */
-  virtual void GetRootIterator(FsIterator* iter) = 0;
+  void (*GetRootIterator)(void *ctx, void *iterator);
 
   /**
    * Method which checks whether the file described by the given content hash
@@ -212,11 +123,11 @@ class DestinationFsInterface {
    * This should always be realised by a file system lookup since the all files
    * should be hardlinked once by their content hash.
    * 
-   * @param[in] hash The content hash of the file that should searched
+   * @param[in] hash The content hash of the file that should searchedc
    * @returns True if file was found, false if not
    * 
    */
-  virtual bool HasFile(const shash::Any &hash) = 0;
+  bool (*HasFile)(void *ctx, const shash::Any hash);
 
   /**
    * Method which creates a hardlink from the given path to the file identified
@@ -232,7 +143,7 @@ class DestinationFsInterface {
    * @param[in] path The path at which the file should be hardlinked.
    * @param[in] hash The content hash of the file to hardlink
    */
-  virtual int Link(const PathString &path, const shash::Any &hash) = 0;
+  int (*Link)(void *ctx, const char *path, shash::Any hash);
 
   /**
    * Method removes the hardlink at the given path
@@ -242,21 +153,21 @@ class DestinationFsInterface {
    * GetRootIterator
    * @param[in] path The path which should be removed
    */
-  virtual int Unlink(const PathString &path) = 0;
+  int (*Unlink)(void *ctx, const char *path);
 
   /**
    * Method which will create the given directory
    * 
    * @param[in] path The path to the directory that should be created
    */
-  virtual int CreateDirectory(const PathString &path) = 0;
+  int (*CreateDirectory)(void *ctx, const char *path);
 
   /**
    * Method which removes the given directory
    * 
    * @param[in] path The path to the directory that should be removed
    */
-  virtual int RemoveDirectory(const PathString &path) = 0;
+  int (*RemoveDirectory)(void *ctx, const char *path);
 
   /**
    * Method which creates a copy of the given file on the destination file
@@ -265,7 +176,7 @@ class DestinationFsInterface {
    * @param[in] fd A file descriptor to use for reading the file
    * @param[in] hash A hash by which the file can be identified (content hash)
    */
-  virtual int CopyFile(const FILE *fd, const shash::Any &hash) = 0;
+  int (*CopyFile)(void *ctx, FILE *fd, shash::Any hash);  // TODO(steuber): shash FILE -> c?
 
   /**
    * Method which creates a symlink at src which points to dest
@@ -273,13 +184,13 @@ class DestinationFsInterface {
    * @param[in] The position at which the symlink should be saved
    * @param[in] The position the symlink should point to
    */
-  virtual int CreateSymlink(const PathString &src, const PathString &dest) = 0;
+  int (*CreateSymlink)(void *ctx, const char *src, const char *dest);
 
   /**
    * Method which executes a garbage collection on the destination file system.
    * This will remove all no longer linked content adressed files
    */
-  virtual int GarbageCollection() = 0;
+  int (*GarbageCollection)(void *ctx);
 };
 
 #endif  // CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
