@@ -209,7 +209,7 @@ bool CatalogTestTool::Init() {
 
   const std::string sandbox_root = GetCurrentWorkingDirectory();
 
-  stratum0_ = sandbox_root + "/" + name_ ;
+  stratum0_ = sandbox_root + "/" + name_;
   MkdirDeep(stratum0_ + "/data", 0777);
   MakeCacheDirectories(stratum0_ + "/data", 0777);
   temp_dir_ = stratum0_ + "/data/txn";
@@ -317,6 +317,48 @@ bool CatalogTestTool::AddNestedCatalog(const shash::Any& root_hash, const std::s
   catalog_mgr->CreateNestedCatalog(path);
 
   if (!catalog_mgr->Commit(false, 0, manifest_)) {
+    return false;
+  }
+
+  return true;
+}
+
+bool CatalogTestTool::FindEntry(const shash::Any& root_hash, const std::string& path, catalog::DirectoryEntry *entry) {
+  perf::Statistics stats;
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
+                       download_manager(), &stats));
+  if (!catalog_mgr.IsValid()) {
+    return false;
+  }
+
+  if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, entry)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for directory '%s' cannot be found",
+             path.c_str());
+    return false;
+  }
+
+  return true;
+}
+
+bool CatalogTestTool::FindNestedFileCatalogHash(const shash::Any& root_hash, const std::string& path, shash::Any *nc_hash, uint64_t *size)
+{
+  perf::Statistics stats;
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
+                       download_manager(), &stats));
+  if (!catalog_mgr.IsValid()) {
+    return false;
+  }
+
+  PathString p;
+  p.Assign(&path[0], path.length());
+  bool retval = catalog_mgr->GetRootCatalog()->FindNested(p, nc_hash, size);
+  if (!retval) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "nested catalog for directory '%s' cannot be found",
+             path.c_str());
     return false;
   }
 
@@ -550,5 +592,3 @@ void CreateMiniRepository(SimpleOptionsParser *options_mgr_, string *repo_path_)
   options_mgr_->SetValue("CVMFS_HTTP_PROXY", "DIRECT");
   options_mgr_->SetValue("CVMFS_PUBLIC_KEY", tester.public_key());
 }
-
-

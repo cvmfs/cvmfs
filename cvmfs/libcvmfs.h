@@ -37,6 +37,7 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdint.h>
 
 // Legacy error codes
 #define LIBCVMFS_FAIL_OK         0
@@ -91,6 +92,13 @@ typedef enum {
   LIBCVMFS_ERR_LOCK_WORKSPACE,
   LIBCVMFS_ERR_REVISION_BLACKLISTED,
 } cvmfs_errors;
+
+
+struct cvmfs_nc_stat {
+  const char *mountpoint;
+  const void *hash;
+  uint64_t size;
+};
 
 
 /**
@@ -309,6 +317,44 @@ int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
  * \return 0 on success, -1 on failure (sets errno)
  */
 int cvmfs_listdir(
+  cvmfs_context *ctx,
+  const char *path,
+  char ***buf,
+  size_t *buflen);
+
+/**
+ * Get the CVMFS information about a nested catalog. The information returned
+ * pertains to the catalog that serves this path, if this path is a transition
+ * point, then the information is about this transition point.
+ *
+ *
+ * @param[in] path, path of nested catalog (e.g. /dir, not /cvmfs/repo/dir)
+ * @param[out] ncst, cvmfs_nc_stat buffer in which to write the result
+ * \return 0 on success, -1 on failure
+ */
+int cvmfs_stat_nested_catalog(
+  cvmfs_context *ctx, 
+  const char *path, 
+  struct cvmfs_nc_stat *ncst);
+
+/**
+* Get list of nested catalog at path. The list contents includes the empty string 
+* for the base and each nested catalog needed to reach this location. It also 
+* contains the list of nested catalogs reachable directly from the nested catalog
+* serving this location. If this is a transition point, the nested catalog at this 
+* location is used.
+*
+* On return, the array will contain a NULL-terminated list of strings.  The
+* caller must free the strings and the array containing them.  The array (*buf)
+* may be NULL when this function is called.
+*
+* @param[in] path, path of nested catalog (e.g. /dir, not /cvmfs/repo/dir)
+* @param[out] buf, pointer to dynamically allocated NULL-terminated array of
+*             strings
+* @param[in] buflen, pointer to variable containing size of array
+* \return 0 on success, -1 on failure (sets errno)
+*/
+int cvmfs_list_nested_catalog(
   cvmfs_context *ctx,
   const char *path,
   char ***buf,

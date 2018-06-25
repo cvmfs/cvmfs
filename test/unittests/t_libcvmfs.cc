@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <errno.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -12,6 +14,8 @@
 #include "duplex_sqlite3.h"
 #include "libcvmfs.h"
 #include "util/posix.h"
+#include "catalog_test_tools.h"
+#include "options.h"
 
 using namespace std;  // NOLINT
 
@@ -45,6 +49,8 @@ class T_Libcvmfs : public ::testing::Test {
     fclose(fdevnull_);
     if (tmp_path_ != "")
       RemoveTree(tmp_path_);
+    if (repo_path_ != "")
+      RemoveTree(repo_path_);
     cvmfs_set_log_fn(NULL);
 
     EXPECT_EQ(0, chdir(previous_working_directory_.c_str()));
@@ -63,10 +69,23 @@ class T_Libcvmfs : public ::testing::Test {
   // back to it in the test's TearDown().
   string previous_working_directory_;
 
+  SimpleOptionsParser options_mgr_;
+
   string tmp_path_;
+  string repo_path_;
   string alien_path_;
   string opt_cache_;
   FILE *fdevnull_;
+
+  int fd_cwd_;
+  unsigned used_fds_;
+
+  /**
+   * Initialize libuuid / open file descriptor on /dev/urandom
+   */
+
+
+
 };
 
 bool T_Libcvmfs::first_test = true;
@@ -224,6 +243,7 @@ TEST_F(T_Libcvmfs, Attachv2) {
   cvmfs_option_map *opts = cvmfs_options_init();
 
   cvmfs_options_set(opts, "CVMFS_CACHE_DIR", tmp_path_.c_str());
+  
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
   cvmfs_option_map *opts_repo = cvmfs_options_clone(opts);
@@ -264,3 +284,252 @@ TEST_F(T_Libcvmfs, Templating) {
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }
+
+const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
+                        "26ab0db90d72e28ad0ba1e22ee510510000000",
+                        "6d7fce9fee471194aa8b5b6e47267f03000000",
+                        "48a24b70a0b376535542b996af517398000000",
+                        "1dcca23355272056f04fe8bf20edfce0000000",
+                        "11111111111111111111111111111111111111"};
+
+const size_t file_size = 4096;
+
+DirSpec MakeBaseSpec() {
+  DirSpec spec;
+
+
+  // adding "/dir"
+  EXPECT_TRUE(spec.AddDirectory("dir", "", file_size));
+
+  // adding "/dir/file1"
+  EXPECT_TRUE(spec.AddFile("file1", "dir", hashes[0], file_size));
+
+  // adding "/dir/dir"
+  EXPECT_TRUE(spec.AddDirectory("dir",  "dir", file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir2", "dir", file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir3", "dir", file_size));
+
+  // adding "/dir/dir/file2"
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir", hashes[1], file_size));
+
+  // adding "/dir/dir2/file2"
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir2", hashes[3], file_size));
+
+  // adding "/dir/dir3/file2"
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir3", hashes[4], file_size));
+
+
+
+  // adding "/file3"
+  EXPECT_TRUE(spec.AddFile("file3", "", hashes[2], file_size));
+
+  return spec;
+}
+
+TEST_F(T_Libcvmfs, Stat) {
+
+  cvmfs_option_map *opts = cvmfs_options_init();
+  
+  CatalogTestTool tester("stat");
+
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec1 = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+
+  cvmfs_options_set(opts,"CVMFS_ROOT_HASH",
+                        tester.manifest()->catalog_hash().ToString().c_str());
+  cvmfs_options_set(opts,"CVMFS_SERVER_URL", ("file://" + tester.repo_name()).c_str());
+  cvmfs_options_set(opts,"CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts,"CVMFS_PUBLIC_KEY", tester.public_key().c_str());
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", (tester.repo_name()+"/data/txn").c_str());
+  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
+
+
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  cvmfs_context *ctx;
+  EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
+
+  struct stat st;
+  int retval = cvmfs_stat(ctx, "dir/file1", &st);
+  EXPECT_EQ(0, retval);
+  EXPECT_TRUE(st.st_mode & S_IFREG);
+  retval = cvmfs_stat(ctx, "dir/dir", &st);
+  EXPECT_EQ(0, retval);
+  EXPECT_TRUE(st.st_mode & S_IFDIR);
+  retval = cvmfs_stat(ctx, "dir/file4", &st);
+  EXPECT_EQ(-1, retval);
+
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}
+
+
+TEST_F(T_Libcvmfs, StatExt) {
+
+  cvmfs_option_map *opts = cvmfs_options_init();
+  
+  CatalogTestTool tester("ext-stat");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec1 = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+
+  catalog::DirectoryEntry entry;
+  EXPECT_TRUE(tester.FindEntry(tester.manifest()->catalog_hash(), "/dir/file1", &entry));
+
+  cvmfs_options_set(opts,"CVMFS_ROOT_HASH",
+                        tester.manifest()->catalog_hash().ToString().c_str());
+  cvmfs_options_set(opts,"CVMFS_SERVER_URL", ("file://" + tester.repo_name()).c_str());
+  cvmfs_options_set(opts,"CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts,"CVMFS_PUBLIC_KEY", tester.public_key().c_str());
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", (tester.repo_name()+"/data/txn").c_str());
+  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
+
+
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  cvmfs_context *ctx;
+  EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
+  
+  struct cvmfs_stat st;
+  int retval = cvmfs_ext_stat(ctx, "/dir/file1", &st);
+  EXPECT_EQ(0, retval);
+  EXPECT_TRUE(!strcmp(((shash::Any *)st.checksum)->ToString().c_str(), entry.checksum().ToString().c_str()));
+  EXPECT_EQ(st.size, file_size);
+
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}
+
+TEST_F(T_Libcvmfs, Listdir) {
+
+  cvmfs_option_map *opts = cvmfs_options_init();
+  
+  CatalogTestTool tester("list");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec1 = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+
+  cvmfs_options_set(opts,"CVMFS_ROOT_HASH",
+                        tester.manifest()->catalog_hash().ToString().c_str());
+  cvmfs_options_set(opts,"CVMFS_SERVER_URL", ("file://" + tester.repo_name()).c_str());
+  cvmfs_options_set(opts,"CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts,"CVMFS_PUBLIC_KEY", tester.public_key().c_str());
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", (tester.repo_name()+"/data/txn").c_str());
+  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
+
+
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  cvmfs_context *ctx;
+  EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
+
+  char **buf = NULL;
+  size_t buflen = 0;
+  cvmfs_listdir(ctx, "dir/dir", &buf, &buflen);
+  // The buf length should be at least 3
+  EXPECT_LE(3, buflen);
+  // Check that listed info matches specified dir
+  EXPECT_TRUE(!strcmp(".",  buf[0]));
+  EXPECT_TRUE(!strcmp("..", buf[1]));
+  EXPECT_TRUE(!strcmp("file2",  buf[2]));
+  // The 'last' value is null
+  EXPECT_TRUE(!buf[3]);
+
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}
+
+TEST_F(T_Libcvmfs, StatNestedCatalog) {
+
+  cvmfs_option_map *opts = cvmfs_options_init();
+  
+  CatalogTestTool tester("stat_nc");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec1 = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+  EXPECT_TRUE(tester.AddNestedCatalog(tester.manifest()->catalog_hash(), "dir"));
+
+  uint64_t size;
+  shash::Any nc_hash;
+  EXPECT_TRUE(tester.FindNestedFileCatalogHash(tester.manifest()->catalog_hash(), "/dir", &nc_hash, &size));
+
+  cvmfs_options_set(opts,"CVMFS_ROOT_HASH",
+                        tester.manifest()->catalog_hash().ToString().c_str());
+  cvmfs_options_set(opts,"CVMFS_SERVER_URL", ("file://" + tester.repo_name()).c_str());
+  cvmfs_options_set(opts,"CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts,"CVMFS_PUBLIC_KEY", tester.public_key().c_str());
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", (tester.repo_name()+"/data/txn").c_str());
+  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
+
+
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  cvmfs_context *ctx;
+  EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
+
+  struct cvmfs_nc_stat st;
+  cvmfs_stat_nested_catalog(ctx, "dir", &st);
+  EXPECT_TRUE(!strcmp(nc_hash.ToString().c_str(), ((shash::Any *)st.hash)->ToString().c_str()));
+  EXPECT_EQ(size, st.size);
+
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}
+
+
+
+TEST_F(T_Libcvmfs, ListNestedCatalog) {
+
+  cvmfs_option_map *opts = cvmfs_options_init();
+  
+  CatalogTestTool tester("list_nc");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec1 = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+  EXPECT_TRUE(tester.AddNestedCatalog(tester.manifest()->catalog_hash(), "dir"));
+  EXPECT_TRUE(tester.AddNestedCatalog(tester.manifest()->catalog_hash(), "dir/dir"));
+  EXPECT_TRUE(tester.AddNestedCatalog(tester.manifest()->catalog_hash(), "dir/dir2"));
+  EXPECT_TRUE(tester.AddNestedCatalog(tester.manifest()->catalog_hash(), "dir/dir3"));
+
+  cvmfs_options_set(opts,"CVMFS_ROOT_HASH",
+                        tester.manifest()->catalog_hash().ToString().c_str());
+  cvmfs_options_set(opts,"CVMFS_SERVER_URL", ("file://" + tester.repo_name()).c_str());
+  cvmfs_options_set(opts,"CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts,"CVMFS_PUBLIC_KEY", tester.public_key().c_str());
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", (tester.repo_name()+"/data/txn").c_str());
+  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
+
+
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  cvmfs_context *ctx;
+  EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
+
+  char **buf = NULL;
+  size_t buflen = 0;
+  EXPECT_TRUE(!cvmfs_list_nested_catalog(ctx, "dir", &buf, &buflen));
+  EXPECT_TRUE(!strcmp("/",  buf[0]));
+  EXPECT_TRUE(!strcmp("/dir", buf[1]));
+  EXPECT_TRUE(!strcmp("/dir/dir",  buf[2]));
+  EXPECT_TRUE(!strcmp("/dir/dir2",  buf[3]));
+  EXPECT_TRUE(!strcmp("/dir/dir3",  buf[4]));
+
+  buf = NULL;
+  buflen = 0;
+  EXPECT_TRUE(!cvmfs_list_nested_catalog(ctx, "/dir/dir", &buf, &buflen));
+  EXPECT_TRUE(!strcmp("/",  buf[0]));
+  EXPECT_TRUE(!strcmp("/dir", buf[1]));
+  EXPECT_TRUE(!strcmp("/dir/dir",  buf[2]));
+
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}
+
+
+

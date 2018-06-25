@@ -208,6 +208,8 @@ class AbstractCatalogManager : public SingleCopy {
     return (inode <= kInodeOffset) ? GetRootInode() : inode;
   }
 
+  CatalogT *FindCatalog(const PathString &path) const;
+
  protected:
   /**
    * Load the catalog and return a file name and the catalog hash. Derived
@@ -246,8 +248,6 @@ class AbstractCatalogManager : public SingleCopy {
   void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
   bool IsAttached(const PathString &root_path,
                   CatalogT **attached_catalog) const;
-
-  CatalogT *FindCatalog(const PathString &path) const;
 
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);
