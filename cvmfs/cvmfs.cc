@@ -1761,7 +1761,8 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
 
   if (loader_exports->config_files != "") {
     vector<string> tokens = SplitString(loader_exports->config_files, ':');
-    DefaultOptionsTemplatingManager *opt_templ_mgr = new DefaultOptionsTemplatingManager(loader_exports->repository_name);
+    DefaultOptionsTemplatingManager *opt_templ_mgr =
+      new DefaultOptionsTemplatingManager(loader_exports->repository_name);
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
       cvmfs::options_mgr_->ParsePath(tokens[i], false, *opt_templ_mgr);
     }

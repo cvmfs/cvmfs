@@ -181,14 +181,17 @@ static void ReadConfigurations() {
     string optarg;
     UniquePtr<OptionsManager> options_mgr(new BashOptionsManager());
     options_mgr->set_taint_environment(false);
-    OptionsTemplatingManager *opt_templ_mgr = new DefaultOptionsTemplatingManager(name);
-    options_mgr->ParsePath(repo_config_dirs[i] + "/server.conf", false, *opt_templ_mgr);
+    OptionsTemplatingManager *opt_templ_mgr =
+      new DefaultOptionsTemplatingManager(name);
+    options_mgr->ParsePath(repo_config_dirs[i] + "/server.conf",
+      false, *opt_templ_mgr);
     if (!options_mgr->GetValue("CVMFS_REPOSITORY_TYPE", &optarg) ||
         (optarg != "stratum1"))
     {
       continue;
     }
-    options_mgr->ParsePath(repo_config_dirs[i] + "/replica.conf", false, *opt_templ_mgr);
+    options_mgr->ParsePath(repo_config_dirs[i] + "/replica.conf",
+      false, *opt_templ_mgr);
     delete opt_templ_mgr;
     opt_templ_mgr = NULL;
     if (options_mgr->GetValue("CVMFS_STRATUM_AGENT", &optarg) &&

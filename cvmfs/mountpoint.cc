@@ -11,8 +11,8 @@
 #endif
 #include <inttypes.h>
 #include <stdint.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
@@ -1126,7 +1126,7 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
   if (!mountpoint->CreateTracer())
     return mountpoint.Release();
-  
+
   mountpoint->ReEvaluateAuthz();
   mountpoint->CreateTables();
   mountpoint->SetupBehavior();
@@ -1406,13 +1406,15 @@ bool MountPoint::CreateTracer() {
 
     string tracebufferSizeOpt;
     string tracebufferThresholdOpt;
-    if(options_mgr_->GetValue("CVMFS_TRACEBUFFER", &tracebufferSizeOpt)){
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &tracebufferSizeOpt)) {
       tracebufferSize = atoi(tracebufferSizeOpt.c_str());
     }
-    if(options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD", &tracebufferThresholdOpt)){
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD",
+      &tracebufferThresholdOpt)) {
       tracebufferThreshold = atoi(tracebufferThresholdOpt.c_str());
     }
-    LogCvmfs(kLogCvmfs, kLogDebug, "Initialising tracer with buffer size %i and threshold %i",
+    LogCvmfs(kLogCvmfs, kLogDebug,
+      "Initialising tracer with buffer size %i and threshold %i",
       tracebufferSize, tracebufferThreshold);
     tracer_->Activate(tracebufferSize, tracebufferThreshold, optarg);
   }
