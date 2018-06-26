@@ -32,7 +32,8 @@ namespace publish {
 AbstractSyncMediator::~AbstractSyncMediator() {}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
-                           const SyncParameters *params) :
+                           const SyncParameters *params,
+                           perf::StatisticsTemplate statistics) :
   catalog_manager_(catalog_manager),
   union_engine_(NULL),
   handle_hardlinks_(false),
@@ -45,6 +46,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
+  counters_ = new Counters(statistics);
 }
 
 
@@ -87,7 +89,14 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
   if (entry->IsDirectory()) {
     AddDirectoryRecursively(entry);
+    if (counters_.IsValid()) {
+      Inc(counters_->n_directories_added);
+    }
     return;
+  }
+
+  if (counters_.IsValid()) {
+    Inc(counters_->n_files_added);
   }
 
   if (entry->IsRegularFile() || entry->IsSymlink()) {
@@ -132,11 +141,22 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
   if (entry->IsGraftMarker()) {return;}
   if (entry->IsDirectory()) {
     TouchDirectory(entry);
+    if (counters_.IsValid()) {
+      Inc(counters_->n_directories_changed);
+    }
     return;
+  }
+
+  if (counters_.IsValid()) {
+    Inc(counters_->n_files_changed);
   }
 
   if (entry->IsRegularFile() || entry->IsSymlink() || entry->IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
+    if (counters_.IsValid()) {
+      Dec(counters_->n_files_added);    // Replace calls Add
+      Dec(counters_->n_files_removed);  // Replace calls Remove
+    }
     return;
   }
 
@@ -153,7 +173,14 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
 
   if (entry->WasDirectory()) {
     RemoveDirectoryRecursively(entry);
+    if (counters_.IsValid()) {
+      Inc(counters_->n_directories_removed);
+    }
     return;
+  }
+
+  if (counters_.IsValid()) {
+    Inc(counters_->n_files_removed);
   }
 
   if (entry->WasRegularFile() || entry->WasSymlink() ||
@@ -945,6 +972,26 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
     group.file_chunks);
   if (xattrs != &default_xattrs)
     free(xattrs);
+}
+
+void SyncMediator::PrintStatistics() {
+  if (counters_.IsValid()) {
+    LogCvmfs(kLogPublish, kLogStdout, "Statistics:");
+    LogCvmfs(kLogPublish, kLogStdout, "Files         added: %s",
+      counters_->n_files_added->Print().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "Files       removed: %s",
+      counters_->n_files_removed->Print().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "Files       changed: %s",
+      counters_->n_files_changed->Print().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "Directories   added: %s",
+      counters_->n_directories_added->Print().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "Directories removed: %s",
+      counters_->n_directories_removed->Print().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "Directories changed: %s",
+      counters_->n_directories_changed->Print().c_str());
+  } else {
+    LogCvmfs(kLogPublish, kLogStderr, "Publish statistics failed.");
+  }
 }
 
 }  // namespace publish

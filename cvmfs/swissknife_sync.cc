@@ -43,6 +43,7 @@
 #include "platform.h"
 #include "reflog.h"
 #include "sanitizer.h"
+#include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_aufs.h"
@@ -749,7 +750,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  publish::SyncMediator mediator(&catalog_manager, &params);
+  perf::StatisticsTemplate statistics =
+          perf::StatisticsTemplate("Publish-sync", this->statistics());
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations
@@ -784,6 +787,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
 
     sync->Traverse();
+    mediator.PrintStatistics();
   } else {
     assert(!manifest->history().IsNull());
     catalog::VirtualCatalog virtual_catalog(
