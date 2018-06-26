@@ -140,7 +140,7 @@ struct cvmfs_stat {
   uint64_t st_blocks;
   time_t   mtime;
 
-  // Actual contents of stat, mapped from DirectoryEntry
+  // CVMFS related content
   const void * cvm_checksum;
   const char * cvm_symlink;
   const char * cvm_name;
