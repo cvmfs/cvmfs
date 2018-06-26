@@ -95,16 +95,15 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     return;
   }
 
-  if (counters_.IsValid()) {
-    Inc(counters_->n_files_added);
-  }
-
   if (entry->IsRegularFile() || entry->IsSymlink()) {
     // A file is a hard link if the link count is greater than 1
     if (entry->HasHardlinks() && handle_hardlinks_)
       InsertHardlink(entry);
     else
       AddFile(entry);
+    if (counters_.IsValid()) {
+      Inc(counters_->n_files_added);
+    }
     return;
   } else if (entry->IsGraftMarker()) {
     LogCvmfs(kLogPublish, kLogDebug, "Ignoring graft marker file.");
@@ -123,6 +122,9 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
         InsertHardlink(entry);
       else
         AddFile(entry);
+      if (counters_.IsValid()) {
+        Inc(counters_->n_files_added);
+      }
     }
     return;
   }
@@ -147,13 +149,10 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
     return;
   }
 
-  if (counters_.IsValid()) {
-    Inc(counters_->n_files_changed);
-  }
-
   if (entry->IsRegularFile() || entry->IsSymlink() || entry->IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
     if (counters_.IsValid()) {
+      Inc(counters_->n_files_changed);
       Dec(counters_->n_files_added);    // Replace calls Add
       Dec(counters_->n_files_removed);  // Replace calls Remove
     }
@@ -179,13 +178,12 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
     return;
   }
 
-  if (counters_.IsValid()) {
-    Inc(counters_->n_files_removed);
-  }
-
   if (entry->WasRegularFile() || entry->WasSymlink() ||
       entry->WasSpecialFile()) {
     RemoveFile(entry);
+    if (counters_.IsValid()) {
+      Inc(counters_->n_files_removed);
+    }
     return;
   }
 
