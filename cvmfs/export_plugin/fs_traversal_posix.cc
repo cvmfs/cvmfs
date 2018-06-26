@@ -17,60 +17,59 @@
 #include "string.h"
 #include "util/posix.h"
 
-PosixFsObjectImplementor::PosixFsObjectImplementor(PathString path_param) {
-  path_ = path_param;
-}
 
-NameString PosixFsObjectImplementor::DoGetIdentifier() {
-  return GetFileName(path_);
-}
-
-PathString PosixFsObjectImplementor::DoGetPath() {
-  return path_;
-}
-
-void PosixFsObjectImplementor::DoGetIterator(FsIterator *iterator) {
-  assert(true);  // TODO(steuber): Assert folder
-}
-
-shash::Any PosixFsObjectImplementor::DoGetHash() {
-  assert(true);  // TODO(steuber): Assert file
-}
-
-PathString PosixFsObjectImplementor::DoGetDestination() {
-  assert(true);  // TODO(steuber): Assert symlink
-}
-
-
-FsObject *PosixFsIterator::GetCurrent() {
-  // TODO(steuber)
-}
-
-bool PosixFsIterator::HasCurrent() {
-  // TODO(steuber)
-}
-
-void PosixFsIterator::Step() {
-  // TODO(steuber)
+void AppendStringToList(char const   *str,
+                        char       ***buf,
+                        size_t       *listlen,
+                        size_t       *buflen)
+{
+  if (*listlen + 1 >= *buflen) {
+       size_t newbuflen = (*listlen)*2 + 5;
+       *buf = reinterpret_cast<char **>(
+         realloc(*buf, sizeof(char *) * newbuflen));
+       assert(*buf);
+       *buflen = newbuflen;
+       assert(*listlen < *buflen);
+  }
+  if (str) {
+    (*buf)[(*listlen)] = strdup(str);
+    // null-terminate the list
+    (*buf)[++(*listlen)] = NULL;
+  } else {
+    (*buf)[(*listlen)] = NULL;
+  }
 }
 
 
-PosixDestinationFsInterface::PosixDestinationFsInterface(
-  PathString root_path_param) {
-  root_path_ = root_path_param;
+
+void listdir(const char *dir, char ***buf, size_t len){
+  struct dirent *de;
+
+  DIR *dr = opendir(dir);
+
+  if(dr == NULL) {
+    return;
+  }
+
+  size_t listlen = 0;
+  AppendStringToList(NULL, buf, &listlen, buflen);
+
+  while((de == readdir(dr)) != NULL){
+    AppendStringToList(de->d_name, buf, &listlen, buflen);
+  }
+
+  closedir(dr);
+  return 0;
+
 }
 
-void PosixDestinationFsInterface::GetRootIterator(FsIterator *iterator) {
-  // TODO(steuber)
+bool has_hash(void *hash) {
+  return FileExists(get_hashed_path((shash::Any *)hash));
 }
 
-bool PosixDestinationFsInterface::HasFile(const shash::Any &hash) {
-  return FileExists(get_hashed_path(hash));
-}
-
-int PosixDestinationFsInterface::Link(
+int link(
   const PathString &path,
-  const shash::Any &hash) {
+  void *hash) {
   if (!HasFile(hash)) {
     return -4;
   }

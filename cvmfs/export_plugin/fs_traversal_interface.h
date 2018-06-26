@@ -8,105 +8,29 @@
 #include "pointer.h"
 #include "shortstring.h"
 
-/**
- * The different possible types of objects
- */ 
-enum FsObjectType {
-  FS_FILE = 1,
-  FS_SYMLINK,
-  FS_DIRECTORY
+enum fs_type {
+  FS_CVMFS;
+  FS_POSIX;
+  FS_SQUASH;
 };
 
-struct FsDestinationTraversal {
-  FsObjectImplementor fsObject;
-  FsIterator iterator;
-  DestinationFs destination;
+struct fs_traversal_context {
+  uint64_t version;
+  uint64_t size;
+  fs_type type;
+
+  char *repo;
+  char *data;
+
+  void * ctx;
 };
 
-/**
- * Interface to be implemented for file systems so FsObjects work with them
- */
-struct FsObjectImplementor {
-  void *(*InitiateFsObjectStruct)();
-  void  (*DestroyFsObjectStruct)();
+struct fs_traversal {
 
-  FsObjectType (GetType)(void *fs_object);
+  struct fs_traversal_context *ctx;
 
-  /**
-   * Method which returns the identifier (name) of the object
-   * 
-   * @returns The identifier of the object
-   */
-  std::string (*GetIdentifier)(void *fs_object);
-
-  /**
-   * Method which returns the path of the object relative to the root of the
-   * desired destination.
-   * 
-   * @returns The path of the object
-   */
-  std::string (*GetPath)(void *fs_object);
-
-  /**
-   * Method which returns the content hash of the file described by this object
-   * 
-   * @returns The content hash of the file
-   */
-  shash::Any (*GetHash)(void *fs_object);
-
-  /**
-   * Method which returns the path of the symlink described by this object
-   * 
-   * @returns THe path of the symlink
-   */
-  std::string (*GetDestination)(void *fs_object);
-
-  /**
-   * Method which returns an iterator over the subdirectory described by this
-   * object
-   * 
-   * @params[out] iterator Where the iterator should be saved
-   */
-  void (*GetIterator)(void *iterator);
-};
-
-/**
- * Iterator which allows iteration over the contents of a directory
- */
-struct FsIterator {
-  void *(*InitiateFsIteratorContext)();
-  void  (*DestroyFsIteratorContext)();
-
-  /**
-   * Method which retrieves the current iterator element.
-   * If no elements are left NULL is returned.
-   * The first invocation after object construction returns the first element.
-   * Contrary to other iterators this call is idempotent!
-   * 
-   * @returns A pointer to the current File System object of the iterator
-   */
-  void (GetCurrent)(void *iteratorCtx, void *fsObject);
-
-  /**
-   * Method which checks if there are any elements left
-   * 
-   * @returns True if there is an element, false if not
-   */
-  bool (HasCurrent)(void *iteratorCtx);
-
-  /**
-   * Method which sets the current element (retrievable by GetCurrent())
-   * to the next one.
-   * 
-   * Silently fails if no more elements are available GetGurrent will then
-   * return NULL
-   */
-  void (Step)(void *iterator);
-};
-
-struct DestinationFs {
-  void *(*InitiateDestFsContext(const char *dest));
-  void (*DestroyDestFsContext)(void *ctx);
+  struct fs_traversal *(*initialize(fs_type type, const char *repo, const char *data));
+  void (*finalize)();
 
   /**
    * Method which returns an iterator over all files, symlinks and directories
@@ -114,7 +38,7 @@ struct DestinationFs {
    * 
    * @params[out] iterator Where the iterator should be saved
    */
-  void (*GetRootIterator)(void *ctx, void *iterator);
+  void (*listdir)(const char *dir, char ***buf, size_t len);
 
   /**
    * Method which checks whether the file described by the given content hash
@@ -127,7 +51,7 @@ struct DestinationFs {
    * @returns True if file was found, false if not
    * 
    */
-  bool (*HasFile)(void *ctx, const shash::Any hash);
+  bool (*has_hash)(const shash::Any hash);
 
   /**
    * Method which creates a hardlink from the given path to the file identified
@@ -143,7 +67,7 @@ struct DestinationFs {
    * @param[in] path The path at which the file should be hardlinked.
    * @param[in] hash The content hash of the file to hardlink
    */
-  int (*Link)(void *ctx, const char *path, shash::Any hash);
+  int (*link)(const char *path, void *hash);
 
   /**
    * Method removes the hardlink at the given path
@@ -153,21 +77,21 @@ struct DestinationFs {
    * GetRootIterator
    * @param[in] path The path which should be removed
    */
-  int (*Unlink)(void *ctx, const char *path);
+  int (*unlink)(const char *path);
 
   /**
    * Method which will create the given directory
    * 
    * @param[in] path The path to the directory that should be created
    */
-  int (*CreateDirectory)(void *ctx, const char *path);
+  int (*mkdir)(const char *path);
 
   /**
    * Method which removes the given directory
    * 
    * @param[in] path The path to the directory that should be removed
    */
-  int (*RemoveDirectory)(void *ctx, const char *path);
+  int (*rmdir)(const char *path);
 
   /**
    * Method which creates a copy of the given file on the destination file
@@ -176,7 +100,7 @@ struct DestinationFs {
    * @param[in] fd A file descriptor to use for reading the file
    * @param[in] hash A hash by which the file can be identified (content hash)
    */
-  int (*CopyFile)(void *ctx, FILE *fd, shash::Any hash);  // TODO(steuber): shash FILE -> c?
+  int (*copy)(const char *path, void *hash);  // TODO(steuber): shash FILE -> c?
 
   /**
    * Method which creates a symlink at src which points to dest
@@ -184,13 +108,13 @@ struct DestinationFs {
    * @param[in] The position at which the symlink should be saved
    * @param[in] The position the symlink should point to
    */
-  int (*CreateSymlink)(void *ctx, const char *src, const char *dest);
+  int (*symlink)(const char *src, const char *dest);
 
   /**
    * Method which executes a garbage collection on the destination file system.
    * This will remove all no longer linked content adressed files
    */
-  int (*GarbageCollection)(void *ctx);
+  int (*garbage_collection)();
 };
 
 #endif  // CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
