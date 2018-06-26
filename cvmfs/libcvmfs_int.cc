@@ -312,7 +312,7 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_stat *info) {
   }
 
   *info = dirent.GetCVMFSStatStructure();
-  if(dirent.HasXattrs()){
+  if ( dirent.HasXattrs() ) {
     XattrList xattrs = XattrList();
     mount_point_->catalog_mgr()->LookupXattrs(p, &xattrs);
     info->cvm_xattrs = &xattrs;
