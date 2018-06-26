@@ -10,6 +10,7 @@
 #include "catalog_virtual.h"
 #include "logging.h"
 #include "manifest.h"
+#include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
@@ -137,7 +138,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  publish::SyncMediator mediator(&catalog_manager, &params);
+  perf::StatisticsTemplate statistics =
+          perf::StatisticsTemplate("Publish-sync", this->statistics());
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   publish::SyncUnion *sync;
 
@@ -152,7 +155,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
 
   sync->Traverse();
-
+  printf("ingest......................................\n");
+  mediator.PrintStatistics();
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "Adding contents of authz file %s to"

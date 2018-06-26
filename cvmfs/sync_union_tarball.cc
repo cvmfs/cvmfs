@@ -44,7 +44,6 @@ SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
 
 bool SyncUnionTarball::Initialize() {
   bool result;
-
   // We are just deleting entity from the repo
   if (tarball_path_ == "") {
     assert(NULL == src);

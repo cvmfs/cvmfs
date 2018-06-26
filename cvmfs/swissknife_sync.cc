@@ -43,11 +43,13 @@
 #include "platform.h"
 #include "reflog.h"
 #include "sanitizer.h"
+#include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_aufs.h"
 #include "sync_union_overlayfs.h"
 #include "util/string.h"
+
 
 using namespace std;  // NOLINT
 
@@ -534,7 +536,6 @@ bool swissknife::CommandSync::ObtainDacReadSearchCapability() {
 
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   SyncParameters params;
-
   // Initialization
   params.dir_union = MakeCanonicalPath(*args.find('u')->second);
   params.dir_scratch = MakeCanonicalPath(*args.find('s')->second);
@@ -749,7 +750,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  publish::SyncMediator mediator(&catalog_manager, &params);
+  perf::StatisticsTemplate statistics =
+          perf::StatisticsTemplate("Publish-sync", this->statistics());
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations
@@ -782,8 +785,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                "engine failed");
       return 4;
     }
-
     sync->Traverse();
+    mediator.PrintStatistics();
   } else {
     assert(!manifest->history().IsNull());
     catalog::VirtualCatalog virtual_catalog(
@@ -818,6 +821,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
+
   if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
     return 5;
@@ -828,6 +832,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
+
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
 

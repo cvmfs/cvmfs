@@ -33,7 +33,9 @@
 #include <set>
 #include <string>
 
+#include "statistics.h"
 #include "sync_item.h"
+#include "util/pointer.h"
 #include "util/shared_ptr.h"
 
 namespace publish {
@@ -129,6 +131,7 @@ class SyncUnion {
 
   bool IsInitialized() const { return initialized_; }
   virtual bool SupportsHardlinks() const { return false; }
+
 
  protected:
   std::string rdonly_path_;
