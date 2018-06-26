@@ -430,6 +430,7 @@ TEST_F(T_Libcvmfs, StatExt) {
   /* Compare hash and size */
   EXPECT_TRUE(!strcmp(rw_hash, lib_hash));
   EXPECT_EQ(st.st_size, file_size);
+  EXPECT_TRUE(!st.cvm_xattrs);
 
   /* Finalize and close repo and options */
   cvmfs_fini();

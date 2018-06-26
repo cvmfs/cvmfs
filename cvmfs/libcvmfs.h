@@ -143,7 +143,7 @@ struct cvmfs_stat {
   const void * cvm_checksum;
   const char * cvm_symlink;
   const char * cvm_name;
-  bool         cvm_has_xattr;
+  void *       cvm_xattrs;
 };
 
 

@@ -73,6 +73,7 @@
 #include "sqlitevfs.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -311,6 +312,11 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_stat *info) {
   }
 
   *info = dirent.GetCVMFSStatStructure();
+  if(dirent.HasXattrs()){
+    XattrList xattrs = XattrList();
+    mount_point_->catalog_mgr()->LookupXattrs(p, &xattrs);
+    info->cvm_xattrs = &xattrs;
+  }
   return 0;
 }
 

@@ -220,7 +220,7 @@ class DirectoryEntryBase {
     s.cvm_checksum = (const void *)&checksum_;
     s.cvm_symlink  = symlink_.ToString().c_str();
     s.cvm_name     = name_.ToString().c_str();
-    s.cvm_has_xattr = has_xattrs_;
+    s.cvm_xattrs   = NULL;
     return s;
   }
 
