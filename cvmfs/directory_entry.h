@@ -205,16 +205,22 @@ class DirectoryEntryBase {
   inline struct cvmfs_stat GetCVMFSStatStructure() const {
     struct cvmfs_stat s;
     memset(&s, 0, sizeof(s));
-    s.version = 1;
-    s.struct_size = sizeof(s);
-    s.inode = inode_;
-    s.mode = mode_;
-    s.linkcount = linkcount();
-    s.uid = uid();
-    s.gid = gid();
-    s.size = size();
+    s.version  = 1;
+    s.size     = sizeof(s);
+    s.st_ino   = inode_;
+    s.st_mode  = mode_;
+    s.st_nlink = linkcount();
+    s.st_uid   = uid();
+    s.st_gid   = gid();
+    s.st_rdev  = rdev();
+    s.st_size  = size();
+    s.st_blksize = 4096;  // will be ignored by Fuse
+    s.st_blocks = 1 + size() / 512;
     s.mtime = mtime_;
-    s.checksum = (const void *)&checksum_;
+    s.cvm_checksum = (const void *)&checksum_;
+    s.cvm_symlink  = symlink_.ToString().c_str();
+    s.cvm_name     = name_.ToString().c_str();
+    s.cvm_has_xattr = has_xattrs_;
     return s;
   }
 

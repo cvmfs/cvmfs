@@ -51,6 +51,7 @@
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "catalog.h"
+#include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"

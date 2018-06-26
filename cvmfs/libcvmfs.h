@@ -37,8 +37,8 @@
 
 #include <stdint.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
-#include <stdint.h>
 
 // Legacy error codes
 #define LIBCVMFS_FAIL_OK         0
@@ -123,22 +123,28 @@ struct cvmfs_nc_attr* cvmfs_nc_attr_init();
  */
 void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr);
 
-struct cvmfs_stat { 
+struct cvmfs_stat {
   // Struct definition information
   unsigned version;
-  uint64_t struct_size;
+  uint64_t size;
 
   // Actual contents of stat, mapped from DirectoryEntry
-  uint64_t inode;
-  unsigned int mode;
-  uid_t uid;
-  gid_t gid;
-  uint64_t size;
-  time_t mtime;
-  uint32_t linkcount;
-  bool has_xattrs;
-  bool is_external_file;
-  const void *checksum;
+  uint64_t st_ino;
+  unsigned int st_mode;
+  uint32_t st_nlink;
+  uid_t    st_uid;
+  gid_t    st_gid;
+  dev_t    st_rdev;
+  uint64_t st_size;
+  uint64_t st_blksize;
+  uint64_t st_blocks;
+  time_t   mtime;
+
+  // Actual contents of stat, mapped from DirectoryEntry
+  const void * cvm_checksum;
+  const char * cvm_symlink;
+  const char * cvm_name;
+  bool         cvm_has_xattr;
 };
 
 
@@ -352,7 +358,10 @@ int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
  * @param[out] cst, cvmfs_stat buffer in which to write the result
  * \return 0 on success, -1 on failure
  */
-int cvmfs_ext_stat(cvmfs_context *ctx, const char *path, struct cvmfs_stat *cst);
+int cvmfs_ext_stat(
+  cvmfs_context *ctx,
+  const char *path,
+  struct cvmfs_stat *cst);
 
 /**
  * Get list of directory contents.  The directory contents includes "." and
