@@ -158,6 +158,8 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
       Inc(counters_->n_files_changed);
       Dec(counters_->n_files_added);    // Replace calls Add
       Dec(counters_->n_files_removed);  // Replace calls Remove
+      Xadd(counters_->n_bytes_added, -GetFileSize(entry->GetScratchPath()));
+      Xadd(counters_->n_bytes_removed, -GetFileSize(entry->GetRdOnlyPath()));
     }
     return;
   }
