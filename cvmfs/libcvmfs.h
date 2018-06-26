@@ -35,9 +35,9 @@
 // 26: CernVM-FS 2.5.0
 #define LIBCVMFS_REVISION 26
 
+#include <stdint.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <stdint.h>
 
 // Legacy error codes
 #define LIBCVMFS_FAIL_OK         0
@@ -333,8 +333,8 @@ int cvmfs_listdir(
  * \return 0 on success, -1 on failure
  */
 int cvmfs_stat_nested_catalog(
-  cvmfs_context *ctx, 
-  const char *path, 
+  cvmfs_context *ctx,
+  const char *path,
   struct cvmfs_nc_stat *ncst);
 
 /**

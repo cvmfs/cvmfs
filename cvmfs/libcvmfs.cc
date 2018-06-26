@@ -300,8 +300,8 @@ int cvmfs_listdir(
 
 
 int cvmfs_stat_nested_catalog(
-  LibContext *ctx, 
-  const char *path, 
+  LibContext *ctx,
+  const char *path,
   struct cvmfs_nc_stat *cst
 ) {
   string lpath;

@@ -48,8 +48,8 @@
 
 #include "atomic.h"
 #include "cache_posix.h"
-#include "catalog_mgr_client.h"
 #include "catalog.h"
+#include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"
@@ -375,11 +375,12 @@ int LibContext::ListDirectory(
 }
 
 int LibContext::GetNestedCatalogAttr(
-  const char *c_path, 
+  const char *c_path,
   struct cvmfs_nc_stat *info
 ) {
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_get_nested_catalog_attr (cvmfs_nc_stat) for path: %s", c_path);
+  LogCvmfs(kLogCvmfs, kLogDebug,
+    "cvmfs_stat_nested_catalog (cvmfs_nc_stat) : %s", c_path);
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -387,7 +388,8 @@ int LibContext::GetNestedCatalogAttr(
   /* Find the nested catalog from the root catalog */
   shash::Any hash;
   uint64_t size;
-  const bool found = mount_point_->catalog_mgr()->GetRootCatalog()->FindNested(p, &hash, &size);
+  const bool found = 
+    mount_point_->catalog_mgr()->GetRootCatalog()->FindNested(p, &hash, &size);
   if (!found) {
     return -ENOENT;
   }
@@ -406,8 +408,9 @@ int LibContext::ListNestedCatalog(
   char ***buf,
   size_t *buflen
 ) {
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_list_nested_file_catalog on path: %s", c_path);
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  LogCvmfs(kLogCvmfs, kLogDebug,
+    "cvmfs_list_nested_file_catalog on path: %s", c_path);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -423,12 +426,14 @@ int LibContext::ListNestedCatalog(
 
   /* If dirent exists and is a nested catalog mountpoint, 
    * we look past it so the catalog is mounted. */
-  if(dirent && dirent.IsNestedCatalogMountpoint()){
+  if ( dirent.IsNestedCatalogMountpoint() ) {
     /* Look at fake file */
     const std::string fake("/.cvmfscatalog");
     std::string extended_path = path.ToString() + fake;
-    path.Assign(extended_path.c_str(), strlen(extended_path.c_str())); 
-    mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupSole, &dirent);
+    path.Assign(extended_path.c_str(), strlen(extended_path.c_str()));
+    mount_point_->catalog_mgr()->LookupPath(path,
+                                            catalog::kLookupSole,
+                                            &dirent);
   }
 
   /* Find the correct catalog */
@@ -439,25 +444,27 @@ int LibContext::ListNestedCatalog(
   AppendStringToList(NULL, buf, &listlen, buflen);
 
   /* Build listing */
-  catalog::Catalog *parent  = found_catalog->parent() ;
-  if( parent ){
+  catalog::Catalog *parent  = found_catalog->parent();
+  if ( parent ) {
     /* Walk up parent tree to find base */
     std::vector<catalog::Catalog*> parents;
-    while(parent->HasParent()){
+    while ( parent->HasParent() ) {
       parents.push_back(parent);
       parent = parent->parent();
     }
     parents.push_back(parent);
-    while(!parents.empty()){
+    while ( !parents.empty() ) {
       AppendStringToList(parents.back()->root_prefix().c_str(),
                           buf, &listlen, buflen);
       parents.pop_back();
     }
   }
   /* Add the current catalog */
-  AppendStringToList(found_catalog->root_prefix().c_str(), buf, &listlen, buflen);
+  AppendStringToList(found_catalog->root_prefix().c_str(),
+                      buf, &listlen, buflen);
 
-  std::vector<catalog::Catalog::NestedCatalog> children = found_catalog->ListOwnNestedCatalogs();
+  std::vector<catalog::Catalog::NestedCatalog> children;
+  children = found_catalog->ListOwnNestedCatalogs();
 
   /* Add all children nested catalogs */
   for (unsigned i = 0; i < children.size(); i++) {
