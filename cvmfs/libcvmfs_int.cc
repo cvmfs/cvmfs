@@ -388,7 +388,7 @@ int LibContext::GetNestedCatalogAttr(
   /* Find the nested catalog from the root catalog */
   shash::Any hash;
   uint64_t size;
-  const bool found = 
+  const bool found =
     mount_point_->catalog_mgr()->GetRootCatalog()->FindNested(p, &hash, &size);
   if (!found) {
     return -ENOENT;
