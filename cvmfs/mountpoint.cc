@@ -11,11 +11,11 @@
 #endif
 #include <inttypes.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
+#include <climits>
 #include <cstring>
 #include <vector>
 
@@ -1401,18 +1401,23 @@ bool MountPoint::CreateTracer() {
       boot_status_ = loader::kFailOptions;
       return false;
     }
-    int tracebufferSize = kTracerBufferSize;
-    int tracebufferThreshold = kTracerFlushThreshold;
+    uint64_t tracebufferSize = kTracerBufferSize;
+    uint64_t tracebufferThreshold = kTracerFlushThreshold;
 
     string tracebufferSizeOpt;
     string tracebufferThresholdOpt;
+    bool parse_failed = false;
     if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &tracebufferSizeOpt)) {
-      tracebufferSize = atoi(tracebufferSizeOpt.c_str());
+      parse_failed |= !String2Uint64Parse(tracebufferSizeOpt, &tracebufferSize);
     }
     if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD",
       &tracebufferThresholdOpt)) {
-      tracebufferThreshold = atoi(tracebufferThresholdOpt.c_str());
+      parse_failed |= !String2Uint64Parse(tracebufferThresholdOpt,
+        &tracebufferThreshold);
     }
+    assert(!parse_failed
+      && tracebufferSize <= INT_MAX
+      && tracebufferThreshold <= INT_MAX);
     LogCvmfs(kLogCvmfs, kLogDebug,
       "Initialising tracer with buffer size %i and threshold %i",
       tracebufferSize, tracebufferThreshold);
