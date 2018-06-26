@@ -59,26 +59,3 @@ check_trace() {
         return 3
     fi
 }
-# Expected:
-# opendir /
-# getattr /
-
-# lookup /vc
-# lookup /vc/bin
-# opendir /vc/bin
-# getattr /vc/bin
-
-# lookup /README
-# open /README
-# getattr /README
-# open /README
-# statfs /README
-
-# listxattr /README
-# getxattr /README [...]
-
-# lookup /glite
-# readlink /$(GLITE_VERSION)
-# lookup /util
-# opendir /util
-
