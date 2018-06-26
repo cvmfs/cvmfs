@@ -172,3 +172,8 @@ std::string hidden_datapath = ".data";
 struct DestinationFsContext {
   std::string 
 }
+
+
+void *get_meta_hash(struct cvmfs_stat file) {
+  // TODO(steuber): Hash of mode, flags, uid, gid, xattr
+}
