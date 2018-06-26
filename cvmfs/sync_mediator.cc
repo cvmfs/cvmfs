@@ -91,6 +91,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     AddDirectoryRecursively(entry);
     if (counters_.IsValid()) {
       Inc(counters_->n_directories_added);
+      // Xadd(counters_->n_bytes_added, GetFileSize(entry->GetScratchPath()));
     }
     return;
   }
@@ -103,6 +104,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
       AddFile(entry);
     if (counters_.IsValid()) {
       Inc(counters_->n_files_added);
+      Xadd(counters_->n_bytes_added, GetFileSize(entry->GetScratchPath()));
     }
     return;
   } else if (entry->IsGraftMarker()) {
@@ -124,6 +126,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
         AddFile(entry);
       if (counters_.IsValid()) {
         Inc(counters_->n_files_added);
+        Xadd(counters_->n_bytes_added, GetFileSize(entry->GetScratchPath()));
       }
     }
     return;
@@ -174,6 +177,7 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
     RemoveDirectoryRecursively(entry);
     if (counters_.IsValid()) {
       Inc(counters_->n_directories_removed);
+      // Xadd(counters_->n_bytes_removed, GetFileSize(entry->GetRdOnlyPath()));
     }
     return;
   }
@@ -183,6 +187,7 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
     RemoveFile(entry);
     if (counters_.IsValid()) {
       Inc(counters_->n_files_removed);
+      Xadd(counters_->n_bytes_removed, GetFileSize(entry->GetRdOnlyPath()));
     }
     return;
   }
@@ -987,6 +992,10 @@ void SyncMediator::PrintStatistics() {
       counters_->n_directories_removed->Print().c_str());
     LogCvmfs(kLogPublish, kLogStdout, "Directories changed: %s",
       counters_->n_directories_changed->Print().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "Bytes         added: %s",
+      counters_->n_bytes_added->Print().c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "Bytes       removed: %s",
+      counters_->n_bytes_removed->Print().c_str());
   } else {
     LogCvmfs(kLogPublish, kLogStderr, "Publish statistics failed.");
   }
