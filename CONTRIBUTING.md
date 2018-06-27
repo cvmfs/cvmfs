@@ -18,7 +18,7 @@ If possible, commits should be done in such a way that the code remains compilab
 
 # Code Conventions
 
-Starting point is [Google C++ style guide](https://google-styleguide.googlecode.com/svn/trunk/cppguide.html).
+Starting point is [Google C++ style guide](https://google.github.io/styleguide/cppguide.html).
 
 We have the following exceptions/adjustments:
 
