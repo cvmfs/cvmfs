@@ -428,6 +428,11 @@ TEST_F(T_Libcvmfs, StatExt) {
   const char *rw_hash = entry.checksum().ToString().c_str();
   const char *lib_hash = ((shash::Any *)st.cvm_checksum)->ToString().c_str();
   /* Compare hash and size */
+  retval = strcmp(rw_hash, lib_hash);
+  if ( retval ) {
+    printf("Tester   : %s\n", rw_hash);
+    printf("Libcvmfs : %s\n", lib_hash);
+  }
   EXPECT_TRUE(!strcmp(rw_hash, lib_hash));
   EXPECT_EQ(st.st_size, file_size);
   EXPECT_TRUE(!st.cvm_xattrs);
