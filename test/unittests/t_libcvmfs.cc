@@ -12,7 +12,6 @@
 #include "duplex_sqlite3.h"
 #include "libcvmfs.h"
 #include "util/posix.h"
-#include "catalog_test_tools.h"
 
 using namespace std;  // NOLINT
 
@@ -253,9 +252,10 @@ TEST_F(T_Libcvmfs, Templating) {
   cvmfs_option_map *opts_repo = cvmfs_options_clone(opts);
   cvmfs_options_set(opts_repo, "CVMFS_DEBUG_LOG", "/tmp/@fqrn@.debug.log");
   cvmfs_context *ctx = reinterpret_cast<cvmfs_context *>(1);
-  // This will not actually load a repository however it should reparse the attributes anyway...
+  // This will not actually load a repository
+  // however it should reparse the attributes anyway...
   cvmfs_attach_repo_v2("test.cern.ch", opts_repo, &ctx);
-  
+
   EXPECT_STREQ("/tmp/test/", cvmfs_options_get(opts_repo, "CVMFS_CACHE_DIR"));
   EXPECT_STREQ("/tmp/test.cern.ch.debug.log",
     cvmfs_options_get(opts_repo, "CVMFS_DEBUG_LOG"));
