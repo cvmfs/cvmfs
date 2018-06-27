@@ -22,7 +22,7 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
       "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
 
   SimpleOptionsParser parser = SimpleOptionsParser(
-    DefaultOptionsTemplatingManager(repo_name));
+    DefaultOptionsTemplateManager(repo_name));
   if (!parser.TryParsePath(repo_config_file)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Could not parse repository configuration: %s.",

@@ -72,7 +72,7 @@ string OptionsManager::TrimParameter(const string &parameter) {
 }
 
 void OptionsManager::SwitchTemplateManager(
-  OptionsTemplatingManager opt_templ_mgr_param) {
+  OptionsTemplateManager opt_templ_mgr_param) {
   opt_templ_mgr_ = opt_templ_mgr_param;
   for (std::map<std::string, std::string>::iterator it
     = templatable_values_.begin();
@@ -452,24 +452,24 @@ void OptionsManager::UnsetValue(const string &key) {
     unsetenv(key.c_str());
 }
 
-const std::string DefaultOptionsTemplatingManager
+const std::string DefaultOptionsTemplateManager
   ::kTemplateIdentFqrn = "fqrn";
 
-const std::string DefaultOptionsTemplatingManager
+const std::string DefaultOptionsTemplateManager
   ::kTemplateIdentOrg = "org";
 
-DefaultOptionsTemplatingManager::DefaultOptionsTemplatingManager(
+DefaultOptionsTemplateManager::DefaultOptionsTemplateManager(
   std::string fqrn) {
   SetTemplate(kTemplateIdentFqrn, fqrn);
   vector<string> fqrn_parts = SplitString(fqrn, '.');
   SetTemplate(kTemplateIdentOrg, fqrn_parts[0]);
 }
 
-void OptionsTemplatingManager::SetTemplate(std::string name, std::string val) {
+void OptionsTemplateManager::SetTemplate(std::string name, std::string val) {
   templates_[name] = val;
 }
 
-std::string OptionsTemplatingManager::GetTemplate(std::string name) {
+std::string OptionsTemplateManager::GetTemplate(std::string name) {
   if (templates_.count(name)) {
     return templates_[name];
   } else {
@@ -480,7 +480,7 @@ std::string OptionsTemplatingManager::GetTemplate(std::string name) {
   }
 }
 
-bool OptionsTemplatingManager::ParseString(std::string *input) {
+bool OptionsTemplateManager::ParseString(std::string *input) {
   std::string result;
   std::string in = *input;
   bool has_vars = false;
@@ -514,7 +514,7 @@ bool OptionsTemplatingManager::ParseString(std::string *input) {
   return has_vars;
 }
 
-bool OptionsTemplatingManager::HasTemplate(std::string name) {
+bool OptionsTemplateManager::HasTemplate(std::string name) {
   return templates_.count(name);
 }
 

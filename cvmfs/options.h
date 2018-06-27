@@ -18,7 +18,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 /**
  * Templating manager used for variable replacement in the config file
  */
-class OptionsTemplatingManager {
+class OptionsTemplateManager {
  public:
   void SetTemplate(std::string name, std::string val);
   std::string GetTemplate(std::string name);
@@ -28,9 +28,9 @@ class OptionsTemplatingManager {
   std::map<std::string, std::string> templates_;
 };
 
-class DefaultOptionsTemplatingManager : public OptionsTemplatingManager {
+class DefaultOptionsTemplateManager : public OptionsTemplateManager {
  public:
-  explicit DefaultOptionsTemplatingManager(std::string fqrn);
+  explicit DefaultOptionsTemplateManager(std::string fqrn);
  private:
   static const std::string kTemplateIdentFqrn;
   static const std::string kTemplateIdentOrg;
@@ -47,9 +47,9 @@ class OptionsManager {
  public:
   OptionsManager()
       : taint_environment_(true) {
-    opt_templ_mgr_ = OptionsTemplatingManager();
+    opt_templ_mgr_ = OptionsTemplateManager();
   }
-  explicit OptionsManager(OptionsTemplatingManager opt_templ_mgr_param)
+  explicit OptionsManager(OptionsTemplateManager opt_templ_mgr_param)
       : taint_environment_(true) {
     opt_templ_mgr_ = opt_templ_mgr_param;
   }
@@ -58,7 +58,7 @@ class OptionsManager {
   /**
    * Switches the Options Templating Manager and reparses the set options
    */
-  void SwitchTemplateManager(OptionsTemplatingManager opt_templ_mgr_param);
+  void SwitchTemplateManager(OptionsTemplateManager opt_templ_mgr_param);
 
   /**
    * Opens the config_file and extracts all contained variables and their
@@ -179,7 +179,7 @@ class OptionsManager {
   std::map<std::string, std::string> protected_parameters_;
   std::map<std::string, std::string> templatable_values_;
 
-  OptionsTemplatingManager opt_templ_mgr_;
+  OptionsTemplateManager opt_templ_mgr_;
   /**
    * Whether to add environment variables to the process' environment or not.
    * In libcvmfs, we don't want a tainted environment.
@@ -208,7 +208,7 @@ class SimpleOptionsParser : public OptionsManager {
   SimpleOptionsParser()
     : OptionsManager() { }
   explicit SimpleOptionsParser(
-    OptionsTemplatingManager opt_templ_mgr_param)
+    OptionsTemplateManager opt_templ_mgr_param)
     : OptionsManager(opt_templ_mgr_param) { }
   virtual void ParsePath(
     const std::string &config_file,
@@ -231,7 +231,7 @@ class BashOptionsManager : public OptionsManager {
   BashOptionsManager()
     : OptionsManager() { }
   explicit BashOptionsManager(
-    OptionsTemplatingManager opt_templ_mgr_param)
+    OptionsTemplateManager opt_templ_mgr_param)
     : OptionsManager(opt_templ_mgr_param) { }
   void ParsePath(const std::string &config_file, const bool external);
 };  // class BashOptionsManager

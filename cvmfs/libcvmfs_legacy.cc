@@ -459,7 +459,7 @@ SimpleOptionsParser *cvmfs_options_clone_legacy(
 
   SimpleOptionsParser *options_mgr = cvmfs_options_clone(opts);
   options_mgr->SwitchTemplateManager(
-    DefaultOptionsTemplatingManager(repo_opts.repo_name));
+    DefaultOptionsTemplateManager(repo_opts.repo_name));
   options_mgr->SetValue("CVMFS_FQRN", repo_opts.repo_name);
   options_mgr->SetValue("CVMFS_TIMEOUT", StringifyInt(repo_opts.timeout));
   options_mgr->SetValue("CVMFS_TIMEOUT_DIRECT",

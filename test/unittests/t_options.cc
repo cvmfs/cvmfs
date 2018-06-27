@@ -90,8 +90,8 @@ TYPED_TEST(T_Options, ParsePath) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
   const unsigned expected_number_elements = TestFixture::ExpectedValues();
-  OptionsTemplatingManager opt_temp_mgr =
-    DefaultOptionsTemplatingManager("atlas.cern.ch");
+  OptionsTemplateManager opt_temp_mgr =
+    DefaultOptionsTemplateManager("atlas.cern.ch");
   opt_temp_mgr.SetTemplate("foo", "fourtytwo");
   options_manager.ParsePath(config_file, false);
   options_manager.SwitchTemplateManager(opt_temp_mgr);
@@ -233,8 +233,8 @@ TYPED_TEST(T_Options, TaintEnvironment) {
 }
 
 
-TEST(T_OptionsTemplatingManager, InsertRetrieveUpdate) {
-  OptionsTemplatingManager opt_templ_mgr = OptionsTemplatingManager();
+TEST(T_OptionsTemplateManager, InsertRetrieveUpdate) {
+  OptionsTemplateManager opt_templ_mgr = OptionsTemplateManager();
   opt_templ_mgr.SetTemplate("foo", "bar");
   EXPECT_TRUE(opt_templ_mgr.HasTemplate("foo"));
   EXPECT_EQ("bar", opt_templ_mgr.GetTemplate("foo"));
@@ -247,7 +247,7 @@ TEST(T_OptionsTemplatingManager, InsertRetrieveUpdate) {
   EXPECT_EQ("foobar", opt_templ_mgr.GetTemplate("foo"));
 }
 
-void check_parser(OptionsTemplatingManager opt_templ_mgr,
+void check_parser(OptionsTemplateManager opt_templ_mgr,
   std::string in,
   std::string out,
   bool has_var) {
@@ -255,9 +255,9 @@ void check_parser(OptionsTemplatingManager opt_templ_mgr,
   EXPECT_EQ(out, in);
 }
 
-TEST(T_OptionsTemplatingManager, FqrnPredefined) {
-  OptionsTemplatingManager opt_templ_mgr
-    = DefaultOptionsTemplatingManager("atlas.cern.ch");
+TEST(T_OptionsTemplateManager, FqrnPredefined) {
+  OptionsTemplateManager opt_templ_mgr
+    = DefaultOptionsTemplateManager("atlas.cern.ch");
   opt_templ_mgr.SetTemplate("foo", "bar");
   EXPECT_TRUE(opt_templ_mgr.HasTemplate("foo"));
   EXPECT_EQ("bar", opt_templ_mgr.GetTemplate("foo"));

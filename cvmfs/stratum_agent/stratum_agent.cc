@@ -180,7 +180,7 @@ static void ReadConfigurations() {
     string name = GetFileName(repo_config_dirs[i]);
     string optarg;
     UniquePtr<OptionsManager> options_mgr(
-      new BashOptionsManager(DefaultOptionsTemplatingManager(
+      new BashOptionsManager(DefaultOptionsTemplateManager(
         repo_config_dirs[i])));
     // TODO(steuber): Is this how it should be?
     options_mgr->set_taint_environment(false);
