@@ -67,6 +67,32 @@ struct HardlinkGroup {
   FileChunkList file_chunks;
 };
 
+struct Counters {
+  perf::Counter *n_files_added;
+  perf::Counter *n_files_removed;
+  perf::Counter *n_files_changed;
+  perf::Counter *n_directories_added;
+  perf::Counter *n_directories_removed;
+  perf::Counter *n_directories_changed;
+
+  explicit Counters(perf::StatisticsTemplate statistics) {
+    n_files_added = statistics.RegisterTemplated("n_files_added",
+        "Number of files added");
+    n_files_removed = statistics.RegisterTemplated("n_files_removed",
+        "Number of files removed");
+    n_files_changed = statistics.RegisterTemplated("n_files_changed",
+        "Number of files changed");
+    n_directories_added = statistics.RegisterTemplated("n_directories_added",
+        "Number of directories added");
+    n_directories_removed =
+                  statistics.RegisterTemplated("n_directories_removed",
+                                            "Number of directories removed");
+    n_directories_changed =
+                  statistics.RegisterTemplated("n_directories_changed",
+                                            "Number of directories changed");
+  }
+};  // Counters
+
 class AbstractSyncMediator {
  public:
   virtual ~AbstractSyncMediator() = 0;
@@ -108,7 +134,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
   static const unsigned int processing_dot_interval = 100;
 
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
-               const SyncParameters *params);
+               const SyncParameters *params,
+               perf::StatisticsTemplate statistics);
   void RegisterUnionEngine(SyncUnion *engine);
   // Final class, it is not meant to be derived any further
   ~SyncMediator();
@@ -131,6 +158,11 @@ class SyncMediator : public virtual AbstractSyncMediator {
   zlib::Algorithms GetCompressionAlgorithm() const {
     return params_->compression_alg;
   }
+
+  /**
+   * Print number of files added/changed/removed
+   */
+  void PrintStatistics();
 
  private:
   enum ChangesetAction {
@@ -265,6 +297,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * By default, files have no extended attributes.
    */
   XattrList default_xattrs;
+
+  UniquePtr<Counters> counters_;
 };  // class SyncMediator
 
 }  // namespace publish

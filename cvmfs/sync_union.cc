@@ -21,10 +21,7 @@ SyncUnion::SyncUnion(AbstractSyncMediator *mediator,
       mediator_(mediator),
       initialized_(false) {}
 
-bool SyncUnion::Initialize(perf::StatisticsTemplate *statistics) {
-  if (statistics != NULL) {
-    counters_ = new Counters(*statistics);
-  }
+bool SyncUnion::Initialize() {
   mediator_->RegisterUnionEngine(this);
   initialized_ = true;
   return true;
@@ -118,25 +115,16 @@ void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
            entry->filename().c_str());
   if (entry->IsWhiteout()) {
     mediator_->Remove(entry);
-    if (counters_.IsValid()) {
-      Inc(counters_->n_files_removed);
-    }
   } else {
     if (entry->IsNew()) {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg, "processing file [%s] as new (add)",
                entry->filename().c_str());
       mediator_->Add(entry);
-      if (counters_.IsValid()) {
-        Inc(counters_->n_files_added);
-      }
     } else {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg,
                "processing file [%s] as existing (touch)",
                entry->filename().c_str());
       mediator_->Touch(entry);
-      if (counters_.IsValid()) {
-        Inc(counters_->n_files_changed);
-      }
     }
   }
 }
@@ -187,13 +175,6 @@ void SyncUnion::ProcessSocket(const std::string &parent_dir,
            parent_dir.c_str(), filename.c_str());
   SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename, kItemSocket);
   ProcessFile(entry);
-}
-
-void SyncUnion::PrintStatistics() {
-  printf("\nStatistics:\n");
-  printf("Files   added: %s\n", counters_->n_files_added->Print().c_str());
-  printf("Files removed: %s\n", counters_->n_files_removed->Print().c_str());
-  printf("Files changed: %s\n", counters_->n_files_changed->Print().c_str());
 }
 
 }  // namespace publish

@@ -138,16 +138,16 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  publish::SyncMediator mediator(&catalog_manager, &params);
+  perf::StatisticsTemplate statistics =
+          perf::StatisticsTemplate("Publish-sync", this->statistics());
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   publish::SyncUnion *sync;
 
   sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
                                        params.tar_file, params.base_directory,
                                        params.to_delete);
-  perf::StatisticsTemplate statistics =
-        perf::StatisticsTemplate("Publish-sync", this->statistics());
-  if (!sync->Initialize(&statistics)) {
+  if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "Initialization of the synchronisation "
              "engine failed");
@@ -155,7 +155,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
 
   sync->Traverse();
-
+  printf("ingest......................................\n");
+  mediator.PrintStatistics();
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "Adding contents of authz file %s to"

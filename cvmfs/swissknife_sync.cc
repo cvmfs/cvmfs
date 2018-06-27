@@ -750,7 +750,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  publish::SyncMediator mediator(&catalog_manager, &params);
+  perf::StatisticsTemplate statistics =
+          perf::StatisticsTemplate("Publish-sync", this->statistics());
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations
@@ -761,9 +763,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
              params.ttl_seconds);
     catalog_manager.SetTTL(params.ttl_seconds);
   }
-
-
-
 
   // Either real catalogs or virtual catalog
   if (params.virtual_dir_actions == catalog::VirtualCatalog::kActionNone) {
@@ -780,16 +779,14 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 3;
     }
 
-    perf::StatisticsTemplate statistics =
-          perf::StatisticsTemplate("Publish-sync", this->statistics());
-    if (!sync->Initialize(&statistics)) {
+    if (!sync->Initialize()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Initialization of the synchronisation "
                "engine failed");
       return 4;
     }
     sync->Traverse();
-    sync->PrintStatistics();
+    mediator.PrintStatistics();
   } else {
     assert(!manifest->history().IsNull());
     catalog::VirtualCatalog virtual_catalog(

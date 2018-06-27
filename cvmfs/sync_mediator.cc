@@ -32,7 +32,8 @@ namespace publish {
 AbstractSyncMediator::~AbstractSyncMediator() {}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
-                           const SyncParameters *params) :
+                           const SyncParameters *params,
+                           perf::StatisticsTemplate statistics) :
   catalog_manager_(catalog_manager),
   union_engine_(NULL),
   handle_hardlinks_(false),
@@ -45,6 +46,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
+  counters_ = new Counters(statistics);
 }
 
 
@@ -87,7 +89,14 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
   if (entry->IsDirectory()) {
     AddDirectoryRecursively(entry);
+    if (counters_.IsValid()) {
+      Inc(counters_->n_directories_added);
+    }
     return;
+  }
+
+  if (counters_.IsValid()) {
+    Inc(counters_->n_files_added);
   }
 
   if (entry->IsRegularFile() || entry->IsSymlink()) {
@@ -122,7 +131,6 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
                "' cannot be added. Unrecognized file type.");
 }
 
-
 /**
  * Touch an entry in the repository.
  */
@@ -132,7 +140,18 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
   if (entry->IsGraftMarker()) {return;}
   if (entry->IsDirectory()) {
     TouchDirectory(entry);
+    if (counters_.IsValid()) {
+      Inc(counters_->n_directories_changed);
+      // Dec(counters_->n_directories_added);
+      // Dec(counters_->n_directories_removed);
+    }
     return;
+  }
+
+  if (counters_.IsValid()) {
+    Inc(counters_->n_files_changed);
+    Dec(counters_->n_files_added);
+    Dec(counters_->n_files_removed);
   }
 
   if (entry->IsRegularFile() || entry->IsSymlink() || entry->IsSpecialFile()) {
@@ -153,7 +172,14 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
 
   if (entry->WasDirectory()) {
     RemoveDirectoryRecursively(entry);
+    if (counters_.IsValid()) {
+      Inc(counters_->n_directories_removed);
+    }
     return;
+  }
+
+  if (counters_.IsValid()) {
+    Inc(counters_->n_files_removed);
   }
 
   if (entry->WasRegularFile() || entry->WasSymlink() ||
@@ -945,6 +971,26 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
     group.file_chunks);
   if (xattrs != &default_xattrs)
     free(xattrs);
+}
+
+void SyncMediator::PrintStatistics() {
+  if (counters_.IsValid()) {
+    printf("\nStatistics:\n");
+    printf("Files         added: %s\n",
+      counters_->n_files_added->Print().c_str());
+    printf("Files       removed: %s\n",
+      counters_->n_files_removed->Print().c_str());
+    printf("Files       changed: %s\n",
+      counters_->n_files_changed->Print().c_str());
+    printf("Directories   added: %s\n",
+      counters_->n_directories_added->Print().c_str());
+    printf("Directories removed: %s\n",
+      counters_->n_directories_removed->Print().c_str());
+    printf("Directories changed: %s\n",
+      counters_->n_directories_changed->Print().c_str());
+  } else {
+    printerr("There are no statistics..\n");
+  }
 }
 
 }  // namespace publish
