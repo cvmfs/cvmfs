@@ -12,6 +12,7 @@
 #include "duplex_sqlite3.h"
 #include "libcvmfs.h"
 #include "util/posix.h"
+#include "catalog_test_tools.h"
 
 using namespace std;  // NOLINT
 
@@ -245,15 +246,16 @@ TEST_F(T_Libcvmfs, Templating) {
   cvmfs_options_set(opts, "CVMFS_CACHE_DIR", "/tmp/@org@/");
   cvmfs_options_set(opts, "CVMFS_HTTP_PROXY", "DIRECT");
   cvmfs_options_set(opts, "CVMFS_SERVER_URL",
-    "http://cvmfs-stratum-one.cern.ch/cvmfs/test.cern.ch");
+    test_tool->repo_name().c_str());
   cvmfs_options_set(opts, "CVMFS_MAX_RETRIES", "2");
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
   cvmfs_option_map *opts_repo = cvmfs_options_clone(opts);
   cvmfs_options_set(opts_repo, "CVMFS_DEBUG_LOG", "/tmp/@fqrn@.debug.log");
   cvmfs_context *ctx = reinterpret_cast<cvmfs_context *>(1);
+  // This will not actually load a repository however it should reparse the attributes anyway...
   cvmfs_attach_repo_v2("test.cern.ch", opts_repo, &ctx);
-  // NOTE(steuber): Should variables be set on failure of attachment
+  
   EXPECT_STREQ("/tmp/test/", cvmfs_options_get(opts_repo, "CVMFS_CACHE_DIR"));
   EXPECT_STREQ("/tmp/test.cern.ch.debug.log",
     cvmfs_options_get(opts_repo, "CVMFS_DEBUG_LOG"));
