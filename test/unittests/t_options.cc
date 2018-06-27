@@ -90,9 +90,9 @@ TYPED_TEST(T_Options, ParsePath) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
   const unsigned expected_number_elements = TestFixture::ExpectedValues();
-  OptionsTemplateManager opt_temp_mgr =
-    DefaultOptionsTemplateManager("atlas.cern.ch");
-  opt_temp_mgr.SetTemplate("foo", "fourtytwo");
+  OptionsTemplateManager *opt_temp_mgr =
+    new DefaultOptionsTemplateManager("atlas.cern.ch");
+  opt_temp_mgr->SetTemplate("foo", "fourtytwo");
   options_manager.ParsePath(config_file, false);
   options_manager.SwitchTemplateManager(opt_temp_mgr);
 

@@ -72,14 +72,19 @@ string OptionsManager::TrimParameter(const string &parameter) {
 }
 
 void OptionsManager::SwitchTemplateManager(
-  OptionsTemplateManager opt_templ_mgr_param) {
-  opt_templ_mgr_ = opt_templ_mgr_param;
+  OptionsTemplateManager *opt_templ_mgr_param) {
+  delete opt_templ_mgr_;
+  if (opt_templ_mgr_param != NULL) {
+    opt_templ_mgr_ = opt_templ_mgr_param;
+  } else {
+    opt_templ_mgr_ = new OptionsTemplateManager();
+  }
   for (std::map<std::string, std::string>::iterator it
     = templatable_values_.begin();
     it != templatable_values_.end();
     it++) {
     config_[it->first].value = it->second;
-    opt_templ_mgr_.ParseString(&(config_[it->first].value));
+    opt_templ_mgr_->ParseString(&(config_[it->first].value));
   }
 }
 
@@ -331,7 +336,7 @@ void OptionsManager::PopulateParameter(
 
 void OptionsManager::ParseValue(std::string param, ConfigValue *val) {
   string orig = val->value;
-  bool has_templ = opt_templ_mgr_.ParseString(&(val->value));
+  bool has_templ = opt_templ_mgr_->ParseString(&(val->value));
   if (has_templ) {
     templatable_values_[param] = orig;
   }

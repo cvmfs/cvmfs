@@ -679,10 +679,10 @@ int main(int argc, char *argv[]) {
   OptionsManager *options_manager;
   if (simple_options_parsing_) {
     options_manager = new SimpleOptionsParser(
-      DefaultOptionsTemplateManager(*repository_name_));
+      new DefaultOptionsTemplateManager(*repository_name_));
   } else {
     options_manager = new BashOptionsManager(
-      DefaultOptionsTemplateManager(*repository_name_));
+      new DefaultOptionsTemplateManager(*repository_name_));
   }
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');

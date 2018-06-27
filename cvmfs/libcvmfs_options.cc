@@ -54,7 +54,6 @@ char *cvmfs_options_dump(SimpleOptionsParser *opts) {
 
 SimpleOptionsParser *cvmfs_options_init() {
   SimpleOptionsParser *result = new SimpleOptionsParser();
-  // TODO(steuber): is this right?
   // In contrast to the fuse module, we don't want to taint the process'
   // environment with parameters from the cvmfs configuration in libcvmfs
   result->set_taint_environment(false);

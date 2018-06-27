@@ -80,8 +80,7 @@ bool S3Uploader::ParseSpoolerDefinition(
 
   // Parse S3 configuration
   BashOptionsManager options_manager = BashOptionsManager(
-    DefaultOptionsTemplateManager(repository_alias_));
-    // TODO(steuber): Correct?
+    new DefaultOptionsTemplateManager(repository_alias_));
   options_manager.ParsePath(config_path, false);
   std::string parameter;
 

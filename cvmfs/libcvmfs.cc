@@ -305,7 +305,7 @@ cvmfs_errors cvmfs_attach_repo_v2(
   LibContext **ctx)
 {
   assert(ctx != NULL);
-  opts->SwitchTemplateManager(DefaultOptionsTemplateManager(fqrn));
+  opts->SwitchTemplateManager(new DefaultOptionsTemplateManager(fqrn));
   *ctx = LibContext::Create(fqrn, opts);
   assert(*ctx != NULL);
   loader::Failures result = (*ctx)->mount_point()->boot_status();
