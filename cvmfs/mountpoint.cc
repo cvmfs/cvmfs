@@ -1219,7 +1219,7 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
-    download_mgr_->SetHostChain(ReplaceHosts(optarg));
+    download_mgr_->SetHostChain(optarg);
   }
 
   SetupDnsTuning(download_mgr_);
@@ -1401,22 +1401,23 @@ bool MountPoint::CreateTracer() {
       boot_status_ = loader::kFailOptions;
       return false;
     }
-    int tracebufferSize = kTracerBufferSize;
-    int tracebufferThreshold = kTracerFlushThreshold;
+    string tracebuffer_file = optarg;
+    uint64_t tracebuffer_size = kTracerBufferSize;
+    uint64_t tracebuffer_threshold = kTracerFlushThreshold;
 
-    string tracebufferSizeOpt;
-    string tracebufferThresholdOpt;
-    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &tracebufferSizeOpt)) {
-      tracebufferSize = atoi(tracebufferSizeOpt.c_str());
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &optarg)) {
+      tracebuffer_size = String2Uint64(optarg.c_str());
     }
     if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD",
-      &tracebufferThresholdOpt)) {
-      tracebufferThreshold = atoi(tracebufferThresholdOpt.c_str());
+      &optarg)) {
+      tracebuffer_threshold = String2Uint64(optarg.c_str());
     }
+    assert(tracebuffer_size <= INT_MAX
+      && tracebuffer_threshold <= INT_MAX);
     LogCvmfs(kLogCvmfs, kLogDebug,
-      "Initialising tracer with buffer size %i and threshold %i",
-      tracebufferSize, tracebufferThreshold);
-    tracer_->Activate(tracebufferSize, tracebufferThreshold, optarg);
+      "Initialising tracer with buffer size %" PRIu64 " and threshold %" PRIu64,
+      tracebuffer_size, tracebuffer_threshold);
+    tracer_->Activate(tracebuffer_size, tracebuffer_threshold, optarg);
   }
   return true;
 }
@@ -1638,15 +1639,6 @@ void MountPoint::ReEvaluateAuthz() {
 }
 
 
-string MountPoint::ReplaceHosts(string hosts) {
-  vector<string> tokens = SplitString(fqrn_, '.');
-  const string org = tokens[0];
-  hosts = ReplaceAll(hosts, "@org@", org);
-  hosts = ReplaceAll(hosts, "@fqrn@", fqrn_);
-  return hosts;
-}
-
-
 void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   MutexLockGuard lock_guard(lock_max_ttl_);
   max_ttl_sec_ = value_minutes * 60;
@@ -1728,7 +1720,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
-    external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
+    external_download_mgr_->SetHostChain(optarg);
     if (dogeosort) {
       std::vector<std::string> host_chain;
       external_download_mgr_->GetHostInfo(&host_chain, NULL, NULL);

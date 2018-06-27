@@ -21,16 +21,14 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
   const std::string repo_config_file =
       "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
 
-  SimpleOptionsParser parser;
-  OptionsTemplatingManager *opt_templ_mgr =
-    new DefaultOptionsTemplatingManager(repo_name);
-  if (!parser.TryParsePath(repo_config_file, *opt_templ_mgr)) {
+  SimpleOptionsParser parser = SimpleOptionsParser(
+    DefaultOptionsTemplatingManager(repo_name));
+  if (!parser.TryParsePath(repo_config_file)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Could not parse repository configuration: %s.",
              repo_config_file.c_str());
     return false;
   }
-  delete opt_templ_mgr;
 
   if (!parser.GetValue("CVMFS_STRATUM0", &params->stratum0)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,

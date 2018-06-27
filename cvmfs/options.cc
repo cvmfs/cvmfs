@@ -37,7 +37,7 @@ static string EscapeShell(const std::string &raw) {
           ((raw[i] >= 'a') && (raw[i] <= 'z')) ||
           (raw[i] == '/') || (raw[i] == ':') || (raw[i] == '.') ||
           (raw[i] == '_') || (raw[i] == '-') || (raw[i] == ',')))
-    {
+          {
       goto escape_shell_quote;
     }
   }
@@ -71,9 +71,20 @@ string OptionsManager::TrimParameter(const string &parameter) {
   return result;
 }
 
+void OptionsManager::SwitchTemplateManager(
+  OptionsTemplatingManager opt_templ_mgr_param) {
+  opt_templ_mgr_ = opt_templ_mgr_param;
+  for (std::map<std::string, std::string>::iterator it
+    = templatable_values_.begin();
+    it != templatable_values_.end();
+    it++) {
+    config_[it->first].value = it->second;
+    opt_templ_mgr_.ParseString(&(config_[it->first].value));
+  }
+}
 
-bool SimpleOptionsParser::TryParsePath(const string &config_file,
-  OptionsTemplatingManager opt_templ_mgr) {
+
+bool SimpleOptionsParser::TryParsePath(const string &config_file) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s",
       config_file.c_str());
   string line;
@@ -113,16 +124,14 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file,
     ConfigValue config_value;
     config_value.source = config_file;
     config_value.value = value;
-    PopulateParameter(parameter, config_value, &opt_templ_mgr);
+    PopulateParameter(parameter, config_value);
   }
   fclose(fconfig);
   return true;
 }
 
-
 void BashOptionsManager::ParsePath(const string &config_file,
-                                   const bool external,
-                                   OptionsTemplatingManager opt_templ_mgr) {
+                                   const bool external) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
   int retval;
   int pipe_open[2];
@@ -225,7 +234,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
     const string sh_echo = "echo $" + parameter + "\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
     GetLineFd(fd_stdout, &value.value);
-    PopulateParameter(parameter, value, &opt_templ_mgr);
+    PopulateParameter(parameter, value);
   }
 
   close(fd_stderr);
@@ -268,19 +277,17 @@ void OptionsManager::ParseDefault(const string &fqrn) {
   }
 
   protected_parameters_.clear();
-  DefaultOptionsTemplatingManager *opt_templ_mgr =
-    new DefaultOptionsTemplatingManager(fqrn);
-  ParsePath("/etc/cvmfs/default.conf", false, *opt_templ_mgr);
+  ParsePath("/etc/cvmfs/default.conf", false);
   vector<string> dist_defaults =
     FindFilesBySuffix("/etc/cvmfs/default.d", ".conf");
   for (unsigned i = 0; i < dist_defaults.size(); ++i) {
-    ParsePath(dist_defaults[i], false, *opt_templ_mgr);
+    ParsePath(dist_defaults[i], false);
   }
   ProtectParameter("CVMFS_CONFIG_REPOSITORY");
   string external_config_path;
   if ((fqrn != "") && HasConfigRepository(fqrn, &external_config_path))
-    ParsePath(external_config_path + "default.conf", true, *opt_templ_mgr);
-  ParsePath("/etc/cvmfs/default.local", false, *opt_templ_mgr);
+    ParsePath(external_config_path + "default.conf", true);
+  ParsePath("/etc/cvmfs/default.local", false);
 
   if (fqrn != "") {
     string domain;
@@ -291,27 +298,21 @@ void OptionsManager::ParseDefault(const string &fqrn) {
 
     if (HasConfigRepository(fqrn, &external_config_path))
       ParsePath(external_config_path+ "domain.d/" + domain + ".conf",
-        true, *opt_templ_mgr);
-    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false, *opt_templ_mgr);
-    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local", false,
-      *opt_templ_mgr);
+        true);
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false);
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local", false);
 
     if (HasConfigRepository(fqrn, &external_config_path))
-      ParsePath(external_config_path + "config.d/" + fqrn + ".conf", true,
-        *opt_templ_mgr);
-    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false, *opt_templ_mgr);
-    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false, *opt_templ_mgr);
+      ParsePath(external_config_path + "config.d/" + fqrn + ".conf", true);
+    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false);
+    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false);
   }
-  delete opt_templ_mgr;
-  opt_templ_mgr = NULL;
 }
 
 
 void OptionsManager::PopulateParameter(
   const string &param,
-  ConfigValue val,
-  OptionsTemplatingManager *opt_templ_mgr)
-{
+  ConfigValue val) {
   map<string, string>::const_iterator iter = protected_parameters_.find(param);
   if ((iter != protected_parameters_.end()) && (iter->second != val.value)) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -320,7 +321,7 @@ void OptionsManager::PopulateParameter(
              param.c_str(), iter->second.c_str(), val.value.c_str());
     return;
   }
-  ParseValue(&val, opt_templ_mgr);
+  ParseValue(param, &val);
   config_[param] = val;
   if (taint_environment_) {
     int retval = setenv(param.c_str(), val.value.c_str(), 1);
@@ -328,23 +329,11 @@ void OptionsManager::PopulateParameter(
   }
 }
 
-void OptionsManager::ParseValue(ConfigValue *val,
-  OptionsTemplatingManager *opt_templ_mgr) {
-  if (opt_templ_mgr == NULL) {
-    // No template manager -> nothing to do here
-    return;
-  }
-  vector<string> tokens = SplitString(val->value, '@');
-  if (tokens.size() > 2) {
-    string resStr = "";
-    for (unsigned int i = 0; i < tokens.size(); i++) {
-      if (i%2 == 0) {
-        resStr+=tokens[i];
-      } else {
-        resStr+=opt_templ_mgr->GetVal(tokens[i]);
-      }
-    }
-    val->value = resStr;
+void OptionsManager::ParseValue(std::string param, ConfigValue *val) {
+  string orig = val->value;
+  bool has_templ = opt_templ_mgr_.ParseString(&(val->value));
+  if (has_templ) {
+    templatable_values_[param] = orig;
   }
 }
 
@@ -452,7 +441,7 @@ void OptionsManager::SetValue(const string &key, const string &value) {
   ConfigValue config_value;
   config_value.source = "@INTERNAL@";
   config_value.value = value;
-  PopulateParameter(key, config_value, NULL);
+  PopulateParameter(key, config_value);
 }
 
 
@@ -464,23 +453,69 @@ void OptionsManager::UnsetValue(const string &key) {
 }
 
 const std::string DefaultOptionsTemplatingManager
-  ::fqrnTemplateIdentifier = "fqrn";
+  ::kTemplateIdentFqrn = "fqrn";
+
+const std::string DefaultOptionsTemplatingManager
+  ::kTemplateIdentOrg = "org";
+
 DefaultOptionsTemplatingManager::DefaultOptionsTemplatingManager(
   std::string fqrn) {
-  SetVal(fqrnTemplateIdentifier, fqrn);
+  SetTemplate(kTemplateIdentFqrn, fqrn);
+  vector<string> fqrn_parts = SplitString(fqrn, '.');
+  SetTemplate(kTemplateIdentOrg, fqrn_parts[0]);
 }
-void OptionsTemplatingManager::SetVal(std::string name, std::string val) {
-  vars[name] = val;
+
+void OptionsTemplatingManager::SetTemplate(std::string name, std::string val) {
+  templates_[name] = val;
 }
-std::string OptionsTemplatingManager::GetVal(std::string name) {
-  if (vars.count(name)) {
-    return vars[name];
+
+std::string OptionsTemplatingManager::GetTemplate(std::string name) {
+  if (templates_.count(name)) {
+    return templates_[name];
   } else {
-    return "@" + name + "@";
+    std::string var_name = "@" + name + "@";
+    LogCvmfs(kLogCvmfs, kLogDebug, "Undeclared variable: %s",
+      var_name.c_str());
+    return var_name;
   }
 }
-bool OptionsTemplatingManager::HasVal(std::string name) {
-  return vars.count(name);
+
+bool OptionsTemplatingManager::ParseString(std::string *input) {
+  std::string result;
+  std::string in = *input;
+  bool has_vars = false;
+  int mode = 0;
+  std::string stock;
+  for (std::string::size_type i = 0; i < in.size(); i++) {
+    switch (mode) {
+      case 0:
+        if (in[i] == '@') {
+          mode = 1;
+        } else {
+          result+=in[i];
+        }
+      break;
+      case 1:
+        if (in[i] == '@') {
+          mode = 0;
+          result += GetTemplate(stock);
+          stock = "";
+          has_vars = true;
+        } else {
+          stock += in[i];
+        }
+      break;
+    }
+  }
+  if (mode == 1) {
+    result += "@" + stock;
+  }
+  *input = result;
+  return has_vars;
+}
+
+bool OptionsTemplatingManager::HasTemplate(std::string name) {
+  return templates_.count(name);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

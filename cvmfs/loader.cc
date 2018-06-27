@@ -678,19 +678,17 @@ int main(int argc, char *argv[]) {
   string parameter;
   OptionsManager *options_manager;
   if (simple_options_parsing_) {
-    options_manager = new SimpleOptionsParser();
+    options_manager = new SimpleOptionsParser(
+      DefaultOptionsTemplatingManager(*repository_name_));
   } else {
-    options_manager = new BashOptionsManager();
+    options_manager = new BashOptionsManager(
+      DefaultOptionsTemplatingManager(*repository_name_));
   }
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
-    DefaultOptionsTemplatingManager *opt_templ_mgr =
-      new DefaultOptionsTemplatingManager(*repository_name_);
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
-      options_manager->ParsePath(tokens[i], false, *opt_templ_mgr);
+      options_manager->ParsePath(tokens[i], false);
     }
-    delete opt_templ_mgr;
-    opt_templ_mgr = NULL;
   } else {
     options_manager->ParseDefault(*repository_name_);
   }

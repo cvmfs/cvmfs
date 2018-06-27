@@ -54,6 +54,7 @@ char *cvmfs_options_dump(SimpleOptionsParser *opts) {
 
 SimpleOptionsParser *cvmfs_options_init() {
   SimpleOptionsParser *result = new SimpleOptionsParser();
+  // TODO(steuber): is this right?
   // In contrast to the fuse module, we don't want to taint the process'
   // environment with parameters from the cvmfs configuration in libcvmfs
   result->set_taint_environment(false);
@@ -73,9 +74,7 @@ void cvmfs_options_set(
 
 
 int cvmfs_options_parse(SimpleOptionsParser *opts, const char *path) {
-  OptionsTemplatingManager *opt_templ_mgr = new OptionsTemplatingManager();
-  bool result = opts->TryParsePath(path, *opt_templ_mgr);
-  delete opt_templ_mgr;
+  bool result = opts->TryParsePath(path);
   return result ? 0 : -1;
 }
 
