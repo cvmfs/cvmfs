@@ -5,6 +5,7 @@
 #define CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
 
 #include "hash.h"
+#include "libcvmfs.h"
 #include "pointer.h"
 #include "shortstring.h"
 
@@ -19,8 +20,8 @@ struct fs_traversal_context {
   uint64_t size;
   fs_type type;
 
-  char *repo;
-  char *data;
+  const char *repo;
+  const char *data;
 
   void * ctx;
 };
@@ -38,18 +39,21 @@ struct fs_file {
 
   struct fs_stat *stat_info;
 
-  int (*open)(void *ctx, fs_open_type op_mode);
-  int (*close)(void *ctx);
-  int (*read)(void *ctx, char *buff, size_t len);
-  int (*write)(void *ctx, const char *buff);
+  int (*do_open)(void *ctx, fs_open_type op_mode);
+  int (*do_close)(void *ctx);
+  int (*do_read)(void *ctx, char *buff, size_t len);
+  int (*do_write)(void *ctx, const char *buff);
 };
 
+/**
+ * @note(steuber): Any hashes are pointers to shash::Any
+ */
 struct fs_traversal {
 
-  struct fs_traversal_context *ctx;
-
-  // NOTE(steuber): How does this work?
-  struct fs_traversal *(*initialize(fs_type type, const char *repo, const char *data));
+  struct fs_traversal_context *(*initialize)(
+    fs_type type,
+    const char *repo,
+    const char *data);
 
   void (*finalize)(struct fs_traversal_context *ctx);
 
@@ -58,12 +62,12 @@ struct fs_traversal {
    * 
    * @param[in] dir The directory over which should be iterated
    * @param[out] buf The list of the paths to the elements in the directory
-   * @param[in] len @todo(steuber): what?
+   * @param[out] len Length of the output list
    */
   void (*list_dir)(struct fs_traversal_context *ctx,
                 const char *dir,
                 char ***buf,
-                size_t len);
+                size_t *len);
 
   /**
    * Method which returns a stat struct given a file path.
@@ -98,12 +102,13 @@ struct fs_traversal {
    * 
    * Error if:
    * - Hash file does not exist
+   * - Directory does not exist
    * 
    * @param[in] content The content hash of the file
    * @param[in] meta The meta hash of the file
    * @param[in] meta The meta hash of the file to hardlink
    */
-  int (*link)(struct fs_traversal_context *ctx,
+  int (*do_link)(struct fs_traversal_context *ctx,
                 const char *path,
                 void *content,
                 void *meta);
@@ -116,32 +121,41 @@ struct fs_traversal {
    * 
    * @param[in] path The path which should be removed
    */
-  int (*unlink)(struct fs_traversal_context *ctx,
+  int (*do_unlink)(struct fs_traversal_context *ctx,
                 const char *path);
 
   /**
    * Method which will create the given directory
    * 
-   * @todo(steuber): Fail if "deep" mkdir?
+   * Error if:
+   * - Parent directory not defined
+   * - If directory already exists
    * 
    * @param[in] path The path to the directory that should be created
    * @param[in] stat The stat containing the meta data for directory creation
    */
-  int (*mkdir)(struct fs_traversal_context *ctx,
+  int (*do_mkdir)(struct fs_traversal_context *ctx,
                 const char *path,
                 const struct cvmfs_stat *stat);
 
   /**
    * Method which removes the given directory
    * 
+   * Error if:
+   * - Error during removal of directory or child
+   * - On ENAMETOOLONG if the full path is too long during removal
+   * 
    * @param[in] path The path to the directory that should be removed
    */
-  int (*rmdir)(struct fs_traversal_context *ctx,
+  int (*do_rmdir)(struct fs_traversal_context *ctx,
                 const char *path);
 
   /**
    * Atomically creates the file representing
    * the given content and meta data hash
+   * 
+   * Error:
+   * - If file exists
    * 
    * @param[in] content The content hash of the file
    * @param[in] meta The meta hash of the file
@@ -167,13 +181,19 @@ struct fs_traversal {
   /**
    * Method which creates a symlink at src which points to dest
    * 
+   * Error:
+   * - src directory doesn't exist
+   * - src already exists
+   * - symlink creation fails
+   * 
    * @param[in] The position at which the symlink should be saved
    * (parent directory must exist)
    * @param[in] The position the symlink should point to
    */
-  int (*symlink)(struct fs_traversal_context *ctx,
+  int (*do_symlink)(struct fs_traversal_context *ctx,
                 const char *src,
-                const char *dest);
+                const char *dest,
+                const struct cvmfs_stat *stat_info);
 
   /**
    * Method which executes a garbage collection on the destination file system.
