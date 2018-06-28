@@ -245,7 +245,7 @@ TEST_F(T_Libcvmfs, Templating) {
   cvmfs_options_set(opts, "CVMFS_CACHE_DIR", "/tmp/@org@/");
   cvmfs_options_set(opts, "CVMFS_HTTP_PROXY", "DIRECT");
   cvmfs_options_set(opts, "CVMFS_SERVER_URL",
-    test_tool->repo_name().c_str());
+    "test.cern.ch");
   cvmfs_options_set(opts, "CVMFS_MAX_RETRIES", "2");
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
