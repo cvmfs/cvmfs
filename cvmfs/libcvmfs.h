@@ -93,6 +93,7 @@ typedef enum {
   LIBCVMFS_ERR_REVISION_BLACKLISTED,
 } cvmfs_errors;
 
+<<<<<<< HEAD
 /**
  * Stat struct for a Nested Catalog.
  *
@@ -160,6 +161,31 @@ struct cvmfs_attr* cvmfs_attr_init();
  * @param attr, pointer to a cvmfs_attr struct to be deleted.
  */
 void cvmfs_attr_free(struct cvmfs_attr *attr);
+=======
+struct cvmfs_stat {
+  // Struct definition information
+  unsigned version;
+  uint64_t size;
+
+  // Actual contents of stat, mapped from DirectoryEntry
+  uint64_t st_ino;
+  unsigned int st_mode;
+  uint32_t st_nlink;
+  uid_t    st_uid;
+  gid_t    st_gid;
+  dev_t    st_rdev;
+  uint64_t st_size;
+  uint64_t st_blksize;
+  uint64_t st_blocks;
+  time_t   mtime;
+
+  // CVMFS related content
+  const void * cvm_checksum;
+  const char * cvm_symlink;
+  const char * cvm_name;
+  void *       cvm_xattrs;
+};
+>>>>>>> Added struct to libcvmfs.h for reference
 
 /**
  * Send syslog and debug messages to log_fn instead.  This may (and probably
