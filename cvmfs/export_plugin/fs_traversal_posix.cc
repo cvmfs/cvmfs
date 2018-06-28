@@ -4,6 +4,8 @@
 #include "fs_traversal_posix.h"
 
 #include <dirent.h>
+#include <fcntl.h>
+#include <ftw.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -11,25 +13,30 @@
 
 #include <string>
 
-
+#include "fs_traversal_interface.h"
 #include "hash.h"
+#include "libcvmfs.h"
 #include "shortstring.h"
 #include "string.h"
 #include "util/posix.h"
 
+// Maximum number of files open in parallel during rmdir
+const int kPosixTraversalMaxDeletePar = 64;
+
+const unsigned kDirLevels = 2;
+const unsigned kDigitsPerDirLevel = 2;
 
 void AppendStringToList(char const   *str,
                         char       ***buf,
                         size_t       *listlen,
-                        size_t       *buflen)
-{
+                        size_t       *buflen) {
   if (*listlen + 1 >= *buflen) {
-       size_t newbuflen = (*listlen)*2 + 5;
-       *buf = reinterpret_cast<char **>(
-         realloc(*buf, sizeof(char *) * newbuflen));
-       assert(*buf);
-       *buflen = newbuflen;
-       assert(*listlen < *buflen);
+    size_t newbuflen = (*listlen)*2 + 5;
+    *buf = reinterpret_cast<char **>(
+      realloc(*buf, sizeof(char *) * newbuflen));
+    assert(*buf);
+    *buflen = newbuflen;
+    assert(*listlen < *buflen);
   }
   if (str) {
     (*buf)[(*listlen)] = strdup(str);
@@ -40,140 +47,318 @@ void AppendStringToList(char const   *str,
   }
 }
 
+bool HasDir(std::string dirname) {
+  struct stat sb;
+  return (stat(dirname.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode));
+}
 
+std::string BuildPath(struct fs_traversal_context *ctx,
+  const char *dir) {
+  std::string result = ctx->repo;
+  result += dir;
+  return result;
+}
 
-void listdir(const char *dir, char ***buf, size_t len){
+std::string BuildHiddenPath(struct fs_traversal_context *ctx,
+  const void *content,
+  const void *meta) {
+  std::string cur_path = ctx->repo;
+  cur_path += "/";
+  cur_path += ctx->data;
+  shash::Any *content_hash = (shash::Any *)content;
+  shash::Any *meta_hash = (shash::Any *)meta;
+  return cur_path+"/"+content_hash->MakePathExplicit(
+    kDirLevels, kDigitsPerDirLevel, '.')
+    + meta_hash->ToString();
+}
+
+int PosixSetMeta(const char *path, const struct cvmfs_stat *stat_info) {
+  int res = chmod(path, stat_info->st_mode);
+  if (res != 0) return -1;
+  // TODO(steuber): Set xattrs with setxattr
+  if (res != 0) return -1;
+  res = chown(path, stat_info->st_uid, stat_info->st_gid);
+  if (res != 0) return -1;
+  return 0;
+}
+
+void PosixCheckDirStructure(const char *repo,
+  const char *data,
+  unsigned int depth = 1, mode_t mode) {
+  // Maximum directory to search for:
+  std::string max_dir_name = std::string(kDigitsPerDirLevel, 'f');
+  // Build current base path
+  std::string cur_path = repo;
+  cur_path += "/";
+  cur_path += data;
+  for (int i = 1; i < depth; i++) {
+    cur_path += "/" + max_dir_name;
+  }
+  // Build template for directory names:
+  assert(kDigitsPerDirLevel <= 99);
+  char hex[kDigitsPerDirLevel];
+  char dir_name_template[4];
+  snprintf(dir_name_template,
+    sizeof(dir_name_template),
+    "%%%ux",
+    kDigitsPerDirLevel);
+  // Go through all levels:
+  for (; depth <= kDirLevels; depth++) {
+    if (!HasDir(cur_path+max_dir_name)) {
+      // Directories in this level not yet fully created...
+      for (int i = 0;
+      i < (((unsigned int) 1) << 4*kDigitsPerDirLevel);
+      i++) {
+        // Go through directories 0^kDigitsPerDirLevel to f^kDigitsPerDirLevel
+        snprintf(hex, sizeof(hex), dir_name_template, i);
+        std::string this_path = cur_path + "/" + std::string(hex);
+        int res = mkdir(this_path.c_str(), mode);
+        assert(res == 0 || errno != EEXIST);
+        // Once directory created: Prepare substructures
+        PosixCheckDirStructure(repo, data, depth+1);
+      }
+    } else {
+      // Directories on this level fully created; check ./
+      PosixCheckDirStructure(repo, data, depth+1);
+    }
+  }
+}
+
+void posix_list_dir(struct fs_traversal_context *ctx,
+  const char *dir,
+  char ***buf,
+  size_t *len) {
   struct dirent *de;
 
-  DIR *dr = opendir(dir);
+  DIR *dr = opendir(BuildPath(ctx, dir).c_str());
 
-  if(dr == NULL) {
+  if (dr == NULL) {
     return;
   }
 
-  size_t listlen = 0;
-  AppendStringToList(NULL, buf, &listlen, buflen);
+  *len = 0;
+  AppendStringToList(NULL, buf, len, len);
 
-  while((de == readdir(dr)) != NULL){
-    AppendStringToList(de->d_name, buf, &listlen, buflen);
+  while ((de == readdir(dr)) != NULL) {
+    AppendStringToList(de->d_name, buf, len, len);
   }
 
   closedir(dr);
-  return 0;
-
+  return;
 }
 
-bool has_hash(void *hash) {
-  return FileExists(get_hashed_path((shash::Any *)hash));
+struct cvmfs_stat posix_get_stat(struct fs_traversal_context *ctx,
+  const char *path) {
+  // TODO(steuber): Where is the stat?
+  // TODO(steuber): Save hash + last modified(!=changed) as xattr
+  // -> Could also be done for directories! (chmod changes on file change)
+  // Probably more realistic without last modified though
+  // (means we need to know that fs wasn`t changed)
+  // -> only hash if necessary?
 }
 
-int link(
-  const PathString &path,
-  void *hash) {
-  if (!HasFile(hash)) {
-    return -4;
-  }
-  std::string complete_path = get_visible_path(path);
-  std::string dirname;
-  std::string filename;
-  SplitPath(complete_path, &dirname, &filename);
-  if (FileExists(complete_path)) {
-    return -3;
-  }
-  if (!MkdirDeep(dirname, 0770)) {  // TODO(steuber): Mode?
+bool posix_has_hash(struct fs_traversal_context *ctx,
+  const void *content,
+  const void *meta) {
+  return FileExists(BuildHiddenPath(ctx, content, meta));
+}
+
+int posix_do_link(struct fs_traversal_context *ctx,
+  const char *path,
+  void *content,
+  void *meta) {
+  std::string complete_path = BuildPath(ctx, path);
+  std::string hidden_datapath = BuildHiddenPath(ctx, content, meta);
+  std::string dirname = GetParentPath(complete_path);
+  if (!FileExists(hidden_datapath)) {
+    // Hash file doesn't exist
     return -2;
   }
-  int res = link(get_hashed_path(hash).c_str(), complete_path.c_str());
+  if (!HasDir(dirname)) {
+    // Directory doesn't exist
+    return -3;
+  }
+  if (FileExists(complete_path)) {
+    // Unlink file if existing
+    posix_do_unlink(ctx, path);
+  }
+  int res = link(hidden_datapath.c_str(), complete_path.c_str());
   if (res == -1) return -1;
   return 0;
 }
 
-int PosixDestinationFsInterface::Unlink(const PathString &path) {
-  std::string complete_path = get_visible_path(path);
+int posix_do_unlink(struct fs_traversal_context *ctx,
+  const char *path) {
+  std::string complete_path = BuildPath(ctx, path);
   int res = unlink(complete_path.c_str());
   if (res == -1) return -1;
   return 0;
 }
 
-int PosixDestinationFsInterface::CreateDirectory(const PathString &path) {
-  std::string complete_path = get_visible_path(path);
-  if (!MkdirDeep(complete_path.c_str(), 0770)) {  // TODO(steuber): Mode?
-    return -1;
-  }
-  return 0;
-}
-
-int PosixDestinationFsInterface::RemoveDirectory(const PathString &path) {
-  std::string complete_path = get_visible_path(path);
-  if (!RemoveTree(complete_path.c_str())) {
-    return -1;
-  }
-  return 0;
-}
-
-int PosixDestinationFsInterface::CopyFile(
-  const FILE *fd,
-  const shash::Any &hash) {
-  // TODO(steuber)
-}
-
-int PosixDestinationFsInterface::CreateSymlink(
-  const PathString &src,
-  const PathString &dest) {
-  if (!FileExists(get_visible_path(dest))) {
-    return -4;
-  }
-  std::string dirname;
-  std::string filename;
-  SplitPath(get_visible_path(src), &dirname, &filename);
-  if (!MkdirDeep(dirname, 0770)) {  // TODO(steuber): Mode?
+int posix_do_mkdir(struct fs_traversal_context *ctx,
+              const char *path,
+              const struct cvmfs_stat *stat_info) {
+  std::string complete_path = BuildPath(ctx, path);
+  std::string dirname = GetParentPath(complete_path);
+  if (!HasDir(dirname)) {
+    // Parent directory doesn't exist
     return -3;
   }
-  int res = symlink(dest.c_str(), src.c_str());
-  if (res == -1) return -1;
-  return 0;
+  int res = mkdir(complete_path.c_str(), stat_info->st_mode);
+  if (res != 0) return -1;
+  return PosixSetMeta(complete_path.c_str(), stat_info);
 }
 
-int PosixDestinationFsInterface::GarbageCollection() {
-  DIR *dp;
-  struct dirent *ep;  
-  struct stat st; 
-  std::string hidden_datapath = (root_path_.ToString() + "/" + HiddenFileDir);  
-  dp = opendir(hidden_datapath.c_str());
+int posix_do_unlink_cb(const char *fpath,
+  const struct stat *sb,
+  int typeflag,
+  struct FTW *ftwbuf) {
+  int rv = remove(fpath);
+  return rv;
+}
 
-  if (dp != NULL)
-  {
-    while (ep = readdir(dp)) {
-      std::string curPath = hidden_datapath+std::string (ep->d_name);
-      if (stat(curPath.c_str(), &st) == -1) return -2;
-      if (st.st_nlink==1) {
-        unlink(curPath.c_str());
-      }
-    }
-    closedir(dp);
-  } else {
+int posix_do_rmdir(struct fs_traversal_context *ctx,
+              const char *path) {
+  std::string complete_path = BuildPath(ctx, path);
+  return nftw(complete_path.c_str(),
+    posix_do_unlink_cb,
+    kPosixTraversalMaxDeletePar,
+    FTW_DEPTH | FTW_PHYS);
+}
+
+int posix_touch(struct fs_traversal_context *ctx,
+              void *content,
+              void *meta,
+              const struct cvmfs_stat *stat_info) {
+  if (posix_has_hash(ctx, content, meta)) {
     return -2;
   }
-}
-std::string PosixDestinationFsInterface::get_hashed_path(
-    const shash::Any &hash) {
-  return root_path_.ToString() + "/" + HiddenFileDir + "/" + hash.ToString();
-}
-
-std::string PosixDestinationFsInterface::get_visible_path(
-  const PathString &path) {
-  return root_path_.ToString() + "/" + path.ToString();
-}
-
-const std::string PosixDestinationFsInterface::HiddenFileDir = ".data";
-
-std::string hidden_datapath = ".data";
-
-struct DestinationFsContext {
-  std::string 
+  std::string hidden_datapath = BuildHiddenPath(ctx, content, meta);
+  int res = creat(hidden_datapath.c_str(), stat_info->st_mode);
+  if (res != 0) return -1;
+  return PosixSetMeta(hidden_datapath.c_str(), stat_info);
 }
 
 
-void *get_meta_hash(struct cvmfs_stat file) {
-  // TODO(steuber): Hash of mode, flags, uid, gid, xattr
+struct posix_file_handle {
+  std::string path;
+  int fd;
+};
+
+int posix_do_open(void *ctx, fs_open_type op_mode) {
+  // TODO(steuber): ...
+  return -1;
+}
+
+int posix_do_close(void *ctx) {
+  // TODO(steuber): ...
+  return -1;
+}
+
+int posix_do_read(void *ctx, char *buff, size_t len) {
+  // TODO(steuber): ...
+  return -1;
+}
+
+int posix_do_write(void *ctx, const char *buff) {
+  // TODO(steuber): ...
+  return -1;
+}
+
+/**
+ * Retrieves a method struct which allows the manipulation of the file
+ * defined by the given content and meta data hash
+ * 
+ * @param[in] content The content hash of the file
+ * @param[in] meta The meta hash of the file
+ */
+struct fs_file *posix_get_handle(struct fs_traversal_context *ctx,
+              void *content,
+              void *meta) {
+  struct fs_file *result = new struct fs_file;
+  struct posix_file_handle *file_ctx = new struct posix_file_handle;
+  file_ctx->path = BuildHiddenPath(ctx, content, meta);
+
+  result->ctx = file_ctx;
+  result->stat_info = NULL;  // TODO(steuber): Get stat
+  result->do_open = posix_do_open;
+  result->do_close = posix_do_close;
+  result->do_read = posix_do_read;
+  result->do_write = posix_do_write;
+}
+
+
+/**
+ * Method which creates a symlink at src which points to dest
+ * 
+ * @param[in] The position at which the symlink should be saved
+ * (parent directory must exist)
+ * @param[in] The position the symlink should point to
+ */
+int posix_do_symlink(struct fs_traversal_context *ctx,
+              const char *src,
+              const char *dest,
+              const struct cvmfs_stat *stat_info) {
+  std::string complete_src_path = BuildPath(ctx, src);
+  std::string complete_dest_path = BuildPath(ctx, dest);
+  std::string dirname = GetParentPath(complete_src_path);
+  struct stat sb;
+  if (!HasDir(dirname)) {
+    // Parent directory doesn't exist
+    return -3;
+  }
+  int res = symlink(complete_dest_path.c_str(), complete_src_path.c_str());
+  if (res != 0) return -1;
+  return PosixSetMeta(complete_src_path.c_str(), stat_info);
+}
+
+/**
+ * Method which executes a garbage collection on the destination file system.
+ * This will remove all no longer linked content adressed files
+ */
+// NOTE(steuber): Shouldn't this maybe just be part of the finalize step?
+int posix_garbage_collection(struct fs_traversal_context *ctx) {
+  // TODO(steuber): ...
+}
+
+
+
+
+
+// NOTE(steuber): How does this work?
+struct fs_traversal_context *posix_initialize(
+  fs_type type,
+  const char *repo,
+  const char *data) {
+  fs_traversal_context *result = new struct fs_traversal_context;
+  result->version = 1;
+  result->repo =  repo;
+  result->data = data;
+  PosixCheckDirStructure(repo, data);
+  return result;
+}
+
+void posix_finalize(struct fs_traversal_context *ctx) {
+  // TODO(steuber): ...
+}
+
+
+
+struct fs_traversal posix_get_interface() {
+  struct fs_traversal result;
+  result.initialize = posix_initialize;
+  result.finalize = posix_finalize;
+  result.list_dir = posix_list_dir;
+  result.get_stat = posix_get_stat;
+  result.has_hash = posix_has_hash;
+  result.do_link = posix_do_link;
+  result.do_unlink = posix_do_unlink;
+  result.do_mkdir = posix_do_mkdir;
+  result.do_rmdir = posix_do_rmdir;
+  result.touch = posix_touch;
+  result.get_handle = posix_get_handle;
+  result.do_symlink = posix_do_symlink;
+  result.garbage_collection = posix_garbage_collection;
+
+  return result;
 }
