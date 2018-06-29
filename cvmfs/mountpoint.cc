@@ -1417,7 +1417,8 @@ bool MountPoint::CreateTracer() {
     LogCvmfs(kLogCvmfs, kLogDebug,
       "Initialising tracer with buffer size %" PRIu64 " and threshold %" PRIu64,
       tracebuffer_size, tracebuffer_threshold);
-    tracer_->Activate(tracebuffer_size, tracebuffer_threshold, optarg);
+    tracer_->Activate(tracebuffer_size, tracebuffer_threshold,
+      tracebuffer_file);
   }
   return true;
 }
