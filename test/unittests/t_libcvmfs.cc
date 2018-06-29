@@ -238,3 +238,29 @@ TEST_F(T_Libcvmfs, Attachv2) {
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }
+
+TEST_F(T_Libcvmfs, Templating) {
+  cvmfs_option_map *opts = cvmfs_options_init();
+
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR", "/tmp/@org@/");
+  cvmfs_options_set(opts, "CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts, "CVMFS_SERVER_URL",
+    "test.cern.ch");
+  cvmfs_options_set(opts, "CVMFS_MAX_RETRIES", "2");
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  cvmfs_option_map *opts_repo = cvmfs_options_clone(opts);
+  cvmfs_options_set(opts_repo, "CVMFS_DEBUG_LOG", "/tmp/@fqrn@.debug.log");
+  cvmfs_context *ctx = reinterpret_cast<cvmfs_context *>(1);
+  // This will not actually load a repository
+  // however it should reparse the attributes anyway...
+  cvmfs_attach_repo_v2("test.cern.ch", opts_repo, &ctx);
+
+  EXPECT_STREQ("/tmp/test/", cvmfs_options_get(opts_repo, "CVMFS_CACHE_DIR"));
+  EXPECT_STREQ("/tmp/test.cern.ch.debug.log",
+    cvmfs_options_get(opts_repo, "CVMFS_DEBUG_LOG"));
+  cvmfs_options_fini(opts_repo);
+
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}
