@@ -295,6 +295,80 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 
 
 template <class CatalogT>
+CatalogT* AbstractCatalogManager<CatalogT>::LookupCatalog(
+  const PathString &path
+) {
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Look past current path to mount up to intended location
+  PathString test(path);
+  test.Append("/.cvmfscatalog", 14);
+
+  // Find catalog, possibly load nested
+  CatalogT *best_fit = FindCatalog(test);
+  CatalogT *catalog = best_fit;
+  if (MountSubtree(test, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(test);
+    result = MountSubtree(test, best_fit, &catalog);
+    if (!result) {
+      Unlock();
+      return NULL;
+    }
+  }
+
+  Unlock();
+
+  return catalog;
+}
+
+
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::LookupNested(
+  const PathString &path,
+  PathString &mountpoint,
+  shash::Any *hash,
+  uint64_t *size
+) {
+  EnforceSqliteMemLimit();
+  bool result = false;
+  ReadLock();
+
+  // Look past current path to mount up to intended location
+  mountpoint.Assign(path);
+  mountpoint.Append("/.cvmfscatalog", 14);
+
+  // Find catalog, possibly load nested
+  CatalogT *best_fit = FindCatalog(mountpoint);
+  CatalogT *catalog = best_fit;
+  if (MountSubtree(mountpoint, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(mountpoint);
+    result = MountSubtree(mountpoint, best_fit, &catalog);
+  }
+
+  /* Mountpoint now points to the found catalog */
+  mountpoint.Assign(catalog->root_prefix());
+  result = GetRootCatalog()->FindNested(mountpoint, hash, size);
+
+  if (!result) {
+    *hash =  GetRootCatalog()->hash();
+    *size = 0;
+    result = true;
+  }
+
+  Unlock();
+  return result;
+}
+
+
+template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   const PathString &path,
   XattrList *xattrs)

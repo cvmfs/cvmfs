@@ -93,8 +93,16 @@ typedef enum {
   LIBCVMFS_ERR_REVISION_BLACKLISTED,
 } cvmfs_errors;
 
-
-struct cvmfs_nc_stat {
+/**
+ * Stat struct for a Nested Catalog.
+ *
+ * mountpoint is allocated by called function
+ *    should be freed by caller
+ * hash is allocated by the called function
+ *    should be freed by caller
+ *
+ */
+struct cvmfs_nc_attr {
   const char *mountpoint;
   const void *hash;
   uint64_t size;
@@ -329,13 +337,13 @@ int cvmfs_listdir(
  *
  *
  * @param[in] path, path of nested catalog (e.g. /dir, not /cvmfs/repo/dir)
- * @param[out] ncst, cvmfs_nc_stat buffer in which to write the result
+ * @param[out] ncst, cvmfs_nc_attr buffer in which to write the result
  * \return 0 on success, -1 on failure
  */
-int cvmfs_stat_nested_catalog(
+int cvmfs_stat_nc(
   cvmfs_context *ctx,
   const char *path,
-  struct cvmfs_nc_stat *ncst);
+  struct cvmfs_nc_attr *ncst);
 
 /**
 * Get list of nested catalog at path. The list contents includes the empty string 
@@ -354,7 +362,7 @@ int cvmfs_stat_nested_catalog(
 * @param[in] buflen, pointer to variable containing size of array
 * \return 0 on success, -1 on failure (sets errno)
 */
-int cvmfs_list_nested_catalog(
+int cvmfs_list_nc(
   cvmfs_context *ctx,
   const char *path,
   char ***buf,

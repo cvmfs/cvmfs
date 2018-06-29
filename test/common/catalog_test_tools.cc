@@ -323,7 +323,7 @@ bool CatalogTestTool::AddNestedCatalog(const shash::Any& root_hash, const std::s
   return true;
 }
 
-bool CatalogTestTool::FindNestedFileCatalogHash(const shash::Any& root_hash, const std::string& path, shash::Any *nc_hash, uint64_t *size)
+bool CatalogTestTool::LookupNestedCatalog(const shash::Any& root_hash, const std::string& path, PathString& mp, shash::Any *nc_hash, uint64_t *size)
 {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
@@ -335,7 +335,7 @@ bool CatalogTestTool::FindNestedFileCatalogHash(const shash::Any& root_hash, con
 
   PathString p;
   p.Assign(&path[0], path.length());
-  bool retval = catalog_mgr->GetRootCatalog()->FindNested(p, nc_hash, size);
+  bool retval = catalog_mgr->LookupNested(p, mp, nc_hash, size);
   if (!retval) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "nested catalog for directory '%s' cannot be found",

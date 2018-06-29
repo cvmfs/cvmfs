@@ -160,6 +160,12 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool LookupXattrs(const PathString &path, XattrList *xattrs);
 
+  CatalogT *LookupCatalog(const PathString &path);
+  bool LookupNested(const PathString &path,
+                    PathString &mountpoint,
+                    shash::Any *hash,
+                    uint64_t *size);
+
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
     PathString p;
@@ -208,8 +214,6 @@ class AbstractCatalogManager : public SingleCopy {
     return (inode <= kInodeOffset) ? GetRootInode() : inode;
   }
 
-  CatalogT *FindCatalog(const PathString &path) const;
-
  protected:
   /**
    * Load the catalog and return a file name and the catalog hash. Derived
@@ -248,6 +252,8 @@ class AbstractCatalogManager : public SingleCopy {
   void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
   bool IsAttached(const PathString &root_path,
                   CatalogT **attached_catalog) const;
+
+  CatalogT *FindCatalog(const PathString &path) const;
 
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);

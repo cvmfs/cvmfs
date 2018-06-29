@@ -206,8 +206,10 @@ class Catalog : SingleCopy {
     uint64_t size;
   } NestedCatalog;
   typedef std::vector<NestedCatalog> NestedCatalogList;
+  typedef std::vector<PathString> NestedCatalogNameList;
   const NestedCatalogList& ListNestedCatalogs() const;
   const NestedCatalogList ListOwnNestedCatalogs() const;
+  const NestedCatalogNameList ListOwnNestedCatalogsSkein() const;
   bool FindNested(const PathString &mountpoint,
                   shash::Any *hash, uint64_t *size) const;
 

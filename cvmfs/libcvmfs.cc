@@ -299,10 +299,10 @@ int cvmfs_listdir(
 }
 
 
-int cvmfs_stat_nested_catalog(
+int cvmfs_stat_nc(
   LibContext *ctx,
   const char *path,
-  struct cvmfs_nc_stat *cst
+  struct cvmfs_nc_attr *nc_attr
 ) {
   string lpath;
   int rc;
@@ -312,7 +312,7 @@ int cvmfs_stat_nested_catalog(
   }
   path = lpath.c_str();
 
-  rc = ctx->GetNestedCatalogAttr(path, cst);
+  rc = ctx->GetNestedCatalogAttr(path, nc_attr);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -321,7 +321,7 @@ int cvmfs_stat_nested_catalog(
 }
 
 
-int cvmfs_list_nested_catalog(
+int cvmfs_list_nc(
   LibContext *ctx,
   const char *path,
   char ***buf,
@@ -335,7 +335,7 @@ int cvmfs_list_nested_catalog(
   }
   path = lpath.c_str();
 
-  rc = ctx->ListNestedCatalog(path, buf, buflen);
+  rc = ctx->ListNestedCatalogs(path, buf, buflen);
   if (rc < 0) {
     errno = -rc;
     return -1;
