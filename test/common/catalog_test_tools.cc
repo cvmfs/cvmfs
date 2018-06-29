@@ -323,7 +323,7 @@ bool CatalogTestTool::AddNestedCatalog(const shash::Any& root_hash, const std::s
   return true;
 }
 
-bool CatalogTestTool::LookupNestedCatalog(const shash::Any& root_hash, const std::string& path, PathString& mp, shash::Any *nc_hash, uint64_t *size)
+bool CatalogTestTool::LookupNestedCatalog(const shash::Any& root_hash, const std::string& path, PathString *mp, shash::Any *nc_hash, uint64_t *size)
 {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(

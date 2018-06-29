@@ -162,7 +162,7 @@ class AbstractCatalogManager : public SingleCopy {
 
   CatalogT *LookupCatalog(const PathString &path);
   bool LookupNested(const PathString &path,
-                    PathString &mountpoint,
+                    PathString *mountpoint,
                     shash::Any *hash,
                     uint64_t *size);
 

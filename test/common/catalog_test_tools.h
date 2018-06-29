@@ -128,7 +128,7 @@ class CatalogTestTool : public ServerTool {
   bool AddNestedCatalog(const shash::Any& root_hash, const std::string& path);
   bool LookupNestedCatalog(const shash::Any& root_hash,
                            const std::string& path,
-                           PathString& mp,
+                           PathString *mp,
                            shash::Any *nc_hash,
                            uint64_t *size);
 

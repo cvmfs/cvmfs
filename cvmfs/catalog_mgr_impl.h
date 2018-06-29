@@ -330,7 +330,7 @@ CatalogT* AbstractCatalogManager<CatalogT>::LookupCatalog(
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::LookupNested(
   const PathString &path,
-  PathString &mountpoint,
+  PathString *mountpoint,
   shash::Any *hash,
   uint64_t *size
 ) {
@@ -339,23 +339,23 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
   ReadLock();
 
   // Look past current path to mount up to intended location
-  mountpoint.Assign(path);
-  mountpoint.Append("/.cvmfscatalog", 14);
+  PathString catalog_path(path);
+  catalog_path.Append("/.cvmfscatalog", 14);
 
   // Find catalog, possibly load nested
-  CatalogT *best_fit = FindCatalog(mountpoint);
+  CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(mountpoint, best_fit, NULL)) {
+  if (MountSubtree(catalog_path, best_fit, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
-    best_fit = FindCatalog(mountpoint);
-    result = MountSubtree(mountpoint, best_fit, &catalog);
+    best_fit = FindCatalog(catalog_path);
+    result = MountSubtree(catalog_path, best_fit, &catalog);
   }
 
   /* Mountpoint now points to the found catalog */
-  mountpoint.Assign(catalog->root_prefix());
-  result = GetRootCatalog()->FindNested(mountpoint, hash, size);
+  result = GetRootCatalog()->FindNested(catalog->root_prefix(), hash, size);
+  mountpoint->Assign(catalog->root_prefix());
 
   if (!result) {
     *hash =  GetRootCatalog()->hash();

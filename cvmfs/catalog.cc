@@ -681,7 +681,8 @@ const Catalog::NestedCatalogList Catalog::ListOwnNestedCatalogs() const {
  * for replication and garbage collection.
  * @return  a list of all nested catalogs.
  */
-const Catalog::NestedCatalogNameList Catalog::ListOwnNestedCatalogsSkein() const {
+const Catalog::NestedCatalogNameList
+  Catalog::ListOwnNestedCatalogsSkein() const {
   NestedCatalogNameList result;
 
   /* Build listing */
