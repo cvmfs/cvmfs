@@ -677,9 +677,11 @@ const Catalog::NestedCatalogList Catalog::ListOwnNestedCatalogs() const {
 
 
 /**
- * Get a list of all registered nested catalogs without bind mountpoints.  Used
- * for replication and garbage collection.
- * @return  a list of all nested catalogs.
+ * Get a list of PathString for catalog "family" mountpoints.  Used
+ * to find the parents of a catalog and its children, and returning
+ * list of the places they are mounted. The parents are recursive
+ * to the root.
+ * @return  a list of PathString for a family of catalogs.
  */
 const Catalog::NestedCatalogNameList
   Catalog::ListOwnNestedCatalogsSkein() const {
@@ -696,6 +698,7 @@ const Catalog::NestedCatalogNameList
     }
     parents.push_back(cur_parent);
     while (!parents.empty()) {
+      /* Add to list in order starting at root */
       result.push_back(parents.back()->root_prefix());
       parents.pop_back();
     }

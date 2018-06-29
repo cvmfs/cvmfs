@@ -294,6 +294,14 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 }
 
 
+/**
+ * Perform a lookup for the Catalog that serves this path.
+ *  If the path specified is a catalog mountpoint the catalog at that point is
+ *  mounted and returned.
+ * @param path      the path to find in the catalogs
+ * @return Catalog that serves path, may be Root catalog. Returns
+ *         NULL if available catalog failed to mount.
+ */
 template <class CatalogT>
 CatalogT* AbstractCatalogManager<CatalogT>::LookupCatalog(
   const PathString &path
@@ -315,6 +323,7 @@ CatalogT* AbstractCatalogManager<CatalogT>::LookupCatalog(
     // Check again to avoid race
     best_fit = FindCatalog(test);
     result = MountSubtree(test, best_fit, &catalog);
+    /* result is false if an available catalog failed to load */
     if (!result) {
       Unlock();
       return NULL;
@@ -322,11 +331,22 @@ CatalogT* AbstractCatalogManager<CatalogT>::LookupCatalog(
   }
 
   Unlock();
-
   return catalog;
 }
 
 
+/**
+ * Perform a lookup for Nested Catalog that serves this path.
+ *  If the path specified is a catalog mountpoint the catalog at that point is
+ *  mounted and returned.
+ * @param path       the path to find in the catalogs
+ * @param mountpoint the path to the nested catalog found
+ * @param hash       the hash of the nested catalog found
+ * @param size       the size of the nested catalog, 0 for root. Root is not a
+ *                   nested catalog in the database.
+ * @return true if lookup succeeded otherwise false (available catalog failed
+ *         to mount)
+ */
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::LookupNested(
   const PathString &path,
@@ -351,10 +371,16 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
     result = MountSubtree(catalog_path, best_fit, &catalog);
+    /* result is false if an available catalog failed to load */
+    if (!result) {
+      Unlock();
+      return false;
+    }
   }
 
-  /* Mountpoint now points to the found catalog */
   result = GetRootCatalog()->FindNested(catalog->root_prefix(), hash, size);
+
+  /* Mountpoint now points to the found catalog */
   mountpoint->Assign(catalog->root_prefix());
 
   if (!result) {
