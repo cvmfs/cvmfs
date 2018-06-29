@@ -1108,7 +1108,7 @@ Supported Commands:
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
-                  Use '--' as -t argument to read the tarball from STDIN.
+                  Use '-' as -t argument to read the tarball from STDIN.
 "
 
 
