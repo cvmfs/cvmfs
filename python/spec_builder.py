@@ -2,21 +2,97 @@ import argparse
 import csv
 import os.path
 
+from collections import namedtuple
+
 # POLICY pdir: Always include the entire (flat) parent directory
-def parent_dir_parser(path, op):
-  def clean_path(p):
-    return p if p!="" else "/"
-  if op in parent_dir_parser.onlyInclFolder:
-    return "^"+clean_path(path)
-  else:
-    return "^"+clean_path(os.path.dirname(path))
-parent_dir_parser.onlyInclFolder = {
-  "opendir()": True
+class SpecPoint:
+  def __init__(self, path, mode):
+    self.path = path
+    self.mode = mode
+    self.subfiles = []
+  def isParentOf(self, path):
+    return path[:len(self.path)+1] == self.path+"/"\
+      or path == self.path or self.path==""
+  def getList(self):
+    results = [self]
+    for f in self.subfiles:
+      results+=f.doGetList(self)
+    return results
+  def doGetList(self, parent):
+    results = []
+    if parent.mode==0\
+      or parent.path != get_parent(self.path)\
+      or self.mode!=0:
+      results.append(self)
+    for f in self.subfiles:
+      results+=f.doGetList(self)
+    return results
+  def __str__(self):
+    if self.mode==1:
+      return "^" + self.path + "/*"
+    elif self.mode==0:
+      return "^" + self.path
+  def __eq__(self, other):
+    return self.path == other.path
+  def __ne__(self, other):
+    return self.path != other.path
+  def __lt__(self, other):
+    return self.path < other.path
+  def __gt__(self, other):
+    return self.path > other.path
+
+def peek(stack, pos = 1):
+  return stack[-pos] if len(stack)>0 else None
+
+def get_parent(path):
+  pos = path.rfind("/")
+  return path[:pos] if pos>0 else ""
+
+def parent_dir_parser(pathsToInclude):
+  # print("\n".join([p.path for p in pathsToInclude]))
+  rootEl = SpecPoint("", 0)
+  workStack = [rootEl]
+  specsToInclude = []
+  for curPoint in pathsToInclude:
+    specPoint = None
+    if curPoint.action in parent_dir_parser.parentDirFlat:
+      specPoint = SpecPoint(get_parent(curPoint.path), 1)
+    elif curPoint.action in parent_dir_parser.dirFlat:
+      specPoint = SpecPoint(curPoint.path, 1)
+    else:
+      specPoint = SpecPoint(curPoint.path, 0)
+    specsToInclude.append(specPoint)
+  specsToInclude.sort()
+  for specPoint in specsToInclude:
+    while not peek(workStack).isParentOf(specPoint.path):
+      workStack.pop()
+    topEl = peek(workStack)
+    if topEl.path == specPoint.path and topEl.mode < specPoint.mode:
+      topEl.mode = specPoint.mode
+    elif topEl.path != specPoint.path:
+      topEl.subfiles.append(specPoint)
+      workStack.append(specPoint)
+  return rootEl.getList()
+
+
+
+
+parent_dir_parser.parentDirFlat = ["open()", "getattr()", "getxattr()", "listxattr()", "statfs()"]
+parent_dir_parser.dirFlat = ["opendir()"]
+
+ParsingPolicies = {
+  "pdir": parent_dir_parser
 }
 
-ParsingPolicies = { # Different policies can be added here
-  "pdir" : parent_dir_parser
-}
+class TracePoint(namedtuple("TracePoint", ["path", "action"])):
+  def __eq__(self, other):
+    return self.path == other.path
+  def __ne__(self, other):
+    return self.path != other.path
+  def __lt__(self, other):
+    return self.path < other.path
+  def __gt__(self, other):
+    return self.path > other.path
 
 class TraceParser:
   def __init__(self, args):
@@ -29,23 +105,23 @@ class TraceParser:
     self.policy = ParsingPolicies[args.policy]
     self.filters = { (f+"()"):True for f in args.filters}
   def read_log(self):
-    pathsToInclude = {}
+    pathsToInclude = []
     with open(self.inputName, "r") as logFile:
       csvLogReader = csv.reader(logFile, delimiter=',', quotechar='"')
       for row in [r
                     for r in csvLogReader
                       if r[3] not in self.filters and int(r[1])>=0]:
         # Iterate over not filtered elements
-        pathsToInclude[self.policy(row[2], row[3])] = True 
-    self.pathSpec = [p for p in pathsToInclude]
-    del pathsToInclude
+        pathsToInclude.append(TracePoint(row[2], row[3]))
+    pathsToInclude.sort()
+    self.pathSpec = self.policy(pathsToInclude)
   def write_spec(self):
     if not self.pathSpec:
       print("No path specification created. Please call read_log first")
       return
     with open(self.outputName, "w") as specFile:
       for p in self.pathSpec:
-        specFile.write(p+"\n")
+        specFile.write(str(p)+"\n")
 
     
 
