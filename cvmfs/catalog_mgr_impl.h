@@ -401,12 +401,13 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
 
 
 /**
- * Perform a lookup for the Catalog that serves this path.
+ * Create a listing of the parents, catalog, and children of the catalog
+ *  that serves the specified path.
  *  If the path specified is a catalog mountpoint the catalog at that point is
  *  mounted and returned.
- * @param path      the path to find in the catalogs
- * @return Catalog that serves path, may be Root catalog. Returns
- *         NULL if available catalog failed to mount.
+ * @param path        the path to find in the catalogs
+ * @param result_list the list where the results will be added.
+ * @return true if the list could be created, false if catalog fails to mount.
  */
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::ListCatalogSkein(
