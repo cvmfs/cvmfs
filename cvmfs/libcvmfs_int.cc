@@ -397,8 +397,8 @@ int LibContext::GetNestedCatalogAttr(
   }
 
   /* Set values of the passed structure */
-  nc_attr->mountpoint = mountpoint.ToString().c_str();
-  nc_attr->hash = &hash;
+  nc_attr->mountpoint = strdup(mountpoint.ToString().c_str());
+  nc_attr->hash = strdup(hash.ToString().c_str());
   nc_attr->size = size;
   return 0;
 }
@@ -422,17 +422,17 @@ int LibContext::ListNestedCatalogs(
   path.Assign(c_path, strlen(c_path));
 
   /* Find the correct catalog */
-  catalog::Catalog *found_catalog;
-  found_catalog = mount_point_->catalog_mgr()->LookupCatalog(path);
+  mount_point_->catalog_mgr()->LookupCatalog(path);
 
   size_t listlen = 0;
   AppendStringToList(NULL, buf, &listlen, buflen);
 
-  std::vector<PathString> skein = found_catalog->ListOwnNestedCatalogsSkein();
+  std::vector<PathString*> skein;
+  skein = mount_point_->catalog_mgr()->ListCatalogSkein(path);
 
   /* Add all children nested catalogs */
   for (unsigned i = 0; i < skein.size(); i++) {
-    AppendStringToList(skein.at(i).c_str(), buf, &listlen, buflen);
+    AppendStringToList(skein.at(i)->c_str(), buf, &listlen, buflen);
   }
 
   return 0;

@@ -165,6 +165,7 @@ class AbstractCatalogManager : public SingleCopy {
                     PathString *mountpoint,
                     shash::Any *hash,
                     uint64_t *size);
+  std::vector<PathString*> ListCatalogSkein(const PathString &path);
 
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {

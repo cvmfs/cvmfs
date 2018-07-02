@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <string>
+#include <vector>
 
 #include "logging.h"
 #include "shortstring.h"
@@ -310,13 +311,14 @@ CatalogT* AbstractCatalogManager<CatalogT>::LookupCatalog(
   bool result;
   ReadLock();
 
-  // Look past current path to mount up to intended location
+  /* Look past current path to mount up to intended location */
   PathString test(path);
   test.Append("/.cvmfscatalog", 14);
 
-  // Find catalog, possibly load nested
+  /* Find catalog, possibly load nested */
   CatalogT *best_fit = FindCatalog(test);
   CatalogT *catalog = best_fit;
+  /* True if there is an available nested catalog */
   if (MountSubtree(test, best_fit, NULL)) {
     Unlock();
     WriteLock();
@@ -383,6 +385,9 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
   /* Mountpoint now points to the found catalog */
   mountpoint->Assign(catalog->root_prefix());
 
+  /* If the result is false, it means that no nested catalog was found for
+   * this path. As the root catalog does not have a Nested Catalog of
+   * itself, we manually set the values and leave the size as 0. */
   if (!result) {
     *hash =  GetRootCatalog()->hash();
     *size = 0;
@@ -391,6 +396,75 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
 
   Unlock();
   return result;
+}
+
+
+/**
+ * Perform a lookup for the Catalog that serves this path.
+ *  If the path specified is a catalog mountpoint the catalog at that point is
+ *  mounted and returned.
+ * @param path      the path to find in the catalogs
+ * @return Catalog that serves path, may be Root catalog. Returns
+ *         NULL if available catalog failed to mount.
+ */
+template <class CatalogT>
+std::vector<PathString*> AbstractCatalogManager<CatalogT>::ListCatalogSkein(
+  const PathString &path
+) {
+  EnforceSqliteMemLimit();
+  bool result;
+  std::vector<PathString*> result_list;
+  ReadLock();
+
+  /* Look past current path to mount up to intended location */
+  PathString test(path);
+  test.Append("/.cvmfscatalog", 14);
+
+  /* Find catalog, possibly load nested */
+  CatalogT *best_fit = FindCatalog(test);
+  CatalogT *catalog = best_fit;
+  /* True if there is an available nested catalog */
+  if (MountSubtree(test, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(test);
+    result = MountSubtree(test, best_fit, &catalog);
+    /* result is false if an available catalog failed to load */
+    if (!result) {
+      Unlock();
+      return result_list;
+    }
+  }
+
+  /* Build listing */
+  CatalogT *cur_parent = catalog->parent();
+  if (cur_parent) {
+    /* Walk up parent tree to find base */
+    std::vector<catalog::Catalog*> parents;
+    while (cur_parent->HasParent()) {
+      parents.push_back(cur_parent);
+      cur_parent = cur_parent->parent();
+    }
+    parents.push_back(cur_parent);
+    while (!parents.empty()) {
+      /* Add to list in order starting at root */
+      result_list.push_back(new PathString(parents.back()->root_prefix()));
+      parents.pop_back();
+    }
+  }
+  /* Add the current catalog */
+  result_list.push_back(new PathString(catalog->root_prefix()));
+
+  Catalog::NestedCatalogList children = catalog->ListOwnNestedCatalogs();
+
+  /* Add all children nested catalogs */
+  for (unsigned i = 0; i < children.size(); i++) {
+    result_list.push_back(new PathString(children.at(i).mountpoint));
+  }
+
+  Unlock();
+  return result_list;
 }
 
 

@@ -104,7 +104,7 @@ typedef enum {
  */
 struct cvmfs_nc_attr {
   const char *mountpoint;
-  const void *hash;
+  const char *hash;
   uint64_t size;
 };
 

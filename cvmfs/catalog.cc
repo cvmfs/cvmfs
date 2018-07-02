@@ -677,47 +677,6 @@ const Catalog::NestedCatalogList Catalog::ListOwnNestedCatalogs() const {
 
 
 /**
- * Get a list of PathString for catalog "family" mountpoints.  Used
- * to find the parents of a catalog and its children, and returning
- * list of the places they are mounted. The parents are recursive
- * to the root.
- * @return  a list of PathString for a family of catalogs.
- */
-const Catalog::NestedCatalogNameList
-  Catalog::ListOwnNestedCatalogsSkein() const {
-  NestedCatalogNameList result;
-
-  /* Build listing */
-  Catalog *cur_parent = parent();
-  if (cur_parent) {
-    /* Walk up parent tree to find base */
-    std::vector<catalog::Catalog*> parents;
-    while (cur_parent->HasParent()) {
-      parents.push_back(cur_parent);
-      cur_parent = cur_parent->parent();
-    }
-    parents.push_back(cur_parent);
-    while (!parents.empty()) {
-      /* Add to list in order starting at root */
-      result.push_back(parents.back()->root_prefix());
-      parents.pop_back();
-    }
-  }
-  /* Add the current catalog */
-  result.push_back(root_prefix());
-
-  NestedCatalogList children = ListOwnNestedCatalogs();
-
-  /* Add all children nested catalogs */
-  for (unsigned i = 0; i < children.size(); i++) {
-    result.push_back(children.at(i).mountpoint);
-  }
-
-  return result;
-}
-
-
-/**
  * Drops the nested catalog cache. Usually this is only useful in subclasses
  * that implement writable catalogs.
  *

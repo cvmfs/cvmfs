@@ -431,35 +431,30 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
     cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
 
   const char *orig_nc = NULL;
-  const char *lib_nc = NULL;
 
   /* stat nested catalog using client repo */
   struct cvmfs_nc_attr nc_attr;
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir/dir/dir/dir", &nc_attr));
   orig_nc = d4_hash.ToString().c_str();
-  lib_nc = ((shash::Any *)nc_attr.hash)->ToString().c_str();
-  EXPECT_FALSE(strcmp(orig_nc, lib_nc));
-  EXPECT_FALSE(strcmp(nc_attr.mountpoint, "/dir/dir/dir/dir"));
+  EXPECT_FALSE(strcmp(orig_nc, nc_attr.hash));
+  EXPECT_FALSE(strcmp("/dir/dir/dir/dir", nc_attr.mountpoint));
   EXPECT_EQ(d4_size, nc_attr.size);
 
 
   /* stat nested catalog using client repo */
-  struct cvmfs_nc_attr nc_attr2;
-  EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir", &nc_attr2));
+  EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir", &nc_attr));
   orig_nc = tester.manifest()->catalog_hash().ToString().c_str();
-  lib_nc = ((shash::Any *)nc_attr2.hash)->ToString().c_str();
-  EXPECT_FALSE(strcmp(orig_nc, lib_nc));
-  EXPECT_FALSE(strcmp(nc_attr2.mountpoint, ""));
+  EXPECT_FALSE(strcmp(orig_nc, nc_attr.hash));
+  EXPECT_FALSE(strcmp("", nc_attr.mountpoint));
   /* Size of root catalog is 0 as a Nested Catalog */
-  EXPECT_EQ(nc_attr2.size, 0);
+  EXPECT_EQ(nc_attr.size, 0);
 
 
   /* stat nested catalog using client repo */
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir/dir", &nc_attr));
   orig_nc = d2_hash.ToString().c_str();
-  lib_nc = ((shash::Any *)nc_attr.hash)->ToString().c_str();
-  EXPECT_FALSE(strcmp(orig_nc, lib_nc));
-  EXPECT_FALSE(strcmp(nc_attr.mountpoint, "/dir/dir"));
+  EXPECT_FALSE(strcmp(orig_nc, nc_attr.hash));
+  EXPECT_FALSE(strcmp("/dir/dir", nc_attr.mountpoint));
   EXPECT_EQ(d2_size, nc_attr.size);
 
 
