@@ -1,4 +1,5 @@
 2.6.0:
+  * Generally replace @fqrn@ and @org@ in configuration (CVM-1526)
   * Add support for CVMFS_NFS_INTERLEAVED_INODES (CVM-1561)
   * Add support for ingesting tarballs (CVM-1476)
   * Optionally print GC stats with CVMFS_SERVER_FLAGS=-+stats
