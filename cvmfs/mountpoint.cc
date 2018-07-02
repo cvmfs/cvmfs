@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <climits>
 #include <cstring>
 #include <vector>
 
@@ -1218,7 +1219,7 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
-    download_mgr_->SetHostChain(ReplaceHosts(optarg));
+    download_mgr_->SetHostChain(optarg);
   }
 
   SetupDnsTuning(download_mgr_);
@@ -1385,7 +1386,14 @@ void MountPoint::CreateTables() {
   inode_tracker_ = new glue::InodeTracker();
 }
 
-
+/**
+ * Will create a tracer for the current mount point
+ * Tracefile path, Trace buffer size and trace buffer flush threshold
+ * can be configured by the options: CVMFS_TRACEFILE,
+ * CVMFS_TRACEBUFFER, CVMFS_TRACEBUFFER_THRESHOLD(respectively)
+ * VMFS_TRACEBUFFER and CVMFS_TRACEBUFFER_THRESHOLD will silently fallback
+ * to default values if configuration values don't exist or are invalid
+ */
 bool MountPoint::CreateTracer() {
   string optarg;
   tracer_ = new Tracer();
@@ -1395,7 +1403,24 @@ bool MountPoint::CreateTracer() {
       boot_status_ = loader::kFailOptions;
       return false;
     }
-    tracer_->Activate(kTracerBufferSize, kTracerFlushThreshold, optarg);
+    string tracebuffer_file = optarg;
+    uint64_t tracebuffer_size = kTracerBufferSize;
+    uint64_t tracebuffer_threshold = kTracerFlushThreshold;
+
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &optarg)) {
+      tracebuffer_size = String2Uint64(optarg);
+    }
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD",
+      &optarg)) {
+      tracebuffer_threshold = String2Uint64(optarg);
+    }
+    assert(tracebuffer_size <= INT_MAX
+      && tracebuffer_threshold <= INT_MAX);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+      "Initialising tracer with buffer size %" PRIu64 " and threshold %" PRIu64,
+      tracebuffer_size, tracebuffer_threshold);
+    tracer_->Activate(tracebuffer_size, tracebuffer_threshold,
+      tracebuffer_file);
   }
   return true;
 }
@@ -1617,15 +1642,6 @@ void MountPoint::ReEvaluateAuthz() {
 }
 
 
-string MountPoint::ReplaceHosts(string hosts) {
-  vector<string> tokens = SplitString(fqrn_, '.');
-  const string org = tokens[0];
-  hosts = ReplaceAll(hosts, "@org@", org);
-  hosts = ReplaceAll(hosts, "@fqrn@", fqrn_);
-  return hosts;
-}
-
-
 void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   MutexLockGuard lock_guard(lock_max_ttl_);
   max_ttl_sec_ = value_minutes * 60;
@@ -1707,7 +1723,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
-    external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
+    external_download_mgr_->SetHostChain(optarg);
     if (dogeosort) {
       std::vector<std::string> host_chain;
       external_download_mgr_->GetHostInfo(&host_chain, NULL, NULL);

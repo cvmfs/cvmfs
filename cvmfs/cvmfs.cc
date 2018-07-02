@@ -1754,9 +1754,11 @@ static FileSystem *InitSystemFs(
 
 static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
   if (loader_exports->version >= 3 && loader_exports->simple_options_parsing) {
-    cvmfs::options_mgr_ = new SimpleOptionsParser();
+    cvmfs::options_mgr_ = new SimpleOptionsParser(
+      new DefaultOptionsTemplateManager(loader_exports->repository_name));
   } else {
-    cvmfs::options_mgr_ = new BashOptionsManager();
+    cvmfs::options_mgr_ = new BashOptionsManager(
+      new DefaultOptionsTemplateManager(loader_exports->repository_name));
   }
 
   if (loader_exports->config_files != "") {

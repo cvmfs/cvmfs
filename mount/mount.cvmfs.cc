@@ -324,6 +324,8 @@ int main(int argc, char **argv) {
 
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
+  options_manager_.SwitchTemplateManager(
+    new DefaultOptionsTemplateManager(fqrn));
   options_manager_.ParseDefault(fqrn);
 
   int retval;
