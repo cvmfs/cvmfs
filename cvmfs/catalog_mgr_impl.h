@@ -388,6 +388,7 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
   /* If the result is false, it means that no nested catalog was found for
    * this path. As the root catalog does not have a Nested Catalog of
    * itself, we manually set the values and leave the size as 0. */
+  /* TODO(nhazekam) Allow for Root Catalog to be returned */
   if (!result) {
     *hash =  GetRootCatalog()->hash();
     *size = 0;
@@ -408,12 +409,12 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
  *         NULL if available catalog failed to mount.
  */
 template <class CatalogT>
-std::vector<PathString*> AbstractCatalogManager<CatalogT>::ListCatalogSkein(
-  const PathString &path
+bool AbstractCatalogManager<CatalogT>::ListCatalogSkein(
+  const PathString &path,
+  std::vector<PathString> *result_list
 ) {
   EnforceSqliteMemLimit();
   bool result;
-  std::vector<PathString*> result_list;
   ReadLock();
 
   /* Look past current path to mount up to intended location */
@@ -433,7 +434,7 @@ std::vector<PathString*> AbstractCatalogManager<CatalogT>::ListCatalogSkein(
     /* result is false if an available catalog failed to load */
     if (!result) {
       Unlock();
-      return result_list;
+      return false;
     }
   }
 
@@ -449,22 +450,22 @@ std::vector<PathString*> AbstractCatalogManager<CatalogT>::ListCatalogSkein(
     parents.push_back(cur_parent);
     while (!parents.empty()) {
       /* Add to list in order starting at root */
-      result_list.push_back(new PathString(parents.back()->root_prefix()));
+      result_list->push_back(parents.back()->root_prefix());
       parents.pop_back();
     }
   }
   /* Add the current catalog */
-  result_list.push_back(new PathString(catalog->root_prefix()));
+  result_list->push_back(catalog->root_prefix());
 
   Catalog::NestedCatalogList children = catalog->ListOwnNestedCatalogs();
 
   /* Add all children nested catalogs */
   for (unsigned i = 0; i < children.size(); i++) {
-    result_list.push_back(new PathString(children.at(i).mountpoint));
+    result_list->push_back(children.at(i).mountpoint);
   }
 
   Unlock();
-  return result_list;
+  return true;
 }
 
 

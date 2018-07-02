@@ -103,11 +103,24 @@ typedef enum {
  *
  */
 struct cvmfs_nc_attr {
-  const char *mountpoint;
-  const char *hash;
+  char *mountpoint;
+  char *hash;
   uint64_t size;
 };
 
+/**
+ * Creates an empty cvmfs_nc_attr struct and
+ * returns the pointer to the user.
+ * \return pointer to newly created cvmfs_nc_attr struct
+ */
+struct cvmfs_nc_attr* cvmfs_nc_attr_create();
+
+/**
+ * Frees the cvmfs_nc_attr struct passed, including
+ * freeing the mountpoint and hash.
+ * @param[in] nc_attr, pointer the cvmfs_nc_attr to be destroyed
+ */
+void cvmfs_nc_attr_destroy(struct cvmfs_nc_attr *nc_attr);
 
 /**
  * Send syslog and debug messages to log_fn instead.  This may (and probably
@@ -367,6 +380,13 @@ int cvmfs_list_nc(
   const char *path,
   char ***buf,
   size_t *buflen);
+
+
+/**
+* Free the items contained in list and then the list.
+* @param[in] buf, pointer to the list that was allocated.
+*/
+void cvmfs_list_destroy(char **buf);
 
 #ifdef __cplusplus
 }

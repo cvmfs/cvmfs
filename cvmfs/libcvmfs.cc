@@ -28,6 +28,24 @@
 
 using namespace std;  // NOLINT
 
+
+struct cvmfs_nc_attr *cvmfs_nc_attr_create()
+{
+  struct cvmfs_nc_attr *attr;
+  attr = reinterpret_cast<cvmfs_nc_attr *>(calloc(1, sizeof(*attr)));
+  return attr;
+}
+
+void cvmfs_nc_attr_destroy(struct cvmfs_nc_attr *nc_attr)
+{
+  if (nc_attr) {
+    free(nc_attr->mountpoint);
+    free(nc_attr->hash);
+  }
+  free(nc_attr);
+}
+
+
 /**
  * Expand symlinks in all levels of a path.  Also, expand ".." and ".".  This
  * also has the side-effect of ensuring that cvmfs_getattr() is called on all
@@ -341,6 +359,21 @@ int cvmfs_list_nc(
     return -1;
   }
   return 0;
+}
+
+
+void cvmfs_list_destroy(char **buf)
+{
+  /* Quick return if base pointer is NULL */
+  if (!buf) return;
+  size_t pos = 0;
+  /* Iterate over each non-null entry and free */
+  /* This assumes no null entries, which don't currently exist */
+  while (buf[pos]) {
+    free(buf[pos]);
+    pos++;
+  }
+  free(buf);
 }
 
 

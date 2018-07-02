@@ -421,18 +421,20 @@ int LibContext::ListNestedCatalogs(
   PathString path;
   path.Assign(c_path, strlen(c_path));
 
-  /* Find the correct catalog */
-  mount_point_->catalog_mgr()->LookupCatalog(path);
+  std::vector<PathString> skein;
+  bool retval = mount_point_->catalog_mgr()->ListCatalogSkein(path, &skein);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+      "cvmfs_list_nc failed to find skein of path: %s", c_path);
+    return 1;
+  }
 
   size_t listlen = 0;
   AppendStringToList(NULL, buf, &listlen, buflen);
 
-  std::vector<PathString*> skein;
-  skein = mount_point_->catalog_mgr()->ListCatalogSkein(path);
-
   /* Add all children nested catalogs */
   for (unsigned i = 0; i < skein.size(); i++) {
-    AppendStringToList(skein.at(i)->c_str(), buf, &listlen, buflen);
+    AppendStringToList(skein.at(i).c_str(), buf, &listlen, buflen);
   }
 
   return 0;
