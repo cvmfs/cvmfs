@@ -55,11 +55,11 @@ class OptionsManager {
     }
   }
 
-  OptionsManager(const OptionsManager& opt_mgr)
-    : taint_environment_(true) {
+  OptionsManager(const OptionsManager& opt_mgr) {
     config_ = opt_mgr.config_;
     protected_parameters_ = opt_mgr.protected_parameters_;
     templatable_values_ = opt_mgr.templatable_values_;
+    taint_environment_ = opt_mgr.taint_environment_;
 
     opt_templ_mgr_ = new OptionsTemplateManager(*(opt_mgr.opt_templ_mgr_));
   }
