@@ -28,6 +28,33 @@
 
 using namespace std;  // NOLINT
 
+/**
+ * Create the cvmfs_attr struct which contains the same information
+ * as a stat, but also has pointers to the hash, symlink, and name.
+ */
+struct cvmfs_attr* cvmfs_attr_create()
+{
+  struct cvmfs_attr *attr;
+  attr = reinterpret_cast<cvmfs_attr *>(calloc(1, sizeof(*attr)));
+  return attr;
+}
+
+
+/**
+ * Destroy the cvmfs_attr struct and frees the checksum, symlink
+ * and name. It does not free xattrs.
+ */
+void cvmfs_attr_destroy(struct cvmfs_attr *attr)
+{
+  if (attr) {
+    free(attr->cvm_checksum);
+    free(attr->cvm_symlink);
+    free(attr->cvm_name);
+    /* xattrs is a shallow pointer and not deleted */
+  }
+  free(attr);
+}
+
 
 struct cvmfs_nc_attr *cvmfs_nc_attr_init()
 {
@@ -43,7 +70,7 @@ void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr)
     free(nc_attr->hash);
   }
   free(nc_attr);
-}
+
 
 
 /**
@@ -294,7 +321,11 @@ int cvmfs_lstat(LibContext *ctx, const char *path, struct stat *st) {
 }
 
 
-int cvmfs_ext_stat(LibContext *ctx, const char *path, struct cvmfs_stat *cst) {
+int cvmfs_stat_attr(
+  LibContext *ctx,
+  const char *path,
+  struct cvmfs_attr *attr
+) {
   string lpath;
   int rc;
   rc = expand_path(0, ctx, path, &lpath);
@@ -303,7 +334,7 @@ int cvmfs_ext_stat(LibContext *ctx, const char *path, struct cvmfs_stat *cst) {
   }
   path = lpath.c_str();
 
-  rc = ctx->GetExtAttr(path, cst);
+  rc = ctx->GetExtAttr(path, attr);
   if (rc < 0) {
     errno = -rc;
     return -1;

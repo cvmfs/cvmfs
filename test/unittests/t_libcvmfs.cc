@@ -383,12 +383,12 @@ TEST_F(T_Libcvmfs, Stat) {
 }
 
 
-TEST_F(T_Libcvmfs, StatExt) {
+TEST_F(T_Libcvmfs, Attr) {
   /* Initialize options */
   cvmfs_option_map *opts = cvmfs_options_init();
 
-  /* Create and initialize repository named "ext-stat" */
-  CatalogTestTool tester("ext-stat");
+  /* Create and initialize repository named "attr" */
+  CatalogTestTool tester("attr");
   EXPECT_TRUE(tester.Init());
 
   /* Create file structure */
@@ -421,21 +421,24 @@ TEST_F(T_Libcvmfs, StatExt) {
   EXPECT_EQ(LIBCVMFS_ERR_OK,
     cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
 
-  struct cvmfs_stat st;
+  struct cvmfs_attr *attr;
+  attr = cvmfs_attr_create();
   /* Find file1 */
-  int retval = cvmfs_ext_stat(ctx, "/dir/file1", &st);
+  int retval = cvmfs_stat_attr(ctx, "/dir/file1", attr);
   EXPECT_EQ(0, retval);
   const char *rw_hash = entry.checksum().ToString().c_str();
-  const char *lib_hash = ((shash::Any *)st.cvm_checksum)->ToString().c_str();
   /* Compare hash and size */
-  retval = strcmp(rw_hash, lib_hash);
-  if ( retval ) {
-    printf("Tester   : %s\n", rw_hash);
-    printf("Libcvmfs : %s\n", lib_hash);
-  }
-  EXPECT_TRUE(!strcmp(rw_hash, lib_hash));
-  EXPECT_EQ(st.st_size, file_size);
-  EXPECT_TRUE(!st.cvm_xattrs);
+  retval = strcmp(rw_hash, attr->cvm_checksum);
+  EXPECT_FALSE(retval);
+  EXPECT_EQ(attr->st_size, file_size);
+  EXPECT_FALSE(attr->cvm_xattrs);
+  cvmfs_attr_destroy(attr);
+
+  /* Lookup non-existent file */
+  attr = cvmfs_attr_create();
+  retval = cvmfs_stat_attr(ctx, "/dir/file40", attr);
+  EXPECT_EQ(-1, retval);
+  cvmfs_attr_destroy(attr);
 
   /* Finalize and close repo and options */
   cvmfs_fini();

@@ -296,7 +296,7 @@ int LibContext::GetAttr(const char *c_path, struct stat *info) {
 }
 
 
-int LibContext::GetExtAttr(const char *c_path, struct cvmfs_stat *info) {
+int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
@@ -311,8 +311,8 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_stat *info) {
     return -ENOENT;
   }
 
-  *info = dirent.GetCVMFSStatStructure();
-  if ( dirent.HasXattrs() ) {
+  dirent.GetCVMFSStatStructure(info);
+  if (dirent.HasXattrs()) {
     XattrList xattrs = XattrList();
     mount_point_->catalog_mgr()->LookupXattrs(p, &xattrs);
     info->cvm_xattrs = &xattrs;

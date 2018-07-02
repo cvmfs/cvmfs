@@ -122,30 +122,45 @@ struct cvmfs_nc_attr* cvmfs_nc_attr_init();
  */
 void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr);
 
-struct cvmfs_stat {
-  // Struct definition information
+struct cvmfs_attr {
+  /* Struct definition information */
   unsigned version;
   uint64_t size;
 
-  // Actual contents of stat, mapped from DirectoryEntry
-  uint64_t st_ino;
-  unsigned int st_mode;
-  uint32_t st_nlink;
-  uid_t    st_uid;
-  gid_t    st_gid;
-  dev_t    st_rdev;
-  uint64_t st_size;
-  uint64_t st_blksize;
-  uint64_t st_blocks;
-  time_t   mtime;
+  /* Contents of stat, mapped from DirectoryEntry */
+  dev_t     st_dev;
+  ino_t     st_ino;
+  mode_t    st_mode;
+  nlink_t   st_nlink;
+  uid_t     st_uid;
+  gid_t     st_gid;
+  dev_t     st_rdev;
+  off_t     st_size;
+  blksize_t st_blksize;
+  blkcnt_t  st_blocks;
+  time_t    mtime;
 
-  // CVMFS related content
-  const void * cvm_checksum;
-  const char * cvm_symlink;
-  const char * cvm_name;
-  void *       cvm_xattrs;
+  /* CVMFS related content */
+  /* This information is allocated and should be freed */
+  char * cvm_checksum;
+  char * cvm_symlink;
+  char * cvm_name;
+  void * cvm_xattrs;
 };
 
+/**
+ * Create the cvmfs_attr struct which contains the same information
+ * as a stat, but also has pointers to the hash, symlink, and name.
+ * \Return pointer to a cvmfs_attr struct
+ */
+struct cvmfs_attr* cvmfs_attr_create();
+
+/**
+ * Destroy the cvmfs_attr struct and frees the checksum, symlink
+ * and name. It does not free xattrs.
+ * @param attr, pointer to a cvmfs_attr struct to be deleted.
+ */
+void cvmfs_attr_destroy(struct cvmfs_attr *attr);
 
 /**
  * Send syslog and debug messages to log_fn instead.  This may (and probably
@@ -354,13 +369,13 @@ int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
  *
  *
  * @param[in] path, path of file (e.g. /dir/file, not /cvmfs/repo/dir/file)
- * @param[out] cst, cvmfs_stat buffer in which to write the result
+ * @param[out] attr, cvmfs_attr struct in which to write the result
  * \return 0 on success, -1 on failure
  */
-int cvmfs_ext_stat(
+int cvmfs_stat_attr(
   cvmfs_context *ctx,
   const char *path,
-  struct cvmfs_stat *cst);
+  struct cvmfs_attr *attr);
 
 /**
  * Get list of directory contents.  The directory contents includes "." and

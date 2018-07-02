@@ -202,26 +202,23 @@ class DirectoryEntryBase {
    * information such as hash.
    * @return the struct cvmfs_stat for this DirectoryEntry
    */
-  inline struct cvmfs_stat GetCVMFSStatStructure() const {
-    struct cvmfs_stat s;
-    memset(&s, 0, sizeof(s));
-    s.version  = 1;
-    s.size     = sizeof(s);
-    s.st_ino   = inode_;
-    s.st_mode  = mode_;
-    s.st_nlink = linkcount();
-    s.st_uid   = uid();
-    s.st_gid   = gid();
-    s.st_rdev  = rdev();
-    s.st_size  = size();
-    s.st_blksize = 4096;  // will be ignored by Fuse
-    s.st_blocks = 1 + size() / 512;
-    s.mtime = mtime_;
-    s.cvm_checksum = (const void *)&checksum_;
-    s.cvm_symlink  = symlink_.ToString().c_str();
-    s.cvm_name     = name_.ToString().c_str();
-    s.cvm_xattrs   = NULL;
-    return s;
+  inline void GetCVMFSStatStructure(struct cvmfs_attr *attr) const {
+    attr->version  = 1;
+    attr->size     = sizeof(*attr);
+    attr->st_ino   = inode_;
+    attr->st_mode  = mode_;
+    attr->st_nlink = linkcount();
+    attr->st_uid   = uid();
+    attr->st_gid   = gid();
+    attr->st_rdev  = rdev();
+    attr->st_size  = size();
+    attr->mtime    = mtime_;
+    attr->st_blksize = 4096;  // will be ignored by Fuse
+    attr->st_blocks  = 1 + size() / 512;
+    attr->cvm_checksum = strdup(checksum_.ToString().c_str());
+    attr->cvm_symlink  = strdup(symlink_.ToString().c_str());
+    attr->cvm_name     = strdup(name_.ToString().c_str());
+    attr->cvm_xattrs   = NULL;
   }
 
   Differences CompareTo(const DirectoryEntryBase &other) const;
