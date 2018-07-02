@@ -72,13 +72,6 @@ void Usage() {
 
 
 int main(int argc, char **argv) {
-  //  // used for debugging
-  //  FILE *f = fopen("/home/ddosaru/cvmfs/build/log_dbg", "w");
-  //  if (f == NULL) {
-  //      printf("Error opening file!\n");
-  //      return -1;
-  //  }
-
   command_list.push_back(new swissknife::CommandCreate());
   command_list.push_back(new swissknife::CommandUpload());
   command_list.push_back(new swissknife::CommandRemove());
@@ -152,7 +145,6 @@ int main(int argc, char **argv) {
   option_string.push_back(':');
   int c;
   while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
-    //  fprintf(f, "getopt --> %c\n", c);
     bool valid_option = false;
     for (unsigned j = 0; j < params.size(); ++j) {
       if (c == params[j].key()) {
@@ -208,6 +200,5 @@ int main(int argc, char **argv) {
     delete *i;
   }
   command_list.clear();
-  // fclose(f);
   return retval;
 }
