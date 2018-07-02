@@ -25,6 +25,7 @@
 #include "smalloc.h"
 #include "statistics.h"
 #include "util/posix.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -41,8 +42,8 @@ struct cvmfs_attr* cvmfs_attr_create()
 
 
 /**
- * Destroy the cvmfs_attr struct and frees the checksum, symlink
- * and name. It does not free xattrs.
+ * Destroy the cvmfs_attr struct and frees the checksum, symlink,
+ * name, and xattrs.
  */
 void cvmfs_attr_destroy(struct cvmfs_attr *attr)
 {
@@ -51,6 +52,7 @@ void cvmfs_attr_destroy(struct cvmfs_attr *attr)
     free(attr->cvm_symlink);
     free(attr->cvm_name);
     /* xattrs is a shallow pointer and not deleted */
+    delete reinterpret_cast<XattrList *>(attr->cvm_xattrs);
   }
   free(attr);
 }

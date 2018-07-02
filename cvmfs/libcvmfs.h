@@ -156,8 +156,8 @@ struct cvmfs_attr {
 struct cvmfs_attr* cvmfs_attr_create();
 
 /**
- * Destroy the cvmfs_attr struct and frees the checksum, symlink
- * and name. It does not free xattrs.
+ * Destroy the cvmfs_attr struct and frees the checksum, symlink,
+ * name, and xattrs.
  * @param attr, pointer to a cvmfs_attr struct to be deleted.
  */
 void cvmfs_attr_destroy(struct cvmfs_attr *attr);
