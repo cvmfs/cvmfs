@@ -140,7 +140,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   perf::StatisticsTemplate statistics =
           perf::StatisticsTemplate("Publish-sync", this->statistics());
-  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
+  publish::SyncMediator mediator(&catalog_manager, &params, &statistics);
 
   publish::SyncUnion *sync;
 

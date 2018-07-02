@@ -213,7 +213,7 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Peek(file_to_peek);
-
+  printf("CommandPeek::Main:  success = %d\n", success);
   if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to peek for %s",
              file_to_peek.c_str());
@@ -675,6 +675,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.repo_tag.description_ = *args.find('J')->second;
   }
 
+  if (args.find('I') != args.end()) {
+    params.gather_statistics = true;
+  }
+
   if (!CheckParams(params)) return 2;
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
@@ -750,9 +754,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  perf::StatisticsTemplate statistics =
+  perf::StatisticsTemplate *statistics_ptr = NULL;
+  if (params.gather_statistics) {
+    perf::StatisticsTemplate statistics =
           perf::StatisticsTemplate("Publish-sync", this->statistics());
-  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
+    statistics_ptr = &statistics;
+  }
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics_ptr);
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations

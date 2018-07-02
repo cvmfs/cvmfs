@@ -274,6 +274,9 @@ cvmfs_server_publish() {
         sync_command_virtual_dir="$sync_command -S remove"
       fi
     fi
+    if [ "x$CVMFS_GATHER_STATISTICS" = "xtrue" ]; then
+      sync_command="$sync_command -I"
+    fi
     # Must be after the virtual-dir command is constructed
     if is_checked_out $name; then
       sync_command="$sync_command -B"

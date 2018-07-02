@@ -102,6 +102,7 @@ struct SyncParameters {
   bool is_balanced;
   unsigned max_weight;
   unsigned min_weight;
+  bool gather_statistics;
 
   // Parameters for when upstream type is HTTP
   std::string session_token_file;
@@ -308,6 +309,7 @@ class CommandSync : public Command {
 
     r.push_back(Parameter::Optional('P', "session_token_file"));
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
+    r.push_back(Parameter::Optional('I', "gather publish statistics"));
 
     return r;
   }

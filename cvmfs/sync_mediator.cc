@@ -33,7 +33,7 @@ AbstractSyncMediator::~AbstractSyncMediator() {}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params,
-                           perf::StatisticsTemplate statistics) :
+                           perf::StatisticsTemplate *statistics = NULL) :
   catalog_manager_(catalog_manager),
   union_engine_(NULL),
   handle_hardlinks_(false),
@@ -46,7 +46,9 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
-  counters_ = new Counters(statistics);
+  if (statistics != NULL) {
+    counters_ = new Counters(*statistics);
+  }
 }
 
 
