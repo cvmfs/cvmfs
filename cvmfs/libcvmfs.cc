@@ -51,7 +51,6 @@ void cvmfs_attr_destroy(struct cvmfs_attr *attr)
     free(attr->cvm_checksum);
     free(attr->cvm_symlink);
     free(attr->cvm_name);
-    /* xattrs is a shallow pointer and not deleted */
     delete reinterpret_cast<XattrList *>(attr->cvm_xattrs);
   }
   free(attr);
