@@ -349,7 +349,7 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
   // If the result is false, it means that no nested catalog was found for
   // this path. As the root catalog does not have a Nested Catalog of
   // itself, we manually set the values and leave the size as 0.
-  /* TODO(nhazekam) Allow for Root Catalog to be returned */
+  // TODO(nhazekam) Allow for Root Catalog to be returned
   if (!result) {
     *hash =  GetRootCatalog()->hash();
     *size = 0;

@@ -389,14 +389,14 @@ int LibContext::GetNestedCatalogAttr(
   shash::Any hash;
   uint64_t size;
 
-  /* Find the nested catalog from the root catalog */
+  // Find the nested catalog from the root catalog
   const bool found =
     mount_point_->catalog_mgr()->LookupNested(p, &mountpoint, &hash, &size);
   if (!found) {
     return -ENOENT;
   }
 
-  /* Set values of the passed structure */
+  // Set values of the passed structure
   nc_attr->mountpoint = strdup(mountpoint.ToString().c_str());
   nc_attr->hash = strdup(hash.ToString().c_str());
   nc_attr->size = size;
@@ -432,7 +432,6 @@ int LibContext::ListNestedCatalogs(
   size_t listlen = 0;
   AppendStringToList(NULL, buf, &listlen, buflen);
 
-  /* Add all children nested catalogs */
   for (unsigned i = 0; i < skein.size(); i++) {
     AppendStringToList(skein.at(i).c_str(), buf, &listlen, buflen);
   }

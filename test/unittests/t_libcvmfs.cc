@@ -322,18 +322,18 @@ DirSpec MakeBaseSpec() {
 
 
 TEST_F(T_Libcvmfs, Listdir) {
-  /* Initialize options */
+  // Initialize options
   cvmfs_option_map *opts = cvmfs_options_init();
 
-  /* Create and initialize repository named "list" */
+  // Create and initialize repository named "list"
   CatalogTestTool tester("list");
   EXPECT_TRUE(tester.Init());
 
-  /* Create file structure */
+  // Create file structure
   DirSpec spec1 = MakeBaseSpec();
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
 
-  /* Set CVMFS options to reflect created repository */
+  // Set CVMFS options to reflect created repository
   cvmfs_options_set(opts,
     "CVMFS_ROOT_HASH", tester.manifest()->catalog_hash().ToString().c_str());
   cvmfs_options_set(opts,
@@ -347,10 +347,10 @@ TEST_F(T_Libcvmfs, Listdir) {
     "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
 
 
-  /* Initialize client repo based on options */
+  // Initialize client repo based on options
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
-  /* Attach to client repo */
+  // Attach to client repo
   cvmfs_context *ctx;
   EXPECT_EQ(LIBCVMFS_ERR_OK,
       cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
@@ -369,21 +369,21 @@ TEST_F(T_Libcvmfs, Listdir) {
   EXPECT_FALSE(buf[4]);
   cvmfs_list_free(buf);
 
-  /* Finalize and close repo and options */
+  // Finalize and close repo and options
   cvmfs_detach_repo(ctx);
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }
 
 TEST_F(T_Libcvmfs, StatNestedCatalog) {
-  /* Initialize options */
+  // Initialize options
   cvmfs_option_map *opts = cvmfs_options_init();
 
-  /* Create and initialize repository named "stat_nc" */
+  // Create and initialize repository named "stat_nc"
   CatalogTestTool tester("stat_nc");
   EXPECT_TRUE(tester.Init());
 
-  /* Create file structure and add Nested Catalog */
+  // Create file structure and add Nested Catalog
   DirSpec spec = MakeBaseSpec();
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
   EXPECT_TRUE(tester.AddNestedCatalog(tester.manifest()->catalog_hash(),
@@ -391,7 +391,7 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   EXPECT_TRUE(tester.AddNestedCatalog(tester.manifest()->catalog_hash(),
                                       "dir/dir/dir/dir"));
 
-  /* Find the hash of the newly added Nested Catalog for comparison */
+  // Find the hash of the newly added Nested Catalog for comparison
   PathString d2_mp;
   shash::Any d2_hash;
   uint64_t d2_size;
@@ -408,7 +408,7 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
                                          &d4_hash, &d4_size));
   EXPECT_FALSE(strcmp(d4_mp.ToString().c_str(), "/dir/dir/dir/dir"));
 
-  /* Set CVMFS options to reflect created repository */
+  // Set CVMFS options to reflect created repository
   cvmfs_options_set(opts,
     "CVMFS_ROOT_HASH", tester.manifest()->catalog_hash().ToString().c_str());
   cvmfs_options_set(opts,
@@ -421,17 +421,17 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   cvmfs_options_set(opts,
     "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
 
-  /* Initialize client repo based on options */
+  // Initialize client repo based on options
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
-  /* Attach to client repo */
+  // Attach to client repo
   cvmfs_context *ctx;
   EXPECT_EQ(LIBCVMFS_ERR_OK,
     cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
 
   const char *orig_nc = NULL;
 
-  /* stat nested catalog using client repo */
+  // stat nested catalog using client repo
   struct cvmfs_nc_attr *nc_attr;
   nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir/dir/dir/dir", nc_attr));
@@ -442,18 +442,18 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   cvmfs_nc_attr_free(nc_attr);
 
 
-  /* stat nested catalog using client repo */
+  // stat nested catalog using client repo
   nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir", nc_attr));
   orig_nc = tester.manifest()->catalog_hash().ToString().c_str();
   EXPECT_FALSE(strcmp(orig_nc, nc_attr->hash));
   EXPECT_FALSE(strcmp("", nc_attr->mountpoint));
-  /* Size of root catalog is 0 as a Nested Catalog */
+  // Size of root catalog is 0 as a Nested Catalog
   EXPECT_EQ(nc_attr->size, 0);
   cvmfs_nc_attr_free(nc_attr);
 
 
-  /* stat nested catalog using client repo */
+  // stat nested catalog using client repo
   nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir/dir", nc_attr));
   orig_nc = d2_hash.ToString().c_str();
@@ -462,7 +462,7 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   EXPECT_EQ(d2_size, nc_attr->size);
   cvmfs_nc_attr_free(nc_attr);
 
-  /* Finalize and close repo and options */
+  // Finalize and close repo and options
   cvmfs_detach_repo(ctx);
   cvmfs_fini();
   cvmfs_options_fini(opts);
@@ -470,14 +470,14 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
 
 
 TEST_F(T_Libcvmfs, ListNestedCatalogs) {
-  /* Initialize options */
+  // Initialize options
   cvmfs_option_map *opts = cvmfs_options_init();
 
-  /* Create and initialize repository named "list_nc" */
+  // Create and initialize repository named "list_nc"
   CatalogTestTool tester("list_nc");
   EXPECT_TRUE(tester.Init());
 
-  /* Create file structure and add Nested Catalogs */
+  // Create file structure and add Nested Catalogs
   DirSpec spec1 = MakeBaseSpec();
   EXPECT_TRUE(
     tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
@@ -490,7 +490,7 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   EXPECT_TRUE(
     tester.AddNestedCatalog(tester.manifest()->catalog_hash(), "dir/dir3"));
 
-  /* Set CVMFS options to reflect created repository */
+  // Set CVMFS options to reflect created repository
   cvmfs_options_set(opts,
     "CVMFS_ROOT_HASH", tester.manifest()->catalog_hash().ToString().c_str());
   cvmfs_options_set(opts,
@@ -503,15 +503,15 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   cvmfs_options_set(opts,
     "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
 
-  /* Initialize client repo based on options */
+  // Initialize client repo based on options
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
-  /* Attach to client repo */
+  // Attach to client repo
   cvmfs_context *ctx;
   EXPECT_EQ(LIBCVMFS_ERR_OK,
     cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
 
-  /* Check that the listing includes itself and its children */
+  // Check that the listing includes itself and its children
   char **buf = NULL;
   size_t buflen = 0;
   EXPECT_FALSE(cvmfs_list_nc(ctx, "/dir", &buf, &buflen));
@@ -532,7 +532,7 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   EXPECT_FALSE(buf[3]);
   cvmfs_list_free(buf);
 
-  /* Finalize and close repo and options */
+  // Finalize and close repo and options
   cvmfs_detach_repo(ctx);
   cvmfs_fini();
   cvmfs_options_fini(opts);

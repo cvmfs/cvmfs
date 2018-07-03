@@ -364,11 +364,11 @@ int cvmfs_list_nc(
 
 void cvmfs_list_free(char **buf)
 {
-  /* Quick return if base pointer is NULL */
+  // Quick return if base pointer is NULL
   if (!buf) return;
   size_t pos = 0;
-  /* Iterate over each non-null entry and free */
-  /* This assumes no null entries, which don't currently exist */
+  // Iterate over each non-null entry and free
+  // This assumes no null entries, which don't currently exist
   while (buf[pos]) {
     free(buf[pos]);
     pos++;
