@@ -13,20 +13,6 @@ class SpecPoint:
   def isParentOf(self, path):
     return path[:len(self.path)+1] == self.path+"/"\
       or path == self.path or self.path==""
-  def getList(self):
-    results = [self]
-    for f in self.subfiles:
-      results+=f.doGetList(self)
-    return results
-  def doGetList(self, parent):
-    results = []
-    if parent.mode==0\
-      or parent.path != get_parent(self.path)\
-      or self.mode!=0:
-      results.append(self)
-    for f in self.subfiles:
-      results+=f.doGetList(self)
-    return results
   def __str__(self):
     if self.mode==1:
       return "^" + self.path + "/*"
@@ -49,9 +35,6 @@ def get_parent(path):
   return path[:pos] if pos>0 else ""
 
 def parent_dir_parser(pathsToInclude):
-  # print("\n".join([p.path for p in pathsToInclude]))
-  rootEl = SpecPoint("", 0)
-  workStack = [rootEl]
   specsToInclude = []
   # Go through tracer points and build specs based on made calls
   for curPoint in pathsToInclude:
@@ -65,18 +48,26 @@ def parent_dir_parser(pathsToInclude):
     specsToInclude.append(specPoint)
   # Sort generated specs alphabetically for reduction
   specsToInclude.sort()
+  rootEl = SpecPoint("", 0)
+  workStack = [rootEl]
+  results = []
   for specPoint in specsToInclude:
     while not peek(workStack).isParentOf(specPoint.path):
-      workStack.pop()
+      # Backtrack up to nearest parent
+      el = workStack.pop()
+      results.append(el)
     topEl = peek(workStack)
     if topEl.path == specPoint.path and topEl.mode < specPoint.mode:
+      # If stack top element is same path: Update if necessary
       topEl.mode = specPoint.mode
     elif topEl.path != specPoint.path:
-      topEl.subfiles.append(specPoint)
-      workStack.append(specPoint)
-  return rootEl.getList()
-
-
+      # If stack top is some parent: Add if necessary
+      if topEl.mode==0\
+        or topEl.path != get_parent(specPoint.path)\
+        or specPoint.mode!=0:
+        workStack.append(specPoint)
+  results+=workStack
+  return results
 
 
 parent_dir_parser.parentDirFlat = ["open()", "getattr()", "getxattr()", "listxattr()", "statfs()"]
@@ -113,9 +104,7 @@ class TraceParser:
       for row in [r
                     for r in csvLogReader
                       if r[3] not in self.filters and int(r[1])>=0]:
-        # Iterate over not filtered elements
         pathsToInclude.append(TracePoint(row[2], row[3]))
-    pathsToInclude.sort()
     self.pathSpec = self.policy(pathsToInclude)
   def write_spec(self):
     if not self.pathSpec:
