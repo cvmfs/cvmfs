@@ -30,6 +30,7 @@ void Tracer::Activate(
   trace_file_ = trace_file;
   buffer_size_ = buffer_size;
   flush_threshold_ = flush_threshold;
+<<<<<<< HEAD
   if (buffer_size_ <= 1 || flush_threshold_< 0
     || flush_threshold_ >= buffer_size_) {
     LogCvmfs(kLogCvmfs, kLogSyslogWarn,
@@ -38,6 +39,10 @@ void Tracer::Activate(
       "and 0 <= CVMFS_TRACEBUFFER_THRESHOLD < CVMFS_TRACEBUFFER");
     return;
   }
+=======
+  assert(buffer_size_ > 1 && flush_threshold_>= 0
+    && flush_threshold_ < buffer_size_);
+>>>>>>> 601010c0286a78b97634093345076f76ea9c5333
 
   ring_buffer_ = new BufferEntry[buffer_size_];
   commit_buffer_ = new atomic_int32[buffer_size_];
@@ -124,7 +129,10 @@ void Tracer::Flush() {
     atomic_cas32(&flush_immediately_, 0, 1);
     LockMutex(&sig_flush_mutex_);
     retval = pthread_cond_signal(&sig_flush_);
+<<<<<<< HEAD
     assert(retval == 0);  // TODO(steuber): Should this assert be changed?
+=======
+>>>>>>> 601010c0286a78b97634093345076f76ea9c5333
     UnlockMutex(&sig_flush_mutex_);
 
     GetTimespecRel(250, &timeout);
