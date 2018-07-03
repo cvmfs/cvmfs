@@ -70,7 +70,7 @@ def parent_dir_parser(pathsToInclude):
   return results
 
 
-parent_dir_parser.parentDirFlat = ["open()", "getattr()", "getxattr()", "listxattr()", "statfs()"]
+parent_dir_parser.parentDirFlat = ["open()"]
 parent_dir_parser.dirFlat = ["opendir()"]
 
 ParsingPolicies = {
