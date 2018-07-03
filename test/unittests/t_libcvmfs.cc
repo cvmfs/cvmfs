@@ -422,7 +422,7 @@ TEST_F(T_Libcvmfs, Attr) {
     cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
 
   struct cvmfs_attr *attr;
-  attr = cvmfs_attr_create();
+  attr = cvmfs_attr_init();
   /* Find file1 */
   int retval = cvmfs_stat_attr(ctx, "/dir/file1", attr);
   EXPECT_EQ(0, retval);
@@ -432,13 +432,13 @@ TEST_F(T_Libcvmfs, Attr) {
   EXPECT_FALSE(retval);
   EXPECT_EQ(attr->st_size, file_size);
   EXPECT_FALSE(attr->cvm_xattrs);
-  cvmfs_attr_destroy(attr);
+  cvmfs_attr_free(attr);
 
   /* Lookup non-existent file */
-  attr = cvmfs_attr_create();
+  attr = cvmfs_attr_init();
   retval = cvmfs_stat_attr(ctx, "/dir/file40", attr);
   EXPECT_EQ(-1, retval);
-  cvmfs_attr_destroy(attr);
+  cvmfs_attr_free(attr);
 
   /* Finalize and close repo and options */
   cvmfs_fini();

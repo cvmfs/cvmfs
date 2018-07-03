@@ -33,7 +33,7 @@ using namespace std;  // NOLINT
  * Create the cvmfs_attr struct which contains the same information
  * as a stat, but also has pointers to the hash, symlink, and name.
  */
-struct cvmfs_attr* cvmfs_attr_create()
+struct cvmfs_attr* cvmfs_attr_init()
 {
   struct cvmfs_attr *attr;
   attr = reinterpret_cast<cvmfs_attr *>(calloc(1, sizeof(*attr)));
@@ -45,7 +45,7 @@ struct cvmfs_attr* cvmfs_attr_create()
  * Destroy the cvmfs_attr struct and frees the checksum, symlink,
  * name, and xattrs.
  */
-void cvmfs_attr_destroy(struct cvmfs_attr *attr)
+void cvmfs_attr_free(struct cvmfs_attr *attr)
 {
   if (attr) {
     free(attr->cvm_checksum);

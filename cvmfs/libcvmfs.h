@@ -153,14 +153,14 @@ struct cvmfs_attr {
  * as a stat, but also has pointers to the hash, symlink, and name.
  * \Return pointer to a cvmfs_attr struct
  */
-struct cvmfs_attr* cvmfs_attr_create();
+struct cvmfs_attr* cvmfs_attr_init();
 
 /**
  * Destroy the cvmfs_attr struct and frees the checksum, symlink,
  * name, and xattrs.
  * @param attr, pointer to a cvmfs_attr struct to be deleted.
  */
-void cvmfs_attr_destroy(struct cvmfs_attr *attr);
+void cvmfs_attr_free(struct cvmfs_attr *attr);
 
 /**
  * Send syslog and debug messages to log_fn instead.  This may (and probably
