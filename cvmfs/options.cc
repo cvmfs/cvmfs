@@ -85,6 +85,7 @@ void OptionsManager::SwitchTemplateManager(
     it++) {
     config_[it->first].value = it->second;
     opt_templ_mgr_->ParseString(&(config_[it->first].value));
+    UpdateEnvironment(it->first, config_[it->first]);
   }
 }
 
@@ -328,6 +329,12 @@ void OptionsManager::PopulateParameter(
   }
   ParseValue(param, &val);
   config_[param] = val;
+  UpdateEnvironment(param, val);
+}
+
+void OptionsManager::UpdateEnvironment(
+  const string &param,
+  ConfigValue val) {
   if (taint_environment_) {
     int retval = setenv(param.c_str(), val.value.c_str(), 1);
     assert(retval == 0);
@@ -457,10 +464,10 @@ void OptionsManager::UnsetValue(const string &key) {
     unsetenv(key.c_str());
 }
 
-const std::string DefaultOptionsTemplateManager
+const char *DefaultOptionsTemplateManager
   ::kTemplateIdentFqrn = "fqrn";
 
-const std::string DefaultOptionsTemplateManager
+const char *DefaultOptionsTemplateManager
   ::kTemplateIdentOrg = "org";
 
 DefaultOptionsTemplateManager::DefaultOptionsTemplateManager(
@@ -497,7 +504,7 @@ bool OptionsTemplateManager::ParseString(std::string *input) {
         if (in[i] == '@') {
           mode = 1;
         } else {
-          result+=in[i];
+          result += in[i];
         }
       break;
       case 1:

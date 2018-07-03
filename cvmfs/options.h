@@ -33,8 +33,8 @@ class DefaultOptionsTemplateManager : public OptionsTemplateManager {
  public:
   explicit DefaultOptionsTemplateManager(std::string fqrn);
  private:
-  static const std::string kTemplateIdentFqrn;
-  static const std::string kTemplateIdentOrg;
+  static const char *kTemplateIdentFqrn;
+  static const char *kTemplateIdentOrg;
 };
 
 /**
@@ -59,6 +59,7 @@ class OptionsManager {
     config_ = opt_mgr.config_;
     protected_parameters_ = opt_mgr.protected_parameters_;
     templatable_values_ = opt_mgr.templatable_values_;
+    taint_environment_ = opt_mgr.taint_environment_;
 
     opt_templ_mgr_ = new OptionsTemplateManager(*(opt_mgr.opt_templ_mgr_));
   }
@@ -187,6 +188,8 @@ class OptionsManager {
   std::string TrimParameter(const std::string &parameter);
   void PopulateParameter(const std::string &param, const ConfigValue val);
   void ParseValue(const std::string param, ConfigValue *val);
+  void UpdateEnvironment(
+    const std::string &param, ConfigValue val);
   std::map<std::string, ConfigValue> config_;
   std::map<std::string, std::string> protected_parameters_;
   std::map<std::string, std::string> templatable_values_;

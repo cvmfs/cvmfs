@@ -1388,9 +1388,11 @@ void MountPoint::CreateTables() {
 
 /**
  * Will create a tracer for the current mount point
- * Tracefile path, Trace buffer size and trace buffer flush threshold can be configured by the options:
- * CVMFS_TRACEFILE, CVMFS_TRACEBUFFER, CVMFS_TRACEBUFFER_THRESHOLD (respectively)
- * VMFS_TRACEBUFFER and CVMFS_TRACEBUFFER_THRESHOLD will silently fallback to default values if configuration values don't exist or are invalid
+ * Tracefile path, Trace buffer size and trace buffer flush threshold
+ * can be configured by the options: CVMFS_TRACEFILE,
+ * CVMFS_TRACEBUFFER, CVMFS_TRACEBUFFER_THRESHOLD(respectively)
+ * VMFS_TRACEBUFFER and CVMFS_TRACEBUFFER_THRESHOLD will silently fallback
+ * to default values if configuration values don't exist or are invalid
  */
 bool MountPoint::CreateTracer() {
   string optarg;
@@ -1406,11 +1408,11 @@ bool MountPoint::CreateTracer() {
     uint64_t tracebuffer_threshold = kTracerFlushThreshold;
 
     if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &optarg)) {
-      tracebuffer_size = String2Uint64(optarg.c_str());
+      tracebuffer_size = String2Uint64(optarg);
     }
     if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD",
       &optarg)) {
-      tracebuffer_threshold = String2Uint64(optarg.c_str());
+      tracebuffer_threshold = String2Uint64(optarg);
     }
     assert(tracebuffer_size <= INT_MAX
       && tracebuffer_threshold <= INT_MAX);
