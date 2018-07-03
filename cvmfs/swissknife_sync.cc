@@ -755,9 +755,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   catalog_manager.Init();
 
   perf::StatisticsTemplate *statistics_ptr = NULL;
+  perf::StatisticsTemplate statistics("Publish-sync", this->statistics());
   if (params.gather_statistics) {
-    perf::StatisticsTemplate statistics =
-          perf::StatisticsTemplate("Publish-sync", this->statistics());
     statistics_ptr = &statistics;
   }
   publish::SyncMediator mediator(&catalog_manager, &params, statistics_ptr);
