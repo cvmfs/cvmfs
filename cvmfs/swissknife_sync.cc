@@ -213,7 +213,7 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Peek(file_to_peek);
-  printf("CommandPeek::Main:  success = %d\n", success);
+
   if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to peek for %s",
              file_to_peek.c_str());
