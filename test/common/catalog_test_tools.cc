@@ -378,7 +378,11 @@ bool CatalogTestTool::LookupNestedCatalogHash(
   return true;
 }
 
-bool CatalogTestTool::FindEntry(const shash::Any& root_hash, const std::string& path, catalog::DirectoryEntry *entry) {
+bool CatalogTestTool::FindEntry(
+  const shash::Any& root_hash,
+  const std::string& path,
+  catalog::DirectoryEntry *entry
+) {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,

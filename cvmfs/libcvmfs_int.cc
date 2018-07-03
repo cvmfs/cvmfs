@@ -50,8 +50,6 @@
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
-#include "catalog.h"
-#include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"
@@ -295,6 +293,26 @@ int LibContext::GetAttr(const char *c_path, struct stat *info) {
   return 0;
 }
 
+void LibContext::CvmfsAttrFromDirent(
+  catalog::DirectoryEntry dirent,
+  struct cvmfs_attr *attr
+) {
+  attr->version  = 1;
+  attr->size     = sizeof(*attr);
+  attr->st_ino   = dirent.inode();
+  attr->st_mode  = dirent.mode();
+  attr->st_nlink = dirent.linkcount();
+  attr->st_uid   = dirent.uid();
+  attr->st_gid   = dirent.gid();
+  attr->st_rdev  = dirent.rdev();
+  attr->st_size  = dirent.size();
+  attr->mtime    = dirent.mtime();
+  attr->cvm_checksum = strdup(dirent.checksum().ToString().c_str());
+  attr->cvm_symlink  = strdup(dirent.symlink().ToString().c_str());
+  attr->cvm_name     = strdup(dirent.name().ToString().c_str());
+  attr->cvm_xattrs   = NULL;
+}
+
 
 int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
@@ -311,7 +329,7 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
     return -ENOENT;
   }
 
-  dirent.GetCVMFSStatStructure(info);
+  CvmfsAttrFromDirent(dirent, info);
   if (dirent.HasXattrs()) {
     XattrList *xattrs = new XattrList();
     mount_point_->catalog_mgr()->LookupXattrs(p, xattrs);

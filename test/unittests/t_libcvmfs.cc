@@ -76,9 +76,6 @@ class T_Libcvmfs : public ::testing::Test {
   string alien_path_;
   string opt_cache_;
   FILE *fdevnull_;
-
-  int fd_cwd_;
-  unsigned used_fds_;
 };
 
 bool T_Libcvmfs::first_test = true;
@@ -441,6 +438,7 @@ TEST_F(T_Libcvmfs, Attr) {
   cvmfs_attr_free(attr);
 
   /* Finalize and close repo and options */
+  cvmfs_detach_repo(ctx);
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }

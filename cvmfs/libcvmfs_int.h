@@ -128,6 +128,8 @@ class LibContext : SingleCopy {
                           size_t       *buflen);
   bool GetDirentForPath(const PathString         &path,
                         catalog::DirectoryEntry  *dirent);
+  void CvmfsAttrFromDirent(catalog::DirectoryEntry dirent,
+                           struct cvmfs_attr *attr);
 
   /**
    * Only non-NULL if cvmfs_attache_repo is used for initialization.  In this

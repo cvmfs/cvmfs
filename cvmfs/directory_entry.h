@@ -18,7 +18,6 @@
 #include "bigvector.h"
 #include "compression.h"
 #include "hash.h"
-#include "libcvmfs.h"
 #include "platform.h"
 #include "shortstring.h"
 
@@ -194,31 +193,6 @@ class DirectoryEntryBase {
     s.st_mtime = mtime_;
     s.st_ctime = mtime_;
     return s;
-  }
-
-  /**
-   * Converts to a cvmfs_stat struct. This provides the
-   * information provided by stat, but also CVMFS specific
-   * information such as hash.
-   * @return the struct cvmfs_stat for this DirectoryEntry
-   */
-  inline void GetCVMFSStatStructure(struct cvmfs_attr *attr) const {
-    attr->version  = 1;
-    attr->size     = sizeof(*attr);
-    attr->st_ino   = inode_;
-    attr->st_mode  = mode_;
-    attr->st_nlink = linkcount();
-    attr->st_uid   = uid();
-    attr->st_gid   = gid();
-    attr->st_rdev  = rdev();
-    attr->st_size  = size();
-    attr->mtime    = mtime_;
-    attr->st_blksize = 4096;  // will be ignored by Fuse
-    attr->st_blocks  = 1 + size() / 512;
-    attr->cvm_checksum = strdup(checksum_.ToString().c_str());
-    attr->cvm_symlink  = strdup(symlink_.ToString().c_str());
-    attr->cvm_name     = strdup(name_.ToString().c_str());
-    attr->cvm_xattrs   = NULL;
   }
 
   Differences CompareTo(const DirectoryEntryBase &other) const;
