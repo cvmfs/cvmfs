@@ -71,7 +71,7 @@ void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr)
     free(nc_attr->hash);
   }
   free(nc_attr);
-
+}
 
 
 /**
