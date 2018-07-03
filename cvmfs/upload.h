@@ -137,11 +137,6 @@ namespace upload {
  *
  * Note: A spooler is derived from the Observable template, meaning that it
  *       allows for Listeners to be registered onto it.
- *
- * Note: Concrete implementations of AbstractSpooler are responsible to pro-
- *       duce a SpoolerResult once they finish a job and pass it upwards by
- *       invoking JobDone(). AbstractSpooler will then take care of notifying
- *       all registered listeners.
  */
 class Spooler : public Observable<SpoolerResult> {
  public:
@@ -294,23 +289,6 @@ class Spooler : public Observable<SpoolerResult> {
    *                             some intrinsics of the concrete Spoolers.
    */
   explicit Spooler(const SpoolerDefinition &spooler_definition);
-
-  /**
-   * Concrete implementations of the AbstractSpooler must call this method
-   * when they finish an upload job. A single upload job might contain more
-   * than one file to be uploaded.
-   *
-   * Note: If the concrete spooler implements uploading as an asynchronous
-   *       task, this method MUST be called when all items for one upload
-   *       job are processed.
-   *
-   * The concrete implementations of AbstractSpooler are responsible to fill
-   * the SpoolerResult structure properly and pass it to this method.
-   *
-   * JobDone() will inform Listeners of the Spooler object about the finished
-   * job.
-   */
-  void JobDone(const SpoolerResult &result);
 
   /**
    * Used internally: Is called when ingestion pipeline finishes a job.
