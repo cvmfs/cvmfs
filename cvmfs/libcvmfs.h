@@ -35,6 +35,7 @@
 // 26: CernVM-FS 2.5.0
 #define LIBCVMFS_REVISION 26
 
+#include <stdint.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -92,6 +93,34 @@ typedef enum {
   LIBCVMFS_ERR_REVISION_BLACKLISTED,
 } cvmfs_errors;
 
+/**
+ * Stat struct for a Nested Catalog.
+ *
+ * mountpoint is allocated by called function
+ *    should be freed by caller
+ * hash is allocated by the called function
+ *    should be freed by caller
+ *
+ */
+struct cvmfs_nc_attr {
+  char *mountpoint;
+  char *hash;
+  uint64_t size;
+};
+
+/**
+ * Creates an empty cvmfs_nc_attr struct and
+ * returns the pointer to the user.
+ * \return pointer to newly created cvmfs_nc_attr struct
+ */
+struct cvmfs_nc_attr* cvmfs_nc_attr_init();
+
+/**
+ * Frees the cvmfs_nc_attr struct passed, including
+ * freeing the mountpoint and hash.
+ * @param[in] nc_attr, pointer the cvmfs_nc_attr to be destroyed
+ */
+void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr);
 
 /**
  * Send syslog and debug messages to log_fn instead.  This may (and probably
@@ -313,6 +342,51 @@ int cvmfs_listdir(
   const char *path,
   char ***buf,
   size_t *buflen);
+
+/**
+ * Get the CVMFS information about a nested catalog. The information returned
+ * pertains to the catalog that serves this path, if this path is a transition
+ * point, then the information is about this transition point.
+ *
+ *
+ * @param[in] path, path of nested catalog (e.g. /dir, not /cvmfs/repo/dir)
+ * @param[out] ncst, cvmfs_nc_attr buffer in which to write the result
+ * \return 0 on success, -1 on failure
+ */
+int cvmfs_stat_nc(
+  cvmfs_context *ctx,
+  const char *path,
+  struct cvmfs_nc_attr *ncst);
+
+/**
+* Get list of nested catalog at path. The list contents includes the empty string 
+* for the base and each nested catalog needed to reach this location. It also 
+* contains the list of nested catalogs reachable directly from the nested catalog
+* serving this location. If this is a transition point, the nested catalog at this 
+* location is used.
+*
+* On return, the array will contain a NULL-terminated list of strings.  The
+* caller must free the strings and the array containing them.  The array (*buf)
+* may be NULL when this function is called.
+*
+* @param[in] path, path of nested catalog (e.g. /dir, not /cvmfs/repo/dir)
+* @param[out] buf, pointer to dynamically allocated NULL-terminated array of
+*             strings
+* @param[in] buflen, pointer to variable containing size of array
+* \return 0 on success, -1 on failure (sets errno)
+*/
+int cvmfs_list_nc(
+  cvmfs_context *ctx,
+  const char *path,
+  char ***buf,
+  size_t *buflen);
+
+
+/**
+* Free the items contained in list and then the list.
+* @param[in] buf, pointer to the list that was allocated.
+*/
+void cvmfs_list_free(char **buf);
 
 #ifdef __cplusplus
 }

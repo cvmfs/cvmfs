@@ -48,6 +48,7 @@
 
 #include "atomic.h"
 #include "cache_posix.h"
+#include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compression.h"
@@ -319,7 +320,6 @@ int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
   return 0;
 }
 
-
 int LibContext::ListDirectory(
   const char *c_path,
   char ***buf,
@@ -369,6 +369,71 @@ int LibContext::ListDirectory(
   for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
     AppendStringToList(listing_from_catalog.AtPtr(i)->name.c_str(),
                           buf, &listlen, buflen);
+  }
+
+  return 0;
+}
+
+int LibContext::GetNestedCatalogAttr(
+  const char *c_path,
+  struct cvmfs_nc_attr *nc_attr
+) {
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  LogCvmfs(kLogCvmfs, kLogDebug,
+    "cvmfs_stat_nc (cvmfs_nc_attr) : %s", c_path);
+
+  PathString p;
+  p.Assign(c_path, strlen(c_path));
+
+  PathString mountpoint;
+  shash::Any hash;
+  uint64_t size;
+
+  // Find the nested catalog from the root catalog
+  const bool found =
+    mount_point_->catalog_mgr()->LookupNested(p, &mountpoint, &hash, &size);
+  if (!found) {
+    return -ENOENT;
+  }
+
+  // Set values of the passed structure
+  nc_attr->mountpoint = strdup(mountpoint.ToString().c_str());
+  nc_attr->hash = strdup(hash.ToString().c_str());
+  nc_attr->size = size;
+  return 0;
+}
+
+
+int LibContext::ListNestedCatalogs(
+  const char *c_path,
+  char ***buf,
+  size_t *buflen
+) {
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  LogCvmfs(kLogCvmfs, kLogDebug,
+    "cvmfs_list_nc on path: %s", c_path);
+
+  if (c_path[0] == '/' && c_path[1] == '\0') {
+    // root path is expected to be "", not "/"
+    c_path = "";
+  }
+
+  PathString path;
+  path.Assign(c_path, strlen(c_path));
+
+  std::vector<PathString> skein;
+  bool retval = mount_point_->catalog_mgr()->ListCatalogSkein(path, &skein);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+      "cvmfs_list_nc failed to find skein of path: %s", c_path);
+    return 1;
+  }
+
+  size_t listlen = 0;
+  AppendStringToList(NULL, buf, &listlen, buflen);
+
+  for (unsigned i = 0; i < skein.size(); i++) {
+    AppendStringToList(skein.at(i).c_str(), buf, &listlen, buflen);
   }
 
   return 0;

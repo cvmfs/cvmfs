@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <sstream>
 
 #include "catalog_rw.h"
@@ -72,9 +73,11 @@ bool DirSpec::AddFile(const std::string& name, const std::string& parent,
     return false;
   }
 
-  const catalog::DirectoryEntry entry = catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash);
+  const catalog::DirectoryEntry entry =
+    catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash);
   const std::string full_path = entry.GetFullPath(parent);
-  items_.insert(std::make_pair(full_path, DirSpecItem(entry, xattrs, parent)));
+  items_.insert(std::make_pair(full_path,
+                               DirSpecItem(entry, xattrs, parent)));
   return true;
 }
 
@@ -85,9 +88,17 @@ bool DirSpec::AddDirectory(const std::string& name, const std::string& parent,
   }
 
   bool ret = AddDir(name, parent);
-  const catalog::DirectoryEntry entry = catalog::DirectoryEntryTestFactory::Directory(name, size);
+  const catalog::DirectoryEntry entry =
+    catalog::DirectoryEntryTestFactory::Directory(name, size);
   const std::string full_path = entry.GetFullPath(parent);
-  items_.insert(std::make_pair(full_path, DirSpecItem(entry, XattrList(), parent)));
+  items_.insert(std::make_pair(full_path,
+                               DirSpecItem(entry, XattrList(), parent)));
+  return ret;
+}
+
+bool DirSpec::AddNestedCatalog(const std::string& name) {
+  bool ret = AddNC(name);
+  nested_catalogs_.push_back(name);
   return ret;
 }
 
@@ -136,7 +147,11 @@ const DirSpecItem* DirSpec::Item(const std::string& full_path) const {
   return NULL;
 }
 
-static void RemoveItemHelper(const DirSpec& spec, const std::string& full_path, std::vector<std::string>* acc) {
+static void RemoveItemHelper(
+  const DirSpec& spec,
+  const std::string& full_path,
+  std::vector<std::string>* acc
+) {
   DirSpec::ItemList::const_iterator it = spec.items().find(full_path);
   if (it != spec.items().end()) {
     const DirSpecItem item = it->second;
@@ -147,7 +162,8 @@ static void RemoveItemHelper(const DirSpec& spec, const std::string& full_path, 
       for (DirSpec::ItemList::const_iterator it = spec.items().begin();
            it != spec.items().end(); ++it) {
         if (it->second.parent() == rel_full_path) {
-          const std::string p = it->second.entry_base().GetFullPath(rel_full_path);
+          const std::string p =
+            it->second.entry_base().GetFullPath(rel_full_path);
           RemoveItemHelper(spec, p, acc);
         }
       }
@@ -195,6 +211,16 @@ bool DirSpec::RmDir(const std::string& name, const std::string& parent) {
   return true;
 }
 
+bool DirSpec::AddNC(const std::string& name) {
+  std::string full_path = name;
+  RemoveLeadingSlash(&full_path);
+  if (!HasDir(full_path)) {
+    return false;
+  }
+  return true;
+}
+
+
 bool DirSpec::HasDir(const std::string& name) const {
   return dirs_.find(name) != dirs_.end();
 }
@@ -209,7 +235,7 @@ bool CatalogTestTool::Init() {
 
   const std::string sandbox_root = GetCurrentWorkingDirectory();
 
-  stratum0_ = sandbox_root + "/" + name_ ;
+  stratum0_ = sandbox_root + "/" + name_;
   MkdirDeep(stratum0_ + "/data", 0777);
   MakeCacheDirectories(stratum0_ + "/data", 0777);
   temp_dir_ = stratum0_ + "/data/txn";
@@ -278,7 +304,10 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   return true;
 }
 
-bool CatalogTestTool::ApplyAtRootHash(const shash::Any& root_hash, const DirSpec& spec) {
+bool CatalogTestTool::ApplyAtRootHash(
+  const shash::Any& root_hash,
+  const DirSpec& spec
+) {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
@@ -298,6 +327,12 @@ bool CatalogTestTool::ApplyAtRootHash(const shash::Any& root_hash, const DirSpec
     }
   }
 
+  DirSpec::NestedCatalogList::const_iterator it;
+  for (it = spec.nested_catalogs().begin();
+       it != spec.nested_catalogs().end(); ++it) {
+    catalog_mgr->CreateNestedCatalog(*it);
+  }
+
   if (!catalog_mgr->Commit(false, 0, manifest_)) {
     return false;
   }
@@ -305,7 +340,11 @@ bool CatalogTestTool::ApplyAtRootHash(const shash::Any& root_hash, const DirSpec
   return true;
 }
 
-bool CatalogTestTool::AddNestedCatalog(const shash::Any& root_hash, const std::string& path) {
+bool CatalogTestTool::LookupNestedCatalogHash(
+  const shash::Any& root_hash,
+  const std::string& path,
+  char **nc_hash
+) {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
@@ -314,9 +353,25 @@ bool CatalogTestTool::AddNestedCatalog(const shash::Any& root_hash, const std::s
     return false;
   }
 
-  catalog_mgr->CreateNestedCatalog(path);
+  PathString p;
+  p.Assign(&path[0], path.length());
+  p.Append("/.cvmfscatalog", 14);
 
-  if (!catalog_mgr->Commit(false, 0, manifest_)) {
+  catalog::DirectoryEntry entry;
+  // This lookup is used to ensure the needed catalogs are mounted
+  catalog_mgr->LookupPath(path, catalog::kLookupSole, &entry);
+
+  p.Assign(&path[0], path.length());
+  shash::Any hash = catalog_mgr->GetNestedCatalogHash(p);
+
+  // If the hash is null don't try to strdup
+  if (!hash.IsNull()) {
+    *nc_hash = strdup(hash.ToString().c_str());
+  }
+  if (!(*nc_hash)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "nested catalog for directory '%s' cannot be found",
+             path.c_str());
     return false;
   }
 
@@ -371,7 +426,11 @@ catalog::WritableCatalogManager* CatalogTestTool::CreateCatalogMgr(
   return catalog_mgr;
 }
 
-void CatalogTestTool::CreateHistory(string repo_path_, manifest::Manifest *manifest, shash::Any *history_hash) {
+void CatalogTestTool::CreateHistory(
+  string repo_path_,
+  manifest::Manifest *manifest,
+  shash::Any *history_hash
+) {
   {
     UniquePtr<history::SqliteHistory> history(
       history::SqliteHistory::Create(repo_path_ + "/history",
@@ -392,7 +451,10 @@ void CatalogTestTool::CreateHistory(string repo_path_, manifest::Manifest *manif
 }
 
 
-void CatalogTestTool::CreateManifest(string repo_path_, manifest::Manifest *manifest) {
+void CatalogTestTool::CreateManifest(
+  string repo_path_,
+  manifest::Manifest *manifest
+) {
   UniquePtr<signature::SignatureManager> signature_mgr(
     new signature::SignatureManager());
   signature_mgr->Init();
@@ -440,7 +502,11 @@ void CatalogTestTool::CreateWhitelist(string repo_path_) {
   EXPECT_TRUE(SafeWriteToFile(wl, repo_path_ + "/.cvmfswhitelist", 0600));
 }
 
-void CatalogTestTool::CreateKeys(string repo_path_, string *public_key, shash::Any *hash_cert) {
+void CatalogTestTool::CreateKeys(
+  string repo_path_,
+  string *public_key,
+  shash::Any *hash_cert
+) {
   // Key material for a repo named "keys.cern.ch"
   string pubkey = "-----BEGIN PUBLIC KEY-----\n"
     "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6eJmVLlzDanGoZjqDf/M\n"
@@ -540,7 +606,10 @@ void CatalogTestTool::CreateKeys(string repo_path_, string *public_key, shash::A
   *public_key = repo_path_ + string("/testrepo.pub");
 }
 
-void CreateMiniRepository(SimpleOptionsParser *options_mgr_, string *repo_path_) {
+void CreateMiniRepository(
+  SimpleOptionsParser *options_mgr_,
+  string *repo_path_
+) {
   CatalogTestTool tester(*repo_path_);
   EXPECT_TRUE(tester.Init());
   *repo_path_ = tester.repo_name();
@@ -550,5 +619,3 @@ void CreateMiniRepository(SimpleOptionsParser *options_mgr_, string *repo_path_)
   options_mgr_->SetValue("CVMFS_HTTP_PROXY", "DIRECT");
   options_mgr_->SetValue("CVMFS_PUBLIC_KEY", tester.public_key());
 }
-
-

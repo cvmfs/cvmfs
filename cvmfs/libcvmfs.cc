@@ -28,6 +28,24 @@
 
 using namespace std;  // NOLINT
 
+
+struct cvmfs_nc_attr *cvmfs_nc_attr_init()
+{
+  struct cvmfs_nc_attr *attr;
+  attr = reinterpret_cast<cvmfs_nc_attr *>(calloc(1, sizeof(*attr)));
+  return attr;
+}
+
+void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr)
+{
+  if (nc_attr) {
+    free(nc_attr->mountpoint);
+    free(nc_attr->hash);
+  }
+  free(nc_attr);
+}
+
+
 /**
  * Expand symlinks in all levels of a path.  Also, expand ".." and ".".  This
  * also has the side-effect of ensuring that cvmfs_getattr() is called on all
@@ -296,6 +314,66 @@ int cvmfs_listdir(
     return -1;
   }
   return 0;
+}
+
+
+int cvmfs_stat_nc(
+  LibContext *ctx,
+  const char *path,
+  struct cvmfs_nc_attr *nc_attr
+) {
+  string lpath;
+  int rc;
+  rc = expand_path(0, ctx, path, &lpath);
+  if (rc < 0) {
+    return -1;
+  }
+  path = lpath.c_str();
+
+  rc = ctx->GetNestedCatalogAttr(path, nc_attr);
+  if (rc < 0) {
+    errno = -rc;
+    return -1;
+  }
+  return 0;
+}
+
+
+int cvmfs_list_nc(
+  LibContext *ctx,
+  const char *path,
+  char ***buf,
+  size_t *buflen
+) {
+  string lpath;
+  int rc;
+  rc = expand_path(0, ctx, path, &lpath);
+  if (rc < 0) {
+    return -1;
+  }
+  path = lpath.c_str();
+
+  rc = ctx->ListNestedCatalogs(path, buf, buflen);
+  if (rc < 0) {
+    errno = -rc;
+    return -1;
+  }
+  return 0;
+}
+
+
+void cvmfs_list_free(char **buf)
+{
+  // Quick return if base pointer is NULL
+  if (!buf) return;
+  size_t pos = 0;
+  // Iterate over each non-null entry and free
+  // This assumes no null entries, which don't currently exist
+  while (buf[pos]) {
+    free(buf[pos]);
+    pos++;
+  }
+  free(buf);
 }
 
 

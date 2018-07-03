@@ -160,6 +160,13 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool LookupXattrs(const PathString &path, XattrList *xattrs);
 
+  bool LookupNested(const PathString &path,
+                    PathString *mountpoint,
+                    shash::Any *hash,
+                    uint64_t *size);
+  bool ListCatalogSkein(const PathString &path,
+                        std::vector<PathString> *result_list);
+
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
     PathString p;
