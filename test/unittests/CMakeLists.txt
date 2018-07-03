@@ -5,6 +5,7 @@
 set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 set (PROJECT_TEST_CACHE_NAME "cvmfs_test_cache")
+set (PROJECT_TEST_EXPORT_NAME "cvmfs_test_export")
 
 # Add the test/common directory to the include path
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
@@ -300,15 +301,46 @@ set (CVMFS_TEST_CACHE_SOURCES
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
 )
 
+set (CVMFS_TEST_EXPORT_SOURCES
+  export_plugin/main.cc
+  export_plugin/t_fs_traversal_interface.cc
+
+  #${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_posix.cc
+  
+  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/util/posix.cc
+
+  #${CVMFS_SOURCE_DIR}/backoff.cc
+  #${CVMFS_SOURCE_DIR}/download.cc
+  #${CVMFS_SOURCE_DIR}/fetch.cc
+  #${CVMFS_SOURCE_DIR}/file_chunk.cc
+  #${CVMFS_SOURCE_DIR}/file_watcher.cc
+  #${CVMFS_SOURCE_DIR}/hash.cc
+  #${CVMFS_SOURCE_DIR}/libcvmfs.cc
+  #${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
+  #${CVMFS_SOURCE_DIR}/logging.cc
+  #${CVMFS_SOURCE_DIR}/mountpoint.cc
+  #${CVMFS_SOURCE_DIR}/options.cc
+  #${CVMFS_SOURCE_DIR}/signature.cc
+  #${CVMFS_SOURCE_DIR}/statistics.cc
+  #${CVMFS_SOURCE_DIR}/sqlitemem.cc
+  #${CVMFS_SOURCE_DIR}/util/string.cc
+  #${CVMFS_SOURCE_DIR}/util/posix.cc
+)
+
 #
 # Compiler and Linker Flags for unit tests
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
 set (CVMFS_TEST_CACHE_CFLAGS "${CVMFS_TEST_CACHE_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
+set (CVMFS_TEST_EXPORT_CFLAGS "${CVMFS_TEST_EXPORT_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_TEST_CACHE_LD_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
+set (CVMFS_TEST_EXPORT_LD_FLAGS "${CVMFS_TEST_EXPORT_LD_FLAGS}")
 
 #
 # build CernVM-FS test cases
@@ -327,6 +359,12 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
     add_executable (${PROJECT_TEST_CACHE_NAME} ${CVMFS_TEST_CACHE_SOURCES})
     add_dependencies (${PROJECT_TEST_CACHE_NAME} cache.pb.generated-unittests)
   endif (BUILD_LIBCVMFS_CACHE)
+
+  if (BUILD_CVMFS_EXPORT)
+    #TODO(steuber): cache.pb.generated-unittests is this necessary?
+    add_executable (${PROJECT_TEST_EXPORT_NAME} ${CVMFS_TEST_EXPORT_SOURCES})
+    add_dependencies (${PROJECT_TEST_EXPORT_NAME} cache.pb.generated-unittests)
+  endif (BUILD_CVMFS_EXPORT)
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
@@ -349,6 +387,9 @@ endif (BUILD_UNITTESTS_DEBUG)
 if (BUILD_LIBCVMFS_CACHE)
   set_target_properties (${PROJECT_TEST_CACHE_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_CACHE_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
 endif (BUILD_LIBCVMFS_CACHE)
+if (BUILD_CVMFS_EXPORT)
+  set_target_properties (${PROJECT_TEST_EXPORT_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_EXPORT_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_EXPORT_LD_FLAGS}")
+endif (BUILD_CVMFS_EXPORT)
 
 
 #
@@ -377,6 +418,15 @@ if (BUILD_LIBCVMFS_CACHE)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
+if (BUILD_CVMFS_EXPORT)
+  target_link_libraries (${PROJECT_TEST_EXPORT_NAME}
+                         ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+                         ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
+                         ${RT_LIBRARY} ${SHA3_LIBRARIES}
+                         ${PROTOBUF_LITE_LIBRARY} pthread)
+endif (BUILD_CVMFS_EXPORT)
+
+
 #
 # Install the generated unit test binary
 #
@@ -394,6 +444,14 @@ if (INSTALL_UNITTESTS)
       DESTINATION    bin
     )
   endif (BUILD_LIBCVMFS_CACHE)
+
+  if (BUILD_CVMFS_EXPORT)
+    install (
+      TARGETS        ${PROJECT_TEST_EXPORT_NAME
+      RUNTIME
+      DESTINATION    bin
+    )
+  endif (BUILD_CVMFS_EXPORT)
 endif (INSTALL_UNITTESTS)
 
 if (INSTALL_UNITTESTS_DEBUG)
