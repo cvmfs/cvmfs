@@ -1,0 +1,111 @@
+cvmfs_test_name="Publish statistics"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "meaningless file content" > file
+  echo "more clever file content" > clever
+
+  mkdir foo
+  mkdir bar
+
+  mkdir foo/bar
+  mkdir bar/foo
+
+  ln file hardlinkToFile
+  ln -s clever symlinkToClever
+
+  popdir
+}
+
+change_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mv hardlinkToFile hardlinkToFile1
+
+  uses_overlayfs $CVMFS_TEST_REPO && break_hardlink file
+  echo "additional meaningless content" >> file
+
+  mkdir newdirectory
+  mkdir newdirectory/foo
+  mkdir newdirectory/bar
+
+  rm -fR bar
+  rm -f symlinkToClever
+
+  ln hardlinkToFile1 hardlinkToFile2
+  ln hardlinkToFile1 hardlinkToFile3
+
+  ln -s hardlinkToFile3 symlinkToHardlinkToFile3
+
+  echo "deeply hidden content" > newdirectory/foo/bar
+  echo "another uselese blubb" > foo/bar/renemeusel
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # ============================================================================
+  echo "activate the statistics by writing in server.conf file CVMFS_GATHER_STATISTICS=true"
+  echo "CVMFS_GATHER_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO > test_100_1 || return $?
+
+  # TODO change the parse method to support number bigger than 9. 
+  # TODO add the other variables and compare them
+
+  # local files_added=$(cat test_100_1 | grep "Files *added" | grep -o '.$')
+  # if filed_added != 4 return error_code
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "change stuff in the repository"
+  change_files_in $repo_dir || return 7
+
+  echo "change exactly the same stuff in the scratch space"
+  change_files_in $reference_dir || return 8
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO > test_100_2 || return $?
+
+  echo "compare the changed directories"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  return 0
+}
+
