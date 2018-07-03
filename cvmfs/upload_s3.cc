@@ -360,8 +360,8 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
 
   info->request = s3fanout::JobInfo::kReqDelete;
 
-  LogCvmfs(kLogUploadS3, kLogDebug, "Asynchronously removing %s/%s:",
-           info->object_key.c_str(), info->bucket.c_str());
+  LogCvmfs(kLogUploadS3, kLogDebug, "Asynchronously removing %s/%s",
+           info->bucket.c_str(), info->object_key.c_str());
   s3fanout_mgr_.PushNewJob(info);
 }
 
