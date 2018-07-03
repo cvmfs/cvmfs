@@ -160,7 +160,6 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool LookupXattrs(const PathString &path, XattrList *xattrs);
 
-  CatalogT *LookupCatalog(const PathString &path);
   bool LookupNested(const PathString &path,
                     PathString *mountpoint,
                     shash::Any *hash,

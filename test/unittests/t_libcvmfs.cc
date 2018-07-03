@@ -76,9 +76,6 @@ class T_Libcvmfs : public ::testing::Test {
   string alien_path_;
   string opt_cache_;
   FILE *fdevnull_;
-
-  int fd_cwd_;
-  unsigned used_fds_;
 };
 
 bool T_Libcvmfs::first_test = true;
@@ -370,9 +367,10 @@ TEST_F(T_Libcvmfs, Listdir) {
   EXPECT_FALSE(strcmp("file2",  buf[3]));
   // The 'last' value is null
   EXPECT_FALSE(buf[4]);
-  cvmfs_list_destroy(buf);
+  cvmfs_list_free(buf);
 
   /* Finalize and close repo and options */
+  cvmfs_detach_repo(ctx);
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }
@@ -435,37 +433,37 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
 
   /* stat nested catalog using client repo */
   struct cvmfs_nc_attr *nc_attr;
-  nc_attr = cvmfs_nc_attr_create();
+  nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir/dir/dir/dir", nc_attr));
   orig_nc = d4_hash.ToString().c_str();
   EXPECT_FALSE(strcmp(orig_nc, nc_attr->hash));
   EXPECT_FALSE(strcmp("/dir/dir/dir/dir", nc_attr->mountpoint));
   EXPECT_EQ(d4_size, nc_attr->size);
-  cvmfs_nc_attr_destroy(nc_attr);
+  cvmfs_nc_attr_free(nc_attr);
 
 
   /* stat nested catalog using client repo */
-  nc_attr = cvmfs_nc_attr_create();
+  nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir", nc_attr));
   orig_nc = tester.manifest()->catalog_hash().ToString().c_str();
   EXPECT_FALSE(strcmp(orig_nc, nc_attr->hash));
   EXPECT_FALSE(strcmp("", nc_attr->mountpoint));
   /* Size of root catalog is 0 as a Nested Catalog */
   EXPECT_EQ(nc_attr->size, 0);
-  cvmfs_nc_attr_destroy(nc_attr);
+  cvmfs_nc_attr_free(nc_attr);
 
 
   /* stat nested catalog using client repo */
-  nc_attr = cvmfs_nc_attr_create();
+  nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir/dir", nc_attr));
   orig_nc = d2_hash.ToString().c_str();
   EXPECT_FALSE(strcmp(orig_nc, nc_attr->hash));
   EXPECT_FALSE(strcmp("/dir/dir", nc_attr->mountpoint));
   EXPECT_EQ(d2_size, nc_attr->size);
-  cvmfs_nc_attr_destroy(nc_attr);
-
+  cvmfs_nc_attr_free(nc_attr);
 
   /* Finalize and close repo and options */
+  cvmfs_detach_repo(ctx);
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }
@@ -523,7 +521,7 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   EXPECT_FALSE(strcmp("/dir/dir2",  buf[3]));
   EXPECT_FALSE(strcmp("/dir/dir3",  buf[4]));
   EXPECT_FALSE(buf[5]);
-  cvmfs_list_destroy(buf);
+  cvmfs_list_free(buf);
 
   buf = NULL;
   buflen = 0;
@@ -532,9 +530,10 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   EXPECT_FALSE(strcmp("/dir", buf[1]));
   EXPECT_FALSE(strcmp("/dir/dir",  buf[2]));
   EXPECT_FALSE(buf[3]);
-  cvmfs_list_destroy(buf);
+  cvmfs_list_free(buf);
 
   /* Finalize and close repo and options */
+  cvmfs_detach_repo(ctx);
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }

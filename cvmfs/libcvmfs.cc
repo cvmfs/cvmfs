@@ -29,14 +29,14 @@
 using namespace std;  // NOLINT
 
 
-struct cvmfs_nc_attr *cvmfs_nc_attr_create()
+struct cvmfs_nc_attr *cvmfs_nc_attr_init()
 {
   struct cvmfs_nc_attr *attr;
   attr = reinterpret_cast<cvmfs_nc_attr *>(calloc(1, sizeof(*attr)));
   return attr;
 }
 
-void cvmfs_nc_attr_destroy(struct cvmfs_nc_attr *nc_attr)
+void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr)
 {
   if (nc_attr) {
     free(nc_attr->mountpoint);
@@ -362,7 +362,7 @@ int cvmfs_list_nc(
 }
 
 
-void cvmfs_list_destroy(char **buf)
+void cvmfs_list_free(char **buf)
 {
   /* Quick return if base pointer is NULL */
   if (!buf) return;
