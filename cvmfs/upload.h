@@ -230,13 +230,14 @@ class Spooler : public Observable<SpoolerResult> {
   void ProcessMetainfo(const std::string &local_path);
 
   /**
-   * Deletes the given file from the repository backend storage. This is done
-   * synchronous, in any case.
+   * Deletes the given file from the repository backend storage.  This requires
+   * using WaitForUpload() to make sure the delete operations reached the
+   * upload backend.
    *
    * @param file_to_delete   path to the file to be deleted
    * @return                 true if file was successfully removed
    */
-  bool Remove(const std::string &file_to_delete);
+  void RemoveAsync(const std::string &file_to_delete);
 
   /**
    * Checks if a file is already present in the backend storage

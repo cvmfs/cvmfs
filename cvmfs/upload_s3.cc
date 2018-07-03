@@ -349,15 +349,16 @@ s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
 }
 
 
-bool S3Uploader::Remove(const std::string& file_to_delete) {
+void S3Uploader::RemoveAsync(const std::string& file_to_delete) {
   const std::string mangled_path = repository_alias_ + "/" + file_to_delete;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
 
   info->request = s3fanout::JobInfo::kReqDelete;
-  bool retme = s3fanout_mgr_.DoSingleJob(info);
+  bool retval = s3fanout_mgr_.DoSingleJob(info);
 
   delete info;
-  return retme;
+  if (!retval)
+    atomic_inc32(&io_errors_);
 }
 
 

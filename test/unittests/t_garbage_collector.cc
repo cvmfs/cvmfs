@@ -46,10 +46,11 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
     assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
-  bool Remove(const shash::Any &hash_to_delete) {
+  void RemoveAsync(const shash::Any &hash_to_delete) {
     deleted_hashes.insert(hash_to_delete);
-    return true;
   }
+
+  virtual unsigned GetNumberOfErrors() const { return 0; }
 
   bool HasDeleted(const shash::Any &hash) const {
     return deleted_hashes.find(hash) != deleted_hashes.end();

@@ -56,7 +56,7 @@ class GatewayUploader : public AbstractUploader {
 
   virtual std::string name() const;
 
-  virtual bool Remove(const std::string& file_to_delete);
+  virtual void RemoveAsync(const std::string& file_to_delete);
 
   virtual bool Peek(const std::string& path) const;
 

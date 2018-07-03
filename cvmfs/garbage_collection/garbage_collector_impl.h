@@ -156,7 +156,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
     return;
   }
 
-  configuration_.uploader->Remove(hash);
+  configuration_.uploader->RemoveAsync(hash);
 }
 
 
@@ -245,8 +245,8 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   }
 
   traversal_.UnregisterListener(callback);
-
-  return success;
+  configuration_.uploader->WaitForUpload();
+  return success && (configuration_.uploader->GetNumberOfErrors() == 0);
 }
 
 
