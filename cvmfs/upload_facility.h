@@ -31,7 +31,7 @@ struct UploaderResults {
       return_code(return_code),
       local_path("") {}
 
-  explicit UploaderResults()
+  UploaderResults()
     : type(kRemove)
     , return_code(0)
   { }
