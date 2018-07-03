@@ -27,6 +27,8 @@ namespace upload {
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   : AbstractUploader(spooler_definition)
   , num_parallel_uploads_(kDefaultNumParallelUploads)
+  , num_retries_(kDefaultNumRetries)
+  , timeout_sec_(kDefaultTimeoutSec)
   , authz_method_(s3fanout::kAuthzAwsV2)
   , temporary_path_(spooler_definition.temporary_path)
 {
@@ -41,6 +43,9 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   }
 
   s3fanout_mgr_.Init(num_parallel_uploads_);
+  s3fanout_mgr_.SetTimeout(timeout_sec_);
+  s3fanout_mgr_.SetRetryParameters(
+    num_retries_, kDefaultBackoffInitMs, kDefaultBackoffMaxMs);
   s3fanout_mgr_.Spawn();
 
   int retval = pthread_create(
@@ -118,6 +123,12 @@ bool S3Uploader::ParseSpoolerDefinition(
                                &parameter))
   {
     num_parallel_uploads_ = String2Uint64(parameter);
+  }
+  if (options_manager.GetValue("CVMFS_S3_MAX_RETRIES", &parameter)) {
+    num_retries_ = String2Uint64(parameter);
+  }
+  if (options_manager.GetValue("CVMFS_S3_TIMEOUT", &parameter)) {
+    timeout_sec_ = String2Uint64(parameter);
   }
   if (options_manager.GetValue("CVMFS_S3_REGION", &region_)) {
     authz_method_ = s3fanout::kAuthzAwsV4;
