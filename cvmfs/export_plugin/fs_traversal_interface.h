@@ -6,7 +6,6 @@
 
 #include "hash.h"
 #include "libcvmfs.h"
-#include "pointer.h"
 #include "shortstring.h"
 
 enum fs_type {
@@ -38,18 +37,12 @@ struct fs_file {
   void *ctx;
 
   struct fs_stat *stat_info;
-
-  int (*do_open)(void *ctx, fs_open_type op_mode);
-  int (*do_close)(void *ctx);
-  int (*do_read)(void *ctx, char *buff, size_t len);
-  int (*do_write)(void *ctx, const char *buff);
 };
 
 /**
  * @note(steuber): Any hashes are pointers to shash::Any
  */
 struct fs_traversal {
-
   struct fs_traversal_context *(*initialize)(
     fs_type type,
     const char *repo,
@@ -75,7 +68,7 @@ struct fs_traversal {
    * 
    * @param[in] path The path of the object to stat
    */
-  struct cvmfs_stat *(get_stat)(struct fs_traversal_context *ctx,
+  struct cvmfs_stat *(*get_stat)(struct fs_traversal_context *ctx,
                 const char *path);
 
   /**
@@ -201,6 +194,11 @@ struct fs_traversal {
    */
   // NOTE(steuber): Shouldn't this maybe just be part of the finalize step?
   int (*garbage_collection)(struct fs_traversal_context *ctx);
+
+  int (*do_open)(void *ctx, fs_open_type op_mode);
+  int (*do_close)(void *ctx);
+  int (*do_read)(void *ctx, char *buff, size_t len);
+  int (*do_write)(void *ctx, const char *buff);
 };
 
 #endif  // CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_

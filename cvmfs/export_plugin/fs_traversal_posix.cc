@@ -4,6 +4,7 @@
 #include "fs_traversal_posix.h"
 
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <ftw.h>
 #include <stdio.h>
@@ -15,7 +16,6 @@
 
 #include "fs_traversal_interface.h"
 #include "hash.h"
-#include "libcvmfs.h"
 #include "shortstring.h"
 #include "string.h"
 #include "util/posix.h"
@@ -83,15 +83,15 @@ int PosixSetMeta(const char *path, const struct cvmfs_stat *stat_info) {
 }
 
 void PosixCheckDirStructure(const char *repo,
-  const char *data,
-  unsigned int depth = 1, mode_t mode) {
+  const char *data, mode_t mode,
+  unsigned int depth = 1) {
   // Maximum directory to search for:
   std::string max_dir_name = std::string(kDigitsPerDirLevel, 'f');
   // Build current base path
   std::string cur_path = repo;
   cur_path += "/";
   cur_path += data;
-  for (int i = 1; i < depth; i++) {
+  for (unsigned int i = 1; i < depth; i++) {
     cur_path += "/" + max_dir_name;
   }
   // Build template for directory names:
@@ -106,7 +106,7 @@ void PosixCheckDirStructure(const char *repo,
   for (; depth <= kDirLevels; depth++) {
     if (!HasDir(cur_path+max_dir_name)) {
       // Directories in this level not yet fully created...
-      for (int i = 0;
+      for (unsigned int i = 0;
       i < (((unsigned int) 1) << 4*kDigitsPerDirLevel);
       i++) {
         // Go through directories 0^kDigitsPerDirLevel to f^kDigitsPerDirLevel
@@ -115,11 +115,11 @@ void PosixCheckDirStructure(const char *repo,
         int res = mkdir(this_path.c_str(), mode);
         assert(res == 0 || errno != EEXIST);
         // Once directory created: Prepare substructures
-        PosixCheckDirStructure(repo, data, depth+1);
+        PosixCheckDirStructure(repo, data, mode, depth+1);
       }
     } else {
       // Directories on this level fully created; check ./
-      PosixCheckDirStructure(repo, data, depth+1);
+      PosixCheckDirStructure(repo, data, mode, depth+1);
     }
   }
 }
@@ -139,7 +139,7 @@ void posix_list_dir(struct fs_traversal_context *ctx,
   *len = 0;
   AppendStringToList(NULL, buf, len, len);
 
-  while ((de == readdir(dr)) != NULL) {
+  while ((de = readdir(dr)) != NULL) {
     AppendStringToList(de->d_name, buf, len, len);
   }
 
@@ -147,7 +147,7 @@ void posix_list_dir(struct fs_traversal_context *ctx,
   return;
 }
 
-struct cvmfs_stat posix_get_stat(struct fs_traversal_context *ctx,
+struct cvmfs_stat *posix_get_stat(struct fs_traversal_context *ctx,
   const char *path) {
   // TODO(steuber): Where is the stat?
   // TODO(steuber): Save hash + last modified(!=changed) as xattr
@@ -155,12 +155,22 @@ struct cvmfs_stat posix_get_stat(struct fs_traversal_context *ctx,
   // Probably more realistic without last modified though
   // (means we need to know that fs wasn`t changed)
   // -> only hash if necessary?
+  struct cvmfs_stat *result = new struct cvmfs_stat;
+  return result;
 }
 
 bool posix_has_hash(struct fs_traversal_context *ctx,
   const void *content,
   const void *meta) {
   return FileExists(BuildHiddenPath(ctx, content, meta));
+}
+
+int posix_do_unlink(struct fs_traversal_context *ctx,
+  const char *path) {
+  std::string complete_path = BuildPath(ctx, path);
+  int res = unlink(complete_path.c_str());
+  if (res == -1) return -1;
+  return 0;
 }
 
 int posix_do_link(struct fs_traversal_context *ctx,
@@ -183,14 +193,6 @@ int posix_do_link(struct fs_traversal_context *ctx,
     posix_do_unlink(ctx, path);
   }
   int res = link(hidden_datapath.c_str(), complete_path.c_str());
-  if (res == -1) return -1;
-  return 0;
-}
-
-int posix_do_unlink(struct fs_traversal_context *ctx,
-  const char *path) {
-  std::string complete_path = BuildPath(ctx, path);
-  int res = unlink(complete_path.c_str());
   if (res == -1) return -1;
   return 0;
 }
@@ -281,10 +283,7 @@ struct fs_file *posix_get_handle(struct fs_traversal_context *ctx,
 
   result->ctx = file_ctx;
   result->stat_info = NULL;  // TODO(steuber): Get stat
-  result->do_open = posix_do_open;
-  result->do_close = posix_do_close;
-  result->do_read = posix_do_read;
-  result->do_write = posix_do_write;
+  return result;
 }
 
 
@@ -302,7 +301,6 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
   std::string complete_src_path = BuildPath(ctx, src);
   std::string complete_dest_path = BuildPath(ctx, dest);
   std::string dirname = GetParentPath(complete_src_path);
-  struct stat sb;
   if (!HasDir(dirname)) {
     // Parent directory doesn't exist
     return -3;
@@ -319,6 +317,7 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
 // NOTE(steuber): Shouldn't this maybe just be part of the finalize step?
 int posix_garbage_collection(struct fs_traversal_context *ctx) {
   // TODO(steuber): ...
+  return -1;
 }
 
 
@@ -334,7 +333,7 @@ struct fs_traversal_context *posix_initialize(
   result->version = 1;
   result->repo =  repo;
   result->data = data;
-  PosixCheckDirStructure(repo, data);
+  PosixCheckDirStructure(repo, data, 0);  // TODO(steuber): mode?
   return result;
 }
 
@@ -344,21 +343,26 @@ void posix_finalize(struct fs_traversal_context *ctx) {
 
 
 
-struct fs_traversal posix_get_interface() {
-  struct fs_traversal result;
-  result.initialize = posix_initialize;
-  result.finalize = posix_finalize;
-  result.list_dir = posix_list_dir;
-  result.get_stat = posix_get_stat;
-  result.has_hash = posix_has_hash;
-  result.do_link = posix_do_link;
-  result.do_unlink = posix_do_unlink;
-  result.do_mkdir = posix_do_mkdir;
-  result.do_rmdir = posix_do_rmdir;
-  result.touch = posix_touch;
-  result.get_handle = posix_get_handle;
-  result.do_symlink = posix_do_symlink;
-  result.garbage_collection = posix_garbage_collection;
+struct fs_traversal *posix_get_interface() {
+  struct fs_traversal *result = new struct fs_traversal;
+  result->initialize = posix_initialize;
+  result->finalize = posix_finalize;
+  result->list_dir = posix_list_dir;
+  result->get_stat = posix_get_stat;
+  result->has_hash = posix_has_hash;
+  result->do_link = posix_do_link;
+  result->do_unlink = posix_do_unlink;
+  result->do_mkdir = posix_do_mkdir;
+  result->do_rmdir = posix_do_rmdir;
+  result->touch = posix_touch;
+  result->get_handle = posix_get_handle;
+  result->do_symlink = posix_do_symlink;
+  result->garbage_collection = posix_garbage_collection;
+
+  result->do_open = posix_do_open;
+  result->do_close = posix_do_close;
+  result->do_read = posix_do_read;
+  result->do_write = posix_do_write;
 
   return result;
 }
