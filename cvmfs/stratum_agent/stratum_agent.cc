@@ -182,7 +182,6 @@ static void ReadConfigurations() {
     UniquePtr<OptionsManager> options_mgr(
       new BashOptionsManager(new DefaultOptionsTemplateManager(
         repo_config_dirs[i])));
-    // TODO(steuber): Is this how it should be?
     options_mgr->set_taint_environment(false);
     options_mgr->ParsePath(repo_config_dirs[i] + "/server.conf",
       false);
