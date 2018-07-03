@@ -26,5 +26,6 @@ cmake -DBUILD_PRELOADER=on \
   -DBUILD_SERVER=no \
   -DBUILD_LIBCVMFS=no \
   -DBUILD_LIBCVMFS_CACHE=no \
+  -DBUILD_CVMFS_EXPORT=no
   $REPO_ROOT
 make -j $(nproc)
