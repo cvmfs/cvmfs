@@ -170,11 +170,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
     assert(AbstractMockUploader::not_implemented);
   }
 
-  virtual void RemoveAsync(const std::string &file_to_delete) {
-    assert(AbstractMockUploader::not_implemented);
-  }
-
-  virtual void RemoveAsync(const shash::Any &hash_to_delete) {
+  virtual void DoRemoveAsync(const std::string &file_to_delete) {
     assert(AbstractMockUploader::not_implemented);
   }
 

@@ -19,7 +19,7 @@
 namespace upload {
 
 struct UploaderResults {
-  enum Type { kFileUpload, kBufferUpload, kChunkCommit };
+  enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove };
 
   UploaderResults(const int return_code, const std::string &local_path)
     : type(kFileUpload),
@@ -30,6 +30,11 @@ struct UploaderResults {
     : type(t),
       return_code(return_code),
       local_path("") {}
+
+  explicit UploaderResults()
+    : type(kRemove)
+    , return_code(0)
+  { }
 
   const Type type;
   const int return_code;
@@ -219,14 +224,17 @@ class AbstractUploader
    *
    * @param file_to_delete  path to the file to be removed
    */
-  virtual void RemoveAsync(const std::string &file_to_delete) = 0;
+  void RemoveAsync(const std::string &file_to_delete) {
+    ++jobs_in_flight_;
+    DoRemoveAsync(file_to_delete);
+  }
 
   /**
    * Overloaded method used to remove a object based on its content hash.
    *
    * @param hash_to_delete  the content hash of a file to be deleted
    */
-  virtual void RemoveAsync(const shash::Any &hash_to_delete) {
+  void RemoveAsync(const shash::Any &hash_to_delete) {
     RemoveAsync("data/" + hash_to_delete.MakePath());
   }
 
@@ -299,6 +307,9 @@ class AbstractUploader
    */
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
                                       const shash::Any &content_hash) = 0;
+
+
+  virtual void DoRemoveAsync(const std::string &file_to_delete) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please

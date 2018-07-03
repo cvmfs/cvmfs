@@ -46,8 +46,11 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
     assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
-  void RemoveAsync(const shash::Any &hash_to_delete) {
+  virtual void DoRemoveAsync(const std::string &file_to_delete) {
+    shash::Any hash_to_delete(shash::MkFromSuffixedHexPtr(shash::HexPtr(
+      file_to_delete.substr(5, 2) + file_to_delete.substr(8))));
     deleted_hashes.insert(hash_to_delete);
+    Respond(NULL, upload::UploaderResults());
   }
 
   virtual unsigned GetNumberOfErrors() const { return 0; }

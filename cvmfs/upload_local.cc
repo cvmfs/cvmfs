@@ -184,10 +184,11 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
  * TODO(jblomer): investigate if parallelism increases the GC speed on local
  * disks.
  */
-void LocalUploader::RemoveAsync(const std::string &file_to_delete) {
+void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
   const int retval = unlink((upstream_path_ + "/" + file_to_delete).c_str());
   if ((retval != 0) && (errno != ENOENT))
-    atomic_inc32(&copy_errors_);;
+    atomic_inc32(&copy_errors_);
+  Respond(NULL, UploaderResults());
 }
 
 bool LocalUploader::Peek(const std::string &path) const {
