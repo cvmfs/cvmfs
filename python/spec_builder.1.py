@@ -65,16 +65,27 @@ def parent_dir_parser(pathsToInclude):
     specsToInclude.append(specPoint)
   # Sort generated specs alphabetically for reduction
   specsToInclude.sort()
+  results = []
   for specPoint in specsToInclude:
     while not peek(workStack).isParentOf(specPoint.path):
-      workStack.pop()
+      el = workStack.pop()
+      #print("Popping...")
+      #print("Popped path: " + el.path)
+      #print("Cur path: " + specPoint.path)
+      results.append(el)
     topEl = peek(workStack)
     if topEl.path == specPoint.path and topEl.mode < specPoint.mode:
+      #print("UPDATE: "+topEl.path)
       topEl.mode = specPoint.mode
     elif topEl.path != specPoint.path:
-      topEl.subfiles.append(specPoint)
-      workStack.append(specPoint)
-  return rootEl.getList()
+      #topEl.subfiles.append(specPoint)
+      if topEl.mode==0\
+        or topEl.path != get_parent(specPoint.path)\
+        or specPoint.mode!=0:
+        workStack.append(specPoint)
+    #print([str(e)+"-"+str(e.mode) for e in workStack])
+  results+=workStack
+  return results#rootEl.getList()
 
 
 
