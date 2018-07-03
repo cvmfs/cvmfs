@@ -15,6 +15,7 @@
 #include <string>
 
 #include "atomic.h"
+#include "logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -33,8 +34,8 @@ void Tracer::Activate(
     || flush_threshold_ >= buffer_size_) {
     LogCvmfs(kLogCvmfs, kLogSyslogWarn,
       "Tracer: Could not start tracing! "
-      + "CVMFS_TRACEBUFFER needs to be larger than one"
-      + "and 0 <= CVMFS_TRACEBUFFER_THRESHOLD < CVMFS_TRACEBUFFER");
+      "CVMFS_TRACEBUFFER needs to be larger than one "
+      "and 0 <= CVMFS_TRACEBUFFER_THRESHOLD < CVMFS_TRACEBUFFER");
     return;
   }
 
