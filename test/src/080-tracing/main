@@ -1,34 +1,39 @@
 cvmfs_test_name="tracing"
 
+cleanup() {
+    sudo rm -f /tmp/cvmfs-$repo.trace.log 2> /dev/null
+}
+
 cvmfs_run_test() {
     logfile=$1
-    sudo sh -c "echo \"export GLITE_VERSION='util'\" > /etc/cvmfs/config.d/grid.cern.ch.local"
-    repo="grid.cern.ch"
-    echo "Setup..."
-    rm -f /tmp/cvmfs-$repo.trace.log 2> /dev/null
-    echo "Mounting test repository..."
-    cvmfs_mount $repo "CVMFS_TRACEFILE=/tmp/cvmfs-@fqrn@.trace.log" "CVMFS_TRACEBUFFER=4096" "CVMFS_TRACEBUFFER_THRESHOLD=2048" > /dev/null
+    local repo="grid.cern.ch"
+    echo "*** Setup..."
+    cleanup
+    trap cleanup HUP EXIT TERM INT || return 4
+    echo "*** Mounting test repository..."
+    cvmfs_mount $repo "GLITE_VERSION=util" "CVMFS_TRACEFILE=/tmp/cvmfs-@fqrn@.trace.log" "CVMFS_TRACEBUFFER=4096" "CVMFS_TRACEBUFFER_THRESHOLD=2048" > /dev/null
 
     echo "Checking trace log creation..."
-    sudo cvmfs_talk tracebuffer flush > /dev/null
+    sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
 
     if [ ! -f /tmp/cvmfs-$repo.trace.log ]; then
-        echo "ERROR: Log file was not created"
+        echo "*** ERROR: Log file was not created"
         return 2
     fi
 
-    cp /dev/null /tmp/cvmfs-$repo.trace.log > /dev/null
+    sudo truncate -s0 /tmp/cvmfs-$repo.trace.log > /dev/null
 
-    echo "Executing a few operations to check tracing..."
+    echo "*** Executing a few operations to check tracing..."
 
-    ls /cvmfs/$repo/ > /dev/null
-    ls /cvmfs/$repo/vc/bin > /dev/null
-    cat /cvmfs/$repo/README > /dev/null
-    df -P /cvmfs/$repo/README > /dev/null
-    getfattr -d -m ".*" /cvmfs/$repo/README > /dev/null
-    ls /cvmfs/$repo/glite > /dev/null
+    ls /cvmfs/$repo/
+    ls /cvmfs/$repo/vc/bin
+    cat /cvmfs/$repo/README
+    df -P /cvmfs/$repo/README
+    list_xattrs /cvmfs/$repo/README
+    #getfattr -d -m ".*" /cvmfs/$repo/README
+    ls /cvmfs/$repo/glite
 
-    sudo cvmfs_talk tracebuffer flush > /dev/null
+    sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
 
     if ! (check_trace 2 opendir ""\
         && check_trace 6 getattr ""\
@@ -54,8 +59,8 @@ cvmfs_run_test() {
 }
 
 check_trace() {
-    if ! grep -q "\"$1\",\"$3\",\"$2()\"" /tmp/cvmfs-$repo.trace.log; then
-        echo "Log did not trace $2 of $3"
+    if ! sudo grep -q "\"$1\",\"$3\",\"$2()\"" /tmp/cvmfs-$repo.trace.log; then
+        echo "*** Log did not trace $2 of $3"
         return 3
     fi
 }
