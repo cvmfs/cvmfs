@@ -8,12 +8,15 @@
 
 #include <cstdio>
 
-#include "globals.h"
+#include <string>
+
+#include "env.h"
 
 
 int main(int argc, char **argv) {
+  CvmfsEnvironment* env = new CvmfsEnvironment(argc, argv);
   ::testing::InitGoogleTest(&argc, argv);
-  // g_plugin_locator = argv[1];
+  ::testing::AddGlobalTestEnvironment(env);
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   return RUN_ALL_TESTS();
 }

@@ -302,32 +302,17 @@ set (CVMFS_TEST_CACHE_SOURCES
 )
 
 set (CVMFS_TEST_EXPORT_SOURCES
+  ../common/env.cc
+
   export_plugin/main.cc
   export_plugin/t_fs_traversal_interface.cc
-
+  
   #${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_posix.cc
   
   ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
-
-  #${CVMFS_SOURCE_DIR}/backoff.cc
-  #${CVMFS_SOURCE_DIR}/download.cc
-  #${CVMFS_SOURCE_DIR}/fetch.cc
-  #${CVMFS_SOURCE_DIR}/file_chunk.cc
-  #${CVMFS_SOURCE_DIR}/file_watcher.cc
-  #${CVMFS_SOURCE_DIR}/hash.cc
-  #${CVMFS_SOURCE_DIR}/libcvmfs.cc
-  #${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
-  #${CVMFS_SOURCE_DIR}/logging.cc
-  #${CVMFS_SOURCE_DIR}/mountpoint.cc
-  #${CVMFS_SOURCE_DIR}/options.cc
-  #${CVMFS_SOURCE_DIR}/signature.cc
-  #${CVMFS_SOURCE_DIR}/statistics.cc
-  #${CVMFS_SOURCE_DIR}/sqlitemem.cc
-  #${CVMFS_SOURCE_DIR}/util/string.cc
-  #${CVMFS_SOURCE_DIR}/util/posix.cc
 )
 
 #
@@ -363,7 +348,7 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   if (BUILD_CVMFS_EXPORT)
     #TODO(steuber): cache.pb.generated-unittests is this necessary?
     add_executable (${PROJECT_TEST_EXPORT_NAME} ${CVMFS_TEST_EXPORT_SOURCES})
-    add_dependencies (${PROJECT_TEST_EXPORT_NAME} cache.pb.generated-unittests)
+    #add_dependencies (${PROJECT_TEST_EXPORT_NAME} cache.pb.generated-unittests)
   endif (BUILD_CVMFS_EXPORT)
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
@@ -447,7 +432,7 @@ if (INSTALL_UNITTESTS)
 
   if (BUILD_CVMFS_EXPORT)
     install (
-      TARGETS        ${PROJECT_TEST_EXPORT_NAME
+      TARGETS        ${PROJECT_TEST_EXPORT_NAME}
       RUNTIME
       DESTINATION    bin
     )
