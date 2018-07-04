@@ -8,16 +8,9 @@
 #include "libcvmfs.h"
 #include "shortstring.h"
 
-enum fs_type {
-  FS_CVMFS,
-  FS_POSIX,
-  FS_SQUASH,
-};
-
 struct fs_traversal_context {
   uint64_t version;
   uint64_t size;
-  fs_type type;
 
   const char *repo;
   const char *data;
@@ -44,7 +37,6 @@ struct fs_file {
  */
 struct fs_traversal {
   struct fs_traversal_context *(*initialize)(
-    fs_type type,
     const char *repo,
     const char *data);
 
