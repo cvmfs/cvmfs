@@ -45,7 +45,7 @@ cvmfs_run_test() {
         && check_trace 6 getattr "/README"\
         && check_trace 5 statfs "/README"\
         && check_trace 7 listxattr "/README"\
-        && check_trace 6 getxattr "/README"\
+        && check_trace 8 getxattr "/README"\
         && check_trace 4 lookup "/glite"\
         && check_trace 3 readlink "/glite"\
         && check_trace 4 lookup "/util"\

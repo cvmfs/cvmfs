@@ -1,3 +1,7 @@
+#
+# This file is part of the CernVM File System.
+#
+
 import argparse
 import csv
 import os.path
@@ -104,6 +108,9 @@ class TraceParser:
       for row in [r
                     for r in csvLogReader
                       if r[3] not in self.filters and int(r[1])>=0]:
+        if row[2] == "@UNKNOWN":
+          print("ERROR: An error occured during tracing (event code 8)")
+          quit(-1)
         pathsToInclude.append(TracePoint(row[2], row[3]))
     self.pathSpec = self.policy(pathsToInclude)
   def write_spec(self):

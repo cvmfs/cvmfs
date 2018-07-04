@@ -39,9 +39,10 @@ class Tracer : SingleCopy {
     kEventOpenDir,
     kEventReadlink,
     kEventLookup,
-    kEventStat,
+    kEventStatFs,
     kEventGetAttr,
     kEventListAttr,
+    kEventGetXAttr
   };
 
   Tracer();

@@ -346,6 +346,7 @@ static void DoTraceInode(const int event,
   if (!found) {
     LogCvmfs(kLogCvmfs, kLogDebug,
       "Tracing: Could not find path for inode %" PRIu64, uint64_t(ino));
+    mount_point_->tracer()->Trace(event, PathString("@UNKNOWN"), msg);
   } else {
     mount_point_->tracer()->Trace(event, path, msg);
   }
@@ -506,7 +507,6 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 
   fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
-  TraceInode(Tracer::kEventGetAttr, ino, "getattr()");
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %" PRIu64,
            uint64_t(ino));
 
@@ -517,6 +517,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   }
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
+  TraceInode(Tracer::kEventGetAttr, ino, "getattr()");
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
@@ -601,13 +602,13 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   ino = catalog_mgr->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %" PRIu64,
            uint64_t(ino));
-  TraceInode(Tracer::kEventOpenDir, ino, "opendir()");
   if (!CheckVoms(*fuse_ctx)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
     return;
   }
 
+  TraceInode(Tracer::kEventOpenDir, ino, "opendir()");
   PathString path;
   catalog::DirectoryEntry d;
   bool found = GetPathForInode(ino, &path);
@@ -808,7 +809,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOENT);
     return;
   }
-  mount_point_->tracer()->Trace(Tracer::kEventOpen, path, "open()");
   found = GetDirentForInode(ino, &dirent);
   if (!found) {
     fuse_remounter_->fence()->Leave();
@@ -822,6 +822,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
+  mount_point_->tracer()->Trace(Tracer::kEventOpen, path, "open()");
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
   // if ((fi->flags & 3) != O_RDONLY) {
@@ -1199,7 +1200,7 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   struct statvfs info;
   memset(&info, 0, sizeof(info));
 
-  TraceInode(Tracer::kEventStat, ino, "statfs()");
+  TraceInode(Tracer::kEventStatFs, ino, "statfs()");
 
   // Unmanaged cache
   if (!file_system_->cache_mgr()->quota_mgr()->HasCapability(
@@ -1255,12 +1256,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_getxattr on inode: %" PRIu64 " for xattr: %s",
            uint64_t(ino), name);
-  TraceInode(Tracer::kEventGetAttr, ino, "getxattr()");
   if (!CheckVoms(*fuse_ctx)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
     return;
   }
+  TraceInode(Tracer::kEventGetXAttr, ino, "getxattr()");
 
   const string attr = name;
   catalog::DirectoryEntry d;
