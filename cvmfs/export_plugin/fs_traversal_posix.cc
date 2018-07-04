@@ -326,7 +326,6 @@ int posix_garbage_collection(struct fs_traversal_context *ctx) {
 
 // NOTE(steuber): How does this work?
 struct fs_traversal_context *posix_initialize(
-  fs_type type,
   const char *repo,
   const char *data) {
   fs_traversal_context *result = new struct fs_traversal_context;
