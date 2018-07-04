@@ -360,8 +360,9 @@ TEST_F(T_Libcvmfs, Listdir) {
   char **buf = NULL;
   size_t buflen = 0;
   cvmfs_listdir(ctx, "/dir/dir", &buf, &buflen);
-  // The buf length should be at least 3
-  EXPECT_LE(3, buflen);
+  // The buf length should be at least 4
+  size_t expected = 4;
+  EXPECT_LE(expected, buflen);
   // Check that listed info matches specified dir
   EXPECT_FALSE(strcmp(".", buf[0]));
   EXPECT_FALSE(strcmp("..", buf[1]));
@@ -439,7 +440,8 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   EXPECT_FALSE(strcmp(d0_hash, nc_attr->hash));
   EXPECT_FALSE(strcmp("", nc_attr->mountpoint));
   // Size of root catalog is 0 as a Nested Catalog
-  EXPECT_EQ(nc_attr->size, 0);
+  size_t expected = 0;
+  EXPECT_EQ(nc_attr->size, expected);
   cvmfs_nc_attr_free(nc_attr);
   free(d0_hash);
 
