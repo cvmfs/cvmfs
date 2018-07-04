@@ -198,6 +198,9 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -D $to_delete"
   fi
 
+  if [ "x$CVMFS_GATHER_STATISTICS" = "xtrue" ]; then
+    ingest_command="$ingest_command -I"
+  fi
 
   # ---> do it! (from here on we are changing things)
   publish_before_hook $name

@@ -79,6 +79,10 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.key_file = *args.find('H')->second;
   }
 
+  if (args.find('I') != args.end()) {
+    params.gather_statistics = true;
+  }
+
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -138,9 +142,12 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  perf::StatisticsTemplate statistics =
-          perf::StatisticsTemplate("Publish-sync", this->statistics());
-  publish::SyncMediator mediator(&catalog_manager, &params, &statistics);
+  perf::StatisticsTemplate *statistics_ptr = NULL;
+  perf::StatisticsTemplate statistics("Publish-sync", this->statistics());
+  if (params.gather_statistics) {
+    statistics_ptr = &statistics;
+  }
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics_ptr);
 
   publish::SyncUnion *sync;
 
