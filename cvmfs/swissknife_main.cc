@@ -200,5 +200,6 @@ int main(int argc, char **argv) {
     delete *i;
   }
   command_list.clear();
+
   return retval;
 }
