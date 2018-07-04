@@ -158,10 +158,19 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
     Replace(entry);  // This way, hardlink processing is correct
     if (counters_.IsValid()) {
       Inc(counters_->n_files_changed);
-      Dec(counters_->n_files_added);    // Replace calls Add
-      Dec(counters_->n_files_removed);  // Replace calls Remove
+      // Replace calls Remove and Add
+      Dec(counters_->n_files_added);
+      Dec(counters_->n_files_removed);
       Xadd(counters_->n_bytes_added, -GetFileSize(entry->GetScratchPath()));
       Xadd(counters_->n_bytes_removed, -GetFileSize(entry->GetRdOnlyPath()));
+
+      int64_t dif = GetFileSize(entry->GetScratchPath()) -
+                    GetFileSize(entry->GetRdOnlyPath());
+      if (dif > 0) {                            // added bytes
+        Xadd(counters_->n_bytes_added, dif);
+      } else if (dif < 0) {                     // removed bytes
+        Xadd(counters_->n_bytes_removed, -dif);
+      }
     }
     return;
   }
@@ -1000,8 +1009,6 @@ void SyncMediator::PrintStatistics() {
       counters_->n_bytes_added->Print().c_str());
     LogCvmfs(kLogPublish, kLogStdout, "Bytes       removed: %s",
       counters_->n_bytes_removed->Print().c_str());
-  } else {
-    LogCvmfs(kLogPublish, kLogStderr, "Publish statistics failed.");
   }
 }
 
