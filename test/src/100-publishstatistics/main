@@ -1,50 +1,44 @@
+# This file contains NR_OF_TESTS tests for checking the publish statistics feature
 cvmfs_test_name="Publish statistics"
-cvmfs_test_autofs_on_startup=false
 
-produce_files_in() {
+ERROR_FILES_ADDED=101
+ERROR_FILES_REMOVED=102
+ERROR_FILES_CHANGED=103
+ERROR_DIR_ADDED=104
+ERROR_DIR_REMOVED=105
+ERROR_DIR_CHANGED=106
+ERROR_BYTES_ADDED=107
+ERROR_BYTES_REMOVED=108
+
+NR_OF_TESTS=2
+
+test1() {
   local working_dir=$1
 
   pushdir $working_dir
 
-  echo "meaningless file content" > file
-  echo "more clever file content" > clever
-
-  mkdir foo
-  mkdir bar
-
-  mkdir foo/bar
-  mkdir bar/foo
-
-  ln file hardlinkToFile
-  ln -s clever symlinkToClever
+  echo "meaningless file content" > file1    # 1 file added ; 25 bytes added
+  echo "more clever file content" > file2    # 1 file added ; 25 bytes added
+  echo "" > file3                            # 1 file added ; 1 byte added ['\n']
+  mkdir foo                                  # 1 directory added
+  mkdir bar                                  # 1 directory added
+  touch ./foo/file4                          # 1 file added ; 0 byte added
+  echo "123 - testing" > ./foo/file5         # 1 file added ; 14 byte added
+  ln -s file1 symlinkTofile1                 # 1 file added ; 25 bytes added
+  ln file2 hardlinkTofile2                   # 1 file added ; 25 bytes added
 
   popdir
 }
 
-change_files_in() {
+test2() {
   local working_dir=$1
 
   pushdir $working_dir
 
-  mv hardlinkToFile hardlinkToFile1
-
-  uses_overlayfs $CVMFS_TEST_REPO && break_hardlink file
-  echo "additional meaningless content" >> file
-
-  mkdir newdirectory
-  mkdir newdirectory/foo
-  mkdir newdirectory/bar
-
-  rm -fR bar
-  rm -f symlinkToClever
-
-  ln hardlinkToFile1 hardlinkToFile2
-  ln hardlinkToFile1 hardlinkToFile3
-
-  ln -s hardlinkToFile3 symlinkToHardlinkToFile3
-
-  echo "deeply hidden content" > newdirectory/foo/bar
-  echo "another uselese blubb" > foo/bar/renemeusel
+  echo "additional meaningless content" >> file1   # 1 file changed ; 31 bytes added
+  echo "new file content" > file2                  # 1 file changed ; 8 bytes removed
+  touch bar                                        # 1 directory changed
+  rm -rf foo               # 1 directory removed ; 2 files removed ; 14 bytes removed
 
   popdir
 }
@@ -53,58 +47,137 @@ cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local scratch_dir=$(pwd)
-  mkdir reference_dir
-  local reference_dir=$scratch_dir/reference_dir
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  # ============================================================================
-  echo "activate the statistics by writing in server.conf file CVMFS_GATHER_STATISTICS=true"
+  echo "Activate the statistics by writing in server.conf file CVMFS_GATHER_STATISTICS=true"
   echo "CVMFS_GATHER_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
-  
+
+  # ============================================================================
+
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository"
-  produce_files_in $repo_dir || return 3
-
-  echo "putting exactly the same stuff in the scratch space for comparison"
-  produce_files_in $reference_dir || return 4
+  echo "Test 1 - putting some stuff in the new repository"
+  test1 $repo_dir || return 3
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > test_100_1 || return $?
-
-  # TODO change the parse method to support number bigger than 9. 
-  # TODO add the other variables and compare them
-
-  # local files_added=$(cat test_100_1 | grep "Files *added" | grep -o '.$')
-  # if filed_added != 4 return error_code
-
-  echo "compare the results of cvmfs to our reference copy"
-  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
   echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "change stuff in the repository"
-  change_files_in $repo_dir || return 7
-
-  echo "change exactly the same stuff in the scratch space"
-  change_files_in $reference_dir || return 8
+  echo "Test 2 - change stuff in the repository"
+  test2 $repo_dir || return 7
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > test_100_2 || return $?
-
-  echo "compare the changed directories"
-  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # Reference test values
+  declare -A test_results
+  # test 1
+  test_results[1,1]=7
+  test_results[1,2]=0
+  test_results[1,3]=0
+  test_results[1,4]=2
+  test_results[1,5]=0
+  test_results[1,6]=0
+  test_results[1,7]=115
+  test_results[1,8]=0
+  # test 2
+  test_results[2,1]=0
+  test_results[2,2]=2
+  test_results[2,3]=2
+  test_results[2,4]=0
+  test_results[2,5]=1
+  test_results[2,6]=1
+  test_results[2,7]=31
+  test_results[2,8]=22
+
+  # check publish statistics
+  for i in `seq 1 $NR_OF_TESTS`;
+  do
+    local files_added=$(cat test_100_$i | grep "Files *added:" | awk '{print $NF}')
+    local files_removed=$(cat test_100_$i | grep "Files *removed:" | awk '{print $NF}')
+    local files_changed=$(cat test_100_$i | grep "Files *changed:" | awk '{print $NF}')
+    local directories_added=$(cat test_100_$i | grep "Directories *added:" | awk '{print $NF}')
+    local directories_removed=$(cat test_100_$i | grep "Directories *removed:" | awk '{print $NF}')
+    local directories_changed=$(cat test_100_$i | grep "Directories *changed:" | awk '{print $NF}')
+    local bytes_added=$(cat test_100_$i | grep "Bytes *added:" | awk '{print $NF}')
+    local bytes_removed=$(cat test_100_$i | grep "Bytes *removed:" | awk '{print $NF}')
+
+    if [ $files_added -eq ${test_results[$i,1]} ]; then
+      echo "Test $i.1 - number of added files --------- passed"
+    else
+      echo "Test $i.1 - number of added files - \
+            ($files_added vs ref:${test_results[$i,1]}) FAILED!"
+      return $ERROR_FILES_ADDED
+    fi
+
+    if [ $files_removed -eq ${test_results[$i,2]} ]; then
+      echo "Test $i.2 - number of removed files ------- passed"
+    else
+      echo "Test $i.2 - number of removed files -\
+           ($files_removed vs ref:${test_results[$i,2]}) FAILED"
+      return $ERROR_FILES_REMOVED
+    fi
+
+     if [ $files_changed -eq ${test_results[$i,3]} ]; then
+      echo "Test $i.3 - number of changed files ------- passed"
+    else
+      echo "Test $i.3 - number of changed files - \
+            ($files_changed vs ref:${test_results[$i,3]}) FAILED"
+      return $ERROR_FILES_CHANGED
+    fi
+    if [ $directories_added -eq ${test_results[$i,4]} ]; then
+      echo "Test $i.4 - number of added directories --- passed"
+    else
+      echo "Test $i.4 - number of added directories - \
+            ($directories_added vs ref:${test_results[$i,4]}) FAILED"
+      return $ERROR_DIR_ADDED
+    fi
+    if [ $directories_removed -eq ${test_results[$i,5]} ]; then
+      echo "Test $i.5 - number of removed directories - passed"
+    else
+      echo "Test $i.5 - number of removed directories \
+            - ($directories_removed vs ref:${test_results[$i,5]}) FAILED"
+      return $ERROR_DIR_REMOVED
+    fi
+    if [ $directories_changed -eq ${test_results[$i,6]} ]; then
+      echo "Test $i.6 - number of changed directories - passed"
+    else
+      echo "Test $i.6 - number of changed directories - \
+            ($directories_changed vs ref:${test_results[$i,6]}) FAILED"
+      return $ERROR_DIR_CHANGED
+    fi
+
+    if [ $bytes_added -eq ${test_results[$i,7]} ]; then
+      echo "Test $i.7 - number of added bytes --------- passed"
+    else
+      echo "Test $i.7 - number of added bytes - \
+            ($bytes_added vs ref:${test_results[$i,7]}) FAILED"
+      return $ERROR_BYTES_ADDED
+    fi
+
+    if [ $bytes_removed -eq ${test_results[$i,8]} ]; then
+      echo "Test $i.8 - number of removed bytes ------- passed"
+    else
+      echo "Test $i.8 - number of removed bytes - \
+            ($bytes_removed vs ref:${test_results[$i,8]}) FAILED"
+      return $ERROR_BYTES_REMOVED
+    fi
+
+    # clean
+    rm test_100_$i
+  done
 
   return 0
 }
