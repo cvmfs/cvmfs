@@ -269,10 +269,12 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
   const std::string path =
     (catalog->mountpoint().IsEmpty()) ? "/" : catalog->mountpoint().ToString();
 
-  LogCvmfs(kLogGc, kLogStdout | kLogDebug, "%s%s %s",
+  LogCvmfs(kLogGc, kLogStdout, "%s%s %s",
     tree_indent.c_str(),
     hash_string.c_str(),
     path.c_str());
+  LogCvmfs(kLogGc, kLogDebug, "catalog tree entry: %s %s",
+           hash_string.c_str(), path.c_str());
 }
 
 
