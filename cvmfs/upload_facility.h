@@ -19,7 +19,7 @@
 namespace upload {
 
 struct UploaderResults {
-  enum Type { kFileUpload, kBufferUpload, kChunkCommit };
+  enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove };
 
   UploaderResults(const int return_code, const std::string &local_path)
     : type(kFileUpload),
@@ -30,6 +30,11 @@ struct UploaderResults {
     : type(t),
       return_code(return_code),
       local_path("") {}
+
+  UploaderResults()
+    : type(kRemove)
+    , return_code(0)
+  { }
 
   const Type type;
   const int return_code;
@@ -213,29 +218,24 @@ class AbstractUploader
   }
 
   /**
-   * Removes a file from the backend storage. This might be done synchronously.
+   * Removes a file from the backend storage.
    *
-   * Note: If the file doesn't exist before calling this method it will report
-   *       a successful deletion anyways.
-   *
-   * Note: This method is currently used very sparsely! If this changes in the
-   *       future, one might think about doing deletion asynchronously!
+   * Note: If the file doesn't exist before calling this won't be an error.
    *
    * @param file_to_delete  path to the file to be removed
-   * @return                true if the file does not exist (anymore), false if
-   *                        the removal failed
    */
-  virtual bool Remove(const std::string &file_to_delete) = 0;
+  void RemoveAsync(const std::string &file_to_delete) {
+    ++jobs_in_flight_;
+    DoRemoveAsync(file_to_delete);
+  }
 
   /**
-   * Overloaded Remove method used to remove a object based on its content hash.
+   * Overloaded method used to remove a object based on its content hash.
    *
    * @param hash_to_delete  the content hash of a file to be deleted
-   * @return                true on successful removal (removing a non-existant
-   *                        object is a successful deletion as well!)
    */
-  virtual bool Remove(const shash::Any &hash_to_delete) {
-    return Remove("data/" + hash_to_delete.MakePath());
+  void RemoveAsync(const shash::Any &hash_to_delete) {
+    RemoveAsync("data/" + hash_to_delete.MakePath());
   }
 
   /**
@@ -307,6 +307,9 @@ class AbstractUploader
    */
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
                                       const shash::Any &content_hash) = 0;
+
+
+  virtual void DoRemoveAsync(const std::string &file_to_delete) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please

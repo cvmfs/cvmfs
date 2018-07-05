@@ -237,9 +237,10 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   const upload::SpoolerDefinition sd(spooler_definition, shash::kAny);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
-  const bool success = spooler->Remove(file_to_delete);
+  spooler->RemoveAsync(file_to_delete);
+  spooler->WaitForUpload();
 
-  if (spooler->GetNumberOfErrors() > 0 || !success) {
+  if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
              file_to_delete.c_str());
     return 1;

@@ -674,8 +674,9 @@ TYPED_TEST(T_Uploaders, RemoveFromStorage) {
   const bool file_exists = this->uploader_->Peek(dest_name);
   EXPECT_TRUE(file_exists);
 
-  const bool removed_successfully = this->uploader_->Remove(dest_name);
-  EXPECT_TRUE(removed_successfully);
+  this->uploader_->RemoveAsync(dest_name);
+  this->uploader_->WaitForUpload();
+  EXPECT_EQ(0U, this->uploader_->GetNumberOfErrors());
 
   EXPECT_FALSE(TestFixture::CheckFile(dest_name));
   const bool file_still_exists = this->uploader_->Peek(dest_name);

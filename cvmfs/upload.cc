@@ -91,8 +91,8 @@ void Spooler::UploadReflog(const std::string &local_path) {
   Upload(local_path, ".cvmfsreflog");
 }
 
-bool Spooler::Remove(const std::string &file_to_delete) {
-  return uploader_->Remove(file_to_delete);
+void Spooler::RemoveAsync(const std::string &file_to_delete) {
+  uploader_->RemoveAsync(file_to_delete);
 }
 
 bool Spooler::Peek(const std::string &path) const {

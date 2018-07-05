@@ -43,9 +43,12 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       LogCvmfs(kLogS3Fanout, kLogDebug, "http status error code: %s",
                header_line.c_str());
       if (header_line.length() < i+3) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "S3: invalid HTTP response '%s'",
+                 header_line.c_str());
         info->error_code = kFailOther;
         return 0;
       }
+      bool print_error = true;
       int http_error = String2Int64(string(&header_line[i], 3));
 
       switch (http_error) {
@@ -61,9 +64,14 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
           break;
         case 404:
           info->error_code = kFailNotFound;
+          print_error = false;
           break;
         default:
           info->error_code = kFailOther;
+      }
+      if (print_error) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "S3: HTTP failure '%s'",
+                 header_line.c_str());
       }
       return 0;
     }

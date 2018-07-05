@@ -103,8 +103,9 @@ void GatewayUploader::WaitForUpload() const {
 
 std::string GatewayUploader::name() const { return "HTTP"; }
 
-bool GatewayUploader::Remove(const std::string& /*file_to_delete*/) {
-  return false;
+void GatewayUploader::DoRemoveAsync(const std::string& /*file_to_delete*/) {
+  atomic_inc32(&num_errors_);
+  Respond(NULL, UploaderResults());
 }
 
 bool GatewayUploader::Peek(const std::string& /*path*/) const { return false; }
