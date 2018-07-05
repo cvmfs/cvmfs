@@ -297,8 +297,6 @@ void LibContext::CvmfsAttrFromDirent(
   catalog::DirectoryEntry dirent,
   struct cvmfs_attr *attr
 ) {
-  attr->version  = 1;
-  attr->size     = sizeof(*attr);
   attr->st_ino   = dirent.inode();
   attr->st_mode  = dirent.mode();
   attr->st_nlink = dirent.linkcount();

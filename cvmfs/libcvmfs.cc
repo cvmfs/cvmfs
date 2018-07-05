@@ -37,6 +37,8 @@ struct cvmfs_attr* cvmfs_attr_init()
 {
   struct cvmfs_attr *attr;
   attr = reinterpret_cast<cvmfs_attr *>(calloc(1, sizeof(*attr)));
+  attr->version  = 1;
+  attr->size     = sizeof(*attr);
   return attr;
 }
 

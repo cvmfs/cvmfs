@@ -396,19 +396,20 @@ TEST_F(T_Libcvmfs, Attr) {
   catalog::DirectoryEntry entry;
   EXPECT_TRUE(
     tester.FindEntry(tester.manifest()->catalog_hash(), "/dir/file1", &entry));
+  char *file1_hash = strdup(entry.checksum().ToString().c_str());
 
-  /* Set CVMFS options to reflect created repository */
-  cvmfs_options_set(opts, "CVMFS_ROOT_HASH",
-                        tester.manifest()->catalog_hash().ToString().c_str());
-  cvmfs_options_set(opts, "CVMFS_SERVER_URL",
-                        ("file://" + tester.repo_name()).c_str());
+  // Set CVMFS options to reflect created repository
+  cvmfs_options_set(opts,
+    "CVMFS_ROOT_HASH", tester.manifest()->catalog_hash().ToString().c_str());
+  cvmfs_options_set(opts,
+    "CVMFS_SERVER_URL", ("file://" + tester.repo_name()).c_str());
   cvmfs_options_set(opts, "CVMFS_HTTP_PROXY", "DIRECT");
-  cvmfs_options_set(opts, "CVMFS_PUBLIC_KEY",
-                        tester.public_key().c_str());
-  cvmfs_options_set(opts, "CVMFS_CACHE_DIR",
-                        (tester.repo_name()+"/data/txn").c_str());
-  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR",
-                        ("/cvmfs" + tester.repo_name()).c_str());
+  cvmfs_options_set(opts,
+    "CVMFS_PUBLIC_KEY", tester.public_key().c_str());
+  cvmfs_options_set(opts,
+    "CVMFS_CACHE_DIR", (tester.repo_name()+"/data/txn").c_str());
+  cvmfs_options_set(opts,
+    "CVMFS_MOUNT_DIR", ("/cvmfs" + tester.repo_name()).c_str());
 
   /* Initialize client repo based on options */
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
@@ -423,13 +424,13 @@ TEST_F(T_Libcvmfs, Attr) {
   /* Find file1 */
   int retval = cvmfs_stat_attr(ctx, "/dir/file1", attr);
   EXPECT_EQ(0, retval);
-  const char *rw_hash = entry.checksum().ToString().c_str();
   /* Compare hash and size */
-  retval = strcmp(rw_hash, attr->cvm_checksum);
+  retval = strcmp(file1_hash, attr->cvm_checksum);
   EXPECT_FALSE(retval);
   EXPECT_EQ(attr->st_size, file_size);
   EXPECT_FALSE(attr->cvm_xattrs);
   cvmfs_attr_free(attr);
+  free(file1_hash);
 
   /* Lookup non-existent file */
   attr = cvmfs_attr_init();
