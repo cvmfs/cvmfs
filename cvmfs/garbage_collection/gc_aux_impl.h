@@ -27,7 +27,8 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
   const HashFilterT &preserved_objects)
 {
   if (config_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Sweeping auxiliary objects older than %s",
+    LogCvmfs(kLogGc, kLogStdout | kLogDebug,
+             "Sweeping auxiliary objects older than %s",
              StringifyTime(timestamp, true).c_str());
   }
   std::vector<SqlReflog::ReferenceType> aux_types;
@@ -44,14 +45,14 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
       return 1;
     }
     if (config_.verbose) {
-      LogCvmfs(kLogGc, kLogStdout, "Scanning %u %s objects",
+      LogCvmfs(kLogGc, kLogStdout | kLogDebug, "Scanning %u %s objects",
                hashes.size(), PrintAuxType(aux_types[i]).c_str());
     }
 
     for (unsigned iter = 0; iter < hashes.size(); ++iter) {
       if (preserved_objects.Contains(hashes[iter])) {
         if (config_.verbose) {
-          LogCvmfs(kLogGc, kLogStdout, "  preserving: %s",
+          LogCvmfs(kLogGc, kLogStdout | kLogDebug, "  preserving: %s",
                    hashes[iter].ToStringWithSuffix().c_str());
         }
         continue;
@@ -91,7 +92,7 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::Sweep(
   const shash::Any &hash)
 {
   if (config_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout,
+    LogCvmfs(kLogGc, kLogStdout | kLogDebug,
              "  sweep: %s", hash.ToStringWithSuffix().c_str());
   }
 
