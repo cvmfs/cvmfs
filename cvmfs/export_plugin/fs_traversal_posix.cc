@@ -334,7 +334,7 @@ struct fs_traversal_context *posix_initialize(
   std::string cur_path = repo;
   cur_path += "/";
   cur_path += data;
-  PosixCheckDirStructure(cur_path, 0700);  // TODO(steuber): mode?
+  PosixCheckDirStructure(cur_path, 0770);  // TODO(steuber): mode?
   return result;
 }
 
