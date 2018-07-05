@@ -1,4 +1,6 @@
 2.5.1:
+  * Make S3 network parameters adjustable, new parameters 
+    CVMFS_S3_MAX_RETRIES, CVMFS_S3_TIMEOUT
   * Fix compiler optimization flags for gcc8+ and clang9+
   * Update BNL and FNAL stratum 1 aliases (CVM-1556)
   * Improved check for OSXFUSE in "cvmfs_config chksetup" (CVM-1550)
