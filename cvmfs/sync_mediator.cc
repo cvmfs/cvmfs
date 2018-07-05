@@ -91,10 +91,6 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
   if (entry->IsDirectory()) {
     AddDirectoryRecursively(entry);
-    if (counters_.IsValid()) {
-      Inc(counters_->n_directories_added);
-      // Xadd(counters_->n_bytes_added, GetFileSize(entry->GetScratchPath()));
-    }
     return;
   }
 
@@ -188,10 +184,6 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
 
   if (entry->WasDirectory()) {
     RemoveDirectoryRecursively(entry);
-    if (counters_.IsValid()) {
-      Inc(counters_->n_directories_removed);
-      // Xadd(counters_->n_bytes_removed, GetFileSize(entry->GetRdOnlyPath()));
-    }
     return;
   }
 
@@ -874,6 +866,9 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
   PrintChangesetNotice(kAdd, entry->GetUnionPath());
 
+  if (counters_.IsValid()) {
+    Inc(counters_->n_directories_added);
+  }
   assert(!entry->HasGraftMarker());
   if (!params_->dry_run) {
     catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(),
@@ -895,6 +890,9 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
 void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
   const std::string directory_path = entry->GetRelativePath();
 
+  if (counters_.IsValid()) {
+    Inc(counters_->n_directories_removed);
+  }
   if (catalog_manager_->IsTransitionPoint(directory_path)) {
     RemoveNestedCatalog(entry);
   }
