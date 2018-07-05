@@ -169,17 +169,22 @@ void *S3Uploader::MainCollectResults(void *data) {
                  info->error_code,
                  s3fanout::Code2Ascii(info->error_code));
         reply_code = 99;
+        atomic_inc32(&uploader->io_errors_);
       }
-      if (info->origin == s3fanout::kOriginMem) {
-        uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                          UploaderResults(UploaderResults::kChunkCommit,
-                                          reply_code));
+      if (info->request == s3fanout::JobInfo::kReqDelete) {
+        uploader->Respond(NULL, UploaderResults());
       } else {
-        uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                          UploaderResults(reply_code, info->origin_path));
+        if (info->origin == s3fanout::kOriginMem) {
+          uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                            UploaderResults(UploaderResults::kChunkCommit,
+                                            reply_code));
+        } else {
+          uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                            UploaderResults(reply_code, info->origin_path));
+        }
+        assert(info->mmf == NULL);
+        assert(info->origin_file == NULL);
       }
-      assert(info->mmf == NULL);
-      assert(info->origin_file == NULL);
     }
 #ifdef _POSIX_PRIORITY_SCHEDULING
     sched_yield();
@@ -360,15 +365,15 @@ s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
 }
 
 
-bool S3Uploader::Remove(const std::string& file_to_delete) {
+void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
   const std::string mangled_path = repository_alias_ + "/" + file_to_delete;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
 
   info->request = s3fanout::JobInfo::kReqDelete;
-  bool retme = s3fanout_mgr_.DoSingleJob(info);
 
-  delete info;
-  return retme;
+  LogCvmfs(kLogUploadS3, kLogDebug, "Asynchronously removing %s/%s",
+           info->bucket.c_str(), info->object_key.c_str());
+  s3fanout_mgr_.PushNewJob(info);
 }
 
 

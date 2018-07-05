@@ -63,7 +63,7 @@ class S3Uploader : public AbstractUploader {
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
                                       const shash::Any &content_hash);
 
-  virtual bool Remove(const std::string &file_to_delete);
+  virtual void DoRemoveAsync(const std::string &file_to_delete);
   virtual bool Peek(const std::string &path) const;
   virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const;
 

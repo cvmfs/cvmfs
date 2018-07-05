@@ -62,7 +62,8 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
     }
   }
 
-  return true;
+  config_.uploader->WaitForUpload();
+  return config_.uploader->GetNumberOfErrors() == 0;
 }
 
 
@@ -95,7 +96,7 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::Sweep(
   }
 
   if (!config_.dry_run) {
-    config_.uploader->Remove(hash);
+    config_.uploader->RemoveAsync(hash);
     bool retval = config_.reflog->Remove(hash);
     if (!retval) {
       LogCvmfs(kLogGc, kLogStderr, "failed to remove %s from reference log",
