@@ -360,8 +360,8 @@ TEST_F(T_Libcvmfs, Listdir) {
   char **buf = NULL;
   size_t buflen = 0;
   cvmfs_listdir(ctx, "/dir/dir", &buf, &buflen);
-  // The buf length should be at least 3
-  EXPECT_LE(3, buflen);
+  // The buf length should be at least 4
+  EXPECT_LE(4U, buflen);
   // Check that listed info matches specified dir
   EXPECT_FALSE(strcmp(".", buf[0]));
   EXPECT_FALSE(strcmp("..", buf[1]));
@@ -392,6 +392,7 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
 
   // Apply the created DirSpec
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+  char *d0_hash = strdup(tester.manifest()->catalog_hash().ToString().c_str());
 
   // Find the hash of the newly added Nested Catalog for comparison
   char *d2_hash;
@@ -423,8 +424,6 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   EXPECT_EQ(LIBCVMFS_ERR_OK,
     cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
 
-  const char *orig_nc = NULL;
-
   // stat nested catalog using client repo
   struct cvmfs_nc_attr *nc_attr;
   nc_attr = cvmfs_nc_attr_init();
@@ -432,18 +431,17 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   EXPECT_FALSE(strcmp(d4_hash, nc_attr->hash));
   EXPECT_FALSE(strcmp("/dir/dir/dir/dir", nc_attr->mountpoint));
   cvmfs_nc_attr_free(nc_attr);
-
+  free(d4_hash);
 
   // stat nested catalog using client repo
   nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir", nc_attr));
-  orig_nc = tester.manifest()->catalog_hash().ToString().c_str();
-  EXPECT_FALSE(strcmp(orig_nc, nc_attr->hash));
+  EXPECT_FALSE(strcmp(d0_hash, nc_attr->hash));
   EXPECT_FALSE(strcmp("", nc_attr->mountpoint));
   // Size of root catalog is 0 as a Nested Catalog
-  EXPECT_EQ(nc_attr->size, 0);
+  EXPECT_EQ(0U, nc_attr->size);
   cvmfs_nc_attr_free(nc_attr);
-
+  free(d0_hash);
 
   // stat nested catalog using client repo
   nc_attr = cvmfs_nc_attr_init();
@@ -451,6 +449,7 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   EXPECT_FALSE(strcmp(d2_hash, nc_attr->hash));
   EXPECT_FALSE(strcmp("/dir/dir", nc_attr->mountpoint));
   cvmfs_nc_attr_free(nc_attr);
+  free(d2_hash);
 
   // Finalize and close repo and options
   cvmfs_detach_repo(ctx);
