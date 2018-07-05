@@ -1,4 +1,5 @@
 2.5.1:
+  * Fix compiler optimization flags for gcc8+ and clang9+
   * Update BNL and FNAL stratum 1 aliases (CVM-1556)
   * Improved check for OSXFUSE in "cvmfs_config chksetup" (CVM-1550)
   * Fix potential deadlock when uploading files to repository GW (CVM-1555)
