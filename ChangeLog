@@ -1,4 +1,5 @@
 2.6.0:
+  * Reactivate tracer, new parameters CVMFS_TRACEBUFFER{_THRESHOLD} (CVM-1596)
   * Add libcvmfs calls that list and stat nested catalogs (CVM-1577)
   * Generally replace @fqrn@ and @org@ in configuration (CVM-1526)
   * Add support for CVMFS_NFS_INTERLEAVED_INODES (CVM-1561)
