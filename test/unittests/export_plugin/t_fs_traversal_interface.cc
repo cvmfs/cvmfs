@@ -5,8 +5,9 @@
 #include <gtest/gtest.h>
 
 #include <errno.h>
-
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "util/posix.h"
 #include "xattr.h"
@@ -28,8 +29,13 @@ class T_Fs_Traversal_Interface :
  protected:
   virtual void SetUp() {
     fs_traversal_instance_ = GetParam();
+    const char *repo = fs_traversal_instance_->repo;
+    if (repo == NULL) {
+      std::string repoName = GetCurrentWorkingDirectory();
+      repo = strdup(repoName.c_str());
+    }
     context_ = fs_traversal_instance_->interface->initialize(
-      fs_traversal_instance_->repo,
+      repo,
       fs_traversal_instance_->data);
   }
 
@@ -47,8 +53,7 @@ class T_Fs_Traversal_Interface :
     return result;
   }
   struct cvmfs_stat create_sample_stat(const char *name,
-    ino_t st_ino, mode_t st_mode, uid_t st_uid, gid_t st_gid,
-    off_t st_size, XattrList *xlist) {
+    ino_t st_ino, mode_t st_mode, off_t st_size, XattrList *xlist) {
     struct timespec spec;
     clock_gettime(CLOCK_REALTIME, &spec);
 
@@ -56,12 +61,12 @@ class T_Fs_Traversal_Interface :
       1,
       sizeof(struct cvmfs_stat),
 
-      st_ino,  // st_ino
-      st_mode,  // st_mode
-      st_uid,  // st_nlink
-      st_gid,  // st_uid
-      st_gid,  // st_gid
-      0,  // st_rdev
+      st_ino,         // st_ino
+      st_mode,        // st_mode
+      1,              // st_nlink
+      getuid(),       // st_uid
+      getgid(),       // st_gid
+      0,              // st_rdev
       st_size,
       1024,
       st_size / 1024,
@@ -91,17 +96,17 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
   // FILE META 1
   XattrList *xlist1 = create_sample_xattrlist("foo");
   struct cvmfs_stat statValues1 = create_sample_stat("hello.world",
-    10, 0770, 1, 1, content1.length(), xlist1);
+    10, 0770, content1.length(), xlist1);
   shash::Any meta1_hash = HashMeta(&statValues1);
   // FILE META 2
   XattrList *xlist2 = create_sample_xattrlist("bar");
   struct cvmfs_stat statValues2 = create_sample_stat("hello.world",
-    10, 0770, 1, 1, content1.length(), xlist2);
+    10, 0770, content1.length(), xlist2);
   shash::Any meta2_hash = HashMeta(&statValues2);
   // FILE META 3
   XattrList *xlist3 = create_sample_xattrlist("foo");
   struct cvmfs_stat statValues3 = create_sample_stat("hello.world",
-    10, 0700, 1, 1, content1.length(), xlist3);
+    10, 0700, content1.length(), xlist3);
   shash::Any meta3_hash = HashMeta(&statValues3);
 
   ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
@@ -157,7 +162,7 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
 std::string dir = GetCurrentWorkingDirectory();
 struct fs_traversal_test posix = {
   posix_get_interface(),
-  dir.c_str(),
+  NULL,
   ".data"
 };
 
