@@ -308,11 +308,15 @@ set (CVMFS_TEST_EXPORT_SOURCES
   export_plugin/t_fs_traversal_interface.cc
   
   #${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/util.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_posix.cc
   
   ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/string.cc
+  ${CVMFS_SOURCE_DIR}/xattr.cc
+  
 )
 
 #

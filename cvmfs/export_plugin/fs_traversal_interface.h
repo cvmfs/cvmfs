@@ -140,7 +140,8 @@ struct fs_traversal {
    * the given content and meta data hash
    * 
    * Error:
-   * - If file exists
+   * - If file exists (errno set to EEXIST)
+   * - Error during creation and meta data saving operations
    * 
    * @param[in] content The content hash of the file
    * @param[in] meta The meta hash of the file
