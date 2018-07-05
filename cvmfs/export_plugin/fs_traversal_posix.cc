@@ -82,29 +82,25 @@ int PosixSetMeta(const char *path, const struct cvmfs_stat *stat_info) {
   return 0;
 }
 
-void PosixCheckDirStructure(const char *repo,
-  const char *data, mode_t mode,
+void PosixCheckDirStructure(std::string cur_path, mode_t mode,
   unsigned int depth = 1) {
   // Maximum directory to search for:
   std::string max_dir_name = std::string(kDigitsPerDirLevel, 'f');
   // Build current base path
-  std::string cur_path = repo;
-  cur_path += "/";
-  cur_path += data;
-  for (unsigned int i = 1; i < depth; i++) {
-    cur_path += "/" + max_dir_name;
-  }
+
+  int res = mkdir(cur_path.c_str(), mode);
+  assert(res == 0 || errno == EEXIST);
   // Build template for directory names:
   assert(kDigitsPerDirLevel <= 99);
-  char hex[kDigitsPerDirLevel];
-  char dir_name_template[4];
+  char hex[kDigitsPerDirLevel+1];
+  char dir_name_template[5];
   snprintf(dir_name_template,
     sizeof(dir_name_template),
-    "%%%ux",
+    "%%%02ux",
     kDigitsPerDirLevel);
   // Go through all levels:
   for (; depth <= kDirLevels; depth++) {
-    if (!HasDir(cur_path+max_dir_name)) {
+    if (!HasDir(cur_path+"/"+max_dir_name)) {
       // Directories in this level not yet fully created...
       for (unsigned int i = 0;
       i < (((unsigned int) 1) << 4*kDigitsPerDirLevel);
@@ -113,13 +109,13 @@ void PosixCheckDirStructure(const char *repo,
         snprintf(hex, sizeof(hex), dir_name_template, i);
         std::string this_path = cur_path + "/" + std::string(hex);
         int res = mkdir(this_path.c_str(), mode);
-        assert(res == 0 || errno != EEXIST);
+        assert(res == 0 || errno == EEXIST);
         // Once directory created: Prepare substructures
-        PosixCheckDirStructure(repo, data, mode, depth+1);
+        PosixCheckDirStructure(this_path, mode, depth+1);
       }
     } else {
       // Directories on this level fully created; check ./
-      PosixCheckDirStructure(repo, data, mode, depth+1);
+      PosixCheckDirStructure(cur_path+"/"+max_dir_name, mode, depth+1);
     }
   }
 }
@@ -233,11 +229,14 @@ int posix_touch(struct fs_traversal_context *ctx,
               void *meta,
               const struct cvmfs_stat *stat_info) {
   if (posix_has_hash(ctx, content, meta)) {
-    return -2;
+    errno = EEXIST;
+    return -1;
   }
   std::string hidden_datapath = BuildHiddenPath(ctx, content, meta);
-  int res = creat(hidden_datapath.c_str(), stat_info->st_mode);
-  if (res != 0) return -1;
+  int res1 = creat(hidden_datapath.c_str(), stat_info->st_mode);
+  if (res1 < 0) return -1;
+  int res2 = close(res1);
+  if (res2 < 0) return -1;
   return PosixSetMeta(hidden_datapath.c_str(), stat_info);
 }
 
@@ -332,7 +331,10 @@ struct fs_traversal_context *posix_initialize(
   result->version = 1;
   result->repo =  repo;
   result->data = data;
-  PosixCheckDirStructure(repo, data, 0);  // TODO(steuber): mode?
+  std::string cur_path = repo;
+  cur_path += "/";
+  cur_path += data;
+  PosixCheckDirStructure(cur_path, 0700);  // TODO(steuber): mode?
   return result;
 }
 
