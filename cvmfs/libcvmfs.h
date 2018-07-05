@@ -41,6 +41,7 @@
 #include <inttypes.h>
 >>>>>>> Newest version of fs traversal interface and its posix implementation.
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 // Legacy error codes
