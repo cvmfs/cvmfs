@@ -100,10 +100,6 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
       InsertHardlink(entry);
     else
       AddFile(entry);
-    if (counters_.IsValid()) {
-      Inc(counters_->n_files_added);
-      Xadd(counters_->n_bytes_added, GetFileSize(entry->GetScratchPath()));
-    }
     return;
   } else if (entry->IsGraftMarker()) {
     LogCvmfs(kLogPublish, kLogDebug, "Ignoring graft marker file.");
@@ -122,10 +118,6 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
         InsertHardlink(entry);
       else
         AddFile(entry);
-      if (counters_.IsValid()) {
-        Inc(counters_->n_files_added);
-        Xadd(counters_->n_bytes_added, GetFileSize(entry->GetScratchPath()));
-      }
     }
     return;
   }
@@ -157,16 +149,6 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
       // Replace calls Remove and Add
       Dec(counters_->n_files_added);
       Dec(counters_->n_files_removed);
-      Xadd(counters_->n_bytes_added, -GetFileSize(entry->GetScratchPath()));
-      Xadd(counters_->n_bytes_removed, -GetFileSize(entry->GetRdOnlyPath()));
-
-      int64_t dif = GetFileSize(entry->GetScratchPath()) -
-                    GetFileSize(entry->GetRdOnlyPath());
-      if (dif > 0) {                            // added bytes
-        Xadd(counters_->n_bytes_added, dif);
-      } else if (dif < 0) {                     // removed bytes
-        Xadd(counters_->n_bytes_removed, -dif);
-      }
     }
     return;
   }
@@ -190,10 +172,6 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
   if (entry->WasRegularFile() || entry->WasSymlink() ||
       entry->WasSpecialFile()) {
     RemoveFile(entry);
-    if (counters_.IsValid()) {
-      Inc(counters_->n_files_removed);
-      Xadd(counters_->n_bytes_removed, GetFileSize(entry->GetRdOnlyPath()));
-    }
     return;
   }
 
@@ -800,6 +778,7 @@ void SyncMediator::PrintChangesetNotice(const ChangesetAction  action,
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
   PrintChangesetNotice(kAdd, entry->GetUnionPath());
+  IngestionSource *SyncItem = entry->CreateIngestionSource();
 
   if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) {
     assert(!entry->HasGraftMarker());
@@ -842,7 +821,34 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
     file_queue_[entry->GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->Process(entry->CreateIngestionSource());
+    params_->spooler->Process(SyncItem);
+  }
+
+  // publish statistics counting
+  if (counters_.IsValid()) {
+    Inc(counters_->n_files_added);
+
+    uint64_t size = 0;
+    if (GetFileSize(entry->GetScratchPath()) == -1) {
+      SyncItem->GetSize(&size);
+    } else {
+      size = GetFileSize(entry->GetScratchPath());
+    }
+
+    Xadd(counters_->n_bytes_added, size);
+
+    // when a file is changed
+    if (!entry->IsNew() && !entry->IsOpaqueDirectory()) {
+      Xadd(counters_->n_bytes_added, -size);
+      Xadd(counters_->n_bytes_removed, -GetFileSize(entry->GetRdOnlyPath()));
+      // Count only the diference between the old and new file
+      int64_t dif = size - GetFileSize(entry->GetRdOnlyPath());
+      if (dif > 0) {                            // added bytes
+        Xadd(counters_->n_bytes_added, dif);
+      } else if (dif < 0) {                     // removed bytes
+        Xadd(counters_->n_bytes_removed, -dif);
+      }
+    }
   }
 }
 
@@ -856,6 +862,12 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
       catalog_manager_->ShrinkHardlinkGroup(entry->GetRelativePath());
     }
     catalog_manager_->RemoveFile(entry->GetRelativePath());
+  }
+
+  // Counting nr of removed files and removed bytes
+  if (counters_.IsValid()) {
+    Inc(counters_->n_files_removed);
+    Xadd(counters_->n_bytes_removed, GetFileSize(entry->GetRdOnlyPath()));
   }
 }
 
@@ -987,6 +999,7 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   if (xattrs != &default_xattrs)
     free(xattrs);
 }
+
 
 void SyncMediator::PrintStatistics() {
   if (counters_.IsValid()) {
