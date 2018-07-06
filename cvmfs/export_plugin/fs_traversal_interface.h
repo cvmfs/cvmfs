@@ -4,9 +4,7 @@
 #ifndef CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
 #define CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
 
-#include "hash.h"
 #include "libcvmfs.h"
-#include "shortstring.h"
 
 struct fs_traversal_context {
   uint64_t version;
@@ -24,9 +22,6 @@ enum fs_open_type {
   fs_open_append = 4
 };
 
-/**
- * @note(steuber): Any hashes are pointers to shash::Any
- */
 struct fs_traversal {
   /**
    * Method which initializes a file system traversal context based on
@@ -80,17 +75,15 @@ struct fs_traversal {
 
   /**
    * Method which returns an identifier (usually a path)
-   * to a file identified by content and meta hash
+   * to a file identified by a stat struct
    * 
    * @param[in] ctx The file system traversal context
-   * @param[in] content The content hash of the file
-   * @param[in] meta The meta hash of the file
+   * @param[in] stat The stat struct describing the file
    * @returns A path that can be used to identify the file
    * The memory of the char is allocated on the heap and needs to be freed
    */
   const char *(*get_identifier)(struct fs_traversal_context *ctx,
-                const void *content,
-                const void *meta);
+                struct cvmfs_stat *stat);
 
 
   /**
@@ -106,11 +99,11 @@ struct fs_traversal {
                 const char *identifier);
 
   /**
-   * Method which creates a hardlink from the given path to the file identified
-   * by its content hash.
+   * Method which creates a hardlink from the given path to the file given
+   * by its identifier
    * 
-   * For this call to succeed the file addressed by the content and meta hash
-   * already needs to exist in the destination file system
+   * For this call to succeed the file given by its identifier already needs to
+   * exist in the destination filesystem
    * 
    * If the path already exists the old entry will silently be removed
    * and a new link will be created
@@ -174,7 +167,7 @@ struct fs_traversal {
 
   /**
    * Atomically creates the file representing
-   * the given content and meta data hash
+   * the given identifier
    * 
    * Error:
    * - If file exists (errno set to EEXIST)
