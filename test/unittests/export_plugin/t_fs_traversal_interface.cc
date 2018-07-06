@@ -34,7 +34,7 @@ class T_Fs_Traversal_Interface :
   virtual void TearDown() {
     // TODO(steuber): Where to free?
     Fin();
-    //delete fs_traversal_instance_->interface;
+    // delete fs_traversal_instance_->interface;
   }
 
   void Init() {
@@ -126,7 +126,7 @@ class T_Fs_Traversal_Interface :
     &stat_values1));
 
   // FILES
-  
+
 
   // SYMLINKS
   ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
@@ -320,7 +320,7 @@ TEST_P(T_Fs_Traversal_Interface, CheckLink) {
     "/CheckLink-foobar",
     &stat_values1));
   // Overwritable Symlink
-  // TODO(steuber): 
+  // TODO(steuber):
   ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
     context_,
     "/CheckLink-overwritesymlink",
