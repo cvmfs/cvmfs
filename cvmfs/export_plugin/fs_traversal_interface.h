@@ -36,15 +36,35 @@ struct fs_file {
  * @note(steuber): Any hashes are pointers to shash::Any
  */
 struct fs_traversal {
+  /**
+   * Method which initializes a file system traversal context based on
+   * repository and data storage information
+   * 
+   * @param[in] repo Repository information
+   * @param[in] data Data storage information
+   * @param[out] A pointer to the context
+   */
   struct fs_traversal_context *(*initialize)(
     const char *repo,
     const char *data);
 
+  /**
+   * Method which finalizes the file system traversal.
+   * Must always be called after a context had been initialized and before the
+   * procedure ends
+   * 
+   * The context is freed during execution of this method
+   * 
+   * @param[in] ctx The context to finalize and free
+   */
   void (*finalize)(struct fs_traversal_context *ctx);
 
   /**
    * Method which returns a list over the given directory
    * 
+   * This should not include hidden directories (like the data directory)
+   * 
+   * @param[in] ctx The file system traversal context
    * @param[in] dir The directory over which should be iterated
    * @param[out] buf The list of the paths to the elements in the directory
    * @param[out] len Length of the output list
@@ -58,52 +78,69 @@ struct fs_traversal {
    * Method which returns a stat struct given a file path.
    * If the file doesn't exist, NULL is returned
    * 
+   * @param[in] ctx The file system traversal context
    * @param[in] path The path of the object to stat
    */
   struct cvmfs_stat *(*get_stat)(struct fs_traversal_context *ctx,
                 const char *path);
 
   /**
-   * Method which checks whether the file described by the given content and metadata hash
-   * exists in the destination file system
+   * Method which returns an identifier (usually a path)
+   * to a file identified by content and meta hash
    * 
-   * This should always be realised by a file system lookup since the all files
-   * should be hardlinked once by a combination of content and metadata hash.
-   * 
+   * @param[in] ctx The file system traversal context
    * @param[in] content The content hash of the file
    * @param[in] meta The meta hash of the file
-   * @returns True if file was found, false if not
+   * @returns A path that can be used to identify the file
    */
-  bool (*has_hash)(struct fs_traversal_context *ctx,
+  const char *(*get_identifier)(struct fs_traversal_context *ctx,
                 const void *content,
                 const void *meta);
+
+
+  /**
+   * Method which checks whether the file described by the given
+   * path exists in the destination file system
+   * 
+   * @param[in] ctx The file system traversal context
+   * @param[in] identifier The identifier of the file
+   * (obtained by get_identifier)
+   * @returns True if file was found, false if not
+   */
+  bool (*has_file)(struct fs_traversal_context *ctx,
+                const char *identifier);
 
   /**
    * Method which creates a hardlink from the given path to the file identified
    * by its content hash.
    * 
-   * For this call to succeed the file addressed by the content hash already
-   * needs to exist in the destination file system
+   * For this call to succeed the file addressed by the content and meta hash
+   * already needs to exist in the destination file system
+   * 
+   * If the path already exists the old entry will silently be removed
+   * and a new link will be created
    * 
    * Error if:
-   * - Hash file does not exist
+   * - File described by identifier does not exist
    * - Directory does not exist
    * 
-   * @param[in] content The content hash of the file
-   * @param[in] meta The meta hash of the file
-   * @param[in] meta The meta hash of the file to hardlink
+   * @param[in] ctx The file system traversal context
+   * @param[in] path The path where the file should be linked
+   * @param[in] identifier The identifier of the file
+   * (usually obtained through get_identifier)
    */
   int (*do_link)(struct fs_traversal_context *ctx,
                 const char *path,
-                void *content,
-                void *meta);
+                const char *identifier);
 
   /**
    * Method removes the hardlink at the given path
    * 
    * Error if:
-   * - unlink not successful
+   * - Link does not exist
+   * - Unlink not successful
    * 
+   * @param[in] ctx The file system traversal context
    * @param[in] path The path which should be removed
    */
   int (*do_unlink)(struct fs_traversal_context *ctx,
@@ -112,10 +149,13 @@ struct fs_traversal {
   /**
    * Method which will create the given directory
    * 
+   * If the path already exists the old entry will silently be removed
+   * and a new directory will be created
+   * 
    * Error if:
    * - Parent directory not defined
-   * - If directory already exists
    * 
+   * @param[in] ctx The file system traversal context
    * @param[in] path The path to the directory that should be created
    * @param[in] stat The stat containing the meta data for directory creation
    */
@@ -127,9 +167,11 @@ struct fs_traversal {
    * Method which removes the given directory
    * 
    * Error if:
+   * - Directory doesn't exist
    * - Error during removal of directory or child
    * - On ENAMETOOLONG if the full path is too long during removal
    * 
+   * @param[in] ctx The file system traversal context
    * @param[in] path The path to the directory that should be removed
    */
   int (*do_rmdir)(struct fs_traversal_context *ctx,
@@ -143,38 +185,44 @@ struct fs_traversal {
    * - If file exists (errno set to EEXIST)
    * - Error during creation and meta data saving operations
    * 
-   * @param[in] content The content hash of the file
-   * @param[in] meta The meta hash of the file
-   * @param[in] stat The stat containing the meta data for directory creation
+   * @param[in] ctx The file system traversal context
+   * @param[in] ident The identifier under which the file should be saved
+   * (usually obtained through get_identifier)
+   * @param[in] stat The stat containing the meta data for file creation
    */
   int (*touch)(struct fs_traversal_context *ctx,
-                void *content,
-                void *meta,
+                const char *identifier,
                 const struct cvmfs_stat *stat);
 
   /**
-   * Retrieves a method struct which allows the manipulation of the file
-   * defined by the given content and meta data hash
+   * Retrieves a handle struct which allows the manipulation of the file
+   * defined by the given identifier
    * 
-   * @param[in] content The content hash of the file
-   * @param[in] meta The meta hash of the file
+   * @param[in] ctx The file system traversal context
+   * @param[in] identifier The identifier of the file to manipulate
+   * (usually obtained through get_identifier)
    */
   struct fs_file *(*get_handle)(struct fs_traversal_context *ctx,
-                void *content,
-                void *meta);
+                const char *identifier);
 
 
   /**
    * Method which creates a symlink at src which points to dest
    * 
+   * If src already exists the old entry will silently be removed
+   * and a new symlink will be created
+   * 
    * Error:
    * - src directory doesn't exist
-   * - src already exists
    * - symlink creation fails
    * 
-   * @param[in] The position at which the symlink should be saved
+   * @param[in] ctx The file system traversal context
+   * @param[in] src The position at which the symlink should be saved
    * (parent directory must exist)
-   * @param[in] The position the symlink should point to
+   * @param[in] dest The position the symlink should point to
+   * @param[in] stat_info The stat containing the meta data for symlink creation
+   * @note(steuber): Currently permissions and user. xattributes are not
+   * established due to posix limitations.
    */
   int (*do_symlink)(struct fs_traversal_context *ctx,
                 const char *src,
@@ -182,16 +230,48 @@ struct fs_traversal {
                 const struct cvmfs_stat *stat_info);
 
   /**
-   * Method which executes a garbage collection on the destination file system.
-   * This will remove all no longer linked content adressed files
+   * Method which opens a file described by the given file context.
+   * Needs to be called before read and write operations
+   * 
+   * @param[in,out] file_ctx The file context used for opening
+   * @param[in] op_mode The mode for opening the file
+   * @returns 0 on success
    */
-  // NOTE(steuber): Shouldn't this maybe just be part of the finalize step?
-  int (*garbage_collection)(struct fs_traversal_context *ctx);
+  int (*do_open)(void *file_ctx, fs_open_type op_mode);
 
-  int (*do_open)(void *ctx, fs_open_type op_mode);
-  int (*do_close)(void *ctx);
-  int (*do_read)(void *ctx, char *buff, size_t len);
-  int (*do_write)(void *ctx, const char *buff);
+  /**
+   * Method which closes a file described by the given file context.
+   * Needs to be called after open.
+   * After this operation open needs to be called again before further
+   * read and write operations
+   * 
+   * @param[in,out] file_ctx The file context used
+   * @returns 0 on success
+   */
+  int (*do_close)(void *file_ctx);
+
+  /**
+   * Method which reads len chars into buff from the file described by the given
+   * context
+   * 
+   * @param[in] file_ctx The file context used
+   * @param[out] buff The buffer to write to
+   * @param[in] len The length of the buffer buff
+   * @param[out] read_len The number of chars read
+   * $returns 0 on success
+   */
+  int (*do_read)(void *file_ctx, char *buff, size_t len, size_t *read_len);
+
+  /**
+   * Method which writes len chars from buff into the file described by the
+   * given context
+   * 
+   * @param[in] file_ctx The file context used
+   * @param[in] buff The buffer to read from
+   * @param[in] len The length of the buffer buff
+   * @returns 0 on success
+   */
+  int (*do_write)(void *file_ctx, const char *buff, size_t len);
 };
 
 #endif  // CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
