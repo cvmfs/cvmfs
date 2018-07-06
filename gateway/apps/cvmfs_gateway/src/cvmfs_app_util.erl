@@ -50,4 +50,6 @@ default_user_config() ->
       receiver_config => #{size => 1,
                            max_overflow => 1},
       receiver_worker_config =>
-          #{executable_path => "/usr/bin/cvmfs_receiver"}}.
+          #{executable_path => "/usr/bin/cvmfs_receiver"},
+      log_level => <<"info">>}.
+
