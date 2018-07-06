@@ -73,7 +73,7 @@ set_lager_log_level(LogLevel) ->
               <<"critical">>, <<"alert">>, <<"emergency">>],
     case lists:member(LogLevel, Levels) of
         true ->
-            lager:set_loglevel(lager_syslog_backend,
+            lager:set_loglevel({lager_syslog_backend, {"cvmfs_gateway", local1}},
                                erlang:binary_to_atom(LogLevel, latin1)),
             ok;
         false ->
