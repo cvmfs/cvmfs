@@ -24,6 +24,9 @@ start(_StartType, _StartArgs) ->
     UserVars = cvmfs_app_util:read_vars(user_config,
                                         cvmfs_app_util:default_user_config()),
 
+    LogLevel = maps:get(log_level, UserVars, <<"info">>),
+    ok = set_lager_log_level(LogLevel),
+
     application:set_env(cvmfs_gateway, max_lease_time,
                         maps:get(max_lease_time, UserVars) * 1000),
 
@@ -60,3 +63,19 @@ start(_StartType, _StartArgs) ->
 stop(_State) ->
     ok.
 
+
+%%====================================================================
+%% Private functions
+%%====================================================================
+
+set_lager_log_level(LogLevel) ->
+    Levels = [<<"debug">>, <<"info">>, <<"notice">>, <<"warning">>, <<"error">>,
+              <<"critical">>, <<"alert">>, <<"emergency">>],
+    case lists:member(LogLevel, Levels) of
+        true ->
+            lager:set_loglevel(lager_syslog_backend,
+                               erlang:binary_to_atom(LogLevel, latin1)),
+            ok;
+        false ->
+            error
+    end.
