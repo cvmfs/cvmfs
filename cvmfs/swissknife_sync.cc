@@ -794,7 +794,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
 
     sync->Traverse();
-    mediator.PrintStatistics();
+    if (params.gather_statistics) {
+      mediator.PrintStatistics();
+    }
   } else {
     assert(!manifest->history().IsNull());
     catalog::VirtualCatalog virtual_catalog(

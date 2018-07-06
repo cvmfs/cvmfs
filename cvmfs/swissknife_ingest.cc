@@ -162,7 +162,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
 
   sync->Traverse();
-  mediator.PrintStatistics();
+  if (params.gather_statistics) {
+    mediator.PrintStatistics();
+  }
 
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,
