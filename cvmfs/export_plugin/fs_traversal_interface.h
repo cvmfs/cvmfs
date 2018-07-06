@@ -24,14 +24,6 @@ enum fs_open_type {
   fs_open_append = 4
 };
 
-struct fs_file {
-  uint64_t version;
-  uint64_t size;
-  void *ctx;
-
-  struct fs_stat *stat_info;
-};
-
 /**
  * @note(steuber): Any hashes are pointers to shash::Any
  */
@@ -201,8 +193,10 @@ struct fs_traversal {
    * @param[in] ctx The file system traversal context
    * @param[in] identifier The identifier of the file to manipulate
    * (usually obtained through get_identifier)
+   * @returns A context that can be used for reading from and writing to the
+   * specified file (needs to be freed by ffree method)
    */
-  struct fs_file *(*get_handle)(struct fs_traversal_context *ctx,
+  void *(*get_handle)(struct fs_traversal_context *ctx,
                 const char *identifier);
 
 
