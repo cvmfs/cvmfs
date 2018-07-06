@@ -72,9 +72,11 @@ struct fs_traversal {
    * 
    * @param[in] ctx The file system traversal context
    * @param[in] path The path of the object to stat
+   * @param[out] stat The stat struct to write the information into
+   * @returns 0 on success
    */
-  struct cvmfs_stat *(*get_stat)(struct fs_traversal_context *ctx,
-                const char *path);
+  int (*get_stat)(struct fs_traversal_context *ctx,
+                const char *path, struct cvmfs_stat *stat);
 
   /**
    * Method which returns an identifier (usually a path)
@@ -84,6 +86,7 @@ struct fs_traversal {
    * @param[in] content The content hash of the file
    * @param[in] meta The meta hash of the file
    * @returns A path that can be used to identify the file
+   * The memory of the char is allocated on the heap and needs to be freed
    */
   const char *(*get_identifier)(struct fs_traversal_context *ctx,
                 const void *content,
