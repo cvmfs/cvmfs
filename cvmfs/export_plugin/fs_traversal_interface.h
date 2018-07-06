@@ -237,7 +237,7 @@ struct fs_traversal {
    * @param[in] op_mode The mode for opening the file
    * @returns 0 on success
    */
-  int (*do_open)(void *file_ctx, fs_open_type op_mode);
+  int (*do_fopen)(void *file_ctx, fs_open_type op_mode);
 
   /**
    * Method which closes a file described by the given file context.
@@ -248,7 +248,7 @@ struct fs_traversal {
    * @param[in,out] file_ctx The file context used
    * @returns 0 on success
    */
-  int (*do_close)(void *file_ctx);
+  int (*do_fclose)(void *file_ctx);
 
   /**
    * Method which reads len chars into buff from the file described by the given
@@ -260,7 +260,7 @@ struct fs_traversal {
    * @param[out] read_len The number of chars read
    * $returns 0 on success
    */
-  int (*do_read)(void *file_ctx, char *buff, size_t len, size_t *read_len);
+  int (*do_fread)(void *file_ctx, char *buff, size_t len, size_t *read_len);
 
   /**
    * Method which writes len chars from buff into the file described by the
@@ -271,7 +271,12 @@ struct fs_traversal {
    * @param[in] len The length of the buffer buff
    * @returns 0 on success
    */
-  int (*do_write)(void *file_ctx, const char *buff, size_t len);
+  int (*do_fwrite)(void *file_ctx, const char *buff, size_t len);
+
+  /**
+   * Method which frees a given file context
+   */
+  void (*do_ffree)(void *file_ctx);
 };
 
 #endif  // CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
