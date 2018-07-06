@@ -18,7 +18,9 @@
 #include "hash.h"
 #include "shortstring.h"
 #include "string.h"
+#include "util.h"
 #include "util/posix.h"
+#include "xattr.h"
 
 // Maximum number of files open in parallel during rmdir
 const int kPosixTraversalMaxDeletePar = 64;
@@ -33,7 +35,7 @@ void AppendStringToList(char const   *str,
   if (*listlen + 1 >= *buflen) {
     size_t newbuflen = (*listlen)*2 + 5;
     *buf = reinterpret_cast<char **>(
-      realloc(*buf, sizeof(char *) * newbuflen));
+    realloc(*buf, sizeof(char *) * newbuflen));
     assert(*buf);
     *buflen = newbuflen;
     assert(*listlen < *buflen);
@@ -71,7 +73,7 @@ int PosixSetMeta(const char *path,
     res = chown(path, stat_info->st_uid, stat_info->st_gid);
     if (res != 0) return -1;
   }
-  // TODO(steuber): Set xattrs with setxattr
+  // TODO(steuber): Set xattrs with setxattr (if symlink no user. xattrs!)
   if (res != 0) return -1;
   return 0;
 }
@@ -137,27 +139,65 @@ void posix_list_dir(struct fs_traversal_context *ctx,
   return;
 }
 
-struct cvmfs_stat *posix_get_stat(struct fs_traversal_context *ctx,
-  const char *path) {
-  // TODO(steuber): Where is the stat?
-  // TODO(steuber): Save hash + last modified(!=changed) as xattr
+int posix_get_stat(struct fs_traversal_context *ctx,
+  const char *path, struct cvmfs_stat *stat_result) {
+  // NOTE(steuber): Save hash + last modified(!=changed) as xattr
   // -> Could also be done for directories! (chmod changes on file change)
   // Probably more realistic without last modified though
   // (means we need to know that fs wasn`t changed)
   // -> only hash if necessary?
-  struct cvmfs_stat *result = new struct cvmfs_stat;
-  return result;
+  std::string complete_path = BuildPath(ctx, path);
+  struct stat buf;
+  int res = lstat(path, &buf);
+  if (res == -1) {
+    return -1;
+  }
+  stat_result->st_dev = buf.st_dev;
+  stat_result->st_ino = buf.st_ino;
+  stat_result->st_mode = buf.st_mode;
+  stat_result->st_nlink = buf.st_nlink;
+  stat_result->st_uid = buf.st_gid;
+  stat_result->st_gid = buf.st_gid;
+  stat_result->st_rdev = buf.st_rdev;
+  stat_result->st_size = buf.st_size;
+  stat_result->st_blksize = buf.st_blksize;
+  stat_result->st_blocks = buf.st_blocks;
+  stat_result->mtime = buf.st_mtime;
+
+  // Calculate hash
+  // NOTE(steuber): Which hashing algorithm? (Not Sha1?)
+  shash::Any cvm_checksum = shash::Any(shash::kSha1);
+  shash::HashFile(complete_path, &cvm_checksum);
+  std::string checksum_string = cvm_checksum.ToString();
+  stat_result->cvm_checksum = strdup(checksum_string.c_str);
+  if (S_ISLNK(buf.st_mode)) {
+    char slnk[PATH_MAX+1];
+    const ssize_t length =
+      readlink(complete_path.c_str(), slnk, PATH_MAX);
+    if (length < 0) {
+      return -1;
+    }
+    slnk[length] = '\0'
+    stat_result->cvm_symlink = strdup(slnk);
+  } else {
+    stat_result->cvm_symlink = NULL;
+  }
+  stat_result->cvm_name = strdup(path);
+
+  stat_result->cvm_xattrs = XattrList::CreateFromFile(complete_path);
+  if (stat_result->cvm_xattrs == NULL) return -1;
+  return 0;
 }
 
 const char *posix_get_identifier(struct fs_traversal_context *ctx,
-  const void *content,
-  const void *meta) {
-  shash::Any *content_hash = (shash::Any *)content;
-  shash::Any *meta_hash = (shash::Any *)meta;
-  // TODO(steuber): Fix this...
-  const char *res = strdup(("/"
-    + content_hash->MakePathExplicit(kDirLevels, kDigitsPerDirLevel, '.')
-    + meta_hash->ToString()).c_str());
+  struct cvmfs_stat *stat) {
+  shash::Any content_hash =
+    shash::MkFromHexPtr(shash::HexPtr(stat->cvm_checksum));
+  shash::Any meta_hash = HashMeta(stat);
+  std::string path = ("/"
+    + content_hash.MakePathExplicit(kDirLevels, kDigitsPerDirLevel, '.')
+    + meta_hash.ToString());
+  const char *res = strdup(path.c_str());
   return res;
 }
 
@@ -243,13 +283,6 @@ int posix_do_mkdir(struct fs_traversal_context *ctx,
   return PosixSetMeta(complete_path.c_str(), stat_info);
 }
 
-/**
- * Method which creates a symlink at src which points to dest
- * 
- * @param[in] The position at which the symlink should be saved
- * (parent directory must exist)
- * @param[in] The position the symlink should point to
- */
 int posix_do_symlink(struct fs_traversal_context *ctx,
               const char *src,
               const char *dest,
@@ -268,6 +301,7 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
 int posix_touch(struct fs_traversal_context *ctx,
               const char *identifier,
               const struct cvmfs_stat *stat_info) {
+  // NOTE(steuber): creat is only atomic on non-NFS paths!
   if (posix_has_file(ctx, identifier)) {
     errno = EEXIST;
     return -1;
@@ -283,62 +317,71 @@ int posix_touch(struct fs_traversal_context *ctx,
 
 struct posix_file_handle {
   std::string path;
-  int fd;
+  FILE *fd;
 };
 
-int posix_do_open(void *ctx, fs_open_type op_mode) {
-  // TODO(steuber): ...
-  return -1;
-}
-
-int posix_do_close(void *ctx) {
-  // TODO(steuber): ...
-  return -1;
-}
-
-int posix_do_read(void *file_ctx, char *buff, size_t len, size_t *read_len) {
-  // TODO(steuber): ...
-  return -1;
-}
-
-int posix_do_write(void *file_ctx, const char *buff, size_t len) {
-  // TODO(steuber): ...
-  return -1;
-}
-
-/**
- * Retrieves a method struct which allows the manipulation of the file
- * defined by the given content and meta data hash
- * 
- * @param[in] content The content hash of the file
- * @param[in] meta The meta hash of the file
- */
-struct fs_file *posix_get_handle(struct fs_traversal_context *ctx,
+void *posix_get_handle(struct fs_traversal_context *ctx,
               const char *identifier) {
-  struct fs_file *result = new struct fs_file;
   struct posix_file_handle *file_ctx = new struct posix_file_handle;
   file_ctx->path = BuildHiddenPath(ctx, identifier);
 
-  result->ctx = file_ctx;
-  result->stat_info = NULL;  // TODO(steuber): Get stat
-  return result;
+  return file_ctx;
 }
 
-/**
- * Method which executes a garbage collection on the destination file system.
- * This will remove all no longer linked content adressed files
- */
-// NOTE(steuber): Shouldn't this maybe just be part of the finalize step?
-int posix_garbage_collection(struct fs_traversal_context *ctx) {
-  // TODO(steuber): ...
-  return -1;
+int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
+  struct posix_file_handle *handle =
+    reinterpret_cast<posix_file_handle *>(file_ctx);
+  char *mode = "r";
+  if (op_mode == fs_open_write) {
+    mode = "w";
+  } else if (op_mode == fs_open_append) {
+    mode = "a";
+  }
+  FILE *fd = fopen(handle->path.c_str(), mode);
+  if (fd == NULL) {
+    return -1;
+  }
+  handle->fd = fd;
+  return 0;
+}
+
+int posix_do_fclose(void *file_ctx) {
+  struct posix_file_handle *handle =
+    reinterpret_cast<posix_file_handle *>(file_ctx);
+  int res = fclose(handle->fd);
+  if (res != 0) return -1;
+  handle->fd = NULL;
+  return 0;
+}
+
+int posix_do_fread(void *file_ctx, char *buff, size_t len, size_t *read_len) {
+  struct posix_file_handle *handle =
+    reinterpret_cast<posix_file_handle *>(file_ctx);
+  *read_len = fread(buff, sizeof(char), len, handle->fd);
+  if (*read_len < len && ferror(handle->fd) != 0) {
+      clearerr(handle->fd);
+      return -1;
+  }
+  return 0;
+}
+
+int posix_do_fwrite(void *file_ctx, const char *buff, size_t len) {
+  struct posix_file_handle *handle =
+    reinterpret_cast<posix_file_handle *>(file_ctx);
+  size_t written_len = fwrite(buff, sizeof(char), len, handle->fd);
+  return written_len == len;
+}
+
+void posix_do_ffree(void *file_ctx) {
+  struct posix_file_handle *handle =
+    reinterpret_cast<posix_file_handle *>(file_ctx);
+  if (handle->fd != NULL) {
+    posix_do_fclose(file_ctx);
+  }
+  delete file_ctx;
 }
 
 
-
-
-
-// NOTE(steuber): How does this work?
 struct fs_traversal_context *posix_initialize(
   const char *repo,
   const char *data) {
@@ -346,10 +389,7 @@ struct fs_traversal_context *posix_initialize(
   result->version = 1;
   result->repo =  repo;
   result->data = data;
-  std::string cur_path = repo;
-  cur_path += "/";
-  cur_path += data;
-  PosixCheckDirStructure(cur_path, 0770);  // TODO(steuber): mode?
+  PosixCheckDirStructure(data, 0770);  // NOTE(steuber): mode?
   return result;
 }
 
@@ -375,10 +415,11 @@ struct fs_traversal *posix_get_interface() {
   result->get_handle = posix_get_handle;
   result->do_symlink = posix_do_symlink;
 
-  result->do_open = posix_do_open;
-  result->do_close = posix_do_close;
-  result->do_read = posix_do_read;
-  result->do_write = posix_do_write;
+  result->do_fopen = posix_do_fopen;
+  result->do_fclose = posix_do_fclose;
+  result->do_fread = posix_do_fread;
+  result->do_fwrite = posix_do_fwrite;
+  result->do_ffree = posix_do_ffree;
 
   return result;
 }
