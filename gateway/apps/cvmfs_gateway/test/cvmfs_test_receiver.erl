@@ -89,23 +89,23 @@ init(_Args) ->
 %%--------------------------------------------------------------------
 handle_call({worker_req, generate_token, KeyId, Path, MaxLeaseTime}, _From, State) ->
     Reply = p_generate_token(KeyId, Path, MaxLeaseTime),
-    lager:info("Worker ~p request: {generate_token, {~p, ~p, ~p}} -> Reply: ~p",
-               [self(), KeyId, Path, MaxLeaseTime, Reply]),
+    lager:debug("Worker ~p request: {generate_token, {~p, ~p, ~p}} -> Reply: ~p",
+                [self(), KeyId, Path, MaxLeaseTime, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, get_token_id, Token}, _From, State) ->
     Reply = p_get_token_id(Token),
-    lager:info("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
-               [self(), Token, Reply]),
+    lager:debug("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
+                [self(), Token, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, submit_payload, SubmissionData, Secret}, _From, State) ->
     Reply = p_submit_payload(SubmissionData, Secret),
-    lager:info("Worker ~p request: {submit_payload, {~p, ~p}} -> Reply: ~p",
-               [self(), SubmissionData, Secret, Reply]),
+    lager:debug("Worker ~p request: {submit_payload, {~p, ~p}} -> Reply: ~p",
+                [self(), SubmissionData, Secret, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, RepoTag}, _From, State) ->
     Reply = p_commit(LeasePath, OldRootHash, NewRootHash, RepoTag),
-    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p, ~p} -> Reply: ~p",
-               [self(), LeasePath, OldRootHash, NewRootHash, RepoTag, Reply]),
+    lager:debug("Worker ~p request: {commit, ~p, ~p, ~p, ~p, ~p} -> Reply: ~p",
+                [self(), LeasePath, OldRootHash, NewRootHash, RepoTag, Reply]),
     {reply, Reply, State}.
 
 

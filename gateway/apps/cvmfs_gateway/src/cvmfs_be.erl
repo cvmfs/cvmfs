@@ -188,12 +188,12 @@ handle_call({be_req, new_lease, Uid, KeyId, Path}, From,
     Task = fun() ->
                    case p_new_lease(KeyId, Path, MaxLeaseTime) of
                        {ok, LeaseToken} ->
-                           lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
-                                      [Uid, KeyId, Path, LeaseToken]),
+                           lager:debug("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+                                       [Uid, KeyId, Path, LeaseToken]),
                            gen_server:reply(From, {ok, LeaseToken});
                        Other ->
-                           lager:info("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
-                                      [Uid, KeyId, Path, Other]),
+                           lager:debug("Backend request: Uid: ~p - {new_lease, {~p, ~p}} -> Reply: ~p",
+                                       [Uid, KeyId, Path, Other]),
                            gen_server:reply(From, Other)
                    end
            end,
@@ -202,8 +202,8 @@ handle_call({be_req, new_lease, Uid, KeyId, Path}, From,
 handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
     Task = fun() ->
                    Reply = p_cancel_lease(LeaseToken),
-                   lager:info("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
-                              [Uid, LeaseToken, Reply]),
+                   lager:debug("Backend request: Uid: ~p - {end_lease, ~p} -> Reply: ~p",
+                               [Uid, LeaseToken, Reply]),
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
@@ -211,8 +211,8 @@ handle_call({be_req, cancel_lease, Uid, LeaseToken}, From, State) ->
 handle_call({be_req, commit_lease, Uid, LeaseToken, OldRootHash, NewRootHash, RepoTag}, From, State) ->
     Task = fun() ->
                    Reply = p_commit_lease(LeaseToken, {OldRootHash, NewRootHash}, RepoTag),
-                   lager:info("Backend request: Uid: ~p - {commit_lease, ~p, ~p, ~p, ~p} -> Reply: ~p",
-                              [Uid, LeaseToken, OldRootHash, NewRootHash, RepoTag, Reply]),
+                   lager:debug("Backend request: Uid: ~p - {commit_lease, ~p, ~p, ~p, ~p} -> Reply: ~p",
+                               [Uid, LeaseToken, OldRootHash, NewRootHash, RepoTag, Reply]),
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
@@ -221,8 +221,8 @@ handle_call({be_req, submit_payload, Uid, SubmissionData}, From, State) ->
     Task = fun() ->
                    Reply = p_submit_payload(SubmissionData),
                    {LeaseToken, _Payload, Digest, HeaderSize} = SubmissionData,
-                   lager:info("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
-                              [Uid, LeaseToken, <<"payload_not_shown">>, Digest, HeaderSize, Reply]),
+                   lager:debug("Backend request: Uid: ~p - {submit_payload, {~p, ~p, ~p, ~p}} -> Reply: ~p",
+                               [Uid, LeaseToken, <<"payload_not_shown">>, Digest, HeaderSize, Reply]),
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
@@ -230,8 +230,8 @@ handle_call({be_req, submit_payload, Uid, SubmissionData}, From, State) ->
 handle_call({be_req, get_repos, Uid}, From, State) ->
     Task = fun() ->
                    Reply = p_get_repos(),
-                   lager:info("Backend request: Uid: ~p - {get_repos} -> Reply: ~p",
-                              [Uid, Reply]),
+                   lager:debug("Backend request: Uid: ~p - {get_repos} -> Reply: ~p",
+                               [Uid, Reply]),
                    gen_server:reply(From, Reply)
               end,
     spawn_link(Task),
@@ -239,8 +239,8 @@ handle_call({be_req, get_repos, Uid}, From, State) ->
 handle_call({be_req, check_hmac, Uid, Message, KeyId, HMAC}, From, State) ->
     Task = fun() ->
                    Reply = p_check_hmac(Message, KeyId, HMAC),
-                   lager:info("Backend request: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
-                              [Uid, Message, KeyId, HMAC, Reply]),
+                   lager:debug("Backend request: Uid: ~p - {check_hmac, {~p, ~p, ~p}} -> Reply: ~p",
+                               [Uid, Message, KeyId, HMAC, Reply]),
                    gen_server:reply(From, Reply)
            end,
     spawn_link(Task),
@@ -248,7 +248,7 @@ handle_call({be_req, check_hmac, Uid, Message, KeyId, HMAC}, From, State) ->
 handle_call({be_req, unique_id}, From, State) ->
     Task = fun() ->
                    Reply = p_unique_id(),
-                   lager:info("Backend request: {unique_id} -> Reply: ~p", [Reply]),
+                   lager:debug("Backend request: {unique_id} -> Reply: ~p", [Reply]),
                    gen_server:reply(From,Reply)
            end,
     spawn_link(Task),
@@ -274,7 +274,7 @@ handle_cast(Msg, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({'EXIT', Pid, normal}, State) ->
-    lager:info("Task ~p finished", [Pid]),
+    lager:debug("Task ~p finished", [Pid]),
     {noreply, State};
 handle_info(Info, State) ->
     lager:warning("Unknown message received: ~p", [Info]),

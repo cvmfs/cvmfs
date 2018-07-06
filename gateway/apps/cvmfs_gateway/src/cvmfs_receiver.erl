@@ -176,11 +176,11 @@ init(Args) ->
                                                       exit_status]),
 
     %% Send a kEcho request to the worker
-    lager:info("Sending kEcho request to worker process."),
     p_write_request(WorkerPort, ?kEcho, <<"Ping">>),
     MaxLeaseTime = cvmfs_app_util:get_max_lease_time(),
     {ok, {Size, Msg}} = p_read_reply(WorkerPort, MaxLeaseTime),
-    lager:info("Received kEcho reply from worker: size: ~p, msg: ~p", [Size, Msg]),
+    lager:info("Worker started at port ~p. kEcho reply - size: ~p, msg: ~p",
+               [WorkerPort, Size, Msg]),
     {ok, #{worker => WorkerPort, max_lease_time => MaxLeaseTime}}.
 
 %%--------------------------------------------------------------------
@@ -200,27 +200,27 @@ init(Args) ->
 handle_call({worker_req, generate_token, KeyId, Path, MaxLeaseTime}, From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
     Reply = p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, From, Timeout),
-    lager:info("Worker ~p request: {generate_token, {~p, ~p, ~p}} -> Reply: ~p",
-               [self(), KeyId, Path, MaxLeaseTime, Reply]),
+    lager:debug("Worker ~p request: {generate_token, {~p, ~p, ~p}} -> Reply: ~p",
+                [self(), KeyId, Path, MaxLeaseTime, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, get_token_id, Token}, From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
     Reply = p_get_token_id(Token, WorkerPort, From, Timeout),
-    lager:info("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
-               [self(), Token, Reply]),
+    lager:debug("Worker ~p request: {get_token_id, ~p} -> Reply: ~p",
+                [self(), Token, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, submit_payload, {Token, _, Digest, HeaderSize} = SubmissionData,
              Secret}, From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
     Reply = p_submit_payload(SubmissionData, Secret, WorkerPort, From, Timeout),
-    lager:info("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
-               [self(), Token, Digest, HeaderSize, Secret, Reply]),
+    lager:debug("Worker ~p request: {submit_payload, {{~p, PAYLOAD_NOT_SHOWN, ~p, ~p} ~p}} -> Reply: ~p",
+                [self(), Token, Digest, HeaderSize, Secret, Reply]),
     {reply, Reply, State};
 handle_call({worker_req, commit, LeasePath, OldRootHash, NewRootHash, RepoTag}, From, State) ->
     #{worker := WorkerPort, max_lease_time := Timeout} = State,
     Reply = p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, From, Timeout),
-    lager:info("Worker ~p request: {commit, ~p, ~p, ~p, ~p} -> Reply: ~p",
-               [self(), LeasePath, OldRootHash, NewRootHash, RepoTag, Reply]),
+    lager:debug("Worker ~p request: {commit, ~p, ~p, ~p, ~p} -> Reply: ~p",
+                [self(), LeasePath, OldRootHash, NewRootHash, RepoTag, Reply]),
     {reply, Reply, State}.
 
 
@@ -251,9 +251,9 @@ handle_cast(Msg, State) ->
 handle_info({Port, {exit_status, Status}}, State) ->
     case Status of
         0 ->
-            lager:info("Worker at port ~p exited with status: 0", [Port]);
+            lager:debug("Worker at port ~p exited with status: 0", [Port]);
         _ ->
-            lager:info("Worker at port ~p crashed. Restarting.", [Port]),
+            lager:error("Worker at port ~p crashed. Restarting.", [Port]),
             exit(self(), kill)
     end,
     {noreply, State};
