@@ -390,7 +390,7 @@ TEST_F(T_Libcvmfs, Attr) {
 
   // Create file structure
   DirSpec spec = MakeBaseSpec();
-  EXPECT_TRUE(spec.LinkFile("link", "dir", "../file1", file_size));
+  EXPECT_TRUE(spec.LinkFile("link", "dir", "file1", file_size));
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
 
   // Find directory entry for use later
@@ -446,7 +446,7 @@ TEST_F(T_Libcvmfs, Attr) {
   retval = cvmfs_stat_attr(ctx, "/dir/link", attr);
   EXPECT_EQ(0, retval);
   // Compare link path
-  EXPECT_FALSE(strcmp("../file1", attr->cvm_symlink));
+  EXPECT_FALSE(strcmp("file1", attr->cvm_symlink));
   // Link checksum is different than the linked file
   EXPECT_FALSE(strcmp(link_hash, attr->cvm_checksum));
   EXPECT_TRUE(strcmp(file1_hash, attr->cvm_checksum));
