@@ -39,6 +39,7 @@ produce_tarball() {
   ln tarball_foo/empty_file.txt tarball_foo/to_empty_hardlink.txt
   ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink.txt
   ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink2.txt
+  ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink3.txt
 
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
@@ -183,11 +184,19 @@ cvmfs_run_test() {
   else
     echo "*** Found also hardlink $file"
   fi
-  
+
+  file=$result_dir/d_1_hardlink3.txt
+  if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+    echo "*** Error not found hardlink: $file or found of the wrong dimension"
+    return 14
+  else
+    echo "*** Found also hardlink $file"
+  fi
+
   file=$result_dir/to_empty_hardlink.txt
   if [ ! -f $file ] || [ $(wc -c <$file) -ne 0 ]; then
     echo "*** Error not found hardlink: $file or found of the wrong dimension"
-    return 14
+    return 15
   else
     echo "*** Found also hardlink $file"
   fi
