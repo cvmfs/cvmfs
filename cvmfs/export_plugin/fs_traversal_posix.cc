@@ -121,6 +121,9 @@ void posix_list_dir(struct fs_traversal_context *ctx,
   char ***buf,
   size_t *len) {
   struct dirent *de;
+  *len = 0;
+  size_t buflen = 5;
+  *buf = reinterpret_cast<char **>(malloc(sizeof(char *) * buflen));
 
   DIR *dr = opendir(BuildPath(ctx, dir).c_str());
 
@@ -128,11 +131,11 @@ void posix_list_dir(struct fs_traversal_context *ctx,
     return;
   }
 
-  *len = 0;
-  AppendStringToList(NULL, buf, len, len);
-
   while ((de = readdir(dr)) != NULL) {
-    AppendStringToList(de->d_name, buf, len, len);
+    if (strcmp(de->d_name, ".") != 0
+      && strcmp(de->d_name, "..") != 0) {
+      AppendStringToList(de->d_name, buf, len, &buflen);
+    }
   }
 
   closedir(dr);
@@ -152,7 +155,6 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   if (res == -1) {
     return -1;
   }
-  stat_result->st_dev = buf.st_dev;
   stat_result->st_ino = buf.st_ino;
   stat_result->st_mode = buf.st_mode;
   stat_result->st_nlink = buf.st_nlink;
@@ -169,7 +171,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   shash::Any cvm_checksum = shash::Any(shash::kSha1);
   shash::HashFile(complete_path, &cvm_checksum);
   std::string checksum_string = cvm_checksum.ToString();
-  stat_result->cvm_checksum = strdup(checksum_string.c_str);
+  stat_result->cvm_checksum = strdup(checksum_string.c_str());
   if (S_ISLNK(buf.st_mode)) {
     char slnk[PATH_MAX+1];
     const ssize_t length =
@@ -177,7 +179,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
     if (length < 0) {
       return -1;
     }
-    slnk[length] = '\0'
+    slnk[length] = '\0';
     stat_result->cvm_symlink = strdup(slnk);
   } else {
     stat_result->cvm_symlink = NULL;
@@ -190,7 +192,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
 }
 
 const char *posix_get_identifier(struct fs_traversal_context *ctx,
-  struct cvmfs_stat *stat) {
+  const struct cvmfs_stat *stat) {
   shash::Any content_hash =
     shash::MkFromHexPtr(shash::HexPtr(stat->cvm_checksum));
   shash::Any meta_hash = HashMeta(stat);
@@ -299,9 +301,9 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
 }
 
 int posix_touch(struct fs_traversal_context *ctx,
-              const char *identifier,
               const struct cvmfs_stat *stat_info) {
   // NOTE(steuber): creat is only atomic on non-NFS paths!
+  const char *identifier = posix_get_identifier(ctx, stat_info);
   if (posix_has_file(ctx, identifier)) {
     errno = EEXIST;
     return -1;
@@ -331,7 +333,7 @@ void *posix_get_handle(struct fs_traversal_context *ctx,
 int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
   struct posix_file_handle *handle =
     reinterpret_cast<posix_file_handle *>(file_ctx);
-  char *mode = "r";
+  const char *mode = "r";
   if (op_mode == fs_open_write) {
     mode = "w";
   } else if (op_mode == fs_open_append) {
@@ -378,7 +380,7 @@ void posix_do_ffree(void *file_ctx) {
   if (handle->fd != NULL) {
     posix_do_fclose(file_ctx);
   }
-  delete file_ctx;
+  delete handle;
 }
 
 
@@ -387,14 +389,17 @@ struct fs_traversal_context *posix_initialize(
   const char *data) {
   fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
-  result->repo =  repo;
-  result->data = data;
+  result->repo =  strdup(repo);
+  result->data = strdup(data);
   PosixCheckDirStructure(data, 0770);  // NOTE(steuber): mode?
   return result;
 }
 
 void posix_finalize(struct fs_traversal_context *ctx) {
-  // TODO(steuber): ...
+  // TODO(steuber): Garbage collection
+  delete ctx->repo;
+  delete ctx->data;
+  delete ctx;
 }
 
 

@@ -6,8 +6,9 @@
 
 #include <errno.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
+
+#include <ctime>
 
 #include "util/posix.h"
 #include "xattr.h"
@@ -60,92 +61,19 @@ class T_Fs_Traversal_Interface :
     result->Set("bar", std::string(256, 'a'));
     return result;
   }
-  /**
-   * Creates the following entries:
-   * DIRECTORIES:
-   * /[prefix]-foo
-   * /[prefix]-foo/bar
-   * /[prefix]-foo/foobar
-   * /[prefix]-foo/foobar/foobar
-   * /[prefix]-bar
-   * /[prefix]-bar/test
-   * 
-   * SYMLINKS:
-   * /[prefix]-symlink1
-   * /[prefix]-foo/bar/symlink2
-   */
-  void MakeTestFiles(std::string prefix) {
-    // FILE CONTENT 1
-  std::string content1 = prefix + ": Hello world!\nHello traversal!";
-  shash::Any content1_hash(shash::kSha1);
-  shash::HashString(content1, &content1_hash);
-  // FILE CONTENT 2
-  std::string content2 = prefix + ": Hello traversal!\nHello world!";
-  shash::Any content2_hash(shash::kSha1);
-  shash::HashString(content2, &content2_hash);
-  // FILE META 1
-  XattrList *xlist1 = create_sample_xattrlist("foo");
-  struct cvmfs_stat stat_values1 = create_sample_stat(prefix + "-hello.world",
-    10, 0770, 0, xlist1);
-  shash::Any meta1_hash = HashMeta(&stat_values1);
-  // BACKGROUND FILES
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
-    context_,
-    &content1_hash,
-    &meta1_hash,
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
-    context_,
-    &content2_hash,
-    &meta1_hash,
-    &stat_values1));
-  // DIRECTORIES
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
-    context_,
-    ("/"+prefix+"-foo").c_str(),
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
-    context_,
-    ("/"+prefix+"-bar").c_str(),
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
-    context_,
-    ("/"+prefix+"-bar/test").c_str(),
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
-    context_,
-    ("/"+prefix+"-foo/bar").c_str(),
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
-    context_,
-    ("/"+prefix+"-bar/foobar").c_str(),
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
-    context_,
-    ("/"+prefix+"-bar/foobar/foobar").c_str(),
-    &stat_values1));
-
-  // FILES
-
-
-  // SYMLINKS
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
-    context_,
-    ("/"+prefix+"-symlink1").c_str(),
-    "/foo",
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
-    context_,
-    ("/"+prefix+"-foo/bar/symlink2").c_str(),
-    "/foo",
-    &stat_values1));
-  }
-
   struct cvmfs_stat create_sample_stat(const char *name,
-    ino_t st_ino, mode_t st_mode, off_t st_size, XattrList *xlist) {
-    struct timespec spec;
-    clock_gettime(CLOCK_REALTIME, &spec);
-
+    ino_t st_ino, mode_t st_mode, off_t st_size,
+    XattrList *xlist, shash::Any *content_hash = NULL,
+    const char *link = NULL) {
+    const char *hash_result = NULL;
+    if (content_hash != NULL) {
+      std::string hash = content_hash->ToString();
+      hash_result = strdup(hash.c_str());
+    }
+    const char *link_result = NULL;
+    if (link != NULL) {
+      link_result = strdup(link);
+    }
     struct cvmfs_stat result = {
       1,
       sizeof(struct cvmfs_stat),
@@ -159,14 +87,159 @@ class T_Fs_Traversal_Interface :
       st_size,
       1024,
       st_size / 1024,
-      spec,
+      time(NULL),
 
-      NULL,
-      NULL,
-      name,
+      hash_result,
+      link_result,
+      strdup(name),
       xlist
     };
     return result;
+  }
+  void free_stat_attr(struct cvmfs_stat *stat) {
+    if (stat->cvm_checksum != NULL) {
+      delete stat->cvm_checksum;
+    }
+    if (stat->cvm_symlink != NULL) {
+      delete stat->cvm_symlink;
+    }
+    if (stat->cvm_name != NULL) {
+      delete stat->cvm_name;
+    }
+    if (stat->cvm_xattrs != NULL) {
+      delete reinterpret_cast<XattrList *>(stat->cvm_xattrs);
+    }
+  }
+  /**
+   * Creates the following entries:
+   * DIRECTORIES:
+   * /[prefix]-foo
+   * /[prefix]-foo/bar
+   * /[prefix]-bar
+   * /[prefix]-bar/foobar
+   * /[prefix]-bar/foobar/foobar
+   * /[prefix]-bar/test
+   * 
+   * FILES:
+   * /[prefix]-foo.txt -> ident1
+   * /[prefix]-bar.txt -> ident2
+   * /[prefix]-foo/bar/foobar1.txt -> ident1
+   * /[prefix]-foo/bar/foobar2.txt -> ident1
+   * /[prefix]-foo/bar/foobar3.txt -> ident1
+   * 
+   * SYMLINKS:
+   * /[prefix]-symlink1 -> /foo
+   * /[prefix]-foo/bar/symlink2 -> /foobar
+   */
+  void MakeTestFiles(std::string prefix,
+    std::string *ident1, std::string *ident2) {
+    // FILE CONTENT 1
+    std::string content1 = prefix + ": Hello world!\nHello traversal!";
+    shash::Any content1_hash(shash::kSha1);
+    shash::HashString(content1, &content1_hash);
+    // FILE CONTENT 2
+    std::string content2 = prefix + ": Hello traversal!\nHello world!";
+    shash::Any content2_hash(shash::kSha1);
+    shash::HashString(content2, &content2_hash);
+    // FILE META 1
+    XattrList *xlistdir = create_sample_xattrlist(prefix);
+    struct cvmfs_stat stat_values_dir = create_sample_stat(
+      (prefix + "-hello.world").c_str(),
+      10, 0770, 0, xlistdir);
+    XattrList *xlist1 = create_sample_xattrlist(prefix);
+    struct cvmfs_stat stat_values1 = create_sample_stat(
+      (prefix + "-hello.world").c_str(),
+      10, 0770, 0, xlist1, &content1_hash);
+    XattrList *xlist2 = create_sample_xattrlist(prefix);
+    struct cvmfs_stat stat_values2 = create_sample_stat(
+      (prefix + "-hello.world").c_str(),
+      10, 0770, 0, xlist2, &content2_hash);
+    *ident1 = std::string(
+      fs_traversal_instance_->interface->get_identifier(context_,
+      &stat_values1));
+    *ident2 = std::string(
+      fs_traversal_instance_->interface->get_identifier(context_,
+      &stat_values2));
+    // BACKGROUND FILES
+    ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
+      context_,
+      &stat_values1));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
+      context_,
+      &stat_values2));
+    // DIRECTORIES
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+      context_,
+      ("/" + prefix + "-foo").c_str(),
+      &stat_values_dir));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+      context_,
+      ("/" + prefix + "-bar").c_str(),
+      &stat_values_dir));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+      context_,
+      ("/" + prefix + "-bar/test").c_str(),
+      &stat_values_dir));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+      context_,
+      ("/" + prefix + "-foo/bar").c_str(),
+      &stat_values_dir));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+      context_,
+      ("/" + prefix + "-bar/foobar").c_str(),
+      &stat_values_dir));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+      context_,
+      ("/" + prefix + "-bar/foobar/foobar").c_str(),
+      &stat_values_dir));
+
+    // FILES
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+      context_,
+      ("/" + prefix + "-foo.txt").c_str(),
+      ident1->c_str()));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+      context_,
+      ("/" + prefix + "-bar.txt").c_str(),
+      ident2->c_str()));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+      context_,
+      ("/" + prefix + "-foo/bar/foobar1.txt").c_str(),
+      ident1->c_str()));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+      context_,
+      ("/" + prefix + "-foo/bar/foobar2.txt").c_str(),
+      ident1->c_str()));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+      context_,
+      ("/" + prefix + "-foo/bar/foobar3.txt").c_str(),
+      ident1->c_str()));
+
+    // SYMLINKS
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
+      context_,
+      ("/" + prefix + "-symlink1").c_str(),
+      "/foo",
+      &stat_values1));
+    ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
+      context_,
+      ("/" + prefix + "-foo/bar/symlink2").c_str(),
+      "/foobar",
+      &stat_values1));
+    free_stat_attr(&stat_values1);
+    free_stat_attr(&stat_values2);
+    free_stat_attr(&stat_values_dir);
+  }
+  void AssertListHas(const char *query, char **dirList, size_t listLen,
+    bool hasNot = false) {
+    char **curEl = dirList;
+    for (size_t i = 0; i < listLen; i++) {
+      if (strcmp(*curEl, query) == 0) {
+        return;
+      }
+      curEl = (curEl+1);
+    }
+    ASSERT_TRUE(hasNot) << "Could not find element " << query << " in list";
   }
  protected:
   struct fs_traversal_test *fs_traversal_instance_;
@@ -174,215 +247,116 @@ class T_Fs_Traversal_Interface :
 };
 
 TEST_P(T_Fs_Traversal_Interface, TouchTest) {
+  std::string ident1;
+  std::string ident2;
+  MakeTestFiles("TouchTest", &ident1, &ident2);
+
+
   // FILE CONTENT 1
   std::string content1 = "TouchTest: Hello world!\nHello traversal!";
   shash::Any content1_hash(shash::kSha1);
   shash::HashString(content1, &content1_hash);
-  // FILE CONTENT 2
   std::string content2 = "TouchTest: Hello traversal!\nHello world!";
   shash::Any content2_hash(shash::kSha1);
   shash::HashString(content2, &content2_hash);
-  // FILE META 1
-  XattrList *xlist1 = create_sample_xattrlist("foo");
-  struct cvmfs_stat stat_values1 = create_sample_stat("hello.world",
-    10, 0770, content1.length(), xlist1);
-  shash::Any meta1_hash = HashMeta(&stat_values1);
-  // FILE META 2
-  XattrList *xlist2 = create_sample_xattrlist("bar");
-  struct cvmfs_stat stat_values2 = create_sample_stat("hello.world",
-    10, 0770, content1.length(), xlist2);
-  shash::Any meta2_hash = HashMeta(&stat_values2);
   // FILE META 3
-  XattrList *xlist3 = create_sample_xattrlist("foo");
+  XattrList *xlist3 = create_sample_xattrlist("TouchTest: foo");
   struct cvmfs_stat stat_values3 = create_sample_stat("hello.world",
-    10, 0700, content1.length(), xlist3);
-  shash::Any meta3_hash = HashMeta(&stat_values3);
+    10, 0700, content1.length(), xlist3, &content1_hash);
 
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
+  XattrList *xlist4 = create_sample_xattrlist("TouchTest: foobarfoo");
+  struct cvmfs_stat stat_values4 = create_sample_stat("hello.world",
+    10, 0700, content1.length(), xlist4, &content1_hash);
+  std::string ident4 = fs_traversal_instance_->interface->get_identifier(
     context_,
-    &content1_hash,
-    &meta1_hash,
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
+    &stat_values4);
+
+  XattrList *xlist5 = new XattrList(*xlist4);
+  struct cvmfs_stat stat_values5 = create_sample_stat("hello.world",
+    10, 0700, content1.length(), xlist5, &content2_hash);
+  std::string ident5 = fs_traversal_instance_->interface->get_identifier(
     context_,
-    &content1_hash,
-    &meta2_hash,
-    &stat_values2));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
-    context_,
-    &content1_hash,
-    &meta3_hash,
-    &stat_values3));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
-    context_,
-    &content2_hash,
-    &meta1_hash,
-    &stat_values1));
+    &stat_values5);
+
   // Creating again should fail...
+  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
+    context_,
+    &stat_values3));
   ASSERT_EQ(-1, fs_traversal_instance_->interface->touch(
     context_,
-    &content2_hash,
-    &meta1_hash,
-    &stat_values1));
+    &stat_values3));
   // With errno...
   ASSERT_EQ(EEXIST, errno);
-  ASSERT_TRUE(fs_traversal_instance_->interface->has_hash(
+  ASSERT_TRUE(fs_traversal_instance_->interface->has_file(
     context_,
-    &content1_hash,
-    &meta1_hash));
-  ASSERT_TRUE(fs_traversal_instance_->interface->has_hash(
+    ident1.c_str()));
+  ASSERT_TRUE(fs_traversal_instance_->interface->has_file(
     context_,
-    &content1_hash,
-    &meta2_hash));
-  ASSERT_TRUE(fs_traversal_instance_->interface->has_hash(
+    ident2.c_str()));
+  ASSERT_FALSE(fs_traversal_instance_->interface->has_file(
     context_,
-    &content1_hash,
-    &meta3_hash));
-  ASSERT_TRUE(fs_traversal_instance_->interface->has_hash(
+    ident4.c_str()));
+  ASSERT_FALSE(fs_traversal_instance_->interface->has_file(
     context_,
-    &content2_hash,
-    &meta1_hash));
-  ASSERT_FALSE(fs_traversal_instance_->interface->has_hash(
-    context_,
-    &content2_hash,
-    &meta2_hash));
+    ident5.c_str()));
+  free_stat_attr(&stat_values3);
+  free_stat_attr(&stat_values4);
+  free_stat_attr(&stat_values5);
 }
 
-TEST_P(T_Fs_Traversal_Interface, RmMkDir) {
-  XattrList *xlist1 = create_sample_xattrlist("foo");
-  struct cvmfs_stat stat_values1 = create_sample_stat("hello.world",
-    10, 0770, 0, xlist1);
+TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
+  std::string ident1;
+  std::string ident2;
+  MakeTestFiles("MkRmDirTest", &ident1, &ident2);
+  XattrList *xlist1 = create_sample_xattrlist("MkRmDirTest: foo");
+  struct cvmfs_stat stat_values_dir = create_sample_stat(
+      "MkRmDirTest-hello.world",
+      10, 0770, 0, xlist1);
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_mkdir(
     context_,
-    "/RmMkDir-foo/foo/foo",
-    &stat_values1));
+    "/MkRmDirTest-foo/foobar/foobar",
+    &stat_values_dir));
   ASSERT_EQ(ENOENT, errno);
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+  size_t listLen = 0;
+  char **dirList;
+  fs_traversal_instance_->interface->list_dir(
     context_,
-    "/RmMkDir-foo/foo",
-    &stat_values1));
-
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_rmdir(
+    "/",
+    &dirList,
+    &listLen);
+  AssertListHas("MkRmDirTest-foo", dirList, listLen);
+  AssertListHas("MkRmDirTest-bar", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
     context_,
-    "/RmMkDir-foo/bar"));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_rmdir(
+    "/MkRmDirTest-foo",
+    &dirList,
+    &listLen);
+  ASSERT_EQ(1, listLen);
+  AssertListHas("bar", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
     context_,
-    "/RmMkDir-foo"));
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
+    "/MkRmDirTest-bar",
+    &dirList,
+    &listLen);
+  ASSERT_EQ(2, listLen);
+  AssertListHas("foobar", dirList, listLen);
+  AssertListHas("test", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
     context_,
-    "/RmMkDir-bar/test"));
-  ASSERT_EQ(ENOENT, errno);
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_rmdir(
-    context_,
-    "/RmMkDir-bar"));
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
-    context_,
-    "/RmMkDir-bar"));
-  ASSERT_EQ(ENOENT, errno);
+    "/MkRmDirTest-bar/foobar",
+    &dirList,
+    &listLen);
+  AssertListHas("foobar", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  free_stat_attr(&stat_values_dir);
 }
-
-TEST_P(T_Fs_Traversal_Interface, CheckLink) {
-  // FILE CONTENT 1
-  std::string content1 = "CheckLink: Hello world!\nHello traversal!";
-  shash::Any content1_hash(shash::kSha1);
-  shash::HashString(content1, &content1_hash);
-  // FILE CONTENT 2
-  std::string content2 = "CheckLink: Hello traversal!\nHello world!";
-  shash::Any content2_hash(shash::kSha1);
-  shash::HashString(content2, &content2_hash);
-  // FILE HASH 3
-  std::string content3 = "CheckLink: I won't exist";
-  shash::Any content3_hash(shash::kSha1);
-  shash::HashString(content3, &content3_hash);
-  // FILE META 1
-  XattrList *xlist1 = create_sample_xattrlist("foo");
-  struct cvmfs_stat stat_values1 = create_sample_stat("hello.world",
-    10, 0770, 0, xlist1);
-  shash::Any meta1_hash = HashMeta(&stat_values1);
-  // BACKGROUND FILES
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
-    context_,
-    &content1_hash,
-    &meta1_hash,
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
-    context_,
-    &content2_hash,
-    &meta1_hash,
-    &stat_values1));
-  // DIRECTORY
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
-    context_,
-    "/CheckLink-foo",
-    &stat_values1));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
-    context_,
-    "/CheckLink-foobar",
-    &stat_values1));
-  // Overwritable Symlink
-  // TODO(steuber):
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
-    context_,
-    "/CheckLink-overwritesymlink",
-    "/foo",
-    &stat_values1));
-  // Make links
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-bar.txt",
-    &content1_hash,
-    &meta1_hash));
-  // Rewrite link
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-bar.txt",
-    &content2_hash,
-    &meta1_hash));
-  // Make link in subdir
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-foo/CheckLink-bar.txt",
-    &content2_hash,
-    &meta1_hash));
-  // Write link with not existing inode
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-foo/CheckLink-foo.txt",
-    &content3_hash,
-    &meta1_hash));
-  ASSERT_EQ(ENOENT, errno);
-  // Try to overwrite link for filled dir
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-foo",
-    &content2_hash,
-    &meta1_hash));
-  // Try to overwrite link for empty dir
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-foobar",
-    &content2_hash,
-    &meta1_hash));
-  // Try to overwrite symlink:
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-overwritesymlink",
-    &content2_hash,
-    &meta1_hash));
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-foobar/CheckLink-bar.txt",
-    &content1_hash,
-    &meta1_hash));
-  ASSERT_EQ(ENOENT, errno);
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_link(
-    context_,
-    "/CheckLink-bar/CheckLink-bar.txt",
-    &content1_hash,
-    &meta1_hash));
-  ASSERT_EQ(ENOENT, errno);
-}
-
 
 
 struct fs_traversal_test posix = {

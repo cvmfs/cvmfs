@@ -8,7 +8,7 @@
 #include "libcvmfs.h"
 #include "xattr.h"
 
-shash::Any HashMeta(struct cvmfs_stat *stat_info) {
+shash::Any HashMeta(const struct cvmfs_stat *stat_info) {
   // TODO(steuber): Can we do any better here?
   shash::Any meta_hash(shash::kMd5);
   unsigned min_buffer_size = sizeof(mode_t)
