@@ -306,14 +306,12 @@ void WritableCatalogManager::Clone(const std::string destination,
   DirectoryEntry to_dirent;
   if (!LookupPath(relative_source, kLookupSole, &to_dirent)) {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "catalog for file '%s' cannot be found aborting",
-             source.c_str());
+             "catalog for file '%s' cannot be found aborting", source.c_str());
     assert(false);
   }
-  if (!to_dirent.IsRegular()) {
-     LogCvmfs(kLogCatalog, kLogStderr,
-             "Trying to clone a non regular file: '%s' aborting",
-             source.c_str());
+  if (to_dirent.IsDirectory()) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "Trying to clone a directory: '%s' aborting", source.c_str());
     assert(false);
   }
 
