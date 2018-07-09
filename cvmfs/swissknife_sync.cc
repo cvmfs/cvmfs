@@ -676,7 +676,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('I') != args.end()) {
-    params.gather_statistics = true;
+    params.print_statistics = true;
   }
 
   if (!CheckParams(params)) return 2;
@@ -754,12 +754,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  perf::StatisticsTemplate *statistics_ptr = NULL;
   perf::StatisticsTemplate statistics("Publish-sync", this->statistics());
-  if (params.gather_statistics) {
-    statistics_ptr = &statistics;
-  }
-  publish::SyncMediator mediator(&catalog_manager, &params, statistics_ptr);
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations
@@ -794,7 +790,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
 
     sync->Traverse();
-    if (params.gather_statistics) {
+    if (params.print_statistics) {
       mediator.PrintStatistics();
     }
   } else {

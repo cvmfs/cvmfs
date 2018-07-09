@@ -80,7 +80,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('I') != args.end()) {
-    params.gather_statistics = true;
+    params.print_statistics = true;
   }
 
 
@@ -142,12 +142,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  perf::StatisticsTemplate *statistics_ptr = NULL;
   perf::StatisticsTemplate statistics("Publish-sync", this->statistics());
-  if (params.gather_statistics) {
-    statistics_ptr = &statistics;
-  }
-  publish::SyncMediator mediator(&catalog_manager, &params, statistics_ptr);
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   publish::SyncUnion *sync;
 
@@ -162,7 +158,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
 
   sync->Traverse();
-  if (params.gather_statistics) {
+  if (params.print_statistics) {
     mediator.PrintStatistics();
   }
 

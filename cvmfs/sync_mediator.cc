@@ -33,7 +33,7 @@ AbstractSyncMediator::~AbstractSyncMediator() {}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params,
-                           perf::StatisticsTemplate *statistics = NULL) :
+                           perf::StatisticsTemplate statistics) :
   catalog_manager_(catalog_manager),
   union_engine_(NULL),
   handle_hardlinks_(false),
@@ -46,9 +46,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
-  if (statistics != NULL) {
-    counters_ = new Counters(*statistics);
-  }
+  counters_ = new Counters(statistics);
 }
 
 
@@ -136,20 +134,16 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
   if (entry->IsGraftMarker()) {return;}
   if (entry->IsDirectory()) {
     TouchDirectory(entry);
-    if (counters_.IsValid()) {
-      Inc(counters_->n_directories_changed);
-    }
+    Inc(counters_->n_directories_changed);
     return;
   }
 
   if (entry->IsRegularFile() || entry->IsSymlink() || entry->IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
-    if (counters_.IsValid()) {
-      Inc(counters_->n_files_changed);
-      // Replace calls Remove and Add
-      Dec(counters_->n_files_added);
-      Dec(counters_->n_files_removed);
-    }
+    Inc(counters_->n_files_changed);
+    // Replace calls Remove and Add
+    Dec(counters_->n_files_added);
+    Dec(counters_->n_files_removed);
     return;
   }
 
@@ -824,29 +818,22 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
   }
 
   // publish statistics counting
-  if (counters_.IsValid()) {
-    Inc(counters_->n_files_added);
+  Inc(counters_->n_files_added);
 
-    uint64_t size = 0;
-    if (GetFileSize(entry->GetScratchPath()) == -1) {
-      entry->CreateIngestionSource()->GetSize(&size);
-    } else {
-      size = GetFileSize(entry->GetScratchPath());
-    }
+  uint64_t size = 0;
+  size = entry->GetScratchSize();
+  Xadd(counters_->n_bytes_added, size);
 
-    Xadd(counters_->n_bytes_added, size);
-
-    // when a file is changed
-    if (!entry->IsNew() && !entry->IsOpaqueDirectory()) {
-      Xadd(counters_->n_bytes_added, -size);
-      Xadd(counters_->n_bytes_removed, -GetFileSize(entry->GetRdOnlyPath()));
-      // Count only the diference between the old and new file
-      int64_t dif = size - GetFileSize(entry->GetRdOnlyPath());
-      if (dif > 0) {                            // added bytes
-        Xadd(counters_->n_bytes_added, dif);
-      } else if (dif < 0) {                     // removed bytes
-        Xadd(counters_->n_bytes_removed, -dif);
-      }
+  // when a file is changed
+  if (!entry->IsNew() && !entry->IsOpaqueDirectory()) {
+    Xadd(counters_->n_bytes_added, -size);
+    Xadd(counters_->n_bytes_removed, -GetFileSize(entry->GetRdOnlyPath()));
+    // Count only the diference between the old and new file
+    int64_t dif = size - GetFileSize(entry->GetRdOnlyPath());
+    if (dif > 0) {                            // added bytes
+      Xadd(counters_->n_bytes_added, dif);
+    } else if (dif < 0) {                     // removed bytes
+      Xadd(counters_->n_bytes_removed, -dif);
     }
   }
 }
@@ -864,10 +851,8 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
   }
 
   // Counting nr of removed files and removed bytes
-  if (counters_.IsValid()) {
-    Inc(counters_->n_files_removed);
-    Xadd(counters_->n_bytes_removed, GetFileSize(entry->GetRdOnlyPath()));
-  }
+  Inc(counters_->n_files_removed);
+  Xadd(counters_->n_bytes_removed, GetFileSize(entry->GetRdOnlyPath()));
 }
 
 void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
@@ -877,9 +862,7 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
   PrintChangesetNotice(kAdd, entry->GetUnionPath());
 
-  if (counters_.IsValid()) {
-    Inc(counters_->n_directories_added);
-  }
+  Inc(counters_->n_directories_added);
   assert(!entry->HasGraftMarker());
   if (!params_->dry_run) {
     catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(),
@@ -901,9 +884,8 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
 void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
   const std::string directory_path = entry->GetRelativePath();
 
-  if (counters_.IsValid()) {
-    Inc(counters_->n_directories_removed);
-  }
+  Inc(counters_->n_directories_removed);
+
   if (catalog_manager_->IsTransitionPoint(directory_path)) {
     RemoveNestedCatalog(entry);
   }
@@ -1001,25 +983,23 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
 
 
 void SyncMediator::PrintStatistics() {
-  if (counters_.IsValid()) {
-    LogCvmfs(kLogPublish, kLogStdout, "Statistics:");
-    LogCvmfs(kLogPublish, kLogStdout, "Files         added: %s",
-      counters_->n_files_added->Print().c_str());
-    LogCvmfs(kLogPublish, kLogStdout, "Files       removed: %s",
-      counters_->n_files_removed->Print().c_str());
-    LogCvmfs(kLogPublish, kLogStdout, "Files       changed: %s",
-      counters_->n_files_changed->Print().c_str());
-    LogCvmfs(kLogPublish, kLogStdout, "Directories   added: %s",
-      counters_->n_directories_added->Print().c_str());
-    LogCvmfs(kLogPublish, kLogStdout, "Directories removed: %s",
-      counters_->n_directories_removed->Print().c_str());
-    LogCvmfs(kLogPublish, kLogStdout, "Directories changed: %s",
-      counters_->n_directories_changed->Print().c_str());
-    LogCvmfs(kLogPublish, kLogStdout, "Bytes         added: %s",
-      counters_->n_bytes_added->Print().c_str());
-    LogCvmfs(kLogPublish, kLogStdout, "Bytes       removed: %s",
-      counters_->n_bytes_removed->Print().c_str());
-  }
+  LogCvmfs(kLogPublish, kLogStdout, "Statistics:");
+  LogCvmfs(kLogPublish, kLogStdout, "Files         added: %s",
+    counters_->n_files_added->Print().c_str());
+  LogCvmfs(kLogPublish, kLogStdout, "Files       removed: %s",
+    counters_->n_files_removed->Print().c_str());
+  LogCvmfs(kLogPublish, kLogStdout, "Files       changed: %s",
+    counters_->n_files_changed->Print().c_str());
+  LogCvmfs(kLogPublish, kLogStdout, "Directories   added: %s",
+    counters_->n_directories_added->Print().c_str());
+  LogCvmfs(kLogPublish, kLogStdout, "Directories removed: %s",
+    counters_->n_directories_removed->Print().c_str());
+  LogCvmfs(kLogPublish, kLogStdout, "Directories changed: %s",
+    counters_->n_directories_changed->Print().c_str());
+  LogCvmfs(kLogPublish, kLogStdout, "Bytes         added: %s",
+    counters_->n_bytes_added->Print().c_str());
+  LogCvmfs(kLogPublish, kLogStdout, "Bytes       removed: %s",
+    counters_->n_bytes_removed->Print().c_str());
 }
 
 }  // namespace publish

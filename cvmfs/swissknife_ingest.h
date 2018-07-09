@@ -36,7 +36,7 @@ class Ingest : public Command {
     r.push_back(Parameter::Optional(
         'D', "entity to delete before to extract the tar"));
     r.push_back(Parameter::Switch(
-        'I', "gather publish statistics"));
+        'I', "print publish statistics"));
 
     return r;
   }

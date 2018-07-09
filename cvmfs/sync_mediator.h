@@ -141,7 +141,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
 
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                const SyncParameters *params,
-               perf::StatisticsTemplate *statistics);
+               perf::StatisticsTemplate statistics);
   void RegisterUnionEngine(SyncUnion *engine);
   // Final class, it is not meant to be derived any further
   ~SyncMediator();
