@@ -778,7 +778,6 @@ void SyncMediator::PrintChangesetNotice(const ChangesetAction  action,
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
   PrintChangesetNotice(kAdd, entry->GetUnionPath());
-  IngestionSource *SyncItem = entry->CreateIngestionSource();
 
   if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) {
     assert(!entry->HasGraftMarker());
@@ -821,7 +820,7 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
     file_queue_[entry->GetUnionPath()] = entry;
     pthread_mutex_unlock(&lock_file_queue_);
     // Spool the file
-    params_->spooler->Process(SyncItem);
+    params_->spooler->Process(entry->CreateIngestionSource());
   }
 
   // publish statistics counting
@@ -830,7 +829,7 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
 
     uint64_t size = 0;
     if (GetFileSize(entry->GetScratchPath()) == -1) {
-      SyncItem->GetSize(&size);
+      entry->CreateIngestionSource()->GetSize(&size);
     } else {
       size = GetFileSize(entry->GetScratchPath());
     }
