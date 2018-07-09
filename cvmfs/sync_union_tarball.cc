@@ -221,7 +221,9 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
     } else {
       LogCvmfs(kLogUnionFs, kLogStderr,
                "Found entity called as a catalog marker '%s' that however is "
-               "not a regular file, skipping it", complete_path.c_str());
+               "not a regular file, abort",
+               complete_path.c_str());
+      abort();
     }
 
     // here we don't need to read data from the tar file so we can wake up
