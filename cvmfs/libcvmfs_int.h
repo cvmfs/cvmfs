@@ -128,7 +128,7 @@ class LibContext : SingleCopy {
                           size_t       *buflen);
   bool GetDirentForPath(const PathString         &path,
                         catalog::DirectoryEntry  *dirent);
-  void CvmfsAttrFromDirent(catalog::DirectoryEntry dirent,
+  void CvmfsAttrFromDirent(const catalog::DirectoryEntry dirent,
                            struct cvmfs_attr *attr);
 
   /**

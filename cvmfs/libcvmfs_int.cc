@@ -294,7 +294,7 @@ int LibContext::GetAttr(const char *c_path, struct stat *info) {
 }
 
 void LibContext::CvmfsAttrFromDirent(
-  catalog::DirectoryEntry dirent,
+  const catalog::DirectoryEntry dirent,
   struct cvmfs_attr *attr
 ) {
   attr->st_ino   = dirent.inode();
@@ -306,8 +306,8 @@ void LibContext::CvmfsAttrFromDirent(
   attr->st_size  = dirent.size();
   attr->mtime    = dirent.mtime();
   attr->cvm_checksum = strdup(dirent.checksum().ToString().c_str());
-  attr->cvm_symlink  = strdup(dirent.symlink().ToString().c_str());
-  attr->cvm_name     = strdup(dirent.name().ToString().c_str());
+  attr->cvm_symlink  = strdup(dirent.symlink().c_str());
+  attr->cvm_name     = strdup(dirent.name().c_str());
   attr->cvm_xattrs   = NULL;
 }
 

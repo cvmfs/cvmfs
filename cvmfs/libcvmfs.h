@@ -362,9 +362,8 @@ int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st);
 int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
 
 /**
- * Get the extended CVMFS information about a file. If the file is a symlink
- * return info about the file it points to, not the symlink itself.
- *
+ * Get the extended CVMFS information about a file. If the file is a symlink,
+ * return info about the link, not the file it points to.
  *
  * @param[in] path, path of file (e.g. /dir/file, not /cvmfs/repo/dir/file)
  * @param[out] attr, cvmfs_attr struct in which to write the result

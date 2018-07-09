@@ -68,6 +68,12 @@ class DirSpec {
                const size_t size,
                const XattrList& xattrs = XattrList(),
                shash::Suffix suffix = shash::kSha1);
+  bool LinkFile(const std::string& name,
+                const std::string& parent,
+                const std::string& symlink,
+                const size_t size,
+                const XattrList& xattrs = XattrList(),
+                shash::Suffix suffix = shash::kSha1);
   bool AddDirectory(const std::string& name,
                     const std::string& parent,
                     const size_t size);

@@ -331,7 +331,7 @@ int cvmfs_stat_attr(
 ) {
   string lpath;
   int rc;
-  rc = expand_path(0, ctx, path, &lpath);
+  rc = expand_ppath(ctx, path, &lpath);
   if (rc < 0) {
     return -1;
   }
