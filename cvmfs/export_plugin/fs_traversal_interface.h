@@ -83,7 +83,7 @@ struct fs_traversal {
    * The memory of the char is allocated on the heap and needs to be freed
    */
   const char *(*get_identifier)(struct fs_traversal_context *ctx,
-                struct cvmfs_stat *stat);
+                const struct cvmfs_stat *stat);
 
 
   /**
@@ -174,12 +174,9 @@ struct fs_traversal {
    * - Error during creation and meta data saving operations
    * 
    * @param[in] ctx The file system traversal context
-   * @param[in] ident The identifier under which the file should be saved
-   * (usually obtained through get_identifier)
    * @param[in] stat The stat containing the meta data for file creation
    */
   int (*touch)(struct fs_traversal_context *ctx,
-                const char *identifier,
                 const struct cvmfs_stat *stat);
 
   /**
