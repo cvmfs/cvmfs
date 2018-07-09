@@ -74,8 +74,8 @@ struct Counters {
   perf::Counter *n_directories_added;
   perf::Counter *n_directories_removed;
   perf::Counter *n_directories_changed;
-  perf::Counter *n_bytes_added;
-  perf::Counter *n_bytes_removed;
+  perf::Counter *sz_added_bytes;
+  perf::Counter *sz_removed_bytes;
 
   explicit Counters(perf::StatisticsTemplate statistics) {
     n_files_added = statistics.RegisterTemplated("n_files_added",
@@ -92,9 +92,9 @@ struct Counters {
     n_directories_changed =
                   statistics.RegisterTemplated("n_directories_changed",
                                             "Number of directories changed");
-    n_bytes_added = statistics.RegisterTemplated("n_bytes_added",
+    sz_added_bytes = statistics.RegisterTemplated("sz_added_bytes",
                                             "Number of bytes added");
-    n_bytes_removed = statistics.RegisterTemplated("n_bytes_removed",
+    sz_removed_bytes = statistics.RegisterTemplated("sz_removed_bytes",
                                             "Number of bytes removed");
   }
 };  // Counters
