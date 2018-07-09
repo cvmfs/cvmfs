@@ -10,6 +10,7 @@
 
 #include <ctime>
 
+#include "libcvmfs.h"
 #include "util/posix.h"
 #include "xattr.h"
 
@@ -96,7 +97,7 @@ class T_Fs_Traversal_Interface :
     };
     return result;
   }
-  void free_stat_attr(struct cvmfs_stat *stat) {
+  void free_stat_attr(const struct cvmfs_stat *stat) {
     if (stat->cvm_checksum != NULL) {
       delete stat->cvm_checksum;
     }
@@ -128,8 +129,8 @@ class T_Fs_Traversal_Interface :
    * /[prefix]-foo/bar/foobar3.txt -> ident1
    * 
    * SYMLINKS:
-   * /[prefix]-symlink1 -> /foo
-   * /[prefix]-foo/bar/symlink2 -> /foobar
+   * ./[prefix]-symlink1 -> ./foo
+   * ./[prefix]-foo/bar/symlink2 -> ./foobar
    */
   void MakeTestFiles(std::string prefix,
     std::string *ident1, std::string *ident2) {
@@ -143,15 +144,15 @@ class T_Fs_Traversal_Interface :
     shash::HashString(content2, &content2_hash);
     // FILE META 1
     XattrList *xlistdir = create_sample_xattrlist(prefix);
-    struct cvmfs_stat stat_values_dir = create_sample_stat(
+    const struct cvmfs_stat stat_values_dir = create_sample_stat(
       (prefix + "-hello.world").c_str(),
       10, 0770, 0, xlistdir);
     XattrList *xlist1 = create_sample_xattrlist(prefix);
-    struct cvmfs_stat stat_values1 = create_sample_stat(
+    const struct cvmfs_stat stat_values1 = create_sample_stat(
       (prefix + "-hello.world").c_str(),
       10, 0770, 0, xlist1, &content1_hash);
     XattrList *xlist2 = create_sample_xattrlist(prefix);
-    struct cvmfs_stat stat_values2 = create_sample_stat(
+    const struct cvmfs_stat stat_values2 = create_sample_stat(
       (prefix + "-hello.world").c_str(),
       10, 0770, 0, xlist2, &content2_hash);
     *ident1 = std::string(
@@ -219,12 +220,12 @@ class T_Fs_Traversal_Interface :
     ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
       context_,
       ("/" + prefix + "-symlink1").c_str(),
-      "/foo",
+      "./foo",
       &stat_values1));
     ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
       context_,
       ("/" + prefix + "-foo/bar/symlink2").c_str(),
-      "/foobar",
+      "./foobar",
       &stat_values1));
     free_stat_attr(&stat_values1);
     free_stat_attr(&stat_values2);
@@ -278,6 +279,29 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
     context_,
     &stat_values5);
 
+  // Check directory listings
+  size_t listLen = 0;
+  char **dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/",
+    &dirList,
+    &listLen);
+  AssertListHas("TouchTest-foo.txt", dirList, listLen);
+  AssertListHas("TouchTest-bar.txt", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/TouchTest-foo/bar/",
+    &dirList,
+    &listLen);
+  AssertListHas("foobar1.txt", dirList, listLen);
+  AssertListHas("foobar2.txt", dirList, listLen);
+  AssertListHas("foobar3.txt", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+
   // Creating again should fail...
   ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
     context_,
@@ -312,11 +336,13 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
   struct cvmfs_stat stat_values_dir = create_sample_stat(
       "MkRmDirTest-hello.world",
       10, 0770, 0, xlist1);
+  // Insert in non existing parent directory
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_mkdir(
     context_,
     "/MkRmDirTest-foo/foobar/foobar",
     &stat_values_dir));
   ASSERT_EQ(ENOENT, errno);
+  // Check directory listings
   size_t listLen = 0;
   char **dirList;
   fs_traversal_instance_->interface->list_dir(
@@ -355,7 +381,39 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
   AssertListHas("foobar", dirList, listLen);
   listLen = 0;
   delete dirList;
+  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
+    context_, "/MkRmDirTest-foo/foobar/foobar"));
+  ASSERT_EQ(ENOENT, errno);
+  ASSERT_EQ(0, fs_traversal_instance_->interface->do_rmdir(
+    context_, "/MkRmDirTest-bar/foobar"));
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/MkRmDirTest-bar",
+    &dirList,
+    &listLen);
+  ASSERT_EQ(1, listLen);
+  AssertListHas("foobar", dirList, listLen, true);
+  AssertListHas("test", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
+    context_, "/MkRmDirTest-bar/foobar"));
+  ASSERT_EQ(ENOENT, errno);
   free_stat_attr(&stat_values_dir);
+}
+
+TEST_P(T_Fs_Traversal_Interface, SymlinkTest) {
+  std::string ident1;
+  std::string ident2;
+  MakeTestFiles("SymlinkTest", &ident1, &ident2);
+  struct cvmfs_stat sl1Stat;
+  struct cvmfs_stat sl2Stat;
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/SymlinkTest-symlink1", &sl1Stat));
+  ASSERT_STREQ("./foo", sl1Stat.cvm_symlink);
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/SymlinkTest-foo/bar/symlink2", &sl2Stat));
+  ASSERT_STREQ("./foobar", sl2Stat.cvm_symlink);
 }
 
 
