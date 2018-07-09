@@ -158,6 +158,8 @@ class SyncItem {
   uint64_t GetRdOnlyInode() const;
   unsigned int GetUnionLinkcount() const;
   uint64_t GetUnionInode() const;
+  uint64_t GetScratchSize() const;
+  uint64_t GetRdOnlySize() const;
 
   inline std::string filename() const { return filename_; }
   inline std::string relative_parent_path() const {

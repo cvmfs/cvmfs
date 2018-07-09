@@ -174,6 +174,16 @@ uint64_t SyncItem::GetUnionInode() const {
   return union_stat_.stat.st_ino;
 }
 
+uint64_t SyncItem::GetScratchSize() const {
+  StatScratch();
+  return scratch_stat_.stat.st_size;
+}
+
+uint64_t SyncItem::GetRdOnlySize() const {
+  StatRdOnly();
+  return rdonly_stat_.stat.st_size;
+}
+
 IngestionSource *SyncItemNative::CreateIngestionSource() const {
   return new FileIngestionSource(GetUnionPath());
 }
