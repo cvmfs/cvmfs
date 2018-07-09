@@ -198,7 +198,7 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -D $to_delete"
   fi
 
-  if [ "x$CVMFS_GATHER_STATISTICS" = "xtrue" ]; then
+  if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
     ingest_command="$ingest_command -I"
   fi
 
