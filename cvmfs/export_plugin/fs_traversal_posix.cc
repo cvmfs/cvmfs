@@ -16,6 +16,7 @@
 
 #include "fs_traversal_interface.h"
 #include "hash.h"
+#include "libcvmfs.h"
 #include "shortstring.h"
 #include "string.h"
 #include "util.h"
@@ -151,7 +152,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   // -> only hash if necessary?
   std::string complete_path = BuildPath(ctx, path);
   struct stat buf;
-  int res = lstat(path, &buf);
+  int res = lstat(complete_path.c_str(), &buf);
   if (res == -1) {
     return -1;
   }
@@ -290,8 +291,7 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
               const char *dest,
               const struct cvmfs_stat *stat_info) {
   std::string complete_src_path = BuildPath(ctx, src);
-  std::string complete_dest_path = BuildPath(ctx, dest);
-  std::string dirname = GetParentPath(complete_src_path);
+  std::string complete_dest_path = dest;
   if (posix_cleanup_path(ctx, src) != 0) {
     return -1;
   }
