@@ -135,11 +135,6 @@ class SyncMediator : public virtual AbstractSyncMediator {
     return params_->compression_alg;
   }
 
-  /**
-   * Print number of files added/changed/removed
-   */
-  void PrintStatistics();
-
  private:
   enum ChangesetAction {
     kAdd,
