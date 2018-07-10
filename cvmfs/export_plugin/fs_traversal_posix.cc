@@ -3,6 +3,7 @@
  */
 #include "fs_traversal_posix.h"
 
+// #include <attr/xattr.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -12,7 +13,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <attr/xattr.h>  // NOLINT
+// Necessary because xattr.h does not import sys/types.h
+
+#include <iostream>
 #include <string>
+#include <vector>
 
 #include "fs_traversal_interface.h"
 #include "hash.h"
@@ -50,6 +56,14 @@ void AppendStringToList(char const   *str,
   }
 }
 
+bool IsPrefixOf(std::string str, std::string prefix)
+{
+    return std::equal(
+      str.begin(),
+      str.begin() + prefix.size(),
+      prefix.begin() );
+}
+
 std::string BuildPath(struct fs_traversal_context *ctx,
   const char *dir) {
   std::string result = ctx->repo;
@@ -75,6 +89,17 @@ int PosixSetMeta(const char *path,
     if (res != 0) return -1;
   }
   // TODO(steuber): Set xattrs with setxattr (if symlink no user. xattrs!)
+  XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
+  std::vector<std::string> v = xlist->ListKeys();
+  std::string val;
+  for (std::vector<std::string>::iterator it = v.begin(); it != v.end(); ++it) {
+    if (!set_permissions) {
+      continue;
+    }
+    xlist->Get(*it, &val);
+    int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
+    if (res != 0) return -1;
+  }
   if (res != 0) return -1;
   return 0;
 }
@@ -189,6 +214,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
 
   stat_result->cvm_xattrs = XattrList::CreateFromFile(complete_path);
   if (stat_result->cvm_xattrs == NULL) return -1;
+
   return 0;
 }
 
