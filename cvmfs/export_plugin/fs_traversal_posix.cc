@@ -212,7 +212,7 @@ bool posix_has_file(struct fs_traversal_context *ctx,
 int posix_do_unlink(struct fs_traversal_context *ctx,
   const char *path) {
   std::string complete_path = BuildPath(ctx, path);
-  int res = remove(complete_path.c_str());
+  int res = unlink(complete_path.c_str());
   if (res == -1) return -1;
   return 0;
 }
@@ -371,7 +371,10 @@ int posix_do_fwrite(void *file_ctx, const char *buff, size_t len) {
   struct posix_file_handle *handle =
     reinterpret_cast<posix_file_handle *>(file_ctx);
   size_t written_len = fwrite(buff, sizeof(char), len, handle->fd);
-  return written_len == len;
+  if (written_len != len) {
+    return -1;
+  }
+  return 0;
 }
 
 void posix_do_ffree(void *file_ctx) {

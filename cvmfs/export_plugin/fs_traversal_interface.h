@@ -126,6 +126,7 @@ struct fs_traversal {
    * 
    * Error if:
    * - Link does not exist
+   * - Link is directory
    * - Unlink not successful
    * 
    * @param[in] ctx The file system traversal context
