@@ -6,9 +6,11 @@
 
 #include <errno.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <ctime>
+#include <iostream>
 
 #include "libcvmfs.h"
 #include "util/posix.h"
@@ -17,6 +19,8 @@
 #include "export_plugin/fs_traversal_interface.h"
 #include "export_plugin/fs_traversal_posix.h"
 #include "export_plugin/util.h"
+
+#define MODE_BITMASK (S_IRWXO | S_IRWXG | S_IRWXU)
 
 using namespace std;  // NOLINT
 
@@ -63,8 +67,8 @@ class T_Fs_Traversal_Interface :
 
   XattrList *create_sample_xattrlist(std::string var) {
     XattrList *result = new XattrList();
-    result->Set("foo", var);
-    result->Set("bar", std::string(256, 'a'));
+    result->Set("user.foo", var);
+    result->Set("user.bar", std::string(256, 'a'));
     return result;
   }
   struct cvmfs_stat create_sample_stat(const char *name,
@@ -156,7 +160,7 @@ class T_Fs_Traversal_Interface :
     const struct cvmfs_stat stat_values1 = create_sample_stat(
       (prefix + "-hello.world").c_str(),
       10, 0770, 0, xlist1, &content1_hash);
-    XattrList *xlist2 = create_sample_xattrlist(prefix);
+    XattrList *xlist2 = create_sample_xattrlist(prefix+"-2");
     const struct cvmfs_stat stat_values2 = create_sample_stat(
       (prefix + "-hello.world").c_str(),
       10, 0770, 0, xlist2, &content2_hash);
@@ -165,7 +169,8 @@ class T_Fs_Traversal_Interface :
       &stat_values1));
     *ident2 = std::string(
       fs_traversal_instance_->interface->get_identifier(context_,
-      &stat_values2));
+        &stat_values2));
+
     // BACKGROUND FILES
     ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
       context_,
@@ -253,6 +258,41 @@ class T_Fs_Traversal_Interface :
   struct fs_traversal_test *fs_traversal_instance_;
   struct fs_traversal_context *context_;
 };
+
+TEST_P(T_Fs_Traversal_Interface, StatTest) {
+  std::string ident1;
+  std::string ident2;
+  MakeTestFiles("StatTest", &ident1, &ident2);
+  struct cvmfs_stat foostat;
+  struct cvmfs_stat barstat;
+  struct cvmfs_stat symlinkstat;
+  std::string val;
+  // Correct inode configuration
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/StatTest-foo.txt", &foostat));
+  ASSERT_STREQ("/StatTest-foo.txt", foostat.cvm_name);
+  ASSERT_EQ(0770, MODE_BITMASK & foostat.st_mode);
+  ASSERT_EQ(getuid(), foostat.st_uid);
+  ASSERT_EQ(getgid(), foostat.st_gid);
+  XattrList *xlist1 = reinterpret_cast<XattrList *>(foostat.cvm_xattrs);
+  xlist1->Get("user.foo", &val);
+  ASSERT_STREQ("StatTest", val.c_str());
+
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/StatTest-bar.txt", &barstat));
+  XattrList *xlist2 = reinterpret_cast<XattrList *>(barstat.cvm_xattrs);
+  xlist2->Get("user.foo", &val);
+  ASSERT_STREQ("StatTest-2", val.c_str());
+
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/StatTest-symlink1", &symlinkstat));
+  ASSERT_STREQ("./foo", symlinkstat.cvm_symlink);
+
+  free_stat_attr(&foostat);
+  free_stat_attr(&barstat);
+  free_stat_attr(&symlinkstat);
+}
+
 
 TEST_P(T_Fs_Traversal_Interface, TouchTest) {
   std::string ident1;
@@ -512,6 +552,10 @@ TEST_P(T_Fs_Traversal_Interface, LinkUnlinkTest) {
     context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", &foobarstat));
   ASSERT_EQ(barstat.st_ino, foobarstat.st_ino);
 
+  free_stat_attr(&foostat);
+  free_stat_attr(&barstat);
+  free_stat_attr(&foobarstat);
+
   // Correct unlink behaviour
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_unlink(
     context_, "/LinkUnlinkTest-foobar/foofoobar/foofoofoobar"));
@@ -561,6 +605,8 @@ TEST_P(T_Fs_Traversal_Interface, SymlinkTest) {
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
     context_, "/SymlinkTest-foo/bar/symlink2", &sl2Stat));
   ASSERT_STREQ("./foobar", sl2Stat.cvm_symlink);
+  free_stat_attr(&sl1Stat);
+  free_stat_attr(&sl2Stat);
 }
 
 
