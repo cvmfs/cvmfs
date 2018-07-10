@@ -172,6 +172,9 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
 
   if (entry->IsRegularFile() || entry->IsSymlink() || entry->IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
+    // Replace calls Remove; cancel Remove's actions:
+    perf::Dec(counters_->n_files_removed);
+    perf::Xadd(counters_->sz_removed_bytes, -entry->GetRdOnlySize());
 
     perf::Inc(counters_->n_files_changed);
     // Count only the diference between the old and new file
@@ -181,9 +184,6 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
     } else {                                  // removed bytes
       perf::Xadd(counters_->sz_removed_bytes, -dif);
     }
-    // Replace calls Remove; cancel Remove's actions:
-    perf::Dec(counters_->n_files_removed);
-    perf::Xadd(counters_->sz_removed_bytes, -entry->GetRdOnlySize());
     return;
   }
 
