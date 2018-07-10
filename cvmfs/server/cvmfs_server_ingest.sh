@@ -199,7 +199,7 @@ cvmfs_server_ingest() {
   fi
 
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
-    ingest_command="$ingest_command -I"
+    ingest_command="$ingest_command -+stats"
   fi
 
   # ---> do it! (from here on we are changing things)

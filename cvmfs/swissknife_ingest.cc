@@ -79,10 +79,6 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.key_file = *args.find('H')->second;
   }
 
-  if (args.find('I') != args.end()) {
-    params.print_statistics = true;
-  }
-
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -158,10 +154,6 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
 
   sync->Traverse();
-  if (params.print_statistics) {
-    printf("%s", this->statistics()->
-                 PrintList(perf::Statistics::kPrintHeader).c_str());
-  }
 
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,

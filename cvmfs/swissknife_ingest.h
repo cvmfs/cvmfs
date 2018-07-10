@@ -35,8 +35,6 @@ class Ingest : public Command {
         'B', "base directory where to extract the tarfile"));
     r.push_back(Parameter::Optional(
         'D', "entity to delete before to extract the tar"));
-    r.push_back(Parameter::Switch(
-        'I', "print publish statistics"));
 
     return r;
   }

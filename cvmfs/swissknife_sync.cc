@@ -675,10 +675,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.repo_tag.description_ = *args.find('J')->second;
   }
 
-  if (args.find('I') != args.end()) {
-    params.print_statistics = true;
-  }
-
   if (!CheckParams(params)) return 2;
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
@@ -790,10 +786,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
 
     sync->Traverse();
-    if (params.print_statistics) {
-      printf("%s", this->statistics()->
-                   PrintList(perf::Statistics::kPrintHeader).c_str());
-    }
   } else {
     assert(!manifest->history().IsNull());
     catalog::VirtualCatalog virtual_catalog(
