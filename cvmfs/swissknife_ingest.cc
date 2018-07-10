@@ -142,7 +142,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  perf::StatisticsTemplate statistics("Publish-sync", this->statistics());
+  perf::StatisticsTemplate statistics("Ingest", this->statistics());
   publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   publish::SyncUnion *sync;
@@ -159,7 +159,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   sync->Traverse();
   if (params.print_statistics) {
-    mediator.PrintStatistics();
+    printf("%s", this->statistics()->
+                 PrintList(perf::Statistics::kPrintHeader).c_str());
   }
 
   if (!params.authz_file.empty()) {

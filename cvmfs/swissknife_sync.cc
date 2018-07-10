@@ -754,7 +754,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  perf::StatisticsTemplate statistics("Publish-sync", this->statistics());
+  perf::StatisticsTemplate statistics("Publish", this->statistics());
   publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   // Should be before the syncronization starts to avoid race of GetTTL with
@@ -791,7 +791,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
     sync->Traverse();
     if (params.print_statistics) {
-      mediator.PrintStatistics();
+      printf("%s", this->statistics()->
+                   PrintList(perf::Statistics::kPrintHeader).c_str());
     }
   } else {
     assert(!manifest->history().IsNull());

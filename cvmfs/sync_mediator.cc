@@ -1007,25 +1007,4 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
     free(xattrs);
 }
 
-
-void SyncMediator::PrintStatistics() {
-  LogCvmfs(kLogPublish, kLogStdout, "Statistics:");
-  LogCvmfs(kLogPublish, kLogStdout, "Files         added: %s",
-    counters_->n_files_added->Print().c_str());
-  LogCvmfs(kLogPublish, kLogStdout, "Files       removed: %s",
-    counters_->n_files_removed->Print().c_str());
-  LogCvmfs(kLogPublish, kLogStdout, "Files       changed: %s",
-    counters_->n_files_changed->Print().c_str());
-  LogCvmfs(kLogPublish, kLogStdout, "Directories   added: %s",
-    counters_->n_directories_added->Print().c_str());
-  LogCvmfs(kLogPublish, kLogStdout, "Directories removed: %s",
-    counters_->n_directories_removed->Print().c_str());
-  LogCvmfs(kLogPublish, kLogStdout, "Directories changed: %s",
-    counters_->n_directories_changed->Print().c_str());
-  LogCvmfs(kLogPublish, kLogStdout, "Bytes         added: %s",
-    counters_->sz_added_bytes->Print().c_str());
-  LogCvmfs(kLogPublish, kLogStdout, "Bytes       removed: %s",
-    counters_->sz_removed_bytes->Print().c_str());
-}
-
 }  // namespace publish
