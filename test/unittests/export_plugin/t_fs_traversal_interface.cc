@@ -56,6 +56,11 @@ class T_Fs_Traversal_Interface :
     context_ = NULL;
   }
 
+  void Restart() {
+    Fin();
+    Init();
+  }
+
   XattrList *create_sample_xattrlist(std::string var) {
     XattrList *result = new XattrList();
     result->Set("foo", var);
@@ -230,6 +235,8 @@ class T_Fs_Traversal_Interface :
     free_stat_attr(&stat_values1);
     free_stat_attr(&stat_values2);
     free_stat_attr(&stat_values_dir);
+    // Check if fs is consistent over finalizing and reopening...
+    Restart();
   }
   void AssertListHas(const char *query, char **dirList, size_t listLen,
     bool hasNot = false) {
@@ -347,38 +354,12 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
   char **dirList;
   fs_traversal_instance_->interface->list_dir(
     context_,
-    "/",
-    &dirList,
-    &listLen);
-  AssertListHas("MkRmDirTest-foo", dirList, listLen);
-  AssertListHas("MkRmDirTest-bar", dirList, listLen);
-  listLen = 0;
-  delete dirList;
-  fs_traversal_instance_->interface->list_dir(
-    context_,
-    "/MkRmDirTest-foo",
-    &dirList,
-    &listLen);
-  ASSERT_EQ(1, listLen);
-  AssertListHas("bar", dirList, listLen);
-  listLen = 0;
-  delete dirList;
-  fs_traversal_instance_->interface->list_dir(
-    context_,
     "/MkRmDirTest-bar",
     &dirList,
     &listLen);
   ASSERT_EQ(2, listLen);
   AssertListHas("foobar", dirList, listLen);
   AssertListHas("test", dirList, listLen);
-  listLen = 0;
-  delete dirList;
-  fs_traversal_instance_->interface->list_dir(
-    context_,
-    "/MkRmDirTest-bar/foobar",
-    &dirList,
-    &listLen);
-  AssertListHas("foobar", dirList, listLen);
   listLen = 0;
   delete dirList;
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
@@ -400,6 +381,172 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
     context_, "/MkRmDirTest-bar/foobar"));
   ASSERT_EQ(ENOENT, errno);
   free_stat_attr(&stat_values_dir);
+}
+
+TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
+  std::string ident1;
+  std::string ident2;
+  MakeTestFiles("ListDirTest", &ident1, &ident2);
+  size_t listLen = 0;
+  char **dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/",
+    &dirList,
+    &listLen);
+  AssertListHas("ListDirTest-foo", dirList, listLen);
+  AssertListHas("ListDirTest-bar", dirList, listLen);
+  AssertListHas("ListDirTest-foo.txt", dirList, listLen);
+  AssertListHas("ListDirTest-bar.txt", dirList, listLen);
+  AssertListHas("ListDirTest-symlink1", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/ListDirTest-foo",
+    &dirList,
+    &listLen);
+  ASSERT_EQ(1, listLen);
+  AssertListHas("bar", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/ListDirTest-foo/bar",
+    &dirList,
+    &listLen);
+  ASSERT_EQ(4, listLen);
+  AssertListHas("foobar1.txt", dirList, listLen);
+  AssertListHas("foobar2.txt", dirList, listLen);
+  AssertListHas("foobar3.txt", dirList, listLen);
+  AssertListHas("symlink2", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/ListDirTest-bar",
+    &dirList,
+    &listLen);
+  ASSERT_EQ(2, listLen);
+  AssertListHas("foobar", dirList, listLen, true);
+  AssertListHas("test", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/ListDirTest-bar/foobar",
+    &dirList,
+    &listLen);
+  AssertListHas("foobar", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+}
+
+TEST_P(T_Fs_Traversal_Interface, ReadWriteTest) {
+  std::string ident1;
+  std::string ident2;
+  MakeTestFiles("ReadWriteTest", &ident1, &ident2);
+  void *hdl1 = fs_traversal_instance_->interface->get_handle(
+    context_, ident1.c_str());
+  ASSERT_TRUE(NULL != hdl1);
+  ASSERT_EQ(0,
+    fs_traversal_instance_->interface->do_fopen(hdl1, fs_open_write));
+  std::string content1 = "Lorem ipsum dolor sit amet.";
+  ASSERT_EQ(0,
+    fs_traversal_instance_->interface->do_fwrite(
+      hdl1, content1.c_str(), content1.length()));
+  char buf[50];
+  size_t rlen;
+  ASSERT_EQ(-1,
+    fs_traversal_instance_->interface->do_fread(
+      hdl1, buf, 100, &rlen));
+  ASSERT_EQ(0,
+    fs_traversal_instance_->interface->do_fclose(hdl1));
+  ASSERT_EQ(0,
+    fs_traversal_instance_->interface->do_fopen(hdl1, fs_open_read));
+  ASSERT_EQ(-1,
+    fs_traversal_instance_->interface->do_fwrite(
+      hdl1, content1.c_str(), content1.length()));
+  ASSERT_EQ(-1,
+    fs_traversal_instance_->interface->do_fread(
+      hdl1, buf, 100, &rlen));
+  buf[rlen] = '\0';
+  ASSERT_EQ(content1.length(), rlen);
+  ASSERT_STREQ(content1.c_str(), buf);
+  ASSERT_EQ(0,
+    fs_traversal_instance_->interface->do_fclose(hdl1));
+  fs_traversal_instance_->interface->do_ffree(hdl1);
+}
+
+TEST_P(T_Fs_Traversal_Interface, LinkUnlinkTest) {
+  std::string ident1;
+  std::string ident2;
+  MakeTestFiles("LinkUnlinkTest", &ident1, &ident2);
+  struct cvmfs_stat foostat;
+  struct cvmfs_stat barstat;
+  struct cvmfs_stat foobarstat;
+  // Correct inode configuration
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/LinkUnlinkTest-foo.txt", &foostat));
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/LinkUnlinkTest-bar.txt", &barstat));
+  ASSERT_NE(foostat.st_ino, barstat.st_ino);
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/LinkUnlinkTest-foo/bar/foobar1.txt", &foobarstat));
+  ASSERT_EQ(foostat.st_ino, foobarstat.st_ino);
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/LinkUnlinkTest-foo/bar/foobar2.txt", &foobarstat));
+  ASSERT_EQ(foostat.st_ino, foobarstat.st_ino);
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", &foobarstat));
+  ASSERT_EQ(foostat.st_ino, foobarstat.st_ino);
+  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_link(
+    context_, "/LinkUnlinkTest-foobar/foofoobar/foofoofoobar", ident1.c_str()));
+  ASSERT_EQ(ENOENT, errno);
+  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_link(
+    context_, "/LinkUnlinkTest-foobar.txt", "foobarfoobar"));
+  ASSERT_EQ(ENOENT, errno);
+  ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", ident2.c_str()));
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", &foobarstat));
+  ASSERT_EQ(barstat.st_ino, foobarstat.st_ino);
+
+  // Correct unlink behaviour
+  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_unlink(
+    context_, "/LinkUnlinkTest-foobar/foofoobar/foofoofoobar"));
+  ASSERT_EQ(ENOENT, errno);
+  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_unlink(
+    context_, "/LinkUnlinkTest-bar/foobar/foobar"));
+  ASSERT_EQ(EISDIR, errno);
+  size_t listLen = 0;
+  char **dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/ListDirTest-foo/bar",
+    &dirList,
+    &listLen);
+  ASSERT_EQ(4, listLen);
+  AssertListHas("foobar1.txt", dirList, listLen);
+  AssertListHas("foobar2.txt", dirList, listLen);
+  AssertListHas("foobar3.txt", dirList, listLen);
+  AssertListHas("symlink2", dirList, listLen);
+  ASSERT_EQ(0, fs_traversal_instance_->interface->do_unlink(
+    context_, "/ListDirTest-foo/bar/foobar2.txt"));
+  ASSERT_EQ(0, fs_traversal_instance_->interface->do_unlink(
+    context_, "/ListDirTest-foo/bar/symlink2"));
+  listLen = 0;
+  delete dirList;
+  fs_traversal_instance_->interface->list_dir(
+    context_,
+    "/ListDirTest-foo/bar",
+    &dirList,
+    &listLen);
+  ASSERT_EQ(2, listLen);
+  AssertListHas("foobar1.txt", dirList, listLen);
+  AssertListHas("foobar3.txt", dirList, listLen);
+  listLen = 0;
+  delete dirList;
 }
 
 TEST_P(T_Fs_Traversal_Interface, SymlinkTest) {
