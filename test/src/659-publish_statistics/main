@@ -2,6 +2,7 @@
 cvmfs_test_name="Publish statistics"
 cvmfs_test_autofs_on_startup=false
 
+CVMFS_TEST_659_NR_OF_TESTS=4
 CVMFS_TEST_659_ERROR_FILES_ADDED=101
 CVMFS_TEST_659_ERROR_FILES_REMOVED=102
 CVMFS_TEST_659_ERROR_FILES_CHANGED=103
@@ -10,9 +11,6 @@ CVMFS_TEST_659_ERROR_DIR_REMOVED=105
 CVMFS_TEST_659_ERROR_DIR_CHANGED=106
 CVMFS_TEST_659_ERROR_BYTES_ADDED=107
 CVMFS_TEST_659_ERROR_BYTES_REMOVED=108
-
-CVMFS_TEST_659_NR_OF_TESTS=4
-
 CVMFS_TEST_659_TAR_FILE=tarfile.tar
 CVMFS_TEST_659_TAR_DIR=newTarDir
 
@@ -112,7 +110,7 @@ cvmfs_run_test() {
   echo "*** Test 4 - overwrite the tar file"
   cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_659_TAR_DIR $CVMFS_TEST_REPO > test_659_4 || return $?
 
-  # ============================================================================
+  # =========================================================================================================
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -216,8 +214,6 @@ cvmfs_run_test() {
     # clean
     rm test_100_$i
   done
-
-  rm -rf $reference_dir
 
   return 0
 }
