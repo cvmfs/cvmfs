@@ -115,7 +115,8 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
 
 const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
 float          StatisticsDatabase::kLatestSchema           = 1.0f;
-unsigned       StatisticsDatabase::kLatestSchemaRevision   = RevisionFlags::kInitialRevision;
+unsigned       StatisticsDatabase::kLatestSchemaRevision   =
+                                              RevisionFlags::kInitialRevision;
 unsigned int   StatisticsDatabase::instances               = 0;
 bool           StatisticsDatabase::compacting_fails        = false;
 
@@ -275,7 +276,6 @@ int main(int argc, char **argv) {
   if (display_statistics) {
     // get the repo name
     string repo_name = *args.find('N')->second;
-    // LogCvmfs(kLogCvmfs, kLogStdout, "For repository [%s]", repo_name.c_str());
     // create a new database file if is not already there
     StatisticsDatabase *db = StatisticsDatabase::Create(repo_name + ".db");
 
