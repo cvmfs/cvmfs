@@ -91,6 +91,7 @@ init_per_suite(Config) ->
                                                                 cvmfs_lease,
                                                                 cvmfs_be,
                                                                 cvmfs_receiver_pool,
+                                                                cvmfs_fast_receiver_pool,
                                                                 cvmfs_commit_sup]),
     ok = application:set_env(cvmfs_gateway, repo_config,
                              cvmfs_test_util:make_test_repo_config()),
