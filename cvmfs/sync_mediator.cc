@@ -27,12 +27,45 @@
 
 using namespace std;  // NOLINT
 
+struct Counters {
+  perf::Counter *n_files_added;
+  perf::Counter *n_files_removed;
+  perf::Counter *n_files_changed;
+  perf::Counter *n_directories_added;
+  perf::Counter *n_directories_removed;
+  perf::Counter *n_directories_changed;
+  perf::Counter *sz_added_bytes;
+  perf::Counter *sz_removed_bytes;
+
+  explicit Counters(perf::StatisticsTemplate statistics) {
+    n_files_added = statistics.RegisterTemplated("n_files_added",
+        "Number of files added");
+    n_files_removed = statistics.RegisterTemplated("n_files_removed",
+        "Number of files removed");
+    n_files_changed = statistics.RegisterTemplated("n_files_changed",
+        "Number of files changed");
+    n_directories_added = statistics.RegisterTemplated("n_directories_added",
+        "Number of directories added");
+    n_directories_removed =
+                  statistics.RegisterTemplated("n_directories_removed",
+                                            "Number of directories removed");
+    n_directories_changed =
+                  statistics.RegisterTemplated("n_directories_changed",
+                                            "Number of directories changed");
+    sz_added_bytes = statistics.RegisterTemplated("sz_added_bytes",
+                                            "Number of bytes added");
+    sz_removed_bytes = statistics.RegisterTemplated("sz_removed_bytes",
+                                            "Number of bytes removed");
+  }
+};  // Counters
+
 namespace publish {
 
 AbstractSyncMediator::~AbstractSyncMediator() {}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
-                           const SyncParameters *params) :
+                           const SyncParameters *params,
+                           perf::StatisticsTemplate statistics) :
   catalog_manager_(catalog_manager),
   union_engine_(NULL),
   handle_hardlinks_(false),
@@ -45,6 +78,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
+  counters_ = new Counters(statistics);
 }
 
 
@@ -132,11 +166,24 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
   if (entry->IsGraftMarker()) {return;}
   if (entry->IsDirectory()) {
     TouchDirectory(entry);
+    perf::Inc(counters_->n_directories_changed);
     return;
   }
 
   if (entry->IsRegularFile() || entry->IsSymlink() || entry->IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
+    // Replace calls Remove; cancel Remove's actions:
+    perf::Dec(counters_->n_files_removed);
+    perf::Xadd(counters_->sz_removed_bytes, -entry->GetRdOnlySize());
+
+    perf::Inc(counters_->n_files_changed);
+    // Count only the diference between the old and new file
+    int64_t dif = entry->GetScratchSize() - entry->GetRdOnlySize();
+    if (dif > 0) {                            // added bytes
+      perf::Xadd(counters_->sz_added_bytes, dif);
+    } else {                                  // removed bytes
+      perf::Xadd(counters_->sz_removed_bytes, -dif);
+    }
     return;
   }
 
@@ -809,6 +856,12 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
     // Spool the file
     params_->spooler->Process(entry->CreateIngestionSource());
   }
+
+  // publish statistics counting for new file
+  if (entry->IsNew()) {
+    perf::Inc(counters_->n_files_added);
+    perf::Xadd(counters_->sz_added_bytes, entry->GetScratchSize());
+  }
 }
 
 void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
@@ -822,6 +875,10 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
     }
     catalog_manager_->RemoveFile(entry->GetRelativePath());
   }
+
+  // Counting nr of removed files and removed bytes
+  perf::Inc(counters_->n_files_removed);
+  perf::Xadd(counters_->sz_removed_bytes, entry->GetRdOnlySize());
 }
 
 void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
@@ -831,6 +888,7 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
   PrintChangesetNotice(kAdd, entry->GetUnionPath());
 
+  perf::Inc(counters_->n_directories_added);
   assert(!entry->HasGraftMarker());
   if (!params_->dry_run) {
     catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(),
@@ -860,6 +918,8 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
   if (!params_->dry_run) {
     catalog_manager_->RemoveDirectory(directory_path);
   }
+
+  perf::Inc(counters_->n_directories_removed);
 }
 
 
