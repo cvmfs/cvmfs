@@ -81,7 +81,8 @@ start_link(Args) ->
                                                             Public :: binary(),
                                                             Secret :: binary().
 generate_token(KeyId, Path, MaxLeaseTime) ->
-    poolboy:transaction(cvmfs_receiver_pool,
+    %% The request is sent to the fast worker pool
+    poolboy:transaction(cvmfs_fast_receiver_pool,
                         fun(WorkerPid) ->
                                 gen_server:call(WorkerPid,
                                                 {worker_req,
@@ -99,7 +100,8 @@ generate_token(KeyId, Path, MaxLeaseTime) ->
                                  when Token :: binary(),
                                       PublicId :: binary().
 get_token_id(Token) ->
-    poolboy:transaction(cvmfs_receiver_pool,
+    %% The request is sent to the fast worker pool
+    poolboy:transaction(cvmfs_fast_receiver_pool,
                         fun(WorkerPid) ->
                                 gen_server:call(WorkerPid,
                                                 {worker_req,
@@ -307,7 +309,7 @@ code_change(_OldVsn, State, _Extra) ->
                                   Path :: binary(),
                                   MaxLeaseTime :: integer(),
                                   WorkerPort :: port(),
-                                  From :: pid(),
+                                  From :: {pid(), _},
                                   Timeout :: integer(),
                                   Token :: binary(),
                                   Public :: binary(),
@@ -331,7 +333,7 @@ p_generate_token(KeyId, Path, MaxLeaseTime, WorkerPort, From, Timeout) ->
                     -> {ok, PublicId} | {error, invalid_macaroon}
                            when Token :: binary(),
                                 WorkerPort :: port(),
-                                From :: pid(),
+                                From :: {pid(), _},
                                 Timeout :: integer(),
                                 PublicId :: binary().
 p_get_token_id(Token, WorkerPort, From, Timeout) ->
@@ -356,7 +358,7 @@ p_get_token_id(Token, WorkerPort, From, Timeout) ->
                                                     when SubmissionData :: payload_submission_data(),
                                                          Secret :: binary(),
                                                          WorkerPort :: port(),
-                                                         From :: pid(),
+                                                         From :: {pid(), _},
                                                          Timeout :: integer().
 p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, From, Timeout) ->
     Req1 = jsx:encode(#{<<"token">> => LeaseToken, <<"secret">> => Secret}),
@@ -405,7 +407,7 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, 
                                              OldRootHash :: binary(),
                                              NewRootHash :: binary(),
                                              RepoTag :: cvmfs_common_types:repository_tag(),
-                                             From :: pid(),
+                                             From :: {pid(), _},
                                              Timeout :: integer().
 p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, From, Timeout) ->
     {TagName, TagChannel, TagDescription} = RepoTag,
