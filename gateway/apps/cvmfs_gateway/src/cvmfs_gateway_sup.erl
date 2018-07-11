@@ -37,7 +37,7 @@ init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
     ReceiverPoolConfig = [{name, {local, cvmfs_receiver_pool}} | PoolConfig],
     FastReceiverPoolConfig = [{name,
                                {local, cvmfs_fast_receiver_pool}} |
-                              maps:put(size, 1, PoolConfig)],
+                              lists:keystore(size, 1, PoolConfig, {size, 1})],
     WorkerSpecs = #{
       cvmfs_auth => #{id => cvmfs_auth,
                       start => {cvmfs_auth, start_link, [{Repos, Keys}]},
