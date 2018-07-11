@@ -13,6 +13,7 @@
                                        cvmfs_auth,
                                        cvmfs_lease,
                                        cvmfs_receiver_pool,
+                                       cvmfs_fast_receiver_pool,
                                        cvmfs_commit_sup]},
                    {repo_config, {file, "/etc/cvmfs/gateway/repo.json"}},
                    {user_config, {file, "/etc/cvmfs/gateway/user.json"}}]}
