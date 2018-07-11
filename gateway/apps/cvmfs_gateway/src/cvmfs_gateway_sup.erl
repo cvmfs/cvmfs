@@ -35,6 +35,9 @@ init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
                         intensity => 5,
                         period => 5},
     ReceiverPoolConfig = [{name, {local, cvmfs_receiver_pool}} | PoolConfig],
+    FastReceiverPoolConfig = [{name,
+                               {local, cvmfs_fast_receiver_pool}} |
+                              maps:put(size, 1, PoolConfig)],
     WorkerSpecs = #{
       cvmfs_auth => #{id => cvmfs_auth,
                       start => {cvmfs_auth, start_link, [{Repos, Keys}]},
@@ -55,6 +58,9 @@ init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
                        type => worker,
                        modules => [cvmfs_lease]},
       cvmfs_receiver_pool => poolboy:child_spec(cvmfs_receiver_pool, ReceiverPoolConfig, WorkerConfig),
+      cvmfs_fast_receiver_pool => poolboy:child_spec(cvmfs_fast_receiver_pool,
+                                                     FastReceiverPoolConfig,
+                                                     WorkerConfig),
       cvmfs_commit_sup => #{id => cvmfs_commit_sup,
                             start => {cvmfs_commit_sup, start_link, [Repos]},
                             restart => permanent,

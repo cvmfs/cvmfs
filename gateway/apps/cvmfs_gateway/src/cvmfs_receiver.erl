@@ -81,7 +81,7 @@ start_link(Args) ->
                                                             Public :: binary(),
                                                             Secret :: binary().
 generate_token(KeyId, Path, MaxLeaseTime) ->
-    poolboy:transaction(cvmfs_receiver_pool,
+    poolboy:transaction(cvmfs_fast_receiver_pool,
                         fun(WorkerPid) ->
                                 gen_server:call(WorkerPid,
                                                 {worker_req,
@@ -99,7 +99,7 @@ generate_token(KeyId, Path, MaxLeaseTime) ->
                                  when Token :: binary(),
                                       PublicId :: binary().
 get_token_id(Token) ->
-    poolboy:transaction(cvmfs_receiver_pool,
+    poolboy:transaction(cvmfs_fast_receiver_pool,
                         fun(WorkerPid) ->
                                 gen_server:call(WorkerPid,
                                                 {worker_req,
