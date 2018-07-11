@@ -29,6 +29,7 @@
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
+#include "util/posix.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -58,10 +59,18 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
 
   bool CreateEmptyDatabase() {
     ++create_empty_db_calls;
-
   return sqlite::Sql(sqlite_db(),
-    "CREATE TABLE foobar (foo TEXT, bar TEXT, "
-    "  CONSTRAINT pk_foo PRIMARY KEY (foo))").Execute();
+    "CREATE TABLE publish_statistics ("
+     "timestamp TEXT,"
+     "files_added INTEGER,"
+     "files_removed INTEGER,"
+     "files_changed INTEGER,"
+     "directories_added INTEGER,"
+     "directories_removed INTEGER,"
+     "directories_changed INTEGER,"
+     "sz_bytes_added INTEGER,"
+     "sz_bytes_removed INTEGER,"
+     "CONSTRAINT pk_publish_statistics PRIMARY KEY (timestamp));").Execute();
   }
 
   bool CheckSchemaCompatibility() {
@@ -274,10 +283,18 @@ int main(int argc, char **argv) {
   // run the command
   const int retval = command->Main(args);
   if (display_statistics) {
+    StatisticsDatabase *db;
     // get the repo name
     string repo_name = *args.find('N')->second;
+    string filename = repo_name + ".db";
     // create a new database file if is not already there
-    StatisticsDatabase *db = StatisticsDatabase::Create(repo_name + ".db");
+    if (FileExists(filename)) {
+      db = StatisticsDatabase::Open(filename,
+                                    StatisticsDatabase::kOpenReadWrite);
+    } else {
+      db = StatisticsDatabase::Create(filename);
+    }
+    assert(db != NULL);
 
     LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
