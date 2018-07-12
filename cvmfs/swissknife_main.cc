@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
              command->statistics()
              ->PrintList(perf::Statistics::kPrintHeader).c_str());
-    delete db;  // uncomment this to fail ?
+    // delete db;  // uncomment this to fail ?
   }
 
   // delete the command list
