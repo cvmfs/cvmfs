@@ -225,6 +225,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   signing_tool.cc
   sql.cc
   sqlitemem.cc
+  statistics_database.cc
   statistics.cc
   swissknife.cc
   swissknife_assistant.cc

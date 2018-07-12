@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include "logging.h"
+#include "statistics_database.h"
 #include "swissknife.h"
 
 #include "swissknife_check.h"
@@ -34,93 +35,8 @@
 
 using namespace std;  // NOLINT
 
-struct RevisionFlags {
-  enum T {
-    kInitialRevision   = 1,
-    kUpdatableRevision = 2,
-    kUpdatedRevision   = 3,
-    kFailingRevision   = 4,
-  };
-};
-
-class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
- public:
-  // not const - needs to be adaptable!
-  static float        kLatestSchema;
-  // not const - needs to be adaptable!
-  static unsigned     kLatestSchemaRevision;
-  static const float  kLatestCompatibleSchema;
-  static bool         compacting_fails;
-  static unsigned int  instances;
-  unsigned int         create_empty_db_calls;
-  unsigned int         check_compatibility_calls;
-  unsigned int         live_upgrade_calls;
-  mutable unsigned int compact_calls;
-
-  bool CreateEmptyDatabase() {
-    ++create_empty_db_calls;
-  return sqlite::Sql(sqlite_db(),
-    "CREATE TABLE publish_statistics ("
-     "timestamp TEXT,"
-     "files_added INTEGER,"
-     "files_removed INTEGER,"
-     "files_changed INTEGER,"
-     "directories_added INTEGER,"
-     "directories_removed INTEGER,"
-     "directories_changed INTEGER,"
-     "sz_bytes_added INTEGER,"
-     "sz_bytes_removed INTEGER,"
-     "CONSTRAINT pk_publish_statistics PRIMARY KEY (timestamp));").Execute();
-  }
-
-  bool CheckSchemaCompatibility() {
-    ++check_compatibility_calls;
-    return (schema_version() > kLatestCompatibleSchema - 0.1 &&
-            schema_version() < kLatestCompatibleSchema + 0.1);
-  }
-
-  bool LiveSchemaUpgradeIfNecessary() {
-    ++live_upgrade_calls;
-    const unsigned int revision = schema_revision();
-
-    if (revision == RevisionFlags::kInitialRevision) {
-      return true;
-    }
-
-    if (revision == RevisionFlags::kUpdatableRevision) {
-      set_schema_revision(RevisionFlags::kUpdatedRevision);
-      StoreSchemaRevision();
-      return true;
-    }
-
-    if (revision == RevisionFlags::kFailingRevision) {
-      return false;
-    }
-
-    return false;
-  }
-
-  bool CompactDatabase() const {
-    ++compact_calls;
-    return !compacting_fails;
-  }
-
-  ~StatisticsDatabase() {
-    --StatisticsDatabase::instances;
-  }
-
- protected:
-  // TODO(rmeusel): C++11 - constructor inheritance
-  friend class sqlite::Database<StatisticsDatabase>;
-  StatisticsDatabase(const std::string  &filename,
-                const OpenMode      open_mode) :
-    sqlite::Database<StatisticsDatabase>(filename, open_mode),
-    create_empty_db_calls(0),  check_compatibility_calls(0),
-    live_upgrade_calls(0), compact_calls(0)
-  {
-    ++StatisticsDatabase::instances;
-  }
-};
+typedef vector<swissknife::Command *> Commands;
+Commands command_list;
 
 const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
 float          StatisticsDatabase::kLatestSchema           = 1.0f;
@@ -128,9 +44,6 @@ unsigned       StatisticsDatabase::kLatestSchemaRevision   =
                                               RevisionFlags::kInitialRevision;
 unsigned int   StatisticsDatabase::instances               = 0;
 bool           StatisticsDatabase::compacting_fails        = false;
-
-typedef vector<swissknife::Command *> Commands;
-Commands command_list;
 
 void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
@@ -286,13 +199,13 @@ int main(int argc, char **argv) {
     StatisticsDatabase *db;
     // get the repo name
     string repo_name = *args.find('N')->second;
-    string filename = repo_name + ".db";
+    string db_file_path = "/tmp/statistics/" + repo_name + ".db";
     // create a new database file if is not already there
-    if (FileExists(filename)) {
-      db = StatisticsDatabase::Open(filename,
+    if (FileExists(db_file_path)) {
+      db = StatisticsDatabase::Open(db_file_path,
                                     StatisticsDatabase::kOpenReadWrite);
     } else {
-      db = StatisticsDatabase::Create(filename);
+      db = StatisticsDatabase::Create(db_file_path);
     }
     assert(db != NULL);
 
