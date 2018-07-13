@@ -39,13 +39,6 @@ using namespace std;  // NOLINT
 typedef vector<swissknife::Command *> Commands;
 Commands command_list;
 
-const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
-float          StatisticsDatabase::kLatestSchema           = 1.0f;
-unsigned       StatisticsDatabase::kLatestSchemaRevision   =
-                                              RevisionFlags::kInitialRevision;
-unsigned int   StatisticsDatabase::instances               = 0;
-bool           StatisticsDatabase::compacting_fails        = false;
-
 void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "CernVM-FS repository storage management commands\n"

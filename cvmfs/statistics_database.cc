@@ -4,6 +4,13 @@
 
 #include "statistics_database.h"
 
+const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
+float          StatisticsDatabase::kLatestSchema           = 1.0f;
+unsigned       StatisticsDatabase::kLatestSchemaRevision   =
+                                              RevisionFlags::kInitialRevision;
+unsigned int   StatisticsDatabase::instances               = 0;
+bool           StatisticsDatabase::compacting_fails        = false;
+
 bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
 return sqlite::Sql(sqlite_db(),
