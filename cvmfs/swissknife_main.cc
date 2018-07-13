@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
   }
 
   bool display_statistics = false;
-
+  bool store_statistics = false;
   // parse the command line arguments for the Command
   swissknife::ArgumentList args;
   optind = 1;
@@ -176,6 +176,8 @@ int main(int argc, char **argv) {
       for (unsigned i = 0; i < flags.size(); ++i) {
         if (flags[i] == "stats") {
           display_statistics = true;
+        } else if (flags[i] == "store_stats") {
+          store_statistics = true;
         }
       }
     }
@@ -196,7 +198,8 @@ int main(int argc, char **argv) {
 
   // run the command
   const int retval = command->Main(args);
-  if (display_statistics) {
+  if (store_statistics) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Store statistics");
     StatisticsDatabase *db;
     // get the repo name
     string repo_name = *args.find('N')->second;
@@ -246,7 +249,7 @@ int main(int argc, char **argv) {
                               "sz_bytes_added,"
                               "sz_bytes_removed)"
                               " VALUES("
-                              "'"+timestamp_value+"',"+  // TEXT datatype
+                              "'"+timestamp_value+"',"+  // TEXT
                               files_added+"," +
                               files_removed +","+
                               files_changed + "," +
@@ -255,7 +258,7 @@ int main(int argc, char **argv) {
                               dir_changed + "," +
                               bytes_added + "," +
                               bytes_removed + ");";
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s", insert_statement.c_str());
+    // LogCvmfs(kLogCvmfs, kLogStdout, "%s", insert_statement.c_str());
     sqlite::Sql insert(db->sqlite_db(), insert_statement);
 
     if (!db->BeginTransaction()) {
@@ -273,12 +276,14 @@ int main(int argc, char **argv) {
     if (!db->CommitTransaction()) {
       LogCvmfs(kLogCvmfs, kLogStdout, "CommitTransaction failed!");
     }
+    // delete db;  // uncomment this to fail ?
+  }
 
+  if (display_statistics) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
              command->statistics()
              ->PrintList(perf::Statistics::kPrintHeader).c_str());
-    // delete db;  // uncomment this to fail ?
   }
 
   // delete the command list
