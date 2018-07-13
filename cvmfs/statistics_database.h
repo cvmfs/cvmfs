@@ -5,8 +5,21 @@
 #ifndef CVMFS_STATISTICS_DATABASE_H_
 #define CVMFS_STATISTICS_DATABASE_H_
 
+#include <ctime>
 #include <string>
 #include "sql.h"
+#include "swissknife.h"
+
+typedef struct {
+  std::string files_added;
+  std::string files_removed;
+  std::string files_changed;
+  std::string dir_added;
+  std::string dir_removed;
+  std::string dir_changed;
+  std::string bytes_added;
+  std::string bytes_removed;
+} Stats;
 
 struct RevisionFlags {
   enum T {
@@ -35,8 +48,11 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   bool CheckSchemaCompatibility();
   bool LiveSchemaUpgradeIfNecessary();
   bool CompactDatabase() const;
-
   ~StatisticsDatabase();
+  void GetStats(swissknife::Command *command, Stats *stats);
+  std::string GetTimestamp();
+  std::string PrepareStatement(std::string timestamp_value, Stats stats);
+  int StoreStatistics(swissknife::Command *command);
 
  protected:
   // TODO(rmeusel): C++11 - constructor inheritance

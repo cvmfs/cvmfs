@@ -7,7 +7,6 @@
 #include "cvmfs_config.h"
 
 #include <cassert>
-#include <ctime>
 
 #include "logging.h"
 #include "statistics_database.h"
@@ -191,9 +190,11 @@ int main(int argc, char **argv) {
 
   // run the command
   const int retval = command->Main(args);
+
   if (store_statistics) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Store statistics");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Storing statistics...");
     StatisticsDatabase *db;
+
     // get the repo name
     string repo_name = *args.find('N')->second;
     string db_file_path = "/tmp/" + repo_name + ".db";
@@ -205,71 +206,11 @@ int main(int argc, char **argv) {
       db = StatisticsDatabase::Create(db_file_path);
     }
     assert(db != NULL);
-
-    string files_added = command->statistics()->
-                         Lookup("Publish.n_files_added")->ToString();
-    string files_removed = command->statistics()->
-                     Lookup("Publish.n_files_removed")->ToString();
-    string files_changed = command->statistics()->
-                     Lookup("Publish.n_files_changed")->ToString();
-    string dir_added = command->statistics()->
-                         Lookup("Publish.n_directories_added")->ToString();
-    string dir_removed = command->statistics()->
-                     Lookup("Publish.n_directories_removed")->ToString();
-    string dir_changed = command->statistics()->
-                     Lookup("Publish.n_directories_changed")->ToString();
-    string bytes_added = command->statistics()->
-                     Lookup("Publish.sz_added_bytes")->ToString();
-    string bytes_removed = command->statistics()->
-                     Lookup("Publish.sz_removed_bytes")->ToString();
-
-    struct tm time_ptr;
-    char date_and_time[50];
-    time_t t = time(NULL);
-    gmtime_r(&t, &time_ptr);      // take UTC
-    // timestamp format
-    strftime(date_and_time, 1000, "%Y-%m-%d %H:%M:%S", &time_ptr);
-    string timestamp_value(date_and_time);
-
-    string insert_statement = "INSERT INTO publish_statistics ("
-                              "timestamp,"
-                              "files_added,"
-                              "files_removed,"
-                              "files_changed,"
-                              "directories_added,"
-                              "directories_removed,"
-                              "directories_changed,"
-                              "sz_bytes_added,"
-                              "sz_bytes_removed)"
-                              " VALUES("
-                              "'"+timestamp_value+"',"+  // TEXT
-                              files_added+"," +
-                              files_removed +","+
-                              files_changed + "," +
-                              dir_added + "," +
-                              dir_removed + "," +
-                              dir_changed + "," +
-                              bytes_added + "," +
-                              bytes_removed + ");";
-    // LogCvmfs(kLogCvmfs, kLogStdout, "%s", insert_statement.c_str());
-    sqlite::Sql insert(db->sqlite_db(), insert_statement);
-
-    if (!db->BeginTransaction()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "BeginTransaction failed!");
+    if (db->StoreStatistics(command) == 0) {
+       LogCvmfs(kLogCvmfs, kLogStdout, "Stored statistics, success!");
     }
 
-    if (!insert.Execute()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "insert.Execute failed!");
-    }
-
-    if (!insert.Reset()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "insert.Reset() failed!");
-    }
-
-    if (!db->CommitTransaction()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "CommitTransaction failed!");
-    }
-    // delete db;  // uncomment this to fail ?
+    delete db;  // uncomment this to fail ?
   }
 
   if (display_statistics) {
