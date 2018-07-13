@@ -13,18 +13,18 @@ bool           StatisticsDatabase::compacting_fails        = false;
 
 bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
-return sqlite::Sql(sqlite_db(),
-  "CREATE TABLE publish_statistics ("
-  "timestamp TEXT,"
-  "files_added INTEGER,"
-  "files_removed INTEGER,"
-  "files_changed INTEGER,"
-  "directories_added INTEGER,"
-  "directories_removed INTEGER,"
-  "directories_changed INTEGER,"
-  "sz_bytes_added INTEGER,"
-  "sz_bytes_removed INTEGER,"
-  "CONSTRAINT pk_publish_statistics PRIMARY KEY (timestamp));").Execute();
+  return sqlite::Sql(sqlite_db(),
+    "CREATE TABLE publish_statistics ("
+    "timestamp TEXT,"
+    "files_added INTEGER,"
+    "files_removed INTEGER,"
+    "files_changed INTEGER,"
+    "directories_added INTEGER,"
+    "directories_removed INTEGER,"
+    "directories_changed INTEGER,"
+    "sz_bytes_added INTEGER,"
+    "sz_bytes_removed INTEGER,"
+    "CONSTRAINT pk_publish_statistics PRIMARY KEY (timestamp));").Execute();
 }
 
 
@@ -94,7 +94,7 @@ std::string StatisticsDatabase::GetGMTimestamp() {
   time_t t = time(NULL);
   gmtime_r(&t, &time_ptr);      // take UTC
   // timestamp format
-  strftime(date_and_time, 1000, "%Y-%m-%d %H:%M:%S", &time_ptr);
+  strftime(date_and_time, 50, "%Y-%m-%d %H:%M:%S", &time_ptr);
   std::string timestamp(date_and_time);
   return timestamp;
 }

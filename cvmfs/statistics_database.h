@@ -51,23 +51,23 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   ~StatisticsDatabase();
 
 /**
-	*	Get command statistics values and convert them into string.
-	*/
+  * Get command statistics values and convert them into string.
+  */
   void GetStats(swissknife::Command *command, Stats *stats);
 
 /**
-	*	Get UTC Time in YYYY-MM-DD HH:MM:SS format
-	*/
+  * Get UTC Time in YYYY-MM-DD HH:MM:SS format
+  */
   std::string GetGMTimestamp();
 
 /**
-	*	Build the insert statement
-	*/
+  * Build the insert statement
+  */
   std::string PrepareStatement(Stats stats);
 
 /**
-	*	Entry point function for writing data into database
-	*/
+  * Entry point function for writing data into database
+  */
   int StoreStatistics(swissknife::Command *command);
 
  protected:
