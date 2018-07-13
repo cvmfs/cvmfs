@@ -100,7 +100,8 @@ std::string StatisticsDatabase::GetTimestamp() {
 }
 
 
-std::string StatisticsDatabase::PrepareStatement(std::string timestamp_value, Stats stats) {
+std::string StatisticsDatabase::PrepareStatement(std::string timestamp_value,
+                                                                Stats stats) {
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
     "timestamp,"

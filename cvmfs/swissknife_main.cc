@@ -132,6 +132,7 @@ int main(int argc, char **argv) {
 
   bool display_statistics = false;
   bool store_statistics = false;
+
   // parse the command line arguments for the Command
   swissknife::ArgumentList args;
   optind = 1;

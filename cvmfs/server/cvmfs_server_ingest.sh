@@ -202,6 +202,10 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -+stats"
   fi
 
+  if [ "x$CVMFS_STORE_STATISTICS" = "xtrue" ]; then
+    ingest_command="$ingest_command -+store_stats"
+  fi
+
   # ---> do it! (from here on we are changing things)
   publish_before_hook $name
   $user_shell "$dirtab_command" || { cvmfs_server_abort -f $name; die "Failed to apply .cvmfsdirtab"; }
