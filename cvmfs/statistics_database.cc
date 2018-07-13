@@ -113,7 +113,7 @@ std::string StatisticsDatabase::PrepareStatement(Stats stats) {
     "sz_bytes_added,"
     "sz_bytes_removed)"
     " VALUES("
-    "'"+GetTimestamp()+"',"+  // TEXT
+    "'"+GetGMTimestamp()+"',"+  // TEXT
     stats.files_added+"," +
     stats.files_removed +","+
     stats.files_changed + "," +

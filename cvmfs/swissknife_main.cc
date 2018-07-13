@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
        LogCvmfs(kLogCvmfs, kLogStdout, "Stored statistics, success!");
     }
 
-    delete db;  // uncomment this to fail ?
+    delete db;
   }
 
   if (display_statistics) {
