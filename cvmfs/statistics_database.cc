@@ -72,23 +72,23 @@ void StatisticsDatabase::GetStats(swissknife::Command *command, Stats *stats) {
   stats->files_added = command->statistics()->
                        Lookup("Publish.n_files_added")->ToString();
   stats->files_removed = command->statistics()->
-                   Lookup("Publish.n_files_removed")->ToString();
+                       Lookup("Publish.n_files_removed")->ToString();
   stats->files_changed = command->statistics()->
-                   Lookup("Publish.n_files_changed")->ToString();
+                       Lookup("Publish.n_files_changed")->ToString();
   stats->dir_added = command->statistics()->
                        Lookup("Publish.n_directories_added")->ToString();
   stats->dir_removed = command->statistics()->
-                   Lookup("Publish.n_directories_removed")->ToString();
+                       Lookup("Publish.n_directories_removed")->ToString();
   stats->dir_changed = command->statistics()->
-                   Lookup("Publish.n_directories_changed")->ToString();
+                       Lookup("Publish.n_directories_changed")->ToString();
   stats->bytes_added = command->statistics()->
-                   Lookup("Publish.sz_added_bytes")->ToString();
+                       Lookup("Publish.sz_added_bytes")->ToString();
   stats->bytes_removed = command->statistics()->
-                   Lookup("Publish.sz_removed_bytes")->ToString();
+                       Lookup("Publish.sz_removed_bytes")->ToString();
 }
 
 
-std::string StatisticsDatabase::GetTimestamp() {
+std::string StatisticsDatabase::GetGMTimestamp() {
   struct tm time_ptr;
   char date_and_time[50];
   time_t t = time(NULL);
@@ -100,8 +100,7 @@ std::string StatisticsDatabase::GetTimestamp() {
 }
 
 
-std::string StatisticsDatabase::PrepareStatement(std::string timestamp_value,
-                                                                Stats stats) {
+std::string StatisticsDatabase::PrepareStatement(Stats stats) {
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
     "timestamp,"
@@ -114,7 +113,7 @@ std::string StatisticsDatabase::PrepareStatement(std::string timestamp_value,
     "sz_bytes_added,"
     "sz_bytes_removed)"
     " VALUES("
-    "'"+timestamp_value+"',"+  // TEXT
+    "'"+GetTimestamp()+"',"+  // TEXT
     stats.files_added+"," +
     stats.files_removed +","+
     stats.files_changed + "," +
@@ -130,10 +129,8 @@ std::string StatisticsDatabase::PrepareStatement(std::string timestamp_value,
 int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
   Stats stats;
   GetStats(command, &stats);
-  GetTimestamp();
 
-  sqlite::Sql insert(this->sqlite_db(),
-                      PrepareStatement(GetTimestamp(), stats));
+  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(stats));
 
   if (!this->BeginTransaction()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "BeginTransaction failed!");
