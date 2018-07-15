@@ -71,6 +71,7 @@
 #include "sqlitevfs.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -289,6 +290,49 @@ int LibContext::GetAttr(const char *c_path, struct stat *info) {
   }
 
   *info = dirent.GetStatStructure();
+  return 0;
+}
+
+void LibContext::CvmfsAttrFromDirent(
+  const catalog::DirectoryEntry dirent,
+  struct cvmfs_attr *attr
+) {
+  attr->st_ino   = dirent.inode();
+  attr->st_mode  = dirent.mode();
+  attr->st_nlink = dirent.linkcount();
+  attr->st_uid   = dirent.uid();
+  attr->st_gid   = dirent.gid();
+  attr->st_rdev  = dirent.rdev();
+  attr->st_size  = dirent.size();
+  attr->mtime    = dirent.mtime();
+  attr->cvm_checksum = strdup(dirent.checksum().ToString().c_str());
+  attr->cvm_symlink  = strdup(dirent.symlink().c_str());
+  attr->cvm_name     = strdup(dirent.name().c_str());
+  attr->cvm_xattrs   = NULL;
+}
+
+
+int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
+
+  PathString p;
+  p.Assign(c_path, strlen(c_path));
+
+  catalog::DirectoryEntry dirent;
+  const bool found = GetDirentForPath(p, &dirent);
+
+  if (!found) {
+    return -ENOENT;
+  }
+
+  CvmfsAttrFromDirent(dirent, info);
+  if (dirent.HasXattrs()) {
+    XattrList *xattrs = new XattrList();
+    mount_point_->catalog_mgr()->LookupXattrs(p, xattrs);
+    info->cvm_xattrs = xattrs;
+  }
   return 0;
 }
 

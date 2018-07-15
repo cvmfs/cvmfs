@@ -122,6 +122,44 @@ struct cvmfs_nc_attr* cvmfs_nc_attr_init();
  */
 void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr);
 
+struct cvmfs_attr {
+  /* Struct definition information */
+  unsigned version;
+  uint64_t size;
+
+  /* Contents of stat, mapped from DirectoryEntry */
+  dev_t     st_dev;
+  ino_t     st_ino;
+  mode_t    st_mode;
+  nlink_t   st_nlink;
+  uid_t     st_uid;
+  gid_t     st_gid;
+  dev_t     st_rdev;
+  off_t     st_size;
+  time_t    mtime;
+
+  /* CVMFS related content */
+  /* This information is allocated and should be freed */
+  char * cvm_checksum;
+  char * cvm_symlink;
+  char * cvm_name;
+  void * cvm_xattrs;
+};
+
+/**
+ * Create the cvmfs_attr struct which contains the same information
+ * as a stat, but also has pointers to the hash, symlink, and name.
+ * \Return pointer to a cvmfs_attr struct
+ */
+struct cvmfs_attr* cvmfs_attr_init();
+
+/**
+ * Destroy the cvmfs_attr struct and frees the checksum, symlink,
+ * name, and xattrs.
+ * @param attr, pointer to a cvmfs_attr struct to be deleted.
+ */
+void cvmfs_attr_free(struct cvmfs_attr *attr);
+
 /**
  * Send syslog and debug messages to log_fn instead.  This may (and probably
  * should) be called before any other routine.  Setting this to NULL restores
@@ -322,6 +360,19 @@ int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st);
  * \return 0 on success, -1 on failure (sets errno)
  */
 int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
+
+/**
+ * Get the extended CVMFS information about a file. If the file is a symlink,
+ * return info about the link, not the file it points to.
+ *
+ * @param[in] path, path of file (e.g. /dir/file, not /cvmfs/repo/dir/file)
+ * @param[out] attr, cvmfs_attr struct in which to write the result
+ * \return 0 on success, -1 on failure
+ */
+int cvmfs_stat_attr(
+  cvmfs_context *ctx,
+  const char *path,
+  struct cvmfs_attr *attr);
 
 /**
  * Get list of directory contents.  The directory contents includes "." and

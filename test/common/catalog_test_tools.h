@@ -68,6 +68,12 @@ class DirSpec {
                const size_t size,
                const XattrList& xattrs = XattrList(),
                shash::Suffix suffix = shash::kSha1);
+  bool LinkFile(const std::string& name,
+                const std::string& parent,
+                const std::string& symlink,
+                const size_t size,
+                const XattrList& xattrs = XattrList(),
+                shash::Suffix suffix = shash::kSha1);
   bool AddDirectory(const std::string& name,
                     const std::string& parent,
                     const size_t size);
@@ -133,6 +139,9 @@ class CatalogTestTool : public ServerTool {
   bool Init();
   bool Apply(const std::string& id, const DirSpec& spec);
   bool ApplyAtRootHash(const shash::Any& root_hash, const DirSpec& spec);
+  bool FindEntry(const shash::Any& root_hash,
+                 const std::string& path,
+                 catalog::DirectoryEntry *entry);
   bool LookupNestedCatalogHash(const shash::Any& root_hash,
                                const std::string& path,
                                char **nc_hash);

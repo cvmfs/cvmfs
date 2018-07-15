@@ -81,6 +81,17 @@ bool DirSpec::AddFile(const std::string& name, const std::string& parent,
   return true;
 }
 
+bool DirSpec::LinkFile(const std::string& name, const std::string& parent,
+                         const std::string& symlink, const size_t size,
+                         const XattrList& xattrs, shash::Suffix suffix) {
+  const catalog::DirectoryEntry entry =
+    catalog::DirectoryEntryTestFactory::Symlink(name, size, symlink);
+  const std::string full_path = entry.GetFullPath(parent);
+  items_.insert(std::make_pair(full_path,
+                               DirSpecItem(entry, xattrs, parent)));
+  return true;
+}
+
 bool DirSpec::AddDirectory(const std::string& name, const std::string& parent,
                            const size_t size) {
   if (!HasDir(parent)) {
@@ -288,7 +299,7 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   for (DirSpec::ItemList::const_iterator it = spec.items().begin();
        it != spec.items().end(); ++it) {
     const DirSpecItem& item = it->second;
-    if (item.entry_.IsRegular()) {
+    if (item.entry_.IsRegular() || item.entry_.IsLink()) {
       catalog_mgr->AddFile(item.entry_base(), item.xattrs(), item.parent());
     } else if (item.entry_.IsDirectory()) {
       catalog_mgr->AddDirectory(item.entry_base(), item.parent());
@@ -320,7 +331,7 @@ bool CatalogTestTool::ApplyAtRootHash(
   for (DirSpec::ItemList::const_iterator it = spec.items().begin();
        it != spec.items().end(); ++it) {
     const DirSpecItem& item = it->second;
-    if (item.entry_.IsRegular()) {
+    if (item.entry_.IsRegular() || item.entry_.IsLink()) {
       catalog_mgr->AddFile(item.entry_base(), item.xattrs(), item.parent());
     } else if (item.entry_.IsDirectory()) {
       catalog_mgr->AddDirectory(item.entry_base(), item.parent());
@@ -371,6 +382,29 @@ bool CatalogTestTool::LookupNestedCatalogHash(
   if (!(*nc_hash)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "nested catalog for directory '%s' cannot be found",
+             path.c_str());
+    return false;
+  }
+
+  return true;
+}
+
+bool CatalogTestTool::FindEntry(
+  const shash::Any& root_hash,
+  const std::string& path,
+  catalog::DirectoryEntry *entry
+) {
+  perf::Statistics stats;
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
+                       download_manager(), &stats));
+  if (!catalog_mgr.IsValid()) {
+    return false;
+  }
+
+  if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, entry)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for directory '%s' cannot be found",
              path.c_str());
     return false;
   }

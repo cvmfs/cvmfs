@@ -104,6 +104,7 @@ class LibContext : SingleCopy {
   int64_t Pread(int fd, void *buf, uint64_t size, uint64_t off);
   int Close(int fd);
 
+  int GetExtAttr(const char *c_path, struct cvmfs_attr *info);
   int GetNestedCatalogAttr(const char *c_path, struct cvmfs_nc_attr *nc_attr);
   int ListNestedCatalogs(const char *path, char ***buf, size_t *buflen);
 
@@ -127,6 +128,8 @@ class LibContext : SingleCopy {
                           size_t       *buflen);
   bool GetDirentForPath(const PathString         &path,
                         catalog::DirectoryEntry  *dirent);
+  void CvmfsAttrFromDirent(const catalog::DirectoryEntry dirent,
+                           struct cvmfs_attr *attr);
 
   /**
    * Only non-NULL if cvmfs_attache_repo is used for initialization.  In this
