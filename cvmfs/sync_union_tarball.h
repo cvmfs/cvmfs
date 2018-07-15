@@ -13,6 +13,7 @@
 
 #include <pthread.h>
 
+#include <list>
 #include <map>
 #include <set>
 #include <string>
@@ -51,6 +52,8 @@ class SyncUnionTarball : public SyncUnion {
    */
   void Traverse();
 
+  void PostUpload();
+
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
   bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
@@ -62,14 +65,29 @@ class SyncUnionTarball : public SyncUnion {
   const std::string to_delete_;  ///< entity to delete before to extract the tar
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
+
+  /** 
+   * directories where we found catalog marker, after the main traverse we
+   * iterate through them and we add the catalog
+   */
   std::set<std::string> to_create_catalog_dirs_;
-  ///< directories where we found catalog marker, after the main traverse we
-  ///< iterate through them and we add the catalog
+
+  /**
+   * map of all directories found, we need them since we don't know, at priori,
+   * where the catalog files appears
+   */
   std::map<std::string, SharedPtr<SyncItem> > dirs_;
-  ///< map of all directories found, we need them since we don't know, at
-  ///< priori, where the catalog files appears
-  Signal *read_archive_signal_;  ///< Conditional variable to keep track of when
-                                 ///< is possible to read the tar file
+
+  /**
+   * map all the file that point to the same hardlink to the path of the file
+   * itself
+   */
+  std::map<const std::string, std::list<std::string> > hardlinks_;
+
+  /**
+   * Conditional variable to keep track of when is possible to read the tar file
+   */
+  Signal *read_archive_signal_;
 
   static const size_t kBlockSize = 4096 * 4;
 
@@ -85,6 +103,7 @@ class SyncUnionTarball : public SyncUnion {
    * @param target the directory to create
    */
   void CreateDirectories(const std::string &target);
+  void ProcessArchiveEntry(struct archive_entry *entry);
 };  // class SyncUnionTarball
 
 }  // namespace publish

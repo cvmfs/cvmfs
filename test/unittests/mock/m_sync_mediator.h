@@ -9,6 +9,8 @@
 
 #include <gmock/gmock.h>
 
+#include <string>
+
 #include "hash.h"
 #include "sync_mediator.h"
 #include "util/shared_ptr.h"
@@ -35,6 +37,7 @@ class MockSyncMediator : public AbstractSyncMediator {
   MOCK_METHOD1(Touch, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Remove, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Replace, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD2(Clone, void(const std::string from, const std::string to));
   MOCK_METHOD1(AddUnmaterializedDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(EnterDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(LeaveDirectory, void(SharedPtr<SyncItem> entry));

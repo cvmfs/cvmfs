@@ -287,6 +287,40 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
   SyncUnlock();
 }
 
+/**
+ * Clone the file called `source` changing its name into `destination`, the
+ * source file is keep intact
+ * @params destination, the name of the new file, complete path
+ * @params source, the name of the file to clone, which must be already in the
+ * repository
+ * @return void
+ */
+void WritableCatalogManager::Clone(const std::string destination,
+                                   const std::string source) {
+  const std::string relative_source = MakeRelativePath(source);
+
+  std::string destination_dirname;
+  std::string destination_filename;
+  SplitPath(destination, &destination_dirname, &destination_filename);
+
+  DirectoryEntry to_dirent;
+  if (!LookupPath(relative_source, kLookupSole, &to_dirent)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for file '%s' cannot be found aborting", source.c_str());
+    assert(false);
+  }
+  if (to_dirent.IsDirectory()) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "Trying to clone a directory: '%s' aborting", source.c_str());
+    assert(false);
+  }
+
+  DirectoryEntry destination_dirent(to_dirent);
+  destination_dirent.name_.Assign(
+      NameString(destination_filename.c_str(), destination_filename.length()));
+
+  this->AddFile(destination_dirent, empty_xattrs, destination_dirname);
+}
 
 /**
  * Add a new directory to the catalogs.

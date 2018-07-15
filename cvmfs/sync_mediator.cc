@@ -223,6 +223,9 @@ void SyncMediator::Replace(SharedPtr<SyncItem> entry) {
   Add(entry);
 }
 
+void SyncMediator::Clone(const std::string from, const std::string to) {
+  catalog_manager_->Clone(from, to);
+}
 
 void SyncMediator::EnterDirectory(SharedPtr<SyncItem> entry) {
   if (!handle_hardlinks_) {
@@ -304,6 +307,8 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
       AddHardlinkGroup(*i);
     }
   }
+
+  union_engine_->PostUpload();
 
   params_->spooler->UnregisterListeners();
 
