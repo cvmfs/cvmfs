@@ -457,6 +457,7 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
   AssertListHas("ListDirTest-foo.txt", dirList, listLen);
   AssertListHas("ListDirTest-bar.txt", dirList, listLen);
   AssertListHas("ListDirTest-symlink1", dirList, listLen);
+  AssertListHas(WARNING_FILE_NAME, dirList, listLen);
   listLen = 0;
   delete dirList;
   fs_traversal_instance_->interface->list_dir(
@@ -525,7 +526,7 @@ TEST_P(T_Fs_Traversal_Interface, ReadWriteTest) {
   ASSERT_EQ(-1,
     fs_traversal_instance_->interface->do_fwrite(
       hdl1, content1.c_str(), content1.length()));
-  ASSERT_EQ(-1,
+  ASSERT_EQ(0,
     fs_traversal_instance_->interface->do_fread(
       hdl1, buf, 100, &rlen));
   buf[rlen] = '\0';
