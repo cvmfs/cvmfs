@@ -23,7 +23,6 @@ enum fs_open_type {
 };
 
 struct fs_traversal {
-
   /**
    * Local copy of the context that should be set with the
    * returned value of initialize. Ideally this is created
