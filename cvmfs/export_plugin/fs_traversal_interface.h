@@ -23,6 +23,14 @@ enum fs_open_type {
 };
 
 struct fs_traversal {
+
+  /**
+   * Local copy of the context that should be set with the
+   * returned value of initialize. Ideally this is created
+   * and then freed all within the traversal.
+   */
+  struct fs_traversal_context *context_;
+
   /**
    * Method which initializes a file system traversal context based on
    * repository and data storage information
@@ -94,6 +102,19 @@ struct fs_traversal {
    */
   bool (*is_hash_consistent)(struct fs_traversal_context *ctx,
                 const struct cvmfs_attr *stat);
+
+  /**
+   * Sets the meta informations for the directory entry.
+   * This assumes that other information is the same, and
+   * only updates the metadata. Used only on directories.
+   *
+   * @param[in] ctx The file systme traverssal context
+   * @param[in] path The path of the object to be updated
+   * @param[in] stat The stat structure that determines the new values
+   * @returns 0 on success, -1 otherwise
+   */
+  int (*set_meta)(struct fs_traversal_context *ctx,
+                const char *path, const struct cvmfs_attr *stat);
 
   /**
    * Method which returns an identifier (usually a path)
