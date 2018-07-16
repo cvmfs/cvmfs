@@ -214,6 +214,10 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   return 0;
 }
 
+int posix_set_meta(struct fs_traversal_context *ctx,
+  const char *path, const struct cvmfs_attr *stat_info) {
+  return PosixSetMeta(path, stat_info);
+}
 const char *posix_get_identifier(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat) {
   shash::Any content_hash =
@@ -473,6 +477,7 @@ struct fs_traversal *posix_get_interface() {
   result->list_dir = posix_list_dir;
   result->get_stat = posix_get_stat;
   result->is_hash_consistent = posix_is_hash_consistent;
+  result->set_meta = posix_set_meta;
   result->has_file = posix_has_file;
   result->get_identifier = posix_get_identifier;
   result->do_link = posix_do_link;
