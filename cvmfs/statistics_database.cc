@@ -126,6 +126,30 @@ std::string StatisticsDatabase::PrepareStatement(Stats stats) {
 }
 
 
+std::string StatisticsDatabase::GetValidPath(std::string repo_name) {
+  // default location
+  std::string db_file_path = "/var/spool/cvmfs/" + repo_name + "/stats.db";
+  receiver::Params server_conf_params;
+  receiver::GetParamsFromFile(repo_name, &server_conf_params);
+  if (server_conf_params.statistics_db != "") {
+    std::string dirname = GetParentPath(server_conf_params.statistics_db);
+    int retval = MkdirDeep(dirname,
+      S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH,
+      true);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+        "Couldn't write statistics at the specified path %s"
+        ", statistics will be written in the default path %s",
+        server_conf_params.statistics_db.c_str(),
+        db_file_path.c_str());
+    } else {
+      db_file_path = server_conf_params.statistics_db;
+    }
+  }
+  return db_file_path;
+}
+
+
 int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
   Stats stats;
   GetStats(command, &stats);

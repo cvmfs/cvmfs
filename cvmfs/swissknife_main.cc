@@ -9,7 +9,6 @@
 #include <cassert>
 
 #include "logging.h"
-#include "receiver/params.h"
 #include "statistics_database.h"
 #include "swissknife.h"
 
@@ -198,16 +197,10 @@ int main(int argc, char **argv) {
 
   if (command->GetName() == "sync" || command->GetName() == "ingest") {
     StatisticsDatabase *db;
-    string db_file_path;
+
     // get the repo name
-    const std::string repo_name = *args.find('N')->second;
-    receiver::Params server_conf_params;
-    receiver::GetParamsFromFile(repo_name, &server_conf_params);
-    if (server_conf_params.statistics_db != "") {
-      db_file_path = server_conf_params.statistics_db;
-    } else {
-      db_file_path = "/var/spool/cvmfs/" + repo_name + "/stats.db";
-    }
+    string repo_name = *args.find('N')->second;
+    string db_file_path = StatisticsDatabase::GetValidPath(repo_name);
 
     // create a new database file if is not already there
     if (FileExists(db_file_path)) {
@@ -219,6 +212,9 @@ int main(int argc, char **argv) {
     assert(db != NULL);
     db->StoreStatistics(command);
     delete db;
+
+    LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at:%s",
+      db_file_path.c_str());
   }
 
   // delete the command list

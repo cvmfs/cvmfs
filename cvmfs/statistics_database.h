@@ -7,8 +7,10 @@
 
 #include <ctime>
 #include <string>
+#include "receiver/params.h"
 #include "sql.h"
 #include "swissknife.h"
+#include "util/posix.h"
 
 typedef struct {
   std::string files_added;
@@ -64,6 +66,11 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * Build the insert statement
   */
   std::string PrepareStatement(Stats stats);
+
+/**
+  * Returns a valid path for the database file
+  */
+  static std::string GetValidPath(std::string repo_name);
 
 /**
   * Entry point function for writing data into database
