@@ -189,7 +189,6 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     params->statistics_db = statistics_db_str;
   }
 
-
   return true;
 }
 
