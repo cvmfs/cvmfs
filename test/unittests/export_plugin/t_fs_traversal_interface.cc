@@ -47,8 +47,8 @@ class T_Fs_Traversal_Interface :
     fs_traversal_instance_ = GetParam();
     const char *repo = fs_traversal_instance_->repo;
     if (repo == NULL) {
-      std::string repoName = GetCurrentWorkingDirectory();
-      repo = strdup(repoName.c_str());
+      // Current working directory setup from testing environment
+      repo = "./";
     }
     context_ = fs_traversal_instance_->interface->initialize(
       repo,
@@ -630,7 +630,7 @@ TEST_P(T_Fs_Traversal_Interface, SymlinkTest) {
 
 struct fs_traversal_test posix = {
   posix_get_interface(),
-  NULL,
+  "./",
   ".data"
 };
 
