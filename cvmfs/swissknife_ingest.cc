@@ -138,7 +138,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  perf::StatisticsTemplate statistics("Ingest", this->statistics());
+  perf::StatisticsTemplate statistics("Publish", this->statistics());
   publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   publish::SyncUnion *sync;
