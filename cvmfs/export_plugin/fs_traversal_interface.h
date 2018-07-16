@@ -83,12 +83,14 @@ struct fs_traversal {
    * If this method returns false it usually means the file is out of sync
    * and needs to be copied and linked
    * 
-   * is_hash_consistent returns false and a non-zero errno on error
    * Error if:
    * - Visible path (stat->cvm_name) doesn't exist (ENOENT)
    * 
    * 
+   * @param[in] ctx The file system traversal context
+   * @param[in] stat The stat which should be used for the consistency check
    * @returns true if consistent, false if not
+   *    is_hash_consistent returns false and a non-zero errno on error
    */
   bool (*is_hash_consistent)(struct fs_traversal_context *ctx,
                 const struct cvmfs_attr *stat);
@@ -236,6 +238,20 @@ struct fs_traversal {
                 const char *src,
                 const char *dest,
                 const struct cvmfs_attr *stat_info);
+
+  /**
+   * Method which executes garbage collection on the file systems hidden data
+   * directories.
+   * 
+   * This method is usually quite costly in terms of time and should only be
+   * invoked with care!
+   * If multiple repositories share the same hidden data repository it makes
+   * sense to invoke it only once all repositories are up to date.
+   * 
+   * @param[in] ctx The file system traversal context
+   * @returns 0 on success
+   */
+  int (*garbage_collector)(struct fs_traversal_context *ctx);
 
   /**
    * Method which opens a file described by the given file context.

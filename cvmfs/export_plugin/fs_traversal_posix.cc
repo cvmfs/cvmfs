@@ -434,6 +434,11 @@ bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
   return display_path_stat.st_ino == hidden_path_stat.st_ino;
 }
 
+int posix_garbage_collector(struct fs_traversal_context *ctx) {
+  // TODO(steuber): Implementation
+  return -1;
+}
+
 struct fs_traversal_context *posix_initialize(
   const char *repo,
   const char *data) {
@@ -470,6 +475,7 @@ struct fs_traversal *posix_get_interface() {
   result->touch = posix_touch;
   result->get_handle = posix_get_handle;
   result->do_symlink = posix_do_symlink;
+  result->garbage_collector = posix_garbage_collector;
 
   result->do_fopen = posix_do_fopen;
   result->do_fclose = posix_do_fclose;
