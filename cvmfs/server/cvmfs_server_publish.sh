@@ -277,9 +277,6 @@ cvmfs_server_publish() {
     if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
       sync_command="$sync_command -+stats"
     fi
-    if [ "x$CVMFS_STORE_STATISTICS" = "xtrue" ]; then
-      sync_command="$sync_command -+store_stats"
-    fi
     # Must be after the virtual-dir command is constructed
     if is_checked_out $name; then
       sync_command="$sync_command -B"

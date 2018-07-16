@@ -131,7 +131,6 @@ int main(int argc, char **argv) {
   }
 
   bool display_statistics = false;
-  bool store_statistics = false;
 
   // parse the command line arguments for the Command
   swissknife::ArgumentList args;
@@ -169,8 +168,6 @@ int main(int argc, char **argv) {
       for (unsigned i = 0; i < flags.size(); ++i) {
         if (flags[i] == "stats") {
           display_statistics = true;
-        } else if (flags[i] == "store_stats") {
-          store_statistics = true;
         }
       }
     }
@@ -192,10 +189,17 @@ int main(int argc, char **argv) {
   // run the command
   const int retval = command->Main(args);
 
-  if (store_statistics) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Storing statistics...");
-    StatisticsDatabase *db;
+  if (display_statistics) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s",
+             command->statistics()
+             ->PrintList(perf::Statistics::kPrintHeader).c_str());
+  }
 
+  if (command->GetName() == "sync" || command->GetName() == "ingest") {
+    LogCvmfs(kLogCvmfs, kLogStdout, "DB...");
+
+    StatisticsDatabase *db;
     // get the repo name
     string repo_name = *args.find('N')->second;
     string db_file_path = "/tmp/" + repo_name + ".db";
@@ -207,18 +211,8 @@ int main(int argc, char **argv) {
       db = StatisticsDatabase::Create(db_file_path);
     }
     assert(db != NULL);
-    if (db->StoreStatistics(command) == 0) {
-       LogCvmfs(kLogCvmfs, kLogStdout, "Stored statistics, success!");
-    }
-
+    db->StoreStatistics(command);
     delete db;
-  }
-
-  if (display_statistics) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s",
-             command->statistics()
-             ->PrintList(perf::Statistics::kPrintHeader).c_str());
   }
 
   // delete the command list
