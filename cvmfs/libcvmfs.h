@@ -396,6 +396,27 @@ int cvmfs_listdir(
   size_t *buflen);
 
 /**
+ * Get list of directory contents.  The directory contents includes "." and
+ * "..".
+ *
+ * On return, the array will contain a NULL-terminated list of strings.  The
+ * caller must free the strings and the array containing them.  The array (*buf)
+ * may be NULL when this function is called.
+ *
+ * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
+ * @param[out] buf, pointer to dynamically allocated NULL-terminated array of
+ *             strings
+ * @param[in] buflen, pointer to variable containing size of array
+ * \return 0 on success, -1 on failure (sets errno)
+ */
+int cvmfs_listdir_contents(
+  cvmfs_context *ctx,
+  const char *path,
+  char ***buf,
+  size_t *listlen,
+  size_t *buflen);
+
+/**
  * Get the CVMFS information about a nested catalog. The information returned
  * pertains to the catalog that serves this path, if this path is a transition
  * point, then the information is about this transition point.

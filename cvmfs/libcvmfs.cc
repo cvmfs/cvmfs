@@ -360,13 +360,38 @@ int cvmfs_listdir(
   }
   path = lpath.c_str();
 
-  rc = ctx->ListDirectory(path, buf, buflen);
+  size_t listsize = 0;
+  rc = ctx->ListDirectory(path, buf, &listsize, buflen);
   if (rc < 0) {
     errno = -rc;
     return -1;
   }
   return 0;
 }
+
+int cvmfs_listdir_contents(
+  LibContext *ctx,
+  const char *path,
+  char ***buf,
+  size_t *listlen,
+  size_t *buflen
+) {
+  string lpath;
+  int rc;
+  rc = expand_path(0, ctx, path, &lpath);
+  if (rc < 0) {
+    return -1;
+  }
+  path = lpath.c_str();
+
+  rc = ctx->ListDirectory(path, buf, listlen, buflen);
+  if (rc < 0) {
+    errno = -rc;
+    return -1;
+  }
+  return 0;
+}
+
 
 
 int cvmfs_stat_nc(

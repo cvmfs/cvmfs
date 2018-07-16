@@ -367,6 +367,7 @@ int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
 int LibContext::ListDirectory(
   const char *c_path,
   char ***buf,
+  size_t *listlen,
   size_t *buflen
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
@@ -391,18 +392,17 @@ int LibContext::ListDirectory(
     return -ENOTDIR;
   }
 
-  size_t listlen = 0;
-  AppendStringToList(NULL, buf, &listlen, buflen);
+  AppendStringToList(NULL, buf, listlen, buflen);
 
   // Build listing
 
   // Add current directory link
-  AppendStringToList(".", buf, &listlen, buflen);
+  AppendStringToList(".", buf, listlen, buflen);
 
   // Add parent directory link
   catalog::DirectoryEntry p;
   if (d.inode() != mount_point_->catalog_mgr()->GetRootInode()) {
-    AppendStringToList("..", buf, &listlen, buflen);
+    AppendStringToList("..", buf, listlen, buflen);
   }
 
   // Add all names
@@ -412,7 +412,7 @@ int LibContext::ListDirectory(
   }
   for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
     AppendStringToList(listing_from_catalog.AtPtr(i)->name.c_str(),
-                          buf, &listlen, buflen);
+                          buf, listlen, buflen);
   }
 
   return 0;
