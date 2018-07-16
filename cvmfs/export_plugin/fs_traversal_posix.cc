@@ -169,7 +169,7 @@ void posix_list_dir(struct fs_traversal_context *ctx,
 }
 
 int posix_get_stat(struct fs_traversal_context *ctx,
-  const char *path, struct cvmfs_attr *stat_result) {
+  const char *path, struct cvmfs_attr *stat_result, bool get_hash) {
   std::string complete_path = BuildPath(ctx, path);
   struct stat buf;
   int res = lstat(complete_path.c_str(), &buf);
@@ -187,13 +187,17 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   stat_result->mtime = buf.st_mtime;
 
   // Calculate hash
-  /*shash::Any cvm_checksum = shash::Any(shash::kSha1);
-  shash::HashFile(complete_path, &cvm_checksum);
-  std::string checksum_string = cvm_checksum.ToString();
-  stat_result->cvm_checksum = strdup(checksum_string.c_str());*/
-  // We usually do not calculate the checksum for posix files since it's a
-  // destination file system.
-  stat_result->cvm_checksum = NULL;
+  if (get_hash) {
+    shash::Any cvm_checksum = shash::Any(shash::kSha1);
+    shash::HashFile(complete_path, &cvm_checksum);
+    std::string checksum_string = cvm_checksum.ToString();
+    stat_result->cvm_checksum = strdup(checksum_string.c_str());
+  } else {
+    // We usually do not calculate the checksum for posix files since it's a
+    // destination file system.
+    stat_result->cvm_checksum = NULL;
+  }
+
   if (S_ISLNK(buf.st_mode)) {
     char slnk[PATH_MAX+1];
     const ssize_t length =
@@ -216,7 +220,8 @@ int posix_get_stat(struct fs_traversal_context *ctx,
 
 int posix_set_meta(struct fs_traversal_context *ctx,
   const char *path, const struct cvmfs_attr *stat_info) {
-  return PosixSetMeta(path, stat_info);
+  std::string complete_path = BuildPath(ctx, path);
+  return PosixSetMeta(complete_path.c_str(), stat_info);
 }
 const char *posix_get_identifier(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat) {
