@@ -153,15 +153,15 @@ class T_Fs_Traversal_Interface :
     shash::HashString(content2, &content2_hash);
     // FILE META 1
     XattrList *xlistdir = create_sample_xattrlist(prefix);
-    const struct cvmfs_attr *stat_values_dir = create_sample_stat(
+    struct cvmfs_attr *stat_values_dir = create_sample_stat(
       ("/" + prefix + "-bar.txt").c_str(),
       10, 0770, 0, xlistdir, &content1_hash);
     XattrList *xlist1 = create_sample_xattrlist(prefix);
-    const struct cvmfs_attr *stat_values1 = create_sample_stat(
+    struct cvmfs_attr *stat_values1 = create_sample_stat(
       ("/" + prefix + "-foo.txt").c_str(),
       10, 0770, 0, xlist1, &content1_hash);
     XattrList *xlist2 = create_sample_xattrlist(prefix+"-2");
-    const struct cvmfs_attr *stat_values2 = create_sample_stat(
+    struct cvmfs_attr *stat_values2 = create_sample_stat(
       ("/" + prefix + "-bar.txt").c_str(),
       10, 0770, 0, xlist2, &content2_hash);
     *ident1 = std::string(
@@ -240,17 +240,17 @@ class T_Fs_Traversal_Interface :
 
     // Test Hash consistency checking...
     ASSERT_TRUE(fs_traversal_instance_->interface->is_hash_consistent(
-      context_, &stat_values1));
+      context_, stat_values1));
     ASSERT_TRUE(fs_traversal_instance_->interface->is_hash_consistent(
-      context_, &stat_values2));
+      context_, stat_values2));
     ASSERT_FALSE(fs_traversal_instance_->interface->is_hash_consistent(
-      context_, &stat_values_dir));
+      context_, stat_values_dir));
     ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-foo.txt").c_str(),
       ident2->c_str()));
     ASSERT_FALSE(fs_traversal_instance_->interface->is_hash_consistent(
-      context_, &stat_values1));
+      context_, stat_values1));
     ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-foo.txt").c_str(),
