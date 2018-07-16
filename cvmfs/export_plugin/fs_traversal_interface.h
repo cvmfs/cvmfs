@@ -65,6 +65,9 @@ struct fs_traversal {
    * Method which returns a stat struct given a file path.
    * If the file doesn't exist, NULL is returned
    * 
+   * @note(steuber): The content checksum only needs to be calculated if this
+   * is a source file system!
+   * 
    * @param[in] ctx The file system traversal context
    * @param[in] path The path of the object to stat
    * @param[out] stat The stat struct to write the information into
@@ -72,6 +75,23 @@ struct fs_traversal {
    */
   int (*get_stat)(struct fs_traversal_context *ctx,
                 const char *path, struct cvmfs_attr *stat);
+
+  /**
+   * Checks whether for a given stat the file at the stat's path name
+   * still corresponds to the stat defined checksums
+   * 
+   * If this method returns false it usually means the file is out of sync
+   * and needs to be copied and linked
+   * 
+   * is_hash_consistent returns false and a non-zero errno on error
+   * Error if:
+   * - Visible path (stat->cvm_name) doesn't exist (ENOENT)
+   * 
+   * 
+   * @returns true if consistent, false if not
+   */
+  bool (*is_hash_consistent)(struct fs_traversal_context *ctx,
+                const struct cvmfs_attr *stat);
 
   /**
    * Method which returns an identifier (usually a path)

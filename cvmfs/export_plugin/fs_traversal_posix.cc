@@ -91,13 +91,14 @@ int PosixSetMeta(const char *path,
   XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
   std::vector<std::string> v = xlist->ListKeys();
   std::string val;
-  for (std::vector<std::string>::iterator it = v.begin(); it != v.end(); ++it) {
-    if (!set_permissions) {
-      continue;
+  if (set_permissions) {
+    for (std::vector<std::string>::iterator it = v.begin();
+          it != v.end();
+          ++it) {
+      xlist->Get(*it, &val);
+      int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
+      if (res != 0) return -1;
     }
-    xlist->Get(*it, &val);
-    int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
-    if (res != 0) return -1;
   }
   if (res != 0) return -1;
   return 0;
@@ -169,11 +170,6 @@ void posix_list_dir(struct fs_traversal_context *ctx,
 
 int posix_get_stat(struct fs_traversal_context *ctx,
   const char *path, struct cvmfs_attr *stat_result) {
-  // NOTE(steuber): Save hash + last modified(!=changed) as xattr
-  // -> Could also be done for directories! (chmod changes on file change)
-  // Probably more realistic without last modified though
-  // (means we need to know that fs wasn`t changed)
-  // -> only hash if necessary?
   std::string complete_path = BuildPath(ctx, path);
   struct stat buf;
   int res = lstat(complete_path.c_str(), &buf);
@@ -191,11 +187,13 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   stat_result->mtime = buf.st_mtime;
 
   // Calculate hash
-  // NOTE(steuber): Which hashing algorithm? (Not Sha1?)
-  shash::Any cvm_checksum = shash::Any(shash::kSha1);
+  /*shash::Any cvm_checksum = shash::Any(shash::kSha1);
   shash::HashFile(complete_path, &cvm_checksum);
   std::string checksum_string = cvm_checksum.ToString();
-  stat_result->cvm_checksum = strdup(checksum_string.c_str());
+  stat_result->cvm_checksum = strdup(checksum_string.c_str());*/
+  // We usually do not calculate the checksum for posix files since it's a
+  // destination file system.
+  stat_result->cvm_checksum = NULL;
   if (S_ISLNK(buf.st_mode)) {
     char slnk[PATH_MAX+1];
     const ssize_t length =
@@ -333,6 +331,7 @@ int posix_touch(struct fs_traversal_context *ctx,
     return -1;
   }
   std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
+  delete identifier;
   int res1 = creat(hidden_datapath.c_str(), stat_info->st_mode);
   if (res1 < 0) return -1;
   int res2 = close(res1);
@@ -410,6 +409,30 @@ void posix_do_ffree(void *file_ctx) {
   delete handle;
 }
 
+bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
+                const struct cvmfs_attr *stat_info) {
+  errno = 0;
+  std::string complete_path = BuildPath(ctx, stat_info->cvm_name);
+  struct stat display_path_stat;
+  int res1 = lstat(complete_path.c_str(), &display_path_stat);
+  if (res1 == -1) {
+    // If visible path doesn't exist => error
+    return false;
+  }
+  const char *identifier = posix_get_identifier(ctx, stat_info);
+  if (!posix_has_file(ctx, identifier)) {
+    return false;
+  }
+  std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
+  struct stat hidden_path_stat;
+  int res2 = stat(hidden_datapath.c_str(), &hidden_path_stat);
+  if (res2 == -1) {
+    // If hidden path doesn't exist although apprently existing => error
+    return false;
+  }
+  delete identifier;
+  return display_path_stat.st_ino == hidden_path_stat.st_ino;
+}
 
 struct fs_traversal_context *posix_initialize(
   const char *repo,
@@ -437,6 +460,7 @@ struct fs_traversal *posix_get_interface() {
   result->finalize = posix_finalize;
   result->list_dir = posix_list_dir;
   result->get_stat = posix_get_stat;
+  result->is_hash_consistent = posix_is_hash_consistent;
   result->has_file = posix_has_file;
   result->get_identifier = posix_get_identifier;
   result->do_link = posix_do_link;
