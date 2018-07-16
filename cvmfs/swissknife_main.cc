@@ -189,7 +189,6 @@ int main(int argc, char **argv) {
 
   // run the command
   const int retval = command->Main(args);
-
   if (display_statistics) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
