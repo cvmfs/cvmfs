@@ -289,7 +289,7 @@ TEST_P(T_Fs_Traversal_Interface, StatTest) {
   std::string val;
   // Correct inode configuration
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/StatTest-foo.txt", foostat));
+    context_, "/StatTest-foo.txt", foostat, false));
   ASSERT_STREQ("/StatTest-foo.txt", foostat->cvm_name);
   ASSERT_EQ(0770, MODE_BITMASK & foostat->st_mode);
   ASSERT_EQ(getuid(), foostat->st_uid);
@@ -299,13 +299,13 @@ TEST_P(T_Fs_Traversal_Interface, StatTest) {
   ASSERT_STREQ("StatTest", val.c_str());
 
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/StatTest-bar.txt", barstat));
+    context_, "/StatTest-bar.txt", barstat, false));
   XattrList *xlist2 = reinterpret_cast<XattrList *>(barstat->cvm_xattrs);
   xlist2->Get("user.foo", &val);
   ASSERT_STREQ("StatTest-2", val.c_str());
 
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/StatTest-symlink1", symlinkstat));
+    context_, "/StatTest-symlink1", symlinkstat, false));
   ASSERT_STREQ("./foo", symlinkstat->cvm_symlink);
 
   cvmfs_attr_free(foostat);
@@ -548,18 +548,18 @@ TEST_P(T_Fs_Traversal_Interface, LinkUnlinkTest) {
   struct cvmfs_attr *foobarstat = cvmfs_attr_init();
   // Correct inode configuration
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo.txt", foostat));
+    context_, "/LinkUnlinkTest-foo.txt", foostat, false));
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-bar.txt", barstat));
+    context_, "/LinkUnlinkTest-bar.txt", barstat, false));
   ASSERT_NE(foostat->st_ino, barstat->st_ino);
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo/bar/foobar1.txt", foobarstat));
+    context_, "/LinkUnlinkTest-foo/bar/foobar1.txt", foobarstat, false));
   ASSERT_EQ(foostat->st_ino, foobarstat->st_ino);
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo/bar/foobar2.txt", foobarstat));
+    context_, "/LinkUnlinkTest-foo/bar/foobar2.txt", foobarstat, false));
   ASSERT_EQ(foostat->st_ino, foobarstat->st_ino);
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", foobarstat));
+    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", foobarstat, false));
   ASSERT_EQ(foostat->st_ino, foobarstat->st_ino);
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_link(
     context_, "/LinkUnlinkTest-foobar/foofoobar/foofoofoobar", ident1.c_str()));
@@ -570,7 +570,7 @@ TEST_P(T_Fs_Traversal_Interface, LinkUnlinkTest) {
   ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
     context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", ident2.c_str()));
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", foobarstat));
+    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", foobarstat, false));
   ASSERT_EQ(barstat->st_ino, foobarstat->st_ino);
 
   cvmfs_attr_free(foostat);
@@ -621,10 +621,10 @@ TEST_P(T_Fs_Traversal_Interface, SymlinkTest) {
   struct cvmfs_attr *sl1Stat = cvmfs_attr_init();
   struct cvmfs_attr *sl2Stat = cvmfs_attr_init();
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/SymlinkTest-symlink1", sl1Stat));
+    context_, "/SymlinkTest-symlink1", sl1Stat, false));
   ASSERT_STREQ("./foo", sl1Stat->cvm_symlink);
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/SymlinkTest-foo/bar/symlink2", sl2Stat));
+    context_, "/SymlinkTest-foo/bar/symlink2", sl2Stat, false));
   ASSERT_STREQ("./foobar", sl2Stat->cvm_symlink);
   cvmfs_attr_free(sl1Stat);
   cvmfs_attr_free(sl2Stat);

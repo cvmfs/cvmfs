@@ -78,10 +78,12 @@ struct fs_traversal {
    * @param[in] ctx The file system traversal context
    * @param[in] path The path of the object to stat
    * @param[out] stat The stat struct to write the information into
+   * @param[in] get_hash Whether the file hash
+   *  should be calculated (true) or not (false)
    * @returns 0 on success
    */
   int (*get_stat)(struct fs_traversal_context *ctx,
-                const char *path, struct cvmfs_attr *stat);
+                const char *path, struct cvmfs_attr *stat, bool get_hash);
 
   /**
    * Checks whether for a given stat the file at the stat's path name

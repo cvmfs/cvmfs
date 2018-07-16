@@ -78,7 +78,8 @@ bool copy_file(
   const char *dest_data,
   int parallel);
 
-bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest) {
+bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
+    struct fs_traversal *dest_fs) {
   if (!src) { return false; }
   if (!dest) { return false; }
   if (src->version != dest->version) { return false; }
@@ -95,10 +96,9 @@ bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest) {
   if (src->mtime != dest->mtime)       { return false; }
 
   // CVMFS related content
-  if (src->cvm_checksum && dest->cvm_checksum) {
-    if (strcmp(src->cvm_checksum, dest->cvm_checksum)) { return false; }
-  } else if ((!src->cvm_checksum && dest->cvm_checksum) ||
-            (src->cvm_checksum && !dest->cvm_checksum)) {
+  if (src->cvm_checksum) {
+    if (!dest_fs->is_hash_consistent(dest_fs->context_, src)) { return false; }
+  } else if (!src->cvm_checksum && dest->cvm_checksum) {
     return false;
   }
 
@@ -155,12 +155,13 @@ bool getNext(
 bool updateStat(
   struct fs_traversal *fs,
   const char *entry,
-  struct cvmfs_attr **st
+  struct cvmfs_attr **st,
+  bool get_hash
 ) {
   cvmfs_attr_free(*st);
   *st = NULL;
   *st = cvmfs_attr_init();
-  int retval = fs->get_stat(fs->context_, entry, *st);
+  int retval = fs->get_stat(fs->context_, entry, *st, get_hash);
   return retval;
 }
 
@@ -182,7 +183,7 @@ bool CommandExport::Traverse(
   qsort(src_dir, src_len, sizeof(char *),  strcmp_list);
 
   if (getNext(src, dir, src_dir, &src_entry, NULL)) {
-    updateStat(src, src_entry, &src_st);
+    updateStat(src, src_entry, &src_st, true);
   }
 
   char **dest_dir = NULL;
@@ -194,7 +195,7 @@ bool CommandExport::Traverse(
   qsort(dest_dir, dest_len, sizeof(char *),  strcmp_list);
 
   if (getNext(dest, dir, dest_dir, &dest_entry, NULL)) {
-    updateStat(dest, dest_entry, &dest_st);
+    updateStat(dest, dest_entry, &dest_st, false);
   }
 
 
@@ -211,19 +212,19 @@ bool CommandExport::Traverse(
     }
     if (cmp == 0) {
       // Compares stats to see if they are equivalent
-      if (!cvmfs_attr_cmp(src_st, dest_st)) {
+      if (!cvmfs_attr_cmp(src_st, dest_st, dest)) {
         // If not equal, bring dest up-to-date
         switch (src_st->st_mode & S_IFMT) {
           case S_IFREG:
             {
               // They don't point to the same data, link new data
               const char *dest_data;
-              dest_data = dest->get_identifier(dest->context_, dest_st);
+              dest_data = dest->get_identifier(dest->context_, src_st);
               const char *src_data;
               src_data = src->get_identifier(src->context_, src_st);
 
               // Touch is atomic, if it fails something else will write file?
-              if (!dest->touch(dest->context_, dest_st)) {
+              if (!dest->touch(dest->context_, src_st)) {
                 // PUSH TO PIPE
                 if (!copy_file(src, src_data, dest, dest_data, parallel)) {
                   LogCvmfs(kLogCvmfs, kLogDebug,
@@ -275,10 +276,10 @@ bool CommandExport::Traverse(
         }
       }
       if (getNext(src, dir, src_dir, &src_entry, &src_iter)) {
-        updateStat(src, src_entry, &src_st);
+        updateStat(src, src_entry, &src_st, true);
       }
       if (getNext(dest, dir, dest_dir, &dest_entry, &dest_iter)) {
-        updateStat(dest, dest_entry, &dest_st);
+        updateStat(dest, dest_entry, &dest_st, false);
       }
 
     /* Src contains something missing from Dest */
@@ -338,7 +339,7 @@ bool CommandExport::Traverse(
           break;
       }
       if (getNext(src, dir, src_dir, &src_entry, &src_iter)) {
-        updateStat(src, src_entry, &src_st);
+        updateStat(src, src_entry, &src_st, true);
       }
     /* Dest contains something missing from Src */
     } else if (cmp > 0) {
@@ -366,7 +367,7 @@ bool CommandExport::Traverse(
           break;
       }
       if (getNext(dest, dir, dest_dir, &dest_entry, &dest_iter)) {
-        updateStat(dest, dest_entry, &dest_st);
+        updateStat(dest, dest_entry, &dest_st, false);
       }
     }
   }
