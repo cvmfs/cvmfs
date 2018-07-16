@@ -433,11 +433,10 @@ TEST_F(T_Libcvmfs, Attr) {
   retval = cvmfs_stat_attr(ctx, "/dir/file1", attr);
   EXPECT_EQ(0, retval);
   // Compare hash and size
-  retval = strcmp(file1_hash, attr->cvm_checksum);
-  EXPECT_FALSE(retval);
+  EXPECT_STREQ(file1_hash, attr->cvm_checksum);
   // Verify the file size
   EXPECT_EQ(file_size, attr->st_size);
-  EXPECT_FALSE(attr->cvm_xattrs);
+  EXPECT_EQ(NULL, attr->cvm_xattrs);
   cvmfs_attr_free(attr);
 
   attr = cvmfs_attr_init();
@@ -445,10 +444,10 @@ TEST_F(T_Libcvmfs, Attr) {
   retval = cvmfs_stat_attr(ctx, "/dir/link", attr);
   EXPECT_EQ(0, retval);
   // Compare link path
-  EXPECT_FALSE(strcmp("file1", attr->cvm_symlink));
+  EXPECT_STREQ("file1", attr->cvm_symlink);
   // Link checksum is different than the linked file
-  EXPECT_FALSE(strcmp(link_hash, attr->cvm_checksum));
-  EXPECT_TRUE(strcmp(file1_hash, attr->cvm_checksum));
+  EXPECT_STREQ(link_hash, attr->cvm_checksum);
+  EXPECT_STRNE(file1_hash, attr->cvm_checksum);
   // Link size is small, not eq to file_size
   EXPECT_FALSE(attr->cvm_xattrs);
   cvmfs_attr_free(attr);
@@ -512,10 +511,10 @@ TEST_F(T_Libcvmfs, Listdir) {
   // The buf length should be at least 4
   EXPECT_LE(4U, buflen);
   // Check that listed info matches specified dir
-  EXPECT_FALSE(strcmp(".", buf[0]));
-  EXPECT_FALSE(strcmp("..", buf[1]));
-  EXPECT_FALSE(strcmp("dir",  buf[2]));
-  EXPECT_FALSE(strcmp("file2",  buf[3]));
+  EXPECT_STREQ(".", buf[0]);
+  EXPECT_STREQ("..", buf[1]);
+  EXPECT_STREQ("dir",  buf[2]);
+  EXPECT_STREQ("file2",  buf[3]);
   // The 'last' value is null
   EXPECT_FALSE(buf[4]);
   cvmfs_list_free(buf);
@@ -578,16 +577,16 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   struct cvmfs_nc_attr *nc_attr;
   nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir/dir/dir/dir", nc_attr));
-  EXPECT_FALSE(strcmp(d4_hash, nc_attr->hash));
-  EXPECT_FALSE(strcmp("/dir/dir/dir/dir", nc_attr->mountpoint));
+  EXPECT_STREQ(d4_hash, nc_attr->hash);
+  EXPECT_STREQ("/dir/dir/dir/dir", nc_attr->mountpoint);
   cvmfs_nc_attr_free(nc_attr);
   free(d4_hash);
 
   // stat nested catalog using client repo
   nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir", nc_attr));
-  EXPECT_FALSE(strcmp(d0_hash, nc_attr->hash));
-  EXPECT_FALSE(strcmp("", nc_attr->mountpoint));
+  EXPECT_STREQ(d0_hash, nc_attr->hash);
+  EXPECT_STREQ("", nc_attr->mountpoint);
   // Size of root catalog is 0 as a Nested Catalog
   EXPECT_EQ(0U, nc_attr->size);
   cvmfs_nc_attr_free(nc_attr);
@@ -596,8 +595,8 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
   // stat nested catalog using client repo
   nc_attr = cvmfs_nc_attr_init();
   EXPECT_FALSE(cvmfs_stat_nc(ctx, "/dir/dir", nc_attr));
-  EXPECT_FALSE(strcmp(d2_hash, nc_attr->hash));
-  EXPECT_FALSE(strcmp("/dir/dir", nc_attr->mountpoint));
+  EXPECT_STREQ(d2_hash, nc_attr->hash);
+  EXPECT_STREQ("/dir/dir", nc_attr->mountpoint);
   cvmfs_nc_attr_free(nc_attr);
   free(d2_hash);
 
@@ -653,10 +652,10 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   char **buf = NULL;
   size_t buflen = 0;
   EXPECT_FALSE(cvmfs_list_nc(ctx, "/dir/dir", &buf, &buflen));
-  EXPECT_FALSE(strcmp("",  buf[0]));
-  EXPECT_FALSE(strcmp("/dir", buf[1]));
-  EXPECT_FALSE(strcmp("/dir/dir",  buf[2]));
-  EXPECT_FALSE(strcmp("/dir/dir/dir/dir",  buf[3]));
+  EXPECT_STREQ("",  buf[0]);
+  EXPECT_STREQ("/dir", buf[1]);
+  EXPECT_STREQ("/dir/dir",  buf[2]);
+  EXPECT_STREQ("/dir/dir/dir/dir",  buf[3]);
   EXPECT_FALSE(buf[4]);
   cvmfs_list_free(buf);
 
@@ -664,11 +663,11 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   buflen = 0;
 
   EXPECT_FALSE(cvmfs_list_nc(ctx, "/dir", &buf, &buflen));
-  EXPECT_FALSE(strcmp("",  buf[0]));
-  EXPECT_FALSE(strcmp("/dir", buf[1]));
-  EXPECT_FALSE(strcmp("/dir/dir",  buf[2]));
-  EXPECT_FALSE(strcmp("/dir/dir2",  buf[3]));
-  EXPECT_FALSE(strcmp("/dir/dir3",  buf[4]));
+  EXPECT_STREQ("",  buf[0]);
+  EXPECT_STREQ("/dir", buf[1]);
+  EXPECT_STREQ("/dir/dir",  buf[2]);
+  EXPECT_STREQ("/dir/dir2",  buf[3]);
+  EXPECT_STREQ("/dir/dir3",  buf[4]);
   EXPECT_FALSE(buf[5]);
   cvmfs_list_free(buf);
 
