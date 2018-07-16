@@ -7,6 +7,6 @@
 #include "hash.h"
 #include "libcvmfs.h"
 
-shash::Any HashMeta(const struct cvmfs_stat *stat_info);
+shash::Any HashMeta(const struct cvmfs_attr *stat_info);
 
 #endif  // CVMFS_EXPORT_PLUGIN_UTIL_H_

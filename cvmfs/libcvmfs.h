@@ -35,11 +35,7 @@
 // 26: CernVM-FS 2.5.0
 #define LIBCVMFS_REVISION 26
 
-<<<<<<< HEAD
-#include <stdint.h>
-=======
 #include <inttypes.h>
->>>>>>> Newest version of fs traversal interface and its posix implementation.
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>

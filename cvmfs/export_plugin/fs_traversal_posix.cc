@@ -56,8 +56,7 @@ void AppendStringToList(char const   *str,
   }
 }
 
-bool IsPrefixOf(std::string str, std::string prefix)
-{
+bool IsPrefixOf(std::string str, std::string prefix) {
     return std::equal(
       str.begin(),
       str.begin() + prefix.size(),
@@ -79,7 +78,7 @@ std::string BuildHiddenPath(struct fs_traversal_context *ctx,
 }
 
 int PosixSetMeta(const char *path,
-  const struct cvmfs_stat *stat_info, bool set_permissions = true)
+  const struct cvmfs_attr *stat_info, bool set_permissions = true)
 {
   int res = 0;
   if (set_permissions) {
@@ -169,7 +168,7 @@ void posix_list_dir(struct fs_traversal_context *ctx,
 }
 
 int posix_get_stat(struct fs_traversal_context *ctx,
-  const char *path, struct cvmfs_stat *stat_result) {
+  const char *path, struct cvmfs_attr *stat_result) {
   // NOTE(steuber): Save hash + last modified(!=changed) as xattr
   // -> Could also be done for directories! (chmod changes on file change)
   // Probably more realistic without last modified though
@@ -181,6 +180,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   if (res == -1) {
     return -1;
   }
+  stat_result->st_dev = buf.st_dev;
   stat_result->st_ino = buf.st_ino;
   stat_result->st_mode = buf.st_mode;
   stat_result->st_nlink = buf.st_nlink;
@@ -188,8 +188,6 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   stat_result->st_gid = buf.st_gid;
   stat_result->st_rdev = buf.st_rdev;
   stat_result->st_size = buf.st_size;
-  stat_result->st_blksize = buf.st_blksize;
-  stat_result->st_blocks = buf.st_blocks;
   stat_result->mtime = buf.st_mtime;
 
   // Calculate hash
@@ -219,7 +217,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
 }
 
 const char *posix_get_identifier(struct fs_traversal_context *ctx,
-  const struct cvmfs_stat *stat) {
+  const struct cvmfs_attr *stat) {
   shash::Any content_hash =
     shash::MkFromHexPtr(shash::HexPtr(stat->cvm_checksum));
   shash::Any meta_hash = HashMeta(stat);
@@ -301,7 +299,7 @@ int posix_do_link(struct fs_traversal_context *ctx,
 
 int posix_do_mkdir(struct fs_traversal_context *ctx,
               const char *path,
-              const struct cvmfs_stat *stat_info) {
+              const struct cvmfs_attr *stat_info) {
   std::string complete_path = BuildPath(ctx, path);
   std::string dirname = GetParentPath(complete_path);
   if (posix_cleanup_path(ctx, path) != 0) {
@@ -315,7 +313,7 @@ int posix_do_mkdir(struct fs_traversal_context *ctx,
 int posix_do_symlink(struct fs_traversal_context *ctx,
               const char *src,
               const char *dest,
-              const struct cvmfs_stat *stat_info) {
+              const struct cvmfs_attr *stat_info) {
   std::string complete_src_path = BuildPath(ctx, src);
   std::string complete_dest_path = dest;
   if (posix_cleanup_path(ctx, src) != 0) {
@@ -327,7 +325,7 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
 }
 
 int posix_touch(struct fs_traversal_context *ctx,
-              const struct cvmfs_stat *stat_info) {
+              const struct cvmfs_attr *stat_info) {
   // NOTE(steuber): creat is only atomic on non-NFS paths!
   const char *identifier = posix_get_identifier(ctx, stat_info);
   if (posix_has_file(ctx, identifier)) {
