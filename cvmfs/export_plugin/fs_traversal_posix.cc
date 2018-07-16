@@ -399,6 +399,7 @@ int posix_do_fwrite(void *file_ctx, const char *buff, size_t len) {
     reinterpret_cast<posix_file_handle *>(file_ctx);
   size_t written_len = fwrite(buff, sizeof(char), len, handle->fd);
   if (written_len != len) {
+    clearerr(handle->fd);
     return -1;
   }
   return 0;
@@ -450,7 +451,13 @@ struct fs_traversal_context *posix_initialize(
   result->version = 1;
   result->repo =  strdup(repo);
   result->data = strdup(data);
-  PosixCheckDirStructure(data, 0770);  // NOTE(steuber): mode?
+  PosixCheckDirStructure(data, 0744);  // NOTE(steuber): mode?
+  const char *warning = WARNING_FILE_NAME;
+  FILE *f = fopen(BuildPath(result, "/" WARNING_FILE_NAME).c_str(), "w");
+  if (f != NULL) {
+    fwrite(warning, sizeof(char), strlen(warning), f);
+    fclose(f);
+  }
   return result;
 }
 
