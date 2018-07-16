@@ -1,4 +1,5 @@
 0.3.0:
+  * Creating or cancelling a lease can no longer be blocked by longer requests (CVM-1547)
   * Make logging less verbose by default: HTTP and backend req tracing are now
     done at "debug" log level, the default log level is now "info" (CVM-1573)
 
