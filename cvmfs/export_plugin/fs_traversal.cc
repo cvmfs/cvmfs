@@ -4,7 +4,7 @@ fs_traverse_dir(const char *dir, struct fs_traversal *src,  struct fs_traversal 
   char **src_dir = NULL;
   size_t src_len = 0;
   size_t src_iter = 0;
-  struct cvmfs_stat src_st;
+  struct cvmfs_attr src_st;
   src->listdir(dir, &src_dir, &src_len);
   if(src_dir[src_iter]){
     src->ext_stat(src_dir[src_iter], &src_st);
@@ -13,7 +13,7 @@ fs_traverse_dir(const char *dir, struct fs_traversal *src,  struct fs_traversal 
   char **dest_dir = NULL;
   size_t dest_len = 0;
   size_t dest_iter = 0;
-  struct cvmfs_stat dest_st;
+  struct cvmfs_attr dest_st;
   dest->listdir(dir, &dest_dir, &dest_len);
   if(dest_dir[dest_iter]){
     dest->ext_stat(dest_dir[dest_iter], &dest_st);

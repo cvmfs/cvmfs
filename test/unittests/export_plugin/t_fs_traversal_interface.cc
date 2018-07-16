@@ -71,33 +71,32 @@ class T_Fs_Traversal_Interface :
     result->Set("user.bar", std::string(256, 'a'));
     return result;
   }
-  struct cvmfs_stat create_sample_stat(const char *name,
+  struct cvmfs_attr create_sample_stat(const char *name,
     ino_t st_ino, mode_t st_mode, off_t st_size,
     XattrList *xlist, shash::Any *content_hash = NULL,
-    const char *link = NULL) {
-    const char *hash_result = NULL;
+    char *link = NULL) {
+    char *hash_result = NULL;
     if (content_hash != NULL) {
       std::string hash = content_hash->ToString();
       hash_result = strdup(hash.c_str());
     }
-    const char *link_result = NULL;
+    char *link_result = NULL;
     if (link != NULL) {
       link_result = strdup(link);
     }
-    struct cvmfs_stat result = {
+    struct cvmfs_attr result = {
       1,
-      sizeof(struct cvmfs_stat),
+      sizeof(struct cvmfs_attr),
 
+      0,              // st_dev
       st_ino,         // st_ino
       st_mode,        // st_mode
       1,              // st_nlink
       getuid(),       // st_uid
       getgid(),       // st_gid
       0,              // st_rdev
-      st_size,
-      1024,
-      st_size / 1024,
-      time(NULL),
+      st_size,        // st_size
+      time(NULL),     // mtime
 
       hash_result,
       link_result,
@@ -106,7 +105,7 @@ class T_Fs_Traversal_Interface :
     };
     return result;
   }
-  void free_stat_attr(const struct cvmfs_stat *stat) {
+  void free_stat_attr(const struct cvmfs_attr *stat) {
     if (stat->cvm_checksum != NULL) {
       delete stat->cvm_checksum;
     }
@@ -153,15 +152,15 @@ class T_Fs_Traversal_Interface :
     shash::HashString(content2, &content2_hash);
     // FILE META 1
     XattrList *xlistdir = create_sample_xattrlist(prefix);
-    const struct cvmfs_stat stat_values_dir = create_sample_stat(
+    const struct cvmfs_attr stat_values_dir = create_sample_stat(
       (prefix + "-hello.world").c_str(),
       10, 0770, 0, xlistdir);
     XattrList *xlist1 = create_sample_xattrlist(prefix);
-    const struct cvmfs_stat stat_values1 = create_sample_stat(
+    const struct cvmfs_attr stat_values1 = create_sample_stat(
       (prefix + "-hello.world").c_str(),
       10, 0770, 0, xlist1, &content1_hash);
     XattrList *xlist2 = create_sample_xattrlist(prefix+"-2");
-    const struct cvmfs_stat stat_values2 = create_sample_stat(
+    const struct cvmfs_attr stat_values2 = create_sample_stat(
       (prefix + "-hello.world").c_str(),
       10, 0770, 0, xlist2, &content2_hash);
     *ident1 = std::string(
@@ -263,9 +262,9 @@ TEST_P(T_Fs_Traversal_Interface, StatTest) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("StatTest", &ident1, &ident2);
-  struct cvmfs_stat foostat;
-  struct cvmfs_stat barstat;
-  struct cvmfs_stat symlinkstat;
+  struct cvmfs_attr foostat;
+  struct cvmfs_attr barstat;
+  struct cvmfs_attr symlinkstat;
   std::string val;
   // Correct inode configuration
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
@@ -309,18 +308,18 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
   shash::HashString(content2, &content2_hash);
   // FILE META 3
   XattrList *xlist3 = create_sample_xattrlist("TouchTest: foo");
-  struct cvmfs_stat stat_values3 = create_sample_stat("hello.world",
+  struct cvmfs_attr stat_values3 = create_sample_stat("hello.world",
     10, 0700, content1.length(), xlist3, &content1_hash);
 
   XattrList *xlist4 = create_sample_xattrlist("TouchTest: foobarfoo");
-  struct cvmfs_stat stat_values4 = create_sample_stat("hello.world",
+  struct cvmfs_attr stat_values4 = create_sample_stat("hello.world",
     10, 0700, content1.length(), xlist4, &content1_hash);
   std::string ident4 = fs_traversal_instance_->interface->get_identifier(
     context_,
     &stat_values4);
 
   XattrList *xlist5 = new XattrList(*xlist4);
-  struct cvmfs_stat stat_values5 = create_sample_stat("hello.world",
+  struct cvmfs_attr stat_values5 = create_sample_stat("hello.world",
     10, 0700, content1.length(), xlist5, &content2_hash);
   std::string ident5 = fs_traversal_instance_->interface->get_identifier(
     context_,
@@ -380,7 +379,7 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
   std::string ident2;
   MakeTestFiles("MkRmDirTest", &ident1, &ident2);
   XattrList *xlist1 = create_sample_xattrlist("MkRmDirTest: foo");
-  struct cvmfs_stat stat_values_dir = create_sample_stat(
+  struct cvmfs_attr stat_values_dir = create_sample_stat(
       "MkRmDirTest-hello.world",
       10, 0770, 0, xlist1);
   // Insert in non existing parent directory
@@ -522,9 +521,9 @@ TEST_P(T_Fs_Traversal_Interface, LinkUnlinkTest) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("LinkUnlinkTest", &ident1, &ident2);
-  struct cvmfs_stat foostat;
-  struct cvmfs_stat barstat;
-  struct cvmfs_stat foobarstat;
+  struct cvmfs_attr foostat;
+  struct cvmfs_attr barstat;
+  struct cvmfs_attr foobarstat;
   // Correct inode configuration
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
     context_, "/LinkUnlinkTest-foo.txt", &foostat));
@@ -597,8 +596,8 @@ TEST_P(T_Fs_Traversal_Interface, SymlinkTest) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("SymlinkTest", &ident1, &ident2);
-  struct cvmfs_stat sl1Stat;
-  struct cvmfs_stat sl2Stat;
+  struct cvmfs_attr sl1Stat;
+  struct cvmfs_attr sl2Stat;
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
     context_, "/SymlinkTest-symlink1", &sl1Stat));
   ASSERT_STREQ("./foo", sl1Stat.cvm_symlink);

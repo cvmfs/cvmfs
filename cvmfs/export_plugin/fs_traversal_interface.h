@@ -71,7 +71,7 @@ struct fs_traversal {
    * @returns 0 on success
    */
   int (*get_stat)(struct fs_traversal_context *ctx,
-                const char *path, struct cvmfs_stat *stat);
+                const char *path, struct cvmfs_attr *stat);
 
   /**
    * Method which returns an identifier (usually a path)
@@ -83,7 +83,7 @@ struct fs_traversal {
    * The memory of the char is allocated on the heap and needs to be freed
    */
   const char *(*get_identifier)(struct fs_traversal_context *ctx,
-                const struct cvmfs_stat *stat);
+                const struct cvmfs_attr *stat);
 
 
   /**
@@ -150,7 +150,7 @@ struct fs_traversal {
    */
   int (*do_mkdir)(struct fs_traversal_context *ctx,
                 const char *path,
-                const struct cvmfs_stat *stat);
+                const struct cvmfs_attr *stat);
 
   /**
    * Method which removes the given directory
@@ -178,7 +178,7 @@ struct fs_traversal {
    * @param[in] stat The stat containing the meta data for file creation
    */
   int (*touch)(struct fs_traversal_context *ctx,
-                const struct cvmfs_stat *stat);
+                const struct cvmfs_attr *stat);
 
   /**
    * Retrieves a handle struct which allows the manipulation of the file
@@ -215,7 +215,7 @@ struct fs_traversal {
   int (*do_symlink)(struct fs_traversal_context *ctx,
                 const char *src,
                 const char *dest,
-                const struct cvmfs_stat *stat_info);
+                const struct cvmfs_attr *stat_info);
 
   /**
    * Method which opens a file described by the given file context.
