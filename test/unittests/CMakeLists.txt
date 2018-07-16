@@ -364,6 +364,101 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc
 )
 
+set (CVMFS_SWISSKNIFE_SOURCES
+  ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
+  ${CVMFS_SOURCE_DIR}/catalog_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
+  ${CVMFS_SOURCE_DIR}/clientctx.cc
+  ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc
+  ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/file_chunk.cc
+  ${CVMFS_SOURCE_DIR}/gateway_util.cc
+  ${CVMFS_SOURCE_DIR}/globals.cc
+  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/history_sql.cc
+  ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item_mem.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/pipeline.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_hash.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_read.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_register.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_write.cc
+  ${CVMFS_SOURCE_DIR}/json_document.cc
+  ${CVMFS_SOURCE_DIR}/letter.cc
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/malloc_arena.cc
+  ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/options.cc
+  ${CVMFS_SOURCE_DIR}/pack.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
+  ${CVMFS_SOURCE_DIR}/reflog.cc
+  ${CVMFS_SOURCE_DIR}/reflog_sql.cc
+  ${CVMFS_SOURCE_DIR}/repository_tag.cc
+  ${CVMFS_SOURCE_DIR}/s3fanout.cc
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/server_tool.cc
+  ${CVMFS_SOURCE_DIR}/session_context.cc
+  ${CVMFS_SOURCE_DIR}/signature.cc
+  ${CVMFS_SOURCE_DIR}/signing_tool.cc
+  ${CVMFS_SOURCE_DIR}/sql.cc
+  ${CVMFS_SOURCE_DIR}/sqlitemem.cc
+  ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/swissknife.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_check.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_diff.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_diff_tool.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_gc.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_graft.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_hash.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_history.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_info.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_ingest.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_letter.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lsrepo.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_migrate.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_pull.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_reflog.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_scrub.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_sign.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_sync.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_zpipe.cc
+  ${CVMFS_SOURCE_DIR}/sync_item.cc
+  ${CVMFS_SOURCE_DIR}/sync_item_tar.cc
+  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
+  ${CVMFS_SOURCE_DIR}/sync_union.cc
+  ${CVMFS_SOURCE_DIR}/sync_union_aufs.cc
+  ${CVMFS_SOURCE_DIR}/sync_union_overlayfs.cc
+  ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
+  ${CVMFS_SOURCE_DIR}/upload.cc
+  ${CVMFS_SOURCE_DIR}/upload_facility.cc
+  ${CVMFS_SOURCE_DIR}/upload_gateway.cc
+  ${CVMFS_SOURCE_DIR}/upload_local.cc
+  ${CVMFS_SOURCE_DIR}/upload_s3.cc
+  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
+  ${CVMFS_SOURCE_DIR}/util/string.cc
+  ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
+)
+
 if (APPLE)
   list(APPEND CVMFS_CLIENT_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc)
 else(APPLE)
@@ -376,6 +471,7 @@ endif (APPLE)
 
 set (LIBCVMFS_SOURCES
   ${CVMFS_CLIENT_SOURCES}
+  ${CVMFS_SWISSKNIFE_SOURCES}
 
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
@@ -490,8 +586,13 @@ endif (BUILD_LIBCVMFS_CACHE)
 
 if (BUILD_CVMFS_EXPORT)
   target_link_libraries (${PROJECT_TEST_EXPORT_NAME}
-                         ${UNITTEST_LINK_LIBRARIES}
-                         ${SPARSEHASH_LIBRARIES})
+                          ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+                          ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
+                          ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
+                          ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
+                          ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
+                          ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                          ${PROTOBUF_LITE_LIBRARY}  ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
 endif (BUILD_CVMFS_EXPORT)
 
 
