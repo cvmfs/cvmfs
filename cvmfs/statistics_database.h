@@ -57,14 +57,14 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * Get command statistics values and convert them into strings.
   *
   * @param command to access counter statistics
-  * @return A Stats struct with all values stored in strings
+  * @return a Stats struct with all statistics values stored in strings
   */
   Stats GetStats(swissknife::Command *command);
 
 /**
   * Get UTC Time.
   *
-  * @return a string in "YYYY-MM-DD HH:MM:SS" format
+  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
   */
   std::string GetGMTimestamp();
 
@@ -79,7 +79,7 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
 /**
   * Entry point function for writing data into database
   *
-  * @return 0 if no error occured
+  * @return 0 if no error occured or a negative integer if errors occurred
   */
   int StoreStatistics(swissknife::Command *command);
 
