@@ -77,6 +77,12 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   std::string PrepareStatement(Stats stats);
 
 /**
+  * Entry point function for writing data into database
+  * @return 0 if no error occured
+  */
+  int StoreStatistics(swissknife::Command *command);
+
+/**
   * Returns the desired path to store the database file.
   * If the path is not valid it returns the
   * default path: /var/spool/cvmfs/$repo_name/stats.db
@@ -85,12 +91,6 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * @path to store database file
   */
   static std::string GetDBPath(std::string repo_name);
-
-/**
-  * Entry point function for writing data into database
-  * @return 0 if no error occured
-  */
-  int StoreStatistics(swissknife::Command *command);
 
  protected:
   // TODO(rmeusel): C++11 - constructor inheritance

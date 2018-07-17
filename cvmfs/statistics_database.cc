@@ -128,6 +128,35 @@ std::string StatisticsDatabase::PrepareStatement(Stats stats) {
 }
 
 
+int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
+  Stats stats = GetStats(command);
+
+  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(stats));
+
+  if (!this->BeginTransaction()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
+    return -1;
+  }
+
+  if (!insert.Execute()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
+    return -2;
+  }
+
+  if (!insert.Reset()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Reset() failed!");
+    return -3;
+  }
+
+  if (!this->CommitTransaction()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "CommitTransaction failed!");
+    return -4;
+  }
+
+  return 0;
+}
+
+
 std::string StatisticsDatabase::GetDBPath(std::string repo_name) {
   // default location
   std::string db_default_path = "/var/spool/cvmfs/" + repo_name + "/stats.db";
@@ -161,33 +190,4 @@ std::string StatisticsDatabase::GetDBPath(std::string repo_name) {
   }
 
   return statistics_db;
-}
-
-
-int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
-  Stats stats = GetStats(command);
-
-  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(stats));
-
-  if (!this->BeginTransaction()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
-    return -1;
-  }
-
-  if (!insert.Execute()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
-    return -2;
-  }
-
-  if (!insert.Reset()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Reset() failed!");
-    return -3;
-  }
-
-  if (!this->CommitTransaction()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "CommitTransaction failed!");
-    return -4;
-  }
-
-  return 0;
 }
