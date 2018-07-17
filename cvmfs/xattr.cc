@@ -235,7 +235,7 @@ void XattrList::Serialize(unsigned char **outbuf, unsigned *size,
     packed_size += entries[ientries].GetSize();
     ientries++;
   }
-  
+
   // Copy data into buffer
   header.num_xattrs = ientries;
   *size = packed_size;
