@@ -197,7 +197,6 @@ int main(int argc, char **argv) {
 
   if (command->GetName() == "sync" || command->GetName() == "ingest") {
     StatisticsDatabase *db;
-
     string repo_name = *args.find('N')->second;
     string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
 

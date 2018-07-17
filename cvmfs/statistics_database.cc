@@ -11,6 +11,7 @@ unsigned       StatisticsDatabase::kLatestSchemaRevision   =
 unsigned int   StatisticsDatabase::instances               = 0;
 bool           StatisticsDatabase::compacting_fails        = false;
 
+
 bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
   return sqlite::Sql(sqlite_db(),
