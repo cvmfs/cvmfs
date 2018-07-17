@@ -1,4 +1,5 @@
 2.5.1:
+  * Fix publishing through gateway with CVMFS_AUTO_TAGS=false (CVM-1559)
   * Parallelize object removal in S3 backend (CVM-1593)
   * Make S3 network parameters adjustable, new parameters 
     CVMFS_S3_MAX_RETRIES, CVMFS_S3_TIMEOUT
