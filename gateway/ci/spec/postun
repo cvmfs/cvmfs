@@ -1,0 +1,20 @@
+%postun
+
+export RUNNER_LOG_DIR=/var/log/cvmfs-gateway-runner
+
+echo "Removing the syslog configuration file"
+rm -fv /etc/rsyslog.d/90-cvmfs-gateway.conf
+
+if [ x"$(which systemctl)" != x"" ]; then
+    rm -fv /etc/logrotate.d/90-cvmfs-gateway-rotate-systemd
+    systemctl restart rsyslog
+
+    rm -fv /etc/systemd/system/cvmfs-gateway.service
+    systemctl daemon-reload
+else
+    rm -fv /etc/logrotate.d/90-cvmfs-gateway-rotate
+    service rsyslog restart
+fi
+
+# Setup Mnesia
+rm -rfv /var/lib/cvmfs-gateway
