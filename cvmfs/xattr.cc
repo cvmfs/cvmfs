@@ -175,6 +175,7 @@ bool XattrList::Set(const string &key, const string &value) {
       return false;
     xattrs_[key] = value;
   }
+  printf("XAttr Set : %s\n", xattrs_[key].c_str());
   return true;
 }
 

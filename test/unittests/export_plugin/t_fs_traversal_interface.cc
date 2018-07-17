@@ -72,7 +72,7 @@ class T_Fs_Traversal_Interface :
   XattrList *create_sample_xattrlist(std::string var) {
     XattrList *result = new XattrList();
     result->Set("user.foo", var);
-    result->Set("user.bar", std::string(256, 'a'));
+    result->Set("user.bar", std::string(255, 'a'));
     return result;
   }
   struct cvmfs_attr *create_sample_stat(const char *name,
@@ -131,7 +131,7 @@ class T_Fs_Traversal_Interface :
   void MakeTestFiles(std::string prefix,
     std::string *ident1, std::string *ident2) {
     // FILE CONTENT 1
-    std::string content1 = prefix + ": Hello world!\nHello traversal!";
+    std::string content1 = "";  // prefix + ": Hello world!\nHello traversal!";
     shash::Any content1_hash(shash::kSha1);
     shash::HashString(content1, &content1_hash);
 
@@ -148,7 +148,7 @@ class T_Fs_Traversal_Interface :
                  content1_hash.ToString().c_str());
 
     // FILE CONTENT 2
-    std::string content2 = prefix + ": Hello traversal!\nHello world!";
+    std::string content2 = "";  // prefix + ": Hello traversal!\nHello world!";
     shash::Any content2_hash(shash::kSha1);
     shash::HashString(content2, &content2_hash);
     // FILE META 1
@@ -163,13 +163,14 @@ class T_Fs_Traversal_Interface :
     XattrList *xlist2 = create_sample_xattrlist(prefix+"-2");
     struct cvmfs_attr *stat_values2 = create_sample_stat(
       ("/" + prefix + "-bar.txt").c_str(),
-      10, 0770, 0, xlist2, &content2_hash);
+      10, 0777, 0, xlist2, &content2_hash);
     *ident1 = std::string(
       fs_traversal_instance_->interface->get_identifier(context_,
       stat_values1));
     *ident2 = std::string(
       fs_traversal_instance_->interface->get_identifier(context_,
         stat_values2));
+    printf("ident1 : %s\nident2 : %s\n", ident1->c_str(), ident2->c_str());
 
     // BACKGROUND FILES
     ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
@@ -637,7 +638,7 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
 
   std::string repoName = GetCurrentWorkingDirectory();
   char *src_name  = strdup((repoName + string("/SRC-foo")).c_str());
-  char *src_data  = strdup((repoName + string("/SDATA")).c_str());
+  char *src_data  = strdup((repoName + string("/.data")).c_str());
   char *dest_name = strdup((repoName + string("/SRC-bar")).c_str());
   char *dest_data = strdup((repoName + string("/DDATA")).c_str());
 
@@ -649,13 +650,13 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
   context = dest->initialize(src_name, src_data);
   dest->context_ = context;
 
-  ASSERT_TRUE(shrinkwrap::CommandExport().Traverse("", src, dest, 0, true));
+  ASSERT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));
 
   dest->finalize(dest->context_);
   context = dest->initialize(dest_name, dest_data);
   dest->context_ = context;
 
-  ASSERT_TRUE(shrinkwrap::CommandExport().Traverse("", src, dest, 0, true));
+  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
@@ -707,23 +708,23 @@ DirSpec MakeSpec() {
 }
 
 TEST_P(T_Fs_Traversal_Interface, TransferCVMFSToPosix) {
-  /* Initialize options */
+  // Initialize options
   cvmfs_option_map *opts = cvmfs_options_init();
 
-  /* Create and initialize repository named "stat" */
+  // Create and initialize repository named "stat"
   CatalogTestTool tester("TransferCVMFSToPosix");
   EXPECT_TRUE(tester.Init());
 
-  /* Create file structure */
+  // Create file structure
   DirSpec spec1 = MakeSpec();
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
 
-  /* Find directory entry for use later */
+  // Find directory entry for use later
   catalog::DirectoryEntry entry;
   EXPECT_TRUE(
     tester.FindEntry(tester.manifest()->catalog_hash(), "/dir/file1", &entry));
 
-  /* Set CVMFS options to reflect created repository */
+  // Set CVMFS options to reflect created repository
   cvmfs_options_set(opts, "CVMFS_ROOT_HASH",
                         tester.manifest()->catalog_hash().ToString().c_str());
   cvmfs_options_set(opts, "CVMFS_SERVER_URL",
@@ -736,10 +737,10 @@ TEST_P(T_Fs_Traversal_Interface, TransferCVMFSToPosix) {
   cvmfs_options_set(opts, "CVMFS_MOUNT_DIR",
                         ("/cvmfs" + tester.repo_name()).c_str());
 
-  /* Initialize client repo based on options */
+  // Initialize client repo based on options
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
-  /* Attach to client repo */
+  // Attach to client repo
   cvmfs_context *ctx;
   EXPECT_EQ(LIBCVMFS_ERR_OK,
     cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
@@ -755,8 +756,8 @@ TEST_P(T_Fs_Traversal_Interface, TransferCVMFSToPosix) {
   context = dest->initialize("posix", "posix_data");
   dest->context_ = context;
 
-  ASSERT_FALSE(shrinkwrap::CommandExport().Traverse("", src, dest, 0, true));
-  // ASSERT_TRUE(shrinkwrap::CommandExport().Traverse("", dest, src, 0, true));
+  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));
+  // ASSERT_TRUE(shrinkwrap::Sync("", dest, src, 0, true));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
