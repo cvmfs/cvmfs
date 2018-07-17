@@ -78,17 +78,18 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
 
 /**
   * Entry point function for writing data into database
+  *
   * @return 0 if no error occured
   */
   int StoreStatistics(swissknife::Command *command);
 
 /**
-  * Returns the desired path to store the database file.
-  * If the path is not valid it returns the
-  * default path: /var/spool/cvmfs/$repo_name/stats.db
+  * Get the path for the database file
+  * user can specify it in the server.conf
+  * by default: /var/spool/cvmfs/$repo_name/stats.db
   *
   * @param repo_name Fully qualified name of the repository
-  * @path to store database file
+  * @return path to store database file
   */
   static std::string GetDBPath(std::string repo_name);
 
