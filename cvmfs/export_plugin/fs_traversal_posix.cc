@@ -89,15 +89,17 @@ int PosixSetMeta(const char *path,
   }
   // TODO(steuber): Set xattrs with setxattr (if symlink no user. xattrs!)
   XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
-  std::vector<std::string> v = xlist->ListKeys();
-  std::string val;
-  if (set_permissions) {
-    for (std::vector<std::string>::iterator it = v.begin();
-          it != v.end();
-          ++it) {
-      xlist->Get(*it, &val);
-      int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
-      if (res != 0) return -1;
+  if (xlist) {
+    std::vector<std::string> v = xlist->ListKeys();
+    std::string val;
+    if (set_permissions) {
+      for (std::vector<std::string>::iterator it = v.begin();
+            it != v.end();
+            ++it) {
+        xlist->Get(*it, &val);
+        int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
+        if (res != 0) return -1;
+      }
     }
   }
   if (res != 0) return -1;
@@ -152,6 +154,9 @@ void posix_list_dir(struct fs_traversal_context *ctx,
   *buf = reinterpret_cast<char **>(malloc(sizeof(char *) * buflen));
 
   DIR *dr = opendir(BuildPath(ctx, dir).c_str());
+
+  // NULL terminate the list;
+  AppendStringToList(NULL, buf, len, &buflen);
 
   if (dr == NULL) {
     return;

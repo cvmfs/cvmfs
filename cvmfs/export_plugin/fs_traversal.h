@@ -12,16 +12,13 @@
 
 namespace shrinkwrap {
 
-class CommandExport {
- public:
-  ~CommandExport() { }
-  int Main();
-  bool Traverse(const char *dir,
-                struct fs_traversal *src,
-                struct fs_traversal *dest,
-                int parallel,
-                bool recursive);
-};
+bool Sync(const char *dir,
+          struct fs_traversal *src,
+          struct fs_traversal *dest,
+          int parallel,
+          bool recursive);
+
+int main(int argc, char **argv);
 
 }  // namespace shrinkwrap
 

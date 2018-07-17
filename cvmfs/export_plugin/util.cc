@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include <stdio.h>
+
 #include "util.h"
 
 #include "hash.h"
@@ -18,16 +20,19 @@ shash::Any HashMeta(const struct cvmfs_attr *stat_info) {
     + sizeof(gid_t)/sizeof(unsigned char)
     + 1;
   XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
+  unsigned xlist_buffer_size = 0;
   unsigned char *xlist_buffer;
-  unsigned xlist_buffer_size;
-  xlist->Serialize(&xlist_buffer, &xlist_buffer_size);
+  if (xlist) {
+    xlist->Serialize(&xlist_buffer, &xlist_buffer_size);
+  }
   unsigned char buffer[min_buffer_size+xlist_buffer_size];
-  /*for (unsigned i = 0; i < (min_buffer_size+xlist_buffer_size); i++) {
+  for (unsigned i = 0; i < (min_buffer_size+xlist_buffer_size); i++) {
     buffer[i] = 255;
-  }*/
+  }
   unsigned offset = 0;
   // Add mode
-  memcpy(buffer+offset, &(stat_info->st_mode), sizeof(mode_t));
+  mode_t hash_mode = stat_info->st_mode & 0777;
+  memcpy(buffer+offset, &hash_mode, sizeof(mode_t));
   offset+=sizeof(mode_t)/sizeof(unsigned char);
   *(buffer+offset) = 0;
   offset+=1;
@@ -42,8 +47,10 @@ shash::Any HashMeta(const struct cvmfs_attr *stat_info) {
   *(buffer+offset) = 0;
   offset+=1;
   // Add xlist
-  memcpy(buffer+offset, xlist_buffer, xlist_buffer_size);
-  delete xlist_buffer;
+  if (xlist) {
+    memcpy(buffer+offset, xlist_buffer, xlist_buffer_size);
+    delete xlist_buffer;
+  }
   // Hash
   shash::HashMem(buffer, min_buffer_size+xlist_buffer_size, &meta_hash);
   return meta_hash;

@@ -368,7 +368,8 @@ int LibContext::ListDirectory(
   const char *c_path,
   char ***buf,
   size_t *listlen,
-  size_t *buflen
+  size_t *buflen,
+  bool self_reference
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
@@ -396,13 +397,15 @@ int LibContext::ListDirectory(
 
   // Build listing
 
-  // Add current directory link
-  AppendStringToList(".", buf, listlen, buflen);
+  if (self_reference) {
+    // Add current directory link
+    AppendStringToList(".", buf, listlen, buflen);
 
-  // Add parent directory link
-  catalog::DirectoryEntry p;
-  if (d.inode() != mount_point_->catalog_mgr()->GetRootInode()) {
-    AppendStringToList("..", buf, listlen, buflen);
+    // Add parent directory link
+    catalog::DirectoryEntry p;
+    if (d.inode() != mount_point_->catalog_mgr()->GetRootInode()) {
+      AppendStringToList("..", buf, listlen, buflen);
+    }
   }
 
   // Add all names

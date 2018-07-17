@@ -361,7 +361,7 @@ int cvmfs_listdir(
   path = lpath.c_str();
 
   size_t listsize = 0;
-  rc = ctx->ListDirectory(path, buf, &listsize, buflen);
+  rc = ctx->ListDirectory(path, buf, &listsize, buflen, true);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -384,7 +384,7 @@ int cvmfs_listdir_contents(
   }
   path = lpath.c_str();
 
-  rc = ctx->ListDirectory(path, buf, listlen, buflen);
+  rc = ctx->ListDirectory(path, buf, listlen, buflen, false);
   if (rc < 0) {
     errno = -rc;
     return -1;
