@@ -32,7 +32,6 @@ struct Params {
   bool use_autocatalogs;
   size_t max_weight;
   size_t min_weight;
-  std::string statistics_db;
 };
 
 bool GetParamsFromFile(const std::string& repo_name, Params* params);

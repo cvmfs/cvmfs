@@ -129,24 +129,44 @@ std::string StatisticsDatabase::PrepareStatement(Stats stats) {
 std::string StatisticsDatabase::GetValidPath(std::string repo_name) {
   // default location
   std::string db_file_path = "/var/spool/cvmfs/" + repo_name + "/stats.db";
-  receiver::Params server_conf_params;
-  receiver::GetParamsFromFile(repo_name, &server_conf_params);
-  if (server_conf_params.statistics_db != "") {
-    std::string dirname = GetParentPath(server_conf_params.statistics_db);
-    int retval = MkdirDeep(dirname,
-      S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH,
-      true);
-    if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
-        "Couldn't write statistics at the specified path %s"
-        ", statistics will be written in the default path %s",
-        server_conf_params.statistics_db.c_str(),
-        db_file_path.c_str());
-    } else {
-      db_file_path = server_conf_params.statistics_db;
-    }
+
+  const std::string repo_config_file =
+      "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
+
+  SimpleOptionsParser parser;
+  if (!parser.TryParsePath(repo_config_file)) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "Could not parse repository configuration: %s. "
+             "Write statistics in %s",
+             repo_config_file.c_str(),
+             db_file_path.c_str());
+    return db_file_path;
   }
-  return db_file_path;
+
+  std::string statistics_db = "";
+  if (!parser.GetValue("CVMFS_STATISTICS_DB", &statistics_db)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Missing parameter %s in repository configuration file. "
+             "Write statistics in %s",
+             "CVMFS_STATISTICS_DB",
+             db_file_path.c_str());
+    return db_file_path;
+  }
+
+  std::string dirname = GetParentPath(statistics_db);
+  int mode = S_IRUSR | S_IWUSR | S_IXUSR |
+             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH; // 755
+  int retval = MkdirDeep(dirname, mode, true);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+      "Couldn't write statistics at the specified path %s, "
+      "Write statistics in %s",
+      statistics_db.c_str(),
+      db_file_path.c_str());
+    return db_file_path;
+  }
+
+  return statistics_db;
 }
 
 
@@ -157,22 +177,22 @@ int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
   sqlite::Sql insert(this->sqlite_db(), PrepareStatement(stats));
 
   if (!this->BeginTransaction()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "BeginTransaction failed!");
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
     return 1;
   }
 
   if (!insert.Execute()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "insert.Execute failed!");
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
     return 2;
   }
 
   if (!insert.Reset()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "insert.Reset() failed!");
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Reset() failed!");
     return 3;
   }
 
   if (!this->CommitTransaction()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "CommitTransaction failed!");
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "CommitTransaction failed!");
     return 4;
   }
 

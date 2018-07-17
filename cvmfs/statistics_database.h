@@ -7,7 +7,8 @@
 
 #include <ctime>
 #include <string>
-#include "receiver/params.h"
+
+#include "options.h"
 #include "sql.h"
 #include "swissknife.h"
 #include "util/posix.h"

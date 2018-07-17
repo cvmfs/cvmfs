@@ -214,7 +214,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   path_filters/relaxed_path_filter.cc
   pathspec/pathspec.cc
   pathspec/pathspec_pattern.cc
-  receiver/params.cc
   reflog.cc
   reflog_sql.cc
   repository_tag.cc
