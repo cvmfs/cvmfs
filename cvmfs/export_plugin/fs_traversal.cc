@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
+
 #include <pthread.h>
 #include <stdio.h>
 #include <fstream>
@@ -20,6 +22,16 @@
 #define COPY_BUFFER_SIZE 4096
 
 using namespace std; //NOLINT
+
+// Taken from fsck
+enum Errors {
+  kErrorOk = 0,
+  kErrorFixed = 1,
+  kErrorReboot = 2,
+  kErrorUnfixed = 4,
+  kErrorOperational = 8,
+  kErrorUsage = 16,
+};
 
 int strcmp_list(const void* a, const void* b)
 {
@@ -49,17 +61,17 @@ class FileCopy {
   const char *dest;
 };
 
-unsigned             num_parallel = 1;
-bool                 recursive = true;
+unsigned             num_parallel;
+bool                 recursive;
 int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
-// unsigned             retries = 1;
+unsigned             retries = 1;
 atomic_int64         overall_copies;
 atomic_int64         overall_new;
 atomic_int64         copy_queue;
 
-}  // anonymous namespace
+}  // namespace
 
 struct fs_traversal* FindInterface(const char * type)
 {
@@ -95,13 +107,14 @@ bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
   if (src->st_size != dest->st_size)   { return false; }
   if (src->mtime != dest->mtime)       { return false; }
 
+/*
   // CVMFS related content
   if (src->cvm_checksum) {
     if (!dest_fs->is_hash_consistent(dest_fs->context_, src)) { return false; }
   } else if (!src->cvm_checksum && dest->cvm_checksum) {
     return false;
   }
-
+*/
   if (src->cvm_symlink && dest->cvm_symlink) {
     if (strcmp(src->cvm_symlink , dest->cvm_symlink)) { return false; }
   } else if ( (!src->cvm_symlink && dest->cvm_symlink) ||
@@ -165,7 +178,7 @@ bool updateStat(
   return retval;
 }
 
-bool CommandExport::Traverse(
+bool Sync(
   const char *dir,
   struct fs_traversal *src,
   struct fs_traversal *dest,
@@ -200,7 +213,7 @@ bool CommandExport::Traverse(
 
 
   // While both have defined members to compare.
-  while ((src_entry) || (dest_entry)) {
+  while (src_entry || dest_entry) {
     // Check if item is present in both
     int cmp = 0;
     if (!src_entry) {
@@ -218,16 +231,16 @@ bool CommandExport::Traverse(
           case S_IFREG:
             {
               // They don't point to the same data, link new data
-              const char *dest_data;
-              dest_data = dest->get_identifier(dest->context_, src_st);
               const char *src_data;
               src_data = src->get_identifier(src->context_, src_st);
+              const char *dest_data;
+              dest_data = dest->get_identifier(dest->context_, src_st);
 
               // Touch is atomic, if it fails something else will write file?
               if (!dest->touch(dest->context_, src_st)) {
                 // PUSH TO PIPE
                 if (!copy_file(src, src_data, dest, dest_data, parallel)) {
-                  LogCvmfs(kLogCvmfs, kLogDebug,
+                  LogCvmfs(kLogCvmfs, kLogStderr,
                   "Traversal failed to copy %s->%s", src_data, dest_data);
                   return false;
                 }
@@ -237,20 +250,20 @@ bool CommandExport::Traverse(
               // Also this needs to be separate from copy_file, the target file
               // could already exist and the link needs to be created anyway.
               if (dest->do_link(dest->context_, dest_entry, dest_data)) {
-                  LogCvmfs(kLogCvmfs, kLogDebug,
-                  "Traversal failed to link %s->%s", dest_entry, dest_data);
+                LogCvmfs(kLogCvmfs, kLogStderr,
+                "Traversal failed to link %s->%s", dest_entry, dest_data);
                 return false;
               }
             }
             break;
           case S_IFDIR:
             if (dest->set_meta(dest->context_, src_entry, src_st)) {
-              LogCvmfs(kLogCvmfs, kLogDebug,
+              LogCvmfs(kLogCvmfs, kLogStderr,
               "Traversal failed to set_meta %s", src_entry);
               return false;
             }
             if (recursive) {
-              if (!Traverse(src_entry, src, dest, parallel, recursive)) {
+              if (!Sync(src_entry, src, dest, parallel, recursive)) {
                 return false;
               }
             }
@@ -259,18 +272,24 @@ bool CommandExport::Traverse(
             // Should likely copy the source of the symlink target
             if (dest->do_symlink(dest->context_, src_entry,
                              src_st->cvm_symlink, src_st)) {
-              LogCvmfs(kLogCvmfs, kLogDebug,
+              LogCvmfs(kLogCvmfs, kLogStderr,
               "Traversal failed to symlink %s->%s",
               src_entry, src_st->cvm_symlink);
               return retval;
             }
+            break;
+          default:
+            LogCvmfs(kLogCvmfs, kLogStderr,
+            "Unknown file type for %s : %d",
+            src_entry, src_st->st_mode);
+            return false;
             break;
         }
       } else {
         // The directory exists and is the same,
         // but we still need to check the children
         if (S_ISDIR(src_st->st_mode) && recursive) {
-          if (!Traverse(src_entry, src, dest, parallel, recursive)) {
+          if (!Sync(src_entry, src, dest, parallel, recursive)) {
             return false;
           }
         }
@@ -295,7 +314,7 @@ bool CommandExport::Traverse(
 
               if (!dest->touch(dest->context_, src_st)) {
                 if (!copy_file(src, src_data, dest, dest_data, parallel)) {
-                  LogCvmfs(kLogCvmfs, kLogDebug,
+                  LogCvmfs(kLogCvmfs, kLogStderr,
                   "Traversal failed to copy %s->%s", src_data, dest_data);
                   return false;
                 }
@@ -305,7 +324,7 @@ bool CommandExport::Traverse(
               // Also this needs to be separate from copy_file, the target file
               // could already exist and the link needs to be created anyway.
               if (dest->do_link(dest->context_, src_entry, dest_data)) {
-                LogCvmfs(kLogCvmfs, kLogDebug,
+                LogCvmfs(kLogCvmfs, kLogStderr,
                 "Traversal failed to link %s->%s", src_entry, dest_data);
                 return false;
               }
@@ -313,12 +332,12 @@ bool CommandExport::Traverse(
           break;
         case S_IFDIR:
           if (dest->do_mkdir(dest->context_, src_entry, src_st)) {
-              LogCvmfs(kLogCvmfs, kLogDebug,
+              LogCvmfs(kLogCvmfs, kLogStderr,
               "Traversal failed to mkdir %s", src_entry);
             return false;
           }
           if (recursive) {
-            if (!Traverse(src_entry, src, dest, parallel, recursive)) {
+            if (!Sync(src_entry, src, dest, parallel, recursive)) {
               return false;
             }
           }
@@ -327,14 +346,16 @@ bool CommandExport::Traverse(
           // Should be same as IFREG? Does link create the file?
           if (dest->do_symlink(dest->context_, src_entry,
                            src_st->cvm_symlink, src_st)) {
-            LogCvmfs(kLogCvmfs, kLogDebug,
+            LogCvmfs(kLogCvmfs, kLogStderr,
             "Traversal failed to symlink %s->%s",
             src_entry, src_st->cvm_symlink);
             return false;
           }
           break;
         default:
-          // Unknown file type, should print error (what stream? log?)
+          LogCvmfs(kLogCvmfs, kLogStderr,
+          "Unknown file type for %s : %d",
+          src_entry, src_st->st_mode);
           return false;
           break;
       }
@@ -347,6 +368,8 @@ bool CommandExport::Traverse(
         case S_IFREG:
         case S_IFLNK:
           if (dest->do_unlink(dest->context_, dest_entry)) {
+            LogCvmfs(kLogCvmfs, kLogStderr,
+            "Failed to unlink file %s", dest_entry);
             return false;
           }
           break;
@@ -354,16 +377,21 @@ bool CommandExport::Traverse(
           // We may want this to be recursive regardless
           /* NOTE(steuber): Do we want this?
           if (recursive) {
-            if (!Traverse(dest_entry, src, dest, parallel, recursive)) {
+            if (!Sync(dest_entry, src, dest, parallel, recursive)) {
               return false;
             }
           }*/
           if (!dest->do_rmdir(dest->context_, dest_entry)) {
+            LogCvmfs(kLogCvmfs, kLogStderr,
+            "Failed to remove directory %s", dest_entry);
             return false;
           }
           break;
         default:
           // Unknown file type, should print error (what stream? log?)
+          LogCvmfs(kLogCvmfs, kLogStderr,
+          "Unknown file type for %s : %d",
+          dest_entry, dest_st->st_mode);
           return false;
           break;
       }
@@ -389,14 +417,14 @@ bool copyFile(
   retval = src_fs->do_fopen(src, fs_open_read);
   if (retval != 0) {
     // Handle error
-    printf("Failed open src : %s\n", src_name);
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed open src : %s\n", src_name);
     return false;
   }
 
   retval = dest_fs->do_fopen(dest, fs_open_write);
   if (retval != 0) {
     // Handle error
-    printf("Failed open dest : %s\n", dest_name);
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed open dest : %s\n", dest_name);
     return false;
   }
 
@@ -405,7 +433,7 @@ bool copyFile(
 
     size_t actual_read = 0;
     retval = src_fs->do_fread(src, buffer, COPY_BUFFER_SIZE, &actual_read);
-    printf("Read : %"PRIu64"\n", actual_read);
+    LogCvmfs(kLogCvmfs, kLogDebug, "Read : %"PRIu64"\n", actual_read);
     if (retval != 0) {
       return false;
     }
@@ -414,7 +442,7 @@ bool copyFile(
     if (retval != 0) {
       return false;
     }
-    printf("Write : %"PRIu64"\n", actual_read);
+    LogCvmfs(kLogCvmfs, kLogDebug, "Write : %"PRIu64"\n", actual_read);
 
     if (actual_read < COPY_BUFFER_SIZE) {
       break;
@@ -424,14 +452,14 @@ bool copyFile(
   retval = src_fs->do_fclose(src);
   if (retval != 0) {
     // Handle error
-    printf("Failed close src : %s\n", src_name);
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed close src : %s\n", src_name);
     return false;
   }
 
   retval = dest_fs->do_fclose(dest);
   if (retval != 0) {
     // Handle error
-    printf("Failed close dest : %s\n", dest_name);
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed close dest : %s\n", dest_name);
     return false;
   }
 
@@ -456,7 +484,8 @@ static void *MainWorker(void *data) {
       break;
 
     if (!copyFile(mwc->src_fs, next_copy.src, mwc->dest_fs, next_copy.dest)) {
-      printf("File %s failed to copy\n\n", next_copy.src);
+      LogCvmfs(kLogCvmfs, kLogStderr,
+      "File %s failed to copy\n", next_copy.src);
     }
 
     atomic_dec64(&copy_queue);
@@ -489,50 +518,99 @@ bool copy_file(
   return true;
 }
 
-// int CommandExport::Main(const swissknife::ArgumentList &args) {
-int CommandExport::Main() {
+static void Usage() {
+  LogCvmfs(kLogCvmfs, kLogStdout,
+           "CernVM File System consistency checker, version %s\n\n"
+           "This tool checks a cvmfs cache directory for consistency.\n"
+           "If necessary, the managed cache db is removed so that\n"
+           "it will be rebuilt on next mount.\n\n"
+           "Usage: cvmfs_fsck [-v] [-p] [-f] [-j #threads] <cache directory>\n"
+           "Options:\n"
+           "  -v verbose output\n"
+           "  -p try to fix automatically\n"
+           "  -f force rebuild of managed cache db on next mount\n"
+           "  -j number of concurrent integrity check worker threads\n",
+           VERSION);
+}
+
+
+int main(int argc, char **argv) {
   // The starting location for the traversal in src
   // Default value is the base directory (only used if not trace provided)
-  string base = "";
+  char *src_repo = NULL;
+  char *src_data = NULL;
+  char *src_type = NULL;
 
-  string src_repo;
-  string src_data;
-  string src_type;
+  char *dest_repo = NULL;
+  char *dest_data = NULL;
+  char *dest_type = NULL;
 
-  string dest_repo;
-  string dest_data;
-  string dest_type;
+  char *base = NULL;
+  char *trace_file = NULL;
 
-  string trace_file;
-/*
-  // Option parsing
-  if (args.find('b') != args.end())
-    base = *args.find('b')->second;
+  int c;
+  while ((c = getopt(argc, argv, "hbsrcdxytjn:")) != -1) {
+    switch (c) {
+      case 'h':
+        shrinkwrap::Usage();
+        return kErrorOk;
+      case 'b':
+        base = strdup(optarg);
+        if (trace_file) {
+          LogCvmfs(kLogCvmfs, kLogStdout,
+                   "Only allowed to specify either base dir or trace file");
+          return kErrorUsage;
+        }
+        break;
+      case 's':
+        src_type = strdup(optarg);
+        break;
+      case 'r':
+        src_repo = strdup(optarg);
+        break;
+      case 'c':
+        src_data = strdup(optarg);
+        break;
+      case 'd':
+        dest_type = strdup(optarg);
+        break;
+      case 'x':
+        dest_repo = strdup(optarg);
+        break;
+      case 'y':
+        dest_data = strdup(optarg);
+        break;
+      case 't':
+        trace_file = strdup(optarg);
+        if (base) {
+          LogCvmfs(kLogCvmfs, kLogStdout,
+                   "Only allowed to specify either base dir or trace file");
+          return kErrorUsage;
+        }
+        break;
+      case 'j':
+        num_parallel = atoi(optarg);
+        if (num_parallel < 1) {
+          LogCvmfs(kLogCvmfs, kLogStdout,
+                   "There is at least one worker thread required");
+          return kErrorUsage;
+        }
+        break;
+      case 'n':
+        retries = atoi(optarg);
+        break;
+      case '?':
+      default:
+        shrinkwrap::Usage();
+        return kErrorUsage;
+    }
+  }
 
-  if (args.find('s') != args.end())
-    src_repo = *args.find('s')->second;
-  if (args.find('i') != args.end())
-    src_data = *args.find('i')->second;
-  if (args.find('t') != args.end())
-    src_type = *args.find('t')->second;
+  struct fs_traversal *src = FindInterface(src_type);
+  src->context_ = src->initialize(src_repo, src_data);
 
-  if (args.find('d') != args.end())
-    dest_repo = *args.find('d')->second;
-  if (args.find('o') != args.end())
-    dest_data = *args.find('o')->second;
-  if (args.find('w') != args.end())
-    dest_type = *args.find('w')->second;
-
-  if (args.find('n') != args.end())
-    num_parallel = String2Uint64(*args.find('n')->second);
-  if (args.find('r') != args.end())
-    retries = String2Uint64(*args.find('r')->second);
-*/
-  struct fs_traversal *src = FindInterface(src_type.c_str());
-  src->context_ = src->initialize(src_repo.c_str(), src_data.c_str());
-
-  struct fs_traversal *dest = FindInterface(dest_type.c_str());
-  dest->context_ = dest->initialize(dest_repo.c_str(), dest_data.c_str());
+  struct fs_traversal *dest = FindInterface(dest_type);
+  dest->context_ = dest->initialize(dest_repo, dest_data);
 
   int result = 1;
 
@@ -558,20 +636,20 @@ int CommandExport::Main() {
     assert(retval == 0);
   }
 
-  if (!trace_file.empty()) {
-    ifstream trace(trace_file.c_str());
+  if (!trace_file) {
+    ifstream trace(trace_file);
     std::string entry;
     while (getline(trace, entry))
     {
       // Function removes special characters and determines if its recursive
       recursive = trim_trace_spec(&entry);
       char *entry_point = strdup(entry.c_str());
-      result = Traverse(entry_point, src, dest, num_parallel, recursive);
+      result = Sync(entry_point, src, dest, num_parallel, recursive);
       free(entry_point);
     }
   } else {
-    char *entry_point = strdup(base.c_str());
-    result = Traverse(entry_point, src, dest, num_parallel, true);
+    char *entry_point = strdup(base);
+    result = Sync(entry_point, src, dest, num_parallel, true);
     free(entry_point);
   }
   while (atomic_read64(&copy_queue) != 0) {
