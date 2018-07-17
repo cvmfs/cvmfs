@@ -54,27 +54,41 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   ~StatisticsDatabase();
 
 /**
-  * Get command statistics values and convert them into string.
+  * Get command statistics values and convert them into strings.
+  *
+  * @param command to access counter statistics
+  * @return A Stats struct with all values stored in strings
   */
-  void GetStats(swissknife::Command *command, Stats *stats);
+  Stats GetStats(swissknife::Command *command);
 
 /**
-  * Get UTC Time in YYYY-MM-DD HH:MM:SS format
+  * Get UTC Time.
+  *
+  * @return a string in "YYYY-MM-DD HH:MM:SS" format
   */
   std::string GetGMTimestamp();
 
 /**
-  * Build the insert statement
+  * Build the insert statement.
+  *
+  * @param stats a struct with all values stored in strings
+  * @return the insert statement
   */
   std::string PrepareStatement(Stats stats);
 
 /**
-  * Returns a valid path for the database file
+  * Returns the desired path to store the database file.
+  * If the path is not valid it returns the
+  * default path: /var/spool/cvmfs/$repo_name/stats.db
+  *
+  * @param repo_name Fully qualified name of the repository
+  * @path to store database file
   */
-  static std::string GetValidPath(std::string repo_name);
+  static std::string GetDBPath(std::string repo_name);
 
 /**
   * Entry point function for writing data into database
+  * @return 0 if no error occured
   */
   int StoreStatistics(swissknife::Command *command);
 

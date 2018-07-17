@@ -68,23 +68,25 @@ StatisticsDatabase::~StatisticsDatabase() {
 }
 
 
-void StatisticsDatabase::GetStats(swissknife::Command *command, Stats *stats) {
-  stats->files_added = command->statistics()->
+Stats StatisticsDatabase::GetStats(swissknife::Command *command) {
+  Stats stats;
+  stats.files_added = command->statistics()->
                        Lookup("Publish.n_files_added")->ToString();
-  stats->files_removed = command->statistics()->
+  stats.files_removed = command->statistics()->
                        Lookup("Publish.n_files_removed")->ToString();
-  stats->files_changed = command->statistics()->
+  stats.files_changed = command->statistics()->
                        Lookup("Publish.n_files_changed")->ToString();
-  stats->dir_added = command->statistics()->
+  stats.dir_added = command->statistics()->
                        Lookup("Publish.n_directories_added")->ToString();
-  stats->dir_removed = command->statistics()->
+  stats.dir_removed = command->statistics()->
                        Lookup("Publish.n_directories_removed")->ToString();
-  stats->dir_changed = command->statistics()->
+  stats.dir_changed = command->statistics()->
                        Lookup("Publish.n_directories_changed")->ToString();
-  stats->bytes_added = command->statistics()->
+  stats.bytes_added = command->statistics()->
                        Lookup("Publish.sz_added_bytes")->ToString();
-  stats->bytes_removed = command->statistics()->
+  stats.bytes_removed = command->statistics()->
                        Lookup("Publish.sz_removed_bytes")->ToString();
+  return stats;
 }
 
 
@@ -126,44 +128,36 @@ std::string StatisticsDatabase::PrepareStatement(Stats stats) {
 }
 
 
-std::string StatisticsDatabase::GetValidPath(std::string repo_name) {
+std::string StatisticsDatabase::GetDBPath(std::string repo_name) {
   // default location
-  std::string db_file_path = "/var/spool/cvmfs/" + repo_name + "/stats.db";
-
+  std::string db_default_path = "/var/spool/cvmfs/" + repo_name + "/stats.db";
   const std::string repo_config_file =
       "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
-
   SimpleOptionsParser parser;
+
   if (!parser.TryParsePath(repo_config_file)) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
-             "Could not parse repository configuration: %s. "
-             "Write statistics in %s",
-             repo_config_file.c_str(),
-             db_file_path.c_str());
-    return db_file_path;
+             "Could not parse repository configuration: %s.",
+             repo_config_file.c_str());
+    return db_default_path;
   }
 
   std::string statistics_db = "";
   if (!parser.GetValue("CVMFS_STATISTICS_DB", &statistics_db)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Missing parameter %s in repository configuration file. "
-             "Write statistics in %s",
-             "CVMFS_STATISTICS_DB",
-             db_file_path.c_str());
-    return db_file_path;
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "Missing parameter %s in repository configuration file.",
+             "CVMFS_STATISTICS_DB");
+    return db_default_path;
   }
 
   std::string dirname = GetParentPath(statistics_db);
   int mode = S_IRUSR | S_IWUSR | S_IXUSR |
-             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH; // 755
-  int retval = MkdirDeep(dirname, mode, true);
-  if (!retval) {
+             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;  // 755
+  if (!MkdirDeep(dirname, mode, true)) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
-      "Couldn't write statistics at the specified path %s, "
-      "Write statistics in %s",
-      statistics_db.c_str(),
-      db_file_path.c_str());
-    return db_file_path;
+      "Couldn't write statistics at the specified path %s.",
+      statistics_db.c_str());
+    return db_default_path;
   }
 
   return statistics_db;
@@ -171,29 +165,28 @@ std::string StatisticsDatabase::GetValidPath(std::string repo_name) {
 
 
 int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
-  Stats stats;
-  GetStats(command, &stats);
+  Stats stats = GetStats(command);
 
   sqlite::Sql insert(this->sqlite_db(), PrepareStatement(stats));
 
   if (!this->BeginTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
-    return 1;
+    return -1;
   }
 
   if (!insert.Execute()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
-    return 2;
+    return -2;
   }
 
   if (!insert.Reset()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Reset() failed!");
-    return 3;
+    return -3;
   }
 
   if (!this->CommitTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "CommitTransaction failed!");
-    return 4;
+    return -4;
   }
 
   return 0;

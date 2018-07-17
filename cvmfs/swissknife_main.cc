@@ -198,23 +198,28 @@ int main(int argc, char **argv) {
   if (command->GetName() == "sync" || command->GetName() == "ingest") {
     StatisticsDatabase *db;
 
-    // get the repo name
     string repo_name = *args.find('N')->second;
-    string db_file_path = StatisticsDatabase::GetValidPath(repo_name);
+    string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
 
-    // create a new database file if is not already there
     if (FileExists(db_file_path)) {
       db = StatisticsDatabase::Open(db_file_path,
                                     StatisticsDatabase::kOpenReadWrite);
     } else {
       db = StatisticsDatabase::Create(db_file_path);
     }
-    assert(db != NULL);
-    db->StoreStatistics(command);
-    delete db;
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at:%s",
-      db_file_path.c_str());
+    if (db == NULL) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+              "Couldn't create StatisticsDatabase object!");
+    } else if (db->StoreStatistics(command) != 0) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+            "Couldn't store statistics in %s!",
+            db_file_path.c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at: %s",
+                                      db_file_path.c_str());
+    }
+    delete db;
   }
 
   // delete the command list
