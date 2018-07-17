@@ -39,7 +39,8 @@ class XattrList {
   bool Remove(const std::string &key);
   bool IsEmpty() const { return xattrs_.empty(); }
 
-  void Serialize(unsigned char **outbuf, unsigned *size) const;
+  void Serialize(unsigned char **outbuf, unsigned *size,
+  const std::vector<std::string> *blacklist = NULL) const;
   static XattrList *Deserialize(const unsigned char *inbuf,
                                 const unsigned size);
 
