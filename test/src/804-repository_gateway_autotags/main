@@ -1,0 +1,60 @@
+cvmfs_test_name="Repository gateway autotags"
+cvmfs_test_autofs_on_startup=false
+
+
+clean_up() {
+    echo "Cleaning up"
+}
+
+check_status() {
+    echo $(( $1 || 0 ))
+}
+
+run_transactions() {
+    set_up_repository_gateway
+
+    echo "Checking named tag creation"
+    cvmfs_server transaction test.repo.org
+    cvmfs_server publish -a tag1 test.repo.org
+    cvmfs_server tag -l test.repo.org
+    local tags=$(cvmfs_server tag -l -x test.repo.org)
+    local num_tags=$(echo "$tags" | wc -l)
+    local num_generic_tags=$(echo "$tags" | grep generic | wc -l)
+    if [ x"$num_tags" != x4 ] || [ x"$num_generic_tags" != x1 ]; then
+        return 1
+    fi
+
+    echo "Checking tag creation with autotags"
+    sudo bash -c "echo CVMFS_AUTO_TAG=true >> /etc/cvmfs/repositories.d/test.repo.org/server.conf"
+    cvmfs_server transaction test.repo.org
+    cvmfs_server publish test.repo.org
+    cvmfs_server tag -l test.repo.org
+    local tags=$(cvmfs_server tag -l -x test.repo.org)
+    local num_tags=$(echo "$tags" | wc -l)
+    local num_generic_tags=$(echo "$tags" | grep generic | wc -l)
+    if [ x"$num_tags" != x5 ] || [ x"$num_generic_tags" != x2 ]; then
+        return 1
+    fi
+
+    echo "Checking tag creation without autotags"
+    sudo bash -c "echo CVMFS_AUTO_TAG=false >> /etc/cvmfs/repositories.d/test.repo.org/server.conf"
+    cvmfs_server transaction test.repo.org
+    cvmfs_server publish test.repo.org
+    cvmfs_server tag -l test.repo.org
+    local tags=$(cvmfs_server tag -l -x test.repo.org)
+    local num_tags=$(echo "$tags" | wc -l)
+    local num_generic_tags=$(echo "$tags" | grep generic | wc -l)
+    if [ x"$num_tags" != x5 ] || [ x"$num_generic_tags" != x2 ]; then
+        return 1
+    fi
+}
+
+cvmfs_run_test() {
+    trap clean_up EXIT HUP INT TERM || return $?
+
+    run_transactions
+    local status=$?
+
+    return $(check_status $status)
+}
+
