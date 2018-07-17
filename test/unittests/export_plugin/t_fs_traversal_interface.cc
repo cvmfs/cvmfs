@@ -459,7 +459,6 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
   AssertListHas("ListDirTest-foo.txt", dirList, listLen);
   AssertListHas("ListDirTest-bar.txt", dirList, listLen);
   AssertListHas("ListDirTest-symlink1", dirList, listLen);
-  AssertListHas(WARNING_FILE_NAME, dirList, listLen);
   listLen = 0;
   delete dirList;
   fs_traversal_instance_->interface->list_dir(
