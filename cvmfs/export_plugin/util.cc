@@ -4,6 +4,9 @@
 
 #include <stdio.h>
 
+#include <vector>
+#include <string>
+
 #include "util.h"
 
 #include "hash.h"
@@ -22,8 +25,10 @@ shash::Any HashMeta(const struct cvmfs_attr *stat_info) {
   XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
   unsigned xlist_buffer_size = 0;
   unsigned char *xlist_buffer;
+  std::vector<std::string> serialize_blacklist;
+  serialize_blacklist.push_back("security.selinux");
   if (xlist) {
-    xlist->Serialize(&xlist_buffer, &xlist_buffer_size);
+    xlist->Serialize(&xlist_buffer, &xlist_buffer_size, &serialize_blacklist);
   }
   unsigned char buffer[min_buffer_size+xlist_buffer_size];
   for (unsigned i = 0; i < (min_buffer_size+xlist_buffer_size); i++) {

@@ -56,13 +56,6 @@ void AppendStringToList(char const   *str,
   }
 }
 
-bool IsPrefixOf(std::string str, std::string prefix) {
-    return std::equal(
-      str.begin(),
-      str.begin() + prefix.size(),
-      prefix.begin() );
-}
-
 std::string BuildPath(struct fs_traversal_context *ctx,
   const char *dir) {
   std::string result = ctx->repo;

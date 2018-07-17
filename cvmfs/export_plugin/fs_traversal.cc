@@ -381,7 +381,7 @@ bool Sync(
               return false;
             }
           }*/
-          if (!dest->do_rmdir(dest->context_, dest_entry)) {
+          if (dest->do_rmdir(dest->context_, dest_entry)) {
             LogCvmfs(kLogCvmfs, kLogStderr,
             "Failed to remove directory %s", dest_entry);
             return false;

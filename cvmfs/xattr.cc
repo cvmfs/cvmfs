@@ -175,7 +175,6 @@ bool XattrList::Set(const string &key, const string &value) {
       return false;
     xattrs_[key] = value;
   }
-  printf("XAttr Set : %s\n", xattrs_[key].c_str());
   return true;
 }
 
@@ -210,7 +209,7 @@ void XattrList::Serialize(
 
   // Determine size of the buffer (allocate space for max num of attributes)
   XattrEntry *entries = reinterpret_cast<XattrEntry *>(
-    smalloc(header.num_xattrs * sizeof(XattrEntry)));
+    smalloc(real_num_xattr * sizeof(XattrEntry)));
   unsigned ientries = 0;
   for (map<string, string>::const_iterator it_att = xattrs_.begin(),
        it_att_end = xattrs_.end(); it_att != it_att_end; ++it_att)
