@@ -19,6 +19,7 @@ echo "Script location: $SCRIPT_LOCATION"
 
 # Create togo project
 echo "Creating togo project"
+togo configure -n "Radu Popescu" -e "radu.popescu@cern.ch"
 cd $BUILD_LOCATION
 mkdir -p togo
 cd togo
