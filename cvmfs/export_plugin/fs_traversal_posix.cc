@@ -159,7 +159,8 @@ void posix_list_dir(struct fs_traversal_context *ctx,
 
   while ((de = readdir(dr)) != NULL) {
     if (strcmp(de->d_name, ".") != 0
-      && strcmp(de->d_name, "..") != 0) {
+      && strcmp(de->d_name, "..") != 0
+      && strcmp(de->d_name, WARNING_FILE_NAME) != 0) {
       AppendStringToList(de->d_name, buf, len, &buflen);
     }
   }

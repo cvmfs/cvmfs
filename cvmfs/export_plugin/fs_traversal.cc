@@ -352,11 +352,12 @@ bool CommandExport::Traverse(
           break;
         case S_IFDIR:
           // We may want this to be recursive regardless
+          /* NOTE(steuber): Do we want this?
           if (recursive) {
             if (!Traverse(dest_entry, src, dest, parallel, recursive)) {
               return false;
             }
-          }
+          }*/
           if (!dest->do_rmdir(dest->context_, dest_entry)) {
             return false;
           }
