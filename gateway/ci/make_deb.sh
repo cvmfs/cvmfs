@@ -16,7 +16,11 @@ echo "Release: $RELEASE"
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
-PACKAGE_NAME_SUFFIX="+ubuntu16.04_amd64"
+if [ x"$PLATFORM" = xubuntu1604 ]; then
+    PACKAGE_NAME_SUFFIX="+ubuntu16.04_amd64"
+elif [ x"$PLATFORM" = xubuntu1804 ]; then
+    PACKAGE_NAME_SUFFIX="+ubuntu18.04_amd64"
+fi
 PACKAGE_NAME=cvmfs-gateway_$VERSION~$RELEASE$PACKAGE_NAME_SUFFIX.deb
 
 mkdir -p ${BUILD_LOCATION}/DEBS
