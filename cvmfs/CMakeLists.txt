@@ -180,6 +180,16 @@ set (CVMFS_TALK_SOURCES
   util/string.cc
 )
 
+set (CVMFS_SHRINKWRAP_SOURCES
+  ${LIBCVMFS_SOURCES}
+
+  export_plugin/fs_traversal.cc
+  export_plugin/fs_traversal_posix.cc
+  export_plugin/fs_traversal_libcvmfs.cc
+  export_plugin/util.cc
+
+  export_plugin/shrinkwrap.cc
+)
 
 set (CVMFS_SWISSKNIFE_SOURCES
   backoff.cc
@@ -487,6 +497,8 @@ set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -
 
 set (LIBCVMFS_CACHE_CFLAGS "${LIBCVMFS_CACHE_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 
+set (CVMFS_SHRINKWRAP_CFLAGS "${CVMFS_SHRINKWRAP_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
+
 #
 # set some include and linking stuff
 #
@@ -672,6 +684,23 @@ if (BUILD_LIBCVMFS)
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
 endif(BUILD_LIBCVMFS)
 
+if (BUILD_CVMFS_SHRINKWRAP)
+  add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
+  add_dependencies (cvmfs_shrinkwrap cache.pb.generated)
+
+  set (CVMFS_SHRINKWRAP_LIBS
+                          ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
+                          ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
+                          ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
+                          ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
+                          ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                          ${PROTOBUF_LITE_LIBRARY}  ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
+
+  set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
+  target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
+endif(BUILD_CVMFS_SHRINKWRAP)
+
+
 if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
@@ -790,6 +819,15 @@ if (BUILD_LIBCVMFS)
     DESTINATION             include
   )
 endif (BUILD_LIBCVMFS)
+
+
+if (BUILD_CVMFS_SHRINKWRAP)
+  install (
+    TARGETS      cvmfs_shrinkwrap
+    RUNTIME
+    DESTINATION    bin
+  )
+endif (BUILD_CVMFS_SHRINKWRAP)
 
 if (BUILD_LIBCVMFS_CACHE)
   install (

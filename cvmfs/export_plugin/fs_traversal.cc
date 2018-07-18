@@ -80,6 +80,8 @@ struct fs_traversal* FindInterface(const char * type)
   } else if (!strcmp(type, "cvmfs")) {
     return libcvmfs_get_interface();
   }
+  LogCvmfs(kLogCvmfs, kLogStderr,
+  "Unknown File System Interface : %s", type);
   return NULL;
 }
 
@@ -520,21 +522,27 @@ bool copy_file(
 
 static void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
-           "CernVM File System consistency checker, version %s\n\n"
-           "This tool checks a cvmfs cache directory for consistency.\n"
-           "If necessary, the managed cache db is removed so that\n"
-           "it will be rebuilt on next mount.\n\n"
-           "Usage: cvmfs_fsck [-v] [-p] [-f] [-j #threads] <cache directory>\n"
+       "CernVM File System Shrinkwrapper, version %s\n\n"
+       "This tool takes a cvmfs cache directory and  outputs\n"
+       "to a destination files system for export.\n"
+       "Usage: cvmfs_shrinkwrap "
+       "[-s][-r][-c][-d][-x][-y][-t|b][-j #threads] <cache directory>\n"
            "Options:\n"
-           "  -v verbose output\n"
-           "  -p try to fix automatically\n"
-           "  -f force rebuild of managed cache db on next mount\n"
+           "  -s Source Filesystem type [default:cvmfs]\n"
+           "  -r Source repo\n"
+           "  -c Source data\n"
+           "  -d Dest type\n"
+           "  -x Dest repo\n"
+           "  -y Dest data\n"
+           "  -t Trace file to be replicated to destination\n"
+           "  -b Base directory to be copied\n"
+           "  -r Number of retries on copying file [default:0]\n"
            "  -j number of concurrent integrity check worker threads\n",
            VERSION);
 }
 
 
-int main(int argc, char **argv) {
+int Main(int argc, char **argv) {
   // The starting location for the traversal in src
   // Default value is the base directory (only used if not trace provided)
   char *src_repo = NULL;
@@ -549,7 +557,7 @@ int main(int argc, char **argv) {
   char *trace_file = NULL;
 
   int c;
-  while ((c = getopt(argc, argv, "hbsrcdxytjn:")) != -1) {
+  while ((c = getopt(argc, argv, "hb:s:r:c:d:x:y:t:j:n:")) != -1) {
     switch (c) {
       case 'h':
         shrinkwrap::Usage();
@@ -607,9 +615,15 @@ int main(int argc, char **argv) {
   }
 
   struct fs_traversal *src = FindInterface(src_type);
+  if (!src) {
+    return 1;
+  }
   src->context_ = src->initialize(src_repo, src_data);
 
   struct fs_traversal *dest = FindInterface(dest_type);
+  if (!dest) {
+    return 1;
+  }
   dest->context_ = dest->initialize(dest_repo, dest_data);
 
   int result = 1;
@@ -672,3 +686,4 @@ int main(int argc, char **argv) {
 }
 
 }  // namespace shrinkwrap
+
