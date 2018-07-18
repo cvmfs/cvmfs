@@ -18,7 +18,7 @@ bool Sync(const char *dir,
           int parallel,
           bool recursive);
 
-int main(int argc, char **argv);
+int Main(int argc, char **argv);
 
 }  // namespace shrinkwrap
 
