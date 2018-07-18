@@ -4,6 +4,58 @@
 
 #include "statistics_database.h"
 
+namespace {
+
+  /**
+  * Get UTC Time.
+  *
+  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
+  */
+std::string GetGMTimestamp() {
+  struct tm time_ptr;
+  char date_and_time[50];
+  time_t t = time(NULL);
+  gmtime_r(&t, &time_ptr);      // take UTC
+  // timestamp format
+  strftime(date_and_time, 50, "%Y-%m-%d %H:%M:%S", &time_ptr);
+  std::string timestamp(date_and_time);
+  return timestamp;
+}
+
+/**
+  * Build the insert statement.
+  *
+  * @param stats a struct with all values stored in strings
+  * @return the insert statement
+  */
+std::string PrepareStatement(Stats stats) {
+  std::string insert_statement =
+    "INSERT INTO publish_statistics ("
+    "timestamp,"
+    "files_added,"
+    "files_removed,"
+    "files_changed,"
+    "directories_added,"
+    "directories_removed,"
+    "directories_changed,"
+    "sz_bytes_added,"
+    "sz_bytes_removed)"
+    " VALUES("
+    "'"+GetGMTimestamp()+"',"+  // TEXT
+    stats.files_added+"," +
+    stats.files_removed +","+
+    stats.files_changed + "," +
+    stats.dir_added + "," +
+    stats.dir_removed + "," +
+    stats.dir_changed + "," +
+    stats.bytes_added + "," +
+    stats.bytes_removed + ");";
+  return insert_statement;
+}
+
+}  // namespace
+
+
 const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
 float          StatisticsDatabase::kLatestSchema           = 1.0f;
 unsigned       StatisticsDatabase::kLatestSchemaRevision   =
@@ -91,44 +143,6 @@ Stats StatisticsDatabase::GetStats(swissknife::Command *command) {
 }
 
 
-std::string StatisticsDatabase::GetGMTimestamp() {
-  struct tm time_ptr;
-  char date_and_time[50];
-  time_t t = time(NULL);
-  gmtime_r(&t, &time_ptr);      // take UTC
-  // timestamp format
-  strftime(date_and_time, 50, "%Y-%m-%d %H:%M:%S", &time_ptr);
-  std::string timestamp(date_and_time);
-  return timestamp;
-}
-
-
-std::string StatisticsDatabase::PrepareStatement(Stats stats) {
-  std::string insert_statement =
-    "INSERT INTO publish_statistics ("
-    "timestamp,"
-    "files_added,"
-    "files_removed,"
-    "files_changed,"
-    "directories_added,"
-    "directories_removed,"
-    "directories_changed,"
-    "sz_bytes_added,"
-    "sz_bytes_removed)"
-    " VALUES("
-    "'"+GetGMTimestamp()+"',"+  // TEXT
-    stats.files_added+"," +
-    stats.files_removed +","+
-    stats.files_changed + "," +
-    stats.dir_added + "," +
-    stats.dir_removed + "," +
-    stats.dir_changed + "," +
-    stats.bytes_added + "," +
-    stats.bytes_removed + ");";
-  return insert_statement;
-}
-
-
 int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
   Stats stats = GetStats(command);
 
@@ -192,4 +206,14 @@ std::string StatisticsDatabase::GetDBPath(std::string repo_name) {
   }
 
   return statistics_db;
+}
+
+
+StatisticsDatabase::StatisticsDatabase(const std::string  &filename,
+              const OpenMode      open_mode) :
+  sqlite::Database<StatisticsDatabase>(filename, open_mode),
+  create_empty_db_calls(0),  check_compatibility_calls(0),
+  live_upgrade_calls(0), compact_calls(0)
+{
+  ++StatisticsDatabase::instances;
 }

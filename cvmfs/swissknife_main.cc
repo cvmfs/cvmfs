@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
   }
 
   if (command->GetName() == "sync" || command->GetName() == "ingest") {
-    StatisticsDatabase *db;
+    UniquePtr<StatisticsDatabase> db;
     string repo_name = *args.find('N')->second;
     string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
 
@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
       db = StatisticsDatabase::Create(db_file_path);
     }
 
-    if (db == NULL) {
+    if (!db.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
               "Couldn't create StatisticsDatabase object!");
     } else if (db->StoreStatistics(command) != 0) {
@@ -218,7 +218,6 @@ int main(int argc, char **argv) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at: %s",
                                       db_file_path.c_str());
     }
-    delete db;
   }
 
   // delete the command list

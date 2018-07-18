@@ -81,29 +81,7 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
  protected:
   friend class sqlite::Database<StatisticsDatabase>;
   StatisticsDatabase(const std::string  &filename,
-                const OpenMode      open_mode) :
-    sqlite::Database<StatisticsDatabase>(filename, open_mode),
-    create_empty_db_calls(0),  check_compatibility_calls(0),
-    live_upgrade_calls(0), compact_calls(0)
-  {
-    ++StatisticsDatabase::instances;
-  }
-
- private:
-  /**
-  * Get UTC Time.
-  *
-  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
-  */
-  std::string GetGMTimestamp();
-
-/**
-  * Build the insert statement.
-  *
-  * @param stats a struct with all values stored in strings
-  * @return the insert statement
-  */
-  std::string PrepareStatement(Stats stats);
+                const OpenMode      open_mode);
 };
 
 
