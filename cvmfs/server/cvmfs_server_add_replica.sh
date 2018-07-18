@@ -170,7 +170,6 @@ EOF
     echo -n "Create CernVM-FS Storage... "
     mkdir -p $storage_dir
     create_repository_skeleton $storage_dir $cvmfs_user > /dev/null
-    sync
     echo "done"
 
     if [ $configure_apache -eq 1 ]; then
@@ -198,6 +197,8 @@ EOF
 
   echo -n "Updating global JSON information... "
   update_global_repository_info && echo "done" || echo "fail"
+
+  syncfs
 
   echo "\
 

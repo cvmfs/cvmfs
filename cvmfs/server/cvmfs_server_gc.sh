@@ -252,6 +252,8 @@ __do_gc_cmd()
         release_update_lock $name
       fi
     fi
+
+    syncfs
 }
 
 # this is used for both auto-gc (after publish or snapshot) and non-auto-gc

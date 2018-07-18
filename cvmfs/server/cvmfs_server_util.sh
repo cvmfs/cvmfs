@@ -972,6 +972,12 @@ is_subcommand() {
 }
 
 
+# Flushes data to disk; we might at some point want to do more than just sync
+syncfs() {
+  sync
+}
+
+
 # prints some help information optionally followed by an error message
 # afterwards it aborts the script
 #

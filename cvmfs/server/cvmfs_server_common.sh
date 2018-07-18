@@ -1291,7 +1291,7 @@ _run_catalog_migration() {
   # finalizing transaction
   local trunk_hash=$(grep "^C" $manifest | tr -d C)
   echo "Flushing file system buffers"
-  sync
+  syncfs
 
   # committing newly created revision
   echo "Signing new manifest"
