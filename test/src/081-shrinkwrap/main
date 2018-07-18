@@ -33,7 +33,8 @@ cvmfs_run_test() {
 
     sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
 
-    python ~/cvmfs/python/spec_builder.py /tmp/cvmfs-$repo.trace.log /tmp/cvmfs-$repo.spec.txt
+    
+    sudo python $TEST_ROOT/../python/spec_builder.py /tmp/cvmfs-$repo.trace.log /tmp/cvmfs-$repo.spec.txt
 
     return 0
 }
