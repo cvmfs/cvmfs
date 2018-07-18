@@ -1,4 +1,7 @@
 0.3.0:
+  * Updated the RPM packaging: when installing RPMs, the setup.sh script
+    no longer needs to be explicitly run, it's steps have been integrated
+    into the RPM pre/post install/uninstall hooks (CVM-1557)
   * Creating or cancelling a lease can no longer be blocked by longer requests (CVM-1547)
   * Make logging less verbose by default: HTTP and backend req tracing are now
     done at "debug" log level, the default log level is now "info" (CVM-1573)
