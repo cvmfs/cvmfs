@@ -480,7 +480,8 @@ set (LIBCVMFS_SOURCES
 )
 
 set (CVMFS_TEST_EXPORT_SOURCES
-  export_plugin/main.cc
+  export_plugin/benchmark_pathspec.cc
+  #export_plugin/main.cc
 
   ../common/env.cc
   ../common/testutil.cc
@@ -492,6 +493,8 @@ set (CVMFS_TEST_EXPORT_SOURCES
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_posix.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_libcvmfs.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/util.cc
+
+  ${CVMFS_SOURCE_DIR}/export_plugin/spec_tree.cc
 
   ${LIBCVMFS_SOURCES}
 )
