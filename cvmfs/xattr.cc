@@ -193,7 +193,8 @@ bool XattrList::Remove(const string &key) {
  * If the list of attributes is empty, Serialize returns NULL.  Deserialize
  * can deal with NULL pointers.
  */
-void XattrList::Serialize(unsigned char **outbuf, unsigned *size) const {
+void XattrList::Serialize(unsigned char **outbuf, unsigned *size,
+  const std::vector<std::string> *blacklist) const {
   if (xattrs_.empty()) {
     *size = 0;
     *outbuf = NULL;
@@ -203,19 +204,40 @@ void XattrList::Serialize(unsigned char **outbuf, unsigned *size) const {
   XattrHeader header(xattrs_.size());
   uint32_t packed_size = sizeof(header);
 
-  // Determine size of the buffer
+  size_t real_num_xattr = header.num_xattrs;
+  // TODO(steuber): Can we optimize this?
+
+  // Determine size of the buffer (allocate space for max num of attributes)
   XattrEntry *entries = reinterpret_cast<XattrEntry *>(
-    smalloc(header.num_xattrs * sizeof(XattrEntry)));
+    smalloc(real_num_xattr * sizeof(XattrEntry)));
   unsigned ientries = 0;
   for (map<string, string>::const_iterator i = xattrs_.begin(),
-       iEnd = xattrs_.end(); i != iEnd; ++i, ientries++)
+       iEnd = xattrs_.end(); i != iEnd; ++i)
   {
+    // Only serialize non-blacklist items
+    if (blacklist != NULL) {
+      bool skip = false;
+      for (std::vector<std::string>::const_iterator blk_li_it
+           = blacklist->begin();
+        blk_li_it != blacklist->end();
+        ++blk_li_it) {
+        if (IsPrefixOf(i->first, *blk_li_it)) {
+          skip = true;
+          break;
+        }
+      }
+      if (skip) {
+        continue;
+      }
+    }
     /*entries[ientries] =*/
     new (entries + ientries) XattrEntry(i->first, i->second);
     packed_size += entries[ientries].GetSize();
+    ientries++;
   }
 
   // Copy data into buffer
+  header.num_xattrs = ientries;
   *size = packed_size;
   *outbuf = reinterpret_cast<unsigned char *>(smalloc(packed_size));
   memcpy(*outbuf, &header, sizeof(header));

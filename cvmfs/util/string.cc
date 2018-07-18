@@ -548,6 +548,13 @@ string Tail(const string &source, unsigned num_lines) {
   return source;
 }
 
+bool IsPrefixOf(std::string str, std::string prefix) {
+  return std::equal(
+    str.begin(),
+    str.begin() + prefix.size(),
+    prefix.begin() );
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

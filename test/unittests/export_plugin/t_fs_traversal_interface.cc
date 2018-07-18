@@ -170,7 +170,6 @@ class T_Fs_Traversal_Interface :
     *ident2 = std::string(
       fs_traversal_instance_->interface->get_identifier(context_,
         stat_values2));
-    printf("ident1 : %s\nident2 : %s\n", ident1->c_str(), ident2->c_str());
 
     // BACKGROUND FILES
     ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
