@@ -62,21 +62,6 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   Stats GetStats(swissknife::Command *command);
 
 /**
-  * Get UTC Time.
-  *
-  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
-  */
-  std::string GetGMTimestamp();
-
-/**
-  * Build the insert statement.
-  *
-  * @param stats a struct with all values stored in strings
-  * @return the insert statement
-  */
-  std::string PrepareStatement(Stats stats);
-
-/**
   * Entry point function for writing data into database
   *
   * @return 0 if no error occured or a negative integer if errors occurred
@@ -94,7 +79,6 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   static std::string GetDBPath(std::string repo_name);
 
  protected:
-  // TODO(rmeusel): C++11 - constructor inheritance
   friend class sqlite::Database<StatisticsDatabase>;
   StatisticsDatabase(const std::string  &filename,
                 const OpenMode      open_mode) :
@@ -104,6 +88,22 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   {
     ++StatisticsDatabase::instances;
   }
+
+ private:
+  /**
+  * Get UTC Time.
+  *
+  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
+  */
+  std::string GetGMTimestamp();
+
+/**
+  * Build the insert statement.
+  *
+  * @param stats a struct with all values stored in strings
+  * @return the insert statement
+  */
+  std::string PrepareStatement(Stats stats);
 };
 
 

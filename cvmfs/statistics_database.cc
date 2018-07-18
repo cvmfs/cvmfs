@@ -160,7 +160,8 @@ int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
 
 std::string StatisticsDatabase::GetDBPath(std::string repo_name) {
   // default location
-  const std::string db_default_path = "/var/spool/cvmfs/" + repo_name + "/stats.db";
+  const std::string db_default_path =
+      "/var/spool/cvmfs/" + repo_name + "/stats.db";
   const std::string repo_config_file =
       "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
   SimpleOptionsParser parser;
