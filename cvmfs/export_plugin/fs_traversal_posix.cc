@@ -249,16 +249,19 @@ int posix_cleanup_path(struct fs_traversal_context *ctx,
   std::string dirname = GetParentPath(complete_path);
   if (!DirectoryExists(dirname)) {
     // Directory doesn't exist
+    fprintf(stderr, "Directory doesn't exist : %s\n", dirname.c_str());
     errno = ENOENT;
     return -1;
   }
   if (FileExists(complete_path) || SymlinkExists(complete_path)) {
     // Unlink file if existing
     int res = posix_do_unlink(ctx, path);
+    if (res != 0) fprintf(stderr, "Unlink failed : %s\n", path);
     if (res != 0) return -1;
   }
   if (DirectoryExists(complete_path)) {
     int res = posix_do_rmdir(ctx, path);
+    if (res != 0) fprintf(stderr, "RMDIR failed : %s\n", path);
     if (res != 0) return -1;
   }
   return 0;
@@ -271,13 +274,16 @@ int posix_do_link(struct fs_traversal_context *ctx,
   std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
   if (!FileExists(hidden_datapath)) {
     // Hash file doesn't exist
+    fprintf(stderr, "File doesn't exist : %s\n", hidden_datapath.c_str());
     errno = ENOENT;
     return -1;
   }
   if (posix_cleanup_path(ctx, path) != 0) {
+    fprintf(stderr, "Failed to clean up path : %s\n", path);
     return -1;
   }
   int res = link(hidden_datapath.c_str(), complete_path.c_str());
+  if (res != 0) fprintf(stderr, "Link failed : %s\n", hidden_datapath.c_str());
   if (res != 0) return -1;
   return 0;
 }
@@ -429,7 +435,8 @@ int posix_garbage_collector(struct fs_traversal_context *ctx) {
 
 struct fs_traversal_context *posix_initialize(
   const char *repo,
-  const char *data) {
+  const char *data,
+  const char *config) {
   fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
   result->repo =  strdup(repo);
