@@ -22,6 +22,7 @@
 #include "export_plugin/fs_traversal_libcvmfs.h"
 #include "export_plugin/fs_traversal_posix.h"
 #include "export_plugin/util.h"
+#include "test-util.h"
 
 #define MODE_BITMASK (S_IRWXO | S_IRWXG | S_IRWXU)
 
@@ -261,18 +262,6 @@ class T_Fs_Traversal_Interface :
     cvmfs_attr_free(stat_values_dir);
     // Check if fs is consistent over finalizing and reopening...
     Restart();
-  }
-
-  void AssertListHas(const char *query, char **dirList, size_t listLen,
-    bool hasNot = false) {
-    char **curEl = dirList;
-    while ((*curEl) != NULL) {
-      if (strcmp(*curEl, query) == 0) {
-        return;
-      }
-      curEl = (curEl+1);
-    }
-    ASSERT_TRUE(hasNot) << "Could not find element " << query << " in list";
   }
  protected:
   struct fs_traversal_test *fs_traversal_instance_;
