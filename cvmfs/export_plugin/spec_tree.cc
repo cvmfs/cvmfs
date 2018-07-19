@@ -189,7 +189,7 @@ int SpecTree::ListDir(const char *dir,
   if (cur_node->mode == '!') {
     return -1;
   }
-  if (path.at(path.length()-1) == '/') {
+  if (path.length() > 0 && path.at(path.length()-1) == '/') {
     path.erase(path.length()-1);
   }
   std::vector<std::string> path_parts = SplitString(path, '/', 256);
@@ -198,7 +198,7 @@ int SpecTree::ListDir(const char *dir,
       part_it++) {
     cur_node = cur_node->GetNode(*part_it);
     if (cur_node == NULL) {
-      if (is_wildcard || (is_flat_cp && (part_it+1) == path_parts.end())) {
+      if (is_wildcard) {
         break;
       }
       return -1;
@@ -213,6 +213,9 @@ int SpecTree::ListDir(const char *dir,
     if (cur_node->mode == '^') {
       is_flat_cp = true;
     }
+  }
+  if (is_wildcard || is_flat_cp) {
+    return SPEC_READ_FS;
   }
   return cur_node->GetListing(path, buf, len);
 }
@@ -244,5 +247,5 @@ int SpecTreeNode::GetListing(std::string base_path,
       AppendStringToList(it->first.c_str(), buf, len, &buflen);
     }
   }
-  return -1;  // nodes_.begin();
+  return 0;  // nodes_.begin();
 }
