@@ -572,34 +572,6 @@ TEST_P(T_Fs_Traversal_Interface, LinkUnlinkTest) {
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_unlink(
     context_, "/LinkUnlinkTest-bar/foobar/foobar"));
   ASSERT_EQ(EISDIR, errno);
-  size_t listLen = 0;
-  char **dirList;
-  fs_traversal_instance_->interface->list_dir(
-    context_,
-    "/ListDirTest-foo/bar",
-    &dirList,
-    &listLen);
-  ASSERT_EQ(4, listLen);
-  AssertListHas("foobar1.txt", dirList, listLen);
-  AssertListHas("foobar2.txt", dirList, listLen);
-  AssertListHas("foobar3.txt", dirList, listLen);
-  AssertListHas("symlink2", dirList, listLen);
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_unlink(
-    context_, "/ListDirTest-foo/bar/foobar2.txt"));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_unlink(
-    context_, "/ListDirTest-foo/bar/symlink2"));
-  listLen = 0;
-  delete dirList;
-  fs_traversal_instance_->interface->list_dir(
-    context_,
-    "/ListDirTest-foo/bar",
-    &dirList,
-    &listLen);
-  ASSERT_EQ(2, listLen);
-  AssertListHas("foobar1.txt", dirList, listLen);
-  AssertListHas("foobar3.txt", dirList, listLen);
-  listLen = 0;
-  delete dirList;
 }
 
 TEST_P(T_Fs_Traversal_Interface, SymlinkTest) {
