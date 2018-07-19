@@ -121,7 +121,7 @@ StatisticsDatabase::~StatisticsDatabase() {
 }
 
 
-Stats StatisticsDatabase::GetStats(swissknife::Command *command) {
+Stats StatisticsDatabase::GetStats(const swissknife::Command *command) {
   Stats stats;
   stats.files_added = command->statistics()->
                        Lookup("Publish.n_files_added")->ToString();
@@ -143,7 +143,7 @@ Stats StatisticsDatabase::GetStats(swissknife::Command *command) {
 }
 
 
-int StatisticsDatabase::StoreStatistics(swissknife::Command *command) {
+int StatisticsDatabase::StoreStatistics(const swissknife::Command *command) {
   Stats stats = GetStats(command);
 
   sqlite::Sql insert(this->sqlite_db(), PrepareStatement(stats));

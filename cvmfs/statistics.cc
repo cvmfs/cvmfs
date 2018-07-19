@@ -58,7 +58,7 @@ Statistics *Statistics::Fork() {
 }
 
 
-Counter *Statistics::Lookup(const std::string &name) {
+Counter *Statistics::Lookup(const std::string &name) const {
   MutexLockGuard lock_guard(lock_);
   map<string, CounterInfo *>::const_iterator i = counters_.find(name);
   if (i != counters_.end())

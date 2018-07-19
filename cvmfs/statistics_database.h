@@ -59,14 +59,14 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * @param command to access counter statistics
   * @return a Stats struct with all statistics values stored in strings
   */
-  Stats GetStats(swissknife::Command *command);
+  Stats GetStats(const swissknife::Command *command);
 
 /**
   * Entry point function for writing data into database
   *
   * @return 0 if no error occured or a negative integer if errors occurred
   */
-  int StoreStatistics(swissknife::Command *command);
+  int StoreStatistics(const swissknife::Command *command);
 
 /**
   * Get the path for the database file
