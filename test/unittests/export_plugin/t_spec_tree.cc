@@ -61,8 +61,79 @@ TEST_F(T_Spec_Tree, CheckListings) {
     "/",
     &dirList,
     &listLen));
-  // AssertListHas("TouchTest-foo.txt", dirList, listLen);
-  // AssertListHas("TouchTest-bar.txt", dirList, listLen);
+
+  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+    "",
+    &dirList,
+    &listLen));
+
+  ASSERT_EQ(0, specs_->ListDir(
+    "/foo",
+    &dirList,
+    &listLen));
+  ASSERT_EQ(1, listLen);
+  AssertListHas("bar", dirList, listLen);
   listLen = 0;
   delete dirList;
+
+  ASSERT_EQ(0, specs_->ListDir(
+    "/foo/bar",
+    &dirList,
+    &listLen));
+  ASSERT_EQ(1, listLen);
+  AssertListHas("abc", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+
+  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+    "/foo/bar/abc",
+    &dirList,
+    &listLen));
+
+  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+    "/foo/bar/abc/def",
+    &dirList,
+    &listLen));
+
+  ASSERT_EQ(-1, specs_->ListDir(
+    "/foo/bar/abc/def/hij",
+    &dirList,
+    &listLen));
+
+  ASSERT_EQ(0, specs_->ListDir(
+    "/bar",
+    &dirList,
+    &listLen));
+  ASSERT_EQ(1, listLen);
+  AssertListHas("abc", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+
+  ASSERT_EQ(0, specs_->ListDir(
+    "/bar/abc",
+    &dirList,
+    &listLen));
+  ASSERT_EQ(1, listLen);
+  AssertListHas("def", dirList, listLen);
+  listLen = 0;
+  delete dirList;
+
+  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+    "/foo/bar/abc/def",
+    &dirList,
+    &listLen));
+
+  ASSERT_EQ(-1, specs_->ListDir(
+    "/bar/abc/def/foo",
+    &dirList,
+    &listLen));
+  ASSERT_EQ(-1, specs_->ListDir(
+    "/bar/abc/def/foo/foo",
+    &dirList,
+    &listLen));
+
+  ASSERT_EQ(-1, specs_->ListDir(
+    "/bar/abc/def/ghj",
+    &dirList,
+    &listLen));
 }

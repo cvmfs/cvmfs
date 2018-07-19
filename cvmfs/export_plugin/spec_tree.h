@@ -57,9 +57,10 @@ class SpecTree {
   bool IsMatching(std::string path);
 
   /**
-   * Method which returns a list over the given directory or SPEC_READ_FS
+   * Method which returns a list over the given directory or asks the caller
+   * to read from the file system.
    * 
-   * This should not include hidden directories (like the data directory)
+   * Memory for buf is only allocated if the return value is 0
    * 
    * @param[in] dir The directory over which should be iterated
    * @param[out] buf The list of the paths to the elements in the directory
