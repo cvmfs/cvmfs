@@ -322,7 +322,6 @@ cvmfs_server_mkfs() {
   local repoinfo_file=${temp_dir}/new_repoinfo
   touch $repoinfo_file
   create_repometa_skeleton $repoinfo_file
-  sync
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
     wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
@@ -381,6 +380,8 @@ cvmfs_server_mkfs() {
 
   echo -n "Updating global JSON information... "
   update_global_repository_info && echo "done" || echo "fail"
+
+  syncfs
 
   print_new_repository_notice $name $cvmfs_user $require_masterkeycard
 }

@@ -118,7 +118,7 @@ cvmfs_server_rollback() {
   set_ro_root_hash $name $trunk_hash
 
   echo "Flushing file system buffers"
-  sync
+  syncfs
 }
 
 
