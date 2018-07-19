@@ -177,6 +177,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
   export_plugin/fs_traversal.cc 
   export_plugin/fs_traversal_posix.cc 
   export_plugin/fs_traversal_libcvmfs.cc 
+  export_plugin/spec_tree.cc 
   export_plugin/util.cc 
 
   export_plugin/shrinkwrap.cc

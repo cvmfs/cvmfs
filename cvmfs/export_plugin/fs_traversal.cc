@@ -4,6 +4,7 @@
 
 #include "cvmfs_config.h"
 
+#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <fstream>
@@ -16,6 +17,7 @@
 #include "libcvmfs.h"
 #include "logging.h"
 #include "smalloc.h"
+#include "spec_tree.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -62,7 +64,7 @@ class FileCopy {
 };
 
 unsigned             num_parallel;
-bool                 recursive;
+bool                 recursive = true;
 int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
@@ -70,6 +72,8 @@ unsigned             retries = 1;
 atomic_int64         overall_copies;
 atomic_int64         overall_new;
 atomic_int64         copy_queue;
+
+SpecTree             *spec_tree_;
 
 }  // namespace
 
@@ -159,7 +163,7 @@ bool getNext(
   free(*entry);
   *entry = NULL;
 
-  if (dir_list[location]) {
+  if (dir_list && dir_list[location]) {
     *entry = get_full_path(dir, dir_list[location]);
   } else {
     return false;
@@ -180,6 +184,20 @@ bool updateStat(
   return retval;
 }
 
+void list_src_dir(
+  struct fs_traversal *src,
+  const char *dir,
+  char ***buf,
+  size_t *len
+) {
+  int retval = spec_tree_->ListDir(dir, buf, len);
+
+  if (retval == SPEC_READ_FS) {
+    src->list_dir(src->context_, dir, buf, len);
+    qsort(*buf, *len, sizeof(char *),  strcmp_list);
+  }
+}
+
 bool Sync(
   const char *dir,
   struct fs_traversal *src,
@@ -194,8 +212,7 @@ bool Sync(
   size_t src_iter = 0;
   char * src_entry = NULL;
   struct cvmfs_attr *src_st = cvmfs_attr_init();
-  src->list_dir(src->context_, dir, &src_dir, &src_len);
-  qsort(src_dir, src_len, sizeof(char *),  strcmp_list);
+  list_src_dir(src, dir, &src_dir, &src_len);
 
   if (getNext(src, dir, src_dir, &src_entry, NULL)) {
     updateStat(src, src_entry, &src_st, true);
@@ -233,17 +250,17 @@ bool Sync(
           case S_IFREG:
             {
               // They don't point to the same data, link new data
-              const char *src_data;
-              src_data = src->get_identifier(src->context_, src_st);
+//              const char *src_data;
+//              src_data = src->get_identifier(src->context_, src_st);
               const char *dest_data;
               dest_data = dest->get_identifier(dest->context_, src_st);
 
               // Touch is atomic, if it fails something else will write file?
               if (!dest->touch(dest->context_, src_st)) {
                 // PUSH TO PIPE
-                if (!copy_file(src, src_data, dest, dest_data, parallel)) {
+                if (!copy_file(src, src_entry, dest, dest_data, parallel)) {
                   LogCvmfs(kLogCvmfs, kLogStderr,
-                  "Traversal failed to copy %s->%s", src_data, dest_data);
+                  "Traversal failed to copy %s->%s", src_entry, dest_data);
                   return false;
                 }
               }
@@ -251,9 +268,9 @@ bool Sync(
               // Should probably happen in the copy function as it is parallel
               // Also this needs to be separate from copy_file, the target file
               // could already exist and the link needs to be created anyway.
-              if (dest->do_link(dest->context_, dest_entry, dest_data)) {
+              if (dest->do_link(dest->context_, src_entry, dest_data)) {
                 LogCvmfs(kLogCvmfs, kLogStderr,
-                "Traversal failed to link %s->%s", dest_entry, dest_data);
+                "Traversal failed to link %s->%s", src_entry, dest_data);
                 return false;
               }
             }
@@ -311,13 +328,13 @@ bool Sync(
               // They don't point to the same data, link new data
               const char *dest_data;
               dest_data = dest->get_identifier(dest->context_, src_st);
-              const char *src_data;
-              src_data  = src->get_identifier(src->context_, src_st);
+//              const char *src_data;
+//              src_data  = src->get_identifier(src->context_, src_st);
 
               if (!dest->touch(dest->context_, src_st)) {
-                if (!copy_file(src, src_data, dest, dest_data, parallel)) {
+                if (!copy_file(src, src_entry, dest, dest_data, parallel)) {
                   LogCvmfs(kLogCvmfs, kLogStderr,
-                  "Traversal failed to copy %s->%s", src_data, dest_data);
+                  "Traversal failed to copy %s->%s", src_entry, dest_data);
                   return false;
                 }
               }
@@ -369,7 +386,7 @@ bool Sync(
       switch (dest_st->st_mode & S_IFMT) {
         case S_IFREG:
         case S_IFLNK:
-          if (dest->do_unlink(dest->context_, dest_entry)) {
+          if (!dest->do_unlink(dest->context_, dest_entry)) {
             LogCvmfs(kLogCvmfs, kLogStderr,
             "Failed to unlink file %s", dest_entry);
             return false;
@@ -383,7 +400,7 @@ bool Sync(
               return false;
             }
           }*/
-          if (dest->do_rmdir(dest->context_, dest_entry)) {
+          if (!dest->do_rmdir(dest->context_, dest_entry)) {
             LogCvmfs(kLogCvmfs, kLogStderr,
             "Failed to remove directory %s", dest_entry);
             return false;
@@ -434,17 +451,19 @@ bool copyFile(
     char buffer[COPY_BUFFER_SIZE];
 
     size_t actual_read = 0;
-    retval = src_fs->do_fread(src, buffer, COPY_BUFFER_SIZE, &actual_read);
-    LogCvmfs(kLogCvmfs, kLogDebug, "Read : %"PRIu64"\n", actual_read);
+    retval = src_fs->do_fread(src, buffer, sizeof(buffer), &actual_read);
     if (retval != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+      "Read failed : %d %s\n", errno, strerror(errno));
       return false;
     }
 
     retval = dest_fs->do_fwrite(dest, buffer, actual_read);
     if (retval != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+      "Write failed : %d %s\n", errno, strerror(errno));
       return false;
     }
-    LogCvmfs(kLogCvmfs, kLogDebug, "Write : %"PRIu64"\n", actual_read);
 
     if (actual_read < COPY_BUFFER_SIZE) {
       break;
@@ -495,11 +514,6 @@ static void *MainWorker(void *data) {
   return NULL;
 }
 
-// Dummy function for now
-bool trim_trace_spec(string *entry) {
-  return true;
-}
-
 bool copy_file(
   struct fs_traversal *src_fs,
   const char *src_data,
@@ -513,7 +527,8 @@ bool copy_file(
     atomic_inc64(&copy_queue);
   } else {
     if (!copyFile(src_fs, src_data, dest_fs, dest_data)) {
-      printf("File %s failed to copy\n\n", src_data);
+      LogCvmfs(kLogCvmfs, kLogStderr,
+      "File %s failed to copy\n\n", src_data);
       return false;
     }
   }
@@ -526,14 +541,16 @@ static void Usage() {
        "This tool takes a cvmfs cache directory and  outputs\n"
        "to a destination files system for export.\n"
        "Usage: cvmfs_shrinkwrap "
-       "[-s][-r][-c][-d][-x][-y][-t|b][-j #threads] <cache directory>\n"
+       "[-s][-r][-c][-f][-d][-x][-y][-z][-t|b][-j #threads]\n"
            "Options:\n"
            "  -s Source Filesystem type [default:cvmfs]\n"
            "  -r Source repo\n"
            "  -c Source data\n"
+           "  -f Source config\n"
            "  -d Dest type\n"
            "  -x Dest repo\n"
            "  -y Dest data\n"
+           "  -z Dest config\n"
            "  -t Trace file to be replicated to destination\n"
            "  -b Base directory to be copied\n"
            "  -r Number of retries on copying file [default:0]\n"
@@ -548,23 +565,25 @@ int Main(int argc, char **argv) {
   char *src_repo = NULL;
   char *src_data = NULL;
   char *src_type = NULL;
+  char *src_config = NULL;
 
   char *dest_repo = NULL;
   char *dest_data = NULL;
   char *dest_type = NULL;
+  char *dest_config = NULL;
 
   char *base = NULL;
-  char *trace_file = NULL;
+  char *spec_file = NULL;
 
   int c;
-  while ((c = getopt(argc, argv, "hb:s:r:c:d:x:y:t:j:n:")) != -1) {
+  while ((c = getopt(argc, argv, "hb:s:r:c:f:d:x:y:t:j:n:")) != -1) {
     switch (c) {
       case 'h':
         shrinkwrap::Usage();
         return kErrorOk;
       case 'b':
         base = strdup(optarg);
-        if (trace_file) {
+        if (spec_file) {
           LogCvmfs(kLogCvmfs, kLogStdout,
                    "Only allowed to specify either base dir or trace file");
           return kErrorUsage;
@@ -579,6 +598,9 @@ int Main(int argc, char **argv) {
       case 'c':
         src_data = strdup(optarg);
         break;
+      case 'f':
+        src_config = strdup(optarg);
+        break;
       case 'd':
         dest_type = strdup(optarg);
         break;
@@ -588,8 +610,11 @@ int Main(int argc, char **argv) {
       case 'y':
         dest_data = strdup(optarg);
         break;
+      case 'z':
+        dest_config = strdup(optarg);
+        break;
       case 't':
-        trace_file = strdup(optarg);
+        spec_file = strdup(optarg);
         if (base) {
           LogCvmfs(kLogCvmfs, kLogStdout,
                    "Only allowed to specify either base dir or trace file");
@@ -614,17 +639,36 @@ int Main(int argc, char **argv) {
     }
   }
 
+  if (!src_type) {
+    src_type = strdup("cvmfs");
+  }
+
+  if (!dest_type) {
+    dest_type = strdup("posix");
+  }
+
+  if (!dest_repo) {
+    dest_repo = strdup("/tmp/cvmfs/");
+  }
+
+  if (!dest_data) {
+    size_t len = 7 + strlen(dest_repo);
+    dest_data = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+    snprintf(dest_data, len, "%s/.data",  dest_repo);
+  }
+
+
   struct fs_traversal *src = FindInterface(src_type);
   if (!src) {
     return 1;
   }
-  src->context_ = src->initialize(src_repo, src_data);
+  src->context_ = src->initialize(src_repo, src_data, src_config);
 
   struct fs_traversal *dest = FindInterface(dest_type);
   if (!dest) {
     return 1;
   }
-  dest->context_ = dest->initialize(dest_repo, dest_data);
+  dest->context_ = dest->initialize(dest_repo, dest_data, dest_config);
 
   int result = 1;
 
@@ -636,51 +680,53 @@ int Main(int argc, char **argv) {
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
 
-  // Start Workers
-  MakePipe(pipe_chunks);
-  LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
-  MainWorkerContext mwc;
-  mwc.src_fs = src;
-  mwc.dest_fs = dest;
-  mwc.parallel = num_parallel;
+  if (num_parallel) {
+    // Start Workers
+    MakePipe(pipe_chunks);
+    LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
+    MainWorkerContext mwc;
+    mwc.src_fs = src;
+    mwc.dest_fs = dest;
+    mwc.parallel = num_parallel;
 
-  for (unsigned i = 0; i < num_parallel; ++i) {
-    int retval = pthread_create(&workers[i], NULL, MainWorker,
+    for (unsigned i = 0; i < num_parallel; ++i) {
+      int retval = pthread_create(&workers[i], NULL, MainWorker,
                                 static_cast<void*>(&mwc));
-    assert(retval == 0);
+      assert(retval == 0);
+    }
   }
 
-  if (!trace_file) {
-    ifstream trace(trace_file);
-    std::string entry;
-    while (getline(trace, entry))
-    {
-      // Function removes special characters and determines if its recursive
-      recursive = trim_trace_spec(&entry);
-      char *entry_point = strdup(entry.c_str());
-      result = Sync(entry_point, src, dest, num_parallel, recursive);
-      free(entry_point);
-    }
-  } else {
-    char *entry_point = strdup(base);
-    result = Sync(entry_point, src, dest, num_parallel, true);
-    free(entry_point);
+  if (!base) {
+    base = strdup("");
   }
+
+  if (spec_file) {
+    spec_tree_ = SpecTree::Create(spec_file);
+  } else {
+    spec_tree_ = new SpecTree('*');
+  }
+
+  char *entry_point = strdup(base);
+  result = Sync(entry_point, src, dest, num_parallel, recursive);
+  free(entry_point);
+
   while (atomic_read64(&copy_queue) != 0) {
     SafeSleepMs(100);
   }
 
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);
-  for (unsigned i = 0; i < num_parallel; ++i) {
-    FileCopy terminate_workers;
-    WritePipe(pipe_chunks[1], &terminate_workers, sizeof(terminate_workers));
+  if (num_parallel) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);
+    for (unsigned i = 0; i < num_parallel; ++i) {
+      FileCopy terminate_workers;
+      WritePipe(pipe_chunks[1], &terminate_workers, sizeof(terminate_workers));
+    }
+    for (unsigned i = 0; i < num_parallel; ++i) {
+      int retval = pthread_join(workers[i], NULL);
+      assert(retval == 0);
+    }
+    ClosePipe(pipe_chunks);
   }
-  for (unsigned i = 0; i < num_parallel; ++i) {
-    int retval = pthread_join(workers[i], NULL);
-    assert(retval == 0);
-  }
-  ClosePipe(pipe_chunks);
 
   return result;
 }

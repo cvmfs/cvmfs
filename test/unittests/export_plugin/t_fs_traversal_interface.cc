@@ -56,7 +56,7 @@ class T_Fs_Traversal_Interface :
     }
     context_ = fs_traversal_instance_->interface->initialize(
       repo,
-      fs_traversal_instance_->data);
+      fs_traversal_instance_->data, NULL);
     fs_traversal_instance_->interface->context_ = context_;
   }
 
@@ -631,17 +631,18 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
   char *dest_data = strdup((repoName + string("/DDATA")).c_str());
 
   struct fs_traversal *src = posix_get_interface();
-  struct fs_traversal_context *context = src->initialize(src_name, src_data);
+  struct fs_traversal_context *context =
+    src->initialize(src_name, src_data, NULL);
   src->context_ = context;
 
   struct fs_traversal *dest = posix_get_interface();
-  context = dest->initialize(src_name, src_data);
+  context = dest->initialize(src_name, src_data, NULL);
   dest->context_ = context;
 
   ASSERT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));
 
   dest->finalize(dest->context_);
-  context = dest->initialize(dest_name, dest_data);
+  context = dest->initialize(dest_name, dest_data, NULL);
   dest->context_ = context;
 
   EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));
@@ -735,13 +736,13 @@ TEST_P(T_Fs_Traversal_Interface, TransferCVMFSToPosix) {
 
   struct fs_traversal *src = libcvmfs_get_interface();
   struct fs_traversal_context *context;
-  context = src->initialize(tester.repo_name().c_str(), NULL);
+  context = src->initialize(tester.repo_name().c_str(), NULL, NULL);
   context->ctx = ctx;
   src->context_ = context;
 
   mkdir("posix", 0770);
   struct fs_traversal *dest = posix_get_interface();
-  context = dest->initialize("posix", "posix_data");
+  context = dest->initialize("posix", "posix_data", NULL);
   dest->context_ = context;
 
   EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));

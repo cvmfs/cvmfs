@@ -36,11 +36,13 @@ struct fs_traversal {
    * 
    * @param[in] repo Repository information
    * @param[in] data Data storage information
+   * @param[in] config A configuration file name
    * @param[out] A pointer to the context
    */
   struct fs_traversal_context *(*initialize)(
     const char *repo,
-    const char *data);
+    const char *data,
+    const char *config);
 
   /**
    * Method which finalizes the file system traversal.

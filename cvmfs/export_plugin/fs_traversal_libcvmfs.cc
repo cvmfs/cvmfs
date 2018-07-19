@@ -23,6 +23,7 @@
 #include "fs_traversal_interface.h"
 #include "hash.h"
 #include "libcvmfs.h"
+#include "options.h"
 #include "shortstring.h"
 #include "string.h"
 #include "util.h"
@@ -35,6 +36,9 @@ void libcvmfs_list_dir(struct fs_traversal_context *ctx,
   size_t *len) {
   cvmfs_context *context = reinterpret_cast<cvmfs_context *>(ctx->ctx);
   size_t buf_len = 0;
+  struct cvmfs_nc_attr *nc_attr = cvmfs_nc_attr_init();
+  cvmfs_stat_nc(context, dir, nc_attr);
+  cvmfs_nc_attr_free(nc_attr);
   cvmfs_listdir_contents(context, dir, buf, len, &buf_len);
   return;
 }
@@ -63,12 +67,14 @@ bool libcvmfs_has_file(struct fs_traversal_context *ctx,
 struct libcvmfs_file_handle {
   char *path;
   int fd;
+  off_t off;
   cvmfs_context *ctx;
 };
 
 void *libcvmfs_get_handle(struct fs_traversal_context *ctx,
               const char *identifier) {
-  struct libcvmfs_file_handle *file_ctx = new struct libcvmfs_file_handle;
+  struct libcvmfs_file_handle *file_ctx =
+    reinterpret_cast<libcvmfs_file_handle *>(calloc(1, sizeof(*file_ctx)));
   cvmfs_context *context = reinterpret_cast<cvmfs_context *>(ctx->ctx);
   file_ctx->ctx = context;
   file_ctx->path = strdup(identifier);
@@ -103,7 +109,12 @@ int libcvmfs_do_fread(
 ) {
   struct libcvmfs_file_handle *handle =
     reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
-  *read_len = cvmfs_pread(handle->ctx, handle->fd, buff, len, handle->fd);
+  ssize_t read = cvmfs_pread(handle->ctx, handle->fd, buff, len, handle->off);
+  if (read == -1)  {
+    return -1;
+  }
+  *read_len = read;
+  handle->off += *read_len;
   return 0;
 }
 
@@ -123,7 +134,8 @@ void libcvmfs_do_ffree(void *file_ctx) {
 
 struct fs_traversal_context *libcvmfs_initialize(
   const char *repo,
-  const char *data) {
+  const char *data,
+  const char *config) {
   struct fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
   result->size = sizeof(*result);
@@ -132,13 +144,23 @@ struct fs_traversal_context *libcvmfs_initialize(
   if (data) {
     result->data = strdup(data);
   }
-  /*
-  cvmfs_option_map *opts = cvmfs_options_init();
-  cvmfs_init_v2(opts);
+
+  SimpleOptionsParser *options_mgr = new SimpleOptionsParser(
+      new DefaultOptionsTemplateManager(repo));
+  options_mgr->ParsePath(config, false);
+  int retval = cvmfs_init_v2(options_mgr);
+  if (retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "CVMFS Initilization failed : %s", repo);
+  }
   cvmfs_context *ctx;
-  cvmfs_attach_repo_v2(repo, opts, &ctx);
+  retval = cvmfs_attach_repo_v2(repo, options_mgr, &ctx);
+  if (retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "CVMFS Attach to %s failed", repo);
+  }
   result->ctx = ctx;
-  */
+  cvmfs_adopt_options(ctx, options_mgr);
   return result;
 }
 
