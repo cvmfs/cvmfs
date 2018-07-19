@@ -7,14 +7,21 @@
 #include <map>
 #include <string>
 
+#define SPEC_READ_FS -42  // <- The answer to no questions at all
+
 class SpecTreeNode {
  public:
   explicit SpecTreeNode(char modeParam)
     : mode(modeParam) {}
-  // TODO(steuber): Destructor -> delete tree nodes
-  // TODO(steuber): list_dir
+  ~SpecTreeNode() {
+    for (std::map<std::string, SpecTreeNode*>::iterator it = nodes_.begin();
+      it != nodes_.end();
+      it++) {
+      delete it->second;
+    }
+  }
   SpecTreeNode *GetNode(const std::string &name);
-  std::map<std::string, SpecTreeNode*>::const_iterator GetNodes();
+  int GetListing(std::string base_path, char ***buf, size_t *len);
 
   void AddNode(const std::string &name, SpecTreeNode *node);
 
@@ -49,9 +56,23 @@ class SpecTree {
 
   bool IsMatching(std::string path);
 
-  char **list_dir() {
-    return NULL;
-  }
+  /**
+   * Method which returns a list over the given directory or SPEC_READ_FS
+   * 
+   * This should not include hidden directories (like the data directory)
+   * 
+   * @param[in] dir The directory over which should be iterated
+   * @param[out] buf The list of the paths to the elements in the directory
+   * @param[out] len Length of the output list
+   * @returns
+   *    0 if listing was successfully loaded into the buffer
+   *    -1 if directory should not be listed (because excluded)
+   *    SPEC_READ_FS if listing should be read from source filesystem
+   */
+  int ListDir(const char *dir,
+                char ***buf,
+                size_t *len);
+
  private:
   void Open(const std::string &path);
   void Parse(FILE *spec_file);
