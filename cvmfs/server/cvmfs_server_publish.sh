@@ -407,7 +407,7 @@ cvmfs_server_publish() {
 
     # finalizing transaction
     echo "Flushing file system buffers"
-    sync
+    syncfs
 
     # committing newly created revision
     echo "Signing new manifest"
@@ -444,7 +444,7 @@ cvmfs_server_publish() {
     close_transaction  $name $use_fd_fallback
     publish_after_hook $name
     publish_succeeded  $name
-
+    syncfs
   done
 
   return $retcode

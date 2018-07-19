@@ -120,6 +120,7 @@ create_whitelist() {
     __swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
   fi
   rm -f $whitelist
+  syncfs
   echo "done"
 }
 

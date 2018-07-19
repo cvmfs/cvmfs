@@ -756,6 +756,12 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (!DirectoryExists(*mount_point_)) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "Moint point %s does not exist", mount_point_->c_str());
+    return kFailPermission;
+  }
+
   // Number of file descriptors
   if (options_manager->GetValue("CVMFS_NFILES", &parameter)) {
     int retval = SetLimitNoFile(String2Uint64(parameter));

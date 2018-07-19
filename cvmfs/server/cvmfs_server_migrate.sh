@@ -544,6 +544,8 @@ cvmfs_server_migrate() {
 
   done
 
+  syncfs
+
   return $retcode
 }
 
