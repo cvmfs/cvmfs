@@ -60,3 +60,24 @@ shash::Any HashMeta(const struct cvmfs_attr *stat_info) {
   shash::HashMem(buffer, min_buffer_size+xlist_buffer_size, &meta_hash);
   return meta_hash;
 }
+
+void AppendStringToList(char const   *str,
+                        char       ***buf,
+                        size_t       *listlen,
+                        size_t       *buflen) {
+  if (*listlen + 1 >= *buflen) {
+    size_t newbuflen = (*listlen)*2 + 5;
+    *buf = reinterpret_cast<char **>(
+    realloc(*buf, sizeof(char *) * newbuflen));
+    assert(*buf);
+    *buflen = newbuflen;
+    assert(*listlen < *buflen);
+  }
+  if (str) {
+    (*buf)[(*listlen)] = strdup(str);
+    // null-terminate the list
+    (*buf)[++(*listlen)] = NULL;
+  } else {
+    (*buf)[(*listlen)] = NULL;
+  }
+}

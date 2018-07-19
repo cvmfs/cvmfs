@@ -50,6 +50,7 @@ set(CVMFS_UNITTEST_FILES
   t_download.cc
   t_encrypt.cc
   export_plugin/t_fs_traversal_interface.cc
+  export_plugin/test-util.cc
   t_fd_table.cc
   t_fence.cc
   t_fetch.cc
@@ -485,14 +486,16 @@ set (LIBCVMFS_SOURCES
 )
 
 set (CVMFS_TEST_EXPORT_SOURCES
-  export_plugin/benchmark_pathspec.cc
-  #export_plugin/main.cc
+  #export_plugin/benchmark_pathspec.cc
+  export_plugin/main.cc
 
   ../common/env.cc
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
   export_plugin/t_fs_traversal_interface.cc
+  export_plugin/t_spec_tree.cc
+  export_plugin/test-util.cc
   
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_posix.cc

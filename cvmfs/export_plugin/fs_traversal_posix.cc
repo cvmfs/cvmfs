@@ -35,27 +35,6 @@ const int kPosixTraversalMaxDeletePar = 64;
 const unsigned kDirLevels = 2;
 const unsigned kDigitsPerDirLevel = 2;
 
-void AppendStringToList(char const   *str,
-                        char       ***buf,
-                        size_t       *listlen,
-                        size_t       *buflen) {
-  if (*listlen + 1 >= *buflen) {
-    size_t newbuflen = (*listlen)*2 + 5;
-    *buf = reinterpret_cast<char **>(
-    realloc(*buf, sizeof(char *) * newbuflen));
-    assert(*buf);
-    *buflen = newbuflen;
-    assert(*listlen < *buflen);
-  }
-  if (str) {
-    (*buf)[(*listlen)] = strdup(str);
-    // null-terminate the list
-    (*buf)[++(*listlen)] = NULL;
-  } else {
-    (*buf)[(*listlen)] = NULL;
-  }
-}
-
 std::string BuildPath(struct fs_traversal_context *ctx,
   const char *dir) {
   std::string result = ctx->repo;

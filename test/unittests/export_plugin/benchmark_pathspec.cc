@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 
+#include "path_filters/dirtab.h"
 #include "export_plugin/spec_tree.h"
 
 std::string& rtrim(std::string& str, const std::string& chars = "\t\n\v\f\r ")
@@ -22,10 +23,15 @@ int main() {
                 timeEnd;
   long double diff = 0;
   SpecTree *specs;
+  // catalog::Dirtab *specs;
   gettimeofday(&timeStart, NULL);
-  for (int i = 0; i <= 100; i++) {
-    specs = SpecTree::Create(
-    "/home/pteuber/Documents/cernvmfs/notes/benchmark-pathspec/cvmfs-atlas.cern.ch-bench3.trace.spec.txt");
+  specs = SpecTree::Create("/home/pteuber/Documents/cernvmfs/notes/benchmark-pathspec/cvmfs-atlas.cern.ch-bench4.trace.spec.txt");
+  // specs = catalog::Dirtab::Create("/home/pteuber/Documents/cernvmfs/notes/benchmark-pathspec/cvmfs-atlas.cern.ch-bench4.trace.spec.txt");
+  for (int i = 0; i < 99; i++) {
+    delete specs;
+    specs = SpecTree::Create("/home/pteuber/Documents/cernvmfs/notes/benchmark-pathspec/cvmfs-atlas.cern.ch-bench4.trace.spec.txt");
+    // specs = catalog::Dirtab::Create("/home/pteuber/Documents/cernvmfs/notes/benchmark-pathspec/cvmfs-atlas.cern.ch-bench4.trace.spec.txt");
+
   }
   gettimeofday(&timeEnd, NULL);
   diff = ((timeEnd.tv_sec - timeStart.tv_sec) * 1000000 + timeEnd.tv_usec - timeStart.tv_usec)/100;
@@ -36,6 +42,7 @@ int main() {
   std::string line;
   uint32_t steps = 0;
   bool res;
+  __asm__ __volatile__("" :: "m" (specs));
   while (std::getline(infile, line)) {
     const char *path = strdup(line.c_str());
     gettimeofday(&timeStart, NULL);
@@ -47,6 +54,7 @@ int main() {
       delete path;
       return -1;
     }*/
+    __asm__ __volatile__("" :: "m" (res));
     delete path;
     diff += ((timeEnd.tv_sec - timeStart.tv_sec) * 1000000 + timeEnd.tv_usec - timeStart.tv_usec);
     if (steps % 10000 == 0 && steps > 0) {
