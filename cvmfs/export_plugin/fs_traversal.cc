@@ -73,7 +73,7 @@ atomic_int64         overall_copies;
 atomic_int64         overall_new;
 atomic_int64         copy_queue;
 
-SpecTree             *spec_tree_;
+SpecTree             *spec_tree_ = new SpecTree('*');
 
 }  // namespace
 
@@ -436,14 +436,18 @@ bool copyFile(
   retval = src_fs->do_fopen(src, fs_open_read);
   if (retval != 0) {
     // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed open src : %s\n", src_name);
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "Failed open src : %s : %d : %s\n",
+    src_name, errno, strerror(errno));
     return false;
   }
 
   retval = dest_fs->do_fopen(dest, fs_open_write);
   if (retval != 0) {
     // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed open dest : %s\n", dest_name);
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "Failed open dest : %s : %d : %s\n",
+    dest_name, errno, strerror(errno));
     return false;
   }
 
@@ -473,14 +477,18 @@ bool copyFile(
   retval = src_fs->do_fclose(src);
   if (retval != 0) {
     // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed close src : %s\n", src_name);
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "Failed close src : %s : %d : %s\n",
+    src_name, errno, strerror(errno));
     return false;
   }
 
   retval = dest_fs->do_fclose(dest);
   if (retval != 0) {
     // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed close dest : %s\n", dest_name);
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "Failed close dest : %s : %d : %s\n",
+    dest_name, errno, strerror(errno));
     return false;
   }
 
@@ -701,9 +709,8 @@ int Main(int argc, char **argv) {
   }
 
   if (spec_file) {
+    delete spec_tree_;
     spec_tree_ = SpecTree::Create(spec_file);
-  } else {
-    spec_tree_ = new SpecTree('*');
   }
 
   char *entry_point = strdup(base);
