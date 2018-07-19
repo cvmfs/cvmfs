@@ -549,9 +549,12 @@ string Tail(const string &source, unsigned num_lines) {
 }
 
 bool IsPrefixOf(std::string str, std::string prefix) {
+  if (prefix.length() > str.length()) {
+    return false;
+  }
   return std::equal(
     str.begin(),
-    str.begin() + prefix.size(),
+    str.begin() + prefix.length(),
     prefix.begin() );
 }
 

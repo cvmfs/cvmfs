@@ -43,8 +43,8 @@ class SpecTreeNode {
 
 class SpecTree {
  public:
-  SpecTree() {
-    root_ = new SpecTreeNode(0);
+  explicit SpecTree(char mode = 0) {
+    root_ = new SpecTreeNode(mode);
   }
   SpecTree(const SpecTree &tree) {
     root_ = tree.root_;
