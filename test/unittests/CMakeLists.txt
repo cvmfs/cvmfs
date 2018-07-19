@@ -250,6 +250,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_posix.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_libcvmfs.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/spec_tree.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/util.cc
 
   cache.pb.cc cache.pb.h
