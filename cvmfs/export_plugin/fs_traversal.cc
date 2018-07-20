@@ -153,28 +153,6 @@ char *get_full_path(const char *dir, const char *entry) {
   return path;
 }
 
-struct fs_dir {
-  struct fs_traversal *fs;
-  char **dir;
-  size_t len;
-  ssize_t iter;
-  char *entry;
-  struct cvmfs_attr *stat;
-};
-
-struct fs_dir* fs_dir_init(struct fs_traversal *fs)
-{
-  struct fs_dir *dir = new struct fs_dir;
-  dir->fs = fs;
-  dir->dir = NULL;
-  dir->len = 0;
-  dir->iter = -1;
-  dir->entry = NULL;
-  dir->stat = cvmfs_attr_init();
-  return dir;
-}
-
-
 bool updateStat(
   struct fs_traversal *fs,
   const char *entry,
@@ -303,7 +281,6 @@ bool Sync(
 
               // Touch is atomic, if it fails something else will write file?
               if (!dest->touch(dest->context_, src_st)) {
-                pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
                 // PUSH TO PIPE
                 if (!copy_file(src, src_entry, dest,
                                dest_data, parallel, pstats)) {
@@ -378,7 +355,6 @@ bool Sync(
 //              src_data  = src->get_identifier(src->context_, src_st);
 
               if (!dest->touch(dest->context_, src_st)) {
-                pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
                 if (!copy_file(src, src_entry, dest,
                                dest_data, parallel, pstats)) {
                   LogCvmfs(kLogCvmfs, kLogStderr,
@@ -395,15 +371,16 @@ bool Sync(
                 "Traversal failed to link %s->%s", src_entry, dest_data);
                 return false;
               }
+              pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
             }
           break;
         case S_IFDIR:
           if (dest->do_mkdir(dest->context_, src_entry, src_st)) {
-            pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
             LogCvmfs(kLogCvmfs, kLogStderr,
             "Traversal failed to mkdir %s", src_entry);
             return false;
           }
+          pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
           if (recursive) {
             if (!Sync(src_entry, src, dest, parallel, recursive, pstats)) {
               return false;
@@ -419,6 +396,7 @@ bool Sync(
             src_entry, src_st->cvm_symlink);
             return false;
           }
+          pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
           break;
         default:
           LogCvmfs(kLogCvmfs, kLogStderr,
