@@ -10,7 +10,7 @@
 
 #include "options.h"
 #include "sql.h"
-#include "swissknife.h"
+#include "statistics.h"
 #include "util/posix.h"
 
 typedef struct {
