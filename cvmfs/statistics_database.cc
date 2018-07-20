@@ -5,6 +5,16 @@
 #include "statistics_database.h"
 
 
+const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
+float          StatisticsDatabase::kLatestSchema           = 1.0f;
+unsigned       StatisticsDatabase::kLatestSchemaRevision   =
+                                              RevisionFlags::kInitialRevision;
+unsigned int   StatisticsDatabase::instances               = 0;
+bool           StatisticsDatabase::compacting_fails        = false;
+
+
+namespace {
+
 struct Stats {
   std::string files_added;
   std::string files_removed;
@@ -35,39 +45,14 @@ struct Stats {
   }
 };
 
-const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
-float          StatisticsDatabase::kLatestSchema           = 1.0f;
-unsigned       StatisticsDatabase::kLatestSchemaRevision   =
-                                              RevisionFlags::kInitialRevision;
-unsigned int   StatisticsDatabase::instances               = 0;
-bool           StatisticsDatabase::compacting_fails        = false;
-
-
-namespace {
-
-  /**
-  * Get UTC Time.
-  *
-  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
-  */
-std::string GetGMTimestamp() {
-  struct tm time_ptr;
-  char date_and_time[50];
-  time_t t = time(NULL);
-  gmtime_r(&t, &time_ptr);      // take UTC
-  // timestamp format
-  strftime(date_and_time, 50, "%Y-%m-%d %H:%M:%S", &time_ptr);
-  std::string timestamp(date_and_time);
-  return timestamp;
-}
-
 /**
   * Build the insert statement.
   *
   * @param stats a struct with all values stored in strings
   * @return the insert statement
   */
-std::string PrepareStatement(const struct Stats &stats) {
+std::string PrepareStatement(const perf::Statistics *statistics) {
+  struct Stats stats = Stats(statistics);
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
     "timestamp,"
@@ -93,6 +78,7 @@ std::string PrepareStatement(const struct Stats &stats) {
 }
 
 }  // namespace
+
 
 bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
@@ -152,7 +138,7 @@ StatisticsDatabase::~StatisticsDatabase() {
 
 
 int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics) {
-  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(Stats(statistics)));
+  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(statistics));
 
   if (!this->BeginTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
@@ -178,7 +164,7 @@ int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics) {
 }
 
 
-std::string StatisticsDatabase::GetDBPath(std::string repo_name) {
+std::string StatisticsDatabase::GetDBPath(const std::string repo_name) {
   // default location
   const std::string db_default_path =
       "/var/spool/cvmfs/" + repo_name + "/stats.db";

@@ -12,6 +12,7 @@
 #include "sql.h"
 #include "statistics.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 struct Stats;
 
@@ -25,6 +26,11 @@ struct RevisionFlags {
 };
 
 class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
+ protected:
+  friend class sqlite::Database<StatisticsDatabase>;
+  StatisticsDatabase(const std::string  &filename,
+                const OpenMode      open_mode);
+
  public:
   // not const - needs to be adaptable!
   static float        kLatestSchema;
@@ -59,12 +65,7 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * @param repo_name Fully qualified name of the repository
   * @return path to store database file
   */
-  static std::string GetDBPath(std::string repo_name);
-
- protected:
-  friend class sqlite::Database<StatisticsDatabase>;
-  StatisticsDatabase(const std::string  &filename,
-                const OpenMode      open_mode);
+  static std::string GetDBPath(const std::string repo_name);
 };
 
 
