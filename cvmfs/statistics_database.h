@@ -13,16 +13,7 @@
 #include "statistics.h"
 #include "util/posix.h"
 
-typedef struct {
-  std::string files_added;
-  std::string files_removed;
-  std::string files_changed;
-  std::string dir_added;
-  std::string dir_removed;
-  std::string dir_changed;
-  std::string bytes_added;
-  std::string bytes_removed;
-} Stats;
+struct Stats;
 
 struct RevisionFlags {
   enum T {
@@ -52,14 +43,6 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   bool LiveSchemaUpgradeIfNecessary();
   bool CompactDatabase() const;
   ~StatisticsDatabase();
-
-/**
-  * Get command statistics values and convert them into strings.
-  *
-  * @param command to access counter statistics
-  * @return a Stats struct with all statistics values stored in strings
-  */
-  Stats GetStats(const perf::Statistics *statistics);
 
 /**
   * Entry point function for writing data into database

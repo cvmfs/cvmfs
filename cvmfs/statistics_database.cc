@@ -4,6 +4,45 @@
 
 #include "statistics_database.h"
 
+
+struct Stats {
+  std::string files_added;
+  std::string files_removed;
+  std::string files_changed;
+  std::string dir_added;
+  std::string dir_removed;
+  std::string dir_changed;
+  std::string bytes_added;
+  std::string bytes_removed;
+
+  explicit Stats(const perf::Statistics *statistics):
+    files_added(statistics->
+                    Lookup("Publish.n_files_added")->ToString()),
+    files_removed(statistics->
+                    Lookup("Publish.n_files_removed")->ToString()),
+    files_changed(statistics->
+                    Lookup("Publish.n_files_changed")->ToString()),
+    dir_added(statistics->
+                    Lookup("Publish.n_directories_added")->ToString()),
+    dir_removed(statistics->
+                    Lookup("Publish.n_directories_removed")->ToString()),
+    dir_changed(statistics->
+                    Lookup("Publish.n_directories_changed")->ToString()),
+    bytes_added(statistics->
+                    Lookup("Publish.sz_added_bytes")->ToString()),
+    bytes_removed(statistics->
+                    Lookup("Publish.sz_removed_bytes")->ToString()) {
+  }
+};
+
+const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
+float          StatisticsDatabase::kLatestSchema           = 1.0f;
+unsigned       StatisticsDatabase::kLatestSchemaRevision   =
+                                              RevisionFlags::kInitialRevision;
+unsigned int   StatisticsDatabase::instances               = 0;
+bool           StatisticsDatabase::compacting_fails        = false;
+
+
 namespace {
 
   /**
@@ -28,7 +67,7 @@ std::string GetGMTimestamp() {
   * @param stats a struct with all values stored in strings
   * @return the insert statement
   */
-std::string PrepareStatement(Stats stats) {
+std::string PrepareStatement(struct Stats stats) {
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
     "timestamp,"
@@ -54,15 +93,6 @@ std::string PrepareStatement(Stats stats) {
 }
 
 }  // namespace
-
-
-const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
-float          StatisticsDatabase::kLatestSchema           = 1.0f;
-unsigned       StatisticsDatabase::kLatestSchemaRevision   =
-                                              RevisionFlags::kInitialRevision;
-unsigned int   StatisticsDatabase::instances               = 0;
-bool           StatisticsDatabase::compacting_fails        = false;
-
 
 bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
@@ -121,32 +151,8 @@ StatisticsDatabase::~StatisticsDatabase() {
 }
 
 
-Stats StatisticsDatabase::GetStats(const perf::Statistics *statistics) {
-  Stats stats;
-  stats.files_added = statistics->
-                       Lookup("Publish.n_files_added")->ToString();
-  stats.files_removed = statistics->
-                       Lookup("Publish.n_files_removed")->ToString();
-  stats.files_changed = statistics->
-                       Lookup("Publish.n_files_changed")->ToString();
-  stats.dir_added = statistics->
-                       Lookup("Publish.n_directories_added")->ToString();
-  stats.dir_removed = statistics->
-                       Lookup("Publish.n_directories_removed")->ToString();
-  stats.dir_changed = statistics->
-                       Lookup("Publish.n_directories_changed")->ToString();
-  stats.bytes_added = statistics->
-                       Lookup("Publish.sz_added_bytes")->ToString();
-  stats.bytes_removed = statistics->
-                       Lookup("Publish.sz_removed_bytes")->ToString();
-  return stats;
-}
-
-
 int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics) {
-  Stats stats = GetStats(statistics);
-
-  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(stats));
+  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(Stats(statistics)));
 
   if (!this->BeginTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
