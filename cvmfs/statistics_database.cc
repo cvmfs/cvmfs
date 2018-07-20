@@ -121,30 +121,30 @@ StatisticsDatabase::~StatisticsDatabase() {
 }
 
 
-Stats StatisticsDatabase::GetStats(const swissknife::Command *command) {
+Stats StatisticsDatabase::GetStats(const perf::Statistics *statistics) {
   Stats stats;
-  stats.files_added = command->statistics()->
+  stats.files_added = statistics->
                        Lookup("Publish.n_files_added")->ToString();
-  stats.files_removed = command->statistics()->
+  stats.files_removed = statistics->
                        Lookup("Publish.n_files_removed")->ToString();
-  stats.files_changed = command->statistics()->
+  stats.files_changed = statistics->
                        Lookup("Publish.n_files_changed")->ToString();
-  stats.dir_added = command->statistics()->
+  stats.dir_added = statistics->
                        Lookup("Publish.n_directories_added")->ToString();
-  stats.dir_removed = command->statistics()->
+  stats.dir_removed = statistics->
                        Lookup("Publish.n_directories_removed")->ToString();
-  stats.dir_changed = command->statistics()->
+  stats.dir_changed = statistics->
                        Lookup("Publish.n_directories_changed")->ToString();
-  stats.bytes_added = command->statistics()->
+  stats.bytes_added = statistics->
                        Lookup("Publish.sz_added_bytes")->ToString();
-  stats.bytes_removed = command->statistics()->
+  stats.bytes_removed = statistics->
                        Lookup("Publish.sz_removed_bytes")->ToString();
   return stats;
 }
 
 
-int StatisticsDatabase::StoreStatistics(const swissknife::Command *command) {
-  Stats stats = GetStats(command);
+int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics) {
+  Stats stats = GetStats(statistics);
 
   sqlite::Sql insert(this->sqlite_db(), PrepareStatement(stats));
 

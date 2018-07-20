@@ -47,6 +47,7 @@ class ServerTool {
   download::DownloadManager *download_manager() const;
   signature::SignatureManager *signature_manager() const;
   perf::Statistics *statistics() { return &statistics_; }
+  const perf::Statistics *statistics() const { return &statistics_; }
 
  protected:
   UniquePtr<download::DownloadManager> download_manager_;

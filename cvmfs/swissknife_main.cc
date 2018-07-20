@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
     if (!db.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
               "Couldn't create StatisticsDatabase object!");
-    } else if (db->StoreStatistics(command) != 0) {
+    } else if (db->StoreStatistics(command->statistics()) != 0) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
             "Couldn't store statistics in %s!",
             db_file_path.c_str());

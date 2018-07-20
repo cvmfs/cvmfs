@@ -82,9 +82,6 @@ class Command : public ServerTool {
   virtual std::string GetDescription() const = 0;
   virtual ParameterList GetParams() const = 0;
   virtual int Main(const ArgumentList &args) = 0;
-
-
-  const perf::Statistics *statistics() { return &statistics_; }
 };
 
 }  // namespace swissknife
