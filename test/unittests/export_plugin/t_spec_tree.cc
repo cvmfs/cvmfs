@@ -34,6 +34,7 @@ class T_Spec_Tree :
 };
 
 TEST_F(T_Spec_Tree, BasicMatchTest) {
+  EXPECT_TRUE(specs_->IsMatching(""));
   EXPECT_TRUE(specs_->IsMatching("/"));
   EXPECT_TRUE(specs_->IsMatching("/asdf"));
   EXPECT_TRUE(specs_->IsMatching("/foo/"));

@@ -46,13 +46,16 @@ void SpecTree::Open(const std::string &path) {
 }
 
 bool SpecTree::IsMatching(std::string path) {
+  if (path.length() == 0) {
+    path = "/";
+  }
   SpecTreeNode *cur_node = root_;
   bool is_wildcard = (cur_node->mode == '*');
   bool is_flat_cp = (cur_node->mode == '^');
   if (cur_node->mode == '!') {
     return false;
   }
-  if (path.at(path.length()-1) == '/') {
+  if (path.length() > 0 && path.at(path.length()-1) == '/') {
     path.erase(path.length()-1);
   }
   std::vector<std::string> path_parts = SplitString(path, '/', 256);
