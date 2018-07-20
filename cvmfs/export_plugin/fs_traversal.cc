@@ -7,6 +7,8 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <time.h>
+
 #include <fstream>
 
 #include "atomic.h"
@@ -18,6 +20,7 @@
 #include "logging.h"
 #include "smalloc.h"
 #include "spec_tree.h"
+#include "statistics.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -94,7 +97,8 @@ bool copy_file(
   const char *src_data,
   struct fs_traversal *dest_fs,
   const char *dest_data,
-  int parallel);
+  int parallel,
+  perf::Statistics *sync_stats);
 
 bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
     struct fs_traversal *dest_fs) {
@@ -203,9 +207,13 @@ bool Sync(
   struct fs_traversal *src,
   struct fs_traversal *dest,
   int parallel,
-  bool recursive
+  bool recursive,
+  perf::Statistics *sync_stats
 ) {
   bool retval = true;
+
+  perf::Counter *srcEntries = sync_stats->Lookup(SHRINKWRAP_STAT_SRC_ENTRIES);
+  perf::Counter *destEntries = sync_stats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES);
 
   char **src_dir = NULL;
   size_t src_len = 0;
@@ -215,6 +223,7 @@ bool Sync(
   list_src_dir(src, dir, &src_dir, &src_len);
 
   if (getNext(src, dir, src_dir, &src_entry, NULL)) {
+    srcEntries->Inc();
     updateStat(src, src_entry, &src_st, true);
   }
 
@@ -227,6 +236,7 @@ bool Sync(
   qsort(dest_dir, dest_len, sizeof(char *),  strcmp_list);
 
   if (getNext(dest, dir, dest_dir, &dest_entry, NULL)) {
+    destEntries->Inc();
     updateStat(dest, dest_entry, &dest_st, false);
   }
 
@@ -257,8 +267,10 @@ bool Sync(
 
               // Touch is atomic, if it fails something else will write file?
               if (!dest->touch(dest->context_, src_st)) {
+                destEntries->Inc();
                 // PUSH TO PIPE
-                if (!copy_file(src, src_entry, dest, dest_data, parallel)) {
+                if (!copy_file(src, src_entry, dest, dest_data, parallel,
+                  sync_stats)) {
                   LogCvmfs(kLogCvmfs, kLogStderr,
                   "Traversal failed to copy %s->%s", src_entry, dest_data);
                   return false;
@@ -282,7 +294,8 @@ bool Sync(
               return false;
             }
             if (recursive) {
-              if (!Sync(src_entry, src, dest, parallel, recursive)) {
+              if (!Sync(src_entry, src, dest, parallel,
+                recursive, sync_stats)) {
                 return false;
               }
             }
@@ -308,15 +321,17 @@ bool Sync(
         // The directory exists and is the same,
         // but we still need to check the children
         if (S_ISDIR(src_st->st_mode) && recursive) {
-          if (!Sync(src_entry, src, dest, parallel, recursive)) {
+          if (!Sync(src_entry, src, dest, parallel, recursive, sync_stats)) {
             return false;
           }
         }
       }
       if (getNext(src, dir, src_dir, &src_entry, &src_iter)) {
+        srcEntries->Inc();
         updateStat(src, src_entry, &src_st, true);
       }
       if (getNext(dest, dir, dest_dir, &dest_entry, &dest_iter)) {
+        destEntries->Inc();
         updateStat(dest, dest_entry, &dest_st, false);
       }
 
@@ -332,7 +347,9 @@ bool Sync(
 //              src_data  = src->get_identifier(src->context_, src_st);
 
               if (!dest->touch(dest->context_, src_st)) {
-                if (!copy_file(src, src_entry, dest, dest_data, parallel)) {
+                destEntries->Inc();
+                if (!copy_file(src, src_entry, dest, dest_data, parallel,
+                  sync_stats)) {
                   LogCvmfs(kLogCvmfs, kLogStderr,
                   "Traversal failed to copy %s->%s", src_entry, dest_data);
                   return false;
@@ -351,12 +368,13 @@ bool Sync(
           break;
         case S_IFDIR:
           if (dest->do_mkdir(dest->context_, src_entry, src_st)) {
+            destEntries->Inc();
               LogCvmfs(kLogCvmfs, kLogStderr,
               "Traversal failed to mkdir %s", src_entry);
             return false;
           }
           if (recursive) {
-            if (!Sync(src_entry, src, dest, parallel, recursive)) {
+            if (!Sync(src_entry, src, dest, parallel, recursive, sync_stats)) {
               return false;
             }
           }
@@ -379,6 +397,7 @@ bool Sync(
           break;
       }
       if (getNext(src, dir, src_dir, &src_entry, &src_iter)) {
+        srcEntries->Inc();
         updateStat(src, src_entry, &src_st, true);
       }
     /* Dest contains something missing from Src */
@@ -415,6 +434,7 @@ bool Sync(
           break;
       }
       if (getNext(dest, dir, dest_dir, &dest_entry, &dest_iter)) {
+        destEntries->Inc();
         updateStat(dest, dest_entry, &dest_st, false);
       }
     }
@@ -426,7 +446,8 @@ bool copyFile(
   struct fs_traversal *src_fs,
   const char *src_name,
   struct fs_traversal *dest_fs,
-  const char *dest_name
+  const char *dest_name,
+  perf::Statistics *sync_stats
 ) {
   int retval;
 
@@ -450,7 +471,7 @@ bool copyFile(
     dest_name, errno, strerror(errno));
     return false;
   }
-
+  size_t bytes_transferred = 0;
   while (1) {
     char buffer[COPY_BUFFER_SIZE];
 
@@ -461,7 +482,7 @@ bool copyFile(
       "Read failed : %d %s\n", errno, strerror(errno));
       return false;
     }
-
+    bytes_transferred+=actual_read;
     retval = dest_fs->do_fwrite(dest, buffer, actual_read);
     if (retval != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
@@ -473,6 +494,7 @@ bool copyFile(
       break;
     }
   }
+  sync_stats->Lookup(SHRINKWRAP_STAT_BYTE_COUNT)->Xadd(bytes_transferred);
 
   retval = src_fs->do_fclose(src);
   if (retval != 0) {
@@ -498,13 +520,32 @@ bool copyFile(
 struct MainWorkerContext {
   struct fs_traversal *src_fs;
   struct fs_traversal *dest_fs;
+  perf::Statistics *sync_stats;
   int parallel;
 };
 
+struct MainWorkerSpecificContext {
+  struct MainWorkerContext *ctx;
+  int num_thread;
+};
+
 static void *MainWorker(void *data) {
-  MainWorkerContext *mwc = static_cast<MainWorkerContext*>(data);
+  MainWorkerSpecificContext *sc = static_cast<MainWorkerSpecificContext*>(data);
+  MainWorkerContext *mwc = sc->ctx;
+  perf::Counter *files_transferred
+    = mwc->sync_stats->Lookup(SHRINKWRAP_STAT_FILE_COUNT);
+  time_t last_print_time;
+  if (sc == 0) {
+    last_print_time = time(NULL);
+  }
 
   while (1) {
+    if (sc == 0 && time(NULL)-last_print_time > 10) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+        "%s",
+        mwc->sync_stats->PrintList(perf::Statistics::kPrintSimple).c_str());
+      last_print_time = time(NULL);
+    }
     FileCopy next_copy;
     pthread_mutex_lock(&lock_pipe);
     ReadPipe(pipe_chunks[0], &next_copy, sizeof(next_copy));
@@ -512,10 +553,12 @@ static void *MainWorker(void *data) {
     if (next_copy.IsTerminateJob())
       break;
 
-    if (!copyFile(mwc->src_fs, next_copy.src, mwc->dest_fs, next_copy.dest)) {
+    if (!copyFile(mwc->src_fs, next_copy.src, mwc->dest_fs, next_copy.dest,
+      mwc->sync_stats)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
       "File %s failed to copy\n", next_copy.src);
     }
+    files_transferred->Inc();
 
     atomic_dec64(&copy_queue);
   }
@@ -527,20 +570,35 @@ bool copy_file(
   const char *src_data,
   struct fs_traversal *dest_fs,
   const char *dest_data,
-  int parallel
+  int parallel,
+  perf::Statistics *sync_stats
 ) {
   if (parallel) {
     FileCopy next_copy(src_data, dest_data);
     WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
     atomic_inc64(&copy_queue);
   } else {
-    if (!copyFile(src_fs, src_data, dest_fs, dest_data)) {
+    if (!copyFile(src_fs, src_data, dest_fs, dest_data, sync_stats)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
       "File %s failed to copy\n\n", src_data);
       return false;
     }
+    sync_stats->Lookup(SHRINKWRAP_STAT_FILE_COUNT)->Inc();
   }
   return true;
+}
+
+perf::Statistics *GetSyncStatTemplate() {
+  perf::Statistics *result = new perf::Statistics();
+  result->Register(SHRINKWRAP_STAT_BYTE_COUNT,
+    "The number of bytes transfered from the source to the destination");
+  result->Register(SHRINKWRAP_STAT_FILE_COUNT,
+    "The number of files transfered from the source to the destination");
+  result->Register(SHRINKWRAP_STAT_SRC_ENTRIES,
+    "The number of file system entries processed in the source");
+  result->Register(SHRINKWRAP_STAT_DEST_ENTRIES,
+    "The number of file system entries processed in the destination");
+  return result;
 }
 
 static void Usage() {
@@ -680,26 +738,41 @@ int Main(int argc, char **argv) {
 
   int result = 1;
 
+  perf::Statistics *sync_stats = GetSyncStatTemplate();
+
   // Initialization
   atomic_init64(&overall_copies);
   atomic_init64(&overall_new);
   atomic_init64(&copy_queue);
 
-  pthread_t *workers =
-    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
+  pthread_t *workers = NULL;
+
+  struct MainWorkerSpecificContext *specificWorkerContexts = NULL;
+
+  MainWorkerContext *mwc = NULL;
 
   if (num_parallel) {
+    workers =
+    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
+
+    specificWorkerContexts =
+      reinterpret_cast<struct MainWorkerSpecificContext *>(
+        smalloc(sizeof(struct MainWorkerSpecificContext) * num_parallel));
+
+    mwc = new struct MainWorkerContext;
     // Start Workers
     MakePipe(pipe_chunks);
     LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
-    MainWorkerContext mwc;
-    mwc.src_fs = src;
-    mwc.dest_fs = dest;
-    mwc.parallel = num_parallel;
+    mwc->src_fs = src;
+    mwc->dest_fs = dest;
+    mwc->sync_stats = sync_stats;
+    mwc->parallel = num_parallel;
 
     for (unsigned i = 0; i < num_parallel; ++i) {
+      specificWorkerContexts[i].ctx = mwc;
+      specificWorkerContexts[i].num_thread = i;
       int retval = pthread_create(&workers[i], NULL, MainWorker,
-                                static_cast<void*>(&mwc));
+          static_cast<void*>(&(specificWorkerContexts[i])));
       assert(retval == 0);
     }
   }
@@ -714,7 +787,7 @@ int Main(int argc, char **argv) {
   }
 
   char *entry_point = strdup(base);
-  result = Sync(entry_point, src, dest, num_parallel, recursive);
+  result = Sync(entry_point, src, dest, num_parallel, recursive, sync_stats);
   free(entry_point);
 
   while (atomic_read64(&copy_queue) != 0) {
@@ -733,7 +806,14 @@ int Main(int argc, char **argv) {
       assert(retval == 0);
     }
     ClosePipe(pipe_chunks);
+    delete workers;
+    delete specificWorkerContexts;
+    delete mwc;
   }
+  LogCvmfs(kLogCvmfs, kLogStdout,
+        "%s",
+        sync_stats->PrintList(perf::Statistics::kPrintHeader).c_str());
+  delete sync_stats;
 
   return result;
 }

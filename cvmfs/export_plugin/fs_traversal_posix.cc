@@ -435,6 +435,13 @@ struct fs_traversal_context *posix_initialize(
   result->version = 1;
   result->repo =  strdup(repo);
   result->data = strdup(data);
+  if (!DirectoryExists(result->repo)) {
+    if (!MkdirDeep(result->repo, 0744, true)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Failed to create repository directory '%s'", result->repo);
+      return NULL;
+    }
+  }
   PosixCheckDirStructure(data, 0744);  // NOTE(steuber): mode?
   const char *warning = WARNING_FILE_NAME;
   FILE *f = fopen(BuildPath(result, "/" WARNING_FILE_NAME).c_str(), "w");

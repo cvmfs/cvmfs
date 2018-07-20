@@ -14,6 +14,7 @@
 
 #include "catalog_test_tools.h"
 #include "libcvmfs.h"
+#include "statistics.h"
 #include "util/posix.h"
 #include "xattr.h"
 
@@ -611,13 +612,15 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
   context = dest->initialize(src_name, src_data, NULL);
   dest->context_ = context;
 
-  ASSERT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));
+  perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
+
+  ASSERT_TRUE(shrinkwrap::Sync("", src, dest, 0, true, statistics));
 
   dest->finalize(dest->context_);
   context = dest->initialize(dest_name, dest_data, NULL);
   dest->context_ = context;
 
-  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));
+  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true, statistics));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
@@ -717,7 +720,9 @@ TEST_P(T_Fs_Traversal_Interface, TransferCVMFSToPosix) {
   context = dest->initialize("posix", "posix_data", NULL);
   dest->context_ = context;
 
-  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true));
+  perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
+
+  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true, statistics));
   // ASSERT_TRUE(shrinkwrap::Sync("", dest, src, 0, true));
 
   src->finalize(src->context_);
