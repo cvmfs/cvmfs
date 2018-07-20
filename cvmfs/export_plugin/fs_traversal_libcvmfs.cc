@@ -159,6 +159,7 @@ struct fs_traversal_context *libcvmfs_initialize(
     LogCvmfs(kLogCvmfs, kLogStderr,
     "CVMFS Attach to %s failed", repo);
   }
+  cvmfs_enable_threaded(ctx);
   result->ctx = ctx;
   cvmfs_adopt_options(ctx, options_mgr);
   return result;
