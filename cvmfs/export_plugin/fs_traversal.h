@@ -24,7 +24,7 @@ bool Sync(const char *dir,
           struct fs_traversal *dest,
           int parallel,
           bool recursive,
-          perf::Statistics *sync_stat);
+          perf::Statistics *pstats);
 
 // Exported for testing purposes:
 perf::Statistics *GetSyncStatTemplate();
