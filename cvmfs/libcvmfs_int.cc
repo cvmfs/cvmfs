@@ -220,6 +220,9 @@ LibContext::~LibContext() {
   delete options_mgr_;
 }
 
+void LibContext::EnableMultiThreaded() {
+  mount_point_->download_mgr()->Spawn();
+}
 
 bool LibContext::GetDirentForPath(const PathString         &path,
                                   catalog::DirectoryEntry  *dirent)

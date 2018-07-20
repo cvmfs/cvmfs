@@ -180,6 +180,10 @@ char *cvmfs_statistics_format(cvmfs_context *ctx);
  * An option map must be created an populated before calling cvmfs_init_v2().
  */
 cvmfs_option_map *cvmfs_options_init();
+
+
+void cvmfs_enable_threaded(cvmfs_context *ctx);
+
 /**
  * Creates a new option map based on the legacy option string that would be
  * passed to the legacy function cvmfs_init().  Returns NULL if legacy_options

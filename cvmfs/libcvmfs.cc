@@ -453,6 +453,11 @@ void cvmfs_list_free(char **buf)
   free(buf);
 }
 
+void cvmfs_enable_threaded(
+  LibContext *ctx
+) {
+  ctx->EnableMultiThreaded();
+}
 
 cvmfs_errors cvmfs_attach_repo_v2(
   const char *fqrn,

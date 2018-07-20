@@ -433,7 +433,7 @@ struct fs_traversal_context *posix_initialize(
   const char *config) {
   fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
-  result->repo =  strdup(repo);
+  result->repo = strdup(repo);
   result->data = strdup(data);
   if (!DirectoryExists(result->repo)) {
     if (!MkdirDeep(result->repo, 0744, true)) {
