@@ -67,7 +67,7 @@ std::string GetGMTimestamp() {
   * @param stats a struct with all values stored in strings
   * @return the insert statement
   */
-std::string PrepareStatement(struct Stats stats) {
+std::string PrepareStatement(const struct Stats &stats) {
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
     "timestamp,"
