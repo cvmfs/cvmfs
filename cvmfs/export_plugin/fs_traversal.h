@@ -9,6 +9,13 @@
 
 #include "fs_traversal.h"
 #include "fs_traversal_interface.h"
+#include "statistics.h"
+
+#define SHRINKWRAP_STAT_BYTE_COUNT "byteCnt"
+#define SHRINKWRAP_STAT_FILE_COUNT "fileCnt"
+#define SHRINKWRAP_STAT_SRC_ENTRIES "srcEntries"
+#define SHRINKWRAP_STAT_DEST_ENTRIES "destEntries"
+#define SHRINKWRAP_STAT_LAST_PRINT "timeOfLastPrint"
 
 namespace shrinkwrap {
 
@@ -16,7 +23,11 @@ bool Sync(const char *dir,
           struct fs_traversal *src,
           struct fs_traversal *dest,
           int parallel,
-          bool recursive);
+          bool recursive,
+          perf::Statistics *sync_stat);
+
+// Exported for testing purposes:
+perf::Statistics *GetSyncStatTemplate();
 
 int Main(int argc, char **argv);
 
