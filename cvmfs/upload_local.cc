@@ -166,6 +166,10 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
       return;
     }
   } else {
+    printf("Peek retval = %d\n", Peek(final_path));
+    if (counters_.IsValid()) {
+      perf::Inc(counters_->n_duplicated_files);
+    }
     const int retval = unlink(local_handle->temporary_path.c_str());
     if (retval != 0) {
       LogCvmfs(kLogSpooler, kLogVerboseMsg,

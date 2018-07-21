@@ -12,9 +12,19 @@
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "repository_tag.h"
+#include "statistics.h"
 #include "upload_spooler_definition.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
+
+struct UploadCounters {
+  perf::Counter *n_duplicated_files;
+
+  explicit UploadCounters(perf::StatisticsTemplate statistics) {
+    n_duplicated_files = statistics.RegisterTemplated("n_duplicated_files",
+        "Number of duplicated files added");
+  }
+};  // UploadCounters
 
 namespace upload {
 
@@ -269,6 +279,10 @@ class AbstractUploader
   virtual unsigned int GetNumberOfErrors() const = 0;
   static void RegisterPlugins();
 
+  void SetStats(perf::StatisticsTemplate *publish_statistics) {
+    counters_ = new UploadCounters(*publish_statistics);
+  }
+
  protected:
   typedef Callbackable<UploaderResults>::CallbackTN *CallbackPtr;
 
@@ -344,6 +358,8 @@ class AbstractUploader
   const SpoolerDefinition &spooler_definition() const {
     return spooler_definition_;
   }
+
+  UniquePtr<UploadCounters> counters_;
 
  private:
   const SpoolerDefinition spooler_definition_;

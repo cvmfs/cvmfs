@@ -12,9 +12,10 @@
 
 namespace upload {
 
-Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition) {
+Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
+                            perf::StatisticsTemplate *publish_statistics) {
   Spooler *result = new Spooler(spooler_definition);
-  if (!result->Initialize()) {
+  if (!result->Initialize(publish_statistics)) {
     delete result;
     result = NULL;
   }
@@ -32,7 +33,7 @@ Spooler::~Spooler() {
 
 std::string Spooler::backend_name() const { return uploader_->name(); }
 
-bool Spooler::Initialize() {
+bool Spooler::Initialize(perf::StatisticsTemplate *publish_statistics) {
   // configure the uploader environment
   uploader_ = AbstractUploader::Construct(spooler_definition_);
   if (!uploader_) {
@@ -40,6 +41,10 @@ bool Spooler::Initialize() {
              "Failed to initialize backend upload "
              "facility in Spooler.");
     return false;
+  }
+
+  if (publish_statistics != NULL) {
+    uploader_->SetStats(publish_statistics);
   }
 
   // configure the file processor context
