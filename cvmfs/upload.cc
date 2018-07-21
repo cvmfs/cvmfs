@@ -13,9 +13,15 @@
 namespace upload {
 
 Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
+<<<<<<< HEAD
                                   perf::StatisticsTemplate *statistics) {
   Spooler *result = new Spooler(spooler_definition);
   if (!result->Initialize(statistics)) {
+=======
+                            perf::StatisticsTemplate *publish_statistics) {
+  Spooler *result = new Spooler(spooler_definition);
+  if (!result->Initialize(publish_statistics)) {
+>>>>>>> Duplicated files counter added.
     delete result;
     result = NULL;
   }
@@ -33,7 +39,11 @@ Spooler::~Spooler() {
 
 std::string Spooler::backend_name() const { return uploader_->name(); }
 
+<<<<<<< HEAD
 bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
+=======
+bool Spooler::Initialize(perf::StatisticsTemplate *publish_statistics) {
+>>>>>>> Duplicated files counter added.
   // configure the uploader environment
   uploader_ = AbstractUploader::Construct(spooler_definition_);
   if (!uploader_) {
@@ -43,8 +53,13 @@ bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
     return false;
   }
 
+<<<<<<< HEAD
   if (statistics != NULL) {
     uploader_->InitCounters(statistics);
+=======
+  if (publish_statistics != NULL) {
+    uploader_->SetStats(publish_statistics);
+>>>>>>> Duplicated files counter added.
   }
 
   // configure the file processor context

@@ -141,7 +141,11 @@ namespace upload {
 class Spooler : public Observable<SpoolerResult> {
  public:
   static Spooler *Construct(const SpoolerDefinition &spooler_definition,
+<<<<<<< HEAD
                               perf::StatisticsTemplate *statistics = NULL);
+=======
+                        perf::StatisticsTemplate *publish_statistics = NULL);
+>>>>>>> Duplicated files counter added.
   virtual ~Spooler();
 
   /**
@@ -284,7 +288,11 @@ class Spooler : public Observable<SpoolerResult> {
    * This method is called once before any other operations are performed on
    * a Spooler. Implements global initialization work.
    */
+<<<<<<< HEAD
   bool Initialize(perf::StatisticsTemplate *statistics);
+=======
+  bool Initialize(perf::StatisticsTemplate *publish_statistics);
+>>>>>>> Duplicated files counter added.
 
   /**
    * @param spooler_definition   the SpoolerDefinition structure that defines
