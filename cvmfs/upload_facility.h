@@ -278,10 +278,7 @@ class AbstractUploader
 
   virtual unsigned int GetNumberOfErrors() const = 0;
   static void RegisterPlugins();
-
-  void SetStats(perf::StatisticsTemplate *publish_statistics) {
-    counters_ = new UploadCounters(*publish_statistics);
-  }
+  void InitCounters(perf::StatisticsTemplate *statistics);
 
  protected:
   typedef Callbackable<UploaderResults>::CallbackTN *CallbackPtr;

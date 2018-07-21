@@ -70,6 +70,10 @@ void AbstractUploader::TearDown() {
 
 void AbstractUploader::WaitForUpload() const { jobs_in_flight_.WaitForZero(); }
 
+void AbstractUploader::InitCounters(perf::StatisticsTemplate *statistics) {
+  counters_ = new UploadCounters(*statistics);
+}
+
 
 //------------------------------------------------------------------------------
 
