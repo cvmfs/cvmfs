@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
-
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -12,14 +10,15 @@
 #include <fstream>
 
 #include "atomic.h"
-#include "fs_traversal.h"
-#include "fs_traversal_interface.h"
-#include "fs_traversal_libcvmfs.h"
-#include "fs_traversal_posix.h"
+#include "cvmfs_config.h"
+#include "export_plugin/fs_traversal.h"
+#include "export_plugin/fs_traversal_interface.h"
+#include "export_plugin/fs_traversal_libcvmfs.h"
+#include "export_plugin/fs_traversal_posix.h"
+#include "export_plugin/spec_tree.h"
 #include "libcvmfs.h"
 #include "logging.h"
 #include "smalloc.h"
-#include "spec_tree.h"
 #include "statistics.h"
 #include "util/posix.h"
 #include "util/string.h"
