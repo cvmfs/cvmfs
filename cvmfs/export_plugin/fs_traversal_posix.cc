@@ -16,13 +16,13 @@
 #include <attr/xattr.h>  // NOLINT
 // Necessary because xattr.h does not import sys/types.h
 
-#include <iostream>
 #include <string>
 #include <vector>
 
 #include "fs_traversal_interface.h"
 #include "hash.h"
 #include "libcvmfs.h"
+#include "logging.h"
 #include "shortstring.h"
 #include "string.h"
 #include "util.h"

@@ -1,34 +1,14 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "fs_traversal_libcvmfs.h"
 
-// #include <attr/xattr.h>
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <ftw.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include <attr/xattr.h>  // NOLINT
-// Necessary because xattr.h does not import sys/types.h
-
-#include <iostream>
-#include <string>
-#include <vector>
+#include <stdlib.h>
 
 #include "fs_traversal_interface.h"
-#include "hash.h"
+#include "fs_traversal_libcvmfs.h"
 #include "libcvmfs.h"
-#include "options.h"
-#include "shortstring.h"
+#include "logging.h"
 #include "string.h"
-#include "util.h"
-#include "util/posix.h"
-#include "xattr.h"
 
 void libcvmfs_list_dir(struct fs_traversal_context *ctx,
   const char *dir,
@@ -145,10 +125,13 @@ struct fs_traversal_context *libcvmfs_initialize(
     result->data = strdup(data);
   }
 
-  SimpleOptionsParser *options_mgr = new SimpleOptionsParser(
-      new DefaultOptionsTemplateManager(repo));
-  options_mgr->ParsePath(config, false);
-  int retval = cvmfs_init_v2(options_mgr);
+  cvmfs_option_map *options_mgr = cvmfs_options_init();
+  int retval = cvmfs_options_parse(options_mgr, config);
+  if (retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "CVMFS Options failed to parse from : %s", config);
+  }
+  retval = cvmfs_init_v2(options_mgr);
   if (retval) {
     LogCvmfs(kLogCvmfs, kLogStderr,
     "CVMFS Initilization failed : %s", repo);
