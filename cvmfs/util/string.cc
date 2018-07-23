@@ -548,6 +548,22 @@ string Tail(const string &source, unsigned num_lines) {
   return source;
 }
 
+/**
+  * Get UTC Time.
+  *
+  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
+  */
+std::string GetGMTimestamp() {
+  struct tm time_ptr;
+  char date_and_time[50];
+  time_t t = time(NULL);
+  gmtime_r(&t, &time_ptr);      // take UTC
+  // timestamp format
+  strftime(date_and_time, 50, "%Y-%m-%d %H:%M:%S", &time_ptr);
+  std::string timestamp(date_and_time);
+  return timestamp;
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

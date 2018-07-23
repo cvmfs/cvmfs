@@ -58,6 +58,7 @@ std::string Tail(const std::string &source, unsigned num_lines);
 std::string Base64(const std::string &data);
 std::string Base64Url(const std::string &data);
 bool Debase64(const std::string &data, std::string *decoded);
+std::string GetGMTimestamp();
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
