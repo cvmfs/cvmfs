@@ -215,6 +215,12 @@ p_handle_commit_lease(Req0, State, Uid) ->
                                         {error, io_error} ->
                                             #{<<"status">> => <<"error">>,
                                               <<"reason">> => <<"io_error">>};
+                                        {error, misc_error} ->
+                                            #{<<"status">> => <<"error">>,
+                                              <<"reason">> => <<"miscellaneous">>};
+                                        {error, missing_reflog} ->
+                                            #{<<"status">> => <<"error">>,
+                                              <<"reason">> => <<"missing_reflog">>};
                                         {error, worker_died} ->
                                             #{<<"status">> => <<"error">>,
                                               <<"reason">> => <<"worker_died">>}
