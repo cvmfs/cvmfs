@@ -134,7 +134,7 @@ CommitProcessor::Result CommitProcessor::Process(
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "CommitProcessor - error: Could not get configuration parameters.");
-    return kIoError;
+    return kError;
   }
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
@@ -143,7 +143,7 @@ CommitProcessor::Result CommitProcessor::Process(
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "CommitProcessor - error: Could not initialize the download manager");
-    return kIoError;
+    return kError;
   }
 
   const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
@@ -153,7 +153,7 @@ CommitProcessor::Result CommitProcessor::Process(
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "CommitProcessor - error: Could not initialize the signature manager");
-    return kIoError;
+    return kError;
   }
 
   shash::Any manifest_base_hash;
@@ -164,7 +164,7 @@ CommitProcessor::Result CommitProcessor::Process(
   if (!manifest.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Could not open repository manifest");
-    return kIoError;
+    return kError;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,
@@ -193,14 +193,14 @@ CommitProcessor::Result CommitProcessor::Process(
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error: Could not initialize the catalog merge tool");
-    return kIoError;
+    return kError;
   }
 
   std::string new_manifest_path;
   if (!merge_tool.Run(params, &new_manifest_path)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Catalog merge failed");
-    return kMergeError;
+    return kMergeFailure;
   }
 
   UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_root));
@@ -212,7 +212,7 @@ CommitProcessor::Result CommitProcessor::Process(
                     new_manifest_path, public_key)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
     final_tag.name_.c_str());
-    return kIoError;
+    return kError;
   }
 
   // We need to re-initialize the ServerTool component for signing
@@ -228,9 +228,17 @@ CommitProcessor::Result CommitProcessor::Process(
                        params.spooler_configuration, temp_dir, certificate,
                        private_key, repo_name, "", "",
                        "/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
+
+    // We need to check for the reflog and reflog checksum and log an error
+    // if either is absent
+    if (!FileExists("/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: missing reflog.chksum");
+      return kMissingReflog;
+    }
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: signing manifest");
-    return kIoError;
+    return kError;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,
@@ -243,7 +251,7 @@ CommitProcessor::Result CommitProcessor::Process(
       LogCvmfs(
           kLogReceiver, kLogSyslogErr,
           "CommitProcessor - error: Could not initialize the download manager");
-      return kIoError;
+      return kError;
     }
 
     const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
@@ -254,7 +262,7 @@ CommitProcessor::Result CommitProcessor::Process(
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "CommitProcessor - error: Could not initialize the signature "
                "manager");
-      return kIoError;
+      return kError;
     }
 
     shash::Any manifest_base_hash;
