@@ -366,6 +366,8 @@ fi
 # Port 8000 is also assigned to soundd (CVM-1308)
 /usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
 %endif
+# remove old-style geoip data
+rm -f /var/lib/cvmfs-server/geo/*.dat
 
 %preun
 if [ $1 = 0 ] ; then
