@@ -14,10 +14,8 @@ CVMFS_UPDATEGEO_MINDAYS=25 # Minimum days between update attempts
 CVMFS_UPDATEGEO_MAXDAYS=100 # Maximum days old before considering it an error
 
 CVMFS_UPDATEGEO_URLBASE="http://geolite.maxmind.com/download/geoip/database"
-CVMFS_UPDATEGEO_URLBASE6="${CVMFS_UPDATEGEO_URLBASE}/GeoLiteCityv6-beta"
 CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
-CVMFS_UPDATEGEO_DAT="GeoLiteCity.dat"
-CVMFS_UPDATEGEO_DAT6="GeoLiteCityv6.dat"
+CVMFS_UPDATEGEO_DB="GeoLite2-City.mmdb"
 
 DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 

@@ -820,12 +820,7 @@ strip_manifest_signature() {
 _update_geodb_days_since_update() {
   local timestamp=$(date +%s)
   local dbdir=$CVMFS_UPDATEGEO_DIR
-  local db_mtime=$(stat --format='%Y' ${dbdir}/${CVMFS_UPDATEGEO_DAT})
-  local db_mtime6=$(stat --format='%Y' ${dbdir}/${CVMFS_UPDATEGEO_DAT6})
-  if [ "$db_mtime6" -lt "$db_mtime" ]; then
-    # take the older of the two
-    db_mtime=$db_mtime6
-  fi
+  local db_mtime=$(stat --format='%Y' ${dbdir}/${CVMFS_UPDATEGEO_DB})
   local days_since_update=$(( ( $timestamp - $db_mtime ) / 86400 ))
   echo "$days_since_update"
 }
@@ -839,14 +834,13 @@ _to_syslog_for_geoip() {
   to_syslog "(GeoIP) $1"
 }
 
-_update_geodb_install_1() {
+_update_geodb_install() {
   local retcode=0
-  local urlbase="$1"
   local datname="$2"
-  local dburl="${urlbase}/${datname}.gz"
-  local dbfile="${CVMFS_UPDATEGEO_DIR}/${datname}"
-  local download_target=${dbfile}.gz
-  local unzip_target=${dbfile}.new
+  local dburl="${CVMFS_UPDATEGEO_URLBASE}/${CVMFS_UPDATEGEO_DB%.*}.tar.gz"
+  local dbfile="${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_DB}"
+  local download_target=${dbfile}.tgz
+  local untar_dir=${dbfile}.untar
 
   _to_syslog_for_geoip "started update from $dburl"
 
@@ -862,24 +856,29 @@ _update_geodb_install_1() {
     return 1
   fi
 
-  # unzipping the GeoIP database file
-  if ! zcat $download_target > $unzip_target 2>/dev/null; then
-    echo "failed to unzip $download_target to $unzip_target" >&2
-    _to_syslog_for_geoip "failed to unzip $download_target to $unzip_target"
-    rm -f $download_target $unzip_target
+  # untar the GeoIP database file
+  rm -rf $untar_dir
+  mkdir -p $untar_dir
+  if ! tar xmf $download_target -C $untar_dir --no-same-owner 2>/dev/null; then
+    echo "failed to untar $download_target into $untar_dir" >&2
+    _to_syslog_for_geoip "failed to untar $download_target into $untar_dir"
+    rm -rf $download_target $untar_dir
     return 2
   fi
 
-  # get rid of the zipped GeoIP database
+  # get rid of the tarred GeoIP database
   rm -f $download_target
 
-  # atomically installing the GeoIP database
-  if ! mv -f $unzip_target $dbfile; then
+  # atomically install the GeoIP database
+  if ! mv -f $untar_dir/*/${CVMFS_UPDATEGEO_DB} $dbfile; then
     echo "failed to install $dbfile" >&2
     _to_syslog_for_geoip "failed to install $dbfile"
-    rm -f $unzip_target
+    rm -rf $untar_dir
     return 3
   fi
+
+  # get rid of other files in the untar
+  rm -rf $untar_dir
 
   set_selinux_httpd_context_if_needed "$CVMFS_UPDATEGEO_DIR"
 
@@ -888,15 +887,9 @@ _update_geodb_install_1() {
   return 0
 }
 
-_update_geodb_install() {
-  _update_geodb_install_1 $CVMFS_UPDATEGEO_URLBASE $CVMFS_UPDATEGEO_DAT && \
-    _update_geodb_install_1 $CVMFS_UPDATEGEO_URLBASE6 $CVMFS_UPDATEGEO_DAT6
-}
-
 _update_geodb() {
   local dbdir=$CVMFS_UPDATEGEO_DIR
-  local dbfile=$dbdir/$CVMFS_UPDATEGEO_DAT
-  local dbfile6=$dbdir/$CVMFS_UPDATEGEO_DAT6
+  local dbfile=$dbdir/$CVMFS_UPDATEGEO_DB
   local lazy=false
   local retcode=0
 
@@ -917,10 +910,9 @@ _update_geodb() {
   # sanity checks
   [ -w "$dbdir"  ]   || { echo "Directory '$dbdir' doesn't exist or is not writable by $(whoami)" >&2; return 1; }
   [ ! -f "$dbfile" ] || [ -w "$dbfile" ] || { echo "GeoIP database '$dbfile' is not writable by $(whoami)" >&2; return 2; }
-  [ ! -f "$dbfile6" ] || [ -w "$dbfile6" ] || { echo "GeoIP database '$dbfile6' is not writable by $(whoami)" >&2; return 2; }
 
   # check if an update/installation needs to be done
-  if [ ! -f "$dbfile" ] || [ ! -f "$dbfile6" ]; then
+  if [ ! -f "$dbfile" ]; then
     echo -n "Installing GeoIP Database... "
   elif ! $lazy; then
     echo -n "Updating GeoIP Database... "
@@ -936,7 +928,9 @@ _update_geodb() {
         return 0
       fi
     else
-      echo "GeoIP Database is up to date ($days_old days old). Nothing to do."
+      if ! $lazy; then
+        echo "GeoIP Database is up to date ($days_old days old). Nothing to do."
+      fi
       return 0
     fi
   fi
