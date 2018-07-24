@@ -166,10 +166,6 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
       return;
     }
   } else {
-<<<<<<< HEAD
-=======
-    printf("Peek retval = %d\n", Peek(final_path));
->>>>>>> Duplicated files counter added.
     if (counters_.IsValid()) {
       perf::Inc(counters_->n_duplicated_files);
     }

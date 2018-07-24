@@ -280,10 +280,6 @@ class AbstractUploader
   static void RegisterPlugins();
   void InitCounters(perf::StatisticsTemplate *statistics);
 
-  void SetStats(perf::StatisticsTemplate *publish_statistics) {
-    counters_ = new UploadCounters(*publish_statistics);
-  }
-
  protected:
   typedef Callbackable<UploaderResults>::CallbackTN *CallbackPtr;
 
