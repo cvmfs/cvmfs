@@ -393,7 +393,7 @@ if (BUILD_CVMFS)
   endif (MACOSX)
 endif (BUILD_CVMFS)
 
-# Server only: python/geoip, unzip, libcap, mongoose
+# Server only: unzip, libcap, mongoose
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   find_package(Mongoose REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MONGOOSE_INCLUDE_DIRS})
@@ -403,15 +403,6 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   if (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
     message(FATAL_ERROR "unzip utility missing. Please install unzip...")
   endif (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
-
-  if (BUILTIN_EXTERNALS)
-    set(libgeoip_names libGeoIP.a GeoIP)
-    #set(ENV{PYTHONPATH} ${EXTERNALS_INSTALL_LOCATION}/lib)
-    find_library(PY_GEOIP_LIBRARY GeoIP.so ${EXTERNALS_INSTALL_LOCATION}/lib)
-  else (BUILTIN_EXTERNALS)
-    find_python_module (GeoIP REQUIRED)
-  endif (BUILTIN_EXTERNALS)
-  find_package (LibGeoIP REQUIRED)
 endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 
 
