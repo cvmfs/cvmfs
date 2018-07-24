@@ -13,8 +13,6 @@
 #include "upload_facility.h"
 #include "util_concurrency.h"
 
-struct Counters;
-
 namespace upload {
 
 struct LocalStreamHandle : public UploadStreamHandle {
