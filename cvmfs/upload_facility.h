@@ -19,10 +19,13 @@
 
 struct UploadCounters {
   perf::Counter *n_duplicated_files;
+  perf::Counter *sz_uploaded_bytes;
 
   explicit UploadCounters(perf::StatisticsTemplate statistics) {
     n_duplicated_files = statistics.RegisterTemplated("n_duplicated_files",
         "Number of duplicated files added");
+    sz_uploaded_bytes = statistics.RegisterTemplated("sz_uploaded_bytes",
+        "Number of uploaded bytes");
   }
 };  // UploadCounters
 

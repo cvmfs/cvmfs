@@ -77,6 +77,10 @@ void LocalUploader::FileUpload(const std::string &local_path,
     Respond(callback, UploaderResults(retcode, local_path));
     return;
   }
+
+  if (counters_.IsValid()) {
+    perf::Xadd(counters_->sz_uploaded_bytes, GetFileSize(remote_path));
+  }
   Respond(callback, UploaderResults(retcode, local_path));
 }
 
@@ -124,6 +128,10 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
     return;
   }
 
+  if (counters_.IsValid()) {
+    perf::Xadd(counters_->sz_uploaded_bytes, bytes_written);
+  }
+
   // Tell kernel to evict written pages from the page cache.  We don't care if
   // it succeeds or not.
   (void)platform_invalidate_kcache(local_handle->file_descriptor, offset,
@@ -165,6 +173,8 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
               UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
       return;
     }
+    std::string dest = upstream_path_ + "/" + final_path;
+    printf("----- moved file %s \n with %ld bytes \n", dest.c_str(), GetFileSize(dest));
   } else {
     if (counters_.IsValid()) {
       perf::Inc(counters_->n_duplicated_files);
