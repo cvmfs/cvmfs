@@ -19,11 +19,13 @@ struct Stats {
   std::string files_added;
   std::string files_removed;
   std::string files_changed;
+  std::string duplicated_files;
   std::string dir_added;
   std::string dir_removed;
   std::string dir_changed;
   std::string bytes_added;
   std::string bytes_removed;
+  std::string bytes_uploaded;
 
   explicit Stats(const perf::Statistics *statistics):
     files_added(statistics->
@@ -32,6 +34,8 @@ struct Stats {
                     Lookup("Publish.n_files_removed")->ToString()),
     files_changed(statistics->
                     Lookup("Publish.n_files_changed")->ToString()),
+    duplicated_files(statistics->
+                    Lookup("Publish.n_duplicated_files")->ToString()),
     dir_added(statistics->
                     Lookup("Publish.n_directories_added")->ToString()),
     dir_removed(statistics->
@@ -41,7 +45,9 @@ struct Stats {
     bytes_added(statistics->
                     Lookup("Publish.sz_added_bytes")->ToString()),
     bytes_removed(statistics->
-                    Lookup("Publish.sz_removed_bytes")->ToString()) {
+                    Lookup("Publish.sz_removed_bytes")->ToString()),
+    bytes_uploaded(statistics->
+                    Lookup("Publish.sz_uploaded_bytes")->ToString()) {
   }
 };
 
@@ -59,21 +65,25 @@ std::string PrepareStatement(const perf::Statistics *statistics) {
     "files_added,"
     "files_removed,"
     "files_changed,"
+    "duplicated_files,"
     "directories_added,"
     "directories_removed,"
     "directories_changed,"
     "sz_bytes_added,"
-    "sz_bytes_removed)"
+    "sz_bytes_removed,"
+    "sz_bytes_uploaded)"
     " VALUES("
     "'"+GetGMTimestamp()+"',"+  // TEXT
     stats.files_added+"," +
     stats.files_removed +","+
     stats.files_changed + "," +
+    stats.duplicated_files + "," +
     stats.dir_added + "," +
     stats.dir_removed + "," +
     stats.dir_changed + "," +
     stats.bytes_added + "," +
-    stats.bytes_removed + ");";
+    stats.bytes_removed + "," +
+    stats.bytes_uploaded + ");";
   return insert_statement;
 }
 
@@ -88,11 +98,13 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "files_added INTEGER,"
     "files_removed INTEGER,"
     "files_changed INTEGER,"
+    "duplicated_files INTEGER,"
     "directories_added INTEGER,"
     "directories_removed INTEGER,"
     "directories_changed INTEGER,"
     "sz_bytes_added INTEGER,"
     "sz_bytes_removed INTEGER,"
+    "sz_bytes_uploaded INTEGER,"
     "CONSTRAINT pk_publish_statistics PRIMARY KEY (timestamp));").Execute();
 }
 
