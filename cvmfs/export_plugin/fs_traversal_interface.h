@@ -34,13 +34,15 @@ struct fs_traversal {
    * Method which initializes a file system traversal context based on
    * repository and data storage information
    * 
-   * @param[in] repo Repository information
+   * @param[in] repo Repository name
+   * @param[in] base Base repository location
    * @param[in] data Data storage information
    * @param[in] config A configuration file name
    * @param[out] A pointer to the context
    */
   struct fs_traversal_context *(*initialize)(
     const char *repo,
+    const char *base,
     const char *data,
     const char *config);
 
