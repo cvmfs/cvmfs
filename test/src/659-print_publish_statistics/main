@@ -199,32 +199,32 @@ cvmfs_run_test() {
       return $CVMFS_TEST_659_ERROR_DUPLICATED_FILES
     fi
     if [ $directories_added != ${test_results[$i,5]} ]; then
-      echo "*** Test $i.4 - number of added directories - \
+      echo "*** Test $i.5 - number of added directories - \
             ($directories_added vs ref:${test_results[$i,5]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_DIR_ADDED
     fi
     if [ $directories_removed != ${test_results[$i,6]} ]; then
-      echo "*** Test $i.5 - number of removed directories \
+      echo "*** Test $i.6 - number of removed directories \
             - ($directories_removed vs ref:${test_results[$i,6]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_DIR_REMOVED
     fi
     if [ $directories_changed != ${test_results[$i,7]} ]; then
-      echo "*** Test $i.6 - number of changed directories - \
+      echo "*** Test $i.7 - number of changed directories - \
             ($directories_changed vs ref:${test_results[$i,7]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_DIR_CHANGED
     fi
     if [ $bytes_added != ${test_results[$i,8]} ]; then
-      echo "*** Test $i.7 - number of added bytes - \
+      echo "*** Test $i.8 - number of added bytes - \
             ($bytes_added vs ref:${test_results[$i,8]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_BYTES_ADDED
     fi
     if [ $bytes_removed != ${test_results[$i,9]} ]; then
-      echo "*** Test $i.8 - number of removed bytes - \
+      echo "*** Test $i.9 - number of removed bytes - \
             ($bytes_removed vs ref:${test_results[$i,9]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_BYTES_REMOVED
     fi
     if [ $bytes_uploaded != ${test_results[$i,10]} ]; then
-      echo "*** Test $i.8 - number of uploaded bytes - \
+      echo "*** Test $i.10 - number of uploaded bytes - \
             ($bytes_uploaded vs ref:${test_results[$i,10]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_BYTES_UPLOADED
     fi
