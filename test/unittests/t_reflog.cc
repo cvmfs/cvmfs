@@ -124,7 +124,8 @@ TEST(T_Reflog, Checksum) {
   shash::Any content_hash(shash::kSha1);
   content_hash.Randomize();
   manifest::Reflog::WriteChecksum("./reflog.chksum", content_hash);
-  shash::Any read_hash = manifest::Reflog::ReadChecksum("./reflog.chksum");
+  shash::Any read_hash;
+  EXPECT_TRUE(manifest::Reflog::ReadChecksum("./reflog.chksum", &read_hash));
   EXPECT_EQ(content_hash, read_hash);
 }
 

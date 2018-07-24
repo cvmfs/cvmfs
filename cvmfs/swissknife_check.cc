@@ -959,7 +959,11 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!reflog_chksum_path.empty()) {
-    shash::Any reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+    shash::Any reflog_hash;
+    if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read reflog checksum");
+      return 1;
+    }
     bool retval = InspectReflog(reflog_hash, manifest);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");

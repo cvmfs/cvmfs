@@ -35,7 +35,10 @@ int SigningTool::Run(const std::string &manifest_path,
                      const bool bootstrap_shortcuts, const bool return_early) {
   shash::Any reflog_hash;
   if (reflog_chksum_path != "") {
-    reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+    if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum");
+      return 1;
+    }
   }
 
   UniquePtr<upload::Spooler> spooler;
