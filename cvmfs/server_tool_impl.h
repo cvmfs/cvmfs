@@ -27,20 +27,20 @@ manifest::Reflog *ServerTool::FetchReflog(ObjectFetcherT *object_fetcher,
                "reflog for '%s' not found but reflog.chksum is present; "
                "remove reflog.chksum to recreate the reflog",
                repo_name.c_str());
-      abort();
+      return NULL;
 
     case ObjectFetcherT::kFailBadData:
       LogCvmfs(kLogCvmfs, kLogStderr,
                "data corruption in .cvmfsreflog for %s, remove for automatic "
                "recreation or verify reflog.chksum file",
                repo_name.c_str());
-      abort();
+      return NULL;
 
     default:
       LogCvmfs(kLogCvmfs, kLogStderr,
                "failed loading reflog from '%s' (%d - %s)",
                object_fetcher->GetUrl(reflog_hash).c_str(), f, Code2Ascii(f));
-      abort();
+      return NULL;
   }
 
   assert(reflog != NULL);
