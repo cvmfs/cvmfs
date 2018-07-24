@@ -114,6 +114,7 @@ void libcvmfs_do_ffree(void *file_ctx) {
 
 struct fs_traversal_context *libcvmfs_initialize(
   const char *repo,
+  const char *base,
   const char *data,
   const char *config) {
   struct fs_traversal_context *result = new struct fs_traversal_context;
