@@ -129,11 +129,12 @@ submit_payload(SubmissionData, Secret) ->
 
 
 -spec commit(LeasePath, OldRootHash, NewRootHash, RepoTag) ->
-                    ok | {error, merge_error | io_error | worker_died | worker_timeout}
+                    ok | Error
                         when LeasePath :: binary(),
                              OldRootHash :: binary(),
                              NewRootHash :: binary(),
-                             RepoTag :: cvmfs_common_types:repository_tag().
+                             RepoTag :: cvmfs_common_types:repository_tag(),
+                             Error :: cvmfs_common_types:commit_error().
 commit(LeasePath, OldRootHash, NewRootHash, RepoTag) ->
     poolboy:transaction(cvmfs_receiver_pool,
                         fun(WorkerPid) ->
@@ -401,14 +402,15 @@ p_submit_payload({LeaseToken, Payload, Digest, HeaderSize}, Secret, WorkerPort, 
 
 
 -spec p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, From, Timeout)
-              -> ok | {error, merge_error | io_error | worker_timeout}
+              -> ok | Error
                                         when WorkerPort :: port(),
                                              LeasePath :: binary(),
                                              OldRootHash :: binary(),
                                              NewRootHash :: binary(),
                                              RepoTag :: cvmfs_common_types:repository_tag(),
                                              From :: {pid(), _},
-                                             Timeout :: integer().
+                                             Timeout :: integer(),
+                                             Error :: cvmfs_common_types:commit_error().
 p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, From, Timeout) ->
     {TagName, TagChannel, TagDescription} = RepoTag,
     Req1 = jsx:encode(#{<<"lease_path">> => LeasePath,
@@ -425,8 +427,12 @@ p_commit(WorkerPort, LeasePath, OldRootHash, NewRootHash, RepoTag, From, Timeout
                     ok;
                 #{<<"status">> := <<"error">>, <<"reason">> := <<"merge_error">>} ->
                     {error, merge_error};
+                #{<<"status">> := <<"error">>, <<"reason">> := <<"missing_reflog">>} ->
+                    {error, missing_reflog};
                 #{<<"status">> := <<"error">>, <<"reason">> := <<"io_error">>} ->
-                    {error, io_error}
+                    {error, io_error};
+                #{<<"status">> := <<"error">>, <<"reason">> := <<"miscellaneous">>} ->
+                    {error, misc_error}
             end;
         {error, worker_died} ->
             gen_server:reply(From, {error, worker_died}),
@@ -458,3 +464,4 @@ p_read_reply(Port, Timeout) ->
         Timeout ->
             {error, worker_timeout}
     end.
+
