@@ -40,10 +40,8 @@ PathString RemoveRepoName(const PathString& lease_path) {
   }
 }
 
-bool CreateNewTag(const RepositoryTag& repo_tag,
-                  const std::string& repo_name,
-                  const receiver::Params& params,
-                  const std::string& temp_dir,
+bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
+                  const receiver::Params& params, const std::string& temp_dir,
                   const std::string& manifest_path,
                   const std::string& public_key_path) {
   swissknife::ArgumentList args;
@@ -63,8 +61,8 @@ bool CreateNewTag(const RepositoryTag& repo_tag,
       new swissknife::CommandEditTag());
   const int ret = edit_cmd->Main(args);
 
-  for (swissknife::ArgumentList::iterator it = args.begin();
-       it != args.end(); ++it) {
+  for (swissknife::ArgumentList::iterator it = args.begin(); it != args.end();
+       ++it) {
     delete it->second;
   }
 
@@ -104,7 +102,6 @@ CommitProcessor::~CommitProcessor() {}
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
     const shash::Any& new_root_hash, const RepositoryTag& tag) {
-
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
   if (HasPrefix(final_tag.name_, "generic-", false)) {
@@ -208,10 +205,10 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
-  if (!CreateNewTag(final_tag, repo_name, params, temp_dir,
-                    new_manifest_path, public_key)) {
+  if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
+                    public_key)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
-    final_tag.name_.c_str());
+             final_tag.name_.c_str());
     return kError;
   }
 
@@ -220,29 +217,32 @@ CommitProcessor::Result CommitProcessor::Process(
   server_tool = new ServerTool();
 
   LogCvmfs(kLogReceiver, kLogSyslog,
-    "CommitProcessor - lease_path: %s, signing manifest",
-    lease_path.c_str());
+           "CommitProcessor - lease_path: %s, signing manifest",
+           lease_path.c_str());
 
   SigningTool signing_tool(server_tool.weak_ref());
-  if (signing_tool.Run(new_manifest_path, params.stratum0,
+  SigningTool::Result res = signing_tool.Run(new_manifest_path, params.stratum0,
                        params.spooler_configuration, temp_dir, certificate,
                        private_key, repo_name, "", "",
-                       "/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
-
-    // We need to check for the reflog and reflog checksum and log an error
-    // if either is absent
-    if (!FileExists("/var/spool/cvmfs/" + repo_name + "/reflog.chksum")) {
+                       "/var/spool/cvmfs/" + repo_name + "/reflog.chksum");
+  switch (res) {
+    case SigningTool::kReflogChecksumMissing:
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "CommitProcessor - error: missing reflog.chksum");
       return kMissingReflog;
-    }
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "CommitProcessor - error: signing manifest");
-    return kError;
+    case SigningTool::kReflogMissing:
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: missing reflog");
+      return kMissingReflog;
+    case SigningTool::kError:
+    case SigningTool::kInitError:
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: signing manifest");
+      return kError;
+    case SigningTool::kSuccess:
+      LogCvmfs(kLogReceiver, kLogSyslog,
+               "CommitProcessor - lease_path: %s, success.", lease_path.c_str());
   }
-
-  LogCvmfs(kLogReceiver, kLogSyslog,
-           "CommitProcessor - lease_path: %s, success.", lease_path.c_str());
 
   {
     UniquePtr<ServerTool> server_tool(new ServerTool());

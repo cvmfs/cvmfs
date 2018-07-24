@@ -23,21 +23,19 @@ SigningTool::SigningTool(ServerTool *server_tool) : server_tool_(server_tool) {}
 
 SigningTool::~SigningTool() {}
 
-int SigningTool::Run(const std::string &manifest_path,
-                     const std::string &repo_url,
-                     const std::string &spooler_definition,
-                     const std::string &temp_dir,
-                     const std::string &certificate,
-                     const std::string &priv_key, const std::string &repo_name,
-                     const std::string &pwd, const std::string &meta_info,
-                     const std::string &reflog_chksum_path,
-                     const bool garbage_collectable,
-                     const bool bootstrap_shortcuts, const bool return_early) {
+SigningTool::Result SigningTool::Run(
+    const std::string &manifest_path, const std::string &repo_url,
+    const std::string &spooler_definition, const std::string &temp_dir,
+    const std::string &certificate, const std::string &priv_key,
+    const std::string &repo_name, const std::string &pwd,
+    const std::string &meta_info, const std::string &reflog_chksum_path,
+    const bool garbage_collectable, const bool bootstrap_shortcuts,
+    const bool return_early) {
   shash::Any reflog_hash;
   if (reflog_chksum_path != "") {
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum");
-      return 1;
+      return kReflogChecksumMissing;
     }
   }
 
@@ -46,7 +44,7 @@ int SigningTool::Run(const std::string &manifest_path,
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
-    return 1;
+    return kError;
   }
 
   // prepare global manager modules
@@ -54,7 +52,7 @@ int SigningTool::Run(const std::string &manifest_path,
   if (!server_tool_->InitDownloadManager(follow_redirects) ||
       !server_tool_->InitSigningSignatureManager(certificate, priv_key, pwd)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
-    return 2;
+    return kInitError;
   }
 
   // init the download helper
@@ -66,7 +64,7 @@ int SigningTool::Run(const std::string &manifest_path,
   manifest = manifest::Manifest::LoadFile(manifest_path);
   if (!manifest.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
-    return 1;
+    return kError;
   }
 
   // Connect to the spooler
@@ -75,19 +73,23 @@ int SigningTool::Run(const std::string &manifest_path,
   spooler = upload::Spooler::Construct(sd);
   if (!spooler.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
-    return 1;
+    return kInitError;
   }
 
   UniquePtr<manifest::Reflog> reflog;
   if (!reflog_hash.IsNull()) {
     reflog = server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash);
-    assert(reflog.IsValid());
+    if (!reflog.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "reflog hash specified but reflog not present");
+      return kReflogMissing;
+    }
   } else {
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no reflog (ignoring)");
     if (spooler->Peek("/.cvmfsreflog")) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "no reflog hash specified but reflog is present");
-      return 1;
+      return kError;
     }
   }
 
@@ -105,7 +107,7 @@ int SigningTool::Run(const std::string &manifest_path,
 
   if (certificate_hash.IsNull()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate");
-    return 1;
+    return kError;
   }
 
   // Safe repository meta info file
@@ -119,7 +121,7 @@ int SigningTool::Run(const std::string &manifest_path,
 
     if (metainfo_hash.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info");
-      return 1;
+      return kError;
     }
   }
 
@@ -129,25 +131,25 @@ int SigningTool::Run(const std::string &manifest_path,
 
     if (!reflog->AddCatalog(manifest->catalog_hash())) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add catalog to Reflog");
-      return 1;
+      return kError;
     }
 
     if (!reflog->AddCertificate(certificate_hash)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add certificate to Reflog");
-      return 1;
+      return kError;
     }
 
     if (!manifest->history().IsNull()) {
       if (!reflog->AddHistory(manifest->history())) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add history to Reflog");
-        return 1;
+        return kError;
       }
     }
 
     if (!metainfo_hash.IsNull()) {
       if (!reflog->AddMetainfo(metainfo_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add meta info to Reflog");
-        return 1;
+        return kError;
       }
     }
 
@@ -165,7 +167,7 @@ int SigningTool::Run(const std::string &manifest_path,
     if (spooler->GetNumberOfErrors()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload Reflog (errors: %d)",
                spooler->GetNumberOfErrors());
-      return 1;
+      return kError;
     }
     assert(!reflog_chksum_path.empty());
     manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
@@ -174,7 +176,7 @@ int SigningTool::Run(const std::string &manifest_path,
   // Don't activate new manifest, just make sure all its references are uploaded
   // and entered into the reflog
   if (return_early) {
-    return 0;
+    return kSuccess;
   }
 
   // Update manifest
@@ -208,7 +210,7 @@ int SigningTool::Run(const std::string &manifest_path,
       LogCvmfs(kLogCvmfs, kLogStderr,
                "failed to place VOMS bootstrapping "
                "symlinks");
-      return 1;
+      return kError;
     }
   }
 
@@ -221,7 +223,7 @@ int SigningTool::Run(const std::string &manifest_path,
   if (!manifest_was_signed) {
     abort();
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
-    return 1;
+    return kError;
   }
 
   // Write new manifest
@@ -230,7 +232,7 @@ int SigningTool::Run(const std::string &manifest_path,
   if (!SafeWriteToFile(signed_manifest, manifest_path, 0664)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest (errno: %d)",
              errno);
-    return 1;
+    return kError;
   }
 
   // Upload manifest
@@ -240,10 +242,10 @@ int SigningTool::Run(const std::string &manifest_path,
   if (spooler->GetNumberOfErrors()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest (errors: %d)",
              spooler->GetNumberOfErrors());
-    return 1;
+    return kError;
   }
 
-  return 0;
+  return kSuccess;
 }
 
 void SigningTool::CertificateUploadCallback(
