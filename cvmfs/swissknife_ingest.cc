@@ -79,6 +79,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.key_file = *args.find('H')->second;
   }
 
+  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -93,7 +94,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  params.spooler = upload::Spooler::Construct(spooler_definition);
+  params.spooler = upload::Spooler::Construct(spooler_definition,
+                                              &publish_statistics);
   if (NULL == params.spooler) return 3;
   UniquePtr<upload::Spooler> spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs));
@@ -138,8 +140,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  perf::StatisticsTemplate statistics("Publish", this->statistics());
-  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
+  publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
 
   publish::SyncUnion *sync;
 
