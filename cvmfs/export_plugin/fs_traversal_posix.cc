@@ -429,12 +429,36 @@ int posix_garbage_collector(struct fs_traversal_context *ctx) {
 
 struct fs_traversal_context *posix_initialize(
   const char *repo,
+  const char *base,
   const char *data,
   const char *config) {
   fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
-  result->repo = strdup(repo);
-  result->data = strdup(data);
+
+  char *def_base = NULL;
+  if (!base) {
+    def_base = strdup("/tmp/cvmfs/");
+  } else {
+    def_base = strdup(base);
+  }
+
+  size_t len = 2 + strlen(repo) + strlen(def_base);
+  char *fqrn = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+  snprintf(fqrn, len, "%s/%s",  def_base, repo);
+  result->repo = strdup(fqrn);
+  free(fqrn);
+
+  if (!data) {
+    size_t len = 7 + strlen(def_base);
+    char *def_data = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+    snprintf(def_data, len, "%s/.data",  def_base);
+    result->data = strdup(def_data);
+    free(def_data);
+  } else {
+    result->data = strdup(data);
+  }
+  free(def_base);
+
   if (!DirectoryExists(result->repo)) {
     if (!MkdirDeep(result->repo, 0744, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
@@ -442,7 +466,7 @@ struct fs_traversal_context *posix_initialize(
       return NULL;
     }
   }
-  PosixCheckDirStructure(data, 0744);  // NOTE(steuber): mode?
+  PosixCheckDirStructure(result->data, 0744);  // NOTE(steuber): mode?
   const char *warning = WARNING_FILE_NAME;
   FILE *f = fopen(BuildPath(result, "/" WARNING_FILE_NAME).c_str(), "w");
   if (f != NULL) {

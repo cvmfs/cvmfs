@@ -636,12 +636,14 @@ static void Usage() {
 int Main(int argc, char **argv) {
   // The starting location for the traversal in src
   // Default value is the base directory (only used if not trace provided)
-  char *src_repo = NULL;
+  char *repo = NULL;
+
+  char *src_base = NULL;
   char *src_cache = NULL;
   char *src_type = NULL;
   char *src_config = NULL;
 
-  char *dest_repo = NULL;
+  char *dest_base = NULL;
   char *dest_cache = NULL;
   char *dest_type = NULL;
   char *dest_config = NULL;
@@ -650,12 +652,12 @@ int Main(int argc, char **argv) {
   char *spec_file = NULL;
 
   int c;
-  while ((c = getopt(argc, argv, "hb:s:r:c:f:d:x:y:t:j:n:")) != -1) {
+  while ((c = getopt(argc, argv, "hp:b:s:r:c:f:d:x:y:t:j:n:")) != -1) {
     switch (c) {
       case 'h':
         shrinkwrap::Usage();
         return kErrorOk;
-      case 'b':
+      case 'p':
         base = strdup(optarg);
         if (spec_file) {
           LogCvmfs(kLogCvmfs, kLogStdout,
@@ -663,11 +665,14 @@ int Main(int argc, char **argv) {
           return kErrorUsage;
         }
         break;
+      case 'r':
+        repo = strdup(optarg);
+        break;
       case 's':
         src_type = strdup(optarg);
         break;
-      case 'r':
-        src_repo = strdup(optarg);
+      case 'b':
+        src_base = strdup(optarg);
         break;
       case 'c':
         src_cache = strdup(optarg);
@@ -679,7 +684,7 @@ int Main(int argc, char **argv) {
         dest_type = strdup(optarg);
         break;
       case 'x':
-        dest_repo = strdup(optarg);
+        dest_base = strdup(optarg);
         break;
       case 'y':
         dest_cache = strdup(optarg);
@@ -721,28 +726,17 @@ int Main(int argc, char **argv) {
     dest_type = strdup("posix");
   }
 
-  if (!dest_repo) {
-    dest_repo = strdup("/tmp/cvmfs/");
-  }
-
-  if (!dest_cache) {
-    size_t len = 7 + strlen(dest_repo);
-    dest_cache = reinterpret_cast<char *>(malloc(len*sizeof(char)));
-    snprintf(dest_cache, len, "%s/.data",  dest_repo);
-  }
-
-
   struct fs_traversal *src = FindInterface(src_type);
   if (!src) {
     return 1;
   }
-  src->context_ = src->initialize(src_repo, src_cache, src_config);
+  src->context_ = src->initialize(repo, src_base, src_cache, src_config);
 
   struct fs_traversal *dest = FindInterface(dest_type);
   if (!dest) {
     return 1;
   }
-  dest->context_ = dest->initialize(dest_repo, dest_cache, dest_config);
+  dest->context_ = dest->initialize(repo, dest_base, dest_cache, dest_config);
 
   perf::Statistics *pstats = GetSyncStatTemplate();
 
