@@ -173,8 +173,6 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
               UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
       return;
     }
-    std::string dest = upstream_path_ + "/" + final_path;
-    printf("----- moved file %s \n with %ld bytes \n", dest.c_str(), GetFileSize(dest));
   } else {
     if (counters_.IsValid()) {
       perf::Inc(counters_->n_duplicated_files);
