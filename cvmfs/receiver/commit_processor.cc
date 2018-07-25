@@ -221,10 +221,10 @@ CommitProcessor::Result CommitProcessor::Process(
            lease_path.c_str());
 
   SigningTool signing_tool(server_tool.weak_ref());
-  SigningTool::Result res = signing_tool.Run(new_manifest_path, params.stratum0,
-                       params.spooler_configuration, temp_dir, certificate,
-                       private_key, repo_name, "", "",
-                       "/var/spool/cvmfs/" + repo_name + "/reflog.chksum");
+  SigningTool::Result res = signing_tool.Run(
+      new_manifest_path, params.stratum0, params.spooler_configuration,
+      temp_dir, certificate, private_key, repo_name, "", "",
+      "/var/spool/cvmfs/" + repo_name + "/reflog.chksum");
   switch (res) {
     case SigningTool::kReflogChecksumMissing:
       LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -241,7 +241,8 @@ CommitProcessor::Result CommitProcessor::Process(
       return kError;
     case SigningTool::kSuccess:
       LogCvmfs(kLogReceiver, kLogSyslog,
-               "CommitProcessor - lease_path: %s, success.", lease_path.c_str());
+               "CommitProcessor - lease_path: %s, success.",
+               lease_path.c_str());
   }
 
   {
