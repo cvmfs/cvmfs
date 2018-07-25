@@ -759,7 +759,7 @@ TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
     &content1_hash);
   struct cvmfs_attr *stat4 = create_sample_stat("foo", 0, 0777, 0, xlist2,
     &content2_hash);
-  
+
   dest->touch(context, stat1);
   const char *ident1 = dest->get_identifier(context, stat1);
   dest->do_link(context, "file1.txt", ident1);
