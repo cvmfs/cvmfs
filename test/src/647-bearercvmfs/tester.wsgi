@@ -1,1 +1,0 @@
-from tokenparser import app as application
