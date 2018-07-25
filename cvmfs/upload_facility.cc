@@ -80,7 +80,7 @@ void AbstractUploader::CountUploadedBytes(int64_t bytes_written) const {
   }
 }
 
-void AbstractUploader::CountDuplicate() const {
+void AbstractUploader::CountDuplicates() const {
   if (counters_.IsValid()) {
     perf::Inc(counters_->n_duplicated_files);
   }

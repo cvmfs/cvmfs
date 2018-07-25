@@ -197,7 +197,7 @@ void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
 bool LocalUploader::Peek(const std::string &path) const {
   bool retval = FileExists(upstream_path_ + "/" + path);
   if (retval) {
-    CountDuplicate();
+    CountDuplicates();
   }
   return retval;
 }

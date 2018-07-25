@@ -361,7 +361,7 @@ class AbstractUploader
 
   void CountUploadedBytes(int64_t bytes_written) const;
 
-  void CountDuplicate() const;
+  void CountDuplicates() const;
 
  private:
   const SpoolerDefinition spooler_definition_;
