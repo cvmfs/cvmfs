@@ -78,9 +78,7 @@ void LocalUploader::FileUpload(const std::string &local_path,
     return;
   }
 
-  if (counters_.IsValid()) {
-    perf::Xadd(counters_->sz_uploaded_bytes, GetFileSize(remote_path));
-  }
+  CountUploadedBytes(GetFileSize(remote_path));
   Respond(callback, UploaderResults(retcode, local_path));
 }
 
@@ -128,10 +126,7 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
     return;
   }
 
-  if (counters_.IsValid()) {
-    perf::Xadd(counters_->sz_uploaded_bytes, bytes_written);
-  }
-
+  CountUploadedBytes(bytes_written);
   // Tell kernel to evict written pages from the page cache.  We don't care if
   // it succeeds or not.
   (void)platform_invalidate_kcache(local_handle->file_descriptor, offset,
@@ -174,9 +169,6 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
       return;
     }
   } else {
-    if (counters_.IsValid()) {
-      perf::Inc(counters_->n_duplicated_files);
-    }
     const int retval = unlink(local_handle->temporary_path.c_str());
     if (retval != 0) {
       LogCvmfs(kLogSpooler, kLogVerboseMsg,
@@ -203,7 +195,11 @@ void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
 }
 
 bool LocalUploader::Peek(const std::string &path) const {
-  return FileExists(upstream_path_ + "/" + path);
+  bool retval = FileExists(upstream_path_ + "/" + path);
+  if (retval) {
+    CountDuplicate();
+  }
+  return retval;
 }
 
 bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) const {

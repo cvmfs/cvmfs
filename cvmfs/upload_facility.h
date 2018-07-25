@@ -17,6 +17,8 @@
 #include "util/posix.h"
 #include "util_concurrency.h"
 
+namespace upload {
+
 struct UploadCounters {
   perf::Counter *n_duplicated_files;
   perf::Counter *sz_uploaded_bytes;
@@ -28,8 +30,6 @@ struct UploadCounters {
         "Number of uploaded bytes");
   }
 };  // UploadCounters
-
-namespace upload {
 
 struct UploaderResults {
   enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove };
@@ -359,7 +359,9 @@ class AbstractUploader
     return spooler_definition_;
   }
 
-  UniquePtr<UploadCounters> counters_;
+  void CountUploadedBytes(int64_t bytes_written) const;
+
+  void CountDuplicate() const;
 
  private:
   const SpoolerDefinition spooler_definition_;
@@ -367,6 +369,7 @@ class AbstractUploader
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
   Tube<UploadJob> tube_upload_;
+  mutable UniquePtr<UploadCounters> counters_;
 };  // class AbstractUploader
 
 

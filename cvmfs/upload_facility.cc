@@ -74,6 +74,18 @@ void AbstractUploader::InitCounters(perf::StatisticsTemplate *statistics) {
   counters_ = new UploadCounters(*statistics);
 }
 
+void AbstractUploader::CountUploadedBytes(int64_t bytes_written) const {
+  if (counters_.IsValid()) {
+    perf::Xadd(counters_->sz_uploaded_bytes, bytes_written);
+  }
+}
+
+void AbstractUploader::CountDuplicate() const {
+  if (counters_.IsValid()) {
+    perf::Inc(counters_->n_duplicated_files);
+  }
+}
+
 
 //------------------------------------------------------------------------------
 
