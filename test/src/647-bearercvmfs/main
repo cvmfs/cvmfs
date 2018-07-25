@@ -1,0 +1,268 @@
+#!/bin/sh -x
+
+cvmfs_test_name="Test CVMFS over HTTPS with HTTP Bearer Authorization"
+cvmfs_test_autofs_on_startup=false
+
+
+# TODO(rmeusel): make this multi-platform
+TEST647_HTTPS_CONFIG=/etc/httpd/conf.d/test647.cvmfs.secure.conf
+# Set later to the scratch dir
+TEST647_HOSTCERT=
+TEST647_HOSTKEY=
+TEST647_TESTCA=
+TEST647_TESTCRL=
+TEST647_TESTSIGNING=
+# These three variables will be updated later with the generated hash
+TEST647_TESTCA_HASH=
+TEST647_TESTCRL_HASH=
+TEST647_TESTSIGNING_HASH=
+# replacing /etc/grid-security
+TEST647_GRID_SECURITY_DIR=
+# Mountpoint and cache directory for grid.cern.ch private mount
+TEST647_GRID_MOUNTPOINT=
+TEST647_GRID_CACHE=
+# For generate_certs
+TEST647_CERTS_DIR=
+# Bind mount to /etc/grid-security active
+TEST647_GRID_SECURITY_TAINTED=
+# local mount for testing
+TEST647_PRIVATE_MOUNT=
+TEST647_HOSTNAME=
+TEST647_SELINUX_DISABLED=
+TEST647_RESOLV_CONF_DISABLED=
+TEST647_AUTHZ_HELPER=/usr/libexec/cvmfs/authz/cvmfs_scitoken_helper
+TEST647_WSGI_SCRIPT=/var/www/wsgi-scripts/test_647.wsgi
+TEST647_WSGI_HELPER=/var/www/wsgi-scripts/tokenparser.py
+
+
+disable_resolv_conf() {
+  if [ -f /etc/resolv.conf ]; then
+    TEST647_RESOLV_CONF_DISABLED="/etc/resolv.conf.disabled.cvmfsTEST647"
+    sudo mv /etc/resolv.conf ${TEST647_RESOLV_CONF_DISABLED}
+  fi
+}
+
+enable_resolv_conf() {
+  if [ -f "$TEST647_RESOLV_CONF_DISABLED" ]; then
+    sudo mv ${TEST647_RESOLV_CONF_DISABLED} /etc/resolv.conf
+    TEST647_RESOLV_CONF_DISABLED=
+  fi
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  enable_resolv_conf
+  sudo umount ${TEST647_GRID_MOUNTPOINT}
+  [ "x$TEST647_GRID_SECURITY_TAINTED" = "xyes" ] && sudo umount /etc/grid-security
+  [ -z "$TEST647_HTTPS_CONFIG"                 ] || sudo rm -f $TEST647_HTTPS_CONFIG
+  [ -z "$TEST647_HOSTCERT"                     ] || sudo rm -f $TEST647_HOSTCERT
+  [ -z "$TEST647_HOSTKEY"                      ] || sudo rm -f $TEST647_HOSTKEY
+  [ -z "$TEST647_VOMSDIR"                      ] || sudo rm -fR $TEST647_VOMSDIR
+  [ -z "$TEST647_TESTCA"                       ] || sudo rm -f $TEST647_TESTCA
+  [ -z "$TEST647_TESTCRL"                      ] || sudo rm -f $TEST647_TESTCRL
+  [ -z "$TEST647_TESTSIGNING"                  ] || sudo rm -f $TEST647_TESTSIGNING
+  [ -z "$TEST647_TESTCA_HASH"                  ] || sudo rm -f $TEST647_TESTCA_HASH
+  [ -z "$TEST647_TESTCRL_HASH"                 ] || sudo rm -f $TEST647_TESTCRL_HASH
+  [ -z "$TEST647_TESTSIGNING_HASH"             ] || sudo rm -f $TEST647_TESTSIGNING_HASH
+  [ -z "$TEST647_AUTHZ_HELPER"                 ] || sudo rm -f $TEST647_AUTHZ_HELPER
+  [ -z "$TEST647_WSGI_SCRIPT"                 ] || sudo rm -f $TEST647_WSGI_SCRIPT
+  [ -z "$TEST647_WSGI_HELPER"                 ] || sudo rm -f $TEST647_WSGI_HELPER
+  [ -z "$TEST647_HOSTNAME"                     ] || sudo sed -i -e "/$TEST647_HOSTNAME/d" /etc/hosts
+  if [ ! -z "$TEST647_PRIVATE_MOUNT" ]; then
+    sudo umount $TEST647_PRIVATE_MOUNT
+    sudo rmdir $TEST647_PRIVATE_MOUNT
+  fi
+  [ -z "$TEST647_SELINUX_DISABLED"             ] || sudo setenforce 1
+}
+
+mount_cvmfs_grid() {
+  local mountpoint=$1
+  local cache_dir=$2
+
+  mkdir -p $mountpoint $cache_dir
+
+  echo "writing config in ${cache_dir}/client.conf"
+  cat << EOF > ${cache_dir}/client.conf
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_CLAIM_OWNERSHIP=yes
+CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch
+CVMFS_HTTP_PROXY="${CVMFS_TEST_PROXY}"
+CVMFS_KEYS_DIR=/etc/cvmfs/keys/cern.ch
+EOF
+  cat ${cache_dir}/client.conf
+
+  cvmfs2 -o config=${cache_dir}/client.conf grid.cern.ch $mountpoint
+  return $?
+}
+
+generate_certs() {
+  local script_location=$1
+  mkdir -p $TEST647_CERTS_DIR $TEST647_GRID_CACHE $TEST647_GRID_MOUNTPOINT
+
+  cp $script_location/ca-generate-certs $TEST647_CERTS_DIR/
+  cp $script_location/openssl-cert-extensions-template.conf $TEST647_CERTS_DIR/
+  cp $script_location/openssl.config $TEST647_CERTS_DIR/
+
+  echo "generating vomsproxy.pem"
+  pushdir $TEST647_CERTS_DIR
+  ./ca-generate-certs ${TEST647_HOSTNAME}
+  result=$?
+
+  popdir
+
+  set -x
+
+  sudo cp $TEST647_CERTS_DIR/hostcert.pem $TEST647_HOSTCERT || return 1
+  sudo cp $TEST647_CERTS_DIR/hostkey.pem $TEST647_HOSTKEY || return 1
+  sudo cp $TEST647_CERTS_DIR/OSG-Test-CA.pem $TEST647_TESTCA || return 1
+  sudo cp $TEST647_CERTS_DIR/OSG-Test-CA.r0 $TEST647_TESTCRL || return 1
+  sudo cp $TEST647_CERTS_DIR/OSG-Test-CA.signing_policy $TEST647_TESTSIGNING || return 1
+  local hash=`openssl x509 -in $TEST647_TESTCA -noout -hash`
+  TEST647_TESTCA_HASH=${TEST647_GRID_SECURITY_DIR}/certificates/${hash}.0
+  TEST647_TESTCRL_HASH=${TEST647_GRID_SECURITY_DIR}/certificates/${hash}.r0
+  TEST647_TESTSIGNING_HASH=${TEST647_GRID_SECURITY_DIR}/certificates/${hash}.signing_policy
+  sudo ln -sf $TEST647_TESTCA $TEST647_TESTCA_HASH || return 1
+  sudo ln -sf $TEST647_TESTCRL $TEST647_TESTCRL_HASH || return 1
+  sudo ln -sf $TEST647_TESTSIGNING $TEST647_TESTSIGNING_HASH || return 1
+  #set +x
+
+  return $result;
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  if [ ! -z $CVMFS_TEST_S3_CONFIG ]; then
+    echo "This is not yet implemented for S3"
+    return 1
+  fi
+
+  local TEST647_GRID_SECURITY_DIR=${scratch_dir}/grid-security
+  mkdir -p ${TEST647_GRID_SECURITY_DIR}/certificates ${scratch_dir}/vomsdir
+  TEST647_HOSTCERT=${TEST647_GRID_SECURITY_DIR}/hostcert-cvmfs.pem
+  TEST647_HOSTKEY=${TEST647_GRID_SECURITY_DIR}/hostkey-cvmfs.pem
+  TEST647_TESTCA=${TEST647_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.pem
+  TEST647_TESTCRL=${TEST647_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.r0
+  TEST647_TESTSIGNING=${TEST647_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.signing_policy
+  # These three variables will be updated later with the generated hash
+  TEST647_TESTCA_HASH=${TEST647_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.pem
+  TEST647_TESTCRL_HASH=${TEST647_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.r0
+  TEST647_TESTSIGNING_HASH=${TEST647_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.signing_policy
+
+  TEST647_CERTS_DIR=$(pwd)/certs
+  TEST647_GRID_MOUNTPOINT=$(pwd)/cvmfs-grid/mountpoint
+  TEST647_GRID_CACHE=$(pwd)/cvmfs-grid/cache
+
+  # Generate repo first - check will fail after apache change below until we
+  # change the default URL.
+  if [ -f "$TEST647_HTTPS_CONFIG" ]; then
+    sudo rm -f $TEST647_HTTPS_CONFIG
+    echo "restarting apache"
+    apache_switch off
+    apache_switch on
+  fi
+
+  echo "set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "setting a dummy host name"
+  TEST647_HOSTNAME='test-647-dummyhost'
+  echo "127.0.0.1 $TEST647_HOSTNAME" | sudo tee --append /etc/hosts
+  echo "==== new /etc/hosts: ===="
+  cat /etc/hosts
+
+  if has_selinux; then
+    echo "make sure that SELinux does not interfere"
+    TEST647_SELINUX_DISABLED=1
+    sudo setenforce 0 || return 1
+  fi
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "mount grid.cern.ch"
+  mount_cvmfs_grid $TEST647_GRID_MOUNTPOINT $TEST647_GRID_CACHE
+  ls $TEST647_GRID_MOUNTPOINT
+
+  echo "Generating certificates"
+  generate_certs $script_location || return 4
+
+  echo "make '$TEST647_GRID_SECURITY_DIR' available as /etc/grid-security"
+  sudo mkdir -p /etc/grid-security                                || return 20
+  sudo mount --bind $TEST647_GRID_SECURITY_DIR /etc/grid-security || return 21
+  TEST647_GRID_SECURITY_TAINTED="yes"
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER /dev/stdout -V "scitoken%cvmfs:/cvmfs" || return $?
+  echo "Make sure we don't lock out ourselves when publishing"
+  echo "CVMFS_AUTHZ_HELPER=/usr/libexec/cvmfs/authz/cvmfs_allow_helper" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
+
+  echo "gather information about the just created repo"
+  load_repo_config $CVMFS_TEST_REPO
+  local spool_dir="$CVMFS_SPOOL_DIR"
+  local cache_base="$CVMFS_CACHE_BASE"
+
+  echo "put some stuff into $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO                           || return $?
+  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world     || return 3
+  echo "Hello World v2" > /cvmfs/$CVMFS_TEST_REPO/hello_world2 || return 3
+  publish_repo $CVMFS_TEST_REPO -v                             || return $?
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  # requires mod_gridsite from the gridsite package
+  echo "Setting up apache configuration"
+  sudo cp $script_location/test647.cvmfs.secure.conf $TEST647_HTTPS_CONFIG             || return 60
+  sudo sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST647_HTTPS_CONFIG                   || return 61
+  sudo sed -i "s,@GRIDSECURITYDIR@,$TEST647_GRID_SECURITY_DIR," $TEST647_HTTPS_CONFIG  || return 62
+  #cp $script_location/gacl $(get_local_repo_storage $CVMFS_TEST_REPO)/data/.gacl       || return 63
+  #cp $script_location/gacl-39 $(get_local_repo_storage $CVMFS_TEST_REPO)/data/39/.gacl || return 64
+  sudo cp $script_location/test_647.wsgi $TEST647_WSGI_SCRIPT
+  sudo cp $script_location/tokenparser.py $TEST647_WSGI_HELPER
+
+  echo "restarting apache"
+  apache_switch off
+  apache_switch on
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  # Copy the helper into the cvmfs authz dir:
+  sudo cp $script_location/cvmfs_scitoken_helper.py $TEST647_AUTHZ_HELPER
+
+  local mntpnt="${scratch_dir}/secure_mnt"
+  TEST647_PRIVATE_MOUNT="$mntpnt"
+  # VMware Fusion's DNS server times out on ${TEST647_HOSTNAME}
+  disable_resolv_conf
+  do_local_mount_as_root "$mntpnt"          \
+                         "$CVMFS_TEST_REPO" \
+                         "https://${TEST647_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" || return 19
+  enable_resolv_conf
+ 
+  # Create a stupid simple bearer token
+  # Naming conventions copied from the condor implementation
+  TEST647_CRED_DIR="/tmp/condor_creds"
+  mkdir $TEST647_CRED_DIR
+  echo "abcd1234" > $TEST647_CRED_DIR/scitoken.use
+
+  echo "This should work"
+  sudo -u nobody /bin/sh -c "export _CONDOR_CREDS=${TEST647_CRED_DIR}; cat ${mntpnt}/hello_world" > /dev/null || return 30
+
+  echo "This should work because the above and below are in the same session id."
+  sudo -u nobody /bin/sh -c "cat ${mntpnt}/hello_world" || return 31
+
+  echo "This should not work"
+  sudo -u nobody setsid /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 32
+
+
+  echo "Check authz attr"
+  local authz_attr=
+  authz_attr="$(attr -qg authz $mntpnt)" || return 41
+  [ x"$authz_attr" = x"scitoken%cvmfs:/cvmfs" ]   || return 42
+
+  return 0
+}

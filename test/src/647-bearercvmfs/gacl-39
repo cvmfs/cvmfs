@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<gacl version="0.9.0">
+  <entry>
+    <person><dn>/DC=org/DC=Open Science Grid/O=OSG Test/OU=Users/CN=John Q Public</dn></person>
+    <allow><read/></allow>
+  </entry>
+</gacl>

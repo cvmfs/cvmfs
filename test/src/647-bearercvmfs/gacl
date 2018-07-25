@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<gacl version="0.9.0">
+  <entry>
+    <voms><fqan>/cvmfs/Role=NULL</fqan></voms>
+    <allow><read/></allow>
+  </entry>
+</gacl>
