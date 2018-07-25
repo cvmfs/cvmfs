@@ -35,6 +35,42 @@ struct fs_traversal_test {
   const char *data;
 };
 
+XattrList *create_sample_xattrlist(std::string var) {
+  XattrList *result = new XattrList();
+  result->Set("user.foo", var);
+  result->Set("user.bar", std::string(255, 'a'));
+  return result;
+}
+struct cvmfs_attr *create_sample_stat(const char *name,
+  ino_t st_ino, mode_t st_mode, off_t st_size,
+  XattrList *xlist, shash::Any *content_hash = NULL,
+  const char *link = NULL) {
+  char *hash_result = NULL;
+  if (content_hash != NULL) {
+    std::string hash = content_hash->ToString();
+    hash_result = strdup(hash.c_str());
+  }
+  char *link_result = NULL;
+  if (link != NULL) {
+    link_result = strdup(link);
+  }
+  struct cvmfs_attr *result = cvmfs_attr_init();
+  result->st_ino = st_ino;
+  result->st_mode = st_mode;
+  result->st_nlink = 1;
+  result->st_uid = getuid();
+  result->st_gid = getgid();
+  result->st_size = st_size;
+  result->mtime = time(NULL);
+
+  result->cvm_checksum = hash_result;
+  result->cvm_symlink = link_result;
+  result->cvm_name = strdup(name);
+  result->cvm_xattrs = xlist;
+
+  return result;
+}
+
 class T_Fs_Traversal_Interface :
   public ::testing::TestWithParam<struct fs_traversal_test *> {
  protected:
@@ -70,42 +106,6 @@ class T_Fs_Traversal_Interface :
   void Restart() {
     Fin();
     Init();
-  }
-
-  XattrList *create_sample_xattrlist(std::string var) {
-    XattrList *result = new XattrList();
-    result->Set("user.foo", var);
-    result->Set("user.bar", std::string(255, 'a'));
-    return result;
-  }
-  struct cvmfs_attr *create_sample_stat(const char *name,
-    ino_t st_ino, mode_t st_mode, off_t st_size,
-    XattrList *xlist, shash::Any *content_hash = NULL,
-    const char *link = NULL) {
-    char *hash_result = NULL;
-    if (content_hash != NULL) {
-      std::string hash = content_hash->ToString();
-      hash_result = strdup(hash.c_str());
-    }
-    char *link_result = NULL;
-    if (link != NULL) {
-      link_result = strdup(link);
-    }
-    struct cvmfs_attr *result = cvmfs_attr_init();
-    result->st_ino = st_ino;
-    result->st_mode = st_mode;
-    result->st_nlink = 1;
-    result->st_uid = getuid();
-    result->st_gid = getgid();
-    result->st_size = st_size;
-    result->mtime = time(NULL);
-
-    result->cvm_checksum = hash_result;
-    result->cvm_symlink = link_result;
-    result->cvm_name = strdup(name);
-    result->cvm_xattrs = xlist;
-
-    return result;
   }
 
   /**
@@ -416,6 +416,11 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
     context_, "/MkRmDirTest-foo/foobar/foobar"));
   ASSERT_EQ(ENOENT, errno);
+  // No recursive deletion
+  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
+    context_, "/MkRmDirTest-bar/foobar"));
+  ASSERT_EQ(0, fs_traversal_instance_->interface->do_rmdir(
+    context_, "/MkRmDirTest-bar/foobar/foobar"));
   ASSERT_EQ(0, fs_traversal_instance_->interface->do_rmdir(
     context_, "/MkRmDirTest-bar/foobar"));
   fs_traversal_instance_->interface->list_dir(
@@ -672,7 +677,7 @@ DirSpec MakeSpec() {
   return spec;
 }
 
-TEST_P(T_Fs_Traversal_Interface, TransferCVMFSToPosix) {
+TEST(T_Fs_Traversal_CVMFS, TransferCVMFSToPosix) {
   // Initialize options
   cvmfs_option_map *opts = cvmfs_options_init();
 
@@ -731,6 +736,61 @@ TEST_P(T_Fs_Traversal_Interface, TransferCVMFSToPosix) {
 
   // Finalize and close repo and options
   cvmfs_options_fini(opts);
+}
+
+TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
+  struct fs_traversal *dest = posix_get_interface();
+  struct fs_traversal_context *context
+    = dest->initialize("./", "posix", "./data", NULL);
+
+  std::string content1 = "a";
+  shash::Any content1_hash(shash::kSha1);
+  shash::HashString(content1, &content1_hash);
+  std::string content2 = "b";
+  shash::Any content2_hash(shash::kSha1);
+  shash::HashString(content2, &content2_hash);
+  XattrList *xlist1 = create_sample_xattrlist("TestGarbageCollection1");
+  XattrList *xlist2 = create_sample_xattrlist("TestGarbageCollection1");
+  struct cvmfs_attr *stat1 = create_sample_stat("foo", 0, 0777, 0, xlist1,
+    &content1_hash);
+  struct cvmfs_attr *stat2 = create_sample_stat("foo", 0, 0777, 0, xlist1,
+    &content2_hash);
+  struct cvmfs_attr *stat3 = create_sample_stat("foo", 0, 0777, 0, xlist2,
+    &content1_hash);
+  struct cvmfs_attr *stat4 = create_sample_stat("foo", 0, 0777, 0, xlist2,
+    &content2_hash);
+  
+  dest->touch(context, stat1);
+  const char *ident1 = dest->get_identifier(context, stat1);
+  dest->do_link(context, "file1.txt", ident1);
+  dest->touch(context, stat2);
+  const char *ident2 = dest->get_identifier(context, stat2);
+  dest->do_link(context, "file1.txt", ident2);  // unlinks ident1
+  dest->touch(context, stat3);
+  const char *ident3 = dest->get_identifier(context, stat3);
+  dest->do_link(context, "file3.txt", ident3);
+  dest->touch(context, stat4);
+  const char *ident4 = dest->get_identifier(context, stat4);
+  dest->do_link(context, "file4.txt", ident4);
+
+  dest->do_unlink(context, "file3.txt");
+
+  dest->finalize(context);
+  context = dest->initialize("./", "posix", "./data", NULL);
+  dest->garbage_collector(context);
+
+  std::string data_base_path = "./data/";
+  ASSERT_FALSE(FileExists(data_base_path + ident1));
+  ASSERT_TRUE(FileExists(data_base_path + ident2));
+  ASSERT_FALSE(FileExists(data_base_path + ident3));
+  ASSERT_TRUE(FileExists(data_base_path + ident4));
+
+  delete stat1;
+  delete stat2;
+  delete stat3;
+  delete stat4;
+  delete xlist1;
+  delete xlist2;
 }
 
 
