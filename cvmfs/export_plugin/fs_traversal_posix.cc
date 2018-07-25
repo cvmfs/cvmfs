@@ -10,12 +10,14 @@
 #include <ftw.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <attr/xattr.h>  // NOLINT
 // Necessary because xattr.h does not import sys/types.h
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -29,11 +31,18 @@
 #include "util/posix.h"
 #include "xattr.h"
 
-// Maximum number of files open in parallel during rmdir
-const int kPosixTraversalMaxDeletePar = 64;
+const char kDirLevels = 2;
+const char kDigitsPerDirLevel = 2;
 
-const unsigned kDirLevels = 2;
-const unsigned kDigitsPerDirLevel = 2;
+struct fs_traversal_posix_context {
+  std::map<ino_t, bool> gc_flagged;
+};
+
+struct posix_gc_thread{
+  struct fs_traversal_context *ctx;
+  unsigned thread_total;
+  unsigned thread_num;
+};
 
 std::string BuildPath(struct fs_traversal_context *ctx,
   const char *dir) {
@@ -47,6 +56,65 @@ std::string BuildHiddenPath(struct fs_traversal_context *ctx,
   std::string cur_path = ctx->data;
   cur_path += ident;
   return cur_path;
+}
+
+void *PosixGcMainWorker(void *data) {
+  struct posix_gc_thread *thread_context
+    = reinterpret_cast<struct posix_gc_thread *>(data);
+  struct fs_traversal_posix_context *posix_ctx
+    = reinterpret_cast<struct fs_traversal_posix_context *>(
+      thread_context->ctx->ctx);
+  // Build path array
+  int offset = strlen(thread_context->ctx->data)+1;
+  // used for both path building and stat calls (therefore +257)
+  char dir_path[offset+kDigitsPerDirLevel*kDirLevels+kDirLevels+257];
+  snprintf(dir_path, offset, thread_context->ctx->data);
+  dir_path[offset-1]='/';
+  dir_path[offset+kDigitsPerDirLevel*kDirLevels+kDirLevels+257] = '\0';
+  char dir_name_template[6];
+  snprintf(dir_name_template,
+    sizeof(dir_name_template),
+    "%%%02ux/",
+    kDigitsPerDirLevel);
+  const unsigned directory_mask = (1 << (kDigitsPerDirLevel*4)) -1;
+  const unsigned max_dir_name = (1 << kDigitsPerDirLevel*4);
+  const unsigned max_val = (1 << (kDirLevels*kDigitsPerDirLevel*4));
+  for (unsigned i = thread_context->thread_num*max_dir_name*(kDirLevels-1);
+    i < max_val;
+    i+=thread_context->thread_total*+(max_val/max_dir_name)) {
+    // Iterate over paths of current subdirectory...
+    for (unsigned j = i; j < i+(max_val/max_dir_name); j++) {
+      // For every subdirectory chain (described by j)
+      unsigned path_pos = offset;
+      for (int level = kDirLevels-1;
+        level >= 0;
+        level--) {
+        const unsigned cur_dir
+          = (j >> (level*kDigitsPerDirLevel*4)) & directory_mask;
+        snprintf(dir_path+path_pos,
+          kDigitsPerDirLevel+2, dir_name_template, cur_dir);
+        path_pos+=kDigitsPerDirLevel+1;
+      }
+      dir_path[path_pos]='\0';
+      // Calculated path - now garbage collection...
+      DIR *cur_dir_ent = opendir(dir_path);
+      assert(cur_dir_ent != NULL);
+      struct stat stat_buf;
+      struct dirent *de;
+      while ((de = readdir(cur_dir_ent)) != NULL) {
+        if (posix_ctx->gc_flagged.count(de->d_ino) > 0
+          && posix_ctx->gc_flagged[de->d_ino]) {
+          snprintf(dir_path+path_pos, sizeof(dir_path)-path_pos, de->d_name);
+          stat(dir_path, &stat_buf);
+          if (stat_buf.st_nlink == 1) {
+            unlink(dir_path);
+          }
+        }
+      }
+      closedir(cur_dir_ent);
+    }
+  }
+  return NULL;
 }
 
 int PosixSetMeta(const char *path,
@@ -80,12 +148,18 @@ int PosixSetMeta(const char *path,
 
 void PosixCheckDirStructure(std::string cur_path, mode_t mode,
   unsigned int depth = 1) {
-  // Maximum directory to search for:
+  
   std::string max_dir_name = std::string(kDigitsPerDirLevel, 'f');
   // Build current base path
-
-  int res = mkdir(cur_path.c_str(), mode);
-  assert(res == 0 || errno == EEXIST);
+  if (depth == 1) {
+    bool res1 = MkdirDeep(cur_path.c_str(), mode);
+    assert(res1);
+    int res2 = mkdir((cur_path+POSIX_GARBAGE_DIR).c_str(), mode);
+    assert(res2 == 0 || errno == EEXIST);
+  } else {
+    int res = mkdir(cur_path.c_str(), mode);
+    assert(res == 0 || errno == EEXIST);
+  }
   // Build template for directory names:
   assert(kDigitsPerDirLevel <= 99);
   char hex[kDigitsPerDirLevel+1];
@@ -221,26 +295,27 @@ bool posix_has_file(struct fs_traversal_context *ctx,
 int posix_do_unlink(struct fs_traversal_context *ctx,
   const char *path) {
   std::string complete_path = BuildPath(ctx, path);
-  int res = unlink(complete_path.c_str());
-  if (res == -1) return -1;
+  const char *complete_path_char = complete_path.c_str();
+  struct stat buf;
+  int res2 = lstat(complete_path_char, &buf);
+  if (res2 == -1 && errno == ENOENT) return -1;
+  assert(res2 == 0);
+  // Unlinking
+  int res1 = unlink(complete_path_char);
+  if (res1 == -1) return -1;
+  // GC Flagging
+  if (S_ISREG(buf.st_mode) && buf.st_nlink == 2) {
+    struct fs_traversal_posix_context *pos_ctx
+      =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
+    pos_ctx->gc_flagged[buf.st_ino] = true;
+  }
   return 0;
-}
-
-int posix_do_unlink_cb(const char *fpath,
-  const struct stat *sb,
-  int typeflag,
-  struct FTW *ftwbuf) {
-  int rv = remove(fpath);
-  return rv;
 }
 
 int posix_do_rmdir(struct fs_traversal_context *ctx,
               const char *path) {
   std::string complete_path = BuildPath(ctx, path);
-  return nftw(complete_path.c_str(),
-    posix_do_unlink_cb,
-    kPosixTraversalMaxDeletePar,
-    FTW_DEPTH | FTW_PHYS);
+  return rmdir(complete_path.c_str());
 }
 
 int posix_cleanup_path(struct fs_traversal_context *ctx,
@@ -269,6 +344,7 @@ int posix_do_link(struct fs_traversal_context *ctx,
   const char *identifier) {
   std::string complete_path = BuildPath(ctx, path);
   std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
+  const char *hidden_datapath_char = hidden_datapath.c_str();
   if (!FileExists(hidden_datapath)) {
     // Hash file doesn't exist
     errno = ENOENT;
@@ -277,8 +353,19 @@ int posix_do_link(struct fs_traversal_context *ctx,
   if (posix_cleanup_path(ctx, path) != 0) {
     return -1;
   }
-  int res = link(hidden_datapath.c_str(), complete_path.c_str());
-  if (res != 0) return -1;
+    // GC Unflagging
+  struct stat buf;
+  int res2 = lstat(hidden_datapath_char, &buf);
+  assert(res2 == 0);
+  int res1 = link(hidden_datapath_char, complete_path.c_str());
+  if (res1 != 0) return -1;
+  if (S_ISREG(buf.st_mode) && buf.st_nlink == 2) {
+    struct fs_traversal_posix_context *pos_ctx
+      =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
+    if (pos_ctx->gc_flagged.count(buf.st_ino) > 0) {
+      pos_ctx->gc_flagged[buf.st_ino] = false;
+    }
+  }
   return 0;
 }
 
@@ -423,7 +510,24 @@ bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
 }
 
 int posix_garbage_collector(struct fs_traversal_context *ctx) {
-  // TODO(steuber): Implementation
+  unsigned thread_total = get_nprocs()+1;
+  pthread_t *workers
+    = reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * thread_total));
+  struct posix_gc_thread *thread_contexts
+    = reinterpret_cast<struct posix_gc_thread *>(
+      smalloc(sizeof(struct posix_gc_thread) * thread_total));
+  for (unsigned i = 0; i < thread_total; i++) {
+    thread_contexts[i].thread_total = thread_total;
+    thread_contexts[i].thread_num = i;
+    thread_contexts[i].ctx = ctx;
+    int retval = pthread_create(&workers[i], NULL,
+      PosixGcMainWorker, &thread_contexts[i]);
+    assert(retval == 0);
+  }
+
+  for (unsigned i = 0; i < thread_total; i++) {
+    pthread_join(workers[i], NULL);
+  }
   return -1;
 }
 
@@ -473,13 +577,48 @@ struct fs_traversal_context *posix_initialize(
     fwrite(warning, sizeof(char), strlen(warning), f);
     fclose(f);
   }
+
+  struct fs_traversal_posix_context *posix_ctx
+    = new struct fs_traversal_posix_context;
+  if (FileExists(std::string(result->data)
+    + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE)) {
+    FILE *gc_flagged_file = fopen((std::string(result->data)
+      + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE).c_str(), "r");
+    assert(gc_flagged_file != NULL);
+    while (true) {
+      ino_t cur_ino;
+      size_t read = fread(&cur_ino, sizeof(ino_t), 1, gc_flagged_file);
+      if (read == 1) {
+        posix_ctx->gc_flagged[cur_ino] = true;
+      } else {
+        assert(feof(gc_flagged_file) != 0);
+        break;
+      }
+    }
+    int res = fclose(gc_flagged_file);
+    assert(res == 0);
+  }
+  result->ctx = posix_ctx;
   return result;
 }
 
 void posix_finalize(struct fs_traversal_context *ctx) {
-  // TODO(steuber): Garbage collection
+  struct fs_traversal_posix_context *posix_ctx
+    =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
+  FILE *gc_flagged_file = fopen((std::string(ctx->data)
+      + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE).c_str(), "w");
+  for (
+    std::map<ino_t, bool>::const_iterator it = posix_ctx->gc_flagged.begin();
+    it != posix_ctx->gc_flagged.end();
+    it++) {
+    if (it->second) {
+      fwrite(&(it->first), sizeof(ino_t), 1, gc_flagged_file);
+    }
+  }
+  fclose(gc_flagged_file);
   delete ctx->repo;
   delete ctx->data;
+  delete posix_ctx;
   delete ctx;
 }
 

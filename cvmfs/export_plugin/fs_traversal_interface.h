@@ -205,8 +205,7 @@ struct fs_traversal {
    * 
    * Error if:
    * - Directory doesn't exist
-   * - Error during removal of directory or child
-   * - On ENAMETOOLONG if the full path is too long during removal
+   * - Directory is not empty
    * 
    * @param[in] ctx The file system traversal context
    * @param[in] path The path to the directory that should be removed
