@@ -8,7 +8,7 @@ import time
 import threading
 import cvmfs_globals
 
-# TODO(jblomer): we should better sepearate the code that needs the maxminddb
+# TODO(jblomer): we should better separate the code that needs the maxminddb
 # dependency from the code that doesn't
 if not cvmfs_globals.CVMFS_UNITTESTS:
     import maxminddb
