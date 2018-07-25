@@ -175,6 +175,7 @@ void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
   }
 
   ObjectPack::AddToBucket(buffer.data, buffer.size, hd->bucket);
+
   Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
