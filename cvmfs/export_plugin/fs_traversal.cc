@@ -23,8 +23,6 @@
 #include "util/posix.h"
 #include "util/string.h"
 
-#define COPY_BUFFER_SIZE 4096
-
 using namespace std; //NOLINT
 
 // Taken from fsck
@@ -734,12 +732,24 @@ int Main(int argc, char **argv) {
     return 1;
   }
   src->context_ = src->initialize(repo, src_base, src_cache, src_config);
+  if (!src->context_) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+      "Unable to initialize src: type %s", src_type);
+    return 1;
+  }
 
   struct fs_traversal *dest = FindInterface(dest_type);
   if (!dest) {
     return 1;
   }
   dest->context_ = dest->initialize(repo, dest_base, dest_cache, dest_config);
+  if (!dest->context_) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+      "Unable to initialize src: type %s", dest_type);
+    return 1;
+  }
+
+  dest->archive_provenance(src->context_, dest->context_);
 
   perf::Statistics *pstats = GetSyncStatTemplate();
 

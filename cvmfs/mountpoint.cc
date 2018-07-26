@@ -280,8 +280,9 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
     settings.cache_path = optarg;
   }
   // We already changed the cwd to the workspace
-  if (settings.cache_path == workspace_fullpath_)
+  if ((type_ == kFsFuse) && (settings.cache_path == workspace_fullpath_)) {
     settings.cache_path = ".";
+  }
 
   // The cache workspace usually is the cache directory, unless explicitly
   // set otherwise
