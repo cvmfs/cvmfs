@@ -43,8 +43,8 @@ class Reflog {
   static void HashDatabase(const std::string &database_path,
                            shash::Any *hash_reflog);
 
-  static shash::Any ReadChecksum(const std::string &path);
-  static void WriteChecksum(const std::string &path, const shash::Any &value);
+  static bool ReadChecksum(const std::string &path, shash::Any* checksum);
+  static bool WriteChecksum(const std::string &path, const shash::Any &value);
 
   bool AddCertificate(const shash::Any &certificate);
   bool AddCatalog(const shash::Any &catalog);
