@@ -191,7 +191,11 @@ set (CVMFS_SHRINKWRAP_SOURCES
   xattr.cc
 
   export_plugin/fs_traversal.cc
-  export_plugin/fs_traversal_posix.cc
+  export_plugin/posix/data_dir_mgmt.cc
+  export_plugin/posix/garbage_collector.cc
+  export_plugin/posix/helpers.cc
+  export_plugin/posix/interface.cc
+
   export_plugin/fs_traversal_libcvmfs.cc
   export_plugin/spec_tree.cc
   export_plugin/util.cc

@@ -42,6 +42,7 @@ struct fs_traversal {
    * @param[in] repo Repository name
    * @param[in] base Base repository location
    * @param[in] data Data storage information
+   * @param[in] num_threads Number of threads that may be started
    * @param[in] config A configuration file name
    * @param[out] A pointer to the context
    */
@@ -49,6 +50,7 @@ struct fs_traversal {
     const char *repo,
     const char *base,
     const char *data,
+    int num_threads,
     const char *config);
 
   /**

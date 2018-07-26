@@ -248,7 +248,11 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc
   
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_posix.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc 
+  ${CVMFS_SOURCE_DIR}/export_plugin/posix/data_dir_mgmt.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/posix/garbage_collector.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/posix/helpers.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/posix/interface.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_libcvmfs.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/spec_tree.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/util.cc
@@ -494,7 +498,10 @@ set (CVMFS_TEST_EXPORT_SOURCES
   export_plugin/test-util.cc
   
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_posix.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/posix/data_dir_mgmt.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/posix/garbage_collector.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/posix/helpers.cc
+  ${CVMFS_SOURCE_DIR}/export_plugin/posix/interface.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_libcvmfs.cc
   ${CVMFS_SOURCE_DIR}/export_plugin/util.cc
 
