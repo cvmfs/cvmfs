@@ -62,6 +62,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                 -x src/518-hardlinkstresstest                   \
                                    src/585-xattrs                               \
                                    src/600-securecvmfs                          \
+                                   src/647-bearercvmfs                          \
                                    $CVMFS_EXCLUDE                               \
                                    --                                           \
                                    src/5*                                       \
