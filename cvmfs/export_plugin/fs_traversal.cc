@@ -14,7 +14,7 @@
 #include "export_plugin/fs_traversal.h"
 #include "export_plugin/fs_traversal_interface.h"
 #include "export_plugin/fs_traversal_libcvmfs.h"
-#include "export_plugin/fs_traversal_posix.h"
+#include "export_plugin/posix/interface.h"
 #include "export_plugin/spec_tree.h"
 #include "libcvmfs.h"
 #include "logging.h"
@@ -731,7 +731,8 @@ int Main(int argc, char **argv) {
   if (!src) {
     return 1;
   }
-  src->context_ = src->initialize(repo, src_base, src_cache, src_config);
+  src->context_ = src->initialize(repo, src_base, src_cache,
+    num_parallel, src_config);
   if (!src->context_) {
     LogCvmfs(kLogCvmfs, kLogStdout,
       "Unable to initialize src: type %s", src_type);
@@ -742,7 +743,8 @@ int Main(int argc, char **argv) {
   if (!dest) {
     return 1;
   }
-  dest->context_ = dest->initialize(repo, dest_base, dest_cache, dest_config);
+  dest->context_ = dest->initialize(repo, dest_base, dest_cache,
+    num_parallel, dest_config);
   if (!dest->context_) {
     LogCvmfs(kLogCvmfs, kLogStdout,
       "Unable to initialize src: type %s", dest_type);
