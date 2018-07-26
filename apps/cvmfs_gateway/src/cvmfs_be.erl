@@ -93,10 +93,9 @@ cancel_lease(Uid, LeaseToken) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec commit_lease(Uid, LeaseToken, RootHashes, RepoTag) ->
-                          ok | {error, invalid_macaroon
-                                       | merge_error
-                                       | io_error
-                                       | worker_died }
+                          ok |
+                          {error, invalid_macaroon} |
+                          cvmfs_common_types:commit_error()
                               when Uid :: binary(),
                                    LeaseToken :: binary(),
                                    RootHashes :: {binary(), binary()},
@@ -345,9 +344,10 @@ p_cancel_lease(LeaseToken) ->
 
 
 -spec p_commit_lease(LeaseToken, RootHashes, RepoTag) ->
-                            ok
-                                | {error, invalid_macaroon | merge_error | io_error}
-                                | cvmfs_lease:lease_get_value()
+                            ok |
+                            {error, invalid_macaroon} |
+                            cvmfs_common_types:commit_error() |
+                            cvmfs_lease:lease_get_value()
                                 when LeaseToken :: binary(),
                                      RootHashes :: {binary(), binary()},
                                      RepoTag :: cvmfs_common_types:repository_tag().

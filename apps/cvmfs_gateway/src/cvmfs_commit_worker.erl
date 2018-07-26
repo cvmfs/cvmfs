@@ -29,12 +29,13 @@ start_link(RepoName) ->
 
 
 -spec commit(Pid, LeasePath, OldRootHash, NewRootHash, RepoTag) ->
-                     ok | {error, merge_error | io_error | worker_timeout}
+                     ok | Error
                         when Pid :: pid(),
                              LeasePath :: binary(),
                              OldRootHash :: binary(),
                              NewRootHash :: binary(),
-                             RepoTag :: cvmfs_common_types:repository_tag().
+                             RepoTag :: cvmfs_common_types:repository_tag(),
+                             Error :: cvmfs_common_types:commit_error().
 commit(Pid, LeasePath, OldRootHash, NewRootHash, RepoTag) ->
     gen_server:call(Pid, {commit, {LeasePath, OldRootHash, NewRootHash, RepoTag}},
                     cvmfs_app_util:get_max_lease_time()).
