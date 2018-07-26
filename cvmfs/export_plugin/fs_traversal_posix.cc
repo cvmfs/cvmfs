@@ -46,7 +46,11 @@ struct posix_gc_thread{
 
 std::string BuildPath(struct fs_traversal_context *ctx,
   const char *dir) {
-  std::string result = ctx->repo;
+  std::string result = ctx->base;
+  result += ctx->repo;
+  if (dir[0] != '/') {
+    result += "/";
+  }
   result += dir;
   return result;
 }
@@ -146,7 +150,9 @@ int PosixSetMeta(const char *path,
   return 0;
 }
 
-void PosixCheckDirStructure(std::string cur_path, mode_t mode,
+void PosixCheckDirStructure(
+  std::string cur_path,
+  mode_t mode,
   unsigned int depth = 1) {
   std::string max_dir_name = std::string(kDigitsPerDirLevel, 'f');
   // Build current base path
@@ -537,38 +543,55 @@ struct fs_traversal_context *posix_initialize(
   const char *config) {
   fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
+  result->lib_version = strdup("1.0");
 
-  char *def_base = NULL;
   if (!base) {
-    def_base = strdup("/tmp/cvmfs/");
+    result->base = strdup("/tmp/cvmfs/");
   } else {
-    def_base = strdup(base);
+    if  (base[strlen(base)-1] != '/') {
+      size_t len = 2 + strlen(base);
+      char *base_dir = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+      snprintf(base_dir, len, "%s/",  base);
+      result->base = strdup(base_dir);
+      free(base_dir);
+    } else {
+      result->base = strdup(base);
+    }
   }
 
-  size_t len = 2 + strlen(repo) + strlen(def_base);
-  char *fqrn = reinterpret_cast<char *>(malloc(len*sizeof(char)));
-  snprintf(fqrn, len, "%s/%s",  def_base, repo);
-  result->repo = strdup(fqrn);
-  free(fqrn);
+  if (!repo) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Repository name must be specified");
+    return NULL;
+  }
+  result->repo = strdup(repo);
 
   if (!data) {
-    size_t len = 7 + strlen(def_base);
+    size_t len = 6 + strlen(result->base);
     char *def_data = reinterpret_cast<char *>(malloc(len*sizeof(char)));
-    snprintf(def_data, len, "%s/.data",  def_base);
+    snprintf(def_data, len, "%s.data",  result->base);
     result->data = strdup(def_data);
     free(def_data);
   } else {
     result->data = strdup(data);
   }
-  free(def_base);
 
-  if (!DirectoryExists(result->repo)) {
-    if (!MkdirDeep(result->repo, 0744, true)) {
+  if (config) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Configuration file is not supported in POSIX interface '%s'", config);
+    return NULL;
+  }
+  result->config = NULL;
+
+  std::string req_dirs = BuildPath(result, "");
+  if (!DirectoryExists(req_dirs.c_str())) {
+    if (!MkdirDeep(req_dirs.c_str(), 0744, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-        "Failed to create repository directory '%s'", result->repo);
+        "Failed to create repository directory '%s'", req_dirs.c_str());
       return NULL;
     }
   }
+
   PosixCheckDirStructure(result->data, 0744);  // NOTE(steuber): mode?
   const char *warning = WARNING_FILE_NAME;
   FILE *f = fopen(BuildPath(result, "/" WARNING_FILE_NAME).c_str(), "w");
@@ -601,6 +624,137 @@ struct fs_traversal_context *posix_initialize(
   return result;
 }
 
+bool posix_archive_config(
+  std::string config_name,
+  std::string prov_name
+) {
+  int retval;
+  FILE *config = fopen(config_name.c_str(), "r");
+  if (config == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Failed to open : %s : %d : %s\n",
+      config_name.c_str(), errno, strerror(errno));
+    return 1;
+  }
+
+  FILE *prov = fopen(prov_name.c_str(), "w");
+  if (prov == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Failed to open : %s : %d : %s\n",
+      prov_name.c_str(), errno, strerror(errno));
+    return 1;
+  }
+
+  size_t bytes_transferred = 0;
+  while (1) {
+    char buffer[COPY_BUFFER_SIZE];
+
+    size_t actual_read = 0;
+    actual_read = fread(&buffer, sizeof(char), sizeof(buffer), config);
+    if (actual_read < sizeof(buffer) && ferror(config) != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Read failed : %d %s\n", errno, strerror(errno));
+      return false;
+    }
+    bytes_transferred+=actual_read;
+    size_t written_len = fwrite(buffer, sizeof(char), actual_read, prov);
+    if (written_len != actual_read) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Write failed : %d %s\n", errno, strerror(errno));
+      return false;
+    }
+
+    if (actual_read < COPY_BUFFER_SIZE) {
+      break;
+    }
+  }
+
+  retval = fclose(config);
+  if (retval != 0) {
+    // Handle error
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Failed close config file : %s : %d : %s\n",
+      config_name.c_str(), errno, strerror(errno));
+    return false;
+  }
+
+  retval = fclose(prov);
+  if (retval != 0) {
+    // Handle error
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Failed close provenance file : %s : %d : %s\n",
+      prov_name.c_str(), errno, strerror(errno));
+    return false;
+  }
+
+  return true;
+}
+
+void posix_write_provenance_info(
+  struct fs_traversal_context *ctx,
+  const char *info_file
+) {
+  FILE *f = fopen(info_file, "w");
+  if (f != NULL) {
+    fwrite("repo : ", sizeof(char), 7, f);
+    fwrite(ctx->repo, sizeof(char), strlen(ctx->repo), f);
+    fwrite("\nversion : ", sizeof(char), 11, f);
+    fwrite(ctx->lib_version, sizeof(char), strlen(ctx->lib_version), f);
+    fwrite("\nbase : ", sizeof(char), 8, f);
+    if (ctx->base)
+      fwrite(ctx->base, sizeof(char), strlen(ctx->base), f);
+    fwrite("\ncache : ", sizeof(char), 9, f);
+    if (ctx->data)
+      fwrite(ctx->data, sizeof(char), strlen(ctx->data), f);
+    fwrite("\nconfig : ", sizeof(char), 10, f);
+    if (ctx->config)
+      fwrite(ctx->config, sizeof(char), strlen(ctx->config), f);
+    fclose(f);
+  }
+}
+
+void posix_archive_provenance(
+  struct fs_traversal_context *src,
+  struct fs_traversal_context *dest)
+{
+  std::string prov_dir;
+  prov_dir.append(dest->base);
+  prov_dir.append(".provenance/");
+  prov_dir.append(dest->repo);
+  prov_dir.append("/");
+
+  if (!DirectoryExists(prov_dir.c_str())) {
+    if (!MkdirDeep(prov_dir.c_str(), 0744, true)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Failed to create repository directory '%s'", prov_dir.c_str());
+    }
+  }
+
+  std::string src_info = prov_dir;
+  src_info.append("src.info");
+  posix_write_provenance_info(src, src_info.c_str());
+
+  if (src->config) {
+    std::string src_config = prov_dir + "src.config";
+    if (!posix_archive_config(src->config, src_config)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Failed to archive source config '%s'", src->config);
+    }
+  }
+
+  std::string dest_info = prov_dir;
+  dest_info.append("dest.info");
+  posix_write_provenance_info(dest, dest_info.c_str());
+
+  if (dest->config) {
+    std::string dest_config = prov_dir + "dest.config";
+    if (!posix_archive_config(dest->config, dest_config)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Failed to archive destination config '%s'", dest->config);
+    }
+  }
+}
+
 void posix_finalize(struct fs_traversal_context *ctx) {
   struct fs_traversal_posix_context *posix_ctx
     =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
@@ -616,6 +770,7 @@ void posix_finalize(struct fs_traversal_context *ctx) {
   }
   fclose(gc_flagged_file);
   delete ctx->repo;
+  delete ctx->base;
   delete ctx->data;
   delete posix_ctx;
   delete ctx;
@@ -627,6 +782,7 @@ struct fs_traversal *posix_get_interface() {
   struct fs_traversal *result = new struct fs_traversal;
   result->initialize = posix_initialize;
   result->finalize = posix_finalize;
+  result->archive_provenance = posix_archive_provenance;
   result->list_dir = posix_list_dir;
   result->get_stat = posix_get_stat;
   result->is_hash_consistent = posix_is_hash_consistent;

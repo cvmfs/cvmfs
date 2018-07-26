@@ -6,12 +6,17 @@
 
 #include "libcvmfs.h"
 
+#define COPY_BUFFER_SIZE 4096
+
 struct fs_traversal_context {
   uint64_t version;
   uint64_t size;
 
   const char *repo;
+  const char *base;
   const char *data;
+  const char *config;
+  const char *lib_version;
 
   void * ctx;
 };
@@ -56,6 +61,16 @@ struct fs_traversal {
    * @param[in] ctx The context to finalize and free
    */
   void (*finalize)(struct fs_traversal_context *ctx);
+
+  /**
+   * Method that takes the specifications provided and stores
+   * them in a provenance directory. 
+   *
+   * @param[in] src The src context being archived
+   * @param[in] dest The dest context being archived
+   */
+  void (*archive_provenance)(struct fs_traversal_context *src,
+                             struct fs_traversal_context *dest);
 
   /**
    * Method which returns a list over the given directory

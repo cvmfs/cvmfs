@@ -680,25 +680,24 @@ if (BUILD_LIBCVMFS)
                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                         ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
-
-  if (BUILD_CVMFS_SHRINKWRAP)
-    add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
-    add_dependencies (cvmfs_shrinkwrap cache.pb.generated)
-    add_dependencies (cvmfs_shrinkwrap libcvmfs)
-
-    set (CVMFS_SHRINKWRAP_LIBS 
-                          ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a 
-                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
-                          ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                          ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                          ${PROTOBUF_LITE_LIBRARY}
-                          ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl
-                          )
-
-    set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
-    target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
-  endif(BUILD_CVMFS_SHRINKWRAP)
 endif(BUILD_LIBCVMFS)
+
+if (BUILD_CVMFS_SHRINKWRAP)
+  add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
+  add_dependencies (cvmfs_shrinkwrap cache.pb.generated)
+  add_dependencies (cvmfs_shrinkwrap libcvmfs)
+
+  set (CVMFS_SHRINKWRAP_LIBS 
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a 
+                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                        ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                        ${PROTOBUF_LITE_LIBRARY}
+                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+
+  set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
+  target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
+endif(BUILD_CVMFS_SHRINKWRAP)
 
 
 if (BUILD_OCTOPUS)
