@@ -1,6 +1,14 @@
 #!/bin/sh
 
-script_location=$(dirname $(readlink --canonicalize $0))
+portable_dirname() {
+  if [ "x$(uname -s)" = "xDarwin" ]; then
+    echo $(dirname $(/usr/local/bin/greadlink --canonicalize $1))
+  else
+    echo $(dirname $(readlink --canonicalize $1))
+  fi
+}
+
+script_location=$(portable_dirname $0)
 . ${script_location}/common.sh
 
 #
@@ -14,11 +22,11 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #    LOG_DIRECTORY         location of the test log files to be created
 #
 # Additionally the following configuration variables will be defined:
-#    FAKE_S3_PORT          network port to communicate with FakeS3
-#    FAKE_S3_STORAGE       storage location of FakeS3
-#    FAKE_S3_CONFIG        location of the S3 config file to be created/used
-#    FAKE_S3_BUCKET        name of the S3 bucket to be used
-#    FAKE_S3_URL           URL to the S3 server
+#    TEST_S3_PORT          network port to communicate with the test S3 provider
+#    TEST_S3_STORAGE       storage location of the test S3 provider
+#    TEST_S3_CONFIG        location of the S3 config file to be created/used
+#    TEST_S3_BUCKET        name of the S3 bucket to be used
+#    TEST_S3_URL           URL to the S3 server
 #
 
 SOURCE_DIRECTORY=""
@@ -27,11 +35,11 @@ CLIENT_PACKAGE=""
 DEVEL_PACKAGE=""
 LOG_DIRECTORY=""
 
-FAKE_S3_PORT=13337
-FAKE_S3_STORAGE=/srv/fakes3
-FAKE_S3_CONFIG=/etc/cvmfs/fakes3.conf
-FAKE_S3_BUCKET=cvmfs_test
-FAKE_S3_URL=http://localhost:${FAKE_S3_PORT}/${FAKE_S3_BUCKET}-1-1
+TEST_S3_PORT=13337
+TEST_S3_STORAGE=/srv/test_s3
+TEST_S3_CONFIG=/etc/cvmfs/test_s3.conf
+TEST_S3_BUCKET=cvmfstest
+TEST_S3_URL=http://localhost:${TEST_S3_PORT}/${TEST_S3_BUCKET}
 
 usage() {
   local msg=$1
@@ -76,11 +84,16 @@ done
 # check that all mandatory parameters are set
 if [ x$SOURCE_DIRECTORY      = "x" ] ||
    [ x$LOG_DIRECTORY         = "x" ] ||
-   [ x$SERVER_PACKAGE        = "x" ] ||
-   [ x$CLIENT_PACKAGE        = "x" ] ||
-   [ x$DEVEL_PACKAGE         = "x" ]; then
+   [ x$CLIENT_PACKAGE        = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
+fi
+if [ "x$(uname -s)" != "xDarwin" ]; then
+    if [ x$SERVER_PACKAGE        = "x" ] ||
+       [ x$DEVEL_PACKAGE         = "x" ]; then
+      echo "missing parameter(s), cannot run platform dependent test script"
+      exit 200
+    fi
 fi
 
 sudo tee /etc/cvmfs/cvmfs_server_hooks.sh << EOF
@@ -91,15 +104,15 @@ EOF
 
 CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client.log"
 SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server.log"
-TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
-FAKE_S3_LOGFILE="${LOG_DIRECTORY}/fake_s3.log"
+S3_TEST_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
+TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3_instance.log"
 UNITTEST_LOGFILE="${LOG_DIRECTORY}/unittest.log"
 MIGRATIONTEST_LOGFILE="${LOG_DIRECTORY}/migrationtest.log"
 
 XUNIT_OUTPUT_SUFFIX=".xunit.xml"
 
 # check that the script is running under the correct user account
-if [ $(id --user --name) != "sftnight" ]; then
+if [ $(id -u -n) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
   exit 3
 fi

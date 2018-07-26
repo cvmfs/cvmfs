@@ -1,3 +1,15 @@
+cvmfs-config-default (1.7-1) lucid; urgency=low
+
+  * Replace BNL and FNAL stratum 1s with their OSG aliases
+
+ -- Jakob Blomer <jblomer@cern.ch>  Mon, 28 May 2018 09:00:00 +0000
+
+cvmfs-config-default (1.6-1) lucid; urgency=low
+
+  * Turn into virtual package
+
+ -- Dave Dykstra <dwd@fnal.gov>  Tue, 14 Nov 2017 16:00:00 +0000
+
 cvmfs-config-default (1.5-1) lucid; urgency=low
 
   * Update comment on config repository

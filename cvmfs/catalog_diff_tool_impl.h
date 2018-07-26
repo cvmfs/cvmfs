@@ -50,13 +50,13 @@ bool CatalogDiffTool<RoCatalogMgr>::Init() {
 
     // Old catalog from release manager machine (before lease)
     old_catalog_mgr_ =
-      OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(), old_root_hash_,
-                           download_manager_, &stats_old_);
+        OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(),
+                           old_root_hash_, download_manager_, &stats_old_);
 
     // New catalog from release manager machine (before lease)
     new_catalog_mgr_ =
-      OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(), new_root_hash_,
-                           download_manager_, &stats_new_);
+        OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(),
+                           new_root_hash_, download_manager_, &stats_new_);
 
     if (!old_catalog_mgr_.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
@@ -108,8 +108,27 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   unsigned i_from = 0, size_from = old_listing.size();
   unsigned i_to = 0, size_to = new_listing.size();
   while ((i_from < size_from) || (i_to < size_to)) {
-    const catalog::DirectoryEntry old_entry = old_listing[i_from];
-    const catalog::DirectoryEntry new_entry = new_listing[i_to];
+    catalog::DirectoryEntry old_entry = old_listing[i_from];
+    catalog::DirectoryEntry new_entry = new_listing[i_to];
+
+    if (old_entry.linkcount() == 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                "CatalogDiffTool - Entry %s in old catalog has linkcount 0. "
+                "Aborting.",
+                old_entry.name().c_str());
+      abort();
+    }
+    if (new_entry.linkcount() == 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                "CatalogDiffTool - Entry %s in new catalog has linkcount 0. "
+                "Aborting.",
+                new_entry.name().c_str());
+      abort();
+    }
+
+    // Skip .cvmfs hidden directory
+    while (old_entry.IsHidden()) old_entry = old_listing[++i_from];
+    while (new_entry.IsHidden()) new_entry = new_listing[++i_to];
 
     PathString old_path(path);
     old_path.Append("/", 1);
@@ -125,14 +144,19 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
 
     if (IsSmaller(new_entry, old_entry)) {
       i_to++;
-      ReportAddition(new_path, new_entry, xattrs);
+      FileChunkList chunks;
+      if (new_entry.IsChunkedFile()) {
+        new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
+                                         &chunks);
+      }
+      ReportAddition(new_path, new_entry, xattrs, chunks);
       if (new_entry.IsDirectory()) {
         DiffRec(new_path);
       }
       continue;
     } else if (IsSmaller(old_entry, new_entry)) {
       i_from++;
-      if (old_entry.IsDirectory()) {
+      if (old_entry.IsDirectory() && !old_entry.IsNestedCatalogMountpoint()) {
         DiffRec(old_path);
       }
       ReportRemoval(old_path, old_entry);
@@ -142,19 +166,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     assert(old_path == new_path);
     i_from++;
     i_to++;
-    if (old_entry.CompareTo(new_entry) > 0) {
-      ReportModification(old_path, old_entry, new_entry, xattrs);
-    }
-    if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
-      if (old_entry.IsDirectory()) {
-        DiffRec(old_path);
-      } else if (new_entry.IsDirectory()) {
-        DiffRec(new_path);
-      }
-      continue;
-    }
 
-    // Recursion
     catalog::DirectoryEntryBase::Differences diff =
         old_entry.CompareTo(new_entry);
     if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
@@ -167,6 +179,24 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       if (id_nested_from == id_nested_to) continue;
     }
 
+    if (old_entry.CompareTo(new_entry) > 0) {
+      FileChunkList chunks;
+      if (new_entry.IsChunkedFile()) {
+        new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
+                                         &chunks);
+      }
+      ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
+    }
+    if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
+      if (old_entry.IsDirectory()) {
+        DiffRec(old_path);
+      } else if (new_entry.IsDirectory()) {
+        DiffRec(new_path);
+      }
+      continue;
+    }
+
+    // Recursion
     DiffRec(old_path);
   }
 }

@@ -520,7 +520,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   string master_keys = *args.find('k')->second;
   if (DirectoryExists(master_keys))
-    master_keys = JoinStrings(FindFiles(master_keys, ".pub"), ":");
+    master_keys = JoinStrings(FindFilesBySuffix(master_keys, ".pub"), ":");
   const string repository_name = *args.find('m')->second;
   string trusted_certs;
   if (args.find('y') != args.end())
@@ -835,6 +835,23 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       if (reflog != NULL && !reflog->AddMetainfo(meta_info_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add metainfo to Reflog.");
         goto fini;
+      }
+    }
+
+    // Create alternative bootstrapping symlinks for VOMS secured repos
+    if (ensemble.manifest->has_alt_catalog_path()) {
+      const bool success =
+        spooler->PlaceBootstrappingShortcut(ensemble.manifest->certificate()) &&
+        spooler->PlaceBootstrappingShortcut(ensemble.manifest->catalog_hash())
+          && (ensemble.manifest->history().IsNull() ||
+            spooler->PlaceBootstrappingShortcut(ensemble.manifest->history()))
+          && (meta_info_hash.IsNull() ||
+            spooler->PlaceBootstrappingShortcut(meta_info_hash));
+
+      if (!success) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "failed to place root catalog bootstrapping symlinks");
+        return 1;
       }
     }
 

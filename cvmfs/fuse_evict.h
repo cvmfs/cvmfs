@@ -64,7 +64,7 @@ class FuseInvalidator : SingleCopy {
                   struct fuse_chan **fuse_channel);
   ~FuseInvalidator();
   void Spawn();
-  void InvalidateDentries(Handle *handle);
+  void InvalidateInodes(Handle *handle);
 
  private:
   /**
@@ -81,14 +81,6 @@ class FuseInvalidator : SingleCopy {
    */
   static const unsigned kCheckTimeoutFreqOps;  // = 256
 
-  /**
-   * The information given to fuse_lowlevel_notify_inval_entry
-   */
-  struct EvictableObject {
-    uint64_t inode;
-    NameString name;
-  };
-
   static void *MainInvalidator(void *data);
 
   glue::InodeTracker *inode_tracker_;
@@ -101,7 +93,7 @@ class FuseInvalidator : SingleCopy {
    * thread should be shut down.
    */
   atomic_int32 terminated_;
-  BigVector<EvictableObject> evict_list_;
+  BigVector<uint64_t> evict_list_;
 };  // class FuseInvalidator
 
 #endif  // CVMFS_FUSE_EVICT_H_

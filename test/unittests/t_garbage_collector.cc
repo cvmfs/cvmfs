@@ -34,8 +34,10 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
     return NULL;
   }
 
-  void Upload(upload::UploadStreamHandle *abstract_handle,
-              upload::CharBuffer *buffer, const CallbackTN *callback = NULL) {
+  void StreamedUpload(upload::UploadStreamHandle *abstract_handle,
+                      upload::AbstractUploader::UploadBuffer buffer,
+                      const CallbackTN *callback = NULL)
+  {
     assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
@@ -44,10 +46,14 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
     assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
-  bool Remove(const shash::Any &hash_to_delete) {
+  virtual void DoRemoveAsync(const std::string &file_to_delete) {
+    shash::Any hash_to_delete(shash::MkFromSuffixedHexPtr(shash::HexPtr(
+      file_to_delete.substr(5, 2) + file_to_delete.substr(8))));
     deleted_hashes.insert(hash_to_delete);
-    return true;
+    Respond(NULL, upload::UploaderResults());
   }
+
+  virtual unsigned GetNumberOfErrors() const { return 0; }
 
   bool HasDeleted(const shash::Any &hash) const {
     return deleted_hashes.find(hash) != deleted_hashes.end();

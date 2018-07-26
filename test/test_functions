@@ -8,6 +8,7 @@
 # `export CVMFS_TEST_SRVDEBUG=fail`    - for crash debugging with gdb
 # `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
 
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
@@ -29,7 +30,6 @@ CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
 CVMFS_TEST_HTTP_BASE=${CVMFS_TEST_HTTP_BASE:=}
 CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}   # backward compatibility! use CVMFS_TEST_HTTP_BASE instead
-CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
 
 # These OPT variables are for the benchmark options under the benchmarks folder
 CVMFS_OPT_WARM_CACHE=${CVMFS_OPT_WARM_CACHE:=yes}
@@ -212,17 +212,17 @@ service_request() {
   local request_verb=$2
   if is_systemd; then
     echo "using systemd"
+    # Prevent "service restarted too often" failures
+    sudo systemctl reset-failed $service_name
     if [ "x$request_verb" = "xrestart" ]; then
-      # Prevent "service restarted too often" failures
-      sudo systemctl reset-failed $service_name
       sudo systemctl stop $service_name
       if ! sudo systemctl start $service_name; then
-        sleep 10
+        sleep 20
         sudo systemctl start $service_name
       fi
     else
       if ! sudo systemctl $request_verb $service_name; then
-        sleep 10
+        sleep 20
         sudo systemctl $request_verb $service_name
       fi
     fi
@@ -608,18 +608,6 @@ has_repo() {
 }
 
 
-apply_server_cache_config() {
-  local repo=$1
-  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
-  [ x"$CVMFS_TEST_SERVER_CACHE" != x"" ] || return 0
-
-  local cache_base=$(echo "$CVMFS_TEST_SERVER_CACHE" | sed 's/\//\\\//g')
-  # will take effect _after_ the first publish operation...
-  sudo sed -i "s/^\(CVMFS_CACHE_BASE\)=.*\$/\1=${cache_base}/"     $client_conf || return 1
-  sudo sed -i "s/^\(CVMFS_RELOAD_SOCKETS\)=.*\$/\1=${cache_base}/" $client_conf || return 2
-}
-
-
 create_repo() {
   local repo=$1
   local uid=$2
@@ -632,6 +620,12 @@ create_repo() {
   if has_repo $repo; then
     echo "Repository $repo is already present... removing it"
     destroy_repo $repo || return 101
+  fi
+
+  # Note: We need to do a non-graceful (brutal?) restart of Apache on Fedora 26+ to avoid
+  #       a timeout issue
+  if [ x"$(which apachectl)" != x"" ]; then
+    sudo apachectl restart
   fi
 
   echo -n "Creating new repository $repo (with extra options "$@") ..."
@@ -658,7 +652,6 @@ create_repo() {
                             "$@" $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
-  apply_server_cache_config $repo || return 103
 
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a $client_conf
@@ -747,8 +740,6 @@ import_repo() {
     unionfs=" -f $CVMFS_TEST_UNIONFS"
   fi
   sudo -E cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
-
-  apply_server_cache_config $repo || return 103
 }
 
 
@@ -2218,7 +2209,7 @@ EOF
   if [ x"$as_root" != x"" ]; then
     sudo cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
   else
-    cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+    cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
   fi
 }
 
@@ -2354,98 +2345,48 @@ find_or_build_cvmfs_preload() {
 }
 
 
-#####################################
-##### CVMFS Repository Services #####
-#####################################
+# Sets up the CVMFS repository gateway application
+set_up_repository_gateway() {
+    echo "Setting up repository gateway"
 
-
-# Sets up the CVMFS repository services application
-set_up_repository_services() {
-    echo "Setting up repository services"
-
-    local package_url_root=$CVMFS_SERVICES_URL
-
-    # Choose which package to download and install based on platform
-    if [ -f /etc/lsb-release ]; then
-        if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-            package_map_url=${package_url_root}/pkgmap/pkgmap.ubuntu1604_x86_64
-        fi
-    elif is_redhat; then
-        rhver=$(cat /etc/redhat-release | awk {'print $(NF-1)'} | cut -d'.' -f1)
-        if [ x"$rhver" = x6 ]; then
-            package_map_url=${package_url_root}/pkgmap/pkgmap.slc6_x86_64
-        elif [ x"$rhver" = x7 ]; then
-            package_map_url=${package_url_root}/pkgmap/pkgmap.cc7_x86_64
-        fi
-    fi
-
-    if [ x"$package_map_url" = x"" ]; then
-        echo "Platform not supported. Exiting"
-        exit 1
-    fi
-
-    echo "  Installing the cvmfs_services application"
-    pushd /tmp
-
-    echo "Package map URL: ${package_map_url}"
-    curl -o package_map $package_map_url
-
-    local cvmfs_services_package_url=${package_url_root}/$(tail -1 package_map | cut -d'=' -f2)
-    echo "    Using package: $cvmfs_services_package_url"
-
-    local cvmfs_services_package_file_name=$(echo $cvmfs_services_package_url | awk -F'/' {'print $NF'})
-
-    if [ ! -f "/tmp/$cvmfs_services_package_file_name" ]; then
-        curl -o $cvmfs_services_package_file_name $cvmfs_services_package_url
-    fi
-    sudo rm -rf /opt/cvmfs_services && sudo mkdir -p /opt/cvmfs_services && cd /opt/cvmfs_services
-    sudo tar xzf /tmp/$cvmfs_services_package_file_name
-    popd
+    echo "  Stopping repository gateway"
+    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
 
     echo "  Writing configuration files"
-    sudo bash -c 'cat <<EOF > /opt/cvmfs_services/etc/repo.config
-{repos, [{<<"test.repo.org">>, [<<"key1">>]}]}.
-{keys, [{file, "/etc/cvmfs/keys/test.repo.org.gw"}]}.
+    sudo bash -c 'cat <<EOF > /etc/cvmfs/gateway/repo.json
+{
+    "repos" : [
+        {
+            "domain" : "test.repo.org",
+            "keys" : ["key1"]
+        }
+    ],
+    "keys" : [
+        {
+            "type" : "file",
+            "file_name" : "/etc/cvmfs/keys/test.repo.org.gw",
+            "repo_subpath" : "/"
+        }
+    ]
+}
 EOF'
+
+    echo "  Creating test repo"
+    create_repo test.repo.org `whoami`
 
     echo "  Writing API key file"
     sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/test.repo.org.gw
-test key1 secret1
+plain_text key1 secret1
 EOF'
 
-    echo "  Creating Mnesia schema"
-    sudo mkdir -p /opt/cvmfs_mnesia
-    sudo chown `whoami`:`whoami` /opt/cvmfs_mnesia
-    cd /opt/cvmfs_services
-    ./scripts/setup.sh
-
-    echo "  Creating test repo"
-    sudo -E cvmfs_server mkfs -o `whoami` test.repo.org
-
     echo "  Modifying test repo configuration"
-    sudo sed -i -e 's/local,/gw,/' /etc/cvmfs/repositories.d/test.repo.org/server.conf
-    sudo sed -i -e 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:8080\/api\/v1/g' /etc/cvmfs/repositories.d/test.repo.org/server.conf
+    local repo_server_config=/etc/cvmfs/repositories.d/test.repo.org/server.conf
+    local original_upstream=$(grep CVMFS_UPSTREAM_STORAGE $repo_server_config | cut -d'=' -f2-)
+    sudo sed -i -e 's/local,/gw,/' $repo_server_config
+    sudo sed -i -e 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:4929\/api\/v1/g' $repo_server_config
+    sudo bash -c "echo TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE=$original_upstream >> $repo_server_config"
     sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 
-    echo "  Starting repository services application"
-    RUNNER_LOG_DIR=/tmp /opt/cvmfs_services/bin/cvmfs_services start
-
-    # Waiting here is necessary in order to give the cvmfs_services application enough time to boot
-    wait_for_app_start
+    echo "  Starting repository gateway"
+    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
 }
-
-wait_for_app_start() {
-    local reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
-    local num_iter=1
-    while [ $reply != "pong" ]; do
-        sleep 1
-        reply=$(/opt/cvmfs_services/bin/cvmfs_services ping | awk {'print $1'})
-        echo "Num iter: $num_iter"
-        num_iter=$((num_iter + 1))
-        if [ $num_iter -eq 10 ]; then
-            break;
-        fi
-    done
-    echo $reply
-}
-

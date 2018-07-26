@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "util/shared_ptr.h"
 #include "util_concurrency.h"
 
 namespace upload {
@@ -42,33 +43,37 @@ bool Spooler::Initialize() {
   }
 
   // configure the file processor context
-  file_processor_ =
-      new FileProcessor(uploader_.weak_ref(), spooler_definition_);
-  file_processor_->RegisterListener(&Spooler::ProcessingCallback, this);
+  ingestion_pipeline_ =
+      new IngestionPipeline(uploader_.weak_ref(), spooler_definition_);
+  ingestion_pipeline_->RegisterListener(&Spooler::ProcessingCallback, this);
+  ingestion_pipeline_->Spawn();
 
   // all done...
   return true;
 }
 
-void Spooler::Process(const std::string &local_path,
-                      const bool allow_chunking) {
-  file_processor_->Process(local_path, allow_chunking);
+void Spooler::Process(IngestionSource *source, const bool allow_chunking) {
+  ingestion_pipeline_->Process(source, allow_chunking);
 }
 
 void Spooler::ProcessCatalog(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixCatalog);
+  ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
+                               shash::kSuffixCatalog);
 }
 
 void Spooler::ProcessHistory(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixHistory);
+  ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
+                               shash::kSuffixHistory);
 }
 
 void Spooler::ProcessCertificate(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixCertificate);
+  ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
+                               shash::kSuffixCertificate);
 }
 
 void Spooler::ProcessMetainfo(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixMetainfo);
+  ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
+                               shash::kSuffixMetainfo);
 }
 
 void Spooler::Upload(const std::string &local_path,
@@ -86,8 +91,8 @@ void Spooler::UploadReflog(const std::string &local_path) {
   Upload(local_path, ".cvmfsreflog");
 }
 
-bool Spooler::Remove(const std::string &file_to_delete) {
-  return uploader_->Remove(file_to_delete);
+void Spooler::RemoveAsync(const std::string &file_to_delete) {
+  uploader_->RemoveAsync(file_to_delete);
 }
 
 bool Spooler::Peek(const std::string &path) const {
@@ -108,13 +113,15 @@ void Spooler::UploadingCallback(const UploaderResults &data) {
 }
 
 void Spooler::WaitForUpload() const {
+  ingestion_pipeline_->WaitFor();
   uploader_->WaitForUpload();
-  file_processor_->WaitForProcessing();
 }
 
-void Spooler::FinalizeSession(bool commit, const std::string &old_root_hash,
-                              const std::string &new_root_hash) const {
-  uploader_->FinalizeSession(commit, old_root_hash, new_root_hash);
+bool Spooler::FinalizeSession(bool commit, const std::string &old_root_hash,
+                              const std::string &new_root_hash,
+                              const RepositoryTag &tag) const {
+  return uploader_->FinalizeSession(commit, old_root_hash,
+                                    new_root_hash, tag);
 }
 
 unsigned int Spooler::GetNumberOfErrors() const {

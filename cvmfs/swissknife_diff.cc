@@ -47,6 +47,27 @@ ParameterList CommandDiff::GetParams() const {
   return r;
 }
 
+
+history::History::Tag CommandDiff::GetTag(const string &tag_name) {
+  history::History::Tag tag;
+  if (tag_name.empty())
+    return tag;
+
+  if (tag_name[0] == kRawHashSymbol) {
+    tag.name = tag_name.substr(1);
+    tag.root_hash =
+      shash::MkFromHexPtr(shash::HexPtr(tag.name), shash::kSuffixCatalog);
+  } else {
+    bool retval = history_->GetByName(tag_name, &tag);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "unknown tag: s", tag_name.c_str());
+    }
+  }
+
+  return tag;
+}
+
+
 int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   const string fqrn = MakeCanonicalPath(*args.find('n')->second);
   const string tmp_dir = MakeCanonicalPath(*args.find('t')->second);
@@ -57,7 +78,7 @@ int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   const bool follow_redirects = args.count('L') > 0;
   string pubkey_path = *args.find('k')->second;
   if (DirectoryExists(pubkey_path))
-    pubkey_path = JoinStrings(FindFiles(pubkey_path, ".pub"), ":");
+    pubkey_path = JoinStrings(FindFilesBySuffix(pubkey_path, ".pub"), ":");
   string tagname_from = "trunk-previous";
   string tagname_to = "trunk";
   if (args.count('s') > 0) tagname_from = *args.find('s')->second;
@@ -74,24 +95,15 @@ int swissknife::CommandDiff::Main(const swissknife::ArgumentList &args) {
   assert(manifest.IsValid());
 
   Assistant assistant(download_manager(), manifest, repository, tmp_dir);
-  UniquePtr<history::History> history(
-      assistant.GetHistory(Assistant::kOpenReadOnly));
-  assert(history.IsValid());
-  history::History::Tag tag_from;
-  retval = history->GetByName(tagname_from, &tag_from);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "unknown tag: s", tagname_from.c_str());
-    return 1;
-  }
-  history::History::Tag tag_to;
-  retval = history->GetByName(tagname_to, &tag_to);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "unknown tag: s", tagname_to.c_str());
-    return 1;
-  }
+  history_ = assistant.GetHistory(Assistant::kOpenReadOnly);
+  assert(history_.IsValid());
+  history::History::Tag tag_from = GetTag(tagname_from);
+  if (tag_from.root_hash.IsNull()) return 1;
+  history::History::Tag tag_to = GetTag(tagname_to);
+  if (tag_to.root_hash.IsNull()) return 1;
 
   DiffTool diff_tool(repository, tag_from, tag_to, tmp_dir, download_manager(),
-                     machine_readable, ignore_timediff);
+                     statistics(), machine_readable, ignore_timediff);
   if (!diff_tool.Init()) {
     return 1;
   }

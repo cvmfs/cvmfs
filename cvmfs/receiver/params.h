@@ -12,9 +12,13 @@
 
 namespace receiver {
 
+std::string GetSpoolerTempDir(const std::string& spooler_config);
+
 struct Params {
+  std::string stratum0;
   std::string spooler_configuration;
   shash::Algorithms hash_alg;
+  std::string hash_alg_str;
   zlib::Algorithms compression_alg;
   bool generate_legacy_bulk_chunks;
   bool use_file_chunking;

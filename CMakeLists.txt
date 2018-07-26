@@ -15,10 +15,10 @@ message ("Running CMake version ${CMAKE_VERSION}")
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.5.0
+## CVMFS_VERSION 2.6.0
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 5)
+set (CernVM-FS_VERSION_MINOR 6)
 set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
@@ -181,6 +181,9 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
       set(ENV{BUILD_SERVER} "true")
     endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+    if (BUILD_QC_TESTS)
+      set(ENV{BUILD_QC_TESTS} "true")
+    endif(BUILD_QC_TESTS)
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
@@ -200,6 +203,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_CXX_FLAGS} "")
     set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
+    set(ENV{BUILD_QC_TESTS} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
@@ -294,14 +298,17 @@ endif (NOT MACOSX)
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
-
 find_package (GTest REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 
+find_package (GMock REQUIRED)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GMOCK_INCLUDE_DIRS})
 
 find_package (VJSON REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
 
+find_package (LibArchive REQUIRED)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
 
 # Almost all build targets require zlib, sha2/3
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
@@ -385,17 +392,6 @@ if (BUILD_CVMFS)
   endif (MACOSX)
 endif (BUILD_CVMFS)
 
-# Server/preloader only: tbb
-if (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR
-    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
-    if (BUILTIN_EXTERNALS)
-      set(TBB_LIB_SUFFIX "_cvmfs")
-    endif(BUILTIN_EXTERNALS)
-  find_package(TBB REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_INCLUDE_DIRS})
-endif (BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_PRELOADER OR
-       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
-
 # Server only: python/geoip, unzip, libcap, mongoose
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   find_package(Mongoose REQUIRED)
@@ -447,6 +443,12 @@ endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 if (BUILD_UBENCHMARKS)
   add_subdirectory (test/micro-benchmarks)
 endif (BUILD_UBENCHMARKS)
+
+if (BUILD_QC_TESTS)
+  find_package(RapidCheck REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${RAPIDCHECK_INCLUDE_DIRS})
+  add_subdirectory (test/quickcheck)
+endif(BUILD_QC_TESTS)
 
 #
 # Documentation

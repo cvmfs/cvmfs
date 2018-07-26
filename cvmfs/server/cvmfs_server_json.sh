@@ -217,3 +217,12 @@ update_repo_status() {
     -o .cvmfs_status.json"
   $user_shell "rm -f $jq_tmp"
 }
+
+
+get_json_field() {
+  has_jq || return ""
+
+  local snippet="$1"
+  local field="$2"
+  echo "$snippet" | jq -r ".$field // empty"
+}

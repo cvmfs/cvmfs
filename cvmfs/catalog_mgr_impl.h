@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <string>
+#include <vector>
 
 #include "logging.h"
 #include "shortstring.h"
@@ -294,6 +295,142 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 }
 
 
+/**
+ * Perform a lookup for Nested Catalog that serves this path.
+ *  If the path specified is a catalog mountpoint the catalog at that point is
+ *  mounted and returned.
+ * @param path       the path to find in the catalogs
+ * @param mountpoint the path to the nested catalog found
+ * @param hash       the hash of the nested catalog found
+ * @param size       the size of the nested catalog, 0 for root. Root is not a
+ *                   nested catalog in the database.
+ * @return true if lookup succeeded otherwise false (available catalog failed
+ *         to mount)
+ */
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::LookupNested(
+  const PathString &path,
+  PathString *mountpoint,
+  shash::Any *hash,
+  uint64_t *size
+) {
+  EnforceSqliteMemLimit();
+  bool result = false;
+  ReadLock();
+
+  // Look past current path to mount up to intended location
+  PathString catalog_path(path);
+  catalog_path.Append("/.cvmfscatalog", 14);
+
+  // Find catalog, possibly load nested
+  CatalogT *best_fit = FindCatalog(catalog_path);
+  CatalogT *catalog = best_fit;
+  if (MountSubtree(catalog_path, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(catalog_path);
+    result = MountSubtree(catalog_path, best_fit, &catalog);
+    // Result is false if an available catalog failed to load (error happened)
+    if (!result) {
+      Unlock();
+      return false;
+    }
+  }
+
+  // If the found catalog is the Root there is no parent to lookup
+  if (catalog->HasParent()) {
+    result = catalog->parent()->FindNested(catalog->root_prefix(), hash, size);
+  }
+
+  // Mountpoint now points to the found catalog
+  mountpoint->Assign(catalog->root_prefix());
+
+  // If the result is false, it means that no nested catalog was found for
+  // this path. As the root catalog does not have a Nested Catalog of
+  // itself, we manually set the values and leave the size as 0.
+  // TODO(nhazekam) Allow for Root Catalog to be returned
+  if (!result) {
+    *hash =  GetRootCatalog()->hash();
+    *size = 0;
+    result = true;
+  }
+
+  Unlock();
+  return result;
+}
+
+
+/**
+ * Create a listing of the parents, catalog, and children of the catalog
+ *  that serves the specified path.
+ *  If the path specified is a catalog mountpoint the catalog at that point is
+ *  mounted and returned.
+ * @param path        the path to find in the catalogs
+ * @param result_list the list where the results will be added.
+ * @return true if the list could be created, false if catalog fails to mount.
+ */
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::ListCatalogSkein(
+  const PathString &path,
+  std::vector<PathString> *result_list
+) {
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Look past current path to mount up to intended location
+  PathString test(path);
+  test.Append("/.cvmfscatalog", 14);
+
+  // Find catalog, possibly load nested
+  CatalogT *best_fit = FindCatalog(test);
+  CatalogT *catalog = best_fit;
+  // True if there is an available nested catalog
+  if (MountSubtree(test, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(test);
+    result = MountSubtree(test, best_fit, &catalog);
+    // result is false if an available catalog failed to load
+    if (!result) {
+      Unlock();
+      return false;
+    }
+  }
+
+  // Build listing
+  CatalogT *cur_parent = catalog->parent();
+  if (cur_parent) {
+    // Walk up parent tree to find base
+    std::vector<catalog::Catalog*> parents;
+    while (cur_parent->HasParent()) {
+      parents.push_back(cur_parent);
+      cur_parent = cur_parent->parent();
+    }
+    parents.push_back(cur_parent);
+    while (!parents.empty()) {
+      // Add to list in order starting at root
+      result_list->push_back(parents.back()->root_prefix());
+      parents.pop_back();
+    }
+  }
+  // Add the current catalog
+  result_list->push_back(catalog->root_prefix());
+
+  Catalog::NestedCatalogList children = catalog->ListOwnNestedCatalogs();
+
+  // Add all children nested catalogs
+  for (unsigned i = 0; i < children.size(); i++) {
+    result_list->push_back(children.at(i).mountpoint);
+  }
+
+  Unlock();
+  return true;
+}
+
+
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   const PathString &path,
@@ -456,6 +593,15 @@ bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
     *authz = authz_cache_;
   Unlock();
   return has_authz;
+}
+
+
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::HasExplicitTTL() const {
+  ReadLock();
+  const bool result = GetRootCatalog()->HasExplicitTTL();
+  Unlock();
+  return result;
 }
 
 

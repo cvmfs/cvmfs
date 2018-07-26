@@ -38,11 +38,14 @@
 #include "platform.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
+#include "util/shared_ptr.h"
 #include "xattr.h"
 
 namespace manifest {
 class Manifest;
 }
+
+struct Counters;
 
 namespace publish {
 
@@ -53,24 +56,46 @@ namespace publish {
  * Assertion: linkcount == HardlinkGroup::hardlinks.size() at the end
  */
 struct HardlinkGroup {
-  explicit HardlinkGroup(const SyncItem &item) : master(item) {
-    hardlinks[master.GetRelativePath()] = master;
+  explicit HardlinkGroup(SharedPtr<SyncItem> item) : master(item) {
+    hardlinks[master->GetRelativePath()] = item;
   }
 
-  void AddHardlink(const SyncItem &entry) {
-    hardlinks[entry.GetRelativePath()] = entry;
+  void AddHardlink(SharedPtr<SyncItem> entry) {
+    hardlinks[entry->GetRelativePath()] = entry;
   }
 
-  SyncItem master;
+  SharedPtr<SyncItem> master;
   SyncItemList hardlinks;
   FileChunkList file_chunks;
+};
+
+class AbstractSyncMediator {
+ public:
+  virtual ~AbstractSyncMediator() = 0;
+
+  virtual void RegisterUnionEngine(SyncUnion *engine) = 0;
+
+  virtual void Add(SharedPtr<SyncItem> entry) = 0;
+  virtual void Touch(SharedPtr<SyncItem> entry) = 0;
+  virtual void Remove(SharedPtr<SyncItem> entry) = 0;
+  virtual void Replace(SharedPtr<SyncItem> entry) = 0;
+  virtual void Clone(const std::string from, const std::string to) = 0;
+
+  virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
+
+  virtual void EnterDirectory(SharedPtr<SyncItem> entry) = 0;
+  virtual void LeaveDirectory(SharedPtr<SyncItem> entry) = 0;
+
+  virtual bool Commit(manifest::Manifest *manifest) = 0;
+
+  virtual bool IsExternalData() const = 0;
+  virtual zlib::Algorithms GetCompressionAlgorithm() const = 0;
 };
 
 /**
  * Mapping of inode number to the related HardlinkGroup.
  */
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
-
 
 /**
  * The SyncMediator refines the input received from a concrete UnionSync object.
@@ -81,22 +106,27 @@ typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
  * Furthermore it sends new and modified files to the spooler for compression
  * and hashing.
  */
-class SyncMediator {
+class SyncMediator : public virtual AbstractSyncMediator {
  public:
   static const unsigned int processing_dot_interval = 100;
 
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
-               const SyncParameters *params);
+               const SyncParameters *params,
+               perf::StatisticsTemplate statistics);
   void RegisterUnionEngine(SyncUnion *engine);
-  virtual ~SyncMediator();
+  // Final class, it is not meant to be derived any further
+  ~SyncMediator();
 
-  void Add(const SyncItem &entry);
-  void Touch(const SyncItem &entry);
-  void Remove(const SyncItem &entry);
-  void Replace(const SyncItem &entry);
+  void Add(SharedPtr<SyncItem> entry);
+  void Touch(SharedPtr<SyncItem> entry);
+  void Remove(SharedPtr<SyncItem> entry);
+  void Replace(SharedPtr<SyncItem> entry);
+  void Clone(const std::string from, const std::string to);
 
-  void EnterDirectory(const SyncItem &entry);
-  void LeaveDirectory(const SyncItem &entry);
+  void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);
+
+  void EnterDirectory(SharedPtr<SyncItem> entry);
+  void LeaveDirectory(SharedPtr<SyncItem> entry);
 
   bool Commit(manifest::Manifest *manifest);
 
@@ -123,66 +153,89 @@ class SyncMediator {
   void PrintChangesetNotice(const ChangesetAction action,
                             const std::string &extra_info) const;
 
-  void EnsureAllowed(const SyncItem &entry);
+  void EnsureAllowed(SharedPtr<SyncItem> entry);
 
   // Called after figuring out the type of a path (file, symlink, dir)
-  void AddFile(const SyncItem &entry);
-  void RemoveFile(const SyncItem &entry);
+  void AddFile(SharedPtr<SyncItem> entry);
+  void RemoveFile(SharedPtr<SyncItem> entry);
 
-  void AddDirectory(const SyncItem &entry);
-  void RemoveDirectory(const SyncItem &entry);
-  void TouchDirectory(const SyncItem &entry);
+  void AddDirectory(SharedPtr<SyncItem> entry);
+  void RemoveDirectory(SharedPtr<SyncItem> entry);
+  void TouchDirectory(SharedPtr<SyncItem> entry);
 
-  void CreateNestedCatalog(const SyncItem &directory);
-  void RemoveNestedCatalog(const SyncItem &directory);
+  void CreateNestedCatalog(SharedPtr<SyncItem> directory);
+  void RemoveNestedCatalog(SharedPtr<SyncItem> directory);
 
+  void TouchDirectoryRecursively(SharedPtr<SyncItem> entry);
+  void TouchingFileCallback(const std::string &parent_dir,
+                          const std::string &file_name);
+  void TouchingSymlinkCallback(const std::string &parent_dir,
+                             const std::string &link_name);
+  void TouchDirectoryCallback(const std::string &parent_dir,
+                               const std::string &dir_name);
+  void RemoveDirectoryRecursively(SharedPtr<SyncItem> entry);
+  void RemoveFileCallback(const std::string &parent_dir,
+                          const std::string &file_name);
+  void RemoveSymlinkCallback(const std::string &parent_dir,
+                             const std::string &link_name);
+  void RemoveCharacterDeviceCallback(const std::string &parent_dir,
+                                     const std::string &link_name);
+  void RemoveBlockDeviceCallback(const std::string &parent_dir,
+                                 const std::string &link_name);
+  void RemoveFifoCallback(const std::string &parent_dir,
+                          const std::string &link_name);
+  void RemoveSocketCallback(const std::string &parent_dir,
+                            const std::string &link_name);
+  void RemoveDirectoryCallback(const std::string &parent_dir,
+                               const std::string &dir_name);
+  bool IgnoreFileCallback(const std::string &parent_dir,
+                          const std::string &file_name);
   // Called by file system traversal
   void EnterAddedDirectoryCallback(const std::string &parent_dir,
                                    const std::string &dir_name);
   void LeaveAddedDirectoryCallback(const std::string &parent_dir,
                                    const std::string &dir_name);
-
-  void AddDirectoryRecursively(const SyncItem &entry);
+  void AddDirectoryRecursively(SharedPtr<SyncItem> entry);
   bool AddDirectoryCallback(const std::string &parent_dir,
                             const std::string &dir_name);
   void AddFileCallback(const std::string &parent_dir,
                        const std::string &file_name);
   void AddCharacterDeviceCallback(const std::string &parent_dir,
-                       const std::string &file_name);
+                                  const std::string &file_name);
   void AddBlockDeviceCallback(const std::string &parent_dir,
+                              const std::string &file_name);
+  void AddFifoCallback(const std::string &parent_dir,
                        const std::string &file_name);
+  void AddSocketCallback(const std::string &parent_dir,
+                         const std::string &file_name);
   void AddSymlinkCallback(const std::string &parent_dir,
                           const std::string &link_name);
-
-  void RemoveDirectoryRecursively(const SyncItem &entry);
-  void RemoveFileCallback(const std::string &parent_dir,
-                          const std::string &file_name);
-  void RemoveSymlinkCallback(const std::string &parent_dir,
-                             const std::string &link_name);
-  void RemoveDirectoryCallback(const std::string &parent_dir,
-                               const std::string &dir_name);
-
-  bool IgnoreFileCallback(const std::string &parent_dir,
-                          const std::string &file_name);
-
-  SyncItem CreateSyncItem(const std::string  &relative_parent_path,
-                          const std::string  &filename,
-                          const SyncItemType  entry_type) const;
+  SharedPtr<SyncItem> CreateSyncItem(const std::string &relative_parent_path,
+                                     const std::string &filename,
+                                     const SyncItemType entry_type) const;
 
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
 
   // Hardlink handling
-  void CompleteHardlinks(const SyncItem &entry);
+  void CompleteHardlinks(SharedPtr<SyncItem> entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
   void LegacyRegularHardlinkCallback(const std::string &parent_dir,
                                      const std::string &file_name);
   void LegacySymlinkHardlinkCallback(const std::string &parent_dir,
-                                      const std::string &file_name);
-  void InsertLegacyHardlink(const SyncItem &entry);
-  uint64_t GetTemporaryHardlinkGroupNumber(const SyncItem &entry) const;
-  void InsertHardlink(const SyncItem &entry);
+                                     const std::string &file_name);
+  void LegacyCharacterDeviceHardlinkCallback(const std::string &parent_dir,
+                                             const std::string &file_name);
+  void LegacyBlockDeviceHardlinkCallback(const std::string &parent_dir,
+                                         const std::string &file_name);
+  void LegacyFifoHardlinkCallback(const std::string &parent_dir,
+                                  const std::string &file_name);
+  void LegacySocketHardlinkCallback(const std::string &parent_dir,
+                                    const std::string &file_name);
+  void InsertLegacyHardlink(SharedPtr<SyncItem> entry);
+  uint64_t GetTemporaryHardlinkGroupNumber(SharedPtr<SyncItem> entry) const;
+  void InsertHardlink(SharedPtr<SyncItem> entry);
 
   void AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks);
   void AddHardlinkGroup(const HardlinkGroup &group);
@@ -217,6 +270,7 @@ class SyncMediator {
    * By default, files have no extended attributes.
    */
   XattrList default_xattrs;
+  UniquePtr<Counters> counters_;
 };  // class SyncMediator
 
 }  // namespace publish

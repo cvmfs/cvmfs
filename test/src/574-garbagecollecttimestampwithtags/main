@@ -329,9 +329,6 @@ cvmfs_run_test() {
   cvmfs_server gc -f -t 'later today'    $CVMFS_TEST_REPO && return 13
   cvmfs_server gc -f -t '13.12.'         $CVMFS_TEST_REPO && return 14
 
-  echo "*** {7} try to provide a timestamp in the future"
-  cvmfs_server gc -f -t 'tomorrow' $CVMFS_TEST_REPO && return 15
-
   # ============================================================================
 
   echo "*** {8} perform garbage collection with initial time stamp (nothing to be deleted)"

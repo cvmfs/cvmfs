@@ -201,6 +201,14 @@ class CacheManager : SingleCopy {
   void RestoreState(const int fd_progress, void *state);
   void FreeState(const int fd_progress, void *state);
 
+  /**
+   * While not strictly necessary, cache managers often have a directory
+   * associated with them. This directory is currently used to find the
+   * cached manifest copy, the cvmfschecksum.$reponame file. This is important
+   * to make pre-loaded alien caches work, even in a tiered setup.
+   */
+  virtual std::string GetBackingDirectory() { return ""; }
+
  protected:
   CacheManager();
 

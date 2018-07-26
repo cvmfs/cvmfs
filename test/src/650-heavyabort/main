@@ -1,0 +1,21 @@
+cvmfs_test_name="Abort after filling temporary area"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** fill up tmp area in spool"
+  for i in $(seq 1 64000); do
+    touch /var/spool/cvmfs/$CVMFS_TEST_REPO/tmp/cvmfs_test_$i
+  done
+  ls -l /var/spool/cvmfs/$CVMFS_TEST_REPO/tmp | wc -l
+  echo "*** aborting transaction"
+  abort_transaction $CVMFS_TEST_REPO || return 10
+
+  return 0
+}
+

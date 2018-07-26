@@ -146,6 +146,9 @@ bool Catalog::ReadCatalogCounters() {
   } else if (database().schema_revision() < 3) {
     statistics_loaded =
       counters_.ReadFromDatabase(database(), LegacyMode::kNoExternals);
+  } else if (database().schema_revision() < 5) {
+    statistics_loaded =
+      counters_.ReadFromDatabase(database(), LegacyMode::kNoSpecials);
   } else {
     statistics_loaded = counters_.ReadFromDatabase(database());
   }
@@ -482,6 +485,14 @@ uint64_t Catalog::GetTTL() const {
   pthread_mutex_lock(lock_);
   const uint64_t result =
     database().GetPropertyDefault<uint64_t>("TTL", kDefaultTTL);
+  pthread_mutex_unlock(lock_);
+  return result;
+}
+
+
+bool Catalog::HasExplicitTTL() const {
+  pthread_mutex_lock(lock_);
+  const bool result = database().HasProperty("TTL");
   pthread_mutex_unlock(lock_);
   return result;
 }

@@ -181,11 +181,12 @@ class SqlDirent : public SqlCatalog {
   static const int kFlagDirNestedRoot       = 32;
   static const int kFlagFile                = 4;
   static const int kFlagLink                = 8;
-  static const int kFlagFileStat            = 16;  // currently unused
+  static const int kFlagFileSpecial         = 16;
   static const int kFlagFileChunk           = 64;
   /**
    * The file is not natively stored in cvmfs but on a different storage system,
    * for instance on HTTPS data federation services.
+   * NOTE: used as magic number in SqlListContentHashes::SqlListContentHashes
    */
   static const int kFlagFileExternal        = 128;
   // as of 2^8: 3 bit for hashes

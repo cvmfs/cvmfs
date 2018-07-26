@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "compression.h"
+#include "repository_tag.h"
 #include "swissknife.h"
 #include "upload.h"
 
@@ -25,6 +26,7 @@ struct SyncParameters {
   SyncParameters()
       : spooler(NULL),
         union_fs_type("aufs"),
+        to_delete(""),
         print_changeset(false),
         dry_run(false),
         mucatalogs(false),
@@ -53,7 +55,8 @@ struct SyncParameters {
         max_weight(kDefaultMaxWeight),
         min_weight(kDefaultMinWeight),
         session_token_file(),
-        key_file() {}
+        key_file(),
+        repo_tag() {}
 
   upload::Spooler *spooler;
   std::string repo_name;
@@ -69,6 +72,9 @@ struct SyncParameters {
   std::string public_keys;
   std::string trusted_certs;
   std::string authz_file;
+  std::string tar_file;
+  std::string base_directory;
+  std::string to_delete;
   bool print_changeset;
   bool dry_run;
   bool mucatalogs;
@@ -100,12 +106,13 @@ struct SyncParameters {
   // Parameters for when upstream type is HTTP
   std::string session_token_file;
   std::string key_file;
+  RepositoryTag repo_tag;
 };
 
 namespace catalog {
 class Dirtab;
 class SimpleCatalogManager;
-}
+}  // namespace catalog
 
 namespace swissknife {
 
@@ -259,11 +266,17 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('C', "trusted certificates"));
     r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
-    r.push_back(Parameter::Optional('Q',
-                                    "nested catalog limit in kilo-entries"));
+    r.push_back(
+        Parameter::Optional('Q', "nested catalog limit in kilo-entries"));
     r.push_back(Parameter::Optional('R', "root catalog limit in kilo-entries"));
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
     r.push_back(Parameter::Optional('U', "file size limit in megabytes"));
+    r.push_back(
+        Parameter::Optional('D', "tag name (only used when upstream is GW)"));
+    r.push_back(Parameter::Optional(
+        'G', "tag channel (only used when upstream is GW)"));
+    r.push_back(Parameter::Optional(
+        'J', "tag description (only used when upstream is GW)"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('Z',
                                     "compression algorithm "
@@ -304,6 +317,7 @@ class CommandSync : public Command {
   bool ReadFileChunkingArgs(const swissknife::ArgumentList &args,
                             SyncParameters *params);
   bool CheckParams(const SyncParameters &p);
+  bool ObtainDacReadSearchCapability();
 };
 
 }  // namespace swissknife

@@ -10,7 +10,6 @@
 #include <string>
 
 #include "compression.h"
-#include "file_processing/char_buffer.h"
 #include "logging.h"
 #include "platform.h"
 #include "util/posix.h"
@@ -94,9 +93,8 @@ UploadStreamHandle *LocalUploader::InitStreamedUpload(
 }
 
 void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
-                                   CharBuffer *buffer,
+                                   UploadBuffer buffer,
                                    const CallbackTN *callback) {
-  assert(buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle *>(handle);
 
   const off_t offset = lseek(local_handle->file_descriptor, 0, SEEK_CUR);
@@ -106,21 +104,23 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
              "failed to seek in '%s' (errno: %d)",
              local_handle->temporary_path.c_str(), seek_err);
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(seek_err, buffer));
+    Respond(callback,
+            UploaderResults(UploaderResults::kBufferUpload, seek_err));
     return;
   }
 
   const size_t bytes_written =
-      write(local_handle->file_descriptor, buffer->ptr(), buffer->used_bytes());
-  if (bytes_written != buffer->used_bytes()) {
+      write(local_handle->file_descriptor, buffer.data, buffer.size);
+  if (bytes_written != buffer.size) {
     const int cpy_errno = errno;
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "failed to write %d bytes to '%s' "
              "(errno: %d)",
-             buffer->used_bytes(), local_handle->temporary_path.c_str(),
+             buffer.size, local_handle->temporary_path.c_str(),
              cpy_errno);
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(cpy_errno, buffer));
+    Respond(callback,
+            UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
   }
 
@@ -129,7 +129,7 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
   (void)platform_invalidate_kcache(local_handle->file_descriptor, offset,
                                    bytes_written);
 
-  Respond(callback, UploaderResults(0, buffer));
+  Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
 void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
@@ -145,7 +145,8 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
              "(errno: %d)",
              local_handle->temporary_path.c_str(), cpy_errno);
     atomic_inc32(&copy_errors_);
-    Respond(handle->commit_callback, UploaderResults(cpy_errno));
+    Respond(handle->commit_callback,
+            UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
     return;
   }
 
@@ -160,15 +161,15 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
                local_handle->temporary_path.c_str(), final_path.c_str(),
                cpy_errno);
       atomic_inc32(&copy_errors_);
-      Respond(handle->commit_callback, UploaderResults(cpy_errno));
+      Respond(handle->commit_callback,
+              UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
       return;
     }
   } else {
     const int retval = unlink(local_handle->temporary_path.c_str());
     if (retval != 0) {
       LogCvmfs(kLogSpooler, kLogVerboseMsg,
-               "failed to remove temporary '%s' "
-               "(errno: %d)",
+               "failed to remove temporary file '%s' (errno: %d)",
                local_handle->temporary_path.c_str(), errno);
     }
   }
@@ -176,12 +177,18 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
   const CallbackTN *callback = handle->commit_callback;
   delete local_handle;
 
-  Respond(callback, UploaderResults(0));
+  Respond(callback, UploaderResults(UploaderResults::kChunkCommit, 0));
 }
 
-bool LocalUploader::Remove(const std::string &file_to_delete) {
+/**
+ * TODO(jblomer): investigate if parallelism increases the GC speed on local
+ * disks.
+ */
+void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
   const int retval = unlink((upstream_path_ + "/" + file_to_delete).c_str());
-  return retval == 0 || errno == ENOENT;
+  if ((retval != 0) && (errno != ENOENT))
+    atomic_inc32(&copy_errors_);
+  Respond(NULL, UploaderResults());
 }
 
 bool LocalUploader::Peek(const std::string &path) const {

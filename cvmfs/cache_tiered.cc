@@ -11,6 +11,7 @@
 
 #include "platform.h"
 #include "quota.h"
+#include "util/posix.h"
 
 
 std::string TieredCacheManager::Describe() {
@@ -126,6 +127,35 @@ CacheManager *TieredCacheManager::Create(
     new TieredCacheManager(upper_cache, lower_cache);
   delete cache_mgr->quota_mgr_;
   cache_mgr->quota_mgr_ = upper_cache->quota_mgr();
+
+  // The backing directory for the tiered cache manager is tricky.  If there is
+  // only one backing directory set, take it.  If both layers have backing
+  // directories, prefer the upper layer unless the lower layer provides a
+  // .cvmfschecksum... file
+  if (upper_cache->GetBackingDirectory().empty() &&
+      !lower_cache->GetBackingDirectory().empty())
+  {
+    cache_mgr->backing_directory_ = lower_cache->GetBackingDirectory();
+  } else if (!upper_cache->GetBackingDirectory().empty() &&
+             lower_cache->GetBackingDirectory().empty())
+  {
+    cache_mgr->backing_directory_ = upper_cache->GetBackingDirectory();
+  } else if (!upper_cache->GetBackingDirectory().empty() &&
+             !lower_cache->GetBackingDirectory().empty())
+  {
+    if (!FindFilesByPrefix(upper_cache->GetBackingDirectory(),
+                           "cvmfschecksum.").empty())
+    {
+      cache_mgr->backing_directory_ = upper_cache->GetBackingDirectory();
+    } else if (!FindFilesByPrefix(lower_cache->GetBackingDirectory(),
+                                  "cvmfschecksum.").empty())
+    {
+      cache_mgr->backing_directory_ = lower_cache->GetBackingDirectory();
+    } else {
+      cache_mgr->backing_directory_ = upper_cache->GetBackingDirectory();
+    }
+  }
+
   return cache_mgr;
 }
 

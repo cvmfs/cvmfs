@@ -157,6 +157,8 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   bool ParseRevision(JSON *json_authz, AuthzExternalMsg *binary_msg);
   bool ParsePermit(JSON *json_authz, AuthzExternalMsg *binary_msg);
 
+  void ReapHelper();
+
   /**
    * The fully qualified repository name, e.g. atlas.cern.ch
    */
@@ -202,6 +204,12 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
    * The send-receive cycle is atomic.
    */
   pthread_mutex_t lock_;
+
+  /**
+   * After the helper process fails, this is set to the time when it should
+   * be restarted.
+   */
+  uint64_t next_start_;
 };
 
 #endif  // CVMFS_AUTHZ_AUTHZ_FETCH_H_

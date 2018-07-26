@@ -50,3 +50,4 @@ build_config_package() {
 echo "build the config packages..."
 build_config_package "config-default"
 build_config_package "config-none"
+build_config_package "config-graphdriver"

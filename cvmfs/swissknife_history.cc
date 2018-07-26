@@ -764,10 +764,11 @@ ParameterList CommandListTags::GetParams() const {
   ParameterList r;
   InsertCommonParameters(&r);
   r.push_back(Parameter::Switch('x', "machine readable output"));
+  r.push_back(Parameter::Switch('B', "print branch hierarchy"));
   return r;
 }
 
-void CommandListTags::PrintHumanReadableList(
+void CommandListTags::PrintHumanReadableTagList(
     const CommandListTags::TagList &tags) const {
   // go through the list of tags and figure out the column widths
   const std::string name_label = "Name";
@@ -842,7 +843,7 @@ void CommandListTags::PrintHumanReadableList(
   LogCvmfs(kLogCvmfs, kLogStdout, "listing contains %d tags", tags.size());
 }
 
-void CommandListTags::PrintMachineReadableList(const TagList &tags) const {
+void CommandListTags::PrintMachineReadableTagList(const TagList &tags) const {
   TagList::const_iterator i = tags.begin();
   const TagList::const_iterator iend = tags.end();
   for (; i != iend; ++i) {
@@ -850,8 +851,72 @@ void CommandListTags::PrintMachineReadableList(const TagList &tags) const {
   }
 }
 
+
+void CommandListTags::PrintHumanReadableBranchList(
+  const BranchHierarchy &branches) const
+{
+  unsigned N = branches.size();
+  for (unsigned i = 0; i < N; ++i) {
+    for (unsigned l = 0; l < branches[i].level; ++l) {
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s",
+               ((l + 1) == branches[i].level) ? "\u251c " : "\u2502 ");
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s @%u",
+             branches[i].branch.branch.c_str(),
+             branches[i].branch.initial_revision);
+  }
+}
+
+
+void CommandListTags::PrintMachineReadableBranchList(
+  const BranchHierarchy &branches) const
+{
+  unsigned N = branches.size();
+  for (unsigned i = 0; i < N; ++i) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "[%u] %s%s @%u",
+             branches[i].level,
+             AddPadding("", branches[i].level, false, " ").c_str(),
+             branches[i].branch.branch.c_str(),
+             branches[i].branch.initial_revision);
+  }
+}
+
+
+void CommandListTags::SortBranchesRecursively(
+  unsigned level,
+  const string &parent_branch,
+  const BranchList &branches,
+  BranchHierarchy *hierarchy) const
+{
+  // For large numbers of branches, this should be turned into the O(n) version
+  // using a linked list
+  unsigned N = branches.size();
+  for (unsigned i = 0; i < N; ++i) {
+    if (branches[i].branch == "")
+      continue;
+    if (branches[i].parent == parent_branch) {
+      hierarchy->push_back(BranchLevel(branches[i], level));
+      SortBranchesRecursively(
+          level + 1, branches[i].branch, branches, hierarchy);
+    }
+  }
+}
+
+
+CommandListTags::BranchHierarchy CommandListTags::SortBranches(
+  const BranchList &branches) const
+{
+  BranchHierarchy hierarchy;
+  hierarchy.push_back(
+    BranchLevel(history::History::Branch("(default)", "", 0), 0));
+  SortBranchesRecursively(1, "", branches, &hierarchy);
+  return hierarchy;
+}
+
+
 int CommandListTags::Main(const ArgumentList &args) {
   const bool machine_readable = (args.find('x') != args.end());
+  const bool branch_hierarchy = (args.find('B') != args.end());
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
@@ -861,17 +926,34 @@ int CommandListTags::Main(const ArgumentList &args) {
     return 1;
   }
 
-  // obtain a full list of all tags
-  TagList tags;
-  if (!env->history->List(&tags)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to list tags in history database");
-    return 1;
-  }
+  if (branch_hierarchy) {
+    BranchList branch_list;
+    if (!env->history->ListBranches(&branch_list)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to list branches in history database");
+      return 1;
+    }
+    BranchHierarchy branch_hierarchy = SortBranches(branch_list);
 
-  if (machine_readable) {
-    PrintMachineReadableList(tags);
+    if (machine_readable) {
+      PrintMachineReadableBranchList(branch_hierarchy);
+    } else {
+      PrintHumanReadableBranchList(branch_hierarchy);
+    }
   } else {
-    PrintHumanReadableList(tags);
+    // obtain a full list of all tags
+    TagList tags;
+    if (!env->history->List(&tags)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to list tags in history database");
+      return 1;
+    }
+
+    if (machine_readable) {
+      PrintMachineReadableTagList(tags);
+    } else {
+      PrintHumanReadableTagList(tags);
+    }
   }
 
   return 0;

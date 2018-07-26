@@ -9,6 +9,7 @@
 
 # This file depends on fuctions implemented in the following files:
 # - cvmfs_server_util.sh
+# - cvmfs_server_json.sh
 
 
 # checks the parameter count for a situation where we might be able to guess
@@ -136,9 +137,12 @@ check_multiple_repository_existence() {
   local no_kill=$2
 
   for name in $given_names; do
-    if ! check_repository_existence $name; then
+    # If "name" contains a subpath (i.e. repo.cern.ch/sub/path) only
+    # the repository name should be kept
+    local repo_name=$(echo $name | cut -d'/' -f1)
+    if ! check_repository_existence $repo_name; then
       if [ x"$no_kill" = x"" ]; then
-        die "The repository $name does not exist."
+        die "The repository $repo_name does not exist."
       else
         return 1
       fi
@@ -464,14 +468,35 @@ is_garbage_collectable() {
 }
 
 
-# checks if a repository has automatic garbage collection enabled
+# checks if a repository has automatic garbage collection enabled and was
+# not garbage collected for long enough to justify an automatic run
 #
 # @param name  the name of the repository to be checked
-# @return      0 if automatic garbage collection is enabled
-has_auto_garbage_collection_enabled() {
+# @return      0 if automatic garbage collection should run
+is_due_auto_garbage_collection() {
   local name=$1
   load_repo_config $name
-  is_garbage_collectable $name && [ x"$CVMFS_AUTO_GC" = x"true" ]
+
+  is_garbage_collectable $name || return 1
+  [ x"$CVMFS_AUTO_GC" = x"true" ] || return 1
+
+  CVMFS_AUTO_GC_LAPSE="${CVMFS_AUTO_GC_LAPSE:-$CVMFS_DEFAULT_AUTO_GC_LAPSE}"
+  local gc_deadline=$(date --date "$CVMFS_AUTO_GC_LAPSE" +%s 2>/dev/null)
+  if [ -z "$gc_deadline" ]; then
+    echo "Failed to parse CVMFS_AUTO_GC_LAPSE: '$CVMFS_AUTO_GC_LAPSE'" >&2
+    return 0
+  fi
+
+  local gc_status="$(read_repo_item $name .cvmfs_status.json)"
+  local last_gc="$(get_json_field "$gc_status" last_gc)"
+  [ ! -z "$last_gc" ] || return 0
+  last_gc=$(date --date "$last_gc" +%s 2>/dev/null)
+  if [ -z "$last_gc" ]; then
+    echo "Failed to parse last gc timestamp: '$last_gc'" >&2
+    return 0
+  fi
+
+  [ $last_gc -lt $gc_deadline ]
 }
 
 
@@ -487,9 +512,9 @@ get_item() {
   load_repo_config $name
 
   if [ x"$noproxy" != x"" ]; then
-    unset http_proxy && curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null
+    unset http_proxy && curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
   else
-    curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null
+    curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
   fi
 }
 
@@ -716,7 +741,8 @@ close_transaction() {
   else
     run_suid_helper clear_scratch $name
   fi
-  [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
+  # Prevent "argument too long" errors
+  [ ! -z "$tmp_dir" ] && find "${tmp_dir}" -mindepth 1 | xargs rm -fR
   run_suid_helper rdonly_mount $name > /dev/null
   run_suid_helper rw_mount $name
   release_lock "$tx_lock"
@@ -909,6 +935,7 @@ CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 CVMFS_AUTOCATALOGS=false
 CVMFS_ASYNC_SCRATCH_CLEANUP=true
+CVMFS_PRINT_STATISTICS=false
 EOF
 
   if [ x"$voms_authz" != x"" ]; then
@@ -1078,7 +1105,7 @@ setup_and_mount_new_repository() {
     echo -n "(overlayfs) "
     cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
-overlay_$name /cvmfs/$name overlay upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=$ofs_workdir,noauto,ro 0 0 # added by CernVM-FS for $name
+overlay_$name /cvmfs/$name overlay upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=$ofs_workdir,noauto,nodev,ro 0 0 # added by CernVM-FS for $name
 EOF
   else
     echo -n "(aufs) "
@@ -1087,7 +1114,7 @@ EOF
     fi
     cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
-aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,noauto,ro$selinux_context 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,noauto,nodev,ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   fi
   local user_shell="$(get_user_shell $name)"
@@ -1106,6 +1133,13 @@ EOF
 
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
+
+  # Make sure the systemd mount unit exists
+  if is_systemd; then
+    /usr/lib/systemd/system-generators/systemd-fstab-generator \
+      /run/systemd/generator '' '' 2>/dev/null || true
+    systemctl daemon-reload
+  fi
 }
 
 
@@ -1258,7 +1292,7 @@ _run_catalog_migration() {
   # finalizing transaction
   local trunk_hash=$(grep "^C" $manifest | tr -d C)
   echo "Flushing file system buffers"
-  sync
+  syncfs
 
   # committing newly created revision
   echo "Signing new manifest"

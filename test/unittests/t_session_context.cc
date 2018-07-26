@@ -4,8 +4,15 @@
 
 #include <gtest/gtest.h>
 
-#include <session_context.h>
+#include "repository_tag.h"
+#include "session_context.h"
 #include "util/posix.h"
+
+namespace {
+  RepositoryTag TestRepositoryTag() {
+    return RepositoryTag("tag_name", "trunk", "");
+  }
+}
 
 class SessionContextMocked : public upload::SessionContext {
  public:
@@ -22,7 +29,8 @@ class SessionContextMocked : public upload::SessionContext {
   }
 
   virtual bool Commit(const std::string& /*old_catalog*/,
-                      const std::string& /*new_catalog*/) {
+                      const std::string& /*new_catalog*/,
+                      const RepositoryTag& /*tag_name*/) {
     return true;
   }
 
@@ -36,7 +44,7 @@ class T_SessionContext : public ::testing::Test {};
 
 TEST_F(T_SessionContext, BasicLifeCycle) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret"));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -52,13 +60,14 @@ TEST_F(T_SessionContext, BasicLifeCycle) {
   EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
   EXPECT_EQ(1, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(1, ctx.num_jobs_finished_);
 }
 
 TEST_F(T_SessionContext, MultipleFiles) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 20000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -76,13 +85,39 @@ TEST_F(T_SessionContext, MultipleFiles) {
   }
   EXPECT_EQ(2, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(3, ctx.num_jobs_finished_);
+}
+
+TEST_F(T_SessionContext, MultipleFilesQueueSizeOne) {
+  SessionContextMocked ctx;
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
+                             "/path/to/the/session_file", "some_key_id",
+                             "some_secret", 5000, 1));
+  EXPECT_EQ(0, ctx.num_jobs_dispatched_);
+  EXPECT_EQ(0, ctx.num_jobs_finished_);
+
+  for (int i = 0; i < 10; ++i) {
+    ObjectPack::BucketHandle hd = ctx.NewBucket();
+
+    unsigned char buffer[4096];
+    memset(buffer, 0, 4096);
+    ObjectPack::AddToBucket(buffer, 4096, hd);
+
+    shash::Any hash(shash::kSha1);
+    EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, ""));
+  }
+  EXPECT_EQ(9, ctx.num_jobs_dispatched_);
+
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
+  EXPECT_EQ(10, ctx.num_jobs_finished_);
 }
 
 TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 20000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -101,13 +136,14 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchLast) {
   }
   EXPECT_EQ(3, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
 
 TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 20000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -125,13 +161,14 @@ TEST_F(T_SessionContext, MultipleFilesForcedDispatchEach) {
   }
   EXPECT_EQ(10, ctx.num_jobs_dispatched_);
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(10, ctx.num_jobs_finished_);
 }
 
 TEST_F(T_SessionContext, FirstAddAllThenCommit) {
   SessionContextMocked ctx;
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 20000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -151,7 +188,8 @@ TEST_F(T_SessionContext, FirstAddAllThenCommit) {
     EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hds[i], ""));
   }
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(3, ctx.num_jobs_dispatched_);
   EXPECT_EQ(3, ctx.num_jobs_finished_);
 }
@@ -159,7 +197,7 @@ TEST_F(T_SessionContext, FirstAddAllThenCommit) {
 TEST_F(T_SessionContext, EncounterFileWhichIsLargerThanExpected) {
   SessionContextMocked ctx;
 
-  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:8080/api/v1",
+  EXPECT_TRUE(ctx.Initialize("http://my.repo.address:4929/api/v1",
                              "/path/to/the/session_file", "some_key_id",
                              "some_secret", 4000));
   EXPECT_EQ(0, ctx.num_jobs_dispatched_);
@@ -174,7 +212,8 @@ TEST_F(T_SessionContext, EncounterFileWhichIsLargerThanExpected) {
   shash::Any hash(shash::kSha1);
   EXPECT_TRUE(ctx.CommitBucket(ObjectPack::kCas, hash, hd, "", true));
 
-  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash"));
+  EXPECT_TRUE(ctx.Finalize(true, "fake/old_root_hash", "fake/new_root_hash",
+                           TestRepositoryTag()));
   EXPECT_EQ(1, ctx.num_jobs_dispatched_);
   EXPECT_EQ(1, ctx.num_jobs_finished_);
 }

@@ -244,10 +244,6 @@ cvmfs_setup() {
   fi
 
   if [ $nocfgmod -eq 0 ]; then
-    if ! configure_fuse; then
-      echo "Cannot configure fuse!"
-      exit 1
-    fi
     if ! configure_autofs; then
       echo "Cannot configure autofs!"
       exit 1
@@ -356,22 +352,26 @@ cvmfs_chksetup() {
 
   # No autofs integration on OS X
   if [ "$sys_arch" = "Linux" ]; then
-    for path in /etc/auto.master /etc/autofs/auto.master; do
+    for path in /etc/auto.master.d/cvmfs.autofs \
+                /etc/autofs/auto.master.d/cvmfs.autofs \
+                /etc/auto.master \
+                /etc/autofs/auto.master
+    do
       if [ -f $path ]; then
-        AUTOMASTER=$path
+        AUTOFSMAP=$path
         break;
       fi
     done
-    if [ -z "$AUTOMASTER" ]; then
-      echo "Error: unable to find auto.master in any of the supplied paths!"
+    if [ -z "$AUTOFSMAP" ]; then
+      echo "Error: unable to find cvmfs.auto or auto.master in any of the supplied paths!"
       num_errors=$(($num_errors+1))
-      AUTOMASTER=/dev/null
+      AUTOFSMAP=/dev/null
     fi
-    # Check that /etc/auto.cvmfs is referenced in auto.master
+    # Check that /etc/auto.cvmfs is referenced in autofs maps
     # Check that /etc/auto.cvmfs is executable on Linux
-    if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" $AUTOMASTER 2> /dev/null; then
+    if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" $AUTOFSMAP 2> /dev/null; then
       if ! check_is_on CVMFS_NFS_SOURCE; then
-        echo "Warning: CernVM-FS map is not referenced from autofs master map"
+        echo "Warning: CernVM-FS map is not referenced from autofs maps ($AUTOFSMAP)"
         num_warnings=$(($num_warnings+1))
       fi
     fi
@@ -407,6 +407,10 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
+  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/osxfuse.fs ]; then
+    echo "Error: OSXFUSE is missing."
+    num_errors=$(($num_errors+1))
+  fi
   check_dev_fuse
   exit_code=$?
   if [ $exit_code -ne 0 ]; then
@@ -426,14 +430,6 @@ cvmfs_chksetup() {
     if ! check_is_on CVMFS_NFS_SOURCE; then
       echo "Warning: autofs service is not running"
       num_warnings=$(($num_warnings+1))
-    fi
-  fi
-
-  # Check fuse configuration
-  if [ "$CVMFS_USER" != "root" ]; then
-    if ! check_fuse_config; then
-      echo "Error: user_allow_other not set in /etc/fuse.conf"
-      num_errors=$(($num_errors+1))
     fi
   fi
 
@@ -1045,7 +1041,8 @@ cvmfs_reload() {
       continue
     fi
     echo "Pausing ${fqrn} on ${m}"
-    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap) && cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap) && \
+      cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
       awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
     cd /
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
@@ -1163,16 +1160,21 @@ cvmfs_config_fsck() {
 
 cvmfs_umount() {
   local silent=$1
+  local force=$2
+  local umount_options=
+  if [ "x$force" != "x" ]; then
+    umount_options="-l"
+  fi
+
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
 
   RETVAL=0
-
   local m
   for m in $mount_list
   do
     [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
-    umount $m 2>/dev/null
+    umount $umount_options $m 2>/dev/null
     if [ $? -ne 0 ]; then
       RETVAL=1
       if [ "x$silent" = "x" ]; then
@@ -1222,8 +1224,11 @@ cvmfs_killall() {
   echo -n "Unmounting stale mount points... "
   cvmfs_umount silent
   if [ $? -ne 0 ]; then
-    echo "Failed!"
-    return 1
+    cvmfs_umount silent force
+    if [ $? -ne 0 ]; then
+      echo "Failed!"
+      return 1
+    fi
   fi
   echo "OK"
 
@@ -1600,8 +1605,13 @@ check_dev_fuse() {
   return_code=0
 
   if [ ! -c $charDevice ]; then
-    echo "Error: character device $charDevice does not exist"
-    return_code=$(($return_code+1))
+    if [ x"$sys_arch" = x"Linux" ]; then
+      echo "Error: character device $charDevice does not exist"
+      return_code=$(($return_code+1))
+    elif [ x"$sys_arch" = x"Darwin" ]; then
+      echo -n "Warning: character device $charDevice does not exist. "
+      echo "Please make sure that OSXFUSE is installed."
+    fi
   else
     if ! runascvmfsuser "test -r $charDevice"; then
       echo "Error: $charDevice is not readable by cvmfs user"
@@ -1713,7 +1723,7 @@ configure_autofs() {
       for path in /etc/auto.master /etc/autofs/auto.master; do
         if [ -f $path ]; then
           AUTOMASTER=$path
-          break;
+          break
         fi
       done
       if [ -z "$AUTOMASTER" ]; then
@@ -1721,6 +1731,12 @@ configure_autofs() {
         num_errors=$(($num_errors+1))
         AUTOMASTER=/dev/null
       fi
+      for path in /etc/auto.master.d /etc/autofs/auto.master.d; do
+        if [ -d $path ]; then
+          AUTOFSMAPSDIR=$path
+          break
+        fi
+      done
       # Fix 'systemctl restart autofs' on CentOS 7 (CVM-1200)
       if [ -e /usr/bin/systemctl ]; then
         if /usr/bin/systemctl show -p KillMode autofs.service | \
@@ -1735,12 +1751,22 @@ EOF
         fi
       fi
 
-      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" $AUTOMASTER # Still needed or needs to be adjusted?
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
-      if ! grep -q "^$cvmfs_map" $AUTOMASTER; then
-        echo "$cvmfs_map" >> $AUTOMASTER
-        $pidof automount > /dev/null && reload_service autofs || true
-      fi ;;
+      if [ -z "$AUTOFSMAPSDIR" ]; then
+        if ! grep -q "^$cvmfs_map" $AUTOMASTER; then
+          echo "$cvmfs_map" >> $AUTOMASTER
+          $pidof automount > /dev/null && reload_service autofs || true
+        fi
+      else
+        AUTOFSMAP="$AUTOFSMAPSDIR/cvmfs.autofs"
+        if ! grep -q "^$cvmfs_map" $AUTOFSMAP 2>/dev/null; then
+          echo -e "# automatically generated by CernVM-FS\n${cvmfs_map}" >> $AUTOFSMAP
+          # Remove the entry in auto.master from previous cvmfs versions
+          sed -i "\\,^${cvmfs_map},d" $AUTOMASTER
+          $pidof automount > /dev/null && reload_service autofs || true
+        fi
+      fi
+    ;;
 
    Darwin )
      #sudo sed -i -e "/^$(echo $CVMFS_MOUNT_DIR | sed -e "s,/,\\\\/,g")/d" /etc/auto_master
@@ -1775,19 +1801,6 @@ cvmfs ALL= NOPASSWD: /usr/sbin/sysctl -w kern.maxfilesperproc=* kern.maxfiles=* 
 %everyone ALL= NOPASSWD: /bin/mkdir -p /var/run/cvmfs # added by CernVM-FS
 %everyone ALL= NOPASSWD: /usr/sbin/chown $CVMFS_USER /var/run/cvmfs # added by CernVM-FS
 EOF
-  fi
-}
-
-
-check_fuse_config() {
-  grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1
-  return $?
-}
-
-
-configure_fuse() {
-  if ! $(grep "^user_allow_other" /etc/fuse.conf >/dev/null 2>&1); then
-    echo "user_allow_other # added by CernVM-FS" >> /etc/fuse.conf
   fi
 }
 

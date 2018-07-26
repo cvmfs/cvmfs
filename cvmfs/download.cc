@@ -416,13 +416,13 @@ int DownloadManager::CallbackCurlSocket(CURL *easy,
 
   switch (action) {
     case CURL_POLL_IN:
-      download_mgr->watch_fds_[index].events |= POLLIN | POLLPRI;
+      download_mgr->watch_fds_[index].events = POLLIN | POLLPRI;
       break;
     case CURL_POLL_OUT:
-      download_mgr->watch_fds_[index].events |= POLLOUT | POLLWRBAND;
+      download_mgr->watch_fds_[index].events = POLLOUT | POLLWRBAND;
       break;
     case CURL_POLL_INOUT:
-      download_mgr->watch_fds_[index].events |=
+      download_mgr->watch_fds_[index].events =
         POLLIN | POLLPRI | POLLOUT | POLLWRBAND;
       break;
     case CURL_POLL_REMOVE:
@@ -529,7 +529,14 @@ void *DownloadManager::MainDownload(void *data) {
     }
 
     // Activity on curl sockets
-    for (unsigned i = 2; i < download_mgr->watch_fds_inuse_; ++i) {
+    // Within this loop the curl_multi_socket_action() may cause socket(s)
+    // to be removed from watch_fds_. If a socket is removed it is replaced
+    // by the socket at the end of the array and the inuse count is decreased.
+    // Therefore loop over the array in reverse order.
+    for (int64_t i = download_mgr->watch_fds_inuse_-1; i >= 2; --i) {
+      if (i >= download_mgr->watch_fds_inuse_) {
+        continue;
+      }
       if (download_mgr->watch_fds_[i].revents) {
         int ev_bitmask = 0;
         if (download_mgr->watch_fds_[i].revents & (POLLIN | POLLPRI))
@@ -938,8 +945,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_direct_);
     curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_direct_);
   }
-  if (opt_dns_server_)
-    curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_);
+  if (!opt_dns_server_.empty())
+    curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_.c_str());
 
   if (info->probe_hosts && opt_host_chain_)
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
@@ -951,6 +958,10 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     const char *cadir = getenv("X509_CERT_DIR");
     if (!cadir || !*cadir) {cadir = "/etc/grid-security/certificates";}
     curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
+    const char *cabundle = getenv("X509_CERT_BUNDLE");
+    if (cabundle && *cabundle) {
+      curl_easy_setopt(curl_handle, CURLOPT_CAINFO, cabundle);
+    }
     if (info->pid != -1) {
       if (credentials_attachment_ == NULL) {
         LogCvmfs(kLogDownload, kLogDebug,
@@ -1249,16 +1260,24 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_TOO_MANY_REDIRECTS:
       info->error_code = kFailHostConnection;
       break;
+    case CURLE_SSL_CACERT_BADFILE:
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
+               "Failed to load certificate bundle. "
+               "X509_CERT_BUNDLE might point to the wrong location.");
+      info->error_code = kFailHostConnection;
+      break;
     case CURLE_SSL_CACERT:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "SSL certificate cannot"
-               "be authenticated with known CA certificates. "
-               "X509_CERT_DIR might point to the wrong directory.");
+               " be authenticated with known CA certificates. "
+               "X509_CERT_DIR and/or X509_CERT_BUNDLE might point to the wrong "
+               "location.");
       info->error_code = kFailHostConnection;
       break;
     case CURLE_PEER_FAILED_VERIFICATION:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                "invalid SSL certificate of remote host. "
-               "X509_CERT_DIR might point to the wrong directory.");
+               "X509_CERT_DIR and/or X509_CERT_BUNDLE might point to the wrong "
+               "location.");
       info->error_code = kFailHostConnection;
       break;
     case CURLE_ABORTED_BY_CALLBACK:
@@ -1475,7 +1494,7 @@ DownloadManager::DownloadManager() {
   retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
   assert(retval == 0);
 
-  opt_dns_server_ = NULL;
+  opt_dns_server_ = "";
   opt_ip_preference_ = dns::kIpPreferSystem;
   opt_timeout_proxy_ = 0;
   opt_timeout_direct_ = 0;
@@ -1759,6 +1778,12 @@ void DownloadManager::SetCredentialsAttachment(CredentialsAttachment *ca) {
   pthread_mutex_unlock(lock_options_);
 }
 
+/**
+ * Gets the DNS sever.
+ */
+std::string DownloadManager::GetDnsServer() const {
+  return opt_dns_server_;
+}
 
 /**
  * Sets a DNS server.  Only for testing as it cannot be reverted to the system
@@ -1766,11 +1791,9 @@ void DownloadManager::SetCredentialsAttachment(CredentialsAttachment *ca) {
  */
 void DownloadManager::SetDnsServer(const string &address) {
   pthread_mutex_lock(lock_options_);
-  if (opt_dns_server_)
-    free(opt_dns_server_);
-  if (address != "") {
-    opt_dns_server_ = strdup(address.c_str());
-    assert(opt_dns_server_);
+  if (!address.empty()) {
+    opt_dns_server_ = address;
+    assert(!opt_dns_server_.empty());
 
     vector<string> servers;
     servers.push_back(address);
@@ -2705,7 +2728,7 @@ DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
     clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
     clone->SetMaxIpaddrPerProxy(resolver_->throttle());
   }
-  if (opt_dns_server_)
+  if (!opt_dns_server_.empty())
     clone->SetDnsServer(opt_dns_server_);
   clone->opt_timeout_proxy_ = opt_timeout_proxy_;
   clone->opt_timeout_direct_ = opt_timeout_direct_;

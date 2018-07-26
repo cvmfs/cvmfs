@@ -185,8 +185,16 @@ int ExternalCacheManager::ConnectLocator(const std::string &locator) {
   } else {
     return -EINVAL;
   }
-  if (result < 0)
+  if (result < 0) {
+    if (errno) {
+      LogCvmfs(kLogCache, kLogDebug | kLogStderr,
+               "Failed to connect to socket: %s", strerror(errno));
+    } else {
+      LogCvmfs(kLogCache, kLogDebug | kLogStderr,
+               "Failed to connect to socket (unknown error)");
+    }
     return -EIO;
+  }
   LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
            "connected to cache plugin at %s", locator.c_str());
   return result;
@@ -262,8 +270,16 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
     if (plugin_handle->IsValid()) {
       break;
     } else if (plugin_handle->fd_connection_ == -EINVAL) {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+               "Invalid locator: %s", locator.c_str());
       plugin_handle->error_msg_ = "Invalid locator: " + locator;
+      break;
     } else {
+      if (num_attempts > 1) {
+        LogCvmfs(kLogCache, kLogDebug | kLogStderr,
+                 "Failed to connect to external cache manager: %d",
+                 plugin_handle->fd_connection_);
+      }
       plugin_handle->error_msg_ = "Failed to connect to external cache manager";
     }
 

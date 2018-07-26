@@ -15,6 +15,11 @@ cvmfs_run_test() {
   local bin_name="602-test"
   local num_repos=2
   local base_name="$CVMFS_TEST_602_REPO_PREFIX"
+  # See main.cc
+  local cache_dir="/tmp/test-libcvmfs-cache"
+
+  # Sanity check
+  [ "x$cache_dir" != "x$PWD" ] || return 1
 
   echo "compiling libcvmfs test binary..."
   g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -lcrypto -luuid -lrt || return 1
@@ -29,8 +34,6 @@ cvmfs_run_test() {
 
     CVMFS_TEST_602_REPO_COUNT=$(( $CVMFS_TEST_602_REPO_COUNT + 1 ))
     create_empty_repo "$repo_name" $CVMFS_TEST_USER || return 2
-    echo "CVMFS_GENERATE_LEGACY_BULK_CHUNKS=false" | \
-      sudo tee -a /etc/cvmfs/repositories.d/$repo_name/server.conf || return 2
     start_transaction "$repo_name"                  || return 3
 
     mkdir "$repo_dir/main"                || return 4
@@ -49,6 +52,9 @@ cvmfs_run_test() {
 
   echo "check libcvmfs with the generated binary"
   ./$bin_name "$(get_repo_url)" "$base_name" "$num_repos" || return 9
+
+  [ -f ${cache_dir}/cvmfschecksum.${base_name}1 ] || return 20
+  [ -f ${PWD}/cvmfschecksum.${base_name}1 ] && return 21
 
   return 0
 }

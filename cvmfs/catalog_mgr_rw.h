@@ -111,6 +111,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void TouchDirectory(const DirectoryEntryBase &entry,
                       const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
+  void Clone(const std::string from, const std::string to);
 
   // Hardlink group handling
   void AddHardlinkGroup(const DirectoryEntryBaseList &entries,
@@ -121,7 +122,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);
-  void RemoveNestedCatalog(const std::string &mountpoint);
+  void RemoveNestedCatalog(const std::string &mountpoint,
+                           const bool merge = true);
   bool IsTransitionPoint(const std::string &mountpoint);
   WritableCatalog *GetHostingCatalog(const std::string &path);
 

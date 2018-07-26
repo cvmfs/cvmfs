@@ -16,7 +16,6 @@ cvmfs_server_transaction() {
   local gw_key_file
   local spool_dir
   local stratum0
-  local exact=0
   local force=0
   local retcode=0
 
@@ -28,9 +27,6 @@ cvmfs_server_transaction() {
       f)
         force=1
       ;;
-      e) # Need this mode if passing repository subpaths: cvmfs_server transaction myrepo.cern.ch/some/subpath
-        exact=1
-      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command transaction: Unrecognized option: $1"
@@ -40,13 +36,8 @@ cvmfs_server_transaction() {
 
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
-  # get repository names
-  if [ $exact -eq 0 ]; then
-      names=$(get_or_guess_multiple_repository_names "$@")
-      check_multiple_repository_existence "$names"
-  else
-      names=$@
-  fi
+  names=$(get_or_guess_multiple_repository_names "$@")
+  check_multiple_repository_existence "$names"
 
   # sanity checks
   check_autofs_on_cvmfs && die "Autofs on /cvmfs has to be disabled"

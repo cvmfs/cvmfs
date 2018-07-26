@@ -10,6 +10,7 @@
 #include <string>
 
 #include "pack.h"
+#include "repository_tag.h"
 #include "session_context.h"
 #include "upload_facility.h"
 
@@ -48,13 +49,12 @@ class GatewayUploader : public AbstractUploader {
   virtual bool Initialize();
 
   virtual bool FinalizeSession(bool commit, const std::string& old_root_hash,
-                               const std::string& new_root_hash);
+                               const std::string& new_root_hash,
+                               const RepositoryTag& tag);
 
   virtual void WaitForUpload() const;
 
   virtual std::string name() const;
-
-  virtual bool Remove(const std::string& file_to_delete);
 
   virtual bool Peek(const std::string& path) const;
 
@@ -70,11 +70,13 @@ class GatewayUploader : public AbstractUploader {
   virtual UploadStreamHandle* InitStreamedUpload(
       const CallbackTN* callback = NULL);
 
-  virtual void StreamedUpload(UploadStreamHandle* handle, CharBuffer* buffer,
+  virtual void StreamedUpload(UploadStreamHandle* handle, UploadBuffer buffer,
                               const CallbackTN* callback);
 
   virtual void FinalizeStreamedUpload(UploadStreamHandle* handle,
                                       const shash::Any& content_hash);
+
+  virtual void DoRemoveAsync(const std::string& file_to_delete);
 
  protected:
   virtual bool ReadSessionTokenFile(const std::string& token_file_name,

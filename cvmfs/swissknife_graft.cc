@@ -89,7 +89,7 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
     }
 
     // Start a new hash if current one is above threshold
-    if (do_chunk && (*file_size - chunk_offsets->back() > chunk_size_)) {
+    if (do_chunk && (*file_size - chunk_offsets->back() >= chunk_size_)) {
       shash::Final(chunk_hash_context, &chunk_hash);
       chunk_offsets->push_back(*file_size);
       chunk_checksums->push_back(chunk_hash);

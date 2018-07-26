@@ -287,6 +287,40 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
   SyncUnlock();
 }
 
+/**
+ * Clone the file called `source` changing its name into `destination`, the
+ * source file is keep intact
+ * @params destination, the name of the new file, complete path
+ * @params source, the name of the file to clone, which must be already in the
+ * repository
+ * @return void
+ */
+void WritableCatalogManager::Clone(const std::string destination,
+                                   const std::string source) {
+  const std::string relative_source = MakeRelativePath(source);
+
+  std::string destination_dirname;
+  std::string destination_filename;
+  SplitPath(destination, &destination_dirname, &destination_filename);
+
+  DirectoryEntry to_dirent;
+  if (!LookupPath(relative_source, kLookupSole, &to_dirent)) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for file '%s' cannot be found aborting", source.c_str());
+    assert(false);
+  }
+  if (to_dirent.IsDirectory()) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "Trying to clone a directory: '%s' aborting", source.c_str());
+    assert(false);
+  }
+
+  DirectoryEntry destination_dirent(to_dirent);
+  destination_dirent.name_.Assign(
+      NameString(destination_filename.c_str(), destination_filename.length()));
+
+  this->AddFile(destination_dirent, empty_xattrs, destination_dirname);
+}
 
 /**
  * Add a new directory to the catalogs.
@@ -660,13 +694,18 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
 
 /**
- * Remove a nested catalog.
- * When you remove a nested catalog all entries currently held by it
- * will be merged into its parent catalog.
- * @param mountpoint the path of the nested catalog to be removed
- * @return true on success, false otherwise
+ * Remove a nested catalog
+ *
+ * If the merged parameter is true, when you remove a nested catalog
+ * all entries currently held by it will be merged into its parent
+ * catalog.
+ * @param mountpoint - the path of the nested catalog to be removed
+ * @param merge - merge the subtree associated with the nested catalog
+ *                into its parent catalog
+ * @return - true on success, false otherwise
  */
-void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
+void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
+                                                 const bool merge) {
   const string nested_root_path = MakeRelativePath(mountpoint);
 
   SyncLock();
@@ -683,8 +722,12 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint) {
   assert(!nested_catalog->IsRoot() &&
          (nested_catalog->mountpoint().ToString() == nested_root_path));
 
-  // Merge all data from the nested catalog into it's parent
-  nested_catalog->MergeIntoParent();
+  if (merge) {
+    // Merge all data from the nested catalog into it's parent
+    nested_catalog->MergeIntoParent();
+  } else {
+    nested_catalog->RemoveFromParent();
+  }
 
   // Delete the catalog database file from the working copy
   if (unlink(nested_catalog->database_path().c_str()) != 0) {
@@ -1134,9 +1177,8 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
       PrintError("could not compress catalog " + (*i)->mountpoint().ToString());
       assert(false);
     }
-    spooler_->ProcessCatalog((*i)->database_path());
 
-    uint64_t catalog_size = GetFileSize((*i)->database_path());
+    int64_t catalog_size = GetFileSize((*i)->database_path());
     assert(catalog_size > 0);
 
     if ((*i)->HasParent()) {
@@ -1153,6 +1195,8 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
     } else {
       assert(false && "inconsistent state detected");
     }
+
+    spooler_->ProcessCatalog((*i)->database_path());
   }
   spooler_->WaitForUpload();
 

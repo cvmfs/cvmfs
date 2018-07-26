@@ -330,6 +330,12 @@ void *TalkManager::MainResponder(void *data) {
         mount_point->SetMaxTtlMn(max_ttl);
         talk_mgr->Answer(con_fd, "OK\n");
       }
+    } else if (line.substr(0, 14) == "nameserver get") {
+      const string dns_server = mount_point->download_mgr()->GetDnsServer();
+      const string reply = !dns_server.empty() ?
+        std::string("DNS server address: ") + dns_server + "\n":
+        std::string("DNS server not set.\n");
+      talk_mgr->Answer(con_fd, reply);
     } else if (line.substr(0, 14) == "nameserver set") {
       if (line.length() < 16) {
         talk_mgr->Answer(con_fd, "Usage: nameserver set <host>\n");
@@ -512,7 +518,7 @@ void *TalkManager::MainResponder(void *data) {
 
       if (file_system->IsNfsSource()) {
         result += "\nNFS Map Statistics:\n";
-        result += nfs_maps::GetStatistics();
+        result += file_system->nfs_maps()->GetStatistics();
       }
 
       result += "SQlite Statistics:\n";
@@ -587,6 +593,30 @@ void *TalkManager::MainResponder(void *data) {
           (*i)->so_version + ")\n";
       }
       talk_mgr->Answer(con_fd, history_str);
+    } else if (line == "vfs inodes") {
+      string result;
+      glue::InodeTracker::Cursor cursor(
+        mount_point->inode_tracker()->BeginEnumerate());
+      uint64_t inode;
+      while (mount_point->inode_tracker()->NextInode(&cursor, &inode)) {
+        result += StringifyInt(inode) + "\n";
+      }
+      mount_point->inode_tracker()->EndEnumerate(&cursor);
+      talk_mgr->Answer(con_fd, result);
+    } else if (line == "vfs entries") {
+      string result;
+      glue::InodeTracker::Cursor cursor(
+        mount_point->inode_tracker()->BeginEnumerate());
+      uint64_t inode_parent;
+      NameString name;
+      while (mount_point->inode_tracker()->NextEntry(
+        &cursor, &inode_parent, &name))
+      {
+        result += "<" + StringifyInt(inode_parent) + ">/" + name.ToString() +
+                  "\n";
+      }
+      mount_point->inode_tracker()->EndEnumerate(&cursor);
+      talk_mgr->Answer(con_fd, result);
     } else if (line == "version") {
       string version_str = string(VERSION) + " (CernVM-FS Fuse Module)\n" +
         cvmfs::loader_exports_->loader_version + " (Loader)\n";

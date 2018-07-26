@@ -151,9 +151,10 @@ __do_snapshot() {
       -i $last_snapshot_tmp                                \
       -o .cvmfs_last_snapshot"
     $user_shell "rm -f $last_snapshot_tmp"
+    syncfs
 
     # run the automatic garbage collection (if configured)
-    if has_auto_garbage_collection_enabled $alias_name; then
+    if is_due_auto_garbage_collection $alias_name; then
       echo "Running automatic garbage collection"
       local dry_run=0
       __run_gc "$alias_name" \

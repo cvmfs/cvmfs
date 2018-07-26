@@ -20,16 +20,21 @@ class MockedPayloadProcessor : public PayloadProcessor {
   MockedPayloadProcessor() : PayloadProcessor() {}
 
  protected:
+  virtual Result Initialize() { return kSuccess; }
+
+  virtual Result Finalize() { return kSuccess; }
+
+  virtual void Upload(const std::string& source,
+                      const std::string& dest) {}
+
   virtual bool WriteFile(int /*fd*/, const void* const /*buf*/,
                          size_t /*buf_size*/) {
     // NO OP
     return true;
   }
-  virtual int RenameFile(const std::string& /*old_name*/,
-                         const std::string& /*new_name*/) {
-    // NO OP
-    return 0;
-  }
+
+  virtual void ConsumerEventCallback(
+    const ObjectPackBuild::Event& /*event*/) {}
 };
 
 class MockedReactor : public Reactor {
@@ -47,9 +52,6 @@ class T_Reactor : public ::testing::Test {
   T_Reactor() : ready_(1, 1), thread_() {}
 
   virtual void SetUp() {
-    SetLogCustomFile(0, "/tmp/t_reactor_out.log");
-    SetLogCustomFile(1, "/tmp/t_reactor_err.log");
-
     ASSERT_NE(-1, pipe(to_reactor_));
     ASSERT_NE(-1, pipe(from_reactor_));
 
@@ -212,7 +214,7 @@ TEST_F(T_Reactor, FullCycle) {
     serializer.GetDigest(&digest);
 
     const std::string request = "{\"path\":\"some_path\",\"digest\":\"" +
-                                Base64(digest.ToString(false)) +
+                                digest.ToString(false) +
                                 "\",\"header_size\":" +
                                 StringifyInt(serializer.GetHeaderSize()) + "}";
 

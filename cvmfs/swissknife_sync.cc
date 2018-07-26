@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <glob.h>
 #include <inttypes.h>
+#include <sys/capability.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -41,8 +42,12 @@
 #include "path_filters/dirtab.h"
 #include "platform.h"
 #include "reflog.h"
+#include "sanitizer.h"
+#include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
+#include "sync_union_aufs.h"
+#include "sync_union_overlayfs.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -233,9 +238,10 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   const upload::SpoolerDefinition sd(spooler_definition, shash::kAny);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
-  const bool success = spooler->Remove(file_to_delete);
+  spooler->RemoveAsync(file_to_delete);
+  spooler->WaitForUpload();
 
-  if (spooler->GetNumberOfErrors() > 0 || !success) {
+  if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
              file_to_delete.c_str());
     return 1;
@@ -483,6 +489,51 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
   return true;
 }
 
+bool swissknife::CommandSync::ObtainDacReadSearchCapability() {
+  cap_value_t cap = CAP_DAC_READ_SEARCH;
+#ifdef CAP_IS_SUPPORTED
+  assert(CAP_IS_SUPPORTED(cap));
+#endif
+
+  cap_t caps_proc = cap_get_proc();
+  assert(caps_proc != NULL);
+
+  cap_flag_value_t cap_state;
+  int retval = cap_get_flag(caps_proc, cap, CAP_EFFECTIVE, &cap_state);
+  assert(retval == 0);
+
+  if (cap_state == CAP_SET) {
+    cap_free(caps_proc);
+    return true;
+  }
+
+  retval = cap_get_flag(caps_proc, cap, CAP_PERMITTED, &cap_state);
+  assert(retval == 0);
+  if (cap_state != CAP_SET) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Warning: CAP_DAC_READ_SEARCH cannot be obtained. "
+             "It's not in the process's permitted set.");
+    cap_free(caps_proc);
+    return false;
+  }
+
+  retval = cap_set_flag(caps_proc, CAP_EFFECTIVE, 1, &cap, CAP_SET);
+  assert(retval == 0);
+
+  retval = cap_set_proc(caps_proc);
+  cap_free(caps_proc);
+
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Cannot reset capabilities for current process "
+             "(errno: %d)",
+             errno);
+    return false;
+  }
+
+  return true;
+}
+
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   SyncParameters params;
 
@@ -583,6 +634,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('v') != args.end()) {
+    sanitizer::IntegerSanitizer sanitizer;
+    if (!sanitizer.IsValid(*args.find('v')->second)) {
+      PrintError("invalid revision number");
+      return 1;
+    }
     params.manual_revision = String2Uint64(*args.find('v')->second);
   }
 
@@ -608,20 +664,28 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.key_file = *args.find('H')->second;
   }
 
+  if (args.find('D') != args.end()) {
+    params.repo_tag.name_ = *args.find('D')->second;
+  }
+
+  if (args.find('G') != args.end()) {
+    params.repo_tag.channel_ = *args.find('G')->second;
+  }
+
+  if (args.find('J') != args.end()) {
+    params.repo_tag.description_ = *args.find('J')->second;
+  }
+
   if (!CheckParams(params)) return 2;
+  // This may fail, in which case a warning is printed and the process continues
+  ObtainDacReadSearchCapability();
 
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
-      params.spooler_definition,
-      hash_algorithm,
-      params.compression_alg,
-      params.generate_legacy_bulk_chunks,
-      params.use_file_chunking,
-      params.min_file_chunk_size,
-      params.avg_file_chunk_size,
-      params.max_file_chunk_size,
-      params.session_token_file,
-      params.key_file);
+      params.spooler_definition, hash_algorithm, params.compression_alg,
+      params.generate_legacy_bulk_chunks, params.use_file_chunking,
+      params.min_file_chunk_size, params.avg_file_chunk_size,
+      params.max_file_chunk_size, params.session_token_file, params.key_file);
   if (params.max_concurrent_write_jobs > 0) {
     spooler_definition.number_of_concurrent_uploads =
         params.max_concurrent_write_jobs;
@@ -646,6 +710,17 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
+  bool with_gateway =
+      spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
+  /*
+   * Note: If the upstream is of type gateway, due to the possibility of
+   * concurrent
+   *       release managers, it's possible to have a different local and remote
+   * root
+   *       hashes. We proceed by loading the remote manifest but we give an
+   * empty base
+   *       hash.
+   */
   UniquePtr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
@@ -655,8 +730,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     manifest = this->OpenLocalManifest(params.manifest_path);
     params.base_hash = manifest->catalog_hash();
   } else {
-    manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                   params.base_hash);
+    if (with_gateway) {
+      manifest =
+          FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any());
+    } else {
+      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
+                                     params.base_hash);
+    }
   }
   if (!manifest) {
     return 3;
@@ -671,13 +751,14 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  publish::SyncMediator mediator(&catalog_manager, &params);
+  perf::StatisticsTemplate statistics("Publish", this->statistics());
+  publish::SyncMediator mediator(&catalog_manager, &params, statistics);
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations
   if ((params.ttl_seconds > 0) &&
-      (params.ttl_seconds != catalog_manager.GetTTL()))
-  {
+      ((params.ttl_seconds != catalog_manager.GetTTL()) ||
+       !catalog_manager.HasExplicitTTL())) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %" PRIu64 "s",
              params.ttl_seconds);
     catalog_manager.SetTTL(params.ttl_seconds);
@@ -746,10 +827,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   // finalize the spooler
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
+  LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
 
   // We call FinalizeSession(true) this time, to also trigger the commit
   // operation on the gateway machine (if the upstream is of type "gw").
@@ -757,7 +840,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // Get the path of the new root catalog
   const std::string new_root_hash = manifest->catalog_hash().ToString(true);
 
-  spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash);
+  if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
+                                         params.repo_tag)) {
+    PrintError("Failed to commit transaction.");
+    return 9;
+                                         }
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

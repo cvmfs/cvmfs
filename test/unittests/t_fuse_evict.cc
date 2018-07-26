@@ -9,7 +9,7 @@
 #include "util/string.h"
 
 extern "C" {
-unsigned fuse_lowlevel_notify_inval_entry_cnt = 0;
+unsigned fuse_lowlevel_notify_inval_inode_cnt = 0;
 }
 
 class T_FuseInvalidator : public ::testing::Test {
@@ -48,14 +48,14 @@ TEST_F(T_FuseInvalidator, StartStop) {
 TEST_F(T_FuseInvalidator, InvalidateTimeout) {
   FuseInvalidator::Handle handle(0);
   EXPECT_FALSE(handle.IsDone());
-  invalidator_->InvalidateDentries(&handle);
+  invalidator_->InvalidateInodes(&handle);
   handle.WaitFor();
   EXPECT_TRUE(handle.IsDone());
 
   invalidator_->terminated_ = 1;
   FuseInvalidator::Handle handle2(1000000);
   EXPECT_FALSE(handle2.IsDone());
-  invalidator_->InvalidateDentries(&handle2);
+  invalidator_->InvalidateInodes(&handle2);
   handle2.WaitFor();
   EXPECT_TRUE(handle2.IsDone());
 }
@@ -70,26 +70,26 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
 
   FuseInvalidator::Handle handle(0);
   EXPECT_FALSE(handle.IsDone());
-  invalidator_->InvalidateDentries(&handle);
+  invalidator_->InvalidateInodes(&handle);
   handle.WaitFor();
   EXPECT_TRUE(handle.IsDone());
   EXPECT_EQ(FuseInvalidator::kCheckTimeoutFreqOps,
-            fuse_lowlevel_notify_inval_entry_cnt);
+            fuse_lowlevel_notify_inval_inode_cnt);
 
   FuseInvalidator::Handle handle2(1000000);
   EXPECT_FALSE(handle2.IsDone());
-  invalidator_->InvalidateDentries(&handle2);
+  invalidator_->InvalidateInodes(&handle2);
   handle2.WaitFor();
   EXPECT_TRUE(handle2.IsDone());
   EXPECT_EQ(FuseInvalidator::kCheckTimeoutFreqOps + 1024,
-            fuse_lowlevel_notify_inval_entry_cnt);
+            fuse_lowlevel_notify_inval_inode_cnt);
 
   invalidator_->terminated_ = 1;
   handle2.Reset();
   EXPECT_FALSE(handle2.IsDone());
-  invalidator_->InvalidateDentries(&handle2);
+  invalidator_->InvalidateInodes(&handle2);
   handle2.WaitFor();
   EXPECT_TRUE(handle2.IsDone());
   EXPECT_EQ((2 * FuseInvalidator::kCheckTimeoutFreqOps) + 1024,
-            fuse_lowlevel_notify_inval_entry_cnt);
+            fuse_lowlevel_notify_inval_inode_cnt);
 }

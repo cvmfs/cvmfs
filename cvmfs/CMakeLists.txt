@@ -40,6 +40,7 @@ set (CVMFS_CLIENT_SOURCES
   download.cc
   fetch.cc
   file_chunk.cc
+  file_watcher.cc
   globals.cc
   glue_buffer.cc
   hash.cc
@@ -57,6 +58,7 @@ set (CVMFS_CLIENT_SOURCES
   options.cc
   quota.cc
   quota_posix.cc
+  resolv_conf_event_handler.cc
   sanitizer.cc
   signature.cc
   sql.cc
@@ -72,7 +74,16 @@ set (CVMFS_CLIENT_SOURCES
   whitelist.cc
   wpad.cc
   xattr.cc
-)
+  )
+
+if (APPLE)
+  list(APPEND CVMFS_CLIENT_SOURCES file_watcher_kqueue.cc)
+else(APPLE)
+  if (CVMFS_ENABLE_INOTIFY)
+    list(APPEND CVMFS_CLIENT_SOURCES file_watcher_inotify.cc)
+    add_definitions(-DCVMFS_ENABLE_INOTIFY)
+  endif(CVMFS_ENABLE_INOTIFY)
+endif (APPLE)
 
 # First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc
@@ -97,8 +108,8 @@ set (CVMFS2_DEBUG_SOURCES
   cvmfs.cc
   fuse_evict.cc
   fuse_remount.cc
-  nfs_maps.cc
-  nfs_shared_maps.cc
+  nfs_maps_leveldb.cc
+  nfs_maps_sqlite.cc
   quota_listener.cc
   talk.cc
 )
@@ -146,6 +157,7 @@ set (CVMFS_CACHE_RAM_SOURCES
   malloc_heap.cc
   statistics.cc
   util_concurrency.cc
+  util/posix.cc
   util/string.cc
 )
 
@@ -161,6 +173,7 @@ set (CVMFS_FSCK_SOURCES
 
 
 set (CVMFS_SWISSKNIFE_SOURCES
+  backoff.cc
   catalog.cc
   catalog_counters.cc
   catalog_mgr_ro.cc
@@ -174,18 +187,21 @@ set (CVMFS_SWISSKNIFE_SOURCES
   dns.cc
   download.cc
   file_chunk.cc
-  file_processing/async_reader.cc
-  file_processing/chunk.cc
-  file_processing/chunk_detector.cc
-  file_processing/file.cc
-  file_processing/file_processor.cc
-  file_processing/io_dispatcher.cc
-  file_processing/processor.cc
   gateway_util.cc
   globals.cc
   hash.cc
   history_sql.cc
   history_sqlite.cc
+  ingestion/chunk_detector.cc
+  ingestion/item.cc
+  ingestion/item_mem.cc
+  ingestion/pipeline.cc
+  ingestion/task_chunk.cc
+  ingestion/task_compress.cc
+  ingestion/task_hash.cc
+  ingestion/task_read.cc
+  ingestion/task_register.cc
+  ingestion/task_write.cc
   json_document.cc
   letter.cc
   logging.cc
@@ -200,6 +216,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   pathspec/pathspec_pattern.cc
   reflog.cc
   reflog_sql.cc
+  repository_tag.cc
   s3fanout.cc
   sanitizer.cc
   server_tool.cc
@@ -208,6 +225,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   signing_tool.cc
   sql.cc
   sqlitemem.cc
+  statistics_database.cc
   statistics.cc
   swissknife.cc
   swissknife_assistant.cc
@@ -219,6 +237,10 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_hash.cc
   swissknife_history.cc
   swissknife_info.cc
+  swissknife_ingest.cc
+  swissknife_lease.cc
+  swissknife_lease_curl.cc
+  swissknife_lease_json.cc
   swissknife_letter.cc
   swissknife_lsrepo.cc
   swissknife_main.cc
@@ -229,12 +251,13 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_sign.cc
   swissknife_sync.cc
   swissknife_zpipe.cc
-  swissknife_lease.cc
-  swissknife_lease_curl.cc
-  swissknife_lease_json.cc
   sync_item.cc
+  sync_item_tar.cc
   sync_mediator.cc
   sync_union.cc
+  sync_union_aufs.cc
+  sync_union_overlayfs.cc
+  sync_union_tarball.cc
   upload.cc
   upload_facility.cc
   upload_gateway.cc
@@ -256,27 +279,33 @@ set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
 )
 
 set (CVMFS_SUID_HELPER_SOURCES
-  cvmfs_suid_helper.cc sanitizer.cc
+  cvmfs_suid_helper.cc
+  cvmfs_suid_util.cc
+  sanitizer.cc
 )
 
 set (CVMFS_PRELOADER_SOURCES
+  backoff.cc
   catalog.cc
   catalog_sql.cc
   compression.cc
   dns.cc
   download.cc
-  file_processing/async_reader.cc
-  file_processing/chunk.cc
-  file_processing/chunk_detector.cc
-  file_processing/file.cc
-  file_processing/file_processor.cc
-  file_processing/io_dispatcher.cc
-  file_processing/processor.cc
   gateway_util.cc
   globals.cc
   hash.cc
   history_sql.cc
   history_sqlite.cc
+  ingestion/chunk_detector.cc
+  ingestion/item.cc
+  ingestion/item_mem.cc
+  ingestion/pipeline.cc
+  ingestion/task_chunk.cc
+  ingestion/task_compress.cc
+  ingestion/task_hash.cc
+  ingestion/task_read.cc
+  ingestion/task_register.cc
+  ingestion/task_write.cc
   json_document.cc
   logging.cc
   malloc_arena.cc
@@ -345,11 +374,13 @@ set (CVMFS_STRATUM_AGENT_SOURCES
 if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
     receiver/commit_processor.cc
+    receiver/lease_path_util.cc
     receiver/params.cc
     receiver/payload_processor.cc
     receiver/reactor.cc
     receiver/receiver.cc
     receiver/session_token.cc
+    backoff.cc
     catalog.cc
     catalog_rw.cc
     catalog_counters.cc
@@ -361,16 +392,21 @@ if(BUILD_RECEIVER)
     dns.cc
     download.cc
     encrypt.cc
-    file_processing/async_reader.cc
-    file_processing/chunk.cc
-    file_processing/chunk_detector.cc
-    file_processing/file.cc
-    file_processing/file_processor.cc
-    file_processing/io_dispatcher.cc
-    file_processing/processor.cc
     gateway_util.cc
     globals.cc
     hash.cc
+    history_sql.cc
+    history_sqlite.cc
+    ingestion/chunk_detector.cc
+    ingestion/item.cc
+    ingestion/item_mem.cc
+    ingestion/pipeline.cc
+    ingestion/task_chunk.cc
+    ingestion/task_compress.cc
+    ingestion/task_hash.cc
+    ingestion/task_read.cc
+    ingestion/task_register.cc
+    ingestion/task_write.cc
     json_document.cc
     logging.cc
     malloc_arena.cc
@@ -380,6 +416,7 @@ if(BUILD_RECEIVER)
     pack.cc
     reflog.cc
     reflog_sql.cc
+    repository_tag.cc
     s3fanout.cc
     sanitizer.cc
     server_tool.cc
@@ -387,9 +424,12 @@ if(BUILD_RECEIVER)
     signature.cc
     signing_tool.cc
     statistics.cc
+    swissknife.cc
+    swissknife_history.cc
     swissknife_lease_curl.cc
     sql.cc
     sqlitemem.cc
+    sync_item.cc
     upload.cc
     upload_facility.cc
     upload_gateway.cc
@@ -401,13 +441,17 @@ if(BUILD_RECEIVER)
     util/posix.cc
     util/string.cc
     util/raii_temp_dir.cc
+    util_concurrency.cc
     uuid.cc
     whitelist.cc
     xattr.cc
     )
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${TBB_LIBRARIES} ${CARES_LIBRARIES} ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES} ${RT_LIBRARY} pthread dl)
+  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                        ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
 
   set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
   set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
@@ -518,23 +562,35 @@ if (BUILD_LIBCVMFS_CACHE)
   add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
   add_dependencies (cvmfs_cache_only cache.pb.generated)
   set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
-                           ${LIBCVMFS_CACHE_LIBS}
-                           ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+    ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
+  if (MACOSX)
+    list(APPEND LIBCVMFS_CACHE_LIBS ${OPENSSL_LIBRARIES})
+  endif (MACOSX)
+
   set_target_properties (cvmfs_cache_only PROPERTIES COMPILE_FLAGS
                          "${LIBCVMFS_CACHE_CFLAGS}")
   target_link_libraries(cvmfs_cache_only ${LIBCVMFS_CACHE_LIBS})
-  if (NOT MACOSX)
-    # We do not (yet) have a recipe for localizing private symbols
-    # in Mac OS X, so skip that step on Mac
-    #set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
-  endif (NOT MACOSX)
 
-  add_custom_command(
-      OUTPUT libcvmfs_cache.a
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${LIBCVMFS_CACHE_LIBS}
-    )
+  # Note: it would be a good idea to try to unify the next block for macOS and Linux.
+  #       It may be possible to use libtool on both platforms, including the ability
+  #       to hide private symbols in the library - which is currently done by the
+  #       `combine_libs` script, on Linux only.
+  if (MACOSX)
+    add_custom_command(
+        OUTPUT libcvmfs_cache.a
+        COMMAND libtool -static -o libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_CACHE_LIBS}
+      )
+  else (MACOSX)
+    set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
+    add_custom_command(
+        OUTPUT libcvmfs_cache.a
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_CACHE_LIBS}
+      )
+  endif (MACOSX)
 
   # dummy target to cause merged libcvmfs_cache to be produced
   add_custom_target (libcvmfs_cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
@@ -572,18 +628,26 @@ if (BUILD_LIBCVMFS)
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
   target_link_libraries(cvmfs_only ${LIBCVMFS_LIBS})
 
-  if (NOT MACOSX)
-    # We do not (yet) have a recipe for localizing private symbols
-    # in Mac OS X, so skip that step on Mac
+  # Note: it would be a good idea to try to unify the next block for macOS and Linux.
+  #       It may be possible to use libtool on both platforms, including the ability
+  #       to hide private symbols in the library - which is currently done by the
+  #       `combine_libs` script, on Linux only.
+  if (MACOSX)
+    add_custom_command(
+        OUTPUT libcvmfs.a
+        COMMAND libtool -static -o libcvmfs.a ${LIBCVMFS_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_LIBS}
+    )
+  else (MACOSX)
     set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
-  endif (NOT MACOSX)
-
-  add_custom_command(
-      OUTPUT libcvmfs.a
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${LIBCVMFS_LIBS}
-  )
+    add_custom_command(
+        OUTPUT libcvmfs.a
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_LIBS}
+    )
+  endif (MACOSX)
 
   # dummy target to cause merged libcvmfs to be produced
   add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
@@ -634,10 +698,9 @@ if (BUILD_SERVER)
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
-                         ${CARES_LIBRARIES} ${TBB_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                         ${RT_LIBRARY} ${VJSON_LIBRARIES}
-                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
+                         ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                         ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
+                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
 
   target_link_libraries(cvmfs_stratum_agent
                         ${CURL_LIBRARIES} ${CARES_LIBRARIES}
@@ -651,25 +714,20 @@ if (BUILD_SERVER)
 
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
 
-    # link the stuff (*_LIBRARIES are dynamic link libraries)
-    if (NOT TBB_DEBUG_LIBRARIES)
-      message (WARNING "Debug libraries of TBB were not found. Using the release versions instead.")
-      set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
-    endif (NOT TBB_DEBUG_LIBRARIES)
     target_link_libraries (cvmfs_swissknife_debug
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
-                           ${CARES_LIBRARIES} ${TBB_DEBUG_LIBRARIES}
-                           ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                           ${RT_LIBRARY} ${VJSON_LIBRARIES}
-                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} pthread dl)
+                           ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                           ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
+                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)
   add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
-  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${TBB_LIBRARIES} ${RT_LIBRARY}
+  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
+                        ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${RT_LIBRARY}
                         ${UUID_LIBRARIES} ${VJSON_LIBRARIES} ${SHA3_LIBRARIES}
                         pthread dl)
 endif (BUILD_PRELOADER)
@@ -773,9 +831,15 @@ endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)
   install (
-    TARGETS     cvmfs_swissknife
+    TARGETS     cvmfs_swissknife cvmfs_stratum_agent
     RUNTIME
     DESTINATION    bin
+  )
+
+  install(
+    FILES        stratum_agent/cvmfs_stratum_agent.service stratum_agent/cvmfs_stratum_agent.initd
+    DESTINATION  "/usr/share/cvmfs-server/agent"
+    PERMISSIONS  OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
@@ -813,7 +877,7 @@ if (BUILD_SERVER)
 
   install(
     FILES      webapi/cvmfs-api.wsgi
-    DESTINATION    "/var/www/wsgi-scripts"
+    DESTINATION    "/var/www/wsgi-scripts/cvmfs-server"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
@@ -834,7 +898,7 @@ if (BUILD_SERVER)
   )
 
   install(
-    FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
+    FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py webapi/cvmfs_globals.py
     DESTINATION    "/usr/share/cvmfs-server/webapi"
     PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
   )
@@ -849,24 +913,6 @@ if (BUILD_SERVER)
   install(
     CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
     )
-
-  # If we built the third-party libraries ourselves, we should also install the TBB libraries
-  if (BUILTIN_EXTERNALS)
-    install(
-      FILES
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs.so
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs_debug.so
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs.so.2
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbb_cvmfs_debug.so.2
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs.so
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs_debug.so
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs.so.2
-      ${EXTERNALS_INSTALL_LOCATION}/lib/libtbbmalloc_cvmfs_debug.so.2
-      DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-      )
-  endif (BUILTIN_EXTERNALS)
-
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)

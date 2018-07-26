@@ -171,8 +171,8 @@ cvmfs_server_mkfs() {
   check_parameter_count 1 $#
   name=$(get_repository_name $1)
 
-  [ $(echo -n "$name" | wc -c) -gt 60 ] && \
-    die "repository name longer than 60 characters"
+  is_valid_repo_name "$name" || die "invalid repository name: $name"
+  is_root                    || die "Only root can create a new repository"
 
   # default values
   [ x"$unionfs"   = x"" ] && unionfs="$(get_available_union_fs)"
@@ -198,7 +198,6 @@ cvmfs_server_mkfs() {
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
-  is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
   if [ $unionfs = "overlayfs" ]; then
     local msg
@@ -225,9 +224,11 @@ cvmfs_server_mkfs() {
   local keys_location="/etc/cvmfs/keys"
   mkdir -p $keys_location
   local upstream_type=$(get_upstream_type $upstream)
-  local keys="${name}.key ${name}.crt ${name}.pub"
+  local keys="${name}.crt ${name}.pub"
   if [ x"$upstream_type" = xgw ]; then
       keys="$keys ${name}.gw"
+  else
+      keys="$keys ${name}.key"
   fi
   if [ $require_masterkeycard -eq 1 ]; then
       local reason
@@ -235,7 +236,9 @@ cvmfs_server_mkfs() {
   elif masterkeycard_cert_available >/dev/null; then
       require_masterkeycard=1
   else
-      keys="${name}.masterkey $keys"
+      if [ x"$upstream_type" != xgw ]; then
+          keys="${name}.masterkey $keys"
+      fi
   fi
   local keys_are_there=0
   for k in $keys; do
@@ -319,7 +322,6 @@ cvmfs_server_mkfs() {
   local repoinfo_file=${temp_dir}/new_repoinfo
   touch $repoinfo_file
   create_repometa_skeleton $repoinfo_file
-  sync
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
     wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
@@ -378,6 +380,8 @@ cvmfs_server_mkfs() {
 
   echo -n "Updating global JSON information... "
   update_global_repository_info && echo "done" || echo "fail"
+
+  syncfs
 
   print_new_repository_notice $name $cvmfs_user $require_masterkeycard
 }

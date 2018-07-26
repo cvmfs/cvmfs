@@ -6,9 +6,9 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
-# running unittests
+running unittests
 run_unittests --gtest_shuffle \
-              --gtest_death_test_use_fork || retval=1
+             --gtest_death_test_use_fork || retval=1
 
 
 CVMFS_EXCLUDE=
@@ -27,14 +27,14 @@ fi
 if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # Ubuntu 14.04
   # aufs, expected failure
-  CVMFS_EXCLUDE="src/700-overlayfs_validation src/800-repository_services"
+  CVMFS_EXCLUDE="src/700-overlayfs_validation src/80*-repository_gateway*"
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi
 if [ x"$(lsb_release -cs)" = x"precise" ]; then
   # Ubuntu 12.04
   # aufs, expected failure
-  CVMFS_EXCLUDE="src/700-overlayfs_validation src/800-repository_services"
+  CVMFS_EXCLUDE="src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway*"
 
   echo "Ubuntu 12.04... using aufs instead of overlayfs"
 fi
@@ -71,16 +71,12 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                 || retval=1
 fi
 
-# TODO: after the 2.4 release there will be distro specific "previous packages"
-if [ x"$(lsb_release -cs)" = x"precise" ]; then
-  # Ubuntu 12.04
-  echo "running CernVM-FS migration test cases..."
-  CVMFS_TEST_CLASS_NAME=MigrationTests \
-  ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                     migration_tests/*                              \
-                                  || retval=1
-else
-  echo "no previous client package, skipping migration test"
-fi
+
+# Ubuntu 12.04
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
 
 exit $retval

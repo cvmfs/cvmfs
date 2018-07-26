@@ -11,10 +11,12 @@
 
 
 cvmfs_server_fix_permissions() {
-  local num_overlayfs=$(find /etc/cvmfs/repositories.d -name server.conf \
+  local num_overlayfs=$(find /etc/cvmfs/repositories.d -name server.conf 2>/dev/null \
     -exec grep "CVMFS_UNION_FS_TYPE=overlayfs" {} \; | wc -l)
   if [ $num_overlayfs -gt 0 ]; then
     ensure_swissknife_suid overlayfs
+  else
+    ensure_swissknife_suid other
   fi
 }
 

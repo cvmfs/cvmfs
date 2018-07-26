@@ -68,7 +68,7 @@ else # RedHat based
 fi
 
 SERVICE_BIN="false"
-if ! $PIDOF_BIN systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
+if [ ! -f /bin/systemctl ]; then
   if cvmfs_sys_file_is_executable /sbin/service ; then
     SERVICE_BIN="/sbin/service"
   elif cvmfs_sys_file_is_executable /usr/sbin/service ; then
@@ -88,16 +88,21 @@ if [ "x$RUNUSER_BIN" != "x" ]; then
 fi
 
 # standard values
-CVMFS_DEFAULT_GENERATE_LEGACY_BULK_CHUNKS=true
+CVMFS_DEFAULT_GENERATE_LEGACY_BULK_CHUNKS=false
 CVMFS_DEFAULT_USE_FILE_CHUNKING=true
 CVMFS_DEFAULT_MIN_CHUNK_SIZE=4194304
 CVMFS_DEFAULT_AVG_CHUNK_SIZE=8388608
 CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 CVMFS_DEFAULT_ENFORCE_LIMITS=false
+CVMFS_DEFAULT_AUTO_GC_LAPSE='1 day ago'
 
 CVMFS_SERVER_DEBUG=${CVMFS_SERVER_DEBUG:=0}
 CVMFS_SERVER_SWISSKNIFE="cvmfs_swissknife"
 CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
+
+# On newer Apache version, reloading is asynchonrous and not guaranteed to succeed.
+# The integration test cases set this parameter to true.
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=${CVMFS_SERVER_APACHE_RELOAD_IS_RESTART:=false}
 
 ################################################################################
 #                                                                              #

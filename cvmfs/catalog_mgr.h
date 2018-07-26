@@ -160,6 +160,13 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool LookupXattrs(const PathString &path, XattrList *xattrs);
 
+  bool LookupNested(const PathString &path,
+                    PathString *mountpoint,
+                    shash::Any *hash,
+                    uint64_t *size);
+  bool ListCatalogSkein(const PathString &path,
+                        std::vector<PathString> *result_list);
+
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
     PathString p;
@@ -182,6 +189,7 @@ class AbstractCatalogManager : public SingleCopy {
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
+  bool HasExplicitTTL() const;
   bool GetVOMSAuthz(std::string *authz) const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;

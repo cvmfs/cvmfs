@@ -33,6 +33,11 @@
 #include <string>
 #include <vector>
 
+#ifdef CVMFS_ENABLE_INOTIFY
+#include "file_watcher_inotify.h"
+#else  // CVMFS_ENABLE_INOTIFY
+#include "file_watcher.h"
+#endif  // CVMFS_ENABLE_INOTIFY
 #include "smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -59,10 +64,10 @@ inline std::vector<std::string> platform_mountlist() {
 inline bool platform_umount(const char *mountpoint, const bool lazy) {
   struct stat64 mtab_info;
   int retval = lstat64(_PATH_MOUNTED, &mtab_info);
-  // If /etc/mtab exists and is not a symlink to /proc/mount
+  // If /etc/mtab exists and is not a symlink to /proc/mounts
   if ((retval == 0) && S_ISREG(mtab_info.st_mode)) {
     // Lock the modification on /etc/mtab against concurrent
-    // crash unmount handlers
+    // crash unmount handlers (removing the lock file would result in a race)
     std::string lockfile = std::string(_PATH_MOUNTED) + ".cvmfslock";
     const int fd_lockfile = open(lockfile.c_str(), O_RDONLY | O_CREAT, 0600);
     if (fd_lockfile < 0) return false;
@@ -70,13 +75,17 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     while ((flock(fd_lockfile, LOCK_EX | LOCK_NB) != 0) && (timeout > 0)) {
       if (errno != EWOULDBLOCK) {
         close(fd_lockfile);
-        unlink(lockfile.c_str());
+        return false;
       }
       struct timeval wait_for;
       wait_for.tv_sec = 1;
       wait_for.tv_usec = 0;
       select(0, NULL, NULL, NULL, &wait_for);
       timeout--;
+    }
+    if (timeout <= 0) {
+      close(fd_lockfile);
+      return false;
     }
 
     // Remove entry from /etc/mtab (create new file without entry)
@@ -85,7 +94,6 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     if (!fmntold) {
       flock(fd_lockfile, LOCK_UN);
       close(fd_lockfile);
-      unlink(lockfile.c_str());
       return false;
     }
     FILE *fmntnew = setmntent(mntnew.c_str(), "w+");
@@ -94,7 +102,6 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
       endmntent(fmntold);
       flock(fd_lockfile, LOCK_UN);
       close(fd_lockfile);
-      unlink(lockfile.c_str());
       return false;
     }
     struct mntent *mntbuf;  // Static buffer managed by libc!
@@ -107,7 +114,6 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
           unlink(mntnew.c_str());
           flock(fd_lockfile, LOCK_UN);
           close(fd_lockfile);
-          unlink(lockfile.c_str());
           return false;
         }
       }
@@ -117,11 +123,11 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     retval = rename(mntnew.c_str(), _PATH_MOUNTED);
     flock(fd_lockfile, LOCK_UN);
     close(fd_lockfile);
-    unlink(lockfile.c_str());
     if (retval != 0) return false;
     // Best effort
-    (void)chmod(_PATH_MOUNTED, mtab_info.st_mode);
-    (void)chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
+    retval = chmod(_PATH_MOUNTED, mtab_info.st_mode);
+    retval = chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
+    // We pickup these values only to silent warnings
   }
 
   int flags = lazy ? MNT_DETACH : 0;
@@ -318,6 +324,14 @@ inline uint64_t platform_monotonic_time() {
 inline uint64_t platform_memsize() {
   return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
          static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
+}
+
+inline file_watcher::FileWatcher* platform_file_watcher() {
+#ifdef CVMFS_ENABLE_INOTIFY
+  return new file_watcher::FileWatcherInotify();
+#else  // CVMFS_ENABLE_INOTIFY
+  return NULL;
+#endif  // CVMFS_ENABLE_INOTIFY
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

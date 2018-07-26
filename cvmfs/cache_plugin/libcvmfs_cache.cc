@@ -10,6 +10,7 @@
 
 #include <unistd.h>
 
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -24,7 +25,7 @@ using namespace std;  // NOLINT
 
 namespace {
 
-static shash::Any Chash2Cpphash(struct cvmcache_hash *h) {
+static shash::Any Chash2Cpphash(const struct cvmcache_hash *h) {
   shash::Any hash;
   memcpy(hash.digest, h->digest, sizeof(h->digest));
   hash.algorithm = static_cast<shash::Algorithms>(h->algorithm);
@@ -266,7 +267,7 @@ int cvmcache_hash_cmp(struct cvmcache_hash *a, struct cvmcache_hash *b) {
     return 1;
 }
 
-char *cvmcache_hash_print(struct cvmcache_hash *h) {
+char *cvmcache_hash_print(const struct cvmcache_hash *h) {
   const shash::Any hash = Chash2Cpphash(h);
   return strdup(hash.ToString().c_str());
 }
@@ -309,6 +310,15 @@ void cvmcache_terminate(struct cvmcache_context *ctx) {
 
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx) {
   return ctx->plugin->max_object_size();
+}
+
+void cvmcache_get_session(cvmcache_session *session) {
+  assert(session != NULL);
+  SessionCtx *session_ctx = SessionCtx::GetInstance();
+  assert(session_ctx);
+  session_ctx->Get(&(session->id),
+                   &(session->repository_name),
+                   &(session->client_instance));
 }
 
 void cvmcache_spawn_watchdog(const char *crash_dump_file) {

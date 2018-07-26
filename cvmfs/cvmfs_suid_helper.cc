@@ -20,6 +20,7 @@
 #include <cstring>
 #include <string>
 
+#include "cvmfs_suid_util.h"
 #include "platform.h"
 #include "sanitizer.h"
 
@@ -77,7 +78,14 @@ static void Remount(const string &path, const RemountType how) {
 }
 
 static void Mount(const string &path) {
-  ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
+  platform_stat64 info;
+  int retval = platform_stat("/bin/systemctl", &info);
+  if (retval == 0) {
+    string systemd_unit = cvmfs_suid::EscapeSystemdUnit(path);
+    ExecAsRoot("/bin/systemctl", "start", systemd_unit.c_str(), NULL);
+  } else {
+    ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
+  }
 }
 
 static void Umount(const string &path) {

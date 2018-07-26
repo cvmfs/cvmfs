@@ -47,13 +47,16 @@ class ServerTool {
   download::DownloadManager *download_manager() const;
   signature::SignatureManager *signature_manager() const;
   perf::Statistics *statistics() { return &statistics_; }
+  const perf::Statistics *statistics() const { return &statistics_; }
+
+ protected:
+  UniquePtr<download::DownloadManager> download_manager_;
+  UniquePtr<signature::SignatureManager> signature_manager_;
+  perf::Statistics statistics_;
 
  private:
   static const unsigned kDownloadTimeout = 60;  // 1 minute
   static const unsigned kDownloadRetries = 1;   // 2 attempts in total
-  UniquePtr<download::DownloadManager> download_manager_;
-  UniquePtr<signature::SignatureManager> signature_manager_;
-  perf::Statistics statistics_;
 };
 
 #include "server_tool_impl.h"

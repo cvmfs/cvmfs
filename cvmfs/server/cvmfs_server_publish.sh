@@ -1,7 +1,6 @@
 cvmfs_server_publish() {
   local names
   local user
-  local exact=0
   local gw_key_file
   local spool_dir
   local stratum0
@@ -60,9 +59,6 @@ cvmfs_server_publish() {
       f)
         open_fd_dialog=0
       ;;
-      e)
-        exact=1
-      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
@@ -77,39 +73,40 @@ cvmfs_server_publish() {
   shift $(($OPTIND-1))
   check_parameter_count_for_multiple_repositories $#
   # get repository names
-  if [ $exact -eq 0 ]; then
-    names=$(get_or_guess_multiple_repository_names "$@")
-    check_multiple_repository_existence "$names"
-  else
-    names=$@
-  fi
-
-  # sanity checks
-  if [ ! -z "$tag_name" ]; then
-    echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
-    check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
-  fi
+  names=$(get_or_guess_multiple_repository_names "$@")
+  check_multiple_repository_existence "$names"
 
   for name in $names; do
+    # sanity checks
+    if [ ! -z "$tag_name" ]; then
+      echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
+      check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
+    fi
 
     # Check if the repo name contains a subpath for locking, e.g. repo.cern.ch/sub/path/for/locking
     local subpath=$(echo $name | cut -d'/' -f2- -s)
     name=$(echo $name | cut -d'/' -f1)
 
+    load_repo_config $name
+    # We need the upstream type for configuring the health_check function
+    upstream=$CVMFS_UPSTREAM_STORAGE
+    upstream_type=$(get_upstream_type $upstream)
+
     # sanity checks
     is_stratum0 $name   || die "This is not a stratum 0 repository"
     is_publishing $name && die "Another publish process is active for $name"
-    health_check -r $name
+    if [ x"$upstream_type" = xgw ]; then
+        health_check -g -r $name
+    else
+        health_check -r $name
+    fi
 
     # get repository information
-    load_repo_config $name
     user=$CVMFS_USER
     gw_key_file=/etc/cvmfs/keys/${name}.gw
     spool_dir=$CVMFS_SPOOL_DIR
     scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
-    upstream=$CVMFS_UPSTREAM_STORAGE
-    upstream_type=$(get_upstream_type $upstream)
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
     compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
     if [ x"$force_compression_algorithm" != "x" ]; then
@@ -131,6 +128,11 @@ cvmfs_server_publish() {
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
     if [ x"$manual_revision" != x"" ]; then
+      if [ "x$(echo "$manual_revision" | tr -cd 0-9)" != "x$manual_revision" ]; then
+        echo "Invalid revision number: $manual_revision"
+        retcode=1
+        continue
+      fi
       local revision_number=$(attr -qg revision /var/spool/cvmfs/${name}/rdonly)
       if [ $manual_revision -le $revision_number ]; then
         echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
@@ -196,6 +198,17 @@ cvmfs_server_publish() {
         $(get_follow_http_redirects_flag)              \
         $authz_file                                    \
         $log_level $tweaks_option $external_option $verbosity"
+
+    if [ ! -z "$tag_name" ]; then
+      sync_command="$sync_command -D $tag_name"
+    fi
+    if [ ! -z "$tag_channel" ]; then
+      sync_command="$sync_command -G $tag_channel"
+    fi
+
+    if [ x"$tag_description" != x"" ]; then
+      sync_command="$sync_command -J $tag_description"
+    fi
 
     # If the upstream type is "gw", we need to pass additional parameters
     # to the `cvmfs_swissknife sync` command: the username and the
@@ -266,6 +279,9 @@ cvmfs_server_publish() {
         sync_command_virtual_dir="$sync_command -S remove"
       fi
     fi
+    if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
+      sync_command="$sync_command -+stats"
+    fi
     # Must be after the virtual-dir command is constructed
     if is_checked_out $name; then
       sync_command="$sync_command -B"
@@ -288,12 +304,6 @@ cvmfs_server_publish() {
       if [ "x$(get_checked_out_previous_branch $name)" != "x" ]; then
         tag_command="$tag_command -P $(get_checked_out_previous_branch $name)"
       fi
-    fi
-    # If the upstream type is "gw", we need to pass additional parameters
-    # to the `cvmfs_swissknife sync` command: the username and the
-    # subpath of the active lease
-    if [ x"$upstream_type" = xgw ]; then
-      tag_command="$tag_command -P /var/spool/cvmfs/$name/session_token_$subpath"
     fi
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
@@ -397,7 +407,7 @@ cvmfs_server_publish() {
 
     # finalizing transaction
     echo "Flushing file system buffers"
-    sync
+    syncfs
 
     # committing newly created revision
     echo "Signing new manifest"
@@ -409,7 +419,7 @@ cvmfs_server_publish() {
     fi
 
     # run the automatic garbage collection (if configured)
-    if has_auto_garbage_collection_enabled $name; then
+    if is_due_auto_garbage_collection $name; then
       echo "Running automatic garbage collection"
       local dry_run=0
       __run_gc $name       \
@@ -434,7 +444,7 @@ cvmfs_server_publish() {
     close_transaction  $name $use_fd_fallback
     publish_after_hook $name
     publish_succeeded  $name
-
+    syncfs
   done
 
   return $retcode

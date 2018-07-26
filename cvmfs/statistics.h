@@ -68,7 +68,7 @@ class Statistics {
   ~Statistics();
   Statistics *Fork();
   Counter *Register(const std::string &name, const std::string &desc);
-  Counter *Lookup(const std::string &name);
+  Counter *Lookup(const std::string &name) const;
   std::string LookupDesc(const std::string &name);
   std::string PrintList(const PrintOptions print_options);
 
@@ -85,7 +85,7 @@ class Statistics {
     std::string desc;
   };
   std::map<std::string, CounterInfo *> counters_;
-  pthread_mutex_t *lock_;
+  mutable pthread_mutex_t *lock_;
 };
 
 

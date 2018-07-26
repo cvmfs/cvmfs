@@ -305,7 +305,7 @@ class ExternalQuotaManager : public QuotaManager {
 
   virtual bool Pin(const shash::Any &hash, const uint64_t size,
                    const std::string &description, const bool is_catalog)
-  { return false; }
+  { return is_catalog; }
 
   virtual void Unpin(const shash::Any &hash) { }
   virtual void Touch(const shash::Any &hash) { }

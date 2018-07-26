@@ -82,6 +82,9 @@ install_from_repo cmake        || die "fail (installing cmake)"
 install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
 install_from_repo python-dev   || die "fail (installing python-dev)"
 
+# Install the test S3 provider
+install_test_s3 || die "fail (installing test S3)"
+
 # install 'jq' (on 12.04 this needs the precise-backports repo)
 if [ x"$(lsb_release -cs)" = x"precise" ]; then
   echo -n "enabling precise-backports... "
@@ -94,12 +97,21 @@ install_from_repo jq || die "fail (installing jq)"
 # On Ubuntu 16.04 install backported autofs
 if [ "x$(lsb_release -cs)" = "xxenial" ]; then
   install_from_repo wget || die "fail (installing wget)"
-  wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_2.0-1_all.deb
-  sudo dpkg -i cvmfs-release_2.0-1_all.deb || die "fail (installing cvmfs-release)"
+  wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_2.0-3_all.deb
+  sudo dpkg -i cvmfs-release_2.0-3_all.deb || die "fail (installing cvmfs-release)"
   sudo apt-get update
   sudo apt-get install autofs || die "fail installing backported autofs"
   sudo cvmfs_config setup || die "re-running cvmfs setup"
   dpkg -s autofs
+fi
+
+# On Ubuntu 16.04 install the repository gateway
+if [ "x$(lsb_release -cs)" = "xxenial" ]; then
+  echo "Installing repository gateway"
+  package_map=pkgmap.ubuntu1604_x86_64
+  download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+  install_deb $(cat gateway_package_name)
+  sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
 fi
 
 # setting up the AUFS kernel module

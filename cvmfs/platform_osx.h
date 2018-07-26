@@ -37,6 +37,7 @@
 #include <string>
 #include <vector>
 
+#include "file_watcher_kqueue.h"
 #include "smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -271,6 +272,10 @@ inline uint64_t platform_memsize() {
   rc = sysctl(mib, 2, &ramsize, &len, NULL, 0);
   assert(rc == 0);
   return ramsize;
+}
+
+inline file_watcher::FileWatcher* platform_file_watcher() {
+  return new file_watcher::FileWatcherKqueue();
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

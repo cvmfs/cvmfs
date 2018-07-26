@@ -51,8 +51,16 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(
     if (current_retval) {
       *(const_cast<FieldT*>(i->second)) =
         static_cast<FieldT>(sql_counter.GetCounter());
+    } else if ( (legacy == LegacyMode::kNoSpecials) &&
+                ((i->first == "self_special") ||
+                 (i->first == "subtree_special")) )
+    {
+      *(const_cast<FieldT*>(i->second)) = FieldT(0);
+      current_retval = true;
     } else if ( (legacy == LegacyMode::kNoExternals) &&
-                ((i->first == "self_external")
+                ((i->first == "self_special")
+                  || (i->first == "subtree_special") ||
+                 (i->first == "self_external")
                   || (i->first == "subtree_external") ||
                  (i->first == "self_external_file_size")
                   || (i->first == "subtree_external_file_size")) )
@@ -60,7 +68,9 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(
       *(const_cast<FieldT*>(i->second)) = FieldT(0);
       current_retval = true;
     } else if ( (legacy == LegacyMode::kNoXattrs) &&
-                ((i->first == "self_external")
+                ((i->first == "self_special")
+                  || (i->first == "subtree_special") ||
+                (i->first == "self_external")
                  || (i->first == "subtree_external") ||
                 (i->first == "self_external_file_size")
                  || (i->first == "subtree_external_file_size") ||

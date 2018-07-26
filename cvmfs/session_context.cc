@@ -5,6 +5,7 @@
 #include "session_context.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "curl/curl.h"
 #include "cvmfs_config.h"
@@ -12,6 +13,12 @@
 #include "json_document.h"
 #include "swissknife_lease_curl.h"
 #include "util/string.h"
+
+namespace {
+// Maximum number of jobs during a session. No limit, for practical
+// purposes.
+const uint64_t kMaxNumJobs = std::numeric_limits<uint64_t>::max();
+}
 
 namespace upload {
 
@@ -63,7 +70,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(1000, 1000),
+    : upload_results_(kMaxNumJobs, kMaxNumJobs),
       api_url_(),
       session_token_(),
       key_id_(),
@@ -83,7 +90,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
                                     const std::string& session_token,
                                     const std::string& key_id,
                                     const std::string& secret,
-                                    uint64_t max_pack_size) {
+                                    uint64_t max_pack_size,
+                                    uint64_t max_queue_size) {
   bool ret = true;
 
   // Initialize session context lock
@@ -122,13 +130,14 @@ bool SessionContextBase::Initialize(const std::string& api_url,
     ret = false;
   }
 
-  ret = InitializeDerived() && ret;
+  ret = InitializeDerived(max_queue_size) && ret;
 
   return ret;
 }
 
 bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
-                                  const std::string& new_root_hash) {
+                                  const std::string& new_root_hash,
+                                  const RepositoryTag& tag) {
   assert(active_handles_.empty());
   {
     MutexLockGuard lock(current_pack_mtx_);
@@ -152,7 +161,12 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (old_root_hash.empty() || new_root_hash.empty()) {
       return false;
     }
-    results &= Commit(old_root_hash, new_root_hash);
+    bool commit_result = Commit(old_root_hash, new_root_hash, tag);
+    if (!commit_result) {
+      LogCvmfs(kLogUploadGateway, kLogStderr,
+               "SessionContext: could not commit session. Aborting.");
+      return false;
+    }
   }
 
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
@@ -245,16 +259,16 @@ void SessionContextBase::Dispatch() {
 
 SessionContext::SessionContext()
     : SessionContextBase(),
-      upload_jobs_(1000, 900),
+      upload_jobs_(),
       worker_terminate_(),
       worker_() {}
 
-bool SessionContext::InitializeDerived() {
+bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
   atomic_init32(&worker_terminate_);
-  atomic_write32(&worker_terminate_, 0);
 
-  upload_jobs_.Drop();
+  upload_jobs_ = new FifoChannel<UploadJob*>(max_queue_size, max_queue_size);
+  upload_jobs_->Drop();
 
   int retval =
       pthread_create(&worker_, NULL, UploadLoop, reinterpret_cast<void*>(this));
@@ -271,13 +285,20 @@ bool SessionContext::FinalizeDerived() {
 }
 
 bool SessionContext::Commit(const std::string& old_root_hash,
-                            const std::string& new_root_hash) {
+                            const std::string& new_root_hash,
+                            const RepositoryTag& tag) {
   std::string request;
   JsonStringInput request_input;
   request_input.push_back(
       std::make_pair("old_root_hash", old_root_hash.c_str()));
   request_input.push_back(
       std::make_pair("new_root_hash", new_root_hash.c_str()));
+  request_input.push_back(std::make_pair("tag_name",
+                                         tag.name_.c_str()));
+  request_input.push_back(std::make_pair("tag_channel",
+                                         tag.channel_.c_str()));
+  request_input.push_back(std::make_pair("tag_description",
+                                         tag.description_.c_str()));
   ToJsonString(request_input, &request);
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
@@ -288,7 +309,7 @@ Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;
   job->pack = pack;
   job->result = new Future<bool>();
-  upload_jobs_.Enqueue(job);
+  upload_jobs_->Enqueue(job);
   return job->result;
 }
 
@@ -300,7 +321,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   serializer.GetDigest(&payload_digest);
   const std::string json_msg =
       "{\"session_token\" : \"" + session_token_ +
-      "\", \"payload_digest\" : \"" + Base64(payload_digest.ToString(false)) +
+      "\", \"payload_digest\" : \"" + payload_digest.ToString(false) +
       "\", \"header_size\" : \"" + StringifyInt(serializer.GetHeaderSize()) +
       "\", \"api_version\" : \"" + StringifyInt(gateway::APIVersion()) + "\"}";
 
@@ -337,7 +358,6 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   curl_easy_setopt(h_curl, CURLOPT_USERAGENT, "cvmfs/" VERSION);
   curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
   curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, "POST");
-  curl_easy_setopt(h_curl, CURLOPT_TCP_KEEPALIVE, 1L);
   curl_easy_setopt(h_curl, CURLOPT_URL, (api_url_ + "/payloads").c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, NULL);
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
@@ -349,8 +369,18 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
   // Perform the Curl POST request
   CURLcode ret = curl_easy_perform(h_curl);
+  if (ret) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "SessionContext::DoUpload - curl_easy_perform failed: %d",
+             ret);
+  }
 
   const bool ok = (reply == "{\"status\":\"ok\"}");
+  if (!ok) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+             "SessionContext::DoUpload - error reply: %s",
+             reply.c_str());
+  }
 
   curl_easy_cleanup(h_curl);
   h_curl = NULL;
@@ -364,7 +394,7 @@ void* SessionContext::UploadLoop(void* data) {
   int64_t jobs_processed = 0;
   while (!ctx->ShouldTerminate()) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
-      UploadJob* job = ctx->upload_jobs_.Dequeue();
+      UploadJob* job = ctx->upload_jobs_->Dequeue();
       if (!ctx->DoUpload(job)) {
         LogCvmfs(kLogUploadGateway, kLogStderr,
                  "SessionContext: could not submit payload. Aborting.");

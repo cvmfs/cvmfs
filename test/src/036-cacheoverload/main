@@ -6,7 +6,8 @@ cvmfs_run_test() {
 
   cvmfs_mount "atlas.cern.ch,atlas-nightlies.cern.ch,atlas-condb.cern.ch" \
     "CVMFS_QUOTA_LIMIT=1500" \
-    "CVMFS_CHECK_PERMISSIONS=no" || return 1
+    "CVMFS_CHECK_PERMISSIONS=no" \
+    "CVMFS_AUTO_UPDATE=no" || return 1
 
   RETVAL=0
 
@@ -23,15 +24,16 @@ cvmfs_run_test() {
     pids_du="$! $pids_du"
     echo "*** started new recursive listing on $d"
   done
-  echo "*** letting listings work for 20 minutes"
-  sleep 1200
+  # Should be short enough to not exhaust 32bit inode limit on 32bit platforms
+  echo "*** letting listings work for 15 minutes"
+  sleep 900
 
   pid_after=$(sudo cvmfs_talk -i atlas.cern.ch pid)
   echo "*** pid of atlas.cern.ch fuse module (after stressing): $pid_after"
   if [ x"$pid_before" != x"$pid_after" ]; then
     echo "*** PID mismatch: pid before $pid_before, pid after $pid_after"
     echo "*** cat stacktrace file ($(date))"
-    cat "$(get_cvmfs_cachedir atlas.cern.ch)/stacktrace.atlas.cern.ch"
+    sudo cat "$(get_cvmfs_cachedir atlas.cern.ch)/stacktrace.atlas.cern.ch"
     RETVAL=2
   fi
 

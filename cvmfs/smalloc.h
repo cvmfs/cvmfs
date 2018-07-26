@@ -40,19 +40,19 @@ static inline uint64_t RoundUp8(const uint64_t size) {
 
 static inline void * __attribute__((used)) smalloc(size_t size) {
   void *mem = malloc(size);
-  assert(mem && "Out Of Memory");
+  assert((mem || (size == 0)) && "Out Of Memory");
   return mem;
 }
 
 static inline void * __attribute__((used)) srealloc(void *ptr, size_t size) {
   void *mem = realloc(ptr, size);
-  assert(mem && "Out Of Memory");
+  assert((mem || (size == 0)) && "Out Of Memory");
   return mem;
 }
 
 static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
   void *mem = calloc(count, size);
-  assert(mem && "Out Of Memory");
+  assert((mem || ((count * size) == 0)) && "Out Of Memory");
   return mem;
 }
 

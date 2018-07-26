@@ -179,15 +179,19 @@ static void ReadConfigurations() {
   for (unsigned i = 0; i < repo_config_dirs.size(); ++i) {
     string name = GetFileName(repo_config_dirs[i]);
     string optarg;
-    UniquePtr<OptionsManager> options_mgr(new BashOptionsManager());
+    UniquePtr<OptionsManager> options_mgr(
+      new BashOptionsManager(new DefaultOptionsTemplateManager(
+        repo_config_dirs[i])));
     options_mgr->set_taint_environment(false);
-    options_mgr->ParsePath(repo_config_dirs[i] + "/server.conf", false);
+    options_mgr->ParsePath(repo_config_dirs[i] + "/server.conf",
+      false);
     if (!options_mgr->GetValue("CVMFS_REPOSITORY_TYPE", &optarg) ||
         (optarg != "stratum1"))
     {
       continue;
     }
-    options_mgr->ParsePath(repo_config_dirs[i] + "/replica.conf", false);
+    options_mgr->ParsePath(repo_config_dirs[i] + "/replica.conf",
+      false);
     if (options_mgr->GetValue("CVMFS_STRATUM_AGENT", &optarg) &&
         !options_mgr->IsOn(optarg))
     {
@@ -199,7 +203,7 @@ static void ReadConfigurations() {
     signature_mgr->Init();
     options_mgr->GetValue("CVMFS_PUBLIC_KEY", &optarg);
     if (DirectoryExists(optarg))
-      optarg = JoinStrings(FindFiles(optarg, ".pub"), ":");
+      optarg = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
     if (!signature_mgr->LoadPublicRsaKeys(optarg)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "(%s) could not load public key %s",

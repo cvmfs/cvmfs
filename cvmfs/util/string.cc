@@ -117,6 +117,7 @@ string StringifyTime(const time_t seconds, const bool utc) {
   return string(buffer);
 }
 
+
 /**
  * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
  */
@@ -137,6 +138,27 @@ std::string RfcTimestamp() {
            timestamp.tm_zone);
   return string(buffer);
 }
+
+
+/**
+ * Current time in format YYYYMMDDTHHMMSSZ.  Used in AWS4 requests.
+ */
+std::string IsoTimestamp() {
+  struct tm timestamp;
+  time_t now = time(NULL);
+  gmtime_r(&now, &timestamp);
+
+  char buffer[17];
+  snprintf(buffer, sizeof(buffer), "%04d%02d%02dT%02d%02d%02dZ",
+           timestamp.tm_year + 1900,
+           timestamp.tm_mon + 1,
+           timestamp.tm_mday,
+           timestamp.tm_hour,
+           timestamp.tm_min,
+           timestamp.tm_sec);
+  return string(buffer);
+}
+
 
 string StringifyTimeval(const timeval value) {
   char buffer[64];
@@ -524,6 +546,22 @@ string Tail(const string &source, unsigned num_lines) {
     }
   }
   return source;
+}
+
+/**
+  * Get UTC Time.
+  *
+  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
+  */
+std::string GetGMTimestamp() {
+  struct tm time_ptr;
+  char date_and_time[50];
+  time_t t = time(NULL);
+  gmtime_r(&t, &time_ptr);      // take UTC
+  // timestamp format
+  strftime(date_and_time, 50, "%Y-%m-%d %H:%M:%S", &time_ptr);
+  std::string timestamp(date_and_time);
+  return timestamp;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

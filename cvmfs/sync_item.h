@@ -5,16 +5,24 @@
 #ifndef CVMFS_SYNC_ITEM_H_
 #define CVMFS_SYNC_ITEM_H_
 
+#include <sys/types.h>
+
+#if !defined(__APPLE__)
 #include <sys/sysmacros.h>
+#endif  // __APPLE__
 
 #include <cstring>
 #include <map>
 #include <string>
 
 #include "directory_entry.h"
+#include "duplex_libarchive.h"
 #include "file_chunk.h"
 #include "hash.h"
 #include "platform.h"
+#include "util/shared_ptr.h"
+
+class IngestionSource;
 
 namespace publish {
 
@@ -24,13 +32,14 @@ enum SyncItemType {
   kItemSymlink,
   kItemCharacterDevice,
   kItemBlockDevice,
+  kItemFifo,
+  kItemSocket,
   kItemNew,
   kItemMarker,
-  kItemUnknown
+  kItemUnknown,
 };
 
 class SyncUnion;
-
 /**
  * Every directory entry emitted by the FileSystemTraversal is wrapped in a
  * SyncItem structure by the factory method SyncUnion::CreateSyncItem().
@@ -45,12 +54,12 @@ class SyncUnion;
  * the union file system and hides some interpretation details.
  */
 class SyncItem {
-  // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem)
-  friend class SyncUnion;
+  // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem).
+  // SyncUnionTarball can create SyncItemTar and SyncItemDummyDir.
 
  public:
   SyncItem();
-  ~SyncItem();
+  virtual ~SyncItem();
 
   inline bool IsDirectory()       const { return IsType(kItemDir);             }
   inline bool WasDirectory()      const { return WasType(kItemDir);            }
@@ -59,8 +68,15 @@ class SyncItem {
   inline bool IsSymlink()         const { return IsType(kItemSymlink);         }
   inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
   inline bool IsNew()             const { return WasType(kItemNew);            }
+  inline bool IsTouched() const {
+    return (GetRdOnlyFiletype() == GetUnionFiletype()) &&
+           (GetRdOnlyFiletype() == GetScratchFiletype()) &&
+           (GetUnionFiletype() == GetScratchFiletype());
+  }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
+  inline bool IsFifo()            const { return IsType(kItemFifo);            }
+  inline bool IsSocket()          const { return IsType(kItemSocket);          }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
   inline bool IsExternalData()    const { return external_data_;               }
 
@@ -69,7 +85,13 @@ class SyncItem {
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
 
   inline bool IsSpecialFile()     const {
-    return IsCharacterDevice() || IsBlockDevice();
+    return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
+  }
+  inline bool WasSpecialFile()    const {
+    return WasType(kItemCharacterDevice) ||
+           WasType(kItemBlockDevice) ||
+           WasType(kItemFifo) ||
+           WasType(kItemSocket);
   }
 
   inline unsigned int GetRdevMajor()     const {
@@ -106,7 +128,7 @@ class SyncItem {
    *       count to 1 if MaskHardlink() has been called before (cf. OverlayFS)
    * @return  a DirectoryEntry structure to be written into a catalog
    */
-  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const = 0;
 
   inline std::string GetRelativePath() const {
     return (relative_parent_path_.empty()) ?
@@ -136,11 +158,17 @@ class SyncItem {
   uint64_t GetRdOnlyInode() const;
   unsigned int GetUnionLinkcount() const;
   uint64_t GetUnionInode() const;
+  uint64_t GetScratchSize() const;
+  uint64_t GetRdOnlySize() const;
 
   inline std::string filename() const { return filename_; }
   inline std::string relative_parent_path() const {
     return relative_parent_path_;
   }
+
+  virtual IngestionSource *CreateIngestionSource() const = 0;
+  virtual void IsPlaceholderDirectory() const = 0;
+  void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   bool operator==(const SyncItem &other) const {
     return ((relative_parent_path_ == other.relative_parent_path_) &&
@@ -148,45 +176,6 @@ class SyncItem {
   }
 
  protected:
-  inline platform_stat64 GetUnionStat() const {
-    StatUnion();
-    return union_stat_.stat;
-  }
-
-  SyncItemType GetRdOnlyFiletype() const;
-  SyncItemType GetScratchFiletype() const;
-
-  /**
-   * Checks if the SyncItem _is_ the given file type (file, dir, symlink, ...)
-   * in the union file system volume. Hence: After the publish operation, the
-   * file will be this type in CVMFS.
-   * @param expected_type  the file type to be checked against
-   * @return               true if file type matches the expected type
-   */
-  inline bool IsType(const SyncItemType expected_type) const {
-    if (filename_.substr(0, 12) == ".cvmfsgraft-") {
-      scratch_type_ = kItemMarker;
-    } else if (scratch_type_ == kItemUnknown) {
-      scratch_type_ = GetScratchFiletype();
-    }
-    return scratch_type_ == expected_type;
-  }
-
-  /**
-   * Checks if the SyncItem _was_ the given file type (file, dir, symlink, ...)
-   * in CVMFS (or the lower layer of the union file system). Hence: Before the
-   * current transaction the file _was_ this type in CVMFS.
-   * @param expected_type  the file type to be checked against
-   * @return               true if file type was the expected type in CVMFS
-   */
-  inline bool WasType(const SyncItemType expected_type) const {
-    if (rdonly_type_ == kItemUnknown) {
-      rdonly_type_ = GetRdOnlyFiletype();
-    }
-    return rdonly_type_ == expected_type;
-  }
-
- private:
   /**
    * create a new SyncItem
    * Note: SyncItems cannot be created by any using code. SyncUnion will take
@@ -202,6 +191,39 @@ class SyncItem {
            const SyncUnion    *union_engine,
            const SyncItemType  entry_type);
 
+  inline platform_stat64 GetUnionStat() const {
+    StatUnion();
+    return union_stat_.stat;
+  }
+
+  SyncItemType GetRdOnlyFiletype() const;
+  SyncItemType GetUnionFiletype() const;
+
+  virtual SyncItemType GetScratchFiletype() const = 0;
+
+  /**
+   * Checks if the SyncItem _is_ the given file type (file, dir, symlink, ...)
+   * in the union file system volume. Hence: After the publish operation, the
+   * file will be this type in CVMFS.
+   * @param expected_type  the file type to be checked against
+   * @return               true if file type matches the expected type
+   */
+  virtual bool IsType(const SyncItemType expected_type) const = 0;
+
+  /**
+   * Checks if the SyncItem _was_ the given file type (file, dir, symlink, ...)
+   * in CVMFS (or the lower layer of the union file system). Hence: Before the
+   * current transaction the file _was_ this type in CVMFS.
+   * @param expected_type  the file type to be checked against
+   * @return               true if file type was the expected type in CVMFS
+   */
+  inline bool WasType(const SyncItemType expected_type) const {
+    if (rdonly_type_ == kItemUnknown) {
+      rdonly_type_ = GetRdOnlyFiletype();
+    }
+    return rdonly_type_ == expected_type;
+  }
+
   /**
    * Structure to cache stat calls to the different file locations.
    */
@@ -212,11 +234,13 @@ class SyncItem {
 
     inline SyncItemType GetSyncItemType() const {
       assert(obtained);
-      if (S_ISDIR(stat.st_mode)) return kItemDir;
-      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
-      if (S_ISBLK(stat.st_mode)) return kItemBlockDevice;
       if (S_ISREG(stat.st_mode)) return kItemFile;
       if (S_ISLNK(stat.st_mode)) return kItemSymlink;
+      if (S_ISDIR(stat.st_mode)) return kItemDir;
+      if (S_ISFIFO(stat.st_mode)) return kItemFifo;
+      if (S_ISSOCK(stat.st_mode)) return kItemSocket;
+      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
+      if (S_ISBLK(stat.st_mode)) return kItemBlockDevice;
       return kItemUnknown;
     }
 
@@ -225,11 +249,26 @@ class SyncItem {
     platform_stat64 stat;
   };
 
+  static void StatGeneric(const std::string  &path,
+                          EntryStat          *info,
+                          const bool          refresh);
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
-
   void CheckMarkerFiles();
 
+  mutable SyncItemType rdonly_type_;
+  mutable EntryStat scratch_stat_;
+
+  ssize_t graft_size_;
+
+  // The hash of regular file's content
+  shash::Any content_hash_;
+
+  mutable SyncItemType scratch_type_;
+
+ private:
   void CheckCatalogMarker();
+
+  std::string filename_;
 
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
@@ -238,7 +277,6 @@ class SyncItem {
 
   mutable EntryStat rdonly_stat_;
   mutable EntryStat union_stat_;
-  mutable EntryStat scratch_stat_;
 
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
@@ -249,19 +287,11 @@ class SyncItem {
 
   bool external_data_;
   std::string relative_parent_path_;
-  std::string filename_;
 
   /**
    * Chunklist from graft. Not initialized by default to save memory.
    */
   FileChunkList *graft_chunklist_;
-  ssize_t graft_size_;
-
-  mutable SyncItemType scratch_type_;
-  mutable SyncItemType rdonly_type_;
-
-  // The hash of regular file's content
-  shash::Any content_hash_;
 
   // The compression algorithm for the file
   zlib::Algorithms compression_algorithm_;
@@ -273,15 +303,30 @@ class SyncItem {
   inline void StatUnion(const bool refresh = false) const {
     StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  inline void StatScratch(const bool refresh = false) const {
-    StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
-  }
-  static void StatGeneric(const std::string  &path,
-                          EntryStat          *info,
-                          const bool          refresh);
+  virtual void StatScratch(const bool refresh = false) const = 0;
 };
 
-typedef std::map<std::string, SyncItem> SyncItemList;
+typedef std::map<std::string, SharedPtr<SyncItem> > SyncItemList;
+
+class SyncItemNative : public SyncItem {
+  friend class SyncUnion;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual IngestionSource *CreateIngestionSource() const;
+  virtual void IsPlaceholderDirectory() const { assert(false); }
+  virtual SyncItemType GetScratchFiletype() const;
+  virtual bool IsType(const SyncItemType expected_type) const;
+  virtual void StatScratch(const bool refresh = false) const {
+    StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
+  }
+
+ protected:
+  SyncItemNative(const std::string &relative_parent_path,
+                 const std::string &filename, const SyncUnion *union_engine,
+                 const SyncItemType entry_type)
+      : SyncItem(relative_parent_path, filename, union_engine, entry_type) {
+    CheckMarkerFiles();
+  }
+};
 
 }  // namespace publish
 

@@ -174,6 +174,25 @@ is_mounted() {
 }
 
 
+# only certain characters are allowed in repository names
+#
+# @param repo_name the name to test
+is_valid_repo_name() {
+  local repo_name="$1"
+
+  [ ! -z "$1" ] || return 1
+  local length=$(echo -n "$repo_name" | wc -c)
+  [ $length -le 60 ] || return 1
+
+  local repo_head="$(echo "$repo_name" | head -c 1)"
+  local clean_head="$(echo "$repo_head" | tr -cd a-zA-Z0-9)"
+  [ "x$clean_head" = "x$repo_head" ] || return 1
+
+  local clean_name=$(echo "$repo_name" | tr -cd a-zA-Z0-9_.-)
+  [ "x$clean_name" = "x$repo_name" ]
+}
+
+
 # only certain characters are allowed in branch names
 #
 # @param branch_name the name to test
@@ -367,9 +386,9 @@ cvmfs_version_string() {
   echo $(normalize_version $version_string)
 }
 
-# Tracks changes to the organization of files and directories on the release
-# manager machine.  Stored in CVMFS_CREATOR_VERSION.  Started with 137.
-cvmfs_layout_revision() { echo "137"; }
+# Tracks changes to the organization of files and directories.
+# Stored in CVMFS_CREATOR_VERSION.  Started with 137.
+cvmfs_layout_revision() { echo "139"; }
 
 version_major() { echo $1 | cut --delimiter=. --fields=1 | grep -oe '^[0-9]\+'; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2 | grep -oe '^[0-9]\+'; }
@@ -501,7 +520,15 @@ check_overlayfs_version() {
       if [ "x$scratch_fstype" = "xext3" ] || [ "x$scratch_fstype" = "xext4" ] ; then
         return 0
       fi
-      echo "overlayfs scratch /var/spool/cvmfs is type $scratch_fstype, but ext3 or ext4 required"
+      if [ "x$scratch_fstype" = "xxfs" ] ; then
+        if [ "x$(xfs_info /var/spool/cvmfs 2>/dev/null | grep ftype=1)" != "x" ] ; then
+          return 0
+        else
+          echo "XFS with ftype=0 is not supported for /var/spool/cvmfs. XFS with ftype=1 is required"
+          return 1
+        fi
+      fi
+      echo "overlayfs scratch /var/spool/cvmfs is type $scratch_fstype, but ext3, ext4 or xfs(ftype=1) required"
       return 1
     fi
   fi
@@ -544,9 +571,9 @@ EOF
 _setcap_if_needed() {
   local binary_path="$1"
   local capability="$2"
-  cvmfs_sys_file_is_executable $binary_path                                || return 0
-  $GETCAP_BIN "$binary_path" | grep -q "$capability" && return 0
-  $SETCAP_BIN "${capability}+p" "$binary_path"
+  cvmfs_sys_file_is_executable $binary_path || return 0
+  $SETCAP_BIN -v "${capability}" "$binary_path" >/dev/null 2>&1 && return 0
+  $SETCAP_BIN "${capability}" "$binary_path"
 }
 
 
@@ -557,15 +584,18 @@ ensure_swissknife_suid() {
   local unionfs="$1"
   local sk_bin="/usr/bin/$CVMFS_SERVER_SWISSKNIFE"
   local sk_dbg_bin="/usr/bin/${CVMFS_SERVER_SWISSKNIFE}_debug"
-  local cap="cap_sys_admin"
+  local cap_read="cap_dac_read_search"
+  local cap_overlay="cap_sys_admin"
 
-  # check if we need CAP_SYS_ADMIN for cvmfs_swissknife...
-  is_root || die "need to be root for granting CAP_SYS_ADMIN to $sk_bin"
-  [ x"$unionfs" = x"overlayfs" ] || return 0
+  is_root || die "need to be root for granting capabilities to $sk_bin"
 
-  # ... yes, obviously we need CAP_SYS_ADMIN for cvmfs_swissknife
-  _setcap_if_needed "$sk_bin"     "$cap" || return 1
-  _setcap_if_needed "$sk_dbg_bin" "$cap" || return 2
+  if [ x"$unionfs" = x"overlayfs" ]; then
+    _setcap_if_needed "$sk_bin"     "${cap_read},${cap_overlay}+p" || return 3
+    _setcap_if_needed "$sk_dbg_bin" "${cap_read},${cap_overlay}+p" || return 4
+  else
+    _setcap_if_needed "$sk_bin"     "${cap_read}+p" || return 1
+    _setcap_if_needed "$sk_dbg_bin" "${cap_read}+p" || return 2
+  fi
 }
 
 
@@ -851,6 +881,8 @@ _update_geodb_install_1() {
     return 3
   fi
 
+  set_selinux_httpd_context_if_needed "$CVMFS_UPDATEGEO_DIR"
+
   _to_syslog_for_geoip "successfully updated from $dburl"
 
   return 0
@@ -928,7 +960,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
     eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
-    masterkeycard"
+    masterkeycard ingest"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -937,6 +969,12 @@ is_subcommand() {
   done
 
   return 1
+}
+
+
+# Flushes data to disk; we might at some point want to do more than just sync
+syncfs() {
+  sync
 }
 
 
@@ -1034,6 +1072,7 @@ Supported Commands:
                   [-a create tag <name>] [-c channel] [-m message] [-h hash]
                   [-r remove tag <name>] [-f don't ask again]
                   [-i inspect tag <name>] [-x machine readable]
+                  [-b list branch hierarchy] [-x machine readable]
                   [-l list tags] [-x machine readable]
                   <fully qualified name>
                   Print named tags (snapshots) of the repository
@@ -1069,6 +1108,13 @@ Supported Commands:
   update-repoinfo [-f path to JSON file]
                   <fully qualified name>
                   Open repository meta info JSON file for editing
+  ingest          -t tarfile
+                  -b base directory
+                  [-d folder to delete]
+                  <fully qualified name>
+                  Extract the content of the tarfile inside the base directory,
+                  in the same transaction it also delete the required folders.
+                  Use '-' as -t argument to read the tarball from STDIN.
 "
 
 

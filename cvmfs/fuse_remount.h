@@ -75,6 +75,8 @@ class FuseRemounter : SingleCopy {
   }
   void LeaveCriticalSection() { atomic_dec32(&critical_section_); /* 1 -> 0 */ }
 
+  void SetOfflineMode(bool value);
+
   MountPoint *mountpoint_;  ///< Not owned
   cvmfs::InodeGenerationInfo *inode_generation_info_;  ///< Not owned
   FuseInvalidator *invalidator_;
@@ -98,6 +100,11 @@ class FuseRemounter : SingleCopy {
    * through this pipe.
    */
   int pipe_remount_trigger_[2];
+  /**
+   * Indicates whether the last reload attempt failed. If so, the short term
+   * TTL is active.
+   */
+  bool offline_mode_;
   /**
    * Stores the deadline after which the remount trigger will look again for
    * an updated version.  Can be MountPoint::kIndefiniteDeadline if a fixed root

@@ -67,7 +67,10 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //            * add kFlagDirBindMountpoint
 //            * add kFlagHidden
 //            * add table bind_mountpoints
-const unsigned CatalogDatabase::kLatestSchemaRevision = 4;
+//   4 --> 5: (Dec 07 2017):
+//            * add kFlagFileSpecial (rebranded unused kFlagFileStat)
+//            * add self_special and subtree_special statistics counters
+const unsigned CatalogDatabase::kLatestSchemaRevision = 5;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -160,6 +163,28 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
 
     set_schema_revision(4);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 4)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (4 --> 5)");
+
+    SqlCatalog sql_upgrade9(*this,
+                            "INSERT INTO statistics (counter, value) VALUES "
+                            "('self_special', 0);");
+    SqlCatalog sql_upgrade10(*this,
+                             "INSERT INTO statistics (counter, value) VALUES "
+                             "('subtree_special', 0);");
+    if (!sql_upgrade9.Execute() || !sql_upgrade10.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (4 --> 5)");
+      return false;
+    }
+
+    set_schema_revision(5);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
@@ -385,6 +410,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
     database_flags |= kFlagDir;
   } else if (entry.IsLink()) {
     database_flags |= kFlagFile | kFlagLink;
+  } else if (entry.IsSpecial()) {
+    database_flags |= kFlagFile | kFlagFileSpecial;
   } else {
     database_flags |= kFlagFile;
     database_flags |= entry.compression_algorithm() << kFlagPosCompression;
@@ -394,7 +421,7 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
       database_flags |= kFlagFileExternal;
   }
 
-  if (!entry.checksum_ptr()->IsNull())
+  if (!entry.checksum_ptr()->IsNull() || entry.IsChunkedFile())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
 
   if (entry.IsHidden())
@@ -407,6 +434,7 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
 void SqlDirent::StoreHashAlgorithm(const shash::Algorithms algo,
                                    unsigned *flags) const
 {
+  assert(algo != shash::kAny);
   // Md5 unusable for content hashes
   *flags |= (algo - 1) << kFlagPosHash;
 }
@@ -444,6 +472,7 @@ uint32_t SqlDirent::Hardlinks2HardlinkGroup(const uint64_t hardlinks) const {
 uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
                                   const uint32_t linkcount) const
 {
+  assert(linkcount > 0);
   return (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
 }
 
@@ -556,13 +585,15 @@ SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
   static const char *stmt_ge_2_4 =
       "SELECT hash, flags, 0 "
       "  FROM catalog "
-      "  WHERE length(catalog.hash) > 0 "
+      "  WHERE (length(catalog.hash) > 0) AND "
+      "        ((flags & 128) = 0) "  // kFlagFileExternal
       "UNION "
       "SELECT chunks.hash, catalog.flags, 1 "
       "  FROM catalog "
       "  LEFT JOIN chunks "
       "  ON catalog.md5path_1 = chunks.md5path_1 AND "
-      "     catalog.md5path_2 = chunks.md5path_2;";
+      "     catalog.md5path_2 = chunks.md5path_2 "
+      "  WHERE (catalog.flags & 128) = 0;";  // kFlagFileExternal
 
   if (database.schema_version() < 2.4-CatalogDatabase::kSchemaEpsilon) {
     DeferredInit(database.sqlite_db(), stmt_lt_2_4);

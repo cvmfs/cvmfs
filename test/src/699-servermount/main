@@ -43,7 +43,7 @@ cvmfs_run_test() {
 
   echo "pull in repository configuration"
   load_repo_config $CVMFS_TEST_REPO || return 1
-  local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
+  local rdonly_dir="$(readlink -e "${CVMFS_SPOOL_DIR}/rdonly")"
 
   echo "make sure that CVMFS_AUTO_REPAIR_MOUNTPOINT=true"
   [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" != x"false" ] || return 100
@@ -179,7 +179,7 @@ cvmfs_run_test() {
   echo "pull in repository configuration for $repo2"
   load_repo_config $repo2 || return 43
   local repo2_repo_dir="/cvmfs/${repo2}"
-  local repo2_rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
+  local repo2_rdonly_dir="$(readlink -e "${CVMFS_SPOOL_DIR}/rdonly")"
 
   echo -n "check if there are more repositories than expected... "
   local repo_count=$(cvmfs_server list | wc -l)
@@ -259,6 +259,7 @@ cvmfs_run_test() {
 
   echo "remove ${repo_dir} to provoke failed mount call"
   sudo rm -fR $repo_dir || return 70
+  sudo touch $repo_dir || return 70
 
   echo "check that both $repo_dir and $repo2_repo_dir are not mounted"
   cat /proc/mounts | grep -e " $repo_dir "         && return 71
@@ -276,6 +277,7 @@ cvmfs_run_test() {
   cat /proc/mounts | grep -e " $repo2_repo_dir "   || return 76
 
   echo "repair the mount point"
+  sudo rm $repo_dir || return 77
   sudo mkdir -p $repo_dir || return 77
 
   echo "try to mount again (should work now)"

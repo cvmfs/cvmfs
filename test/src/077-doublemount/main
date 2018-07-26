@@ -1,0 +1,32 @@
+
+cvmfs_test_name="Prevent double mount"
+
+CVMFS_TEST077_MOUNTPOINT_ONE=
+CVMFS_TEST077_MOUNTPOINT_TWO=
+
+cleanup() {
+  sudo umount $CVMFS_TEST077_MOUNTPOINT_ONE $CVMFS_TEST077_MOUNTPOINT_TWO
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  # Set client configuration
+  cvmfs_mount cvmfs-config.cern.ch || return 1
+
+  CVMFS_TEST077_MOUNTPOINT_ONE="${PWD}/mountpoint_one"
+  CVMFS_TEST077_MOUNTPOINT_TWO="${PWD}/mountpoint_two"
+  mkdir $CVMFS_TEST077_MOUNTPOINT_ONE $CVMFS_TEST077_MOUNTPOINT_TWO || return 2
+  trap cleanup EXIT HUP INT TERM
+
+  sudo mount -t cvmfs grid.cern.ch $CVMFS_TEST077_MOUNTPOINT_ONE || return 10
+  ls $CVMFS_TEST077_MOUNTPOINT_ONE || return 11
+
+  sudo mount -t cvmfs grid.cern.ch "$CVMFS_TEST077_MOUNTPOINT_TWO" && return 20
+  sudo mount -t cvmfs grid.cern.ch "$CVMFS_TEST077_MOUNTPOINT_TWO" 2>&1 \
+    | grep "$CVMFS_TEST077_MOUNTPOINT_ONE" \
+    || return 21
+
+  return 0
+}
+

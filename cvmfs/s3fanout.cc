@@ -43,9 +43,12 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       LogCvmfs(kLogS3Fanout, kLogDebug, "http status error code: %s",
                header_line.c_str());
       if (header_line.length() < i+3) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "S3: invalid HTTP response '%s'",
+                 header_line.c_str());
         info->error_code = kFailOther;
         return 0;
       }
+      bool print_error = true;
       int http_error = String2Int64(string(&header_line[i], 3));
 
       switch (http_error) {
@@ -61,9 +64,14 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
           break;
         case 404:
           info->error_code = kFailNotFound;
+          print_error = false;
           break;
         default:
           info->error_code = kFailOther;
+      }
+      if (print_error) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "S3: HTTP failure '%s'",
+                 header_line.c_str());
       }
       return 0;
     }
@@ -148,13 +156,13 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
 
   switch (action) {
     case CURL_POLL_IN:
-      s3fanout_mgr->watch_fds_[index].events |= POLLIN | POLLPRI;
+      s3fanout_mgr->watch_fds_[index].events = POLLIN | POLLPRI;
       break;
     case CURL_POLL_OUT:
-      s3fanout_mgr->watch_fds_[index].events |= POLLOUT | POLLWRBAND;
+      s3fanout_mgr->watch_fds_[index].events = POLLOUT | POLLWRBAND;
       break;
     case CURL_POLL_INOUT:
-      s3fanout_mgr->watch_fds_[index].events |=
+      s3fanout_mgr->watch_fds_[index].events =
           POLLIN | POLLPRI | POLLOUT | POLLWRBAND;
       break;
     case CURL_POLL_REMOVE:
@@ -209,11 +217,11 @@ void *S3FanoutManager::MainUpload(void *data) {
         assert(handle != NULL);
       }
 
-      s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info,
-                                                                        handle);
+      s3fanout::Failures init_failure =
+        s3fanout_mgr->InitializeRequest(info, handle);
       if (init_failure != s3fanout::kFailOk) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to initialize CURL handle "
-                                           "(error: %d - %s | errno: %d)",
+        LogCvmfs(kLogS3Fanout, kLogStderr,
+                "Failed to initialize CURL handle (error: %d - %s | errno: %d)",
                  init_failure, Code2Ascii(init_failure), errno);
         abort();
       }
@@ -248,8 +256,8 @@ void *S3FanoutManager::MainUpload(void *data) {
         assert(retval == CURLM_OK);
       }
     } else if (retval < 0) {
-      LogCvmfs(kLogS3Fanout, kLogStderr, "Error, event poll failed: %d", errno);
-      assert(retval >= 0);
+      assert(errno == EINTR);
+      continue;
     }
 
     // Activity on curl sockets
@@ -310,11 +318,10 @@ void *S3FanoutManager::MainUpload(void *data) {
     }
   }
 
-  set<CURL *>::iterator             i    =
-      s3fanout_mgr->pool_handles_inuse_->begin();
-  const set<CURL *>::const_iterator iEnd =
-      s3fanout_mgr->pool_handles_inuse_->end();
-  for (; i != iEnd; ++i) {
+  set<CURL *>::iterator i = s3fanout_mgr->pool_handles_inuse_->begin();
+  const set<CURL *>::const_iterator i_end =
+    s3fanout_mgr->pool_handles_inuse_->end();
+  for (; i != i_end; ++i) {
     curl_multi_remove_handle(s3fanout_mgr->curl_multi_, *i);
     curl_easy_cleanup(*i);
   }
@@ -388,35 +395,158 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
 
 
 /**
- * The Amazon authorization header according to
+ * The Amazon AWS 2 authorization header according to
  * http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html#ConstructingTheAuthenticationHeader
  */
-string S3FanoutManager::MkAuthoritzation(const string &access_key,
-                                         const string &secret_key,
-                                         const string &timestamp,
-                                         const string &content_type,
-                                         const string &request,
-                                         const string &content_md5_base64,
-                                         const string &bucket,
-                                         const string &object_key) const {
+bool S3FanoutManager::MkV2Authz(const JobInfo &info, vector<string> *headers)
+  const
+{
+  string payload_hash;
+  bool retval = MkPayloadHash(info, &payload_hash);
+  if (!retval)
+    return false;
+  string content_type = GetContentType(info);
+  string request = GetRequestString(info);
+
+  string timestamp = RfcTimestamp();
   string to_sign = request + "\n" +
-                   content_md5_base64 + "\n" +
+                   payload_hash + "\n" +
                    content_type + "\n" +
                    timestamp + "\n" +
                    "x-amz-acl:public-read" + "\n" +  // default ACL
-                   "/" + bucket + "/" + object_key;
-  LogCvmfs(kLogS3Fanout, kLogDebug,
-           "%s string to sign for: %s", request.c_str(), object_key.c_str());
+                   "/" + info.bucket + "/" + info.object_key;
+  LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign for: %s",
+           request.c_str(), info.object_key.c_str());
 
   shash::Any hmac;
   hmac.algorithm = shash::kSha1;
-  shash::Hmac(secret_key,
+  shash::Hmac(info.secret_key,
               reinterpret_cast<const unsigned char *>(to_sign.data()),
               to_sign.length(), &hmac);
 
-  return "Authorization: AWS " + access_key + ":" +
-      Base64(string(reinterpret_cast<char *>(hmac.digest),
-                    hmac.GetDigestSize()));
+  headers->push_back("Authorization: AWS " + info.access_key + ":" +
+                     Base64(string(reinterpret_cast<char *>(hmac.digest),
+                                   hmac.GetDigestSize())));
+  headers->push_back("Date: " + timestamp);
+  headers->push_back("x-amz-acl: public-read");
+  if (!payload_hash.empty())
+    headers->push_back("Content-MD5: " + payload_hash);
+  if (!content_type.empty())
+    headers->push_back("Content-Type: " + content_type);
+  return true;
+}
+
+
+string S3FanoutManager::GetUriEncode(const string &val, bool encode_slash)
+  const
+{
+  string result;
+  const unsigned len = val.length();
+  result.reserve(len);
+  for (unsigned i = 0; i < len; ++i) {
+    char c = val[i];
+    if ((c >= 'A' && c <= 'Z') ||
+        (c >= 'a' && c <= 'z') ||
+        (c >= '0' && c <= '9') ||
+        c == '_' || c == '-' || c == '~' || c == '.')
+    {
+      result.push_back(c);
+    } else if (c == '/') {
+      if (encode_slash) {
+        result += "%2F";
+      } else {
+        result.push_back(c);
+      }
+    } else {
+      result.push_back('%');
+      result.push_back((c / 16) + ((c / 16 <= 9) ? '0' : 'A'-10));
+      result.push_back((c % 16) + ((c % 16 <= 9) ? '0' : 'A'-10));
+    }
+  }
+  return result;
+}
+
+
+string S3FanoutManager::GetAwsV4SigningKey(
+  const JobInfo &info,
+  const string &date) const
+{
+  string id = info.secret_key + info.region + date;
+  map<string, string>::const_iterator iter = signing_keys_.find(id);
+  if (iter != signing_keys_.end())
+    return iter->second;
+
+  string date_key = shash::Hmac256("AWS4" + info.secret_key, date, true);
+  string date_region_key = shash::Hmac256(date_key, info.region, true);
+  string date_region_service_key = shash::Hmac256(date_region_key, "s3", true);
+  string signing_key =
+    shash::Hmac256(date_region_service_key, "aws4_request", true);
+  signing_keys_[id] = signing_key;
+  return signing_key;
+}
+
+
+/**
+ * The Amazon AWS4 authorization header according to
+ * http://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
+ */
+bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
+  const
+{
+  string payload_hash;
+  bool retval = MkPayloadHash(info, &payload_hash);
+  if (!retval)
+    return false;
+  string content_type = GetContentType(info);
+  string timestamp = IsoTimestamp();
+  string date = timestamp.substr(0, 8);
+  vector<string> tokens = SplitString(info.hostname, ':');
+  string host_only = tokens[0];
+
+  string signed_headers;
+  string canonical_headers;
+  if (!content_type.empty()) {
+    signed_headers += "content-type;";
+    headers->push_back("Content-Type: " + content_type);
+    canonical_headers += "content-type:" + content_type + "\n";
+  }
+  signed_headers += "host;x-amz-acl;x-amz-content-sha256;x-amz-date";
+  canonical_headers +=
+    "host:" + host_only + "\n" +
+    "x-amz-acl:public-read\n"
+    "x-amz-content-sha256:" + payload_hash + "\n" +
+    "x-amz-date:" + timestamp + "\n";
+
+  string scope = date + "/" + info.region + "/s3/aws4_request";
+
+  string canonical_request =
+    GetRequestString(info) + "\n" +
+    GetUriEncode("/" + info.bucket + "/" + info.object_key, false) + "\n" +
+    "\n" +
+    canonical_headers + "\n" +
+    signed_headers + "\n" +
+    payload_hash;
+
+  string hash_request = shash::Sha256String(canonical_request.c_str());
+
+  string string_to_sign =
+    "AWS4-HMAC-SHA256\n" +
+    timestamp + "\n" +
+    scope + "\n" +
+    hash_request;
+
+  string signing_key = GetAwsV4SigningKey(info, date);
+  string signature = shash::Hmac256(signing_key, string_to_sign);
+
+  headers->push_back("x-amz-acl: public-read");
+  headers->push_back("x-amz-content-sha256: " + payload_hash);
+  headers->push_back("x-amz-date: " + timestamp);
+  headers->push_back(
+    "Authorization: AWS4-HMAC-SHA256 "
+    "Credential=" + info.access_key + "/" + scope + ","
+    "SignedHeaders=" + signed_headers + ","
+    "Signature=" + signature);
+  return true;
 }
 
 
@@ -446,7 +576,7 @@ int S3FanoutManager::InitializeDnsSettings(
   }
 
   // Remove port number if such exists
-  if (host_with_port.compare(0, 7, "http://") != 0)
+  if (!HasPrefix(host_with_port, "http://", false /*ignore_case*/))
     host_with_port = "http://" + host_with_port;
   std::string remote_host = dns::ExtractHost(host_with_port);
   std::string remote_port = dns::ExtractPort(host_with_port);
@@ -465,7 +595,7 @@ int S3FanoutManager::InitializeDnsSettings(
   }
   if (useme != NULL) {
     curl_sharehandles_->insert(std::pair<CURL *,
-                              S3FanOutDnsEntry *>(handle, useme));
+                               S3FanOutDnsEntry *>(handle, useme));
     useme->counter++;
     InitializeDnsSettingsCurl(handle, useme->sharehandle, useme->clist);
     return 0;
@@ -503,12 +633,146 @@ int S3FanoutManager::InitializeDnsSettings(
     assert(dnse != NULL);
     return -1;
   }
-  curl_sharehandles_->insert(std::pair<CURL *,
-                             S3FanOutDnsEntry *>(handle, dnse));
+  curl_sharehandles_->insert(
+    std::pair<CURL *, S3FanOutDnsEntry *>(handle, dnse));
   dnse->counter++;
   InitializeDnsSettingsCurl(handle, dnse->sharehandle, dnse->clist);
 
   return 0;
+}
+
+
+bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
+  const
+{
+  if ((info.request == JobInfo::kReqHead) ||
+      (info.request == JobInfo::kReqDelete))
+  {
+    switch (info.authz_method) {
+      case kAuthzAwsV2:
+        hex_hash->clear();
+        break;
+      case kAuthzAwsV4:
+        // Sha256 over empty string
+        *hex_hash =
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        break;
+      default:
+        abort();
+    }
+    return true;
+  }
+
+  // PUT, there is actually payload
+  shash::Any payload_hash(shash::kMd5);
+  bool retval;
+
+  switch (info.origin) {
+    case kOriginMem:
+      switch (info.authz_method) {
+        case kAuthzAwsV2:
+          shash::HashMem(info.origin_mem.data, info.origin_mem.size,
+                         &payload_hash);
+          *hex_hash =
+            Base64(string(reinterpret_cast<char *>(payload_hash.digest),
+                          payload_hash.GetDigestSize()));
+          return true;
+        case kAuthzAwsV4:
+          *hex_hash =
+            shash::Sha256Mem(info.origin_mem.data, info.origin_mem.size);
+          return true;
+        default:
+          abort();
+      }
+    case kOriginPath:
+      switch (info.authz_method) {
+        case kAuthzAwsV2:
+          retval = shash::HashFile(info.origin_path, &payload_hash);
+          if (!retval) {
+            LogCvmfs(kLogS3Fanout, kLogStderr,
+                     "failed to hash file %s (errno: %d)",
+                     info.origin_path.c_str(), errno);
+            return false;
+          }
+          *hex_hash =
+            Base64(string(reinterpret_cast<char *>(payload_hash.digest),
+                          payload_hash.GetDigestSize()));
+          return true;
+        case kAuthzAwsV4:
+          *hex_hash = shash::Sha256File(info.origin_path);
+          if (hex_hash->empty()) {
+            LogCvmfs(kLogS3Fanout, kLogStderr,
+                     "failed to hash file %s (errno: %d)",
+                     info.origin_path.c_str(), errno);
+            return false;
+          }
+          return true;
+        default:
+          abort();
+      }
+    default:
+      abort();
+  }
+}
+
+
+bool S3FanoutManager::MkPayloadSize(const JobInfo &info, uint64_t *size) const {
+  if ((info.request == JobInfo::kReqHead) ||
+      (info.request == JobInfo::kReqDelete))
+  {
+    *size = 0;
+    return true;
+  }
+
+  int64_t file_size;
+  switch (info.origin) {
+    case kOriginMem:
+      *size = info.origin_mem.size;
+      return true;
+    case kOriginPath:
+      file_size = GetFileSize(info.origin_path);
+      if (file_size < 0) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to stat file %s (errno: %d)",
+                 info.origin_path.c_str(), errno);
+        return false;
+      }
+      *size = file_size;
+      return true;
+    default:
+      abort();
+  }
+}
+
+
+string S3FanoutManager::GetRequestString(const JobInfo &info) const {
+  switch (info.request) {
+    case JobInfo::kReqHead:
+      return "HEAD";
+    case JobInfo::kReqPut:
+      // fall through
+    case JobInfo::kReqPutNoCache:
+      return "PUT";
+    case JobInfo::kReqDelete:
+      return "DELETE";
+    default:
+      abort();
+  }
+}
+
+
+string S3FanoutManager::GetContentType(const JobInfo &info) const {
+  switch (info.request) {
+    case JobInfo::kReqHead:
+      // fall through
+    case JobInfo::kReqDelete:
+      return "";
+    case JobInfo::kReqPut:
+      // fall through
+    case JobInfo::kReqPutNoCache:
+      return "binary/octet-stream";
+    default:
+      abort();
+  }
 }
 
 
@@ -526,10 +790,12 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
 
   InitializeDnsSettings(handle, info->hostname);
 
-  // HEAD or PUT
-  shash::Any content_md5;
-  content_md5.algorithm = shash::kMd5;
-  string timestamp;
+  bool retval_b;
+  uint64_t payload_size;
+  retval_b = MkPayloadSize(*info, &payload_size);
+  if (!retval_b)
+    return kFailLocalIO;
+
   CURLcode retval;
   if (info->request == JobInfo::kReqHead ||
       info->request == JobInfo::kReqDelete)
@@ -538,22 +804,12 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
     assert(retval == CURLE_OK);
-    timestamp = RfcTimestamp();
-    std::string req = info->request == JobInfo::kReqHead ? "HEAD" : "DELETE";
     info->http_headers =
-        curl_slist_append(info->http_headers,
-                          MkAuthoritzation(info->access_key,
-                                           info->secret_key,
-                                           timestamp, "",
-                                           req.c_str(),
-                                           "",
-                                           info->bucket,
-                                           info->object_key).c_str());
-    info->http_headers =
-        curl_slist_append(info->http_headers, "Content-Length: 0");
+      curl_slist_append(info->http_headers, "Content-Length: 0");
 
     if (info->request == JobInfo::kReqDelete) {
-      retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, req.c_str());
+      retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST,
+                                GetRequestString(*info).c_str());
       assert(retval == CURLE_OK);
     } else {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
@@ -566,27 +822,10 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     assert(retval == CURLE_OK);
-    // MD5 content hash
-    if (info->origin == kOriginMem) {
-      retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                                static_cast<curl_off_t>(info->origin_mem.size));
-      assert(retval == CURLE_OK);
-      shash::HashMem(info->origin_mem.data,
-                     info->origin_mem.size,
-                     &content_md5);
-    } else if (info->origin == kOriginPath) {
-      bool hashretval = shash::HashFile(info->origin_path, &content_md5);
-      if (!hashretval) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to hash file %s (errno: %d)",
-                 info->origin_path.c_str(), errno);
-        return kFailLocalIO;
-      }
-      int64_t file_size = GetFileSize(info->origin_path);
-      if (file_size == -1) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to stat file %s (errno: %d)",
-                 info->origin_path.c_str(), errno);
-        return kFailLocalIO;
-      }
+    retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
+                              static_cast<curl_off_t>(payload_size));
+    assert(retval == CURLE_OK);
+    if (info->origin == kOriginPath) {
       assert(info->origin_file == NULL);
       info->origin_file = fopen(info->origin_path.c_str(), "r");
       if (info->origin_file == NULL) {
@@ -594,33 +833,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                  info->origin_path.c_str(), errno);
         return kFailLocalIO;
       }
-      retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                                static_cast<curl_off_t>(file_size));
-      assert(retval == CURLE_OK);
     }
-    LogCvmfs(kLogS3Fanout, kLogDebug, "content hash: %s",
-             content_md5.ToString().c_str());
-    string content_md5_base64 =
-        Base64(string(reinterpret_cast<char *>(content_md5.digest),
-                      content_md5.GetDigestSize()));
-    info->http_headers =
-        curl_slist_append(info->http_headers,
-                          ("Content-MD5: " + content_md5_base64).c_str());
-
-    // Authorization
-    timestamp = RfcTimestamp();
-    info->http_headers =
-        curl_slist_append(info->http_headers,
-                          MkAuthoritzation(info->access_key,
-                                           info->secret_key,
-                                           timestamp, "binary/octet-stream",
-                                           "PUT", content_md5_base64,
-                                           info->bucket,
-                                           (info->object_key)).c_str());
-
-    info->http_headers =
-        curl_slist_append(info->http_headers,
-                          "Content-Type: binary/octet-stream");
 
     if (info->request == JobInfo::kReqPutNoCache) {
       std::string cache_control = "Cache-Control: no-cache";
@@ -629,12 +842,26 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     }
   }
 
+  // Authorization
+  vector<string> authz_headers;
+  switch (info->authz_method) {
+    case kAuthzAwsV2:
+      retval_b = MkV2Authz(*info, &authz_headers);
+      break;
+    case kAuthzAwsV4:
+      retval_b = MkV4Authz(*info, &authz_headers);
+      break;
+    default:
+      abort();
+  }
+  if (!retval_b)
+    return kFailLocalIO;
+  for (unsigned i = 0; i < authz_headers.size(); ++i) {
+    info->http_headers =
+      curl_slist_append(info->http_headers, authz_headers[i].c_str());
+  }
+
   // Common headers
-  info->http_headers =
-      curl_slist_append(info->http_headers, ("Date: " + timestamp).c_str());
-  std::string acl = "x-amz-acl: public-read";
-  info->http_headers =
-      curl_slist_append(info->http_headers, acl.c_str());
   info->http_headers =
       curl_slist_append(info->http_headers, "Connection: Keep-Alive");
   info->http_headers = curl_slist_append(info->http_headers, "Pragma:");
@@ -1076,14 +1303,12 @@ int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
 /**
  * Push new job to be uploaded to the S3 cloud storage.
  */
-int S3FanoutManager::PushNewJob(JobInfo *info) {
+void S3FanoutManager::PushNewJob(JobInfo *info) {
   available_jobs_->Increment();
 
   pthread_mutex_lock(jobs_todo_lock_);
   jobs_todo_.push_back(info);
   pthread_mutex_unlock(jobs_todo_lock_);
-
-  return 0;
 }
 
 

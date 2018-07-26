@@ -1,0 +1,17 @@
+cvmfs-config-graphdriver (1.2-1) lucid; urgency=low
+
+  * Remove kernel cache workaround
+
+ -- Jakob Blomer <jblomer@cern.ch>  Thu, 07 Dec 2017 09:00:00 +0000
+
+cvmfs-config-graphdriver (1.1-1) lucid; urgency=low
+
+  * Disable kernel caches
+
+ -- Jakob Blomer <jblomer@cern.ch>  Thu, 12 Oct 2017 12:00:00 +0000
+
+cvmfs-config-graphdriver (1.0-1) lucid; urgency=low
+
+  * Initial packaging
+
+ -- Jakob Blomer <jblomer@cern.ch>  Mon, 09 Oct 2017 12:00:00 +0000

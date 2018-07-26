@@ -1,6 +1,14 @@
 #!/bin/bash
 
-script_location=$(dirname $(readlink --canonicalize $0))
+portable_dirname() {
+  if [ "x$(uname -s)" = "xDarwin" ]; then
+    echo $(dirname $(/usr/local/bin/greadlink --canonicalize $1))
+  else
+    echo $(dirname $(readlink --canonicalize $1))
+  fi
+}
+
+script_location=$(portable_dirname $0)
 . ${script_location}/common.sh
 
 #
@@ -14,6 +22,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
 #  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
 #  LOG_DIRECTORY         location of the test log files to be created
+#  GATEWAY_BUILD_URL     location of the repository gateway build to install
 #
 
 SERVER_PACKAGE=""
@@ -23,9 +32,10 @@ UNITTEST_PACKAGE=""
 CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
 LOG_DIRECTORY=""
+GATEWAY_BUILD_URL=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:d:k:t:g:l:" option; do
+while getopts "s:c:d:k:t:g:l:w:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
@@ -48,6 +58,9 @@ while getopts "s:c:d:k:t:g:l:" option; do
     l)
       LOG_DIRECTORY=$OPTARG
       ;;
+    w)
+      GATEWAY_BUILD_URL=$OPTARG
+      ;;
     ?)
       shift $(($OPTIND-2))
       usage "Unrecognized option: $1"
@@ -56,19 +69,25 @@ while getopts "s:c:d:k:t:g:l:" option; do
 done
 
 # check that all mandatory parameters are set
-if [ "x$SERVER_PACKAGE"        = "x" ] ||
-   [ "x$CLIENT_PACKAGE"        = "x" ] ||
-   [ "x$DEVEL_PACKAGE"         = "x" ] ||
-   [ "x$CONFIG_PACKAGES"       = "x" ] ||
-   [ "x$SOURCE_DIRECTORY"      = "x" ] ||
-   [ "x$UNITTEST_PACKAGE"      = "x" ] ||
-   [ "x$LOG_DIRECTORY"         = "x" ]; then
+if [ "x$SOURCE_DIRECTORY"      = "x" ] ||
+   [ "x$LOG_DIRECTORY"         = "x" ] ||
+   [ "x$CLIENT_PACKAGE"        = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
+if [ "x$(uname -s)" != "xDarwin" ]; then
+    if [ "x$SERVER_PACKAGE"        = "x" ] ||
+       [ "x$CONFIG_PACKAGES"       = "x" ] ||
+       [ "x$UNITTEST_PACKAGE"      = "x" ] ||
+       [ "x$GATEWAY_BUILD_URL"     = "x" ] ||
+       [ "x$DEVEL_PACKAGE"         = "x" ]; then
+      echo "missing parameter(s), cannot run platform dependent test script"
+      exit 200
+    fi
+fi
 
 # check that the script is running under the correct user account
-if [ $(id --user --name) != "sftnight" ]; then
+if [ $(id -u -n) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
   exit 3
 fi

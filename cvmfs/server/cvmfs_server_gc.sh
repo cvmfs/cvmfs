@@ -142,7 +142,7 @@ cvmfs_server_gc() {
                   "$dry_run"                    \
                   "$list_deleted_objects"       \
                   "$preserve_revisions"         \
-                  "$preserve_timestamps"        \
+                  "$preserve_timestamp"         \
                   "$deletion_log"
     else
       local log=/var/log/cvmfs/gc.log
@@ -159,7 +159,7 @@ cvmfs_server_gc() {
                   "$dry_run"                    \
                   "$list_deleted_objects"       \
                   "$preserve_revisions"         \
-                  "$preserve_timestamps"        \
+                  "$preserve_timestamp"         \
                   "$deletion_log"
       )
       if [ $? != 0 ]; then
@@ -182,7 +182,7 @@ __do_gc_cmd()
   local dry_run="$2"
   local list_deleted_objects="$3"
   local preserve_revisions="$4"
-  local preserve_timestamps="$5"
+  local preserve_timestamp="$5"
   local deletion_log="$6"
 
   # leave extra layer of indent for now to better show diff with previous
@@ -200,9 +200,6 @@ __do_gc_cmd()
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
     is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
 
-    local head_timestamp="$(get_repo_info -t)"
-    [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
-
     # figure out the URL of the repository
     local repository_url="$CVMFS_STRATUM0"
     if is_stratum1 $name; then
@@ -211,7 +208,7 @@ __do_gc_cmd()
     fi
 
     # generate the garbage collection configuration
-    local additional_switches=""
+    local additional_switches="${CVMFS_SERVER_FLAGS}"
     [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
     [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
     [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
@@ -255,6 +252,8 @@ __do_gc_cmd()
         release_update_lock $name
       fi
     fi
+
+    syncfs
 }
 
 # this is used for both auto-gc (after publish or snapshot) and non-auto-gc

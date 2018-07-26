@@ -364,6 +364,7 @@ class DownloadManager {
   Failures Fetch(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);
+  std::string GetDnsServer() const;
   void SetDnsServer(const std::string &address);
   void SetDnsParameters(const unsigned retries, const unsigned timeout_ms);
   void SetIpPreference(const dns::IpPreference preference);
@@ -407,6 +408,10 @@ class DownloadManager {
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
     return 0;
+  }
+
+  dns::IpPreference opt_ip_preference() const {
+    return opt_ip_preference_;
   }
 
  private:
@@ -457,7 +462,7 @@ class DownloadManager {
 
   pthread_mutex_t *lock_options_;
   pthread_mutex_t *lock_synchronous_mode_;
-  char *opt_dns_server_;
+  std::string opt_dns_server_;
   unsigned opt_timeout_proxy_;
   unsigned opt_timeout_direct_;
   unsigned opt_low_speed_limit_;

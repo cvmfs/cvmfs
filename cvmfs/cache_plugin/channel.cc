@@ -17,14 +17,144 @@
 
 #include "logging.h"
 #include "platform.h"
-#ifdef __APPLE__
 #include "smalloc.h"
-#endif
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
+
+
+SessionCtx *SessionCtx::instance_ = NULL;
+
+void SessionCtx::CleanupInstance() {
+  delete instance_;
+  instance_ = NULL;
+}
+
+
+SessionCtx::SessionCtx() {
+  lock_tls_blocks_ = reinterpret_cast<pthread_mutex_t *>(
+    smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_tls_blocks_, NULL);
+  assert(retval == 0);
+}
+
+
+SessionCtx::~SessionCtx() {
+  pthread_mutex_destroy(lock_tls_blocks_);
+  free(lock_tls_blocks_);
+
+  for (unsigned i = 0; i < tls_blocks_.size(); ++i) {
+    delete tls_blocks_[i];
+  }
+
+  int retval = pthread_key_delete(thread_local_storage_);
+  assert(retval == 0);
+}
+
+
+SessionCtx *SessionCtx::GetInstance() {
+  if (instance_ == NULL) {
+    instance_ = new SessionCtx();
+    int retval =
+      pthread_key_create(&instance_->thread_local_storage_, TlsDestructor);
+    assert(retval == 0);
+  }
+
+  return instance_;
+}
+
+
+void SessionCtx::Get(uint64_t *id, char **reponame, char **client_instance) {
+  ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
+    pthread_getspecific(thread_local_storage_));
+  if ((tls == NULL) || !tls->is_set) {
+    *id = 0;
+    *reponame = NULL;
+    *client_instance = NULL;
+  } else {
+    *id = tls->id;
+    *reponame = tls->reponame;
+    *client_instance = tls->client_instance;
+  }
+}
+
+
+bool SessionCtx::IsSet() {
+  ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
+    pthread_getspecific(thread_local_storage_));
+  if (tls == NULL)
+    return false;
+
+  return tls->is_set;
+}
+
+
+void SessionCtx::Set(uint64_t id, char *reponame, char *client_instance) {
+  ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
+    pthread_getspecific(thread_local_storage_));
+
+  if (tls == NULL) {
+    tls = new ThreadLocalStorage(id, reponame, client_instance);
+    int retval = pthread_setspecific(thread_local_storage_, tls);
+    assert(retval == 0);
+    MutexLockGuard lock_guard(lock_tls_blocks_);
+    tls_blocks_.push_back(tls);
+  } else {
+    tls->id = id;
+    tls->reponame = reponame;
+    tls->client_instance = client_instance;
+    tls->is_set = true;
+  }
+}
+
+
+void SessionCtx::TlsDestructor(void *data) {
+  ThreadLocalStorage *tls = static_cast<SessionCtx::ThreadLocalStorage *>(data);
+  delete tls;
+
+  assert(instance_);
+  MutexLockGuard lock_guard(instance_->lock_tls_blocks_);
+  for (vector<ThreadLocalStorage *>::iterator i =
+       instance_->tls_blocks_.begin(), iEnd = instance_->tls_blocks_.end();
+       i != iEnd; ++i)
+  {
+    if ((*i) == tls) {
+      instance_->tls_blocks_.erase(i);
+      break;
+    }
+  }
+}
+
+
+void SessionCtx::Unset() {
+  ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
+    pthread_getspecific(thread_local_storage_));
+  if (tls != NULL) {
+    tls->is_set = false;
+    tls->id = 0;
+    tls->reponame = NULL;
+    tls->client_instance = NULL;
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
+
+CachePlugin::SessionInfo::SessionInfo(uint64_t id, const std::string &name)
+  : id(id)
+  , name(name)
+{
+  vector<string> tokens = SplitString(name, ':');
+  reponame = strdup(tokens[0].c_str());
+  if (tokens.size() > 1)
+    client_instance = strdup(tokens[1].c_str());
+  else
+    client_instance = NULL;
+}
 
 const uint64_t CachePlugin::kSizeUnknown = uint64_t(-1);
 
@@ -72,10 +202,10 @@ void CachePlugin::HandleHandshake(
 {
   uint64_t session_id = NextSessionId();
   if (msg_req->has_name()) {
-    sessions_[session_id] = msg_req->name();
+    sessions_[session_id] = SessionInfo(session_id, msg_req->name());
   } else {
-    sessions_[session_id] =
-      "anonymous client (" + StringifyInt(session_id) + ")";
+    sessions_[session_id] = SessionInfo(session_id,
+      "anonymous client (" + StringifyInt(session_id) + ")");
   }
   cvmfs::MsgHandshakeAck msg_ack;
   CacheTransport::Frame frame_send(&msg_ack);
@@ -96,6 +226,7 @@ void CachePlugin::HandleInfo(
   cvmfs::MsgInfoReq *msg_req,
   CacheTransport *transport)
 {
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgInfoReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
@@ -137,6 +268,7 @@ void CachePlugin::HandleList(
   cvmfs::MsgListReq *msg_req,
   CacheTransport *transport)
 {
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgListReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
@@ -192,6 +324,7 @@ void CachePlugin::HandleObjectInfo(
   cvmfs::MsgObjectInfoReq *msg_req,
   CacheTransport *transport)
 {
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgObjectInfoReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
@@ -222,6 +355,7 @@ void CachePlugin::HandleRead(
   cvmfs::MsgReadReq *msg_req,
   CacheTransport *transport)
 {
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgReadReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
@@ -260,6 +394,7 @@ void CachePlugin::HandleRefcount(
   cvmfs::MsgRefcountReq *msg_req,
   CacheTransport *transport)
 {
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgRefcountReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
@@ -302,6 +437,12 @@ bool CachePlugin::HandleRequest(int fd_con) {
     HandleHandshake(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
     cvmfs::MsgQuit *msg_req = reinterpret_cast<cvmfs::MsgQuit *>(msg_typed);
+    map<uint64_t, SessionInfo>::const_iterator iter =
+      sessions_.find(msg_req->session_id());
+    if (iter != sessions_.end()) {
+      free(iter->second.reponame);
+      free(iter->second.client_instance);
+    }
     sessions_.erase(msg_req->session_id());
     return false;
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgIoctl") {
@@ -353,6 +494,7 @@ void CachePlugin::HandleShrink(
   cvmfs::MsgShrinkReq *msg_req,
   CacheTransport *transport)
 {
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgShrinkReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
@@ -372,6 +514,7 @@ void CachePlugin::HandleStoreAbort(
   cvmfs::MsgStoreAbortReq *msg_req,
   CacheTransport *transport)
 {
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgStoreReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
   msg_reply.set_req_id(msg_req->req_id());
@@ -401,6 +544,7 @@ void CachePlugin::HandleStore(
   CacheTransport::Frame *frame,
   CacheTransport *transport)
 {
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgStoreReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
   msg_reply.set_req_id(msg_req->req_id());
@@ -545,9 +689,9 @@ bool CachePlugin::Listen(const string &locator) {
 
 void CachePlugin::LogSessionInfo(uint64_t session_id, const string &msg) {
   string session_str("unidentified client (" + StringifyInt(session_id) + ")");
-  map<uint64_t, string>::const_iterator iter = sessions_.find(session_id);
+  map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(session_id);
   if (iter != sessions_.end()) {
-    session_str = iter->second;
+    session_str = iter->second.name;
   }
   LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
            "session '%s': %s", session_str.c_str(), msg.c_str());
@@ -560,9 +704,9 @@ void CachePlugin::LogSessionError(
   const std::string &msg)
 {
   string session_str("unidentified client (" + StringifyInt(session_id) + ")");
-  map<uint64_t, string>::const_iterator iter = sessions_.find(session_id);
+  map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(session_id);
   if (iter != sessions_.end()) {
-    session_str = iter->second;
+    session_str = iter->second.name;
   }
   LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
            "session '%s': %s (%d - %s)",

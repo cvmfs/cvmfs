@@ -1,0 +1,32 @@
+cvmfs_test_name="Publish files that forbid being read"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** create file with permission 000"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir /cvmfs/$CVMFS_TEST_REPO/dir || return 10
+  echo "secret" > /cvmfs/$CVMFS_TEST_REPO/dir/hidden || return 10
+  echo "content" > /cvmfs/$CVMFS_TEST_REPO/shadow || return 10
+  chmod 000 /cvmfs/$CVMFS_TEST_REPO/shadow || return 11
+  chmod 000 /cvmfs/$CVMFS_TEST_REPO/dir || return 11
+  if [ $(id -u) -ne 0 ]; then
+    cat /cvmfs/$CVMFS_TEST_REPO/shadow && return 12
+    cat /cvmfs/$CVMFS_TEST_REPO/dir/hidden && return 12
+  fi
+  publish_repo $CVMFS_TEST_REPO || return 13
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  if [ $(id -u) -ne 0 ]; then
+    cat /cvmfs/$CVMFS_TEST_REPO/shadow && return 20
+    cat /cvmfs/$CVMFS_TEST_REPO/dir/hidden && return 20
+  fi
+
+  return 0
+}
+

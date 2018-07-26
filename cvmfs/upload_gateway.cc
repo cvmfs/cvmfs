@@ -7,7 +7,6 @@
 #include <limits>
 #include <vector>
 
-#include "file_processing/char_buffer.h"
 #include "gateway_util.h"
 #include "util/string.h"
 
@@ -64,12 +63,6 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
   }
 
   atomic_init32(&num_errors_);
-
-  LogCvmfs(kLogUploadGateway, kLogStderr,
-           "HTTP uploader configuration:\n"
-           "  API URL: %s\n"
-           "  Session token file: %s\n",
-           config_.api_url.c_str(), config_.session_token_file.c_str());
 }
 
 GatewayUploader::~GatewayUploader() {
@@ -99,8 +92,9 @@ bool GatewayUploader::Initialize() {
 
 bool GatewayUploader::FinalizeSession(bool commit,
                                       const std::string& old_root_hash,
-                                      const std::string& new_root_hash) {
-  return session_context_->Finalize(commit, old_root_hash, new_root_hash);
+                                      const std::string& new_root_hash,
+                                      const RepositoryTag& tag) {
+  return session_context_->Finalize(commit, old_root_hash, new_root_hash, tag);
 }
 
 void GatewayUploader::WaitForUpload() const {
@@ -109,8 +103,9 @@ void GatewayUploader::WaitForUpload() const {
 
 std::string GatewayUploader::name() const { return "HTTP"; }
 
-bool GatewayUploader::Remove(const std::string& /*file_to_delete*/) {
-  return false;
+void GatewayUploader::DoRemoveAsync(const std::string& /*file_to_delete*/) {
+  atomic_inc32(&num_errors_);
+  Respond(NULL, UploaderResults());
 }
 
 bool GatewayUploader::Peek(const std::string& /*path*/) const { return false; }
@@ -167,28 +162,20 @@ UploadStreamHandle* GatewayUploader::InitStreamedUpload(
 }
 
 void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
-                                     CharBuffer* buffer,
+                                     UploadBuffer buffer,
                                      const CallbackTN* callback) {
-  if (!buffer->IsInitialized()) {
-    LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Streamed upload - input buffer is not initialized");
-    BumpErrors();
-    Respond(callback, UploaderResults(1, buffer));
-    return;
-  }
-
   GatewayStreamHandle* hd = dynamic_cast<GatewayStreamHandle*>(handle);
   if (!hd) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Streamed upload - incompatible upload handle");
     BumpErrors();
-    Respond(callback, UploaderResults(2, buffer));
+    Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 2));
     return;
   }
 
-  ObjectPack::AddToBucket(buffer->ptr(), buffer->used_bytes(), hd->bucket);
+  ObjectPack::AddToBucket(buffer.data, buffer.size, hd->bucket);
 
-  Respond(callback, UploaderResults(0, buffer));
+  Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
 void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
@@ -198,7 +185,8 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - incompatible upload handle");
     BumpErrors();
-    Respond(handle->commit_callback, UploaderResults(2));
+    Respond(handle->commit_callback,
+            UploaderResults(UploaderResults::kChunkCommit, 2));
     return;
   }
 
@@ -207,11 +195,13 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - could not commit bucket");
     BumpErrors();
-    Respond(handle->commit_callback, UploaderResults(4));
+    Respond(handle->commit_callback,
+            UploaderResults(UploaderResults::kChunkCommit, 4));
     return;
   }
 
-  Respond(handle->commit_callback, UploaderResults(0));
+  Respond(handle->commit_callback,
+          UploaderResults(UploaderResults::kChunkCommit, 0));
 }
 
 bool GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,

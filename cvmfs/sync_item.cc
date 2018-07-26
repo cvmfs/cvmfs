@@ -4,9 +4,16 @@
 
 #include "sync_item.h"
 
+
+#if !defined(__APPLE__)
+#include <sys/sysmacros.h>
+#endif  // __APPLE__
+
 #include <cerrno>
 #include <vector>
 
+#include "duplex_libarchive.h"
+#include "ingestion/ingestion_source.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 
@@ -14,8 +21,10 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
-
 SyncItem::SyncItem() :
+  rdonly_type_(static_cast<SyncItemType>(0)),
+  graft_size_(-1),
+  scratch_type_(static_cast<SyncItemType>(0)),
   union_engine_(NULL),
   whiteout_(false),
   opaque_(false),
@@ -25,15 +34,16 @@ SyncItem::SyncItem() :
   graft_marker_present_(false),
   external_data_(false),
   graft_chunklist_(NULL),
-  graft_size_(-1),
-  scratch_type_(static_cast<SyncItemType>(0)),
-  rdonly_type_(static_cast<SyncItemType>(0)),
   compression_algorithm_(zlib::kZlibDefault) {}
 
-SyncItem::SyncItem(const string       &relative_parent_path,
-                   const string       &filename,
+SyncItem::SyncItem(const std::string  &relative_parent_path,
+                   const std::string  &filename,
                    const SyncUnion    *union_engine,
-                   const SyncItemType  entry_type) :
+                   const SyncItemType entry_type) :
+  rdonly_type_(kItemUnknown),
+  graft_size_(-1),
+  scratch_type_(entry_type),
+  filename_(filename),
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
@@ -43,17 +53,10 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   graft_marker_present_(false),
   external_data_(false),
   relative_parent_path_(relative_parent_path),
-  filename_(filename),
   graft_chunklist_(NULL),
-  graft_size_(-1),
-  scratch_type_(entry_type),
-  rdonly_type_(kItemUnknown),
-  compression_algorithm_(zlib::kZlibDefault)
-{
+  compression_algorithm_(zlib::kZlibDefault) {
   content_hash_.algorithm = shash::kAny;
-  CheckMarkerFiles();
 }
-
 
 SyncItem::~SyncItem() {
   delete graft_chunklist_;
@@ -88,7 +91,7 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 }
 
 
-SyncItemType SyncItem::GetScratchFiletype() const {
+SyncItemType SyncItemNative::GetScratchFiletype() const {
   StatScratch();
   if (scratch_stat_.error_code != 0) {
     PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
@@ -99,8 +102,24 @@ SyncItemType SyncItem::GetScratchFiletype() const {
   return GetGenericFiletype(scratch_stat_);
 }
 
+SyncItemType SyncItem::GetUnionFiletype() const {
+  StatUnion();
+  if (union_stat_.error_code == ENOENT || union_stat_.error_code == ENOTDIR)
+    return kItemUnknown;
+  return GetGenericFiletype(union_stat_);
+}
+
+bool SyncItemNative::IsType(const SyncItemType expected_type) const {
+  if (filename().substr(0, 12) == ".cvmfsgraft-") {
+    scratch_type_ = kItemMarker;
+  } else if (scratch_type_ == kItemUnknown) {
+    scratch_type_ = GetScratchFiletype();
+  }
+  return scratch_type_ == expected_type;
+}
 
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
+  StatScratch(true);
   // Mark the file as whiteout entry and strip the whiteout prefix
   whiteout_ = true;
   filename_ = actual_filename;
@@ -155,6 +174,19 @@ uint64_t SyncItem::GetUnionInode() const {
   return union_stat_.stat.st_ino;
 }
 
+uint64_t SyncItem::GetScratchSize() const {
+  StatScratch();
+  return scratch_stat_.stat.st_size;
+}
+
+uint64_t SyncItem::GetRdOnlySize() const {
+  StatRdOnly();
+  return rdonly_stat_.stat.st_size;
+}
+
+IngestionSource *SyncItemNative::CreateIngestionSource() const {
+  return new FileIngestionSource(GetUnionPath());
+}
 
 void SyncItem::StatGeneric(const string  &path,
                            EntryStat     *info,
@@ -166,7 +198,7 @@ void SyncItem::StatGeneric(const string  &path,
 }
 
 
-catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
+catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   catalog::DirectoryEntryBase dirent;
 
   // inode and parent inode is determined at runtime of client
@@ -186,7 +218,7 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   dirent.is_external_file_ = this->IsExternalData();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
 
-  dirent.name_.Assign(filename_.data(), filename_.length());
+  dirent.name_.Assign(filename().data(), filename().length());
 
   if (this->IsSymlink()) {
     char slnk[PATH_MAX+1];
@@ -196,8 +228,13 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
     dirent.symlink_.Assign(slnk, length);
   }
 
+  if (this->IsCharacterDevice() || this->IsBlockDevice()) {
+    dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
+  }
+
   return dirent;
 }
+
 
 std::string SyncItem::GetRdOnlyPath() const {
   const string relative_path = GetRelativePath().empty() ?
@@ -215,6 +252,7 @@ std::string SyncItem::GetScratchPath() const {
   const string relative_path = GetRelativePath().empty() ?
                                "" : "/" + GetRelativePath();
   return union_engine_->scratch_path() + relative_path;
+  // return union_engine_->scratch_path() + filename();
 }
 
 void SyncItem::CheckMarkerFiles() {

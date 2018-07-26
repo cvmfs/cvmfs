@@ -78,16 +78,16 @@ S S 1
 S D 1
 S N 1
 M[N] D /dir2
-A F /dir2/.cvmfscatalog
-A D /dir3
-A F /dir3/new_file
-A F /dir3/.cvmfscatalog
+A F /dir2/.cvmfscatalog +0
+A D /dir3 +4096
+A F /dir3/new_file +0
+A F /dir3/.cvmfscatalog +0
 M[SC] F /file
-R S /symlink
+R S /symlink -4
 M[SMLC] FS /directory/foo
 M[N] D /directory/nested
-R F /directory/nested/.cvmfscatalog
-A S /other-symlink
+R F /directory/nested/.cvmfscatalog -0
+A S /other-symlink +4
 EOF
   cvmfs_server diff -im $CVMFS_TEST_REPO > forward.output || return 21
   diff forward.reference forward.output || return 22
@@ -99,18 +99,33 @@ S S -1
 S D -1
 S N -1
 M[N] D /dir2
-R F /dir2/.cvmfscatalog
-R D /dir3
+R F /dir2/.cvmfscatalog -0
+R D /dir3 -4096
 M[SC] F /file
-A S /symlink
+A S /symlink +4
 M[SMLC] SF /directory/foo
 M[N] D /directory/nested
-A F /directory/nested/.cvmfscatalog
-R S /other-symlink
+A F /directory/nested/.cvmfscatalog +0
+R S /other-symlink -4
 EOF
   cvmfs_server diff -im -s trunk -d trunk-previous $CVMFS_TEST_REPO \
     > reverse.output || return 31
   diff reverse.reference reverse.output || return 32
+
+  echo "*** check skipping of hidden .cvmfs directory"
+  echo "CVMFS_VIRTUAL_DIR=true" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf || return 40
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+  cat << EOF > hiddencvmfs.reference
+S F 1
+S S 0
+S D 7
+S N 1
+EOF
+  cvmfs_server diff -m $CVMFS_TEST_REPO > hiddencvmfs.output || return 41
+  diff hiddencvmfs.reference hiddencvmfs.output || return 42
 
   return 0
 }

@@ -36,8 +36,11 @@ Signal::Signal() : fired_(false) {
 
 
 Signal::~Signal() {
-  pthread_cond_destroy(&signal_);
-  pthread_mutex_destroy(&lock_);
+  assert(IsSleeping());
+  int res = pthread_cond_destroy(&signal_);
+  assert(0 == res);
+  res = pthread_mutex_destroy(&lock_);
+  assert(0 == res);
 }
 
 
@@ -47,6 +50,7 @@ void Signal::Wait() {
     int retval = pthread_cond_wait(&signal_, &lock_);
     assert(retval == 0);
   }
+  fired_ = false;
 }
 
 
@@ -55,6 +59,11 @@ void Signal::Wakeup() {
   fired_ = true;
   int retval = pthread_cond_broadcast(&signal_);
   assert(retval == 0);
+}
+
+bool Signal::IsSleeping() {
+  MutexLockGuard guard(lock_);
+  return fired_ == false;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

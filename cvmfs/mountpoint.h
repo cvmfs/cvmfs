@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "cache.h"
+#include "file_watcher.h"
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "loader.h"
@@ -46,6 +47,7 @@ class InodeCache;
 class Md5PathCache;
 class PathCache;
 }
+class NfsMaps;
 class OptionsManager;
 namespace perf {
 class Counter;
@@ -179,6 +181,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
   perf::Counter *n_io_error() { return n_io_error_; }
   std::string name() { return name_; }
+  NfsMaps *nfs_maps() { return nfs_maps_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
   perf::Counter *no_open_files() { return no_open_files_; }
   OptionsManager *options_mgr() { return options_mgr_; }
@@ -332,9 +335,10 @@ class FileSystem : SingleCopy, public BootFactory {
   cvmfs::Uuid *uuid_cache_;
 
   /**
-   * Used internally to remember if NFS maps need to be shut down.
+   * TODO(jblomer): Move to MountPoint. Tricky because of the sqlite maps
+   * and the sqlite configuration done for the file catalogs.
    */
-  bool has_nfs_maps_;
+  NfsMaps *nfs_maps_;
   /**
    * Used internally to remember if the Sqlite memory manager need to be shut
    * down.
@@ -379,6 +383,9 @@ class MountPoint : SingleCopy, public BootFactory {
   download::DownloadManager *download_mgr() { return download_mgr_; }
   download::DownloadManager *external_download_mgr() {
     return external_download_mgr_;
+  }
+  file_watcher::FileWatcher* resolv_conf_watcher() {
+    return resolv_conf_watcher_;
   }
   cvmfs::Fetcher *fetcher() { return fetcher_; }
   bool fixed_catalog() { return fixed_catalog_; }
@@ -458,6 +465,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool CreateSignatureManager();
   bool CheckBlacklists();
   bool CreateDownloadManagers();
+  bool CreateResolvConfWatcher();
   void CreateFetchers();
   bool CreateCatalogManager();
   void CreateTables();
@@ -503,6 +511,8 @@ class MountPoint : SingleCopy, public BootFactory {
   lru::Md5PathCache *md5path_cache_;
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
+
+  file_watcher::FileWatcher* resolv_conf_watcher_;
 
   unsigned max_ttl_sec_;
   pthread_mutex_t lock_max_ttl_;

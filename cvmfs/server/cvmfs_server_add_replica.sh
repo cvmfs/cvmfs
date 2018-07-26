@@ -75,6 +75,7 @@ cvmfs_server_add_replica() {
   fi
 
   # sanity checks
+  is_valid_repo_name "$alias_name" || die "invalid repository name: $alias_name"
   is_master_replica $stratum0 || die "The repository URL $stratum0 does not point to a replicable master copy of $name"
   if check_repository_existence $alias_name; then
     if is_stratum0 $alias_name; then
@@ -160,11 +161,6 @@ CVMFS_AUTO_GC=true
 EOF
   fi
 
-  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
-    create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
-    create_apache_config_for_global_info
-    reload_apache > /dev/null
-  fi
   echo "done"
 
   if is_local_upstream $upstream; then
@@ -175,6 +171,18 @@ EOF
     mkdir -p $storage_dir
     create_repository_skeleton $storage_dir $cvmfs_user > /dev/null
     echo "done"
+
+    if [ $configure_apache -eq 1 ]; then
+      echo -n "Update Apache configuration... "
+      ensure_enabled_apache_modules
+      create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
+      create_apache_config_for_global_info
+      reload_apache > /dev/null
+      touch $storage_dir/.cvmfsempty
+      wait_for_apache "${stratum1}/.cvmfsempty" || die "fail (Apache configuration)"
+      rm -f $storage_dir/.cvmfsempty
+      echo "done"
+    fi
   fi
 
   echo -n "Creating CernVM-FS Server Infrastructure... "
@@ -189,6 +197,8 @@ EOF
 
   echo -n "Updating global JSON information... "
   update_global_repository_info && echo "done" || echo "fail"
+
+  syncfs
 
   echo "\
 

@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "repository_tag.h"
 #include "server_tool.h"
 #include "util/pointer.h"
 
@@ -30,12 +31,11 @@ class CommitProcessor {
   virtual ~CommitProcessor();
 
   Result Process(const std::string& lease_path, const shash::Any& old_root_hash,
-                 const shash::Any& new_root_hash);
+                 const shash::Any& new_root_hash, const RepositoryTag& tag);
 
   int GetNumErrors() const { return num_errors_; }
 
  private:
-  std::string temp_dir_;
   int num_errors_;
 };
 

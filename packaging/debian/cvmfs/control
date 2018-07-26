@@ -2,14 +2,14 @@ Source: cvmfs
 Section: utils
 Priority: extra
 Maintainer: Jakob Blomer <jblomer@cern.ch>
-Build-Depends: debhelper (>= 9), autotools-dev, cmake, libcap-dev, libssl-dev, make, gcc, g++, libfuse-dev, pkg-config, libattr1-dev, patch, python-dev, unzip, uuid-dev, libc6-dev, valgrind, libz-dev
-Standards-Version: 3.9.3.1
+Build-Depends: debhelper (>= 9), autotools-dev, cmake, libcap-dev, libssl-dev, libfuse-dev, pkg-config, libattr1-dev, patch, python-dev, unzip, uuid-dev, valgrind, libz-dev
+Standards-Version: 3.9.6.1
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: cvmfs-config, bash, coreutils, grep, gawk, sed, perl, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb, uuid-dev, uuid
+Depends: cvmfs-config-default | cvmfs-config, gawk, perl, psmisc, autofs, fuse, curl, attr, libfuse2, zlib1g, gdb, uuid-dev, uuid, adduser, ${misc:Depends}
 Recommends: autofs (>= 5.1.2)
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
@@ -19,8 +19,8 @@ Description: CernVM File System
 Package: cvmfs-server
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: insserv, initscripts, bash, coreutils, grep, sed, psmisc, curl, gzip, attr, openssl, apache2, libcap2, lsof, rsync, jq, usbutils
-Conflicts: cvmfs-server (< 2.1)
+Depends: insserv, initscripts, psmisc, curl, attr, openssl, apache2, libcap2, libcap2-bin, lsof, rsync, jq, usbutils, ${misc:Depends}
+Conflicts: cvmfs-server (<< 2.1)
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System Server
@@ -29,7 +29,7 @@ Description: CernVM File System Server
 Package: cvmfs-dev
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: openssl
+Depends: openssl, ${misc:Depends}
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System Server
@@ -38,7 +38,7 @@ Description: CernVM File System Server
 Package: cvmfs-unittests
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: libssl-dev, uuid-dev, cvmfs-server (= ${source:Version})
+Depends: libssl-dev, uuid-dev, ${misc:Depends}
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System Unit Tests

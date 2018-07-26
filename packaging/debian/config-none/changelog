@@ -1,3 +1,9 @@
+cvmfs-config-none (1.1-0) lucid; urgency=low
+
+  * Turn into virtual package
+
+ -- Dave Dykstra <dwd@fnal.gov>  Tue, 14 Nov 2017 16:00:00 +0000
+
 cvmfs-config-none (1.0-2) lucid; urgency=low
 
   * Fix packaging errors

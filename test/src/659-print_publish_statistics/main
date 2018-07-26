@@ -1,0 +1,220 @@
+# This file contains $NR_OF_TESTS tests for checking the print publish statistics feature
+cvmfs_test_name="Print publish statistics"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_659_NR_OF_TESTS=4
+CVMFS_TEST_659_ERROR_FILES_ADDED=101
+CVMFS_TEST_659_ERROR_FILES_REMOVED=102
+CVMFS_TEST_659_ERROR_FILES_CHANGED=103
+CVMFS_TEST_659_ERROR_DIR_ADDED=104
+CVMFS_TEST_659_ERROR_DIR_REMOVED=105
+CVMFS_TEST_659_ERROR_DIR_CHANGED=106
+CVMFS_TEST_659_ERROR_BYTES_ADDED=107
+CVMFS_TEST_659_ERROR_BYTES_REMOVED=108
+CVMFS_TEST_659_TAR_FILE=tarfile.tar
+CVMFS_TEST_659_TAR_DIR=newTarDir
+
+test1() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "meaningless file content" > file1    # 1 file added ; 25 bytes added
+  echo "more clever file content" > file2    # 1 file added ; 25 bytes added
+  echo "" > file3                            # 1 file added ; 1 byte added ['\n']
+  mkdir foo                                  # 1 directory added
+  mkdir bar                                  # 1 directory added
+  touch ./foo/file4                          # 1 file added ; 0 byte added
+  echo "123 - testing" > ./foo/file5         # 1 file added ; 14 byte added
+
+  popdir
+}
+
+test2() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "additional meaningless content" >> file1   # 1 file changed ; 31 bytes added
+  echo "new file content" > file2                  # 1 file changed ; (25 -17 = 8 bytes removed
+  touch bar                                        # 1 directory changed
+  rm -rf foo               # 1 directory removed ; 2 files removed ; 14 bytes removed
+
+  popdir
+}
+
+#ingest command test
+test3() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "*** Create files in $working_dir..."
+  test1 $working_dir
+  echo "*** Making tar file..."
+  tar -cvf $CVMFS_TEST_659_TAR_FILE  * || return $?
+  echo "*** Tar file created."
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  local tar_file_path=$scratch_dir/tmp_dir/$CVMFS_TEST_659_TAR_FILE
+
+  echo "*** Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** Activate the statistics by writing in server.conf file CVMFS_PRINT_STATISTICS=true"
+  cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf | grep CVMFS_PRINT_STATISTICS
+  if [ $? -eq 0 ]; then   # just change the value
+    echo "*** Found CVMFS_PRINT_STATISTICS variable, value overwritten with true."
+    sed -i 's/CVMFS_PRINT_STATISTICS=.*/CVMFS_PRINT_STATISTICS=true/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  else
+    echo "*** CVMFS_PRINT_STATISTICS not found, append CVMFS_PRINT_STATISTICS=true in server.conf"
+    echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  fi
+
+  # ============================ Test1 =============================
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** Test 1 - putting some stuff in the new repository"
+  test1 $repo_dir || return 1
+
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO > test_659_1 || return $?
+
+  # ============================ Test2 =============================
+
+  echo "*** init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** Test 2 - change stuff in the repository"
+  test2 $repo_dir || return 2
+
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO > test_659_2 || return $?
+
+  # ============================ Test3 =============================
+
+  echo "*** Test 3 - making a tar and execute ingest command"
+  mkdir tmp_dir
+  test3 $scratch_dir/tmp_dir || return 3
+  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_659_TAR_DIR $CVMFS_TEST_REPO > test_659_3 || return $?
+
+  # ============================ Test4 =============================
+
+  echo "*** Test 4 - overwrite the tar file"
+  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_659_TAR_DIR $CVMFS_TEST_REPO > test_659_4 || return $?
+
+  # =========================================================================================================
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # Reference test values
+  declare -A test_results
+  # test 1
+  test_results[1,1]=5     # n_files_added
+  test_results[1,2]=0     # n_files_removed
+  test_results[1,3]=0     # n_files_changed
+  test_results[1,4]=2     # n_directories_added
+  test_results[1,5]=0     # n_directories_removed
+  test_results[1,6]=0     # n_directories_changed
+  test_results[1,7]=65    # sz_added_bytes
+  test_results[1,8]=0     # sz_removed_bytes
+  # test 2
+  test_results[2,1]=0
+  test_results[2,2]=2
+  test_results[2,3]=2
+  test_results[2,4]=0
+  test_results[2,5]=1
+  test_results[2,6]=1
+  test_results[2,7]=31
+  test_results[2,8]=22
+  # test 3
+  test_results[3,1]=5
+  test_results[3,2]=0
+  test_results[3,3]=0
+  test_results[3,4]=3
+  test_results[3,5]=0
+  test_results[3,6]=0
+  test_results[3,7]=65
+  test_results[3,8]=0
+  # test 4
+  test_results[4,1]=0
+  test_results[4,2]=0
+  test_results[4,3]=5
+  test_results[4,4]=0
+  test_results[4,5]=0
+  test_results[4,6]=0
+  test_results[4,7]=0
+  test_results[4,8]=0
+
+  # check publish statistics
+  for i in `seq 1 $CVMFS_TEST_659_NR_OF_TESTS`;
+  do
+    local files_added=$(cat test_659_$i | grep n_files_added |cut -d '|' -f 2)
+    local files_removed=$(cat test_659_$i |  grep n_files_removed |cut -d '|' -f 2)
+    local files_changed=$(cat test_659_$i |  grep n_files_changed |cut -d '|' -f 2)
+    local directories_added=$(cat test_659_$i | grep n_directories_added |cut -d '|' -f 2)
+    local directories_removed=$(cat test_659_$i |  grep n_directories_removed |cut -d '|' -f 2)
+    local directories_changed=$(cat test_659_$i |  grep n_directories_changed |cut -d '|' -f 2)
+    local bytes_added=$(cat test_659_$i |  grep sz_added_bytes |cut -d '|' -f 2)
+    local bytes_removed=$(cat test_659_$i |  grep sz_removed_bytes |cut -d '|' -f 2)
+
+    if [ $files_added != ${test_results[$i,1]} ]; then
+      echo "*** Test $i.1 - number of added files - \
+            ($files_added vs ref:${test_results[$i,1]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_FILES_ADDED
+    fi
+
+    if [ $files_removed != ${test_results[$i,2]} ]; then
+      echo "*** Test $i.2 - number of removed files -\
+           ($files_removed vs ref:${test_results[$i,2]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_FILES_REMOVED
+    fi
+
+     if [ $files_changed != ${test_results[$i,3]} ]; then
+      echo "*** Test $i.3 - number of changed files - \
+            ($files_changed vs ref:${test_results[$i,3]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_FILES_CHANGED
+    fi
+    if [ $directories_added != ${test_results[$i,4]} ]; then
+      echo "*** Test $i.4 - number of added directories - \
+            ($directories_added vs ref:${test_results[$i,4]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_DIR_ADDED
+    fi
+    if [ $directories_removed != ${test_results[$i,5]} ]; then
+      echo "*** Test $i.5 - number of removed directories \
+            - ($directories_removed vs ref:${test_results[$i,5]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_DIR_REMOVED
+    fi
+    if [ $directories_changed != ${test_results[$i,6]} ]; then
+      echo "*** Test $i.6 - number of changed directories - \
+            ($directories_changed vs ref:${test_results[$i,6]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_DIR_CHANGED
+    fi
+
+    if [ $bytes_added != ${test_results[$i,7]} ]; then
+      echo "*** Test $i.7 - number of added bytes - \
+            ($bytes_added vs ref:${test_results[$i,7]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_BYTES_ADDED
+    fi
+
+    if [ $bytes_removed != ${test_results[$i,8]} ]; then
+      echo "*** Test $i.8 - number of removed bytes - \
+            ($bytes_removed vs ref:${test_results[$i,8]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_BYTES_REMOVED
+    fi
+
+    # clean
+    rm test_100_$i
+  done
+
+  return 0
+}
+

@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <climits>
 #include <cstring>
 #include <vector>
 
@@ -51,12 +52,15 @@
 #include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps.h"
+#ifdef CVMFS_NFS_SUPPORT
+#include "nfs_maps_leveldb.h"
+#include "nfs_maps_sqlite.h"
 #endif
 #include "options.h"
 #include "platform.h"
 #include "quota_posix.h"
+#include "resolv_conf_event_handler.h"
 #include "signature.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
@@ -340,7 +344,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , nfs_mode_(kNfsNone)
   , cache_mgr_(NULL)
   , uuid_cache_(NULL)
-  , has_nfs_maps_(false)
+  , nfs_maps_(NULL)
   , has_custom_sqlitevfs_(false)
 {
   assert(!g_alive);
@@ -349,7 +353,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   g_gid = getegid();
 
   string optarg;
-  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SERVER_CACHE",
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SERVER_MODE",
                                          kDefaultCacheMgrInstance),
                              &optarg)
       && options_mgr_->IsOn(optarg))
@@ -366,10 +370,7 @@ FileSystem::~FileSystem() {
     sqlite::UnregisterVfsRdOnly();
 
   delete uuid_cache_;
-#ifdef CVMFS_NFS_SUPPORT
-  if (has_nfs_maps_)
-    nfs_maps::Fini();
-#endif
+  delete nfs_maps_;
   delete cache_mgr_;
 
   if (sqlite3_temp_directory) {
@@ -587,7 +588,8 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
     settings.cache_path,
     settings.is_alien,
-    settings.avoid_rename));
+    settings.avoid_rename ? PosixCacheManager::kRenameLink
+                          : PosixCacheManager::kRenameNormal));
   if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);
@@ -817,18 +819,41 @@ bool FileSystem::SetupNfsMaps() {
   }
 
   // TODO(jblomer): make this a manager class
-  bool retval =
-    nfs_maps::Init(inode_cache_dir,
-                   catalog::ClientCatalogManager::kInodeOffset + 1,
-                   found_previous_crash_,
-                   IsHaNfsSource());
-  if (!retval) {
+  if (IsHaNfsSource()) {
+    nfs_maps_ = NfsMapsSqlite::Create(
+      inode_cache_dir,
+      catalog::ClientCatalogManager::kInodeOffset + 1,
+      found_previous_crash_,
+      statistics_);
+  } else {
+    nfs_maps_ = NfsMapsLeveldb::Create(
+      inode_cache_dir,
+      catalog::ClientCatalogManager::kInodeOffset + 1,
+      found_previous_crash_,
+      statistics_);
+  }
+
+  if (nfs_maps_ == NULL) {
     boot_error_ = "Failed to initialize NFS maps";
     boot_status_ = loader::kFailNfsMaps;
     return false;
   }
 
-  return has_nfs_maps_ = true;
+  string optarg;
+  if (options_mgr_->GetValue("CVMFS_NFS_INTERLEAVED_INODES", &optarg)) {
+    vector<string> tokens = SplitString(optarg, '%');
+    if (tokens.size() != 2) {
+      boot_error_ =
+        "invalid format for CVMFS_NFS_INTERLEAVED_INODES: " + optarg;
+      boot_status_ = loader::kFailNfsMaps;
+      return false;
+    }
+    nfs_maps_->SetInodeResidue(String2Uint64(tokens[1]),
+                               String2Uint64(tokens[0]));
+  }
+
+  return true;
+
 #else
   return true;
 #endif
@@ -1093,6 +1118,9 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
   if (!mountpoint->CreateDownloadManagers())
     return mountpoint.Release();
+  if (!mountpoint->CreateResolvConfWatcher()) {
+    return mountpoint.Release();
+  }
   mountpoint->CreateFetchers();
   if (!mountpoint->CreateCatalogManager())
     return mountpoint.Release();
@@ -1137,8 +1165,7 @@ void MountPoint::CreateAuthz() {
 bool MountPoint::CreateCatalogManager() {
   string optarg;
 
-  catalog_mgr_ = new catalog::ClientCatalogManager(
-    fqrn_, fetcher_, signature_mgr_, statistics_);
+  catalog_mgr_ = new catalog::ClientCatalogManager(this);
 
   SetupInodeAnnotation();
   if (!SetupOwnerMaps())
@@ -1192,7 +1219,7 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
-    download_mgr_->SetHostChain(ReplaceHosts(optarg));
+    download_mgr_->SetHostChain(optarg);
   }
 
   SetupDnsTuning(download_mgr_);
@@ -1232,6 +1259,28 @@ bool MountPoint::CreateDownloadManagers() {
   return SetupExternalDownloadMgr(false);
 }
 
+bool MountPoint::CreateResolvConfWatcher() {
+  std::string roaming_value;
+  options_mgr_->GetValue("CVMFS_DNS_ROAMING", &roaming_value);
+  if (options_mgr_->IsDefined("CVMFS_DNS_ROAMING") &&
+      options_mgr_->IsOn(roaming_value)) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "DNS roaming is enabled for this repository.");
+    // Create a file watcher to update the DNS settings of the download
+    // managers when there are changes to /etc/resolv.conf
+    resolv_conf_watcher_ = platform_file_watcher();
+
+    if (resolv_conf_watcher_) {
+      ResolvConfEventHandler *handler =
+          new ResolvConfEventHandler(download_mgr_, external_download_mgr_);
+      resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
+    }
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "DNS roaming is disabled for this repository.");
+  }
+  return true;
+}
 
 void MountPoint::CreateFetchers() {
   fetcher_ = new cvmfs::Fetcher(
@@ -1260,9 +1309,10 @@ bool MountPoint::CreateSignatureManager() {
     public_keys = optarg;
   } else if (options_mgr_->GetValue("CVMFS_KEYS_DIR", &optarg)) {
     // Collect .pub files from CVMFS_KEYS_DIR
-    public_keys = JoinStrings(FindFiles(optarg, ".pub"), ":");
+    public_keys = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
   } else {
-    public_keys = JoinStrings(FindFiles("/etc/cvmfs/keys", ".pub"), ":");
+    public_keys =
+      JoinStrings(FindFilesBySuffix("/etc/cvmfs/keys", ".pub"), ":");
   }
 
   if (!signature_mgr_->LoadPublicRsaKeys(public_keys)) {
@@ -1336,7 +1386,14 @@ void MountPoint::CreateTables() {
   inode_tracker_ = new glue::InodeTracker();
 }
 
-
+/**
+ * Will create a tracer for the current mount point
+ * Tracefile path, Trace buffer size and trace buffer flush threshold
+ * can be configured by the options: CVMFS_TRACEFILE,
+ * CVMFS_TRACEBUFFER, CVMFS_TRACEBUFFER_THRESHOLD(respectively)
+ * VMFS_TRACEBUFFER and CVMFS_TRACEBUFFER_THRESHOLD will silently fallback
+ * to default values if configuration values don't exist or are invalid
+ */
 bool MountPoint::CreateTracer() {
   string optarg;
   tracer_ = new Tracer();
@@ -1346,7 +1403,24 @@ bool MountPoint::CreateTracer() {
       boot_status_ = loader::kFailOptions;
       return false;
     }
-    tracer_->Activate(kTracerBufferSize, kTracerFlushThreshold, optarg);
+    string tracebuffer_file = optarg;
+    uint64_t tracebuffer_size = kTracerBufferSize;
+    uint64_t tracebuffer_threshold = kTracerFlushThreshold;
+
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &optarg)) {
+      tracebuffer_size = String2Uint64(optarg);
+    }
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD",
+      &optarg)) {
+      tracebuffer_threshold = String2Uint64(optarg);
+    }
+    assert(tracebuffer_size <= INT_MAX
+      && tracebuffer_threshold <= INT_MAX);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+      "Initialising tracer with buffer size %" PRIu64 " and threshold %" PRIu64,
+      tracebuffer_size, tracebuffer_threshold);
+    tracer_->Activate(tracebuffer_size, tracebuffer_threshold,
+      tracebuffer_file);
   }
   return true;
 }
@@ -1508,6 +1582,7 @@ MountPoint::MountPoint(
   , md5path_cache_(NULL)
   , tracer_(NULL)
   , inode_tracker_(NULL)
+  , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
@@ -1547,6 +1622,11 @@ MountPoint::~MountPoint() {
     delete signature_mgr_;
   }
 
+  if (resolv_conf_watcher_ != NULL) {
+    resolv_conf_watcher_->Stop();
+    delete resolv_conf_watcher_;
+  }
+
   delete backoff_throttle_;
   delete authz_attachment_;
   delete authz_session_mgr_;
@@ -1559,15 +1639,6 @@ MountPoint::~MountPoint() {
 void MountPoint::ReEvaluateAuthz() {
   has_membership_req_ = catalog_mgr_->GetVOMSAuthz(&membership_req_);
   authz_attachment_->set_membership(membership_req_);
-}
-
-
-string MountPoint::ReplaceHosts(string hosts) {
-  vector<string> tokens = SplitString(fqrn_, '.');
-  const string org = tokens[0];
-  hosts = ReplaceAll(hosts, "@org@", org);
-  hosts = ReplaceAll(hosts, "@fqrn@", fqrn_);
-  return hosts;
 }
 
 
@@ -1652,7 +1723,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
-    external_download_mgr_->SetHostChain(ReplaceHosts(optarg));
+    external_download_mgr_->SetHostChain(optarg);
     if (dogeosort) {
       std::vector<std::string> host_chain;
       external_download_mgr_->GetHostInfo(&host_chain, NULL, NULL);

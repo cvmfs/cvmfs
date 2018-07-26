@@ -1,0 +1,100 @@
+cvmfs_test_name="Repository gateway Slow"
+cvmfs_test_autofs_on_startup=false
+
+# A "stress test" variant of test #800 for the repository gateway application
+# The sources of the Linux kernel are published to a new CVMFS repository
+# configured with the GW backend. The contents are copied back out of the
+# repository into /tmp/cvmfs_out.
+# To do an integrity check, the SHA1 digest of each file is computed as well
+# as the SHA1 digest of the list of file digests - a root hash.
+# The root hashes, thus computed, of the input and /tmp/cvmfs_out are compared.
+
+clean_up() {
+    echo "Cleaning up"
+
+    echo "  Removing test output data"
+    rm -rf /tmp/cvmfs_out
+}
+
+check_status() {
+    echo $(( $1 || 0 ))
+}
+
+# Poor man's Merkle tree
+#
+# Compute the SHA1 digest of each file in the $dir_name. The output of the function
+# is the SHA1 digest of the list of SHA1 file digests.
+compute_root_hash() {
+    local dir_name=$1
+    echo $(find $1 -type f -print | sort | xargs sha1sum | cut -d' ' -f1 | sha1sum | cut -d' ' -f1)
+}
+
+save_repo_contents() {
+    local dest=$1
+    rm -rf $dest
+    mkdir -p $dest
+    cp -r /cvmfs/test.repo.org/* $dest/
+}
+
+run_transactions() {
+    set_up_repository_gateway
+
+    echo "Checking transaction + publish"
+
+    ## Transaction 1
+
+    echo "  Starting transaction 1"
+    cvmfs_server transaction test.repo.org
+
+    echo "  Copying the payload into repository"
+    rm -v /cvmfs/test.repo.org/new_repository
+    if [ ! -d /tmp/linux-4.12.8 ]; then
+        curl -o /tmp/linux.tar.xz http://ecsft.cern.ch/dist/cvmfs/test-data/linux-4.12.8.tar.xz
+        cd /tmp/
+        tar xf linux.tar.xz
+        cd
+    fi
+    cp -r /tmp/linux-4.12.8 /cvmfs/test.repo.org/
+
+    echo "  Publishing changes 1"
+    cvmfs_server publish test.repo.org
+    cvmfs_server check test.repo.org
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out
+
+    ## Transaction 2 (remove all the files from the repo)
+
+    echo "  Starting transaction 2"
+    cvmfs_server transaction test.repo.org
+
+    echo "  Removing all the files from the repository"
+    rm -rf /cvmfs/test.repo.org/*
+
+    echo "  Publishing changes 2"
+    cvmfs_server publish test.repo.org
+    cvmfs_server check test.repo.org
+
+    ## Check results with a poor man's Merkle tree
+    echo "Checking results"
+
+    local hash_in=$(compute_root_hash /tmp/linux-4.12.8)
+    local hash_out=$(compute_root_hash /tmp/cvmfs_out/linux-4.12.8)
+    echo "Input hash  : $hash_in"
+    echo "Output hash : $hash_out"
+    if [ "$hash_in" != "$hash_out" ]; then
+        exit 1
+    fi
+
+    clean_up
+}
+
+cvmfs_run_test() {
+    trap clean_up EXIT HUP INT TERM || return $?
+
+    run_transactions
+    local status=$?
+
+    return $(check_status $status)
+}
+

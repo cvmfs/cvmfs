@@ -1,0 +1,206 @@
+
+cvmfs_test_name="Ingest weird and complex files"
+cvmfs_test_autofs_on_startup=false
+
+produce_tarball() {
+  local tarball_name=$1
+
+  mkdir tarball_foo
+  mkdir -p tarball_foo/a/b/c
+  mkdir -p tarball_foo/d/e/f
+
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/3.txt
+  touch tarball_foo/a/.cvmfscatalog
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/3.txt
+  touch tarball_foo/a/b/.cvmfscatalog
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/3.txt
+
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/d/1.txt
+
+  dd bs=1024 count=5 2>/dev/null  </dev/urandom >tarball_foo/d/e/f/foo.txt
+
+  touch tarball_foo/empty_file.txt
+  touch tarball_foo/a/b/another_empty.txt
+
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/4_change_owner.txt
+  chown $CVMFS_TEST_USER tarball_foo/a/b/c/4_change_owner.txt
+
+  ln -s empty_file.txt tarball_foo/to_empty_link.txt
+  ln -s a/b/c/4_change_owner.txt tarball_foo/to_different_owner.txt
+
+  mkfifo tarball_foo/fifo
+
+  ln tarball_foo/empty_file.txt tarball_foo/to_empty_hardlink.txt
+  ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink.txt
+  ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink2.txt
+  ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink3.txt
+
+  echo "*** Generating a tarball in $tarball_name"
+  tar -cvf $tarball_name tarball_foo/
+
+  rm -rf tarball_foo
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local tarfile=$scratch_dir/tarball.tar
+  local dir=tar_dir
+
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+
+  # ============================================================================
+
+  echo "*** generating a tarball $tarfile"
+  produce_tarball $tarfile
+
+  echo "*** ingesting the tarball in the directory $dir"
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  local result_dir=$repo_dir/$dir/tarball_foo
+
+  echo "*** check that we actually put the files in $result_dir"
+  if [ ! -d $result_dir ]; then
+    return 1
+  fi
+
+  for d in a a/b a/b/c; do
+    if [ ! -d $result_dir/$d ]; then
+      echo "*** Error not found directory: $repo_dir/$dir/tarball_foo/$d"
+      return 2
+    else
+      echo "*** Ingested directory: $repo_dir/$dir/tarball_foo/$d"
+
+      for f in 1 2 3; do
+        file=$result_dir/$d/$f.txt
+        if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+          echo "*** Error not found file: $file"
+          return 3
+        else
+          echo "*** Ingested file of size 2048 bytes: $file"
+        fi
+      done
+
+    fi
+  done
+
+  file=$result_dir/d/e/f/foo.txt
+  file_size=$(wc -c <$file)
+  if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
+    echo "*** Error not found file of size 5120: $file"
+    return 4
+  else
+    echo "*** Ingested file of size $file_size bytes: $file"
+  fi
+
+  for f in empty_file.txt a/b/another_empty.txt; do
+    if [ ! -f $result_dir/$f ] || [ $(wc -c <$result_dir/$f) -ne 0 ]; then
+      echo "*** Error not found empty file: $result_dir/$f"
+      return 5
+    else
+      echo "*** Ingested also empty file: $result_dir/$f"
+    fi
+  done
+
+  file=$result_dir/a/b/c/4_change_owner.txt
+  if [ ! -f $file ]; then
+    echo "*** Error not found file with different owner: $file"
+    return 6
+  else
+    echo "*** Found also file from different owner: $file"
+  fi
+
+  # below, -h checks that the file exists and that is a symbolic link
+
+  file=$result_dir/to_empty_link.txt
+  file_size=$(wc -c <$file)
+  original_path="empty_file.txt"
+  original=$(realpath $file)
+  if [ ! $original = "$result_dir/$original_path" ]; then
+    echo "*** Error link points to different file $file -> $original \
+  while it should be $file -> $result_dir/$original_path"
+    return 7
+  else
+    echo "*** Link points correctly $file -> $result_dir/$original_path"
+  fi
+  if [ ! -h $file ] || [ $file_size -ne 0 ]; then
+    echo "*** Error not found link to empty file: $file"
+    return 8
+  else
+    echo "*** Found also link to empty file: $file"
+  fi
+
+  file=$result_dir/to_different_owner.txt
+  file_size=$(wc -c <$file)
+  original_path="a/b/c/4_change_owner.txt"
+  original=$(realpath $file)
+  if [ ! $original = "$result_dir/$original_path" ]; then
+    echo "*** Error link points to different file $file -> $original \
+  while it should be $file -> $result_dir/$original_path"
+    return 9
+  else
+    echo "*** Link points correctly $file -> $result_dir/$original_path"
+  fi
+
+  if [ ! -h $file ] || [ $file_size -ne 2048 ]; then
+    echo "*** Error not found link to different owner file: $file"
+    return 10
+  else
+    echo "*** Found also link to to different owner file: $file"
+  fi
+
+  file=$result_dir/fifo
+  if [ ! -p $file ]; then
+    echo "*** Error not found fifo: $file"
+    return 11
+  else
+    echo "*** Found also fifo: $file"
+  fi
+
+  file=$result_dir/d_1_hardlink.txt
+  if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+    echo "*** Error not found hardlink: $file or found of the wrong dimension"
+    return 12
+  else
+    echo "*** Found also hardlink $file"
+  fi
+
+  file=$result_dir/d_1_hardlink2.txt
+  if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+    echo "*** Error not found hardlink: $file or found of the wrong dimension"
+    return 13
+  else
+    echo "*** Found also hardlink $file"
+  fi
+
+  file=$result_dir/d_1_hardlink3.txt
+  if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+    echo "*** Error not found hardlink: $file or found of the wrong dimension"
+    return 14
+  else
+    echo "*** Found also hardlink $file"
+  fi
+
+  file=$result_dir/to_empty_hardlink.txt
+  if [ ! -f $file ] || [ $(wc -c <$file) -ne 0 ]; then
+    echo "*** Error not found hardlink: $file or found of the wrong dimension"
+    return 15
+  else
+    echo "*** Found also hardlink $file"
+  fi
+
+  return 0
+}
+

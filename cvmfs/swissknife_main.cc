@@ -6,7 +6,10 @@
 
 #include "cvmfs_config.h"
 
+#include <cassert>
+
 #include "logging.h"
+#include "statistics_database.h"
 #include "swissknife.h"
 
 #include "swissknife_check.h"
@@ -16,6 +19,7 @@
 #include "swissknife_hash.h"
 #include "swissknife_history.h"
 #include "swissknife_info.h"
+#include "swissknife_ingest.h"
 #include "swissknife_lease.h"
 #include "swissknife_letter.h"
 #include "swissknife_lsrepo.h"
@@ -26,7 +30,8 @@
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
-
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -96,6 +101,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandGc());
   command_list.push_back(new swissknife::CommandReconstructReflog());
   command_list.push_back(new swissknife::CommandLease());
+  command_list.push_back(new swissknife::Ingest());
 
   if (argc < 2) {
     Usage();
@@ -124,6 +130,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  bool display_statistics = false;
+
   // parse the command line arguments for the Command
   swissknife::ArgumentList args;
   optind = 1;
@@ -134,11 +142,15 @@ int main(int argc, char **argv) {
     if (!params[j].switch_only())
       option_string.push_back(':');
   }
+  // Now adding the generic -+ extra option command
+  option_string.push_back(swissknife::Command::kGenericParam);
+  option_string.push_back(':');
   int c;
   while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
     bool valid_option = false;
     for (unsigned j = 0; j < params.size(); ++j) {
       if (c == params[j].key()) {
+        assert(c != swissknife::Command::kGenericParam);
         valid_option = true;
         string *argument = NULL;
         if (!params[j].switch_only()) {
@@ -146,6 +158,17 @@ int main(int argc, char **argv) {
         }
         args[c] = argument;
         break;
+      }
+    }
+    if (c == swissknife::Command::kGenericParam) {
+      valid_option = true;
+      vector<string> flags = SplitString(optarg,
+                                         swissknife::
+                                         Command::kGenericParamSeparator);
+      for (unsigned i = 0; i < flags.size(); ++i) {
+        if (flags[i] == "stats") {
+          display_statistics = true;
+        }
       }
     }
     if (!valid_option) {
@@ -165,6 +188,37 @@ int main(int argc, char **argv) {
 
   // run the command
   const int retval = command->Main(args);
+  if (display_statistics) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s",
+             command->statistics()
+             ->PrintList(perf::Statistics::kPrintHeader).c_str());
+  }
+
+  if (command->GetName() == "sync" || command->GetName() == "ingest") {
+    UniquePtr<StatisticsDatabase> db;
+    string repo_name = *args.find('N')->second;
+    string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
+
+    if (FileExists(db_file_path)) {
+      db = StatisticsDatabase::Open(db_file_path,
+                                    StatisticsDatabase::kOpenReadWrite);
+    } else {
+      db = StatisticsDatabase::Create(db_file_path);
+    }
+
+    if (!db.IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+              "Couldn't create StatisticsDatabase object!");
+    } else if (db->StoreStatistics(command->statistics()) != 0) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+            "Couldn't store statistics in %s!",
+            db_file_path.c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at: %s",
+                                      db_file_path.c_str());
+    }
+  }
 
   // delete the command list
         Commands::const_iterator i    = command_list.begin();
