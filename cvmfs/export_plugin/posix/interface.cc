@@ -1,219 +1,183 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "fs_traversal_posix.h"
+#include "interface.h"
 
-// #include <attr/xattr.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <ftw.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <sys/sysinfo.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <utime.h>
-
-#include <attr/xattr.h>  // NOLINT
-// Necessary because xattr.h does not import sys/types.h
 
 #include <map>
 #include <string>
-#include <vector>
 
-#include "fs_traversal_interface.h"
+#include "export_plugin/fs_traversal_interface.h"
+#include "export_plugin/util.h"
+#include "garbage_collector.h"
 #include "hash.h"
+#include "helpers.h"
 #include "libcvmfs.h"
 #include "logging.h"
-#include "shortstring.h"
-#include "statistics.h"
 #include "string.h"
-#include "util.h"
 #include "util/posix.h"
 #include "xattr.h"
 
-const char kDirLevels = 2;
-const char kDigitsPerDirLevel = 2;
-
-struct fs_traversal_posix_context {
-  std::map<ino_t, bool> gc_flagged;
+struct posix_file_handle {
+  std::string path;
+  FILE *fd;
+  struct utimbuf mtimes;
 };
 
-struct posix_gc_thread{
-  struct fs_traversal_context *ctx;
-  perf::Statistics *stat;
-  unsigned thread_total;
-  unsigned thread_num;
-};
+/*
+ * BASIC FS OPERATIONS
+ */
+void posix_list_dir(struct fs_traversal_context *ctx, const char *dir,
+  char ***buf, size_t *len);
 
-std::string BuildPath(struct fs_traversal_context *ctx,
-  const char *dir) {
-  std::string result = ctx->base;
-  result += ctx->repo;
-  if (dir[0] != '/') {
-    result += "/";
-  }
-  result += dir;
+int posix_get_stat(struct fs_traversal_context *ctx,
+  const char *path, struct cvmfs_attr *stat_result, bool get_hash);
+
+int posix_set_meta(struct fs_traversal_context *ctx,
+  const char *path, const struct cvmfs_attr *stat_info);
+
+const char *posix_get_identifier(struct fs_traversal_context *ctx,
+  const struct cvmfs_attr *stat);
+
+bool posix_has_file(struct fs_traversal_context *ctx,
+  const char *ident);
+
+int posix_do_unlink(struct fs_traversal_context *ctx,
+  const char *path);
+
+int posix_do_rmdir(struct fs_traversal_context *ctx,
+  const char *path);
+
+int posix_do_link(struct fs_traversal_context *ctx,
+  const char *path, const char *identifier);
+
+int posix_do_mkdir(struct fs_traversal_context *ctx, const char *path,
+  const struct cvmfs_attr *stat_info);
+
+int posix_do_symlink(struct fs_traversal_context *ctx, const char *src,
+  const char *dest, const struct cvmfs_attr *stat_info);
+
+int posix_touch(struct fs_traversal_context *ctx,
+  const struct cvmfs_attr *stat_info);
+
+bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
+  const struct cvmfs_attr *stat_info);
+
+/*
+ * FILE OPERATIONS
+ */
+
+void *posix_get_handle(struct fs_traversal_context *ctx,
+  const char *identifier);
+
+int posix_do_fopen(void *file_ctx, fs_open_type op_mode);
+
+int posix_do_fclose(void *file_ctx);
+
+int posix_do_fread(void *file_ctx, char *buff, size_t len, size_t *read_len);
+
+int posix_do_fwrite(void *file_ctx, const char *buff, size_t len);
+
+void posix_do_ffree(void *file_ctx);
+
+/*
+ * GARBAGE COLLECTION
+ */
+
+int posix_garbage_collector(struct fs_traversal_context *ctx);
+
+
+/*
+ * ARCHIVE PROVENANCE INFORMATION
+ */
+bool posix_archive_config(
+  std::string config_name,
+  std::string prov_name
+);
+
+void posix_write_provenance_info(
+  struct fs_traversal_context *ctx,
+  const char *info_file
+);
+
+void posix_archive_provenance(
+  struct fs_traversal_context *src,
+  struct fs_traversal_context *dest);
+
+/*
+ * INITIALIZATION
+ */
+
+struct fs_traversal_context *posix_initialize(
+  const char *repo,
+  const char *base,
+  const char *data,
+  int num_threads,
+  const char *config);
+
+void posix_finalize(struct fs_traversal_context *ctx);
+
+struct fs_traversal *posix_get_interface() {
+  struct fs_traversal *result = new struct fs_traversal;
+  result->initialize = posix_initialize;
+  result->finalize = posix_finalize;
+  result->archive_provenance = posix_archive_provenance;
+  result->list_dir = posix_list_dir;
+  result->get_stat = posix_get_stat;
+  result->is_hash_consistent = posix_is_hash_consistent;
+  result->set_meta = posix_set_meta;
+  result->has_file = posix_has_file;
+  result->get_identifier = posix_get_identifier;
+  result->do_link = posix_do_link;
+  result->do_unlink = posix_do_unlink;
+  result->do_mkdir = posix_do_mkdir;
+  result->do_rmdir = posix_do_rmdir;
+  result->touch = posix_touch;
+  result->get_handle = posix_get_handle;
+  result->do_symlink = posix_do_symlink;
+  result->garbage_collector = posix_garbage_collector;
+
+  result->do_fopen = posix_do_fopen;
+  result->do_fclose = posix_do_fclose;
+  result->do_fread = posix_do_fread;
+  result->do_fwrite = posix_do_fwrite;
+  result->do_ffree = posix_do_ffree;
+
   return result;
 }
 
-std::string BuildHiddenPath(struct fs_traversal_context *ctx,
-  const char *ident) {
-  std::string cur_path = ctx->data;
-  cur_path += ident;
-  return cur_path;
-}
-
-void *PosixGcMainWorker(void *data) {
-  struct posix_gc_thread *thread_context
-    = reinterpret_cast<struct posix_gc_thread *>(data);
-  struct fs_traversal_posix_context *posix_ctx
-    = reinterpret_cast<struct fs_traversal_posix_context *>(
-      thread_context->ctx->ctx);
-  int64_t files_removed = 0;
-  int64_t bytes_removed = 0;
-  // Build path array
-  int offset = strlen(thread_context->ctx->data)+1;
-  // used for both path building and stat calls (therefore +257)
-  char dir_path[offset+kDigitsPerDirLevel*kDirLevels+kDirLevels+257];
-  snprintf(dir_path, offset, thread_context->ctx->data);
-  dir_path[offset-1]='/';
-  dir_path[offset+kDigitsPerDirLevel*kDirLevels+kDirLevels+257] = '\0';
-  char dir_name_template[6];
-  snprintf(dir_name_template,
-    sizeof(dir_name_template),
-    "%%%02ux/",
-    kDigitsPerDirLevel);
-  const unsigned directory_mask = (1 << (kDigitsPerDirLevel*4)) -1;
-  const unsigned max_dir_name = (1 << kDigitsPerDirLevel*4);
-  const unsigned max_val = (1 << (kDirLevels*kDigitsPerDirLevel*4));
-  for (unsigned i = thread_context->thread_num*max_dir_name*(kDirLevels-1);
-    i < max_val;
-    i+=thread_context->thread_total*+(max_val/max_dir_name)) {
-    // Iterate over paths of current subdirectory...
-    for (unsigned j = i; j < i+(max_val/max_dir_name); j++) {
-      // For every subdirectory chain (described by j)
-      unsigned path_pos = offset;
-      for (int level = kDirLevels-1;
-        level >= 0;
-        level--) {
-        const unsigned cur_dir
-          = (j >> (level*kDigitsPerDirLevel*4)) & directory_mask;
-        snprintf(dir_path+path_pos,
-          kDigitsPerDirLevel+2, dir_name_template, cur_dir);
-        path_pos+=kDigitsPerDirLevel+1;
-      }
-      dir_path[path_pos]='\0';
-      // Calculated path - now garbage collection...
-      DIR *cur_dir_ent = opendir(dir_path);
-      assert(cur_dir_ent != NULL);
-      struct stat stat_buf;
-      struct dirent *de;
-      while ((de = readdir(cur_dir_ent)) != NULL) {
-        if (posix_ctx->gc_flagged.count(de->d_ino) > 0
-          && posix_ctx->gc_flagged[de->d_ino]) {
-          snprintf(dir_path+path_pos, sizeof(dir_path)-path_pos, de->d_name);
-          stat(dir_path, &stat_buf);
-          if (stat_buf.st_nlink == 1) {
-            files_removed++;
-            bytes_removed+=stat_buf.st_size;
-            int res = unlink(dir_path);
-            assert(res == 0);
-            posix_ctx->gc_flagged.erase(de->d_ino);
-          }
-        }
-      }
-      closedir(cur_dir_ent);
-    }
+// Utility function
+int posix_cleanup_path(struct fs_traversal_context *ctx,
+  const char *path) {
+  std::string complete_path = BuildPath(ctx, path);
+  std::string dirname = GetParentPath(complete_path);
+  if (!DirectoryExists(dirname)) {
+    // Directory doesn't exist
+    errno = ENOENT;
+    return -1;
   }
-  thread_context->stat
-    ->Lookup(POSIX_GC_STAT_FILES_REMOVED)->Xadd(files_removed);
-  thread_context->stat
-    ->Lookup(POSIX_GC_STAT_BYTES_REMOVED)->Xadd(bytes_removed);
-  return NULL;
-}
-
-int PosixSetMeta(const char *path,
-  const struct cvmfs_attr *stat_info, bool set_permissions = true)
-{
-  int res = 0;
-  if (set_permissions) {
-    res = chmod(path, stat_info->st_mode);
-    if (res != 0) return -1;
-    res = chown(path, stat_info->st_uid, stat_info->st_gid);
+  if (FileExists(complete_path) || SymlinkExists(complete_path)) {
+    // Unlink file if existing
+    int res = posix_do_unlink(ctx, path);
     if (res != 0) return -1;
   }
-  // TODO(steuber): Set xattrs with setxattr (if symlink no user. xattrs!)
-  XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
-  if (xlist) {
-    std::vector<std::string> v = xlist->ListKeys();
-    std::string val;
-    if (set_permissions) {
-      for (std::vector<std::string>::iterator it = v.begin();
-            it != v.end();
-            ++it) {
-        xlist->Get(*it, &val);
-        int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
-        if (res != 0) return -1;
-      }
-    }
+  if (DirectoryExists(complete_path)) {
+    int res = posix_do_rmdir(ctx, path);
+    if (res != 0) return -1;
   }
-  if (res != 0) return -1;
-  const struct timeval times[2] = {
-    {stat_info->mtime, 0},
-    {stat_info->mtime, 0}
-  };
-  res = lutimes(path, times);
-  if (res != 0) return -1;
   return 0;
 }
 
-void PosixCheckDirStructure(
-  std::string cur_path,
-  mode_t mode,
-  unsigned int depth = 1
-) {
-  std::string max_dir_name = std::string(kDigitsPerDirLevel, 'f');
-  // Build current base path
-  if (depth == 1) {
-    bool res1 = MkdirDeep(cur_path.c_str(), mode);
-    assert(res1);
-    int res2 = mkdir((cur_path+POSIX_GARBAGE_DIR).c_str(), mode);
-    assert(res2 == 0 || errno == EEXIST);
-  } else {
-    int res = mkdir(cur_path.c_str(), mode);
-    assert(res == 0 || errno == EEXIST);
-  }
-  // Build template for directory names:
-  assert(kDigitsPerDirLevel <= 99);
-  char hex[kDigitsPerDirLevel+1];
-  char dir_name_template[5];
-  snprintf(dir_name_template,
-    sizeof(dir_name_template),
-    "%%%02ux",
-    kDigitsPerDirLevel);
-  // Go through all levels:
-  for (; depth <= kDirLevels; depth++) {
-    if (!DirectoryExists(cur_path+"/"+max_dir_name)) {
-      // Directories in this level not yet fully created...
-      for (unsigned int i = 0;
-      i < (((unsigned int) 1) << 4*kDigitsPerDirLevel);
-      i++) {
-        // Go through directories 0^kDigitsPerDirLevel to f^kDigitsPerDirLevel
-        snprintf(hex, sizeof(hex), dir_name_template, i);
-        std::string this_path = cur_path + "/" + std::string(hex);
-        int res = mkdir(this_path.c_str(), mode);
-        assert(res == 0 || errno == EEXIST);
-        // Once directory created: Prepare substructures
-        PosixCheckDirStructure(this_path, mode, depth+1);
-      }
-    } else {
-      // Directories on this level fully created; check ./
-      PosixCheckDirStructure(cur_path+"/"+max_dir_name, mode, depth+1);
-    }
-  }
-}
+/**
+ * INTERFACE FUNCTION IMPLEMENTATIONS
+ */
 
 void posix_list_dir(struct fs_traversal_context *ctx,
   const char *dir,
@@ -347,7 +311,7 @@ int posix_do_unlink(struct fs_traversal_context *ctx,
 }
 
 int posix_do_rmdir(struct fs_traversal_context *ctx,
-              const char *path) {
+  const char *path) {
   std::string complete_path = BuildPath(ctx, path);
   std::string parent_path = GetParentPath(complete_path);
   struct stat parbuf;
@@ -358,27 +322,6 @@ int posix_do_rmdir(struct fs_traversal_context *ctx,
   int res = rmdir(complete_path.c_str());
   res |= utime(parent_path.c_str(), &mtimes);
   if (res != 0) return -1;
-  return 0;
-}
-
-int posix_cleanup_path(struct fs_traversal_context *ctx,
-  const char *path) {
-  std::string complete_path = BuildPath(ctx, path);
-  std::string dirname = GetParentPath(complete_path);
-  if (!DirectoryExists(dirname)) {
-    // Directory doesn't exist
-    errno = ENOENT;
-    return -1;
-  }
-  if (FileExists(complete_path) || SymlinkExists(complete_path)) {
-    // Unlink file if existing
-    int res = posix_do_unlink(ctx, path);
-    if (res != 0) return -1;
-  }
-  if (DirectoryExists(complete_path)) {
-    int res = posix_do_rmdir(ctx, path);
-    if (res != 0) return -1;
-  }
   return 0;
 }
 
@@ -426,8 +369,8 @@ int posix_do_link(struct fs_traversal_context *ctx,
 }
 
 int posix_do_mkdir(struct fs_traversal_context *ctx,
-              const char *path,
-              const struct cvmfs_attr *stat_info) {
+  const char *path,
+  const struct cvmfs_attr *stat_info) {
   std::string complete_path = BuildPath(ctx, path);
   std::string parent_path = GetParentPath(complete_path);
   std::string dirname = GetParentPath(complete_path);
@@ -446,9 +389,9 @@ int posix_do_mkdir(struct fs_traversal_context *ctx,
 }
 
 int posix_do_symlink(struct fs_traversal_context *ctx,
-              const char *src,
-              const char *dest,
-              const struct cvmfs_attr *stat_info) {
+  const char *src,
+  const char *dest,
+  const struct cvmfs_attr *stat_info) {
   std::string complete_src_path = BuildPath(ctx, src);
   std::string parent_path = GetParentPath(complete_src_path);
   std::string complete_dest_path = dest;
@@ -467,7 +410,7 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
 }
 
 int posix_touch(struct fs_traversal_context *ctx,
-              const struct cvmfs_attr *stat_info) {
+  const struct cvmfs_attr *stat_info) {
   // NOTE(steuber): creat is only atomic on non-NFS paths!
   const char *identifier = posix_get_identifier(ctx, stat_info);
   if (posix_has_file(ctx, identifier)) {
@@ -483,15 +426,34 @@ int posix_touch(struct fs_traversal_context *ctx,
   return PosixSetMeta(hidden_datapath.c_str(), stat_info);
 }
 
-
-struct posix_file_handle {
-  std::string path;
-  FILE *fd;
-  struct utimbuf mtimes;
-};
+bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
+  const struct cvmfs_attr *stat_info) {
+  errno = 0;
+  std::string complete_path = BuildPath(ctx,
+    (std::string(stat_info->cvm_parent)+"/"+stat_info->cvm_name).c_str());
+  struct stat display_path_stat;
+  int res1 = lstat(complete_path.c_str(), &display_path_stat);
+  if (res1 == -1) {
+    // If visible path doesn't exist => error
+    return false;
+  }
+  const char *identifier = posix_get_identifier(ctx, stat_info);
+  if (!posix_has_file(ctx, identifier)) {
+    return false;
+  }
+  std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
+  struct stat hidden_path_stat;
+  int res2 = stat(hidden_datapath.c_str(), &hidden_path_stat);
+  if (res2 == -1) {
+    // If hidden path doesn't exist although apprently existing => error
+    return false;
+  }
+  delete identifier;
+  return display_path_stat.st_ino == hidden_path_stat.st_ino;
+}
 
 void *posix_get_handle(struct fs_traversal_context *ctx,
-              const char *identifier) {
+  const char *identifier) {
   struct posix_file_handle *file_ctx = new struct posix_file_handle;
   file_ctx->path = BuildHiddenPath(ctx, identifier);
 
@@ -561,148 +523,8 @@ void posix_do_ffree(void *file_ctx) {
   delete handle;
 }
 
-bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
-                const struct cvmfs_attr *stat_info) {
-  errno = 0;
-  std::string complete_path = BuildPath(ctx,
-    (std::string(stat_info->cvm_parent)+"/"+stat_info->cvm_name).c_str());
-  struct stat display_path_stat;
-  int res1 = lstat(complete_path.c_str(), &display_path_stat);
-  if (res1 == -1) {
-    // If visible path doesn't exist => error
-    return false;
-  }
-  const char *identifier = posix_get_identifier(ctx, stat_info);
-  if (!posix_has_file(ctx, identifier)) {
-    return false;
-  }
-  std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
-  struct stat hidden_path_stat;
-  int res2 = stat(hidden_datapath.c_str(), &hidden_path_stat);
-  if (res2 == -1) {
-    // If hidden path doesn't exist although apprently existing => error
-    return false;
-  }
-  delete identifier;
-  return display_path_stat.st_ino == hidden_path_stat.st_ino;
-}
-
 int posix_garbage_collector(struct fs_traversal_context *ctx) {
-  unsigned thread_total = get_nprocs()+1;
-  pthread_t *workers
-    = reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * thread_total));
-  struct posix_gc_thread *thread_contexts
-    = reinterpret_cast<struct posix_gc_thread *>(
-      smalloc(sizeof(struct posix_gc_thread) * thread_total));
-  perf::Statistics *gc_statistics = new perf::Statistics();
-  gc_statistics->Register(POSIX_GC_STAT_FILES_REMOVED,
-    "Number of deduplicated files removed by Garbage Collector");
-  gc_statistics->Register(POSIX_GC_STAT_BYTES_REMOVED,
-    "Sum of sizes of removed files");
-  for (unsigned i = 0; i < thread_total; i++) {
-    thread_contexts[i].thread_total = thread_total;
-    thread_contexts[i].thread_num = i;
-    thread_contexts[i].ctx = ctx;
-    thread_contexts[i].stat = gc_statistics;
-    int retval = pthread_create(&workers[i], NULL,
-      PosixGcMainWorker, &thread_contexts[i]);
-    assert(retval == 0);
-  }
-
-  for (unsigned i = 0; i < thread_total; i++) {
-    pthread_join(workers[i], NULL);
-  }
-  LogCvmfs(kLogCvmfs, kLogStdout,
-      "%s", gc_statistics->PrintList(perf::Statistics::kPrintHeader).c_str());
-  return -1;
-}
-
-struct fs_traversal_context *posix_initialize(
-  const char *repo,
-  const char *base,
-  const char *data,
-  const char *config) {
-  fs_traversal_context *result = new struct fs_traversal_context;
-  result->version = 1;
-  result->lib_version = strdup("1.0");
-
-  if (!base) {
-    result->base = strdup("/tmp/cvmfs/");
-  } else {
-    if  (base[strlen(base)-1] != '/') {
-      size_t len = 2 + strlen(base);
-      char *base_dir = reinterpret_cast<char *>(malloc(len*sizeof(char)));
-      snprintf(base_dir, len, "%s/",  base);
-      result->base = strdup(base_dir);
-      free(base_dir);
-    } else {
-      result->base = strdup(base);
-    }
-  }
-
-  if (!repo) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Repository name must be specified");
-    return NULL;
-  }
-  result->repo = strdup(repo);
-
-  if (!data) {
-    size_t len = 6 + strlen(result->base);
-    char *def_data = reinterpret_cast<char *>(malloc(len*sizeof(char)));
-    snprintf(def_data, len, "%s.data",  result->base);
-    result->data = strdup(def_data);
-    free(def_data);
-  } else {
-    result->data = strdup(data);
-  }
-
-  if (config) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Configuration file is not supported in POSIX interface '%s'", config);
-    return NULL;
-  }
-  result->config = NULL;
-
-  std::string req_dirs = BuildPath(result, "");
-  if (!DirectoryExists(req_dirs.c_str())) {
-    if (!MkdirDeep(req_dirs.c_str(), 0744, true)) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-        "Failed to create repository directory '%s'", req_dirs.c_str());
-      return NULL;
-    }
-  }
-
-  PosixCheckDirStructure(result->data, 0744);  // NOTE(steuber): mode?
-  const char *warning = WARNING_FILE_NAME;
-  FILE *f = fopen(BuildPath(result, "/" WARNING_FILE_NAME).c_str(), "w");
-  if (f != NULL) {
-    fwrite(warning, sizeof(char), strlen(warning), f);
-    fclose(f);
-  }
-
-  struct fs_traversal_posix_context *posix_ctx
-    = new struct fs_traversal_posix_context;
-  if (FileExists(std::string(result->data)
-    + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE)) {
-    FILE *gc_flagged_file = fopen((std::string(result->data)
-      + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE).c_str(), "r");
-    assert(gc_flagged_file != NULL);
-    while (true) {
-      ino_t cur_ino;
-      size_t read = fread(&cur_ino, sizeof(ino_t), 1, gc_flagged_file);
-      if (read == 1) {
-        posix_ctx->gc_flagged[cur_ino] = true;
-      } else {
-        assert(feof(gc_flagged_file) != 0);
-        break;
-      }
-    }
-    int res = fclose(gc_flagged_file);
-    assert(res == 0);
-  }
-  result->ctx = posix_ctx;
-  return result;
+  return RunGarbageCollection(ctx);
 }
 
 bool posix_archive_config(
@@ -836,54 +658,83 @@ void posix_archive_provenance(
   }
 }
 
-void posix_finalize(struct fs_traversal_context *ctx) {
+struct fs_traversal_context *posix_initialize(
+  const char *repo,
+  const char *base,
+  const char *data,
+  int num_threads,
+  const char *config) {
+  fs_traversal_context *result = new struct fs_traversal_context;
+  result->version = 1;
+  result->lib_version = strdup("1.0");
   struct fs_traversal_posix_context *posix_ctx
-    =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
-  FILE *gc_flagged_file = fopen((std::string(ctx->data)
-      + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE).c_str(), "w");
-  for (
-    std::map<ino_t, bool>::const_iterator it = posix_ctx->gc_flagged.begin();
-    it != posix_ctx->gc_flagged.end();
-    it++) {
-    if (it->second) {
-      fwrite(&(it->first), sizeof(ino_t), 1, gc_flagged_file);
+    = new struct fs_traversal_posix_context;
+  posix_ctx->num_threads = num_threads;
+  result->ctx = posix_ctx;
+
+  // Retrieve base directory for traversal
+  if (!base) {
+    result->base = strdup("/tmp/cvmfs/");
+  } else {
+    if  (base[strlen(base)-1] != '/') {
+      size_t len = 2 + strlen(base);
+      char *base_dir = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+      snprintf(base_dir, len, "%s/",  base);
+      result->base = strdup(base_dir);
+      free(base_dir);
+    } else {
+      result->base = strdup(base);
     }
   }
-  fclose(gc_flagged_file);
+
+  // Retrieve repository (inside base directory) for traversal
+  if (!repo) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Repository name must be specified");
+    return NULL;
+  }
+  result->repo = strdup(repo);
+
+  // Retrieve data directory (for hidden dedup directory)
+  if (!data) {
+    size_t len = 6 + strlen(result->base);
+    char *def_data = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+    snprintf(def_data, len, "%s.data",  result->base);
+    result->data = strdup(def_data);
+    free(def_data);
+  } else {
+    result->data = strdup(data);
+  }
+
+  if (config) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Configuration file is not supported in POSIX interface '%s'", config);
+    return NULL;
+  }
+  result->config = NULL;
+
+  // Build directory if not there yet
+  std::string req_dirs = BuildPath(result, "");
+  if (!DirectoryExists(req_dirs.c_str())) {
+    if (!MkdirDeep(req_dirs.c_str(), 0744, true)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Failed to create repository directory '%s'", req_dirs.c_str());
+      return NULL;
+    }
+  }
+
+  // Initializes Data Directory, Garbage Collection and Warning file
+  InitialFsOperations(result);
+  return result;
+}
+
+void posix_finalize(struct fs_traversal_context *ctx) {
+  FinalizeFsOperations(ctx);
   delete ctx->repo;
   delete ctx->base;
   delete ctx->data;
+  struct fs_traversal_posix_context *posix_ctx
+    =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
   delete posix_ctx;
   delete ctx;
-}
-
-
-
-struct fs_traversal *posix_get_interface() {
-  struct fs_traversal *result = new struct fs_traversal;
-  result->initialize = posix_initialize;
-  result->finalize = posix_finalize;
-  result->archive_provenance = posix_archive_provenance;
-  result->list_dir = posix_list_dir;
-  result->get_stat = posix_get_stat;
-  result->is_hash_consistent = posix_is_hash_consistent;
-  result->set_meta = posix_set_meta;
-  result->has_file = posix_has_file;
-  result->get_identifier = posix_get_identifier;
-  result->do_link = posix_do_link;
-  result->do_unlink = posix_do_unlink;
-  result->do_mkdir = posix_do_mkdir;
-  result->do_rmdir = posix_do_rmdir;
-  result->touch = posix_touch;
-  result->get_handle = posix_get_handle;
-  result->do_symlink = posix_do_symlink;
-  result->garbage_collector = posix_garbage_collector;
-
-  result->do_fopen = posix_do_fopen;
-  result->do_fclose = posix_do_fclose;
-  result->do_fread = posix_do_fread;
-  result->do_fwrite = posix_do_fwrite;
-  result->do_ffree = posix_do_ffree;
-
-  return result;
 }

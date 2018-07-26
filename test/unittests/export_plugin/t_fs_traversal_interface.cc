@@ -21,7 +21,7 @@
 #include "export_plugin/fs_traversal.h"
 #include "export_plugin/fs_traversal_interface.h"
 #include "export_plugin/fs_traversal_libcvmfs.h"
-#include "export_plugin/fs_traversal_posix.h"
+#include "export_plugin/posix/interface.h"
 #include "export_plugin/util.h"
 #include "test-util.h"
 
@@ -95,7 +95,7 @@ class T_Fs_Traversal_Interface :
     context_ = fs_traversal_instance_->interface->initialize(
       repo,
       repo,
-      fs_traversal_instance_->data, NULL);
+      fs_traversal_instance_->data, 4, NULL);
     fs_traversal_instance_->interface->context_ = context_;
   }
 
@@ -619,11 +619,11 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
 
   struct fs_traversal *src = posix_get_interface();
   struct fs_traversal_context *context =
-    src->initialize(src_name, repoName.c_str(), src_data, NULL);
+    src->initialize(src_name, repoName.c_str(), src_data, 4, NULL);
   src->context_ = context;
 
   struct fs_traversal *dest = posix_get_interface();
-  context = dest->initialize(src_name, repoName.c_str(), src_data, NULL);
+  context = dest->initialize(src_name, repoName.c_str(), src_data, 4, NULL);
   dest->context_ = context;
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
@@ -631,7 +631,7 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
   ASSERT_TRUE(shrinkwrap::Sync("", src, dest, 0, true, statistics));
 
   dest->finalize(dest->context_);
-  context = dest->initialize(dest_name, repoName.c_str(), dest_data, NULL);
+  context = dest->initialize(dest_name, repoName.c_str(), dest_data, 4, NULL);
   dest->context_ = context;
 
   EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true, statistics));
@@ -725,13 +725,13 @@ TEST(T_Fs_Traversal_CVMFS, TransferCVMFSToPosix) {
 
   struct fs_traversal *src = libcvmfs_get_interface();
   struct fs_traversal_context *context;
-  context = src->initialize(tester.repo_name().c_str(), NULL, NULL, NULL);
+  context = src->initialize(tester.repo_name().c_str(), NULL, NULL, 4, NULL);
   context->ctx = ctx;
   src->context_ = context;
 
   mkdir("posix", 0770);
   struct fs_traversal *dest = posix_get_interface();
-  context = dest->initialize("./", "posix", "posix_data", NULL);
+  context = dest->initialize("./", "posix", "posix_data", 4, NULL);
   dest->context_ = context;
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
@@ -749,7 +749,7 @@ TEST(T_Fs_Traversal_CVMFS, TransferCVMFSToPosix) {
 TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
   struct fs_traversal *dest = posix_get_interface();
   struct fs_traversal_context *context
-    = dest->initialize("./", "posix", "./data", NULL);
+    = dest->initialize("./", "posix", "./data", 4, NULL);
 
   std::string content1 = "a";
   shash::Any content1_hash(shash::kSha1);
@@ -784,7 +784,7 @@ TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
   dest->do_unlink(context, "file3.txt");
 
   dest->finalize(context);
-  context = dest->initialize("./", "posix", "./data", NULL);
+  context = dest->initialize("./", "posix", "./data", 4, NULL);
   dest->garbage_collector(context);
 
   std::string data_base_path = "./data/";
