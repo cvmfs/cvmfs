@@ -27,6 +27,7 @@
 #include "libcvmfs.h"
 #include "logging.h"
 #include "shortstring.h"
+#include "statistics.h"
 #include "string.h"
 #include "util.h"
 #include "util/posix.h"
@@ -41,6 +42,7 @@ struct fs_traversal_posix_context {
 
 struct posix_gc_thread{
   struct fs_traversal_context *ctx;
+  perf::Statistics *stat;
   unsigned thread_total;
   unsigned thread_num;
 };
@@ -69,6 +71,8 @@ void *PosixGcMainWorker(void *data) {
   struct fs_traversal_posix_context *posix_ctx
     = reinterpret_cast<struct fs_traversal_posix_context *>(
       thread_context->ctx->ctx);
+  int64_t files_removed = 0;
+  int64_t bytes_removed = 0;
   // Build path array
   int offset = strlen(thread_context->ctx->data)+1;
   // used for both path building and stat calls (therefore +257)
@@ -112,6 +116,8 @@ void *PosixGcMainWorker(void *data) {
           snprintf(dir_path+path_pos, sizeof(dir_path)-path_pos, de->d_name);
           stat(dir_path, &stat_buf);
           if (stat_buf.st_nlink == 1) {
+            files_removed++;
+            bytes_removed+=stat_buf.st_size;
             int res = unlink(dir_path);
             assert(res == 0);
             posix_ctx->gc_flagged.erase(de->d_ino);
@@ -121,6 +127,10 @@ void *PosixGcMainWorker(void *data) {
       closedir(cur_dir_ent);
     }
   }
+  thread_context->stat
+    ->Lookup(POSIX_GC_STAT_FILES_REMOVED)->Xadd(files_removed);
+  thread_context->stat
+    ->Lookup(POSIX_GC_STAT_BYTES_REMOVED)->Xadd(bytes_removed);
   return NULL;
 }
 
@@ -583,10 +593,16 @@ int posix_garbage_collector(struct fs_traversal_context *ctx) {
   struct posix_gc_thread *thread_contexts
     = reinterpret_cast<struct posix_gc_thread *>(
       smalloc(sizeof(struct posix_gc_thread) * thread_total));
+  perf::Statistics *gc_statistics = new perf::Statistics();
+  gc_statistics->Register(POSIX_GC_STAT_FILES_REMOVED,
+    "Number of deduplicated files removed by Garbage Collector");
+  gc_statistics->Register(POSIX_GC_STAT_BYTES_REMOVED,
+    "Sum of sizes of removed files");
   for (unsigned i = 0; i < thread_total; i++) {
     thread_contexts[i].thread_total = thread_total;
     thread_contexts[i].thread_num = i;
     thread_contexts[i].ctx = ctx;
+    thread_contexts[i].stat = gc_statistics;
     int retval = pthread_create(&workers[i], NULL,
       PosixGcMainWorker, &thread_contexts[i]);
     assert(retval == 0);
@@ -595,6 +611,8 @@ int posix_garbage_collector(struct fs_traversal_context *ctx) {
   for (unsigned i = 0; i < thread_total; i++) {
     pthread_join(workers[i], NULL);
   }
+  LogCvmfs(kLogCvmfs, kLogStdout,
+      "%s", gc_statistics->PrintList(perf::Statistics::kPrintHeader).c_str());
   return -1;
 }
 
