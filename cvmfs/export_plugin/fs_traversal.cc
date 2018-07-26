@@ -109,31 +109,29 @@ bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
   if (src->size != dest->size) { return false; }
 
   // Actual contents of stat, mapped from DirectoryEntry
-  if (src->st_ino != dest->st_ino)     { return false; }
-  if (src->st_mode != dest->st_mode)   { return false; }
-  if (src->st_nlink != dest->st_nlink) { return false; }
-  if (src->st_uid != dest->st_uid)     { return false; }
-  if (src->st_gid != dest->st_gid)     { return false; }
-  if (src->st_rdev != dest->st_rdev)   { return false; }
-  if (src->st_size != dest->st_size)   { return false; }
-  if (src->mtime != dest->mtime)       { return false; }
+  if ( (!S_ISLNK(src->st_mode) && src->st_mode != dest->st_mode)
+      || ((S_IFMT & src->st_mode) != (S_IFMT & dest->st_mode)) )
+    { return false; }
 
-/*
+  if (!S_ISLNK(src->st_mode) && src->st_uid != dest->st_uid)
+    { return false; }
+  if (!S_ISLNK(src->st_mode) && src->st_gid != dest->st_gid)
+    { return false; }
+
+
   // CVMFS related content
-  if (src->cvm_checksum) {
+  if (S_ISREG(src->st_mode) && src->cvm_checksum) {
     if (!dest_fs->is_hash_consistent(dest_fs->context_, src)) { return false; }
-  } else if (!src->cvm_checksum && dest->cvm_checksum) {
-    return false;
   }
-*/
-  if (src->cvm_symlink && dest->cvm_symlink) {
-    if (strcmp(src->cvm_symlink , dest->cvm_symlink)) { return false; }
-  } else if ( (!src->cvm_symlink && dest->cvm_symlink) ||
-              (src->cvm_symlink && !dest->cvm_symlink) ) {
+
+  if (S_ISLNK(src->st_mode)) {
+    if (strcmp(src->cvm_name, dest->cvm_name)) { return false; }
+  } else if ((!S_ISLNK(src->st_mode) && S_ISLNK(dest->st_mode)) ||
+            (S_ISLNK(src->st_mode) && !S_ISLNK(dest->st_mode))) {
     return false;
   }
 
-  if (src->cvm_name && dest->cvm_name) {
+  if (src->cvm_name != NULL && dest->cvm_name != NULL) {
     if (strcmp(src->cvm_name, dest->cvm_name)) { return false; }
   } else if ((!src->cvm_name && dest->cvm_name) ||
             (src->cvm_name && !dest->cvm_name)) {
@@ -292,7 +290,7 @@ bool Sync(
               // Should probably happen in the copy function as it is parallel
               // Also this needs to be separate from copy_file, the target file
               // could already exist and the link needs to be created anyway.
-              if (dest->do_link(dest->context_, src_entry, dest_data)) {
+              if (dest->do_link(dest->context_, src_entry, dest_data) != 0) {
                 LogCvmfs(kLogCvmfs, kLogStderr,
                 "Traversal failed to link %s->%s", src_entry, dest_data);
                 return false;
@@ -300,7 +298,7 @@ bool Sync(
             }
             break;
           case S_IFDIR:
-            if (dest->set_meta(dest->context_, src_entry, src_st)) {
+            if (dest->set_meta(dest->context_, src_entry, src_st) != 0) {
               LogCvmfs(kLogCvmfs, kLogStderr,
               "Traversal failed to set_meta %s", src_entry);
               return false;
@@ -315,7 +313,7 @@ bool Sync(
           case S_IFLNK:
             // Should likely copy the source of the symlink target
             if (dest->do_symlink(dest->context_, src_entry,
-                             src_st->cvm_symlink, src_st)) {
+                             src_st->cvm_symlink, src_st) != 0) {
               LogCvmfs(kLogCvmfs, kLogStderr,
               "Traversal failed to symlink %s->%s",
               src_entry, src_st->cvm_symlink);
@@ -365,7 +363,7 @@ bool Sync(
               // Should probably happen in the copy function as it is parallel
               // Also this needs to be separate from copy_file, the target file
               // could already exist and the link needs to be created anyway.
-              if (dest->do_link(dest->context_, src_entry, dest_data)) {
+              if (dest->do_link(dest->context_, src_entry, dest_data) != 0) {
                 LogCvmfs(kLogCvmfs, kLogStderr,
                 "Traversal failed to link %s->%s", src_entry, dest_data);
                 return false;
@@ -374,7 +372,7 @@ bool Sync(
             }
           break;
         case S_IFDIR:
-          if (dest->do_mkdir(dest->context_, src_entry, src_st)) {
+          if (dest->do_mkdir(dest->context_, src_entry, src_st) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
             "Traversal failed to mkdir %s", src_entry);
             return false;
@@ -389,7 +387,7 @@ bool Sync(
         case S_IFLNK:
           // Should be same as IFREG? Does link create the file?
           if (dest->do_symlink(dest->context_, src_entry,
-                           src_st->cvm_symlink, src_st)) {
+                           src_st->cvm_symlink, src_st) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
             "Traversal failed to symlink %s->%s",
             src_entry, src_st->cvm_symlink);
@@ -411,7 +409,7 @@ bool Sync(
       switch (dest_st->st_mode & S_IFMT) {
         case S_IFREG:
         case S_IFLNK:
-          if (!dest->do_unlink(dest->context_, dest_entry)) {
+          if (dest->do_unlink(dest->context_, dest_entry) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
             "Failed to unlink file %s", dest_entry);
             return false;
@@ -424,7 +422,7 @@ bool Sync(
               return false;
             }
           }
-          if (!dest->do_rmdir(dest->context_, dest_entry)) {
+          if (dest->do_rmdir(dest->context_, dest_entry) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
             "Failed to remove directory %s", dest_entry);
             return false;
@@ -615,19 +613,20 @@ static void Usage() {
        "to a destination files system for export.\n"
        "Usage: cvmfs_shrinkwrap "
        "[-s][-r][-c][-f][-d][-x][-y][-z][-t|b][-j #threads]\n"
-           "Options:\n"
-           "  -s Source Filesystem type [default:cvmfs]\n"
-           "  -r Source repo\n"
-           "  -c Source cache\n"
-           "  -f Source config\n"
-           "  -d Dest type\n"
-           "  -x Dest repo\n"
-           "  -y Dest cache\n"
-           "  -z Dest config\n"
-           "  -t Trace file to be replicated to destination\n"
-           "  -b Base directory to be copied\n"
-           "  -r Number of retries on copying file [default:0]\n"
-           "  -j number of concurrent integrity check worker threads\n",
+        "Options:\n"
+        "  -s Source Filesystem type [default:cvmfs]\n"
+        "  -r Source repo\n"
+        "  -c Source cache\n"
+        "  -f Source config\n"
+        "  -d Dest type\n"
+        "  -x Dest repo\n"
+        "  -y Dest cache\n"
+        "  -z Dest config\n"
+        "  -t Trace file to be replicated to destination\n"
+        "  -b Base directory to be copied\n"
+        "  -r Number of retries on copying file [default:0]\n"
+        "  -j number of concurrent integrity check worker threads\n",
+        "  -g Perform garbage collection on destination\n"
            VERSION);
 }
 
@@ -650,8 +649,10 @@ int Main(int argc, char **argv) {
   char *base = NULL;
   char *spec_file = NULL;
 
+  bool garbage_collection = false;
+
   int c;
-  while ((c = getopt(argc, argv, "hp:b:s:r:c:f:d:x:y:t:j:n:")) != -1) {
+  while ((c = getopt(argc, argv, "hp:b:s:r:c:f:d:x:y:t:j:n:g")) != -1) {
     switch (c) {
       case 'h':
         shrinkwrap::Usage();
@@ -709,6 +710,9 @@ int Main(int argc, char **argv) {
         break;
       case 'n':
         retries = atoi(optarg);
+        break;
+      case 'g':
+        garbage_collection = true;
         break;
       case '?':
       default:
@@ -817,6 +821,16 @@ int Main(int argc, char **argv) {
   delete pstats;
 
   src->finalize(src->context_);
+  if (garbage_collection) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+      "Performing garbage collection...");
+    time_t start_time = time(NULL);
+    dest->garbage_collector(dest->context_);
+    time_t end_time = time(NULL);
+    LogCvmfs(kLogCvmfs, kLogStdout,
+      "Garbage collection took %d seconds.",
+        (end_time-start_time));
+  }
   dest->finalize(dest->context_);
 
   return result;

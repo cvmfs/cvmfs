@@ -331,6 +331,7 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
   }
 
   CvmfsAttrFromDirent(dirent, info);
+  info->cvm_parent = strdup(GetParentPath(c_path).c_str());
   if (dirent.HasXattrs()) {
     XattrList *xattrs = new XattrList();
     mount_point_->catalog_mgr()->LookupXattrs(p, xattrs);

@@ -53,6 +53,7 @@ void cvmfs_attr_free(struct cvmfs_attr *attr)
     free(attr->cvm_checksum);
     free(attr->cvm_symlink);
     free(attr->cvm_name);
+    free(attr->cvm_parent);
     delete reinterpret_cast<XattrList *>(attr->cvm_xattrs);
   }
   free(attr);

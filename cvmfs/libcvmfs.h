@@ -143,6 +143,7 @@ struct cvmfs_attr {
   /* This information is allocated and should be freed */
   char * cvm_checksum;
   char * cvm_symlink;
+  char * cvm_parent;
   char * cvm_name;
   void * cvm_xattrs;
 };
