@@ -49,11 +49,12 @@ add_worker(RepoName) ->
     supervisor:start_child(?MODULE, ChildSpec).
 
 -spec commit(LeasePath, OldRootHash, NewRootHash, RepoTag) ->
-                     ok | {error, merge_error | io_error | worker_timeout}
+                     ok | Error
                         when LeasePath :: binary(),
                              OldRootHash :: binary(),
                              NewRootHash :: binary(),
-                             RepoTag :: cvmfs_common_types:repository_tag().
+                             RepoTag :: cvmfs_common_types:repository_tag(),
+                             Error :: cvmfs_common_types:commit_error().
 commit(LeasePath, OldRootHash, NewRootHash, RepoTag) ->
     RepoName = hd(binary:split(LeasePath, <<"/">>)),
     {RepoName, Pid} = hd(ets:lookup(commit_workers, RepoName)),
