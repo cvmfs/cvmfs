@@ -2,13 +2,17 @@
  * This file is part of the CernVM File System.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string>
 
 #include "fs_traversal_interface.h"
 #include "fs_traversal_libcvmfs.h"
 #include "libcvmfs.h"
 #include "logging.h"
 #include "string.h"
+
+#define MAX_INTEGER_DIGITS 20
 
 void libcvmfs_list_dir(struct fs_traversal_context *ctx,
   const char *dir,
@@ -117,21 +121,70 @@ struct fs_traversal_context *libcvmfs_initialize(
   const char *base,
   const char *data,
   const char *config) {
+  if (!repo) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Repository name must be specified");
+    return NULL;
+  }
+  int retval = 0;
+
   struct fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
+  char* major = reinterpret_cast<char *>(malloc(MAX_INTEGER_DIGITS));
+  snprintf(major, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_VERSION_MAJOR);
+  char* minor = reinterpret_cast<char *>(malloc(MAX_INTEGER_DIGITS));
+  snprintf(minor, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_VERSION_MINOR);
+  char* rev = reinterpret_cast<char *>(malloc(MAX_INTEGER_DIGITS));
+  snprintf(rev, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_REVISION);
+  size_t len = 3 + strlen(major) + strlen(minor) + strlen(rev);
+  char* lib_version = reinterpret_cast<char *>(malloc(len));
+  snprintf(lib_version, len, "%s.%s:%s", major, minor, rev);
+
+  result->lib_version = strdup(lib_version);
+
+  free(major);
+  free(minor);
+  free(rev);
+  free(lib_version);
+
   result->size = sizeof(*result);
   result->repo = strdup(repo);
+  result->base = NULL;
   result->data = NULL;
-  if (data) {
+  result->config = NULL;
+
+  cvmfs_option_map *options_mgr = cvmfs_options_init();
+  if (config) {
+    result->config = strdup(config);
+  } else {
+    size_t len = 8 + strlen(result->repo);
+    char *def_config = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+    snprintf(def_config, len, "%s.config",  result->repo);
+    result->config = strdup(def_config);
+    free(def_config);
+  }
+  retval = cvmfs_options_parse(options_mgr, result->config);
+  if (retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "CVMFS Options failed to parse from : %s", result->config);
+    return NULL;
+  }
+
+  // Override repository name even if specified
+  cvmfs_options_set(options_mgr, "CVMFS_REPOSITORY_NAME", repo);
+
+  // Override Mount dir if not specified in configuration
+  if (base && !cvmfs_options_get(options_mgr, "CVMFS_MOUNT_DIR")) {
+    cvmfs_options_set(options_mgr, "CVMFS_MOUNT_DIR", base);
+  }
+
+  // Override Cache base if not specified in configuration
+  if (data && (!cvmfs_options_get(options_mgr, "CVMFS_CACHE_BASE") &&
+               !cvmfs_options_get(options_mgr, "CVMFS_CACHE_DIR"))) {
+    cvmfs_options_set(options_mgr, "CVMFS_CACHE_BASE", data);
     result->data = strdup(data);
   }
 
-  cvmfs_option_map *options_mgr = cvmfs_options_init();
-  int retval = cvmfs_options_parse(options_mgr, config);
-  if (retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-    "CVMFS Options failed to parse from : %s", config);
-  }
   retval = cvmfs_init_v2(options_mgr);
   if (retval) {
     LogCvmfs(kLogCvmfs, kLogStderr,
