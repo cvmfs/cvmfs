@@ -13,6 +13,7 @@
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <utime.h>
 
 #include <attr/xattr.h>  // NOLINT
 // Necessary because xattr.h does not import sys/types.h
@@ -111,7 +112,9 @@ void *PosixGcMainWorker(void *data) {
           snprintf(dir_path+path_pos, sizeof(dir_path)-path_pos, de->d_name);
           stat(dir_path, &stat_buf);
           if (stat_buf.st_nlink == 1) {
-            unlink(dir_path);
+            int res = unlink(dir_path);
+            assert(res == 0);
+            posix_ctx->gc_flagged.erase(de->d_ino);
           }
         }
       }
@@ -146,6 +149,12 @@ int PosixSetMeta(const char *path,
       }
     }
   }
+  if (res != 0) return -1;
+  const struct timeval times[2] = {
+    {stat_info->mtime, 0},
+    {stat_info->mtime, 0}
+  };
+  res = lutimes(path, times);
   if (res != 0) return -1;
   return 0;
 }
@@ -267,7 +276,8 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   } else {
     stat_result->cvm_symlink = NULL;
   }
-  stat_result->cvm_name = strdup(path);
+  stat_result->cvm_parent = strdup(GetParentPath(path).c_str());
+  stat_result->cvm_name = strdup(GetFileName(path).c_str());
 
   stat_result->cvm_xattrs = XattrList::CreateFromFile(complete_path);
   if (stat_result->cvm_xattrs == NULL) return -1;
@@ -278,7 +288,8 @@ int posix_get_stat(struct fs_traversal_context *ctx,
 int posix_set_meta(struct fs_traversal_context *ctx,
   const char *path, const struct cvmfs_attr *stat_info) {
   std::string complete_path = BuildPath(ctx, path);
-  return PosixSetMeta(complete_path.c_str(), stat_info);
+  return PosixSetMeta(complete_path.c_str(), stat_info,
+    !S_ISLNK(stat_info->st_mode));
 }
 const char *posix_get_identifier(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat) {
@@ -300,13 +311,20 @@ bool posix_has_file(struct fs_traversal_context *ctx,
 int posix_do_unlink(struct fs_traversal_context *ctx,
   const char *path) {
   std::string complete_path = BuildPath(ctx, path);
+  std::string parent_path = GetParentPath(complete_path);
   const char *complete_path_char = complete_path.c_str();
   struct stat buf;
   int res2 = lstat(complete_path_char, &buf);
   if (res2 == -1 && errno == ENOENT) return -1;
   assert(res2 == 0);
+  struct stat parbuf;
+  struct utimbuf mtimes;
+  stat(parent_path.c_str(), &parbuf);
+  mtimes.actime = parbuf.st_mtime;
+  mtimes.modtime = parbuf.st_mtime;
   // Unlinking
   int res1 = unlink(complete_path_char);
+  res1 |= utime(parent_path.c_str(), &mtimes);
   if (res1 == -1) return -1;
   // GC Flagging
   if (S_ISREG(buf.st_mode) && buf.st_nlink == 2) {
@@ -320,7 +338,16 @@ int posix_do_unlink(struct fs_traversal_context *ctx,
 int posix_do_rmdir(struct fs_traversal_context *ctx,
               const char *path) {
   std::string complete_path = BuildPath(ctx, path);
-  return rmdir(complete_path.c_str());
+  std::string parent_path = GetParentPath(complete_path);
+  struct stat parbuf;
+  struct utimbuf mtimes;
+  stat(parent_path.c_str(), &parbuf);
+  mtimes.actime = parbuf.st_mtime;
+  mtimes.modtime = parbuf.st_mtime;
+  int res = rmdir(complete_path.c_str());
+  res |= utime(parent_path.c_str(), &mtimes);
+  if (res != 0) return -1;
+  return 0;
 }
 
 int posix_cleanup_path(struct fs_traversal_context *ctx,
@@ -348,6 +375,7 @@ int posix_do_link(struct fs_traversal_context *ctx,
   const char *path,
   const char *identifier) {
   std::string complete_path = BuildPath(ctx, path);
+  std::string parent_path = GetParentPath(complete_path);
   std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
   const char *hidden_datapath_char = hidden_datapath.c_str();
   if (!FileExists(hidden_datapath)) {
@@ -355,6 +383,16 @@ int posix_do_link(struct fs_traversal_context *ctx,
     errno = ENOENT;
     return -1;
   }
+  struct stat parbuf;
+  struct utimbuf mtimesParent;
+  stat(parent_path.c_str(), &parbuf);
+  mtimesParent.actime = parbuf.st_mtime;
+  mtimesParent.modtime = parbuf.st_mtime;
+  struct stat linkbuf;
+  struct utimbuf mtimesLink;
+  stat(hidden_datapath.c_str(), &linkbuf);
+  mtimesLink.actime = linkbuf.st_mtime;
+  mtimesLink.modtime = linkbuf.st_mtime;
   if (posix_cleanup_path(ctx, path) != 0) {
     return -1;
   }
@@ -363,6 +401,8 @@ int posix_do_link(struct fs_traversal_context *ctx,
   int res2 = lstat(hidden_datapath_char, &buf);
   assert(res2 == 0);
   int res1 = link(hidden_datapath_char, complete_path.c_str());
+  res1 |= utime(parent_path.c_str(), &mtimesParent);
+  res1 |= utime(hidden_datapath.c_str(), &mtimesLink);
   if (res1 != 0) return -1;
   if (S_ISREG(buf.st_mode) && buf.st_nlink == 2) {
     struct fs_traversal_posix_context *pos_ctx
@@ -378,11 +418,18 @@ int posix_do_mkdir(struct fs_traversal_context *ctx,
               const char *path,
               const struct cvmfs_attr *stat_info) {
   std::string complete_path = BuildPath(ctx, path);
+  std::string parent_path = GetParentPath(complete_path);
   std::string dirname = GetParentPath(complete_path);
+  struct stat parbuf;
+  struct utimbuf mtimes;
+  stat(parent_path.c_str(), &parbuf);
+  mtimes.actime = parbuf.st_mtime;
+  mtimes.modtime = parbuf.st_mtime;
   if (posix_cleanup_path(ctx, path) != 0) {
     return -1;
   }
   int res = mkdir(complete_path.c_str(), stat_info->st_mode);
+  res |= utime(parent_path.c_str(), &mtimes);
   if (res != 0) return -1;
   return PosixSetMeta(complete_path.c_str(), stat_info);
 }
@@ -392,11 +439,18 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
               const char *dest,
               const struct cvmfs_attr *stat_info) {
   std::string complete_src_path = BuildPath(ctx, src);
+  std::string parent_path = GetParentPath(complete_src_path);
   std::string complete_dest_path = dest;
+  struct stat parbuf;
+  struct utimbuf mtimes;
+  stat(parent_path.c_str(), &parbuf);
+  mtimes.actime = parbuf.st_mtime;
+  mtimes.modtime = parbuf.st_mtime;
   if (posix_cleanup_path(ctx, src) != 0) {
     return -1;
   }
   int res = symlink(complete_dest_path.c_str(), complete_src_path.c_str());
+  res |= utime(parent_path.c_str(), &mtimes);
   if (res != 0) return -1;
   return PosixSetMeta(complete_src_path.c_str(), stat_info, false);
 }
@@ -422,6 +476,7 @@ int posix_touch(struct fs_traversal_context *ctx,
 struct posix_file_handle {
   std::string path;
   FILE *fd;
+  struct utimbuf mtimes;
 };
 
 void *posix_get_handle(struct fs_traversal_context *ctx,
@@ -441,6 +496,11 @@ int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
   } else if (op_mode == fs_open_append) {
     mode = "a";
   }
+  struct stat statbuf;
+  stat(handle->path.c_str(), &statbuf);
+  handle->mtimes.actime = statbuf.st_mtime;
+  handle->mtimes.modtime = statbuf.st_mtime;
+
   FILE *fd = fopen(handle->path.c_str(), mode);
   if (fd == NULL) {
     return -1;
@@ -453,6 +513,7 @@ int posix_do_fclose(void *file_ctx) {
   struct posix_file_handle *handle =
     reinterpret_cast<posix_file_handle *>(file_ctx);
   int res = fclose(handle->fd);
+  res |= utime(handle->path.c_str(), &(handle->mtimes));
   if (res != 0) return -1;
   handle->fd = NULL;
   return 0;
@@ -492,7 +553,8 @@ void posix_do_ffree(void *file_ctx) {
 bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
                 const struct cvmfs_attr *stat_info) {
   errno = 0;
-  std::string complete_path = BuildPath(ctx, stat_info->cvm_name);
+  std::string complete_path = BuildPath(ctx,
+    (std::string(stat_info->cvm_parent)+"/"+stat_info->cvm_name).c_str());
   struct stat display_path_stat;
   int res1 = lstat(complete_path.c_str(), &display_path_stat);
   if (res1 == -1) {

@@ -66,6 +66,7 @@ struct cvmfs_attr *create_sample_stat(const char *name,
   result->cvm_checksum = hash_result;
   result->cvm_symlink = link_result;
   result->cvm_name = strdup(name);
+  result->cvm_parent = strdup("/");
   result->cvm_xattrs = xlist;
 
   return result;
@@ -281,10 +282,17 @@ TEST_P(T_Fs_Traversal_Interface, StatTest) {
   // Correct inode configuration
   ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
     context_, "/StatTest-foo.txt", foostat, false));
-  ASSERT_STREQ("/StatTest-foo.txt", foostat->cvm_name);
+  ASSERT_STREQ("StatTest-foo.txt", foostat->cvm_name);
+  ASSERT_STREQ("", foostat->cvm_parent);
   ASSERT_EQ(0770, MODE_BITMASK & foostat->st_mode);
   ASSERT_EQ(getuid(), foostat->st_uid);
   ASSERT_EQ(getgid(), foostat->st_gid);
+
+  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
+    context_, "/StatTest-foo/bar/foobar1.txt", foostat, false));
+  ASSERT_STREQ("foobar1.txt", foostat->cvm_name);
+  ASSERT_STREQ("/StatTest-foo/bar", foostat->cvm_parent);
+
   XattrList *xlist1 = reinterpret_cast<XattrList *>(foostat->cvm_xattrs);
   xlist1->Get("user.foo", &val);
   ASSERT_STREQ("StatTest", val.c_str());
