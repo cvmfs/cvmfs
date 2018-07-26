@@ -249,7 +249,9 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   }
 
   traversal_.UnregisterListener(callback);
-
+  printf("SweepReflog -- %d %d %d \n", preserved_catalog_count(),
+                                       condemned_catalog_count(),
+                                       condemned_objects_count());
   // TODO(jblomer): turn current counters into perf::Counters
   if (configuration_.statistics) {
     perf::Counter *ctr_preserved_catalogs =
