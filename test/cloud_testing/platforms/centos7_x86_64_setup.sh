@@ -55,6 +55,9 @@ install_from_repo tree
 # traffic shaping
 install_from_repo trickle
 
+# Install test dependency for 647
+install_from_repo python-flask          || die "fail (installing python-flask)"
+
 # install ruby gem for FakeS3
 install_ruby_gem fakes3
 

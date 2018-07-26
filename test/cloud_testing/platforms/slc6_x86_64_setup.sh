@@ -111,6 +111,9 @@ echo -n "install x509 helper... "
 sudo rpm -ivh $(basename $x509_helper) > /dev/null || die "install failed"
 echo "OK"
 
+# Install test dependency for 647
+install_from_repo python-flask          || die "fail (installing python-flask)"
+
 # install ruby gem for FakeS3
 install_ruby_gem fakes3 0.2.0  # latest is 0.2.1 (23.07.2015) that didn't work.
 
