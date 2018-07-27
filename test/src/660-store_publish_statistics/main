@@ -3,7 +3,7 @@ cvmfs_test_name="Store publish statistics in a SQLite database"
 cvmfs_test_autofs_on_startup=false
 
 CVMFS_TEST_660_NR_OF_TESTS=4
-CVMFS_TEST_660_DB_PATH=/tmp/test_660_store_stats_db/stats.db
+CVMFS_TEST_660_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db
 CVMFS_TEST_660_ERROR_FILES_ADDED=101
 CVMFS_TEST_660_ERROR_FILES_REMOVED=102
 CVMFS_TEST_660_ERROR_FILES_CHANGED=103
@@ -69,26 +69,16 @@ cvmfs_run_test() {
   echo "*** Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  # just to be written in log file
-  echo "*** Activate the statistics by writing in server.conf file CVMFS_PRINT_STATISTICS=true"
-  cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf | grep CVMFS_PRINT_STATISTICS
-  if [ $? -eq 0 ]; then   # just change the value
-    echo "*** Found CVMFS_PRINT_STATISTICS variable, value overwritten with true."
-    sed -i 's/CVMFS_PRINT_STATISTICS=.*/CVMFS_PRINT_STATISTICS=true/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
-  else
-    echo "*** CVMFS_PRINT_STATISTICS not found, append CVMFS_PRINT_STATISTICS=true in server.conf"
-    echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
-  fi
-
-  echo "*** Create database in a certain path: $CVMFS_TEST_660_DB_PATH"
-  cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf | grep CVMFS_STATISTICS_DB
-  if [ $? -eq 0 ]; then   # just change the value
-    echo "*** Found CVMFS_STATISTICS_DB variable, assign it to $CVMFS_TEST_660_DB_PATH"
-    sed -i 's/CVMFS_STATISTICS_DB=.*/CVMFS_STATISTICS_DB=$CVMFS_TEST_660_DB_PATH/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
-  else
-    echo "*** CVMFS_STATISTICS_DB not found, append CVMFS_STATISTICS_DB=$CVMFS_TEST_660_DB_PATH in server.conf"
-    echo "CVMFS_STATISTICS_DB=$CVMFS_TEST_660_DB_PATH" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
-  fi
+  # # just to be written in log file
+  # echo "*** Activate the statistics by writing in server.conf file CVMFS_PRINT_STATISTICS=true"
+  # cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf | grep CVMFS_PRINT_STATISTICS
+  # if [ $? -eq 0 ]; then   # just change the value
+  #   echo "*** Found CVMFS_PRINT_STATISTICS variable, value overwritten with true."
+  #   sed -i 's/CVMFS_PRINT_STATISTICS=.*/CVMFS_PRINT_STATISTICS=true/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  # else
+  #   echo "*** CVMFS_PRINT_STATISTICS not found, append CVMFS_PRINT_STATISTICS=true in server.conf"
+  #   echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  # fi
 
   # ============================ Test1 =============================
 
