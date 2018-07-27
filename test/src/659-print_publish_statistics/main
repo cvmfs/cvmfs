@@ -65,8 +65,7 @@ cvmfs_run_test() {
   local scratch_dir=$(pwd)
   local tar_file_path=$scratch_dir/tmp_dir/$CVMFS_TEST_659_TAR_FILE
 
-  echo "*** Create a fresh repository named $CVMFS_TEST_REPO "
-       "with user $CVMFS_TEST_USER and CVMFS_PRINT_STATISTICS=true"
+  echo "*** Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and CVMFS_PRINT_STATISTICS=true"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
   echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
 
