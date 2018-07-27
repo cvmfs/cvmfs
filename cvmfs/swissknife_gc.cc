@@ -51,7 +51,12 @@ int CommandGc::Main(const ArgumentList &args) {
   const std::string &spooler = *args.find('u')->second;
   const std::string &repo_name = *args.find('n')->second;
   const std::string &reflog_chksum_path = *args.find('R')->second;
-  shash::Any reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+  shash::Any reflog_hash;
+  if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum");
+    return 1;
+  }
+
   const int64_t revisions = (args.count('h') > 0) ?
     String2Int64(*args.find('h')->second) : GcConfig::kFullHistory;
   const time_t timestamp  = (args.count('z') > 0)
