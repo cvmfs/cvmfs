@@ -41,6 +41,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
   , preserved_catalogs_(0)
   , condemned_catalogs_(0)
   , condemned_objects_(0)
+  , condemned_bytes_(0)
 {
   assert(configuration_.uploader != NULL);
 }
@@ -249,9 +250,10 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   }
 
   traversal_.UnregisterListener(callback);
-  printf("SweepReflog -- %d %d %d \n", preserved_catalog_count(),
+  printf("SweepReflog -- %d %d %d bytes: %ld \n", preserved_catalog_count(),
                                        condemned_catalog_count(),
-                                       condemned_objects_count());
+                                       condemned_objects_count(),
+                                       condemned_bytes_count());
   // TODO(jblomer): turn current counters into perf::Counters
   if (configuration_.statistics) {
     perf::Counter *ctr_preserved_catalogs =
@@ -263,9 +265,13 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
     perf::Counter *ctr_condemned_objects =
       configuration_.statistics->Register(
         "gc.n_condemned_objects", "number of deleted objects");
+    perf::Counter *ctr_condemned_bytes =
+      configuration_.statistics->Register(
+        "gc.sz_condemned_objects", "number of deleted bytez");
     ctr_preserved_catalogs->Set(preserved_catalog_count());
     ctr_condemned_catalogs->Set(condemned_catalog_count());
     ctr_condemned_objects->Set(condemned_objects_count());
+    ctr_condemned_bytes->Set(condemned_bytes_count());
   }
 
   configuration_.uploader->WaitForUpload();
