@@ -292,11 +292,8 @@ int posix_do_unlink(struct fs_traversal_context *ctx,
   int res2 = lstat(complete_path_char, &buf);
   if (res2 == -1 && errno == ENOENT) return -1;
   assert(res2 == 0);
-  struct stat parbuf;
   struct utimbuf mtimes;
-  stat(parent_path.c_str(), &parbuf);
-  mtimes.actime = parbuf.st_mtime;
-  mtimes.modtime = parbuf.st_mtime;
+  BackupMtimes(parent_path, &mtimes);
   // Unlinking
   int res1 = unlink(complete_path_char);
   res1 |= utime(parent_path.c_str(), &mtimes);
@@ -314,11 +311,8 @@ int posix_do_rmdir(struct fs_traversal_context *ctx,
   const char *path) {
   std::string complete_path = BuildPath(ctx, path);
   std::string parent_path = GetParentPath(complete_path);
-  struct stat parbuf;
   struct utimbuf mtimes;
-  stat(parent_path.c_str(), &parbuf);
-  mtimes.actime = parbuf.st_mtime;
-  mtimes.modtime = parbuf.st_mtime;
+  BackupMtimes(parent_path, &mtimes);
   int res = rmdir(complete_path.c_str());
   res |= utime(parent_path.c_str(), &mtimes);
   if (res != 0) return -1;
@@ -337,16 +331,12 @@ int posix_do_link(struct fs_traversal_context *ctx,
     errno = ENOENT;
     return -1;
   }
-  struct stat parbuf;
-  struct utimbuf mtimesParent;
-  stat(parent_path.c_str(), &parbuf);
-  mtimesParent.actime = parbuf.st_mtime;
-  mtimesParent.modtime = parbuf.st_mtime;
-  struct stat linkbuf;
-  struct utimbuf mtimesLink;
-  stat(hidden_datapath.c_str(), &linkbuf);
-  mtimesLink.actime = linkbuf.st_mtime;
-  mtimesLink.modtime = linkbuf.st_mtime;
+  struct utimbuf mtimes_parent;
+  BackupMtimes(parent_path, &mtimes_parent);
+
+  struct utimbuf mtimes_link;
+  BackupMtimes(hidden_datapath, &mtimes_link);
+
   if (posix_cleanup_path(ctx, path) != 0) {
     return -1;
   }
@@ -355,8 +345,8 @@ int posix_do_link(struct fs_traversal_context *ctx,
   int res2 = lstat(hidden_datapath_char, &buf);
   assert(res2 == 0);
   int res1 = link(hidden_datapath_char, complete_path.c_str());
-  res1 |= utime(parent_path.c_str(), &mtimesParent);
-  res1 |= utime(hidden_datapath.c_str(), &mtimesLink);
+  res1 |= utime(parent_path.c_str(), &mtimes_parent);
+  res1 |= utime(hidden_datapath.c_str(), &mtimes_link);
   if (res1 != 0) return -1;
   if (S_ISREG(buf.st_mode) && buf.st_nlink == 2) {
     struct fs_traversal_posix_context *pos_ctx
@@ -374,11 +364,8 @@ int posix_do_mkdir(struct fs_traversal_context *ctx,
   std::string complete_path = BuildPath(ctx, path);
   std::string parent_path = GetParentPath(complete_path);
   std::string dirname = GetParentPath(complete_path);
-  struct stat parbuf;
   struct utimbuf mtimes;
-  stat(parent_path.c_str(), &parbuf);
-  mtimes.actime = parbuf.st_mtime;
-  mtimes.modtime = parbuf.st_mtime;
+  BackupMtimes(parent_path, &mtimes);
   if (posix_cleanup_path(ctx, path) != 0) {
     return -1;
   }
@@ -395,11 +382,8 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
   std::string complete_src_path = BuildPath(ctx, src);
   std::string parent_path = GetParentPath(complete_src_path);
   std::string complete_dest_path = dest;
-  struct stat parbuf;
   struct utimbuf mtimes;
-  stat(parent_path.c_str(), &parbuf);
-  mtimes.actime = parbuf.st_mtime;
-  mtimes.modtime = parbuf.st_mtime;
+  BackupMtimes(parent_path, &mtimes);
   if (posix_cleanup_path(ctx, src) != 0) {
     return -1;
   }
@@ -469,10 +453,7 @@ int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
   } else if (op_mode == fs_open_append) {
     mode = "a";
   }
-  struct stat statbuf;
-  stat(handle->path.c_str(), &statbuf);
-  handle->mtimes.actime = statbuf.st_mtime;
-  handle->mtimes.modtime = statbuf.st_mtime;
+  BackupMtimes(handle->path, &(handle->mtimes));
 
   FILE *fd = fopen(handle->path.c_str(), mode);
   if (fd == NULL) {

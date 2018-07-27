@@ -90,3 +90,10 @@ int PosixSetMeta(const char *path,
   if (res != 0) return -1;
   return 0;
 }
+
+void BackupMtimes(std::string path, struct utimbuf *mtimes) {
+  struct stat stat_buf;
+  stat(path.c_str(), &stat_buf);
+  mtimes->actime = stat_buf.st_mtime;
+  mtimes->modtime = stat_buf.st_mtime;
+}

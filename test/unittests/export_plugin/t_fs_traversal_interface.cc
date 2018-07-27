@@ -758,7 +758,7 @@ TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
   shash::Any content2_hash(shash::kSha1);
   shash::HashString(content2, &content2_hash);
   XattrList *xlist1 = create_sample_xattrlist("TestGarbageCollection1");
-  XattrList *xlist2 = create_sample_xattrlist("TestGarbageCollection1");
+  XattrList *xlist2 = create_sample_xattrlist("TestGarbageCollection2");
   struct cvmfs_attr *stat1 = create_sample_stat("foo", 0, 0777, 0, xlist1,
     &content1_hash);
   struct cvmfs_attr *stat2 = create_sample_stat("foo", 0, 0777, 0, xlist1,
@@ -788,6 +788,12 @@ TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
   dest->garbage_collector(context);
 
   std::string data_base_path = "./data/";
+  ASSERT_STRNE(ident1, ident2);
+  ASSERT_STRNE(ident1, ident3);
+  ASSERT_STRNE(ident1, ident4);
+  ASSERT_STRNE(ident2, ident3);
+  ASSERT_STRNE(ident2, ident4);
+  ASSERT_STRNE(ident3, ident4);
   ASSERT_FALSE(FileExists(data_base_path + ident1));
   ASSERT_TRUE(FileExists(data_base_path + ident2));
   ASSERT_FALSE(FileExists(data_base_path + ident3));

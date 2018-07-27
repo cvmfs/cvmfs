@@ -16,6 +16,16 @@
 #include "smalloc.h"
 #include "util/posix.h"
 
+/**
+ * Initializes garbage collection by setting up the corresponding hash map
+ * in the fs_traversal_posix_context
+ * The initialization uses the data stored in the file at
+ * [data directory] + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE
+ * 
+ * This file contains a fixed length concatenation of
+ * inodes (type ino_t) which should be checked
+ * and deleted upon garbage collection
+ */
 void InitializeGarbageCollection(struct fs_traversal_context *ctx) {
   struct fs_traversal_posix_context *posix_ctx
     = reinterpret_cast<struct fs_traversal_posix_context *>(ctx->ctx);
@@ -41,6 +51,12 @@ void InitializeGarbageCollection(struct fs_traversal_context *ctx) {
   }
 }
 
+/**
+ * Finalizes the garbage collection
+ * Stores the content of the garbage collection hash map in the file at
+ * [data directory] + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE
+ * 
+ */
 void FinalizeGarbageCollection(struct fs_traversal_context *ctx) {
   struct fs_traversal_posix_context *posix_ctx
     =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
@@ -57,6 +73,15 @@ void FinalizeGarbageCollection(struct fs_traversal_context *ctx) {
   fclose(gc_flagged_file);
 }
 
+/**
+ * Main Worker of the Posix Garbage Collector
+ * Iterates over a calculated set of directories and check for inodes that can
+ * be deleted.
+ * For the thread with thread number j the thread starts with the top level data
+ * directory /j/ and iterates over the contained files. Afterwards it continues
+ * with /j+i*n/ where n is the number of total threads and i is an arbitrary
+ * integer.
+ */
 void *PosixGcMainWorker(void *data) {
   struct posix_gc_thread *thread_context
     = reinterpret_cast<struct posix_gc_thread *>(data);
@@ -126,34 +151,53 @@ void *PosixGcMainWorker(void *data) {
   return NULL;
 }
 
+/**
+ * Method which runs the garbage collection.
+ * Will start posix_ctx->num_threads in parallel for the task.
+ * For posix_ctx->num_threads <= 1 there is a fallback to a sequential version.
+ */
 int RunGarbageCollection(struct fs_traversal_context *ctx) {
   struct fs_traversal_posix_context *posix_ctx
     = reinterpret_cast<struct fs_traversal_posix_context *>(ctx->ctx);
+
   int thread_total = posix_ctx->num_threads;
-  pthread_t *workers
-    = reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * thread_total));
   struct posix_gc_thread *thread_contexts
-    = reinterpret_cast<struct posix_gc_thread *>(
-      smalloc(sizeof(struct posix_gc_thread) * thread_total));
+      = reinterpret_cast<struct posix_gc_thread *>(
+        smalloc(sizeof(struct posix_gc_thread) * thread_total));
+
   perf::Statistics *gc_statistics = new perf::Statistics();
   gc_statistics->Register(POSIX_GC_STAT_FILES_REMOVED,
     "Number of deduplicated files removed by Garbage Collector");
   gc_statistics->Register(POSIX_GC_STAT_BYTES_REMOVED,
     "Sum of sizes of removed files");
-  for (int i = 0; i < thread_total; i++) {
-    thread_contexts[i].thread_total = thread_total;
-    thread_contexts[i].thread_num = i;
-    thread_contexts[i].ctx = ctx;
-    thread_contexts[i].stat = gc_statistics;
-    int retval = pthread_create(&workers[i], NULL,
-      PosixGcMainWorker, &thread_contexts[i]);
-    assert(retval == 0);
-  }
 
-  for (int i = 0; i < thread_total; i++) {
-    pthread_join(workers[i], NULL);
+  if (thread_total > 1) {
+    pthread_t *workers
+    = reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * thread_total));
+    for (int i = 0; i < thread_total; i++) {
+      thread_contexts[i].thread_total = thread_total;
+      thread_contexts[i].thread_num = i;
+      thread_contexts[i].ctx = ctx;
+      thread_contexts[i].stat = gc_statistics;
+      int retval = pthread_create(&workers[i], NULL,
+        PosixGcMainWorker, &thread_contexts[i]);
+      assert(retval == 0);
+    }
+
+    for (int i = 0; i < thread_total; i++) {
+      pthread_join(workers[i], NULL);
+    }
+    delete workers;
+  } else {
+    thread_contexts[0].thread_total = thread_total;
+    thread_contexts[0].thread_num = 0;
+    thread_contexts[0].ctx = ctx;
+    thread_contexts[0].stat = gc_statistics;
+    PosixGcMainWorker(thread_contexts);
   }
   LogCvmfs(kLogCvmfs, kLogStdout,
       "%s", gc_statistics->PrintList(perf::Statistics::kPrintHeader).c_str());
+  delete thread_contexts;
+  delete gc_statistics;
   return 0;
 }
