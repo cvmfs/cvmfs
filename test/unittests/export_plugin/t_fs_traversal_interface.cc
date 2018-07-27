@@ -628,13 +628,13 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
 
-  ASSERT_TRUE(shrinkwrap::Sync("", src, dest, 0, true, statistics));
+  ASSERT_TRUE(shrinkwrap::Sync("", src, dest, true, statistics));
 
   dest->finalize(dest->context_);
   context = dest->initialize(dest_name, repoName.c_str(), dest_data, 4, NULL);
   dest->context_ = context;
 
-  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true, statistics));
+  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, true, statistics));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
@@ -736,8 +736,7 @@ TEST(T_Fs_Traversal_CVMFS, TransferCVMFSToPosix) {
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
 
-  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, 0, true, statistics));
-  // ASSERT_TRUE(shrinkwrap::Sync("", dest, src, 0, true));
+  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, true, statistics));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);

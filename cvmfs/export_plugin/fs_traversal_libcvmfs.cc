@@ -33,9 +33,9 @@ int libcvmfs_get_stat(struct fs_traversal_context *ctx,
   return cvmfs_stat_attr(context, path, stat_result);
 }
 
-const char *libcvmfs_get_identifier(struct fs_traversal_context *ctx,
+char *libcvmfs_get_identifier(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat) {
-  const char *res = strdup(stat->cvm_name);
+  char *res = strdup(stat->cvm_name);
   return res;
 }
 
@@ -112,7 +112,8 @@ void libcvmfs_do_ffree(void *file_ctx) {
   if (handle->fd > 0) {
     libcvmfs_do_fclose(file_ctx);
   }
-  delete handle;
+  free(handle->path);
+  free(handle);
 }
 
 
@@ -207,6 +208,11 @@ void libcvmfs_finalize(struct fs_traversal_context *ctx) {
   cvmfs_context *context = reinterpret_cast<cvmfs_context *>(ctx->ctx);
   cvmfs_detach_repo(context);
   cvmfs_fini();
+  free(ctx->repo);
+  free(ctx->base);
+  free(ctx->data);
+  free(ctx->config);
+  free(ctx->lib_version);
   delete ctx;
 }
 
