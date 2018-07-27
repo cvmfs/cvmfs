@@ -1,7 +1,11 @@
 %pre
 
 if [ x"$(which systemctl)" != x"" ]; then
-    systemctl stop cvmfs-gateway
+    if [ "x$(systemctl list-unit-files | grep cvmfs-gateway)" != "x" ]; then
+        systemctl stop cvmfs-gateway
+    fi
 else
-    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
+    if [ -x /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh ]; then
+        /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
+    fi
 fi
