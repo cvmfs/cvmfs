@@ -15,7 +15,8 @@
 #define SHRINKWRAP_STAT_FILE_COUNT "fileCnt"
 #define SHRINKWRAP_STAT_SRC_ENTRIES "srcEntries"
 #define SHRINKWRAP_STAT_DEST_ENTRIES "destEntries"
-#define SHRINKWRAP_STAT_LAST_PRINT "timeOfLastPrint"
+#define SHRINKWRAP_STAT_DEDUPED_FILES "dedupedFiles"
+#define SHRINKWRAP_STAT_DEDUPED_BYTES "dedupedBytes"
 
 namespace shrinkwrap {
 
