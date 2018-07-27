@@ -65,18 +65,10 @@ cvmfs_run_test() {
   local scratch_dir=$(pwd)
   local tar_file_path=$scratch_dir/tmp_dir/$CVMFS_TEST_659_TAR_FILE
 
-  echo "*** Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** Create a fresh repository named $CVMFS_TEST_REPO "
+       "with user $CVMFS_TEST_USER and CVMFS_PRINT_STATISTICS=true"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
-
-  echo "*** Activate the statistics by writing in server.conf file CVMFS_PRINT_STATISTICS=true"
-  cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf | grep CVMFS_PRINT_STATISTICS
-  if [ $? -eq 0 ]; then   # just change the value
-    echo "*** Found CVMFS_PRINT_STATISTICS variable, value overwritten with true."
-    sed -i 's/CVMFS_PRINT_STATISTICS=.*/CVMFS_PRINT_STATISTICS=true/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
-  else
-    echo "*** CVMFS_PRINT_STATISTICS not found, append CVMFS_PRINT_STATISTICS=true in server.conf"
-    echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
-  fi
+  echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
 
   # ============================ Test1 =============================
 
