@@ -656,6 +656,9 @@ struct fs_traversal_context *posix_initialize(
   posix_ctx->num_threads = num_threads;
   result->ctx = posix_ctx;
 
+  LogCvmfs(kLogCvmfs, kLogStdout,
+      "Initializing posix interface with its directory structure");
+
   // Retrieve base directory for traversal
   if (!base) {
     result->base = strdup("/tmp/cvmfs/");

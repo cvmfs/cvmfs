@@ -342,6 +342,9 @@ bool handle_file(
       }
       pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT)->Inc();
     }
+  } else {
+    pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_FILES)->Inc();
+    pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_BYTES)->Xadd(src_st->st_size);
   }
 
   // Should probably happen in the copy function as it is parallel
@@ -603,6 +606,10 @@ perf::Statistics *GetSyncStatTemplate() {
     "The number of file system entries processed in the source");
   result->Register(SHRINKWRAP_STAT_DEST_ENTRIES,
     "The number of file system entries processed in the destination");
+  result->Register(SHRINKWRAP_STAT_DEDUPED_FILES,
+    "The number of files not copied thanks to deduplication");
+  result->Register(SHRINKWRAP_STAT_DEDUPED_BYTES,
+    "The number of bytes not copied thanks to deduplication");
   return result;
 }
 
