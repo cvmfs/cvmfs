@@ -12,11 +12,11 @@ struct fs_traversal_context {
   uint64_t version;
   uint64_t size;
 
-  const char *repo;
-  const char *base;
-  const char *data;
-  const char *config;
-  const char *lib_version;
+  char *repo;
+  char *base;
+  char *data;
+  char *config;
+  char *lib_version;
 
   void * ctx;
 };
@@ -147,7 +147,7 @@ struct fs_traversal {
    * @returns A path that can be used to identify the file
    * The memory of the char is allocated on the heap and needs to be freed
    */
-  const char *(*get_identifier)(struct fs_traversal_context *ctx,
+  char *(*get_identifier)(struct fs_traversal_context *ctx,
                 const struct cvmfs_attr *stat);
 
 

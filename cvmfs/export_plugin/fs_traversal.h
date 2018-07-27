@@ -22,7 +22,6 @@ namespace shrinkwrap {
 bool Sync(const char *dir,
           struct fs_traversal *src,
           struct fs_traversal *dest,
-          int parallel,
           bool recursive,
           perf::Statistics *pstats);
 

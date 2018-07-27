@@ -43,7 +43,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
 int posix_set_meta(struct fs_traversal_context *ctx,
   const char *path, const struct cvmfs_attr *stat_info);
 
-const char *posix_get_identifier(struct fs_traversal_context *ctx,
+char *posix_get_identifier(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat);
 
 bool posix_has_file(struct fs_traversal_context *ctx,
@@ -266,7 +266,8 @@ int posix_set_meta(struct fs_traversal_context *ctx,
   return PosixSetMeta(complete_path.c_str(), stat_info,
     !S_ISLNK(stat_info->st_mode));
 }
-const char *posix_get_identifier(struct fs_traversal_context *ctx,
+
+char *posix_get_identifier(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat) {
   shash::Any content_hash =
     shash::MkFromHexPtr(shash::HexPtr(stat->cvm_checksum));
@@ -274,7 +275,7 @@ const char *posix_get_identifier(struct fs_traversal_context *ctx,
   std::string path = ("/"
     + content_hash.MakePathExplicit(kDirLevels, kDigitsPerDirLevel, '.')
     + meta_hash.ToString());
-  const char *res = strdup(path.c_str());
+  char *res = strdup(path.c_str());
   return res;
 }
 
@@ -396,13 +397,14 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
 int posix_touch(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat_info) {
   // NOTE(steuber): creat is only atomic on non-NFS paths!
-  const char *identifier = posix_get_identifier(ctx, stat_info);
+  char *identifier = posix_get_identifier(ctx, stat_info);
   if (posix_has_file(ctx, identifier)) {
+    free(identifier);
     errno = EEXIST;
     return -1;
   }
   std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
-  delete identifier;
+  free(identifier);
   int res1 = creat(hidden_datapath.c_str(), stat_info->st_mode);
   if (res1 < 0) return -1;
   int res2 = close(res1);
@@ -421,18 +423,19 @@ bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
     // If visible path doesn't exist => error
     return false;
   }
-  const char *identifier = posix_get_identifier(ctx, stat_info);
+  char *identifier = posix_get_identifier(ctx, stat_info);
   if (!posix_has_file(ctx, identifier)) {
+    free(identifier);
     return false;
   }
   std::string hidden_datapath = BuildHiddenPath(ctx, identifier);
+  free(identifier);
   struct stat hidden_path_stat;
   int res2 = stat(hidden_datapath.c_str(), &hidden_path_stat);
   if (res2 == -1) {
     // If hidden path doesn't exist although apprently existing => error
     return false;
   }
-  delete identifier;
   return display_path_stat.st_ino == hidden_path_stat.st_ino;
 }
 
@@ -711,9 +714,11 @@ struct fs_traversal_context *posix_initialize(
 
 void posix_finalize(struct fs_traversal_context *ctx) {
   FinalizeFsOperations(ctx);
-  delete ctx->repo;
-  delete ctx->base;
-  delete ctx->data;
+  free(ctx->repo);
+  free(ctx->base);
+  free(ctx->data);
+  free(ctx->config);
+  free(ctx->lib_version);
   struct fs_traversal_posix_context *posix_ctx
     =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
   delete posix_ctx;

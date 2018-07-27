@@ -45,3 +45,4 @@ cvmfs_listdir_contents
 cvmfs_stat_attr
 cvmfs_stat_nc
 cvmfs_list_nc
+cvmfs_list_free
