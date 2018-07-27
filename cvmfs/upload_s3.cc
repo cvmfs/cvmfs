@@ -225,7 +225,7 @@ void S3Uploader::FileUpload(
   UploadJobInfo(info);
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from file finished: %s",
            local_path.c_str());
-  // CountUploadedBytes(???);
+  CountUploadedBytes(GetFileSize(local_path));
 }
 
 
