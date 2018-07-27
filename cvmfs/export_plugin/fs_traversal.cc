@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include <fstream>
+#include <vector>
 
 #include "atomic.h"
 #include "cvmfs_config.h"
@@ -65,15 +66,40 @@ class FileCopy {
   char *dest;
 };
 
-unsigned             num_parallel;
+class RecDir {
+ public:
+  RecDir()
+    : dir(NULL)
+    , recursive(false) {}
+
+  RecDir(char *dir, bool recursive)
+    : dir(dir)
+    , recursive(recursive) {}
+
+  ~RecDir() {
+    free(dir);
+  }
+
+  bool IsTerminateJob() const {
+    return (dir == NULL);
+  }
+
+  char *dir;
+  bool recursive;
+};
+
+unsigned             num_parallel = 0;
 bool                 recursive = true;
 int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
-unsigned             retries = 1;
 atomic_int64         overall_copies;
 atomic_int64         overall_new;
 atomic_int64         copy_queue;
+
+vector<RecDir*>       dirs;
+
+unsigned             retries = 1;
 
 SpecTree             *spec_tree_ = new SpecTree('*');
 
@@ -87,17 +113,9 @@ struct fs_traversal* FindInterface(const char * type)
     return libcvmfs_get_interface();
   }
   LogCvmfs(kLogCvmfs, kLogStderr,
-  "Unknown File System Interface : %s", type);
+    "Unknown File System Interface : %s", type);
   return NULL;
 }
-
-bool copy_file(
-  struct fs_traversal *src_fs,
-  const char *src_data,
-  struct fs_traversal *dest_fs,
-  const char *dest_data,
-  int parallel,
-  perf::Statistics *pstats);
 
 bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
     struct fs_traversal *dest_fs) {
@@ -138,6 +156,83 @@ bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
 
   // TODO(nhazekam): Not comparing Xattrs yet
   // void *       cvm_xattrs;
+  return true;
+}
+
+bool copyFile(
+  struct fs_traversal *src_fs,
+  const char *src_name,
+  struct fs_traversal *dest_fs,
+  const char *dest_name,
+  perf::Statistics *pstats
+) {
+  int retval;
+
+  void *src  = src_fs->get_handle(src_fs->context_, src_name);
+  void *dest = dest_fs->get_handle(dest_fs->context_, dest_name);
+
+  retval = src_fs->do_fopen(src, fs_open_read);
+  if (retval != 0) {
+    // Handle error
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "Failed open src : %s : %d : %s\n",
+    src_name, errno, strerror(errno));
+    return false;
+  }
+
+  retval = dest_fs->do_fopen(dest, fs_open_write);
+  if (retval != 0) {
+    // Handle error
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "Failed open dest : %s : %d : %s\n",
+    dest_name, errno, strerror(errno));
+    return false;
+  }
+  size_t bytes_transferred = 0;
+  while (1) {
+    char buffer[COPY_BUFFER_SIZE];
+
+    size_t actual_read = 0;
+    retval = src_fs->do_fread(src, buffer, sizeof(buffer), &actual_read);
+    if (retval != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+      "Read failed : %d %s\n", errno, strerror(errno));
+      return false;
+    }
+    bytes_transferred+=actual_read;
+    retval = dest_fs->do_fwrite(dest, buffer, actual_read);
+    if (retval != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+      "Write failed : %d %s\n", errno, strerror(errno));
+      return false;
+    }
+
+    if (actual_read < COPY_BUFFER_SIZE) {
+      break;
+    }
+  }
+  pstats->Lookup(SHRINKWRAP_STAT_BYTE_COUNT)->Xadd(bytes_transferred);
+
+  retval = src_fs->do_fclose(src);
+  if (retval != 0) {
+    // Handle error
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "Failed close src : %s : %d : %s\n",
+    src_name, errno, strerror(errno));
+    return false;
+  }
+  src_fs->do_ffree(src);
+
+  retval = dest_fs->do_fclose(dest);
+  if (retval != 0) {
+    // Handle error
+    LogCvmfs(kLogCvmfs, kLogStderr,
+    "Failed close dest : %s : %d : %s\n",
+    dest_name, errno, strerror(errno));
+    return false;
+  }
+  dest_fs->do_ffree(dest);
+
   return true;
 }
 
@@ -219,15 +314,87 @@ void list_src_dir(
   }
 }
 
+bool handle_file(
+  struct fs_traversal *src,
+  struct cvmfs_attr *src_st,
+  struct fs_traversal *dest,
+  struct cvmfs_attr *dest_st,
+  const char *entry,
+  perf::Statistics *pstats
+) {
+  bool result = true;
+  // They don't point to the same data, link new data
+  char *dest_data = dest->get_identifier(dest->context_, src_st);
+
+  // Touch is atomic, if it fails something else will write file
+  if (!dest->touch(dest->context_, src_st)) {
+    if (num_parallel) {
+      FileCopy next_copy(strdup(entry), strdup(dest_data));
+      WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
+      atomic_inc64(&copy_queue);
+    } else {
+      if (!copyFile(src, entry, dest, dest_data, pstats)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+          "Failed to copy %s->%s : %d : %s",
+          entry, dest_data, errno, strerror(errno));
+        errno = 0;
+        result = false;
+      }
+      pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT)->Inc();
+    }
+  }
+
+  // Should probably happen in the copy function as it is parallel
+  // Also this needs to be separate from copyFile, the target file
+  // could already exist and the link needs to be created anyway.
+  if (result && dest->do_link(dest->context_, entry, dest_data)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Failed to link %s->%s : %d : %s",
+      entry, dest_data, errno, strerror(errno));
+    errno = 0;
+    result = false;
+  }
+  free(dest_data);
+  return result;
+}
+
+bool handle_dir(
+  struct fs_traversal *src,
+  struct cvmfs_attr *src_st,
+  struct fs_traversal *dest,
+  struct cvmfs_attr *dest_st,
+  const char *entry
+) {
+  if (dest->do_mkdir(dest->context_, entry, src_st)) {
+    if (errno == EEXIST) {
+      errno = 0;
+      if (dest->set_meta(dest->context_, entry, src_st)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+          "Traversal failed to set_meta %s", entry);
+        return false;
+      }
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Traversal failed to mkdir %s : %d : %s",
+        entry, errno, strerror(errno));
+      return false;
+    }
+  }
+  return true;
+}
+
+void add_dir_for_sync(const char *dir, bool recursive) {
+  dirs.push_back(new RecDir(strdup(dir), recursive));
+}
+
 bool Sync(
   const char *dir,
   struct fs_traversal *src,
   struct fs_traversal *dest,
-  int parallel,
   bool recursive,
   perf::Statistics *pstats
 ) {
-  bool retval = true;
+  int cmp = 0;
 
   char **src_dir = NULL;
   size_t src_len = 0;
@@ -235,9 +402,6 @@ bool Sync(
   char * src_entry = NULL;
   struct cvmfs_attr *src_st = cvmfs_attr_init();
   list_src_dir(src, dir, &src_dir, &src_len);
-
-  getNext(src, dir, src_dir, &src_entry, &src_iter,
-          &src_st, true, true, pstats);
 
   char **dest_dir = NULL;
   size_t dest_len = 0;
@@ -247,272 +411,130 @@ bool Sync(
   dest->list_dir(dest->context_, dir, &dest_dir, &dest_len);
   qsort(dest_dir, dest_len, sizeof(char *),  strcmp_list);
 
-  getNext(dest, dir, dest_dir, &dest_entry, &dest_iter,
-          &dest_st, false, false, pstats);
-
   // While both have defined members to compare.
-  while (src_entry || dest_entry) {
-    // Check if item is present in both
-    int cmp = 0;
-    if (!src_entry) {
+  while (1) {
+    if (cmp <= 0) {
+      getNext(src, dir, src_dir, &src_entry, &src_iter,
+            &src_st, true, true, pstats);
+    }
+
+    if (cmp >= 0) {
+      getNext(dest, dir, dest_dir, &dest_entry, &dest_iter,
+              &dest_st, false, false, pstats);
+    } else {
+      // A destination entry was added
+      pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
+    }
+
+    if (!src_entry && !dest_entry) {
+      // If we have visited all entries in both we break
+      break;
+    } else if (!src_entry) {
       cmp = 1;
     } else if (!dest_entry) {
       cmp = -1;
     } else {
       cmp = strcmp(src_entry, dest_entry);
     }
-    if (cmp == 0) {
+
+    if (cmp <= 0) {
       // Compares stats to see if they are equivalent
-      if (!cvmfs_attr_cmp(src_st, dest_st, dest)) {
-        // If not equal, bring dest up-to-date
-        switch (src_st->st_mode & S_IFMT) {
-          case S_IFREG:
-            {
-              // They don't point to the same data, link new data
-//              const char *src_data;
-//              src_data = src->get_identifier(src->context_, src_st);
-              const char *dest_data;
-              dest_data = dest->get_identifier(dest->context_, src_st);
-
-              // Touch is atomic, if it fails something else will write file?
-              if (!dest->touch(dest->context_, src_st)) {
-                // PUSH TO PIPE
-                if (!copy_file(src, src_entry, dest,
-                               dest_data, parallel, pstats)) {
-                  LogCvmfs(kLogCvmfs, kLogStderr,
-                  "Traversal failed to copy %s->%s", src_entry, dest_data);
-                  return false;
-                }
-              }
-
-              // Should probably happen in the copy function as it is parallel
-              // Also this needs to be separate from copy_file, the target file
-              // could already exist and the link needs to be created anyway.
-              if (dest->do_link(dest->context_, src_entry, dest_data) != 0) {
-                LogCvmfs(kLogCvmfs, kLogStderr,
-                "Traversal failed to link %s->%s", src_entry, dest_data);
-                return false;
-              }
-            }
-            break;
-          case S_IFDIR:
-            if (dest->set_meta(dest->context_, src_entry, src_st) != 0) {
-              LogCvmfs(kLogCvmfs, kLogStderr,
-              "Traversal failed to set_meta %s", src_entry);
-              return false;
-            }
-            if (recursive) {
-              if (!Sync(src_entry, src, dest, parallel,
-                recursive, pstats)) {
-                return false;
-              }
-            }
-            break;
-          case S_IFLNK:
-            // Should likely copy the source of the symlink target
-            if (dest->do_symlink(dest->context_, src_entry,
-                             src_st->cvm_symlink, src_st) != 0) {
-              LogCvmfs(kLogCvmfs, kLogStderr,
-              "Traversal failed to symlink %s->%s",
-              src_entry, src_st->cvm_symlink);
-              return retval;
-            }
-            break;
-          default:
-            LogCvmfs(kLogCvmfs, kLogStderr,
-            "Unknown file type for %s : %d",
-            src_entry, src_st->st_mode);
-            return false;
-            break;
-        }
-      } else {
-        // The directory exists and is the same,
-        // but we still need to check the children
+      if (cmp == 0 && cvmfs_attr_cmp(src_st, dest_st, dest)) {
         if (S_ISDIR(src_st->st_mode) && recursive) {
-          if (!Sync(src_entry, src, dest, parallel, recursive, pstats)) {
-            return false;
-          }
+          add_dir_for_sync(src_entry, recursive);
         }
+        continue;
       }
-      getNext(src, dir, src_dir, &src_entry, &src_iter,
-              &src_st, true, true, pstats);
-      getNext(dest, dir, dest_dir, &dest_entry, &dest_iter,
-              &dest_st, false, false, pstats);
-    /* Src contains something missing from Dest */
-    } else if (cmp < 0) {
-       switch (src_st->st_mode & S_IFMT) {
+      // If not equal, bring dest up-to-date
+      switch (src_st->st_mode & S_IFMT) {
         case S_IFREG:
-            {
-              // They don't point to the same data, link new data
-              const char *dest_data;
-              dest_data = dest->get_identifier(dest->context_, src_st);
-//              const char *src_data;
-//              src_data  = src->get_identifier(src->context_, src_st);
-
-              if (!dest->touch(dest->context_, src_st)) {
-                if (!copy_file(src, src_entry, dest,
-                               dest_data, parallel, pstats)) {
-                  LogCvmfs(kLogCvmfs, kLogStderr,
-                  "Traversal failed to copy %s->%s", src_entry, dest_data);
-                  return false;
-                }
-              }
-
-              // Should probably happen in the copy function as it is parallel
-              // Also this needs to be separate from copy_file, the target file
-              // could already exist and the link needs to be created anyway.
-              if (dest->do_link(dest->context_, src_entry, dest_data) != 0) {
-                LogCvmfs(kLogCvmfs, kLogStderr,
-                "Traversal failed to link %s->%s", src_entry, dest_data);
-                return false;
-              }
-              pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
-            }
+          if (!handle_file(src, src_st, dest, dest_st, src_entry, pstats))
+            return false;
           break;
         case S_IFDIR:
-          if (dest->do_mkdir(dest->context_, src_entry, src_st) != 0) {
-            LogCvmfs(kLogCvmfs, kLogStderr,
-            "Traversal failed to mkdir %s", src_entry);
+          if (!handle_dir(src, src_st, dest, dest_st, src_entry))
             return false;
-          }
-          pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
-          if (recursive) {
-            if (!Sync(src_entry, src, dest, parallel, recursive, pstats)) {
-              return false;
-            }
-          }
+          if (recursive)
+            add_dir_for_sync(src_entry, recursive);
           break;
         case S_IFLNK:
-          // Should be same as IFREG? Does link create the file?
+          // Should likely copy the source of the symlink target
           if (dest->do_symlink(dest->context_, src_entry,
-                           src_st->cvm_symlink, src_st) != 0) {
+                               src_st->cvm_symlink, src_st) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
-            "Traversal failed to symlink %s->%s",
-            src_entry, src_st->cvm_symlink);
+              "Traversal failed to symlink %s->%s : %d : %s",
+              src_entry, src_st->cvm_symlink, errno, strerror(errno));
             return false;
           }
-          pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
           break;
         default:
           LogCvmfs(kLogCvmfs, kLogStderr,
-          "Unknown file type for %s : %d",
-          src_entry, src_st->st_mode);
+            "Unknown file type for %s : %d", src_entry, src_st->st_mode);
           return false;
-          break;
       }
-      getNext(src, dir, src_dir, &src_entry, &src_iter,
-              &src_st, true, true, pstats);
     /* Dest contains something missing from Src */
-    } else if (cmp > 0) {
+    } else {
       switch (dest_st->st_mode & S_IFMT) {
         case S_IFREG:
         case S_IFLNK:
           if (dest->do_unlink(dest->context_, dest_entry) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
-            "Failed to unlink file %s", dest_entry);
+              "Failed to unlink file %s", dest_entry);
             return false;
           }
           break;
         case S_IFDIR:
           // We may want this to be recursive regardless
           if (recursive) {
-            if (!Sync(dest_entry, src, dest, parallel, recursive, pstats)) {
-              return false;
-            }
+            add_dir_for_sync(src_entry, recursive);
           }
           if (dest->do_rmdir(dest->context_, dest_entry) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
-            "Failed to remove directory %s", dest_entry);
+              "Failed to remove directory %s", dest_entry);
             return false;
           }
           break;
         default:
           // Unknown file type, should print error (what stream? log?)
           LogCvmfs(kLogCvmfs, kLogStderr,
-          "Unknown file type for %s : %d",
-          dest_entry, dest_st->st_mode);
+            "Unknown file type for %s : %d", dest_entry, dest_st->st_mode);
           return false;
-          break;
       }
-      getNext(dest, dir, dest_dir, &dest_entry, &dest_iter,
-              &dest_st, false, false, pstats);
     }
   }
+
+  cvmfs_list_free(src_dir);
+  free(src_entry);
+  if (src_st)
+    cvmfs_attr_free(src_st);
+
+  cvmfs_list_free(dest_dir);
+  free(dest_entry);
+  if (dest_st)
+    cvmfs_attr_free(dest_st);
+
   return true;
 }
 
-bool copyFile(
-  struct fs_traversal *src_fs,
-  const char *src_name,
-  struct fs_traversal *dest_fs,
-  const char *dest_name,
+bool SyncFull(
+  struct fs_traversal *src,
+  struct fs_traversal *dest,
   perf::Statistics *pstats
 ) {
-  int retval;
-
-  void *src  = src_fs->get_handle(src_fs->context_, src_name);
-  void *dest = dest_fs->get_handle(dest_fs->context_, dest_name);
-
-  retval = src_fs->do_fopen(src, fs_open_read);
-  if (retval != 0) {
-    // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr,
-    "Failed open src : %s : %d : %s\n",
-    src_name, errno, strerror(errno));
-    return false;
-  }
-
-  retval = dest_fs->do_fopen(dest, fs_open_write);
-  if (retval != 0) {
-    // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr,
-    "Failed open dest : %s : %d : %s\n",
-    dest_name, errno, strerror(errno));
-    return false;
-  }
-  size_t bytes_transferred = 0;
-  while (1) {
-    char buffer[COPY_BUFFER_SIZE];
-
-    size_t actual_read = 0;
-    retval = src_fs->do_fread(src, buffer, sizeof(buffer), &actual_read);
-    if (retval != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-      "Read failed : %d %s\n", errno, strerror(errno));
-      return false;
-    }
-    bytes_transferred+=actual_read;
-    retval = dest_fs->do_fwrite(dest, buffer, actual_read);
-    if (retval != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-      "Write failed : %d %s\n", errno, strerror(errno));
-      return false;
-    }
-
-    if (actual_read < COPY_BUFFER_SIZE) {
+  while (!dirs.empty()) {
+    RecDir *next_dir = dirs.back();
+    dirs.pop_back();
+    if (next_dir->IsTerminateJob())
       break;
+
+    if (!Sync(next_dir->dir, src, dest, next_dir->recursive, pstats)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "File %s failed to copy\n", next_dir->dir);
+      return false;
     }
-  }
-  pstats->Lookup(SHRINKWRAP_STAT_BYTE_COUNT)->Xadd(bytes_transferred);
 
-  retval = src_fs->do_fclose(src);
-  if (retval != 0) {
-    // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr,
-    "Failed close src : %s : %d : %s\n",
-    src_name, errno, strerror(errno));
-    return false;
+    delete next_dir;
   }
-
-  retval = dest_fs->do_fclose(dest);
-  if (retval != 0) {
-    // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr,
-    "Failed close dest : %s : %d : %s\n",
-    dest_name, errno, strerror(errno));
-    return false;
-  }
-
   return true;
 }
 
@@ -563,32 +585,12 @@ static void *MainWorker(void *data) {
     }
     files_transferred->Inc();
 
+    free(next_copy.src);
+    free(next_copy.dest);
+
     atomic_dec64(&copy_queue);
   }
   return NULL;
-}
-
-bool copy_file(
-  struct fs_traversal *src_fs,
-  const char *src_data,
-  struct fs_traversal *dest_fs,
-  const char *dest_data,
-  int parallel,
-  perf::Statistics *pstats
-) {
-  if (parallel) {
-    FileCopy next_copy(strdup(src_data), strdup(dest_data));
-    WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
-    atomic_inc64(&copy_queue);
-  } else {
-    if (!copyFile(src_fs, src_data, dest_fs, dest_data, pstats)) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-      "File %s failed to copy\n\n", src_data);
-      return false;
-    }
-    pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT)->Inc();
-  }
-  return true;
 }
 
 perf::Statistics *GetSyncStatTemplate() {
@@ -778,7 +780,6 @@ int Main(int argc, char **argv) {
     // Start Workers
     MakePipe(pipe_chunks);
     LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
-    MainWorkerContext *mwc = new MainWorkerContext();
     mwc->src_fs = src;
     mwc->dest_fs = dest;
     mwc->pstats = pstats;
@@ -802,10 +803,8 @@ int Main(int argc, char **argv) {
     spec_tree_ = SpecTree::Create(spec_file);
   }
 
-  char *entry_point = strdup(base);
-  int result =
-    !Sync(entry_point, src, dest, num_parallel, recursive, pstats);
-  free(entry_point);
+  add_dir_for_sync(base, recursive);
+  int result = !SyncFull(src, dest, pstats);
 
   while (atomic_read64(&copy_queue) != 0) {
     SafeSleepMs(100);
@@ -844,6 +843,23 @@ int Main(int argc, char **argv) {
         (end_time-start_time));
   }
   dest->finalize(dest->context_);
+
+  delete src;
+  delete dest;
+  free(repo);
+
+  free(src_base);
+  free(src_cache);
+  free(src_type);
+  free(src_config);
+
+  free(dest_base);
+  free(dest_cache);
+  free(dest_type);
+  free(dest_config);
+
+  free(base);
+  free(spec_file);
 
   return result;
 }
