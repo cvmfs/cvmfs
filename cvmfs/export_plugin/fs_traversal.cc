@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include <fstream>
+#include <map>
 #include <vector>
 
 #include "atomic.h"
@@ -47,6 +48,45 @@ int strcmp_list(const void* a, const void* b)
 namespace shrinkwrap {
 
 namespace {
+
+/**
+ * Class which locks file writing permissions based on inode numbers
+ * While this is not necessary for the standard Sync execution (since touch
+ * is supposed to be atomic), it is necessary for the Sync operation
+ * with do_fsck=true to obtain decisions on which thread rewrites modified files.
+ */
+class FsckLock {
+ public:
+  FsckLock() {
+    int res = pthread_mutex_init(&hash_map_lock_, NULL);
+    assert(res == 0);
+  }
+  ~FsckLock() {
+    pthread_mutex_destroy(&hash_map_lock_);
+  }
+  FsckLock(const FsckLock &other) {
+    int res = pthread_mutex_init(&hash_map_lock_, NULL);
+    assert(res == 0);
+    locks_ = other.locks_;
+  }
+  bool AddLock(ino_t inode) {
+    bool result = false;
+    pthread_mutex_lock(&hash_map_lock_);
+    if (locks_.count(inode) == 0) {
+      locks_[inode] = true;
+      result = true;
+    }
+    pthread_mutex_unlock(&hash_map_lock_);
+    return result;
+  }
+
+ private:
+  FsckLock & operator=(const FsckLock &other) {
+    assert(false);
+  }
+  pthread_mutex_t hash_map_lock_;
+  std::map<ino_t, bool> locks_;
+};
 
 class FileCopy {
  public:
@@ -103,6 +143,8 @@ unsigned             retries_ = 0;
 
 SpecTree             *spec_tree_ = new SpecTree('*');
 
+FsckLock             *fsck_lock = new FsckLock();
+
 }  // namespace
 
 struct fs_traversal* FindInterface(const char * type)
@@ -137,7 +179,13 @@ bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
 
   // CVMFS related content
   if (S_ISREG(src->st_mode) && src->cvm_checksum) {
-    if (!dest_fs->is_hash_consistent(dest_fs->context_, src)) { return false; }
+    if (dest->cvm_checksum != NULL) {
+      if (strcmp(src->cvm_checksum, dest->cvm_checksum)) {
+          return false;
+      }
+    } else if (!dest_fs->is_hash_consistent(dest_fs->context_, src)) {
+      return false;
+    }
   }
 
   if (S_ISLNK(src->st_mode)) {
@@ -314,6 +362,23 @@ void list_src_dir(
   }
 }
 
+/**
+ * This method checks whether a file has been manually modified by the source
+ * system and therefore needs to be rewritten (based on is_hash_consistent)
+ * 
+ * This method will return true exactly once for each inode and can therefore
+ * be used as an atomic locking procedure for file writing decisions.
+ */
+bool should_write_anyway(struct fs_traversal *dest,
+  struct cvmfs_attr *src_st,
+  struct cvmfs_attr *dest_st) {
+  if (!dest->is_hash_consistent(dest->context_, dest_st)
+    && fsck_lock->AddLock(dest_st->st_ino)) {
+    return true;
+  }
+  return false;
+}
+
 bool handle_file(
   struct fs_traversal *src,
   struct cvmfs_attr *src_st,
@@ -327,19 +392,24 @@ bool handle_file(
   char *dest_data = dest->get_identifier(dest->context_, src_st);
 
   // Touch is atomic, if it fails something else will write file
-  if (!dest->touch(dest->context_, src_st)) {
-    if (num_parallel_) {
-      FileCopy next_copy(strdup(entry), strdup(dest_data));
+  if (!dest->touch(dest->context_, src_st)
+    || (dest_st->cvm_checksum != NULL
+      && should_write_anyway(dest, src_st, dest_st)) ) {
+    char *src_ident = src->get_identifier(dest->context_, src_st);
+    if (num_parallel) {
+      FileCopy next_copy(src_ident, strdup(dest_data));
       WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
       atomic_inc64(&copy_queue);
     } else {
-      if (!copyFile(src, entry, dest, dest_data, pstats)) {
+      if (!copyFile(src, src_ident, dest, dest_data, pstats)) {
+        free(src_ident);
         LogCvmfs(kLogCvmfs, kLogStderr,
           "Failed to copy %s->%s : %d : %s",
           entry, dest_data, errno, strerror(errno));
         errno = 0;
         result = false;
       }
+      free(src_ident);
       pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT)->Inc();
     }
   } else {
@@ -395,8 +465,8 @@ bool Sync(
   struct fs_traversal *src,
   struct fs_traversal *dest,
   bool recursive,
-  perf::Statistics *pstats
-) {
+  perf::Statistics *pstats,
+  bool do_fsck) {
   int cmp = 0;
 
   char **src_dir = NULL;
@@ -423,7 +493,7 @@ bool Sync(
 
     if (cmp >= 0) {
       getNext(dest, dir, dest_dir, &dest_entry, &dest_iter,
-              &dest_st, false, false, pstats);
+              &dest_st, do_fsck, false, pstats);
     } else {
       // A destination entry was added
       pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
@@ -442,7 +512,11 @@ bool Sync(
 
     if (cmp <= 0) {
       // Compares stats to see if they are equivalent
-      if (cmp == 0 && cvmfs_attr_cmp(src_st, dest_st, dest)) {
+      if (cmp == 0 && cvmfs_attr_cmp(src_st, dest_st, dest)
+        // Also check internal hardlink consistency in destination file system
+        // where applicable:
+        && (dest_st->cvm_checksum == NULL
+          || dest->is_hash_consistent(dest->context_, dest_st))) {
         if (S_ISDIR(src_st->st_mode) && recursive) {
           add_dir_for_sync(src_entry, recursive);
         }
@@ -487,10 +561,7 @@ bool Sync(
           }
           break;
         case S_IFDIR:
-          // We may want this to be recursive regardless
-          if (recursive) {
-            add_dir_for_sync(src_entry, recursive);
-          }
+          Sync(dest_entry, src, dest, true, pstats, false);
           if (dest->do_rmdir(dest->context_, dest_entry) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
               "Failed to remove directory %s", dest_entry);
@@ -522,15 +593,19 @@ bool Sync(
 bool SyncFull(
   struct fs_traversal *src,
   struct fs_traversal *dest,
-  perf::Statistics *pstats
+  perf::Statistics *pstats,
+  bool do_fsck
 ) {
-  while (!dirs_.empty()) {
-    RecDir *next_dir = dirs_.back();
-    dirs_.pop_back();
+  if (dirs.empty()) {
+    dirs.push_back(new RecDir(strdup(""), true));
+  }
+  while (!dirs.empty()) {
+    RecDir *next_dir = dirs.back();
+    dirs.pop_back();
     if (next_dir->IsTerminateJob())
       break;
 
-    if (!Sync(next_dir->dir, src, dest, next_dir->recursive, pstats)) {
+    if (!Sync(next_dir->dir, src, dest, next_dir->recursive, pstats, do_fsck)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
         "File %s failed to copy\n", next_dir->dir);
       return false;
@@ -580,7 +655,6 @@ static void *MainWorker(void *data) {
     if (!next_copy.src || !next_copy.dest) {
       continue;
     }
-
     if (!copyFile(mwc->src_fs, next_copy.src, mwc->dest_fs,
                   next_copy.dest, mwc->pstats)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
@@ -669,7 +743,8 @@ int SyncInit(
   }
 
   add_dir_for_sync(base, recursive);
-  int result = !SyncFull(src, dest, pstats);
+  // TODO(steuber): Make fsck configurable
+  int result = !SyncFull(src, dest, pstats, false);
 
   while (atomic_read64(&copy_queue) != 0) {
     SafeSleepMs(100);

@@ -169,6 +169,15 @@ int posix_cleanup_path(struct fs_traversal_context *ctx,
     if (res != 0) return -1;
   }
   if (DirectoryExists(complete_path)) {
+    struct dirent *de;
+    DIR *dr = opendir(complete_path.c_str());
+    while ((de = readdir(dr)) != NULL) {
+      if (strcmp(de->d_name, ".") != 0
+        && strcmp(de->d_name, "..") != 0) {
+        std::string cur_path = complete_path + "/" + de->d_name;
+        posix_cleanup_path(ctx, cur_path.c_str());
+      }
+    }
     int res = posix_do_rmdir(ctx, path);
     if (res != 0) return -1;
   }
@@ -228,7 +237,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   stat_result->mtime = buf.st_mtime;
 
   // Calculate hash
-  if (get_hash) {
+  if (get_hash && S_ISREG(buf.st_mode)) {
     shash::Any cvm_checksum = shash::Any(shash::kSha1);
     shash::HashFile(complete_path, &cvm_checksum);
     std::string checksum_string = cvm_checksum.ToString();
