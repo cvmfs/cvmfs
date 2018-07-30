@@ -104,6 +104,16 @@ create_whitelist() {
   echo -n $hash > ${whitelist}.hash
   if [ $usemasterkeycard -eq 1 ]; then
     masterkeycard_sign ${whitelist}.hash ${whitelist}.signature
+    # verify the signature because it is not 100% reliable
+    local pubkey=/etc/cvmfs/keys/${name}.pub
+    if [ -f $pubkey ]; then
+      cp $pubkey ${whitelist}.pub
+    else
+      masterkeycard_read_pubkey >${whitelist}.pub
+    fi
+    local checkhash="`openssl rsautl -verify -inkey ${whitelist}.pub -pubin -in ${whitelist}.signature 2>/dev/null`"
+    rm -f ${whitelist}.pub
+    [ "$hash" = "$checkhash" ] || die "invalid masterkeycard signature"
   else
     openssl rsautl -inkey $masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
   fi
