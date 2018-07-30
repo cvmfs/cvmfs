@@ -395,14 +395,13 @@ bool handle_file(
   if (!dest->touch(dest->context_, src_st)
     || (dest_st->cvm_checksum != NULL
       && should_write_anyway(dest, src_st, dest_st)) ) {
-    char *src_ident = src->get_identifier(dest->context_, src_st);
-    if (num_parallel) {
+    char *src_ident = src->get_identifier(src->context_, src_st);
+    if (num_parallel_) {
       FileCopy next_copy(src_ident, strdup(dest_data));
       WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
       atomic_inc64(&copy_queue);
     } else {
       if (!copyFile(src, src_ident, dest, dest_data, pstats)) {
-        free(src_ident);
         LogCvmfs(kLogCvmfs, kLogStderr,
           "Failed to copy %s->%s : %d : %s",
           entry, dest_data, errno, strerror(errno));

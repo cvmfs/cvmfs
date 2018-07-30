@@ -1,15 +1,16 @@
 cvmfs_test_name="shrinkwrap"
 
+. ./test_functions
+
 cleanup() {
     sudo rm -f /tmp/cvmfs-$repo.trace.log 2> /dev/null
     sudo rm -f /tmp/cvmfs-$repo.spec.txt  2> /dev/null
-    sudo rm -f /tmp/posix_dir  2> /dev/null
-    sudo rm -f /tmp/posix_data  2> /dev/null
+    sudo rm -f /tmp/cvmfs  2> /dev/null
 }
 
 cvmfs_run_test() {
     logfile=$1
-    local repo="test.cern.ch"
+    local repo="sft.cern.ch"
     echo "*** Setup..."
     cleanup
     trap cleanup HUP EXIT TERM INT || return 4
@@ -28,15 +29,54 @@ cvmfs_run_test() {
 
     echo "*** Executing a few operations to check tracing..."
 
-    ls /cvmfs/$repo/
-    cat /cvmfs/$repo/test.txt
-    df -P /cvmfs/$repo/test.txt
+    . /cvmfs/sft.cern.ch/lcg/releases/gcc/7.1.0/x86_64-centos7/setup.sh
+    . /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.10.04-4c60e/x86_64-centos7-gcc7-opt/ROOT-env.sh
+    . /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.10.04-4c60e/x86_64-centos7-gcc7-opt/bin/thisroot.sh
+
+    root -h
 
     sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
 
-    sudo python $TEST_ROOT/../python/spec_builder.py /tmp/cvmfs-$repo.trace.log /tmp/cvmfs-$repo.spec.txt
+    echo "*** Creating specification file..."
 
-    sudo cvmfs_shrinkwrap -r $repo -f $TEST_ROOT//$repo.config -t /tmp/cvmfs-$repo.spec.txt -x /tmp/cvmfs/
+    sudo python $TEST_ROOT/../add-ons/export_plugin/spec_builder.py /tmp/cvmfs-$repo.trace.log /tmp/cvmfs-$repo.spec.txt
+
+    echo "*** Creating shrinkwrapped repository..."
+
+    sudo cvmfs_shrinkwrap -r $repo -f $TEST_ROOT/src/081-shrinkwrap/$repo.config -t /tmp/cvmfs-$repo.spec.txt
+
+    if [[ $? != 0 ]]; then
+      echo "*** ERROR: failed to create shrinkwrapped repository : " $?
+      return 3
+    fi
+
+    echo "*** Unmount CMVFS and remount recreated repo..."
+
+    sudo service autofs stop
+
+    sleep 5
+
+    cvmfs_umount $repo
+
+    sleep 5
+    sudo mkdir -p /cvmfs
+    sudo mount --bind /tmp/cvmfs /cvmfs
+
+    sleep 5
+
+    echo "*** Try same steps as before used to create specification..."
+
+    . /cvmfs/sft.cern.ch/lcg/releases/gcc/7.1.0/x86_64-centos7/setup.sh
+    . /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.10.04-4c60e/x86_64-centos7-gcc7-opt/ROOT-env.sh
+    . /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.10.04-4c60e/x86_64-centos7-gcc7-opt/bin/thisroot.sh
+
+    root -h
+
+    echo "*** Unmount and clean repo..."
+
+    sleep 5
+
+    sudo umount /cvmfs
 
     return 0
 }
