@@ -685,66 +685,6 @@ DirSpec MakeSpec() {
   return spec;
 }
 
-TEST(T_Fs_Traversal_CVMFS, TransferCVMFSToPosix) {
-  // Initialize options
-  cvmfs_option_map *opts = cvmfs_options_init();
-
-  // Create and initialize repository named "stat"
-  CatalogTestTool tester("TransferCVMFSToPosix");
-  EXPECT_TRUE(tester.Init());
-
-  // Create file structure
-  DirSpec spec1 = MakeSpec();
-  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
-
-  // Find directory entry for use later
-  catalog::DirectoryEntry entry;
-  EXPECT_TRUE(
-    tester.FindEntry(tester.manifest()->catalog_hash(), "/dir/file1", &entry));
-
-  // Set CVMFS options to reflect created repository
-  cvmfs_options_set(opts, "CVMFS_ROOT_HASH",
-                        tester.manifest()->catalog_hash().ToString().c_str());
-  cvmfs_options_set(opts, "CVMFS_SERVER_URL",
-                        ("file://" + tester.repo_name()).c_str());
-  cvmfs_options_set(opts, "CVMFS_HTTP_PROXY", "DIRECT");
-  cvmfs_options_set(opts, "CVMFS_PUBLIC_KEY",
-                        tester.public_key().c_str());
-  cvmfs_options_set(opts, "CVMFS_CACHE_DIR",
-                        (tester.repo_name()+"/data/txn").c_str());
-  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR",
-                        ("/cvmfs" + tester.repo_name()).c_str());
-
-  // Initialize client repo based on options
-  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
-
-  // Attach to client repo
-  cvmfs_context *ctx;
-  EXPECT_EQ(LIBCVMFS_ERR_OK,
-    cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
-
-  struct fs_traversal *src = libcvmfs_get_interface();
-  struct fs_traversal_context *context;
-  context = src->initialize(tester.repo_name().c_str(), NULL, NULL, 4, NULL);
-  context->ctx = ctx;
-  src->context_ = context;
-
-  mkdir("posix", 0770);
-  struct fs_traversal *dest = posix_get_interface();
-  context = dest->initialize("./", "posix", "posix_data", 4, NULL);
-  dest->context_ = context;
-
-  perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
-
-  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, true, statistics));
-
-  src->finalize(src->context_);
-  dest->finalize(dest->context_);
-
-  // Finalize and close repo and options
-  cvmfs_options_fini(opts);
-}
-
 TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
   struct fs_traversal *dest = posix_get_interface();
   struct fs_traversal_context *context

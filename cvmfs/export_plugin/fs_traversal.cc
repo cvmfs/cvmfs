@@ -88,7 +88,7 @@ class RecDir {
   bool recursive;
 };
 
-unsigned             num_parallel = 0;
+unsigned             num_parallel_ = 0;
 bool                 recursive = true;
 int                  pipe_chunks[2];
 // required for concurrent reading
@@ -97,9 +97,9 @@ atomic_int64         overall_copies;
 atomic_int64         overall_new;
 atomic_int64         copy_queue;
 
-vector<RecDir*>       dirs;
+vector<RecDir*>      dirs_;
 
-unsigned             retries = 1;
+unsigned             retries_ = 0;
 
 SpecTree             *spec_tree_ = new SpecTree('*');
 
@@ -328,7 +328,7 @@ bool handle_file(
 
   // Touch is atomic, if it fails something else will write file
   if (!dest->touch(dest->context_, src_st)) {
-    if (num_parallel) {
+    if (num_parallel_) {
       FileCopy next_copy(strdup(entry), strdup(dest_data));
       WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
       atomic_inc64(&copy_queue);
@@ -387,7 +387,7 @@ bool handle_dir(
 }
 
 void add_dir_for_sync(const char *dir, bool recursive) {
-  dirs.push_back(new RecDir(strdup(dir), recursive));
+  dirs_.push_back(new RecDir(strdup(dir), recursive));
 }
 
 bool Sync(
@@ -524,9 +524,9 @@ bool SyncFull(
   struct fs_traversal *dest,
   perf::Statistics *pstats
 ) {
-  while (!dirs.empty()) {
-    RecDir *next_dir = dirs.back();
-    dirs.pop_back();
+  while (!dirs_.empty()) {
+    RecDir *next_dir = dirs_.back();
+    dirs_.pop_back();
     if (next_dir->IsTerminateJob())
       break;
 
@@ -613,154 +613,16 @@ perf::Statistics *GetSyncStatTemplate() {
   return result;
 }
 
-static void Usage() {
-  LogCvmfs(kLogCvmfs, kLogStdout,
-       "CernVM File System Shrinkwrapper, version %s\n\n"
-       "This tool takes a cvmfs cache directory and  outputs\n"
-       "to a destination files system for export.\n"
-       "Usage: cvmfs_shrinkwrap "
-       "[-s][-r][-c][-f][-d][-x][-y][-z][-t|b][-j #threads]\n"
-        "Options:\n"
-        "  -s Source Filesystem type [default:cvmfs]\n"
-        "  -r Source repo\n"
-        "  -c Source cache\n"
-        "  -f Source config\n"
-        "  -d Dest type\n"
-        "  -x Dest repo\n"
-        "  -y Dest cache\n"
-        "  -z Dest config\n"
-        "  -t Trace file to be replicated to destination\n"
-        "  -b Base directory to be copied\n"
-        "  -r Number of retries on copying file [default:0]\n"
-        "  -j number of concurrent integrity check worker threads\n",
-        "  -g Perform garbage collection on destination\n"
-           VERSION);
-}
-
-
-int Main(int argc, char **argv) {
-  // The starting location for the traversal in src
-  // Default value is the base directory (only used if not trace provided)
-  char *repo = NULL;
-
-  char *src_base = NULL;
-  char *src_cache = NULL;
-  char *src_type = NULL;
-  char *src_config = NULL;
-
-  char *dest_base = NULL;
-  char *dest_cache = NULL;
-  char *dest_type = NULL;
-  char *dest_config = NULL;
-
-  char *base = NULL;
-  char *spec_file = NULL;
-
-  bool garbage_collection = false;
-
-  int c;
-  while ((c = getopt(argc, argv, "hp:b:s:r:c:f:d:x:y:t:j:n:g")) != -1) {
-    switch (c) {
-      case 'h':
-        shrinkwrap::Usage();
-        return kErrorOk;
-      case 'p':
-        base = strdup(optarg);
-        if (spec_file) {
-          LogCvmfs(kLogCvmfs, kLogStdout,
-                   "Only allowed to specify either base dir or trace file");
-          return kErrorUsage;
-        }
-        break;
-      case 'r':
-        repo = strdup(optarg);
-        break;
-      case 's':
-        src_type = strdup(optarg);
-        break;
-      case 'b':
-        src_base = strdup(optarg);
-        break;
-      case 'c':
-        src_cache = strdup(optarg);
-        break;
-      case 'f':
-        src_config = strdup(optarg);
-        break;
-      case 'd':
-        dest_type = strdup(optarg);
-        break;
-      case 'x':
-        dest_base = strdup(optarg);
-        break;
-      case 'y':
-        dest_cache = strdup(optarg);
-        break;
-      case 'z':
-        dest_config = strdup(optarg);
-        break;
-      case 't':
-        spec_file = strdup(optarg);
-        if (base) {
-          LogCvmfs(kLogCvmfs, kLogStdout,
-                   "Only allowed to specify either base dir or trace file");
-          return kErrorUsage;
-        }
-        break;
-      case 'j':
-        num_parallel = atoi(optarg);
-        if (num_parallel < 1) {
-          LogCvmfs(kLogCvmfs, kLogStdout,
-                   "There is at least one worker thread required");
-          return kErrorUsage;
-        }
-        break;
-      case 'n':
-        retries = atoi(optarg);
-        break;
-      case 'g':
-        garbage_collection = true;
-        break;
-      case '?':
-      default:
-        shrinkwrap::Usage();
-        return kErrorUsage;
-    }
-  }
-
-  if (!src_type) {
-    src_type = strdup("cvmfs");
-  }
-
-  if (!dest_type) {
-    dest_type = strdup("posix");
-  }
-
-  struct fs_traversal *src = FindInterface(src_type);
-  if (!src) {
-    return 1;
-  }
-  src->context_ = src->initialize(repo, src_base, src_cache,
-    num_parallel, src_config);
-  if (!src->context_) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-      "Unable to initialize src: type %s", src_type);
-    return 1;
-  }
-
-  struct fs_traversal *dest = FindInterface(dest_type);
-  if (!dest) {
-    return 1;
-  }
-  dest->context_ = dest->initialize(repo, dest_base, dest_cache,
-    num_parallel, dest_config);
-  if (!dest->context_) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-      "Unable to initialize src: type %s", dest_type);
-    return 1;
-  }
-
-  dest->archive_provenance(src->context_, dest->context_);
+int SyncInit(
+  struct fs_traversal *src,
+  struct fs_traversal *dest,
+  const char *base,
+  const char *spec,
+  unsigned parallel,
+  unsigned retries
+) {
+  num_parallel_ = parallel;
+  retries_ = retries;
 
   perf::Statistics *pstats = GetSyncStatTemplate();
 
@@ -775,24 +637,24 @@ int Main(int argc, char **argv) {
 
   MainWorkerContext *mwc = NULL;
 
-  if (num_parallel > 0) {
+  if (num_parallel_ > 0) {
     workers =
-    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
+    reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel_));
 
     specificWorkerContexts =
       reinterpret_cast<struct MainWorkerSpecificContext *>(
-        smalloc(sizeof(struct MainWorkerSpecificContext) * num_parallel));
+        smalloc(sizeof(struct MainWorkerSpecificContext) * num_parallel_));
 
     mwc = new struct MainWorkerContext;
     // Start Workers
     MakePipe(pipe_chunks);
-    LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel);
+    LogCvmfs(kLogCvmfs, kLogStdout, "Starting %u workers", num_parallel_);
     mwc->src_fs = src;
     mwc->dest_fs = dest;
     mwc->pstats = pstats;
-    mwc->parallel = num_parallel;
+    mwc->parallel = num_parallel_;
 
-    for (unsigned i = 0; i < num_parallel; ++i) {
+    for (unsigned i = 0; i < num_parallel_; ++i) {
       specificWorkerContexts[i].mwc = mwc;
       specificWorkerContexts[i].num_thread = i;
       int retval = pthread_create(&workers[i], NULL, MainWorker,
@@ -801,13 +663,9 @@ int Main(int argc, char **argv) {
     }
   }
 
-  if (!base) {
-    base = strdup("");
-  }
-
-  if (spec_file) {
+  if (spec) {
     delete spec_tree_;
-    spec_tree_ = SpecTree::Create(spec_file);
+    spec_tree_ = SpecTree::Create(spec);
   }
 
   add_dir_for_sync(base, recursive);
@@ -818,13 +676,13 @@ int Main(int argc, char **argv) {
   }
 
 
-  if (num_parallel > 0) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);
-    for (unsigned i = 0; i < num_parallel; ++i) {
+  if (num_parallel_ > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel_);
+    for (unsigned i = 0; i < num_parallel_; ++i) {
       FileCopy terminate_workers;
       WritePipe(pipe_chunks[1], &terminate_workers, sizeof(terminate_workers));
     }
-    for (unsigned i = 0; i < num_parallel; ++i) {
+    for (unsigned i = 0; i < num_parallel_; ++i) {
       int retval = pthread_join(workers[i], NULL);
       assert(retval == 0);
     }
@@ -838,37 +696,21 @@ int Main(int argc, char **argv) {
         pstats->PrintList(perf::Statistics::kPrintHeader).c_str());
   delete pstats;
 
-  src->finalize(src->context_);
-  if (garbage_collection) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-      "Performing garbage collection...");
-    time_t start_time = time(NULL);
-    dest->garbage_collector(dest->context_);
-    time_t end_time = time(NULL);
-    LogCvmfs(kLogCvmfs, kLogStdout,
-      "Garbage collection took %d seconds.",
-        (end_time-start_time));
-  }
-  dest->finalize(dest->context_);
-
-  delete src;
-  delete dest;
-  free(repo);
-
-  free(src_base);
-  free(src_cache);
-  free(src_type);
-  free(src_config);
-
-  free(dest_base);
-  free(dest_cache);
-  free(dest_type);
-  free(dest_config);
-
-  free(base);
-  free(spec_file);
+  delete spec_tree_;
 
   return result;
+}
+
+int GarbageCollect(struct fs_traversal *fs) {
+  LogCvmfs(kLogCvmfs, kLogStdout,
+    "Performing garbage collection...");
+  time_t start_time = time(NULL);
+  int retval = fs->garbage_collector(fs->context_);
+  time_t end_time = time(NULL);
+  LogCvmfs(kLogCvmfs, kLogStdout,
+    "Garbage collection took %d seconds.",
+  (end_time-start_time));
+  return retval;
 }
 
 }  // namespace shrinkwrap
