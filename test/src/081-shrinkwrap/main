@@ -36,9 +36,7 @@ cvmfs_run_test() {
 
     sudo python $TEST_ROOT/../python/spec_builder.py /tmp/cvmfs-$repo.trace.log /tmp/cvmfs-$repo.spec.txt
 
-    # sudo cvmfs_config showconfig -s $repo > /tmp/$repo.config
-
-    sudo cvmfs_shrinkwrap -r $repo -f /tmp/$repo.config -t /tmp/cvmfs-$repo.spec.txt -x /tmp/posix_dir  2> $logfile.dbg
+    sudo cvmfs_shrinkwrap -r $repo -f $TEST_ROOT//$repo.config -t /tmp/cvmfs-$repo.spec.txt -x /tmp/cvmfs/
 
     return 0
 }
