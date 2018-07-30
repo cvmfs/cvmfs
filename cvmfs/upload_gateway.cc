@@ -153,6 +153,7 @@ void GatewayUploader::FileUpload(const std::string& local_path,
     return;
   }
 
+  CountUploadedBytes(handle->bucket->size);
   Respond(callback, UploaderResults(0, local_path));
 }
 
@@ -200,6 +201,7 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     return;
   }
 
+  CountUploadedBytes(hd->bucket->size);
   Respond(handle->commit_callback,
           UploaderResults(UploaderResults::kChunkCommit, 0));
 }

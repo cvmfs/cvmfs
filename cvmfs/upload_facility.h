@@ -12,11 +12,24 @@
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "repository_tag.h"
+#include "statistics.h"
 #include "upload_spooler_definition.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
 
 namespace upload {
+
+struct UploadCounters {
+  perf::Counter *n_duplicated_files;
+  perf::Counter *sz_uploaded_bytes;
+
+  explicit UploadCounters(perf::StatisticsTemplate statistics) {
+    n_duplicated_files = statistics.RegisterTemplated("n_duplicated_files",
+        "Number of duplicated files added");
+    sz_uploaded_bytes = statistics.RegisterTemplated("sz_uploaded_bytes",
+        "Number of uploaded bytes");
+  }
+};  // UploadCounters
 
 struct UploaderResults {
   enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove };
@@ -268,6 +281,7 @@ class AbstractUploader
 
   virtual unsigned int GetNumberOfErrors() const = 0;
   static void RegisterPlugins();
+  void InitCounters(perf::StatisticsTemplate *statistics);
 
  protected:
   typedef Callbackable<UploaderResults>::CallbackTN *CallbackPtr;
@@ -345,12 +359,17 @@ class AbstractUploader
     return spooler_definition_;
   }
 
+  void CountUploadedBytes(int64_t bytes_written) const;
+
+  void CountDuplicates() const;
+
  private:
   const SpoolerDefinition spooler_definition_;
 
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
   Tube<UploadJob> tube_upload_;
+  mutable UniquePtr<UploadCounters> counters_;
 };  // class AbstractUploader
 
 
