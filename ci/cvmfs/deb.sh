@@ -50,10 +50,10 @@ echo "copy packaging meta information and get in place..."
 cp -r ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs ${copied_source}/debian
 cd $copied_source
 
-# On Ubuntu 18.04 Bionic, the insserv package is no longer available
-# It should be removed from the list of dependencies
+# On Ubuntu 18.04 Bionic, the insserv and initscripts packages are no longer
+# available. They should be removed from the list of dependencies
 if [ x"$(lsb_release -sc)" = x"bionic" ]; then
-  sed -i -e "s/insserv, //g" debian/control
+  sed -i -e "s/insserv, initscripts, //g" debian/control
 fi
 
 cpu_cores=$(get_number_of_cpu_cores)
