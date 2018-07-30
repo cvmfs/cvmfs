@@ -20,6 +20,18 @@
 
 namespace shrinkwrap {
 
+struct fs_traversal* FindInterface(const char * type);
+
+int SyncInit(struct fs_traversal *src,
+             struct fs_traversal *dest,
+             const char *base,
+             const char *spec,
+             unsigned parallel,
+             unsigned retries);
+
+int GarbageCollect(struct fs_traversal *fs);
+
+// Exported for testing purposes:
 bool Sync(const char *dir,
           struct fs_traversal *src,
           struct fs_traversal *dest,
@@ -28,8 +40,6 @@ bool Sync(const char *dir,
 
 // Exported for testing purposes:
 perf::Statistics *GetSyncStatTemplate();
-
-int Main(int argc, char **argv);
 
 }  // namespace shrinkwrap
 
