@@ -36,7 +36,14 @@ bool Sync(const char *dir,
           struct fs_traversal *src,
           struct fs_traversal *dest,
           bool recursive,
-          perf::Statistics *pstats);
+          perf::Statistics *pstats,
+          bool do_fsck);
+
+bool SyncFull(
+  struct fs_traversal *src,
+  struct fs_traversal *dest,
+  perf::Statistics *pstats,
+  bool do_fsck);
 
 // Exported for testing purposes:
 perf::Statistics *GetSyncStatTemplate();
