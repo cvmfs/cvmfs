@@ -784,7 +784,7 @@ acquire_update_lock()
   local update_lock=${CVMFS_SPOOL_DIR}/is_updating
 
   # check for other updates in progress
-  if ! acquire_lock $update_lock ignore_stale; then
+  if ! acquire_lock $update_lock; then
     if [ $abort_on_conflict -eq 1 ]; then
       echo "another update is in progress... aborting"
       to_syslog_for_repo $name "did not $update_type (another update in progress)"
