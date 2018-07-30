@@ -35,43 +35,6 @@ struct fs_traversal_test {
   const char *data;
 };
 
-XattrList *create_sample_xattrlist(std::string var) {
-  XattrList *result = new XattrList();
-  result->Set("user.foo", var);
-  result->Set("user.bar", std::string(255, 'a'));
-  return result;
-}
-struct cvmfs_attr *create_sample_stat(const char *name,
-  ino_t st_ino, mode_t st_mode, off_t st_size,
-  XattrList *xlist, shash::Any *content_hash = NULL,
-  const char *link = NULL) {
-  char *hash_result = NULL;
-  if (content_hash != NULL) {
-    std::string hash = content_hash->ToString();
-    hash_result = strdup(hash.c_str());
-  }
-  char *link_result = NULL;
-  if (link != NULL) {
-    link_result = strdup(link);
-  }
-  struct cvmfs_attr *result = cvmfs_attr_init();
-  result->st_ino = st_ino;
-  result->st_mode = st_mode;
-  result->st_nlink = 1;
-  result->st_uid = getuid();
-  result->st_gid = getgid();
-  result->st_size = st_size;
-  result->mtime = time(NULL);
-
-  result->cvm_checksum = hash_result;
-  result->cvm_symlink = link_result;
-  result->cvm_name = strdup(name);
-  result->cvm_parent = strdup("/");
-  result->cvm_xattrs = xlist;
-
-  return result;
-}
-
 class T_Fs_Traversal_Interface :
   public ::testing::TestWithParam<struct fs_traversal_test *> {
  protected:
@@ -135,7 +98,7 @@ class T_Fs_Traversal_Interface :
   void MakeTestFiles(std::string prefix,
     std::string *ident1, std::string *ident2) {
     // FILE CONTENT 1
-    std::string content1 = "";  // prefix + ": Hello world!\nHello traversal!";
+    std::string content1 = prefix + ": Hello world!\nHello traversal!";
     shash::Any content1_hash(shash::kSha1);
     shash::HashString(content1, &content1_hash);
 
@@ -152,7 +115,7 @@ class T_Fs_Traversal_Interface :
                  content1_hash.ToString().c_str());
 
     // FILE CONTENT 2
-    std::string content2 = "";  // prefix + ": Hello traversal!\nHello world!";
+    std::string content2 = prefix + ": Hello traversal!\nHello world!";
     shash::Any content2_hash(shash::kSha1);
     shash::HashString(content2, &content2_hash);
     // FILE META 1
@@ -179,9 +142,23 @@ class T_Fs_Traversal_Interface :
     ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
       context_,
       stat_values1));
+    void *hdl1 = fs_traversal_instance_->interface->get_handle(
+      context_, ident1->c_str());
+    fs_traversal_instance_->interface->do_fopen(hdl1, fs_open_write);
+    fs_traversal_instance_->interface->do_fwrite(hdl1, content1.c_str(),
+      content1.length());
+    fs_traversal_instance_->interface->do_fclose(hdl1);
+    fs_traversal_instance_->interface->do_ffree(hdl1);
     ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
       context_,
       stat_values2));
+    void *hdl2 = fs_traversal_instance_->interface->get_handle(
+      context_, ident2->c_str());
+    fs_traversal_instance_->interface->do_fopen(hdl2, fs_open_write);
+    fs_traversal_instance_->interface->do_fwrite(hdl2, content2.c_str(),
+      content2.length());
+    fs_traversal_instance_->interface->do_fclose(hdl2);
+    fs_traversal_instance_->interface->do_ffree(hdl2);
     // DIRECTORIES
     ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
       context_,
@@ -612,32 +589,83 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
   MakeTestFiles(prefix, &ident1, &ident2);
 
   std::string repoName = GetCurrentWorkingDirectory();
-  char *src_name  = strdup((repoName + string("/SRC-foo")).c_str());
-  char *src_data  = strdup((repoName + string("/.data")).c_str());
-  char *dest_name = strdup((repoName + string("/SRC-bar")).c_str());
-  char *dest_data = strdup((repoName + string("/DDATA")).c_str());
+  std::string src_name  = "/SRC-foo";
+  std::string dest_name = "/SRC-bar";
+  std::string dest_data = repoName+"/SRC-DDATA";
 
   struct fs_traversal *src = posix_get_interface();
   struct fs_traversal_context *context =
-    src->initialize(src_name, repoName.c_str(), src_data, 4, NULL);
+    src->initialize(
+      src_name.c_str(), repoName.c_str(), NULL, 4, NULL);
   src->context_ = context;
 
   struct fs_traversal *dest = posix_get_interface();
-  context = dest->initialize(src_name, repoName.c_str(), src_data, 4, NULL);
+  context = dest->initialize(
+    src_name.c_str(), repoName.c_str(), NULL, 4, NULL);
   dest->context_ = context;
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
 
-  ASSERT_TRUE(shrinkwrap::Sync("", src, dest, true, statistics));
+  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, false));
 
   dest->finalize(dest->context_);
-  context = dest->initialize(dest_name, repoName.c_str(), dest_data, 4, NULL);
+  context = dest->initialize(
+    dest_name.c_str(), repoName.c_str(), dest_data.c_str(), 4, NULL);
   dest->context_ = context;
 
-  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, true, statistics));
+  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, false));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
+}
+
+TEST_P(T_Fs_Traversal_Interface, FsckPosixToPosix) {
+  struct fs_traversal *src = posix_get_interface();
+  struct fs_traversal *dest = posix_get_interface();
+  perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
+  std::string ident1;
+  std::string ident2;
+  std::string prefix = "FsckPosixToPosix-SRC";
+  MakeTestFiles(prefix, &ident1, &ident2);
+
+  std::string repoName = GetCurrentWorkingDirectory();
+  std::string src_name  = "/FsckPosixToPosix-SRC-foo";
+  std::string dest_name = "/FsckPosixToPosix-SRC-bar";
+  std::string dest_data = repoName+"/FsckPosixToPosix-DDATA";
+
+  struct fs_traversal_context *context =
+    src->initialize(src_name.c_str(), repoName.c_str(),
+    NULL, 4, NULL);
+  src->context_ = context;
+  context = dest->initialize(dest_name.c_str(), repoName.c_str(),
+    dest_data.c_str(), 4, NULL);
+  dest->context_ = context;
+
+  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, true));
+  errno = 0;
+  std::string content1 = "Lorem Ipsum dolor sit amet.";
+  char buf[100];
+  size_t buf_len;
+  void *dest_hdl = dest->get_handle(dest->context_, ident1.c_str());
+  ASSERT_EQ(0, dest->do_fopen(dest_hdl, fs_open_write));
+  ASSERT_EQ(0, dest->do_fwrite(dest_hdl, content1.c_str(), content1.length()));
+  ASSERT_EQ(0, dest->do_fclose(dest_hdl));
+
+  ASSERT_EQ(0, dest->do_fopen(dest_hdl, fs_open_read));
+  ASSERT_EQ(0, dest->do_fread(dest_hdl, buf, 99, &buf_len));
+  buf[buf_len]='\0';
+  ASSERT_STREQ(content1.c_str(), buf);
+  ASSERT_EQ(0, dest->do_fclose(dest_hdl));
+  dest->do_ffree(dest_hdl);
+
+  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, true));
+  void *dest_hdl_new = dest->get_handle(dest->context_, ident1.c_str());
+  ASSERT_EQ(0, dest->do_fopen(dest_hdl_new, fs_open_read));
+  ASSERT_EQ(0, dest->do_fread(dest_hdl_new, buf, 99, &buf_len));
+  buf[buf_len]='\0';
+  ASSERT_EQ(51, buf_len);
+  // Actual content: FsckPosixToPosix-SRC: Hello world!\nHello traversal!
+  ASSERT_EQ(0, dest->do_fclose(dest_hdl_new));
 }
 
 // Create some default hashes for DirSpec
@@ -736,7 +764,7 @@ TEST(T_Fs_Traversal_CVMFS, TransferCVMFSToPosix) {
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
 
-  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, true, statistics));
+  EXPECT_TRUE(shrinkwrap::Sync("", src, dest, true, statistics, false));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
@@ -744,68 +772,6 @@ TEST(T_Fs_Traversal_CVMFS, TransferCVMFSToPosix) {
   // Finalize and close repo and options
   cvmfs_options_fini(opts);
 }
-
-TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
-  struct fs_traversal *dest = posix_get_interface();
-  struct fs_traversal_context *context
-    = dest->initialize("./", "posix", "./data", 4, NULL);
-
-  std::string content1 = "a";
-  shash::Any content1_hash(shash::kSha1);
-  shash::HashString(content1, &content1_hash);
-  std::string content2 = "b";
-  shash::Any content2_hash(shash::kSha1);
-  shash::HashString(content2, &content2_hash);
-  XattrList *xlist1 = create_sample_xattrlist("TestGarbageCollection1");
-  XattrList *xlist2 = create_sample_xattrlist("TestGarbageCollection2");
-  struct cvmfs_attr *stat1 = create_sample_stat("foo", 0, 0777, 0, xlist1,
-    &content1_hash);
-  struct cvmfs_attr *stat2 = create_sample_stat("foo", 0, 0777, 0, xlist1,
-    &content2_hash);
-  struct cvmfs_attr *stat3 = create_sample_stat("foo", 0, 0777, 0, xlist2,
-    &content1_hash);
-  struct cvmfs_attr *stat4 = create_sample_stat("foo", 0, 0777, 0, xlist2,
-    &content2_hash);
-
-  dest->touch(context, stat1);
-  const char *ident1 = dest->get_identifier(context, stat1);
-  dest->do_link(context, "file1.txt", ident1);
-  dest->touch(context, stat2);
-  const char *ident2 = dest->get_identifier(context, stat2);
-  dest->do_link(context, "file1.txt", ident2);  // unlinks ident1
-  dest->touch(context, stat3);
-  const char *ident3 = dest->get_identifier(context, stat3);
-  dest->do_link(context, "file3.txt", ident3);
-  dest->touch(context, stat4);
-  const char *ident4 = dest->get_identifier(context, stat4);
-  dest->do_link(context, "file4.txt", ident4);
-
-  dest->do_unlink(context, "file3.txt");
-
-  dest->finalize(context);
-  context = dest->initialize("./", "posix", "./data", 4, NULL);
-  dest->garbage_collector(context);
-
-  std::string data_base_path = "./data/";
-  ASSERT_STRNE(ident1, ident2);
-  ASSERT_STRNE(ident1, ident3);
-  ASSERT_STRNE(ident1, ident4);
-  ASSERT_STRNE(ident2, ident3);
-  ASSERT_STRNE(ident2, ident4);
-  ASSERT_STRNE(ident3, ident4);
-  ASSERT_FALSE(FileExists(data_base_path + ident1));
-  ASSERT_TRUE(FileExists(data_base_path + ident2));
-  ASSERT_FALSE(FileExists(data_base_path + ident3));
-  ASSERT_TRUE(FileExists(data_base_path + ident4));
-
-  delete stat1;
-  delete stat2;
-  delete stat3;
-  delete stat4;
-  delete xlist1;
-  delete xlist2;
-}
-
 
 struct fs_traversal_test posix = {
   posix_get_interface(),

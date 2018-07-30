@@ -107,8 +107,8 @@ struct fs_traversal {
                 const char *path, struct cvmfs_attr *stat, bool get_hash);
 
   /**
-   * Checks whether for a given stat the file at the stat's path name
-   * still corresponds to the stat defined checksums
+   * Checks whether for a given stat the file at the stat's path name is
+   * actually linked to the file described by the stat's checksum
    * 
    * If this method returns false it usually means the file is out of sync
    * and needs to be copied and linked

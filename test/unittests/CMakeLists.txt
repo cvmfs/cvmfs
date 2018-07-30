@@ -499,6 +499,7 @@ set (CVMFS_TEST_EXPORT_SOURCES
   ../common/catalog_test_tools.cc
 
   export_plugin/t_fs_traversal_interface.cc
+  export_plugin/t_fs_posix.cc
   export_plugin/t_spec_tree.cc
   export_plugin/test-util.cc
   
