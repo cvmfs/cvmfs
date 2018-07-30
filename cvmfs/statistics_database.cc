@@ -193,7 +193,7 @@ std::string StatisticsDatabase::GetDBPath(const std::string repo_name) {
 
   std::string statistics_db = "";
   if (!parser.GetValue("CVMFS_STATISTICS_DB", &statistics_db)) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+    LogCvmfs(kLogCvmfs, kLogSyslog,
              "Missing parameter %s in repository configuration file.",
              "CVMFS_STATISTICS_DB");
     return db_default_path;
