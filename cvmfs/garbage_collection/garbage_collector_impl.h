@@ -157,12 +157,13 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
   if (configuration_.dry_run) {
     return;
   }
-  std::string file_path = hash.MakePath();
-  printf("---------------- hash_file:%s\n", file_path.c_str());
-  // Change reponame
-  printf("---------------- size = %ld bytes\n",
-          GetFileSize("/srv/cvmfs/test.repo.org/data/" + file_path));
 
+  std::string absolute_path = "/srv/cvmfs/" + configuration_.repo_name +
+                              "/data/" + hash.MakePath();
+  printf("---------------- hash_file:%s\n", absolute_path.c_str());
+  printf("---------------- size = %ld bytes\n", GetFileSize(absolute_path));
+
+  condemned_bytes_ += GetFileSize(absolute_path);
   configuration_.uploader->RemoveAsync(hash);
 }
 
