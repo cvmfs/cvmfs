@@ -193,8 +193,8 @@ std::string StatisticsDatabase::GetDBPath(const std::string repo_name) {
 
   std::string statistics_db = "";
   if (!parser.GetValue("CVMFS_STATISTICS_DB", &statistics_db)) {
-    LogCvmfs(kLogCvmfs, kLogSyslog,
-             "Parameter %s was not set in repository configuration file. "
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "Parameter %s was not set in the repository configuration file. "
              "Using default value: %s",
              "CVMFS_STATISTICS_DB", db_default_path.c_str());
     return db_default_path;
