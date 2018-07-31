@@ -152,6 +152,7 @@ StatisticsDatabase::~StatisticsDatabase() {
 
 int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics) {
   sqlite::Sql insert(this->sqlite_db(), PrepareStatement(statistics));
+
   if (!this->BeginTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
     return -1;
