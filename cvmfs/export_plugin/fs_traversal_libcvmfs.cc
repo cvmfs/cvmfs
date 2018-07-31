@@ -35,7 +35,9 @@ int libcvmfs_get_stat(struct fs_traversal_context *ctx,
 
 char *libcvmfs_get_identifier(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat) {
-  char *res = strdup(stat->cvm_name);
+  int length = 2+strlen(stat->cvm_parent)+strlen(stat->cvm_name);
+  char* res = reinterpret_cast<char *>(malloc(length));
+  snprintf(res, length, "%s/%s", stat->cvm_parent, stat->cvm_name);
   return res;
 }
 

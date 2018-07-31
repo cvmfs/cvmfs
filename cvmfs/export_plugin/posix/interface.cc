@@ -357,7 +357,12 @@ int posix_do_link(struct fs_traversal_context *ctx,
   int res1 = link(hidden_datapath_char, complete_path.c_str());
   res1 |= utime(parent_path.c_str(), &mtimes_parent);
   res1 |= utime(hidden_datapath.c_str(), &mtimes_link);
-  if (res1 != 0) return -1;
+  if (res1 != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Failed to create link : %s->%s : %d : %s\n",
+      hidden_datapath_char, complete_path.c_str(), errno, strerror(errno));
+    return -1;
+  }
   if (S_ISREG(buf.st_mode) && buf.st_nlink == 2) {
     struct fs_traversal_posix_context *pos_ctx
       =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
