@@ -23,6 +23,13 @@ void AssertListHas(const char *query, char **dirList, size_t listLen,
   ASSERT_TRUE(hasNot) << "Could not find element " << query << " in list";
 }
 
+void FreeList(char **list, size_t len) {
+  for (size_t i = 0; i < len; i++) {
+    free(*(list+i));
+  }
+  free(list);
+}
+
 XattrList *create_sample_xattrlist(std::string var) {
   XattrList *result = new XattrList();
   result->Set("user.foo", var);
