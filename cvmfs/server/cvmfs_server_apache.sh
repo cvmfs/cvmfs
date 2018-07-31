@@ -31,7 +31,10 @@ reload_apache() {
   echo -n "Reloading Apache... "
   local verb=reload
   if [ "x$CVMFS_SERVER_APACHE_RELOAD_IS_RESTART" = "xtrue" ]; then
-    request_apache_service reset-failed > /dev/null 2>&1
+    # The reset-failed verb is only available with systemd
+    if is_systemd; then
+      request_apache_service reset-failed > /dev/null 2>&1
+    fi
     verb=restart
   fi
   request_apache_service $verb > /dev/null || die "fail"
