@@ -59,7 +59,7 @@ struct Stats {
   */
 std::string PrepareStatement(const perf::Statistics *statistics) {
   struct Stats stats = Stats(statistics);
-  std::string insert_statement =
+  std::string insert_into_publish_statistics =
     "INSERT INTO publish_statistics ("
     "timestamp,"
     "files_added,"
@@ -84,7 +84,21 @@ std::string PrepareStatement(const perf::Statistics *statistics) {
     stats.bytes_added + "," +
     stats.bytes_removed + "," +
     stats.bytes_uploaded + ");";
-  return insert_statement;
+  return insert_into_publish_statistics;
+}
+
+/**
+  * Build the insert statement for properties table
+  * with the repo_name
+  *
+  * @param repona_name
+  * @return the insert statement
+  */
+std::string PrepareStatement(const std::string repo_name) {
+  std::string insert_into_properties =
+      "INSERT INTO properties (key, value) VALUES ('repo_name', "
+      "'"+ repo_name +"');";
+  return insert_into_properties;
 }
 
 }  // namespace
@@ -146,6 +160,33 @@ bool StatisticsDatabase::CompactDatabase() const {
 
 StatisticsDatabase::~StatisticsDatabase() {
   --StatisticsDatabase::instances;
+}
+
+
+
+int StatisticsDatabase::InsertRepoName(const std::string repo_name) {
+  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(repo_name));
+  if (!this->BeginTransaction()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
+    return -1;
+  }
+
+  if (!insert.Execute()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
+    return -2;
+  }
+
+  if (!insert.Reset()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Reset() failed!");
+    return -3;
+  }
+
+  if (!this->CommitTransaction()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "CommitTransaction failed!");
+    return -4;
+  }
+
+  return 0;
 }
 
 
