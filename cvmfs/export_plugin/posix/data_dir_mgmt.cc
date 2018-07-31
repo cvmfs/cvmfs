@@ -10,14 +10,13 @@
 #include "helpers.h"
 #include "util/posix.h"
 
-void InitializeDataDirectory(struct fs_traversal_context *ctx) {
-  PosixCheckDirStructure(ctx->data, 0700);
-}
-
+/**
+ * Method which recursively creates the .data subdirectories
+ */
 void PosixCheckDirStructure(
   std::string cur_path,
   mode_t mode,
-  unsigned int depth/* = 1*/) {
+  unsigned int depth = 1) {
   std::string max_dir_name = std::string(kDigitsPerDirLevel, 'f');
   // Build current base path
   if (depth == 1) {
@@ -55,4 +54,9 @@ void PosixCheckDirStructure(
       PosixCheckDirStructure(cur_path+"/"+max_dir_name, mode, depth+1);
     }
   }
+}
+
+void InitializeDataDirectory(struct fs_traversal_context *ctx) {
+  // NOTE(steuber): Can we do this in parallel?
+  PosixCheckDirStructure(ctx->data, 0700);
 }
