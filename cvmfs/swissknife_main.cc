@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
       db = StatisticsDatabase::Create(db_file_path);
       // insert repo_name into properties table
       if (db.IsValid()) {
-        if(!db->SetProperty("repo_name", repo_name)) {
+        if (!db->SetProperty("repo_name", repo_name)) {
           LogCvmfs(kLogCvmfs, kLogSyslogErr,
               "Couldn't insert repo_name into properties table!");
         }
