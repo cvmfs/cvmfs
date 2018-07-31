@@ -83,7 +83,7 @@ class GarbageCollector {
     bool                       verbose;
     FILE                      *deleted_objects_logfile;
     perf::Statistics          *statistics;
-    std::string                     repo_name;
+    std::string                repo_name;
   };
 
  public:

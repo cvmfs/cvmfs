@@ -160,18 +160,14 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
 
   std::string file_name = hash.MakePath();
   char last_char = file_name[file_name.length() - 1];
-  if (last_char != 'C') {    // if is not a CATALOG file
+  if (last_char != 'C') {    // if is not a catalog file
     std::string absolute_path = "/srv/cvmfs/" + configuration_.repo_name +
                             "/data/" + file_name;
-    printf("---------------- hash_file:%s\n", absolute_path.c_str());
-    printf("---------------- size = %ld bytes\n", GetFileSize(absolute_path));
     int64_t deleted_bytes = GetFileSize(absolute_path);
     if (deleted_bytes > 0) {
       condemned_bytes_ += deleted_bytes;
     }
   }
-
-
   configuration_.uploader->RemoveAsync(hash);
 }
 
@@ -264,10 +260,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   }
 
   traversal_.UnregisterListener(callback);
-  printf("SweepReflog -- %d %d %d bytes: %ld \n", preserved_catalog_count(),
-                                       condemned_catalog_count(),
-                                       condemned_objects_count(),
-                                       condemned_bytes_count());
+
   // TODO(jblomer): turn current counters into perf::Counters
   if (configuration_.statistics) {
     perf::Counter *ctr_preserved_catalogs =
