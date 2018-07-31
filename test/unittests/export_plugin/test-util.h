@@ -14,6 +14,8 @@
 void AssertListHas(const char *query, char **dirList, size_t listLen,
   bool hasNot = false);
 
+void FreeList(char **list, size_t len);
+
 XattrList *create_sample_xattrlist(std::string var);
 
 struct cvmfs_attr *create_sample_stat(const char *name,
