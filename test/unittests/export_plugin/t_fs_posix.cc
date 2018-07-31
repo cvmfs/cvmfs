@@ -11,6 +11,74 @@
 #include "export_plugin/util.h"
 #include "test-util.h"
 
+class T_FS_Traversal_POSIX : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    interface_ = posix_get_interface();
+    const char *test_name
+      = ::testing::UnitTest::GetInstance()->current_test_info()->name();
+    interface_->context_ = interface_->initialize(test_name,
+      "./", NULL, 0, NULL);
+  }
+  virtual void TearDown() {
+    interface_->finalize(interface_->context_);
+    interface_->context_ = NULL;
+    delete interface_;
+    interface_ = NULL;
+  }
+  struct fs_traversal *interface_;
+};
+
+TEST_F(T_FS_Traversal_POSIX, TestInit) {
+  ASSERT_TRUE(DirectoryExists("./TestInit"));
+  ASSERT_TRUE(DirectoryExists("./.data"));
+  ASSERT_TRUE(DirectoryExists("./.data/ff/ff"));
+  interface_->finalize(interface_->context_);
+  interface_->context_ = interface_->initialize("TestInit-2",
+      "./", "./.data-TestInit", 0, NULL);
+  ASSERT_TRUE(DirectoryExists("./TestInit-2"));
+  ASSERT_TRUE(DirectoryExists("./.data-TestInit"));
+  ASSERT_TRUE(DirectoryExists("./.data-TestInit/ff/ff"));
+}
+
+TEST_F(T_FS_Traversal_POSIX, TestListDir) {
+  ASSERT_EQ(0, mkdir("./TestListDir/testdir", 0700));
+  CreateFile("./TestListDir/testfile1.txt", 0700, false);
+  CreateFile("./TestListDir/testdir/testfile2.txt", 0700, false);
+  CreateFile("./TestListDir/testdir/testfile3.txt", 0700, false);
+  size_t len = 0;
+  char **list;
+  interface_->list_dir(interface_->context_, "", &list, &len);
+  ASSERT_EQ(2, len);
+  AssertListHas("testfile1.txt", list, len);
+  AssertListHas("testdir", list, len);
+  FreeList(list, len);
+  len = 0;
+  interface_->list_dir(interface_->context_, "testdir", &list, &len);
+  ASSERT_EQ(2, len);
+  AssertListHas("testfile2.txt", list, len);
+  AssertListHas("testfile3.txt", list, len);
+  FreeList(list, len);
+  len = 1;
+  interface_->list_dir(interface_->context_, "idontexist", &list, &len);
+  ASSERT_EQ(0, len);
+  ASSERT_EQ(NULL, *list);
+  FreeList(list, len);
+}
+
+TEST_F(T_FS_Traversal_POSIX, TestStat) {
+  CreateFile("./TestStat/testfile1.txt", 0744, false);
+  struct cvmfs_attr stat;
+  ASSERT_EQ(0,
+    interface_->get_stat(
+      interface_->context_,
+      "testfile1.txt",
+      &stat, true));
+  // Check empty checksum
+  ASSERT_STREQ("da39a3ee5e6b4b0d3255bfef95601890afd80709", stat.cvm_checksum);
+  ASSERT_EQ(0744, (~S_IFMT) & stat.st_mode);
+}
+
 TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
   struct fs_traversal *dest = posix_get_interface();
   struct fs_traversal_context *context

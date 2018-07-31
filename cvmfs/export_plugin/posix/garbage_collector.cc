@@ -60,8 +60,9 @@ void InitializeGarbageCollection(struct fs_traversal_context *ctx) {
 void FinalizeGarbageCollection(struct fs_traversal_context *ctx) {
   struct fs_traversal_posix_context *posix_ctx
     =  reinterpret_cast<struct fs_traversal_posix_context*>(ctx->ctx);
-  FILE *gc_flagged_file = fopen((std::string(ctx->data)
-      + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE).c_str(), "w");
+  std::string gc_path = std::string(ctx->data)
+      + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE;
+  FILE *gc_flagged_file = fopen(gc_path.c_str(), "w");
   for (
     std::map<ino_t, bool>::const_iterator it = posix_ctx->gc_flagged.begin();
     it != posix_ctx->gc_flagged.end();

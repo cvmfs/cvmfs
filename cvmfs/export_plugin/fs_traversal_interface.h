@@ -77,8 +77,6 @@ struct fs_traversal {
   /**
    * Method which returns a list over the given directory
    * 
-   * This should not include hidden directories (like the data directory)
-   * 
    * @param[in] ctx The file system traversal context
    * @param[in] dir The directory over which should be iterated
    * @param[out] buf The list of the paths to the elements in the directory
