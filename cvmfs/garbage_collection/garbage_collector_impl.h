@@ -158,12 +158,20 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
     return;
   }
 
-  std::string absolute_path = "/srv/cvmfs/" + configuration_.repo_name +
-                              "/data/" + hash.MakePath();
-  printf("---------------- hash_file:%s\n", absolute_path.c_str());
-  printf("---------------- size = %ld bytes\n", GetFileSize(absolute_path));
+  std::string file_name = hash.MakePath();
+  char last_char = file_name[file_name.length() - 1];
+  if (last_char != 'C') {    // if is not a CATALOG file
+    std::string absolute_path = "/srv/cvmfs/" + configuration_.repo_name +
+                            "/data/" + file_name;
+    printf("---------------- hash_file:%s\n", absolute_path.c_str());
+    printf("---------------- size = %ld bytes\n", GetFileSize(absolute_path));
+    int64_t deleted_bytes = GetFileSize(absolute_path);
+    if (deleted_bytes > 0) {
+      condemned_bytes_ += deleted_bytes;
+    }
+  }
 
-  condemned_bytes_ += GetFileSize(absolute_path);
+
   configuration_.uploader->RemoveAsync(hash);
 }
 
@@ -273,7 +281,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
         "gc.n_condemned_objects", "number of deleted objects");
     perf::Counter *ctr_condemned_bytes =
       configuration_.statistics->Register(
-        "gc.sz_condemned_objects", "number of deleted bytez");
+        "gc.sz_condemned_objects", "number of deleted bytes");
     ctr_preserved_catalogs->Set(preserved_catalog_count());
     ctr_condemned_catalogs->Set(condemned_catalog_count());
     ctr_condemned_objects->Set(condemned_objects_count());
