@@ -50,9 +50,6 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   bool CompactDatabase() const;
   ~StatisticsDatabase();
 
-
-  int InsertRepoName(const std::string repo_name);
-
 /**
   * Entry point function for writing data into database
   *

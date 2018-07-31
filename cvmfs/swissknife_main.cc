@@ -205,13 +205,7 @@ int main(int argc, char **argv) {
                                     StatisticsDatabase::kOpenReadWrite);
     } else {
       db = StatisticsDatabase::Create(db_file_path);
-      if (db.IsValid()) {
-        int ret = db->InsertRepoName(repo_name);
-        if (ret != 0) {
-          LogCvmfs(kLogCvmfs, kLogSyslogErr, "Couldn't insert repo_name "
-                                    "into properties table, error %d!", ret);
-        }
-      }
+      db->SetProperty("repo_name", repo_name);
     }
 
     if (!db.IsValid()) {
