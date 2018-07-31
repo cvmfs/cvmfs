@@ -1,4 +1,5 @@
 2.6.0:
+  * Publication statistics are saved to an SQLite file (CVM-1567)
   * Optionally print statistics at the end of publication (CVM-1566)
   * Reactivate tracer, new parameters CVMFS_TRACEBUFFER{_THRESHOLD} (CVM-1596)
   * Add libcvmfs calls that list and stat nested catalogs (CVM-1577)
