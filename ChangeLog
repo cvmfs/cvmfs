@@ -1,4 +1,8 @@
 2.5.1:
+  * Fix locking bug in cvmfs_server snapshot (CVM-1598)
+  * Fix Yubikey signature handling (CVM-1604)
+  * Publication with gateway gracefully exits when reflog is missing (CVM-1560)
+  * Fixed Ubuntu 18.04 packages
   * Workspace is only assumed to be CWD in the FUSE client (CVM-1603)
   * Flush file system buffers after snapshot, gc, resign, publish (CVM-1552)
   * Add support for CA bundle files through X509_CERT_BUNDLE (CVM-1421)
