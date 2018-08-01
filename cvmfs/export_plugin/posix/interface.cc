@@ -625,7 +625,7 @@ void posix_archive_provenance(
   prov_dir.append("/");
 
   if (!DirectoryExists(prov_dir.c_str())) {
-    if (!MkdirDeep(prov_dir.c_str(), 0744, true)) {
+    if (!MkdirDeep(prov_dir.c_str(), 0755, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
         "Failed to create repository directory '%s'", prov_dir.c_str());
     }
@@ -717,7 +717,7 @@ struct fs_traversal_context *posix_initialize(
   // Build directory if not there yet
   std::string req_dirs = BuildPath(result, "");
   if (!DirectoryExists(req_dirs.c_str())) {
-    if (!MkdirDeep(req_dirs.c_str(), 0744, true)) {
+    if (!MkdirDeep(req_dirs.c_str(), 0755, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
         "Failed to create repository directory '%s'", req_dirs.c_str());
       return NULL;
