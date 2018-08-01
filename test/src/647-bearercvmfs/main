@@ -53,7 +53,7 @@ cleanup() {
   echo "running cleanup()..."
   enable_resolv_conf
   sudo umount ${TEST647_GRID_MOUNTPOINT}
-  [ "x$TEST647_GRID_SECURITY_TAINTED" = "xyes" ] && sudo umount /etc/grid-security
+  [ "x$TEST647_GRID_SECURITY_TAINTED" = "xyes" ] && sudo rm -f /etc/grid-security
   [ -z "$TEST647_HTTPS_CONFIG"                 ] || sudo rm -f $TEST647_HTTPS_CONFIG
   [ -z "$TEST647_HOSTCERT"                     ] || sudo rm -f $TEST647_HOSTCERT
   [ -z "$TEST647_HOSTKEY"                      ] || sudo rm -f $TEST647_HOSTKEY
@@ -191,7 +191,7 @@ cvmfs_run_test() {
 
   echo "make '$TEST647_GRID_SECURITY_DIR' available as /etc/grid-security"
   sudo mkdir -p /etc/grid-security                                || return 20
-  sudo mount --bind $TEST647_GRID_SECURITY_DIR /etc/grid-security || return 21
+  sudo cp -r $TEST647_GRID_SECURITY_DIR/* /etc/grid-security      || return 21
   TEST647_GRID_SECURITY_TAINTED="yes"
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
