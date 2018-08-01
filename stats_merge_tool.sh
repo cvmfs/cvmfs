@@ -15,6 +15,10 @@ fi
 # default output file
 output_db=output.db
 
+if [ "$#" -eq 3 ]; then
+	output_db=$3
+fi
+
 sqlite3 $1 "SELECT key, value from properties" > properties_values_1
 sqlite3 $2 "SELECT key, value from properties" > properties_values_2
 
@@ -43,11 +47,11 @@ fi
 echo ".dump publish_statistics" > script_publish_statistics
 echo ".dump properties" > script_properties
 
-# get properties table 
+# get properties table
 sqlite3 $1 < script_properties > properties_table.txt
-# get publish_statistics table from the first database file 
+# get publish_statistics table from the first database file
 sqlite3 $1 < script_publish_statistics > publish_statistics_table1.txt
-# get publish_statistics table from the second database file 
+# get publish_statistics table from the second database file
 sqlite3 $2 < script_publish_statistics > publish_statistics_table2.txt
 
 cat properties_table.txt > tmp.txt
