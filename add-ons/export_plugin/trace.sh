@@ -51,10 +51,7 @@ main() {
   echo "*** Writing config file..."
 
   sudo cp /etc/cvmfs/default.local $TRACE_DIR/config.backup
-  sudo truncate -s0 /etc/cvmfs/default.local
-
-  sudo echo "CVMFS_REPOSITORIES=sft.cern.ch" >> /etc/cvmfs/default.local
-  sudo echo "CVMFS_HTTP_PROXY=http://ca-proxy.cern.ch:3128" >> /etc/cvmfs/default.local
+  
   sudo echo "CVMFS_TRACEFILE=$TRACE_DIR/@fqrn@.trace.log" >> /etc/cvmfs/default.local
   sudo echo "CVMFS_TRACEBUFFER=16384" >> /etc/cvmfs/default.local
   sudo echo "CVMFS_TRACEBUFFER_THRESHOLD=4092" >> /etc/cvmfs/default.local
@@ -81,8 +78,8 @@ main() {
   sudo cvmfs_talk tracebuffer flush
 
   echo "*** Writing config file..."
-  sudo rm /etc/cvmfs/default.local
   sudo cp $TRACE_DIR/config.backup /etc/cvmfs/default.local
+  rm $TRACE_DIR/config.backup
   echo "*** Restarting autofs"
   sudo service autofs restart
 

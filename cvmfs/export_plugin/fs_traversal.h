@@ -31,14 +31,7 @@ int SyncInit(struct fs_traversal *src,
 
 int GarbageCollect(struct fs_traversal *fs);
 
-// Exported for testing purposes:
-bool Sync(const char *dir,
-          struct fs_traversal *src,
-          struct fs_traversal *dest,
-          bool recursive,
-          perf::Statistics *pstats,
-          bool do_fsck);
-
+// Public for testing
 bool SyncFull(
   struct fs_traversal *src,
   struct fs_traversal *dest,

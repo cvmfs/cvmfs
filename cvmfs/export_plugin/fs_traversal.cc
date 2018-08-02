@@ -64,11 +64,6 @@ class FsckLock {
   ~FsckLock() {
     pthread_mutex_destroy(&hash_map_lock_);
   }
-  FsckLock(const FsckLock &other) {
-    int res = pthread_mutex_init(&hash_map_lock_, NULL);
-    assert(res == 0);
-    locks_ = other.locks_;
-  }
   bool AddLock(ino_t inode) {
     bool result = false;
     pthread_mutex_lock(&hash_map_lock_);
@@ -81,6 +76,9 @@ class FsckLock {
   }
 
  private:
+  FsckLock(const FsckLock &other) {
+    assert(false);
+  }
   FsckLock & operator=(const FsckLock &other) {
     assert(false);
   }
@@ -189,12 +187,8 @@ bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
   }
 
   if (S_ISLNK(src->st_mode)) {
-    if (strcmp(src->cvm_name, dest->cvm_name)) { return false; }
-  } else if ((!S_ISLNK(src->st_mode) && S_ISLNK(dest->st_mode)) ||
-            (S_ISLNK(src->st_mode) && !S_ISLNK(dest->st_mode))) {
-    return false;
+    if (strcmp(src->cvm_symlink, dest->cvm_symlink)) { return false; }
   }
-
   if (src->cvm_name != NULL && dest->cvm_name != NULL) {
     if (strcmp(src->cvm_name, dest->cvm_name)) { return false; }
   } else if ((!src->cvm_name && dest->cvm_name) ||
@@ -546,7 +540,9 @@ bool Sync(
           break;
         default:
           LogCvmfs(kLogCvmfs, kLogStderr,
-            "Unknown file type for %s : %d", src_entry, src_st->st_mode);
+            "Encountered unknown file type '%d' for source file %s",
+              src_st->st_mode & S_IFMT,
+              src_entry);
           return false;
       }
     /* Dest contains something missing from Src */
@@ -571,7 +567,9 @@ bool Sync(
         default:
           // Unknown file type, should print error (what stream? log?)
           LogCvmfs(kLogCvmfs, kLogStderr,
-            "Unknown file type for %s : %d", dest_entry, dest_st->st_mode);
+            "Encountered unknown file type '%d' for destination file %s",
+              dest_st->st_mode & S_IFMT,
+              dest_entry);
           return false;
       }
     }
@@ -602,9 +600,6 @@ bool SyncFull(
   while (!dirs_.empty()) {
     RecDir *next_dir = dirs_.back();
     dirs_.pop_back();
-
-    if (next_dir->IsTerminateJob())
-      break;
 
     if (!Sync(next_dir->dir, src, dest, next_dir->recursive, pstats, do_fsck)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
