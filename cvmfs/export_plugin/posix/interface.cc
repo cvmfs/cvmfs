@@ -21,6 +21,7 @@
 #include "helpers.h"
 #include "libcvmfs.h"
 #include "logging.h"
+#include "smalloc.h"
 #include "string.h"
 #include "util/posix.h"
 #include "xattr.h"
@@ -195,7 +196,7 @@ void posix_list_dir(struct fs_traversal_context *ctx,
   struct dirent *de;
   *len = 0;
   size_t buflen = 5;
-  *buf = reinterpret_cast<char **>(malloc(sizeof(char *) * buflen));
+  *buf = reinterpret_cast<char **>(smalloc(sizeof(char *) * buflen));
 
   DIR *dr = opendir(BuildPath(ctx, dir).c_str());
 
@@ -679,7 +680,7 @@ struct fs_traversal_context *posix_initialize(
   } else {
     if  (base[strlen(base)-1] != '/') {
       size_t len = 2 + strlen(base);
-      char *base_dir = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+      char *base_dir = reinterpret_cast<char *>(smalloc(len*sizeof(char)));
       snprintf(base_dir, len, "%s/",  base);
       result->base = strdup(base_dir);
       free(base_dir);
@@ -699,7 +700,7 @@ struct fs_traversal_context *posix_initialize(
   // Retrieve data directory (for hidden dedup directory)
   if (!data) {
     size_t len = 6 + strlen(result->base);
-    char *def_data = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+    char *def_data = reinterpret_cast<char *>(smalloc(len*sizeof(char)));
     snprintf(def_data, len, "%s.data",  result->base);
     result->data = strdup(def_data);
     free(def_data);

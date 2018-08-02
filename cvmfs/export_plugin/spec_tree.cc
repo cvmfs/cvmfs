@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "logging.h"
+#include "smalloc.h"
 #include "util.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -238,7 +239,7 @@ int SpecTreeNode::GetListing(std::string base_path,
   char ***buf, size_t *len) {
   *len = 0;
   size_t buflen = 5;
-  *buf = reinterpret_cast<char **>(malloc(sizeof(char *) * buflen));
+  *buf = reinterpret_cast<char **>(smalloc(sizeof(char *) * buflen));
   // NULL terminate the list;
   AppendStringToList(NULL, buf, len, &buflen);
   for (std::map<std::string, SpecTreeNode*>::const_iterator
