@@ -88,6 +88,11 @@ class FsckLock {
   std::map<ino_t, bool> locks_;
 };
 
+// No destructor is written to prevent double free and
+// corruption of string pointers. After the copy written
+// to the pipe, the new copy falls out of scope and
+// is destroyed. If there is a destructor that frees the
+// strings they get deleted after writing to the pipe.
 class FileCopy {
  public:
   FileCopy()
@@ -95,8 +100,8 @@ class FileCopy {
     , dest(NULL) {}
 
   FileCopy(char *src, char *dest)
-    : src(src)
-    , dest(dest) {}
+    : src(strdup(src))
+    , dest(strdup(dest)) {}
 
   bool IsTerminateJob() const {
     return ((src == NULL) && (dest == NULL));
@@ -112,8 +117,8 @@ class RecDir {
     : dir(NULL)
     , recursive(false) {}
 
-  RecDir(char *dir, bool recursive)
-    : dir(dir)
+  RecDir(const char *dir, bool recursive)
+    : dir(strdup(dir))
     , recursive(recursive) {}
 
   ~RecDir() {
@@ -397,7 +402,8 @@ bool handle_file(
       && should_write_anyway(dest, src_st, dest_st)) ) {
     char *src_ident = src->get_identifier(src->context_, src_st);
     if (num_parallel_) {
-      FileCopy next_copy(src_ident, strdup(dest_data));
+      FileCopy next_copy(src_ident, dest_data);
+
       WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
       atomic_inc64(&copy_queue);
     } else {
@@ -408,9 +414,9 @@ bool handle_file(
         errno = 0;
         result = false;
       }
-      free(src_ident);
       pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT)->Inc();
     }
+    free(src_ident);
   } else {
     pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_FILES)->Inc();
     pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_BYTES)->Xadd(src_st->st_size);
@@ -456,7 +462,7 @@ bool handle_dir(
 }
 
 void add_dir_for_sync(const char *dir, bool recursive) {
-  dirs_.push_back(new RecDir(strdup(dir), recursive));
+  dirs_.push_back(new RecDir(dir, recursive));
 }
 
 bool Sync(
@@ -595,8 +601,13 @@ bool SyncFull(
   perf::Statistics *pstats,
   bool do_fsck
 ) {
+<<<<<<< HEAD
   if (dirs.empty()) {
     dirs.push_back(new RecDir(strdup(""), true));
+=======
+  if (dirs_.empty()) {
+    dirs_.push_back(new RecDir("", true));
+>>>>>>> Update memory management in FileCopy and RecDir
   }
   while (!dirs.empty()) {
     RecDir *next_dir = dirs.back();
