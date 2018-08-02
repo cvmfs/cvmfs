@@ -94,10 +94,20 @@ struct fs_traversal {
    * @note(steuber): The content checksum only needs to be calculated if this
    * is a source file system!
    * 
+   * For correnct behaviour the following fields must be set
+   * (and may not be NULL):
+   * - version
+   * - size
+   * - st_mode
+   * - st_uid
+   * - st_gid
+   * - cvm_name
+   * 
+   * 
    * @param[in] ctx The file system traversal context
    * @param[in] path The path of the object to stat
    * @param[out] stat The stat struct to write the information into
-   * @param[in] get_hash Whether the file hash
+   * @param[in] get_hash Whether the file hash in cvm_checksum
    *  should be calculated (true) or not (false)
    * @returns 0 on success
    */
