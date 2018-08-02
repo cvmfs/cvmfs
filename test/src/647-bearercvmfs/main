@@ -33,6 +33,7 @@ TEST647_RESOLV_CONF_DISABLED=
 TEST647_AUTHZ_HELPER=/usr/libexec/cvmfs/authz/cvmfs_scitoken_helper
 TEST647_WSGI_SCRIPT=/var/www/wsgi-scripts/test_647.wsgi
 TEST647_WSGI_HELPER=/var/www/wsgi-scripts/tokenparser.py
+TEST647_HTTPD_DROPIN=/etc/systemd/system/httpd.service.d/no-private-tmp.conf
 
 
 disable_resolv_conf() {
@@ -53,7 +54,7 @@ cleanup() {
   echo "running cleanup()..."
   enable_resolv_conf
   sudo umount ${TEST647_GRID_MOUNTPOINT}
-  [ "x$TEST647_GRID_SECURITY_TAINTED" = "xyes" ] && sudo rm -f /etc/grid-security
+  [ "x$TEST647_GRID_SECURITY_TAINTED" = "xyes" ] && sudo umount /etc/grid-security
   [ -z "$TEST647_HTTPS_CONFIG"                 ] || sudo rm -f $TEST647_HTTPS_CONFIG
   [ -z "$TEST647_HOSTCERT"                     ] || sudo rm -f $TEST647_HOSTCERT
   [ -z "$TEST647_HOSTKEY"                      ] || sudo rm -f $TEST647_HOSTKEY
@@ -67,6 +68,7 @@ cleanup() {
   [ -z "$TEST647_AUTHZ_HELPER"                 ] || sudo rm -f $TEST647_AUTHZ_HELPER
   [ -z "$TEST647_WSGI_SCRIPT"                 ] || sudo rm -f $TEST647_WSGI_SCRIPT
   [ -z "$TEST647_WSGI_HELPER"                 ] || sudo rm -f $TEST647_WSGI_HELPER
+  [ -z "$TEST647_HTTPD_DROPIN"                 ] || sudo rm -f $TEST647_HTTPD_DROPIN
   [ -z "$TEST647_HOSTNAME"                     ] || sudo sed -i -e "/$TEST647_HOSTNAME/d" /etc/hosts
   if [ ! -z "$TEST647_PRIVATE_MOUNT" ]; then
     sudo umount $TEST647_PRIVATE_MOUNT
@@ -191,7 +193,7 @@ cvmfs_run_test() {
 
   echo "make '$TEST647_GRID_SECURITY_DIR' available as /etc/grid-security"
   sudo mkdir -p /etc/grid-security                                || return 20
-  sudo cp -r $TEST647_GRID_SECURITY_DIR/* /etc/grid-security      || return 21
+  sudo mount --bind $TEST647_GRID_SECURITY_DIR /etc/grid-security      || return 21
   TEST647_GRID_SECURITY_TAINTED="yes"
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -224,6 +226,15 @@ cvmfs_run_test() {
   #cp $script_location/gacl-39 $(get_local_repo_storage $CVMFS_TEST_REPO)/data/39/.gacl || return 64
   sudo cp $script_location/test_647.wsgi $TEST647_WSGI_SCRIPT
   sudo cp $script_location/tokenparser.py $TEST647_WSGI_HELPER
+
+  # On EL7, systemd starts apache with PrivateTmp=true, we need to disable this
+  # in order to access the host certs, which are in /tmp
+  if [ -e /usr/lib/systemd/system/httpd.service ]; then
+    # Make the systemd drop in file
+    sudo mkdir -p `dirname $TEST647_HTTPD_DROPIN`
+    sudo cp $script_location/no-private-tmp.conf $TEST647_HTTPD_DROPIN
+    sudo systemctl daemon-reload
+  fi
 
   echo "restarting apache"
   apache_switch off
