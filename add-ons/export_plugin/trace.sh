@@ -89,7 +89,7 @@ main() {
   do
     REPO=${CUR_TRACE_FILE#$TRACE_DIR"/"}
     REPO=${REPO%.trace.log}
-    CMD="python $SCRIPT_DIR/spec_builder.py"
+    CMD="sudo python $SCRIPT_DIR/spec_builder.py"
     if [ ! -z "$POLICY" ]
     then
       CMD=$CMD" --policy $POLICY"
