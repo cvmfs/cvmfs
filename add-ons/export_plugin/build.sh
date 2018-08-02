@@ -1,5 +1,5 @@
 print_help() {
-  echo "trace.sh --spec_dir=<directory with spec files> --cvmfs_config=<cvmfs config> [--dest_sys=<destination file system>] [--dest_base=<destination file system base>] [--dest_data=<destination data directory>] [--gc]"
+  echo "build.sh --spec_dir=<directory with spec files> --cvmfs_config=<cvmfs config> [--dest_sys=<destination file system>] [--dest_base=<destination file system base>] [--dest_data=<destination data directory>] [--gc]"
 }
 
 parse_args() {
