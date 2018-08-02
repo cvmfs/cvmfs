@@ -27,7 +27,8 @@ int SyncInit(struct fs_traversal *src,
              const char *base,
              const char *spec,
              unsigned parallel,
-             unsigned retries);
+             unsigned retries,
+             bool fsck);
 
 int GarbageCollect(struct fs_traversal *fs);
 
