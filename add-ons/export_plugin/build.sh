@@ -39,6 +39,10 @@ parse_args() {
       DO_GC="DO"
       shift
       ;;
+      --fsck)
+      DO_FSCK="DO"
+      shift
+      ;;
       *)
       # unknown option
       echo "Unknown option ${i%=*}"
@@ -70,7 +74,11 @@ export_spec() {
   then
   CMD=$CMD" -j $THREADS"
   fi
-  eval $CMD
+  if [ ! -z "$DO_FSCK" ]
+  then
+  CMD=$CMD" -k"
+  fi
+  echo $CMD
 }
 
 main() {

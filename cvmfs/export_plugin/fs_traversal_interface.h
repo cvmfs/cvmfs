@@ -22,9 +22,9 @@ struct fs_traversal_context {
 };
 
 enum fs_open_type {
-  fs_open_read = 1,
-  fs_open_write = 2,
-  fs_open_append = 4
+  fs_open_read,
+  fs_open_write,
+  fs_open_append
 };
 
 struct fs_traversal {
@@ -275,6 +275,7 @@ struct fs_traversal {
    * Error:
    * - src directory doesn't exist
    * - symlink creation fails
+   * - on empty destination
    * 
    * @param[in] ctx The file system traversal context
    * @param[in] src The position at which the symlink should be saved

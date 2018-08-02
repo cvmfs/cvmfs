@@ -548,6 +548,7 @@ bool posix_archive_config(
   }
 
   size_t bytes_transferred = 0;
+  bool result = true;
   while (1) {
     char buffer[COPY_BUFFER_SIZE];
 
@@ -556,40 +557,42 @@ bool posix_archive_config(
     if (actual_read < sizeof(buffer) && ferror(config) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
         "Read failed : %d %s\n", errno, strerror(errno));
-      return false;
+      goto posix_archive_config_close_files;
+      result = false;
     }
     bytes_transferred+=actual_read;
     size_t written_len = fwrite(buffer, sizeof(char), actual_read, prov);
     if (written_len != actual_read) {
       LogCvmfs(kLogCvmfs, kLogStderr,
         "Write failed : %d %s\n", errno, strerror(errno));
-      return false;
+      result = false;
+      goto posix_archive_config_close_files;
     }
 
     if (actual_read < COPY_BUFFER_SIZE) {
       break;
     }
   }
+  posix_archive_config_close_files:
+    retval = fclose(config);
+    if (retval != 0) {
+      // Handle error
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Failed close config file : %s : %d : %s\n",
+        config_name.c_str(), errno, strerror(errno));
+      result = false;
+    }
 
-  retval = fclose(config);
-  if (retval != 0) {
-    // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Failed close config file : %s : %d : %s\n",
-      config_name.c_str(), errno, strerror(errno));
-    return false;
-  }
+    retval = fclose(prov);
+    if (retval != 0) {
+      // Handle error
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Failed close provenance file : %s : %d : %s\n",
+        prov_name.c_str(), errno, strerror(errno));
+      result = false;
+    }
 
-  retval = fclose(prov);
-  if (retval != 0) {
-    // Handle error
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Failed close provenance file : %s : %d : %s\n",
-      prov_name.c_str(), errno, strerror(errno));
-    return false;
-  }
-
-  return true;
+  return result;
 }
 
 void posix_write_provenance_info(

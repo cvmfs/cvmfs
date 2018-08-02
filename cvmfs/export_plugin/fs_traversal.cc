@@ -709,7 +709,8 @@ int SyncInit(
   const char *base,
   const char *spec,
   unsigned parallel,
-  unsigned retries
+  unsigned retries,
+  bool fsck
 ) {
   num_parallel_ = parallel;
   retries_ = retries;
@@ -760,7 +761,7 @@ int SyncInit(
 
   add_dir_for_sync(base, recursive);
   // TODO(steuber): Make fsck configurable
-  int result = !SyncFull(src, dest, pstats, false);
+  int result = !SyncFull(src, dest, pstats, fsck);
 
   while (atomic_read64(&copy_queue) != 0) {
     SafeSleepMs(100);

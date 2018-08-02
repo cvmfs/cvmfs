@@ -194,12 +194,14 @@ struct fs_traversal_context *libcvmfs_initialize(
   if (retval) {
     LogCvmfs(kLogCvmfs, kLogStderr,
     "CVMFS Initilization failed : %s", repo);
+    return NULL;
   }
   cvmfs_context *ctx;
   retval = cvmfs_attach_repo_v2(repo, options_mgr, &ctx);
   if (retval) {
     LogCvmfs(kLogCvmfs, kLogStderr,
     "CVMFS Attach to %s failed", repo);
+    return NULL;
   }
   cvmfs_enable_threaded(ctx);
   result->ctx = ctx;
