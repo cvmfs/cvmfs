@@ -286,7 +286,7 @@ bool copyFile(
 
 char *get_full_path(const char *dir, const char *entry) {
   size_t len = 2 + strlen(dir)+ strlen(entry);
-  char * path = reinterpret_cast<char *>(malloc(len));
+  char * path = reinterpret_cast<char *>(smalloc(len));
   snprintf(path, len, "%s/%s",  dir, entry);
   return path;
 }

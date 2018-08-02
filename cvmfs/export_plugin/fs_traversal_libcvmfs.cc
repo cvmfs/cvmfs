@@ -10,6 +10,7 @@
 #include "fs_traversal_libcvmfs.h"
 #include "libcvmfs.h"
 #include "logging.h"
+#include "smalloc.h"
 #include "string.h"
 
 #define MAX_INTEGER_DIGITS 20
@@ -36,7 +37,7 @@ int libcvmfs_get_stat(struct fs_traversal_context *ctx,
 char *libcvmfs_get_identifier(struct fs_traversal_context *ctx,
   const struct cvmfs_attr *stat) {
   int length = 2+strlen(stat->cvm_parent)+strlen(stat->cvm_name);
-  char* res = reinterpret_cast<char *>(malloc(length));
+  char* res = reinterpret_cast<char *>(smalloc(length));
   snprintf(res, length, "%s/%s", stat->cvm_parent, stat->cvm_name);
   return res;
 }
@@ -134,14 +135,14 @@ struct fs_traversal_context *libcvmfs_initialize(
 
   struct fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
-  char* major = reinterpret_cast<char *>(malloc(MAX_INTEGER_DIGITS));
+  char* major = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
   snprintf(major, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_VERSION_MAJOR);
-  char* minor = reinterpret_cast<char *>(malloc(MAX_INTEGER_DIGITS));
+  char* minor = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
   snprintf(minor, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_VERSION_MINOR);
-  char* rev = reinterpret_cast<char *>(malloc(MAX_INTEGER_DIGITS));
+  char* rev = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
   snprintf(rev, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_REVISION);
   size_t len = 3 + strlen(major) + strlen(minor) + strlen(rev);
-  char* lib_version = reinterpret_cast<char *>(malloc(len));
+  char* lib_version = reinterpret_cast<char *>(smalloc(len));
   snprintf(lib_version, len, "%s.%s:%s", major, minor, rev);
 
   result->lib_version = strdup(lib_version);
@@ -162,7 +163,7 @@ struct fs_traversal_context *libcvmfs_initialize(
     result->config = strdup(config);
   } else {
     size_t len = 8 + strlen(result->repo);
-    char *def_config = reinterpret_cast<char *>(malloc(len*sizeof(char)));
+    char *def_config = reinterpret_cast<char *>(smalloc(len*sizeof(char)));
     snprintf(def_config, len, "%s.config",  result->repo);
     result->config = strdup(def_config);
     free(def_config);
