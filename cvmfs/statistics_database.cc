@@ -52,15 +52,14 @@ struct Stats {
 };
 
 /**
-  * Build the insert statement for publish_statistics table with
-  * all the statistics values.
+  * Build the insert statement.
   *
   * @param stats a struct with all values stored in strings
   * @return the insert statement
   */
 std::string PrepareStatement(const perf::Statistics *statistics) {
   struct Stats stats = Stats(statistics);
-  std::string insert_into_publish_statistics =
+  std::string insert_statement =
     "INSERT INTO publish_statistics ("
     "timestamp,"
     "files_added,"
@@ -85,7 +84,7 @@ std::string PrepareStatement(const perf::Statistics *statistics) {
     stats.bytes_added + "," +
     stats.bytes_removed + "," +
     stats.bytes_uploaded + ");";
-  return insert_into_publish_statistics;
+  return insert_statement;
 }
 
 }  // namespace
