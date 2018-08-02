@@ -960,7 +960,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
     eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
-    masterkeycard ingest"
+    masterkeycard ingest stats"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1115,6 +1115,10 @@ Supported Commands:
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
                   Use '-' as -t argument to read the tarball from STDIN.
+  stats           [-o output file]
+                  [-m \$DB_FILE_1 \$DB_FILE_2 to merge two database files]
+                  [-r \$REPO_NAME print publish_statistics table values
+                      from /var/spool/cvmfs/\$REPO_NAME/stats.db]
 "
 
 
