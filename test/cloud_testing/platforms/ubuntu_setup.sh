@@ -4,6 +4,8 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+ubuntu_release="$(lsb_release -cs)"
+
 # configuring apt for non-interactive environment
 echo -n "configure package manager for non-interactive usage... "
 export DEBIAN_FRONTEND=noninteractive
@@ -70,7 +72,9 @@ install_from_repo gcc                           || die "fail (installing gcc)"
 install_from_repo g++                           || die "fail (installing g++)"
 install_from_repo make                          || die "fail (installing make)"
 install_from_repo sqlite3                       || die "fail (installing sqlite3)"
-install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
+if [ "x$ubuntu_release" != "xbionic" ]; then
+  install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
+fi
 install_from_repo bc                            || die "fail (installing bc)"
 install_from_repo tree                          || die "fail (installing tree)"
 
@@ -86,7 +90,7 @@ install_from_repo python-dev   || die "fail (installing python-dev)"
 install_test_s3 || die "fail (installing test S3)"
 
 # install 'jq' (on 12.04 this needs the precise-backports repo)
-if [ x"$(lsb_release -cs)" = x"precise" ]; then
+if [ x"$ubuntu_release" = x"precise" ]; then
   echo -n "enabling precise-backports... "
   sudo sed -i -e 's/^# \(.*precise-backports.*\)$/\1/g' /etc/apt/sources.list || die "fail (updating sources.list)"
   sudo apt-get update > /dev/null                                             || die "fail (apt-get update)"
@@ -95,7 +99,7 @@ fi
 install_from_repo jq || die "fail (installing jq)"
 
 # On Ubuntu 16.04 install backported autofs
-if [ "x$(lsb_release -cs)" = "xxenial" ]; then
+if [ "x$ubuntu_release" = "xxenial" ]; then
   install_from_repo wget || die "fail (installing wget)"
   wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_2.0-3_all.deb
   sudo dpkg -i cvmfs-release_2.0-3_all.deb || die "fail (installing cvmfs-release)"
@@ -106,7 +110,7 @@ if [ "x$(lsb_release -cs)" = "xxenial" ]; then
 fi
 
 # On Ubuntu 16.04 install the repository gateway
-if [ "x$(lsb_release -cs)" = "xxenial" ]; then
+if [ "x$ubuntu_release" = "xxenial" ] || [ "x$ubuntu_release" = "xbionic" ]; then
   echo "Installing repository gateway"
   package_map=pkgmap.ubuntu1604_x86_64
   download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
