@@ -144,10 +144,8 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   # merge old db file with the new db file
-  echo "cvmfs_server merge-stats -o $CVMFS_TEST_660_MERGED_DB $CVMFS_TEST_660_OLD_DB $CVMFS_TEST_660_DB_PATH"
   cvmfs_server merge-stats -o $CVMFS_TEST_660_MERGED_DB $CVMFS_TEST_660_OLD_DB $CVMFS_TEST_660_DB_PATH
 
-  sqlite3 $CVMFS_TEST_660_MERGED_DB "select * from publish_statistics;"
   local nr_entries="$(sqlite3 $CVMFS_TEST_660_MERGED_DB "select count(*) from publish_statistics;")"
 
   if [ "x$nr_entries" != "x7" ]; then
