@@ -166,6 +166,8 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
     int64_t deleted_bytes = GetFileSize(absolute_path);
     if (deleted_bytes > 0) {
       condemned_bytes_ += deleted_bytes;
+    } else {
+      printf(" --------------- %ld for %s\n", deleted_bytes, absolute_path.c_str());
     }
   }
   configuration_.uploader->RemoveAsync(hash);
@@ -274,7 +276,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
         "gc.n_condemned_objects", "number of deleted objects");
     perf::Counter *ctr_condemned_bytes =
       configuration_.statistics->Register(
-        "gc.sz_condemned_objects", "number of deleted bytes");
+        "gc.sz_condemned_bytes", "number of deleted bytes");
     ctr_preserved_catalogs->Set(preserved_catalog_count());
     ctr_condemned_catalogs->Set(condemned_catalog_count());
     ctr_condemned_objects->Set(condemned_objects_count());

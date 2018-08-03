@@ -198,7 +198,8 @@ int main(int argc, char **argv) {
              ->PrintList(perf::Statistics::kPrintHeader).c_str());
   }
 
-  if (command->GetName() == "sync" || command->GetName() == "ingest") {
+  if (command->GetName() == "sync" || command->GetName() == "ingest"
+                                   || command->GetName() == "gc") {
     UniquePtr<StatisticsDatabase> db;
     string repo_name = *args.find('N')->second;
     string db_file_path = StatisticsDatabase::GetDBPath(repo_name);

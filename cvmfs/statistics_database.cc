@@ -96,7 +96,7 @@ std::string PrepareStatement(const perf::Statistics *statistics,
 
 bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
-  return sqlite::Sql(sqlite_db(),
+  bool ret1 = sqlite::Sql(sqlite_db(),
     "CREATE TABLE publish_statistics ("
     "publish_id INTEGER PRIMARY KEY,"
     "start_time TEXT,"
@@ -111,6 +111,16 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "sz_bytes_added INTEGER,"
     "sz_bytes_removed INTEGER,"
     "sz_bytes_uploaded INTEGER);").Execute();
+  bool ret2 = sqlite::Sql(sqlite_db(),
+    "CREATE TABLE gc_statistics ("
+    "gc_id INTEGER PRIMARY KEY,"
+    "start_time TEXT,"
+    "finished_time TEXT,"
+    "n_preserved_catalogs INTEGER,"
+    "n_condemned_catalogs INTEGER,"
+    "n_condemned_objects INTEGER,"
+    "sz_condemned_objects INTEGER);").Execute();
+  return ret1 & ret2;
 }
 
 
