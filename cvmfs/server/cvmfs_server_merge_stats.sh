@@ -20,12 +20,12 @@ cvmfs_server_merge_table() {
   sqlite3 $db_file_1 "SELECT key, value from properties" > $TMP_DIR/properties_values_1
   sqlite3 $db_file_2 "SELECT key, value from properties" > $TMP_DIR/properties_values_2
 
-  local repo_name_1=$(cat $TMP_DIR/properties_values_1 | grep repo_name | cut -d '|' -f 2)
-  local repo_name_2=$(cat $TMP_DIR/properties_values_2 | grep repo_name | cut -d '|' -f 2)
-  local schema_1=$(cat $TMP_DIR/properties_values_1 | grep schema | cut -d '|' -f 2)
-  local schema_2=$(cat $TMP_DIR/properties_values_2 | grep schema | cut -d '|' -f 2)
-  local schema_revision_1=$(cat $TMP_DIR/properties_values_1 | grep schema_revision | cut -d '|' -f 2)
-  local schema_revision_2=$(cat $TMP_DIR/properties_values_2 | grep schema_revision | cut -d '|' -f 2)
+  local repo_name_1="$(cat $TMP_DIR/properties_values_1 | grep repo_name | cut -d '|' -f 2)"
+  local repo_name_2="$(cat $TMP_DIR/properties_values_2 | grep repo_name | cut -d '|' -f 2)"
+  local schema_1="$(cat $TMP_DIR/properties_values_1 | grep schema | cut -d '|' -f 2)"
+  local schema_2="$(cat $TMP_DIR/properties_values_2 | grep schema | cut -d '|' -f 2)"
+  local schema_revision_1="$(cat $TMP_DIR/properties_values_1 | grep schema_revision | cut -d '|' -f 2)"
+  local schema_revision_2="$(cat $TMP_DIR/properties_values_2 | grep schema_revision | cut -d '|' -f 2)"
 
   # Sanity checks
   if [ "x$repo_name_1" != "x$repo_name_2" ]; then
