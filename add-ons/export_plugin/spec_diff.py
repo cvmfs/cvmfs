@@ -55,6 +55,7 @@ class DiffBuilder:
               if not part in curNode.children\
                 and curDepth > self.depth\
                 and mergable:
+                print("Found mergable")
                 curNode.mode = self.calc_new_mode(curNode.mode, '*')
                 break
               elif not part in curNode.children:
