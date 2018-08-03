@@ -18,7 +18,7 @@ class T_FS_Traversal_POSIX : public ::testing::Test {
     const char *test_name
       = ::testing::UnitTest::GetInstance()->current_test_info()->name();
     interface_->context_ = interface_->initialize(test_name,
-      "./", NULL, 0, NULL);
+      "./", NULL, NULL, 0);
   }
   virtual void TearDown() {
     interface_->finalize(interface_->context_);
@@ -35,7 +35,7 @@ TEST_F(T_FS_Traversal_POSIX, TestInit) {
   ASSERT_TRUE(DirectoryExists("./.data/ff/ff"));
   interface_->finalize(interface_->context_);
   interface_->context_ = interface_->initialize("TestInit-2",
-      "./", "./.data-TestInit", 0, NULL);
+      "./", "./.data-TestInit", NULL, 0);
   ASSERT_TRUE(DirectoryExists("./TestInit-2"));
   ASSERT_TRUE(DirectoryExists("./.data-TestInit"));
   ASSERT_TRUE(DirectoryExists("./.data-TestInit/ff/ff"));
@@ -82,7 +82,7 @@ TEST_F(T_FS_Traversal_POSIX, TestStat) {
 TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
   struct fs_traversal *dest = posix_get_interface();
   struct fs_traversal_context *context
-    = dest->initialize("./", "posix", "./data", 4, NULL);
+    = dest->initialize("./", "posix", "./data", NULL, 4);
 
   std::string content1 = "a";
   shash::Any content1_hash(shash::kSha1);
@@ -117,7 +117,7 @@ TEST(T_Fs_Traversal_POSIX, TestGarbageCollection) {
   dest->do_unlink(context, "file3.txt");
 
   dest->finalize(context);
-  context = dest->initialize("./", "posix", "./data", 4, NULL);
+  context = dest->initialize("./", "posix", "./data", NULL, 4);
   dest->garbage_collector(context);
 
   std::string data_base_path = "./data/";

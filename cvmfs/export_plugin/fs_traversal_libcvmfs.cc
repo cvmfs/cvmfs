@@ -124,8 +124,8 @@ struct fs_traversal_context *libcvmfs_initialize(
   const char *repo,
   const char *base,
   const char *data,
-  int num_threads,
-  const char *config) {
+  const char *config,
+  int num_threads) {
   if (!repo) {
     LogCvmfs(kLogCvmfs, kLogStderr,
       "Repository name must be specified");

@@ -35,10 +35,11 @@ void InitializeWarningFile(struct fs_traversal_context *ctx) {
   const char *warning = WARNING_FILE_NAME;
   FILE *f = fopen(BuildPath(ctx, "/" WARNING_FILE_NAME).c_str(), "w");
   if (f != NULL) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Could not write warning file for posix file system!");
     fwrite(warning, sizeof(char), strlen(warning), f);
     fclose(f);
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "Could not write warning file for posix file system!");
   }
 }
 
