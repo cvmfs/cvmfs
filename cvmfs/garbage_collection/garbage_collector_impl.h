@@ -167,7 +167,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
     if (deleted_bytes > 0) {
       condemned_bytes_ += deleted_bytes;
     } else {
-      printf(" --------------- %ld for %s\n", deleted_bytes, absolute_path.c_str());
+      printf(" ----- %ld for %s\n", deleted_bytes, absolute_path.c_str());
     }
   }
   configuration_.uploader->RemoveAsync(hash);
