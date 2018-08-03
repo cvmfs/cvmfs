@@ -214,8 +214,7 @@ int main(int argc, char **argv) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
               "Couldn't create StatisticsDatabase object!");
     } else if (db->StoreStatistics(command->statistics(),
-                                              start_time,
-                                              finished_time) != 0) {
+                                    start_time, finished_time) != 0) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
             "Couldn't store statistics in %s!",
             db_file_path.c_str());
