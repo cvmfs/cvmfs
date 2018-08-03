@@ -78,7 +78,7 @@ export_spec() {
   then
   CMD=$CMD" -k"
   fi
-  echo $CMD
+  eval $CMD
 }
 
 main() {
