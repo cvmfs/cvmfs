@@ -4,9 +4,14 @@
 # Implementation of the "cvmfs_server stats command"
 
 
-cvmfs_server_merge_stats() {
-  sqlite3 $1 "SELECT key, value from properties" > properties_values_1
-  sqlite3 $2 "SELECT key, value from properties" > properties_values_2
+# merge publish_statistics table
+cvmfs_server_merge_table() {
+  local db_file_1=$1
+  local db_file_2=$2
+  local output_db=$3
+
+  sqlite3 $db_file_1 "SELECT key, value from properties" > properties_values_1
+  sqlite3 $db_file_2 "SELECT key, value from properties" > properties_values_2
 
   local repo_name_1=$(cat properties_values_1 | grep repo_name | cut -d '|' -f 2)
   local repo_name_2=$(cat properties_values_2 | grep repo_name | cut -d '|' -f 2)
@@ -29,16 +34,15 @@ cvmfs_server_merge_stats() {
     return 1
   fi
 
-
   echo ".dump publish_statistics" > script_publish_statistics
   echo ".dump properties" > script_properties
 
   # get properties table
-  sqlite3 $1 < script_properties > properties_table.txt
+  sqlite3 $db_file_1 < script_properties > properties_table.txt
   # get publish_statistics table from the first database file
-  sqlite3 $1 < script_publish_statistics > publish_statistics_table1.txt
+  sqlite3 $db_file_1 < script_publish_statistics > publish_statistics_table1.txt
   # get publish_statistics table from the second database file
-  sqlite3 $2 < script_publish_statistics > publish_statistics_table2.txt
+  sqlite3 $db_file_2 < script_publish_statistics > publish_statistics_table2.txt
 
   cat properties_table.txt > tmp.txt
   cat publish_statistics_table1.txt | grep BEGIN >> tmp.txt
@@ -48,11 +52,11 @@ cvmfs_server_merge_stats() {
   # Add insert statements from the second database file
   cat publish_statistics_table2.txt | grep INSERT >> tmp.txt
   cat publish_statistics_table2.txt | grep COMMIT >> tmp.txt
-  echo "" > $3  # make sure the output file is empty
+  echo "" > $output_db  # make sure the output file is empty
 
   # Merge!
-  sqlite3 $3 < tmp.txt
-  echo "Files $1 and $2 were merged in $3"
+  sqlite3 $output_db < tmp.txt
+  echo "Success: $1 and $2 publish_statistics tables were merged in $3"
   # clean
   rm tmp.txt
   rm script_publish_statistics
@@ -67,6 +71,7 @@ cvmfs_server_merge_stats() {
   local output_db="output.db"   # default output file
   local db_file_1=""
   local db_file_2=""
+  local db_table="publish_statistics"
   local merge_option=0
 
   # optional parameter handling
@@ -84,7 +89,8 @@ cvmfs_server_merge_stats() {
     esac
   done
 
-  echo $@
-  # cvmfs_server_merge_stats $db_file_1 $db_file_2 $output_db
+  shift $(($OPTIND-1))
+
+  cvmfs_server_merge_table $1 $2 $output_db
 }
 

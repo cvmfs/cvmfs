@@ -1115,10 +1115,15 @@ Supported Commands:
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
                   Use '-' as -t argument to read the tarball from STDIN.
-  stats           [-o output file]
-                  [-m \$DB_FILE_1 \$DB_FILE_2 to merge two database files]
-                  [-r \$REPO_NAME print publish_statistics table values
-                      from /var/spool/cvmfs/\$REPO_NAME/stats.db]
+  print-stats     [-o output_file]
+                  [-t table_name]
+                  [-s separator] - char
+                  <fully qualified name>
+                  Print statistics values for a table (default publish_statistics)
+                  using the separator specified. (default  '|')
+  merge-stats     [-o output db file]
+                  <db_file_1> <db_file_2>
+                  Merge tables from two database files.
 "
 
 
