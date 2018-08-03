@@ -31,10 +31,10 @@ void InitializeGarbageCollection(struct fs_traversal_context *ctx) {
     = reinterpret_cast<struct fs_traversal_posix_context *>(ctx->ctx);
   int res2 = mkdir((std::string(ctx->data)+POSIX_GARBAGE_DIR).c_str(), 0700);
     assert(res2 == 0 || errno == EEXIST);
-  if (FileExists(std::string(ctx->data)
-    + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE)) {
-    FILE *gc_flagged_file = fopen((std::string(ctx->data)
-      + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE).c_str(), "r");
+  std::string gc_path = std::string(ctx->data)
+      + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE;
+  if (FileExists(gc_path)) {
+    FILE *gc_flagged_file = fopen(gc_path.c_str(), "r");
     assert(gc_flagged_file != NULL);
     while (true) {
       ino_t cur_ino;

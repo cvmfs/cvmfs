@@ -7,7 +7,10 @@
 #include <map>
 #include <string>
 
-#define SPEC_READ_FS -42  // <- The answer to no questions at all
+enum SPEC_READ_ST {
+  SPEC_READ_TREE,
+  SPEC_READ_FS = -42,  // <- The answer to no questions at all
+};
 
 class SpecTreeNode {
  public:

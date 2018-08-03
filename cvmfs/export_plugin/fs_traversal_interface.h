@@ -30,8 +30,8 @@ enum fs_open_type {
 struct fs_traversal {
   /**
    * Local copy of the context that should be set with the
-   * returned value of initialize. Ideally this is created
-   * and then freed all within the traversal.
+   * returned value of initialize. This is allocated using
+   * initialize and freed using finalize.
    */
   struct fs_traversal_context *context_;
 
@@ -42,16 +42,16 @@ struct fs_traversal {
    * @param[in] repo Repository name
    * @param[in] base Base repository location
    * @param[in] data Data storage information
-   * @param[in] num_threads Number of threads that may be started
    * @param[in] config A configuration file name
+   * @param[in] num_threads Number of threads that may be started
    * @param[out] A pointer to the context
    */
   struct fs_traversal_context *(*initialize)(
     const char *repo,
     const char *base,
     const char *data,
-    int num_threads,
-    const char *config);
+    const char *config,
+    int num_threads);
 
   /**
    * Method which finalizes the file system traversal.
@@ -75,7 +75,8 @@ struct fs_traversal {
                              struct fs_traversal_context *dest);
 
   /**
-   * Method which returns a list over the given directory
+   * Method which returns a list of the given directory.
+   * Should not include "." or "..".
    * 
    * @param[in] ctx The file system traversal context
    * @param[in] dir The directory over which should be iterated

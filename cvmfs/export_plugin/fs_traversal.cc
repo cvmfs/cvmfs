@@ -132,8 +132,6 @@ bool                 recursive = true;
 int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
-atomic_int64         overall_copies;
-atomic_int64         overall_new;
 atomic_int64         copy_queue;
 
 vector<RecDir*>      dirs_;
@@ -678,6 +676,8 @@ static void *MainWorker(void *data) {
     }
     files_transferred->Inc();
 
+    // Noted in FileCopy: This is freed here to prevent the strings from being
+    // double freed when a FileCopy goes out of scope here and at WritePipe
     free(next_copy.src);
     free(next_copy.dest);
 
@@ -718,8 +718,6 @@ int SyncInit(
   perf::Statistics *pstats = GetSyncStatTemplate();
 
   // Initialization
-  atomic_init64(&overall_copies);
-  atomic_init64(&overall_new);
   atomic_init64(&copy_queue);
 
   pthread_t *workers = NULL;
