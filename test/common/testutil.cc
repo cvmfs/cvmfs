@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-#include <sys/stat.h>
 #ifdef __APPLE__
   #include <sys/sysctl.h>
 #endif
@@ -207,8 +206,6 @@ DirectoryEntry DirectoryEntryTestFactory::RegularFile(const string &name,
                                                       shash::Any hash) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
-  dirent.uid_ = getuid();
-  dirent.gid_ = getgid();
   dirent.name_ = NameString(name);
   dirent.checksum_ = hash;
   dirent.size_ = size;
@@ -219,8 +216,6 @@ DirectoryEntry DirectoryEntryTestFactory::RegularFile(const string &name,
 DirectoryEntry DirectoryEntryTestFactory::ExternalFile() {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
-  dirent.uid_ = getuid();
-  dirent.gid_ = getgid();
   dirent.is_external_file_ = true;
   return dirent;
 }
@@ -228,8 +223,6 @@ DirectoryEntry DirectoryEntryTestFactory::ExternalFile() {
 DirectoryEntry DirectoryEntryTestFactory::SpecialFile() {
   DirectoryEntry dirent;
   dirent.mode_ = 4516;  // FIFO
-  dirent.uid_ = getuid();
-  dirent.gid_ = getgid();
   return dirent;
 }
 
@@ -241,8 +234,6 @@ DirectoryEntry DirectoryEntryTestFactory::Directory(
 {
   DirectoryEntry dirent;
   dirent.mode_ = 16893;
-  dirent.uid_ = getuid();
-  dirent.gid_ = getgid();
   dirent.name_ = NameString(name);
   dirent.checksum_ = hash;
   dirent.size_ = size;
@@ -256,8 +247,6 @@ DirectoryEntry DirectoryEntryTestFactory::Symlink(const string &name,
                                                   const string &symlink_path) {
   DirectoryEntry dirent;
   dirent.mode_ = 41471;
-  dirent.uid_ = getuid();
-  dirent.gid_ = getgid();
   dirent.name_ = NameString(name);
   dirent.size_ = size;
   dirent.symlink_ = LinkString(symlink_path);
@@ -268,8 +257,6 @@ DirectoryEntry DirectoryEntryTestFactory::Symlink(const string &name,
 DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
-  dirent.uid_ = getuid();
-  dirent.gid_ = getgid();
   dirent.is_chunked_file_ = true;
   dirent.checksum_ = content_hash;
   return dirent;

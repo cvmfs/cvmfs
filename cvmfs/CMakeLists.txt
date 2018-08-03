@@ -716,7 +716,6 @@ endif(BUILD_LIBCVMFS)
 
 if (BUILD_CVMFS_SHRINKWRAP)
   add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
-  add_dependencies (cvmfs_shrinkwrap cache.pb.generated)
   add_dependencies (cvmfs_shrinkwrap libcvmfs)
 
   set (CVMFS_SHRINKWRAP_LIBS

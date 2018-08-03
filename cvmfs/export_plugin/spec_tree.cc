@@ -135,15 +135,15 @@ void SpecTree::Parse(FILE *spec_file) {
         delete entr;
       }
     }
-    char passthroughMode = '_';
-    if (inclusion_mode == '!') passthroughMode = '-';
+    char passthrough_mode = '_';
+    if (inclusion_mode == '!') passthrough_mode = '-';
     // TODO(steuber): max_chunks?
     // Split remaining path into its parts
     std::vector<std::string> path_parts = SplitString(line, '/', 256);
     cur_node = node_cache.top()->node;
     // Store second last mode to check whether it is NOT passthrough!
-    char past1Mode = node_cache.top()->node->mode;
-    char past2Mode = node_cache.top()->node->mode;
+    char past_1_mode = node_cache.top()->node->mode;
+    char past_2_mode = node_cache.top()->node->mode;
     for (std::vector<std::string>::const_iterator part_it = path_parts.begin();
       part_it != path_parts.end();
       part_it++) {
@@ -151,18 +151,18 @@ void SpecTree::Parse(FILE *spec_file) {
         continue;
       }
       if ((cur_node = node_cache.top()->node->GetNode(*part_it)) == NULL) {
-        cur_node = new SpecTreeNode(passthroughMode);
+        cur_node = new SpecTreeNode(passthrough_mode);
         node_cache.top()->node->AddNode(*part_it, cur_node);
       }
       entr = new struct NodeCacheEntry;
       entr->node = cur_node;
       entr->path = node_cache.top()->path + *part_it + "/";
       node_cache.push(entr);
-      past1Mode = past2Mode;
-      past2Mode = passthroughMode;
+      past_1_mode = past_2_mode;
+      past_2_mode = passthrough_mode;
     }
     cur_node->mode = inclusion_mode;
-    if (inclusion_mode != '!' && past1Mode == '-') {
+    if (inclusion_mode != '!' && past_1_mode == '-') {
       node_cache.pop();
       while (!node_cache.empty() && node_cache.top()->node->mode == '-') {
         node_cache.top()->node->mode = '_';

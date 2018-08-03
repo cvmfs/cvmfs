@@ -49,8 +49,6 @@ set(CVMFS_UNITTEST_FILES
   t_dns.cc
   t_download.cc
   t_encrypt.cc
-  export_plugin/t_fs_traversal_interface.cc
-  export_plugin/test-util.cc
   t_fd_table.cc
   t_fence.cc
   t_fetch.cc

@@ -120,8 +120,8 @@ struct fs_traversal_context *posix_initialize(
   const char *repo,
   const char *base,
   const char *data,
-  int num_threads,
-  const char *config);
+  const char *config,
+  int num_threads);
 
 void posix_finalize(struct fs_traversal_context *ctx);
 
@@ -664,8 +664,8 @@ struct fs_traversal_context *posix_initialize(
   const char *repo,
   const char *base,
   const char *data,
-  int num_threads,
-  const char *config) {
+  const char *config,
+  int num_threads) {
   fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
   result->lib_version = strdup("1.0");
