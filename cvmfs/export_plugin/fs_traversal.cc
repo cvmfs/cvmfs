@@ -123,10 +123,6 @@ class RecDir {
     free(dir);
   }
 
-  bool IsTerminateJob() const {
-    return (dir == NULL);
-  }
-
   char *dir;
   bool recursive;
 };
@@ -194,12 +190,8 @@ bool cvmfs_attr_cmp(struct cvmfs_attr *src, struct cvmfs_attr *dest,
   if (S_ISLNK(src->st_mode)) {
     if (strcmp(src->cvm_symlink, dest->cvm_symlink)) { return false; }
   }
-  if (src->cvm_name != NULL && dest->cvm_name != NULL) {
-    if (strcmp(src->cvm_name, dest->cvm_name)) { return false; }
-  } else if ((!src->cvm_name && dest->cvm_name) ||
-            (src->cvm_name && !dest->cvm_name)) {
-    return false;
-  }
+
+  if (strcmp(src->cvm_name, dest->cvm_name)) { return false; }
 
   // TODO(nhazekam): Not comparing Xattrs yet
   // void *       cvm_xattrs;
@@ -214,44 +206,49 @@ bool copyFile(
   perf::Statistics *pstats
 ) {
   int retval;
+  bool status = true;
+  size_t bytes_transferred = 0;
 
   void *src  = src_fs->get_handle(src_fs->context_, src_name);
   void *dest = dest_fs->get_handle(dest_fs->context_, dest_name);
 
   retval = src_fs->do_fopen(src, fs_open_read);
   if (retval != 0) {
-    // Handle error
     LogCvmfs(kLogCvmfs, kLogStderr,
-    "Failed open src : %s : %d : %s\n",
-    src_name, errno, strerror(errno));
-    return false;
+      "Failed open src : %s : %d : %s\n",
+      src_name, errno, strerror(errno));
+    status = false;
+    goto copy_fail;
   }
 
   retval = dest_fs->do_fopen(dest, fs_open_write);
   if (retval != 0) {
-    // Handle error
     LogCvmfs(kLogCvmfs, kLogStderr,
-    "Failed open dest : %s : %d : %s\n",
-    dest_name, errno, strerror(errno));
-    return false;
+      "Failed open dest : %s : %d : %s\n",
+      dest_name, errno, strerror(errno));
+    status = false;
+    goto copy_fail;
   }
-  size_t bytes_transferred = 0;
-  while (1) {
+
+  while (status) {
     char buffer[COPY_BUFFER_SIZE];
 
     size_t actual_read = 0;
     retval = src_fs->do_fread(src, buffer, sizeof(buffer), &actual_read);
     if (retval != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-      "Read failed : %d %s\n", errno, strerror(errno));
-      return false;
+        "Read failed : %d %s\n", errno, strerror(errno));
+      status = false;
+      goto copy_fail;
     }
     bytes_transferred+=actual_read;
+
     retval = dest_fs->do_fwrite(dest, buffer, actual_read);
     if (retval != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-      "Write failed : %d %s\n", errno, strerror(errno));
-      return false;
+        "Write failed : %d %s\n", errno, strerror(errno));
+      status = false;
+      goto copy_fail;
     }
 
     if (actual_read < COPY_BUFFER_SIZE) {
@@ -262,25 +259,29 @@ bool copyFile(
 
   retval = src_fs->do_fclose(src);
   if (retval != 0) {
-    // Handle error
     LogCvmfs(kLogCvmfs, kLogStderr,
-    "Failed close src : %s : %d : %s\n",
-    src_name, errno, strerror(errno));
-    return false;
+      "Failed close src : %s : %d : %s\n",
+      src_name, errno, strerror(errno));
+    status = false;
+    goto copy_fail;
   }
-  src_fs->do_ffree(src);
 
   retval = dest_fs->do_fclose(dest);
   if (retval != 0) {
-    // Handle error
     LogCvmfs(kLogCvmfs, kLogStderr,
-    "Failed close dest : %s : %d : %s\n",
-    dest_name, errno, strerror(errno));
-    return false;
+      "Failed close dest : %s : %d : %s\n",
+      dest_name, errno, strerror(errno));
+    status = false;
+    goto copy_fail;
   }
+
+copy_fail:
+  // This function will close the file if still open
+  // and free the handle.
+  src_fs->do_ffree(src);
   dest_fs->do_ffree(dest);
 
-  return true;
+  return status;
 }
 
 char *get_full_path(const char *dir, const char *entry) {
@@ -416,9 +417,8 @@ bool handle_file(
     pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_BYTES)->Xadd(src_st->st_size);
   }
 
-  // Should probably happen in the copy function as it is parallel
-  // Also this needs to be separate from copyFile, the target file
-  // could already exist and the link needs to be created anyway.
+  // The target alway exists (either previously existed or just created).
+  // This is not done in parallel like copyFile
   if (result && dest->do_link(dest->context_, entry, dest_data)) {
     LogCvmfs(kLogCvmfs, kLogStderr,
       "Failed to link %s->%s : %d : %s",
@@ -459,6 +459,20 @@ void add_dir_for_sync(const char *dir, bool recursive) {
   dirs_.push_back(new RecDir(dir, recursive));
 }
 
+// Compares possibly null strings.
+// If  1->handle destination
+// If -1->handle source
+// If  0->handle both
+int robust_strcmp(const char *src, const char *dest) {
+  if (!src) {
+    return 1;
+  } else if (!dest) {
+    return -1;
+  } else {
+    return strcmp(src, dest);
+  }
+}
+
 bool Sync(
   const char *dir,
   struct fs_traversal *src,
@@ -466,6 +480,7 @@ bool Sync(
   bool recursive,
   perf::Statistics *pstats,
   bool do_fsck) {
+  bool result = true;
   int cmp = 0;
 
   char **src_dir = NULL;
@@ -483,13 +498,12 @@ bool Sync(
   dest->list_dir(dest->context_, dir, &dest_dir, &dest_len);
   qsort(dest_dir, dest_len, sizeof(char *),  strcmp_list);
 
-  // While both have defined members to compare.
-  while (1) {
+  // While either have defined members and there hasn't been a failure
+  while (result) {
     if (cmp <= 0) {
       getNext(src, dir, src_dir, &src_entry, &src_iter,
             &src_st, true, true, pstats);
     }
-
     if (cmp >= 0) {
       getNext(dest, dir, dest_dir, &dest_entry, &dest_iter,
               &dest_st, do_fsck, false, pstats);
@@ -498,16 +512,11 @@ bool Sync(
       pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
     }
 
-    if (!src_entry && !dest_entry) {
-      // If we have visited all entries in both we break
+    // All entries in both have been visited
+    if (!src_entry && !dest_entry)
       break;
-    } else if (!src_entry) {
-      cmp = 1;
-    } else if (!dest_entry) {
-      cmp = -1;
-    } else {
-      cmp = strcmp(src_entry, dest_entry);
-    }
+
+    cmp = robust_strcmp(src_entry, dest_entry);
 
     if (cmp <= 0) {
       // Compares stats to see if they are equivalent
@@ -525,12 +534,12 @@ bool Sync(
       switch (src_st->st_mode & S_IFMT) {
         case S_IFREG:
           if (!handle_file(src, src_st, dest, dest_st, src_entry, pstats))
-            return false;
+            result = false;
           break;
         case S_IFDIR:
           if (!handle_dir(src, src_st, dest, dest_st, src_entry))
-            return false;
-          if (recursive)
+            result = false;
+          if (result && recursive)
             add_dir_for_sync(src_entry, recursive);
           break;
         case S_IFLNK:
@@ -540,7 +549,7 @@ bool Sync(
             LogCvmfs(kLogCvmfs, kLogStderr,
               "Traversal failed to symlink %s->%s : %d : %s",
               src_entry, src_st->cvm_symlink, errno, strerror(errno));
-            return false;
+            result = false;
           }
           break;
         default:
@@ -548,7 +557,7 @@ bool Sync(
             "Encountered unknown file type '%d' for source file %s",
               src_st->st_mode & S_IFMT,
               src_entry);
-          return false;
+          result = false;
       }
     /* Dest contains something missing from Src */
     } else {
@@ -558,24 +567,30 @@ bool Sync(
           if (dest->do_unlink(dest->context_, dest_entry) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
               "Failed to unlink file %s", dest_entry);
-            return false;
+            result = false;
           }
           break;
         case S_IFDIR:
-          Sync(dest_entry, src, dest, true, pstats, false);
+          // This is recursive so that the contents of the directory
+          // are removed before trying to remove the directory. If
+          // tail recursed, do_rmdir will fail as there are still
+          // contents.
+          if (!Sync(dest_entry, src, dest, true, pstats, false)) {
+            result = false;
+            break;
+          }
           if (dest->do_rmdir(dest->context_, dest_entry) != 0) {
             LogCvmfs(kLogCvmfs, kLogStderr,
               "Failed to remove directory %s", dest_entry);
-            return false;
+            result = false;
           }
           break;
         default:
-          // Unknown file type, should print error (what stream? log?)
           LogCvmfs(kLogCvmfs, kLogStderr,
             "Encountered unknown file type '%d' for destination file %s",
               dest_st->st_mode & S_IFMT,
               dest_entry);
-          return false;
+          result = false;
       }
     }
   }
@@ -590,7 +605,7 @@ bool Sync(
   if (dest_st)
     cvmfs_attr_free(dest_st);
 
-  return true;
+  return result;
 }
 
 bool SyncFull(
