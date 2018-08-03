@@ -232,8 +232,8 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 
   } else {
     LogCvmfs(kLogUnionFs, kLogStderr,
-             "Fatal error found unexpected file: \n%s\n", filename.c_str());
-    abort();
+             "Warning found unexpected file: \n%s\n", filename.c_str());
+    read_archive_signal_->Wakeup();
   }
 }
 
