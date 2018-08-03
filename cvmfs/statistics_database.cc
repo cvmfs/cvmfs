@@ -57,11 +57,14 @@ struct Stats {
   * @param stats a struct with all values stored in strings
   * @return the insert statement
   */
-std::string PrepareStatement(const perf::Statistics *statistics) {
+std::string PrepareStatement(const perf::Statistics *statistics,
+                            const std::string start_time,
+                            const std::string finished_time) {
   struct Stats stats = Stats(statistics);
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
-    "timestamp,"
+    "start_time,"
+    "finished_time,"
     "files_added,"
     "files_removed,"
     "files_changed,"
@@ -73,7 +76,8 @@ std::string PrepareStatement(const perf::Statistics *statistics) {
     "sz_bytes_removed,"
     "sz_bytes_uploaded)"
     " VALUES("
-    "'"+GetGMTimestamp()+"',"+  // TEXT
+    "'"+start_time+"',"+
+    "'"+finished_time+"',"+
     stats.files_added+"," +
     stats.files_removed +","+
     stats.files_changed + "," +
@@ -94,7 +98,8 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
   return sqlite::Sql(sqlite_db(),
     "CREATE TABLE publish_statistics ("
-    "timestamp TEXT,"
+    "start_time TEXT,"
+    "finished_time TEXT,"
     "files_added INTEGER,"
     "files_removed INTEGER,"
     "files_changed INTEGER,"
@@ -105,7 +110,7 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "sz_bytes_added INTEGER,"
     "sz_bytes_removed INTEGER,"
     "sz_bytes_uploaded INTEGER,"
-    "CONSTRAINT pk_publish_statistics PRIMARY KEY (timestamp));").Execute();
+    "CONSTRAINT pk_publish_statistics PRIMARY KEY (start_time));").Execute();
 }
 
 
@@ -149,8 +154,12 @@ StatisticsDatabase::~StatisticsDatabase() {
 }
 
 
-int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics) {
-  sqlite::Sql insert(this->sqlite_db(), PrepareStatement(statistics));
+int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
+                                        const std::string start_time,
+                                        const std::string finished_time) {
+  sqlite::Sql insert(this->sqlite_db(),
+                      PrepareStatement(statistics, start_time,
+                                                   finished_time));
 
   if (!this->BeginTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");

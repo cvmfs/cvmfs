@@ -55,7 +55,9 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   *
   * @return 0 if no error occured or a negative integer if errors occurred
   */
-  int StoreStatistics(const perf::Statistics *statistics);
+  int StoreStatistics(const perf::Statistics *statistics,
+                      const std::string start_time,
+                      const std::string finished_time);
 
 /**
   * Get the path for the database file

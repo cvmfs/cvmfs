@@ -187,7 +187,10 @@ int main(int argc, char **argv) {
   }
 
   // run the command
+  string start_time = GetGMTimestamp();
   const int retval = command->Main(args);
+  string finished_time = GetGMTimestamp();
+
   if (display_statistics) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
@@ -210,7 +213,8 @@ int main(int argc, char **argv) {
     if (!db.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
               "Couldn't create StatisticsDatabase object!");
-    } else if (db->StoreStatistics(command->statistics()) != 0) {
+    } else if (db->StoreStatistics(command->statistics(),
+                                    start_time, finished_time) != 0) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
             "Couldn't store statistics in %s!",
             db_file_path.c_str());
