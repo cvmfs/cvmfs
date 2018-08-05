@@ -49,6 +49,7 @@ void PosixCheckDirStructure(
         // Once directory created: Prepare substructures
         PosixCheckDirStructure(this_path, mode, depth+1);
       }
+      break;
     } else {
       // Directories on this level fully created; check ./
       PosixCheckDirStructure(cur_path+"/"+max_dir_name, mode, depth+1);

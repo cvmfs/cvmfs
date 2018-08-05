@@ -58,7 +58,7 @@ class T_Fs_Traversal_Interface :
     context_ = fs_traversal_instance_->interface->initialize(
       repo,
       repo,
-      fs_traversal_instance_->data, 4, NULL);
+      fs_traversal_instance_->data, NULL, 4);
     fs_traversal_instance_->interface->context_ = context_;
   }
 
@@ -596,12 +596,12 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
   struct fs_traversal *src = posix_get_interface();
   struct fs_traversal_context *context =
     src->initialize(
-      src_name.c_str(), repoName.c_str(), NULL, 4, NULL);
+      src_name.c_str(), repoName.c_str(), NULL, NULL, 4);
   src->context_ = context;
 
   struct fs_traversal *dest = posix_get_interface();
   context = dest->initialize(
-    src_name.c_str(), repoName.c_str(), NULL, 4, NULL);
+    src_name.c_str(), repoName.c_str(), NULL, NULL, 4);
   dest->context_ = context;
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
@@ -610,7 +610,7 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
 
   dest->finalize(dest->context_);
   context = dest->initialize(
-    dest_name.c_str(), repoName.c_str(), dest_data.c_str(), 4, NULL);
+    dest_name.c_str(), repoName.c_str(), dest_data.c_str(), NULL, 4);
   dest->context_ = context;
 
   EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, false));
@@ -635,10 +635,10 @@ TEST_P(T_Fs_Traversal_Interface, FsckPosixToPosix) {
 
   struct fs_traversal_context *context =
     src->initialize(src_name.c_str(), repoName.c_str(),
-    NULL, 4, NULL);
+    NULL, NULL, 4);
   src->context_ = context;
   context = dest->initialize(dest_name.c_str(), repoName.c_str(),
-    dest_data.c_str(), 4, NULL);
+    dest_data.c_str(), NULL, 4);
   dest->context_ = context;
 
   ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, true));

@@ -35,9 +35,8 @@
 // 26: CernVM-FS 2.5.0
 #define LIBCVMFS_REVISION 26
 
-#include <inttypes.h>
+#include <stdint.h>
 #include <sys/stat.h>
-#include <time.h>
 #include <unistd.h>
 
 // Legacy error codes
@@ -401,8 +400,7 @@ int cvmfs_listdir(
   size_t *buflen);
 
 /**
- * Get list of directory contents.  The directory contents includes "." and
- * "..".
+ * Get list of directory contents.  The list does not include "." or "..".
  *
  * On return, the array will contain a NULL-terminated list of strings.  The
  * caller must free the strings and the array containing them.  The array (*buf)

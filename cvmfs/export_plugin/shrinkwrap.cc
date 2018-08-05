@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   src->context_ = src->initialize(repo, src_base, src_cache,
-    num_parallel, src_config);
+    src_config, num_parallel);
   if (!src->context_) {
     LogCvmfs(kLogCvmfs, kLogStdout,
       "Unable to initialize src: type %s", src_type);
@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   dest->context_ = dest->initialize(repo, dest_base, dest_cache,
-    num_parallel, dest_config);
+    dest_config, num_parallel);
   if (!dest->context_) {
     LogCvmfs(kLogCvmfs, kLogStdout,
       "Unable to initialize src: type %s", dest_type);
