@@ -133,7 +133,7 @@ uint32_t WritableCatalog::GetMaxLinkId() const {
 
 
 /**
- * Adds a direcotry entry.
+ * Adds a directory entry.
  * @param entry the DirectoryEntry to add to the catalog
  * @param entry_path the full path of the DirectoryEntry to add
  * @param parent_path the full path of the containing directory

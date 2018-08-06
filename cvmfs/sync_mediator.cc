@@ -188,7 +188,7 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
   }
 
   PrintWarning("'" + entry->GetRelativePath() +
-               "' cannot be touched. Unrecognied file type.");
+               "' cannot be touched. Unrecognized file type.");
 }
 
 
