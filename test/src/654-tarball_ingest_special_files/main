@@ -41,6 +41,10 @@ produce_tarball() {
   ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink2.txt
   ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink3.txt
 
+  # use 0 (zero) as major number to automatically allocate a free major number
+  mknod tarball_foo/char_device c 0 42
+  mknod tarball_foo/block_device b 0 24
+
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
 
@@ -200,6 +204,23 @@ cvmfs_run_test() {
   else
     echo "*** Found also hardlink $file"
   fi
+
+  chardevice=$result_dir/char_device
+  if [ ! -c $chardevice ]; then
+    echo "*** Error not found chardevice $chardevice"
+    return 16
+  else
+    echo "*** Found also chardevice $chardevice"
+  fi
+
+  blockdevice=$result_dir/block_device
+  if [ ! -b $blockdevice ]; then
+    echo "*** Error not found blockdevice $blockdevice"
+    return 17
+  else
+    echo "*** Found also blockdevice $blockdevice"
+  fi
+
 
   return 0
 }
