@@ -11,6 +11,10 @@ argparser.add_argument("command",
     choices=["init", "prepare", "inject"])
 argparser.add_argument("host",
   type=str)
+argparser.add_argument("user",
+  type=str)
+argparser.add_argument("pw",
+  type=str)
 argparser.add_argument("image",
   type=str)
 argparser.add_argument("source_tag",
@@ -25,7 +29,7 @@ argparser.add_argument("--dest_tag",
   type=str)
 args = argparser.parse_args()
 
-injector = DockerInjector(args.host, args.image, args.source_tag)
+injector = DockerInjector(args.host, args.image, args.source_tag, args.user, args.pw)
 if args.command == "init":
   injector.setup(args.dest_tag)
 elif args.command == "prepare":
