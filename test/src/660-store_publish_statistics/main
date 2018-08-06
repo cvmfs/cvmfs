@@ -178,16 +178,16 @@ cvmfs_run_test() {
   # check publish statistics
   for i in `seq 1 $CVMFS_TEST_660_NR_OF_TESTS`;
   do
-    local files_added=$(cat test_660_$i | cut -d '|' -f 3)
-    local files_removed=$(cat test_660_$i | cut -d '|' -f 4)
-    local files_changed=$(cat test_660_$i | cut -d '|' -f 5)
-    local duplicated_files=$(cat test_660_$i | cut -d '|' -f 6)
-    local directories_added=$(cat test_660_$i | cut -d '|' -f 7)
-    local directories_removed=$(cat test_660_$i | cut -d '|' -f 8)
-    local directories_changed=$(cat test_660_$i | cut -d '|' -f 9)
-    local bytes_added=$(cat test_660_$i | cut -d '|' -f 10)
-    local bytes_removed=$(cat test_660_$i | cut -d '|' -f 11)
-    local bytes_uploaded=$(cat test_660_$i | cut -d '|' -f 12)
+    local files_added=$(cat test_660_$i | cut -d '|' -f 4)
+    local files_removed=$(cat test_660_$i | cut -d '|' -f 5)
+    local files_changed=$(cat test_660_$i | cut -d '|' -f 6)
+    local duplicated_files=$(cat test_660_$i | cut -d '|' -f 7)
+    local directories_added=$(cat test_660_$i | cut -d '|' -f 8)
+    local directories_removed=$(cat test_660_$i | cut -d '|' -f 9)
+    local directories_changed=$(cat test_660_$i | cut -d '|' -f 10)
+    local bytes_added=$(cat test_660_$i | cut -d '|' -f 11)
+    local bytes_removed=$(cat test_660_$i | cut -d '|' -f 12)
+    local bytes_uploaded=$(cat test_660_$i | cut -d '|' -f 13)
 
     if [ "x$files_added" != "x${test_results[$i,1]}" ]; then
       echo "*** Test $i.1 - number of added files - \

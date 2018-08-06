@@ -98,6 +98,7 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
   return sqlite::Sql(sqlite_db(),
     "CREATE TABLE publish_statistics ("
+    "publish_id INTEGER PRIMARY KEY,"
     "start_time TEXT,"
     "finished_time TEXT,"
     "files_added INTEGER,"
@@ -109,8 +110,7 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "directories_changed INTEGER,"
     "sz_bytes_added INTEGER,"
     "sz_bytes_removed INTEGER,"
-    "sz_bytes_uploaded INTEGER,"
-    "CONSTRAINT pk_publish_statistics PRIMARY KEY (start_time));").Execute();
+    "sz_bytes_uploaded INTEGER);").Execute();
 }
 
 
