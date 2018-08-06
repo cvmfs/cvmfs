@@ -15,7 +15,7 @@ bool           StatisticsDatabase::compacting_fails        = false;
 
 namespace {
 
-struct Stats {
+struct PublishStats {
   std::string files_added;
   std::string files_removed;
   std::string files_changed;
@@ -27,7 +27,7 @@ struct Stats {
   std::string bytes_removed;
   std::string bytes_uploaded;
 
-  explicit Stats(const perf::Statistics *statistics):
+  explicit PublishStats(const perf::Statistics *statistics):
     files_added(statistics->
                     Lookup("Publish.n_files_added")->ToString()),
     files_removed(statistics->
@@ -51,16 +51,36 @@ struct Stats {
   }
 };
 
+
+struct GcStats {
+  std::string n_preserved_catalogs;
+  std::string n_condemned_catalogs;
+  std::string n_condemned_objects;
+  std::string sz_condemned_bytes;
+
+  explicit GcStats(const perf::Statistics *statistics):
+    n_preserved_catalogs(statistics->
+                    Lookup("gc.n_preserved_catalogs")->ToString()),
+    n_condemned_catalogs(statistics->
+                    Lookup("gc.n_condemned_catalogs")->ToString()),
+    n_condemned_objects(statistics->
+                    Lookup("gc.n_condemned_objects")->ToString()),
+    sz_condemned_bytes(statistics->
+                    Lookup("gc.sz_condemned_bytes")->ToString()) {
+  }
+};
+
+
 /**
-  * Build the insert statement.
+  * Build the insert statement into publish_statistics table.
   *
   * @param stats a struct with all values stored in strings
   * @return the insert statement
   */
-std::string PrepareStatement(const perf::Statistics *statistics,
+std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
                             const std::string start_time,
                             const std::string finished_time) {
-  struct Stats stats = Stats(statistics);
+  struct PublishStats stats = PublishStats(statistics);
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
     "start_time,"
@@ -88,6 +108,40 @@ std::string PrepareStatement(const perf::Statistics *statistics,
     stats.bytes_added + "," +
     stats.bytes_removed + "," +
     stats.bytes_uploaded + ");";
+  return insert_statement;
+}
+
+
+/**
+  * Build the insert statement into gc_statistics table.
+  *
+  * @param stats a struct with all values stored in strings
+  * @return the insert statement
+  */
+std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
+                            const std::string start_time,
+                            const std::string finished_time) {
+  struct GcStats stats = GcStats(statistics);
+  printf("---------- %s %s %s %s\n", stats.n_preserved_catalogs.c_str(),
+                                     stats.n_condemned_catalogs.c_str(),
+                                     stats.n_condemned_objects.c_str(),
+                                     stats.sz_condemned_bytes.c_str());
+  std::string insert_statement =
+    "INSERT INTO gc_statistics ("
+    "start_time,"
+    "finished_time,"
+    "n_preserved_catalogs,"
+    "n_condemned_catalogs,"
+    "n_condemned_objects,"
+    "sz_condemned_bytes)"
+    " VALUES("
+    "'"+start_time+"',"+
+    "'"+finished_time+"',"+
+    stats.n_preserved_catalogs +"," +
+    stats.n_condemned_catalogs +","+
+    stats.n_condemned_objects + "," +
+    stats.sz_condemned_bytes + ");";
+    printf("%s\n", insert_statement.c_str());
   return insert_statement;
 }
 
@@ -166,26 +220,42 @@ StatisticsDatabase::~StatisticsDatabase() {
 
 int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
                                         const std::string start_time,
-                                        const std::string finished_time) {
-  sqlite::Sql insert(this->sqlite_db(),
-                      PrepareStatement(statistics, start_time,
-                                                   finished_time));
+                                        const std::string finished_time,
+                                        const std::string command_name) {
+  std::string insert_statement;
+  printf("--------- 1 \n");
+  if (command_name == "ingest" || command_name == "sync") {
+    insert_statement = PrepareStatementIntoPublish(statistics, start_time,
+                                                               finished_time);
+  } else if (command_name == "gc") {
+    insert_statement = PrepareStatementIntoGc(statistics, start_time,
+                                                          finished_time);
+  } else {
+    return -5;
+  }
+  printf("--------- 2 \n");
+  printf("insert_statement = %s\n", insert_statement.c_str());
+  sqlite::Sql insert(this->sqlite_db(), insert_statement);
+  printf("--------- 3 \n");
 
   if (!this->BeginTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
     return -1;
   }
 
+  printf("--------- 4 \n");
   if (!insert.Execute()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
     return -2;
   }
 
+  printf("--------- 5 \n");
   if (!insert.Reset()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Reset() failed!");
     return -3;
   }
 
+  printf("--------- 6 \n");
   if (!this->CommitTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "CommitTransaction failed!");
     return -4;

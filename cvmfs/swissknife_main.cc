@@ -201,7 +201,14 @@ int main(int argc, char **argv) {
   if (command->GetName() == "sync" || command->GetName() == "ingest"
                                    || command->GetName() == "gc") {
     UniquePtr<StatisticsDatabase> db;
-    string repo_name = *args.find('N')->second;
+
+    string repo_name;
+    if (args.find('N') != args.end()) {
+      string repo_name = *args.find('N')->second;
+    } else if (args.find('n') != args.end()) {
+      string repo_name = *args.find('n')->second;
+    }
+
     string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
 
     if (FileExists(db_file_path)) {
@@ -221,8 +228,8 @@ int main(int argc, char **argv) {
     if (!db.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
               "Couldn't create StatisticsDatabase object!");
-    } else if (db->StoreStatistics(command->statistics(),
-                                    start_time, finished_time) != 0) {
+    } else if (db->StoreStatistics(command->statistics(), start_time,
+                                   finished_time, command->GetName()) != 0) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
             "Couldn't store statistics in %s!",
             db_file_path.c_str());
