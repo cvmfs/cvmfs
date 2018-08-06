@@ -136,7 +136,7 @@ class DockerInjector:
       print(tmp_file.name)
       _, error = exec_bash("tar -C "+src_dir+" -cvf "+tmp_file.name+" .")
       if error:
-        print("Failed to tar with error " + error)
+        print("Failed to tar with error " + str(error))
         return
       tar_digest = hash_file(tmp_file.name)
       gz_dest = tmp_file.name+".gz"

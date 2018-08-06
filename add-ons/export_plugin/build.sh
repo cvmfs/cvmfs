@@ -91,8 +91,8 @@ main() {
   if [ ! -z "$DO_GC" ]
   then
     CMD=$CMD" -g"
+    eval  $CMD
   fi
-  eval  $CMD
 }
 
 parse_args $@
