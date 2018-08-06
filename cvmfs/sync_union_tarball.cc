@@ -177,6 +177,12 @@ void SyncUnionTarball::Traverse() {
 
 void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   std::string archive_file_path(archive_entry_pathname(entry));
+  if (archive_file_path.length() >= 2) {
+    if (archive_file_path[0] == '.' && archive_file_path[1] == '/') {
+      archive_file_path = archive_file_path.erase(0, 2);
+    }
+  }
+
   std::string complete_path =
       MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
 
