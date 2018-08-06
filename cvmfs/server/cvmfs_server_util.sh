@@ -960,7 +960,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
     eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
-    masterkeycard ingest"
+    masterkeycard ingest merge-stats print-stats"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1115,6 +1115,15 @@ Supported Commands:
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
                   Use '-' as -t argument to read the tarball from STDIN.
+  print-stats     [-o output_file]
+                  [-t table_name]
+                  [-s separator] - char
+                  <fully qualified name>
+                  Print statistics values for a table (default publish_statistics)
+                  using the separator specified. (default  '|')
+  merge-stats     [-o output db file]
+                  <db_file_1> <db_file_2>
+                  Merge tables from two database files.
 "
 
 
