@@ -1,3 +1,6 @@
+#
+# This file is part of the CernVM File System.
+#
 TRACE_DIR=/tmp/cvmfs-trace
 SPEC_DIR=/tmp/cvmfs-spec
 POLICY="pdir"

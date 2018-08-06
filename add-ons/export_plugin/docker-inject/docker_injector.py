@@ -1,3 +1,6 @@
+#
+# This file is part of the CernVM File System.
+#
 from datetime import datetime, timezone
 from dxf import DXF, hash_file, hash_bytes
 import json
@@ -11,17 +14,24 @@ def exec_bash(cmd):
   process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   output, error = process.communicate()
   return (output, error)
-# TODO(steuber): Error handling with throws
+
 class FatManifest:
+  """
+  Class which represents a "fat" OCI image configuration manifest
+  """
   def __init__(self, manif):
     self.manif = json.loads(manif)
+
   def init_cvmfs_layer(self, tar_digest, gz_digest):
+    """
+    Method which initializes the cvmfs injection capability by adding an empty /cvmfs layer
+    to the image's fat manifest
+    """
     if self.manif["rootfs"]["type"] != "layers":
-      print("Cannot inject in rootfs of type " + self.manif["rootfs"]["type"])
-      print("Currently only supporting layer rootfs")
-      return
+      raise ValueError("Cannot inject in rootfs of type " + self.manif["rootfs"]["type"])
     self.manif["rootfs"]["diff_ids"].append(tar_digest)
-                                   
+    
+    # Write history
     local_time = datetime.now(timezone.utc).astimezone()
     self.manif["history"].append({
       "created":local_time.isoformat(),
@@ -29,6 +39,8 @@ class FatManifest:
       "author":"cvmfs_shrinkwrap",
       "comment": "This change was executed through the CVMFS Shrinkwrap Docker Injector"
     })
+
+    # Setup labels
     if "Labels" not in self.manif["config"]:
       self.manif["config"]["Labels"] = {}
     self.manif["config"]["Labels"]["cvmfs_injection_tar"] = tar_digest
@@ -39,10 +51,13 @@ class FatManifest:
         self.manif["container_config"]["Labels"] = {}
       self.manif["container_config"]["Labels"]["cvmfs_injection_tar"] = tar_digest
       self.manif["container_config"]["Labels"]["cvmfs_injection_gz"] = gz_digest
+
   def inject(self, tar_digest, gz_digest):
+    """
+    Injects a new version of the layer by replacing the corresponding digests
+    """
     if not self.is_cvmfs_prepared():
-      print("Cannot inject in unprepated image")
-      return
+      raise ValueError("Cannot inject in unprepated image")
     old_tar_digest = self.manif["config"]["Labels"]["cvmfs_injection_tar"]
 
     self.manif["container_config"]["Labels"]["cvmfs_injection_tar"] = tar_digest
@@ -50,9 +65,14 @@ class FatManifest:
     self.manif["config"]["Labels"]["cvmfs_injection_tar"] = tar_digest
     self.manif["config"]["Labels"]["cvmfs_injection_gz"] = gz_digest
 
+    found = False
     for i in range(len(self.manif["rootfs"]["diff_ids"])):
       if self.manif["rootfs"]["diff_ids"][i] == old_tar_digest:
         self.manif["rootfs"]["diff_ids"][i] = tar_digest
+        found = True
+        break
+    if not found:
+      raise ValueError("Image did not contain old cvmfs injection!")
     
     local_time = datetime.now(timezone.utc).astimezone()
     self.manif["history"].append({
@@ -64,19 +84,41 @@ class FatManifest:
     })
     
   def is_cvmfs_prepared(self):
+    """
+    Checks whether image is prepared for cvmfs injection
+    """
     return "cvmfs_injection_gz" in self.manif["config"]["Labels"]\
       and "cvmfs_injection_tar" in self.manif["config"]["Labels"]
+
   def get_gz_digest(self):
+    """
+    Retrieves the GZ digest necessary for layer downloading
+    """
     return self.manif["config"]["Labels"]["cvmfs_injection_gz"]
+
   def as_JSON(self):
+    """
+    Retrieve JSON version of OCI manifest (for upload)
+    """
     return json.dumps(self.manif)
 
 class ImageManifest:
+  """
+  Class which represents the "slim" image manifest used by the OCI distribution spec
+  """
   def __init__(self, manif):
     self.manif = json.loads(manif)
   def get_fat_manif_digest(self):
+    """
+    Method for retrieving the digest (content address) of the manifest.
+    """
     return self.manif['config']['digest']
+
   def init_cvmfs_layer(self, layer_digest, layer_size, manifest_digest, manifest_size):
+    """
+    Method which initializes the cvmfs injection capability by adding an empty /cvmfs layer
+    to the image's slim manifest
+    """
     self.manif["layers"].append({
       'mediaType':'application/vnd.docker.image.rootfs.diff.tar.gzip',
       'size':layer_size,
@@ -85,6 +127,9 @@ class ImageManifest:
     self.manif["config"]["size"] = manifest_size
     self.manif["config"]["digest"] = manifest_digest
   def inject(self ,old, new, layer_size, manifest_digest, manifest_size):
+    """
+    Injects a new version of the layer by replacing the corresponding digest
+    """
     for i in range(len(self.manif["layers"])):
       if self.manif["layers"][i]["digest"] == old:
         self.manif["layers"][i]["digest"] = new
@@ -95,13 +140,23 @@ class ImageManifest:
     return json.dumps(self.manif)
 
 class DockerInjector:
+  """
+  The main class of the Docker injector which injects new versions of a layer into 
+  OCI images retrieved from an OCI compliant distribution API
+  """
   def __init__(self, host, repo, alias):
+    """
+    Initializes the injector by downloading both the slim and the fat image manifest
+    """
     # TODO(steuber): remove tlsverify
     self.dxfObject = DXF(host, repo, tlsverify=False)
     self.image_manifest = self._get_manifest(alias)
     self.fat_manifest = self._get_fat_manifest(self.image_manifest)
 
   def setup(self, push_alias):
+    """
+    Sets an image up for layer injection
+    """
     tar_digest, gz_digest = self._build_init_tar()
     layer_size = self.dxfObject.blob_size(gz_digest)
     self.fat_manifest.init_cvmfs_layer(tar_digest, gz_digest)
@@ -115,6 +170,9 @@ class DockerInjector:
     self.dxfObject.set_manifest(push_alias, image_man_json)
   
   def unpack(self, dest_dir):
+    """
+    Unpacks the current version of a layer into the dest_dir directory in order to update it
+    """
     if not self.fat_manifest.is_cvmfs_prepared():
       print("This image is not correctly prepared for cvmfs injection (lacking Docker labels)")
     gz_digest = self.fat_manifest.get_gz_digest()
@@ -132,18 +190,20 @@ class DockerInjector:
       tar.close()
 
   def update(self, src_dir, push_alias):
+    """
+    Packs and uploads the contents of src_dir as a layer and injects the layer into the image.
+    The new layer version is stored under the tag push_alias
+    """
     with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
       print(tmp_file.name)
       _, error = exec_bash("tar -C "+src_dir+" -cvf "+tmp_file.name+" .")
       if error:
-        print("Failed to tar with error " + str(error))
-        return
+        raise RuntimeError("Failed to tar with error " + str(error))
       tar_digest = hash_file(tmp_file.name)
       gz_dest = tmp_file.name+".gz"
       _, error = exec_bash("gzip "+tmp_file.name)
       if error:
-        print("Failed to tar with error " + str(error))
-        return
+        raise RuntimeError("Failed to tar with error " + str(error))
       gz_digest = self.dxfObject.push_blob(gz_dest)
       os.unlink(gz_dest)
     old_gz_digest = self.fat_manifest.get_gz_digest()
@@ -165,7 +225,7 @@ class DockerInjector:
 
   def _get_fat_manifest(self, image_manifest):
     fat_manifest = ""
-    (readIter, size) = self.dxfObject.pull_blob(self.image_manifest.get_fat_manif_digest(), size=True, chunk_size=4096)
+    (readIter, _) = self.dxfObject.pull_blob(self.image_manifest.get_fat_manif_digest(), size=True, chunk_size=4096)
     for chunk in readIter:
       fat_manifest += str(chunk)[2:-1]
     fat_manifest = fat_manifest.replace("\\\\","\\")
