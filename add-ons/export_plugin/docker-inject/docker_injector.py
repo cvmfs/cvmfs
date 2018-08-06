@@ -3,6 +3,7 @@
 #
 from datetime import datetime, timezone
 from dxf import DXF, hash_file, hash_bytes
+from dxf.exceptions import DXFUnauthorizedError
 import json
 import subprocess
 import tarfile
@@ -100,7 +101,8 @@ class FatManifest:
     """
     Retrieve JSON version of OCI manifest (for upload)
     """
-    return json.dumps(self.manif)
+    res = json.dumps(self.manif)
+    return res
 
 class ImageManifest:
   """
@@ -137,20 +139,23 @@ class ImageManifest:
     self.manif["config"]["size"] = manifest_size
     self.manif["config"]["digest"] = manifest_digest
   def as_JSON(self):
-    return json.dumps(self.manif)
+    res = json.dumps(self.manif)
+    return res
 
 class DockerInjector:
   """
   The main class of the Docker injector which injects new versions of a layer into 
   OCI images retrieved from an OCI compliant distribution API
   """
-  def __init__(self, host, repo, alias):
+  def __init__(self, host, repo, alias, user, pw):
     """
     Initializes the injector by downloading both the slim and the fat image manifest
     """
     # TODO(steuber): remove tlsverify
-    self.dxfObject = DXF(host, repo, tlsverify=False)
-    self.image_manifest = self._get_manifest(alias)
+    def auth(dxf, response):
+      dxf.authenticate(user, pw, response=response)
+    self.dxfObject = DXF(host, repo, tlsverify=True, auth=auth)
+    self.image_manifest = self._get_manifest(alias)  
     self.fat_manifest = self._get_fat_manifest(self.image_manifest)
 
   def setup(self, push_alias):
@@ -245,16 +250,16 @@ class DockerInjector:
     tar_dest = "/tmp/"+ident+".tar"
     _, error = exec_bash("tar -C "+tmp_name+" -cvf "+tar_dest+" .")
     if error:
-      print("Failed to tar with error " + error)
+      print("Failed to tar with error " + str(error))
       return
     tar_digest = hash_file(tar_dest)
-    _, error = exec_bash("gzip "+tar_dest)
+    _, error = exec_bash("gzip -n "+tar_dest)
     if error:
-      print("Failed to tar with error " + error)
+      print("Failed to tar with error " + str(error))
       return
     gz_dest = tar_dest+".gz"
     gzip_digest = self.dxfObject.push_blob(tar_dest+".gz")
-    
+
     # Cleanup
     os.rmdir(tmp_name+"/cvmfs")
     os.rmdir(tmp_name)
