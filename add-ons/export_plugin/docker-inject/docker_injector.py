@@ -8,6 +8,7 @@ import json
 import subprocess
 import tarfile
 import tempfile
+from requests.exceptions import HTTPError
 import os
 import zlib
 
@@ -151,7 +152,6 @@ class DockerInjector:
     """
     Initializes the injector by downloading both the slim and the fat image manifest
     """
-    # TODO(steuber): remove tlsverify
     def auth(dxf, response):
       dxf.authenticate(user, pw, response=response)
     self.dxfObject = DXF(host, repo, tlsverify=True, auth=auth)
@@ -179,18 +179,26 @@ class DockerInjector:
     Unpacks the current version of a layer into the dest_dir directory in order to update it
     """
     if not self.fat_manifest.is_cvmfs_prepared():
-      print("This image is not correctly prepared for cvmfs injection (lacking Docker labels)")
+      os.makedirs(dest_dir+"/cvmfs", exist_ok=True)
+      return
+      
     gz_digest = self.fat_manifest.get_gz_digest()
     # Write out tar file
     decompress_object = zlib.decompressobj(16+zlib.MAX_WBITS)
-    chunk_it = self.dxfObject.pull_blob(gz_digest)
+    try:
+      chunk_it = self.dxfObject.pull_blob(gz_digest)
+    except HTTPError as e:
+      if e.response.status_code == 404:
+        print("ERROR: The hash of the CVMFS layer must have changed.")
+        print("This is a known issue. Please do not reupload images to other repositories after CVMFS injection!")
+      else:
+        raise e
     with tempfile.TemporaryFile() as tmp_file:
       for chunk in chunk_it:
         tmp_file.write(decompress_object.decompress(chunk))
       tmp_file.write(decompress_object.flush())
       tmp_file.seek(0)
       tar = tarfile.TarFile(fileobj=tmp_file)
-      # TODO(steuber): TAR checking beforehand (in paticular for ../ paths)
       tar.extractall(dest_dir)
       tar.close()
 
@@ -199,18 +207,24 @@ class DockerInjector:
     Packs and uploads the contents of src_dir as a layer and injects the layer into the image.
     The new layer version is stored under the tag push_alias
     """
+    if not self.fat_manifest.is_cvmfs_prepared():
+      print("Preparing image for CVMFS injection...")
+      self.setup(push_alias)
     with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-      print(tmp_file.name)
-      _, error = exec_bash("tar -C "+src_dir+" -cvf "+tmp_file.name+" .")
+      print("Bundling file into tar...")
+      _, error = exec_bash("tar --xattrs -C "+src_dir+" -cvf "+tmp_file.name+" .")
       if error:
         raise RuntimeError("Failed to tar with error " + str(error))
       tar_digest = hash_file(tmp_file.name)
+      print("Bundling tar into gz...")
       gz_dest = tmp_file.name+".gz"
       _, error = exec_bash("gzip "+tmp_file.name)
       if error:
         raise RuntimeError("Failed to tar with error " + str(error))
+      print("Uploading...")
       gz_digest = self.dxfObject.push_blob(gz_dest)
       os.unlink(gz_dest)
+    print("Refreshing manifests...")
     old_gz_digest = self.fat_manifest.get_gz_digest()
     layer_size = self.dxfObject.blob_size(gz_digest)
     self.fat_manifest.inject(tar_digest, gz_digest)
@@ -245,10 +259,9 @@ class DockerInjector:
     """
     ident = self.image_manifest.get_fat_manif_digest()[5:15]
     tmp_name = "/tmp/injector-"+ident
-    os.mkdir(tmp_name)
-    os.mkdir(tmp_name+"/cvmfs")
+    os.makedirs(tmp_name+"/cvmfs", exist_ok=True)
     tar_dest = "/tmp/"+ident+".tar"
-    _, error = exec_bash("tar -C "+tmp_name+" -cvf "+tar_dest+" .")
+    _, error = exec_bash("tar --xattrs -C "+tmp_name+" -cvf "+tar_dest+" .")
     if error:
       print("Failed to tar with error " + str(error))
       return
