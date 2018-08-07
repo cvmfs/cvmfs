@@ -173,7 +173,7 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "n_preserved_catalogs INTEGER,"
     "n_condemned_catalogs INTEGER,"
     "n_condemned_objects INTEGER,"
-    "sz_condemned_objects INTEGER);").Execute();
+    "sz_condemned_bytes INTEGER);").Execute();
   return ret1 & ret2;
 }
 
@@ -245,6 +245,7 @@ int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
 
   printf("--------- 4 \n");
   if (!insert.Execute()) {
+  printf("--------- 4.1 \n");
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
     return -2;
   }
