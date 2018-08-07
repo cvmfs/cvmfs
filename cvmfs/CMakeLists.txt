@@ -886,20 +886,34 @@ if (BUILD_SERVER)
   endif (BUILD_OCTOPUS)
 
   install(
-    DIRECTORY      ${EXTERNALS_INSTALL_LOCATION}/lib/maxminddb
-    DESTINATION    "/usr/share/cvmfs-server/webapi"
-    FILE_PERMISSIONS       OWNER_READ GROUP_READ WORLD_READ
-    DIRECTORY_PERMISSIONS  OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server)"
   )
+
+  if (NOT DEFINED BUILD_GEOAPI)
+    set(BUILD_GEOAPI yes)
+  endif (NOT DEFINED BUILD_GEOAPI)
+
+  if (BUILD_GEOAPI)
+    install(
+      DIRECTORY      ${EXTERNALS_INSTALL_LOCATION}/lib/maxminddb
+      DESTINATION    "/usr/share/cvmfs-server/webapi"
+      FILE_PERMISSIONS       OWNER_READ GROUP_READ WORLD_READ
+      DIRECTORY_PERMISSIONS  OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+
+    install(
+      FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py webapi/cvmfs_globals.py
+      DESTINATION    "/usr/share/cvmfs-server/webapi"
+      PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+    )
+
+    install(
+      CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
+    )
+  endif (BUILD_GEOAPI)
 
   install(
     FILES          ${EXTERNALS_INSTALL_LOCATION}/lib/ipaddress.py
-    DESTINATION    "/usr/share/cvmfs-server/webapi"
-    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
-  )
-
-  install(
-    FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py webapi/cvmfs_globals.py
     DESTINATION    "/usr/share/cvmfs-server/webapi"
     PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
   )
@@ -910,10 +924,6 @@ if (BUILD_SERVER)
     PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     RENAME         README
   )
-
-  install(
-    CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
-    )
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)

@@ -65,6 +65,11 @@ recreate_server_hooks_from_stashed_if_needed() {
 cvmfs_run_test() {
   logfile=$1
 
+  if [ ! -d `dirname $CVMFS_TEST_595_GEODB` ]; then
+    echo "No geo database directory, disabled on this platform"
+    return 0
+  fi
+
   # can't start out as root, it causes some of the tests below to fail
   echo "check if running as root"
   [ $(id -u) != 0 ] || return 1
