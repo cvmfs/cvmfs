@@ -252,6 +252,15 @@ class AbstractUploader
   }
 
   /**
+   * Get object size based on its content hash
+   *
+   * @param hash  the content hash of a file
+   */
+  int64_t GetObjectSize(const shash::Any &hash) {
+    return GetObjectSize("data/" + hash.MakePath());
+  }
+
+  /**
    * Checks if a file is already present in the backend storage. This might be a
    * synchronous operation.
    *
@@ -324,6 +333,8 @@ class AbstractUploader
 
 
   virtual void DoRemoveAsync(const std::string &file_to_delete) = 0;
+
+  virtual int64_t GetObjectSize(const std::string &file) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please

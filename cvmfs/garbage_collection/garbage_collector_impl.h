@@ -152,24 +152,21 @@ template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
                                                        const shash::Any &hash) {
   ++condemned_objects_;
+  std::string file_name = hash.MakePath();
+  char last_char = file_name[file_name.length() - 1];
+  if (last_char != 'C') {    // if is not a catalog file
+    int64_t condemned_bytes = configuration_.uploader->GetObjectSize(hash);
+    printf("........................ condemned_bytes_ %ld \n", condemned_bytes);
+    if (condemned_bytes > 0) {
+      condemned_bytes_ += condemned_bytes;
+    }
+  }
 
   LogDeletion(hash);
   if (configuration_.dry_run) {
     return;
   }
 
-  std::string file_name = hash.MakePath();
-  char last_char = file_name[file_name.length() - 1];
-  if (last_char != 'C') {    // if is not a catalog file
-    std::string absolute_path = "/srv/cvmfs/" + configuration_.repo_name +
-                            "/data/" + file_name;
-    int64_t deleted_bytes = GetFileSize(absolute_path);
-    if (deleted_bytes > 0) {
-      condemned_bytes_ += deleted_bytes;
-    } else {
-      printf(" ----- %ld for %s\n", deleted_bytes, absolute_path.c_str());
-    }
-  }
   configuration_.uploader->RemoveAsync(hash);
 }
 

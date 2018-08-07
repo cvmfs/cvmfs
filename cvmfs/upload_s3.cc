@@ -398,4 +398,9 @@ bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
   return false;  // TODO(rmeusel): implement
 }
 
+
+int64_t S3Uploader::GetObjectSize(const std::string &file_name) {
+  return 0;
+}
+
 }  // namespace upload
