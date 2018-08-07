@@ -122,10 +122,6 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
                             const std::string start_time,
                             const std::string finished_time) {
   struct GcStats stats = GcStats(statistics);
-  printf("---------- %s %s %s %s\n", stats.n_preserved_catalogs.c_str(),
-                                     stats.n_condemned_catalogs.c_str(),
-                                     stats.n_condemned_objects.c_str(),
-                                     stats.sz_condemned_bytes.c_str());
   std::string insert_statement =
     "INSERT INTO gc_statistics ("
     "start_time,"
@@ -141,7 +137,6 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
     stats.n_condemned_catalogs +","+
     stats.n_condemned_objects + "," +
     stats.sz_condemned_bytes + ");";
-    printf("%s\n", insert_statement.c_str());
   return insert_statement;
 }
 
@@ -223,7 +218,6 @@ int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
                                         const std::string finished_time,
                                         const std::string command_name) {
   std::string insert_statement;
-  printf("--------- 1 \n");
   if (command_name == "ingest" || command_name == "sync") {
     insert_statement = PrepareStatementIntoPublish(statistics, start_time,
                                                                finished_time);
@@ -233,30 +227,24 @@ int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
   } else {
     return -5;
   }
-  printf("--------- 2 \n");
-  printf("insert_statement = %s\n", insert_statement.c_str());
+
   sqlite::Sql insert(this->sqlite_db(), insert_statement);
-  printf("--------- 3 \n");
 
   if (!this->BeginTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
     return -1;
   }
 
-  printf("--------- 4 \n");
   if (!insert.Execute()) {
-  printf("--------- 4.1 \n");
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
     return -2;
   }
 
-  printf("--------- 5 \n");
   if (!insert.Reset()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Reset() failed!");
     return -3;
   }
 
-  printf("--------- 6 \n");
   if (!this->CommitTransaction()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "CommitTransaction failed!");
     return -4;

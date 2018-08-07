@@ -211,7 +211,6 @@ int main(int argc, char **argv) {
 
     string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "^^^^^^^^^^ %s", db_file_path.c_str());
     if (FileExists(db_file_path)) {
       db = StatisticsDatabase::Open(db_file_path,
                                     StatisticsDatabase::kOpenReadWrite);
