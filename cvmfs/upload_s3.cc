@@ -399,7 +399,7 @@ bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
 }
 
 
-int64_t S3Uploader::GetObjectSize(const std::string &file_name) {
+int64_t S3Uploader::DoGetObjectSize(const std::string &file_name) {
   return 0;
 }
 

@@ -71,7 +71,7 @@ class LocalUploader : public AbstractUploader {
    */
   unsigned int GetNumberOfErrors() const;
 
-  int64_t GetObjectSize(const std::string &file_name);
+  int64_t DoGetObjectSize(const std::string &file_name);
 
  protected:
   int Move(const std::string &local_path, const std::string &remote_path) const;

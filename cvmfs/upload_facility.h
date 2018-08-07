@@ -257,7 +257,7 @@ class AbstractUploader
    * @param hash  the content hash of a file
    */
   int64_t GetObjectSize(const shash::Any &hash) {
-    return GetObjectSize("data/" + hash.MakePath());
+    return DoGetObjectSize("data/" + hash.MakePath());
   }
 
   /**
@@ -334,7 +334,7 @@ class AbstractUploader
 
   virtual void DoRemoveAsync(const std::string &file_to_delete) = 0;
 
-  virtual int64_t GetObjectSize(const std::string &file) = 0;
+  virtual int64_t DoGetObjectSize(const std::string &file) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please

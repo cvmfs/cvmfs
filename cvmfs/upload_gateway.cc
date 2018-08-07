@@ -231,7 +231,7 @@ bool GatewayUploader::ReadKey(const std::string& key_file, std::string* key_id,
   return gateway::ReadKeys(key_file, key_id, secret);
 }
 
-int64_t GatewayUploader::GetObjectSize(const std::string &file_name) {
+int64_t GatewayUploader::DoGetObjectSize(const std::string &file_name) {
   return 0;
 }
 
