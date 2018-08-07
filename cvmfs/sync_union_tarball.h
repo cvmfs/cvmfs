@@ -104,7 +104,7 @@ class SyncUnionTarball : public SyncUnion {
    */
   void CreateDirectories(const std::string &target);
   void ProcessArchiveEntry(struct archive_entry *entry);
-  void SanitizePath(std::string &path);
+  std::string SanitizePath(const std::string &path);
 };  // class SyncUnionTarball
 
 }  // namespace publish

@@ -177,7 +177,8 @@ void SyncUnionTarball::Traverse() {
 
 void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   std::string archive_file_path(archive_entry_pathname(entry));
-  SanitizePath(archive_file_path);
+  archive_file_path = SanitizePath(archive_file_path);
+
   std::string complete_path =
       MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
 
@@ -248,12 +249,15 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   }
 }
 
-void SyncUnionTarball::SanitizePath(std::string &path) {
+std::string SyncUnionTarball::SanitizePath(const std::string &path) {
   if (path.length() >= 2) {
     if (path[0] == '.' && path[1] == '/') {
-      path = path.erase(0, 2);
+      std::string to_return(path);
+      to_return.erase(0, 2);
+      return to_return;
     }
   }
+  return path;
 }
 
 void SyncUnionTarball::PostUpload() {
