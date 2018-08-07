@@ -14,11 +14,59 @@ cvmfs_server_merge_table() {
   local db_file_1=$1
   local db_file_2=$2
   local output_db=$3
+  local table=$4
+  local TMP_DIR=/tmp/cvmfs_server_merge_stats
+  local create_table_statement=""
+  local columns=""
+
+  mkdir -p $TMP_DIR
+  echo ".dump $table" > $TMP_DIR/script_${table}
+  echo ".dump ${table}1" > $TMP_DIR/script_${table}1
+  echo ".dump ${table}2" > $TMP_DIR/script_${table}2
+
+  sqlite3 $1 < $TMP_DIR/script_${table} > $TMP_DIR/${table}.txt
+  create_table_statement="$(cat $TMP_DIR/${table}.txt | grep CREATE)"
+  sqlite3 $1 "ALTER table $table RENAME TO ${table}1;"
+  sqlite3 $2 "ALTER table $table RENAME TO ${table}2;"
+
+  sqlite3 $1 < $TMP_DIR/script_${table}1 > $TMP_DIR/${table}1.txt
+  sqlite3 $2 < $TMP_DIR/script_${table}2 > $TMP_DIR/${table}2.txt
+
+  cat $TMP_DIR/${table}1.txt > $TMP_DIR/new_db.txt
+  cat $TMP_DIR/${table}2.txt >> $TMP_DIR/new_db.txt
+
+  sqlite3 $1 -header -separator "," "Select * from ${table}1;" | head -1 > $TMP_DIR/all_columns.txt
+  # Eliminate first column (*_id) -- PRIMARY KEY
+  cut -d ',' -f2- $TMP_DIR/all_columns.txt > $TMP_DIR/columns.txt
+  columns="$(cat $TMP_DIR/columns.txt)"
+
+  # Merge!
+  sqlite3 $output_db < $TMP_DIR/new_db.txt
+  sqlite3 $output_db "$create_table_statement"
+  sqlite3 $output_db "insert into ${table} select * from ${table}1;"
+  sqlite3 $output_db "insert into ${table} ($columns) select $columns from ${table}2;"
+  sqlite3 $output_db "drop table ${table}1"
+  sqlite3 $output_db "drop table ${table}2"
+
+  # Undo changes into input db files
+  sqlite3 $1 "ALTER table ${table}1 RENAME TO ${table};"
+  sqlite3 $2 "ALTER table ${table}2 RENAME TO ${table};"
+
+  echo "Success: $1 and $2 ${table} tables were merged in $output_db"
+
+  clean_up $TMP_DIR
+  return 0
+}
+
+cvmfs_server_merge_checks() {
+  local db_file_1=$1
+  local db_file_2=$2
+  local output_db=$3
   local TMP_DIR=/tmp/cvmfs_server_merge_stats
 
   mkdir -p $TMP_DIR
-  sqlite3 $db_file_1 "SELECT key, value from properties" > $TMP_DIR/properties_values_1
-  sqlite3 $db_file_2 "SELECT key, value from properties" > $TMP_DIR/properties_values_2
+  sqlite3 $db_file_1 "SELECT * from properties" > $TMP_DIR/properties_values_1
+  sqlite3 $db_file_2 "SELECT * from properties" > $TMP_DIR/properties_values_2
 
   local repo_name_1="$(cat $TMP_DIR/properties_values_1 | grep repo_name | cut -d '|' -f 2)"
   local repo_name_2="$(cat $TMP_DIR/properties_values_2 | grep repo_name | cut -d '|' -f 2)"
@@ -41,31 +89,11 @@ cvmfs_server_merge_table() {
     return 1
   fi
 
-  echo ".dump publish_statistics" > $TMP_DIR/script_publish_statistics
   echo ".dump properties" > $TMP_DIR/script_properties
-
-  # get properties table
-  sqlite3 $db_file_1 < $TMP_DIR/script_properties > $TMP_DIR/properties_table.txt
-  # get publish_statistics table from the first database file
-  sqlite3 $db_file_1 < $TMP_DIR/script_publish_statistics > $TMP_DIR/publish_statistics_table1.txt
-  # get publish_statistics table from the second database file
-  sqlite3 $db_file_2 < $TMP_DIR/script_publish_statistics > $TMP_DIR/publish_statistics_table2.txt
-
+  sqlite3 $1 < $TMP_DIR/script_properties > $TMP_DIR/properties_table.txt
   cat $TMP_DIR/properties_table.txt > $TMP_DIR/new_db.txt
-  cat $TMP_DIR/publish_statistics_table1.txt | grep BEGIN >> $TMP_DIR/new_db.txt
-  cat $TMP_DIR/publish_statistics_table1.txt | grep CREATE >> $TMP_DIR/new_db.txt
-  # Add insert statements from the first database file
-  cat $TMP_DIR/publish_statistics_table1.txt | grep INSERT >> $TMP_DIR/new_db.txt
-  # Add insert statements from the second database file
-  cat $TMP_DIR/publish_statistics_table2.txt | grep INSERT >> $TMP_DIR/new_db.txt
-  cat $TMP_DIR/publish_statistics_table2.txt | grep COMMIT >> $TMP_DIR/new_db.txt
-  echo "" > $output_db  # make sure the output file is empty
-
-  # Merge!
   sqlite3 $output_db < $TMP_DIR/new_db.txt
-  echo "Success: $1 and $2 publish_statistics tables were merged in $3 ."
-  clean_up $TMP_DIR
-  return 0
+
 }
 
 
@@ -93,7 +121,10 @@ cvmfs_server_merge_stats() {
   shift $(($OPTIND-1))
 
   check_parameter_count 2 $#
-  cvmfs_server_merge_table $1 $2 $output_db
+
+  echo "" > $output_db
+  cvmfs_server_merge_checks $1 $2 $output_db
+  cvmfs_server_merge_table $1 $2 $output_db "publish_statistics"
+  cvmfs_server_merge_table $1 $2 $output_db "gc_statistics"
   return $?
 }
-
