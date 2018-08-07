@@ -241,7 +241,8 @@ int LocalUploader::Move(const std::string &local_path,
 
 int64_t LocalUploader::GetObjectSize(const std::string &file_name) {
   int64_t size = GetFileSize(upstream_path_ + "/" + file_name);
-  printf("********** file %s \nsize = %ld\n", (upstream_path_ + "/" + file_name).c_str(), size);
+  printf("********** file %s \nsize = %ld\n",
+          (upstream_path_ + "/" + file_name).c_str(), size);
   return size;
 }
 
