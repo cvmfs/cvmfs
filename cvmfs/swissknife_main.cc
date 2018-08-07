@@ -201,14 +201,12 @@ int main(int argc, char **argv) {
   if (command->GetName() == "sync" || command->GetName() == "ingest"
                                    || command->GetName() == "gc") {
     UniquePtr<StatisticsDatabase> db;
-
     string repo_name;
     if (args.find('N') != args.end()) {
       repo_name = *args.find('N')->second;
     } else if (args.find('n') != args.end()) {
       repo_name = *args.find('n')->second;
     }
-
     string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
 
     if (FileExists(db_file_path)) {
