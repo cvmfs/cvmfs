@@ -606,66 +606,17 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
 
-  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, false));
+  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
 
   dest->finalize(dest->context_);
   context = dest->initialize(
     dest_name.c_str(), repoName.c_str(), dest_data.c_str(), NULL, 4);
   dest->context_ = context;
 
-  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, false));
+  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
-}
-
-TEST_P(T_Fs_Traversal_Interface, FsckPosixToPosix) {
-  struct fs_traversal *src = posix_get_interface();
-  struct fs_traversal *dest = posix_get_interface();
-  perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
-  std::string ident1;
-  std::string ident2;
-  std::string prefix = "FsckPosixToPosix-SRC";
-  MakeTestFiles(prefix, &ident1, &ident2);
-
-  std::string repoName = GetCurrentWorkingDirectory();
-  std::string src_name  = "/FsckPosixToPosix-SRC-foo";
-  std::string dest_name = "/FsckPosixToPosix-SRC-bar";
-  std::string dest_data = repoName+"/FsckPosixToPosix-DDATA";
-
-  struct fs_traversal_context *context =
-    src->initialize(src_name.c_str(), repoName.c_str(),
-    NULL, NULL, 4);
-  src->context_ = context;
-  context = dest->initialize(dest_name.c_str(), repoName.c_str(),
-    dest_data.c_str(), NULL, 4);
-  dest->context_ = context;
-
-  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, true));
-  errno = 0;
-  std::string content1 = "Lorem Ipsum dolor sit amet.";
-  char buf[100];
-  size_t buf_len;
-  void *dest_hdl = dest->get_handle(dest->context_, ident1.c_str());
-  ASSERT_EQ(0, dest->do_fopen(dest_hdl, fs_open_write));
-  ASSERT_EQ(0, dest->do_fwrite(dest_hdl, content1.c_str(), content1.length()));
-  ASSERT_EQ(0, dest->do_fclose(dest_hdl));
-
-  ASSERT_EQ(0, dest->do_fopen(dest_hdl, fs_open_read));
-  ASSERT_EQ(0, dest->do_fread(dest_hdl, buf, 99, &buf_len));
-  buf[buf_len]='\0';
-  ASSERT_STREQ(content1.c_str(), buf);
-  ASSERT_EQ(0, dest->do_fclose(dest_hdl));
-  dest->do_ffree(dest_hdl);
-
-  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, true));
-  void *dest_hdl_new = dest->get_handle(dest->context_, ident1.c_str());
-  ASSERT_EQ(0, dest->do_fopen(dest_hdl_new, fs_open_read));
-  ASSERT_EQ(0, dest->do_fread(dest_hdl_new, buf, 99, &buf_len));
-  buf[buf_len]='\0';
-  ASSERT_EQ(51, buf_len);
-  // Actual content: FsckPosixToPosix-SRC: Hello world!\nHello traversal!
-  ASSERT_EQ(0, dest->do_fclose(dest_hdl_new));
 }
 
 // Create some default hashes for DirSpec
