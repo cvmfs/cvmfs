@@ -74,7 +74,6 @@ int main(int argc, char **argv) {
   char *spec_file = NULL;
 
   bool garbage_collection = false;
-  bool fsck = false;
 
   unsigned num_parallel = 0;
   unsigned retries = 0;
@@ -98,7 +97,6 @@ int main(int argc, char **argv) {
       {"threads",     required_argument, 0, 'j'},
       {"retries",     required_argument, 0, 'n'},
       {"gc",          required_argument, 0, 'g'},
-      {"fsck",        required_argument, 0, 'k'},
       {0, 0, 0, 0}
     };
 
@@ -166,9 +164,6 @@ int main(int argc, char **argv) {
       case 'g':
         garbage_collection = true;
         break;
-      case 'k':
-        fsck = true;
-        break;
       case '?':
       default:
         Usage();
@@ -215,7 +210,7 @@ int main(int argc, char **argv) {
   }
 
   int result = shrinkwrap::SyncInit(src, dest, base, spec_file,
-                                    num_parallel, retries, fsck);
+                                    num_parallel, retries);
 
   src->finalize(src->context_);
   if (garbage_collection) {

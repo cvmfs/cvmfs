@@ -206,7 +206,7 @@ void XattrList::Serialize(unsigned char **outbuf, unsigned *size,
 
   // Determine size of the buffer (allocate space for max num of attributes)
   XattrEntry *entries = reinterpret_cast<XattrEntry *>(
-    smalloc(real_num_xattr * sizeof(XattrEntry)));
+    smalloc(header.num_xattrs * sizeof(XattrEntry)));
   unsigned ientries = 0;
   for (map<string, string>::const_iterator i = xattrs_.begin(),
        iEnd = xattrs_.end(); i != iEnd; ++i)
