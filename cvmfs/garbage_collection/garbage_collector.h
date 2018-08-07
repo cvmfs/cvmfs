@@ -34,7 +34,6 @@
 
 #include <inttypes.h>
 
-#include <string>
 #include <vector>
 
 #include "catalog_traversal.h"
@@ -69,8 +68,7 @@ class GarbageCollector {
       , dry_run(false)
       , verbose(false)
       , deleted_objects_logfile(NULL)
-      , statistics(NULL)
-      , repo_name("") {}
+      , statistics(NULL) {}
 
     bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
@@ -83,7 +81,6 @@ class GarbageCollector {
     bool                       verbose;
     FILE                      *deleted_objects_logfile;
     perf::Statistics          *statistics;
-    std::string                repo_name;
   };
 
  public:

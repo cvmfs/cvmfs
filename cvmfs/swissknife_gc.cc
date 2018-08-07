@@ -151,7 +151,6 @@ int CommandGc::Main(const ArgumentList &args) {
   config.reflog                  = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
   config.statistics              = statistics();
-  config.repo_name               = repo_name;
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,
