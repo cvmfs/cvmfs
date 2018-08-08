@@ -1,4 +1,6 @@
 2.5.1:
+  * Fix potential memory corruption in ingestion pipeline
+  * Fix occasional false error of 'cvmfs_config probe' on FC28
   * Fix locking bug in cvmfs_server snapshot (CVM-1598)
   * Fix Yubikey signature handling (CVM-1604)
   * Publication with gateway gracefully exits when reflog is missing (CVM-1560)
