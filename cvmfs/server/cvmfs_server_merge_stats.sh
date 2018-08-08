@@ -146,10 +146,6 @@ cvmfs_server_merge_stats() {
   check_parameter_count 2 $#
   echo "" > $output_db
   cvmfs_server_merge_checks $1 $2 $output_db
-  if [ "x$?" != "x0" ]; then
-    echo "Sanity checks failed!"
-    return 1
-  fi
   cvmfs_server_merge_table $1 $2 $output_db "publish_statistics"
   cvmfs_server_merge_table $1 $2 $output_db "gc_statistics"
   return $?

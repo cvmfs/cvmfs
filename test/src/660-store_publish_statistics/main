@@ -29,8 +29,8 @@ test1() {
   echo "meaningless file content" > file1    # 1 file added ; 25 bytes added
   echo "more clever file content" > file2    # 1 file added ; 25 bytes added
   echo "" > file3                            # 1 file added ; 1 byte added ['\n']
-  mkdir foo                                  # 1 directory added
-  mkdir bar                                  # 1 directory added
+  mkdir -p foo                               # 1 directory added
+  mkdir -p bar                               # 1 directory added
   touch ./foo/file4                          # 1 file added ; 0 byte added
   echo "123 - testing" > ./foo/file5         # 1 file added ; 14 byte added
 
