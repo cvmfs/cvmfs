@@ -4,9 +4,9 @@
 # Implementation of the "cvmfs_server stats command"
 
 clean_up() {
-    echo "Cleaning up"
-    echo "  Removing temporary files"
-    rm -rvf /tmp/cvmfs_server_merge_stats/*
+  echo "Cleaning up"
+  echo "  Removing temporary files"
+  rm -rvf /tmp/cvmfs_server_merge_stats/*
 }
 
 # merge publish_statistics table
@@ -21,30 +21,46 @@ cvmfs_server_merge_table() {
 
   mkdir -p $TMP_DIR
 
-  echo ".dump $table" | sqlite3 $1 > $TMP_DIR/${table}.txt
+  echo ".dump $table" | sqlite3 $db_file_1 > $TMP_DIR/${table}.txt
+  # Prepare the merged table
   create_table_statement="$(cat $TMP_DIR/${table}.txt | grep CREATE)"
-  sqlite3 $1 "ALTER table $table RENAME TO ${table}1;"
-  sqlite3 $2 "ALTER table $table RENAME TO ${table}2;"
+  sqlite3 $output_db "$create_table_statement"  # create ${table}
+  # change the name of the input tables into ${table}1 and ${table}2
+  sqlite3 $db_file_1 "ALTER table $table RENAME TO ${table}1;"
+  sqlite3 $db_file_2 "ALTER table $table RENAME TO ${table}2;"
 
-  echo ".dump ${table}1" | sqlite3 $1 > $TMP_DIR/${table}1.txt
-  echo ".dump ${table}2" | sqlite3 $2 > $TMP_DIR/${table}2.txt
+  echo ".dump ${table}1" | sqlite3 $db_file_1 > $TMP_DIR/${table}1.txt
+  echo ".dump ${table}2" | sqlite3 $db_file_2 > $TMP_DIR/${table}2.txt
 
   cat $TMP_DIR/${table}1.txt > $TMP_DIR/new_db.txt
   cat $TMP_DIR/${table}2.txt >> $TMP_DIR/new_db.txt
+  sqlite3 $db_file_1 -header -separator "," "Select * from ${table}1;" > $TMP_DIR/data
+
+  if [ ! -s $TMP_DIR/data ]; then
+    sqlite3 $db_file_2 -header -separator "," "Select * from ${table}2;" > $TMP_DIR/data
+    if [ ! -s $TMP_DIR/data ]; then
+      echo "At least one ${table} table should have data!"
+      # Undo changes into input db files
+      sqlite3 $1 "ALTER table ${table}1 RENAME TO ${table};"
+      sqlite3 $2 "ALTER table ${table}2 RENAME TO ${table};"
+      return 1
+    fi
+  fi
 
   # list with all columns separated by  ','
-  sqlite3 $1 -header -separator "," "Select * from ${table}1;" | head -1 > $TMP_DIR/all_columns.txt
+  cat $TMP_DIR/data | head -1 > $TMP_DIR/all_columns.txt
   # Eliminate first column (*_id) -- PRIMARY KEY
   cut -d ',' -f2- $TMP_DIR/all_columns.txt > $TMP_DIR/columns.txt
   columns="$(cat $TMP_DIR/columns.txt)"
 
   # Merge!
   sqlite3 $output_db < $TMP_DIR/new_db.txt      # create ${table}1 and ${table}2 (with data)
-  sqlite3 $output_db "$create_table_statement"  # create ${table}
+  # in $output_db should be three tables: ${table}, ${table}1 and ${table}2
   sqlite3 $output_db "insert into ${table} select * from ${table}1;"
   sqlite3 $output_db "insert into ${table} ($columns) select $columns from ${table}2;"
-  sqlite3 $output_db "drop table ${table}1"
-  sqlite3 $output_db "drop table ${table}2"
+  # delete from $output_db ${table}1 and ${table}2 tables, keep ${table}
+  sqlite3 $output_db "drop table ${table}1;"
+  sqlite3 $output_db "drop table ${table}2;"
 
   # Undo changes into input db files
   sqlite3 $1 "ALTER table ${table}1 RENAME TO ${table};"
@@ -52,7 +68,7 @@ cvmfs_server_merge_table() {
 
   echo "Success: $1 and $2 ${table} tables were merged in $output_db"
 
-  clean_up $TMP_DIR
+  clean_up
   return 0
 }
 
@@ -74,6 +90,8 @@ cvmfs_server_merge_checks() {
   local schema_2="$(cat $TMP_DIR/properties_values_2 | grep schema | cut -d '|' -f 2)"
   local schema_revision_1="$(cat $TMP_DIR/properties_values_1 | grep schema_revision | cut -d '|' -f 2)"
   local schema_revision_2="$(cat $TMP_DIR/properties_values_2 | grep schema_revision | cut -d '|' -f 2)"
+  tables1="$(echo ".tables" | sqlite3 $1)"
+  tables2="$(echo ".tables" | sqlite3 $2)"
 
   # Sanity checks
   if [ "x$repo_name_1" != "x$repo_name_2" ]; then
@@ -89,13 +107,18 @@ cvmfs_server_merge_checks() {
     return 1
   fi
 
+  if [ "x$tables1" != "x$tables2" ]; then
+    echo "The given db files have different tables!"
+    return 1
+  fi
+
   # Create properties table in the output db file and insert data into it
   echo ".dump properties" > $TMP_DIR/script_properties
   sqlite3 $1 < $TMP_DIR/script_properties > $TMP_DIR/properties_table.txt
   cat $TMP_DIR/properties_table.txt > $TMP_DIR/new_db.txt
   sqlite3 $output_db < $TMP_DIR/new_db.txt
 
-  return 0;
+  return 0
 }
 
 cvmfs_server_merge_stats() {
@@ -103,7 +126,6 @@ cvmfs_server_merge_stats() {
   local output_db="output.db"   # default output file
   local db_file_1=""
   local db_file_2=""
-  local checks=""
 
   # optional parameter handling
   OPTIND=1
@@ -119,18 +141,15 @@ cvmfs_server_merge_stats() {
       ;;
     esac
   done
-
   shift $(($OPTIND-1))
 
   check_parameter_count 2 $#
-
   echo "" > $output_db
-  checks="$(cvmfs_server_merge_checks $1 $2 $output_db)"
-  if [ "x$checks" != "x0" ]; then
+  cvmfs_server_merge_checks $1 $2 $output_db
+  if [ "x$?" != "x0" ]; then
     echo "Sanity checks failed!"
     return 1
   fi
-
   cvmfs_server_merge_table $1 $2 $output_db "publish_statistics"
   cvmfs_server_merge_table $1 $2 $output_db "gc_statistics"
   return $?
