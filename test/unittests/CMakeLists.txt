@@ -249,16 +249,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
-  
-  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc 
-  ${CVMFS_SOURCE_DIR}/export_plugin/posix/data_dir_mgmt.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/posix/garbage_collector.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/posix/helpers.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/posix/interface.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_libcvmfs.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/spec_tree.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/util.cc
 
   cache.pb.cc cache.pb.h
 )
@@ -489,27 +479,26 @@ set (LIBCVMFS_SOURCES
 )
 
 set (CVMFS_TEST_SHRINKWRAP_SOURCES
-  #export_plugin/benchmark_pathspec.cc
-  export_plugin/main.cc
+  shrinkwrap/main.cc
 
   ../common/env.cc
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
-  export_plugin/t_fs_traversal_interface.cc
-  export_plugin/t_fs_posix.cc
-  export_plugin/t_spec_tree.cc
-  export_plugin/test-util.cc
+  shrinkwrap/t_fs_traversal_interface.cc
+  shrinkwrap/t_fs_posix.cc
+  shrinkwrap/t_spec_tree.cc
+  shrinkwrap/test-util.cc
   
-  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/posix/data_dir_mgmt.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/posix/garbage_collector.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/posix/helpers.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/posix/interface.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/fs_traversal_libcvmfs.cc
-  ${CVMFS_SOURCE_DIR}/export_plugin/util.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/fs_traversal.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/data_dir_mgmt.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/garbage_collector.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/helpers.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/interface.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/fs_traversal_libcvmfs.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/util.cc
 
-  ${CVMFS_SOURCE_DIR}/export_plugin/spec_tree.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/spec_tree.cc
 
   ${LIBCVMFS_SOURCES}
 )
@@ -544,11 +533,10 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
     add_dependencies (${PROJECT_TEST_CACHE_NAME} cache.pb.generated-unittests)
   endif (BUILD_LIBCVMFS_CACHE)
 
-  if (BUILD_CVMFS_SHRINKWRAP)
-    #TODO(steuber): cache.pb.generated-unittests is this necessary?
+  if (BUILD_SHRINKWRAP)
     add_executable (${PROJECT_TEST_SHRINKWRAP_NAME} ${CVMFS_TEST_SHRINKWRAP_SOURCES})
     add_dependencies (${PROJECT_TEST_SHRINKWRAP_NAME} cache.pb.generated-unittests)
-  endif (BUILD_CVMFS_SHRINKWRAP)
+  endif (BUILD_SHRINKWRAP)
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
@@ -571,9 +559,9 @@ endif (BUILD_UNITTESTS_DEBUG)
 if (BUILD_LIBCVMFS_CACHE)
   set_target_properties (${PROJECT_TEST_CACHE_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_CACHE_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
 endif (BUILD_LIBCVMFS_CACHE)
-if (BUILD_CVMFS_SHRINKWRAP)
+if (BUILD_SHRINKWRAP)
   set_target_properties (${PROJECT_TEST_SHRINKWRAP_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_SHRINKWRAP_LD_FLAGS}")
-endif (BUILD_CVMFS_SHRINKWRAP)
+endif (BUILD_SHRINKWRAP)
 
 
 #
@@ -602,7 +590,7 @@ if (BUILD_LIBCVMFS_CACHE)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
-if (BUILD_CVMFS_SHRINKWRAP)
+if (BUILD_SHRINKWRAP)
   target_link_libraries (${PROJECT_TEST_SHRINKWRAP_NAME}
                           ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
                           ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
@@ -611,7 +599,7 @@ if (BUILD_CVMFS_SHRINKWRAP)
                           ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
                           ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
                           ${PROTOBUF_LITE_LIBRARY}  ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
-endif (BUILD_CVMFS_SHRINKWRAP)
+endif (BUILD_SHRINKWRAP)
 
 
 #
@@ -632,13 +620,13 @@ if (INSTALL_UNITTESTS)
     )
   endif (BUILD_LIBCVMFS_CACHE)
 
-  if (BUILD_CVMFS_SHRINKWRAP)
+  if (BUILD_SHRINKWRAP)
     install (
       TARGETS        ${PROJECT_TEST_SHRINKWRAP_NAME}
       RUNTIME
       DESTINATION    bin
     )
-  endif (BUILD_CVMFS_SHRINKWRAP)
+  endif (BUILD_SHRINKWRAP)
 endif (INSTALL_UNITTESTS)
 
 if (INSTALL_UNITTESTS_DEBUG)

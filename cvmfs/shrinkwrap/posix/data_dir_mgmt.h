@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-#ifndef CVMFS_EXPORT_PLUGIN_POSIX_DATA_DIR_MGMT_H_
-#define CVMFS_EXPORT_PLUGIN_POSIX_DATA_DIR_MGMT_H_
+#ifndef CVMFS_SHRINKWRAP_POSIX_DATA_DIR_MGMT_H_
+#define CVMFS_SHRINKWRAP_POSIX_DATA_DIR_MGMT_H_
 
 #include <sys/types.h>
 
@@ -23,4 +23,4 @@
  */
 void InitializeDataDirectory(struct fs_traversal_context *ctx);
 
-#endif  // CVMFS_EXPORT_PLUGIN_POSIX_DATA_DIR_MGMT_H_
+#endif  // CVMFS_SHRINKWRAP_POSIX_DATA_DIR_MGMT_H_

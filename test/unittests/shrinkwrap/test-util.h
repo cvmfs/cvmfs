@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-#ifndef TEST_UNITTESTS_EXPORT_PLUGIN_TEST_UTIL_H_
-#define TEST_UNITTESTS_EXPORT_PLUGIN_TEST_UTIL_H_
+#ifndef TEST_UNITTESTS_SHRINKWRAP_TEST_UTIL_H_
+#define TEST_UNITTESTS_SHRINKWRAP_TEST_UTIL_H_
 
 #include <unistd.h>
 
@@ -23,4 +23,4 @@ struct cvmfs_attr *create_sample_stat(const char *name,
   XattrList *xlist, shash::Any *content_hash = NULL,
   const char *link = NULL);
 
-#endif  // TEST_UNITTESTS_EXPORT_PLUGIN_TEST_UTIL_H_
+#endif  // TEST_UNITTESTS_SHRINKWRAP_TEST_UTIL_H_

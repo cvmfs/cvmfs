@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-#ifndef CVMFS_EXPORT_PLUGIN_UTIL_H_
-#define CVMFS_EXPORT_PLUGIN_UTIL_H_
+#ifndef CVMFS_SHRINKWRAP_UTIL_H_
+#define CVMFS_SHRINKWRAP_UTIL_H_
 
 #include "hash.h"
 #include "libcvmfs.h"
@@ -14,4 +14,4 @@ void AppendStringToList(char const   *str,
                         size_t       *listlen,
                         size_t       *buflen);
 
-#endif  // CVMFS_EXPORT_PLUGIN_UTIL_H_
+#endif  // CVMFS_SHRINKWRAP_UTIL_H_

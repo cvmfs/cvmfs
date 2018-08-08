@@ -14,9 +14,9 @@
 #include <vector>
 
 #include "cvmfs_config.h"
-#include "export_plugin/fs_traversal.h"
-#include "export_plugin/fs_traversal_interface.h"
 #include "logging.h"
+#include "shrinkwrap/fs_traversal.h"
+#include "shrinkwrap/fs_traversal_interface.h"
 #include "util/string.h"
 
 // Taken from fsck
