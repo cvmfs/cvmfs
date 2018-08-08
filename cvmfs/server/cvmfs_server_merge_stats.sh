@@ -77,19 +77,26 @@ cvmfs_server_merge_checks() {
   local TMP_DIR=/tmp/cvmfs_server_merge_stats
   local tables1=""
   local tables2=""
+  local repo_name_1=""
+  local repo_name_2=""
+  local schema_1=""
+  local schema_2=""
+  local schema_revision_1=""
+  local schema_revision_2=""
 
   mkdir -p $TMP_DIR
   sqlite3 $db_file_1 "SELECT * from properties" > $TMP_DIR/properties_values_1
   sqlite3 $db_file_2 "SELECT * from properties" > $TMP_DIR/properties_values_2
 
-  local repo_name_1="$(cat $TMP_DIR/properties_values_1 | grep repo_name | cut -d '|' -f 2)"
-  local repo_name_2="$(cat $TMP_DIR/properties_values_2 | grep repo_name | cut -d '|' -f 2)"
-  local schema_1="$(cat $TMP_DIR/properties_values_1 | grep schema | cut -d '|' -f 2)"
-  local schema_2="$(cat $TMP_DIR/properties_values_2 | grep schema | cut -d '|' -f 2)"
-  local schema_revision_1="$(cat $TMP_DIR/properties_values_1 | grep schema_revision | cut -d '|' -f 2)"
-  local schema_revision_2="$(cat $TMP_DIR/properties_values_2 | grep schema_revision | cut -d '|' -f 2)"
+  repo_name_1="$(cat $TMP_DIR/properties_values_1 | grep repo_name | cut -d '|' -f 2)"
+  repo_name_2="$(cat $TMP_DIR/properties_values_2 | grep repo_name | cut -d '|' -f 2)"
+  schema_1="$(cat $TMP_DIR/properties_values_1 | grep schema | cut -d '|' -f 2)"
+  schema_2="$(cat $TMP_DIR/properties_values_2 | grep schema | cut -d '|' -f 2)"
+  schema_revision_1="$(cat $TMP_DIR/properties_values_1 | grep schema_revision | cut -d '|' -f 2)"
+  schema_revision_2="$(cat $TMP_DIR/properties_values_2 | grep schema_revision | cut -d '|' -f 2)"
   tables1="$(echo ".tables" | sqlite3 $db_file_1)"
   tables2="$(echo ".tables" | sqlite3 $db_file_2)"
+
   # Sanity checks
   if [ "x$repo_name_1" != "x$repo_name_2" ]; then
     echo "The given db files have different repo_name: $repo_name_1 vs $repo_name_2!"
@@ -103,11 +110,11 @@ cvmfs_server_merge_checks() {
     echo "The given db files have different schema_revision: $schema_revision_1 vs $schema_revision_2!"
     return 1
   fi
-
   if [ "x$tables1" != "x$tables2" ]; then
     echo "The given db files have different tables!"
     return 1
   fi
+
   # Create properties table in the output db file and insert data into it
   echo ".dump properties" | sqlite3 $db_file_1 > $TMP_DIR/properties_table.txt
   cat $TMP_DIR/properties_table.txt > $TMP_DIR/new_db.txt
@@ -117,9 +124,8 @@ cvmfs_server_merge_checks() {
 
 cvmfs_server_merge_stats() {
   trap clean_up EXIT HUP INT TERM || return $?
+
   local output_db="output.db"   # default output file
-  local db_file_1=""
-  local db_file_2=""
 
   # optional parameter handling
   OPTIND=1
@@ -138,6 +144,7 @@ cvmfs_server_merge_stats() {
   shift $(($OPTIND-1))
 
   check_parameter_count 2 $#
+  # Make sure the output file is empty
   echo "" > $output_db
   cvmfs_server_merge_checks $1 $2 $output_db
   cvmfs_server_merge_table $1 $2 $output_db "publish_statistics"
