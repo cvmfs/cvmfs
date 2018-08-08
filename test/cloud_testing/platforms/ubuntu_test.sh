@@ -12,6 +12,16 @@ run_unittests --gtest_shuffle \
 
 
 CVMFS_EXCLUDE=
+if [ x"$(lsb_release -cs)" = x"bionic" ]; then
+  # Ubuntu 18.04
+  # Kernel sources too old for gcc, TODO
+  CVMFS_EXCLUDE="src/006-buildkernel"
+  # Expected failure, see test case
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
+
+  echo "Ubuntu 18.04... using overlayfs"
+  export CVMFS_TEST_UNIONFS=overlayfs
+fi
 if [ x"$(lsb_release -cs)" = x"xenial" ]; then
   # Ubuntu 16.04
   # Kernel sources too old for gcc, TODO
