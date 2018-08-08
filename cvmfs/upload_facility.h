@@ -334,7 +334,7 @@ class AbstractUploader
 
   virtual void DoRemoveAsync(const std::string &file_to_delete) = 0;
 
-  virtual int64_t DoGetObjectSize(const std::string &file) = 0;
+  virtual int64_t DoGetObjectSize(const std::string &file_name) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please
