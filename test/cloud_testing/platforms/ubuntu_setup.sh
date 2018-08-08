@@ -109,13 +109,15 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
   dpkg -s autofs
 fi
 
-# On Ubuntu 16.04 install the repository gateway
+# On Ubuntu 16.04+ 64bit install the repository gateway
 if [ "x$ubuntu_release" = "xxenial" ] || [ "x$ubuntu_release" = "xbionic" ]; then
-  echo "Installing repository gateway"
-  package_map=pkgmap.ubuntu1604_x86_64
-  download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
-  install_deb $(cat gateway_package_name)
-  sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
+  if [ "x$(uname -m)" = "xx86_64" ]; then
+    echo "Installing repository gateway"
+    package_map=pkgmap.ubuntu1604_x86_64
+    download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+    install_deb $(cat gateway_package_name)
+    sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
+  fi
 fi
 
 # setting up the AUFS kernel module
