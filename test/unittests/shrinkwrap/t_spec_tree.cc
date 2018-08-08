@@ -7,7 +7,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "export_plugin/spec_tree.h"
+#include "shrinkwrap/spec_tree.h"
 #include "test-util.h"
 
 class T_Spec_Tree :

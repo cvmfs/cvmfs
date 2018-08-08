@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-#ifndef CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
-#define CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
+#ifndef CVMFS_SHRINKWRAP_FS_TRAVERSAL_INTERFACE_H_
+#define CVMFS_SHRINKWRAP_FS_TRAVERSAL_INTERFACE_H_
 
 #include "libcvmfs.h"
 
@@ -355,4 +355,4 @@ struct fs_traversal {
   void (*do_ffree)(void *file_ctx);
 };
 
-#endif  // CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_INTERFACE_H_
+#endif  // CVMFS_SHRINKWRAP_FS_TRAVERSAL_INTERFACE_H_

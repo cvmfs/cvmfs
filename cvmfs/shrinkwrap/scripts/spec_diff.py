@@ -1,6 +1,7 @@
 #
 # This file is part of the CernVM File System.
 #
+
 import argparse
 
 class TreeNode:

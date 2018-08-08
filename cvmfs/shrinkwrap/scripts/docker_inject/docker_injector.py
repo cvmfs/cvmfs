@@ -1,6 +1,7 @@
 #
 # This file is part of the CernVM File System.
 #
+
 from datetime import datetime, timezone
 from dxf import DXF, hash_file, hash_bytes
 from dxf.exceptions import DXFUnauthorizedError

@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-#ifndef CVMFS_EXPORT_PLUGIN_POSIX_HELPERS_H_
-#define CVMFS_EXPORT_PLUGIN_POSIX_HELPERS_H_
+#ifndef CVMFS_SHRINKWRAP_POSIX_HELPERS_H_
+#define CVMFS_SHRINKWRAP_POSIX_HELPERS_H_
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -45,4 +45,4 @@ int PosixSetMeta(const char *path,
 void BackupMtimes(std::string path, struct utimbuf *mtimes);
 
 
-#endif  // CVMFS_EXPORT_PLUGIN_POSIX_HELPERS_H_
+#endif  // CVMFS_SHRINKWRAP_POSIX_HELPERS_H_
