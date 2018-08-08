@@ -76,7 +76,7 @@ class TubeConsumerGroup : SingleCopy {
   void Spawn() {
     assert(!is_active_);
     unsigned N = consumers_.size();
-    threads_.reserve(N);
+    threads_.resize(N);
     for (unsigned i = 0; i < N; ++i) {
       int retval = pthread_create(
         &threads_[i], NULL, TubeConsumer<ItemT>::MainConsumer, consumers_[i]);
