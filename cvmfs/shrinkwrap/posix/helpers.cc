@@ -70,18 +70,19 @@ int PosixSetMeta(const char *path,
     res = chown(path, stat_info->st_uid, stat_info->st_gid);
     if (res != 0) return -1;
   }
-  // TODO(steuber): Set xattrs with setxattr (if symlink no user. xattrs!)
-  XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
-  if (xlist) {
-    std::vector<std::string> v = xlist->ListKeys();
-    std::string val;
-    if (set_permissions) {
-      for (std::vector<std::string>::iterator it = v.begin();
-            it != v.end();
-            ++it) {
-        xlist->Get(*it, &val);
-        int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
-        if (res != 0) return -1;
+  if (stat_info->cvm_xattrs != NULL) {
+    XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
+    if (xlist) {
+      std::vector<std::string> v = xlist->ListKeys();
+      std::string val;
+      if (set_permissions) {
+        for (std::vector<std::string>::iterator it = v.begin();
+              it != v.end();
+              ++it) {
+          xlist->Get(*it, &val);
+          int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
+          if (res != 0) return -1;
+        }
       }
     }
   }
