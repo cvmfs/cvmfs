@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <errno.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "libcvmfs.h"
@@ -206,10 +207,10 @@ TEST_F(T_FS_Traversal_POSIX, TestTouchLinkUnlink) {
 
 TEST_F(T_FS_Traversal_POSIX, TestSymlink) {
   struct cvmfs_attr *stat = cvmfs_attr_init();
-  interface_->do_symlink(interface_->context_,
+  ASSERT_EQ(0, interface_->do_symlink(interface_->context_,
     "/asymlink",
     "somedestination",
-    stat);
+    stat));
   struct stat buf;
   ASSERT_EQ(0, lstat("./TestSymlink/asymlink", &buf));
   ASSERT_TRUE(S_ISLNK(buf.st_mode));
@@ -218,11 +219,67 @@ TEST_F(T_FS_Traversal_POSIX, TestSymlink) {
     = readlink("./TestSymlink/asymlink", strbuf, sizeof(strbuf)-1);
   strbuf[read_len] = '\0';
   ASSERT_STREQ("somedestination", strbuf);
+  ASSERT_EQ(0, interface_->do_symlink(interface_->context_,
+    "/asymlink",
+    "anotherdestinat",
+    stat));
+  read_len
+    = readlink("./TestSymlink/asymlink", strbuf, sizeof(strbuf)-1);
+  strbuf[read_len] = '\0';
+  ASSERT_STREQ("anotherdestinat", strbuf);
   cvmfs_attr_free(stat);
 }
 
 TEST_F(T_FS_Traversal_POSIX, TestReadWrite) {
-  // TODO(steuber): Write tests here
+  std::string ident = "/ff/ff/test.txt";
+  std::string path = "./.data/"+ident;
+  CreateFile(path, 0744);
+  void *handle = interface_->get_handle(interface_->context_, ident.c_str());
+  ASSERT_TRUE(NULL != handle);
+
+  size_t read_len;
+  char dummybuf[1];
+  FILE *fd;
+  char buf1[4];
+  char buf2[7];
+  char buf3[10];
+
+  // Write with interface
+  ASSERT_EQ(0, interface_->do_fopen(handle, fs_open_write));
+  ASSERT_EQ(-1, interface_->do_fread(handle, dummybuf, 1, &read_len));
+  ASSERT_EQ(0, interface_->do_fwrite(handle, "foo", 3));
+  ASSERT_EQ(0, interface_->do_fclose(handle));
+
+  // Read (check) and append with posix (content should be foo)
+  fd = fopen(path.c_str(), "a+");
+  ASSERT_EQ(3, fread(buf1, sizeof(char), 3, fd));
+  buf1[3] = '\0';
+  ASSERT_STREQ("foo", buf1);
+  ASSERT_EQ(3, fwrite("bar", sizeof(char), 3, fd));
+  fclose(fd);
+
+  // Read with interface (content should be foobar)
+  ASSERT_EQ(0, interface_->do_fopen(handle, fs_open_read));
+  ASSERT_EQ(-1, interface_->do_fwrite(handle, "foo", 3));
+  ASSERT_EQ(0, interface_->do_fread(handle, buf2, 6, &read_len));
+  buf2[6] = '\0';
+  ASSERT_STREQ("foobar", buf2);
+  ASSERT_EQ(0, interface_->do_fclose(handle));
+
+  // Append with interface
+  ASSERT_EQ(0, interface_->do_fopen(handle, fs_open_append));
+  ASSERT_EQ(-1, interface_->do_fread(handle, dummybuf, 1, &read_len));
+  ASSERT_EQ(0, interface_->do_fwrite(handle, "bar", 3));
+  ASSERT_EQ(0, interface_->do_fclose(handle));
+
+  // Read (check) with posix (content should be foobarbar)
+  fd = fopen(path.c_str(), "r");
+  ASSERT_EQ(9, fread(buf3, sizeof(char), 9, fd));
+  buf3[9] = '\0';
+  ASSERT_STREQ("foobarbar", buf3);
+  fclose(fd);
+
+  interface_->do_ffree(handle);
 }
 
 TEST_F(T_FS_Traversal_POSIX, TestMkDirRmDir) {
