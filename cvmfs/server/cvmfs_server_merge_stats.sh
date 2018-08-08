@@ -35,17 +35,18 @@ cvmfs_server_merge_table() {
   cat $TMP_DIR/${table}1.txt > $TMP_DIR/new_db.txt
   cat $TMP_DIR/${table}2.txt >> $TMP_DIR/new_db.txt
 
+  # list with all columns separated by  ','
   sqlite3 $1 -header -separator "," "Select * from ${table}1;" | head -1 > $TMP_DIR/all_columns.txt
   # Eliminate first column (*_id) -- PRIMARY KEY
   cut -d ',' -f2- $TMP_DIR/all_columns.txt > $TMP_DIR/columns.txt
   columns="$(cat $TMP_DIR/columns.txt)"
 
   # Merge!
-  sqlite3 $output_db < $TMP_DIR/new_db.txt
-  sqlite3 $output_db "$create_table_statement"
+  sqlite3 $output_db < $TMP_DIR/new_db.txt      # create ${table}1 and ${table}2 (with data)
+  sqlite3 $output_db "$create_table_statement"  # create ${table}
   sqlite3 $output_db "insert into ${table} select * from ${table}1;"
   sqlite3 $output_db "insert into ${table} ($columns) select $columns from ${table}2;"
-  sqlite3 $output_db "drop table ${table}1"
+  sqlite3 $output_db "drop table ${table}1"     
   sqlite3 $output_db "drop table ${table}2"
 
   # Undo changes into input db files
@@ -89,11 +90,11 @@ cvmfs_server_merge_checks() {
     return 1
   fi
 
+  # Create properties table in the output db file and insert data into it
   echo ".dump properties" > $TMP_DIR/script_properties
   sqlite3 $1 < $TMP_DIR/script_properties > $TMP_DIR/properties_table.txt
   cat $TMP_DIR/properties_table.txt > $TMP_DIR/new_db.txt
   sqlite3 $output_db < $TMP_DIR/new_db.txt
-
 }
 
 
