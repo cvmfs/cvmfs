@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_H_
-#define CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_H_
+#ifndef CVMFS_SHRINKWRAP_FS_TRAVERSAL_H_
+#define CVMFS_SHRINKWRAP_FS_TRAVERSAL_H_
 
 #include <string>
 
@@ -42,4 +42,4 @@ perf::Statistics *GetSyncStatTemplate();
 
 }  // namespace shrinkwrap
 
-#endif  // CVMFS_EXPORT_PLUGIN_FS_TRAVERSAL_H_
+#endif  // CVMFS_SHRINKWRAP_FS_TRAVERSAL_H_

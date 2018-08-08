@@ -190,17 +190,17 @@ set (CVMFS_SHRINKWRAP_SOURCES
   util_concurrency.cc
   xattr.cc
 
-  export_plugin/fs_traversal.cc
-  export_plugin/posix/data_dir_mgmt.cc
-  export_plugin/posix/garbage_collector.cc
-  export_plugin/posix/helpers.cc
-  export_plugin/posix/interface.cc
+  shrinkwrap/fs_traversal.cc
+  shrinkwrap/posix/data_dir_mgmt.cc
+  shrinkwrap/posix/garbage_collector.cc
+  shrinkwrap/posix/helpers.cc
+  shrinkwrap/posix/interface.cc
 
-  export_plugin/fs_traversal_libcvmfs.cc
-  export_plugin/spec_tree.cc
-  export_plugin/util.cc
+  shrinkwrap/fs_traversal_libcvmfs.cc
+  shrinkwrap/spec_tree.cc
+  shrinkwrap/util.cc
 
-  export_plugin/shrinkwrap.cc
+  shrinkwrap/shrinkwrap.cc
 )
 
 set (CVMFS_SWISSKNIFE_SOURCES
@@ -714,7 +714,7 @@ if (BUILD_LIBCVMFS)
   endif(BUILD_CVMFS_SHRINKWRAP)
 endif(BUILD_LIBCVMFS)
 
-if (BUILD_CVMFS_SHRINKWRAP)
+if (BUILD_SHRINKWRAP)
   add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
   add_dependencies (cvmfs_shrinkwrap libcvmfs)
 
@@ -728,7 +728,7 @@ if (BUILD_CVMFS_SHRINKWRAP)
 
   set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
   target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
-endif(BUILD_CVMFS_SHRINKWRAP)
+endif(BUILD_SHRINKWRAP)
 
 
 
@@ -852,13 +852,13 @@ if (BUILD_LIBCVMFS)
 endif (BUILD_LIBCVMFS)
 
 
-if (BUILD_CVMFS_SHRINKWRAP)
+if (BUILD_SHRINKWRAP)
   install (
     TARGETS      cvmfs_shrinkwrap
     RUNTIME
     DESTINATION    bin
   )
-endif (BUILD_CVMFS_SHRINKWRAP)
+endif (BUILD_SHRINKWRAP)
 
 if (BUILD_LIBCVMFS_CACHE)
   install (

@@ -10,9 +10,9 @@
 #include <map>
 #include <string>
 
-#include "export_plugin/fs_traversal.h"
 #include "helpers.h"
 #include "logging.h"
+#include "shrinkwrap/fs_traversal.h"
 #include "smalloc.h"
 #include "util/posix.h"
 

@@ -6,8 +6,8 @@
 #include <errno.h>
 #include <stdio.h>
 
-#include "export_plugin/fs_traversal_interface.h"
 #include "helpers.h"
+#include "shrinkwrap/fs_traversal_interface.h"
 #include "util/posix.h"
 
 /**

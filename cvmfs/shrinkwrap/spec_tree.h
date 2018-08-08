@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-#ifndef CVMFS_EXPORT_PLUGIN_SPEC_TREE_H_
-#define CVMFS_EXPORT_PLUGIN_SPEC_TREE_H_
+#ifndef CVMFS_SHRINKWRAP_SPEC_TREE_H_
+#define CVMFS_SHRINKWRAP_SPEC_TREE_H_
 
 #include <map>
 #include <string>
@@ -86,4 +86,4 @@ class SpecTree {
 
 
 
-#endif  // CVMFS_EXPORT_PLUGIN_SPEC_TREE_H_
+#endif  // CVMFS_SHRINKWRAP_SPEC_TREE_H_

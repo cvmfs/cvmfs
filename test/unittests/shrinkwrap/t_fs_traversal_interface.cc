@@ -18,11 +18,11 @@
 #include "util/posix.h"
 #include "xattr.h"
 
-#include "export_plugin/fs_traversal.h"
-#include "export_plugin/fs_traversal_interface.h"
-#include "export_plugin/fs_traversal_libcvmfs.h"
-#include "export_plugin/posix/interface.h"
-#include "export_plugin/util.h"
+#include "shrinkwrap/fs_traversal.h"
+#include "shrinkwrap/fs_traversal_interface.h"
+#include "shrinkwrap/fs_traversal_libcvmfs.h"
+#include "shrinkwrap/posix/interface.h"
+#include "shrinkwrap/util.h"
 #include "test-util.h"
 
 #define MODE_BITMASK (S_IRWXO | S_IRWXG | S_IRWXU)

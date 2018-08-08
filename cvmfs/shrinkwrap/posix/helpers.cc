@@ -15,9 +15,9 @@
 #include <vector>
 
 #include "data_dir_mgmt.h"
-#include "export_plugin/fs_traversal_interface.h"
 #include "garbage_collector.h"
 #include "logging.h"
+#include "shrinkwrap/fs_traversal_interface.h"
 #include "util/posix.h"
 #include "xattr.h"
 

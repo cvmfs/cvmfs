@@ -6,9 +6,9 @@
 #include "libcvmfs.h"
 #include "util/posix.h"
 
-#include "export_plugin/fs_traversal_interface.h"
-#include "export_plugin/posix/interface.h"
-#include "export_plugin/util.h"
+#include "shrinkwrap/fs_traversal_interface.h"
+#include "shrinkwrap/posix/interface.h"
+#include "shrinkwrap/util.h"
 #include "test-util.h"
 
 class T_FS_Traversal_POSIX : public ::testing::Test {
