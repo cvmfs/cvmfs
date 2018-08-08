@@ -175,11 +175,14 @@ int posix_cleanup_path(struct fs_traversal_context *ctx,
     while ((de = readdir(dr)) != NULL) {
       if (strcmp(de->d_name, ".") != 0
         && strcmp(de->d_name, "..") != 0) {
-        std::string cur_path = complete_path + "/" + de->d_name;
-        posix_cleanup_path(ctx, cur_path.c_str());
+        std::string cur_path = std::string(path) + "/" + de->d_name;
+        if (posix_cleanup_path(ctx, cur_path.c_str()) != 0) {
+          return -1;
+        }
       }
     }
-    int res = posix_do_rmdir(ctx, path);
+    int res = closedir(dr);
+    res |= posix_do_rmdir(ctx, path);
     if (res != 0) return -1;
   }
   return 0;
@@ -261,8 +264,10 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   } else {
     stat_result->cvm_symlink = NULL;
   }
-  stat_result->cvm_parent = strdup(GetParentPath(path).c_str());
-  stat_result->cvm_name = strdup(GetFileName(path).c_str());
+  std::string parent_path = GetParentPath(path);
+  std::string file_name = GetFileName(path);
+  stat_result->cvm_parent = strdup(parent_path.c_str());
+  stat_result->cvm_name = strdup(file_name.c_str());
 
   stat_result->cvm_xattrs = XattrList::CreateFromFile(complete_path);
   if (stat_result->cvm_xattrs == NULL) return -1;
