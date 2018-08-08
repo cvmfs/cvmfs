@@ -11,8 +11,8 @@ clean_up() {
 
 # merge publish_statistics table
 cvmfs_server_merge_table() {
-  local db_file_1=$1
-  local db_file_2=$2
+  local db_file_1=""
+  local db_file_2=""
   local output_db=$3
   local table=$4
   local TMP_DIR=/tmp/cvmfs_server_merge_stats
@@ -20,6 +20,11 @@ cvmfs_server_merge_table() {
   local columns=""
 
   mkdir -p $TMP_DIR
+  # Make copies for the input db files
+  cp $1 $TMP_DIR/db1
+  cp $2 $TMP_DIR/db2
+  db_file_1=${TMP_DIR}/db1
+  db_file_2=${TMP_DIR}/db2
 
   echo ".dump $table" | sqlite3 $db_file_1 > $TMP_DIR/${table}.txt
   # Prepare the merged table
@@ -40,9 +45,6 @@ cvmfs_server_merge_table() {
     sqlite3 $db_file_2 -header -separator "," "Select * from ${table}2;" > $TMP_DIR/data
     if [ ! -s $TMP_DIR/data ]; then
       echo "At least one ${table} table should have data!"
-      # Undo changes into input db files
-      sqlite3 $1 "ALTER table ${table}1 RENAME TO ${table};"
-      sqlite3 $2 "ALTER table ${table}2 RENAME TO ${table};"
       return 1
     fi
   fi
@@ -61,10 +63,6 @@ cvmfs_server_merge_table() {
   # delete from $output_db ${table}1 and ${table}2 tables, keep ${table}
   sqlite3 $output_db "drop table ${table}1;"
   sqlite3 $output_db "drop table ${table}2;"
-
-  # Undo changes into input db files
-  sqlite3 $1 "ALTER table ${table}1 RENAME TO ${table};"
-  sqlite3 $2 "ALTER table ${table}2 RENAME TO ${table};"
 
   echo "Success: $1 and $2 ${table} tables were merged in $output_db"
 
@@ -90,9 +88,8 @@ cvmfs_server_merge_checks() {
   local schema_2="$(cat $TMP_DIR/properties_values_2 | grep schema | cut -d '|' -f 2)"
   local schema_revision_1="$(cat $TMP_DIR/properties_values_1 | grep schema_revision | cut -d '|' -f 2)"
   local schema_revision_2="$(cat $TMP_DIR/properties_values_2 | grep schema_revision | cut -d '|' -f 2)"
-  tables1="$(echo ".tables" | sqlite3 $1)"
-  tables2="$(echo ".tables" | sqlite3 $2)"
-
+  tables1="$(echo ".tables" | sqlite3 $db_file_1)"
+  tables2="$(echo ".tables" | sqlite3 $db_file_2)"
   # Sanity checks
   if [ "x$repo_name_1" != "x$repo_name_2" ]; then
     echo "The given db files have different repo_name: $repo_name_1 vs $repo_name_2!"
@@ -111,13 +108,10 @@ cvmfs_server_merge_checks() {
     echo "The given db files have different tables!"
     return 1
   fi
-
   # Create properties table in the output db file and insert data into it
-  echo ".dump properties" > $TMP_DIR/script_properties
-  sqlite3 $1 < $TMP_DIR/script_properties > $TMP_DIR/properties_table.txt
+  echo ".dump properties" | sqlite3 $db_file_1 > $TMP_DIR/properties_table.txt
   cat $TMP_DIR/properties_table.txt > $TMP_DIR/new_db.txt
   sqlite3 $output_db < $TMP_DIR/new_db.txt
-
   return 0
 }
 
