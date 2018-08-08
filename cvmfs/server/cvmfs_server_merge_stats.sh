@@ -20,17 +20,14 @@ cvmfs_server_merge_table() {
   local columns=""
 
   mkdir -p $TMP_DIR
-  echo ".dump $table" > $TMP_DIR/script_${table}
-  echo ".dump ${table}1" > $TMP_DIR/script_${table}1
-  echo ".dump ${table}2" > $TMP_DIR/script_${table}2
 
-  sqlite3 $1 < $TMP_DIR/script_${table} > $TMP_DIR/${table}.txt
+  echo ".dump $table" | sqlite3 $1 > $TMP_DIR/${table}.txt
   create_table_statement="$(cat $TMP_DIR/${table}.txt | grep CREATE)"
   sqlite3 $1 "ALTER table $table RENAME TO ${table}1;"
   sqlite3 $2 "ALTER table $table RENAME TO ${table}2;"
 
-  sqlite3 $1 < $TMP_DIR/script_${table}1 > $TMP_DIR/${table}1.txt
-  sqlite3 $2 < $TMP_DIR/script_${table}2 > $TMP_DIR/${table}2.txt
+  echo ".dump ${table}1" | sqlite3 $1 > $TMP_DIR/${table}1.txt
+  echo ".dump ${table}2" | sqlite3 $2 > $TMP_DIR/${table}2.txt
 
   cat $TMP_DIR/${table}1.txt > $TMP_DIR/new_db.txt
   cat $TMP_DIR/${table}2.txt >> $TMP_DIR/new_db.txt
@@ -46,7 +43,7 @@ cvmfs_server_merge_table() {
   sqlite3 $output_db "$create_table_statement"  # create ${table}
   sqlite3 $output_db "insert into ${table} select * from ${table}1;"
   sqlite3 $output_db "insert into ${table} ($columns) select $columns from ${table}2;"
-  sqlite3 $output_db "drop table ${table}1"     
+  sqlite3 $output_db "drop table ${table}1"
   sqlite3 $output_db "drop table ${table}2"
 
   # Undo changes into input db files
@@ -64,6 +61,8 @@ cvmfs_server_merge_checks() {
   local db_file_2=$2
   local output_db=$3
   local TMP_DIR=/tmp/cvmfs_server_merge_stats
+  local tables1=""
+  local tables2=""
 
   mkdir -p $TMP_DIR
   sqlite3 $db_file_1 "SELECT * from properties" > $TMP_DIR/properties_values_1
@@ -95,14 +94,16 @@ cvmfs_server_merge_checks() {
   sqlite3 $1 < $TMP_DIR/script_properties > $TMP_DIR/properties_table.txt
   cat $TMP_DIR/properties_table.txt > $TMP_DIR/new_db.txt
   sqlite3 $output_db < $TMP_DIR/new_db.txt
-}
 
+  return 0;
+}
 
 cvmfs_server_merge_stats() {
   trap clean_up EXIT HUP INT TERM || return $?
   local output_db="output.db"   # default output file
   local db_file_1=""
   local db_file_2=""
+  local checks=""
 
   # optional parameter handling
   OPTIND=1
@@ -124,7 +125,12 @@ cvmfs_server_merge_stats() {
   check_parameter_count 2 $#
 
   echo "" > $output_db
-  cvmfs_server_merge_checks $1 $2 $output_db
+  checks="$(cvmfs_server_merge_checks $1 $2 $output_db)"
+  if [ "x$checks" != "x0" ]; then
+    echo "Sanity checks failed!"
+    return 1
+  fi
+
   cvmfs_server_merge_table $1 $2 $output_db "publish_statistics"
   cvmfs_server_merge_table $1 $2 $output_db "gc_statistics"
   return $?
