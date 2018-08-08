@@ -4,6 +4,9 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+echo "enabling epel yum repository..."
+install_from_repo epel-release
+
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
