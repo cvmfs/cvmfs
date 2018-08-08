@@ -182,13 +182,13 @@ build_lib() {
         do_build "googletest"
       ;;
     ipaddress)
-      if [ x"$BUILD_SERVER" != x ]; then
+      if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
         do_extract "ipaddress" "ipaddress-${IPADDRESS_VERSION}.tar.gz"
         do_build "ipaddress"
       fi
       ;;
     maxminddb)
-      if [ x"$BUILD_SERVER" != x ]; then
+      if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
         do_extract "maxminddb" "MaxMind-DB-Reader-python-${MAXMINDDB_VERSION}.tar.gz"
         do_build "maxminddb"
       fi
