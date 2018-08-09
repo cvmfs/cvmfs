@@ -57,9 +57,9 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * @return 0 if no error occured or a negative integer if errors occurred
   */
   int StoreStatistics(const perf::Statistics *statistics,
-                      const std::string start_time,
-                      const std::string finished_time,
-                      const std::string command_name,
+                      const std::string &start_time,
+                      const std::string &finished_time,
+                      const std::string &command_name,
                       const swissknife::ArgumentList &args);
 
 /**
@@ -70,7 +70,7 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * @param repo_name Fully qualified name of the repository
   * @return path to store database file
   */
-  static std::string GetDBPath(const std::string repo_name);
+  static std::string GetDBPath(const std::string &repo_name);
 };
 
 

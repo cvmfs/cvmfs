@@ -78,8 +78,8 @@ struct GcStats {
   * @return the insert statement
   */
 std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
-                            const std::string start_time,
-                            const std::string finished_time) {
+                            const std::string &start_time,
+                            const std::string &finished_time) {
   struct PublishStats stats = PublishStats(statistics);
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
@@ -119,9 +119,9 @@ std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
   * @return the insert statement
   */
 std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
-                            const std::string start_time,
-                            const std::string finished_time,
-                            const std::string dry_run) {
+                            const std::string &start_time,
+                            const std::string &finished_time,
+                            const std::string &dry_run) {
   struct GcStats stats = GcStats(statistics);
   std::string insert_statement =
     "INSERT INTO gc_statistics ("
@@ -218,9 +218,9 @@ StatisticsDatabase::~StatisticsDatabase() {
 
 
 int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
-                                        const std::string start_time,
-                                        const std::string finished_time,
-                                        const std::string command_name,
+                                        const std::string &start_time,
+                                        const std::string &finished_time,
+                                        const std::string &command_name,
                                         const swissknife::ArgumentList &args) {
   std::string insert_statement;
   if (command_name == "ingest" || command_name == "sync") {
@@ -265,7 +265,7 @@ int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
 }
 
 
-std::string StatisticsDatabase::GetDBPath(const std::string repo_name) {
+std::string StatisticsDatabase::GetDBPath(const std::string &repo_name) {
   // default location
   const std::string db_default_path =
       "/var/spool/cvmfs/" + repo_name + "/stats.db";
