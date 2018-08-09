@@ -11,6 +11,7 @@
 #include "options.h"
 #include "sql.h"
 #include "statistics.h"
+#include "swissknife.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -58,7 +59,8 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   int StoreStatistics(const perf::Statistics *statistics,
                       const std::string start_time,
                       const std::string finished_time,
-                      const std::string command_name);
+                      const std::string command_name,
+                      const swissknife::ArgumentList &args);
 
 /**
   * Get the path for the database file
