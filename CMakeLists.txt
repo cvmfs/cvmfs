@@ -234,20 +234,42 @@ macro (pedantic_include_check HEADERFILE VARIABLENAME)
   endif (NOT ${VARIABLENAME})
 endmacro (pedantic_include_check)
 
-macro (look_for_include_files)
+macro (permissive_include_check HEADERFILE VARIABLENAME)
+  check_include_file (${HEADERFILE} ${VARIABLENAME})
+  if (${VARIABLENAME})
+    set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -D${VARIABLENAME}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D${VARIABLENAME}")
+  endif (${VARIABLENAME})
+endmacro (permissive_include_check)
+
+macro (look_for_required_include_files)
   foreach (HEADER ${ARGV})
     string (REGEX REPLACE "/|\\." "_" HEADER_VAR_LOWER ${HEADER})
     string (TOUPPER "have_${HEADER_VAR_LOWER}" HEADER_VAR)
     pedantic_include_check (${HEADER} ${HEADER_VAR})
   endforeach (HEADER IN ITEMS ${ARGV})
-endmacro (look_for_include_files)
+endmacro (look_for_required_include_files)
+
+macro (look_for_optional_include_files)
+  foreach (HEADER ${ARGV})
+    string (REGEX REPLACE "/|\\." "_" HEADER_VAR_LOWER ${HEADER})
+    string (TOUPPER "have_${HEADER_VAR_LOWER}" HEADER_VAR)
+    permissive_include_check (${HEADER} ${HEADER_VAR})
+  endforeach (HEADER IN ITEMS ${ARGV})
+endmacro (look_for_optional_include_files)
 
 set (REQUIRED_HEADERS sys/xattr.h zlib.h netinet/in.h arpa/inet.h sys/socket.h
                       sys/un.h sys/time.h sys/uio.h sys/stat.h sys/types.h
                       sys/wait.h sys/select.h pthread.h termios.h utime.h
                       signal.h errno.h dirent.h unistd.h fcntl.h netdb.h
                       syslog.h sys/resource.h execinfo.h poll.h pwd.h grp.h)
+set (OPTIONAL_HEADERS )
 if (NOT MACOSX)
+  set (REQUIRED_HEADERS ${REQUIRED_HEADERS}
+                        sys/statfs.h)
+
+  # As of attr-2.4.48, the attr/xattr.h header disappeard in favor of sys/xattr.h
+  #
   # Unfortunately, attr/xattr.h fails to compile without including sys/types.h
   # before including attr/xattr.h (it uses size_t and ssize_t).
   # CMake searches for include files by compiling a minimal *.c file like:
@@ -258,12 +280,12 @@ if (NOT MACOSX)
   # file is found by the compiler but mitigating the compiler errors caused by
   # a standalone inclusion of attr/xattr.h
   set (CMAKE_REQUIRED_DEFINITIONS "-D__XATTR_H__")
-  set (REQUIRED_HEADERS ${REQUIRED_HEADERS}
-                        sys/statfs.h
+  set (OPTIONAL_HEADERS ${OPTIONAL_HEADERS}
                         attr/xattr.h)
 endif (NOT MACOSX)
 
-look_for_include_files (${REQUIRED_HEADERS})
+look_for_required_include_files (${REQUIRED_HEADERS})
+look_for_optional_include_files (${OPTIONAL_HEADERS})
 
 #
 # configure the config.h.in file
