@@ -1,0 +1,99 @@
+# This file contains $NR_OF_TESTS tests for checking the store publish statistics feature (checking the database integrity)
+cvmfs_test_name="Merge two database files"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_662_ERROR_MERGE_PUBLISH_TABLE=101
+CVMFS_TEST_662_ERROR_MERGE_GC_TABLE=102
+CVMFS_TEST_662_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db
+CVMFS_TEST_662_OLD_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_old.db
+CVMFS_TEST_662_MERGED_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_merged.db
+
+
+add_content() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  echo "meaningless file content" > f1
+  echo "meaningless file content" > f1_copy
+  echo "more clever file content" > f2
+  echo "abc123"                   > f3
+  echo "1234abcd"                 > f4
+
+  popdir
+}
+
+remove_content() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  rm -rf ./*
+
+  popdir
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  local gc_log="${scratch_dir}/gc.log"
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+
+  echo "*** disable automatic garbage collection"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
+  echo "*** delete stats.db files"
+  rm -v $CVMFS_TEST_662_DB_PATH
+  rm -v $CVMFS_TEST_662_OLD_DB
+  rm -v $CVMFS_TEST_662_MERGED_DB
+
+  echo "*** make an empty publish"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** putting some stuff in the repository"
+  add_content $repo_dir || return 1
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** delete all stuff from the repository"
+  remove_content $repo_dir || return 2
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** make an empty publish"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  # make a copy of old db file
+  cp -v $CVMFS_TEST_662_DB_PATH $CVMFS_TEST_662_OLD_DB
+  # remove old db file
+  rm -v $CVMFS_TEST_662_DB_PATH
+
+  echo "*** perform basic garbage collection (logging deletions to $gc_log)"
+  cvmfs_server gc -r0 -fL "$gc_log" $CVMFS_TEST_REPO || return 11
+
+  # ====================== Test - merge tool ======================
+
+  # merge old db file with the new db file
+  cvmfs_server merge-stats -o $CVMFS_TEST_662_MERGED_DB $CVMFS_TEST_662_OLD_DB $CVMFS_TEST_662_DB_PATH
+
+  local nr_entries_publish="$(sqlite3 $CVMFS_TEST_662_MERGED_DB "select count(*) from publish_statistics;")"
+  local nr_entries_gc="$(sqlite3 $CVMFS_TEST_662_MERGED_DB "select count(*) from gc_statistics;")"
+
+  if [ "x$nr_entries_publish" != "x4" ]; then
+    echo "*** Test FAILED nr_entries in publish_statistics table:"
+    echo "***   expected = 4, received $nr_entries_publish!"
+    return $CVMFS_TEST_662_ERROR_MERGE_PUBLISH_TABLE
+  fi
+  if [ "x$nr_entries_gc" != "x1" ]; then
+    echo "*** Test FAILED nr_entries in gc_statistics table:"
+    echo "***   expected = 1, received $nr_entries_gc!"
+    return $CVMFS_TEST_662_ERROR_MERGE_PUBLISH_TABLE
+  fi
+}

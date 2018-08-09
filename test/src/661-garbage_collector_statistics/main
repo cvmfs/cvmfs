@@ -1,0 +1,21 @@
+# This file 
+cvmfs_test_name="Gather garbage collector statistics"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  local gc_log="${scratch_dir}/gc.log"
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+
+  echo "*** disable automatic garbage collection"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
+  # TODO
+  # echo "perform basic garbage collection (logging deletions to $gc_log)"
+  # cvmfs_server gc -r0 -fL "$gc_log" $CVMFS_TEST_REPO || return 11
+}
