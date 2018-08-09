@@ -147,8 +147,9 @@ LoadError ClientCatalogManager::LoadCatalog(
   retval = manifest::Manifest::ReadChecksum(
     repo_name_, checksum_dir, &cache_hash, &cache_last_modified);
   if (retval) {
-    LogCvmfs(kLogCache, kLogDebug, "cached copy publish date %s",
-             StringifyTime(cache_last_modified, true).c_str());
+    LogCvmfs(kLogCache, kLogDebug, "cached copy publish date %s (hash %s)",
+             StringifyTime(cache_last_modified, true).c_str(),
+             cache_hash.ToString().c_str());
   } else {
     LogCvmfs(kLogCache, kLogDebug, "unable to read local checksum");
   }
@@ -164,16 +165,30 @@ LoadError ClientCatalogManager::LoadCatalog(
     LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
              manifest_failure, manifest::Code2Ascii(manifest_failure));
 
-    if (catalog_path) {
-      LoadError error =
-        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
-      if (error != catalog::kLoadNew)
-        return error;
+    LoadError success_code = catalog::kLoadUp2Date;
+
+    // Network unavailable but cached copy updated externally?
+    std::map<PathString, shash::Any>::const_iterator iter =
+      mounted_catalogs_.find(mountpoint);
+    if (iter != mounted_catalogs_.end()) {
+      LogCvmfs(kLogCache, kLogDebug, "HERE %s", iter->second.ToString().c_str());
+      if (iter->second != cache_hash) {
+        LogCvmfs(kLogCache, kLogDebug, "HERE2");
+        success_code = catalog::kLoadNew;
+      }
     }
-    loaded_catalogs_[mountpoint] = cache_hash;
+
+    if (catalog_path) {
+      LoadError success_code =
+        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
+      if (success_code != catalog::kLoadNew)
+        return success_code;
+      loaded_catalogs_[mountpoint] = cache_hash;
+    }
+
     *catalog_hash = cache_hash;
     offline_mode_ = true;
-    return catalog::kLoadUp2Date;
+    return success_code;
   }
 
   offline_mode_ = false;

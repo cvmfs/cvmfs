@@ -301,9 +301,9 @@ void FuseRemounter::TryFinish() {
 
   atomic_xadd32(&drainout_mode_, -2);  // 2 --> 0, end of drainout mode
 
-  if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace) ||
-      mountpoint_->catalog_mgr()->offline_mode())
-  {
+  if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
+    // Can temporarily "escape" offline mode if update came from updated
+    // alien cache
     SetOfflineMode(true);
     catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
     SetAlarm(MountPoint::kShortTermTTL);
