@@ -1,0 +1,80 @@
+cvmfs_test_name="Apply updated catalog from preloaded cache"
+cvmfs_test_autofs_on_startup=false
+
+
+CVMFS_TEST_654_MOUNTPOINT=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_654_MOUNTPOINT ]; then
+    sudo fusermount -u $CVMFS_TEST_654_MOUNTPOINT
+    sudo umount        $CVMFS_TEST_654_MOUNTPOINT
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_url=$(get_repo_url $CVMFS_TEST_REPO)
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/first
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local preload_dir=$scratch_dir/preload_dir
+  echo "preloading $preload_dir"
+  mkdir -p $preload_dir || return 10
+  cvmfs2 __MK_ALIEN_CACHE__ $preload_dir $(id -u $CVMFS_TEST_USER) $(id -g $CVMFS_TEST_USER) || return 11
+  mkdir $preload_dir/sync_temp || return 12
+  cvmfs_swissknife pull -c \
+    -u $repo_url \
+    -r $preload_dir \
+    -k /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub \
+    -m $CVMFS_TEST_REPO \
+    -x $preload_dir/sync_temp || return 13
+
+  echo "compare the results of cvmfs to our reference copy"
+  mkdir cache
+  mkdir mnt
+# create a local configuration file
+  cat > local.conf << EOF
+CVMFS_CACHE_BASE=$(pwd)/cache
+CVMFS_QUOTA_LIMIT=-1
+CVMFS_RELOAD_SOCKETS=$(pwd)/cache
+CVMFS_ALIEN_CACHE=$preload_dir
+CVMFS_SERVER_URL=NOAVAIL
+CVMFS_HTTP_PROXY=NOAVAIL
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
+EOF
+
+
+  CVMFS_TEST_654_MOUNTPOINT="$(pwd)/mnt"
+  trap cleanup EXIT HUP INT TERM || return 15
+
+  cvmfs2 -o config=$(pwd)/local.conf $CVMFS_TEST_REPO $CVMFS_TEST_654_MOUNTPOINT || return 20
+  ls $CVMFS_TEST_654_MOUNTPOINT/first || return 21
+  ls $CVMFS_TEST_654_MOUNTPOINT/second && return 22
+
+  echo "*** Updating the repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/second
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  cvmfs_swissknife pull -c \
+    -u $repo_url \
+    -r $preload_dir \
+    -k /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub \
+    -m $CVMFS_TEST_REPO \
+    -x $preload_dir/sync_temp || return 30
+
+  cvmfs_talk -p $(pwd)/cache/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO} remount sync || return 31
+
+  ls $CVMFS_TEST_654_MOUNTPOINT/first || return 40
+  ls $CVMFS_TEST_654_MOUNTPOINT/second || return 41
+
+  return 0
+}
+
