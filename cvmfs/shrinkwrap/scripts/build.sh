@@ -61,7 +61,7 @@ export_spec() {
   REPO=${REPO_PATH#$SPEC_DIR"/"}
   REPO=${REPO%".spec.txt"}
   echo "*** Exporting $REPO"
-  CMD="sudo cvmfs_shrinkwrap -r $REPO -f $CVMFS_CONFIG -t $REPO_PATH"
+  CMD="sudo env PATH=$PATH cvmfs_shrinkwrap -r $REPO -f $CVMFS_CONFIG -t $REPO_PATH"
   if [ ! -z "$DEST_SYS" ]
   then
   CMD=$CMD" -d $DEST_SYS"
