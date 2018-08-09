@@ -142,7 +142,7 @@ cvmfs_run_test() {
   test_results[3,7]=0
   test_results[3,8]=65
   test_results[3,9]=0
-  test_results[3,10]=103
+  test_results[3,10]=0
   # test 4
   test_results[4,1]=0
   test_results[4,2]=0
@@ -153,7 +153,7 @@ cvmfs_run_test() {
   test_results[4,7]=0
   test_results[4,8]=0
   test_results[4,9]=0
-  test_results[4,10]=103
+  test_results[4,10]=0
 
   # check publish statistics
   for i in `seq 1 $CVMFS_TEST_659_NR_OF_TESTS`;
