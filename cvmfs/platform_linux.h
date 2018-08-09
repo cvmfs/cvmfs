@@ -250,7 +250,7 @@ inline bool platform_setxattr(const std::string &path, const std::string &name,
   return retval == 0;
 }
 
-inline bool platform_setxattr(const std::string &path, const std::string &name,
+inline bool platform_lsetxattr(const std::string &path, const std::string &name,
                               const std::string &value) {
   int retval =
       lsetxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
