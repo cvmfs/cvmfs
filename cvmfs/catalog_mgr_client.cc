@@ -171,9 +171,7 @@ LoadError ClientCatalogManager::LoadCatalog(
     std::map<PathString, shash::Any>::const_iterator iter =
       mounted_catalogs_.find(mountpoint);
     if (iter != mounted_catalogs_.end()) {
-      LogCvmfs(kLogCache, kLogDebug, "HERE %s", iter->second.ToString().c_str());
       if (iter->second != cache_hash) {
-        LogCvmfs(kLogCache, kLogDebug, "HERE2");
         success_code = catalog::kLoadNew;
       }
     }
