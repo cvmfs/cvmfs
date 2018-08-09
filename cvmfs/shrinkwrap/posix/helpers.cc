@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <utime.h>
 
-#include <attr/xattr.h>  // NOLINT
+// #include <attr/xattr.h>  // NOLINT
 // Necessary because xattr.h does not import sys/types.h
 
 #include <string>
@@ -17,6 +17,7 @@
 #include "data_dir_mgmt.h"
 #include "garbage_collector.h"
 #include "logging.h"
+#include "platform.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "util/posix.h"
 #include "xattr.h"
@@ -80,7 +81,7 @@ int PosixSetMeta(const char *path,
               it != v.end();
               ++it) {
           xlist->Get(*it, &val);
-          int res = lsetxattr(path, it->c_str(), val.c_str(), val.length(), 0);
+          int res = platform_lsetxattr(path, *it, val);
           if (res != 0) return -1;
         }
       }
