@@ -157,6 +157,8 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
   if (last_char != 'C') {    // if is not a catalog file
     int64_t condemned_bytes = configuration_.uploader->GetObjectSize(hash);
     if (condemned_bytes > 0) {
+      printf("condemned ------ %s\n", hash.MakePath().c_str());
+      printf("condemned size - %ld\n", condemned_bytes);
       condemned_bytes_ += condemned_bytes;
     }
   }
