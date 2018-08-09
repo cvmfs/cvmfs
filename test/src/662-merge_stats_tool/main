@@ -8,16 +8,23 @@ CVMFS_TEST_662_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db
 CVMFS_TEST_662_OLD_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_old.db
 CVMFS_TEST_662_MERGED_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_merged.db
 
-
 add_content() {
   local working_dir=$1
   pushdir $working_dir
 
   echo "meaningless file content" > f1
-  echo "meaningless file content" > f1_copy
   echo "more clever file content" > f2
   echo "abc123"                   > f3
   echo "1234abcd"                 > f4
+
+  popdir
+}
+
+add_duplicate() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  echo "meaningless file content" > f1_copy
 
   popdir
 }
@@ -48,10 +55,6 @@ cvmfs_run_test() {
   rm -v $CVMFS_TEST_662_OLD_DB
   rm -v $CVMFS_TEST_662_MERGED_DB
 
-  echo "*** make an empty publish"
-  start_transaction $CVMFS_TEST_REPO || return $?
-  publish_repo $CVMFS_TEST_REPO || return $?
-
   echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
   echo "*** putting some stuff in the repository"
@@ -61,8 +64,15 @@ cvmfs_run_test() {
 
   echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** putting a duplicated file in the repository"
+  add_duplicate $repo_dir || return 2
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
   echo "*** delete all stuff from the repository"
-  remove_content $repo_dir || return 2
+  remove_content $repo_dir || return 3
   echo "*** creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
@@ -76,7 +86,10 @@ cvmfs_run_test() {
   rm -v $CVMFS_TEST_662_DB_PATH
 
   echo "*** perform basic garbage collection (logging deletions to $gc_log)"
-  cvmfs_server gc -r0 -fL "$gc_log" $CVMFS_TEST_REPO || return 11
+  cvmfs_server gc -r1 -fL "$gc_log" $CVMFS_TEST_REPO || return 4
+
+  echo "*** perform basic garbage collection (logging deletions to $gc_log)"
+  cvmfs_server gc -r1 -fL "$gc_log" $CVMFS_TEST_REPO || return 5
 
   # ====================== Test - merge tool ======================
 
@@ -91,9 +104,9 @@ cvmfs_run_test() {
     echo "***   expected = 4, received $nr_entries_publish!"
     return $CVMFS_TEST_662_ERROR_MERGE_PUBLISH_TABLE
   fi
-  if [ "x$nr_entries_gc" != "x1" ]; then
+  if [ "x$nr_entries_gc" != "x2" ]; then
     echo "*** Test FAILED nr_entries in gc_statistics table:"
-    echo "***   expected = 1, received $nr_entries_gc!"
+    echo "***   expected = 2, received $nr_entries_gc!"
     return $CVMFS_TEST_662_ERROR_MERGE_PUBLISH_TABLE
   fi
 }
