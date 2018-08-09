@@ -194,6 +194,13 @@ inline bool platform_setxattr(const std::string &path, const std::string &name,
   return retval == 0;
 }
 
+inline bool platform_lsetxattr(const std::string &path, const std::string &name,
+                               const std::string &value) {
+  int retval = 
+      setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0, XATTR_NOFOLLOW);
+  return retval == 0;
+}
+
 inline ssize_t platform_lgetxattr(const char *path, const char *name,
                                   void *value, size_t size) {
   return getxattr(path, name, value, size, 0 /* position */, XATTR_NOFOLLOW);
