@@ -152,9 +152,8 @@ template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
                                                        const shash::Any &hash) {
   ++condemned_objects_;
-  std::string file_name = hash.MakePath();
-  char last_char = file_name[file_name.length() - 1];
-  if (last_char != 'C') {    // if is not a catalog file
+
+  if (!hash.HasSuffix()) {  // Count only data, not metadata
     int64_t condemned_bytes = configuration_.uploader->GetObjectSize(hash);
     if (condemned_bytes > 0) {
       condemned_bytes_ += condemned_bytes;
