@@ -126,7 +126,6 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
     return;
   }
 
-  CountUploadedBytes(bytes_written);
   // Tell kernel to evict written pages from the page cache.  We don't care if
   // it succeeds or not.
   (void)platform_invalidate_kcache(local_handle->file_descriptor, offset,
@@ -167,6 +166,9 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
       Respond(handle->commit_callback,
               UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
       return;
+    }
+    if (!content_hash.HasSuffix()) {  // count only data, not metadata
+      CountUploadedBytes(GetFileSize(upstream_path_ + "/" + final_path));
     }
   } else {
     const int retval = unlink(local_handle->temporary_path.c_str());
