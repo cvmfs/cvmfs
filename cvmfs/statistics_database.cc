@@ -56,7 +56,8 @@ struct GcStats {
   std::string n_preserved_catalogs;
   std::string n_condemned_catalogs;
   std::string n_condemned_objects;
-  std::string sz_condemned_bytes;
+  std::string n_condemned_data_objects;
+  std::string sz_condemned_data_bytes;
 
   explicit GcStats(const perf::Statistics *statistics):
     n_preserved_catalogs(statistics->
@@ -65,8 +66,10 @@ struct GcStats {
                     Lookup("gc.n_condemned_catalogs")->ToString()),
     n_condemned_objects(statistics->
                     Lookup("gc.n_condemned_objects")->ToString()),
-    sz_condemned_bytes(statistics->
-                    Lookup("gc.sz_condemned_bytes")->ToString()) {
+    n_condemned_data_objects(statistics->
+                    Lookup("gc.n_condemned_data_objects")->ToString()),
+    sz_condemned_data_bytes(statistics->
+                    Lookup("gc.sz_condemned_data_bytes")->ToString()) {
   }
 };
 
@@ -131,7 +134,8 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
     "n_preserved_catalogs,"
     "n_condemned_catalogs,"
     "n_condemned_objects,"
-    "sz_condemned_bytes)"
+    "n_condemned_data_objects,"
+    "sz_condemned_data_bytes)"
     " VALUES("
     "'" + start_time + "'," +
     "'" + finished_time + "'," +
@@ -139,7 +143,8 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
     stats.n_preserved_catalogs + "," +
     stats.n_condemned_catalogs + ","+
     stats.n_condemned_objects + "," +
-    stats.sz_condemned_bytes + ");";
+    stats.n_condemned_data_objects + "," +
+    stats.sz_condemned_data_bytes + ");";
   return insert_statement;
 }
 
@@ -172,7 +177,8 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "n_preserved_catalogs INTEGER,"
     "n_condemned_catalogs INTEGER,"
     "n_condemned_objects INTEGER,"
-    "sz_condemned_bytes INTEGER);").Execute();
+    "n_condemned_data_objects INTEGER,"
+    "sz_condemned_data_bytes INTEGER);").Execute();
   return ret1 & ret2;
 }
 
@@ -222,6 +228,7 @@ int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
                                         const std::string &finished_time,
                                         const std::string &command_name,
                                         const swissknife::ArgumentList &args) {
+
   std::string insert_statement;
   if (command_name == "ingest" || command_name == "sync") {
     insert_statement = PrepareStatementIntoPublish(statistics, start_time,
@@ -238,7 +245,6 @@ int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
   } else {
     return -5;
   }
-
   sqlite::Sql insert(this->sqlite_db(), insert_statement);
 
   if (!this->BeginTransaction()) {
