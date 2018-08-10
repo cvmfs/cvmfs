@@ -153,6 +153,7 @@ Group: Application/System
 BuildRequires: python-devel
 BuildRequires: libcap-devel
 BuildRequires: unzip
+BuildRequires: python-setuptools
 %if 0%{?suse_version}
 Requires: insserv
 %else
@@ -220,7 +221,11 @@ export CXXFLAGS="$CXXFLAGS -O0"
 %if 0%{?suse_version}
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
-%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes .
+EXTRA_CMAKE_OPTS=""
+%if 0%{?el5} || 0%{?el4}
+EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
+%endif
+%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
 %endif
 
 make %{?_smp_mflags}
@@ -366,6 +371,8 @@ fi
 # Port 8000 is also assigned to soundd (CVM-1308)
 /usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
 %endif
+# remove old-style geoip data
+rm -f /var/lib/cvmfs-server/geo/*.dat
 
 %preun
 if [ $1 = 0 ] ; then
@@ -474,6 +481,9 @@ fi
 %doc COPYING AUTHORS README.md ChangeLog
 
 %changelog
+* Tue Aug 07 2018 Dave Dykstra <dwd@fnal.gov> - 2.5.1
+- Add python-setuptools build requirement, and disable building geoapi
+  on el4 & el5
 * Thu Mar 22 2018 Jakob Blomer <jblomer@cern.ch> - 2.5.0
 - Add missing bzip2 build requirement
 * Mon Sep 18 2017 Jakob Blomer <jblomer@cern.ch> - 2.5.0
