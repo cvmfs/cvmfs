@@ -3,7 +3,6 @@ cvmfs_test_name="Gather garbage collector statistics"
 cvmfs_test_autofs_on_startup=false
 
 CVMFS_TEST_661_ERROR_BYTES=101
-CVMFS_TEST_661_ERROR_OBJECTS=102
 CVMFS_TEST_661_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db
 
 add_content() {
@@ -32,35 +31,23 @@ remove_content() {
   local working_dir=$1
   pushdir $working_dir
 
-  rm -v ./f*
+  rm -v *
 
   popdir
 }
 
 cvmfs_run_test() {
-  logfile=$1
   local logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
-  local scratch_dir=$(pwd)
-  local gc_log="/tmp/gc.log"
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
 
   echo "*** disable automatic garbage collection"
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
 
-  # echo "*** delete stats.db files"
-  # rm -v $CVMFS_TEST_662_DB_PATH
-  # rm -v $CVMFS_TEST_662_OLD_DB
-  # rm -v $CVMFS_TEST_662_MERGED_DB
-
-  echo "*** Empty publish"
-  start_transaction $CVMFS_TEST_REPO || return $?
-  publish_repo $CVMFS_TEST_REPO || return $?
-
-  echo "*** perform basic garbage collection (logging deletions to $gc_log)"
-  cvmfs_server gc -r1 -fL "$gc_log" $CVMFS_TEST_REPO || return 4  
+  echo "*** delete older stats.db files:"
+  rm -vf $CVMFS_TEST_662_DB_PATH
 
   echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -83,30 +70,19 @@ cvmfs_run_test() {
   echo "*** creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "*** make an empty publish"
+  echo "*** empty publish"
   start_transaction $CVMFS_TEST_REPO || return $?
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "*** perform basic garbage collection (logging deletions to $gc_log)"
-  cvmfs_server gc -r1 -fL "$gc_log" $CVMFS_TEST_REPO || return 4
+  echo "*** perform basic garbage collection"
+  cvmfs_server gc -r1 -f $CVMFS_TEST_REPO || return 4
 
   # ====================== Test gc stats ======================
-  local sz_condemned_bytes="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(sz_condemned_data_bytes) FROM gc_statistics")"
+  local sz_condemned_bytes="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(sz_condemned_bytes) FROM gc_statistics")"
   local uploaded_bytes="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(sz_bytes_uploaded) FROM publish_statistics")"
-  local n_condemned_data_objects="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(n_condemned_data_objects) FROM gc_statistics")"
-  local n_files_added="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(files_added) FROM publish_statistics")"
-  local duplicated_files="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(duplicated_files) FROM publish_statistics")"
-  local expected_condemned_data_objects=$n_files_added - $duplicated_files;
+
   if [ "x$sz_condemned_bytes" != "x$uploaded_bytes" ]; then
     echo "*** Test FAILED sz_condemned_bytes not equal to uploaded_bytes: $sz_condemned_bytes vs $uploaded_bytes."
     return $CVMFS_TEST_661_ERROR_BYTES
   fi
-
-  # just for small files
-  if [ "x$n_condemned_data_objects" != "x$($n_files_added - $duplicated_files)" ]; then
-    echo "*** Test FAILED n_condemned_data_objects not equal to n_files_added - duplicated_files: $n_condemned_data_objects vs ${$n_files_added - $duplicated_files}."
-    return $CVMFS_TEST_661_ERROR_BYTES
-  fi
-
-
 }

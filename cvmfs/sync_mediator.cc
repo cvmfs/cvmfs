@@ -865,7 +865,6 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
   // publish statistics counting for new file
   if (entry->IsNew()) {
     perf::Inc(counters_->n_files_added);
-    printf("Adding ------------- %s\n", entry->relative_parent_path().c_str());
     perf::Xadd(counters_->sz_added_bytes, entry->GetScratchSize());
   }
 }

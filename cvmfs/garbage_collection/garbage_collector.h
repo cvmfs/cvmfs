@@ -92,8 +92,7 @@ class GarbageCollector {
   unsigned int preserved_catalog_count() const { return preserved_catalogs_; }
   unsigned int condemned_catalog_count() const { return condemned_catalogs_; }
   unsigned int condemned_objects_count() const { return condemned_objects_;  }
-  uint64_t condemned_data_bytes_count() const { return condemned_data_bytes_;  }
-  uint64_t condemned_data_objects_count() const { return condemned_data_objects_;  }
+  uint64_t condemned_bytes_count() const { return condemned_bytes_;  }
   uint64_t oldest_trunk_catalog() const { return oldest_trunk_catalog_; }
 
  protected:
@@ -149,8 +148,7 @@ class GarbageCollector {
   unsigned int          condemned_catalogs_;
 
   unsigned int          condemned_objects_;
-  unsigned int          condemned_data_objects_;
-  uint64_t              condemned_data_bytes_;
+  uint64_t              condemned_bytes_;
 };
 
 #include "garbage_collector_impl.h"
