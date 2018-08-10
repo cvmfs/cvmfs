@@ -1,4 +1,5 @@
 2.5.1:
+  * Apply catalog updates from updated alien cache (CVM-1515)
   * Fix compilation with libattr >= 2.4.48
   * Fix potential memory corruption in ingestion pipeline
   * Fix occasional false error of 'cvmfs_config probe' on FC28
