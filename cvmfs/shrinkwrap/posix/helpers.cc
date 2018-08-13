@@ -98,9 +98,12 @@ int PosixSetMeta(const char *path,
   return 0;
 }
 
-void BackupMtimes(std::string path, struct utimbuf *mtimes) {
+bool BackupMtimes(std::string path, struct utimbuf *mtimes) {
+  // According to valgrind this is necessary due to struct paddings here...
   struct stat stat_buf;
-  stat(path.c_str(), &stat_buf);
+  int res = stat(path.c_str(), &stat_buf);
+  if (res != 0) return false;
   mtimes->actime = stat_buf.st_mtime;
   mtimes->modtime = stat_buf.st_mtime;
+  return true;
 }

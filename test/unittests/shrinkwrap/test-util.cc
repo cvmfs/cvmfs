@@ -32,7 +32,7 @@ void FreeList(char **list, size_t len) {
 
 XattrList *create_sample_xattrlist(std::string var) {
   XattrList *result = new XattrList();
-  result->Set("user.foo", var);
+  result->Set("user.foo", std::string(var));
   result->Set("user.bar", std::string(255, 'a'));
   return result;
 }

@@ -188,7 +188,7 @@ int RunGarbageCollection(struct fs_traversal_context *ctx) {
     for (int i = 0; i < thread_total; i++) {
       pthread_join(workers[i], NULL);
     }
-    delete workers;
+    free(workers);
   } else {
     thread_contexts[0].thread_total = thread_total;
     thread_contexts[0].thread_num = 0;
@@ -198,7 +198,7 @@ int RunGarbageCollection(struct fs_traversal_context *ctx) {
   }
   LogCvmfs(kLogCvmfs, kLogStdout,
       "%s", gc_statistics->PrintList(perf::Statistics::kPrintHeader).c_str());
-  delete thread_contexts;
+  free(thread_contexts);
   delete gc_statistics;
   return 0;
 }

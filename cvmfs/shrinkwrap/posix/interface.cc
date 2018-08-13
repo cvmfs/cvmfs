@@ -309,7 +309,7 @@ int posix_do_unlink(struct fs_traversal_context *ctx,
   if (res2 == -1 && errno == ENOENT) return -1;
   assert(res2 == 0);
   struct utimbuf mtimes;
-  BackupMtimes(parent_path, &mtimes);
+  if (!BackupMtimes(parent_path, &mtimes)) return -1;
   // Unlinking
   int res1 = unlink(complete_path_char);
   res1 |= utime(parent_path.c_str(), &mtimes);
@@ -328,7 +328,7 @@ int posix_do_rmdir(struct fs_traversal_context *ctx,
   std::string complete_path = BuildPath(ctx, path);
   std::string parent_path = GetParentPath(complete_path);
   struct utimbuf mtimes;
-  BackupMtimes(parent_path, &mtimes);
+  if (!BackupMtimes(parent_path, &mtimes)) return -1;
   int res = rmdir(complete_path.c_str());
   res |= utime(parent_path.c_str(), &mtimes);
   if (res != 0) return -1;
@@ -348,10 +348,10 @@ int posix_do_link(struct fs_traversal_context *ctx,
     return -1;
   }
   struct utimbuf mtimes_parent;
-  BackupMtimes(parent_path, &mtimes_parent);
+  if (!BackupMtimes(parent_path, &mtimes_parent)) return -1;
 
   struct utimbuf mtimes_link;
-  BackupMtimes(hidden_datapath, &mtimes_link);
+  if (!BackupMtimes(hidden_datapath, &mtimes_link)) return -1;
 
   if (posix_cleanup_path(ctx, path) != 0) {
     return -1;
@@ -386,7 +386,7 @@ int posix_do_mkdir(struct fs_traversal_context *ctx,
   std::string parent_path = GetParentPath(complete_path);
   std::string dirname = GetParentPath(complete_path);
   struct utimbuf mtimes;
-  BackupMtimes(parent_path, &mtimes);
+  if (!BackupMtimes(parent_path, &mtimes)) return -1;
   if (posix_cleanup_path(ctx, path) != 0) {
     return -1;
   }
@@ -404,7 +404,7 @@ int posix_do_symlink(struct fs_traversal_context *ctx,
   std::string parent_path = GetParentPath(complete_src_path);
   std::string complete_dest_path = dest;
   struct utimbuf mtimes;
-  BackupMtimes(parent_path, &mtimes);
+  if (!BackupMtimes(parent_path, &mtimes)) return -1;
   if (posix_cleanup_path(ctx, src) != 0) {
     return -1;
   }
@@ -478,7 +478,7 @@ int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
   } else if (op_mode == fs_open_append) {
     mode = "a";
   }
-  BackupMtimes(handle->path, &(handle->mtimes));
+  if (!BackupMtimes(handle->path, &(handle->mtimes))) return -1;
 
   FILE *fd = fopen(handle->path.c_str(), mode);
   if (fd == NULL) {
