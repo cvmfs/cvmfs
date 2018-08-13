@@ -167,9 +167,6 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
               UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
       return;
     }
-    if (!content_hash.HasSuffix()) {  // count only data, not metadata
-      CountUploadedBytes(GetFileSize(upstream_path_ + "/" + final_path));
-    }
     if (!content_hash.HasSuffix()
         || content_hash.suffix == shash::kSuffixPartial) {
       CountUploadedBytes(GetFileSize(upstream_path_ + "/" + final_path));
