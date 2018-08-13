@@ -151,10 +151,12 @@ struct fs_traversal {
    * Method which returns an identifier (usually a path)
    * to a file identified by a stat struct
    * 
+   * The memory of the char is allocated on the heap and needs to be freed by
+   * the caller
+   * 
    * @param[in] ctx The file system traversal context
    * @param[in] stat The stat struct describing the file
    * @returns A path that can be used to identify the file
-   * The memory of the char is allocated on the heap and needs to be freed
    */
   char *(*get_identifier)(struct fs_traversal_context *ctx,
                 const struct cvmfs_attr *stat);

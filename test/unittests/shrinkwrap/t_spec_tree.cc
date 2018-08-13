@@ -29,6 +29,7 @@ class T_Spec_Tree :
 
   virtual void TearDown() {
     unlink("/tmp/cvmfs-spec-tree-test.spec.txt");
+    delete specs_;
   }
   SpecTree *specs_;
 };
@@ -74,8 +75,8 @@ TEST_F(T_Spec_Tree, CheckListings) {
     &listLen));
   ASSERT_EQ(1, listLen);
   AssertListHas("bar", dirList, listLen);
+  FreeList(dirList, listLen);
   listLen = 0;
-  delete dirList;
 
   ASSERT_EQ(0, specs_->ListDir(
     "/foo/bar",
@@ -83,8 +84,8 @@ TEST_F(T_Spec_Tree, CheckListings) {
     &listLen));
   ASSERT_EQ(1, listLen);
   AssertListHas("abc", dirList, listLen);
+  FreeList(dirList, listLen);
   listLen = 0;
-  delete dirList;
 
   ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
     "/foo/bar/abc",
@@ -107,8 +108,8 @@ TEST_F(T_Spec_Tree, CheckListings) {
     &listLen));
   ASSERT_EQ(1, listLen);
   AssertListHas("abc", dirList, listLen);
+  FreeList(dirList, listLen);
   listLen = 0;
-  delete dirList;
 
   ASSERT_EQ(0, specs_->ListDir(
     "/bar/abc",
@@ -116,8 +117,8 @@ TEST_F(T_Spec_Tree, CheckListings) {
     &listLen));
   ASSERT_EQ(1, listLen);
   AssertListHas("def", dirList, listLen);
+  FreeList(dirList, listLen);
   listLen = 0;
-  delete dirList;
 
   ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
     "/foo/bar/abc/def",

@@ -54,7 +54,7 @@ shash::Any HashMeta(const struct cvmfs_attr *stat_info) {
   // Add xlist
   if (xlist) {
     memcpy(buffer+offset, xlist_buffer, xlist_buffer_size);
-    delete xlist_buffer;
+    free(xlist_buffer);
   }
   // Hash
   shash::HashMem(buffer, min_buffer_size+xlist_buffer_size, &meta_hash);
