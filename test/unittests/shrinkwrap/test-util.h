@@ -4,8 +4,8 @@
 #ifndef TEST_UNITTESTS_SHRINKWRAP_TEST_UTIL_H_
 #define TEST_UNITTESTS_SHRINKWRAP_TEST_UTIL_H_
 
-#include <unistd.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <string>
 
