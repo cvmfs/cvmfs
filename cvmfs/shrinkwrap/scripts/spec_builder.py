@@ -132,8 +132,9 @@ class TraceParser:
       print("No path specification created. Please call read_log first")
       return
     with open(self.outputName, "w") as specFile:
-      for p in self.pathSpec:
+      for p in self.pathSpec[:-1]:
         specFile.write(str(p)+"\n")
+      specFile.write(str(self.pathSpec[-1]))
 
 TraceParser.blacklist = ["/.Trash","/.Trash-1000"]
     
