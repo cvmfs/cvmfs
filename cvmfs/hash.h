@@ -228,7 +228,6 @@ struct Digest {
   }
 
   bool HasSuffix() const { return suffix != kSuffixNone; }
-  Suffix GetSuffix() const { return suffix; }
   void set_suffix(const Suffix s) { suffix = s; }
 
   /**
