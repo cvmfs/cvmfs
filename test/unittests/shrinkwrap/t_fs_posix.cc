@@ -345,10 +345,10 @@ TEST(T_GarbageCollection_POSIX, TestGarbageCollection) {
   struct cvmfs_attr *stat4 = create_sample_stat("foo", 0, 0777, 0, xlist2,
     &content2_hash);
 
-  dest->touch(context, stat1);
+  ASSERT_EQ(0, dest->touch(context, stat1));
   const char *ident1 = dest->get_identifier(context, stat1);
   dest->do_link(context, "file1.txt", ident1);
-  dest->touch(context, stat2);
+  ASSERT_EQ(0, dest->touch(context, stat2));
   const char *ident2 = dest->get_identifier(context, stat2);
   dest->do_link(context, "file1.txt", ident2);  // unlinks ident1
   dest->touch(context, stat3);
