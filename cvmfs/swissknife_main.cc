@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
   }
 
   if (command->GetName() == "sync" || command->GetName() == "ingest"
-                                   || command->GetName() == "gc") {
+      || (command->GetName() == "gc" && !(args.count('d') > 0))) {
     UniquePtr<StatisticsDatabase> db;
     string repo_name = "";
     if (args.find('N') != args.end()) {

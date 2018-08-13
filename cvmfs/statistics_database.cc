@@ -120,14 +120,12 @@ std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
   */
 std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
                             const std::string &start_time,
-                            const std::string &finished_time,
-                            const std::string &dry_run) {
+                            const std::string &finished_time) {
   struct GcStats stats = GcStats(statistics);
   std::string insert_statement =
     "INSERT INTO gc_statistics ("
     "start_time,"
     "finished_time,"
-    "dry_run,"
     "n_preserved_catalogs,"
     "n_condemned_catalogs,"
     "n_condemned_objects,"
@@ -135,7 +133,6 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
     " VALUES("
     "'" + start_time + "'," +
     "'" + finished_time + "'," +
-    dry_run + "," +
     stats.n_preserved_catalogs + "," +
     stats.n_condemned_catalogs + ","+
     stats.n_condemned_objects + "," +
@@ -168,7 +165,6 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "gc_id INTEGER PRIMARY KEY,"
     "start_time TEXT,"
     "finished_time TEXT,"
-    "dry_run INTEGER,"
     "n_preserved_catalogs INTEGER,"
     "n_condemned_catalogs INTEGER,"
     "n_condemned_objects INTEGER,"
@@ -227,14 +223,8 @@ int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
     insert_statement = PrepareStatementIntoPublish(statistics, start_time,
                                                                finished_time);
   } else if (command_name == "gc") {
-    std::string dry_run_ = "0";
-    const bool dry_run = (args.count('d') > 0);
-    if (dry_run) {
-      dry_run_ = "1";
-    }
     insert_statement = PrepareStatementIntoGc(statistics, start_time,
-                                                          finished_time,
-                                                          dry_run_);
+                                                      finished_time);
   } else {
     return -5;
   }
