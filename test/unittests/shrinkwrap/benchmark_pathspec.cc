@@ -15,12 +15,11 @@
 #include "path_filters/dirtab.h"
 #include "shrinkwrap/spec_tree.h"
 
-std::string& rtrim(const std::string &str,
+std::string *rtrim(std::string *str,
   const std::string &chars = "\t\n\v\f\r ")
 {
-    std::string res = str;
-    res.erase(res.find_last_not_of(chars) + 1);
-    return res;
+    str->erase(str->find_last_not_of(chars) + 1);
+    return str;
 }
 
 int main(int argc, char **argv) {
@@ -54,7 +53,7 @@ int main(int argc, char **argv) {
   while (std::getline(infile, line)) {
     const char *path = strdup(line.c_str());
     gettimeofday(&timeStart, NULL);
-    res = specs->IsMatching(rtrim(line));
+    res = specs->IsMatching(*rtrim(&line));
     gettimeofday(&timeEnd, NULL);
     // std::cout << res << std::endl;
     /*if (!res) { 
