@@ -216,8 +216,7 @@ StatisticsDatabase::~StatisticsDatabase() {
 int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
                                         const std::string &start_time,
                                         const std::string &finished_time,
-                                        const std::string &command_name,
-                                        const swissknife::ArgumentList &args) {
+                                        const std::string &command_name) {
   std::string insert_statement;
   if (command_name == "ingest" || command_name == "sync") {
     insert_statement = PrepareStatementIntoPublish(statistics, start_time,
