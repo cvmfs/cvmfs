@@ -196,8 +196,14 @@ inline bool platform_setxattr(const std::string &path, const std::string &name,
 
 inline bool platform_lsetxattr(const std::string &path, const std::string &name,
                                const std::string &value) {
-  int retval = 
-      setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0, XATTR_NOFOLLOW);
+  int retval =
+      setxattr(
+        path.c_str(),
+        name.c_str(),
+        value.c_str(),
+        value.size(),
+        0,
+        XATTR_NOFOLLOW);
   return retval == 0;
 }
 
