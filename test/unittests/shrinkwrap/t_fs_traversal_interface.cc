@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -612,7 +613,12 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
     dest_name.c_str(), repoName.c_str(), dest_data.c_str(), NULL, 4);
   dest->context_ = context;
 
-  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
+  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
+  std::string command = "diff -aq ";
+  command += repoName + "/" + dest_name;
+  command += " " + repoName + "/" + src_name;
+  cerr << command.c_str() << endl;
+  ASSERT_EQ(0, system(command.c_str()));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
@@ -621,7 +627,7 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
 struct fs_traversal_test posix = {
   posix_get_interface(),
   "./",
-  ".data"
+  "./.data"
 };
 
 INSTANTIATE_TEST_CASE_P(PosixInterfaceTest,

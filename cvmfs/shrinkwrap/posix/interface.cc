@@ -429,7 +429,9 @@ int posix_touch(struct fs_traversal_context *ctx,
   if (res1 < 0) return -1;
   int res2 = close(res1);
   if (res2 < 0) return -1;
-  return PosixSetMeta(hidden_datapath.c_str(), stat_info);
+  int res3 = PosixSetMeta(hidden_datapath.c_str(), stat_info);
+  if (res3 < 0) return -1;
+  return 0;
 }
 
 bool posix_is_hash_consistent(struct fs_traversal_context *ctx,

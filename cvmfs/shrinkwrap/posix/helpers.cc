@@ -71,6 +71,7 @@ int PosixSetMeta(const char *path,
     res = chown(path, stat_info->st_uid, stat_info->st_gid);
     if (res != 0) return -1;
   }
+  std::string path_str = std::string(path);
   if (stat_info->cvm_xattrs != NULL) {
     XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
     if (xlist) {
@@ -81,8 +82,8 @@ int PosixSetMeta(const char *path,
               it != v.end();
               ++it) {
           xlist->Get(*it, &val);
-          int res = platform_lsetxattr(path, *it, val);
-          if (res != 0) return -1;
+          bool res = platform_lsetxattr(path_str, *it, val);
+          if (!res) return -1;
         }
       }
     }
