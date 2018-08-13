@@ -336,26 +336,28 @@ TEST(T_GarbageCollection_POSIX, TestGarbageCollection) {
   shash::HashString(content2, &content2_hash);
   XattrList *xlist1 = create_sample_xattrlist("TestGarbageCollection1");
   XattrList *xlist2 = create_sample_xattrlist("TestGarbageCollection2");
+  XattrList *xlist11 = create_sample_xattrlist("TestGarbageCollection1");
+  XattrList *xlist22 = create_sample_xattrlist("TestGarbageCollection2");
   struct cvmfs_attr *stat1 = create_sample_stat("foo", 0, 0777, 0, xlist1,
     &content1_hash);
-  struct cvmfs_attr *stat2 = create_sample_stat("foo", 0, 0777, 0, xlist1,
-    &content2_hash);
+  struct cvmfs_attr *stat2 = create_sample_stat("foo", 0, 0777, 0,
+    xlist11, &content2_hash);
   struct cvmfs_attr *stat3 = create_sample_stat("foo", 0, 0777, 0, xlist2,
     &content1_hash);
-  struct cvmfs_attr *stat4 = create_sample_stat("foo", 0, 0777, 0, xlist2,
-    &content2_hash);
+  struct cvmfs_attr *stat4 = create_sample_stat("foo", 0, 0777, 0,
+    xlist22, &content2_hash);
 
   ASSERT_EQ(0, dest->touch(context, stat1));
-  const char *ident1 = dest->get_identifier(context, stat1);
+  char *ident1 = dest->get_identifier(context, stat1);
   dest->do_link(context, "file1.txt", ident1);
   ASSERT_EQ(0, dest->touch(context, stat2));
-  const char *ident2 = dest->get_identifier(context, stat2);
+  char *ident2 = dest->get_identifier(context, stat2);
   dest->do_link(context, "file1.txt", ident2);  // unlinks ident1
   dest->touch(context, stat3);
-  const char *ident3 = dest->get_identifier(context, stat3);
+  char *ident3 = dest->get_identifier(context, stat3);
   dest->do_link(context, "file3.txt", ident3);
   dest->touch(context, stat4);
-  const char *ident4 = dest->get_identifier(context, stat4);
+  char *ident4 = dest->get_identifier(context, stat4);
   dest->do_link(context, "file4.txt", ident4);
 
   dest->do_unlink(context, "file3.txt");
@@ -375,11 +377,15 @@ TEST(T_GarbageCollection_POSIX, TestGarbageCollection) {
   ASSERT_TRUE(FileExists(data_base_path + ident2));
   ASSERT_FALSE(FileExists(data_base_path + ident3));
   ASSERT_TRUE(FileExists(data_base_path + ident4));
+  dest->finalize(context);
+  delete dest;
 
-  delete stat1;
-  delete stat2;
-  delete stat3;
-  delete stat4;
-  delete xlist1;
-  delete xlist2;
+  cvmfs_attr_free(stat1);
+  cvmfs_attr_free(stat2);
+  cvmfs_attr_free(stat3);
+  cvmfs_attr_free(stat4);
+  free(ident1);
+  free(ident2);
+  free(ident3);
+  free(ident4);
 }

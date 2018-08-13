@@ -42,7 +42,7 @@ std::string BuildHiddenPath(struct fs_traversal_context *ctx,
 int PosixSetMeta(const char *path,
   const struct cvmfs_attr *stat_info, bool set_permissions = true);
 
-void BackupMtimes(std::string path, struct utimbuf *mtimes);
+bool BackupMtimes(std::string path, struct utimbuf *mtimes);
 
 
 #endif  // CVMFS_SHRINKWRAP_POSIX_HELPERS_H_
