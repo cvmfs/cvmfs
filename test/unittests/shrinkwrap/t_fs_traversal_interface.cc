@@ -12,7 +12,6 @@
 #include <ctime>
 #include <iostream>
 
-#include "catalog_test_tools.h"
 #include "libcvmfs.h"
 #include "statistics.h"
 #include "util/posix.h"
@@ -617,51 +616,6 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
-}
-
-// Create some default hashes for DirSpec
-const char* hashs[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
-                        "26ab0db90d72e28ad0ba1e22ee510510000000",
-                        "6d7fce9fee471194aa8b5b6e47267f03000000",
-                        "48a24b70a0b376535542b996af517398000000",
-                        "1dcca23355272056f04fe8bf20edfce0000000",
-                        "11111111111111111111111111111111111111"};
-
-const size_t file_size = 4096;
-
-// Create directory specification for later repositories
-DirSpec MakeSpec() {
-  DirSpec spec;
-
-  // adding "/dir"
-  EXPECT_TRUE(spec.AddDirectory("dir", "", file_size));
-
-  // adding "/dir/file1"
-  EXPECT_TRUE(spec.AddFile("file1", "dir", hashs[0], file_size));
-
-  // adding "/dir/dir"
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir", file_size));
-  EXPECT_TRUE(spec.AddDirectory("dir2", "dir", file_size));
-  EXPECT_TRUE(spec.AddDirectory("dir3", "dir", file_size));
-
-  // adding "/file3"
-  EXPECT_TRUE(spec.AddFile("file3", "", hashs[2], file_size));
-
-  // adding "/dir/dir/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir", hashs[1], file_size));
-
-  // adding "/dir/dir2/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir2", hashs[3], file_size));
-
-  // adding "/dir/dir3/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir3", hashs[4], file_size));
-
-  // Adding Deeply nested catalog
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir", file_size));
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir/dir", file_size));
-  EXPECT_TRUE(spec.AddFile("file1",  "dir/dir/dir/dir", hashs[0], file_size));
-
-  return spec;
 }
 
 struct fs_traversal_test posix = {
