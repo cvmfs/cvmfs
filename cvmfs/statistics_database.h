@@ -70,6 +70,14 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * @return path to store database file
   */
   static std::string GetDBPath(const std::string &repo_name);
+
+  /**
+  * Check if the CVMFS_EXTENDED_GC_STATS is ON or not
+  *
+  * @param repo_name fully qualified name of the repository
+  * @return true if CVMFS_EXTENDED_GC_STATS is ON, false otherwise
+  */
+  static bool GcExtendedStats(const std::string &repo_name);
 };
 
 

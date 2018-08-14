@@ -14,8 +14,8 @@
 #include "garbage_collection/gc_aux.h"
 #include "garbage_collection/hash_filter.h"
 #include "manifest.h"
-#include "options.h"
 #include "reflog.h"
+#include "statistics_database.h"
 #include "upload_facility.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -140,23 +140,7 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
-  SimpleOptionsParser parser;
-  bool extended_stats = false;
-  std::string param_value = "";
-  const std::string repo_config_file =
-      "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
-  if (!parser.TryParsePath(repo_config_file)) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Could not parse repository configuration: %s.",
-             repo_config_file.c_str());
-  } else if (!parser.GetValue("CVMFS_EXTENDED_GC_STATS", &param_value)) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-             "Parameter %s was not set in the repository configuration file. "
-             "Do not count condemned_bytes.",
-             "CVMFS_EXTENDED_GC_STATS");
-  } else if (parser.IsOn(param_value)) {
-    extended_stats = true;
-  }
+  bool extended_stats = StatisticsDatabase::GcExtendedStats(repo_name);
 
   reflog->BeginTransaction();
 

@@ -113,36 +113,6 @@ std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
 
 
 /**
-  * Check if the CVMFS_EXTENDED_GC_STATS is ON or not
-  *
-  * @param repo_name fully qualified name of the repository
-  * @return true if CVMFS_EXTENDED_GC_STATS is ON
-  */
-bool GcExtendedStats(const std::string &repo_name) {
-  SimpleOptionsParser parser;
-  std::string param_value = "";
-  const std::string repo_config_file =
-      "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
-
-  if (!parser.TryParsePath(repo_config_file)) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr,
-             "Could not parse repository configuration: %s.",
-             repo_config_file.c_str());
-    return false;
-  }
-  if (!parser.GetValue("CVMFS_EXTENDED_GC_STATS", &param_value)) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-             "Parameter %s was not set in the repository configuration file. "
-             "condemned_bytes were not counted.",
-             "CVMFS_EXTENDED_GC_STATS");
-  } else if (parser.IsOn(param_value)) {
-    return true;
-  }
-  return false;
-}
-
-
-/**
   * Build the insert statement into gc_statistics table.
   *
   * @param stats a struct with values stored in strings
@@ -157,7 +127,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
                             const std::string &repo_name) {
   struct GcStats stats = GcStats(statistics);
   std::string insert_statement = "";
-  if (GcExtendedStats(repo_name)) {
+  if (StatisticsDatabase::GcExtendedStats(repo_name)) {
     insert_statement =
       "INSERT INTO gc_statistics ("
       "start_time,"
@@ -342,6 +312,36 @@ std::string StatisticsDatabase::GetDBPath(const std::string &repo_name) {
   }
 
   return statistics_db;
+}
+
+
+/**
+  * Check if the CVMFS_EXTENDED_GC_STATS is ON or not
+  *
+  * @param repo_name fully qualified name of the repository
+  * @return true if CVMFS_EXTENDED_GC_STATS is ON
+  */
+bool StatisticsDatabase::GcExtendedStats(const std::string &repo_name) {
+  SimpleOptionsParser parser;
+  std::string param_value = "";
+  const std::string repo_config_file =
+      "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
+
+  if (!parser.TryParsePath(repo_config_file)) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "Could not parse repository configuration: %s.",
+             repo_config_file.c_str());
+    return false;
+  }
+  if (!parser.GetValue("CVMFS_EXTENDED_GC_STATS", &param_value)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "Parameter %s was not set in the repository configuration file. "
+             "condemned_bytes were not counted.",
+             "CVMFS_EXTENDED_GC_STATS");
+  } else if (parser.IsOn(param_value)) {
+    return true;
+  }
+  return false;
 }
 
 
