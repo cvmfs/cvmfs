@@ -53,6 +53,7 @@ void cvmfs_attr_free(struct cvmfs_attr *attr)
     free(attr->cvm_checksum);
     free(attr->cvm_symlink);
     free(attr->cvm_name);
+    free(attr->cvm_parent);
     delete reinterpret_cast<XattrList *>(attr->cvm_xattrs);
   }
   free(attr);
@@ -360,13 +361,38 @@ int cvmfs_listdir(
   }
   path = lpath.c_str();
 
-  rc = ctx->ListDirectory(path, buf, buflen);
+  size_t listsize = 0;
+  rc = ctx->ListDirectory(path, buf, &listsize, buflen, true);
   if (rc < 0) {
     errno = -rc;
     return -1;
   }
   return 0;
 }
+
+int cvmfs_listdir_contents(
+  LibContext *ctx,
+  const char *path,
+  char ***buf,
+  size_t *listlen,
+  size_t *buflen
+) {
+  string lpath;
+  int rc;
+  rc = expand_path(0, ctx, path, &lpath);
+  if (rc < 0) {
+    return -1;
+  }
+  path = lpath.c_str();
+
+  rc = ctx->ListDirectory(path, buf, listlen, buflen, false);
+  if (rc < 0) {
+    errno = -rc;
+    return -1;
+  }
+  return 0;
+}
+
 
 
 int cvmfs_stat_nc(
@@ -428,6 +454,11 @@ void cvmfs_list_free(char **buf)
   free(buf);
 }
 
+void cvmfs_enable_threaded(
+  LibContext *ctx
+) {
+  ctx->EnableMultiThreaded();
+}
 
 cvmfs_errors cvmfs_attach_repo_v2(
   const char *fqrn,

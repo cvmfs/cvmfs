@@ -28,11 +28,12 @@ class TraceParser:
       csvLogReader = csv.reader(logFile, delimiter=',', quotechar='"')
       for row in [r
                     for r in csvLogReader
-                      if r[3] not in self.filters and int(r[1])>=0]:
+                      if r[3] not in self.filters and int(r[1])>=0
+                        and r[2] not in TraceParser.blacklist]:
         # Iterate over not filtered elements
-        path = row[2]
+        path = row[2] if row[2] != "" else "/"
         if row[3] == "opendir()":
-          if ("^"+path+"/*") not in pathsIncluded:
+          if ("^"+row[2]+"/*") not in pathsIncluded:
             error=True
             print("ERROR: "+path+" not included in spec! Searched for:")
             print("^"+path+"/*")
@@ -50,7 +51,7 @@ class TraceParser:
       print("ERROR")
       quit(-1)
 
-    
+TraceParser.blacklist = ["/.Trash","/.Trash-1000"]
 
 def parse_args():
   argparser = argparse.ArgumentParser()
