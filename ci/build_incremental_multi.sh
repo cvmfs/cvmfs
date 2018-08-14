@@ -18,6 +18,8 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_BUILD_LOCATION="$2"
 CVMFS_CONCURRENT_BUILD_JOBS="${3-1}"
 
+. ${CVMFS_SOURCE_LOCATION}/ci/common.sh
+
 cd ${CVMFS_BUILD_LOCATION}
 
 # figure out if the standard compiler is too old and if so look for alternatives
@@ -46,11 +48,18 @@ if [ x"$(uname)" = x"Darwin" ]; then
   build_libcvmfs="no"
 fi
 
+# We need to disable GEOAPI on CentOS < 6
+build_geoapi="ON"
+if is_redhat && [ "$(get_redhat_version)" -lt "6" ]; then
+  build_geoapi="OFF"
+fi
+
 echo "configuring using CMake..."
 cmake -DBUILD_SERVER=$build_server       \
       -DBUILD_SERVER_DEBUG=$build_server \
       -DBUILD_UNITTESTS=yes              \
       -DBUILD_LIBCVMFS=$build_libcvmfs   \
+      -DBUILD_GEOAPI=$build_geoapi       \
       -DBUILD_PRELOAD=yes                \
       $CVMFS_SOURCE_LOCATION
 
