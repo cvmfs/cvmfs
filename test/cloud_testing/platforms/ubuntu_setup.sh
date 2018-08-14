@@ -122,10 +122,15 @@ if [ "x$ubuntu_release" = "xxenial" ] || [ "x$ubuntu_release" = "xbionic" ]; the
   fi
 fi
 
-# On Ubuntu 18.04+ disable service start rate limiting for apache
+# On Ubuntu 18.04+ disable service start rate limiting for apache and autofs
 if [ "x$ubuntu_release" = "xbionic" ]; then
   mkdir -p /lib/systemd/system/apache2.service.d
   cat << EOF > /lib/systemd/system/apache2.service.d/cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+  mkdir -p /lib/systemd/system/autofs.service.d
+  cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
 [Unit]
 StartLimitIntervalSec=0
 EOF
