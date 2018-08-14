@@ -123,6 +123,9 @@ cvmfs_run_test() {
         else
           echo "Successfully disabled a broken IPv6 setup"
           MIGTEST_001_IPV6_DISABLED=1
+          echo "Retrieving new DHCP lease..."
+          sudo dhclient -r
+          sudo dhclient
         fi
       fi
     fi
