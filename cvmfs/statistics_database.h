@@ -58,7 +58,8 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   int StoreStatistics(const perf::Statistics *statistics,
                       const std::string &start_time,
                       const std::string &finished_time,
-                      const std::string &command_name);
+                      const std::string &command_name,
+                      const std::string &repo_name);
 
 /**
   * Get the path for the database file

@@ -14,6 +14,7 @@
 #include "garbage_collection/gc_aux.h"
 #include "garbage_collection/hash_filter.h"
 #include "manifest.h"
+#include "options.h"
 #include "reflog.h"
 #include "upload_facility.h"
 #include "util/posix.h"
@@ -139,6 +140,24 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
+  SimpleOptionsParser parser;
+  bool extended_stats = false;
+  std::string param_value = "";
+  const std::string repo_config_file =
+      "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
+  if (!parser.TryParsePath(repo_config_file)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Could not parse repository configuration: %s.",
+             repo_config_file.c_str());
+  } else if (!parser.GetValue("CVMFS_EXTENDED_GC_STATS", &param_value)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "Parameter %s was not set in the repository configuration file. "
+             "Do not count condemned_bytes.",
+             "CVMFS_EXTENDED_GC_STATS");
+  } else if (parser.IsOn(param_value)) {
+    extended_stats = true;
+  }
+
   reflog->BeginTransaction();
 
   GcConfig config;
@@ -151,6 +170,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.reflog                  = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
   config.statistics              = statistics();
+  config.extended_stats          = extended_stats;
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,

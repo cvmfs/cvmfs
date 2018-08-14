@@ -152,11 +152,12 @@ template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
                                                        const shash::Any &hash) {
   ++condemned_objects_;
-
-  if (!hash.HasSuffix() || hash.suffix == shash::kSuffixPartial) {
-    int64_t condemned_bytes = configuration_.uploader->GetObjectSize(hash);
-    if (condemned_bytes > 0) {
-      condemned_bytes_ += condemned_bytes;
+  if (configuration_.extended_stats) {
+    if (!hash.HasSuffix() || hash.suffix == shash::kSuffixPartial) {
+      int64_t condemned_bytes = configuration_.uploader->GetObjectSize(hash);
+      if (condemned_bytes > 0) {
+        condemned_bytes_ += condemned_bytes;
+      }
     }
   }
 

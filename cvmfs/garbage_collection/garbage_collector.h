@@ -68,7 +68,8 @@ class GarbageCollector {
       , dry_run(false)
       , verbose(false)
       , deleted_objects_logfile(NULL)
-      , statistics(NULL) {}
+      , statistics(NULL)
+      , extended_stats(false) {}
 
     bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
@@ -81,6 +82,7 @@ class GarbageCollector {
     bool                       verbose;
     FILE                      *deleted_objects_logfile;
     perf::Statistics          *statistics;
+    bool                       extended_stats;
   };
 
  public:
