@@ -14,7 +14,6 @@ CVMFS_TEST_660_ERROR_DIR_CHANGED=107
 CVMFS_TEST_660_ERROR_BYTES_ADDED=108
 CVMFS_TEST_660_ERROR_BYTES_REMOVED=109
 CVMFS_TEST_660_ERROR_BYTES_UPLOADED=110
-CVMFS_TEST_660_ERROR_MERGE_TOOL=111
 CVMFS_TEST_660_TAR_FILE=tarfile.tar
 CVMFS_TEST_660_TAR_DIR=newTarDir
 CVMFS_TEST_660_OLD_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_old.db
@@ -125,33 +124,6 @@ cvmfs_run_test() {
   cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_660_TAR_DIR $CVMFS_TEST_REPO || return $?
   # get the last inserted data
   sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_4
-
-  # ====================== Test5 - merge tool ======================
-
-  # make a copy of old db file
-  cp -v $CVMFS_TEST_660_DB_PATH $CVMFS_TEST_660_OLD_DB
-  # remove old db file
-  rm -v $CVMFS_TEST_660_DB_PATH
-
-  # create a fresh db file at the default location $CVMFS_TEST_660_DB_PATH
-  echo "*** starting transaction to edit repository"
-  start_transaction $CVMFS_TEST_REPO || return $?
-
-  echo "*** Test 5 - putting some stuff in the new repository"
-  test1 $repo_dir || return 5
-
-  echo "*** creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
-
-  # merge old db file with the new db file
-  cvmfs_server merge-stats -o $CVMFS_TEST_660_MERGED_DB $CVMFS_TEST_660_OLD_DB $CVMFS_TEST_660_DB_PATH
-
-  local nr_entries="$(sqlite3 $CVMFS_TEST_660_MERGED_DB "select count(*) from publish_statistics;")"
-
-  if [ "x$nr_entries" != "x7" ]; then
-    echo "*** Test 5 FAILED nr_entries expected = 7, received $nr_entries!"
-    return $CVMFS_TEST_660_ERROR_MERGE_TOOL
-  fi
 
   # =========================================================================================================
 

@@ -117,6 +117,8 @@ class IngestionMockUploader
             upload::UploaderResults(upload::UploaderResults::kChunkCommit, 0));
   }
 
+  virtual int64_t DoGetObjectSize(const std::string &file_name) { return 0;}
+
   Results results;
 };
 

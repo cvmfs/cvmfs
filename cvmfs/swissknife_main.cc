@@ -198,36 +198,48 @@ int main(int argc, char **argv) {
              ->PrintList(perf::Statistics::kPrintHeader).c_str());
   }
 
-  if (command->GetName() == "sync" || command->GetName() == "ingest") {
+  if (command->GetName() == "sync" || command->GetName() == "ingest"
+      || (command->GetName() == "gc" && !(args.count('d') > 0))) {
     UniquePtr<StatisticsDatabase> db;
-    string repo_name = *args.find('N')->second;
-    string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
-
-    if (FileExists(db_file_path)) {
-      db = StatisticsDatabase::Open(db_file_path,
-                                    StatisticsDatabase::kOpenReadWrite);
-    } else {
-      db = StatisticsDatabase::Create(db_file_path);
-      // insert repo_name into properties table
-      if (db.IsValid()) {
-        if (!db->SetProperty("repo_name", repo_name)) {
-          LogCvmfs(kLogCvmfs, kLogSyslogErr,
-              "Couldn't insert repo_name into properties table!");
-        }
-      }
+    string repo_name = "";
+    if (args.find('N') != args.end()) {
+      repo_name = *args.find('N')->second;
+    } else if (args.find('n') != args.end()) {
+      repo_name = *args.find('n')->second;
     }
 
-    if (!db.IsValid()) {
-      LogCvmfs(kLogCvmfs, kLogSyslogErr,
-              "Couldn't create StatisticsDatabase object!");
-    } else if (db->StoreStatistics(command->statistics(),
-                                    start_time, finished_time) != 0) {
-      LogCvmfs(kLogCvmfs, kLogSyslogErr,
-            "Couldn't store statistics in %s!",
-            db_file_path.c_str());
+    if (repo_name != "") {
+      string db_file_path = StatisticsDatabase::GetDBPath(repo_name);
+      if (FileExists(db_file_path)) {
+        db = StatisticsDatabase::Open(db_file_path,
+                                      StatisticsDatabase::kOpenReadWrite);
+      } else {
+        db = StatisticsDatabase::Create(db_file_path);
+        // insert repo_name into properties table
+        if (db.IsValid()) {
+          if (!db->SetProperty("repo_name", repo_name)) {
+            LogCvmfs(kLogCvmfs, kLogSyslogErr,
+                "Couldn't insert repo_name into properties table!");
+          }
+        }
+      }
+
+      if (!db.IsValid()) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr,
+                "Couldn't create StatisticsDatabase object!");
+      } else if (db->StoreStatistics(command->statistics(), start_time,
+                                     finished_time, command->GetName(),
+                                                             repo_name) != 0) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr,
+              "Couldn't store statistics in %s!",
+              db_file_path.c_str());
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at: %s",
+                                        db_file_path.c_str());
+      }
     } else {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at: %s",
-                                      db_file_path.c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+                "Couldn't get repo_name!");
     }
   }
 

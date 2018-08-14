@@ -68,7 +68,8 @@ class GarbageCollector {
       , dry_run(false)
       , verbose(false)
       , deleted_objects_logfile(NULL)
-      , statistics(NULL) {}
+      , statistics(NULL)
+      , extended_stats(false) {}
 
     bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
@@ -81,6 +82,7 @@ class GarbageCollector {
     bool                       verbose;
     FILE                      *deleted_objects_logfile;
     perf::Statistics          *statistics;
+    bool                       extended_stats;
   };
 
  public:
@@ -92,6 +94,7 @@ class GarbageCollector {
   unsigned int preserved_catalog_count() const { return preserved_catalogs_; }
   unsigned int condemned_catalog_count() const { return condemned_catalogs_; }
   unsigned int condemned_objects_count() const { return condemned_objects_;  }
+  uint64_t condemned_bytes_count() const { return condemned_bytes_;  }
   uint64_t oldest_trunk_catalog() const { return oldest_trunk_catalog_; }
 
  protected:
@@ -147,6 +150,7 @@ class GarbageCollector {
   unsigned int          condemned_catalogs_;
 
   unsigned int          condemned_objects_;
+  uint64_t              condemned_bytes_;
 };
 
 #include "garbage_collector_impl.h"

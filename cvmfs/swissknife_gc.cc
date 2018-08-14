@@ -15,6 +15,7 @@
 #include "garbage_collection/hash_filter.h"
 #include "manifest.h"
 #include "reflog.h"
+#include "statistics_database.h"
 #include "upload_facility.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -139,6 +140,8 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
+  bool extended_stats = StatisticsDatabase::GcExtendedStats(repo_name);
+
   reflog->BeginTransaction();
 
   GcConfig config;
@@ -151,6 +154,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.reflog                  = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
   config.statistics              = statistics();
+  config.extended_stats          = extended_stats;
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,

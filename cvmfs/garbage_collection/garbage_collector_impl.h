@@ -41,6 +41,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
   , preserved_catalogs_(0)
   , condemned_catalogs_(0)
   , condemned_objects_(0)
+  , condemned_bytes_(0)
 {
   assert(configuration_.uploader != NULL);
 }
@@ -151,6 +152,14 @@ template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
                                                        const shash::Any &hash) {
   ++condemned_objects_;
+  if (configuration_.extended_stats) {
+    if (!hash.HasSuffix() || hash.suffix == shash::kSuffixPartial) {
+      int64_t condemned_bytes = configuration_.uploader->GetObjectSize(hash);
+      if (condemned_bytes > 0) {
+        condemned_bytes_ += condemned_bytes;
+      }
+    }
+  }
 
   LogDeletion(hash);
   if (configuration_.dry_run) {
@@ -261,9 +270,13 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
     perf::Counter *ctr_condemned_objects =
       configuration_.statistics->Register(
         "gc.n_condemned_objects", "number of deleted objects");
+    perf::Counter *ctr_condemned_bytes =
+      configuration_.statistics->Register(
+        "gc.sz_condemned_bytes", "number of deleted bytes");
     ctr_preserved_catalogs->Set(preserved_catalog_count());
     ctr_condemned_catalogs->Set(condemned_catalog_count());
     ctr_condemned_objects->Set(condemned_objects_count());
+    ctr_condemned_bytes->Set(condemned_bytes_count());
   }
 
   configuration_.uploader->WaitForUpload();

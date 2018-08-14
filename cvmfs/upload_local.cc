@@ -239,4 +239,8 @@ int LocalUploader::Move(const std::string &local_path,
   return retcode;
 }
 
+int64_t LocalUploader::DoGetObjectSize(const std::string &file_name) {
+  return GetFileSize(upstream_path_ + "/" + file_name);
+}
+
 }  // namespace upload

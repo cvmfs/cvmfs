@@ -85,6 +85,8 @@ class GatewayUploader : public AbstractUploader {
   virtual bool ReadKey(const std::string& key_file, std::string* key_id,
                        std::string* secret);
 
+  virtual int64_t DoGetObjectSize(const std::string &file_name);
+
  private:
   void BumpErrors() const;
 

@@ -1,0 +1,89 @@
+# This file 
+cvmfs_test_name="Gather garbage collector statistics"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_661_ERROR_BYTES=101
+CVMFS_TEST_661_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db
+
+add_content() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  echo "meaningless file content" > f1
+  echo "more clever file content" > f2
+  echo "abc123"                   > f3
+  echo "1234abcd"                 > f4
+  echo "1234abcd1"                > f5
+
+  popdir
+}
+
+add_duplicate() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  echo "meaningless file content" > f1_copy
+
+  popdir
+}
+
+remove_content() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  rm -v *
+
+  popdir
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+  sudo bash -c "echo CVMFS_EXTENDED_GC_STATS=true >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf"
+
+  echo "*** disable automatic garbage collection"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
+  echo "*** delete older stats.db files:"
+  rm -vf $CVMFS_TEST_662_DB_PATH
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** putting some stuff in the repository"
+  add_content $repo_dir || return 1
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** putting a duplicated file in the repository"
+  add_duplicate $repo_dir || return 2
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** delete all stuff from the repository"
+  remove_content $repo_dir || return 3
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** empty publish"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** perform basic garbage collection"
+  cvmfs_server gc -r1 -f $CVMFS_TEST_REPO || return 4
+
+  # ====================== Test gc stats ======================
+  local sz_condemned_bytes="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(sz_condemned_bytes) FROM gc_statistics")"
+  local uploaded_bytes="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(sz_bytes_uploaded) FROM publish_statistics")"
+
+  if [ "x$sz_condemned_bytes" != "x$uploaded_bytes" ]; then
+    echo "*** Test FAILED sz_condemned_bytes not equal to uploaded_bytes: $sz_condemned_bytes vs $uploaded_bytes."
+    return $CVMFS_TEST_661_ERROR_BYTES
+  fi
+}

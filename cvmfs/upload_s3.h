@@ -68,6 +68,7 @@ class S3Uploader : public AbstractUploader {
   virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const;
 
   virtual unsigned int GetNumberOfErrors() const;
+  int64_t DoGetObjectSize(const std::string &file_name);
 
  private:
   static const unsigned kDefaultPort = 80;
