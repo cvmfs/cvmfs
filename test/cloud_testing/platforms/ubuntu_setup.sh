@@ -85,6 +85,8 @@ install_from_repo trickle || die "fail (installing trickle)"
 install_from_repo cmake        || die "fail (installing cmake)"
 install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
 install_from_repo python-dev   || die "fail (installing python-dev)"
+install_from_repo libz-dev     || die "fail (installing libz-dev)"
+install_from_repo libssl-dev   || die "fail (installing libssl-dev)"
 
 # Install the test S3 provider
 install_test_s3 || die "fail (installing test S3)"
@@ -109,13 +111,30 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
   dpkg -s autofs
 fi
 
-# On Ubuntu 16.04 install the repository gateway
+# On Ubuntu 16.04+ 64bit install the repository gateway
 if [ "x$ubuntu_release" = "xxenial" ] || [ "x$ubuntu_release" = "xbionic" ]; then
-  echo "Installing repository gateway"
-  package_map=pkgmap.ubuntu1604_x86_64
-  download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
-  install_deb $(cat gateway_package_name)
-  sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
+  if [ "x$(uname -m)" = "xx86_64" ]; then
+    echo "Installing repository gateway"
+    package_map=pkgmap.ubuntu1604_x86_64
+    download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+    install_deb $(cat gateway_package_name)
+    sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
+  fi
+fi
+
+# On Ubuntu 18.04+ disable service start rate limiting for apache and autofs
+if [ "x$ubuntu_release" = "xbionic" ]; then
+  mkdir -p /lib/systemd/system/apache2.service.d
+  cat << EOF > /lib/systemd/system/apache2.service.d/cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+  mkdir -p /lib/systemd/system/autofs.service.d
+  cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+  sudo systemctl daemon-reload
 fi
 
 # setting up the AUFS kernel module

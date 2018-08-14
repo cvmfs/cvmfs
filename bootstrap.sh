@@ -10,8 +10,8 @@ ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
 GOOGLETEST_VERSION=1.8.0
-LIBGEOIP_VERSION=1.6.0
-PYTHON_GEOIP_VERSION=1.3.1
+IPADDRESS_VERSION=1.0.22
+MAXMINDDB_VERSION=1.4.0
 PROTOBUF_VERSION=2.6.1
 MONGOOSE_VERSION=3.8
 RAPIDCHECK_VERSION=0.0
@@ -181,16 +181,16 @@ build_lib() {
         patch_external "googletest"     "cmake_compatibility.patch"
         do_build "googletest"
       ;;
-    libgeoip)
-      if [ x"BUILD_SERVER" != x"" ]; then
-        do_extract "libgeoip" "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
-        replace_in_external "libgeoip" "config.guess.latest" "config.guess"
-        replace_in_external "libgeoip" "config.sub.latest" "config.sub"
-        do_build "libgeoip"
-
-        rm -rf $externals_build_dir/build_python-geoip
-        do_extract "python-geoip" "GeoIP-${PYTHON_GEOIP_VERSION}.tar.gz"
-        do_build "python-geoip"
+    ipaddress)
+      if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
+        do_extract "ipaddress" "ipaddress-${IPADDRESS_VERSION}.tar.gz"
+        do_build "ipaddress"
+      fi
+      ;;
+    maxminddb)
+      if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
+        do_extract "maxminddb" "MaxMind-DB-Reader-python-${MAXMINDDB_VERSION}.tar.gz"
+        do_build "maxminddb"
       fi
       ;;
     protobuf)
@@ -245,7 +245,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest libgeoip protobuf googlebench sqlite3 vjson sha2 sha3 mongoose libarchive"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose libarchive"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi

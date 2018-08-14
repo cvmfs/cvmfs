@@ -71,10 +71,27 @@ install_from_repo python-devel
 install_from_repo unzip
 install_from_repo bzip2
 
+# Migration test needs lsb_release
+echo "install lsb_release..."
+install_from_repo redhat-lsb-core
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
+
+# Disable service start rate limiting for apache and autofs
+mkdir -p /lib/systemd/system/httpd.service.d
+cat << EOF > /lib/systemd/system/httpd.service.d/cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+mkdir -p /lib/systemd/system/autofs.service.d
+cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+sudo systemctl daemon-reload
 
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"

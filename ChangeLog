@@ -10,6 +10,12 @@
   * Fix debian packaging warnings and errors
 
 2.5.1:
+  * Fix cvmfs_suid_helper on Ubuntu 18.04 for symlinked spool directory
+  * Replace geolite free database by geolite2 (CVM-1496)
+  * Apply catalog updates from updated alien cache (CVM-1515)
+  * Fix compilation with libattr >= 2.4.48
+  * Fix potential memory corruption in ingestion pipeline
+  * Fix occasional false error of 'cvmfs_config probe' on FC28
   * Fix locking bug in cvmfs_server snapshot (CVM-1598)
   * Fix Yubikey signature handling (CVM-1604)
   * Publication with gateway gracefully exits when reflog is missing (CVM-1560)
