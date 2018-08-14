@@ -33,7 +33,7 @@ BashOptionsManager options_manager_;
 
 static void Usage(int output_dest) {
   LogCvmfs(kLogCvmfs, output_dest,
-           "Mount helper for CernVM-FS.  Used my mount(8)\n"
+           "Mount helper for CernVM-FS.  Used by mount(8)\n"
            "Mandatory arguments:\n"
            "  repository name: <repository>\n"
            "  mountpoint of the repository: <mountpoint>\n"
