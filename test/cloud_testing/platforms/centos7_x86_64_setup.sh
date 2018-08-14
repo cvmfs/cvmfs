@@ -68,6 +68,10 @@ install_from_repo python-devel
 install_from_repo unzip
 install_from_repo bzip2
 
+# Migration test needs lsb_release
+echo "install lsb_release..."
+install_from_repo redhat-lsb-core
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
