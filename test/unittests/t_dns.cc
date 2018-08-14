@@ -678,7 +678,8 @@ TEST_F(T_Dns, CaresResolverLocalhost) {
 TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
   Host host = default_resolver->Resolve("a");
   EXPECT_TRUE((host.status() == kFailUnknownHost) ||
-              (host.status() == kFailTimeout));
+              (host.status() == kFailTimeout) ||
+              (host.status() == kFailInvalidResolvers));
 
   vector<string> new_domains;
   new_domains.push_back("no.such.domain");
@@ -697,7 +698,8 @@ TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
   EXPECT_EQ(retval, true);
   host = default_resolver->Resolve("a");
   EXPECT_TRUE((host.status() == kFailUnknownHost) ||
-              (host.status() == kFailTimeout));
+              (host.status() == kFailTimeout) ||
+              (host.status() == kFailInvalidResolvers));
 }
 
 

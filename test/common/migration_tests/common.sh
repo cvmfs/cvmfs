@@ -22,9 +22,14 @@ guess_package_url() {
 
   # Ubuntu
   if [ -f /etc/debian_version ]                               && \
-     [ x$(lsb_release --id --short 2>/dev/null) = x"Ubuntu" ] && \
-     [ $(uname -m) = "x86_64" ]; then
-    package_file_name="${package_name}_${short_cvmfs_version_string}_amd64.deb"
+     [ x$(lsb_release --id --short 2>/dev/null) = x"Ubuntu" ]
+  then
+    local release=1
+    local architecture=$(uname -m)
+    [ "x$architecture" = x"x86_64" ] && architecture="amd64"
+    [ "x$architecture" = x"i686" ] && architecture="i386"
+    local flavor="$(lsb_release -si | tr [:upper:] [:lower:])$(lsb_release -sr)"
+    package_file_name="${package_name}_${short_cvmfs_version_string}~${release}+${flavor}_${architecture}.deb"
 
   # SLC 5 and 6
   elif [ x$(lsb_release --id --short 2>/dev/null) = x"ScientificCERNSLC" ]; then
