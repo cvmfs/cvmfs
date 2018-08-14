@@ -42,6 +42,7 @@ cvmfs_run_test() {
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
   create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+  sudo bash -c "echo CVMFS_EXTENDED_GC_STATS=true >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf"
 
   echo "*** disable automatic garbage collection"
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
