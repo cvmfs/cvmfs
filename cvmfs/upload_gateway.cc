@@ -232,7 +232,7 @@ bool GatewayUploader::ReadKey(const std::string& key_file, std::string* key_id,
 }
 
 int64_t GatewayUploader::DoGetObjectSize(const std::string &file_name) {
-  return 0;
+  return -EOPNOTSUPP;
 }
 
 void GatewayUploader::BumpErrors() const { atomic_inc32(&num_errors_); }

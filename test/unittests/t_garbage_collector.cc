@@ -54,7 +54,9 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
   }
 
   virtual unsigned GetNumberOfErrors() const { return 0; }
-  virtual int64_t DoGetObjectSize(const std::string &file_name) { return 0;}
+  virtual int64_t DoGetObjectSize(const std::string &file_name) {
+    return -EOPNOTSUPP;
+  }
 
   bool HasDeleted(const shash::Any &hash) const {
     return deleted_hashes.find(hash) != deleted_hashes.end();
