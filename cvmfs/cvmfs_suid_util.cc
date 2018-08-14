@@ -4,7 +4,13 @@
 
 #include "cvmfs_suid_util.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <cassert>
+#include <climits>
+#include <cstdlib>
 
 #include "sanitizer.h"
 
@@ -50,6 +56,21 @@ string EscapeSystemdUnit(const string &path) {
   }
 
   return result + ".mount";
+}
+
+
+bool PathExists(const std::string &path) {
+  struct stat info;
+  int retval = stat(path.c_str(), &info);
+  return retval == 0;
+}
+
+
+string ResolvePath(const std::string &path) {
+  char buf[PATH_MAX];
+  char *retval = realpath(path.c_str(), buf);
+  if (retval == NULL) return "";
+  return string(buf);
 }
 
 }  // namespace cvmfs_suid

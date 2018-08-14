@@ -25,4 +25,18 @@ TEST(T_SuidUtil, EscapeSystemdUnit) {
   EXPECT_EQ("\\x2ea_-.b-c\\x40.mount", EscapeSystemdUnit(".a_/.b/c@"));
 }
 
+
+TEST(T_SuidUtil, PathExists) {
+  EXPECT_TRUE(PathExists("."));
+  EXPECT_FALSE(PathExists("/no/such/path"));
+}
+
+
+TEST(T_SuidUtil, ResolvePath) {
+  EXPECT_EQ("/etc", ResolvePath("/etc"));
+  EXPECT_EQ("/etc", ResolvePath("/etc/"));
+  EXPECT_EQ("/etc", ResolvePath("/etc/../etc/./"));
+}
+
+
 }  // namespace cvmfs_suid
