@@ -33,9 +33,9 @@ TEST(T_SuidUtil, PathExists) {
 
 
 TEST(T_SuidUtil, ResolvePath) {
-  EXPECT_EQ("/etc", ResolvePath("/etc"));
-  EXPECT_EQ("/etc", ResolvePath("/etc/"));
-  EXPECT_EQ("/etc", ResolvePath("/etc/../etc/./"));
+  EXPECT_EQ("/usr", ResolvePath("/usr"));
+  EXPECT_EQ("/usr", ResolvePath("/usr/"));
+  EXPECT_EQ("/usr", ResolvePath("/usr/../usr/./"));
 }
 
 
