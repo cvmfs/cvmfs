@@ -784,7 +784,7 @@ acquire_update_lock()
   local update_lock=${CVMFS_SPOOL_DIR}/is_updating
 
   # check for other updates in progress
-  if ! acquire_lock $update_lock ignore_stale; then
+  if ! acquire_lock $update_lock; then
     if [ $abort_on_conflict -eq 1 ]; then
       echo "another update is in progress... aborting"
       to_syslog_for_repo $name "did not $update_type (another update in progress)"
@@ -935,6 +935,7 @@ CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 CVMFS_AUTOCATALOGS=false
 CVMFS_ASYNC_SCRATCH_CLEANUP=true
+CVMFS_PRINT_STATISTICS=false
 EOF
 
   if [ x"$voms_authz" != x"" ]; then
@@ -1291,7 +1292,7 @@ _run_catalog_migration() {
   # finalizing transaction
   local trunk_hash=$(grep "^C" $manifest | tr -d C)
   echo "Flushing file system buffers"
-  sync
+  syncfs
 
   # committing newly created revision
   echo "Signing new manifest"

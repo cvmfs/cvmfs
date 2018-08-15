@@ -43,6 +43,7 @@
 #include "platform.h"
 #include "reflog.h"
 #include "sanitizer.h"
+#include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_aufs.h"
@@ -237,9 +238,10 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   const upload::SpoolerDefinition sd(spooler_definition, shash::kAny);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
-  const bool success = spooler->Remove(file_to_delete);
+  spooler->RemoveAsync(file_to_delete);
+  spooler->WaitForUpload();
 
-  if (spooler->GetNumberOfErrors() > 0 || !success) {
+  if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
              file_to_delete.c_str());
     return 1;
@@ -678,6 +680,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
 
+  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
+
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -692,7 +696,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  params.spooler = upload::Spooler::Construct(spooler_definition);
+  params.spooler = upload::Spooler::Construct(spooler_definition,
+                                              &publish_statistics);
   if (NULL == params.spooler) return 3;
   UniquePtr<upload::Spooler> spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs));
@@ -749,7 +754,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  publish::SyncMediator mediator(&catalog_manager, &params);
+  publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations

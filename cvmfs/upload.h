@@ -137,15 +137,11 @@ namespace upload {
  *
  * Note: A spooler is derived from the Observable template, meaning that it
  *       allows for Listeners to be registered onto it.
- *
- * Note: Concrete implementations of AbstractSpooler are responsible to pro-
- *       duce a SpoolerResult once they finish a job and pass it upwards by
- *       invoking JobDone(). AbstractSpooler will then take care of notifying
- *       all registered listeners.
  */
 class Spooler : public Observable<SpoolerResult> {
  public:
-  static Spooler *Construct(const SpoolerDefinition &spooler_definition);
+  static Spooler *Construct(const SpoolerDefinition &spooler_definition,
+                              perf::StatisticsTemplate *statistics = NULL);
   virtual ~Spooler();
 
   /**
@@ -232,13 +228,14 @@ class Spooler : public Observable<SpoolerResult> {
   void ProcessMetainfo(const std::string &local_path);
 
   /**
-   * Deletes the given file from the repository backend storage. This is done
-   * synchronous, in any case.
+   * Deletes the given file from the repository backend storage.  This requires
+   * using WaitForUpload() to make sure the delete operations reached the
+   * upload backend.
    *
    * @param file_to_delete   path to the file to be deleted
    * @return                 true if file was successfully removed
    */
-  bool Remove(const std::string &file_to_delete);
+  void RemoveAsync(const std::string &file_to_delete);
 
   /**
    * Checks if a file is already present in the backend storage
@@ -287,30 +284,13 @@ class Spooler : public Observable<SpoolerResult> {
    * This method is called once before any other operations are performed on
    * a Spooler. Implements global initialization work.
    */
-  bool Initialize();
+  bool Initialize(perf::StatisticsTemplate *statistics);
 
   /**
    * @param spooler_definition   the SpoolerDefinition structure that defines
    *                             some intrinsics of the concrete Spoolers.
    */
   explicit Spooler(const SpoolerDefinition &spooler_definition);
-
-  /**
-   * Concrete implementations of the AbstractSpooler must call this method
-   * when they finish an upload job. A single upload job might contain more
-   * than one file to be uploaded.
-   *
-   * Note: If the concrete spooler implements uploading as an asynchronous
-   *       task, this method MUST be called when all items for one upload
-   *       job are processed.
-   *
-   * The concrete implementations of AbstractSpooler are responsible to fill
-   * the SpoolerResult structure properly and pass it to this method.
-   *
-   * JobDone() will inform Listeners of the Spooler object about the finished
-   * job.
-   */
-  void JobDone(const SpoolerResult &result);
 
   /**
    * Used internally: Is called when ingestion pipeline finishes a job.

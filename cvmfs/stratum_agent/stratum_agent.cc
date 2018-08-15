@@ -179,15 +179,19 @@ static void ReadConfigurations() {
   for (unsigned i = 0; i < repo_config_dirs.size(); ++i) {
     string name = GetFileName(repo_config_dirs[i]);
     string optarg;
-    UniquePtr<OptionsManager> options_mgr(new BashOptionsManager());
+    UniquePtr<OptionsManager> options_mgr(
+      new BashOptionsManager(new DefaultOptionsTemplateManager(
+        repo_config_dirs[i])));
     options_mgr->set_taint_environment(false);
-    options_mgr->ParsePath(repo_config_dirs[i] + "/server.conf", false);
+    options_mgr->ParsePath(repo_config_dirs[i] + "/server.conf",
+      false);
     if (!options_mgr->GetValue("CVMFS_REPOSITORY_TYPE", &optarg) ||
         (optarg != "stratum1"))
     {
       continue;
     }
-    options_mgr->ParsePath(repo_config_dirs[i] + "/replica.conf", false);
+    options_mgr->ParsePath(repo_config_dirs[i] + "/replica.conf",
+      false);
     if (options_mgr->GetValue("CVMFS_STRATUM_AGENT", &optarg) &&
         !options_mgr->IsOn(optarg))
     {

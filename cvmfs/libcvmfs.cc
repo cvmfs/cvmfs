@@ -25,8 +25,56 @@
 #include "smalloc.h"
 #include "statistics.h"
 #include "util/posix.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
+
+/**
+ * Create the cvmfs_attr struct which contains the same information
+ * as a stat, but also has pointers to the hash, symlink, and name.
+ */
+struct cvmfs_attr* cvmfs_attr_init()
+{
+  struct cvmfs_attr *attr;
+  attr = reinterpret_cast<cvmfs_attr *>(calloc(1, sizeof(*attr)));
+  attr->version  = 1;
+  attr->size     = sizeof(*attr);
+  return attr;
+}
+
+
+/**
+ * Destroy the cvmfs_attr struct and frees the checksum, symlink,
+ * name, and xattrs.
+ */
+void cvmfs_attr_free(struct cvmfs_attr *attr)
+{
+  if (attr) {
+    free(attr->cvm_checksum);
+    free(attr->cvm_symlink);
+    free(attr->cvm_name);
+    delete reinterpret_cast<XattrList *>(attr->cvm_xattrs);
+  }
+  free(attr);
+}
+
+
+struct cvmfs_nc_attr *cvmfs_nc_attr_init()
+{
+  struct cvmfs_nc_attr *attr;
+  attr = reinterpret_cast<cvmfs_nc_attr *>(calloc(1, sizeof(*attr)));
+  return attr;
+}
+
+void cvmfs_nc_attr_free(struct cvmfs_nc_attr *nc_attr)
+{
+  if (nc_attr) {
+    free(nc_attr->mountpoint);
+    free(nc_attr->hash);
+  }
+  free(nc_attr);
+}
+
 
 /**
  * Expand symlinks in all levels of a path.  Also, expand ".." and ".".  This
@@ -276,6 +324,28 @@ int cvmfs_lstat(LibContext *ctx, const char *path, struct stat *st) {
 }
 
 
+int cvmfs_stat_attr(
+  LibContext *ctx,
+  const char *path,
+  struct cvmfs_attr *attr
+) {
+  string lpath;
+  int rc;
+  rc = expand_ppath(ctx, path, &lpath);
+  if (rc < 0) {
+    return -1;
+  }
+  path = lpath.c_str();
+
+  rc = ctx->GetExtAttr(path, attr);
+  if (rc < 0) {
+    errno = -rc;
+    return -1;
+  }
+  return 0;
+}
+
+
 int cvmfs_listdir(
   LibContext *ctx,
   const char *path,
@@ -299,12 +369,73 @@ int cvmfs_listdir(
 }
 
 
+int cvmfs_stat_nc(
+  LibContext *ctx,
+  const char *path,
+  struct cvmfs_nc_attr *nc_attr
+) {
+  string lpath;
+  int rc;
+  rc = expand_path(0, ctx, path, &lpath);
+  if (rc < 0) {
+    return -1;
+  }
+  path = lpath.c_str();
+
+  rc = ctx->GetNestedCatalogAttr(path, nc_attr);
+  if (rc < 0) {
+    errno = -rc;
+    return -1;
+  }
+  return 0;
+}
+
+
+int cvmfs_list_nc(
+  LibContext *ctx,
+  const char *path,
+  char ***buf,
+  size_t *buflen
+) {
+  string lpath;
+  int rc;
+  rc = expand_path(0, ctx, path, &lpath);
+  if (rc < 0) {
+    return -1;
+  }
+  path = lpath.c_str();
+
+  rc = ctx->ListNestedCatalogs(path, buf, buflen);
+  if (rc < 0) {
+    errno = -rc;
+    return -1;
+  }
+  return 0;
+}
+
+
+void cvmfs_list_free(char **buf)
+{
+  // Quick return if base pointer is NULL
+  if (!buf) return;
+  size_t pos = 0;
+  // Iterate over each non-null entry and free
+  // This assumes no null entries, which don't currently exist
+  while (buf[pos]) {
+    free(buf[pos]);
+    pos++;
+  }
+  free(buf);
+}
+
+
 cvmfs_errors cvmfs_attach_repo_v2(
   const char *fqrn,
   SimpleOptionsParser *opts,
   LibContext **ctx)
 {
   assert(ctx != NULL);
+  opts->SwitchTemplateManager(new DefaultOptionsTemplateManager(fqrn));
   *ctx = LibContext::Create(fqrn, opts);
   assert(*ctx != NULL);
   loader::Failures result = (*ctx)->mount_point()->boot_status();

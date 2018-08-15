@@ -33,7 +33,7 @@ BashOptionsManager options_manager_;
 
 static void Usage(int output_dest) {
   LogCvmfs(kLogCvmfs, output_dest,
-           "Mount helper for CernVM-FS.  Used my mount(8)\n"
+           "Mount helper for CernVM-FS.  Used by mount(8)\n"
            "Mandatory arguments:\n"
            "  repository name: <repository>\n"
            "  mountpoint of the repository: <mountpoint>\n"
@@ -324,6 +324,8 @@ int main(int argc, char **argv) {
 
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
+  options_manager_.SwitchTemplateManager(
+    new DefaultOptionsTemplateManager(fqrn));
   options_manager_.ParseDefault(fqrn);
 
   int retval;

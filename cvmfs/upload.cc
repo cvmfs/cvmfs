@@ -12,9 +12,10 @@
 
 namespace upload {
 
-Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition) {
+Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
+                                  perf::StatisticsTemplate *statistics) {
   Spooler *result = new Spooler(spooler_definition);
-  if (!result->Initialize()) {
+  if (!result->Initialize(statistics)) {
     delete result;
     result = NULL;
   }
@@ -32,7 +33,7 @@ Spooler::~Spooler() {
 
 std::string Spooler::backend_name() const { return uploader_->name(); }
 
-bool Spooler::Initialize() {
+bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   // configure the uploader environment
   uploader_ = AbstractUploader::Construct(spooler_definition_);
   if (!uploader_) {
@@ -40,6 +41,10 @@ bool Spooler::Initialize() {
              "Failed to initialize backend upload "
              "facility in Spooler.");
     return false;
+  }
+
+  if (statistics != NULL) {
+    uploader_->InitCounters(statistics);
   }
 
   // configure the file processor context
@@ -91,8 +96,8 @@ void Spooler::UploadReflog(const std::string &local_path) {
   Upload(local_path, ".cvmfsreflog");
 }
 
-bool Spooler::Remove(const std::string &file_to_delete) {
-  return uploader_->Remove(file_to_delete);
+void Spooler::RemoveAsync(const std::string &file_to_delete) {
+  uploader_->RemoveAsync(file_to_delete);
 }
 
 bool Spooler::Peek(const std::string &path) const {

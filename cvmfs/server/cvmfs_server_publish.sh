@@ -195,11 +195,16 @@ cvmfs_server_publish() {
         -C $trusted_certs                              \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
-        -D $tag_name                                   \
-        -G $tag_channel                                \
         $(get_follow_http_redirects_flag)              \
         $authz_file                                    \
         $log_level $tweaks_option $external_option $verbosity"
+
+    if [ ! -z "$tag_name" ]; then
+      sync_command="$sync_command -D $tag_name"
+    fi
+    if [ ! -z "$tag_channel" ]; then
+      sync_command="$sync_command -G $tag_channel"
+    fi
 
     if [ x"$tag_description" != x"" ]; then
       sync_command="$sync_command -J $tag_description"
@@ -273,6 +278,9 @@ cvmfs_server_publish() {
       if [ -d /cvmfs/$name/.cvmfs ]; then
         sync_command_virtual_dir="$sync_command -S remove"
       fi
+    fi
+    if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
+      sync_command="$sync_command -+stats"
     fi
     # Must be after the virtual-dir command is constructed
     if is_checked_out $name; then
@@ -399,7 +407,7 @@ cvmfs_server_publish() {
 
     # finalizing transaction
     echo "Flushing file system buffers"
-    sync
+    syncfs
 
     # committing newly created revision
     echo "Signing new manifest"
@@ -436,7 +444,7 @@ cvmfs_server_publish() {
     close_transaction  $name $use_fd_fallback
     publish_after_hook $name
     publish_succeeded  $name
-
+    syncfs
   done
 
   return $retcode

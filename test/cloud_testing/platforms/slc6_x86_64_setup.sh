@@ -62,6 +62,9 @@ echo "installing python WSGI module..."
 install_from_repo mod_wsgi || die "fail (installing mod_wsgi)"
 sudo service httpd restart || die "fail (restarting apache)"
 
+echo "installing mod_ssl for Apache"
+install_from_repo mod_ssl || die "fail (installing mod_ssl)"
+
 # setup environment
 echo -n "setting up CernVM-FS environment..."
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
@@ -111,13 +114,19 @@ echo -n "install x509 helper... "
 sudo rpm -ivh $(basename $x509_helper) > /dev/null || die "install failed"
 echo "OK"
 
-# install ruby gem for FakeS3
-install_ruby_gem fakes3 0.2.0  # latest is 0.2.1 (23.07.2015) that didn't work.
+# install the test S3 provider
+install_test_s3
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
+
+# Install repository gateway
+echo "Installing repository gateway"
+package_map=pkgmap.slc6_x86_64
+download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+install_rpm $(cat gateway_package_name)
 
 # rebooting the system (returning 0 value)
 echo "sleep 1 && reboot" > killme.sh

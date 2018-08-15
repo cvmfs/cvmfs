@@ -7,10 +7,9 @@ usr/bin/cvmfs_rsync
 usr/bin/cvmfs_stratum_agent
 etc/cvmfs/cvmfs_server_hooks.sh.demo
 var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
-usr/share/cvmfs-server/webapi/cvmfs_api.py
-usr/share/cvmfs-server/webapi/cvmfs_geo.py
-usr/share/cvmfs-server/webapi/cvmfs_globals.py
-usr/share/cvmfs-server/webapi/GeoIP.so
+usr/share/cvmfs-server/webapi/*
+usr/share/cvmfs-server/webapi/*/*
+usr/share/cvmfs-server/webapi/*/*/*
 usr/share/cvmfs-server/agent/cvmfs_stratum_agent.service
 usr/share/cvmfs-server/agent/cvmfs_stratum_agent.initd
 var/lib/cvmfs-server/geo/

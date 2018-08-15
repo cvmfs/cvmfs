@@ -180,7 +180,6 @@ static bool UseWatchdog() {
   return !loader_exports_->disable_watchdog;
 }
 
-
 std::string PrintInodeGeneration() {
   return "init-catalog-revision: " +
     StringifyInt(inode_generation_info_.initial_revision) + "  " +
@@ -338,6 +337,27 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   return true;
 }
 
+static void DoTraceInode(const int event,
+                          fuse_ino_t ino,
+                          const std::string &msg)
+{
+  PathString path;
+  bool found = GetPathForInode(ino, &path);
+  if (!found) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+      "Tracing: Could not find path for inode %" PRIu64, uint64_t(ino));
+    mount_point_->tracer()->Trace(event, PathString("@UNKNOWN"), msg);
+  } else {
+    mount_point_->tracer()->Trace(event, path, msg);
+  }
+}
+
+static void inline TraceInode(const int event,
+                                fuse_ino_t ino,
+                                const std::string &msg)
+{
+  if (mount_point_->tracer()->IsActive()) DoTraceInode(event, ino, msg);
+}
 
 /**
  * Find the inode number of a file name in a directory given by inode.
@@ -495,9 +515,9 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, EACCES);
     return;
   }
-
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
+  TraceInode(Tracer::kEventGetAttr, ino, "getattr()");
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
@@ -526,6 +546,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
+  TraceInode(Tracer::kEventReadlink, ino, "readlink()");
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
@@ -581,13 +602,13 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   ino = catalog_mgr->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %" PRIu64,
            uint64_t(ino));
-
   if (!CheckVoms(*fuse_ctx)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
     return;
   }
 
+  TraceInode(Tracer::kEventOpenDir, ino, "opendir()");
   PathString path;
   catalog::DirectoryEntry d;
   bool found = GetPathForInode(ino, &path);
@@ -801,6 +822,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
+  mount_point_->tracer()->Trace(Tracer::kEventOpen, path, "open()");
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
   // if ((fi->flags & 3) != O_RDONLY) {
@@ -1178,6 +1200,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   struct statvfs info;
   memset(&info, 0, sizeof(info));
 
+  TraceInode(Tracer::kEventStatFs, ino, "statfs()");
+
   // Unmanaged cache
   if (!file_system_->cache_mgr()->quota_mgr()->HasCapability(
        QuotaManager::kCapIntrospectSize))
@@ -1232,12 +1256,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_getxattr on inode: %" PRIu64 " for xattr: %s",
            uint64_t(ino), name);
-
   if (!CheckVoms(*fuse_ctx)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
     return;
   }
+  TraceInode(Tracer::kEventGetXAttr, ino, "getxattr()");
 
   const string attr = name;
   catalog::DirectoryEntry d;
@@ -1501,6 +1525,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
+  TraceInode(Tracer::kEventListAttr, ino, "listxattr()");
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_listxattr on inode: %" PRIu64 ", size %u [hide xattrs %d]",
            uint64_t(ino), size, mount_point_->hide_magic_xattrs());
@@ -1754,9 +1779,11 @@ static FileSystem *InitSystemFs(
 
 static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
   if (loader_exports->version >= 3 && loader_exports->simple_options_parsing) {
-    cvmfs::options_mgr_ = new SimpleOptionsParser();
+    cvmfs::options_mgr_ = new SimpleOptionsParser(
+      new DefaultOptionsTemplateManager(loader_exports->repository_name));
   } else {
-    cvmfs::options_mgr_ = new BashOptionsManager();
+    cvmfs::options_mgr_ = new BashOptionsManager(
+      new DefaultOptionsTemplateManager(loader_exports->repository_name));
   }
 
   if (loader_exports->config_files != "") {

@@ -57,7 +57,7 @@ if (CMAKE_COMPILER_IS_GNUCC)
   endif (${CVMFS_GCC_MAJOR} GREATER 6)
 endif (CMAKE_COMPILER_IS_GNUCC)
 message (STATUS "using compiler opt flag ${CVMFS_OPT_FLAGS}")
-set (CVMFS_BASE_C_FLAGS "${CVMFS_OPT_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall ${CVMFS_FIX_FLAGS}")
+set (CVMFS_BASE_C_FLAGS "${CVMFS_OPT_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fwrapv -fvisibility=hidden -Wall ${CVMFS_FIX_FLAGS}")
 if (APPLE)
   if (${CMAKE_SYSTEM_VERSION} GREATER 14.5.0)
     set(CVMFS_BASE_C_FLAGS "${CVMFS_BASE_C_FLAGS} -mmacosx-version-min=10.11")
@@ -68,12 +68,6 @@ if (NOT USING_CLANG)
   set (CVMFS_BASE_C_FLAGS "${CVMFS_BASE_C_FLAGS} -fno-optimize-sibling-calls")
   set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_CXX_FLAGS} -fno-optimize-sibling-calls")
 endif (NOT USING_CLANG)
-if (ARM AND NOT IS_64_BIT)
-  #
-  # Fix TBB on the Raspberry Pi
-  #
-  set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_CXX_FLAGS} -DTBB_USE_GCC_BUILTINS=1 -D__TBB_64BIT_ATOMICS=0")
-endif (ARM AND NOT IS_64_BIT)
 set (CVMFS_BASE_DEFINES "-D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CVMFS_BASE_C_FLAGS} ${CVMFS_BASE_DEFINES}")
@@ -88,15 +82,6 @@ if (BUILD_COVERAGE AND NOT USING_CLANG)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fprofile-arcs -ftest-coverage -fPIC")
 endif (BUILD_COVERAGE AND NOT USING_CLANG)
-
-# Check for a potentially buggy Xcode version
-if(NOT CMAKE_CXX_COMPILER_VERSION) # work around for cmake versions smaller than 2.8.10
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE CMAKE_CXX_COMPILER_VERSION)
-endif()
-if (APPLE AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" AND ${CMAKE_CXX_COMPILER_VERSION} VERSION_GREATER 9.1.0.0)
-  message("Xcode version 9.3 or newer detected")
-  set (CVMFS_BUGGY_XCODE ON)
-endif()
 
 # Check for old Linux version that don't have a complete inotify implementation
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")

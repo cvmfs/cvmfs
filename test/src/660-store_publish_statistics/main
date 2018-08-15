@@ -1,0 +1,252 @@
+# This file contains $NR_OF_TESTS tests for checking the store publish statistics feature (checking the database integrity)
+cvmfs_test_name="Store publish statistics in a SQLite database"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_660_NR_OF_TESTS=4
+CVMFS_TEST_660_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db
+CVMFS_TEST_660_ERROR_FILES_ADDED=101
+CVMFS_TEST_660_ERROR_FILES_REMOVED=102
+CVMFS_TEST_660_ERROR_FILES_CHANGED=103
+CVMFS_TEST_660_ERROR_DUPLICATED_FILES=104
+CVMFS_TEST_660_ERROR_DIR_ADDED=105
+CVMFS_TEST_660_ERROR_DIR_REMOVED=106
+CVMFS_TEST_660_ERROR_DIR_CHANGED=107
+CVMFS_TEST_660_ERROR_BYTES_ADDED=108
+CVMFS_TEST_660_ERROR_BYTES_REMOVED=109
+CVMFS_TEST_660_ERROR_BYTES_UPLOADED=110
+CVMFS_TEST_660_TAR_FILE=tarfile.tar
+CVMFS_TEST_660_TAR_DIR=newTarDir
+CVMFS_TEST_660_OLD_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_old.db
+CVMFS_TEST_660_MERGED_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_merged.db
+
+
+test1() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "meaningless file content" > file1    # 1 file added ; 25 bytes added
+  echo "more clever file content" > file2    # 1 file added ; 25 bytes added
+  echo "" > file3                            # 1 file added ; 1 byte added ['\n']
+  mkdir -p foo                               # 1 directory added
+  mkdir -p bar                               # 1 directory added
+  touch ./foo/file4                          # 1 file added ; 0 byte added
+  echo "123 - testing" > ./foo/file5         # 1 file added ; 14 byte added
+
+  popdir
+}
+
+test2() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "additional meaningless content" >> file1   # 1 file changed ; 31 bytes added
+  echo "new file content" > file2                  # 1 file changed ; (25 -17 = 8 bytes removed
+  touch bar                                        # 1 directory changed
+  rm -rf foo               # 1 directory removed ; 2 files removed ; 14 bytes removed
+
+  popdir
+}
+
+#ingest command test
+test3() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "*** Create files in $working_dir..."
+  test1 $working_dir
+  echo "*** Making tar file..."
+  tar -cvf $CVMFS_TEST_660_TAR_FILE  * || return $?
+  echo "*** Tar file created."
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  local tar_file_path=$scratch_dir/tmp_dir/$CVMFS_TEST_660_TAR_FILE
+
+  echo "*** Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # # just to be written in log file
+  # echo "*** Activate the statistics by writing in server.conf file CVMFS_PRINT_STATISTICS=true"
+  # cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf | grep CVMFS_PRINT_STATISTICS
+  # if [ $? -eq 0 ]; then   # just change the value
+  #   echo "*** Found CVMFS_PRINT_STATISTICS variable, value overwritten with true."
+  #   sed -i 's/CVMFS_PRINT_STATISTICS=.*/CVMFS_PRINT_STATISTICS=true/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  # else
+  #   echo "*** CVMFS_PRINT_STATISTICS not found, append CVMFS_PRINT_STATISTICS=true in server.conf"
+  #   echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  # fi
+
+  # ============================ Test1 =============================
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** Test 1 - putting some stuff in the new repository"
+  test1 $repo_dir || return 1
+
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+  # get the last inserted data
+  sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_1
+
+  # ============================ Test2 =============================
+
+  echo "*** init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** Test 2 - change stuff in the repository"
+  test2 $repo_dir || return 2
+
+  echo "*** creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+  # get the last inserted data
+  sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_2
+
+  # ============================ Test3 =============================
+
+  echo "*** Test 3 - making a tar and execute ingest command"
+  mkdir tmp_dir
+  test3 $scratch_dir/tmp_dir || return 3
+  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_660_TAR_DIR $CVMFS_TEST_REPO || return $?
+  # get the last inserted data
+  sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_3
+
+  # ============================ Test4 =============================
+
+  echo "*** Test 4 - overwrite the tar file"
+  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_660_TAR_DIR $CVMFS_TEST_REPO || return $?
+  # get the last inserted data
+  sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_4
+
+  # =========================================================================================================
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # Reference test values
+  declare -A test_results
+  # test 1
+  test_results[1,1]=5     # n_files_added
+  test_results[1,2]=0     # n_files_removed
+  test_results[1,3]=0     # n_files_changed
+  test_results[1,4]=0     # n_duplicated_files
+  test_results[1,5]=2     # n_directories_added
+  test_results[1,6]=0     # n_directories_removed
+  test_results[1,7]=0     # n_directories_changed
+  test_results[1,8]=65    # sz_added_bytes
+  test_results[1,9]=0     # sz_removed_bytes
+  test_results[1,10]=103  # sz_uploaded_bytes
+  # test 2
+  test_results[2,1]=0
+  test_results[2,2]=2
+  test_results[2,3]=2
+  test_results[2,4]=0
+  test_results[2,5]=0
+  test_results[2,6]=1
+  test_results[2,7]=1
+  test_results[2,8]=31
+  test_results[2,9]=22
+  test_results[2,10]=74
+  # test 3
+  test_results[3,1]=5
+  test_results[3,2]=0
+  test_results[3,3]=0
+  test_results[3,4]=5
+  test_results[3,5]=3
+  test_results[3,6]=0
+  test_results[3,7]=0
+  test_results[3,8]=65
+  test_results[3,9]=0
+  test_results[3,10]=0
+  # test 4
+  test_results[4,1]=0
+  test_results[4,2]=0
+  test_results[4,3]=5
+  test_results[4,4]=5
+  test_results[4,5]=0
+  test_results[4,6]=0
+  test_results[4,7]=0
+  test_results[4,8]=0
+  test_results[4,9]=0
+  test_results[4,10]=0
+
+
+  # check publish statistics
+  for i in `seq 1 $CVMFS_TEST_660_NR_OF_TESTS`;
+  do
+    local files_added=$(cat test_660_$i | cut -d '|' -f 4)
+    local files_removed=$(cat test_660_$i | cut -d '|' -f 5)
+    local files_changed=$(cat test_660_$i | cut -d '|' -f 6)
+    local duplicated_files=$(cat test_660_$i | cut -d '|' -f 7)
+    local directories_added=$(cat test_660_$i | cut -d '|' -f 8)
+    local directories_removed=$(cat test_660_$i | cut -d '|' -f 9)
+    local directories_changed=$(cat test_660_$i | cut -d '|' -f 10)
+    local bytes_added=$(cat test_660_$i | cut -d '|' -f 11)
+    local bytes_removed=$(cat test_660_$i | cut -d '|' -f 12)
+    local bytes_uploaded=$(cat test_660_$i | cut -d '|' -f 13)
+
+    if [ "x$files_added" != "x${test_results[$i,1]}" ]; then
+      echo "*** Test $i.1 - number of added files - \
+            ($files_added vs ref:${test_results[$i,1]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_FILES_ADDED
+    fi
+    if [ "x$files_removed" != "x${test_results[$i,2]}" ]; then
+      echo "*** Test $i.2 - number of removed files -\
+           ($files_removed vs ref:${test_results[$i,2]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_FILES_REMOVED
+    fi
+    if [ "x$files_changed" != "x${test_results[$i,3]}" ]; then
+      echo "*** Test $i.3 - number of changed files - \
+            ($files_changed vs ref:${test_results[$i,3]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_FILES_CHANGED
+    fi
+    if [ "x$duplicated_files" != "x${test_results[$i,4]}" ]; then
+      echo "*** Test $i.4 - number of duplicated files - \
+            ($duplicated_files vs ref:${test_results[$i,4]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_DUPLICATED_FILES
+    fi
+    if [ "x$directories_added" != "x${test_results[$i,5]}" ]; then
+      echo "*** Test $i.5 - number of added directories - \
+            ($directories_added vs ref:${test_results[$i,5]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_DIR_ADDED
+    fi
+    if [ "x$directories_removed" != "x${test_results[$i,6]}" ]; then
+      echo "*** Test $i.6 - number of removed directories \
+            - ($directories_removed vs ref:${test_results[$i,6]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_DIR_REMOVED
+    fi
+    if [ "x$directories_changed" != "x${test_results[$i,7]}" ]; then
+      echo "*** Test $i.7 - number of changed directories - \
+            ($directories_changed vs ref:${test_results[$i,7]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_DIR_CHANGED
+    fi
+    if [ "x$bytes_added" != "x${test_results[$i,8]}" ]; then
+      echo "*** Test $i.8 - number of added bytes - \
+            ($bytes_added vs ref:${test_results[$i,8]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_BYTES_ADDED
+    fi
+    if [ "x$bytes_removed" != "x${test_results[$i,9]}" ]; then
+      echo "*** Test $i.9 - number of removed bytes - \
+            ($bytes_removed vs ref:${test_results[$i,9]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_BYTES_REMOVED
+    fi
+    if [ "x$bytes_uploaded" != "x${test_results[$i,10]}" ]; then
+      echo "*** Test $i.10 - number of uploaded bytes - \
+            ($bytes_uploaded vs ref:${test_results[$i,10]}) FAILED!"
+      return $CVMFS_TEST_660_ERROR_BYTES_UPLOADED
+    fi
+
+    # clean
+    rm test_660_$i
+  done
+
+  return 0
+}
+

@@ -43,7 +43,9 @@ class T_Options : public ::testing::Test {
             "#\n"
             "D=E # with a comment\n"
             "F=\"G\"\n"
-            "H='I' ");
+            "H='I' \n"
+            "FOO=abc/@fqrn@/@foo@.@bar@\n"
+            "BAR=abc@def.com");
     int result = fclose(temp_file);
     ASSERT_EQ(0, result);
     fprintf(temp_file_2, "CVMFS_CACHE_BASE=/overwritten\n");
@@ -59,11 +61,11 @@ class T_Options : public ::testing::Test {
   template <typename T> struct type {};
 
   unsigned ExpectedValues(const type<BashOptionsManager>  type_specifier) {
-    return 12u;
+    return 14u;
   }
 
   unsigned ExpectedValues(const type<SimpleOptionsParser>  type_specifier) {
-    return 12u;
+    return 14u;
   }
 
   unsigned ExpectedValues() {
@@ -88,7 +90,11 @@ TYPED_TEST(T_Options, ParsePath) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
   const unsigned expected_number_elements = TestFixture::ExpectedValues();
+  OptionsTemplateManager *opt_temp_mgr =
+    new DefaultOptionsTemplateManager("atlas.cern.ch");
+  opt_temp_mgr->SetTemplate("foo", "fourtytwo");
   options_manager.ParsePath(config_file, false);
+  options_manager.SwitchTemplateManager(opt_temp_mgr);
 
   // printf("DUMP: ***\n%s\n***\n", options_manager.Dump().c_str());
   ASSERT_EQ(expected_number_elements, options_manager.GetAllKeys().size());
@@ -129,6 +135,11 @@ TYPED_TEST(T_Options, ParsePath) {
   EXPECT_EQ("G", container);
   EXPECT_TRUE(options_manager.GetValue("H", &container));
   EXPECT_EQ("I", container);
+
+  EXPECT_TRUE(options_manager.GetValue("FOO", &container));
+  EXPECT_EQ("abc/atlas.cern.ch/fourtytwo.@bar@", container);
+  EXPECT_TRUE(options_manager.GetValue("BAR", &container));
+  EXPECT_EQ("abc@def.com", container);
 }
 
 TYPED_TEST(T_Options, ParsePathNoFile) {
@@ -219,4 +230,65 @@ TYPED_TEST(T_Options, TaintEnvironment) {
   options_manager.SetValue("NO_SUCH_OPTION_NOTAINT", "xxx");
   EXPECT_TRUE(options_manager.GetValue("NO_SUCH_OPTION_NOTAINT", &arg));
   EXPECT_EQ(NULL, getenv("NO_SUCH_OPTION_NOTAINT"));
+}
+
+
+TEST(T_OptionsTemplateManager, InsertRetrieveUpdate) {
+  OptionsTemplateManager opt_templ_mgr = OptionsTemplateManager();
+  opt_templ_mgr.SetTemplate("foo", "bar");
+  EXPECT_TRUE(opt_templ_mgr.HasTemplate("foo"));
+  EXPECT_EQ("bar", opt_templ_mgr.GetTemplate("foo"));
+
+  EXPECT_FALSE(opt_templ_mgr.HasTemplate("fourtytwo"));
+  EXPECT_EQ("@fourtytwo@", opt_templ_mgr.GetTemplate("fourtytwo"));
+
+  opt_templ_mgr.SetTemplate("foo", "foobar");
+  EXPECT_TRUE(opt_templ_mgr.HasTemplate("foo"));
+  EXPECT_EQ("foobar", opt_templ_mgr.GetTemplate("foo"));
+}
+
+void check_parser(OptionsTemplateManager opt_templ_mgr,
+  std::string in,
+  std::string out,
+  bool has_var) {
+  EXPECT_EQ(has_var, opt_templ_mgr.ParseString(&in));
+  EXPECT_EQ(out, in);
+}
+
+TEST(T_OptionsTemplateManager, FqrnPredefined) {
+  OptionsTemplateManager opt_templ_mgr
+    = DefaultOptionsTemplateManager("atlas.cern.ch");
+  opt_templ_mgr.SetTemplate("foo", "bar");
+  EXPECT_TRUE(opt_templ_mgr.HasTemplate("foo"));
+  EXPECT_EQ("bar", opt_templ_mgr.GetTemplate("foo"));
+
+  EXPECT_FALSE(opt_templ_mgr.HasTemplate("fourtytwo"));
+  EXPECT_EQ("@fourtytwo@", opt_templ_mgr.GetTemplate("fourtytwo"));
+
+  opt_templ_mgr.SetTemplate("foo", "foobar");
+  EXPECT_TRUE(opt_templ_mgr.HasTemplate("foo"));
+  EXPECT_EQ("foobar", opt_templ_mgr.GetTemplate("foo"));
+
+  EXPECT_TRUE(opt_templ_mgr.HasTemplate("fqrn"));
+  EXPECT_EQ("atlas.cern.ch", opt_templ_mgr.GetTemplate("fqrn"));
+
+  check_parser(opt_templ_mgr,
+    "/this/is/@a@/test/@fqrn@foo/@foo@/@fourtytwo@a@bc",
+    "/this/is/@a@/test/atlas.cern.chfoo/foobar/@fourtytwo@a@bc",
+    true);
+
+  check_parser(opt_templ_mgr,
+    "abc/def",
+    "abc/def",
+    false);
+
+  check_parser(opt_templ_mgr,
+    "@",
+    "@",
+    false);
+
+  check_parser(opt_templ_mgr,
+  "@fqrn@",
+  "atlas.cern.ch",
+  true);
 }

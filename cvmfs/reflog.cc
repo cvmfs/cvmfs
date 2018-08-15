@@ -44,24 +44,36 @@ Reflog* Reflog::Create(const std::string &database_path,
 }
 
 
-shash::Any Reflog::ReadChecksum(const std::string &path) {
+bool Reflog::ReadChecksum(const std::string &path, shash::Any* checksum) {
   int fd = open(path.c_str(), O_RDONLY);
-  assert(fd >= 0);
+  if (fd < 0) {
+    return false;
+  }
   std::string hex_hash;
   bool retval = GetLineFd(fd, &hex_hash);
-  assert(retval);
+  if (retval == 0) {
+    close(fd);
+    return false;
+  }
   close(fd);
-  return shash::MkFromHexPtr(shash::HexPtr(Trim(hex_hash)));
+  *checksum = shash::MkFromHexPtr(shash::HexPtr(Trim(hex_hash)));
+  return true;
 }
 
 
-void Reflog::WriteChecksum(const std::string &path, const shash::Any &value) {
+bool Reflog::WriteChecksum(const std::string &path, const shash::Any &value) {
   int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, kDefaultFileMode);
-  assert(fd >= 0);
+  if (fd < 0) {
+    return false;
+  }
   std::string hex_hash = value.ToString();
   bool retval = SafeWrite(fd, hex_hash.data(), hex_hash.length());
-  assert(retval);
+  if (retval == 0) {
+    close(fd);
+    return false;
+  }
   close(fd);
+  return true;
 }
 
 

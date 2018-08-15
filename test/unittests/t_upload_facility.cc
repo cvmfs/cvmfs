@@ -75,6 +75,8 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
     Respond(callback, UploaderResults(UploaderResults::kChunkCommit, 0));
   }
 
+  virtual int64_t DoGetObjectSize(const std::string &file_name) { return 0;}
+
  public:
   static upload::AbstractUploader::UploadBuffer last_buffer;
   static unsigned last_offset;

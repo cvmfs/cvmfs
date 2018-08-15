@@ -678,9 +678,11 @@ int main(int argc, char *argv[]) {
   string parameter;
   OptionsManager *options_manager;
   if (simple_options_parsing_) {
-    options_manager = new SimpleOptionsParser();
+    options_manager = new SimpleOptionsParser(
+      new DefaultOptionsTemplateManager(*repository_name_));
   } else {
-    options_manager = new BashOptionsManager();
+    options_manager = new BashOptionsManager(
+      new DefaultOptionsTemplateManager(*repository_name_));
   }
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
@@ -752,6 +754,12 @@ int main(int argc, char *argv[]) {
     if (options_manager->IsOn(parameter)) {
       fuse_opt_add_arg(mount_options, "-odefault_permissions");
     }
+  }
+
+  if (!DirectoryExists(*mount_point_)) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "Moint point %s does not exist", mount_point_->c_str());
+    return kFailPermission;
   }
 
   // Number of file descriptors

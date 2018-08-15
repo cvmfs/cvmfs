@@ -29,8 +29,8 @@ void Tracer::Activate(
   trace_file_ = trace_file;
   buffer_size_ = buffer_size;
   flush_threshold_ = flush_threshold;
-  assert(buffer_size_ > 1);
-  assert(0 <= flush_threshold_ && flush_threshold_ < buffer_size_);
+  assert(buffer_size_ > 1 && flush_threshold_>= 0
+    && flush_threshold_ < buffer_size_);
 
   ring_buffer_ = new BufferEntry[buffer_size_];
   commit_buffer_ = new atomic_int32[buffer_size_];

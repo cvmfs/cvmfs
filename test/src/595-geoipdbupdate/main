@@ -3,17 +3,15 @@ cvmfs_test_autofs_on_startup=false
 
 #
 # Location of the system-wide GeoIP databases
-# configurable: to be changed if $CVMFS_UPDATEGEO_DIR in cvmfs_server changes
-#   or CVMFS_UPDATEGEO_DAT or CVMFS_UPDATEGEO_DAT6
+# configurable: to be changed if $CVMFS_UPDATEGEO_DIR or CVMFS_UPDATEGEO_DB
+#    in cvmfs_server changes
 #
-CVMFS_TEST_595_GEODB="/var/lib/cvmfs-server/geo/GeoLiteCity.dat"
-CVMFS_TEST_595_GEODB2="/var/lib/cvmfs-server/geo/GeoLiteCityv6.dat"
+CVMFS_TEST_595_GEODB="/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb"
 CVMFS_TEST_595_SERVER_HOOKS="/etc/cvmfs/cvmfs_server_hooks.sh"
 
 CVMFS_TEST_595_REPLICA_NAME=
 CVMFS_TEST_595_GEODB_TOUCHED=0
 CVMFS_TEST_595_GEODB_STASH=
-CVMFS_TEST_595_GEODB2_STASH=
 CVMFS_TEST_595_GEODB_OWNER=
 CVMFS_TEST_595_GEODB_GROUP=
 CVMFS_TEST_595_SERVER_HOOKS_TOUCHED=0
@@ -22,9 +20,7 @@ cleanup() {
   echo "running cleanup... "
   [ -z $CVMFS_TEST_595_REPLICA_NAME ]            || sudo cvmfs_server rmfs -f $CVMFS_TEST_595_REPLICA_NAME
   [ $CVMFS_TEST_595_GEODB_TOUCHED -eq 0 ]        || sudo rm -f $CVMFS_TEST_595_GEODB
-  [ $CVMFS_TEST_595_GEODB_TOUCHED -eq 0 ]        || sudo rm -f $CVMFS_TEST_595_GEODB2
   [ -z $CVMFS_TEST_595_GEODB_STASH  ]            || cvmfs_unstash GEODB
-  [ -z $CVMFS_TEST_595_GEODB2_STASH  ]           || cvmfs_unstash GEODB2
   [ -z $CVMFS_TEST_595_GEODB_OWNER ]             || sudo chown ${CVMFS_TEST_595_GEODB_OWNER}:${CVMFS_TEST_595_GEODB_GROUP} $(dirname $CVMFS_TEST_595_GEODB)
   [ $CVMFS_TEST_595_SERVER_HOOKS_TOUCHED -eq 0 ] || sudo rm -f $CVMFS_TEST_595_SERVER_HOOKS
   [ -z $CVMFS_TEST_595_SERVER_HOOKS_STASH ]      || sudo cp -f $CVMFS_TEST_595_SERVER_HOOKS_STASH $CVMFS_TEST_595_SERVER_HOOKS
@@ -69,6 +65,11 @@ recreate_server_hooks_from_stashed_if_needed() {
 cvmfs_run_test() {
   logfile=$1
 
+  if [ ! -d `dirname $CVMFS_TEST_595_GEODB` ]; then
+    echo "No geo database directory, disabled on this platform"
+    return 0
+  fi
+
   # can't start out as root, it causes some of the tests below to fail
   echo "check if running as root"
   [ $(id -u) != 0 ] || return 1
@@ -91,7 +92,6 @@ cvmfs_run_test() {
   trap cleanup EXIT HUP INT TERM || return $?
 
   cvmfs_stash GEODB
-  cvmfs_stash GEODB2
   cvmfs_stash SERVER_HOOKS
 
   echo "create initial $CVMFS_TEST_595_SERVER_HOOKS in necessary"
@@ -104,7 +104,6 @@ cvmfs_run_test() {
 
   echo "check that there is no GeoIP database"
   [ ! -f $CVMFS_TEST_595_GEODB ] || return 3
-  [ ! -f $CVMFS_TEST_595_GEODB2 ] || return 4
 
   echo "create Stratum1 repository on the same machine"
   local create_s1_log="create_stratum1.log"
@@ -117,9 +116,8 @@ cvmfs_run_test() {
   CVMFS_TEST_595_REPLICA_NAME=$replica_name
   CVMFS_TEST_595_GEODB_TOUCHED=1
 
-  echo "check that there are GeoIP databases now"
+  echo "check that there is a GeoIP database now"
   [ -f $CVMFS_TEST_595_GEODB ] || return 6
-  [ -f $CVMFS_TEST_595_GEODB2 ] || return 7
 
   echo "check the logging output for the GeoIP update strategy"
   cat $create_s1_log | grep "Installing GeoIP Database" || return 8
@@ -147,7 +145,6 @@ cvmfs_run_test() {
   sudo -E cvmfs_server update-geodb > $update_4_log 2>&1 || return 14
 
   echo "check output logs for the expected status messages"
-  cat $update_3_log | grep "is up to date"           || return 15
   cat $update_4_log | grep "Updating GeoIP Database" || return 16
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -191,7 +188,7 @@ cvmfs_run_test() {
   sudo -E cvmfs_server update-geodb -l > $update_6_log 2>&1 || return 23
 
   echo "set mtime of the GeoIP database to $old days ago (old)"
-  sudo touch -d "$old days ago" $CVMFS_TEST_595_GEODB2 || return 24
+  sudo touch -d "$old days ago" $CVMFS_TEST_595_GEODB || return 24
 
   echo "do a lazy update as 'root' (should work and update)"
   local update_7_log="update_geodb_7.log"
@@ -199,7 +196,7 @@ cvmfs_run_test() {
 
   echo "check output logs for the expected status messages"
   cat $update_5_log | grep -e "very old.* Updating"   || return 26
-  cat $update_6_log | grep -e "is up to date"         || return 27
+  test -z "`cat $update_6_log`"                       || return 27
   cat $update_7_log | grep -e "is expired.* Updating" || return 28
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -251,9 +248,6 @@ cvmfs_run_test() {
   group="`id -g ${CVMFS_TEST_USER}`"
   sudo chown ${CVMFS_TEST_USER}:${group} $(dirname $CVMFS_TEST_595_GEODB) || return 37
   sudo chown ${CVMFS_TEST_USER}:${group} $CVMFS_TEST_595_GEODB            || return 38
-  echo "change ownership of $CVMFS_TEST_595_GEODB2 to '$CVMFS_TEST_USER'"
-  sudo chown ${CVMFS_TEST_USER}:${group} $CVMFS_TEST_595_GEODB2           || return 39
-
 
   echo "try to update the GeoIP database as user '$CVMFS_TEST_USER' (should work and update)"
   local update_10_log="update_geodb_10.log"
@@ -273,8 +267,6 @@ cvmfs_run_test() {
 
   echo "change ownership of $CVMFS_TEST_595_GEODB to 'root'"
   sudo chown root:root $CVMFS_TEST_595_GEODB || return 44
-  echo "change ownership of $CVMFS_TEST_595_GEODB2 to 'root'"
-  sudo chown root:root $CVMFS_TEST_595_GEODB2 || return 45
 
   echo "create a stratum1 snapshot (should 'fail' due to permissions)"
   local snapshot_2_log="snapshot_2.log"
@@ -288,7 +280,7 @@ cvmfs_run_test() {
   cvmfs_server snapshot $replica_name > $snapshot_3_log 2>&1 || return 48
 
   echo "check output logs for the expected status messages"
-  cat $snapshot_1_log | grep -e "is up to date"                                  || return 49
+  test -z "`cat $snapshot_1_log | grep GeoIP`"                                   || return 49
   cat $snapshot_2_log | grep -e "GeoIP database.*not writable.*$CVMFS_TEST_USER" || return 50
   cat $snapshot_3_log | grep -e "Directory.*not writable.*$CVMFS_TEST_USER"      || return 51
 

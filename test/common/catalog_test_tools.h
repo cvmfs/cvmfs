@@ -2,17 +2,22 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_CATALOG_TEST_TOOLS_H_
-#define CVMFS_CATALOG_TEST_TOOLS_H_
+#ifndef TEST_COMMON_CATALOG_TEST_TOOLS_H_
+#define TEST_COMMON_CATALOG_TEST_TOOLS_H_
 
+#include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "catalog_mgr_rw.h"
+#include "compression.h"
 #include "directory_entry.h"
 #include "manifest.h"
+#include "options.h"
 #include "server_tool.h"
+#include "signature.h"
 #include "statistics.h"
 #include "upload.h"
 
@@ -53,6 +58,7 @@ struct DirSpecItem {
 class DirSpec {
  public:
   typedef std::map<std::string, DirSpecItem> ItemList;
+  typedef std::vector<std::string> NestedCatalogList;
 
   DirSpec();
 
@@ -62,9 +68,16 @@ class DirSpec {
                const size_t size,
                const XattrList& xattrs = XattrList(),
                shash::Suffix suffix = shash::kSha1);
+  bool LinkFile(const std::string& name,
+                const std::string& parent,
+                const std::string& symlink,
+                const size_t size,
+                const XattrList& xattrs = XattrList(),
+                shash::Suffix suffix = shash::kSha1);
   bool AddDirectory(const std::string& name,
                     const std::string& parent,
                     const size_t size);
+  bool AddNestedCatalog(const std::string& name);
 
   bool AddDirectoryEntry(const catalog::DirectoryEntry& entry,
                          const XattrList& xattrs,
@@ -73,6 +86,8 @@ class DirSpec {
   void ToString(std::string* out);
 
   const ItemList& items() const { return items_; }
+
+  const NestedCatalogList& nested_catalogs() const { return nested_catalogs_; }
 
   size_t NumItems() const { return items_.size(); }
 
@@ -91,10 +106,12 @@ class DirSpec {
 
  private:
   bool AddDir(const std::string& name, const std::string& parent);
+  bool AddNC(const std::string& name);
   bool RmDir(const std::string& name, const std::string& parent);
   bool HasDir(const std::string& name) const;
 
   ItemList items_;
+  NestedCatalogList nested_catalogs_;
   std::set<std::string> dirs_;
 };
 
@@ -116,11 +133,18 @@ class CatalogTestTool : public ServerTool {
  public:
   typedef std::vector<std::pair<std::string, shash::Any> > History;
 
-  CatalogTestTool(const std::string& name);
+  explicit CatalogTestTool(const std::string& name);
   ~CatalogTestTool();
 
   bool Init();
   bool Apply(const std::string& id, const DirSpec& spec);
+  bool ApplyAtRootHash(const shash::Any& root_hash, const DirSpec& spec);
+  bool FindEntry(const shash::Any& root_hash,
+                 const std::string& path,
+                 catalog::DirectoryEntry *entry);
+  bool LookupNestedCatalogHash(const shash::Any& root_hash,
+                               const std::string& path,
+                               char **nc_hash);
 
   bool DirSpecAtRootHash(const shash::Any& root_hash, DirSpec* spec);
 
@@ -128,11 +152,21 @@ class CatalogTestTool : public ServerTool {
 
   History history() { return history_; }
 
+  std::string repo_name() { return stratum0_; }
+  std::string public_key() { return public_key_; }
+
  private:
   static upload::Spooler* CreateSpooler(const std::string& config);
 
   static manifest::Manifest* CreateRepository(const std::string& dir,
                                               upload::Spooler* spooler);
+
+  void CreateHistory(string repo_path_,
+                     manifest::Manifest *manifest,
+                     shash::Any *history_hash);
+  void CreateManifest(string repo_path_, manifest::Manifest *manifest);
+  void CreateWhitelist(string repo_path_);
+  void CreateKeys(string repo_path_, string *public_key, shash::Any *hash_cert);
 
   static catalog::WritableCatalogManager* CreateCatalogMgr(
       const shash::Any& root_hash, const std::string stratum0,
@@ -142,11 +176,17 @@ class CatalogTestTool : public ServerTool {
   const std::string name_;
 
   std::string stratum0_;
+  std::string public_key_;
   std::string temp_dir_;
 
   UniquePtr<manifest::Manifest> manifest_;
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr_;
   UniquePtr<upload::Spooler> spooler_;
   History history_;
 };
 
-#endif  //  CVMFS_CATALOG_TEST_TOOLS_H_
+void CreateMiniRepository(
+  SimpleOptionsParser *options_mgr_,
+  string *repo_path_);
+
+#endif  //  TEST_COMMON_CATALOG_TEST_TOOLS_H_

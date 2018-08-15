@@ -22,11 +22,11 @@ script_location=$(portable_dirname $0)
 #    LOG_DIRECTORY         location of the test log files to be created
 #
 # Additionally the following configuration variables will be defined:
-#    FAKE_S3_PORT          network port to communicate with FakeS3
-#    FAKE_S3_STORAGE       storage location of FakeS3
-#    FAKE_S3_CONFIG        location of the S3 config file to be created/used
-#    FAKE_S3_BUCKET        name of the S3 bucket to be used
-#    FAKE_S3_URL           URL to the S3 server
+#    TEST_S3_PORT          network port to communicate with the test S3 provider
+#    TEST_S3_STORAGE       storage location of the test S3 provider
+#    TEST_S3_CONFIG        location of the S3 config file to be created/used
+#    TEST_S3_BUCKET        name of the S3 bucket to be used
+#    TEST_S3_URL           URL to the S3 server
 #
 
 SOURCE_DIRECTORY=""
@@ -35,11 +35,11 @@ CLIENT_PACKAGE=""
 DEVEL_PACKAGE=""
 LOG_DIRECTORY=""
 
-FAKE_S3_PORT=13337
-FAKE_S3_STORAGE=/srv/fakes3
-FAKE_S3_CONFIG=/etc/cvmfs/fakes3.conf
-FAKE_S3_BUCKET=cvmfs_test
-FAKE_S3_URL=http://localhost:${FAKE_S3_PORT}/${FAKE_S3_BUCKET}-1-1
+TEST_S3_PORT=13337
+TEST_S3_STORAGE=/srv/test_s3
+TEST_S3_CONFIG=/etc/cvmfs/test_s3.conf
+TEST_S3_BUCKET=cvmfstest
+TEST_S3_URL=http://localhost:${TEST_S3_PORT}/${TEST_S3_BUCKET}
 
 usage() {
   local msg=$1
@@ -104,8 +104,8 @@ EOF
 
 CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client.log"
 SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server.log"
-TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
-FAKE_S3_LOGFILE="${LOG_DIRECTORY}/fake_s3.log"
+S3_TEST_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
+TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3_instance.log"
 UNITTEST_LOGFILE="${LOG_DIRECTORY}/unittest.log"
 MIGRATIONTEST_LOGFILE="${LOG_DIRECTORY}/migrationtest.log"
 

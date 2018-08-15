@@ -56,8 +56,6 @@ class GatewayUploader : public AbstractUploader {
 
   virtual std::string name() const;
 
-  virtual bool Remove(const std::string& file_to_delete);
-
   virtual bool Peek(const std::string& path) const;
 
   virtual bool PlaceBootstrappingShortcut(const shash::Any& object) const;
@@ -78,12 +76,16 @@ class GatewayUploader : public AbstractUploader {
   virtual void FinalizeStreamedUpload(UploadStreamHandle* handle,
                                       const shash::Any& content_hash);
 
+  virtual void DoRemoveAsync(const std::string& file_to_delete);
+
  protected:
   virtual bool ReadSessionTokenFile(const std::string& token_file_name,
                                     std::string* token);
 
   virtual bool ReadKey(const std::string& key_file, std::string* key_id,
                        std::string* secret);
+
+  virtual int64_t DoGetObjectSize(const std::string &file_name);
 
  private:
   void BumpErrors() const;

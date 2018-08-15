@@ -10,6 +10,7 @@
 #include "catalog_virtual.h"
 #include "logging.h"
 #include "manifest.h"
+#include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
@@ -38,9 +39,12 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   params.public_keys = *args.find('K')->second;
   params.repo_name = *args.find('N')->second;
 
-  params.tar_file = *args.find('T')->second;
-  params.base_directory = *args.find('B')->second;
-
+  if (args.find('T') != args.end()) {
+    params.tar_file = *args.find('T')->second;
+  }
+  if (args.find('B') != args.end()) {
+    params.base_directory = *args.find('B')->second;
+  }
   if (args.find('D') != args.end()) {
     params.to_delete = *args.find('D')->second;
   }
@@ -75,6 +79,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.key_file = *args.find('H')->second;
   }
 
+  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -89,7 +94,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  params.spooler = upload::Spooler::Construct(spooler_definition);
+  params.spooler = upload::Spooler::Construct(spooler_definition,
+                                              &publish_statistics);
   if (NULL == params.spooler) return 3;
   UniquePtr<upload::Spooler> spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs));
@@ -134,7 +140,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
-  publish::SyncMediator mediator(&catalog_manager, &params);
+  publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
 
   publish::SyncUnion *sync;
 

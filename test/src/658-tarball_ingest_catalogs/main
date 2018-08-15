@@ -97,6 +97,9 @@ cvmfs_run_test() {
   echo "*** ingesting the same tarball in a different directory $dir"
   cvmfs_server ingest --base_dir $different_dir --tar_file $tarfile --delete $dir $CVMFS_TEST_REPO || return $?
 
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || die "Not found catalog /"
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a$" || return 9
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a/b$"  || return 10

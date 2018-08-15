@@ -27,6 +27,8 @@ namespace upload {
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   : AbstractUploader(spooler_definition)
   , num_parallel_uploads_(kDefaultNumParallelUploads)
+  , num_retries_(kDefaultNumRetries)
+  , timeout_sec_(kDefaultTimeoutSec)
   , authz_method_(s3fanout::kAuthzAwsV2)
   , temporary_path_(spooler_definition.temporary_path)
 {
@@ -41,6 +43,9 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   }
 
   s3fanout_mgr_.Init(num_parallel_uploads_);
+  s3fanout_mgr_.SetTimeout(timeout_sec_);
+  s3fanout_mgr_.SetRetryParameters(
+    num_retries_, kDefaultBackoffInitMs, kDefaultBackoffMaxMs);
   s3fanout_mgr_.Spawn();
 
   int retval = pthread_create(
@@ -79,7 +84,8 @@ bool S3Uploader::ParseSpoolerDefinition(
   }
 
   // Parse S3 configuration
-  BashOptionsManager options_manager;
+  BashOptionsManager options_manager = BashOptionsManager(
+    new DefaultOptionsTemplateManager(repository_alias_));
   options_manager.ParsePath(config_path, false);
   std::string parameter;
 
@@ -117,6 +123,12 @@ bool S3Uploader::ParseSpoolerDefinition(
                                &parameter))
   {
     num_parallel_uploads_ = String2Uint64(parameter);
+  }
+  if (options_manager.GetValue("CVMFS_S3_MAX_RETRIES", &parameter)) {
+    num_retries_ = String2Uint64(parameter);
+  }
+  if (options_manager.GetValue("CVMFS_S3_TIMEOUT", &parameter)) {
+    timeout_sec_ = String2Uint64(parameter);
   }
   if (options_manager.GetValue("CVMFS_S3_REGION", &region_)) {
     authz_method_ = s3fanout::kAuthzAwsV4;
@@ -158,17 +170,22 @@ void *S3Uploader::MainCollectResults(void *data) {
                  info->error_code,
                  s3fanout::Code2Ascii(info->error_code));
         reply_code = 99;
+        atomic_inc32(&uploader->io_errors_);
       }
-      if (info->origin == s3fanout::kOriginMem) {
-        uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                          UploaderResults(UploaderResults::kChunkCommit,
-                                          reply_code));
+      if (info->request == s3fanout::JobInfo::kReqDelete) {
+        uploader->Respond(NULL, UploaderResults());
       } else {
-        uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                          UploaderResults(reply_code, info->origin_path));
+        if (info->origin == s3fanout::kOriginMem) {
+          uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                            UploaderResults(UploaderResults::kChunkCommit,
+                                            reply_code));
+        } else {
+          uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                            UploaderResults(reply_code, info->origin_path));
+        }
+        assert(info->mmf == NULL);
+        assert(info->origin_file == NULL);
       }
-      assert(info->mmf == NULL);
-      assert(info->origin_file == NULL);
     }
 #ifdef _POSIX_PRIORITY_SCHEDULING
     sched_yield();
@@ -208,6 +225,7 @@ void S3Uploader::FileUpload(
   UploadJobInfo(info);
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from file finished: %s",
            local_path.c_str());
+  CountUploadedBytes(GetFileSize(local_path));
 }
 
 
@@ -266,7 +284,7 @@ void S3Uploader::StreamedUpload(
             UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
   }
-
+  CountUploadedBytes(buffer.size);
   Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
@@ -349,15 +367,15 @@ s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
 }
 
 
-bool S3Uploader::Remove(const std::string& file_to_delete) {
+void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
   const std::string mangled_path = repository_alias_ + "/" + file_to_delete;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
 
   info->request = s3fanout::JobInfo::kReqDelete;
-  bool retme = s3fanout_mgr_.DoSingleJob(info);
 
-  delete info;
-  return retme;
+  LogCvmfs(kLogUploadS3, kLogDebug, "Asynchronously removing %s/%s",
+           info->bucket.c_str(), info->object_key.c_str());
+  s3fanout_mgr_.PushNewJob(info);
 }
 
 
@@ -367,6 +385,9 @@ bool S3Uploader::Peek(const std::string& path) const {
 
   info->request = s3fanout::JobInfo::kReqHead;
   bool retme = s3fanout_mgr_.DoSingleJob(info);
+  if (retme) {
+    CountDuplicates();
+  }
 
   delete info;
   return retme;
@@ -375,6 +396,11 @@ bool S3Uploader::Peek(const std::string& path) const {
 
 bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
   return false;  // TODO(rmeusel): implement
+}
+
+
+int64_t S3Uploader::DoGetObjectSize(const std::string &file_name) {
+  return -EOPNOTSUPP;  // TODO(dosarudaniel): use a head request for byte count
 }
 
 }  // namespace upload

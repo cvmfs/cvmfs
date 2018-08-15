@@ -82,6 +82,18 @@ static void Mount(const string &path) {
   int retval = platform_stat("/bin/systemctl", &info);
   if (retval == 0) {
     string systemd_unit = cvmfs_suid::EscapeSystemdUnit(path);
+    // On newer versions of systemd, the mount unit is based on the fully
+    // resolved path (discovered on Ubuntu 18.04, test 539)
+    if (!cvmfs_suid::PathExists(
+          string("/run/systemd/generator/") + systemd_unit))
+    {
+      string resolved_path = cvmfs_suid::ResolvePath(path);
+      if (resolved_path.empty()) {
+        fprintf(stderr, "cannot resolve %s\n", path.c_str());
+        exit(1);
+      }
+      systemd_unit = cvmfs_suid::EscapeSystemdUnit(resolved_path);
+    }
     ExecAsRoot("/bin/systemctl", "start", systemd_unit.c_str(), NULL);
   } else {
     ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);

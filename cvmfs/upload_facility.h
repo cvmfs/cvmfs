@@ -12,14 +12,27 @@
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "repository_tag.h"
+#include "statistics.h"
 #include "upload_spooler_definition.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
 
 namespace upload {
 
+struct UploadCounters {
+  perf::Counter *n_duplicated_files;
+  perf::Counter *sz_uploaded_bytes;
+
+  explicit UploadCounters(perf::StatisticsTemplate statistics) {
+    n_duplicated_files = statistics.RegisterTemplated("n_duplicated_files",
+        "Number of duplicated files added");
+    sz_uploaded_bytes = statistics.RegisterTemplated("sz_uploaded_bytes",
+        "Number of uploaded bytes");
+  }
+};  // UploadCounters
+
 struct UploaderResults {
-  enum Type { kFileUpload, kBufferUpload, kChunkCommit };
+  enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove };
 
   UploaderResults(const int return_code, const std::string &local_path)
     : type(kFileUpload),
@@ -30,6 +43,11 @@ struct UploaderResults {
     : type(t),
       return_code(return_code),
       local_path("") {}
+
+  UploaderResults()
+    : type(kRemove)
+    , return_code(0)
+  { }
 
   const Type type;
   const int return_code;
@@ -213,29 +231,33 @@ class AbstractUploader
   }
 
   /**
-   * Removes a file from the backend storage. This might be done synchronously.
+   * Removes a file from the backend storage.
    *
-   * Note: If the file doesn't exist before calling this method it will report
-   *       a successful deletion anyways.
-   *
-   * Note: This method is currently used very sparsely! If this changes in the
-   *       future, one might think about doing deletion asynchronously!
+   * Note: If the file doesn't exist before calling this won't be an error.
    *
    * @param file_to_delete  path to the file to be removed
-   * @return                true if the file does not exist (anymore), false if
-   *                        the removal failed
    */
-  virtual bool Remove(const std::string &file_to_delete) = 0;
+  void RemoveAsync(const std::string &file_to_delete) {
+    ++jobs_in_flight_;
+    DoRemoveAsync(file_to_delete);
+  }
 
   /**
-   * Overloaded Remove method used to remove a object based on its content hash.
+   * Overloaded method used to remove a object based on its content hash.
    *
    * @param hash_to_delete  the content hash of a file to be deleted
-   * @return                true on successful removal (removing a non-existant
-   *                        object is a successful deletion as well!)
    */
-  virtual bool Remove(const shash::Any &hash_to_delete) {
-    return Remove("data/" + hash_to_delete.MakePath());
+  void RemoveAsync(const shash::Any &hash_to_delete) {
+    RemoveAsync("data/" + hash_to_delete.MakePath());
+  }
+
+  /**
+   * Get object size based on its content hash
+   *
+   * @param hash  the content hash of a file
+   */
+  int64_t GetObjectSize(const shash::Any &hash) {
+    return DoGetObjectSize("data/" + hash.MakePath());
   }
 
   /**
@@ -268,6 +290,7 @@ class AbstractUploader
 
   virtual unsigned int GetNumberOfErrors() const = 0;
   static void RegisterPlugins();
+  void InitCounters(perf::StatisticsTemplate *statistics);
 
  protected:
   typedef Callbackable<UploaderResults>::CallbackTN *CallbackPtr;
@@ -308,6 +331,11 @@ class AbstractUploader
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
                                       const shash::Any &content_hash) = 0;
 
+
+  virtual void DoRemoveAsync(const std::string &file_to_delete) = 0;
+
+  virtual int64_t DoGetObjectSize(const std::string &file_name) = 0;
+
   /**
    * This notifies the callback that is associated to a finishing job. Please
    * do not call the handed callback yourself in concrete Uploaders!
@@ -342,12 +370,17 @@ class AbstractUploader
     return spooler_definition_;
   }
 
+  void CountUploadedBytes(int64_t bytes_written) const;
+
+  void CountDuplicates() const;
+
  private:
   const SpoolerDefinition spooler_definition_;
 
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
   Tube<UploadJob> tube_upload_;
+  mutable UniquePtr<UploadCounters> counters_;
 };  // class AbstractUploader
 
 

@@ -547,8 +547,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   string reflog_chksum_path;
   if (args.find('R') != args.end()) {
     reflog_chksum_path = *args.find('R')->second;
-    if (!initial_snapshot)
-      reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+    if (!initial_snapshot) {
+      if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum");
+        return 1;
+      }
+    }
   }
   if (args.find('Z') != args.end()) {
     timestamp_threshold = String2Int64(*args.find('Z')->second);

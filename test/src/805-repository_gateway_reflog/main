@@ -1,0 +1,44 @@
+cvmfs_test_name="Repository gateway - missing reflog"
+cvmfs_test_autofs_on_startup=false
+
+
+clean_up() {
+    echo "Cleaning up"
+}
+
+check_status() {
+    echo $(( $1 || 0 ))
+}
+
+run_transactions() {
+    set_up_repository_gateway
+
+    echo "Check transaction with missing reflog"
+    sudo mv /var/spool/cvmfs/test.repo.org/reflog.chksum /tmp
+    cvmfs_server transaction test.repo.org
+
+    local output=$(cvmfs_server publish test.repo.org 2>&1 | grep "missing_reflog")
+
+    if [ x"$output" = x"" ]; then
+        echo -n "Error: the missing reflog should have been reported "
+        echo "as the cause of the publication error"
+
+        cvmfs_server abort -f test.repo.org
+
+        return 1;
+    fi
+
+    cvmfs_server abort -f test.repo.org
+
+    return 0;
+}
+
+cvmfs_run_test() {
+    trap clean_up EXIT HUP INT TERM || return $?
+
+    run_transactions
+    local status=$?
+
+    return $(check_status $status)
+}
+

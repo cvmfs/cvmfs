@@ -103,8 +103,9 @@ void GatewayUploader::WaitForUpload() const {
 
 std::string GatewayUploader::name() const { return "HTTP"; }
 
-bool GatewayUploader::Remove(const std::string& /*file_to_delete*/) {
-  return false;
+void GatewayUploader::DoRemoveAsync(const std::string& /*file_to_delete*/) {
+  atomic_inc32(&num_errors_);
+  Respond(NULL, UploaderResults());
 }
 
 bool GatewayUploader::Peek(const std::string& /*path*/) const { return false; }
@@ -152,6 +153,7 @@ void GatewayUploader::FileUpload(const std::string& local_path,
     return;
   }
 
+  CountUploadedBytes(handle->bucket->size);
   Respond(callback, UploaderResults(0, local_path));
 }
 
@@ -199,6 +201,7 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     return;
   }
 
+  CountUploadedBytes(hd->bucket->size);
   Respond(handle->commit_callback,
           UploaderResults(UploaderResults::kChunkCommit, 0));
 }
@@ -226,6 +229,10 @@ bool GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
 bool GatewayUploader::ReadKey(const std::string& key_file, std::string* key_id,
                               std::string* secret) {
   return gateway::ReadKeys(key_file, key_id, secret);
+}
+
+int64_t GatewayUploader::DoGetObjectSize(const std::string &file_name) {
+  return -EOPNOTSUPP;
 }
 
 void GatewayUploader::BumpErrors() const { atomic_inc32(&num_errors_); }

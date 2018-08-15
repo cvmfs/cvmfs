@@ -33,6 +33,9 @@ echo "installing python WSGI module..."
 install_from_repo mod_wsgi   || die "fail (installing mod_wsgi)"
 sudo systemctl restart httpd || die "fail (restarting apache)"
 
+echo "installing mod_ssl for Apache"
+install_from_repo mod_ssl || die "fail (installing mod_ssl)"
+
 # setup environment
 echo -n "setting up CernVM-FS environment..."
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
@@ -55,8 +58,8 @@ install_from_repo tree
 # traffic shaping
 install_from_repo trickle
 
-# install ruby gem for FakeS3
-install_ruby_gem fakes3
+# Install the test S3 provider
+install_test_s3
 
 # building preloader
 install_from_repo cmake
@@ -68,10 +71,33 @@ install_from_repo python-devel
 install_from_repo unzip
 install_from_repo bzip2
 
+# Migration test needs lsb_release
+echo "install lsb_release..."
+install_from_repo redhat-lsb-core
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
 
+# Disable service start rate limiting for apache and autofs
+mkdir -p /lib/systemd/system/httpd.service.d
+cat << EOF > /lib/systemd/system/httpd.service.d/cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+mkdir -p /lib/systemd/system/autofs.service.d
+cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+sudo systemctl daemon-reload
+
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"
+
+# Install repository gateway
+echo "Installing repository gateway"
+package_map=pkgmap.cc7_x86_64
+download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+install_rpm $(cat gateway_package_name)

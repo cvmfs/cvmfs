@@ -34,6 +34,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &base_directory,
                                    const std::string &to_delete)
     : SyncUnion(mediator, rdonly_path, "", ""),
+      src(NULL),
       tarball_path_(tarball_path),
       base_directory_(base_directory),
       to_delete_(to_delete),
@@ -44,6 +45,12 @@ SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
 
 bool SyncUnionTarball::Initialize() {
   bool result;
+
+  // We are just deleting entity from the repo
+  if (tarball_path_ == "") {
+    assert(NULL == src);
+    return SyncUnion::Initialize();
+  }
 
   src = archive_read_new();
   assert(ARCHIVE_OK == archive_read_support_format_tar(src));
@@ -101,6 +108,9 @@ void SyncUnionTarball::Traverse() {
       mediator_->Remove(sync_entry);
     }
   }
+
+  // we are simplying deleting entity from  the repo
+  if (NULL == src) return;
 
   struct archive_entry *entry = archive_entry_new();
   while (true) {
@@ -167,11 +177,7 @@ void SyncUnionTarball::Traverse() {
 
 void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   std::string archive_file_path(archive_entry_pathname(entry));
-  if (archive_file_path.length() >= 2) {
-    if (archive_file_path[0] == '.' && archive_file_path[1] == '/') {
-      archive_file_path = archive_file_path.erase(0, 2);
-    }
-  }
+  archive_file_path = SanitizePath(archive_file_path);
 
   std::string complete_path =
       MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
@@ -246,6 +252,17 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
     // read_archive_signal_->Wakeup();
     abort();
   }
+}
+
+std::string SyncUnionTarball::SanitizePath(const std::string &path) {
+  if (path.length() >= 2) {
+    if (path[0] == '.' && path[1] == '/') {
+      std::string to_return(path);
+      to_return.erase(0, 2);
+      return to_return;
+    }
+  }
+  return path;
 }
 
 void SyncUnionTarball::PostUpload() {

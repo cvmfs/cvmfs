@@ -45,6 +45,8 @@ namespace manifest {
 class Manifest;
 }
 
+struct Counters;
+
 namespace publish {
 
 /**
@@ -109,7 +111,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
   static const unsigned int processing_dot_interval = 100;
 
   SyncMediator(catalog::WritableCatalogManager *catalog_manager,
-               const SyncParameters *params);
+               const SyncParameters *params,
+               perf::StatisticsTemplate statistics);
   void RegisterUnionEngine(SyncUnion *engine);
   // Final class, it is not meant to be derived any further
   ~SyncMediator();
@@ -267,6 +270,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * By default, files have no extended attributes.
    */
   XattrList default_xattrs;
+  UniquePtr<Counters> counters_;
 };  // class SyncMediator
 
 }  // namespace publish

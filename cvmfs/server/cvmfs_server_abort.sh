@@ -77,7 +77,7 @@ cvmfs_server_abort() {
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
     handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
-    sync
+    syncfs
 
     to_syslog_for_repo $name "aborting transaction"
 

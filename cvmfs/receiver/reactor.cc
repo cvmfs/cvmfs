@@ -375,13 +375,17 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     case CommitProcessor::kSuccess:
       reply_input.push_back(std::make_pair("status", "ok"));
       break;
-    case CommitProcessor::kMergeError:
+    case CommitProcessor::kError:
+      reply_input.push_back(std::make_pair("status", "error"));
+      reply_input.push_back(std::make_pair("reason", "miscellaneous"));
+      break;
+    case CommitProcessor::kMergeFailure:
       reply_input.push_back(std::make_pair("status", "error"));
       reply_input.push_back(std::make_pair("reason", "merge_error"));
       break;
-    case CommitProcessor::kIoError:
+    case CommitProcessor::kMissingReflog:
       reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "io_error"));
+      reply_input.push_back(std::make_pair("reason", "missing_reflog"));
       break;
     default:
       LogCvmfs(kLogReceiver, kLogSyslogErr,

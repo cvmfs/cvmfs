@@ -25,7 +25,7 @@ namespace receiver {
  */
 class CommitProcessor {
  public:
-  enum Result { kSuccess, kMergeError, kIoError };
+  enum Result { kSuccess, kError, kMergeFailure, kMissingReflog};
 
   CommitProcessor();
   virtual ~CommitProcessor();

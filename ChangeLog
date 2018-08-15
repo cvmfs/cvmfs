@@ -1,10 +1,35 @@
 2.6.0:
+  * Publication statistics are saved to an SQLite file (CVM-1567)
+  * Optionally print statistics at the end of publication (CVM-1566)
+  * Reactivate tracer, new parameters CVMFS_TRACEBUFFER{_THRESHOLD} (CVM-1596)
+  * Add libcvmfs calls that list and stat nested catalogs (CVM-1577)
+  * Generally replace @fqrn@ and @org@ in configuration (CVM-1526)
   * Add support for CVMFS_NFS_INTERLEAVED_INODES (CVM-1561)
   * Add support for ingesting tarballs (CVM-1476)
   * Optionally print GC stats with CVMFS_SERVER_FLAGS=-+stats
   * Fix debian packaging warnings and errors
 
 2.5.1:
+  * Fix cvmfs_suid_helper on Ubuntu 18.04 for symlinked spool directory
+  * Replace geolite free database by geolite2 (CVM-1496)
+  * Apply catalog updates from updated alien cache (CVM-1515)
+  * Fix compilation with libattr >= 2.4.48
+  * Fix potential memory corruption in ingestion pipeline
+  * Fix occasional false error of 'cvmfs_config probe' on FC28
+  * Fix locking bug in cvmfs_server snapshot (CVM-1598)
+  * Fix Yubikey signature handling (CVM-1604)
+  * Publication with gateway gracefully exits when reflog is missing (CVM-1560)
+  * Fixed Ubuntu 18.04 packages
+  * Workspace is only assumed to be CWD in the FUSE client (CVM-1603)
+  * Flush file system buffers after snapshot, gc, resign, publish (CVM-1552)
+  * Add support for CA bundle files through X509_CERT_BUNDLE (CVM-1421)
+  * Improve error message when mount point does not exist (CVM-1562)
+  * Gracefully quit mount helper if required config repo is missing (CVM-1512)
+  * Fix publishing through gateway with CVMFS_AUTO_TAGS=false (CVM-1559)
+  * Parallelize object removal in S3 backend (CVM-1593)
+  * Make S3 network parameters adjustable, new parameters
+    CVMFS_S3_MAX_RETRIES, CVMFS_S3_TIMEOUT
+  * Fix compiler optimization flags for gcc8+ and clang9+
   * Update BNL and FNAL stratum 1 aliases (CVM-1556)
   * Improved check for OSXFUSE in "cvmfs_config chksetup" (CVM-1550)
   * Fix potential deadlock when uploading files to repository GW (CVM-1555)

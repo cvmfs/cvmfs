@@ -1,6 +1,7 @@
 cvmfs_test_name="GeoIP Service"
 cvmfs_test_autofs_on_startup=false
 
+CVMFS_TEST_614_GEO_DIR=/var/lib/cvmfs-server/geo
 CVMFS_TEST_614_REPLICA_NAME=
 
 cleanup() {
@@ -72,6 +73,11 @@ cvmfs_check_geosepresult() {
 
 cvmfs_run_test() {
   logfile=$1
+
+  if [ ! -d $CVMFS_TEST_614_GEO_DIR ]; then
+    echo "No geo database directory, disabled on this platform"
+    return 0
+  fi
 
   echo "checking if both IPv4 and IPv6 addresses are available"
   local ipv4addr="`cvmfs_getaddr -4`"

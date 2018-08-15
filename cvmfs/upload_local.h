@@ -59,7 +59,7 @@ class LocalUploader : public AbstractUploader {
   void FinalizeStreamedUpload(UploadStreamHandle *handle,
                               const shash::Any &content_hash);
 
-  bool Remove(const std::string &file_to_delete);
+  void DoRemoveAsync(const std::string &file_to_delete);
 
   bool Peek(const std::string &path) const;
 
@@ -70,6 +70,8 @@ class LocalUploader : public AbstractUploader {
    * well as in the Upload() command.
    */
   unsigned int GetNumberOfErrors() const;
+
+  int64_t DoGetObjectSize(const std::string &file_name);
 
  protected:
   int Move(const std::string &local_path, const std::string &remote_path) const;

@@ -115,8 +115,8 @@ install_from_repo gzip
 # traffic shaping
 install_from_repo trickle
 
-# install ruby gem for FakeS3
-install_ruby_gem fakes3
+# install the test S3 provider
+install_test_s3
 
 # build and install CernVM-FS from source
 cd $SOURCE_DIRECTORY

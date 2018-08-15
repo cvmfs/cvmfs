@@ -958,6 +958,10 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     const char *cadir = getenv("X509_CERT_DIR");
     if (!cadir || !*cadir) {cadir = "/etc/grid-security/certificates";}
     curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
+    const char *cabundle = getenv("X509_CERT_BUNDLE");
+    if (cabundle && *cabundle) {
+      curl_easy_setopt(curl_handle, CURLOPT_CAINFO, cabundle);
+    }
     if (info->pid != -1) {
       if (credentials_attachment_ == NULL) {
         LogCvmfs(kLogDownload, kLogDebug,
@@ -1256,16 +1260,24 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_TOO_MANY_REDIRECTS:
       info->error_code = kFailHostConnection;
       break;
+    case CURLE_SSL_CACERT_BADFILE:
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
+               "Failed to load certificate bundle. "
+               "X509_CERT_BUNDLE might point to the wrong location.");
+      info->error_code = kFailHostConnection;
+      break;
     case CURLE_SSL_CACERT:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "SSL certificate cannot"
-               "be authenticated with known CA certificates. "
-               "X509_CERT_DIR might point to the wrong directory.");
+               " be authenticated with known CA certificates. "
+               "X509_CERT_DIR and/or X509_CERT_BUNDLE might point to the wrong "
+               "location.");
       info->error_code = kFailHostConnection;
       break;
     case CURLE_PEER_FAILED_VERIFICATION:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                "invalid SSL certificate of remote host. "
-               "X509_CERT_DIR might point to the wrong directory.");
+               "X509_CERT_DIR and/or X509_CERT_BUNDLE might point to the wrong "
+               "location.");
       info->error_code = kFailHostConnection;
       break;
     case CURLE_ABORTED_BY_CALLBACK:

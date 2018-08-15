@@ -47,24 +47,23 @@ RALgeo = {
 RALname = 'cernvmfs.gridpp.rl.ac.uk'
 RALaddrs = getaddrs(RALname, socket.AF_INET6)
 
-class giIPv4TestDb():
-    def record_by_addr(self, addr):
+class giTestDb():
+    def get(self, addr):
+        answer = None
         if addr in FNALaddrs:
-            return FNALgeo
-        if addr in IHEPaddrs:
-            return IHEPgeo
-        return None
+            answer = FNALgeo
+        elif addr in IHEPaddrs:
+            answer = IHEPgeo
+        elif addr in CERNaddrs:
+            answer = CERNgeo
+        elif addr in RALaddrs:
+            answer = RALgeo
+        else:
+            return None
 
-class giIPv6TestDb():
-    def record_by_addr_v6(self, addr):
-        if addr in CERNaddrs:
-            return CERNgeo
-        if addr in RALaddrs:
-            return RALgeo
-        return None
+        return {'location' : answer}
 
-cvmfs_geo.gi = giIPv4TestDb()
-cvmfs_geo.gi6 = giIPv6TestDb()
+cvmfs_geo.gireader = giTestDb()
 
 ####
 
@@ -113,17 +112,14 @@ class GeoTest(unittest.TestCase):
         self.assertEqual(4, len(cvmfs_geo.geo_cache))
 
         # test the caching, when there's no database available
-        savegi = cvmfs_geo.gi
-        savegi6 = cvmfs_geo.gi6
-        cvmfs_geo.gi = None
-        cvmfs_geo.gi6 = None
+        savegireader = cvmfs_geo.gireader
+        cvmfs_geo.gireader = None
         now = 1
         self.assertEqual(CERNgeo, name_geoinfo(now, CERNname))
         self.assertEqual(FNALgeo, name_geoinfo(now, FNALname))
         self.assertEqual(IHEPgeo, name_geoinfo(now, IHEPname))
         self.assertEqual(RALgeo,  name_geoinfo(now, RALname))
-        cvmfs_geo.gi = savegi
-        cvmfs_geo.gi6 = savegi6
+        cvmfs_geo.gireader = savegireader
 
     def test4GeosortServers(self):
         self.assertEqual([True, [3, 0, 1, 2]],
