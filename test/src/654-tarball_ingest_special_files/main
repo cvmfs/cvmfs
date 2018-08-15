@@ -42,8 +42,8 @@ produce_tarball() {
   ln tarball_foo/d/1.txt tarball_foo/d_1_hardlink3.txt
 
   # use 0 (zero) as major number to automatically allocate a free major number
-  mknod tarball_foo/char_device c 0 42
-  mknod tarball_foo/block_device b 0 24
+  sudo mknod tarball_foo/char_device c 0 42
+  sudo mknod tarball_foo/block_device b 0 24
 
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
