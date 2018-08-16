@@ -66,8 +66,8 @@ COMPONENTS="\
     server/cvmfs_server_ingest.sh
     server/cvmfs_server_print_stats.sh
     server/cvmfs_server_merge_stats.sh
-    server/cvmfs_server_coda.sh
     server/cvmfs_server_help.sh
+    server/cvmfs_server_coda.sh
     "
 
 # Includes COMPONENTS in OUTPUT_FILE

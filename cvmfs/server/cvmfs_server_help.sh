@@ -12,7 +12,7 @@
 cvmfs_server_help() {
   check_parameter_count 1 $#
   local command="$1"
-  local comm_help_path="../doc/${command}.txt"
+  local comm_help_path="/usr/share/cvmfs-server/help/${command}.txt"
 
   if [ ! -f "$comm_help_path" ]; then
     usage "No manual entry for $command"

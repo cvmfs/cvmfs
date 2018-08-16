@@ -919,6 +919,13 @@ if (BUILD_SERVER)
     )
   endif (BUILD_GEOAPI)
 
+  file(GLOB HELP_FILES "doc/*.txt")
+  install(
+    FILES          ${HELP_FILES}
+    DESTINATION    "/usr/share/cvmfs-server/help"
+    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
+
   install(
     FILES          doc/README-spooler
     DESTINATION    "/var/spool/cvmfs"

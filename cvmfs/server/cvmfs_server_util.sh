@@ -993,8 +993,10 @@ print-stats, publish, resign, rmfs, rollback, snapshot, tag, transaction,
 update-geodb, update-info, update-repoinfo
 
 
-Help for a specific command can be displayed with `cvmfs_server help <command>`
-or see manual page (man cvmfs_server)
+Help for a specific command:
+    \$ cvmfs_server help <command>
+or see manual page:
+    \$ man cvmfs_server
 "
 
   if [ x"$errormsg" != x ]; then
