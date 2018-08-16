@@ -1,0 +1,3 @@
+'mount'
+        [-a | <fully qualified name>]
+    Mount repositories in /cvmfs, for instance after reboot

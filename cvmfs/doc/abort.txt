@@ -1,0 +1,4 @@
+'abort'
+        [-f don't ask again]
+        <fully qualified name>
+    Abort transaction and return to the state before

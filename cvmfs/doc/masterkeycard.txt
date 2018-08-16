@@ -1,0 +1,10 @@
+'masterkeycard'
+        -a Checks if a smartcard is available
+        -k Checks whether a key is stored in a card
+        -r Reads pub key from a card to stdout
+        [-f don't ask again] -s <fully qualified name>
+           Stores masterkey and pub key of a repository into a card
+        [-f don't ask again] -d
+           Deletes a masterkey's certificate (pub key) from a card
+        [-f don't ask again] -c <fully qualified name or wildcard>
+           Converts given repositories to use card for whitelist

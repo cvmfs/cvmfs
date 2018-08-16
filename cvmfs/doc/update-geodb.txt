@@ -1,0 +1,3 @@
+'update-geodb'
+        [-l update lazily based on CVMFS_UPDATEGEO* variables]
+    Updates the geo-IP database

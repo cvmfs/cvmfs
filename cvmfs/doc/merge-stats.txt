@@ -1,0 +1,4 @@
+'merge-stats'
+        [-o output db file]
+        <db_file_1> <db_file_2>
+    Merge tables from two database files.

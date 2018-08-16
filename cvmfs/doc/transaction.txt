@@ -1,0 +1,3 @@
+'transaction'
+        <fully qualified name>
+    Start to edit a repository

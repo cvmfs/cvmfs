@@ -1,0 +1,3 @@
+'update-info'
+        [-p no apache config] [-e don't edit /info/meta]
+    Open meta info JSON file for editing
