@@ -29,16 +29,16 @@ using namespace std;  // NOLINT
 
 
 static bool CopyFile2File(FILE *fsrc, FILE *fdest) {
-  unsigned char buf[1024];
+  unsigned char buf[4096];
   rewind(fsrc);
   rewind(fdest);
 
   size_t have;
   do {
-    have = fread(buf, 1, 1024, fsrc);
+    have = fread(buf, 1, 4096, fsrc);
     if (fwrite(buf, 1, have, fdest) != have)
       return false;
-  } while (have == 1024);
+  } while (have == 4096);
   return true;
 }
 
