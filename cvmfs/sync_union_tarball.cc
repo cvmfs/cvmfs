@@ -225,7 +225,8 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
     }
 
   } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() ||
-             sync_entry->IsSocket()) {
+             sync_entry->IsSocket() || sync_entry->IsCharacterDevice() ||
+             sync_entry->IsBlockDevice()) {
     // we avoid to add an entity called as a catalog marker if it is not a
     // regular file
     if (filename != ".cvmfscatalog") {
@@ -245,6 +246,10 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   } else {
     LogCvmfs(kLogUnionFs, kLogStderr,
              "Fatal error found unexpected file: \n%s\n", filename.c_str());
+    // if for any reason this code path change and we don't abort anymore,
+    // remember to wakeup the signal, otherwise we will be stuck in a deadlock
+    //
+    // read_archive_signal_->Wakeup();
     abort();
   }
 }
