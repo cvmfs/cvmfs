@@ -6,7 +6,7 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
-running unittests
+echo "running unittests"
 run_unittests --gtest_shuffle \
              --gtest_death_test_use_fork || retval=1
 

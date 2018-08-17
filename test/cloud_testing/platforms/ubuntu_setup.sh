@@ -5,6 +5,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
 ubuntu_release="$(lsb_release -cs)"
+echo "Ubuntu release is $ubuntu_release"
 
 # configuring apt for non-interactive environment
 echo -n "configure package manager for non-interactive usage... "
@@ -122,20 +123,19 @@ if [ "x$ubuntu_release" = "xxenial" ] || [ "x$ubuntu_release" = "xbionic" ]; the
   fi
 fi
 
-# On Ubuntu 18.04+ disable service start rate limiting for apache and autofs
-if [ "x$ubuntu_release" = "xbionic" ]; then
-  mkdir -p /lib/systemd/system/apache2.service.d
-  cat << EOF > /lib/systemd/system/apache2.service.d/cvmfs-test.conf
+# Disable service start rate limiting for apache and autofs
+echo "Turning off service rate limit"
+mkdir -p /lib/systemd/system/apache2.service.d
+cat << EOF > /lib/systemd/system/apache2.service.d/cvmfs-test.conf
 [Unit]
 StartLimitIntervalSec=0
 EOF
-  mkdir -p /lib/systemd/system/autofs.service.d
-  cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
+mkdir -p /lib/systemd/system/autofs.service.d
+cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
 [Unit]
 StartLimitIntervalSec=0
 EOF
-  sudo systemctl daemon-reload
-fi
+sudo systemctl daemon-reload || true
 
 # setting up the AUFS kernel module
 echo -n "loading AUFS kernel module..."

@@ -10,6 +10,7 @@
   * Fix debian packaging warnings and errors
 
 2.5.1:
+  * Fix potential memory corruptions in tiered cache and swissknife history
   * Fix cvmfs_suid_helper on Ubuntu 18.04 for symlinked spool directory
   * Replace geolite free database by geolite2 (CVM-1496)
   * Apply catalog updates from updated alien cache (CVM-1515)

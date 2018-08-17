@@ -68,7 +68,7 @@ int TieredCacheManager::Open(const BlessedObject &object) {
   upper_->CtrlTxn(object.info, 0, txn);
 
   std::vector<char> m_buffer;
-  m_buffer.reserve(kCopyBufferSize);
+  m_buffer.resize(kCopyBufferSize);
   uint64_t remaining = size;
   uint64_t offset = 0;
   while (remaining > 0) {
