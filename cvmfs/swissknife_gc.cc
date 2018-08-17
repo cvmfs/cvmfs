@@ -15,6 +15,7 @@
 #include "garbage_collection/hash_filter.h"
 #include "manifest.h"
 #include "reflog.h"
+#include "statistics_database.h"
 #include "upload_facility.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -51,7 +52,12 @@ int CommandGc::Main(const ArgumentList &args) {
   const std::string &spooler = *args.find('u')->second;
   const std::string &repo_name = *args.find('n')->second;
   const std::string &reflog_chksum_path = *args.find('R')->second;
-  shash::Any reflog_hash = manifest::Reflog::ReadChecksum(reflog_chksum_path);
+  shash::Any reflog_hash;
+  if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum");
+    return 1;
+  }
+
   const int64_t revisions = (args.count('h') > 0) ?
     String2Int64(*args.find('h')->second) : GcConfig::kFullHistory;
   const time_t timestamp  = (args.count('z') > 0)
@@ -134,6 +140,8 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
+  bool extended_stats = StatisticsDatabase::GcExtendedStats(repo_name);
+
   reflog->BeginTransaction();
 
   GcConfig config;
@@ -146,6 +154,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.reflog                  = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
   config.statistics              = statistics();
+  config.extended_stats          = extended_stats;
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,

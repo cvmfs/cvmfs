@@ -6,12 +6,22 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
-running unittests
+echo "running unittests"
 run_unittests --gtest_shuffle \
              --gtest_death_test_use_fork || retval=1
 
 
 CVMFS_EXCLUDE=
+if [ x"$(lsb_release -cs)" = x"bionic" ]; then
+  # Ubuntu 18.04
+  # Kernel sources too old for gcc, TODO
+  CVMFS_EXCLUDE="src/006-buildkernel"
+  # Expected failure, see test case
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
+
+  echo "Ubuntu 18.04... using overlayfs"
+  export CVMFS_TEST_UNIONFS=overlayfs
+fi
 if [ x"$(lsb_release -cs)" = x"xenial" ]; then
   # Ubuntu 16.04
   # Kernel sources too old for gcc, TODO
@@ -73,11 +83,14 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
 fi
 
 
-# Ubuntu 12.04
-echo "running CernVM-FS migration test cases..."
-CVMFS_TEST_CLASS_NAME=MigrationTests \
-./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/*                              \
-                                || retval=1
+if [ x"$(lsb_release -cs)" = x"bionic" ]; then
+  echo "TODO: re-enable migration test case after 2.5.1"
+else
+  echo "running CernVM-FS migration test cases..."
+  CVMFS_TEST_CLASS_NAME=MigrationTests \
+  ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                     migration_tests/*                              \
+                                  || retval=1
+fi
 
 exit $retval

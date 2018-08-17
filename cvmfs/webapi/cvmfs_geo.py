@@ -8,12 +8,11 @@ import time
 import threading
 import cvmfs_globals
 
-# TODO(jblomer): we should better sepearate the code that needs the GeoIP
+# TODO(jblomer): we should better separate the code that needs the maxminddb
 # dependency from the code that doesn't
 if not cvmfs_globals.CVMFS_UNITTESTS:
-    import GeoIP
-    gi = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCity.dat", GeoIP.GEOIP_STANDARD)
-    gi6 = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCityv6.dat", GeoIP.GEOIP_STANDARD)
+    import maxminddb
+    gireader = maxminddb.open_database("/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb")
 
 positive_expire_secs = 60*60  # 1 hour
 
@@ -74,10 +73,11 @@ def addr_geoinfo(addr):
     if (len(addr) > 256) or not addr_pattern.search(addr):
         return None
 
-    if addr.find(':') != -1:
-        return gi6.record_by_addr_v6(addr)
-    else:
-        return gi.record_by_addr(addr)
+    response = gireader.get(addr)
+    if response == None:
+        return None
+
+    return response['location']
 
 # Look up geo info by name.  Try IPv4 first since that DB is
 # better and most servers today are dual stack if they have IPv6.
@@ -115,14 +115,16 @@ def name_geoinfo(now, name):
     for info in ai:
         # look for IPv4 address first
         if info[0] == socket.AF_INET:
-            gir = gi.record_by_addr(info[4][0])
+            gir = gireader.get(info[4][0])
             break
     if gir == None:
         # look for an IPv6 address if no IPv4 record found
         for info in ai:
             if info[0] == socket.AF_INET6:
-                gir = gi6.record_by_addr_v6(info[4][0])
+                gir = gireader.get(info[4][0])
                 break
+    if gir != None:
+        gir = gir['location']
 
     lock.acquire()
     if gir == None and name in geo_cache:

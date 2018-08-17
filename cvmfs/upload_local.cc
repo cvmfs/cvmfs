@@ -77,6 +77,8 @@ void LocalUploader::FileUpload(const std::string &local_path,
     Respond(callback, UploaderResults(retcode, local_path));
     return;
   }
+
+  CountUploadedBytes(GetFileSize(remote_path));
   Respond(callback, UploaderResults(retcode, local_path));
 }
 
@@ -165,6 +167,10 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
               UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
       return;
     }
+    if (!content_hash.HasSuffix()
+        || content_hash.suffix == shash::kSuffixPartial) {
+      CountUploadedBytes(GetFileSize(upstream_path_ + "/" + final_path));
+    }
   } else {
     const int retval = unlink(local_handle->temporary_path.c_str());
     if (retval != 0) {
@@ -192,7 +198,11 @@ void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
 }
 
 bool LocalUploader::Peek(const std::string &path) const {
-  return FileExists(upstream_path_ + "/" + path);
+  bool retval = FileExists(upstream_path_ + "/" + path);
+  if (retval) {
+    CountDuplicates();
+  }
+  return retval;
 }
 
 bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
@@ -227,6 +237,10 @@ int LocalUploader::Move(const std::string &local_path,
   }
 
   return retcode;
+}
+
+int64_t LocalUploader::DoGetObjectSize(const std::string &file_name) {
+  return GetFileSize(upstream_path_ + "/" + file_name);
 }
 
 }  // namespace upload

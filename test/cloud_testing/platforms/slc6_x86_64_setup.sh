@@ -62,6 +62,9 @@ echo "installing python WSGI module..."
 install_from_repo mod_wsgi || die "fail (installing mod_wsgi)"
 sudo service httpd restart || die "fail (restarting apache)"
 
+echo "installing mod_ssl for Apache"
+install_from_repo mod_ssl || die "fail (installing mod_ssl)"
+
 # setup environment
 echo -n "setting up CernVM-FS environment..."
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"

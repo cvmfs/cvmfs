@@ -177,6 +177,8 @@ void SyncUnionTarball::Traverse() {
 
 void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   std::string archive_file_path(archive_entry_pathname(entry));
+  archive_file_path = SanitizePath(archive_file_path);
+
   std::string complete_path =
       MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
 
@@ -223,7 +225,8 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
     }
 
   } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() ||
-             sync_entry->IsSocket()) {
+             sync_entry->IsSocket() || sync_entry->IsCharacterDevice() ||
+             sync_entry->IsBlockDevice()) {
     // we avoid to add an entity called as a catalog marker if it is not a
     // regular file
     if (filename != ".cvmfscatalog") {
@@ -243,8 +246,23 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   } else {
     LogCvmfs(kLogUnionFs, kLogStderr,
              "Fatal error found unexpected file: \n%s\n", filename.c_str());
+    // if for any reason this code path change and we don't abort anymore,
+    // remember to wakeup the signal, otherwise we will be stuck in a deadlock
+    //
+    // read_archive_signal_->Wakeup();
     abort();
   }
+}
+
+std::string SyncUnionTarball::SanitizePath(const std::string &path) {
+  if (path.length() >= 2) {
+    if (path[0] == '.' && path[1] == '/') {
+      std::string to_return(path);
+      to_return.erase(0, 2);
+      return to_return;
+    }
+  }
+  return path;
 }
 
 void SyncUnionTarball::PostUpload() {

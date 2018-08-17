@@ -421,7 +421,7 @@ std::string CommandTag::AddPadding(const std::string &str, const size_t padding,
                                    const std::string &fill_char) const {
   assert(str.size() <= padding);
   std::string result(str);
-  result.reserve(padding);
+  result.resize(padding);
   const size_t pos = (align_right) ? 0 : str.size();
   const size_t padding_width = padding - str.size();
   for (size_t i = 0; i < padding_width; ++i) result.insert(pos, fill_char);

@@ -12,11 +12,24 @@
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "repository_tag.h"
+#include "statistics.h"
 #include "upload_spooler_definition.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
 
 namespace upload {
+
+struct UploadCounters {
+  perf::Counter *n_duplicated_files;
+  perf::Counter *sz_uploaded_bytes;
+
+  explicit UploadCounters(perf::StatisticsTemplate statistics) {
+    n_duplicated_files = statistics.RegisterTemplated("n_duplicated_files",
+        "Number of duplicated files added");
+    sz_uploaded_bytes = statistics.RegisterTemplated("sz_uploaded_bytes",
+        "Number of uploaded bytes");
+  }
+};  // UploadCounters
 
 struct UploaderResults {
   enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove };
@@ -239,6 +252,15 @@ class AbstractUploader
   }
 
   /**
+   * Get object size based on its content hash
+   *
+   * @param hash  the content hash of a file
+   */
+  int64_t GetObjectSize(const shash::Any &hash) {
+    return DoGetObjectSize("data/" + hash.MakePath());
+  }
+
+  /**
    * Checks if a file is already present in the backend storage. This might be a
    * synchronous operation.
    *
@@ -268,6 +290,7 @@ class AbstractUploader
 
   virtual unsigned int GetNumberOfErrors() const = 0;
   static void RegisterPlugins();
+  void InitCounters(perf::StatisticsTemplate *statistics);
 
  protected:
   typedef Callbackable<UploaderResults>::CallbackTN *CallbackPtr;
@@ -311,6 +334,8 @@ class AbstractUploader
 
   virtual void DoRemoveAsync(const std::string &file_to_delete) = 0;
 
+  virtual int64_t DoGetObjectSize(const std::string &file_name) = 0;
+
   /**
    * This notifies the callback that is associated to a finishing job. Please
    * do not call the handed callback yourself in concrete Uploaders!
@@ -345,12 +370,17 @@ class AbstractUploader
     return spooler_definition_;
   }
 
+  void CountUploadedBytes(int64_t bytes_written) const;
+
+  void CountDuplicates() const;
+
  private:
   const SpoolerDefinition spooler_definition_;
 
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
   Tube<UploadJob> tube_upload_;
+  mutable UniquePtr<UploadCounters> counters_;
 };  // class AbstractUploader
 
 

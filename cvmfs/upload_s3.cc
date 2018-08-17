@@ -225,6 +225,7 @@ void S3Uploader::FileUpload(
   UploadJobInfo(info);
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from file finished: %s",
            local_path.c_str());
+  CountUploadedBytes(GetFileSize(local_path));
 }
 
 
@@ -283,7 +284,7 @@ void S3Uploader::StreamedUpload(
             UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
   }
-
+  CountUploadedBytes(buffer.size);
   Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
@@ -384,6 +385,9 @@ bool S3Uploader::Peek(const std::string& path) const {
 
   info->request = s3fanout::JobInfo::kReqHead;
   bool retme = s3fanout_mgr_.DoSingleJob(info);
+  if (retme) {
+    CountDuplicates();
+  }
 
   delete info;
   return retme;
@@ -392,6 +396,11 @@ bool S3Uploader::Peek(const std::string& path) const {
 
 bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
   return false;  // TODO(rmeusel): implement
+}
+
+
+int64_t S3Uploader::DoGetObjectSize(const std::string &file_name) {
+  return -EOPNOTSUPP;  // TODO(dosarudaniel): use a head request for byte count
 }
 
 }  // namespace upload

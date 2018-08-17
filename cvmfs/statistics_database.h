@@ -55,7 +55,11 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   *
   * @return 0 if no error occured or a negative integer if errors occurred
   */
-  int StoreStatistics(const perf::Statistics *statistics);
+  int StoreStatistics(const perf::Statistics *statistics,
+                      const std::string &start_time,
+                      const std::string &finished_time,
+                      const std::string &command_name,
+                      const std::string &repo_name);
 
 /**
   * Get the path for the database file
@@ -65,7 +69,15 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * @param repo_name Fully qualified name of the repository
   * @return path to store database file
   */
-  static std::string GetDBPath(const std::string repo_name);
+  static std::string GetDBPath(const std::string &repo_name);
+
+  /**
+  * Check if the CVMFS_EXTENDED_GC_STATS is ON or not
+  *
+  * @param repo_name fully qualified name of the repository
+  * @return true if CVMFS_EXTENDED_GC_STATS is ON, false otherwise
+  */
+  static bool GcExtendedStats(const std::string &repo_name);
 };
 
 

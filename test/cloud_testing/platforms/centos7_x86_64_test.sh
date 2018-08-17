@@ -16,7 +16,7 @@ echo -n "starting apache... "
 sudo systemctl start httpd > /dev/null 2>&1 || die "fail"
 echo "OK"
 
-running unit test suite
+# running unit test suite
 run_unittests --gtest_shuffle \
               --gtest_death_test_use_fork || retval=1
 
@@ -38,7 +38,6 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
                                  src/585-xattrs                               \
-                                 src/600-securecvmfs                          \
                                  src/602-libcvmfs                             \
                                  src/628-pythonwrappedcvmfsserver             \
                                  --                                           \

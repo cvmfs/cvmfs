@@ -4,11 +4,13 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+echo "enabling epel yum repository..."
+install_from_repo epel-release
+
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
-install_rpm $SERVER_PACKAGE  # only needed for tbb shared libs (unit tests)
 install_rpm $UNITTEST_PACKAGE
 
 # setup environment
@@ -29,6 +31,10 @@ install_from_repo wget
 
 # traffic shaping
 install_from_repo trickle
+
+# Migration test needs lsb_release
+echo "install lsb_release..."
+install_from_repo redhat-lsb-core
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
