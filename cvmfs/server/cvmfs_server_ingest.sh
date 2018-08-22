@@ -18,6 +18,7 @@ cvmfs_server_ingest() {
   local tar_file=""
   local to_delete="" # directories or file to delete before the extraction
   local name="" #repository name
+  local create_catalog=false
 
   local force_native=0
   local force_external=0
@@ -38,6 +39,9 @@ cvmfs_server_ingest() {
         else
           to_delete=$to_delete:$2
         fi
+        ;;
+      -c | --catalog )
+        create_catalog=true
         ;;
     esac
     shift
@@ -196,6 +200,10 @@ cvmfs_server_ingest() {
 
   if [ ! x"$to_delete" = "x" ]; then
     ingest_command="$ingest_command -D $to_delete"
+  fi
+
+  if [ "$create_catalog" = true ]; then
+    ingest_command="$ingest_command -C true"
   fi
 
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then

@@ -65,6 +65,10 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
         zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
   }
 
+  if (args.find('C') != args.end()) {
+    printf("\n\n Create new catalog \n\n");
+  }
+
   params.nested_kcatalog_limit = SyncParameters::kDefaultNestedKcatalogLimit;
   params.root_kcatalog_limit = SyncParameters::kDefaultRootKcatalogLimit;
   params.file_mbyte_limit = SyncParameters::kDefaultFileMbyteLimit;
