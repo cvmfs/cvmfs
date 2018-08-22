@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "authz.h"
 #include "download.h"
 
 class AuthzSessionManager;
@@ -26,6 +27,9 @@ class AuthzAttachment : public download::CredentialsAttachment {
  private:
   static void LogOpenSSLErrors(const char *top_message);
   static CURLcode CallbackSslCtx(CURL *curl, void *sslctx, void *parm);
+  bool ConfigureSciTokenCurl(CURL *curl_handle,
+                                    const AuthzToken &token,
+                                    void **info_data);
 
   static bool ssl_strings_loaded_;
 

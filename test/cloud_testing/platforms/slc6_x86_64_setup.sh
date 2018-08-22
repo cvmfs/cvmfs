@@ -114,6 +114,9 @@ echo -n "install x509 helper... "
 sudo rpm -ivh $(basename $x509_helper) > /dev/null || die "install failed"
 echo "OK"
 
+# Install test dependency for 647
+install_from_repo python-flask          || die "fail (installing python-flask)"
+
 # install the test S3 provider
 install_test_s3
 

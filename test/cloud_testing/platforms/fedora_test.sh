@@ -33,6 +33,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/539-symlinkedvarspoolcvmfs               \
                                  src/600-securecvmfs                          \
+                                 src/647-bearercvmfs                          \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \

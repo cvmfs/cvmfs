@@ -29,6 +29,18 @@ struct sslctx_info {
   EVP_PKEY *pkey;
 };
 
+struct bearer_info {
+  /**
+  * List of extra headers to put on the HTTP request.  This is required
+  * in order to add the "Authorization: Bearer XXXXX" header.
+  */
+  struct curl_slist *list;
+
+  /**
+  * Actual text of the bearer token
+  */
+  char* token;
+};
 }  // anonymous namespace
 
 
@@ -98,6 +110,47 @@ CURLcode AuthzAttachment::CallbackSslCtx(
 }
 
 
+bool AuthzAttachment::ConfigureSciTokenCurl(
+  CURL *curl_handle,
+  const AuthzToken &token,
+  void **info_data)
+{
+  if (*info_data == NULL) {
+    AuthzToken* saved_token = new AuthzToken();
+    saved_token->type = kTokenBearer;
+    saved_token->data = new bearer_info;
+    bearer_info* bearer = static_cast<bearer_info*>(saved_token->data);
+    bearer->list = NULL;
+    bearer->token = static_cast<char*>(smalloc((sizeof(char) * token.size)+ 1));
+    memcpy(bearer->token, token.data, token.size);
+    static_cast<char*>(bearer->token)[token.size] = 0;
+    *info_data = saved_token;
+  }
+
+  AuthzToken* tmp_token = static_cast<AuthzToken*>(*info_data);
+  bearer_info* bearer = static_cast<bearer_info*>(tmp_token->data);
+
+  LogCvmfs(kLogAuthz, kLogDebug, "Setting OAUTH bearer token to: %s",
+           static_cast<char*>(bearer->token));
+
+  // Create the Bearer token
+  // The CURLOPT_XOAUTH2_BEARER option only works "IMAP, POP3 and SMTP"
+  // protocols. Not HTTPS
+  std::string auth_preamble = "Authorization: Bearer ";
+  std::string auth_header = auth_preamble + static_cast<char*>(bearer->token);
+  bearer->list = curl_slist_append(bearer->list, auth_header.c_str());
+  int retval = curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, bearer->list);
+
+  if (retval != CURLE_OK) {
+    LogCvmfs(kLogAuthz, kLogSyslogErr, "Failed to set Oauth2 Bearer Token");
+    return false;
+  }
+
+  return true;
+}
+
+
+
 bool AuthzAttachment::ConfigureCurlHandle(
   CURL *curl_handle,
   pid_t pid,
@@ -110,13 +163,6 @@ bool AuthzAttachment::ConfigureCurlHandle(
   curl_easy_setopt(curl_handle, CURLOPT_FRESH_CONNECT, 1);
   curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1);
   curl_easy_setopt(curl_handle, CURLOPT_SSL_SESSIONID_CACHE, 0);
-  curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, NULL);
-
-  // The calling layer is reusing data;
-  if (*info_data) {
-    curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, *info_data);
-    return true;
-  }
 
   UniquePtr<AuthzToken> token(
     authz_session_manager_->GetTokenCopy(pid, membership_));
@@ -124,10 +170,32 @@ bool AuthzAttachment::ConfigureCurlHandle(
     LogCvmfs(kLogAuthz, kLogDebug, "failed to get authz token for pid %d", pid);
     return false;
   }
-  if (token->type != kTokenX509) {
-    LogCvmfs(kLogAuthz, kLogDebug, "unknown token type: %d", token->type);
-    return false;
+
+  switch (token->type) {
+    case kTokenBearer:
+      // If it's a scitoken, then just go to the private
+      // ConfigureSciTokenCurl function
+      return ConfigureSciTokenCurl(curl_handle, *token, info_data);
+
+    case kTokenX509:
+      // The x509 code is below, so just break and go.
+      break;
+
+    default:
+      // Oh no, don't know the the token type, throw error and return
+      LogCvmfs(kLogAuthz, kLogDebug, "unknown token type: %d", token->type);
+      return false;
   }
+
+  curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, NULL);
+
+  // The calling layer is reusing data;
+  if (*info_data) {
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA,
+                     static_cast<AuthzToken*>(*info_data)->data);
+    return true;
+  }
+
 
   int retval = curl_easy_setopt(curl_handle,
                                 CURLOPT_SSL_CTX_FUNCTION,
@@ -211,9 +279,12 @@ bool AuthzAttachment::ConfigureCurlHandle(
              sk_X509_num(certstack));
   }
 
-  sslctx_info *result = parm.Release();
-  curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, result);
-  *info_data = result;
+  AuthzToken* to_return = new AuthzToken();
+  to_return->type = kTokenX509;
+  to_return->data = static_cast<void*>(parm.Release());
+  curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA,
+                   static_cast<sslctx_info*>(to_return->data));
+  *info_data = to_return;
   return true;
 }
 
@@ -231,18 +302,32 @@ void AuthzAttachment::LogOpenSSLErrors(const char *top_message) {
 
 
 void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
-  sslctx_info *p = reinterpret_cast<sslctx_info *>(info_data);
-  STACK_OF(X509) *chain = p->chain;
-  EVP_PKEY *pkey = p->pkey;
-  p->chain = NULL;
-  p->pkey = NULL;
-  delete p;
+  assert(info_data);
 
-  // Calls X509_free on each element, then frees the stack itself
-  sk_X509_pop_free(chain, X509_free);
-  EVP_PKEY_free(pkey);
+  AuthzToken* token = static_cast<AuthzToken*>(info_data);
+  if (token->type == kTokenBearer) {
+    // Compiler complains if we delete a void*
+    bearer_info* bearer = static_cast<bearer_info*>(token->data);
+    delete static_cast<char*>(bearer->token);
+    curl_slist_free_all(bearer->list);
+    delete static_cast<bearer_info*>(token->data);
+    token->data = NULL;
+    delete token;
 
-  // Make sure that if CVMFS reuses this curl handle, curl doesn't try
-  // to reuse cert chain we just freed.
-  curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, 0);
+  } else if (token->type == kTokenX509) {
+    sslctx_info *p = static_cast<sslctx_info *>(info_data);
+    STACK_OF(X509) *chain = p->chain;
+    EVP_PKEY *pkey = p->pkey;
+    p->chain = NULL;
+    p->pkey = NULL;
+    delete p;
+
+    // Calls X509_free on each element, then frees the stack itself
+    sk_X509_pop_free(chain, X509_free);
+    EVP_PKEY_free(pkey);
+
+    // Make sure that if CVMFS reuses this curl handle, curl doesn't try
+    // to reuse cert chain we just freed.
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, 0);
+  }
 }

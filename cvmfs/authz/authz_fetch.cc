@@ -469,6 +469,38 @@ bool AuthzExternalFetcher::ParsePermit(
     }
   }
 
+  json_token = JsonDocument::SearchInObject(json_authz, "bearer_token",
+                                            JSON_STRING);
+  if (json_token != NULL) {
+    binary_msg->permit.token.type = kTokenBearer;
+    unsigned size = strlen(json_token->string_value);
+    binary_msg->permit.token.size = size;
+    if (size > 0) {
+      // The token is passed to the AuthzSessionManager, which takes care of
+      // freeing the memory
+      binary_msg->permit.token.data = smalloc(size);
+      memcpy(binary_msg->permit.token.data, json_token->string_value, size);
+
+      LogCvmfs(kLogAuthz, kLogDebug,
+               "Got a bearer_token from authz_helper. "
+               "Setting token type to kTokenBearer");
+    } else {
+      // We got a bearer_token, but a size 0 (or negative?) string
+      LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
+               "bearer_token was in returned JSON from Authz helper,"
+               " but of size 0 from authz helper %s",
+               progname_.c_str());
+    }
+  }
+
+  if (binary_msg->permit.token.type == kTokenUnknown) {
+    // No auth token returned, so authz should do... what exactly?
+    // Log error message
+    LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
+               "No auth token found in returned JSON from Authz helper %s",
+               progname_.c_str());
+  }
+
   return true;
 }
 

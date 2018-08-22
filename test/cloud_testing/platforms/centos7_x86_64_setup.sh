@@ -58,6 +58,9 @@ install_from_repo tree
 # traffic shaping
 install_from_repo trickle
 
+# Install test dependency for 647
+install_from_repo python-flask          || die "fail (installing python-flask)"
+
 # Install the test S3 provider
 install_test_s3
 
