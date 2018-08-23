@@ -5,6 +5,16 @@
 #
 # Implementation of the "cvmfs_server abort command"
 
+_CVMFS_SERVER_ABORT_SHORT="Abort transaction and return to the state before"
+_CVMFS_SERVER_ABORT_DESCRIPTION="TODO"
+_CVMFS_SERVER_ABORT_SYNOPSIS="_cvmfs_server abort_ [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_ABORT_OPTIONS
+_CVMFS_SERVER_ABORT_OPTIONS=(
+  [f]="don't ask again"
+)
+
+
 cvmfs_server_abort() {
   local names
   local user

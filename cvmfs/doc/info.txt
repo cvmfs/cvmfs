@@ -1,3 +1,0 @@
-'info'
-        <fully qualified name>
-    Print summary about the repository

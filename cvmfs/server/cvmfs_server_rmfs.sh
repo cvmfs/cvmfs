@@ -9,6 +9,17 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_SERVER_RMFS_SHORT="Remove the repository"
+_CVMFS_SERVER_RMFS_DESCRIPTION="TODO"
+_CVMFS_SERVER_RMFS_SYNOPSIS="_cvmfs_server rmfs_ [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_RMFS_OPTIONS
+_CVMFS_SERVER_RMFS_OPTIONS=(
+  [f]="don't ask again"
+  [p]="preserve repo data and keys"
+)
+
+
 cvmfs_server_rmfs() {
   local names
   local force=0
@@ -118,5 +129,3 @@ cvmfs_server_rmfs() {
 
   return $retcode
 }
-
-

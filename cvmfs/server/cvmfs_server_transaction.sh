@@ -11,6 +11,16 @@
 # - cvmfs_server_health_check.sh
 # - cvmfs_server_compat.sh
 
+_CVMFS_SERVER_TRANSACTION_SHORT="Start to edit a repository"
+_CVMFS_SERVER_TRANSACTION_DESCRIPTION="TODO"
+_CVMFS_SERVER_TRANSACTION_SYNOPSIS="_cvmfs_server transaction_ <fqrn>"
+
+declare -A _CVMFS_SERVER_TRANSACTION_OPTIONS
+#_CVMFS_SERVER_TRANSACTION_OPTIONS=(
+#  []=""
+#)
+
+
 cvmfs_server_transaction() {
   local names
   local gw_key_file
@@ -88,4 +98,3 @@ cvmfs_server_transaction() {
 
   return $retcode
 }
-

@@ -939,9 +939,32 @@ _update_geodb() {
   _update_geodb_install && echo "done" || { echo "fail"; return 3; }
 }
 
+
+################################################################################
+
+_CVMFS_SERVER_UPDATE_GEODB_SHORT="Updates the geo-IP database"
+_CVMFS_SERVER_UPDATE_GEODB_DESCRIPTION="TODO"
+_CVMFS_SERVER_UPDATE_GEODB_SYNOPSIS="_cvmfs_server update-geodb_ [options]"
+
+declare -A _CVMFS_SERVER_UPDATE_GEODB_OPTIONS
+_CVMFS_SERVER_UPDATE_GEODB_OPTIONS=(
+  [l]="update lazily based on CVMFS_UPDATEGEO* variables"
+)
+
+
 cvmfs_server_update_geodb() {
   _update_geodb $@
 }
+
+
+_CVMFS_SERVER_COMMANDS="abort add-replica catalog-chown check checkout diff gc \
+import info ingest list list-catalogs masterkeycard \
+merge-stats migrate mkfs mount print-stats publish resign rmfs rollback \
+snapshot tag transaction update-geodb update-info update-repoinfo"
+
+# subcommands hidden from help and manual pages
+_CVMFS_SERVER_HIDDEN_COMMANDS="alterfs eliminate-hardlinks fix-permissions \
+generate-man help list-tags lstags skeleton"
 
 
 # checks if the given command name is a supported command of cvmfs_server
@@ -950,13 +973,8 @@ cvmfs_server_update_geodb() {
 # @return   0 if the command was recognized
 is_subcommand() {
   local subcommand="$1"
-  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
-    resign list info tag list-tags lstags check transaction abort snapshot           \
-    skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
-    eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
-    masterkeycard ingest merge-stats print-stats help"
 
-  for possible_command in $supported_commands; do
+  for possible_command in $_CVMFS_SERVER{,_HIDDEN}_COMMANDS; do
     if [ x"$possible_command" = x"$subcommand" ]; then
       return 0
     fi
@@ -987,24 +1005,23 @@ Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
 
-abort, add-replica, catalog-chown, check, checkout, diff, gc, import, info,
-ingest, list, list-catalogs, masterkeycard, merge-stats, migrate, mkfs, mount,
-print-stats, publish, resign, rmfs, rollback, snapshot, tag, transaction,
-update-geodb, update-info, update-repoinfo
+$_CVMFS_SERVER_COMMANDS
 
 
 Help for a specific command:
     \$ cvmfs_server help <command>
+    \$ cvmfs_server <command> --help
 or see manual page:
     \$ man cvmfs_server
-"
+    \$ man cvmfs_server <command>
+" >&2
 
   if [ x"$errormsg" != x ]; then
     echo "\
 ________________________________________________________________________
 
 NOTE: $errormsg
-"
+" >&2
     exit 3
   else
     exit 2

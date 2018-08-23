@@ -1,6 +1,0 @@
-Write a hello world message to a new CVMFS repository
-
-    # cvmfs_server mkfs new.test.repo
-    # cvmfs_server transaction new.test.repo
-    # echo "Hello World" > /cvmfs/new.test.repo/hello_world
-    # cvmfs_server publish new.test.repo

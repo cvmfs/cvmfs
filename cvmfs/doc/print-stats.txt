@@ -1,6 +1,0 @@
-'print-stats'
-        [-o output_file]
-        [-t table_name]
-        [-s separator] - char
-        <fully qualified name>
-    Print statistics values for a table (default publish_statistics) using the separator specified. (default  '|')

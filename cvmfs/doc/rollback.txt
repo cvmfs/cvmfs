@@ -1,4 +1,0 @@
-'rollback'
-        [-t tag] [-f don't ask again]
-        <fully qualified name>
-    Re-publishes the given tag as the new latest revision. All snapshots between trunk and the target tag become inaccessible.  Without a tag name, trunk-previous is used.

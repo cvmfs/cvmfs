@@ -13,6 +13,19 @@
 # TODO Most of this code is replicated and shared between different scrips,
 # it would be a good idea to refactor common patterns into coherent functions.
 
+
+_CVMFS_SERVER_INGEST_SHORT="Extract the content of the tarfile inside the base directory"
+_CVMFS_SERVER_INGEST_DESCRIPTION="TODO"
+_CVMFS_SERVER_INGEST_SYNOPSIS="_cvmfs_server ingest_ -t <tar_file> -b <base_dir> [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_INGEST_OPTIONS
+_CVMFS_SERVER_INGEST_OPTIONS=(
+  [b]="base directory"
+  [d]="folder to delete"
+  [t]="tarfile | '-' read from STDIN"
+)
+
+
 cvmfs_server_ingest() {
   local base_dir="" # where to extract the tar file
   local tar_file=""

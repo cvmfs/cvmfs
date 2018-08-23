@@ -1,3 +1,0 @@
-'migrate'
-        <fully qualified name>
-    Migrates a repository to the current version of CernVM-FS

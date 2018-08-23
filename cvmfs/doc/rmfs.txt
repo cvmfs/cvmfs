@@ -1,4 +1,0 @@
-'rmfs'
-        [-p(reserve) repo data and keys] [-f don't ask again]
-        <fully qualified name>
-    Remove the repository

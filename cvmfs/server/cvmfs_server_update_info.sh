@@ -15,6 +15,20 @@ _update_info_cleanup() {
   rm -f $tmp_file > /dev/null 2>&1
 }
 
+
+################################################################################
+
+_CVMFS_SERVER_UPDATE_INFO_SHORT="Open meta info JSON file for editing"
+_CVMFS_SERVER_UPDATE_INFO_DESCRIPTION="TODO"
+_CVMFS_SERVER_UPDATE_INFO_SYNOPSIS="_cvmfs_server update-info_ [options]"
+
+declare -A _CVMFS_SERVER_UPDATE_INFO_OPTIONS
+_CVMFS_SERVER_UPDATE_INFO_OPTIONS=(
+  [e]="don't edit /info/meta"
+  [p]="no apache config"
+)
+
+
 cvmfs_server_update_info() {
   local configure_apache=1
   local edit_meta_info=1
@@ -73,5 +87,3 @@ cvmfs_server_update_info() {
   fi
   echo "done"
 }
-
-

@@ -752,7 +752,7 @@ add_custom_target (
   ALL
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./make_cvmfs_server.sh ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server
   COMMENT "Generating the cvmfs_server script"
-  )
+)
 
 #
 # installation
@@ -918,13 +918,6 @@ if (BUILD_SERVER)
       PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
     )
   endif (BUILD_GEOAPI)
-
-  file(GLOB HELP_FILES "doc/*.txt")
-  install(
-    FILES          ${HELP_FILES}
-    DESTINATION    "/usr/share/cvmfs-server/help"
-    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
-  )
 
   install(
     FILES          doc/README-spooler

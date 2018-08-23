@@ -50,6 +50,30 @@ migrate_legacy_dirtab() {
 }
 
 
+################################################################################
+
+_CVMFS_SERVER_IMPORT_SHORT="Imports an old CernVM-FS repository into a fresh repo"
+_CVMFS_SERVER_IMPORT_DESCRIPTION="TODO"
+_CVMFS_SERVER_IMPORT_SYNOPSIS="_cvmfs_server import_ [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_IMPORT_OPTIONS
+_CVMFS_SERVER_IMPORT_OPTIONS=(
+  [R]="recreate whitelist and require masterkeycard"
+  [c]="file ownership (UID:GID)"
+  [f]="union filesystem type"
+  [g]="chown backend"
+  [k]="path to keys"
+  [l]="import legacy repo (2.0.x)"
+  [o]="owner"
+  [p]="no apache config"
+  [r]="recreate whitelist"
+  [s]="show migration statistics"
+  [t]="recreate repo key and certificate"
+  [u]="upstream storage"
+  [w]="stratum0 url"
+)
+
+
 cvmfs_server_import() {
   local name
   local stratum0
@@ -363,5 +387,3 @@ cvmfs_server_import() {
     echo ""
   fi
 }
-
-

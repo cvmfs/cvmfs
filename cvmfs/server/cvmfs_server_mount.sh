@@ -9,6 +9,15 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_SERVER_MOUNT_SHORT="Mount repositories in /cvmfs, for instance after reboot"
+_CVMFS_SERVER_MOUNT_DESCRIPTION="TODO"
+_CVMFS_SERVER_MOUNT_SYNOPSIS="_cvmfs_server mount_ <-a|fqrn>"
+
+declare -A _CVMFS_SERVER_MOUNT_OPTIONS
+_CVMFS_SERVER_MOUNT_OPTIONS=(
+  [a]="all repositories"
+)
+
 
 cvmfs_server_mount() {
   local names=""
@@ -48,5 +57,3 @@ cvmfs_server_mount() {
 
   return $retval
 }
-
-

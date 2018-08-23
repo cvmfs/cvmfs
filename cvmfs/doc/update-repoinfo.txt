@@ -1,4 +1,0 @@
-'update-repoinfo'
-        [-f path to JSON file]
-        <fully qualified name>
-    Open repository meta info JSON file for editing

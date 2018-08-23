@@ -9,6 +9,25 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_SERVER_TAG_SHORT="Create and manage named snapshots. Print named tags (snapshots) of the repository"
+_CVMFS_SERVER_TAG_DESCRIPTION="TODO"
+_CVMFS_SERVER_TAG_SYNOPSIS="_cvmfs_server tag_ [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_TAG_OPTIONS
+_CVMFS_SERVER_TAG_OPTIONS=(
+  [a]="create tag <name>"
+  [b]="list branch hierarchy"
+  [c]="channel"
+  [f]="don't ask again"
+  [h]="hash"
+  [i]="inspect tag <name>"
+  [l]="list tags"
+  [m]="message"
+  [r]="remove tag <name>"
+  [x]="machine readable"
+)
+
+
 cvmfs_server_tag() {
   local name
   local tag_name=""
@@ -235,5 +254,3 @@ cvmfs_server_tag() {
   fi
   rm -f ${new_manifest}~
 }
-
-

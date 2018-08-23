@@ -22,6 +22,18 @@ _update_repoinfo_cleanup() {
 }
 
 
+################################################################################
+
+_CVMFS_SERVER_UPDATE_REPOINFO_SHORT="Open repository meta info JSON file for editing"
+_CVMFS_SERVER_UPDATE_REPOINFO_DESCRIPTION="TODO"
+_CVMFS_SERVER_UPDATE_REPOINFO_SYNOPSIS="_cvmfs_server update-repoinfo_ [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_UPDATE_REPOINFO_OPTIONS
+_CVMFS_SERVER_UPDATE_REPOINFO_OPTIONS=(
+  [f]="path to JSON file"
+)
+
+
 cvmfs_server_update_repoinfo() {
   local name
   local json_file

@@ -67,6 +67,7 @@ COMPONENTS="\
     server/cvmfs_server_print_stats.sh
     server/cvmfs_server_merge_stats.sh
     server/cvmfs_server_help.sh
+    server/cvmfs_server_generate_man.sh
     server/cvmfs_server_coda.sh
     "
 

@@ -9,6 +9,17 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_SERVER_CHECKOUT_SHORT="TODO short description"
+_CVMFS_SERVER_CHECKOUT_DESCRIPTION="TODO"
+_CVMFS_SERVER_CHECKOUT_SYNOPSIS="_cvmfs_server checkout_ [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_CHECKOUT_OPTIONS
+_CVMFS_SERVER_CHECKOUT_OPTIONS=(
+  [b]="<branch name>"
+  [t]="<tag name>"
+)
+
+
 cvmfs_server_checkout() {
   local name
   local branch_name

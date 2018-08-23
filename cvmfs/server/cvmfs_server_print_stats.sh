@@ -3,6 +3,18 @@
 #
 # Implementation of the "cvmfs_server stats command"
 
+_CVMFS_SERVER_PRINT_STATS_SHORT="Print statistics values for a table (default publish_statistics) using the separator specified"
+_CVMFS_SERVER_PRINT_STATS_DESCRIPTION="TODO"
+_CVMFS_SERVER_PRINT_STATS_SYNOPSIS="_cvmfs_server print-stats_ [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_PRINT_STATS_OPTIONS
+_CVMFS_SERVER_PRINT_STATS_OPTIONS=(
+  [o]="output_file"
+  [s]="char separator (default '|')"
+  [t]="table_name"
+)
+
+
 cvmfs_server_print_stats() {
   local output_file="/dev/stdout"
   local repo_name=""

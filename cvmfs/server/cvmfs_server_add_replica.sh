@@ -9,6 +9,23 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_SERVER_ADD_REPLICA_SHORT="Creates a Stratum 1 replica of a Stratum 0 repository"
+_CVMFS_SERVER_ADD_REPLICA_DESCRIPTION="TODO"
+_CVMFS_SERVER_ADD_REPLICA_SYNOPSIS="_cvmfs_server add-replica_ [options] <stratum 0 url> <public key | keys directory>"
+
+declare -A _CVMFS_SERVER_ADD_REPLICA_OPTIONS
+_CVMFS_SERVER_ADD_REPLICA_OPTIONS=(
+  [a]="silence apache warning"
+  [n]="alias name"
+  [o]="owner"
+  [p]="no apache config"
+  [s]="S3 config file"
+  [u]="stratum1 upstream storage"
+  [w]="stratum1 url"
+  [z]="enable garbage collection"
+)
+
+
 cvmfs_server_add_replica() {
   local name
   local alias_name
@@ -206,5 +223,3 @@ Use 'cvmfs_server snapshot' to replicate $alias_name.
 Make sure to install the repository public key in /etc/cvmfs/keys/
 You might have to add the key in /etc/cvmfs/repositories.d/${alias_name}/replica.conf"
 }
-
-

@@ -10,6 +10,15 @@
 # - cvmfs_server_common.sh
 # - cvmfs_server_ssl.sh
 
+_CVMFS_SERVER_LIST_SHORT="List available repositories"
+_CVMFS_SERVER_LIST_DESCRIPTION="TODO"
+_CVMFS_SERVER_LIST_SYNOPSIS="_cvmfs_server list_ <fqrn>"
+
+declare -A _CVMFS_SERVER_LIST_OPTIONS
+#_CVMFS_SERVER_LIST_OPTIONS=(
+#  []=""
+#)
+
 
 cvmfs_server_list() {
   for repository in /etc/cvmfs/repositories.d/*; do
@@ -80,5 +89,3 @@ cvmfs_server_list() {
     CVMFS_CREATOR_VERSION=""
   done
 }
-
-

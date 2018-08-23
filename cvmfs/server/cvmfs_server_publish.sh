@@ -1,3 +1,23 @@
+_CVMFS_SERVER_PUBLISH_SHORT="Make a new repository snapshot"
+_CVMFS_SERVER_PUBLISH_DESCRIPTION="TODO"
+_CVMFS_SERVER_PUBLISH_SYNOPSIS="_cvmfs_server publish_ [options] [-X|-N] <fqrn>"
+
+declare -A _CVMFS_SERVER_PUBLISH_OPTIONS
+_CVMFS_SERVER_PUBLISH_OPTIONS=(
+  [F]="authz info file"
+  [N]="force native data"
+  [X]="force external data"
+  [Z]="compression algorithm"
+  [a]="tag name"
+  [c]="tag channel"
+  [f]="use force remount if necessary"
+  [m]="tag description"
+  [n]="manual revision number"
+  [p]="pause for tweaks"
+  [v]="verbose"
+)
+
+
 cvmfs_server_publish() {
   local names
   local user
@@ -526,4 +546,3 @@ publish_succeeded() {
   release_lock $pub_lock
   to_syslog_for_repo $name "successfully published revision $(get_repo_info -v)"
 }
-

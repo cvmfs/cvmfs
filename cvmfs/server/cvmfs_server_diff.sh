@@ -9,6 +9,19 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_SERVER_DIFF_SHORT="Show change set between two snapshots (default: last publish)"
+_CVMFS_SERVER_DIFF_DESCRIPTION="TODO"
+_CVMFS_SERVER_DIFF_SYNOPSIS="_cvmfs_server diff_ [options] <fqrn>"
+
+declare -A _CVMFS_SERVER_DIFF_OPTIONS
+_CVMFS_SERVER_DIFF_OPTIONS=(
+  [d]="<destination tag>"
+  [h]="header line"
+  [m]="machine readable"
+  [s]="<source tag>"
+)
+
+
 cvmfs_server_diff() {
   local name
   local param_list

@@ -1,5 +1,0 @@
-'list-catalogs'
-        [-s catalog sizes] [-e catalog entry counts]
-        [-h catalog hashes] [-x machine readable]
-        <fully qualified name>
-    Print a full list of all nested catalogs of a repository

@@ -1,3 +1,0 @@
-'checkout'
-        [-t <tag name>] [-b <branch name>]
-        <fully qualified name>

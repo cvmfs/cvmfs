@@ -1,3 +1,0 @@
-'catalog-chown'
-        -u uid_map_file -g gid_map_file <fully qualified name>
-    Bulk change of the ownership ids in CernVM-FS catalogs

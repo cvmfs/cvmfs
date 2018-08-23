@@ -1,5 +1,0 @@
-'diff'
-        [-m(achine readable)] [-h(eader line)]
-        [-s <source tag>] [-d <destination tag>]
-        <fully qualified name>
-    Show change set between two snapshots (default: last publish)

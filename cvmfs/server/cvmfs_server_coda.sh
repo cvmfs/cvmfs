@@ -147,8 +147,12 @@ fi
 
 # check if the given sub-command is known and, if so, call it
 subcommand=$1
-shift
 if is_subcommand $subcommand; then
+  if [ $# -eq 2 ] && [ "$2" = "--help" ]; then
+    cvmfs_server help "${subcommand}"
+    exit 0
+  fi
+  shift
   # replace a dash (-) by an underscore (_) and call the requested sub-command
   # preserve spaces and quotes in the parameters: the eval removes the
   #   single quotes here, leaving "$@" for usual shell substitution
