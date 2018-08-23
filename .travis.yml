@@ -13,21 +13,22 @@ sudo: required
 addons:
   apt:
     packages:
+      - asciidoctor
       - autotools-dev
-      - libcap-dev
-      - libssl-dev
       - g++
-      - libfuse-dev
-      - pkg-config
+      - gdb
       - libattr1-dev
+      - libc6-dev
+      - libcap-dev
+      - libfuse-dev
+      - libssl-dev
       - patch
+      - pkg-config
       - python-dev
       - unzip
       - uuid-dev
-      - libc6-dev
       - valgrind
       - voms-dev
-      - gdb
 
 before_script:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew cask install osxfuse; fi
