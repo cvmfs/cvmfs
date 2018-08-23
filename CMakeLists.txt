@@ -476,9 +476,10 @@ endif (NOT ASCIIDOCTOR_EXE)
 add_custom_target (
   man
   ALL
-  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/cvmfs/cvmfs_server generate-man ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND ./cvmfs_server generate-man ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/man
-  COMMAND for f in ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server*.adoc $<SEMICOLON> do ${ASCIIDOCTOR_EXE} -b manpage -D man $$f $<SEMICOLON> done
+  COMMAND for f in ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server*.adoc $<SEMICOLON> do ${ASCIIDOCTOR_EXE} -b manpage -D ${CMAKE_CURRENT_BINARY_DIR}/man $$f $<SEMICOLON> done
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/cvmfs
   DEPENDS cvmfs_server
 )
 find_program (GZIP_EXE gzip)
