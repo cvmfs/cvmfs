@@ -97,17 +97,19 @@ DESCRIPTION
 -----------
 ${!CVMFS_SERVER_SUBCOMMAND_DESCRIPTION} " > "$TMP_SUBCOMMAND_OUTPUT"
 
-
-    if [ $(eval echo '"${#'${CVMFS_SERVER_SUBCOMMAND_OPTIONS}'[@]}"') -gt 0 ]; then
+    if [ $(eval echo '"${#'${CVMFS_SERVER_SUBCOMMAND_OPTIONS}'[*]}"') -gt 0 ]; then
       echo "
 
 OPTIONS
 -------" >> "$TMP_SUBCOMMAND_OUTPUT"
 
-      for option in $(eval echo '"${!'${CVMFS_SERVER_SUBCOMMAND_OPTIONS}'[@]}"'); do
+      options_array="${CVMFS_SERVER_SUBCOMMAND_OPTIONS}[@]"
+      for option in "${!options_array}"; do
+        option_key="$(echo "$option" |cut -d : -f 1)"
+        option_value="$(echo "$option" |cut -d : -f 2-)"
         echo "\
--${option}
-    $(eval echo '${'${CVMFS_SERVER_SUBCOMMAND_OPTIONS}'[$option]}')
+-$option_key
+    $option_value
         " >> "$TMP_SUBCOMMAND_OUTPUT"
       done
     fi

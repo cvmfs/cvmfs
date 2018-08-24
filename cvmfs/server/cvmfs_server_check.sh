@@ -12,14 +12,12 @@
 _CVMFS_SERVER_CHECK_SHORT="Checks if the repository is sane"
 _CVMFS_SERVER_CHECK_DESCRIPTION="TODO"
 _CVMFS_SERVER_CHECK_SYNOPSIS="_cvmfs_server check_ [options] <fqrn>"
-
-declare -A _CVMFS_SERVER_CHECK_OPTIONS
 _CVMFS_SERVER_CHECK_OPTIONS=(
-  [c]="disable data chunk existence check"
-  [i]="check data integrity (may take some time)"
-  [r]="repair reflog problems"
-  [s]="path to nested catalog subtree to check"
-  [t]="tag (check given tag instead of trunk)"
+  "c:disable data chunk existence check"
+  "i:check data integrity (may take some time)"
+  "r:repair reflog problems"
+  "s:path to nested catalog subtree to check"
+  "t:tag (check given tag instead of trunk)"
 )
 
 

@@ -101,15 +101,13 @@ masterkeycard_sign() {
 _CVMFS_SERVER_MASTERKEYCARD_SHORT="TODO"
 _CVMFS_SERVER_MASTERKEYCARD_DESCRIPTION="TODO"
 _CVMFS_SERVER_MASTERKEYCARD_SYNOPSIS="_cvmfs_server masterkeycard_ (-a|-k|-r) | ([-f] -c|-s <fqrn>) | ([-f] -d)"
-
-declare -A _CVMFS_SERVER_MASTERKEYCARD_OPTIONS
 _CVMFS_SERVER_MASTERKEYCARD_OPTIONS=(
-  [a]="checks if a smartcard is available"
-  [c]="converts given repositories to use card for whitelist"
-  [d]="deletes a masterkey's certificate (pub key) from a card"
-  [k]="checks whether a key is stored in a card"
-  [r]="reads pub key from a card to STDOUT"
-  [s]="stores masterkey and pub key of a repository into a card"
+  "a:checks if a smartcard is available"
+  "c:converts given repositories to use card for whitelist"
+  "d:deletes a masterkey's certificate (pub key) from a card"
+  "k:checks whether a key is stored in a card"
+  "r:reads pub key from a card to STDOUT"
+  "s:stores masterkey and pub key of a repository into a card"
 )
 
 

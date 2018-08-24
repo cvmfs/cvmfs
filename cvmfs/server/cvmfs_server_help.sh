@@ -30,8 +30,11 @@ cvmfs_server $command - ${!CVMFS_SERVER_SUBCOMMAND_SHORT}
 Synopsis: ${!CVMFS_SERVER_SUBCOMMAND_SYNOPSIS}
 
 Options:" >&2
-  for option in $(eval echo '"${!'${CVMFS_SERVER_SUBCOMMAND_OPTIONS}'[@]}"'); do
-    echo "    -${option} : $(eval echo '${'${CVMFS_SERVER_SUBCOMMAND_OPTIONS}'[$option]}')" >&2
+  options_array="${CVMFS_SERVER_SUBCOMMAND_OPTIONS}[@]"
+  for option in "${!options_array}"; do
+    option_key="$(echo "$option" |cut -d : -f 1)"
+    option_value="$(echo "$option" |cut -d : -f 2-)"
+    echo "    -$option_key : $option_value" >&2
   done
 
   if [ x"${!CVMFS_SERVER_SUBCOMMAND_EXAMPLES}" != x"" ]; then

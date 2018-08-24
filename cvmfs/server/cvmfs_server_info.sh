@@ -12,10 +12,8 @@
 _CVMFS_SERVER_INFO_SHORT="Print summary about the repository"
 _CVMFS_SERVER_INFO_DESCRIPTION="TODO"
 _CVMFS_SERVER_INFO_SYNOPSIS="_cvmfs_server info_ <fqrn>"
-
-declare -A _CVMFS_SERVER_INFO_OPTIONS
 #_CVMFS_SERVER_INFO_OPTIONS=(
-#  []=""
+#  "x:y"
 #)
 
 

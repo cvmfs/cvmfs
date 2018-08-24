@@ -12,10 +12,8 @@
 _CVMFS_SERVER_MOUNT_SHORT="Mount repositories in /cvmfs, for instance after reboot"
 _CVMFS_SERVER_MOUNT_DESCRIPTION="TODO"
 _CVMFS_SERVER_MOUNT_SYNOPSIS="_cvmfs_server mount_ <-a|fqrn>"
-
-declare -A _CVMFS_SERVER_MOUNT_OPTIONS
 _CVMFS_SERVER_MOUNT_OPTIONS=(
-  [a]="all repositories"
+  "a:all repositories"
 )
 
 

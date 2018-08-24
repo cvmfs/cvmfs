@@ -302,14 +302,12 @@ EOF
 _CVMFS_SERVER_SNAPSHOT_SHORT="Synchronize a Stratum 1 replica with the Stratum 0 source"
 _CVMFS_SERVER_SNAPSHOT_DESCRIPTION="TODO"
 _CVMFS_SERVER_SNAPSHOT_SYNOPSIS="_cvmfs_server snapshot_ ([-t] <fqrn> | -a [options])"
-
-declare -A _CVMFS_SERVER_SNAPSHOT_OPTIONS
 _CVMFS_SERVER_SNAPSHOT_OPTIONS=(
-  [a]="all repositories"
-  [i]="skip repositories that have not run initial snapshot"
-  [n]="do not warn if /etc/logrotate.d/cvmfs does not exist"
-  [s]="use separate logs in /var/log/cvmfs for each repository"
-  [t]="fail if other snapshot is in progress"
+  "a:all repositories"
+  "i:skip repositories that have not run initial snapshot"
+  "n:do not warn if /etc/logrotate.d/cvmfs does not exist"
+  "s:use separate logs in /var/log/cvmfs for each repository"
+  "t:fail if other snapshot is in progress"
 )
 
 
