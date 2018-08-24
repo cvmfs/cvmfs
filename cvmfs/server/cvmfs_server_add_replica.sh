@@ -12,17 +12,15 @@
 _CVMFS_SERVER_ADD_REPLICA_SHORT="Creates a Stratum 1 replica of a Stratum 0 repository"
 _CVMFS_SERVER_ADD_REPLICA_DESCRIPTION="TODO"
 _CVMFS_SERVER_ADD_REPLICA_SYNOPSIS="_cvmfs_server add-replica_ [options] <stratum 0 url> <public key | keys directory>"
-_CVMFS_SERVER_ADD_REPLICA_OPTIONS=(
-  "a:silence apache warning"
-  "n:alias name"
-  "o:owner"
-  "p:no apache config"
-  "s:S3 config file"
-  "u:stratum1 upstream storage"
-  "w:stratum1 url"
-  "z:enable garbage collection"
-)
-
+_CVMFS_SERVER_ADD_REPLICA_OPTIONS="\
+a:silence apache warning
+n:alias name
+o:owner
+p:no apache config
+s:S3 config file
+u:stratum1 upstream storage
+w:stratum1 url
+z:enable garbage collection"
 
 cvmfs_server_add_replica() {
   local name

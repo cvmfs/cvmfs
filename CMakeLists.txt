@@ -484,7 +484,7 @@ add_custom_target (
 )
 find_program (GZIP_EXE gzip)
 if (GZIP_EXE)
-  install(CODE "execute_process(COMMAND ${GZIP_EXE} -r ${CMAKE_CURRENT_BINARY_DIR}/man)")
+  install(CODE "execute_process(COMMAND ${GZIP_EXE} -rf ${CMAKE_CURRENT_BINARY_DIR}/man)")
 endif (GZIP_EXE)
 install (
   DIRECTORY     ${CMAKE_CURRENT_BINARY_DIR}/man/

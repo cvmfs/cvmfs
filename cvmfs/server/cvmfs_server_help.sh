@@ -19,27 +19,32 @@ cvmfs_server_help() {
     usage "No manual entry for $command"
   fi
 
-  CVMFS_SERVER_SUBCOMMAND_SHORT="$(echo "_CVMFS_SERVER_${command^^}_SHORT" |sed 's/-/_/')"
-  CVMFS_SERVER_SUBCOMMAND_SYNOPSIS="$(echo "_CVMFS_SERVER_${command^^}_SYNOPSIS" |sed 's/-/_/')"
-  CVMFS_SERVER_SUBCOMMAND_OPTIONS="$(echo "_CVMFS_SERVER_${command^^}_OPTIONS" |sed 's/-/_/')"
-  CVMFS_SERVER_SUBCOMMAND_EXAMPLES="$(echo "_CVMFS_SERVER_${command^^}_EXAMPLES" |sed 's/-/_/')"
+  CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_SERVER_${command}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
+  CVMFS_SERVER_SUBCOMMAND_SYNOPSIS="$(eval echo '"${'$(echo "_CVMFS_SERVER_${command}_SYNOPSIS" |tr '[a-z]-' '[A-Z]_')'}"')"
+  CVMFS_SERVER_SUBCOMMAND_OPTIONS="$(eval echo '"${'$(echo "_CVMFS_SERVER_${command}_OPTIONS" |tr '[a-z]-' '[A-Z]_')'}"')"
+  CVMFS_SERVER_SUBCOMMAND_EXAMPLES="$(eval echo '"${'$(echo "_CVMFS_SERVER_${command}_EXAMPLES" |tr '[a-z]-' '[A-Z]_')'}"')"
 
   echo "\
-cvmfs_server $command - ${!CVMFS_SERVER_SUBCOMMAND_SHORT}
+cvmfs_server $command - $CVMFS_SERVER_SUBCOMMAND_SHORT
 
-Synopsis: ${!CVMFS_SERVER_SUBCOMMAND_SYNOPSIS}
+Synopsis: $CVMFS_SERVER_SUBCOMMAND_SYNOPSIS" >&2
 
+
+  if [ x"$CVMFS_SERVER_SUBCOMMAND_OPTIONS" != x"" ]; then
+    echo "
 Options:" >&2
-  options_array="${CVMFS_SERVER_SUBCOMMAND_OPTIONS}[@]"
-  for option in "${!options_array}"; do
-    option_key="$(echo "$option" |cut -d : -f 1)"
-    option_value="$(echo "$option" |cut -d : -f 2-)"
-    echo "    -$option_key : $option_value" >&2
-  done
+    echo "$CVMFS_SERVER_SUBCOMMAND_OPTIONS" |
+    while read -r option; do
+      option_key="$(echo "$option" |cut -d : -f 1)"
+      option_value="$(echo "$option" |cut -d : -f 2-)"
+      echo "    -$option_key : $option_value" >&2
+    done
+  fi
 
-  if [ x"${!CVMFS_SERVER_SUBCOMMAND_EXAMPLES}" != x"" ]; then
+
+  if [ x"$CVMFS_SERVER_SUBCOMMAND_EXAMPLES" != x"" ]; then
     echo "
 Examples:
-${!CVMFS_SERVER_SUBCOMMAND_EXAMPLES}" >&2
+$CVMFS_SERVER_SUBCOMMAND_EXAMPLES" >&2
   fi
 }

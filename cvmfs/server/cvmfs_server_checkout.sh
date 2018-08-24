@@ -12,11 +12,9 @@
 _CVMFS_SERVER_CHECKOUT_SHORT="TODO short description"
 _CVMFS_SERVER_CHECKOUT_DESCRIPTION="TODO"
 _CVMFS_SERVER_CHECKOUT_SYNOPSIS="_cvmfs_server checkout_ [options] <fqrn>"
-_CVMFS_SERVER_CHECKOUT_OPTIONS=(
-  "b:<branch name>"
-  "t:<tag name>"
-)
-
+_CVMFS_SERVER_CHECKOUT_OPTIONS="\
+b:<branch name>
+t:<tag name>"
 
 cvmfs_server_checkout() {
   local name

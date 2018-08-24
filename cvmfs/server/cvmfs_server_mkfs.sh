@@ -85,26 +85,24 @@ cvmfs_server_alterfs() {
 _CVMFS_SERVER_MKFS_SHORT="Creates a new repository with a given name"
 _CVMFS_SERVER_MKFS_DESCRIPTION="TODO"
 _CVMFS_SERVER_MKFS_SYNOPSIS="_cvmfs_server mkfs_ [options] <fqrn>"
-_CVMFS_SERVER_MKFS_OPTIONS=(
-  "G:set timespan for auto tags"
-  "R:require masterkeycard key"
-  "V:VOMS authorization"
-  "X:external data"
-  "Z:compression algorithm (default: zlib)"
-  "a:hash algorithm (default: SHA-1)"
-  "f:union filesystem type"
-  "g:disable auto tags"
-  "k:path to existing keychain"
-  "m:replicable"
-  "o:owner"
-  "p:no apache config"
-  "s:S3 config file"
-  "u:upstream storage"
-  "v:volatile content"
-  "w:stratum0 url"
-  "z:enable garbage collection"
-)
-
+_CVMFS_SERVER_MKFS_OPTIONS="\
+G:set timespan for auto tags
+R:require masterkeycard key
+V:VOMS authorization
+X:external data
+Z:compression algorithm (default: zlib)
+a:hash algorithm (default: SHA-1)
+f:union filesystem type
+g:disable auto tags
+k:path to existing keychain
+m:replicable
+o:owner
+p:no apache config
+s:S3 config file
+u:upstream storage
+v:volatile content
+w:stratum0 url
+z:enable garbage collection"
 
 cvmfs_server_mkfs() {
   local name

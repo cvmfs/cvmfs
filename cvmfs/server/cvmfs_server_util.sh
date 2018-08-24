@@ -945,10 +945,8 @@ _update_geodb() {
 _CVMFS_SERVER_UPDATE_GEODB_SHORT="Updates the geo-IP database"
 _CVMFS_SERVER_UPDATE_GEODB_DESCRIPTION="TODO"
 _CVMFS_SERVER_UPDATE_GEODB_SYNOPSIS="_cvmfs_server update-geodb_ [options]"
-_CVMFS_SERVER_UPDATE_GEODB_OPTIONS=(
-  "l:update lazily based on CVMFS_UPDATEGEO* variables"
-)
-
+_CVMFS_SERVER_UPDATE_GEODB_OPTIONS="\
+l:update lazily based on CVMFS_UPDATEGEO* variables"
 
 cvmfs_server_update_geodb() {
   _update_geodb $@
@@ -972,7 +970,7 @@ generate-man help list-tags lstags skeleton"
 is_subcommand() {
   local subcommand="$1"
 
-  for possible_command in $_CVMFS_SERVER{,_HIDDEN}_COMMANDS; do
+  for possible_command in $_CVMFS_SERVER_COMMANDS $_CVMFS_SERVER_HIDDEN_COMMANDS; do
     if [ x"$possible_command" = x"$subcommand" ]; then
       return 0
     fi

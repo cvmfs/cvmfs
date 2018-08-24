@@ -14,10 +14,8 @@
 _CVMFS_SERVER_TRANSACTION_SHORT="Start to edit a repository"
 _CVMFS_SERVER_TRANSACTION_DESCRIPTION="TODO"
 _CVMFS_SERVER_TRANSACTION_SYNOPSIS="_cvmfs_server transaction_ <fqrn>"
-#_CVMFS_SERVER_TRANSACTION_OPTIONS=(
-#  "x:y"
-#)
-
+#_CVMFS_SERVER_TRANSACTION_OPTIONS="\
+#x:y"
 
 cvmfs_server_transaction() {
   local names

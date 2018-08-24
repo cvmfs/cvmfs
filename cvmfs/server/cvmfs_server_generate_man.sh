@@ -36,14 +36,14 @@ COMMANDS
 
 
   for subcommand in $_CVMFS_SERVER_COMMANDS; do
-    CVMFS_SERVER_SUBCOMMAND_SHORT="$(echo "_CVMFS_SERVER_${subcommand^^}_SHORT" |sed 's/-/_/')"
+    CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
 
     echo "*cvmfs_server-${subcommand}*(8)" >> "$TMP_OUTPUT"
-    if [ x"${!CVMFS_SERVER_SUBCOMMAND_SHORT}" = x"" ]; then
+    if [ x"$CVMFS_SERVER_SUBCOMMAND_SHORT" = x"" ]; then
       echo "No short description provided for ${subcommand}" >&2
       return 1
     fi
-    echo "    ${!CVMFS_SERVER_SUBCOMMAND_SHORT}
+    echo "    $CVMFS_SERVER_SUBCOMMAND_SHORT
     " >> "$TMP_OUTPUT"
   done
 
@@ -73,38 +73,38 @@ SEE ALSO
 
   for subcommand in $_CVMFS_SERVER_COMMANDS; do
     TMP_SUBCOMMAND_OUTPUT="/$1/cvmfs_server-${subcommand}.adoc"
-    CVMFS_SERVER_SUBCOMMAND_SHORT="$(echo "_CVMFS_SERVER_${subcommand^^}_SHORT" |sed 's/-/_/')"
-    CVMFS_SERVER_SUBCOMMAND_SYNOPSIS="$(echo "_CVMFS_SERVER_${subcommand^^}_SYNOPSIS" |sed 's/-/_/')"
-    CVMFS_SERVER_SUBCOMMAND_DESCRIPTION="$(echo "_CVMFS_SERVER_${subcommand^^}_DESCRIPTION" |sed 's/-/_/')"
-    CVMFS_SERVER_SUBCOMMAND_OPTIONS="$(echo "_CVMFS_SERVER_${subcommand^^}_OPTIONS" |sed 's/-/_/')"
-    CVMFS_SERVER_SUBCOMMAND_EXAMPLES="$(echo "_CVMFS_SERVER_${subcommand^^}_EXAMPLES" |sed 's/-/_/')"
-    CVMFS_SERVER_SUBCOMMAND_SEE_ALSO="$(echo "_CVMFS_SERVER_${subcommand^^}_SEE_ALSO" |sed 's/-/_/')"
+    CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_SYNOPSIS="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_SYNOPSIS" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_DESCRIPTION="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_DESCRIPTION" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_OPTIONS="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_OPTIONS" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_EXAMPLES="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_EXAMPLES" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_SEE_ALSO="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_SEE_ALSO" |tr '[a-z]-' '[A-Z]_')'}"')"
 
     echo "\
 = cvmfs_server-${subcommand}(8)
 
 NAME
 ----
-cvmfs_server-${subcommand} - ${!CVMFS_SERVER_SUBCOMMAND_SHORT}
+cvmfs_server-${subcommand} - $CVMFS_SERVER_SUBCOMMAND_SHORT
 
 
 SYNOPSIS
 --------
-${!CVMFS_SERVER_SUBCOMMAND_SYNOPSIS}
+$CVMFS_SERVER_SUBCOMMAND_SYNOPSIS
 
 
 DESCRIPTION
 -----------
-${!CVMFS_SERVER_SUBCOMMAND_DESCRIPTION} " > "$TMP_SUBCOMMAND_OUTPUT"
+$CVMFS_SERVER_SUBCOMMAND_DESCRIPTION " > "$TMP_SUBCOMMAND_OUTPUT"
 
-    if [ $(eval echo '"${#'${CVMFS_SERVER_SUBCOMMAND_OPTIONS}'[*]}"') -gt 0 ]; then
+    if [ x"$CVMFS_SERVER_SUBCOMMAND_OPTIONS" != x"" ]; then
       echo "
 
 OPTIONS
 -------" >> "$TMP_SUBCOMMAND_OUTPUT"
 
-      options_array="${CVMFS_SERVER_SUBCOMMAND_OPTIONS}[@]"
-      for option in "${!options_array}"; do
+      echo "$CVMFS_SERVER_SUBCOMMAND_OPTIONS" |
+      while read -r option; do
         option_key="$(echo "$option" |cut -d : -f 1)"
         option_value="$(echo "$option" |cut -d : -f 2-)"
         echo "\
@@ -114,23 +114,23 @@ OPTIONS
       done
     fi
 
-    if [ x"${!CVMFS_SERVER_SUBCOMMAND_EXAMPLES}" != x"" ]; then
+    if [ x"$CVMFS_SERVER_SUBCOMMAND_EXAMPLES" != x"" ]; then
       echo "
 EXAMPLES
 --------
 [verse]
 ____
-${!CVMFS_SERVER_SUBCOMMAND_EXAMPLES}
+$CVMFS_SERVER_SUBCOMMAND_EXAMPLES
 ____
       " >> "$TMP_SUBCOMMAND_OUTPUT"
     fi
 
 
-    if [ x"${!CVMFS_SERVER_SUBCOMMAND_SEE_ALSO}" != x"" ]; then
+    if [ x"$CVMFS_SERVER_SUBCOMMAND_SEE_ALSO" != x"" ]; then
       echo "
 SEE ALSO
 --------
-${!CVMFS_SERVER_SUBCOMMAND_SEE_ALSO}
+$CVMFS_SERVER_SUBCOMMAND_SEE_ALSO
       " >> "$TMP_SUBCOMMAND_OUTPUT"
     fi
 
