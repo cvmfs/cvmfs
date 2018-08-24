@@ -13,7 +13,6 @@ sudo: required
 addons:
   apt:
     packages:
-      - asciidoctor
       - autotools-dev
       - g++
       - gdb
@@ -31,7 +30,8 @@ addons:
       - voms-dev
 
 before_script:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew cask install osxfuse && brew install asciidoctor; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew cask install osxfuse; fi
+  - gem install asciidoctor
 
 script:
   - ci/run_travis.sh
