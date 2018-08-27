@@ -5,7 +5,7 @@
 
 _CVMFS_SERVER_PRINT_STATS_SHORT="Print statistics values for a table (default publish_statistics) using the separator specified"
 _CVMFS_SERVER_PRINT_STATS_DESCRIPTION="TODO"
-_CVMFS_SERVER_PRINT_STATS_SYNOPSIS="_cvmfs_server print-stats_ [options] <fqrn>"
+_CVMFS_SERVER_PRINT_STATS_SYNOPSIS="[options] <fqrn>"
 _CVMFS_SERVER_PRINT_STATS_OPTIONS="\
 o:output_file
 s:char separator (default '|')

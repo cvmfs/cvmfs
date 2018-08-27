@@ -11,7 +11,7 @@
 
 _CVMFS_SERVER_RESIGN_SHORT="Re-sign the whitelist. Default expiration days goes down to 7 with masterkeycard"
 _CVMFS_SERVER_RESIGN_DESCRIPTION="TODO"
-_CVMFS_SERVER_RESIGN_SYNOPSIS="_cvmfs_server resign_ (-p | [options]) <fqrn>"
+_CVMFS_SERVER_RESIGN_SYNOPSIS="(-p | [options]) <fqrn>"
 _CVMFS_SERVER_RESIGN_OPTIONS="\
 d:days until expiration (default 30)]
 f:don't ask again]

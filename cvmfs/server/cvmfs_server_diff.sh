@@ -11,7 +11,7 @@
 
 _CVMFS_SERVER_DIFF_SHORT="Show change set between two snapshots (default: last publish)"
 _CVMFS_SERVER_DIFF_DESCRIPTION="TODO"
-_CVMFS_SERVER_DIFF_SYNOPSIS="_cvmfs_server diff_ [options] <fqrn>"
+_CVMFS_SERVER_DIFF_SYNOPSIS="[options] <fqrn>"
 _CVMFS_SERVER_DIFF_OPTIONS="\
 d:<destination tag>
 h:header line

@@ -54,7 +54,7 @@ migrate_legacy_dirtab() {
 
 _CVMFS_SERVER_IMPORT_SHORT="Imports an old CernVM-FS repository into a fresh repo"
 _CVMFS_SERVER_IMPORT_DESCRIPTION="TODO"
-_CVMFS_SERVER_IMPORT_SYNOPSIS="_cvmfs_server import_ [options] <fqrn>"
+_CVMFS_SERVER_IMPORT_SYNOPSIS="[options] <fqrn>"
 _CVMFS_SERVER_IMPORT_OPTIONS="\
 R:recreate whitelist and require masterkeycard
 c:file ownership (UID:GID)

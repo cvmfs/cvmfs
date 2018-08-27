@@ -11,7 +11,7 @@
 
 _CVMFS_SERVER_LIST_CATALOGS_SHORT="Print a full list of all nested catalogs of a repository"
 _CVMFS_SERVER_LIST_CATALOGS_DESCRIPTION="TODO"
-_CVMFS_SERVER_LIST_CATALOGS_SYNOPSIS="_cvmfs_server list-catalogs_ [options] <fqrn>"
+_CVMFS_SERVER_LIST_CATALOGS_SYNOPSIS="[options] <fqrn>"
 _CVMFS_SERVER_LIST_CATALOGS_OPTIONS="\
 e:catalog entry counts
 h:catalog hashes

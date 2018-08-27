@@ -16,7 +16,7 @@
 
 _CVMFS_SERVER_INGEST_SHORT="Extract the content of the tarfile inside the base directory"
 _CVMFS_SERVER_INGEST_DESCRIPTION="TODO"
-_CVMFS_SERVER_INGEST_SYNOPSIS="_cvmfs_server ingest_ -t <tar_file> -b <base_dir> [options] <fqrn>"
+_CVMFS_SERVER_INGEST_SYNOPSIS="-t <tar_file> -b <base_dir> [options] <fqrn>"
 _CVMFS_SERVER_INGEST_OPTIONS="\
 b:base directory
 d:folder to delete

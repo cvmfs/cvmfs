@@ -467,31 +467,6 @@ if (BUILD_QC_TESTS)
 endif(BUILD_QC_TESTS)
 
 #
-# Manual pages
-#
-find_program (ASCIIDOCTOR_EXE asciidoctor)
-if (NOT ASCIIDOCTOR_EXE)
-  message (FATAL_ERROR "Could not find asciidoctor. Try yum/gem install asciidoctor")
-endif (NOT ASCIIDOCTOR_EXE)
-add_custom_target (
-  man
-  ALL
-  COMMAND ./cvmfs_server generate-man ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/man
-  COMMAND for f in ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server*.adoc $<SEMICOLON> do ${ASCIIDOCTOR_EXE} -b manpage -D ${CMAKE_CURRENT_BINARY_DIR}/man $$f $<SEMICOLON> done
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/cvmfs
-  DEPENDS cvmfs_server
-)
-find_program (GZIP_EXE gzip)
-if (GZIP_EXE)
-  install(CODE "execute_process(COMMAND ${GZIP_EXE} -rf ${CMAKE_CURRENT_BINARY_DIR}/man)")
-endif (GZIP_EXE)
-install (
-  DIRECTORY     ${CMAKE_CURRENT_BINARY_DIR}/man/
-  DESTINATION   /usr/share/man/man8
-)
-
-#
 # Documentation
 #
 install (

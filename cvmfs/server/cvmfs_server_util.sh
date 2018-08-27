@@ -944,7 +944,7 @@ _update_geodb() {
 
 _CVMFS_SERVER_UPDATE_GEODB_SHORT="Updates the geo-IP database"
 _CVMFS_SERVER_UPDATE_GEODB_DESCRIPTION="TODO"
-_CVMFS_SERVER_UPDATE_GEODB_SYNOPSIS="_cvmfs_server update-geodb_ [options]"
+_CVMFS_SERVER_UPDATE_GEODB_SYNOPSIS="[options]"
 _CVMFS_SERVER_UPDATE_GEODB_OPTIONS="\
 l:update lazily based on CVMFS_UPDATEGEO* variables"
 

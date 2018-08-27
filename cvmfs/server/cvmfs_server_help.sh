@@ -27,7 +27,7 @@ cvmfs_server_help() {
   echo "\
 cvmfs_server $command - $CVMFS_SERVER_SUBCOMMAND_SHORT
 
-Synopsis: $CVMFS_SERVER_SUBCOMMAND_SYNOPSIS" >&2
+Synopsis: cvmfs_server $command $CVMFS_SERVER_SUBCOMMAND_SYNOPSIS" >&2
 
 
   if [ x"$CVMFS_SERVER_SUBCOMMAND_OPTIONS" != x"" ]; then

@@ -426,7 +426,7 @@ _migrate_139() {
 
 _CVMFS_SERVER_MIGRATE_SHORT="Migrates a repository to the current version of CernVM-FS"
 _CVMFS_SERVER_MIGRATE_DESCRIPTION="TODO"
-_CVMFS_SERVER_MIGRATE_SYNOPSIS="_cvmfs_server migrate_ <fqrn>"
+_CVMFS_SERVER_MIGRATE_SYNOPSIS="<fqrn>"
 #_CVMFS_SERVER_MIGRATE_OPTIONS="\
 #x:y"
 

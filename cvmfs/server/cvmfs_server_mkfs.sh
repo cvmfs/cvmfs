@@ -84,7 +84,7 @@ cvmfs_server_alterfs() {
 
 _CVMFS_SERVER_MKFS_SHORT="Creates a new repository with a given name"
 _CVMFS_SERVER_MKFS_DESCRIPTION="TODO"
-_CVMFS_SERVER_MKFS_SYNOPSIS="_cvmfs_server mkfs_ [options] <fqrn>"
+_CVMFS_SERVER_MKFS_SYNOPSIS="[options] <fqrn>"
 _CVMFS_SERVER_MKFS_OPTIONS="\
 G:set timespan for auto tags
 R:require masterkeycard key

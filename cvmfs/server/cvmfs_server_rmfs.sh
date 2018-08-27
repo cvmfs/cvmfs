@@ -11,7 +11,7 @@
 
 _CVMFS_SERVER_RMFS_SHORT="Remove the repository"
 _CVMFS_SERVER_RMFS_DESCRIPTION="TODO"
-_CVMFS_SERVER_RMFS_SYNOPSIS="_cvmfs_server rmfs_ [options] <fqrn>"
+_CVMFS_SERVER_RMFS_SYNOPSIS="[options] <fqrn>"
 _CVMFS_SERVER_RMFS_OPTIONS="\
 f:don't ask again
 p:preserve repo data and keys"

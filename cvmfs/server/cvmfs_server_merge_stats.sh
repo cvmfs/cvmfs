@@ -127,7 +127,7 @@ cvmfs_server_merge_checks() {
 
 _CVMFS_SERVER_MERGE_STATS_SHORT="Merge tables from two database files"
 _CVMFS_SERVER_MERGE_STATS_DESCRIPTION="TODO"
-_CVMFS_SERVER_MERGE_STATS_SYNOPSIS="_cvmfs_server merge-stats_ [options] <db_file_1> <db_file_2>"
+_CVMFS_SERVER_MERGE_STATS_SYNOPSIS="[options] <db_file_1> <db_file_2>"
 _CVMFS_SERVER_MERGE_STATS_OPTIONS="\
 o:output db file"
 

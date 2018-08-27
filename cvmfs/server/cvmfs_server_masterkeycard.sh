@@ -100,7 +100,7 @@ masterkeycard_sign() {
 
 _CVMFS_SERVER_MASTERKEYCARD_SHORT="TODO"
 _CVMFS_SERVER_MASTERKEYCARD_DESCRIPTION="TODO"
-_CVMFS_SERVER_MASTERKEYCARD_SYNOPSIS="_cvmfs_server masterkeycard_ (-a|-k|-r) | ([-f] -c|-s <fqrn>) | ([-f] -d)"
+_CVMFS_SERVER_MASTERKEYCARD_SYNOPSIS="(-a|-k|-r) | ([-f] -c|-s <fqrn>) | ([-f] -d)"
 _CVMFS_SERVER_MASTERKEYCARD_OPTIONS="\
 a:checks if a smartcard is available
 c:converts given repositories to use card for whitelist

@@ -12,7 +12,7 @@
 
 _CVMFS_SERVER_CATALOG_CHOWN_SHORT="Bulk change of the ownership ids in CernVM-FS catalogs"
 _CVMFS_SERVER_CATALOG_CHOWN_DESCRIPTION="TODO"
-_CVMFS_SERVER_CATALOG_CHOWN_SYNOPSIS="_cvmfs_server catalog-chown_ -u <uid_map_file> -g <gid_map_file> <fqrn>"
+_CVMFS_SERVER_CATALOG_CHOWN_SYNOPSIS="-u <uid_map_file> -g <gid_map_file> <fqrn>"
 _CVMFS_SERVER_CATALOG_CHOWN_OPTIONS="\
 g:GID map file
 u:UID map file"

@@ -12,7 +12,7 @@
 
 _CVMFS_SERVER_LIST_SHORT="List available repositories"
 _CVMFS_SERVER_LIST_DESCRIPTION="TODO"
-_CVMFS_SERVER_LIST_SYNOPSIS="_cvmfs_server list_ <fqrn>"
+_CVMFS_SERVER_LIST_SYNOPSIS="<fqrn>"
 #_CVMFS_SERVER_LIST_OPTIONS="\
 #x:y"
 

@@ -301,7 +301,7 @@ EOF
 
 _CVMFS_SERVER_SNAPSHOT_SHORT="Synchronize a Stratum 1 replica with the Stratum 0 source"
 _CVMFS_SERVER_SNAPSHOT_DESCRIPTION="TODO"
-_CVMFS_SERVER_SNAPSHOT_SYNOPSIS="_cvmfs_server snapshot_ ([-t] <fqrn> | -a [options])"
+_CVMFS_SERVER_SNAPSHOT_SYNOPSIS="([-t] <fqrn> | -a [options])"
 _CVMFS_SERVER_SNAPSHOT_OPTIONS="\
 a:all repositories
 i:skip repositories that have not run initial snapshot

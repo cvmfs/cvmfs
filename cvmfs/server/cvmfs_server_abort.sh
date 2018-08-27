@@ -7,7 +7,7 @@
 
 _CVMFS_SERVER_ABORT_SHORT="Abort transaction and return to the state before"
 _CVMFS_SERVER_ABORT_DESCRIPTION="TODO"
-_CVMFS_SERVER_ABORT_SYNOPSIS="_cvmfs_server abort_ [options] <fqrn>"
+_CVMFS_SERVER_ABORT_SYNOPSIS="[options] <fqrn>"
 _CVMFS_SERVER_ABORT_OPTIONS="\
 f:don't ask again"
 
