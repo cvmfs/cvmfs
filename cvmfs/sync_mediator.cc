@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "catalog_balancer.h"
 #include "catalog_virtual.h"
 #include "compression.h"
 #include "fs_traversal.h"
@@ -248,6 +249,14 @@ void SyncMediator::LeaveDirectory(SharedPtr<SyncItem> entry)
   hardlink_stack_.pop();
 }
 
+/**
+ * In this function we only keep track of where to place the new catalogs, they
+ * will be actually created in the commit function.
+ */
+void SyncMediator::AddCatalog(const std::string path) {
+        catalog_to_add_.insert(path);
+        return;
+}
 
 /**
  * Do any pending processing and commit all changes to the catalogs.
@@ -318,15 +327,30 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     return false;
   }
 
-  if (catalog_manager_->IsBalanceable() ||
-      (params_->virtual_dir_actions != catalog::VirtualCatalog::kActionNone))
-  {
-    if (catalog_manager_->IsBalanceable())
+  if ((catalog_manager_->IsBalanceable()) ||
+      (params_->virtual_dir_actions != catalog::VirtualCatalog::kActionNone) ||
+      (catalog_to_add_.size() > 0)) {
+    if (catalog_to_add_.size() > 0) {
+      // Adding catalogs programmatically
+      catalog::CatalogBalancer<catalog::WritableCatalogManager> catalog_adder(
+          catalog_manager_);
+
+      std::set<std::string>::iterator catalog_path;
+      for (catalog_path = catalog_to_add_.begin();
+           catalog_path != catalog_to_add_.end(); ++catalog_path) {
+        std::string catalog_marker_path =
+            MakeCanonicalPath("/" + *catalog_path);
+        catalog_adder.AddCatalogMarker(catalog_marker_path);
+        catalog_manager_->CreateNestedCatalog(catalog_marker_path.substr(1));
+      }
+    }
+    if (catalog_manager_->IsBalanceable()) {
       catalog_manager_->Balance();
+    }
     // Commit empty string to ensure that the "content" of the auto catalog
     // markers is present in the repository.
     string empty_file = CreateTempPath(params_->dir_temp + "/empty", 0600);
-    IngestionSource* source = new FileIngestionSource(empty_file);
+    IngestionSource *source = new FileIngestionSource(empty_file);
     params_->spooler->Process(source);
     params_->spooler->WaitForUpload();
     unlink(empty_file.c_str());
@@ -337,10 +361,8 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
   }
   catalog_manager_->PrecalculateListings();
   return catalog_manager_->Commit(params_->stop_for_catalog_tweaks,
-                                  params_->manual_revision,
-                                  manifest);
+                                  params_->manual_revision, manifest);
 }
-
 
 void SyncMediator::InsertHardlink(SharedPtr<SyncItem> entry) {
   assert(handle_hardlinks_);

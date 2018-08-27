@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "catalog_balancer.h"
 #include "catalog_virtual.h"
 #include "logging.h"
 #include "manifest.h"
@@ -63,10 +64,6 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (args.find('Z') != args.end()) {
     params.compression_alg =
         zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
-  }
-
-  if (args.find('C') != args.end()) {
-    printf("\n\n Create new catalog \n\n");
   }
 
   params.nested_kcatalog_limit = SyncParameters::kDefaultNestedKcatalogLimit;
@@ -158,6 +155,12 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 4;
   }
 
+  if (args.find('C') != args.end()) {
+    if (*args.find('C')->second == "true") {
+      mediator.AddCatalog(params.base_directory);
+    }
+  }
+
   sync->Traverse();
 
   if (!params.authz_file.empty()) {
@@ -191,7 +194,6 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     PrintError("something went wrong during sync");
     return 5;
   }
-
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
   params.spooler->WaitForUpload();

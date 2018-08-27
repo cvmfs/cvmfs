@@ -86,6 +86,17 @@ class AbstractSyncMediator {
   virtual void EnterDirectory(SharedPtr<SyncItem> entry) = 0;
   virtual void LeaveDirectory(SharedPtr<SyncItem> entry) = 0;
 
+  /* This function allow to programmatically add a catalog in the respository
+   * even if there is not a .cvmfscatalog file.
+   * It is a different route than adding the catalogs placing the .cvmfscatalog
+   * file inside the repository and should only be used when we need to
+   * programmatically add catalogs, it is been introduced for adding catalogs
+   * during the ingestion of tar files, we cannot expect the tar files to have
+   * a .cvmfscatalog inside, but on the other hand, those tar can contains a
+   * lot of files, especially if we consider docker images.
+   */
+  virtual void AddCatalog(const std::string location) = 0;
+
   virtual bool Commit(manifest::Manifest *manifest) = 0;
 
   virtual bool IsExternalData() const = 0;
@@ -127,6 +138,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
 
   void EnterDirectory(SharedPtr<SyncItem> entry);
   void LeaveDirectory(SharedPtr<SyncItem> entry);
+
+  void AddCatalog(const std::string path);
 
   bool Commit(manifest::Manifest *manifest);
 
@@ -271,6 +284,11 @@ class SyncMediator : public virtual AbstractSyncMediator {
    */
   XattrList default_xattrs;
   UniquePtr<Counters> counters_;
+
+  /**
+   * This set will contains the path of (sub-)catalog to add to the repository.
+   */
+  std::set<std::string> catalog_to_add_;
 };  // class SyncMediator
 
 }  // namespace publish
