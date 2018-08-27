@@ -45,6 +45,6 @@ Options:" >&2
   if [ x"$CVMFS_SERVER_SUBCOMMAND_EXAMPLES" != x"" ]; then
     echo "
 Examples:
-$CVMFS_SERVER_SUBCOMMAND_EXAMPLES" >&2
+$(echo "$CVMFS_SERVER_SUBCOMMAND_EXAMPLES" |sed 's/^/    /')" >&2
   fi
 }

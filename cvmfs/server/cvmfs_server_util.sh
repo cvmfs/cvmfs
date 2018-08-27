@@ -997,7 +997,7 @@ usage() {
   echo "\
 CernVM-FS Server Tool $(cvmfs_version_string)
 
-Usage: cvmfs_server COMMAND [options] <parameters>
+Usage: cvmfs_server <command> [options] [parameters]
 
 Supported Commands:
 

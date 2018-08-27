@@ -6,10 +6,16 @@
 # Implementation of the "cvmfs_server abort command"
 
 _CVMFS_SERVER_ABORT_SHORT="Abort transaction and return to the state before"
-_CVMFS_SERVER_ABORT_DESCRIPTION="TODO"
 _CVMFS_SERVER_ABORT_SYNOPSIS="[options] <fqrn>"
+_CVMFS_SERVER_ABORT_DESCRIPTION="Remove all the changes made to the repository since starting the current transaction. After this operation you can start a new transaction and continue where you left after your last publication."
 _CVMFS_SERVER_ABORT_OPTIONS="\
 f:don't ask again"
+_CVMFS_SERVER_ABORT_EXAMPLES="\
+# cvmfs_server mkfs new.test.repo
+# cvmfs_server transaction new.test.repo
+# echo \"Hello World\" > /cvmfs/new.test.repo/hello_world
+# cvmfs_server abort new.test.repo"
+_CVMFS_SERVER_ABORT_SEE_ALSO="*cvmfs_server-transaction*(8), *cvmfs_server-publish*(8)"
 
 cvmfs_server_abort() {
   local names

@@ -23,7 +23,7 @@ cvmfs_server - Software distribution service
 
 SYNOPSIS
 --------
-_cvmfs_server_ <command> [options] <parameters>
+_cvmfs_server_ <command> [options] [parameters]
 
 
 DESCRIPTION
