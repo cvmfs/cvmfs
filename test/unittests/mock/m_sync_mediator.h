@@ -41,6 +41,7 @@ class MockSyncMediator : public AbstractSyncMediator {
   MOCK_METHOD1(AddUnmaterializedDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(EnterDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(LeaveDirectory, void(SharedPtr<SyncItem> entry));
+  MOCK_METHOD1(AddCatalog, void(const std::string location));
   MOCK_METHOD1(Commit, bool(manifest::Manifest *manifest));
   MOCK_CONST_METHOD0(IsExternalData, bool());
   MOCK_CONST_METHOD0(GetCompressionAlgorithm, zlib::Algorithms());
