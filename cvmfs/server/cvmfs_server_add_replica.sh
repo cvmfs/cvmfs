@@ -9,10 +9,10 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
-_CVMFS_SERVER_ADD_REPLICA_SHORT="Creates a Stratum 1 replica of a Stratum 0 repository"
-_CVMFS_SERVER_ADD_REPLICA_DESCRIPTION="TODO"
-_CVMFS_SERVER_ADD_REPLICA_SYNOPSIS="[options] <stratum 0 url> <public key | keys directory>"
-_CVMFS_SERVER_ADD_REPLICA_OPTIONS="\
+_CVMFS_DOC_ADD_REPLICA_SHORT="Creates a Stratum 1 replica of a Stratum 0 repository"
+_CVMFS_DOC_ADD_REPLICA_SYNOPSIS="[options] <stratum 0 url> <public key | keys directory>"
+_CVMFS_DOC_ADD_REPLICA_DESCRIPTION="TODO"
+_CVMFS_DOC_ADD_REPLICA_OPTIONS="\
 a:silence apache warning
 n:alias name
 o:owner

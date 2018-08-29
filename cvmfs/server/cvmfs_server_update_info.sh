@@ -18,10 +18,10 @@ _update_info_cleanup() {
 
 ################################################################################
 
-_CVMFS_SERVER_UPDATE_INFO_SHORT="Open meta info JSON file for editing"
-_CVMFS_SERVER_UPDATE_INFO_DESCRIPTION="TODO"
-_CVMFS_SERVER_UPDATE_INFO_SYNOPSIS="[options]"
-_CVMFS_SERVER_UPDATE_INFO_OPTIONS="\
+_CVMFS_DOC_UPDATE_INFO_SHORT="Open meta info JSON file for editing"
+_CVMFS_DOC_UPDATE_INFO_SYNOPSIS="[options]"
+_CVMFS_DOC_UPDATE_INFO_DESCRIPTION="TODO"
+_CVMFS_DOC_UPDATE_INFO_OPTIONS="\
 e:don't edit /info/meta
 p:no apache config"
 

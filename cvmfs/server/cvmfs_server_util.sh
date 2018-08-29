@@ -942,10 +942,10 @@ _update_geodb() {
 
 ################################################################################
 
-_CVMFS_SERVER_UPDATE_GEODB_SHORT="Updates the geo-IP database"
-_CVMFS_SERVER_UPDATE_GEODB_DESCRIPTION="TODO"
-_CVMFS_SERVER_UPDATE_GEODB_SYNOPSIS="[options]"
-_CVMFS_SERVER_UPDATE_GEODB_OPTIONS="\
+_CVMFS_DOC_UPDATE_GEODB_SHORT="Updates the geo-IP database"
+_CVMFS_DOC_UPDATE_GEODB_SYNOPSIS="[options]"
+_CVMFS_DOC_UPDATE_GEODB_DESCRIPTION="TODO"
+_CVMFS_DOC_UPDATE_GEODB_OPTIONS="\
 l:update lazily based on CVMFS_UPDATEGEO* variables"
 
 cvmfs_server_update_geodb() {

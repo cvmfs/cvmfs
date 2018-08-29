@@ -9,10 +9,10 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
-_CVMFS_SERVER_CHECK_SHORT="Checks if the repository is sane"
-_CVMFS_SERVER_CHECK_DESCRIPTION="TODO"
-_CVMFS_SERVER_CHECK_SYNOPSIS="[options] <fqrn>"
-_CVMFS_SERVER_CHECK_OPTIONS="\
+_CVMFS_DOC_CHECK_SHORT="Checks if the repository is sane"
+_CVMFS_DOC_CHECK_SYNOPSIS="[options] <fqrn>"
+_CVMFS_DOC_CHECK_DESCRIPTION="TODO"
+_CVMFS_DOC_CHECK_OPTIONS="\
 c:disable data chunk existence check
 i:check data integrity (may take some time)
 r:repair reflog problems

@@ -424,10 +424,10 @@ _migrate_139() {
 
 ################################################################################
 
-_CVMFS_SERVER_MIGRATE_SHORT="Migrates a repository to the current version of CernVM-FS"
-_CVMFS_SERVER_MIGRATE_DESCRIPTION="TODO"
-_CVMFS_SERVER_MIGRATE_SYNOPSIS="<fqrn>"
-#_CVMFS_SERVER_MIGRATE_OPTIONS="\
+_CVMFS_DOC_MIGRATE_SHORT="Migrates a repository to the current version of CernVM-FS"
+_CVMFS_DOC_MIGRATE_SYNOPSIS="<fqrn>"
+_CVMFS_DOC_MIGRATE_DESCRIPTION="TODO"
+#_CVMFS_DOC_MIGRATE_OPTIONS="\
 #x:y"
 
 cvmfs_server_migrate() {

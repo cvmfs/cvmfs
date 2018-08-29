@@ -9,10 +9,10 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
-_CVMFS_SERVER_RMFS_SHORT="Remove the repository"
-_CVMFS_SERVER_RMFS_DESCRIPTION="TODO"
-_CVMFS_SERVER_RMFS_SYNOPSIS="[options] <fqrn>"
-_CVMFS_SERVER_RMFS_OPTIONS="\
+_CVMFS_DOC_RMFS_SHORT="Remove the repository"
+_CVMFS_DOC_RMFS_SYNOPSIS="[options] <fqrn>"
+_CVMFS_DOC_RMFS_DESCRIPTION="TODO"
+_CVMFS_DOC_RMFS_OPTIONS="\
 f:don't ask again
 p:preserve repo data and keys"
 

@@ -1,7 +1,7 @@
-_CVMFS_SERVER_PUBLISH_SHORT="Make a new repository snapshot"
-_CVMFS_SERVER_PUBLISH_DESCRIPTION="TODO"
-_CVMFS_SERVER_PUBLISH_SYNOPSIS="[options] [-X|-N] <fqrn>"
-_CVMFS_SERVER_PUBLISH_OPTIONS="\
+_CVMFS_DOC_PUBLISH_SHORT="Make a new repository snapshot"
+_CVMFS_DOC_PUBLISH_SYNOPSIS="[options] [-X|-N] <fqrn>"
+_CVMFS_DOC_PUBLISH_DESCRIPTION="TODO"
+_CVMFS_DOC_PUBLISH_OPTIONS="\
 F:authz info file
 N:force native data
 X:force external data

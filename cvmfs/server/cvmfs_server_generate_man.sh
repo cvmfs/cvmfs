@@ -36,7 +36,7 @@ COMMANDS
 
 
   for subcommand in $_CVMFS_SERVER_COMMANDS; do
-    CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_DOC_${subcommand}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
 
     echo "*cvmfs_server-${subcommand}*(8)" >> "$TMP_OUTPUT"
     if [ x"$CVMFS_SERVER_SUBCOMMAND_SHORT" = x"" ]; then
@@ -73,12 +73,12 @@ SEE ALSO
 
   for subcommand in $_CVMFS_SERVER_COMMANDS; do
     TMP_SUBCOMMAND_OUTPUT="/$1/cvmfs_server-${subcommand}.adoc"
-    CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
-    CVMFS_SERVER_SUBCOMMAND_SYNOPSIS="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_SYNOPSIS" |tr '[a-z]-' '[A-Z]_')'}"')"
-    CVMFS_SERVER_SUBCOMMAND_DESCRIPTION="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_DESCRIPTION" |tr '[a-z]-' '[A-Z]_')'}"')"
-    CVMFS_SERVER_SUBCOMMAND_OPTIONS="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_OPTIONS" |tr '[a-z]-' '[A-Z]_')'}"')"
-    CVMFS_SERVER_SUBCOMMAND_EXAMPLES="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_EXAMPLES" |tr '[a-z]-' '[A-Z]_')'}"')"
-    CVMFS_SERVER_SUBCOMMAND_SEE_ALSO="$(eval echo '"${'$(echo "_CVMFS_SERVER_${subcommand}_SEE_ALSO" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_DOC_${subcommand}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_SYNOPSIS="$(eval echo '"${'$(echo "_CVMFS_DOC_${subcommand}_SYNOPSIS" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_DESCRIPTION="$(eval echo '"${'$(echo "_CVMFS_DOC_${subcommand}_DESCRIPTION" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_OPTIONS="$(eval echo '"${'$(echo "_CVMFS_DOC_${subcommand}_OPTIONS" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_EXAMPLES="$(eval echo '"${'$(echo "_CVMFS_DOC_${subcommand}_EXAMPLES" |tr '[a-z]-' '[A-Z]_')'}"')"
+    CVMFS_SERVER_SUBCOMMAND_SEE_ALSO="$(eval echo '"${'$(echo "_CVMFS_DOC_${subcommand}_SEE_ALSO" |tr '[a-z]-' '[A-Z]_')'}"')"
 
     echo "\
 = cvmfs_server-${subcommand}(8)

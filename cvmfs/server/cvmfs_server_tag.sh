@@ -9,10 +9,10 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
-_CVMFS_SERVER_TAG_SHORT="Create and manage named snapshots. Print named tags (snapshots) of the repository"
-_CVMFS_SERVER_TAG_DESCRIPTION="TODO"
-_CVMFS_SERVER_TAG_SYNOPSIS="[options] <fqrn>"
-_CVMFS_SERVER_TAG_OPTIONS="\
+_CVMFS_DOC_TAG_SHORT="Create and manage named snapshots. Print named tags (snapshots) of the repository"
+_CVMFS_DOC_TAG_SYNOPSIS="[options] <fqrn>"
+_CVMFS_DOC_TAG_DESCRIPTION="TODO"
+_CVMFS_DOC_TAG_OPTIONS="\
 a:create tag <name>
 b:list branch hierarchy
 c:channel

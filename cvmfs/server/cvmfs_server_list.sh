@@ -10,10 +10,10 @@
 # - cvmfs_server_common.sh
 # - cvmfs_server_ssl.sh
 
-_CVMFS_SERVER_LIST_SHORT="List available repositories"
-_CVMFS_SERVER_LIST_DESCRIPTION="TODO"
-_CVMFS_SERVER_LIST_SYNOPSIS="<fqrn>"
-#_CVMFS_SERVER_LIST_OPTIONS="\
+_CVMFS_DOC_LIST_SHORT="List available repositories"
+_CVMFS_DOC_LIST_SYNOPSIS="<fqrn>"
+_CVMFS_DOC_LIST_DESCRIPTION="TODO"
+#_CVMFS_DOC_LIST_OPTIONS="\
 #x:y"
 
 cvmfs_server_list() {

@@ -14,10 +14,10 @@
 # it would be a good idea to refactor common patterns into coherent functions.
 
 
-_CVMFS_SERVER_INGEST_SHORT="Extract the content of the tarfile inside the base directory"
-_CVMFS_SERVER_INGEST_DESCRIPTION="TODO"
-_CVMFS_SERVER_INGEST_SYNOPSIS="-t <tar_file> -b <base_dir> [options] <fqrn>"
-_CVMFS_SERVER_INGEST_OPTIONS="\
+_CVMFS_DOC_INGEST_SHORT="Extract the content of the tarfile inside the base directory"
+_CVMFS_DOC_INGEST_SYNOPSIS="-t <tar_file> -b <base_dir> [options] <fqrn>"
+_CVMFS_DOC_INGEST_DESCRIPTION="TODO"
+_CVMFS_DOC_INGEST_OPTIONS="\
 b:base directory
 d:folder to delete
 t:tarfile | '-' read from STDIN"

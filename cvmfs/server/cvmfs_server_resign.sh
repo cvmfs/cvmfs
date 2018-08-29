@@ -9,10 +9,10 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
-_CVMFS_SERVER_RESIGN_SHORT="Re-sign the whitelist. Default expiration days goes down to 7 with masterkeycard"
-_CVMFS_SERVER_RESIGN_DESCRIPTION="TODO"
-_CVMFS_SERVER_RESIGN_SYNOPSIS="(-p | [options]) <fqrn>"
-_CVMFS_SERVER_RESIGN_OPTIONS="\
+_CVMFS_DOC_RESIGN_SHORT="Re-sign the whitelist. Default expiration days goes down to 7 with masterkeycard"
+_CVMFS_DOC_RESIGN_SYNOPSIS="(-p | [options]) <fqrn>"
+_CVMFS_DOC_RESIGN_DESCRIPTION="TODO"
+_CVMFS_DOC_RESIGN_OPTIONS="\
 d:days until expiration (default 30)]
 f:don't ask again]
 p:re-sign .cvmfspublished

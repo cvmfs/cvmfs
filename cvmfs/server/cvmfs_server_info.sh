@@ -9,10 +9,10 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
-_CVMFS_SERVER_INFO_SHORT="Print summary about the repository"
-_CVMFS_SERVER_INFO_DESCRIPTION="TODO"
-_CVMFS_SERVER_INFO_SYNOPSIS="<fqrn>"
-#_CVMFS_SERVER_INFO_OPTIONS="\
+_CVMFS_DOC_INFO_SHORT="Print summary about the repository"
+_CVMFS_DOC_INFO_SYNOPSIS="<fqrn>"
+_CVMFS_DOC_INFO_DESCRIPTION="TODO"
+#_CVMFS_DOC_INFO_OPTIONS="\
 #x:y"
 
 cvmfs_server_info() {

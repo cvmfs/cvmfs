@@ -19,10 +19,10 @@ cvmfs_server_help() {
     usage "No manual entry for $command"
   fi
 
-  CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_SERVER_${command}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
-  CVMFS_SERVER_SUBCOMMAND_SYNOPSIS="$(eval echo '"${'$(echo "_CVMFS_SERVER_${command}_SYNOPSIS" |tr '[a-z]-' '[A-Z]_')'}"')"
-  CVMFS_SERVER_SUBCOMMAND_OPTIONS="$(eval echo '"${'$(echo "_CVMFS_SERVER_${command}_OPTIONS" |tr '[a-z]-' '[A-Z]_')'}"')"
-  CVMFS_SERVER_SUBCOMMAND_EXAMPLES="$(eval echo '"${'$(echo "_CVMFS_SERVER_${command}_EXAMPLES" |tr '[a-z]-' '[A-Z]_')'}"')"
+  CVMFS_SERVER_SUBCOMMAND_SHORT="$(eval echo '"${'$(echo "_CVMFS_DOC_${command}_SHORT" |tr '[a-z]-' '[A-Z]_')'}"')"
+  CVMFS_SERVER_SUBCOMMAND_SYNOPSIS="$(eval echo '"${'$(echo "_CVMFS_DOC_${command}_SYNOPSIS" |tr '[a-z]-' '[A-Z]_')'}"')"
+  CVMFS_SERVER_SUBCOMMAND_OPTIONS="$(eval echo '"${'$(echo "_CVMFS_DOC_${command}_OPTIONS" |tr '[a-z]-' '[A-Z]_')'}"')"
+  CVMFS_SERVER_SUBCOMMAND_EXAMPLES="$(eval echo '"${'$(echo "_CVMFS_DOC_${command}_EXAMPLES" |tr '[a-z]-' '[A-Z]_')'}"')"
 
   echo "\
 cvmfs_server $command - $CVMFS_SERVER_SUBCOMMAND_SHORT
