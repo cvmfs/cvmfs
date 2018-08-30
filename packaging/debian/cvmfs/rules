@@ -17,7 +17,7 @@ export DH_VERBOSE=1
 #DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 #DEB_CONFIGURE_EXTRA_FLAGS += --libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH)
 
-Makefile: 
+Makefile:
 	dh_testdir
 	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no -DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr
 
@@ -31,9 +31,9 @@ clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp
-	
+
 	# Add here commands to clean up after the build process.
-	
+
 	dh_clean
 
 debian/%.install: debian/%.install.in
@@ -44,7 +44,7 @@ install: build debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-uni
 	dh_testroot
 	dh_prep
 	dh_installdirs
-	
+
 	# Add here commands to install the package into debian/gentoo.
 	dh_auto_install --destdir=${CURDIR}/debian/tmp
 	rm -rf ${CURDIR}/debian/tmp/etc/cvmfs/keys/*
@@ -70,7 +70,7 @@ binary-arch: build install
 #       dh_installemacsen
 #       dh_installpam
 #       dh_installmime
-#	dh_installinit -- defaults 21 
+#	dh_installinit -- defaults 21
 	dh_installcron
 	dh_installman
 	dh_installinfo
@@ -86,7 +86,7 @@ binary-arch: build install
 	dh_shlibdeps
 	dh_gencontrol
 	dh_md5sums
-	dh_builddeb
+	dh_builddeb -- -Zgzip
 
 binary: binary-indep binary-arch
 .PHONY: build clean binary-indep binary-arch binary install
