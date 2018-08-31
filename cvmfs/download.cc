@@ -1245,12 +1245,18 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_COULDNT_RESOLVE_HOST:
       info->error_code = kFailHostResolve;
       break;
-    case CURLE_COULDNT_CONNECT:
     case CURLE_OPERATION_TIMEDOUT:
+      info->error_code = (info->proxy == "DIRECT") ?
+                         kFailHostTooSlow : kFailProxyTooSlow;
+      break;
     case CURLE_PARTIAL_FILE:
     case CURLE_GOT_NOTHING:
     case CURLE_RECV_ERROR:
+      info->error_code = (info->proxy == "DIRECT") ?
+                         kFailHostShortTransfer : kFailProxyShortTransfer;
+      break;
     case CURLE_FILE_COULDNT_READ_FILE:
+    case CURLE_COULDNT_CONNECT:
       if (info->proxy != "DIRECT")
         // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
