@@ -315,7 +315,7 @@ void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
     delete token;
 
   } else if (token->type == kTokenX509) {
-    sslctx_info *p = static_cast<sslctx_info *>(info_data);
+    sslctx_info *p = static_cast<sslctx_info *>(token->data);
     STACK_OF(X509) *chain = p->chain;
     EVP_PKEY *pkey = p->pkey;
     p->chain = NULL;
