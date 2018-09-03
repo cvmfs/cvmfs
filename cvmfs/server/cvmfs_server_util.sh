@@ -939,9 +939,28 @@ _update_geodb() {
   _update_geodb_install && echo "done" || { echo "fail"; return 3; }
 }
 
+
+################################################################################
+
+_CVMFS_DOC_UPDATE_GEODB_SHORT="Updates the geo-IP database"
+_CVMFS_DOC_UPDATE_GEODB_SYNOPSIS="[options]"
+_CVMFS_DOC_UPDATE_GEODB_DESCRIPTION="TODO"
+_CVMFS_DOC_UPDATE_GEODB_OPTIONS="\
+l:update lazily based on CVMFS_UPDATEGEO* variables"
+
 cvmfs_server_update_geodb() {
   _update_geodb $@
 }
+
+
+_CVMFS_SERVER_COMMANDS="abort add-replica catalog-chown check checkout diff gc \
+import info ingest list list-catalogs masterkeycard \
+merge-stats migrate mkfs mount print-stats publish resign rmfs rollback \
+snapshot tag transaction update-geodb update-info update-repoinfo"
+
+# subcommands hidden from help and manual pages
+_CVMFS_SERVER_HIDDEN_COMMANDS="alterfs eliminate-hardlinks fix-permissions \
+generate-man help list-tags lstags skeleton"
 
 
 # checks if the given command name is a supported command of cvmfs_server
@@ -950,13 +969,8 @@ cvmfs_server_update_geodb() {
 # @return   0 if the command was recognized
 is_subcommand() {
   local subcommand="$1"
-  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
-    resign list info tag list-tags lstags check transaction abort snapshot           \
-    skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
-    eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
-    masterkeycard ingest merge-stats print-stats"
 
-  for possible_command in $supported_commands; do
+  for possible_command in $_CVMFS_SERVER_COMMANDS $_CVMFS_SERVER_HIDDEN_COMMANDS; do
     if [ x"$possible_command" = x"$subcommand" ]; then
       return 0
     fi
@@ -983,153 +997,29 @@ usage() {
   echo "\
 CernVM-FS Server Tool $(cvmfs_version_string)
 
-Usage: cvmfs_server COMMAND [options] <parameters>
+Usage: cvmfs_server <command> [options] [parameters]
 
 Supported Commands:
-  mkfs            [-w stratum0 url] [-u upstream storage] [-o owner]
-                  [-m replicable] [-f union filesystem type] [-s S3 config file]
-                  [-g disable auto tags] [-G Set timespan for auto tags]
-                  [-a hash algorithm (default: SHA-1)]
-                  [-z enable garbage collection] [-v volatile content]
-                  [-Z compression algorithm (default: zlib)]
-                  [-k path to existing keychain] [-p no apache config]
-                  [-R require masterkeycard key ]
-                  [-V VOMS authorization] [-X (external data)]
-                  <fully qualified repository name>
-                  Creates a new repository with a given name
-  add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
-                  [-a silence apache warning] [-z enable garbage collection]
-                  [-n alias name] [-s S3 config file] [-p no apache config]
-                  <stratum 0 url> <public key | keys directory>
-                  Creates a Stratum 1 replica of a Stratum 0 repository
-  import          [-w stratum0 url] [-o owner] [-u upstream storage]
-                  [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                  [-f union filesystem type] [-c file ownership (UID:GID)]
-                  [-k path to keys] [-g chown backend] [-r recreate whitelist]
-                  [-p no apache config] [-t recreate repo key and certificate]
-                  [ -R recreate whitelist and require masterkeycard ]
-                  <fully qualified repository name>
-                  Imports an old CernVM-FS repository into a fresh repo
-  publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                  [-a tag name] [-c tag channel] [-m tag description]
-                  [-X (force external data) | -N (force native data)]
-                  [-Z compression algorithm] [-F authz info file]
-                  [-f use force remount if necessary]
-                  <fully qualified name>
-                  Make a new repository snapshot
-  gc              [-r number of revisions to preserve]
-                  [-t time stamp after which revisions are preserved]
-                  [-l print deleted objects] [-L log of deleted objects]
-                  [-f force] [-d dry run]
-                  [-a collect all garbage-collectable repos, log to gc.log |
-                    <fully qualified name> ]
-                  Remove unreferenced data from garbage-collectable repository
-  rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
-                  <fully qualified name>
-                  Remove the repository
-  abort           [-f don't ask again]
-                  <fully qualified name>
-                  Abort transaction and return to the state before
-  rollback        [-t tag] [-f don't ask again]
-                  <fully qualified name>
-                  Re-publishes the given tag as the new latest revision.
-                  All snapshots between trunk and the target tag become
-                  inaccessible.  Without a tag name, trunk-previous is used.
-  resign          [ -w path to existing whitelist ]
-                  [ -d days until expiration (default 30) ]
-                  [ -f don't ask again ]
-                  <fully qualified name>
-                  Re-sign the whitelist.
-                  Default expiration days goes down to 7 with masterkeycard.
-  resign -p       <fully qualified name>
-                  Re-sign .cvmfspublished
-  masterkeycard   -a Checks if a smartcard is available
-                  -k Checks whether a key is stored in a card
-                  -r Reads pub key from a card to stdout
-                  [ -f don't ask again ] -s <fully qualified name>
-                     Stores masterkey and pub key of a repository into a card
-                  [ -f don't ask again ] -d
-                     Deletes a masterkey's certificate (pub key) from a card
-                  [ -f don't ask again ] -c <fully qualified name or wildcard>
-                     Converts given repositories to use card for whitelist
-  list-catalogs   [-s catalog sizes] [-e catalog entry counts]
-                  [-h catalog hashes] [-x machine readable]
-                  <fully qualified name>
-                  Print a full list of all nested catalogs of a repository
-  diff            [-m(achine readable)] [-h(eader line)]
-                  [-s <source tag>] [-d <destination tag>]
-                  <fully qualified name>
-                  Show change set between two snapshots (default: last publish)
-  info            <fully qualified name>
-                  Print summary about the repository
-  tag             Create and manage named snapshots
-                  [-a create tag <name>] [-c channel] [-m message] [-h hash]
-                  [-r remove tag <name>] [-f don't ask again]
-                  [-i inspect tag <name>] [-x machine readable]
-                  [-b list branch hierarchy] [-x machine readable]
-                  [-l list tags] [-x machine readable]
-                  <fully qualified name>
-                  Print named tags (snapshots) of the repository
-  checkout        [-t <tag name>] [-b <branch name>]
-                  <fully qualified name>
-  check           [-c disable data chunk existence check]
-                  [-i check data integrity] (may take some time)]
-                  [-t tag (check given tag instead of trunk)]
-                  [-s path to nested catalog subtree to check]
-                  [-r repair reflog problems]
-                  <fully qualified name>
-                  Checks if the repository is sane
-  transaction     <fully qualified name>
-                  Start to edit a repository
-  snapshot        [-t fail if other snapshot is in progress]
-                  <fully qualified name>
-                  Synchronize a Stratum 1 replica with the Stratum 0 source
-  snapshot -a     [-s use separate logs in /var/log/cvmfs for each repository]
-                  [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
-                  [-i skip repositories that have not run initial snapshot]
-                  Do snapshot on all active replica repositories
-  mount           [-a | <fully qualified name>]
-                  Mount repositories in /cvmfs, for instance after reboot
-  migrate         <fully qualified name>
-                  Migrates a repository to the current version of CernVM-FS
-  catalog-chown   <-u uid map file> <-g gid map file> <fully qualified name>
-                  Bulk change of the ownership ids in CernVM-FS catalogs
-  list            List available repositories
-  update-geodb    [-l update lazily based on CVMFS_UPDATEGEO* variables]
-                  Updates the geo-IP database
-  update-info     [-p no apache config] [-e don't edit /info/meta]
-                  Open meta info JSON file for editing
-  update-repoinfo [-f path to JSON file]
-                  <fully qualified name>
-                  Open repository meta info JSON file for editing
-  ingest          -t tarfile
-                  -b base directory
-                  [-d folder to delete]
-                  <fully qualified name>
-                  Extract the content of the tarfile inside the base directory,
-                  in the same transaction it also delete the required folders.
-                  Use '-' as -t argument to read the tarball from STDIN.
-  print-stats     [-o output_file]
-                  [-t table_name]
-                  [-s separator] - char
-                  <fully qualified name>
-                  Print statistics values for a table (default publish_statistics)
-                  using the separator specified. (default  '|')
-  merge-stats     [-o output db file]
-                  <db_file_1> <db_file_2>
-                  Merge tables from two database files.
-"
 
+$_CVMFS_SERVER_COMMANDS
+
+
+Help for a specific command:
+    \$ cvmfs_server help <command>
+    \$ cvmfs_server <command> --help
+or see manual page:
+    \$ man cvmfs_server
+    \$ man cvmfs_server <command>
+" >&2
 
   if [ x"$errormsg" != x ]; then
     echo "\
 ________________________________________________________________________
 
 NOTE: $errormsg
-"
+" >&2
     exit 3
   else
     exit 2
   fi
 }
-

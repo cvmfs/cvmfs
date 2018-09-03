@@ -9,6 +9,17 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_DOC_GC_SHORT="Remove unreferenced data from garbage-collectable repository"
+_CVMFS_DOC_GC_SYNOPSIS="[options] <fqrn|-a>"
+_CVMFS_DOC_GC_DESCRIPTION="TODO"
+_CVMFS_DOC_GC_OPTIONS="\
+L:log of deleted objects
+a:collect all garbage-collectable repos, log to gc.log
+d:dry run
+f:force
+l:print deleted objects
+r:number of revisions to preserve
+t:time stamp after which revisions are preserved"
 
 cvmfs_server_gc() {
   local names
@@ -328,5 +339,3 @@ __run_gc() {
 
   return 0
 }
-
-

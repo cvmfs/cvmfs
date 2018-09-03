@@ -10,6 +10,13 @@
 # - cvmfs_server_common.sh
 
 
+_CVMFS_DOC_CATALOG_CHOWN_SHORT="Bulk change of the ownership ids in CernVM-FS catalogs"
+_CVMFS_DOC_CATALOG_CHOWN_SYNOPSIS="-u <uid_map_file> -g <gid_map_file> <fqrn>"
+_CVMFS_DOC_CATALOG_CHOWN_DESCRIPTION="TODO"
+_CVMFS_DOC_CATALOG_CHOWN_OPTIONS="\
+g:GID map file
+u:UID map file"
+
 cvmfs_server_catalog_chown() {
   local uid_map
   local gid_map
@@ -55,5 +62,3 @@ cvmfs_server_catalog_chown() {
 
   _run_catalog_migration "$name" "$migrate_command"
 }
-
-

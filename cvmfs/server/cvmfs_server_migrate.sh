@@ -421,6 +421,15 @@ _migrate_139() {
   load_repo_config $name
 }
 
+
+################################################################################
+
+_CVMFS_DOC_MIGRATE_SHORT="Migrates a repository to the current version of CernVM-FS"
+_CVMFS_DOC_MIGRATE_SYNOPSIS="<fqrn>"
+_CVMFS_DOC_MIGRATE_DESCRIPTION="TODO"
+#_CVMFS_DOC_MIGRATE_OPTIONS="\
+#x:y"
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -548,5 +557,3 @@ cvmfs_server_migrate() {
 
   return $retcode
 }
-
-

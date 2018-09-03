@@ -10,6 +10,12 @@
 # - cvmfs_server_common.sh
 # - cvmfs_server_ssl.sh
 
+_CVMFS_DOC_ROLLBACK_SHORT="Re-publishes the given tag as the new latest revision. All snapshots between trunk and the target tag become inaccessible.  Without a tag name, trunk-previous is used"
+_CVMFS_DOC_ROLLBACK_SYNOPSIS="[options] <fqrn>"
+_CVMFS_DOC_ROLLBACK_DESCRIPTION="TODO"
+_CVMFS_DOC_ROLLBACK_OPTIONS="\
+f:don't ask again
+t:tag"
 
 cvmfs_server_rollback() {
   local name
@@ -120,5 +126,3 @@ cvmfs_server_rollback() {
   echo "Flushing file system buffers"
   syncfs
 }
-
-

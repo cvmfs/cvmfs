@@ -9,6 +9,12 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_DOC_INFO_SHORT="Print summary about the repository"
+_CVMFS_DOC_INFO_SYNOPSIS="<fqrn>"
+_CVMFS_DOC_INFO_DESCRIPTION="TODO"
+#_CVMFS_DOC_INFO_OPTIONS="\
+#x:y"
+
 cvmfs_server_info() {
   local name
   local stratum0
@@ -49,5 +55,3 @@ Create /etc/cvmfs/config.d/${name}.conf and set
   CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
 Copy /etc/cvmfs/keys/${name}.pub to the client"
 }
-
-

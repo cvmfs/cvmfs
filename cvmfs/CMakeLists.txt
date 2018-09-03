@@ -752,7 +752,7 @@ add_custom_target (
   ALL
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./make_cvmfs_server.sh ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server
   COMMENT "Generating the cvmfs_server script"
-  )
+)
 
 #
 # installation
@@ -925,6 +925,44 @@ if (BUILD_SERVER)
     PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     RENAME         README
   )
+
+  #
+  # Manual pages
+  #
+  find_program (ASCIIDOCTOR_EXE asciidoctor)
+  if (NOT ASCIIDOCTOR_EXE)
+    message (FATAL_ERROR "Could not find asciidoctor. Try yum/gem install asciidoctor")
+  endif (NOT ASCIIDOCTOR_EXE)
+  install(
+    CODE "file(MAKE_DIRECTORY \${CMAKE_BINARY_DIR}/adoc)"
+  )
+  install(
+    CODE "execute_process(
+      COMMAND cvmfs_server generate-man \${CMAKE_BINARY_DIR}/adoc
+    )"
+  )
+  install(
+    CODE "file(MAKE_DIRECTORY \${CMAKE_BINARY_DIR}/man)"
+  )
+  install(
+    CODE "execute_process(
+      COMMAND asciidoctor -b manpage -D \${CMAKE_BINARY_DIR}/man \${CMAKE_BINARY_DIR}/adoc/*
+    )"
+  )
+  find_program (GZIP_EXE gzip)
+  if (GZIP_EXE)
+    install(
+      CODE "execute_process(
+        COMMAND \${GZIP_EXE} -rf \${CMAKE_BINARY_DIR}/man
+      )"
+    )
+  endif (GZIP_EXE)
+  install (
+    DIRECTORY           ${CMAKE_BINARY_DIR}/man/
+    DESTINATION         /usr/share/man/man8
+    FILE_PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
+
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)

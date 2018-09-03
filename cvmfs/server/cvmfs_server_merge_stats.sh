@@ -122,6 +122,15 @@ cvmfs_server_merge_checks() {
   return 0
 }
 
+
+################################################################################
+
+_CVMFS_DOC_MERGE_STATS_SHORT="Merge tables from two database files"
+_CVMFS_DOC_MERGE_STATS_SYNOPSIS="[options] <db_file_1> <db_file_2>"
+_CVMFS_DOC_MERGE_STATS_DESCRIPTION="TODO"
+_CVMFS_DOC_MERGE_STATS_OPTIONS="\
+o:output db file"
+
 cvmfs_server_merge_stats() {
   trap clean_up EXIT HUP INT TERM || return $?
 

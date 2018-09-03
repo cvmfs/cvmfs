@@ -9,6 +9,15 @@
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
+_CVMFS_DOC_CHECK_SHORT="Checks if the repository is sane"
+_CVMFS_DOC_CHECK_SYNOPSIS="[options] <fqrn>"
+_CVMFS_DOC_CHECK_DESCRIPTION="TODO"
+_CVMFS_DOC_CHECK_OPTIONS="\
+c:disable data chunk existence check
+i:check data integrity (may take some time)
+r:repair reflog problems
+s:path to nested catalog subtree to check
+t:tag (check given tag instead of trunk)"
 
 cvmfs_server_check() {
   local name
@@ -168,4 +177,3 @@ __check_repair_reflog() {
     fi
   fi
 }
-

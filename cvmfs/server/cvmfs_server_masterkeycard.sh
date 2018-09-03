@@ -95,6 +95,20 @@ masterkeycard_sign() {
   fi
 }
 
+
+################################################################################
+
+_CVMFS_DOC_MASTERKEYCARD_SHORT="TODO"
+_CVMFS_DOC_MASTERKEYCARD_SYNOPSIS="(-a|-k|-r) | ([-f] -c|-s <fqrn>) | ([-f] -d)"
+_CVMFS_DOC_MASTERKEYCARD_DESCRIPTION="TODO"
+_CVMFS_DOC_MASTERKEYCARD_OPTIONS="\
+a:checks if a smartcard is available
+c:converts given repositories to use card for whitelist
+d:deletes a masterkey's certificate (pub key) from a card
+k:checks whether a key is stored in a card
+r:reads pub key from a card to STDOUT
+s:stores masterkey and pub key of a repository into a card"
+
 cvmfs_server_masterkeycard() {
   local names
   local name
@@ -261,5 +275,3 @@ cvmfs_server_masterkeycard() {
 
   return $retcode
 }
-
-
