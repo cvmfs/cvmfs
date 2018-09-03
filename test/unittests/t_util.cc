@@ -1157,6 +1157,8 @@ TEST_F(T_Util, HasPrefix) {
   EXPECT_TRUE(HasPrefix("hasprefix", "HAs", true));
   EXPECT_TRUE(HasPrefix("HAsprefix", "HAs", true));
   EXPECT_TRUE(HasPrefix("HAsprefix", "", true));
+  EXPECT_TRUE(HasPrefix("", "", false));
+  EXPECT_TRUE(HasPrefix("X", "X", false));
 }
 
 TEST_F(T_Util, SplitString) {

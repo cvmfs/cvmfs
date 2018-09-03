@@ -179,6 +179,7 @@ class AbstractCatalogManager : public SingleCopy {
                       const shash::Algorithms interpret_hashes_as,
                       FileChunkList *chunks);
   void SetOwnerMaps(const OwnerMap &uid_map, const OwnerMap &gid_map);
+  void SetCatalogWatermark(unsigned limit);
 
   shash::Any GetNestedCatalogHash(const PathString &mountpoint);
 
@@ -250,6 +251,7 @@ class AbstractCatalogManager : public SingleCopy {
   bool AttachCatalog(const std::string &db_path, CatalogT *new_catalog);
   void DetachCatalog(CatalogT *catalog);
   void DetachSubtree(CatalogT *catalog);
+  void DetachSiblings(const PathString &current_tree);
   void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
   bool IsAttached(const PathString &root_path,
                   CatalogT **attached_catalog) const;
@@ -274,14 +276,18 @@ class AbstractCatalogManager : public SingleCopy {
   void CheckInodeWatermark();
 
   /**
-   * This list is only needed to find a catalog given an inode.
-   * This might possibly be done by walking the catalog tree, similar to
-   * finding a catalog given the path.
+   * The flat list of all attached catalogs.
    */
   CatalogList catalogs_;
   int inode_watermark_status_;  /**< 0: OK, 1: > 32bit */
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
+  /**
+   * Try to keep number of nested catalogs below the given limit. Zero means no
+   * limit. Surpassing the watermark on mounting a catalog triggers
+   * a DetachSiblings() call.
+   */
+  unsigned catalog_watermark_;
   /**
    * Not protected by a read lock because it can only change when the root
    * catalog is exchanged (during big global lock of the file system).

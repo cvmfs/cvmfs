@@ -1204,6 +1204,10 @@ bool MountPoint::CreateCatalogManager() {
     fixed_catalog_ = true;
   }
 
+  if (options_mgr_->GetValue("CVMFS_CATALOG_WATERMARK", &optarg)) {
+    catalog_mgr_->SetCatalogWatermark(String2Uint64(optarg));
+  }
+
   if (catalog_mgr_->volatile_flag()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "content of repository flagged as VOLATILE");
   }
