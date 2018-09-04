@@ -427,7 +427,7 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
   int num_bytes;
   unsigned i = 0;
   unsigned backoff_ms = 1;
-  unsigned max_backoff_ms = 256;
+  const unsigned max_backoff_ms = 256;
   do {
     // When the writer is not connected, this takes ~200-300ns per call as per
     // micro benchmarks
@@ -437,7 +437,7 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
     i++;
     // Start backing off when the busy loop reaches the ballpark of 1ms
     if ((i > 3000) && (num_bytes == 0)) {
-      // The BackoffThrottle pulls in too many dependencies
+      // The BackoffThrottle would pull in too many dependencies
       SafeSleepMs(backoff_ms);
       if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
     }
