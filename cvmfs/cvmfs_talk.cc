@@ -7,13 +7,90 @@
 #include <errno.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "logging.h"
 #include "options.h"
 #include "util/posix.h"
 #include "util/pointer.h"
+#include "util/string.h"
+
+
+struct InstanceInfo {
+  bool IsDefined() {
+    return !socket_path.empty() || !instance_name.empty();
+  }
+
+  // Called at most once by DeterminePath
+  static std::string GetDefaultDomain() {
+    std::string result;
+    BashOptionsManager options_mgr;
+    options_mgr.ParseDefault("");
+    bool retval = options_mgr.GetValue("CVMFS_DEFAULT_DOMAIN", &result);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Error: could not determin CVMFS_DEFAULT_DOMAIN");
+    }
+    return result;
+  }
+
+  bool DeterminePaths() {
+    std::string fqrn = instance_name;
+    if (fqrn.find('.') == std::string::npos) {
+      static std::string default_domain = GetDefaultDomain();
+      fqrn = fqrn + "." + default_domain;
+    }
+
+    BashOptionsManager options_mgr;
+    options_mgr.ParseDefault(fqrn);
+    if (!options_mgr.GetValue("CVMFS_WORKSPACE", &workspace)) {
+      if (!options_mgr.GetValue("CVMFS_CACHE_DIR", &workspace)) {
+        bool retval = options_mgr.GetValue("CVMFS_CACHE_BASE", &workspace);
+        if (!retval) {
+          LogCvmfs(kLogCvmfs, kLogStderr,
+                   "CVMFS_WORKSPACE, CVMFS_CACHE_DIR, and CVMFS_CACHE_BASE "
+                   "missing");
+          return false;
+        }
+
+        std::string optarg;
+        if (options_mgr.GetValue("CVMFS_SHARED_CACHE", &optarg) &&
+            options_mgr.IsOn(optarg))
+        {
+          workspace += "/shared";
+        } else {
+          workspace += "/" + fqrn;
+        }
+      }
+    }
+
+    socket_path = workspace + "/cvmfs_io." + fqrn;
+    return true;
+  }
+
+  bool CompleteInfo() {
+    assert(IsDefined());
+
+    if (socket_path.empty()) {
+      bool retval = DeterminePaths();
+      if (!retval)
+        return false;
+      identifier = "instance '" + instance_name + "' active in " + workspace;
+    } else {
+      workspace = GetParentPath(socket_path);
+      identifier = "instance listening at " + socket_path;
+    }
+    return true;
+  }
+
+  std::string socket_path;
+  std::string instance_name;
+  std::string workspace;
+  std::string identifier;
+};
 
 
 static bool ReadResponse(int fd) {
@@ -32,54 +109,33 @@ static bool ReadResponse(int fd) {
 }
 
 
-// Called at most once by DetermineInstancePath
-static std::string GetDefaultDomain() {
-  std::string result;
-  BashOptionsManager options_mgr;
-  options_mgr.ParseDefault("");
-  bool retval = options_mgr.GetValue("CVMFS_DEFAULT_DOMAIN", &result);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Error: could not determin CVMFS_DEFAULT_DOMAIN");
-  }
-  return result;
-}
+bool SendCommand(const std::string &command, InstanceInfo instance_info) {
+  bool retval = instance_info.CompleteInfo();
+  if (!retval) return false;
 
-static bool DetermineInstancePaths(
-  const std::string &instance,
-  std::string *socket_path,
-  std::string *workspace)
-{
-  std::string fqrn = instance;
-  if (fqrn.find('.') == std::string::npos) {
-    static std::string default_domain = GetDefaultDomain();
-    fqrn = fqrn + "." + default_domain;
-  }
-
-  BashOptionsManager options_mgr;
-  options_mgr.ParseDefault(fqrn);
-  if (!options_mgr.GetValue("CVMFS_WORKSPACE", workspace)) {
-    if (!options_mgr.GetValue("CVMFS_CACHE_DIR", workspace)) {
-      bool retval = options_mgr.GetValue("CVMFS_CACHE_BASE", workspace);
-      if (!retval) {
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "CVMFS_WORKSPACE, CVMFS_CACHE_DIR, and CVMFS_CACHE_BASE "
-                 "missing");
-        return false;
-      }
-
-      std::string optarg;
-      if (options_mgr.GetValue("CVMFS_SHARED_CACHE", &optarg) &&
-          options_mgr.IsOn(optarg))
-      {
-        *workspace += "/shared";
-      } else {
-        *workspace += "/" + fqrn;
-      }
+  int fd = ConnectSocket(instance_info.socket_path);
+  if (fd < 0) {
+    if (errno == ENOENT) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Seems like CernVM-FS is not running in %s (not found: %s)",
+               instance_info.workspace.c_str(),
+               instance_info.socket_path.c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Could not access %s (%d - %s)",
+               instance_info.identifier.c_str(), errno, strerror(errno));
     }
+    return false;
   }
 
-  *socket_path = *workspace + "/cvmfs_io." + fqrn;
+  WritePipe(fd, command.data(), command.size());
+  retval = ReadResponse(fd);
+  close(fd);
+
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Broken connection to %s (%d - %s)",
+             instance_info.identifier.c_str(), errno, strerror(errno));
+    return false;
+  }
   return true;
 }
 
@@ -152,10 +208,7 @@ static void Usage(const std::string &exe) {
 
 
 int main(int argc, char *argv[]) {
-  std::string socket_path;
-  std::string instance;
-  std::string workspace;
-  std::string identifier;
+  InstanceInfo instance_info;
   std::string command;
 
   int c;
@@ -168,10 +221,10 @@ int main(int argc, char *argv[]) {
         Usage(argv[0]);
         return 0;
       case 'p':
-        socket_path = optarg;
+        instance_info.socket_path = optarg;
         break;
       case 'i':
-        instance = optarg;
+        instance_info.instance_name = optarg;
         break;
       case '?':
       default:
@@ -190,41 +243,24 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (socket_path.empty()) {
-    if (instance.empty()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Specify either -i or -p");
-      return 1;
+  int retcode = 0;
+  if (!instance_info.IsDefined()) {
+    BashOptionsManager options_mgr;
+    options_mgr.ParseDefault("");
+    std::string opt_repos;
+    options_mgr.GetValue("CVMFS_REPOSITORIES", &opt_repos);
+    std::vector<std::string> repos = SplitString(opt_repos, ',');
+    for (unsigned i = 0; i < repos.size(); ++i) {
+      if (repos[i].empty())
+        continue;
+      instance_info.instance_name = repos[i];
+      LogCvmfs(kLogCvmfs, kLogStdout, "%s:", repos[i].c_str());
+      bool retval = SendCommand(command, instance_info);
+      if (!retval) retcode = 1;
     }
-    bool retval = DetermineInstancePaths(instance, &socket_path, &workspace);
-    if (!retval)
-      return 1;
-    identifier = "instance '" + instance + "' active in " + workspace;
   } else {
-    workspace = GetParentPath(socket_path);
-    identifier = "instance listening at " + socket_path;
+    bool retval = SendCommand(command, instance_info);
+    if (!retval) retcode = 1;
   }
-
-  int fd = ConnectSocket(socket_path);
-  if (fd < 0) {
-    if (errno == ENOENT) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Seems like CernVM-FS is not running in %s (not found: %s)",
-               workspace.c_str(), socket_path.c_str());
-    } else {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Could not access %s (%d - %s)",
-               identifier.c_str(), errno, strerror(errno));
-    }
-    return 1;
-  }
-
-  WritePipe(fd, command.data(), command.size());
-  bool retval = ReadResponse(fd);
-  close(fd);
-
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Broken connection to %s (%d - %s)",
-             identifier.c_str(), errno, strerror(errno));
-    return 1;
-  }
-  return 0;
+  return retcode;
 }
