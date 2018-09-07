@@ -87,6 +87,30 @@ BENCHMARK_REGISTER_F(BM_Syscalls, InprocMakePipe)->Repetitions(3)->
   UseRealTime();
 
 
+/**
+ * Used to adjust the backoff time for the busy wait in ReadHalfPipe()
+ */
+BENCHMARK_DEFINE_F(BM_Syscalls, ReadHalfPipe)(benchmark::State &st) {
+  static const char *kFifoPath = "cvmfs_bench.fifo";
+  int retval = mkfifo(kFifoPath, 0600);
+  assert(retval == 0);
+  int fd = open(kFifoPath, O_RDONLY | O_NONBLOCK);
+  assert(fd >= 0);
+  uint64_t buf;
+
+  while (st.KeepRunning()) {
+    int nbytes = read(fd, &buf, sizeof(buf));
+    assert(nbytes == 0);
+  }
+
+  close(fd);
+  unlink(kFifoPath);
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Syscalls, ReadHalfPipe)->Repetitions(3)->
+  UseRealTime();
+
+
 
 void *MainPipeReader(void *data) {
   int fd = *reinterpret_cast<int *>(data);
