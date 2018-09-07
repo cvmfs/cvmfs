@@ -770,7 +770,7 @@ add_custom_target (
 
 if (BUILD_CVMFS)
   install (
-    TARGETS      cvmfs_talk cvmfs2 cvmfs_fsck
+    TARGETS      cvmfs2 cvmfs_fsck cvmfs_talk
     RUNTIME
     DESTINATION    bin
   )
@@ -786,6 +786,13 @@ if (BUILD_CVMFS)
     LIBRARY
     DESTINATION    ${CMAKE_INSTALL_LIBDIR}
   )
+
+  install (
+    FILES      cvmfs_config
+    DESTINATION    bin
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+
 
   if(INSTALL_BASH_COMPLETION)
     install (
