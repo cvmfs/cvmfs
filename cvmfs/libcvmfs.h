@@ -142,6 +142,7 @@ struct cvmfs_attr {
   /* This information is allocated and should be freed */
   char * cvm_checksum;
   char * cvm_symlink;
+  char * cvm_parent;
   char * cvm_name;
   void * cvm_xattrs;
 };
@@ -179,6 +180,10 @@ char *cvmfs_statistics_format(cvmfs_context *ctx);
  * An option map must be created an populated before calling cvmfs_init_v2().
  */
 cvmfs_option_map *cvmfs_options_init();
+
+
+void cvmfs_enable_threaded(cvmfs_context *ctx);
+
 /**
  * Creates a new option map based on the legacy option string that would be
  * passed to the legacy function cvmfs_init().  Returns NULL if legacy_options
@@ -392,6 +397,26 @@ int cvmfs_listdir(
   cvmfs_context *ctx,
   const char *path,
   char ***buf,
+  size_t *buflen);
+
+/**
+ * Get list of directory contents.  The list does not include "." or "..".
+ *
+ * On return, the array will contain a NULL-terminated list of strings.  The
+ * caller must free the strings and the array containing them.  The array (*buf)
+ * may be NULL when this function is called.
+ *
+ * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
+ * @param[out] buf, pointer to dynamically allocated NULL-terminated array of
+ *             strings
+ * @param[in] buflen, pointer to variable containing size of array
+ * \return 0 on success, -1 on failure (sets errno)
+ */
+int cvmfs_listdir_contents(
+  cvmfs_context *ctx,
+  const char *path,
+  char ***buf,
+  size_t *listlen,
   size_t *buflen);
 
 /**

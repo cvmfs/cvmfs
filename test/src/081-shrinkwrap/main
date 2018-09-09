@@ -1,0 +1,156 @@
+cvmfs_test_name="shrinkwrap"
+
+. ./test_functions
+
+cleanup() {
+    sudo rm -f /tmp/cvmfs-$repo.trace.log 2> /dev/null
+    sudo rm -f /tmp/cvmfs-$repo.spec.txt  2> /dev/null
+ 
+    sudo rm -rf /tmp/cvmfs 2> /dev/null
+    sudo rm -rf /var/lib/cvmfs/shrinkwrap 2> /dev/null
+    sudo umount /cvmfs/ 2> /dev/null
+}
+
+redun_umount() {
+  local repositories=$1
+  local times=5
+  local result=-1
+
+  for r in $(echo $repositories | tr , " "); do
+    while (( result != 0 && times > 0  )); do
+      sudo umount $r > /dev/null 2>&1
+      result=$?
+      times=$(( $times - 1 ))
+      if [ $result -ne 0 ] && [ $times -gt 0 ]; then
+        echo "Failed to umount. Trying again..." $r
+        sleep 1
+      fi
+    done
+
+    if [ $result -ne 0 ]; then
+      lsof | grep $r 
+      return 200
+    fi
+
+    times=5
+    result=-1
+  done
+
+  return 0
+}
+
+
+cvmfs_run_test() {
+    logfile=$1
+    local repo="sft.cern.ch"
+    echo "*** Setup..."
+    cleanup
+    trap cleanup HUP EXIT TERM INT || return 4
+    echo "*** Mounting test repository..."
+    cvmfs_mount $repo "GLITE_VERSION=util" "CVMFS_TRACEFILE=/tmp/cvmfs-@fqrn@.trace.log" "CVMFS_TRACEBUFFER=4096" "CVMFS_TRACEBUFFER_THRESHOLD=2048" > /dev/null
+
+    echo "Checking trace log creation..."
+    sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
+
+    if [ ! -f /tmp/cvmfs-$repo.trace.log ]; then
+        echo "*** ERROR: Log file was not created"
+        return 2
+    fi
+
+    sudo truncate -s0 /tmp/cvmfs-$repo.trace.log > /dev/null
+
+    echo "*** Executing a few operations to check tracing..."
+
+    . /cvmfs/sft.cern.ch/lcg/releases/gcc/7.1.0/x86_64-centos7/setup.sh
+    . /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.10.04-4c60e/x86_64-centos7-gcc7-opt/ROOT-env.sh
+    . /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.10.04-4c60e/x86_64-centos7-gcc7-opt/bin/thisroot.sh
+
+    root -h
+
+    sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
+
+    echo "*** Creating specification file..."
+
+    sudo python $TEST_ROOT/../add-ons/export_plugin/spec_builder.py /tmp/cvmfs-$repo.trace.log /tmp/cvmfs-$repo.spec.txt
+    result=$?
+
+    if [[ $result != 0 ]]; then
+      echo "*** ERROR: failed to create specification : " $result
+      return 3
+    fi
+
+
+    echo "*** Creating shrinkwrapped repository..."
+
+    sudo cvmfs_shrinkwrap -r $repo -f $TEST_ROOT/src/081-shrinkwrap/$repo.config -t /tmp/cvmfs-$repo.spec.txt
+    result=$?
+
+    if [[ $result != 0 ]]; then
+      echo "*** ERROR: failed to create shrinkwrapped repository : " $result
+      return 4
+    fi
+
+    # This is verifies the file exists, but was not part of the spec.
+    # this is used later to verify the creation and mount were successful.
+    ls /cvmfs/sft.cern.ch/lcg/mapfile.txt
+    result=$?
+
+    if [[ $result != 0 ]]; then
+      echo "*** ERROR: /cvmfs/sft.cern.ch/lcg/mapfile.txt should be present : " $result
+      return 5
+    fi
+
+    echo "*** Unmount CMVFS and remount recreated repo..."
+
+    sudo service autofs stop
+
+    sudo mkdir -p /cvmfs/
+    sudo mount --bind /tmp/cvmfs/ /cvmfs/
+    result=$?
+
+    if [[ $result != 0 ]]; then
+      echo "*** ERROR: failed to mount repository : " $result
+      return 6
+    fi
+
+    echo "*** Try same steps as before used to create specification..."
+
+    . /cvmfs/sft.cern.ch/lcg/releases/gcc/7.1.0/x86_64-centos7/setup.sh
+    . /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.10.04-4c60e/x86_64-centos7-gcc7-opt/ROOT-env.sh
+    . /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.10.04-4c60e/x86_64-centos7-gcc7-opt/bin/thisroot.sh
+
+    root -h
+    result=$?
+
+    # root returns 1 for with -h option
+    if [[ $result != 1 ]]; then
+      echo "*** ERROR: root failed to run : " $result
+      return 7
+    fi
+
+
+    ls /cvmfs/sft.cern.ch/lcg/mapfile.txt
+    result=$?
+
+    if [[ $result != 2 ]]; then
+      echo "*** ERROR: file should not be present : " $result
+      return 8
+    fi
+
+    echo "*** Unmount and clean repo..."
+
+    rm -rf /tmp/cvmfs
+    rm -rf /var/lib/cvmfs/shrinkwrap
+
+    redun_umount /cvmfs/
+    result=$?
+
+    if [[ $result != 0 ]]; then
+      echo "*** ERROR: failed to mount repository : " $result
+      return 9
+    fi
+
+
+    return 0
+}
+

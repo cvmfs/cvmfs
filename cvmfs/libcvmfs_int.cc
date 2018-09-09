@@ -220,6 +220,9 @@ LibContext::~LibContext() {
   delete options_mgr_;
 }
 
+void LibContext::EnableMultiThreaded() {
+  mount_point_->download_mgr()->Spawn();
+}
 
 bool LibContext::GetDirentForPath(const PathString         &path,
                                   catalog::DirectoryEntry  *dirent)
@@ -328,6 +331,7 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
   }
 
   CvmfsAttrFromDirent(dirent, info);
+  info->cvm_parent = strdup(GetParentPath(c_path).c_str());
   if (dirent.HasXattrs()) {
     XattrList *xattrs = new XattrList();
     mount_point_->catalog_mgr()->LookupXattrs(p, xattrs);
@@ -367,7 +371,9 @@ int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
 int LibContext::ListDirectory(
   const char *c_path,
   char ***buf,
-  size_t *buflen
+  size_t *listlen,
+  size_t *buflen,
+  bool self_reference
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
@@ -391,18 +397,19 @@ int LibContext::ListDirectory(
     return -ENOTDIR;
   }
 
-  size_t listlen = 0;
-  AppendStringToList(NULL, buf, &listlen, buflen);
+  AppendStringToList(NULL, buf, listlen, buflen);
 
   // Build listing
 
-  // Add current directory link
-  AppendStringToList(".", buf, &listlen, buflen);
+  if (self_reference) {
+    // Add current directory link
+    AppendStringToList(".", buf, listlen, buflen);
 
-  // Add parent directory link
-  catalog::DirectoryEntry p;
-  if (d.inode() != mount_point_->catalog_mgr()->GetRootInode()) {
-    AppendStringToList("..", buf, &listlen, buflen);
+    // Add parent directory link
+    catalog::DirectoryEntry p;
+    if (d.inode() != mount_point_->catalog_mgr()->GetRootInode()) {
+      AppendStringToList("..", buf, listlen, buflen);
+    }
   }
 
   // Add all names
@@ -412,7 +419,7 @@ int LibContext::ListDirectory(
   }
   for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
     AppendStringToList(listing_from_catalog.AtPtr(i)->name.c_str(),
-                          buf, &listlen, buflen);
+                          buf, listlen, buflen);
   }
 
   return 0;

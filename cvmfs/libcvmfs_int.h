@@ -96,9 +96,14 @@ class LibContext : SingleCopy {
                             OptionsManager *options_mgr);
   ~LibContext();
 
+  void EnableMultiThreaded();
   int GetAttr(const char *c_path, struct stat *info);
   int Readlink(const char *path, char *buf, size_t size);
-  int ListDirectory(const char *path, char ***buf, size_t *buflen);
+  int ListDirectory(const char *path,
+                    char ***buf,
+                    size_t *listlen,
+                    size_t *buflen,
+                    bool self_reference);
 
   int Open(const char *c_path);
   int64_t Pread(int fd, void *buf, uint64_t size, uint64_t off);
