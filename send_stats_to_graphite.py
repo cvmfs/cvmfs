@@ -16,6 +16,8 @@ import sys
 import time
 from calendar import timegm
 
+
+
 def get_data_publish_stats():
     # check in server.conf if CVMFS_STATISTICS_DB variable is set
     conn = sqlite3.connect('stats.db') # change path
@@ -40,9 +42,12 @@ def run(sock):
     lines = []
 
     data = get_data_publish_stats()
+    f=open("info.txt","w+") # todo: change path
 
     # do this for the last 10 entries? # I will change this
-    for x in xrange(1,10):
+    for x in xrange(0,9):
+        print x
+        print data[x][0]
         time_obj = time.strptime(data[x][0], "%Y-%m-%d %H:%M:%S")
         timestamp_epoch = timegm(time_obj)
         tuples.append(('cvmfs.publish.files_added', (timestamp_epoch, data[x][1])))
@@ -65,6 +70,10 @@ def run(sock):
     sock.sendall(size)
     sock.sendall(package)
 
+    # write the last finished_time into a file
+    f.write(data[0][0]+"\n") # write puclish_statistics last finished_timestamp
+    f.write("alt timestamp\n") # write gc_statistics last finished_timestamp
+
 def main():
     parser = argparse.ArgumentParser(description='Send stats to carbon server using pickle.')
     parser.add_argument('CARBON_SERVER_IP', metavar='<IP>', type=str,
@@ -83,7 +92,7 @@ def main():
     except socket.error:
         raise SystemExit("Couldn't connect to %(server)s on port %(port)d, is graphite running in a docker environment?" % { 'server':CARBON_SERVER_IP, 'port':CARBON_PICKLE_PORT })
 
-    # send data continuously
+    # send data
     try:
         run(sock)
     except KeyboardInterrupt:
