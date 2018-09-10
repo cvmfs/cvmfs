@@ -18,45 +18,91 @@ from calendar import timegm
 
 
 
-def get_data_publish_stats():
+def get_data_publish_stats(last_timestamp):
+    # check in server.conf if CVMFS_STATISTICS_DB variable is set
+    conn = sqlite3.connect('stats.db') # change path
+    c = conn.cursor()
+    print "Last publish submitted:" + last_timestamp
+    # order DESC by id ---> first element of the list has the last start_time
+    c.execute('SELECT start_time, files_added, files_removed, files_changed \
+                FROM publish_statistics \
+                WHERE start_time > ("%s") \
+                ORDER BY publish_id DESC' % last_timestamp)
+    return c.fetchall() 
+
+
+def get_data_gc_stats(last_timestamp):
     # check in server.conf if CVMFS_STATISTICS_DB variable is set
     conn = sqlite3.connect('stats.db') # change path
     c = conn.cursor()
 
-    c.execute('SELECT finished_time, files_added, files_removed, files_changed FROM publish_statistics ORDER BY publish_id DESC')
-    return c.fetchmany(10)
+    print "Last gc submitted:" + last_timestamp
 
-
-def get_data_gc_stats():
-    # check in server.conf if CVMFS_STATISTICS_DB variable is set
-    conn = sqlite3.connect('stats.db') # change path
-    c = conn.cursor()
-
-    # todo: change this to take useful data from gc_statistics
-    c.execute('SELECT finished_time, files_added, files_removed, files_changed FROM publish_statistics ORDER BY publish_id DESC')
-    return c.fetchmany(10)
+    # order DESC by id ---> first element of the list has the last start_time
+    c.execute('SELECT start_time, n_preserved_catalogs, n_condemned_catalogs, n_condemned_objects, sz_condemned_bytes \
+                FROM gc_statistics \
+                WHERE start_time > ("%s") \
+                ORDER BY gc_id DESC' % last_timestamp )
+    return c.fetchall() 
 
 
 def run(sock):
     tuples = ([])
     lines = []
 
-    data = get_data_publish_stats()
-    f=open("info.txt","w+") # todo: change path
+    # the following file must have two timestamps (one per line):
+    # last_start_time_sent_for_publish_statistics
+    # last_start_time_sent_for_gc_statistics
+    
+    f=open("aux.txt", "r+") # todo: change path
 
-    # do this for the last 10 entries? # I will change this
-    for x in xrange(0,9):
-        print x
-        print data[x][0]
-        time_obj = time.strptime(data[x][0], "%Y-%m-%d %H:%M:%S")
-        timestamp_epoch = timegm(time_obj)
-        tuples.append(('cvmfs.publish.files_added', (timestamp_epoch, data[x][1])))
-        tuples.append(('cvmfs.publish.files_removed', (timestamp_epoch, data[x][2])))
-        tuples.append(('cvmfs.publish.files_changed', (timestamp_epoch, data[x][3])))
-        #just for DBG
-        lines.append("cvmfs.publish.files_added %s %s" % (data[x][1], data[x][0]))
-        lines.append("cvmfs.publish.files_removed %s %s" % (data[x][2], data[x][0]))
-        lines.append("cvmfs.publish.files_changed %s %s" % (data[x][3], data[x][0]))
+    # read first two lines
+    publish_timestamp = f.readline()[:-1] # delete the newline character
+    gc_timestamp = f.readline()
+    
+    
+    f.truncate() # delete file content
+    f.seek(0)    # move file cursor
+
+    print publish_timestamp
+    print gc_timestamp
+
+    publish_stats = get_data_publish_stats(publish_timestamp)
+    gc_stats = get_data_gc_stats(gc_timestamp)
+    print "length stats publish=%d " % len(publish_stats)
+    print "length   stats    gc=%d " % len(gc_stats)
+
+    if len(publish_stats) > 0:
+        publish_timestamp = publish_stats[0][0]
+        for x in xrange(0,len(publish_stats)):
+            print "x = %d" % x
+            print publish_stats[x][0]
+            time_obj = time.strptime(publish_stats[x][0], "%Y-%m-%d %H:%M:%S")
+            timestamp_epoch = timegm(time_obj)
+            tuples.append(('cvmfs.publish.files_added', (timestamp_epoch, publish_stats[x][1])))
+            tuples.append(('cvmfs.publish.files_removed', (timestamp_epoch, publish_stats[x][2])))
+            tuples.append(('cvmfs.publish.files_changed', (timestamp_epoch, publish_stats[x][3])))
+            #just for DBG
+            lines.append("cvmfs.publish.files_added %s %s" % (publish_stats[x][1], publish_stats[x][0]))
+            lines.append("cvmfs.publish.files_removed %s %s" % (publish_stats[x][2], publish_stats[x][0]))
+            lines.append("cvmfs.publish.files_changed %s %s" % (publish_stats[x][3], publish_stats[x][0]))
+
+    if len(gc_stats) > 0:
+        gc_timestamp=gc_stats[0][0]
+        for x in xrange(0,len(gc_stats)):
+            print "x = %d" % x
+            print gc_stats[x][0]
+            time_obj = time.strptime(gc_stats[x][0], "%Y-%m-%d %H:%M:%S")
+            timestamp_epoch = timegm(time_obj)
+            tuples.append(('cvmfs.gc.n_preserved_catalogs', (timestamp_epoch, gc_stats[x][1])))
+            tuples.append(('cvmfs.gc.n_condemned_catalogs', (timestamp_epoch, gc_stats[x][2])))
+            tuples.append(('cvmfs.gc.n_condemned_objects', (timestamp_epoch, gc_stats[x][3])))
+            tuples.append(('cvmfs.gc.sz_condemned_bytes', (timestamp_epoch, gc_stats[x][4])))
+            #just for DBG
+            lines.append("cvmfs.gc.n_preserved_catalogs %s %s" % (gc_stats[x][1], gc_stats[x][0]))
+            lines.append("cvmfs.gc.n_condemned_catalogs %s %s" % (gc_stats[x][2], gc_stats[x][0]))
+            lines.append("cvmfs.gc.n_condemned_objects %s %s" % (gc_stats[x][3], gc_stats[x][0]))
+            lines.append("cvmfs.gc.sz_condemned_bytes %s %s" % (gc_stats[x][3], gc_stats[x][0]))
     
     #just for DBG
     message = '\n'.join(lines) + '\n' #all lines must end in a newline
@@ -71,8 +117,9 @@ def run(sock):
     sock.sendall(package)
 
     # write the last finished_time into a file
-    f.write(data[0][0]+"\n") # write puclish_statistics last finished_timestamp
-    f.write("alt timestamp\n") # write gc_statistics last finished_timestamp
+    f.write(publish_timestamp + "\n") # write puclish_statistics last finished_timestamp
+    f.write(gc_timestamp) # write gc_statistics last finished_timestamp
+    f.close()
 
 def main():
     parser = argparse.ArgumentParser(description='Send stats to carbon server using pickle.')
