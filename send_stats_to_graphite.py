@@ -20,13 +20,23 @@ CARBON_SERVER = '127.0.0.1'
 CARBON_PICKLE_PORT = 2004
 DELAY = 10
 
-def get_data_from_stats():
+def get_data_publish_stats():
+    # check in server.conf if CVMFS_STATISTICS_DB variable is set
     conn = sqlite3.connect('stats.db') # change path
     c = conn.cursor()
 
     c.execute('SELECT finished_time, files_added, files_removed, files_changed FROM publish_statistics ORDER BY publish_id DESC')
-    return c.fetchmany(10)
+    return c.fetchmany(100)
 
+
+def get_data_gc_stats():
+    # check in server.conf if CVMFS_STATISTICS_DB variable is set
+    conn = sqlite3.connect('stats.db') # change path
+    c = conn.cursor()
+
+    # todo: change this to take useful data from gc_statistics
+    c.execute('SELECT finished_time, files_added, files_removed, files_changed FROM publish_statistics ORDER BY publish_id DESC')
+    return c.fetchmany(10)
 
 
 def run(sock, delay):
@@ -34,10 +44,10 @@ def run(sock, delay):
         tuples = ([])
         lines = []
 
-        data = get_data_from_stats()
+        data = get_data_publish_stats()
 
         # do this for the last 10 entries? # I will change this
-        for x in xrange(1,10):
+        for x in xrange(1,100):
             time_obj = time.strptime(data[x][0], "%Y-%m-%d %H:%M:%S")
             timestamp_epoch = timegm(time_obj)
             tuples.append(('cvmfs.publish.files_added', (timestamp_epoch, data[x][1])))
@@ -46,7 +56,7 @@ def run(sock, delay):
             #just for DBG
             lines.append("cvmfs.publish.files_added %s %s" % (data[x][1], data[x][0]))
             lines.append("cvmfs.publish.files_removed %s %s" % (data[x][2], data[x][0]))
-            lines.append("cvmfs.publish.files_changed %s %s" % (data[x][2], data[x][0]))
+            lines.append("cvmfs.publish.files_changed %s %s" % (data[x][3], data[x][0]))
         
         #just for DBG
         message = '\n'.join(lines) + '\n' #all lines must end in a newline
