@@ -10,9 +10,9 @@ import sys
 import time
 from calendar import timegm
 
-def get_data_publish_stats(last_timestamp):
+def get_data_publish_stats(last_timestamp, db_file):
     # check in server.conf if CVMFS_STATISTICS_DB variable is set
-    conn = sqlite3.connect('stats.db') # change path
+    conn = sqlite3.connect(db_file) # change path
     c = conn.cursor()
 
     # order DESC by id ---> first element of the list has the last start_time
@@ -23,9 +23,9 @@ def get_data_publish_stats(last_timestamp):
     return c.fetchall() 
 
 
-def get_data_gc_stats(last_timestamp):
+def get_data_gc_stats(last_timestamp, db_file):
     # check in server.conf if CVMFS_STATISTICS_DB variable is set
-    conn = sqlite3.connect('stats.db') # change path
+    conn = sqlite3.connect(db_file) # change path
     c = conn.cursor()
 
     # order DESC by id ---> first element of the list has the last start_time
@@ -36,7 +36,7 @@ def get_data_gc_stats(last_timestamp):
     return c.fetchall() 
 
 
-def run(sock):
+def run(sock, db_file):
     tuples = ([])
     lines = []
 
@@ -56,8 +56,8 @@ def run(sock):
     # print publish_timestamp
     # print gc_timestamp
 
-    publish_stats = get_data_publish_stats(publish_timestamp)
-    gc_stats = get_data_gc_stats(gc_timestamp)
+    publish_stats = get_data_publish_stats(publish_timestamp, db_file)
+    gc_stats = get_data_gc_stats(gc_timestamp, db_file)
 
     # # for debug
     # print "length stats publish=%d " % len(publish_stats)
@@ -110,12 +110,15 @@ def run(sock):
 
 def main():
     parser = argparse.ArgumentParser(description='Send stats to carbon server using pickle.')
+    parser.add_argument('db_file', metavar='<db_file>', type=str,
+                        help='SQLite database file path')
     parser.add_argument('CARBON_SERVER_IP', metavar='<IP>', type=str,
                         help='carbon server ip')
     parser.add_argument('CARBON_PICKLE_PORT', metavar='<PORT>', type=int,
                         help='carbon pickle port')
 
     args = parser.parse_args()
+    db_file=args.db_file
     CARBON_SERVER_IP = args.CARBON_SERVER_IP
     CARBON_PICKLE_PORT = args.CARBON_PICKLE_PORT
 
@@ -128,7 +131,7 @@ def main():
 
     # send new stats to carbon server if available
     try:
-        run(sock)
+        run(sock, db_file)
     except KeyboardInterrupt:
         sys.stderr.write("\nExiting on CTRL-c\n")
         sys.exit(0)
