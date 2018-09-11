@@ -11,12 +11,12 @@ import time
 from calendar import timegm
 
 def get_data_publish_stats(last_timestamp, db_file):
-    # check in server.conf if CVMFS_STATISTICS_DB variable is set
-    conn = sqlite3.connect(db_file) # change path
+    conn = sqlite3.connect(db_file)
     c = conn.cursor()
 
     # order DESC by id ---> first element of the list has the last start_time
-    c.execute('SELECT start_time, files_added, files_removed, files_changed \
+    c.execute('SELECT start_time, files_added, files_removed, files_changed, duplicated_files, directories_added, \
+                      directories_removed, directories_changed, sz_bytes_added, sz_bytes_removed, sz_bytes_uploaded \
                 FROM publish_statistics \
                 WHERE start_time > ("%s") \
                 ORDER BY publish_id DESC' % last_timestamp)
@@ -24,11 +24,8 @@ def get_data_publish_stats(last_timestamp, db_file):
 
 
 def get_data_gc_stats(last_timestamp, db_file):
-    # check in server.conf if CVMFS_STATISTICS_DB variable is set
-    conn = sqlite3.connect(db_file) # change path
+    conn = sqlite3.connect(db_file)
     c = conn.cursor()
-
-    # order DESC by id ---> first element of the list has the last start_time
     c.execute('SELECT start_time, n_preserved_catalogs, n_condemned_catalogs, n_condemned_objects, sz_condemned_bytes \
                 FROM gc_statistics \
                 WHERE start_time > ("%s") \
@@ -52,16 +49,8 @@ def run(sock, db_file):
     f.truncate() # delete file content
     f.seek(0)    # move file cursor
 
-    # # for debug
-    # print publish_timestamp
-    # print gc_timestamp
-
     publish_stats = get_data_publish_stats(publish_timestamp, db_file)
     gc_stats = get_data_gc_stats(gc_timestamp, db_file)
-
-    # # for debug
-    # print "length stats publish=%d " % len(publish_stats)
-    # print "length   stats    gc=%d " % len(gc_stats)
 
     if len(publish_stats) > 0:
         publish_timestamp = publish_stats[0][0]
@@ -71,10 +60,24 @@ def run(sock, db_file):
             tuples.append(('cvmfs.publish.files_added', (timestamp_epoch, publish_stats[x][1])))
             tuples.append(('cvmfs.publish.files_removed', (timestamp_epoch, publish_stats[x][2])))
             tuples.append(('cvmfs.publish.files_changed', (timestamp_epoch, publish_stats[x][3])))
+            tuples.append(('cvmfs.publish.duplicated_files', (timestamp_epoch, publish_stats[x][4])))
+            tuples.append(('cvmfs.publish.directories_added', (timestamp_epoch, publish_stats[x][5])))
+            tuples.append(('cvmfs.publish.directories_removed', (timestamp_epoch, publish_stats[x][6])))
+            tuples.append(('cvmfs.publish.directories_changed', (timestamp_epoch, publish_stats[x][7])))
+            tuples.append(('cvmfs.publish.sz_bytes_added', (timestamp_epoch, publish_stats[x][8])))
+            tuples.append(('cvmfs.publish.sz_bytes_removed', (timestamp_epoch, publish_stats[x][9])))
+            tuples.append(('cvmfs.publish.sz_bytes_uploaded', (timestamp_epoch, publish_stats[x][10])))
             # #just for DBG
             # lines.append("cvmfs.publish.files_added %s %s" % (publish_stats[x][1], publish_stats[x][0]))
             # lines.append("cvmfs.publish.files_removed %s %s" % (publish_stats[x][2], publish_stats[x][0]))
             # lines.append("cvmfs.publish.files_changed %s %s" % (publish_stats[x][3], publish_stats[x][0]))
+            # lines.append("cvmfs.publish.duplicated_files %s %s" % (publish_stats[x][4], publish_stats[x][0]))
+            # lines.append("cvmfs.publish.directories_added %s %s" % (publish_stats[x][5], publish_stats[x][0]))
+            # lines.append("cvmfs.publish.directories_removed %s %s" % (publish_stats[x][6], publish_stats[x][0]))
+            # lines.append("cvmfs.publish.directories_changed %s %s" % (publish_stats[x][7], publish_stats[x][0]))
+            # lines.append("cvmfs.publish.sz_bytes_added %s %s" % (publish_stats[x][8], publish_stats[x][0]))
+            # lines.append("cvmfs.publish.sz_bytes_removed %s %s" % (publish_stats[x][9], publish_stats[x][0]))
+            # lines.append("cvmfs.publish.sz_bytes_uploaded %s %s" % (publish_stats[x][10], publish_stats[x][0]))
 
     if len(gc_stats) > 0:
         gc_timestamp=gc_stats[0][0]
