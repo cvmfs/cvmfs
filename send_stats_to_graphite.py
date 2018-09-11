@@ -43,7 +43,7 @@ def run(sock, db_file):
     # the following file must have two timestamps (one per line):
     # last_start_time_sent_for_publish_statistics
     # last_start_time_sent_for_gc_statistics
-    f=open("aux.txt", "r+") # todo: change path
+    f=open("aux.txt", "r+") # todo: change path to `/var/spool/cvmfs/<REPO>/last_timestamp_sent`
 
     # read first two lines
     publish_timestamp = f.readline()[:-1] # delete the newline character
