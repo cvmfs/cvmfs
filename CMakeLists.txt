@@ -5,6 +5,8 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
+include (${CMAKE_SOURCE_DIR}/cmake/Modules/cvmfs_dev_options.cmake)
+
 cmake_minimum_required (VERSION 2.6.2)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})

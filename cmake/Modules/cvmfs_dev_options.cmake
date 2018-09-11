@@ -1,0 +1,7 @@
+if (BUILD_SANITIZER)
+  message ("Compiling with clang sanitizer, only building unit tests")
+  set (CMAKE_C_COMPILER clang)
+  set (CMAKE_CXX_COMPILER clang++)
+  set (CMAKE_C_FLAGS "-fsanitize=undefined -fsanitize=address")
+  set (CMAKE_CXX_FLAGS "-fsanitize=undefined -fsanitize=address")
+endif (BUILD_SANITIZER)
