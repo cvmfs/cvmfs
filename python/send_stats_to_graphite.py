@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
 import argparse
+import datetime
+import os
 import pickle
 import re
 import socket
@@ -41,19 +43,19 @@ def run(sock, db_file):
     tuples = ([])
     lines = []
 
-    # the following file must have two timestamps (one per line):
-    # last_start_time_sent_for_publish_statistics
-    # last_start_time_sent_for_gc_statistics
-
-    # todo: change path to `/var/spool/cvmfs/<REPO>/last_timestamp_sent`
-    f = open("aux.txt", "r+")
-
-    # read first two lines
-    publish_timestamp = f.readline()[:-1]  # delete the newline character
-    gc_timestamp = f.readline()
-
-    f.truncate()  # delete file content
-    f.seek(0)     # move file cursor
+    # Try to open the last_timestamp_sent file, otherwise create it
+    # and write in it the current UTC timestamp
+    try:
+        f = open(os.path.dirname(db_file) + "/last_timestamp_sent", "r+")
+        publish_timestamp = f.readline()[:-1]  # delete the newline character
+        gc_timestamp = f.readline()
+        f.truncate()  # delete file content
+        f.seek(0)     # move file cursor
+    except IOError:
+        # create the file and get the current UTC timestamp
+        f = open(os.path.dirname(db_file) + "/last_timestamp_sent", "w+")
+        publish_timestamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        gc_timestamp = publish_timestamp
 
     publish_stats = get_data_publish_stats(publish_timestamp, db_file)
     gc_stats = get_data_gc_stats(gc_timestamp, db_file)
@@ -73,17 +75,6 @@ def run(sock, db_file):
             tuples.append(('cvmfs.publish.sz_bytes_added', (timestamp_epoch, publish_stats[x][8])))
             tuples.append(('cvmfs.publish.sz_bytes_removed', (timestamp_epoch, publish_stats[x][9])))
             tuples.append(('cvmfs.publish.sz_bytes_uploaded', (timestamp_epoch, publish_stats[x][10])))
-            # #just for DBG
-            # lines.append("cvmfs.publish.files_added %s %s" % (publish_stats[x][1], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.files_removed %s %s" % (publish_stats[x][2], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.files_changed %s %s" % (publish_stats[x][3], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.duplicated_files %s %s" % (publish_stats[x][4], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.directories_added %s %s" % (publish_stats[x][5], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.directories_removed %s %s" % (publish_stats[x][6], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.directories_changed %s %s" % (publish_stats[x][7], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.sz_bytes_added %s %s" % (publish_stats[x][8], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.sz_bytes_removed %s %s" % (publish_stats[x][9], publish_stats[x][0]))
-            # lines.append("cvmfs.publish.sz_bytes_uploaded %s %s" % (publish_stats[x][10], publish_stats[x][0]))
 
     if len(gc_stats) > 0:
         gc_timestamp = gc_stats[0][0]
@@ -94,17 +85,6 @@ def run(sock, db_file):
             tuples.append(('cvmfs.gc.n_condemned_catalogs', (timestamp_epoch, gc_stats[x][2])))
             tuples.append(('cvmfs.gc.n_condemned_objects', (timestamp_epoch, gc_stats[x][3])))
             tuples.append(('cvmfs.gc.sz_condemned_bytes', (timestamp_epoch, gc_stats[x][4])))
-            # #just for DBG
-            # lines.append("cvmfs.gc.n_preserved_catalogs %s %s" % (gc_stats[x][1], gc_stats[x][0]))
-            # lines.append("cvmfs.gc.n_condemned_catalogs %s %s" % (gc_stats[x][2], gc_stats[x][0]))
-            # lines.append("cvmfs.gc.n_condemned_objects %s %s" % (gc_stats[x][3], gc_stats[x][0]))
-            # lines.append("cvmfs.gc.sz_condemned_bytes %s %s" % (gc_stats[x][3], gc_stats[x][0]))
-
-    # #just for DBG
-    # message = '\n'.join(lines) + '\n' #all lines must end in a newline
-    # print("sending message")
-    # print('-' * 80)
-    # print(message)
 
     # build the package
     package = pickle.dumps(tuples, 1)
@@ -112,14 +92,17 @@ def run(sock, db_file):
     sock.sendall(size)
     sock.sendall(package)
 
-    # write the last finished_time into a file
+    # write the last start_time into the last_timestamp_sent file
     f.write(publish_timestamp + "\n")  # write last publish start_time
     f.write(gc_timestamp)              # write last gc start_time
     f.close()
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Send stats to carbon server using pickle.')
+    parser = argparse.ArgumentParser(description='Send stats to carbon server using pickle.\
+                                                 If the `last_timestamp_sent` file does not exist \
+                                                 in the same directory as <db_file>, this script \
+                                                 will create one and it will write the current UTC timestamp in the file.')
     parser.add_argument('db_file', metavar='<db_file>', type=str,
                         help='SQLite database file path')
     parser.add_argument('CARBON_SERVER_IP', metavar='<IP>', type=str,
@@ -137,7 +120,8 @@ def main():
     try:
         sock.connect((CARBON_SERVER_IP, CARBON_PICKLE_PORT))
     except socket.error:
-        raise SystemExit("Couldn't connect to %(server)s on port %(port)d, is graphite running in a docker environment?" % {'server': CARBON_SERVER_IP, 'port': CARBON_PICKLE_PORT})
+        raise SystemExit("Couldn't connect to %(server)s on port %(port)d, \
+                              is graphite running in a docker environment?" % {'server': CARBON_SERVER_IP, 'port': CARBON_PICKLE_PORT})
 
     # send new stats to carbon server if available
     try:
