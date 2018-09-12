@@ -31,11 +31,6 @@ TEST(T_Statistics, Counter) {
   EXPECT_EQ("1048", counter.PrintK());
   EXPECT_EQ("1", counter.PrintM());
   EXPECT_EQ("1", counter.PrintMi());
-
-  Counter counter2;
-  EXPECT_EQ("inf", counter.PrintRatio(counter2));
-  counter2.Set(1024);
-  EXPECT_EQ("1024.000", counter.PrintRatio(counter2));
 }
 
 

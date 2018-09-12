@@ -38,7 +38,6 @@ class Counter {
   std::string PrintKi();
   std::string PrintM();
   std::string PrintMi();
-  std::string PrintRatio(Counter divider);
   std::string ToString();
 
  private:

@@ -26,11 +26,6 @@ std::string Counter::PrintK() { return StringifyInt(Get() / 1000); }
 std::string Counter::PrintKi() { return StringifyInt(Get() / 1024); }
 std::string Counter::PrintM() { return StringifyInt(Get() / (1000 * 1000)); }
 std::string Counter::PrintMi() { return StringifyInt(Get() / (1024 * 1024)); }
-std::string Counter::PrintRatio(Counter divider) {
-  double enumerator_value = Get();
-  double divider_value = divider.Get();
-  return StringifyDouble(enumerator_value / divider_value);
-}
 
 
 //-----------------------------------------------------------------------------
