@@ -1236,8 +1236,7 @@ TEST_F(T_Util, ParseKeyvalMem) {
 
 TEST_F(T_Util, ParseKeyvalPath) {
   map<char, string> map;
-  UniquePtr<const char> big_buffer(static_cast<const char *>(scalloc(8000,
-      sizeof(char))));
+  char *big_buffer = reinterpret_cast<char *>(scalloc(8000, sizeof(char)));
   string big_file = "bigfile.txt";
   string content_file = "contentfile.txt";
   string cvmfs_published =
@@ -1261,6 +1260,7 @@ TEST_F(T_Util, ParseKeyvalPath) {
   EXPECT_FALSE(ParseKeyvalPath("/path/that/does/not/exists.txt", &map));
   EXPECT_FALSE(ParseKeyvalPath(sandbox + "/" + big_file, &map));
   EXPECT_TRUE(ParseKeyvalPath(sandbox + "/" + content_file, &map));
+  free(big_buffer);
 }
 
 TEST_F(T_Util, DiffTimeSeconds) {
@@ -1511,7 +1511,8 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  UniquePtr<char> buffer(static_cast<char*>(scalloc(100, sizeof(char))));
+  UniquePtr<unsigned char> buffer(static_cast<unsigned char*>(
+    scalloc(100, 1)));
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
   string message = "CVMFS";
@@ -1531,7 +1532,7 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   close(fd_stdout[1]);
   ssize_t bytes_read = read(fd_stdout[0], buffer, message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
-  string result(buffer);
+  string result(reinterpret_cast<char *>(buffer.weak_ref()));
   ASSERT_EQ(message, result);
   close(fd_stdout[0]);
 }
