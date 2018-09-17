@@ -6,6 +6,7 @@
 
 
 #include "compression.h"
+#include "smalloc.h"
 #include "util/pointer.h"
 
 // TODO(jblomer): typed tests
@@ -32,8 +33,8 @@ class T_Compressor : public ::testing::Test {
   }
 
   virtual void TearDown() {
-    delete long_string;
-    delete buf;
+    delete[] long_string;
+    delete[] buf;
     free(test_string);
   }
 
@@ -129,8 +130,8 @@ TEST_F(T_Compressor, EchoCompression) {
 
 TEST_F(T_Compressor, EchoCompressionLong) {
   compressor = zlib::Compressor::Construct(zlib::kNoCompression);
-  UniquePtr<unsigned char> compress_buf(
-    new unsigned char[compressor->DeflateBound(long_size)]);
+  UniquePtr<unsigned char> compress_buf(reinterpret_cast<unsigned char *>(
+    smalloc(compressor->DeflateBound(long_size))));
   unsigned compress_pos = 0;
   bool deflate_finished = false;
   unsigned char *input = long_string;

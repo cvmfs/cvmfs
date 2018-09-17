@@ -696,7 +696,8 @@ bool Catalog::FindNested(const PathString &mountpoint,
                          shash::Any *hash, uint64_t *size) const
 {
   pthread_mutex_lock(lock_);
-  sql_lookup_nested_->BindSearchPath(NormalizePath2(mountpoint));
+  PathString normalized_mountpoint = NormalizePath2(mountpoint);
+  sql_lookup_nested_->BindSearchPath(normalized_mountpoint);
   bool found = sql_lookup_nested_->FetchRow();
   if (found && (hash != NULL)) {
     *hash = sql_lookup_nested_->GetContentHash();
