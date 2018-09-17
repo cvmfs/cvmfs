@@ -171,6 +171,15 @@ set (CVMFS_FSCK_SOURCES
   util/string.cc
 )
 
+set (CVMFS_TALK_SOURCES
+  cvmfs_talk.cc
+  logging.cc
+  options.cc
+  sanitizer.cc
+  util/posix.cc
+  util/string.cc
+)
+
 
 set (CVMFS_SWISSKNIFE_SOURCES
   backoff.cc
@@ -467,6 +476,8 @@ set (CVMFS_SWISSKNIFE_DEBUG_CFLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS} -DDEBUGMSG 
 
 set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
+set (CVMFS_TALK_CFLAGS "${CVMFS_TALK_CFLAGS} -DCVMFS_CLIENT")
+
 set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 
 set (LIBCVMFS_CACHE_CFLAGS "${LIBCVMFS_CACHE_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
@@ -491,6 +502,7 @@ if (BUILD_CVMFS)
   add_dependencies (cvmfs_fuse_debug cache.pb.generated)
   add_dependencies (cvmfs_fuse cache.pb.generated)
   add_executable (cvmfs_fsck ${CVMFS_FSCK_SOURCES})
+  add_executable (cvmfs_talk ${CVMFS_TALK_SOURCES})
 
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
@@ -498,6 +510,7 @@ if (BUILD_CVMFS)
   set_target_properties (cvmfs_fuse_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS} ${CVMFS2_DEBUG_LD_FLAGS}")
   set_target_properties (cvmfs_fuse PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS}")
   set_target_properties (cvmfs_fsck PROPERTIES COMPILE_FLAGS "${CVMFS_FSCK_CFLAGS}" LINK_FLAGS "${CVMFS_FSCK_LD_FLAGS}")
+  set_target_properties (cvmfs_talk PROPERTIES COMPILE_FLAGS "${CVMFS_TALK_CFLAGS}" LINK_FLAGS "${CVMFS_TALK_LD_FLAGS}")
 
   set_target_properties (cvmfs_fuse PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
   set_target_properties (cvmfs_fuse_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
@@ -533,6 +546,8 @@ if (BUILD_CVMFS)
   target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES}
                                           ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
                                           ${SHA3_LIBRARIES} ${RT_LIBRARY} pthread)
+  target_link_libraries (cvmfs_talk       ${CVMFS_TALK_LIBS}
+                                          ${RT_LIBRARY} pthread)
 
 
   set (CVMFS_ALLOW_HELPER_SOURCES
@@ -755,7 +770,7 @@ add_custom_target (
 
 if (BUILD_CVMFS)
   install (
-    TARGETS      cvmfs2 cvmfs_fsck
+    TARGETS      cvmfs2 cvmfs_fsck cvmfs_talk
     RUNTIME
     DESTINATION    bin
   )
@@ -773,10 +788,11 @@ if (BUILD_CVMFS)
   )
 
   install (
-    FILES      cvmfs_talk cvmfs_config
+    FILES      cvmfs_config
     DESTINATION    bin
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
+
 
   if(INSTALL_BASH_COMPLETION)
     install (
