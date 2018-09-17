@@ -9,6 +9,10 @@
   * Optionally print GC stats with CVMFS_SERVER_FLAGS=-+stats
   * Fix debian packaging warnings and errors
 
+2.5.2:
+  * Reimplement cvmfs_talk in C++ to improve efficiency
+  * Fix busy waiting in cache manager communication under heavy load (CVM-1618)
+
 2.5.1:
   * Fix potential memory corruptions in tiered cache and swissknife history
   * Fix cvmfs_suid_helper on Ubuntu 18.04 for symlinked spool directory
