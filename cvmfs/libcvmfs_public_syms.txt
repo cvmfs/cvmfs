@@ -6,6 +6,12 @@ __x86.get_pc_thunk.dx
 __x86.get_pc_thunk.si
 __i686.get_pc_thunk.bx
 __i686.get_pc_thunk.cx
+cvmfs_nc_attr
+cvmfs_nc_attr_init
+cvmfs_nc_attr_free
+cvmfs_attr
+cvmfs_attr_init
+cvmfs_attr_free
 cvmfs_options_init
 cvmfs_options_init_legacy
 cvmfs_options_clone
@@ -17,6 +23,7 @@ cvmfs_options_unset
 cvmfs_options_get
 cvmfs_options_dump
 cvmfs_options_free
+cvmfs_enable_threaded
 cvmfs_init
 cvmfs_init_v2
 cvmfs_fini
@@ -34,3 +41,8 @@ cvmfs_readlink
 cvmfs_stat
 cvmfs_lstat
 cvmfs_listdir
+cvmfs_listdir_contents
+cvmfs_stat_attr
+cvmfs_stat_nc
+cvmfs_list_nc
+cvmfs_list_free
