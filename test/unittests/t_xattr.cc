@@ -273,6 +273,31 @@ TEST_F(T_Xattr, SerializeNull) {
 }
 
 
+TEST_F(T_Xattr, SerializeBlacklist) {
+  std::vector<std::string> blacklist;
+  blacklist.push_back("empty");
+  blacklist.push_back("keya");
+  unsigned char *buf;
+  unsigned size;
+  default_list.Serialize(&buf, &size, &blacklist);
+  EXPECT_GT(size, 0U);
+  EXPECT_TRUE(buf != NULL);
+
+  UniquePtr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
+  free(buf);
+  ASSERT_TRUE(xattr_list.IsValid());
+  EXPECT_EQ(1U, xattr_list->ListKeys().size());
+  string value;
+  EXPECT_TRUE(xattr_list->Get("keyb", &value));
+  EXPECT_EQ("valueb", value);
+
+  blacklist.push_back("keyb");
+  default_list.Serialize(&buf, &size, &blacklist);
+  EXPECT_EQ(0U, size);
+  EXPECT_EQ(NULL, buf);
+}
+
+
 TEST_F(T_Xattr, Limits) {
   XattrList large_list;
   string large_value(256, 'a');

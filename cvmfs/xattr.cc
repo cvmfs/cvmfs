@@ -233,6 +233,14 @@ void XattrList::Serialize(
     ientries++;
   }
 
+  // We might have skipped all attributes
+  if (ientries == 0) {
+    free(entries);
+    *size = 0;
+    *outbuf = NULL;
+    return;
+  }
+
   // Copy data into buffer
   header.num_xattrs = ientries;
   *size = packed_size;
