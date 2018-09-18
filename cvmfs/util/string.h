@@ -60,8 +60,6 @@ std::string Base64Url(const std::string &data);
 bool Debase64(const std::string &data, std::string *decoded);
 std::string GetGMTimestamp();
 
-bool IsPrefixOf(std::string str, std::string prefix);
-
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

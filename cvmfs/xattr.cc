@@ -193,8 +193,11 @@ bool XattrList::Remove(const string &key) {
  * If the list of attributes is empty, Serialize returns NULL.  Deserialize
  * can deal with NULL pointers.
  */
-void XattrList::Serialize(unsigned char **outbuf, unsigned *size,
-  const std::vector<std::string> *blacklist) const {
+void XattrList::Serialize(
+  unsigned char **outbuf,
+  unsigned *size,
+  const std::vector<std::string> *blacklist) const
+{
   if (xattrs_.empty()) {
     *size = 0;
     *outbuf = NULL;
@@ -208,27 +211,24 @@ void XattrList::Serialize(unsigned char **outbuf, unsigned *size,
   XattrEntry *entries = reinterpret_cast<XattrEntry *>(
     smalloc(header.num_xattrs * sizeof(XattrEntry)));
   unsigned ientries = 0;
-  for (map<string, string>::const_iterator i = xattrs_.begin(),
-       iEnd = xattrs_.end(); i != iEnd; ++i)
+  for (map<string, string>::const_iterator it_att = xattrs_.begin(),
+       it_att_end = xattrs_.end(); it_att != it_att_end; ++it_att)
   {
     // Only serialize non-blacklist items
     if (blacklist != NULL) {
       bool skip = false;
-      for (std::vector<std::string>::const_iterator blk_li_it
-           = blacklist->begin();
-        blk_li_it != blacklist->end();
-        ++blk_li_it) {
-        if (IsPrefixOf(i->first, *blk_li_it)) {
+      for (unsigned i_bl = 0; i_bl < blacklist->size(); ++i_bl) {
+        if (HasPrefix(it_att->first, (*blacklist)[i_bl],
+            true /* ignore_case */))
+        {
           skip = true;
           break;
         }
       }
-      if (skip) {
-        continue;
-      }
+      if (skip) continue;
     }
     /*entries[ientries] =*/
-    new (entries + ientries) XattrEntry(i->first, i->second);
+    new (entries + ientries) XattrEntry(it_att->first, it_att->second);
     packed_size += entries[ientries].GetSize();
     ientries++;
   }

@@ -564,20 +564,6 @@ std::string GetGMTimestamp() {
   return timestamp;
 }
 
-/**
- * Checks whether prefix is a prefix of str
- * (this is also the case if str == prefix)
- */
-bool IsPrefixOf(std::string str, std::string prefix) {
-  if (prefix.length() > str.length()) {
-    return false;
-  }
-  return std::equal(
-    str.begin(),
-    str.begin() + prefix.length(),
-    prefix.begin() );
-}
-
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
