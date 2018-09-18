@@ -1,4 +1,5 @@
 2.6.0:
+  * New libcvmfs methods for extended attribs, catalogs, and multi-threading
   * Publication statistics are saved to an SQLite file (CVM-1567)
   * Optionally print statistics at the end of publication (CVM-1566)
   * Reactivate tracer, new parameters CVMFS_TRACEBUFFER{_THRESHOLD} (CVM-1596)
