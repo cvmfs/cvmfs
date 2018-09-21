@@ -7,7 +7,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
-
 #include <string>
 
 #include "env.h"
