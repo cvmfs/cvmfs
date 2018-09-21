@@ -385,8 +385,8 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
   shrinkwrap/t_fs_traversal_interface.cc
   shrinkwrap/t_fs_posix.cc
   shrinkwrap/t_spec_tree.cc
-  shrinkwrap/test-util.cc
-  
+  shrinkwrap/testutil_shrinkwrap.cc
+
   ${CVMFS_SOURCE_DIR}/shrinkwrap/fs_traversal.cc
   ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/data_dir_mgmt.cc
   ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/garbage_collector.cc

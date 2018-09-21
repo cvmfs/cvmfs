@@ -23,7 +23,7 @@
 #include "shrinkwrap/fs_traversal_libcvmfs.h"
 #include "shrinkwrap/posix/interface.h"
 #include "shrinkwrap/util.h"
-#include "test-util.h"
+#include "testutil_shrinkwrap.h"
 
 #define MODE_BITMASK (S_IRWXO | S_IRWXG | S_IRWXU)
 

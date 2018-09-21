@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "test-util.h"
+#include "testutil_shrinkwrap.h"
 
 #include <gtest/gtest.h>
 #include <unistd.h>

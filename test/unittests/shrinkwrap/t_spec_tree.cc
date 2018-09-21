@@ -8,7 +8,7 @@
 #include <iostream>
 
 #include "shrinkwrap/spec_tree.h"
-#include "test-util.h"
+#include "testutil_shrinkwrap.h"
 
 class T_Spec_Tree :
   public ::testing::Test {

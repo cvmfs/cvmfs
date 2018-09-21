@@ -13,7 +13,7 @@
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/posix/interface.h"
 #include "shrinkwrap/util.h"
-#include "test-util.h"
+#include "testutil_shrinkwrap.h"
 
 class T_FS_Traversal_POSIX : public ::testing::Test {
  protected:
