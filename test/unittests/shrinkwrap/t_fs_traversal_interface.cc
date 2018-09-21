@@ -81,7 +81,7 @@ class T_Fs_Traversal_Interface :
    * /[prefix]-bar/foobar
    * /[prefix]-bar/foobar/foobar
    * /[prefix]-bar/test
-   * 
+   *
    * FILES:
    * /[prefix]-foo.txt -> ident1
    * /[prefix]-bar.txt -> ident2
@@ -90,7 +90,7 @@ class T_Fs_Traversal_Interface :
    * /[prefix]-foo/bar/foobar3.txt -> ident1
    * /[prefix]-foo/bar/foobar3.txt -> ident1
    * /[prefix]-foo/bar/foobar3.txt -> ident1
-   * 
+   *
    * SYMLINKS:
    * ./[prefix]-symlink1 -> ./foo
    * ./[prefix]-foo/bar/symlink2 -> ./foobar
@@ -262,7 +262,7 @@ TEST_P(T_Fs_Traversal_Interface, StatTest) {
     context_, "/StatTest-foo.txt", foostat, false));
   ASSERT_STREQ("StatTest-foo.txt", foostat->cvm_name);
   ASSERT_STREQ("", foostat->cvm_parent);
-  ASSERT_EQ(0770, MODE_BITMASK & foostat->st_mode);
+  ASSERT_EQ(mode_t(0770), MODE_BITMASK & foostat->st_mode);
   ASSERT_EQ(getuid(), foostat->st_uid);
   ASSERT_EQ(getgid(), foostat->st_gid);
   cvmfs_attr_free(foostat);
@@ -399,7 +399,7 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
     "/MkRmDirTest-bar",
     &dirList,
     &listLen);
-  ASSERT_EQ(2, listLen);
+  ASSERT_EQ(2U, listLen);
   AssertListHas("foobar", dirList, listLen);
   AssertListHas("test", dirList, listLen);
   FreeList(dirList, listLen);
@@ -419,7 +419,7 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
     "/MkRmDirTest-bar",
     &dirList,
     &listLen);
-  ASSERT_EQ(1, listLen);
+  ASSERT_EQ(1U, listLen);
   AssertListHas("foobar", dirList, listLen, true);
   AssertListHas("test", dirList, listLen);
   FreeList(dirList, listLen);
@@ -453,7 +453,7 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
     "/ListDirTest-foo",
     &dirList,
     &listLen);
-  ASSERT_EQ(1, listLen);
+  ASSERT_EQ(1U, listLen);
   AssertListHas("bar", dirList, listLen);
   FreeList(dirList, listLen);
   listLen = 0;
@@ -462,7 +462,7 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
     "/ListDirTest-foo/bar",
     &dirList,
     &listLen);
-  ASSERT_EQ(4, listLen);
+  ASSERT_EQ(4U, listLen);
   AssertListHas("foobar1.txt", dirList, listLen);
   AssertListHas("foobar2.txt", dirList, listLen);
   AssertListHas("foobar3.txt", dirList, listLen);
@@ -474,7 +474,7 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
     "/ListDirTest-bar",
     &dirList,
     &listLen);
-  ASSERT_EQ(2, listLen);
+  ASSERT_EQ(2U, listLen);
   AssertListHas("foobar", dirList, listLen, true);
   AssertListHas("test", dirList, listLen);
   FreeList(dirList, listLen);

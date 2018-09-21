@@ -53,19 +53,19 @@ TEST_F(T_FS_Traversal_POSIX, TestListDir) {
   size_t len = 0;
   char **list;
   interface_->list_dir(interface_->context_, "", &list, &len);
-  ASSERT_EQ(2, len);
+  ASSERT_EQ(2U, len);
   AssertListHas("testfile1.txt", list, len);
   AssertListHas("testdir", list, len);
   FreeList(list, len);
   len = 0;
   interface_->list_dir(interface_->context_, "testdir", &list, &len);
-  ASSERT_EQ(2, len);
+  ASSERT_EQ(2U, len);
   AssertListHas("testfile2.txt", list, len);
   AssertListHas("testfile3.txt", list, len);
   FreeList(list, len);
   len = 1;
   interface_->list_dir(interface_->context_, "idontexist", &list, &len);
-  ASSERT_EQ(0, len);
+  ASSERT_EQ(0U, len);
   ASSERT_EQ(NULL, *list);
   FreeList(list, len);
 }
@@ -81,7 +81,7 @@ TEST_F(T_FS_Traversal_POSIX, TestStat) {
       stat, true));
   // Check empty checksum
   ASSERT_STREQ("da39a3ee5e6b4b0d3255bfef95601890afd80709", stat->cvm_checksum);
-  ASSERT_EQ(0744, (~S_IFMT) & stat->st_mode);
+  ASSERT_EQ(mode_t(0744), (~S_IFMT) & stat->st_mode);
   ASSERT_EQ(0, stat->st_size);
   ASSERT_EQ(getuid(), stat->st_uid);
   ASSERT_EQ(getgid(), stat->st_gid);
@@ -126,7 +126,7 @@ TEST_F(T_FS_Traversal_POSIX, TestSetMeta) {
       "/abc",
       stat, true));
 
-  ASSERT_EQ(0700, (~S_IFMT) & stat->st_mode);
+  ASSERT_EQ(mode_t(0700), (~S_IFMT) & stat->st_mode);
   XattrList *res_xattrs = reinterpret_cast<XattrList *>(stat->cvm_xattrs);
   std::string xattr_value_result;
   ASSERT_EQ(true, res_xattrs->Get("user.test", &xattr_value_result));
@@ -252,10 +252,10 @@ TEST_F(T_FS_Traversal_POSIX, TestReadWrite) {
 
   // Read (check) and append with posix (content should be foo)
   fd = fopen(path.c_str(), "a+");
-  ASSERT_EQ(3, fread(buf1, sizeof(char), 3, fd));
+  ASSERT_EQ(3U, fread(buf1, sizeof(char), 3, fd));
   buf1[3] = '\0';
   ASSERT_STREQ("foo", buf1);
-  ASSERT_EQ(3, fwrite("bar", sizeof(char), 3, fd));
+  ASSERT_EQ(3U, fwrite("bar", sizeof(char), 3, fd));
   fclose(fd);
 
   // Read with interface (content should be foobar)
@@ -274,7 +274,7 @@ TEST_F(T_FS_Traversal_POSIX, TestReadWrite) {
 
   // Read (check) with posix (content should be foobarbar)
   fd = fopen(path.c_str(), "r");
-  ASSERT_EQ(9, fread(buf3, sizeof(char), 9, fd));
+  ASSERT_EQ(9U, fread(buf3, sizeof(char), 9, fd));
   buf3[9] = '\0';
   ASSERT_STREQ("foobarbar", buf3);
   fclose(fd);
@@ -302,7 +302,7 @@ TEST_F(T_FS_Traversal_POSIX, TestMkDirRmDir) {
   // Try to rewrite a directory
   ASSERT_EQ(0, interface_->do_mkdir(interface_->context_, "/abc", stat));
   ASSERT_EQ(0, lstat("./TestMkDirRmDir/abc", &buf));
-  ASSERT_EQ(0700, ((~S_IFMT) & stat->st_mode));
+  ASSERT_EQ(mode_t(0700), ((~S_IFMT) & stat->st_mode));
   ASSERT_EQ(-1, lstat("./TestMkDirRmDir/abc/def", &buf));
 
   // Try to create simple new directory
