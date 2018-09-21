@@ -3,24 +3,27 @@
  */
 #include "testutil_shrinkwrap.h"
 
+#include <errno.h>
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <cstdlib>
 #include <cstring>
 
 #include "libcvmfs.h"
+#include "platform.h"
+#include "util/posix.h"
 #include "xattr.h"
 
-void AssertListHas(const char *query, char **dirList, size_t listLen,
-  bool hasNot) {
-  char **curEl = dirList;
-  while ((*curEl) != NULL) {
-    if (strcmp(*curEl, query) == 0) {
+void ExpectListHas(const char *query, char **dir_list, bool has_not) {
+  char **cur_el = dir_list;
+  while ((*cur_el) != NULL) {
+    if (strcmp(*cur_el, query) == 0) {
       return;
     }
-    curEl = (curEl+1);
+    cur_el = (cur_el+1);
   }
-  ASSERT_TRUE(hasNot) << "Could not find element " << query << " in list";
+  EXPECT_TRUE(has_not) << "Could not find element " << query << " in list";
 }
 
 void FreeList(char **list, size_t len) {
@@ -64,5 +67,18 @@ struct cvmfs_attr *create_sample_stat(const char *name,
   result->cvm_parent = strdup("/");
   result->cvm_xattrs = xlist;
 
+  return result;
+}
+
+
+bool SupportsXattrs(const std::string &directory) {
+  bool result = true;
+  std::string path = directory + "/testxattr";
+  CreateFile(path, 0600, false /*ignore_failure*/);
+  bool retval = platform_setxattr(path, "user.foo", "bar");
+  // On errors other than EOPNOTSUPP, we do want the test cases to fail
+  if (!retval && (errno = EOPNOTSUPP))
+    result = false;
+  unlink(path.c_str());
   return result;
 }

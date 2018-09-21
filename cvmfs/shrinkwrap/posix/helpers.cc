@@ -83,6 +83,7 @@ int PosixSetMeta(const char *path,
               ++it) {
           xlist->Get(*it, &val);
           bool res = platform_lsetxattr(path_str, *it, val);
+          if (!res) printf("ERRNO IS %d\n", errno);
           if (!res) return -1;
         }
       }

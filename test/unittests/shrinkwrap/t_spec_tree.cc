@@ -74,7 +74,7 @@ TEST_F(T_Spec_Tree, CheckListings) {
     &dirList,
     &listLen));
   ASSERT_EQ(1U, listLen);
-  AssertListHas("bar", dirList, listLen);
+  ExpectListHas("bar", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 
@@ -83,7 +83,7 @@ TEST_F(T_Spec_Tree, CheckListings) {
     &dirList,
     &listLen));
   ASSERT_EQ(1U, listLen);
-  AssertListHas("abc", dirList, listLen);
+  ExpectListHas("abc", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 
@@ -107,7 +107,7 @@ TEST_F(T_Spec_Tree, CheckListings) {
     &dirList,
     &listLen));
   ASSERT_EQ(1U, listLen);
-  AssertListHas("abc", dirList, listLen);
+  ExpectListHas("abc", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 
@@ -116,7 +116,7 @@ TEST_F(T_Spec_Tree, CheckListings) {
     &dirList,
     &listLen));
   ASSERT_EQ(1U, listLen);
-  AssertListHas("def", dirList, listLen);
+  ExpectListHas("def", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 

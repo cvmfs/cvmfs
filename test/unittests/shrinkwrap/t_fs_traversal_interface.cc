@@ -336,8 +336,8 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
     "/",
     &dirList,
     &listLen);
-  AssertListHas("TouchTest-foo.txt", dirList, listLen);
-  AssertListHas("TouchTest-bar.txt", dirList, listLen);
+  ExpectListHas("TouchTest-foo.txt", dirList);
+  ExpectListHas("TouchTest-bar.txt", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
   fs_traversal_instance_->interface->list_dir(
@@ -345,9 +345,9 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
     "/TouchTest-foo/bar/",
     &dirList,
     &listLen);
-  AssertListHas("foobar1.txt", dirList, listLen);
-  AssertListHas("foobar2.txt", dirList, listLen);
-  AssertListHas("foobar3.txt", dirList, listLen);
+  ExpectListHas("foobar1.txt", dirList);
+  ExpectListHas("foobar2.txt", dirList);
+  ExpectListHas("foobar3.txt", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 
@@ -400,8 +400,8 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
     &dirList,
     &listLen);
   ASSERT_EQ(2U, listLen);
-  AssertListHas("foobar", dirList, listLen);
-  AssertListHas("test", dirList, listLen);
+  ExpectListHas("foobar", dirList);
+  ExpectListHas("test", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
@@ -420,8 +420,8 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
     &dirList,
     &listLen);
   ASSERT_EQ(1U, listLen);
-  AssertListHas("foobar", dirList, listLen, true);
-  AssertListHas("test", dirList, listLen);
+  ExpectListHas("foobar", dirList, true);
+  ExpectListHas("test", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
   ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
@@ -441,11 +441,11 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
     "/",
     &dirList,
     &listLen);
-  AssertListHas("ListDirTest-foo", dirList, listLen);
-  AssertListHas("ListDirTest-bar", dirList, listLen);
-  AssertListHas("ListDirTest-foo.txt", dirList, listLen);
-  AssertListHas("ListDirTest-bar.txt", dirList, listLen);
-  AssertListHas("ListDirTest-symlink1", dirList, listLen);
+  ExpectListHas("ListDirTest-foo", dirList);
+  ExpectListHas("ListDirTest-bar", dirList);
+  ExpectListHas("ListDirTest-foo.txt", dirList);
+  ExpectListHas("ListDirTest-bar.txt", dirList);
+  ExpectListHas("ListDirTest-symlink1", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
   fs_traversal_instance_->interface->list_dir(
@@ -454,7 +454,7 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
     &dirList,
     &listLen);
   ASSERT_EQ(1U, listLen);
-  AssertListHas("bar", dirList, listLen);
+  ExpectListHas("bar", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
   fs_traversal_instance_->interface->list_dir(
@@ -463,10 +463,10 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
     &dirList,
     &listLen);
   ASSERT_EQ(4U, listLen);
-  AssertListHas("foobar1.txt", dirList, listLen);
-  AssertListHas("foobar2.txt", dirList, listLen);
-  AssertListHas("foobar3.txt", dirList, listLen);
-  AssertListHas("symlink2", dirList, listLen);
+  ExpectListHas("foobar1.txt", dirList);
+  ExpectListHas("foobar2.txt", dirList);
+  ExpectListHas("foobar3.txt", dirList);
+  ExpectListHas("symlink2", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
   fs_traversal_instance_->interface->list_dir(
@@ -475,8 +475,8 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
     &dirList,
     &listLen);
   ASSERT_EQ(2U, listLen);
-  AssertListHas("foobar", dirList, listLen, true);
-  AssertListHas("test", dirList, listLen);
+  ExpectListHas("foobar", dirList, true);
+  ExpectListHas("test", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
   fs_traversal_instance_->interface->list_dir(
@@ -484,7 +484,7 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
     "/ListDirTest-bar/foobar",
     &dirList,
     &listLen);
-  AssertListHas("foobar", dirList, listLen);
+  ExpectListHas("foobar", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 }
