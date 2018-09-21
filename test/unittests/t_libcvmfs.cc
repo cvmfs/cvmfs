@@ -286,7 +286,7 @@ const char* g_hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
                          "11111111111111111111111111111111111111"};
 
 const size_t g_file_size = 4096;
-}
+}  // anonymous namespace
 
 // Create directory specification for later repositories
 DirSpec MakeBaseSpec() {
@@ -438,7 +438,7 @@ TEST_F(T_Libcvmfs, Attr) {
   // Compare hash and size
   EXPECT_STREQ(file1_hash, attr->cvm_checksum);
   // Verify the file size
-  EXPECT_EQ(int(g_file_size), attr->st_size);
+  EXPECT_EQ(static_cast<int>(g_file_size), attr->st_size);
   EXPECT_EQ(NULL, attr->cvm_xattrs);
   cvmfs_attr_free(attr);
 
