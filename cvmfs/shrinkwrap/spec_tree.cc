@@ -126,7 +126,8 @@ void SpecTree::Parse(FILE *spec_file) {
     // FIND inclusion_mode (END)
     while (!node_cache.empty()) {  // Find nearest parent node in node cache
       entr = node_cache.top();
-      if (IsPrefixOf(line, entr->path)) {  // If entr->path is prefix => parent
+      if (HasPrefix(line, entr->path, false /*ignore_case*/)) {
+        // If entr->path is prefix => parent
         line.erase(0, entr->path.length());
         break;
       } else {  // If no longer parent of current element
