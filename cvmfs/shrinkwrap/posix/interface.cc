@@ -234,7 +234,7 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   stat_result->st_ino = buf.st_ino;
   stat_result->st_mode = buf.st_mode;
   stat_result->st_nlink = buf.st_nlink;
-  stat_result->st_uid = buf.st_gid;
+  stat_result->st_uid = buf.st_uid;
   stat_result->st_gid = buf.st_gid;
   stat_result->st_rdev = buf.st_rdev;
   stat_result->st_size = buf.st_size;

@@ -88,7 +88,6 @@ int PosixSetMeta(const char *path,
       }
     }
   }
-  if (res != 0) return -1;
   const struct timeval times[2] = {
     {stat_info->mtime, 0},
     {stat_info->mtime, 0}
