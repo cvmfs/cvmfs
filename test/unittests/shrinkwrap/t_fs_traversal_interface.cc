@@ -118,16 +118,16 @@ class T_Fs_Traversal_Interface :
     shash::Any content2_hash(shash::kSha1);
     shash::HashString(content2, &content2_hash);
     // FILE META 1
-    XattrList *xlistdir = create_sample_xattrlist(prefix);
-    struct cvmfs_attr *stat_values_dir = create_sample_stat(
+    XattrList *xlistdir = CreateSampleXattrlist(prefix);
+    struct cvmfs_attr *stat_values_dir = CreateSampleStat(
       ("/" + prefix + "-bar.txt").c_str(),
       10, 0770, 0, xlistdir, &content1_hash);
-    XattrList *xlist1 = create_sample_xattrlist(prefix);
-    struct cvmfs_attr *stat_values1 = create_sample_stat(
+    XattrList *xlist1 = CreateSampleXattrlist(prefix);
+    struct cvmfs_attr *stat_values1 = CreateSampleStat(
       ("/" + prefix + "-foo.txt").c_str(),
       10, 0770, 0, xlist1, &content1_hash);
-    XattrList *xlist2 = create_sample_xattrlist(prefix+"-2");
-    struct cvmfs_attr *stat_values2 = create_sample_stat(
+    XattrList *xlist2 = CreateSampleXattrlist(prefix+"-2");
+    struct cvmfs_attr *stat_values2 = CreateSampleStat(
       ("/" + prefix + "-bar.txt").c_str(),
       10, 0777, 0, xlist2, &content2_hash);
     char *buf = fs_traversal_instance_->interface->get_identifier(context_,
@@ -306,12 +306,12 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
   shash::Any content2_hash(shash::kSha1);
   shash::HashString(content2, &content2_hash);
   // FILE META 3
-  XattrList *xlist3 = create_sample_xattrlist("TouchTest: foo");
-  struct cvmfs_attr *stat_values3 = create_sample_stat("hello.world",
+  XattrList *xlist3 = CreateSampleXattrlist("TouchTest: foo");
+  struct cvmfs_attr *stat_values3 = CreateSampleStat("hello.world",
     10, 0700, content1.length(), xlist3, &content1_hash);
 
-  XattrList *xlist4 = create_sample_xattrlist("TouchTest: foobarfoo");
-  struct cvmfs_attr *stat_values4 = create_sample_stat("hello.world",
+  XattrList *xlist4 = CreateSampleXattrlist("TouchTest: foobarfoo");
+  struct cvmfs_attr *stat_values4 = CreateSampleStat("hello.world",
     10, 0700, content1.length(), xlist4, &content1_hash);
   char *buf = fs_traversal_instance_->interface->get_identifier(
     context_,
@@ -320,7 +320,7 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
   free(buf);
 
   XattrList *xlist5 = new XattrList(*xlist4);
-  struct cvmfs_attr *stat_values5 = create_sample_stat("hello.world",
+  struct cvmfs_attr *stat_values5 = CreateSampleStat("hello.world",
     10, 0700, content1.length(), xlist5, &content2_hash);
   buf = fs_traversal_instance_->interface->get_identifier(
     context_,
@@ -381,8 +381,8 @@ TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("MkRmDirTest", &ident1, &ident2);
-  XattrList *xlist1 = create_sample_xattrlist("MkRmDirTest: foo");
-  struct cvmfs_attr *stat_values_dir = create_sample_stat(
+  XattrList *xlist1 = CreateSampleXattrlist("MkRmDirTest: foo");
+  struct cvmfs_attr *stat_values_dir = CreateSampleStat(
       "MkRmDirTest-hello.world",
       10, 0770, 0, xlist1);
   // Insert in non existing parent directory

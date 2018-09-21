@@ -354,10 +354,11 @@ TEST_F(T_FS_Traversal_POSIX, HasFile) {
 }
 
 
-TEST(T_FS_Traversal_POSIX, GarbageCollection) {
+TEST_F(T_FS_Traversal_POSIX, GarbageCollection) {
   struct fs_traversal *dest = posix_get_interface();
-  struct fs_traversal_context *context
-    = dest->initialize("./", "posix", "./data", NULL, 4);
+  struct fs_traversal_context *context =
+    dest->initialize("./", "posix", "./data", NULL, 4);
+  const bool supports_xattrs = SupportsXattrs(".");
 
   std::string content1 = "a";
   shash::Any content1_hash(shash::kSha1);
@@ -365,17 +366,23 @@ TEST(T_FS_Traversal_POSIX, GarbageCollection) {
   std::string content2 = "b";
   shash::Any content2_hash(shash::kSha1);
   shash::HashString(content2, &content2_hash);
-  XattrList *xlist1 = create_sample_xattrlist("TestGarbageCollection1");
-  XattrList *xlist2 = create_sample_xattrlist("TestGarbageCollection2");
-  XattrList *xlist11 = create_sample_xattrlist("TestGarbageCollection1");
-  XattrList *xlist22 = create_sample_xattrlist("TestGarbageCollection2");
-  struct cvmfs_attr *stat1 = create_sample_stat("foo", 0, 0777, 0, xlist1,
+  XattrList *xlist1 = NULL;
+  XattrList *xlist2 = NULL;
+  XattrList *xlist11 = NULL;
+  XattrList *xlist22 = NULL;
+  if (supports_xattrs) {
+    xlist1 = CreateSampleXattrlist("TestGarbageCollection1");
+    xlist2 = CreateSampleXattrlist("TestGarbageCollection2");
+    xlist11 = CreateSampleXattrlist("TestGarbageCollection1");
+    xlist22 = CreateSampleXattrlist("TestGarbageCollection2");
+  }
+  struct cvmfs_attr *stat1 = CreateSampleStat("foo", 0, 0777, 0, xlist1,
     &content1_hash);
-  struct cvmfs_attr *stat2 = create_sample_stat("foo", 0, 0777, 0,
+  struct cvmfs_attr *stat2 = CreateSampleStat("foo", 0, 0777, 0,
     xlist11, &content2_hash);
-  struct cvmfs_attr *stat3 = create_sample_stat("foo", 0, 0777, 0, xlist2,
+  struct cvmfs_attr *stat3 = CreateSampleStat("foo", 0, 0777, 0, xlist2,
     &content1_hash);
-  struct cvmfs_attr *stat4 = create_sample_stat("foo", 0, 0777, 0,
+  struct cvmfs_attr *stat4 = CreateSampleStat("foo", 0, 0777, 0,
     xlist22, &content2_hash);
 
   EXPECT_EQ(0, dest->touch(context, stat1));
@@ -390,19 +397,20 @@ TEST(T_FS_Traversal_POSIX, GarbageCollection) {
   dest->touch(context, stat4);
   char *ident4 = dest->get_identifier(context, stat4);
   dest->do_link(context, "file4.txt", ident4);
-
   dest->do_unlink(context, "file3.txt");
-
   dest->finalize(context);
+
   context = dest->initialize("./", "posix", "./data", NULL, 4);
   dest->garbage_collector(context);
 
   std::string data_base_path = "./data/";
+  if (supports_xattrs) {
+    EXPECT_STRNE(ident1, ident3);
+    EXPECT_STRNE(ident2, ident4);
+  }
   EXPECT_STRNE(ident1, ident2);
-  EXPECT_STRNE(ident1, ident3);
   EXPECT_STRNE(ident1, ident4);
   EXPECT_STRNE(ident2, ident3);
-  EXPECT_STRNE(ident2, ident4);
   EXPECT_STRNE(ident3, ident4);
   EXPECT_FALSE(FileExists(data_base_path + ident1));
   EXPECT_TRUE(FileExists(data_base_path + ident2));

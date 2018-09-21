@@ -26,6 +26,7 @@ void ExpectListHas(const char *query, char **dir_list, bool has_not) {
   EXPECT_TRUE(has_not) << "Could not find element " << query << " in list";
 }
 
+
 void FreeList(char **list, size_t len) {
   for (size_t i = 0; i < len; i++) {
     free(*(list+i));
@@ -33,16 +34,24 @@ void FreeList(char **list, size_t len) {
   free(list);
 }
 
-XattrList *create_sample_xattrlist(std::string var) {
+
+XattrList *CreateSampleXattrlist(std::string var) {
   XattrList *result = new XattrList();
   result->Set("user.foo", std::string(var));
   result->Set("user.bar", std::string(255, 'a'));
   return result;
 }
-struct cvmfs_attr *create_sample_stat(const char *name,
-  ino_t st_ino, mode_t st_mode, off_t st_size,
-  XattrList *xlist, shash::Any *content_hash/* = NULL*/,
-  const char *link/* = NULL*/) {
+
+
+struct cvmfs_attr *CreateSampleStat(
+  const char *name,
+  ino_t st_ino,
+  mode_t st_mode,
+  off_t st_size,
+  XattrList *xlist,
+  shash::Any *content_hash/* = NULL*/,
+  const char *link/* = NULL*/)
+{
   char *hash_result = NULL;
   if (content_hash != NULL) {
     std::string hash = content_hash->ToString();
