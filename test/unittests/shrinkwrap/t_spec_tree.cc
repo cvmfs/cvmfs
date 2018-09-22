@@ -12,7 +12,7 @@
 #include "testutil_shrinkwrap.h"
 
 
-class T_Spec_Tree :
+class T_SpecTree :
   public ::testing::Test {
  protected:
   virtual void SetUp() {
@@ -38,7 +38,7 @@ class T_Spec_Tree :
 };
 
 
-TEST_F(T_Spec_Tree, BasicMatchTest) {
+TEST_F(T_SpecTree, BasicMatchTest) {
   EXPECT_TRUE(specs_->IsMatching(""));
   EXPECT_TRUE(specs_->IsMatching("/"));
   EXPECT_TRUE(specs_->IsMatching("/asdf"));
@@ -61,7 +61,7 @@ TEST_F(T_Spec_Tree, BasicMatchTest) {
 }
 
 
-TEST_F(T_Spec_Tree, CheckListings) {
+TEST_F(T_SpecTree, CheckListings) {
   size_t listLen = 0;
   char **dirList = NULL;
   EXPECT_EQ(SPEC_READ_FS, specs_->ListDir(

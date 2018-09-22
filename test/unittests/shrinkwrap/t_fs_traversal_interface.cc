@@ -11,7 +11,6 @@
 #include <unistd.h>
 
 #include <ctime>
-#include <iostream>
 
 #include "libcvmfs.h"
 #include "statistics.h"
@@ -23,20 +22,20 @@
 #include "shrinkwrap/fs_traversal_libcvmfs.h"
 #include "shrinkwrap/posix/interface.h"
 #include "shrinkwrap/util.h"
+
 #include "testutil_shrinkwrap.h"
 
-#define MODE_BITMASK (S_IRWXO | S_IRWXG | S_IRWXU)
+const mode_t kModeBitmask = (S_IRWXO | S_IRWXG | S_IRWXU);
 
 using namespace std;  // NOLINT
 
-struct fs_traversal_test {
+struct FsTest {
   struct fs_traversal *interface;
   const char *repo;
   const char *data;
 };
 
-class T_Fs_Traversal_Interface :
-  public ::testing::TestWithParam<struct fs_traversal_test *> {
+class T_FsInterface : public ::testing::TestWithParam<struct FsTest *> {
  protected:
   virtual void SetUp() {
     Init();
@@ -45,25 +44,26 @@ class T_Fs_Traversal_Interface :
   virtual void TearDown() {
     // TODO(steuber): Where to free?
     Fin();
-    // delete fs_traversal_instance_->interface;
+    // delete fs_instance_->interface;
   }
 
   void Init() {
-    fs_traversal_instance_ = GetParam();
-    const char *repo = fs_traversal_instance_->repo;
+    fs_instance_ = GetParam();
+    const char *repo = fs_instance_->repo;
     if (repo == NULL) {
       // Current working directory setup from testing environment
       repo = "./";
     }
-    context_ = fs_traversal_instance_->interface->initialize(
+    context_ = fs_instance_->interface->initialize(
       repo,
       repo,
-      fs_traversal_instance_->data, NULL, 4);
-    fs_traversal_instance_->interface->context_ = context_;
+      fs_instance_->data, NULL, 4);
+    fs_instance_->interface->context_ = context_;
+    supports_xattrs_ = SupportsXattrs(".");
   }
 
   void Fin() {
-    fs_traversal_instance_->interface->finalize(context_);
+    fs_instance_->interface->finalize(context_);
     context_ = NULL;
   }
 
@@ -95,145 +95,148 @@ class T_Fs_Traversal_Interface :
    * ./[prefix]-symlink1 -> ./foo
    * ./[prefix]-foo/bar/symlink2 -> ./foobar
    */
-  void MakeTestFiles(std::string prefix,
-    std::string *ident1, std::string *ident2) {
-    // FILE CONTENT 1
+  void MakeTestFiles(
+    std::string prefix,
+    std::string *ident1,
+    std::string *ident2)
+  {
+    // File Content1
     std::string content1 = prefix + ": Hello world!\nHello traversal!";
     shash::Any content1_hash(shash::kSha1);
     shash::HashString(content1, &content1_hash);
 
-    FILE *f = fopen("temp.data", "w");
-    if (f == NULL) {
-      perror("Open failed :");
-    }
-    fwrite(content1.c_str(), sizeof(char), content1.length(), f);
-    fclose(f);
+    ASSERT_TRUE(SafeWriteToFile(content1, "temp.data", 0600));
     shash::Any cvm_checksum = shash::Any(shash::kSha1);
     shash::HashFile("temp.data", &cvm_checksum);
     ASSERT_STREQ(cvm_checksum.ToString().c_str(),
                  content1_hash.ToString().c_str());
 
-    // FILE CONTENT 2
+    // File Content2
     std::string content2 = prefix + ": Hello traversal!\nHello world!";
     shash::Any content2_hash(shash::kSha1);
     shash::HashString(content2, &content2_hash);
-    // FILE META 1
-    XattrList *xlistdir = CreateSampleXattrlist(prefix);
+
+    // File meta data 1
+    XattrList *xlistdir = NULL;
+    XattrList *xlist1 = NULL;
+    XattrList *xlist2 = NULL;
+    if (supports_xattrs_) {
+      xlistdir = CreateSampleXattrlist(prefix);
+      xlist1 = CreateSampleXattrlist(prefix);
+      xlist2 = CreateSampleXattrlist(prefix + "-2");
+    }
+
     struct cvmfs_attr *stat_values_dir = CreateSampleStat(
       ("/" + prefix + "-bar.txt").c_str(),
       10, 0770, 0, xlistdir, &content1_hash);
-    XattrList *xlist1 = CreateSampleXattrlist(prefix);
     struct cvmfs_attr *stat_values1 = CreateSampleStat(
       ("/" + prefix + "-foo.txt").c_str(),
       10, 0770, 0, xlist1, &content1_hash);
-    XattrList *xlist2 = CreateSampleXattrlist(prefix+"-2");
     struct cvmfs_attr *stat_values2 = CreateSampleStat(
       ("/" + prefix + "-bar.txt").c_str(),
       10, 0777, 0, xlist2, &content2_hash);
-    char *buf = fs_traversal_instance_->interface->get_identifier(context_,
-      stat_values1);
+    char *buf = fs_instance_->interface->get_identifier(context_, stat_values1);
     *ident1 = std::string(buf);
     free(buf);
-    buf = fs_traversal_instance_->interface->get_identifier(context_,
-      stat_values2);
+    buf = fs_instance_->interface->get_identifier(context_, stat_values2);
     *ident2 = std::string(buf);
     free(buf);
 
-    // BACKGROUND FILES
-    ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
+    // Background Files
+    ASSERT_EQ(0, fs_instance_->interface->touch(
       context_,
       stat_values1));
-    void *hdl1 = fs_traversal_instance_->interface->get_handle(
+    void *hdl1 = fs_instance_->interface->get_handle(
       context_, ident1->c_str());
-    fs_traversal_instance_->interface->do_fopen(hdl1, fs_open_write);
-    fs_traversal_instance_->interface->do_fwrite(hdl1, content1.c_str(),
-      content1.length());
-    fs_traversal_instance_->interface->do_fclose(hdl1);
-    fs_traversal_instance_->interface->do_ffree(hdl1);
-    ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
+    fs_instance_->interface->do_fopen(hdl1, fs_open_write);
+    fs_instance_->interface->do_fwrite(
+      hdl1, content1.c_str(), content1.length());
+    fs_instance_->interface->do_fclose(hdl1);
+    fs_instance_->interface->do_ffree(hdl1);
+    ASSERT_EQ(0, fs_instance_->interface->touch(
       context_,
       stat_values2));
-    void *hdl2 = fs_traversal_instance_->interface->get_handle(
+    void *hdl2 = fs_instance_->interface->get_handle(
       context_, ident2->c_str());
-    fs_traversal_instance_->interface->do_fopen(hdl2, fs_open_write);
-    fs_traversal_instance_->interface->do_fwrite(hdl2, content2.c_str(),
+    fs_instance_->interface->do_fopen(hdl2, fs_open_write);
+    fs_instance_->interface->do_fwrite(hdl2, content2.c_str(),
       content2.length());
-    fs_traversal_instance_->interface->do_fclose(hdl2);
-    fs_traversal_instance_->interface->do_ffree(hdl2);
-    // DIRECTORIES
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+    fs_instance_->interface->do_fclose(hdl2);
+    fs_instance_->interface->do_ffree(hdl2);
+    // Directories
+    ASSERT_EQ(0, fs_instance_->interface->do_mkdir(
       context_,
       ("/" + prefix + "-foo").c_str(),
       stat_values_dir));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+    ASSERT_EQ(0, fs_instance_->interface->do_mkdir(
       context_,
       ("/" + prefix + "-bar").c_str(),
       stat_values_dir));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+    ASSERT_EQ(0, fs_instance_->interface->do_mkdir(
       context_,
       ("/" + prefix + "-bar/test").c_str(),
       stat_values_dir));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+    ASSERT_EQ(0, fs_instance_->interface->do_mkdir(
       context_,
       ("/" + prefix + "-foo/bar").c_str(),
       stat_values_dir));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+    ASSERT_EQ(0, fs_instance_->interface->do_mkdir(
       context_,
       ("/" + prefix + "-bar/foobar").c_str(),
       stat_values_dir));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_mkdir(
+    ASSERT_EQ(0, fs_instance_->interface->do_mkdir(
       context_,
       ("/" + prefix + "-bar/foobar/foobar").c_str(),
       stat_values_dir));
 
-    // FILES
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+    // Files
+    ASSERT_EQ(0, fs_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-foo.txt").c_str(),
       ident1->c_str()));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+    ASSERT_EQ(0, fs_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-bar.txt").c_str(),
       ident2->c_str()));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+    ASSERT_EQ(0, fs_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-foo/bar/foobar1.txt").c_str(),
       ident1->c_str()));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+    ASSERT_EQ(0, fs_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-foo/bar/foobar2.txt").c_str(),
       ident1->c_str()));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+    ASSERT_EQ(0, fs_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-foo/bar/foobar3.txt").c_str(),
       ident1->c_str()));
 
-    // SYMLINKS
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
+    // Symlinks
+    ASSERT_EQ(0, fs_instance_->interface->do_symlink(
       context_,
       ("/" + prefix + "-symlink1").c_str(),
       "./foo",
       stat_values1));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_symlink(
+    ASSERT_EQ(0, fs_instance_->interface->do_symlink(
       context_,
       ("/" + prefix + "-foo/bar/symlink2").c_str(),
       "./foobar",
       stat_values1));
 
-    // Test Hash consistency checking...
-    ASSERT_TRUE(fs_traversal_instance_->interface->is_hash_consistent(
+    // Check hash consistency
+    ASSERT_TRUE(fs_instance_->interface->is_hash_consistent(
       context_, stat_values1));
-    ASSERT_TRUE(fs_traversal_instance_->interface->is_hash_consistent(
+    ASSERT_TRUE(fs_instance_->interface->is_hash_consistent(
       context_, stat_values2));
-    ASSERT_FALSE(fs_traversal_instance_->interface->is_hash_consistent(
+    ASSERT_FALSE(fs_instance_->interface->is_hash_consistent(
       context_, stat_values_dir));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+    ASSERT_EQ(0, fs_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-foo.txt").c_str(),
       ident2->c_str()));
-    ASSERT_FALSE(fs_traversal_instance_->interface->is_hash_consistent(
+    ASSERT_FALSE(fs_instance_->interface->is_hash_consistent(
       context_, stat_values1));
-    ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
+    ASSERT_EQ(0, fs_instance_->interface->do_link(
       context_,
       ("/" + prefix + "-foo.txt").c_str(),
       ident1->c_str()));
@@ -244,47 +247,56 @@ class T_Fs_Traversal_Interface :
     // Check if fs is consistent over finalizing and reopening...
     Restart();
   }
+
  protected:
-  struct fs_traversal_test *fs_traversal_instance_;
+  struct FsTest *fs_instance_;
   struct fs_traversal_context *context_;
+  bool supports_xattrs_;
 };
 
-TEST_P(T_Fs_Traversal_Interface, StatTest) {
+
+TEST_P(T_FsInterface, Stat) {
   std::string ident1;
   std::string ident2;
-  MakeTestFiles("StatTest", &ident1, &ident2);
+  MakeTestFiles("Stat", &ident1, &ident2);
   struct cvmfs_attr *foostat = cvmfs_attr_init();
   struct cvmfs_attr *barstat = cvmfs_attr_init();
   struct cvmfs_attr *symlinkstat = cvmfs_attr_init();
   std::string val;
   // Correct inode configuration
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/StatTest-foo.txt", foostat, false));
-  ASSERT_STREQ("StatTest-foo.txt", foostat->cvm_name);
-  ASSERT_STREQ("", foostat->cvm_parent);
-  ASSERT_EQ(mode_t(0770), MODE_BITMASK & foostat->st_mode);
-  ASSERT_EQ(getuid(), foostat->st_uid);
-  ASSERT_EQ(getgid(), foostat->st_gid);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/Stat-foo.txt", foostat, false));
+  EXPECT_STREQ("Stat-foo.txt", foostat->cvm_name);
+  EXPECT_STREQ("", foostat->cvm_parent);
+  EXPECT_EQ(mode_t(0770), kModeBitmask & foostat->st_mode);
+  EXPECT_EQ(getuid(), foostat->st_uid);
+  EXPECT_EQ(getgid(), foostat->st_gid);
   cvmfs_attr_free(foostat);
   foostat = cvmfs_attr_init();
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/StatTest-foo/bar/foobar1.txt", foostat, false));
-  ASSERT_STREQ("foobar1.txt", foostat->cvm_name);
-  ASSERT_STREQ("/StatTest-foo/bar", foostat->cvm_parent);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/Stat-foo/bar/foobar1.txt", foostat, false));
+  EXPECT_STREQ("foobar1.txt", foostat->cvm_name);
+  EXPECT_STREQ("/Stat-foo/bar", foostat->cvm_parent);
 
   XattrList *xlist1 = reinterpret_cast<XattrList *>(foostat->cvm_xattrs);
   xlist1->Get("user.foo", &val);
-  ASSERT_STREQ("StatTest", val.c_str());
+  if (supports_xattrs_)
+    EXPECT_STREQ("Stat", val.c_str());
+  else
+    EXPECT_TRUE(val.empty());
 
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/StatTest-bar.txt", barstat, false));
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/Stat-bar.txt", barstat, false));
   XattrList *xlist2 = reinterpret_cast<XattrList *>(barstat->cvm_xattrs);
   xlist2->Get("user.foo", &val);
-  ASSERT_STREQ("StatTest-2", val.c_str());
+  if (supports_xattrs_)
+    EXPECT_STREQ("Stat-2", val.c_str());
+  else
+    EXPECT_TRUE(val.empty());
 
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/StatTest-symlink1", symlinkstat, false));
-  ASSERT_STREQ("./foo", symlinkstat->cvm_symlink);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/Stat-symlink1", symlinkstat, false));
+  EXPECT_STREQ("./foo", symlinkstat->cvm_symlink);
 
   cvmfs_attr_free(foostat);
   cvmfs_attr_free(barstat);
@@ -292,37 +304,42 @@ TEST_P(T_Fs_Traversal_Interface, StatTest) {
 }
 
 
-TEST_P(T_Fs_Traversal_Interface, TouchTest) {
+TEST_P(T_FsInterface, Touch) {
   std::string ident1;
   std::string ident2;
-  MakeTestFiles("TouchTest", &ident1, &ident2);
-
+  MakeTestFiles("Touch", &ident1, &ident2);
 
   // FILE CONTENT 1
-  std::string content1 = "TouchTest: Hello world!\nHello traversal!";
+  std::string content1 = "Touch: Hello world!\nHello traversal!";
   shash::Any content1_hash(shash::kSha1);
   shash::HashString(content1, &content1_hash);
-  std::string content2 = "TouchTest: Hello traversal!\nHello world!";
+  std::string content2 = "Touch: Hello traversal!\nHello world!";
   shash::Any content2_hash(shash::kSha1);
   shash::HashString(content2, &content2_hash);
   // FILE META 3
-  XattrList *xlist3 = CreateSampleXattrlist("TouchTest: foo");
+  XattrList *xlist3 = NULL;
+  XattrList *xlist4 = NULL;
+  XattrList *xlist5 = NULL;
+  if (supports_xattrs_) {
+    xlist3 = CreateSampleXattrlist("Touch: foo");
+    xlist4 = CreateSampleXattrlist("Touch: foobarfoo");
+    xlist5 = new XattrList(*xlist4);
+  }
+
   struct cvmfs_attr *stat_values3 = CreateSampleStat("hello.world",
     10, 0700, content1.length(), xlist3, &content1_hash);
 
-  XattrList *xlist4 = CreateSampleXattrlist("TouchTest: foobarfoo");
   struct cvmfs_attr *stat_values4 = CreateSampleStat("hello.world",
     10, 0700, content1.length(), xlist4, &content1_hash);
-  char *buf = fs_traversal_instance_->interface->get_identifier(
+  char *buf = fs_instance_->interface->get_identifier(
     context_,
     stat_values4);
   std::string ident4 = std::string(buf);
   free(buf);
 
-  XattrList *xlist5 = new XattrList(*xlist4);
   struct cvmfs_attr *stat_values5 = CreateSampleStat("hello.world",
     10, 0700, content1.length(), xlist5, &content2_hash);
-  buf = fs_traversal_instance_->interface->get_identifier(
+  buf = fs_instance_->interface->get_identifier(
     context_,
     stat_values5);
   std::string ident5 = std::string(buf);
@@ -331,18 +348,18 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
   // Check directory listings
   size_t listLen = 0;
   char **dirList;
-  fs_traversal_instance_->interface->list_dir(
+  fs_instance_->interface->list_dir(
     context_,
     "/",
     &dirList,
     &listLen);
-  ExpectListHas("TouchTest-foo.txt", dirList);
-  ExpectListHas("TouchTest-bar.txt", dirList);
+  ExpectListHas("Touch-foo.txt", dirList);
+  ExpectListHas("Touch-bar.txt", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
-  fs_traversal_instance_->interface->list_dir(
+  fs_instance_->interface->list_dir(
     context_,
-    "/TouchTest-foo/bar/",
+    "/Touch-foo/bar/",
     &dirList,
     &listLen);
   ExpectListHas("foobar1.txt", dirList);
@@ -352,24 +369,26 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
   listLen = 0;
 
   // Creating again should fail...
-  ASSERT_EQ(0, fs_traversal_instance_->interface->touch(
+  EXPECT_EQ(0, fs_instance_->interface->touch(
     context_,
     stat_values3));
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->touch(
+  EXPECT_EQ(-1, fs_instance_->interface->touch(
     context_,
     stat_values3));
   // With errno...
-  ASSERT_EQ(EEXIST, errno);
-  ASSERT_TRUE(fs_traversal_instance_->interface->has_file(
+  EXPECT_EQ(EEXIST, errno);
+  EXPECT_TRUE(fs_instance_->interface->has_file(
     context_,
     ident1.c_str()));
-  ASSERT_TRUE(fs_traversal_instance_->interface->has_file(
+  EXPECT_TRUE(fs_instance_->interface->has_file(
     context_,
     ident2.c_str()));
-  ASSERT_FALSE(fs_traversal_instance_->interface->has_file(
-    context_,
-    ident4.c_str()));
-  ASSERT_FALSE(fs_traversal_instance_->interface->has_file(
+  if (supports_xattrs_) {
+    EXPECT_FALSE(fs_instance_->interface->has_file(
+      context_,
+      ident4.c_str()));
+  }
+  EXPECT_FALSE(fs_instance_->interface->has_file(
     context_,
     ident5.c_str()));
   cvmfs_attr_free(stat_values3);
@@ -377,111 +396,115 @@ TEST_P(T_Fs_Traversal_Interface, TouchTest) {
   cvmfs_attr_free(stat_values5);
 }
 
-TEST_P(T_Fs_Traversal_Interface, MkRmDirTest) {
+
+TEST_P(T_FsInterface, MkRmDir) {
   std::string ident1;
   std::string ident2;
-  MakeTestFiles("MkRmDirTest", &ident1, &ident2);
-  XattrList *xlist1 = CreateSampleXattrlist("MkRmDirTest: foo");
+  MakeTestFiles("MkRmDir", &ident1, &ident2);
+  XattrList *xlist1 = NULL;
+  if (supports_xattrs_)
+    xlist1 = CreateSampleXattrlist("MkRmDir: foo");
   struct cvmfs_attr *stat_values_dir = CreateSampleStat(
-      "MkRmDirTest-hello.world",
+      "MkRmDir-hello.world",
       10, 0770, 0, xlist1);
   // Insert in non existing parent directory
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_mkdir(
+  EXPECT_EQ(-1, fs_instance_->interface->do_mkdir(
     context_,
-    "/MkRmDirTest-foo/foobar/foobar",
+    "/MkRmDir-foo/foobar/foobar",
     stat_values_dir));
-  ASSERT_EQ(ENOENT, errno);
+  EXPECT_EQ(ENOENT, errno);
   // Check directory listings
   size_t listLen = 0;
   char **dirList;
-  fs_traversal_instance_->interface->list_dir(
+  fs_instance_->interface->list_dir(
     context_,
-    "/MkRmDirTest-bar",
+    "/MkRmDir-bar",
     &dirList,
     &listLen);
-  ASSERT_EQ(2U, listLen);
+  EXPECT_EQ(2U, listLen);
   ExpectListHas("foobar", dirList);
   ExpectListHas("test", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
-    context_, "/MkRmDirTest-foo/foobar/foobar"));
-  ASSERT_EQ(ENOENT, errno);
+  EXPECT_EQ(-1, fs_instance_->interface->do_rmdir(
+    context_, "/MkRmDir-foo/foobar/foobar"));
+  EXPECT_EQ(ENOENT, errno);
   // No recursive deletion
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
-    context_, "/MkRmDirTest-bar/foobar"));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_rmdir(
-    context_, "/MkRmDirTest-bar/foobar/foobar"));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_rmdir(
-    context_, "/MkRmDirTest-bar/foobar"));
-  fs_traversal_instance_->interface->list_dir(
+  EXPECT_EQ(-1, fs_instance_->interface->do_rmdir(
+    context_, "/MkRmDir-bar/foobar"));
+  EXPECT_EQ(0, fs_instance_->interface->do_rmdir(
+    context_, "/MkRmDir-bar/foobar/foobar"));
+  EXPECT_EQ(0, fs_instance_->interface->do_rmdir(
+    context_, "/MkRmDir-bar/foobar"));
+  fs_instance_->interface->list_dir(
     context_,
-    "/MkRmDirTest-bar",
+    "/MkRmDir-bar",
     &dirList,
     &listLen);
-  ASSERT_EQ(1U, listLen);
+  EXPECT_EQ(1U, listLen);
   ExpectListHas("foobar", dirList, true);
   ExpectListHas("test", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_rmdir(
-    context_, "/MkRmDirTest-bar/foobar"));
-  ASSERT_EQ(ENOENT, errno);
+  EXPECT_EQ(-1, fs_instance_->interface->do_rmdir(
+    context_, "/MkRmDir-bar/foobar"));
+  EXPECT_EQ(ENOENT, errno);
   cvmfs_attr_free(stat_values_dir);
 }
 
-TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
+
+TEST_P(T_FsInterface, ListDir) {
   std::string ident1;
   std::string ident2;
-  MakeTestFiles("ListDirTest", &ident1, &ident2);
+  MakeTestFiles("ListDir", &ident1, &ident2);
   size_t listLen = 0;
   char **dirList;
-  fs_traversal_instance_->interface->list_dir(
+  fs_instance_->interface->list_dir(
     context_,
     "/",
     &dirList,
     &listLen);
-  ExpectListHas("ListDirTest-foo", dirList);
-  ExpectListHas("ListDirTest-bar", dirList);
-  ExpectListHas("ListDirTest-foo.txt", dirList);
-  ExpectListHas("ListDirTest-bar.txt", dirList);
-  ExpectListHas("ListDirTest-symlink1", dirList);
+  ExpectListHas("ListDir-foo", dirList);
+  ExpectListHas("ListDir-bar", dirList);
+  ExpectListHas("ListDir-foo.txt", dirList);
+  ExpectListHas("ListDir-bar.txt", dirList);
+  ExpectListHas("ListDir-symlink1", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
-  fs_traversal_instance_->interface->list_dir(
+  fs_instance_->interface->list_dir(
     context_,
-    "/ListDirTest-foo",
+    "/ListDir-foo",
     &dirList,
     &listLen);
-  ASSERT_EQ(1U, listLen);
+  EXPECT_EQ(1U, listLen);
   ExpectListHas("bar", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
-  fs_traversal_instance_->interface->list_dir(
+  fs_instance_->interface->list_dir(
     context_,
-    "/ListDirTest-foo/bar",
+    "/ListDir-foo/bar",
     &dirList,
     &listLen);
-  ASSERT_EQ(4U, listLen);
+  EXPECT_EQ(4U, listLen);
   ExpectListHas("foobar1.txt", dirList);
   ExpectListHas("foobar2.txt", dirList);
   ExpectListHas("foobar3.txt", dirList);
   ExpectListHas("symlink2", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
-  fs_traversal_instance_->interface->list_dir(
+  fs_instance_->interface->list_dir(
     context_,
-    "/ListDirTest-bar",
+    "/ListDir-bar",
     &dirList,
     &listLen);
-  ASSERT_EQ(2U, listLen);
+  EXPECT_EQ(2U, listLen);
   ExpectListHas("foobar", dirList, true);
   ExpectListHas("test", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
-  fs_traversal_instance_->interface->list_dir(
+  fs_instance_->interface->list_dir(
     context_,
-    "/ListDirTest-bar/foobar",
+    "/ListDir-bar/foobar",
     &dirList,
     &listLen);
   ExpectListHas("foobar", dirList);
@@ -489,148 +512,142 @@ TEST_P(T_Fs_Traversal_Interface, ListDirTest) {
   listLen = 0;
 }
 
-TEST_P(T_Fs_Traversal_Interface, ReadWriteTest) {
+
+TEST_P(T_FsInterface, ReadWrite) {
   std::string ident1;
   std::string ident2;
-  MakeTestFiles("ReadWriteTest", &ident1, &ident2);
-  void *hdl1 = fs_traversal_instance_->interface->get_handle(
-    context_, ident1.c_str());
+  MakeTestFiles("ReadWrite", &ident1, &ident2);
+  void *hdl1 = fs_instance_->interface->get_handle(context_, ident1.c_str());
   ASSERT_TRUE(NULL != hdl1);
-  ASSERT_EQ(0,
-    fs_traversal_instance_->interface->do_fopen(hdl1, fs_open_write));
+  EXPECT_EQ(0, fs_instance_->interface->do_fopen(hdl1, fs_open_write));
   std::string content1 = "Lorem ipsum dolor sit amet.";
-  ASSERT_EQ(0,
-    fs_traversal_instance_->interface->do_fwrite(
+  EXPECT_EQ(0,
+    fs_instance_->interface->do_fwrite(
       hdl1, content1.c_str(), content1.length()));
   char buf[50];
   size_t rlen;
-  ASSERT_EQ(-1,
-    fs_traversal_instance_->interface->do_fread(
-      hdl1, buf, 100, &rlen));
-  ASSERT_EQ(0,
-    fs_traversal_instance_->interface->do_fclose(hdl1));
-  ASSERT_EQ(0,
-    fs_traversal_instance_->interface->do_fopen(hdl1, fs_open_read));
-  ASSERT_EQ(-1,
-    fs_traversal_instance_->interface->do_fwrite(
+  EXPECT_EQ(-1, fs_instance_->interface->do_fread(hdl1, buf, 100, &rlen));
+  EXPECT_EQ(0, fs_instance_->interface->do_fclose(hdl1));
+  EXPECT_EQ(0, fs_instance_->interface->do_fopen(hdl1, fs_open_read));
+  EXPECT_EQ(-1,
+    fs_instance_->interface->do_fwrite(
       hdl1, content1.c_str(), content1.length()));
-  ASSERT_EQ(0,
-    fs_traversal_instance_->interface->do_fread(
-      hdl1, buf, 100, &rlen));
+  EXPECT_EQ(0, fs_instance_->interface->do_fread(hdl1, buf, 100, &rlen));
   buf[rlen] = '\0';
-  ASSERT_EQ(content1.length(), rlen);
-  ASSERT_STREQ(content1.c_str(), buf);
-  ASSERT_EQ(0,
-    fs_traversal_instance_->interface->do_fclose(hdl1));
-  fs_traversal_instance_->interface->do_ffree(hdl1);
+  EXPECT_EQ(content1.length(), rlen);
+  EXPECT_STREQ(content1.c_str(), buf);
+  EXPECT_EQ(0, fs_instance_->interface->do_fclose(hdl1));
+  fs_instance_->interface->do_ffree(hdl1);
 }
 
-TEST_P(T_Fs_Traversal_Interface, LinkUnlinkTest) {
+
+TEST_P(T_FsInterface, LinkUnlink) {
   std::string ident1;
   std::string ident2;
-  MakeTestFiles("LinkUnlinkTest", &ident1, &ident2);
+  MakeTestFiles("LinkUnlink", &ident1, &ident2);
   struct cvmfs_attr *foostat = cvmfs_attr_init();
   struct cvmfs_attr *barstat = cvmfs_attr_init();
   struct cvmfs_attr *foobarstat = cvmfs_attr_init();
   // Correct inode configuration
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo.txt", foostat, false));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-bar.txt", barstat, false));
-  ASSERT_NE(foostat->st_ino, barstat->st_ino);
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo/bar/foobar1.txt", foobarstat, false));
-  ASSERT_EQ(foostat->st_ino, foobarstat->st_ino);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/LinkUnlink-foo.txt", foostat, false));
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/LinkUnlink-bar.txt", barstat, false));
+  EXPECT_NE(foostat->st_ino, barstat->st_ino);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/LinkUnlink-foo/bar/foobar1.txt", foobarstat, false));
+  EXPECT_EQ(foostat->st_ino, foobarstat->st_ino);
   cvmfs_attr_free(foobarstat);
   foobarstat = cvmfs_attr_init();
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo/bar/foobar2.txt", foobarstat, false));
-  ASSERT_EQ(foostat->st_ino, foobarstat->st_ino);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/LinkUnlink-foo/bar/foobar2.txt", foobarstat, false));
+  EXPECT_EQ(foostat->st_ino, foobarstat->st_ino);
   cvmfs_attr_free(foobarstat);
   foobarstat = cvmfs_attr_init();
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", foobarstat, false));
-  ASSERT_EQ(foostat->st_ino, foobarstat->st_ino);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/LinkUnlink-foo/bar/foobar3.txt", foobarstat, false));
+  EXPECT_EQ(foostat->st_ino, foobarstat->st_ino);
   cvmfs_attr_free(foobarstat);
   foobarstat = cvmfs_attr_init();
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_link(
-    context_, "/LinkUnlinkTest-foobar/foofoobar/foofoofoobar", ident1.c_str()));
-  ASSERT_EQ(ENOENT, errno);
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_link(
-    context_, "/LinkUnlinkTest-foobar.txt", "foobarfoobar"));
-  ASSERT_EQ(ENOENT, errno);
-  ASSERT_EQ(0, fs_traversal_instance_->interface->do_link(
-    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", ident2.c_str()));
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/LinkUnlinkTest-foo/bar/foobar3.txt", foobarstat, false));
-  ASSERT_EQ(barstat->st_ino, foobarstat->st_ino);
+  EXPECT_EQ(-1, fs_instance_->interface->do_link(
+    context_, "/LinkUnlink-foobar/foofoobar/foofoofoobar", ident1.c_str()));
+  EXPECT_EQ(ENOENT, errno);
+  EXPECT_EQ(-1, fs_instance_->interface->do_link(
+    context_, "/LinkUnlink-foobar.txt", "foobarfoobar"));
+  EXPECT_EQ(ENOENT, errno);
+  EXPECT_EQ(0, fs_instance_->interface->do_link(
+    context_, "/LinkUnlink-foo/bar/foobar3.txt", ident2.c_str()));
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/LinkUnlink-foo/bar/foobar3.txt", foobarstat, false));
+  EXPECT_EQ(barstat->st_ino, foobarstat->st_ino);
 
   cvmfs_attr_free(foostat);
   cvmfs_attr_free(barstat);
   cvmfs_attr_free(foobarstat);
 
   // Correct unlink behaviour
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_unlink(
-    context_, "/LinkUnlinkTest-foobar/foofoobar/foofoofoobar"));
-  ASSERT_EQ(ENOENT, errno);
-  ASSERT_EQ(-1, fs_traversal_instance_->interface->do_unlink(
-    context_, "/LinkUnlinkTest-bar/foobar/foobar"));
-  ASSERT_EQ(EISDIR, errno);
+  EXPECT_EQ(-1, fs_instance_->interface->do_unlink(
+    context_, "/LinkUnlink-foobar/foofoobar/foofoofoobar"));
+  EXPECT_EQ(ENOENT, errno);
+  EXPECT_EQ(-1, fs_instance_->interface->do_unlink(
+    context_, "/LinkUnlink-bar/foobar/foobar"));
+  EXPECT_EQ(EISDIR, errno);
 }
 
-TEST_P(T_Fs_Traversal_Interface, SymlinkTest) {
+
+TEST_P(T_FsInterface, Symlink) {
   std::string ident1;
   std::string ident2;
-  MakeTestFiles("SymlinkTest", &ident1, &ident2);
+  MakeTestFiles("Symlink", &ident1, &ident2);
   struct cvmfs_attr *sl1Stat = cvmfs_attr_init();
   struct cvmfs_attr *sl2Stat = cvmfs_attr_init();
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/SymlinkTest-symlink1", sl1Stat, false));
-  ASSERT_STREQ("./foo", sl1Stat->cvm_symlink);
-  ASSERT_EQ(0, fs_traversal_instance_->interface->get_stat(
-    context_, "/SymlinkTest-foo/bar/symlink2", sl2Stat, false));
-  ASSERT_STREQ("./foobar", sl2Stat->cvm_symlink);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/Symlink-symlink1", sl1Stat, false));
+  EXPECT_STREQ("./foo", sl1Stat->cvm_symlink);
+  EXPECT_EQ(0, fs_instance_->interface->get_stat(
+    context_, "/Symlink-foo/bar/symlink2", sl2Stat, false));
+  EXPECT_STREQ("./foobar", sl2Stat->cvm_symlink);
   cvmfs_attr_free(sl1Stat);
   cvmfs_attr_free(sl2Stat);
 }
 
-TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
+
+TEST_P(T_FsInterface, TransferPosixToPosix) {
   std::string ident1;
   std::string ident2;
   std::string prefix = "SRC";
   MakeTestFiles(prefix, &ident1, &ident2);
 
-  std::string repoName = GetCurrentWorkingDirectory();
+  std::string repo_name = GetCurrentWorkingDirectory();
   std::string src_name  = "/SRC-foo";
   std::string dest_name = "/SRC-bar";
-  std::string dest_data = repoName+"/SRC-DDATA";
+  std::string dest_data = repo_name + "/SRC-DDATA";
 
   struct fs_traversal *src = posix_get_interface();
   struct fs_traversal_context *context =
-    src->initialize(
-      src_name.c_str(), repoName.c_str(), NULL, NULL, 4);
+    src->initialize(src_name.c_str(), repo_name.c_str(), NULL, NULL, 4);
   src->context_ = context;
 
   struct fs_traversal *dest = posix_get_interface();
   context = dest->initialize(
-    src_name.c_str(), repoName.c_str(), NULL, NULL, 4);
+    src_name.c_str(), repo_name.c_str(), NULL, NULL, 4);
   dest->context_ = context;
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
 
-  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
+  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
 
   dest->finalize(dest->context_);
   context = dest->initialize(
-    dest_name.c_str(), repoName.c_str(), dest_data.c_str(), NULL, 4);
+    dest_name.c_str(), repo_name.c_str(), dest_data.c_str(), NULL, 4);
   dest->context_ = context;
 
-  ASSERT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
+  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
   std::string command = "diff -aq ";
-  command += repoName + "/" + dest_name;
-  command += " " + repoName + "/" + src_name;
+  command += repo_name + "/" + dest_name;
+  command += " " + repo_name + "/" + src_name;
   cerr << command.c_str() << endl;
-  ASSERT_EQ(0, system(command.c_str()));
+  EXPECT_EQ(0, system(command.c_str()));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
@@ -639,12 +656,12 @@ TEST_P(T_Fs_Traversal_Interface, TransferPosixToPosix) {
   delete dest;
 }
 
-struct fs_traversal_test posix = {
+struct FsTest g_fs_posix = {
   posix_get_interface(),
   "./",
   "./.data"
 };
 
-INSTANTIATE_TEST_CASE_P(PosixInterfaceTest,
-                        T_Fs_Traversal_Interface,
-                        ::testing::Values(&posix));
+INSTANTIATE_TEST_CASE_P(T_FsInterfacePosix,
+                        T_FsInterface,
+                        ::testing::Values(&g_fs_posix));

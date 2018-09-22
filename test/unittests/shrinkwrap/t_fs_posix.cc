@@ -19,7 +19,7 @@
 #include "testutil_shrinkwrap.h"
 
 
-class T_FS_Traversal_POSIX : public ::testing::Test {
+class T_FsPosix : public ::testing::Test {
  protected:
   virtual void SetUp() {
     // TODO(jblomer): put in namespace, code style
@@ -41,7 +41,7 @@ class T_FS_Traversal_POSIX : public ::testing::Test {
 };
 
 
-TEST_F(T_FS_Traversal_POSIX, Init) {
+TEST_F(T_FsPosix, Init) {
   EXPECT_TRUE(DirectoryExists("./Init"));
   EXPECT_TRUE(DirectoryExists("./.data"));
   EXPECT_TRUE(DirectoryExists("./.data/ff/ff"));
@@ -54,7 +54,7 @@ TEST_F(T_FS_Traversal_POSIX, Init) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, ListDir) {
+TEST_F(T_FsPosix, ListDir) {
   ASSERT_TRUE(MkdirDeep("./ListDir/testdir", 0700));
   const bool ignore_failure = false;
   CreateFile("./ListDir/testfile1.txt", 0700, ignore_failure);
@@ -84,7 +84,7 @@ TEST_F(T_FS_Traversal_POSIX, ListDir) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, Stat) {
+TEST_F(T_FsPosix, Stat) {
   ASSERT_TRUE(MkdirDeep("./Stat/abc/", 0744));
   const bool ignore_failure = false;
   CreateFile("./Stat/abc/testfile1.txt", 0744, ignore_failure);
@@ -119,7 +119,7 @@ TEST_F(T_FS_Traversal_POSIX, Stat) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, SetMetaData) {
+TEST_F(T_FsPosix, SetMetaData) {
   EXPECT_TRUE(MkdirDeep("./SetMetaData/abc", 0700));
   const bool supports_xattrs = SupportsXattrs("./SetMetaData/abc");
   const bool ignore_failure = false;
@@ -163,7 +163,7 @@ TEST_F(T_FS_Traversal_POSIX, SetMetaData) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, GetIdentifier) {
+TEST_F(T_FsPosix, GetIdentifier) {
   struct cvmfs_attr *stat = cvmfs_attr_init();
   stat->cvm_checksum = strdup("da39a3ee5e6b4b0d3255bfef95601890afd80709");
   char* res = interface_->get_identifier(interface_->context_, stat);
@@ -177,7 +177,7 @@ TEST_F(T_FS_Traversal_POSIX, GetIdentifier) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, TouchLinkUnlink) {
+TEST_F(T_FsPosix, TouchLinkUnlink) {
   MkdirDeep("./TouchLinkUnlink/def/", 0744, true);
   struct cvmfs_attr *stat = cvmfs_attr_init();
   // Other checksum this time to avoid collisions during touch
@@ -230,7 +230,7 @@ TEST_F(T_FS_Traversal_POSIX, TouchLinkUnlink) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, Symlink) {
+TEST_F(T_FsPosix, Symlink) {
   struct cvmfs_attr *stat = cvmfs_attr_init();
   EXPECT_EQ(0, interface_->do_symlink(interface_->context_,
     "/asymlink",
@@ -256,7 +256,7 @@ TEST_F(T_FS_Traversal_POSIX, Symlink) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, ReadWrite) {
+TEST_F(T_FsPosix, ReadWrite) {
   std::string ident = "/ff/ff/test.txt";
   std::string path = "./.data/" + ident;
   CreateFile(path, 0744);
@@ -309,7 +309,7 @@ TEST_F(T_FS_Traversal_POSIX, ReadWrite) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, MkDirRmDir) {
+TEST_F(T_FsPosix, MkDirRmDir) {
   MkdirDeep("./MkDirRmDir/abc/", 0744, true);
   MkdirDeep("./MkDirRmDir/abc/def", 0744, true);
   struct cvmfs_attr *stat = cvmfs_attr_init();
@@ -345,7 +345,7 @@ TEST_F(T_FS_Traversal_POSIX, MkDirRmDir) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, HasFile) {
+TEST_F(T_FsPosix, HasFile) {
   CreateFile("./.data/ff/ff/test.txt", 0744, false);
   EXPECT_TRUE(interface_->has_file(
     interface_->context_, "/ff/ff/test.txt"));
@@ -354,7 +354,7 @@ TEST_F(T_FS_Traversal_POSIX, HasFile) {
 }
 
 
-TEST_F(T_FS_Traversal_POSIX, GarbageCollection) {
+TEST_F(T_FsPosix, GarbageCollection) {
   struct fs_traversal *dest = posix_get_interface();
   struct fs_traversal_context *context =
     dest->initialize("./", "posix", "./data", NULL, 4);
