@@ -4,35 +4,39 @@
 
 #include <gtest/gtest.h>
 
-#include <fstream>
-#include <iostream>
+#include <string>
 
 #include "shrinkwrap/spec_tree.h"
+#include "util/posix.h"
+
 #include "testutil_shrinkwrap.h"
+
 
 class T_Spec_Tree :
   public ::testing::Test {
  protected:
   virtual void SetUp() {
-    std::ofstream f;
-    f.open("/tmp/cvmfs-spec-tree-test.spec.txt");
-    f << "^/*\n";
-    f << "/foo/bar\n";
-    f << "/foo/bar/abc/*\n";
-    f << "!/foo/bar/abc/def/hij\n";
-    f << "^/bar\n";
-    f << "^/bar/abc/def/*\n";
-    f << "!/bar/abc/def/ghj\n";
-    f.close();
-    specs_ = SpecTree::Create("/tmp/cvmfs-spec-tree-test.spec.txt");
+    std::string content;
+    content = "^/*\n"
+              "/foo/bar\n"
+              "/foo/bar/abc/*\n"
+              "!/foo/bar/abc/def/hij\n"
+              "^/bar\n"
+              "^/bar/abc/def/*\n"
+              "!/bar/abc/def/ghj\n";
+    ASSERT_TRUE(
+      SafeWriteToFile(content, "./cvmfs-spec-tree-test.spec.txt", 0600));
+    specs_ = SpecTree::Create("./cvmfs-spec-tree-test.spec.txt");
   }
 
   virtual void TearDown() {
-    unlink("/tmp/cvmfs-spec-tree-test.spec.txt");
+    unlink("cvmfs-spec-tree-test.spec.txt");
     delete specs_;
   }
+
   SpecTree *specs_;
 };
+
 
 TEST_F(T_Spec_Tree, BasicMatchTest) {
   EXPECT_TRUE(specs_->IsMatching(""));
@@ -56,85 +60,86 @@ TEST_F(T_Spec_Tree, BasicMatchTest) {
   EXPECT_FALSE(specs_->IsMatching("/foo/bar/abc/def/hij/def.txt"));
 }
 
+
 TEST_F(T_Spec_Tree, CheckListings) {
   size_t listLen = 0;
   char **dirList = NULL;
-  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+  EXPECT_EQ(SPEC_READ_FS, specs_->ListDir(
     "/",
     &dirList,
     &listLen));
 
-  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+  EXPECT_EQ(SPEC_READ_FS, specs_->ListDir(
     "",
     &dirList,
     &listLen));
 
-  ASSERT_EQ(0, specs_->ListDir(
+  EXPECT_EQ(0, specs_->ListDir(
     "/foo",
     &dirList,
     &listLen));
-  ASSERT_EQ(1U, listLen);
+  EXPECT_EQ(1U, listLen);
   ExpectListHas("bar", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 
-  ASSERT_EQ(0, specs_->ListDir(
+  EXPECT_EQ(0, specs_->ListDir(
     "/foo/bar",
     &dirList,
     &listLen));
-  ASSERT_EQ(1U, listLen);
+  EXPECT_EQ(1U, listLen);
   ExpectListHas("abc", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 
-  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+  EXPECT_EQ(SPEC_READ_FS, specs_->ListDir(
     "/foo/bar/abc",
     &dirList,
     &listLen));
 
-  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+  EXPECT_EQ(SPEC_READ_FS, specs_->ListDir(
     "/foo/bar/abc/def",
     &dirList,
     &listLen));
 
-  ASSERT_EQ(-1, specs_->ListDir(
+  EXPECT_EQ(-1, specs_->ListDir(
     "/foo/bar/abc/def/hij",
     &dirList,
     &listLen));
 
-  ASSERT_EQ(0, specs_->ListDir(
+  EXPECT_EQ(0, specs_->ListDir(
     "/bar",
     &dirList,
     &listLen));
-  ASSERT_EQ(1U, listLen);
+  EXPECT_EQ(1U, listLen);
   ExpectListHas("abc", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 
-  ASSERT_EQ(0, specs_->ListDir(
+  EXPECT_EQ(0, specs_->ListDir(
     "/bar/abc",
     &dirList,
     &listLen));
-  ASSERT_EQ(1U, listLen);
+  EXPECT_EQ(1U, listLen);
   ExpectListHas("def", dirList);
   FreeList(dirList, listLen);
   listLen = 0;
 
-  ASSERT_EQ(SPEC_READ_FS, specs_->ListDir(
+  EXPECT_EQ(SPEC_READ_FS, specs_->ListDir(
     "/foo/bar/abc/def",
     &dirList,
     &listLen));
 
-  ASSERT_EQ(-1, specs_->ListDir(
+  EXPECT_EQ(-1, specs_->ListDir(
     "/bar/abc/def/foo",
     &dirList,
     &listLen));
-  ASSERT_EQ(-1, specs_->ListDir(
+  EXPECT_EQ(-1, specs_->ListDir(
     "/bar/abc/def/foo/foo",
     &dirList,
     &listLen));
 
-  ASSERT_EQ(-1, specs_->ListDir(
+  EXPECT_EQ(-1, specs_->ListDir(
     "/bar/abc/def/ghj",
     &dirList,
     &listLen));

@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-#ifndef TEST_UNITTESTS_SHRINKWRAP_TEST_UTIL_H_
-#define TEST_UNITTESTS_SHRINKWRAP_TEST_UTIL_H_
+#ifndef TEST_UNITTESTS_SHRINKWRAP_TESTUTIL_SHRINKWRAP_H_
+#define TEST_UNITTESTS_SHRINKWRAP_TESTUTIL_SHRINKWRAP_H_
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -29,4 +29,4 @@ struct cvmfs_attr *CreateSampleStat(
 
 bool SupportsXattrs(const std::string &directory);
 
-#endif  // TEST_UNITTESTS_SHRINKWRAP_TEST_UTIL_H_
+#endif  // TEST_UNITTESTS_SHRINKWRAP_TESTUTIL_SHRINKWRAP_H_
