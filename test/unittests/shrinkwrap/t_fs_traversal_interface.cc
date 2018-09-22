@@ -105,12 +105,6 @@ class T_FsInterface : public ::testing::TestWithParam<struct FsTest *> {
     shash::Any content1_hash(shash::kSha1);
     shash::HashString(content1, &content1_hash);
 
-    ASSERT_TRUE(SafeWriteToFile(content1, "temp.data", 0600));
-    shash::Any cvm_checksum = shash::Any(shash::kSha1);
-    shash::HashFile("temp.data", &cvm_checksum);
-    ASSERT_STREQ(cvm_checksum.ToString().c_str(),
-                 content1_hash.ToString().c_str());
-
     // File Content2
     std::string content2 = prefix + ": Hello traversal!\nHello world!";
     shash::Any content2_hash(shash::kSha1);
