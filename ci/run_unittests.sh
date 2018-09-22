@@ -22,7 +22,7 @@ CVMFS_SHRINKWRAP_TEST_BINARY=
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
 
-while getopts "qc:g:s:" option; do
+while getopts "qc:g:s:l:" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
@@ -35,6 +35,10 @@ while getopts "qc:g:s:" option; do
     ;;
     s)
       CVMFS_SHRINKWRAP_TEST_BINARY=$OPTARG
+    ;;
+    l)
+      # Preloading a library now unused
+      :
     ;;
     ?)
       usage
