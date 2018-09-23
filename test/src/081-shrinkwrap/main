@@ -5,7 +5,7 @@ cvmfs_test_name="shrinkwrap"
 cleanup() {
     sudo rm -f /tmp/cvmfs-$repo.trace.log 2> /dev/null
     sudo rm -f /tmp/cvmfs-$repo.spec.txt  2> /dev/null
- 
+
     sudo rm -rf /tmp/cvmfs 2> /dev/null
     sudo rm -rf /var/lib/cvmfs/shrinkwrap 2> /dev/null
     sudo umount /cvmfs/ 2> /dev/null
@@ -28,7 +28,7 @@ redun_umount() {
     done
 
     if [ $result -ne 0 ]; then
-      lsof | grep $r 
+      lsof | grep $r
       return 200
     fi
 
@@ -71,7 +71,7 @@ cvmfs_run_test() {
 
     echo "*** Creating specification file..."
 
-    sudo python $TEST_ROOT/../add-ons/export_plugin/spec_builder.py /tmp/cvmfs-$repo.trace.log /tmp/cvmfs-$repo.spec.txt
+    sudo python $TEST_ROOT/../cvmfs/shrinkwrap/scripts/spec_builder.py /tmp/cvmfs-$repo.trace.log /tmp/cvmfs-$repo.spec.txt
     result=$?
 
     if [[ $result != 0 ]]; then
