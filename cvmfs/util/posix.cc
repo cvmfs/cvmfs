@@ -505,7 +505,7 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
   if (ls_a.size() != ls_b.size())
     return false;
   for (unsigned i = 0; i < ls_a.size(); ++i) {
-    if (ls_a[i] != ls_b[i]) return false;
+    if (GetFileName(ls_a[i]) != GetFileName(ls_b[i])) return false;
     platform_stat64 info_a;
     platform_stat64 info_b;
     retval = platform_lstat(ls_a[i].c_str(), &info_a);

@@ -1753,5 +1753,6 @@ TEST_F(T_Util, DiffTree) {
   MkdirDeep("./subdir2", 0600);
   CreateFile("./file", 0600);
   EXPECT_TRUE(DiffTree(".", "."));
+  EXPECT_TRUE(DiffTree("./.", "."));
   EXPECT_FALSE(DiffTree(".", "/"));
 }
