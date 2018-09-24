@@ -456,6 +456,82 @@ void ClosePipe(int pipe_fd[2]) {
 
 
 /**
+ * Compares two directory trees on the meta-data level. Returns true iff the
+ * trees have identical content.
+ */
+bool DiffTree(const std::string &path_a, const std::string &path_b) {
+  int retval;
+  std::vector<std::string> ls_a;
+  std::vector<std::string> ls_b;
+  std::vector<std::string> subdirs;
+
+  DIR *dirp_a = opendir(path_a.c_str());
+  if (dirp_a == NULL) return false;
+  DIR *dirp_b = opendir(path_b.c_str());
+  if (dirp_b == NULL) {
+    closedir(dirp_a);
+    return false;
+  }
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp_a))) {
+    const std::string name(dirent->d_name);
+    if ((name == ".") || (name == ".."))
+      continue;
+    const std::string path = path_a + "/" + name;
+    ls_a.push_back(path);
+
+    platform_stat64 info;
+    retval = platform_lstat(path.c_str(), &info);
+    if (retval != 0) {
+      closedir(dirp_a);
+      closedir(dirp_b);
+      return false;
+    }
+    if (S_ISDIR(info.st_mode)) subdirs.push_back(name);
+  }
+  while ((dirent = platform_readdir(dirp_b))) {
+    const std::string name(dirent->d_name);
+    if ((name == ".") || (name == ".."))
+      continue;
+    const std::string path = path_b + "/" + name;
+    ls_b.push_back(path);
+  }
+  closedir(dirp_a);
+  closedir(dirp_b);
+
+  sort(ls_a.begin(), ls_a.end());
+  sort(ls_b.begin(), ls_b.end());
+  if (ls_a.size() != ls_b.size())
+    return false;
+  for (unsigned i = 0; i < ls_a.size(); ++i) {
+    if (ls_a[i] != ls_b[i]) return false;
+    platform_stat64 info_a;
+    platform_stat64 info_b;
+    retval = platform_lstat(ls_a[i].c_str(), &info_a);
+    if (retval != 0) return false;
+    retval = platform_lstat(ls_b[i].c_str(), &info_b);
+    if (retval != 0) return false;
+    if ((info_a.st_mode != info_b.st_mode) ||
+        (info_a.st_uid != info_b.st_uid) ||
+        (info_a.st_gid != info_b.st_gid) ||
+        (info_a.st_size != info_b.st_size))
+    {
+      return false;
+    }
+  }
+
+  for (unsigned i = 0; i < subdirs.size(); ++i) {
+    bool retval_subtree = DiffTree(path_a + "/" + subdirs[i],
+                                   path_b + "/" + subdirs[i]);
+    if (!retval_subtree) return false;
+  }
+
+  return true;
+}
+
+
+/**
  * Changes a non-blocking file descriptor to a blocking one.
  */
 void Nonblock2Block(int filedes) {
