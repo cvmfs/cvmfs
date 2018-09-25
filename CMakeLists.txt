@@ -133,15 +133,6 @@ else (NOT DEFINED SYSCONF_INSTALL_DIR)
 endif (NOT DEFINED SYSCONF_INSTALL_DIR)
 
 #
-# set name of fuse library (-losxfuse for osxfuse)
-#
-if (MACOSX)
-  set(LIBFUSE osxfuse)
-else (MACOSX)
-  set(LIBFUSE fuse)
-endif(MACOSX)
-
-#
 # include file with user-defined options
 #
 include (cvmfs_options)
