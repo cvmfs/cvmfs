@@ -10,24 +10,11 @@
 #include <string.h>
 #include <time.h>
 
-#include <fstream>
-#include <vector>
-
 #include "cvmfs_config.h"
 #include "logging.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "util/string.h"
-
-// Taken from fsck
-enum Errors {
-  kErrorOk = 0,
-  kErrorFixed = 1,
-  kErrorReboot = 2,
-  kErrorUnfixed = 4,
-  kErrorOperational = 8,
-  kErrorUsage = 16,
-};
 
 
 static void Usage() {
@@ -106,13 +93,13 @@ int main(int argc, char **argv) {
     switch (c) {
       case 'h':
         Usage();
-        return kErrorOk;
+        return 0;
       case 'p':
         base = strdup(optarg);
         if (spec_file) {
           LogCvmfs(kLogCvmfs, kLogStdout,
                    "Only allowed to specify either base dir or trace file");
-          return kErrorUsage;
+          return 1;
         }
         break;
       case 'r':
@@ -147,7 +134,7 @@ int main(int argc, char **argv) {
         if (base) {
           LogCvmfs(kLogCvmfs, kLogStdout,
                    "Only allowed to specify either base dir or trace file");
-          return kErrorUsage;
+          return 1;
         }
         break;
       case 'j':
@@ -155,7 +142,7 @@ int main(int argc, char **argv) {
         if (num_parallel < 1) {
           LogCvmfs(kLogCvmfs, kLogStdout,
                    "There is at least one worker thread required");
-          return kErrorUsage;
+          return 1;
         }
         break;
       case 'n':
@@ -167,7 +154,7 @@ int main(int argc, char **argv) {
       case '?':
       default:
         Usage();
-        return kErrorUsage;
+        return 1;
     }
   }
 
