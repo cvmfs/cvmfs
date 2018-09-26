@@ -11,6 +11,7 @@
   * Fix debian packaging warnings and errors
 
 2.5.2:
+  * Fix potential memory corruption in catalog traversal
   * Reimplement cvmfs_talk in C++ to improve efficiency
   * Fix busy waiting in cache manager communication under heavy load (CVM-1618)
 
