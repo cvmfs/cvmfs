@@ -500,7 +500,7 @@ fi
 %files shrinkwrap
 %defattr(-,root,root)
 %{_bindir}/cvmfs_shrinkwrap
-/usr/libexec/cvmfs/shrinkwrap_spec_builder.py
+/usr/libexec/cvmfs/shrinkwrap/spec_builder.py
 %doc COPYING AUTHORS README.md ChangeLog
 
 %files unittests
