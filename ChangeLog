@@ -1,4 +1,5 @@
 2.5.2:
+  * Fix building on macOS 10.14
   * Fix potential memory corruption in catalog traversal
   * Reimplement cvmfs_talk in C++ to improve efficiency
   * Fix busy waiting in cache manager communication under heavy load (CVM-1618)
