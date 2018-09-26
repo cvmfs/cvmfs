@@ -21,7 +21,7 @@
  * in the fs_traversal_posix_context
  * The initialization uses the data stored in the file at
  * [data directory] + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE
- * 
+ *
  * This file contains a fixed length concatenation of
  * inodes (type ino_t) which should be checked
  * and deleted upon garbage collection
@@ -55,7 +55,7 @@ void InitializeGarbageCollection(struct fs_traversal_context *ctx) {
  * Finalizes the garbage collection
  * Stores the content of the garbage collection hash map in the file at
  * [data directory] + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE
- * 
+ *
  */
 void FinalizeGarbageCollection(struct fs_traversal_context *ctx) {
   struct fs_traversal_posix_context *posix_ctx
@@ -95,7 +95,7 @@ void *PosixGcMainWorker(void *data) {
   int offset = strlen(thread_context->ctx->data)+1;
   // used for both path building and stat calls (therefore +257)
   char dir_path[offset+kDigitsPerDirLevel*kDirLevels+kDirLevels+257];
-  snprintf(dir_path, offset, thread_context->ctx->data);
+  snprintf(dir_path, offset, "%s", thread_context->ctx->data);
   dir_path[offset-1]='/';
   dir_path[offset+kDigitsPerDirLevel*kDirLevels+kDirLevels+257] = '\0';
   char dir_name_template[6];
@@ -131,7 +131,8 @@ void *PosixGcMainWorker(void *data) {
       while ((de = readdir(cur_dir_ent)) != NULL) {
         if (posix_ctx->gc_flagged.count(de->d_ino) > 0
           && posix_ctx->gc_flagged[de->d_ino]) {
-          snprintf(dir_path+path_pos, sizeof(dir_path)-path_pos, de->d_name);
+          snprintf(dir_path+path_pos, sizeof(dir_path)-path_pos, "%s",
+                   de->d_name);
           stat(dir_path, &stat_buf);
           if (stat_buf.st_nlink == 1) {
             files_removed++;
