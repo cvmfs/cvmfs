@@ -1,7 +1,7 @@
 # Maintainer: Jakob Blomer <jblomer@cern.ch>
 
-pkgname=('cvmfs' 'cvmfs-server' 'cvmfs-devel' 'cvmfs-unittests')
-pkgver=2.4.0
+pkgname=('cvmfs' 'cvmfs-server' 'cvmfs-devel' 'cvmfs-shrinkwrap' 'cvmfs-unittests')
+pkgver=2.6.0
 pkgrel=1
 pkgdesc="A fuse based network file system developed to deliver software distributions in a fast, scalable, and reliable way."
 arch=('x86_64' 'i686')
@@ -23,6 +23,7 @@ build() {
     -DBUILD_SERVER_DEBUG=yes \
     -DBUILD_LIBCVMFS=yes \
     -DBUILD_LIBCVMFS_CACHE=yes \
+    -DBUILD_SHRINKWRAP=yes \
     -DBUILD_UNITTESTS=yes \
     -DINSTALL_UNITTESTS=yes
   make -j $(nproc)
@@ -78,6 +79,14 @@ _remove_server() {
 }
 
 
+_remove_shrinkwrap() {
+  local pkgdir="$1"
+
+  rm -f "$pkgdir/usr/bin/cvmfs_shrinkwrap"
+  rm -rf "$pkgdir/usr/lib/cvmfs/shrinkwrap"
+}
+
+
 _remove_devel() {
   local pkgdir="$1"
 
@@ -90,7 +99,9 @@ _remove_devel() {
 _remove_unittests() {
   local pkgdir="$1"
 
-  rm -f "$pkgdir/usr/bin/cvmfs_unittests" "$pkgdir/usr/bin/cvmfs_test_cache"
+  rm -f "$pkgdir/usr/bin/cvmfs_unittests" \
+    "$pkgdir/usr/bin/cvmfs_test_cache" \
+    "$pkgdir/usr/bin/cvmfs_test_shrinkwrap"
 }
 
 
@@ -110,6 +121,7 @@ package_cvmfs() {
   mv "$pkgdir/usr/share/doc/cvmfs-$pkgver" "$pkgdir/usr/share/doc/cvmfs"
   rm -rf "$pkgdir/etc/bash_completion.d"
   _remove_server "$pkgdir"
+  _remove_shrinkwrap "$pkgdir"
   _remove_devel "$pkgdir"
   _remove_unittests "$pkgdir"
 }
@@ -129,6 +141,7 @@ package_cvmfs-server() {
   mv "$pkgdir/usr/share/doc/cvmfs-$pkgver" "$pkgdir/usr/share/doc/cvmfs-server"
   _remove_client "$pkgdir"
   _remove_devel "$pkgdir"
+  _remove_shrinkwrap "$pkgdir"
   _remove_unittests "$pkgdir"
 }
 
@@ -144,6 +157,23 @@ package_cvmfs-devel() {
   mv "$pkgdir/usr/share/doc/cvmfs-$pkgver" "$pkgdir/usr/share/doc/cvmfs-devel"
   _remove_client "$pkgdir"
   _remove_server "$pkgdir"
+  _remove_shrinkwrap "$pkgdir"
+  _remove_unittests "$pkgdir"
+}
+
+
+package_cvmfs-shrinkwrap() {
+  pkgdesc="CernVM-FS shrinkwrap utility to export /cvmfs file system trees"
+  depends=('openssl')
+  options=('!strip' '!emptydirs')
+
+  cd "$srcdir/cvmfs-$pkgver"
+  make -j $(nproc) DESTDIR="$pkgdir/" install
+
+  mv "$pkgdir/usr/share/doc/cvmfs-$pkgver" "$pkgdir/usr/share/doc/cvmfs-shrinkwrap"
+  _remove_client "$pkgdir"
+  _remove_server "$pkgdir"
+  _remove_devel "$pkgdir"
   _remove_unittests "$pkgdir"
 }
 
@@ -158,5 +188,6 @@ package_cvmfs-unittests() {
   rm -rf "$pkgdir/usr/share/doc/cvmfs-$pkgver"
   _remove_client "$pkgdir"
   _remove_server "$pkgdir"
+  _remove_shrinkwrap "$pkgdir"
   _remove_devel "$pkgdir"
 }

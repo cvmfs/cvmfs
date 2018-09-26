@@ -23,7 +23,7 @@ Depends: insserv, initscripts, psmisc, curl, attr, openssl, apache2, libcap2, li
 Conflicts: cvmfs-server (<< 2.1)
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
-Description: CernVM File System Server
+Description: CernVM-FS server utilities
  HTTP File System Repository Server for Distributing Software to CernVM.
 
 Package: cvmfs-dev
@@ -32,8 +32,17 @@ Architecture: i386 amd64 armhf arm64
 Depends: openssl, ${misc:Depends}
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
-Description: CernVM File System Server
+Description: CernVM-FS client library
  CernVM-FS static client library
+
+Package: cvmfs-shrinkwrap
+Architecture: i386 amd64 armhf arm64
+#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
+Depends: openssl, python, ${misc:Depends}
+#Multi-Arch: same   (preparation for multiarch support)
+Homepage: http://cernvm.cern.ch
+Description: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
+ CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container images.
 
 Package: cvmfs-unittests
 Architecture: i386 amd64 armhf arm64

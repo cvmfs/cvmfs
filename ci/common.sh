@@ -110,12 +110,14 @@ generate_package_map() {
   local devel="$4"
   local unittests="$5"
   local config="$6"
+  local shrinkwrap="$7"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
 client=$client
 server=$server
 devel=$devel
+shrinkwrap=$shrinkwrap
 unittests=$unittests
 config=$config
 EOF

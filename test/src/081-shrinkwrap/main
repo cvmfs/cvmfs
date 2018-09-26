@@ -47,7 +47,7 @@ cvmfs_run_test() {
     sudo cat /tmp/cvmfs-$repo.trace.log
 
     echo "*** Creating specification file..."
-    sudo python $TEST_ROOT/../cvmfs/shrinkwrap/scripts/spec_builder.py \
+    sudo python /usr/libexec/cvmfs/shrinkwrap/spec_builder.py \
       --policy=exact \
       --filters=opendir \
       /tmp/cvmfs-$repo.trace.log \

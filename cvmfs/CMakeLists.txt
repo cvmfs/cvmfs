@@ -184,23 +184,20 @@ set (CVMFS_SHRINKWRAP_SOURCES
   hash.cc
   logging.cc
   monitor.cc
+  shrinkwrap/fs_traversal.cc
+  shrinkwrap/fs_traversal_libcvmfs.cc
+  shrinkwrap/posix/data_dir_mgmt.cc
+  shrinkwrap/posix/garbage_collector.cc
+  shrinkwrap/posix/helpers.cc
+  shrinkwrap/posix/interface.cc
+  shrinkwrap/shrinkwrap.cc
+  shrinkwrap/spec_tree.cc
+  shrinkwrap/util.cc
   statistics.cc
   util/posix.cc
   util/string.cc
   util_concurrency.cc
   xattr.cc
-
-  shrinkwrap/fs_traversal.cc
-  shrinkwrap/posix/data_dir_mgmt.cc
-  shrinkwrap/posix/garbage_collector.cc
-  shrinkwrap/posix/helpers.cc
-  shrinkwrap/posix/interface.cc
-
-  shrinkwrap/fs_traversal_libcvmfs.cc
-  shrinkwrap/spec_tree.cc
-  shrinkwrap/util.cc
-
-  shrinkwrap/shrinkwrap.cc
 )
 
 set (CVMFS_SWISSKNIFE_SOURCES
@@ -857,6 +854,12 @@ if (BUILD_SHRINKWRAP)
     TARGETS      cvmfs_shrinkwrap
     RUNTIME
     DESTINATION    bin
+  )
+
+  install (
+    FILES          shrinkwrap/scripts/spec_builder.py
+    DESTINATION    ${CVMFS_LIBEXEC_DIR}/shrinkwrap
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 endif (BUILD_SHRINKWRAP)
 
