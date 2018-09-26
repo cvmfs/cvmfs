@@ -516,12 +516,6 @@ if (BUILD_CVMFS)
   set_target_properties (cvmfs_fuse_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
 
   set (CVMFS_FUSE_LINK_LIBRARIES "")
-  if (MACOSX)
-    list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${OSXFUSE_LIBRARIES})
-  else(MACOSX)
-    list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${FUSE_LIBRARIES})
-  endif(MACOSX)
-
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${CURL_LIBRARIES}
                                         ${CARES_LIBRARIES}
                                         ${OPENSSL_LIBRARIES}
@@ -536,11 +530,12 @@ if (BUILD_CVMFS)
                                         ${VJSON_LIBRARIES}
                                         ${RT_LIBRARY}
                                         ${UUID_LIBRARIES}
+                                        ${FUSE_LIBRARIES}
                                         pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
-                                ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                                ${SHA3_LIBRARIES} pthread dl)
+                                ${CVMFS_FUSE_LINK_LIBRARIES} ${RT_LIBRARY}
+                                ${UUID_LIBRARIES} ${SHA3_LIBRARIES} pthread dl)
   target_link_libraries (cvmfs_fuse_debug ${CVMFS2_DEBUG_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fuse       ${CVMFS2_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES}
