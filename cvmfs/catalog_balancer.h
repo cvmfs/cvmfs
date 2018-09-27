@@ -41,6 +41,17 @@ namespace catalog {
  *
  * c) The number of entries of the catalog is lesser than min_weight_: the
  * catalog gets merged with its father (except the root catalog, obviously).
+ *
+ * Notes: Originally the CatalogBalancer class had only a single function,
+ * Balance, then it is been necessary to expose also the function
+ * AddCatalogMarker.
+ * One of the biggest risk, when working with any kind of interface is to,
+ * eventually, make them too wide, and having too wide interfaces is as good
+ * as not having interfaces at all.
+ * This is what is happening in this class.
+ * From a pragmatic point of view I believe that we are still striking a good
+ * --not ideal-- balance, but if it will ever be necessary to expose another
+ * function, then it may be worth to re-factor the whole class.
  */
 template <class CatalogMgrT>
 class CatalogBalancer {
@@ -77,6 +88,12 @@ class CatalogBalancer {
    * in the WritableCatalogManager
    */
   void Balance(catalog_t *catalog);
+
+  /**
+   * This function is necessary to programmatically add catalogs inside the
+   * repository, please refer to the Notes above
+   */
+  void AddCatalogMarker(std::string path);
 
  private:
  /**
@@ -128,7 +145,6 @@ class CatalogBalancer {
   typedef typename CatalogBalancer<CatalogMgrT>::VirtualNode virtual_node_t;
 
   void PartitionOptimally(VirtualNode *virtual_node);
-  void AddCatalogMarker(std::string path);
   DirectoryEntryBase MakeEmptyDirectoryEntryBase(std::string name,
                                                  uid_t uid,
                                                  gid_t gid);
@@ -143,4 +159,3 @@ class CatalogBalancer {
 #include "catalog_balancer_impl.h"
 
 #endif  // CVMFS_CATALOG_BALANCER_H_
-
