@@ -175,6 +175,8 @@ void SyncUnionTarball::Traverse() {
           archive_entry_set_pathname(catalog, root.c_str());
           archive_entry_set_filetype(catalog, AE_IFREG);
           ProcessArchiveEntry(catalog);
+          // The ProcessArchiveEntry does call Wakeup on the signal, in this
+          // particular corner case we need to re-wait for it.
           read_archive_signal_->Wait();
         }
         first_iteration = false;
