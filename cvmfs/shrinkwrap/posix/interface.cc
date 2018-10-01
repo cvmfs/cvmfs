@@ -715,7 +715,7 @@ struct fs_traversal_context *posix_initialize(
     result->data = strdup(data);
   }
 
-  if (config) {
+  if (config && strlen(config) > 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
       "Configuration file is not supported in POSIX interface '%s'", config);
     return NULL;

@@ -17,7 +17,80 @@
 #include "util/string.h"
 
 
-static void Usage() {
+namespace {
+
+struct Params {
+  bool CheckType(const std::string &type) {
+    if ((type == "cvmfs") || (type == "posix")) return true;
+    LogCvmfs(kLogCvmfs, kLogStderr, "Unknown type: %s", type.c_str());
+    return false;
+  }
+
+  bool Check() {
+    if (spec_trace_path.empty() && spec_base_dir.empty()) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Either base directory or trace file must be specified");
+      return false;
+    }
+    if (!spec_trace_path.empty() && !spec_base_dir.empty()) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Only allowed to specify either base dir or trace file");
+      return false;
+    }
+
+    if (num_parallel < 1) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "There is at least one worker thread required");
+      return false;
+    }
+
+    if (!CheckType(src_type) || !CheckType(dst_type)) return false;
+
+    return true;
+  }
+
+  void Complete() {
+    if (src_config_path.empty())
+      src_config_path = repo_name + ".config";
+
+    if (dst_data_dir.empty())
+      dst_data_dir = dst_base_dir + "/.data";
+  }
+
+  Params()
+    : repo_name()
+    , src_type("cvmfs")
+    , src_base_dir("/cvmfs")
+    , src_config_path()
+    , src_data_dir()
+    , dst_type("posix")
+    , dst_config_path()
+    , dst_base_dir("/tmp/cvmfs")
+    , dst_data_dir()
+    , spec_base_dir()
+    , spec_trace_path()
+    , num_parallel(1)
+    , retries(0)
+    , do_garbage_collection(false)
+  { }
+
+  std::string repo_name;
+  std::string src_type;
+  std::string src_base_dir;
+  std::string src_config_path;
+  std::string src_data_dir;
+  std::string dst_type;
+  std::string dst_config_path;
+  std::string dst_base_dir;
+  std::string dst_data_dir;
+  std::string spec_base_dir;
+  std::string spec_trace_path;
+  unsigned num_parallel;
+  unsigned retries;
+  bool do_garbage_collection;
+};
+
+void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
        "CernVM File System Shrinkwrapper, version %s\n\n"
        "This tool takes a cvmfs repository and outputs\n"
@@ -42,31 +115,12 @@ static void Usage() {
            VERSION);
 }
 
+}  // anonymous namespace
+
 int main(int argc, char **argv) {
-  // The starting location for the traversal in src
-  // Default value is the base directory (only used if not trace provided)
-  char *repo = NULL;
-
-  char *src_base = NULL;
-  char *src_cache = NULL;
-  char *src_type = NULL;
-  char *src_config = NULL;
-
-  char *dest_base = NULL;
-  char *dest_cache = NULL;
-  char *dest_type = NULL;
-  char *dest_config = NULL;
-
-  char *base = NULL;
-  char *spec_file = NULL;
-
-  bool garbage_collection = false;
-
-  unsigned num_parallel = 0;
-  unsigned retries = 0;
+  Params params;
 
   int c;
-
   static struct option long_opts[] = {
       /* All of the options require an argument */
       {"help",        no_argument, 0, 'h'},
@@ -95,61 +149,46 @@ int main(int argc, char **argv) {
         Usage();
         return 0;
       case 'p':
-        base = strdup(optarg);
-        if (spec_file) {
-          LogCvmfs(kLogCvmfs, kLogStdout,
-                   "Only allowed to specify either base dir or trace file");
-          return 1;
-        }
+        params.spec_base_dir = optarg;
         break;
       case 'r':
-        repo = strdup(optarg);
+        params.repo_name = optarg;
         break;
       case 's':
-        src_type = strdup(optarg);
+        params.src_type = optarg;
         break;
       case 'b':
-        src_base = strdup(optarg);
+        params.src_base_dir = optarg;
         break;
       case 'c':
-        src_cache = strdup(optarg);
+        params.src_data_dir = optarg;
         break;
       case 'f':
-        src_config = strdup(optarg);
+        params.src_config_path = optarg;
         break;
       case 'd':
-        dest_type = strdup(optarg);
+        params.dst_type = optarg;
         break;
       case 'x':
-        dest_base = strdup(optarg);
+        params.dst_base_dir = optarg;
         break;
       case 'y':
-        dest_cache = strdup(optarg);
+        params.dst_data_dir = optarg;
         break;
       case 'z':
-        dest_config = strdup(optarg);
+        params.dst_config_path = optarg;
         break;
       case 't':
-        spec_file = strdup(optarg);
-        if (base) {
-          LogCvmfs(kLogCvmfs, kLogStdout,
-                   "Only allowed to specify either base dir or trace file");
-          return 1;
-        }
+        params.spec_trace_path = optarg;
         break;
       case 'j':
-        num_parallel = atoi(optarg);
-        if (num_parallel < 1) {
-          LogCvmfs(kLogCvmfs, kLogStdout,
-                   "There is at least one worker thread required");
-          return 1;
-        }
+        params.num_parallel = atoi(optarg);
         break;
       case 'n':
-        retries = atoi(optarg);
+        params.retries = atoi(optarg);
         break;
       case 'g':
-        garbage_collection = true;
+        params.do_garbage_collection = true;
         break;
       case '?':
       default:
@@ -158,69 +197,60 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (!src_type) {
-    src_type = strdup("cvmfs");
-  }
+  if (!params.Check()) return 1;
+  params.Complete();
 
-  if (!dest_type) {
-    dest_type = strdup("posix");
-  }
-
-  struct fs_traversal *src = shrinkwrap::FindInterface(src_type);
+  struct fs_traversal *src = shrinkwrap::FindInterface(params.src_type.c_str());
   if (!src) {
     return 1;
   }
-  src->context_ = src->initialize(repo, src_base, src_cache,
-    src_config, num_parallel);
+  src->context_ = src->initialize(
+    params.repo_name.c_str(),
+    params.src_base_dir.c_str(),
+    params.src_data_dir.c_str(),
+    params.src_config_path.c_str(),
+    params.num_parallel);
   if (!src->context_) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-      "Unable to initialize src: type %s", src_type);
+    LogCvmfs(kLogCvmfs, kLogStderr, "Unable to initialize source");
     return 1;
   }
 
-  struct fs_traversal *dest = shrinkwrap::FindInterface(dest_type);
+  struct fs_traversal *dest =
+    shrinkwrap::FindInterface(params.dst_type.c_str());
   if (!dest) {
     return 1;
   }
-  dest->context_ = dest->initialize(repo, dest_base, dest_cache,
-    dest_config, num_parallel);
+  dest->context_ = dest->initialize(
+    params.repo_name.c_str(),
+    params.dst_base_dir.c_str(),
+    params.dst_data_dir.c_str(),
+    params.dst_config_path.c_str(),
+    params.num_parallel);
   if (!dest->context_) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-      "Unable to initialize src: type %s", dest_type);
+    LogCvmfs(kLogCvmfs, kLogStderr, "Unable to initialize destination");
+    src->finalize(src->context_);
+    delete src;
     return 1;
   }
 
   dest->archive_provenance(src->context_, dest->context_);
 
-  if (!base) {
-    base = strdup("");
-  }
-
-  int result = shrinkwrap::SyncInit(src, dest, base, spec_file,
-                                    num_parallel, retries);
+  int result = shrinkwrap::SyncInit(
+    src,
+    dest,
+    params.spec_base_dir.c_str(),
+    params.spec_trace_path.c_str(),
+    params.num_parallel,
+    params.retries);
 
   src->finalize(src->context_);
-  if (garbage_collection) {
+  if (params.do_garbage_collection) {
     shrinkwrap::GarbageCollect(dest);
   }
   dest->finalize(dest->context_);
 
   delete src;
   delete dest;
-  free(repo);
-
-  free(src_base);
-  free(src_cache);
-  free(src_type);
-  free(src_config);
-
-  free(dest_base);
-  free(dest_cache);
-  free(dest_type);
-  free(dest_config);
-
-  free(base);
-  free(spec_file);
 
   return result;
 }
