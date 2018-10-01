@@ -284,7 +284,7 @@ const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
                         "1dcca23355272056f04fe8bf20edfce0000000",
                         "11111111111111111111111111111111111111"};
 
-const size_t file_size = 4096;
+const off_t file_size = 4096;
 
 // Create directory specification for later repositories
 DirSpec MakeBaseSpec() {
