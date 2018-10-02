@@ -152,8 +152,8 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
 int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
                              void* user, void* in, size_t len) {
   PerSessionStorage* pss = static_cast<PerSessionStorage*>(user);
-  ContextData* cd = (ContextData*)lws_protocol_vh_priv_get(
-      lws_get_vhost(wsi), lws_get_protocol(wsi));
+  ContextData* cd = static_cast<ContextData*>(
+      lws_protocol_vh_priv_get(lws_get_vhost(wsi), lws_get_protocol(wsi)));
 
   switch (reason) {
     case LWS_CALLBACK_PROTOCOL_INIT: {
@@ -164,19 +164,29 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
       cd->context = lws_get_context(wsi);
       cd->vhost = lws_get_vhost(wsi);
 
+      // Note: libwebsockets is a C library. Passing parameters into the
+      //       connection context is done with a link list storing generic
+      //       pointers (void*) to the parameter values. C-style casts back
+      //       to the original value types are needed. See:
+      //
+      //   https://libwebsockets.org/git/libwebsockets/tree/minimal-examples
+      //
+      //       Using C++-style casts would not increase readability in this
+      //       case, since each C-style cast would need to be replaced with
+      //       a const_cast, followed by a reinterpret_cast.
       cd->subscriber =
-          (SubscriberWS*)(lws_pvo_search(
+          (SubscriberWS*)(lws_pvo_search(  // NOLINT(readability/casting)
                               (const struct lws_protocol_vhost_options*)in,
                               "subscriber")
                               ->value);
 
       cd->should_stop =
-          (bool*)(lws_pvo_search((const struct lws_protocol_vhost_options*)in,
-                                 "should_stop")
+          (bool*)(lws_pvo_search(  // NOLINT(readability/casting)
+            (const struct lws_protocol_vhost_options*) in, "should_stop")
                       ->value);
 
       cd->settings =
-          *((Settings*)lws_pvo_search(
+          *((Settings*)lws_pvo_search(  // NOLINT(readability/casting)
                 (const struct lws_protocol_vhost_options*)in, "settings")
                 ->value);
       if (ConnectClient(cd)) {

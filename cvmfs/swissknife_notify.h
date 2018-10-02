@@ -7,6 +7,8 @@
 
 #include "swissknife.h"
 
+#include <string>
+
 namespace swissknife {
 
 class CommandNotify : public Command {

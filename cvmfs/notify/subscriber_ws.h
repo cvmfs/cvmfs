@@ -8,13 +8,15 @@
 
 #include "subscriber.h"
 
+#include <string>
+
 #include "libwebsockets.h"
 
 namespace notify {
 
 class SubscriberWS : public Subscriber {
  public:
-  SubscriberWS(const std::string& server_url);
+  explicit SubscriberWS(const std::string& server_url);
   virtual ~SubscriberWS();
 
   virtual bool Subscribe(const std::string& topic);

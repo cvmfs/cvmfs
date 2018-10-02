@@ -37,7 +37,7 @@ class Url {
   int port() const { return port_; }
 
  private:
-  explicit Url();
+  Url();
   Url(const std::string& protocol, const std::string& host,
       const std::string& path, int port);
 

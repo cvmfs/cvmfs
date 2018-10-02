@@ -7,11 +7,13 @@
 
 #include "publisher.h"
 
+#include <string>
+
 namespace notify {
 
 class PublisherHTTP : public Publisher {
  public:
-  PublisherHTTP(const std::string& server_url);
+  explicit PublisherHTTP(const std::string& server_url);
   virtual ~PublisherHTTP();
 
   virtual bool Publish(const std::string& msg, const std::string& topic);
