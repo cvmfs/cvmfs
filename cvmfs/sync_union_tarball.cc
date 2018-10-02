@@ -7,6 +7,7 @@
 #include "sync_union_tarball.h"
 
 #include <pthread.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdio>
@@ -32,14 +33,15 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &rdonly_path,
                                    const std::string &tarball_path,
                                    const std::string &base_directory,
-                                   const std::string &to_delete)
+                                   const std::string &to_delete,
+                                   const bool create_catalog_on_root)
     : SyncUnion(mediator, rdonly_path, "", ""),
       src(NULL),
       tarball_path_(tarball_path),
       base_directory_(base_directory),
       to_delete_(to_delete),
-      read_archive_signal_(new Signal) {
-}
+      create_catalog_on_root_(create_catalog_on_root),
+      read_archive_signal_(new Signal) {}
 
 SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
 
@@ -86,6 +88,13 @@ bool SyncUnionTarball::Initialize() {
  * not reading data anymore from there.
  * This whole process is not necessary for directories since we don't
  * actually need to read data from them.
+ *
+ * It may be needed to add a catalog as a root of the archive.
+ * A possible way to do it is by creating an virtual `.cvmfscatalog` file and
+ * push it into the usual pipeline.
+ * This operation must be done only once, and it seems like a good idea to do
+ * it at the first iteration of the loop, hence this logic is managed by the
+ * `first_iteration` boolean flag.
  */
 void SyncUnionTarball::Traverse() {
   read_archive_signal_->Wakeup();
@@ -112,6 +121,7 @@ void SyncUnionTarball::Traverse() {
   // we are simplying deleting entity from  the repo
   if (NULL == src) return;
 
+  bool first_iteration = true;
   struct archive_entry *entry = archive_entry_new();
   while (true) {
     // Get the lock, wait if lock is not available yet
@@ -158,6 +168,21 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_OK: {
+        if (first_iteration && create_catalog_on_root_) {
+          struct archive_entry *catalog = archive_entry_new();
+          archive_entry_set_pathname(catalog, base_directory_.c_str());
+          archive_entry_set_filetype(catalog, AE_IFREG);
+          archive_entry_set_perm(catalog, kDefaultFileMode);
+          archive_entry_set_gid(catalog, getgid());
+          archive_entry_set_uid(catalog, getuid());
+          ProcessArchiveEntry(catalog);
+          archive_entry_free(catalog);
+          // The ProcessArchiveEntry does call Wakeup on the signal, in this
+          // particular corner case we need to re-wait for it.
+          read_archive_signal_->Wait();
+        }
+        first_iteration = false;
+
         ProcessArchiveEntry(entry);
         break;
       }

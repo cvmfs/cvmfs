@@ -65,6 +65,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
         zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
   }
 
+  bool create_catalog = args.find('C') != args.end();
+
   params.nested_kcatalog_limit = SyncParameters::kDefaultNestedKcatalogLimit;
   params.root_kcatalog_limit = SyncParameters::kDefaultRootKcatalogLimit;
   params.file_mbyte_limit = SyncParameters::kDefaultFileMbyteLimit;
@@ -146,7 +148,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
                                        params.tar_file, params.base_directory,
-                                       params.to_delete);
+                                       params.to_delete, create_catalog);
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "Initialization of the synchronisation "

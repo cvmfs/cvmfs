@@ -31,7 +31,8 @@ class SyncUnionTarball : public SyncUnion {
                    const std::string &rdonly_path,
                    const std::string &tarball_path,
                    const std::string &base_directory,
-                   const std::string &to_delete);
+                   const std::string &to_delete,
+                   const bool create_catalog_on_root);
 
   ~SyncUnionTarball();
 
@@ -63,6 +64,7 @@ class SyncUnionTarball : public SyncUnion {
   const std::string tarball_path_;
   const std::string base_directory_;
   const std::string to_delete_;  ///< entity to delete before to extract the tar
+  const bool create_catalog_on_root_;
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
 
