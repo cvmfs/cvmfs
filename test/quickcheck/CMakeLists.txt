@@ -30,6 +30,7 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_QC_FILES}
 
   # dependencies
+  ${CVMFS_SOURCE_DIR}/backoff.cc
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
@@ -43,6 +44,7 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
   ${CVMFS_SOURCE_DIR}/ingestion/item.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item_mem.cc
   ${CVMFS_SOURCE_DIR}/ingestion/pipeline.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc
@@ -54,6 +56,8 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/globals.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
   ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/history_sql.cc
+  ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
