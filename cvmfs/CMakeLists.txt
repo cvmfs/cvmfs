@@ -523,6 +523,7 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_LINK_LIBRARIES "")
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${CURL_LIBRARIES}
                                         ${CARES_LIBRARIES}
+                                        ${LibWebsockets_LIBRARIES}
                                         ${OPENSSL_LIBRARIES}
                                         ${PACPARSER_LIBRARIES}
                                         ${SQLITE3_LIBRARY}
@@ -629,10 +630,9 @@ if (BUILD_LIBCVMFS)
   add_dependencies (cvmfs_only cache.pb.generated)
 
   set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CURL_LIBRARIES}
-                     ${PACPARSER_LIBRARIES} ${SQLITE3_LIBRARY}
-                     ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
-                     ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                     ${PROTOBUF_LITE_LIBRARY}
+                     ${LibWebsockets_LIBRARIES} ${PACPARSER_LIBRARIES}
+                     ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
+                     ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
                      ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
@@ -665,11 +665,12 @@ if (BUILD_LIBCVMFS)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
   add_dependencies(test_libcvmfs libcvmfs)
-  target_link_libraries(test_libcvmfs
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
-                        ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+
+  list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${LibWebsockets_LIBRARIES}
+                                 ${CARES_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES}
+                                 ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
+
+  target_link_libraries(test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${TEST_LIBCVMFS_LIBS})
 endif(BUILD_LIBCVMFS)
 
 if (BUILD_OCTOPUS)
@@ -710,7 +711,8 @@ if (BUILD_SERVER)
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
                          ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
-                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
+                         ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
+                         ${LibWebsockets_LIBRARIES} pthread dl)
 
   target_link_libraries(cvmfs_stratum_agent
                         ${CURL_LIBRARIES} ${CARES_LIBRARIES}

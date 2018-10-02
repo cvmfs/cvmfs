@@ -198,7 +198,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
     set(ENV{BUILD_QC_TESTS} "")
-  endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+    endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
   # point to the prefix where the libraries are installed. This path will take precedence
@@ -325,6 +325,9 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
 
 find_package (LibArchive REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
+
+find_package(LibWebsockets REQUIRED)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibWebsockets_INCLUDE_DIRS})
 
 # Almost all build targets require zlib, sha2/3
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
