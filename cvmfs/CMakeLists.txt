@@ -110,8 +110,13 @@ set (CVMFS2_DEBUG_SOURCES
   fuse_remount.cc
   nfs_maps_leveldb.cc
   nfs_maps_sqlite.cc
+  notification_client.cc
+  notify/messages.cc
+  notify/subscriber_ws.cc
   quota_listener.cc
+  supervisor.cc
   talk.cc
+  url.cc
 )
 
 set (CVMFS2_SOURCES

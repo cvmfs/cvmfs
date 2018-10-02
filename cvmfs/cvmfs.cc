@@ -92,6 +92,7 @@
 #include "monitor.h"
 #include "mountpoint.h"
 #include "nfs_maps.h"
+#include "notification_client.h"
 #include "options.h"
 #include "platform.h"
 #include "quota_listener.h"
@@ -116,6 +117,7 @@ namespace cvmfs {
 FileSystem *file_system_ = NULL;
 MountPoint *mount_point_ = NULL;
 TalkManager *talk_mgr_ = NULL;
+NotificationClient *notification_client_ = NULL;
 Watchdog *watchdog_ = NULL;
 FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
@@ -1802,6 +1804,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::loader_exports_ = loader_exports;
   InitOptionsMgr(loader_exports);
 
+  // Set default logging facilities
+  DefaultLogging::Set(kLogSyslog, kLogSyslogErr);
+
   FileSystem::FileSystemInfo fs_info;
   fs_info.type = FileSystem::kFsFuse;
   fs_info.name = loader_exports->repository_name;
@@ -1866,6 +1871,18 @@ static int Init(const loader::LoaderExports *loader_exports) {
     return loader::kFailTalk;
   }
 
+  // Notification system client
+  {
+    OptionsManager* options = cvmfs::file_system_->options_mgr();
+    if (options->IsDefined("CVMFS_NOTIFICATION_SERVER")) {
+      std::string config;
+      options->GetValue("CVMFS_NOTIFICATION_SERVER", &config);
+      const std::string repo_name = cvmfs::mount_point_->fqrn();
+      cvmfs::notification_client_ = new NotificationClient(config, repo_name, cvmfs::fuse_remounter_);
+    }
+  }
+
+
   auto_umount::SetMountpoint(loader_exports->mount_point);
 
   return loader::kFailOk;
@@ -1903,6 +1920,11 @@ static void Spawn() {
   }
   cvmfs::mount_point_->tracer()->Spawn();
   cvmfs::talk_mgr_->Spawn();
+
+  if (cvmfs::notification_client_ != NULL) {
+    cvmfs::notification_client_->Spawn();
+  }
+
   if (cvmfs::file_system_->nfs_maps() != NULL)
     cvmfs::file_system_->nfs_maps()->Spawn();
 
