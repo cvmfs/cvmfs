@@ -217,6 +217,12 @@ set (CVMFS_SWISSKNIFE_SOURCES
   malloc_arena.cc
   manifest.cc
   manifest_fetch.cc
+  notify/cmd_pub.cc
+  notify/cmd_sub.cc
+  notify/messages.cc
+  notify/publisher.cc
+  notify/publisher_http.cc
+  notify/subscriber_ws.cc
   options.cc
   pack.cc
   path_filters/dirtab.cc
@@ -255,6 +261,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_lsrepo.cc
   swissknife_main.cc
   swissknife_migrate.cc
+  swissknife_notify.cc
   swissknife_pull.cc
   swissknife_reflog.cc
   swissknife_scrub.cc
@@ -468,7 +475,6 @@ if(BUILD_RECEIVER)
   set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
 
 endif(BUILD_RECEIVER)
-
 
 #
 # configure some compiler flags for proper build
