@@ -17,6 +17,9 @@ namespace {
 
 const int kLogError = DefaultLogging::error;
 
+const unsigned char kPingToken = 123;
+const int kPingInterval = 50000000; // 50 sec
+
 const int kWsLogLevel = LLL_ERR | LLL_WARN | LLL_NOTICE | LLL_INFO | LLL_USER;
 
 void LogWs(int level, const char* line) {
@@ -38,6 +41,7 @@ struct Settings {
 
 struct PerSessionStorage {
   std::string* message;
+  bool send_ping;
 };
 
 struct ContextData {
@@ -198,10 +202,20 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
     }
     case LWS_CALLBACK_CLIENT_ESTABLISHED: {
       pss->message = new std::string();
+      pss->send_ping = false;
       lws_callback_on_writable(wsi);
       break;
     }
     case LWS_CALLBACK_CLIENT_WRITEABLE: {
+      // Send a Websocket PING
+      if (pss->send_ping) {
+        unsigned char token = kPingToken;
+        lws_write(wsi, &token, 1, LWS_WRITE_PING);
+        lws_set_timer_usecs(wsi, kPingInterval);
+        break;
+      }
+
+      // Send initial subscription request
       std::string buf(LWS_PRE, '0');
       buf += "{\"version\":" + StringifyInt(notify::msg::kProtocolVersion) +
              ",\"repository\":\"" + cd->settings.topic + "\"}";
@@ -213,6 +227,8 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
         LogCvmfs(kLogCvmfs, kLogError, "Could not send subscription request.");
         return -1;
       }
+      lws_set_timer_usecs(wsi, kPingInterval);
+      pss->send_ping = true;
       break;
     }
     case LWS_CALLBACK_CLIENT_RECEIVE: {
@@ -257,6 +273,10 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
       lws_cancel_service(lws_get_context(wsi));
       break;
     }
+    case LWS_CALLBACK_TIMER: {
+      lws_callback_on_writable(wsi);
+      break;
+    }
     case LWS_CALLBACK_USER: {
       if (ConnectClient(cd)) {
         ScheduleCallback(wsi, LWS_CALLBACK_USER, 1);
@@ -264,7 +284,7 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
       break;
     }
     default:
-      LogCvmfs(kLogCvmfs, kLogDebug, "Unhandled websocket event: %d", reason);
+      //LogCvmfs(kLogCvmfs, kLogDebug, "Unhandled websocket event: %d", reason);
   }
 
   return 0;
