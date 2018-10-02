@@ -198,8 +198,7 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
           lws_write(wsi, reinterpret_cast<unsigned char*>(&buf[LWS_PRE]),
                     body_size, LWS_WRITE_BINARY);
       if (bytes_sent != body_size) {
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "Could not send subscription request.");
+        LogCvmfs(kLogCvmfs, kLogStderr, "Could not send subscription request.");
         return -1;
       }
       break;

@@ -76,7 +76,8 @@ class SubscriptionSupervisor : public Supervisor {
   virtual bool Task() {
     bool ret = subscriber_->Subscribe(topic_);
     if (ret) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Subcription ended successfully. Stopping.");
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Subcription ended successfully. Stopping.");
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Subcription failed. Retrying.");
     }

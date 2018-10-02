@@ -12,12 +12,8 @@ namespace notify {
 
 Publisher::~Publisher() {}
 
-bool Publisher::Init() {
-  return true;
-}
+bool Publisher::Init() { return true; }
 
-bool Publisher::Finalize() {
-  return true;
-}
+bool Publisher::Finalize() { return true; }
 
 }  // namespace notify

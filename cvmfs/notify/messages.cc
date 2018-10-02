@@ -32,15 +32,13 @@ void Activity::ToJSONString(std::string* s) {
 bool Activity::FromJSONString(const std::string& s) {
   const UniquePtr<JsonDocument> m(JsonDocument::Create(s));
   if (!m.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "Could not create JSON document.");
+    LogCvmfs(kLogCvmfs, kLogDebug, "Could not create JSON document.");
     return false;
   }
 
   std::string message_type;
   if (!GetFromJSON(m->root(), "type", &message_type)) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "Could not read message type.");
+    LogCvmfs(kLogCvmfs, kLogDebug, "Could not read message type.");
     return false;
   }
   if (message_type != "activity") {
@@ -63,8 +61,7 @@ bool Activity::FromJSONString(const std::string& s) {
     return false;
   }
   if (!Debase64(manifest_b64, &manifest_)) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "Could not debase64 manifest.");
+    LogCvmfs(kLogCvmfs, kLogDebug, "Could not debase64 manifest.");
     return false;
   }
 
