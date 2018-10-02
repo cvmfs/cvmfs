@@ -15,6 +15,9 @@
 
 namespace {
 
+const int kLogInfo = DefaultLogging::info;
+const int kLogError = DefaultLogging::error;
+
 class TriggerSubscriber : public notify::SubscriberWS {
  public:
   TriggerSubscriber(const std::string& server_url, uint64_t min_revision,
@@ -29,7 +32,7 @@ class TriggerSubscriber : public notify::SubscriberWS {
   virtual bool Consume(const std::string& topic, const std::string& msg_text) {
     notify::msg::Activity msg;
     if (!msg.FromJSONString(msg_text)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Could not decode message.");
+      LogCvmfs(kLogCvmfs, kLogError, "Could not decode message.");
       return false;
     }
 
@@ -38,17 +41,17 @@ class TriggerSubscriber : public notify::SubscriberWS {
         msg.manifest_.size()));
 
     if (!manifest.IsValid()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Could not parse manifest.");
+      LogCvmfs(kLogCvmfs, kLogError, "Could not parse manifest.");
       return false;
     }
 
     uint64_t new_revision = manifest->revision();
     bool triggered = false;
     if (new_revision > revision_) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Repository %s is now at revision %lu.",
+      LogCvmfs(kLogCvmfs, kLogInfo, "Repository %s is now at revision %lu.",
                topic.c_str(), new_revision, revision_);
       if (verbose_) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "%s", msg_text.c_str());
+        LogCvmfs(kLogCvmfs, kLogInfo, "%s", msg_text.c_str());
       }
       revision_ = new_revision;
       triggered = true;
@@ -76,10 +79,10 @@ class SubscriptionSupervisor : public Supervisor {
   virtual bool Task() {
     bool ret = subscriber_->Subscribe(topic_);
     if (ret) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
+      LogCvmfs(kLogCvmfs, kLogInfo,
                "Subcription ended successfully. Stopping.");
     } else {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Subcription failed. Retrying.");
+      LogCvmfs(kLogCvmfs, kLogInfo, "Subcription failed. Retrying.");
     }
     return ret;
   }

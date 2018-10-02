@@ -19,6 +19,9 @@
 
 namespace {
 
+const int kLogInfo = DefaultLogging::info;
+const int kLogError = DefaultLogging::error;
+
 const int kMaxPoolHandles = 1;
 const bool kUseSystemPorxy = true;
 const unsigned kDownloadTimeout = 60;  // 1 minute
@@ -32,10 +35,10 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
               bool verbose) {
   const std::string repo_url = MakeCanonicalPath(repository_url);
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Parameters: ");
-  LogCvmfs(kLogCvmfs, kLogStdout, "  CVMFS repository URL: %s",
+  LogCvmfs(kLogCvmfs, kLogInfo, "Parameters: ");
+  LogCvmfs(kLogCvmfs, kLogInfo, "  CVMFS repository URL: %s",
            repo_url.c_str());
-  LogCvmfs(kLogCvmfs, kLogStdout, "  Notification server URL: %s",
+  LogCvmfs(kLogCvmfs, kLogInfo, "  Notification server URL: %s",
            server_url.c_str());
 
   // Extract repository name from repository URL
@@ -59,7 +62,7 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
     download::JobInfo download_manifest(&manifest_url, false, false, NULL);
     download::Failures retval = download_manager->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to download manifest (%d - %s)",
+      LogCvmfs(kLogCvmfs, kLogError, "Failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
       return 6;
     }
@@ -69,11 +72,11 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
   } else {
     int fd = open(manifest_url.c_str(), O_RDONLY);
     if (fd == -1) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Could not open manifest file");
+      LogCvmfs(kLogCvmfs, kLogInfo, "Could not open manifest file");
       return 7;
     }
     if (!SafeReadToString(fd, &manifest_contents)) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Could not read manifest file");
+      LogCvmfs(kLogCvmfs, kLogInfo, "Could not read manifest file");
       close(fd);
       return 8;
     }
@@ -85,7 +88,7 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
       manifest_contents.size()));
 
   if (verbose) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Current repository manifest:\n%s",
+    LogCvmfs(kLogCvmfs, kLogInfo, "Current repository manifest:\n%s",
              manifest->ExportString().c_str());
   }
 
@@ -101,7 +104,7 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
   msg.ToJSONString(&msg_text);
 
   if (!publisher->Publish(msg_text, repository_name)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Could not publish notification");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not publish notification");
     return 9;
   }
 

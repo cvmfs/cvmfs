@@ -15,12 +15,14 @@
 
 namespace {
 
+const int kLogError = DefaultLogging::error;
+
 const int kWsLogLevel = LLL_ERR | LLL_WARN | LLL_NOTICE | LLL_INFO | LLL_USER;
 
 void LogWs(int level, const char* line) {
   int dest = kLogDebug;
   if (level & LLL_ERR) {
-    dest = kLogStderr;
+    dest = kLogError;
   }
 
   LogCvmfs(kLogCvmfs, dest, line);
@@ -89,7 +91,7 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
 
   UniquePtr<Url> url(Url::Parse(server_url_));
   if (!url.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Could not parse notification server url",
+    LogCvmfs(kLogCvmfs, kLogError, "Could not parse notification server url",
              server_url_.c_str());
     return true;
   }
@@ -128,7 +130,7 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
 
   struct lws_context* context = lws_create_context(&info);
   if (!context) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Could not create libwebsocket context.");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not create libwebsocket context.");
     return false;
   }
 
@@ -139,7 +141,7 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
 
   bool ret = true;
   if (err) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
+    LogCvmfs(kLogCvmfs, kLogError,
              "SubscriberWS event loop finished with error: %d", err);
     ret = false;
   }
@@ -208,7 +210,7 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
           lws_write(wsi, reinterpret_cast<unsigned char*>(&buf[LWS_PRE]),
                     body_size, LWS_WRITE_BINARY);
       if (bytes_sent != body_size) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Could not send subscription request.");
+        LogCvmfs(kLogCvmfs, kLogError, "Could not send subscription request.");
         return -1;
       }
       break;
