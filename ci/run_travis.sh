@@ -70,7 +70,7 @@ fi
 echo -n "BUILDING CernVM-FS "
 start_processing
 mkdir -p build && cd build
-cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes .. > build.log 2>&1  && \
+cmake -DBUILD_UNITTESTS=yes -DBUILD_PRELOADER=yes -DBUILD_SHRINKWRAP=yes .. > build.log 2>&1  && \
 make >> "$(pwd)/build.log" 2>&1                                           || { BUILD_FAILED=true; report_error "$(pwd)/build.log"; }
 stop_processing
 if ! $BUILD_FAILED ; then
