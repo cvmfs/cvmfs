@@ -273,6 +273,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_local.cc
   upload_s3.cc
   upload_spooler_definition.cc
+  url.cc
   util/algorithm.cc
   util/mmap_file.cc
   util/posix.cc

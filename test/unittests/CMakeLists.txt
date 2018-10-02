@@ -113,6 +113,7 @@ set(CVMFS_UNITTEST_FILES
   t_uploaders.cc
   t_gateway_uploader.cc
   t_uri_map.cc
+  t_url.cc
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
@@ -235,6 +236,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_gateway.cc
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/url.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
