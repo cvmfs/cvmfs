@@ -1,0 +1,29 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#include "supervisor.h"
+
+#include "logging.h"
+#include "platform.h"
+
+Supervisor::Supervisor(int max_retries, uint64_t interval_sec)
+    : max_retries_(max_retries), interval_(interval_sec) {}
+
+Supervisor::~Supervisor() {}
+
+void Supervisor::Run() {
+  int retries = 0;
+  uint64_t t0 = platform_monotonic_time();
+  bool result = false;
+  do {
+    result = Task();
+    uint64_t t1 = platform_monotonic_time();
+    if (t1 - t0 < interval_) {
+      retries += 1;
+    } else {
+      t0 = t1;
+      retries = 0;
+    }
+  } while (!result && (retries < max_retries_));
+}

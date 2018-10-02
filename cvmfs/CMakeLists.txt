@@ -236,6 +236,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   sqlitemem.cc
   statistics_database.cc
   statistics.cc
+  supervisor.cc
   swissknife.cc
   swissknife_assistant.cc
   swissknife_check.cc

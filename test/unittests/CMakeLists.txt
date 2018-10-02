@@ -100,6 +100,7 @@ set(CVMFS_UNITTEST_FILES
   t_sqlitemem.cc
   t_statistics.cc
   t_suid_util.cc
+  t_supervisor.cc
   t_swissknife_lease.cc
   t_sync_union_tarball.cc
   t_synchronizing_counter.cc
@@ -219,6 +220,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/supervisor.cc
   ${CVMFS_SOURCE_DIR}/swissknife.cc
   ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
   ${CVMFS_SOURCE_DIR}/swissknife_history.cc
