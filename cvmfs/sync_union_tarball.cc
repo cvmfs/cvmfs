@@ -7,6 +7,7 @@
 #include "sync_union_tarball.h"
 
 #include <pthread.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdio>
@@ -168,12 +169,12 @@ void SyncUnionTarball::Traverse() {
 
       case ARCHIVE_OK: {
         if (first_iteration && create_catalog_on_root_) {
-          std::string root =
-              GetRoot(std::string(archive_entry_pathname(entry)));
-          root = root + "/.cvmfscatalog";
-          struct archive_entry *catalog = archive_entry_clone(entry);
-          archive_entry_set_pathname(catalog, root.c_str());
+          struct archive_entry *catalog = archive_entry_new();
+          archive_entry_set_pathname(catalog, base_directory_.c_str());
           archive_entry_set_filetype(catalog, AE_IFREG);
+          archive_entry_set_perm(catalog, kDefaultFileMode);
+          archive_entry_set_gid(catalog, getgid());
+          archive_entry_set_uid(catalog, getuid());
           ProcessArchiveEntry(catalog);
           archive_entry_free(catalog);
           // The ProcessArchiveEntry does call Wakeup on the signal, in this
@@ -287,20 +288,6 @@ std::string SyncUnionTarball::SanitizePath(const std::string &path) {
     }
   }
   return path;
-}
-
-std::string SyncUnionTarball::GetRoot(const std::string &path) {
-  assert("" != path);
-  // it is called iterator since it "iterate" from directory to direrctory
-  std::string path_iterator = path;
-  std::string dir;
-  std::string filename;
-  do {
-    SplitPath(path_iterator, &dir, &filename);
-    path_iterator = dir;
-  } while ("." != dir);
-
-  return filename;
 }
 
 void SyncUnionTarball::PostUpload() {

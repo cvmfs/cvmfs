@@ -107,13 +107,6 @@ class SyncUnionTarball : public SyncUnion {
   void CreateDirectories(const std::string &target);
   void ProcessArchiveEntry(struct archive_entry *entry);
   std::string SanitizePath(const std::string &path);
-  /**
-   * GetRoot returns the root of a path, it panics if the input is empty,
-   * Given "" => panic
-   * Given "/foo" => "foo"
-   * Given "/a/b/c/" => "a"
-   */
-  std::string GetRoot(const std::string &path);
 };  // class SyncUnionTarball
 
 }  // namespace publish
