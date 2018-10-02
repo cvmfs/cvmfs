@@ -52,4 +52,7 @@ class JsonDocument : SingleCopy {
   char *raw_text_;
 };
 
+template <typename T>
+bool GetFromJSON(const JSON *object, const std::string &name, T *value);
+
 #endif  // CVMFS_JSON_DOCUMENT_H_

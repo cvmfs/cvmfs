@@ -218,3 +218,44 @@ JSON *JsonDocument::SearchInObject(const JSON *json_object, const string &name,
   }
   return NULL;
 }
+
+template <>
+bool GetFromJSON<std::string>(const JSON *object, const std::string &name,
+                              std::string *value) {
+  const JSON *o = JsonDocument::SearchInObject(object, name, JSON_STRING);
+
+  if (o == NULL || value == NULL) {
+    return false;
+  }
+
+  *value = o->string_value;
+
+  return true;
+}
+
+template <>
+bool GetFromJSON<int>(const JSON *object, const std::string &name, int *value) {
+  const JSON *o = JsonDocument::SearchInObject(object, name, JSON_INT);
+
+  if (o == NULL || value == NULL) {
+    return false;
+  }
+
+  *value = o->int_value;
+
+  return true;
+}
+
+template <>
+bool GetFromJSON<float>(const JSON *object, const std::string &name,
+                        float *value) {
+  const JSON *o = JsonDocument::SearchInObject(object, name, JSON_FLOAT);
+
+  if (o == NULL || value == NULL) {
+    return false;
+  }
+
+  *value = o->float_value;
+
+  return true;
+}
