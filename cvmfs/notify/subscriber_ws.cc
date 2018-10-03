@@ -18,7 +18,7 @@ namespace {
 const int kLogError = DefaultLogging::error;
 
 const unsigned char kPingToken = 123;
-const int kPingInterval = 50000000; // 50 sec
+const int kPingInterval = 50000000;  // 50 sec
 
 const int kWsLogLevel = LLL_ERR | LLL_WARN | LLL_NOTICE | LLL_INFO | LLL_USER;
 
@@ -284,7 +284,9 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
       break;
     }
     default:
-      //LogCvmfs(kLogCvmfs, kLogDebug, "Unhandled websocket event: %d", reason);
+      // LogCvmfs(kLogCvmfs, kLogDebug,
+      //          "Unhandled websocket event: %d", reason);
+      break;
   }
 
   return 0;
