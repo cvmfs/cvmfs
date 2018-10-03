@@ -23,7 +23,7 @@ shift
 test_exclusions=0
 xml_output=""
 debug=""
-labels=""
+labels="$CVMFS_TEST_SUITES"
 while getopts "xo:ds:" option; do
   case $option in
     x)
