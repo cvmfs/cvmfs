@@ -10,7 +10,9 @@
 #include "logging.h"
 #include "manifest.h"
 #include "notify/messages.h"
+#include "notify/subscriber_supervisor.h"
 #include "notify/subscriber_ws.h"
+#include "supervisor.h"
 #include "util/posix.h"
 
 namespace {
@@ -53,16 +55,20 @@ class ActivitySubscriber : public notify::SubscriberWS {
         LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - remount failed");
         break;
       case FuseRemounter::kStatusFailNoSpace:
-        LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - remount failed (no space)");
+        LogCvmfs(kLogCvmfs, kLogSyslog,
+                 "NotificationClient - remount failed (no space)");
         break;
       case FuseRemounter::kStatusUp2Date:
-        LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - catalog up to date");
+        LogCvmfs(kLogCvmfs, kLogSyslog,
+                 "NotificationClient - catalog up to date");
         break;
       case FuseRemounter::kStatusDraining:
-        LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - new revision applied");
+        LogCvmfs(kLogCvmfs, kLogSyslog,
+                 "NotificationClient - new revision applied");
         break;
       case FuseRemounter::kStatusMaintenance:
-        LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - in maintenance mode");
+        LogCvmfs(kLogCvmfs, kLogSyslog,
+                 "NotificationClient - in maintenance mode");
         break;
       default:
         LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - internal error");
@@ -76,7 +82,6 @@ class ActivitySubscriber : public notify::SubscriberWS {
 };
 
 }  // namespace
-
 
 NotificationClient::NotificationClient(const std::string& config,
                                        const std::string& repo_name,
@@ -105,7 +110,12 @@ void* NotificationClient::Run(void* data) {
       "NotificationClient - Entering subscription loop for repository: %s.",
       cl->repo_name_.c_str());
 
-  sub->Subscribe(cl->repo_name_);
+  // Retry settings: accept no more than 10 failures in the last minute
+  const int num_retries = 10;
+  const uint64_t interval = 60;
+  notify::SubscriberSupervisor supervisor(sub.weak_ref(), cl->repo_name_,
+                                          num_retries, interval);
+  supervisor.Run();
 
   return NULL;
 }

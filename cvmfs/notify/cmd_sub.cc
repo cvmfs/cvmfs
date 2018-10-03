@@ -7,6 +7,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "notify/messages.h"
+#include "subscriber_supervisor.h"
 #include "subscriber_ws.h"
 #include "supervisor.h"
 #include "util/pointer.h"
@@ -69,29 +70,6 @@ class TriggerSubscriber : public notify::SubscriberWS {
   bool verbose_;
 };
 
-class SubscriptionSupervisor : public Supervisor {
- public:
-  SubscriptionSupervisor(notify::Subscriber* s, std::string t, int max_retries,
-                         uint64_t interval)
-      : Supervisor(max_retries, interval), subscriber_(s), topic_(t) {}
-  virtual ~SubscriptionSupervisor() {}
-
-  virtual bool Task() {
-    bool ret = subscriber_->Subscribe(topic_);
-    if (ret) {
-      LogCvmfs(kLogCvmfs, kLogInfo,
-               "Subcription ended successfully. Stopping.");
-    } else {
-      LogCvmfs(kLogCvmfs, kLogInfo, "Subcription failed. Retrying.");
-    }
-    return ret;
-  }
-
- private:
-  notify::Subscriber* subscriber_;
-  std::string topic_;
-};
-
 }  // namespace
 
 namespace notify {
@@ -103,7 +81,7 @@ int DoSubscribe(const std::string& server_url, const std::string& topic,
   // Retry settings: accept no more than 10 failures in the last minute
   const int num_retries = 10;
   const uint64_t interval = 60;
-  SubscriptionSupervisor supervisor(&subscriber, topic, num_retries, interval);
+  SubscriberSupervisor supervisor(&subscriber, topic, num_retries, interval);
   supervisor.Run();
 
   return 0;

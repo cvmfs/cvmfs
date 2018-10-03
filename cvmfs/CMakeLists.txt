@@ -112,6 +112,7 @@ set (CVMFS2_DEBUG_SOURCES
   nfs_maps_sqlite.cc
   notification_client.cc
   notify/messages.cc
+  notify/subscriber_supervisor.cc
   notify/subscriber_ws.cc
   quota_listener.cc
   supervisor.cc
@@ -227,6 +228,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   notify/messages.cc
   notify/publisher.cc
   notify/publisher_http.cc
+  notify/subscriber_supervisor.cc
   notify/subscriber_ws.cc
   options.cc
   pack.cc
