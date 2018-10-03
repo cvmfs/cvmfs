@@ -1,7 +1,7 @@
 #!/bin/bash
 
 usage() {
-  echo "$0 <logfile> [-o xUnit XML output] [-x <exclusion list> --] [test list]"
+  echo "$0 <logfile> [-o xUnit XML output] [-s suite labels] [-x <exclusion list> --] [test list]"
 }
 
 export LC_ALL=C
@@ -23,7 +23,8 @@ shift
 test_exclusions=0
 xml_output=""
 debug=""
-while getopts "xo:d" option; do
+labels=""
+while getopts "xo:ds:" option; do
   case $option in
     x)
       test_exclusions=1
@@ -33,6 +34,9 @@ while getopts "xo:d" option; do
     ;;
     d)
       debug="-x"
+    ;;
+    s)
+      labels="$OPTARG"
     ;;
     ?)
       usage
@@ -55,6 +59,10 @@ fi
 testsuite="$@"
 if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
+fi
+
+if [ "x$labels" != "x" ]; then
+  echo "Limiting test cases to suite(s): $labels"
 fi
 
 # start running the tests
@@ -220,7 +228,14 @@ do
   # check if test should be skipped
   if contains "$exclusions" $t; then
     report_skipped "test case was marked to be skipped" >> $logfile
-    echo "Skipped"
+    echo "Skipped by exclusion"
+    touch ${scratchdir}/skipped
+    continue
+  fi
+
+  if ! is_in_suite $t $labels; then
+    report_skipped "test case not part of selected suites" >> $logfile
+    echo "Skipped by suite restriction"
     touch ${scratchdir}/skipped
     continue
   fi
