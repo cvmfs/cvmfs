@@ -40,12 +40,12 @@ struct Settings {
   std::string topic;
 };
 
-struct PerSessionStorage {
+struct SessionState {
   std::string* message;
   bool send_ping;
 };
 
-struct ContextData {
+struct Context {
   struct lws_context* context;
   struct lws_vhost* vhost;
   struct lws* client_wsi;
@@ -57,7 +57,7 @@ struct ContextData {
   Settings settings;
 };
 
-int ConnectClient(ContextData* cd) {
+int ConnectClient(Context* cd) {
   struct lws_client_connect_info i;
   memset(&i, 0, sizeof(i));
 
@@ -111,8 +111,8 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
 
   // C-style structs needed to initialize the libwebsockets session
   const struct lws_protocols protocols[] = {
-      {"cvmfs", SubscriberWS::WSCallback, sizeof(PerSessionStorage), 1024, 0,
-       NULL, 0},
+      {"cvmfs", SubscriberWS::WSCallback, sizeof(SessionState), 1024, 0, NULL,
+       0},
       {NULL, NULL, 0, 0}};
 
   bool should_stop = false;
@@ -160,14 +160,14 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
 
 int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
                              void* user, void* in, size_t len) {
-  PerSessionStorage* pss = static_cast<PerSessionStorage*>(user);
-  ContextData* cd = static_cast<ContextData*>(
+  SessionState* pss = static_cast<SessionState*>(user);
+  Context* cd = static_cast<Context*>(
       lws_protocol_vh_priv_get(lws_get_vhost(wsi), lws_get_protocol(wsi)));
 
   switch (reason) {
     case LWS_CALLBACK_PROTOCOL_INIT: {
-      cd = static_cast<ContextData*>(lws_protocol_vh_priv_zalloc(
-          lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(ContextData)));
+      cd = static_cast<Context*>(lws_protocol_vh_priv_zalloc(
+          lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(Context)));
       if (!cd) return -1;
 
       cd->context = lws_get_context(wsi);
@@ -191,7 +191,8 @@ int SubscriberWS::WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
 
       cd->should_stop =
           (bool*)(lws_pvo_search(  // NOLINT(readability/casting)
-            (const struct lws_protocol_vhost_options*) in, "should_stop")
+                      (const struct lws_protocol_vhost_options*)in,
+                      "should_stop")
                       ->value);
 
       cd->settings =
