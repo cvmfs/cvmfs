@@ -59,7 +59,7 @@ usage() {
 
 
 # parse script parameters (same for all platforms)
-while getopts "t:s:c:d:l:" option; do
+while getopts "t:s:c:d:l:S:" option; do
   case $option in
     t)
       SOURCE_DIRECTORY=$OPTARG
