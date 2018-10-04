@@ -13,7 +13,7 @@
 
 namespace {
 
-const int kLogError = DefaultLogging::error;
+const LogFacilities& kLogError = DefaultLogging::error;
 
 struct CurlBuffer {
   std::string data;

@@ -106,7 +106,7 @@ void* NotificationClient::Run(void* data) {
       new ActivitySubscriber(cl->config_, cl->remounter_));
 
   LogCvmfs(
-      kLogCvmfs, kLogDebug,
+      kLogCvmfs, kLogSyslog,
       "NotificationClient - Entering subscription loop for repository: %s.",
       cl->repo_name_.c_str());
 

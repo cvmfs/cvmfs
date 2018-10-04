@@ -38,8 +38,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 static void LogCustom(unsigned id, const std::string &message);
 
-LogFacilities DefaultLogging::info = kLogStdout;
-LogFacilities DefaultLogging::error = kLogStderr;
+LogFacilities DefaultLogging::info = kLogSyslog;
+LogFacilities DefaultLogging::error = kLogSyslogErr;
 
 void DefaultLogging::Set(LogFacilities info, LogFacilities error) {
   DefaultLogging::info = info;

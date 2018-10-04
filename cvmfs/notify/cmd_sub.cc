@@ -16,8 +16,8 @@
 
 namespace {
 
-const int kLogInfo = DefaultLogging::info;
-const int kLogError = DefaultLogging::error;
+const LogFacilities& kLogInfo = DefaultLogging::info;
+const LogFacilities& kLogError = DefaultLogging::error;
 
 class TriggerSubscriber : public notify::SubscriberWS {
  public:

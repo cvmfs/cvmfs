@@ -75,6 +75,9 @@ void Usage() {
 
 
 int main(int argc, char **argv) {
+  // Set default logging facilities
+  DefaultLogging::Set(kLogStdout, kLogStderr);
+
   command_list.push_back(new swissknife::CommandCreate());
   command_list.push_back(new swissknife::CommandUpload());
   command_list.push_back(new swissknife::CommandRemove());

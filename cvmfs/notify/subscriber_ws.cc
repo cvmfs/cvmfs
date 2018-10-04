@@ -15,7 +15,8 @@
 
 namespace {
 
-const int kLogError = DefaultLogging::error;
+const LogFacilities& kLogInfo = DefaultLogging::info;
+const LogFacilities& kLogError = DefaultLogging::error;
 
 const unsigned char kPingToken = 123;
 const int kPingInterval = 50000000;  // 50 sec
@@ -95,7 +96,8 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
 
   UniquePtr<Url> url(Url::Parse(server_url_));
   if (!url.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogError, "Could not parse notification server url",
+    LogCvmfs(kLogCvmfs, kLogError,
+             "SubscriberWS - could not parse notification server url",
              server_url_.c_str());
     return true;
   }
@@ -134,7 +136,8 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
 
   struct lws_context* context = lws_create_context(&info);
   if (!context) {
-    LogCvmfs(kLogCvmfs, kLogError, "Could not create libwebsocket context.");
+    LogCvmfs(kLogCvmfs, kLogError,
+             "SubscriberWS - could not create libwebsocket context.");
     return false;
   }
 
@@ -146,7 +149,7 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
   bool ret = true;
   if (err) {
     LogCvmfs(kLogCvmfs, kLogError,
-             "SubscriberWS event loop finished with error: %d", err);
+             "SubscriberWS - event loop finished with error: %d", err);
     ret = false;
   }
 

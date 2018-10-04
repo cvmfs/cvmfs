@@ -19,8 +19,8 @@
 
 namespace {
 
-const int kLogInfo = DefaultLogging::info;
-const int kLogError = DefaultLogging::error;
+const LogFacilities& kLogInfo = DefaultLogging::info;
+const LogFacilities& kLogError = DefaultLogging::error;
 
 const int kMaxPoolHandles = 1;
 const bool kUseSystemPorxy = true;

@@ -1804,9 +1804,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::loader_exports_ = loader_exports;
   InitOptionsMgr(loader_exports);
 
-  // Set default logging facilities
-  DefaultLogging::Set(kLogSyslog, kLogSyslogErr);
-
   FileSystem::FileSystemInfo fs_info;
   fs_info.type = FileSystem::kFsFuse;
   fs_info.name = loader_exports->repository_name;
