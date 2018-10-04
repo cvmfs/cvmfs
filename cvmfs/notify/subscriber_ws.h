@@ -10,11 +10,15 @@
 
 #include <string>
 
-#include "libwebsockets.h"
-
 namespace notify {
 
 class SubscriberWS : public Subscriber {
+  /**
+   * The WebsocketContext class needs to call the Subscriber::Consume
+   * protected method during its event loop
+   */
+  friend class WebsocketContext;
+
  public:
   explicit SubscriberWS(const std::string& server_url);
   virtual ~SubscriberWS();
@@ -22,9 +26,6 @@ class SubscriberWS : public Subscriber {
   virtual bool Subscribe(const std::string& topic);
 
  private:
-  static int WSCallback(struct lws* wsi, enum lws_callback_reasons reason,
-                        void* user, void* in, size_t len);
-
   std::string server_url_;
 };
 
