@@ -445,6 +445,7 @@ check_result() {
 
 run_unittests() {
   echo -n "running CernVM-FS unit tests... "
+  local skip_filter=
   if [ "x$CVMFS_TEST_SUITES" != "x" ]; then
     local skip=1
     for suite in $CVMFS_TEST_SUITES; do
@@ -453,12 +454,14 @@ run_unittests() {
       fi
     done
     if [ $skip -eq 1 ]; then
-      echo "skipped by suite restriction"
-      return 0
+      echo -n "[skipped by suite restriction] "
+      # We still run the unit test in order to output the xml files but we don't run any actual tests
+      skip_filter="--gtest_filter=skip"
     fi
   fi
+
   local xml_output="${UNITTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}"
-  /usr/bin/cvmfs_unittests --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
+  /usr/bin/cvmfs_unittests $skip_filter --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
   local ut_retval=$?
   check_result $ut_retval
 
