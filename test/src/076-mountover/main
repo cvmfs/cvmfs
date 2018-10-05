@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Mount over a directory in cvmfs and reload"
+cvmfs_test_suites="quick"
 
 cleanup() {
   sudo umount /cvmfs/cvmfs-config.cern.ch/etc/cvmfs

@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Avoid Resurrection of Legacy Catalog via Rollback"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 
 get_head_revision() {

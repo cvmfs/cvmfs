@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Test pickup of changed files"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 TEST633_PRIVATE_MOUNT=
 TEST633_TAIL_SMALL=

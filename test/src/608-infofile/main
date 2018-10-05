@@ -1,5 +1,6 @@
 cvmfs_test_name="Repository info JSON file"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 # TODO(rmeusel): Make this S3 compliant after CVM-980 is implemented
 

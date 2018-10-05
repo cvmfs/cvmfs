@@ -1,5 +1,6 @@
 cvmfs_test_name="Move Chunked File To Nested Catalog"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 inflate_file() {
   local destination_file=$1

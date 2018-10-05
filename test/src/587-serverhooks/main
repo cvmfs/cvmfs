@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Server Hooks"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_587_FILE=/etc/cvmfs/cvmfs_server_hooks.sh
 CVMFS_TEST_587_HOOK_FILE=

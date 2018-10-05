@@ -1,5 +1,6 @@
 cvmfs_test_name="Repository gateway nested catalogs"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 # This test covers the creation and deletion of nested catalogs when the repository
 # upstream is of type GW

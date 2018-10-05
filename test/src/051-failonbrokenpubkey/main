@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Mount with Broken Public Key Files"
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_051_KEYFILE="broken.key.051.pub"
 cleanup() {

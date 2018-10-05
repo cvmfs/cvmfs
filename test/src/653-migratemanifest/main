@@ -1,6 +1,6 @@
 cvmfs_test_name="Ensure healthy manifest after catalog migration"
 cvmfs_test_autofs_on_startup=false
-
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1

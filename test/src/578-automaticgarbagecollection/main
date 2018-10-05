@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Automatic Garbage Collection"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 create_revision() {
   local repo_name=$1

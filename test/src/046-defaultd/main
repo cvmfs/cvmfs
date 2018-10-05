@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Using config files from /etc/cvmfs/default.d/"
+cvmfs_test_suites="quick"
 
 create_config_files() {
   sudo sh -c "echo CVMFS_KCACHE_TIMEOUT=2 > /etc/cvmfs/default.d/50-testA.conf" || return 1

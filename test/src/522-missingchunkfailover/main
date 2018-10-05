@@ -1,5 +1,6 @@
 cvmfs_test_name="404 on Data Chunk"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 desaster_cleanup() {
   local mnt_point=$1

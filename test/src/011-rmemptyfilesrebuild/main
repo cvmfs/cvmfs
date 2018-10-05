@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Remove empty corrupted files on cache rebuild"
+cvmfs_test_suites="quick"
 
 cleanup() {
   cvmfs_enable_config_repository

@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Import Corrupt Legacy Repository"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 TEST568_LEGACY_STORAGE=""
 TEST568_NEW_REPO_NAME=""

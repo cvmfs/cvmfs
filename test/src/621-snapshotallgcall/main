@@ -1,5 +1,6 @@
 cvmfs_test_name="cvmfs_server snapshot -a and gc -a"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_621_REPLICA_NAMES=
 

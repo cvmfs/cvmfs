@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Test authz helper interface"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 TEST632_PRIVATE_MOUNT=
 
@@ -103,7 +104,7 @@ cvmfs_run_test() {
   echo "new authz helper pid $authz_helper_pid_new"
   [ "x$authz_helper_pid_new" = "x" ] && return 76
   [ "x$authz_helper_pid" = "x$authz_helper_pid_new" ] && return 77
-  
+
   echo "checking authz attribute"
   attr -l $mntpnt || return 72
   local authz_attr=$(get_xattr authz $mntpnt)

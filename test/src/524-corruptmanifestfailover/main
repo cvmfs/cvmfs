@@ -1,5 +1,6 @@
 cvmfs_test_name="Data Corruption in Whitelist or Manifest"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST524_MOUNTPOINT=
 CVMFS_TEST524_REPLICA=

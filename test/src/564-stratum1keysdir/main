@@ -1,5 +1,6 @@
 cvmfs_test_name="Use keys directory on stratum 1"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST564_REPLICA_ALIAS=
 
