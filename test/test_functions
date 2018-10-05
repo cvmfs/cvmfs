@@ -317,6 +317,33 @@ apache_switch() {
   fi
 }
 
+# Checks whether the given test case is marked with any of the given
+# test suite tags.  If there are no labels, execute the test
+# @return        0 on success
+is_in_suite() {
+  local testdir=$1
+  shift
+  local labels=$@
+
+  if [ "x$labels" = "x" ]; then
+    return 0;
+  fi
+
+  (
+    unset cvmfs_test_suites
+    . $t/main
+    for wanted_label in $labels; do
+      for test_label in $cvmfs_test_suites; do
+        if [ "$wanted_label" = "$test_label" ]; then
+          exit 0;
+        fi
+      done
+    done
+    exit 1
+  )
+  return $?
+}
+
 
 contains() {
   local haystack="$1"

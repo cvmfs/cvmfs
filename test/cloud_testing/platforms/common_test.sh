@@ -41,6 +41,8 @@ TEST_S3_CONFIG=/etc/cvmfs/test_s3.conf
 TEST_S3_BUCKET=cvmfstest
 TEST_S3_URL=http://localhost:${TEST_S3_PORT}/${TEST_S3_BUCKET}
 
+CVMFS_TEST_SUITES=""
+
 usage() {
   local msg=$1
 
@@ -73,6 +75,9 @@ while getopts "t:s:c:d:l:" option; do
       ;;
     l)
       LOG_DIRECTORY=$OPTARG
+      ;;
+    S)
+      CVMFS_TEST_SUITES="$OPTARG"
       ;;
     ?)
       shift $(($OPTIND-2))
@@ -116,3 +121,5 @@ if [ $(id -u -n) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
   exit 3
 fi
+
+export CVMFS_TEST_SUITES
