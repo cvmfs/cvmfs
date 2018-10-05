@@ -445,6 +445,18 @@ check_result() {
 
 run_unittests() {
   echo -n "running CernVM-FS unit tests... "
+  if [ "x$CVMFS_TEST_SUITES" != "x" ]; then
+    local skip=1
+    for suite in $CVMFS_TEST_SUITES; do
+      if [ "x$suite" = "xunittests" ]; then
+        skip=0
+      fi
+    done
+    if [ $skip -eq 1 ]; then
+      echo "skipped by suite restriction"
+      return 0
+    fi
+  fi
   local xml_output="${UNITTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}"
   /usr/bin/cvmfs_unittests --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
   local ut_retval=$?
