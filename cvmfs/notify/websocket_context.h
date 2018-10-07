@@ -41,7 +41,7 @@ class WebsocketContext {
 
   bool Connect();
 
-  void Finish();
+  void Finish(Status s);
 
   static int MainCallback(struct lws* wsi, enum lws_callback_reasons reason,
                           void* user, void* in, size_t len);
@@ -62,6 +62,9 @@ class WebsocketContext {
   std::string message_;
 
   State state_;
+
+  // Status at the end of the connnection
+  Status status_;
 
   std::string host_;
   std::string path_;

@@ -15,16 +15,16 @@
 
 namespace {
 
-const LogFacilities& kLogInfo = DefaultLogging::info;
+//const LogFacilities& kLogInfo = DefaultLogging::info;
 const LogFacilities& kLogError = DefaultLogging::error;
 
 const unsigned char kPingToken = 123;
-const int kPingInterval = 5000000;  // 50 sec
+const int kPingInterval = 50000000;  // 50 sec
 
 const int kWsLogLevel = LLL_ERR | LLL_WARN | LLL_NOTICE | LLL_INFO | LLL_USER;
 
 void LogWs(int level, const char* line) {
-  const LogFacilities& dest = (level & LLL_ERR) ? kLogError : kLogInfo;
+  const LogFacilities& dest = (level & LLL_ERR) ? kLogError : kLogDebug;
   LogCvmfs(kLogCvmfs, dest, line);
 }
 
@@ -41,7 +41,11 @@ int WSWrite(struct lws* wsi, const std::string& msg,
                    msg.size(), protocol);
 }
 
-struct SessionData {};
+enum PingState { kPingNone, kPingSent, kPongReceived };
+
+struct SessionData {
+  PingState ping_state;
+};
 
 }  // namespace
 
@@ -99,7 +103,7 @@ WebsocketContext::Status WebsocketContext::Run() {
   }
   lws_context_destroy(lws_ctx_);
 
-  return err ? kError : kOk;
+  return status_;
 }
 
 WebsocketContext::WebsocketContext(const Url& server_url,
@@ -107,6 +111,7 @@ WebsocketContext::WebsocketContext(const Url& server_url,
                                    SubscriberWS* subscriber)
     : message_(),
       state_(kNotConnected),
+      status_(kOk),
       host_(server_url.host()),
       path_(server_url.path()),
       port_(server_url.port()),
@@ -122,7 +127,7 @@ WebsocketContext::WebsocketContext(const Url& server_url,
 WebsocketContext::~WebsocketContext() {}
 
 void WebsocketContext::SetState(State new_state) {
-  LogCvmfs(kLogCvmfs, kLogInfo, "WebsocketContext - entered state: %d",
+  LogCvmfs(kLogCvmfs, kLogDebug, "WebsocketContext - entered state: %d",
            new_state);
   state_ = new_state;
 }
@@ -144,7 +149,7 @@ bool WebsocketContext::Connect() {
   return lws_client_connect_via_info(&i) != NULL;
 }
 
-void WebsocketContext::Finish() { SetState(kFinished); }
+void WebsocketContext::Finish(Status s) { status_ = s; SetState(kFinished); }
 
 int WebsocketContext::MainCallback(struct lws* wsi,
                                    enum lws_callback_reasons reason, void* user,
@@ -162,8 +167,7 @@ int WebsocketContext::MainCallback(struct lws* wsi,
     case LWS_CALLBACK_GET_THREAD_ID:
       return 0;
     default:
-      LogCvmfs(kLogCvmfs, kLogInfo, "WebsocketContext - reason: %d", reason);
-      //return 0;
+      break;
   }
 
   switch (cd->ctx->state_) {
@@ -181,10 +185,9 @@ int WebsocketContext::MainCallback(struct lws* wsi,
 int WebsocketContext::NotConnectedCallback(ConnectionData** cd, struct lws* wsi,
                                            enum lws_callback_reasons reason,
                                            void* user, void* in, size_t len) {
+  SessionData* sd = static_cast<SessionData*>(user);
   switch (reason) {
     case LWS_CALLBACK_PROTOCOL_INIT: {
-      LogCvmfs(kLogCvmfs, kLogInfo,
-               "WebsocketContext - LWS_CALLBACK_PROTOCOL_INIT State");
       *cd = static_cast<ConnectionData*>(lws_protocol_vh_priv_zalloc(
           lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(ConnectionData)));
       if (!*cd) {
@@ -205,14 +208,12 @@ int WebsocketContext::NotConnectedCallback(ConnectionData** cd, struct lws* wsi,
       break;
     }
     case LWS_CALLBACK_CLIENT_ESTABLISHED: {
-      LogCvmfs(kLogCvmfs, kLogInfo,
-               "WebsocketContext - LWS_CALLBACK_CLIENT_ESTABLISHED");
+      sd->ping_state = kPingNone;
       (*cd)->ctx->SetState(kConnected);
       lws_callback_on_writable(wsi);
       break;
     }
     case LWS_CALLBACK_USER: {
-      LogCvmfs(kLogCvmfs, kLogInfo, "WebsocketContext - LWS_CALLBACK_USER");
       if (!(*cd)->ctx->Connect()) {
         ScheduleCallback(wsi, LWS_CALLBACK_USER, 1);
       }
@@ -227,11 +228,8 @@ int WebsocketContext::NotConnectedCallback(ConnectionData** cd, struct lws* wsi,
 int WebsocketContext::ConnectedCallback(ConnectionData* cd, struct lws* wsi,
                                         enum lws_callback_reasons reason,
                                         void* user, void* in, size_t len) {
-  LogCvmfs(kLogCvmfs, kLogInfo, "WebsocketContext::ConnectedCallback");
   switch (reason) {
     case LWS_CALLBACK_CLIENT_WRITEABLE: {
-      LogCvmfs(kLogCvmfs, kLogInfo,
-               "WebsocketContext - LWS_CALLBACK_CLIENT_WRITABLE");
       // Send initial subscription request
       std::string msg =
           "{\"version\":" + StringifyInt(notify::msg::kProtocolVersion) +
@@ -240,11 +238,11 @@ int WebsocketContext::ConnectedCallback(ConnectionData* cd, struct lws* wsi,
       if (bytes_sent == -1) {
         LogCvmfs(kLogCvmfs, kLogError,
                  "WebsocketContext - could not send subscription request.");
-        cd->ctx->Finish();
+        cd->ctx->Finish(kError);
         return -1;
       }
       if (static_cast<size_t>(bytes_sent) < msg.size()) {
-        LogCvmfs(kLogCvmfs, kLogInfo,
+        LogCvmfs(kLogCvmfs, kLogError,
                  "WebsocketContext - incomplete send: %d / %d.", bytes_sent,
                  msg.size());
         break;
@@ -252,6 +250,10 @@ int WebsocketContext::ConnectedCallback(ConnectionData* cd, struct lws* wsi,
       lws_set_timer_usecs(wsi, kPingInterval);
       cd->ctx->SetState(kSubscribed);
       break;
+    }
+    case LWS_CALLBACK_CLIENT_CLOSED: {
+      cd->ctx->Finish(kError);
+      return -1;
     }
     default:
       break;
@@ -262,27 +264,33 @@ int WebsocketContext::ConnectedCallback(ConnectionData* cd, struct lws* wsi,
 int WebsocketContext::SubscribedCallback(ConnectionData* cd, struct lws* wsi,
                                          enum lws_callback_reasons reason,
                                          void* user, void* in, size_t len) {
-  LogCvmfs(kLogCvmfs, kLogInfo, "WebsocketContext::SubscribedCallback");
+  SessionData* sd = static_cast<SessionData*>(user);
   switch (reason) {
     case LWS_CALLBACK_CLIENT_WRITEABLE: {
-      LogCvmfs(kLogCvmfs, kLogInfo,
-               "WebsocketContext - LWS_CALLBACK_CLIENT_WRITABLE");
-      // Send a Websocket PING
-      unsigned char token = kPingToken;
-      int bytes_sent = lws_write(wsi, &token, sizeof(token), LWS_WRITE_PING);
-      if (bytes_sent == -1) {
-        LogCvmfs(kLogCvmfs, kLogError,
-                 "WebsocketContext - could not send ping: %d", bytes_sent);
-        cd->ctx->Finish();
+      if (sd->ping_state != kPingSent) {
+        // Send a Websocket PING
+        unsigned char token = kPingToken;
+        int bytes_sent = lws_write(wsi, &token, sizeof(token), LWS_WRITE_PING);
+        if (bytes_sent == -1) {
+          LogCvmfs(kLogCvmfs, kLogError,
+                   "WebsocketContext - could not send ping: %d", bytes_sent);
+          cd->ctx->Finish(kError);
+          return -1;
+        }
+        sd->ping_state = kPingSent;
+        lws_set_timer_usecs(wsi, kPingInterval);
+        break;
+      } else {
+        LogCvmfs(kLogCvmfs, kLogError, "WebsocketContext - ping timeout.");
+        cd->ctx->Finish(kError);
         return -1;
       }
-      lws_set_timer_usecs(wsi, kPingInterval);
+    }
+    case LWS_CALLBACK_CLIENT_RECEIVE_PONG: {
+      sd->ping_state = kPongReceived;
       break;
     }
     case LWS_CALLBACK_CLIENT_RECEIVE: {
-      LogCvmfs(kLogCvmfs, kLogInfo,
-               "WebsocketContext - LWS_CALLBACK_CLIENT_RECEIVE");
-
       if (lws_is_first_fragment(wsi)) {
         cd->ctx->message_.resize(0);
       }
@@ -294,14 +302,18 @@ int WebsocketContext::SubscribedCallback(ConnectionData* cd, struct lws* wsi,
       if (lws_is_final_fragment(wsi)) {
         if (!cd->ctx->subscriber_->Consume(cd->ctx->topic_,
                                            cd->ctx->message_)) {
-          cd->ctx->Finish();
+          cd->ctx->Finish(kOk);
           return -1;
         }
       }
       break;
     }
+    case LWS_CALLBACK_CLIENT_CLOSED: {
+      LogCvmfs(kLogCvmfs, kLogError, "WebsocketContext - connection closed.");
+      cd->ctx->Finish(kError);
+      return -1;
+    }
     case LWS_CALLBACK_TIMER: {
-      LogCvmfs(kLogCvmfs, kLogInfo, "WebsocketContext - LWS_CALLBACK_TIMER");
       lws_callback_on_writable(wsi);
       break;
     }
@@ -315,7 +327,6 @@ int WebsocketContext::SubscribedCallback(ConnectionData* cd, struct lws* wsi,
 int WebsocketContext::FinishedCallback(ConnectionData* cd, struct lws* wsi,
                                        enum lws_callback_reasons reason,
                                        void* user, void* in, size_t len) {
-  LogCvmfs(kLogCvmfs, kLogInfo, "WebsocketContext::FinishedCallback");
   return 0;
 }
 
