@@ -23,6 +23,9 @@ option (BUILD_QC_TESTS          "Build the QuickCheck property random tests"    
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 option (BUILD_ALL               "Build client, server, lib, preload, octopus, unit tests"          OFF)
+
+option (ENABLE_ASAN             "Enable the Address Sanitizer"                                     OFF)
+
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
 option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
