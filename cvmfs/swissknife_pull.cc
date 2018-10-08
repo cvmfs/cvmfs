@@ -37,6 +37,7 @@
 #include "smalloc.h"
 #include "upload.h"
 #include "util/posix.h"
+#include "util/shared_ptr.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -94,9 +95,9 @@ static void SpoolerOnUpload(const upload::SpoolerResult &result) {
   }
 }
 
-string              *stratum0_url = NULL;
-string              *stratum1_url = NULL;
-string              *temp_dir = NULL;
+SharedPtr<string>    stratum0_url;
+SharedPtr<string>    stratum1_url;
+SharedPtr<string>    temp_dir;
 unsigned             num_parallel = 1;
 bool                 pull_history = false;
 bool                 apply_timestamp_threshold = false;

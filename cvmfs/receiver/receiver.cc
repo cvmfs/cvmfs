@@ -38,11 +38,10 @@ bool ReadCmdLineArguments(int argc, char** argv,
     for (unsigned j = 0; j < params.size(); ++j) {
       if (c == params[j].key()) {
         valid_option = true;
-        std::string* argument = NULL;
+        (*arguments)[c].Reset();
         if (!params[j].switch_only()) {
-          argument = new std::string(optarg);
+          (*arguments)[c].Reset(new std::string(optarg));
         }
-        (*arguments)[c] = argument;
         break;
       }
     }

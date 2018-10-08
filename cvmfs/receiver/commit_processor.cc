@@ -45,26 +45,20 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
                   const std::string& manifest_path,
                   const std::string& public_key_path) {
   swissknife::ArgumentList args;
-  args['r'] = new std::string(params.spooler_configuration);
-  args['w'] = new std::string(params.stratum0);
-  args['t'] = new std::string(temp_dir);
-  args['m'] = new std::string(manifest_path);
-  args['p'] = new std::string(public_key_path);
-  args['f'] = new std::string(repo_name);
-  args['e'] = new std::string(params.hash_alg_str);
-  args['a'] = new std::string(repo_tag.name_);
-  args['c'] = new std::string(repo_tag.channel_);
-  args['D'] = new std::string(repo_tag.description_);
-  args['x'] = NULL;
+  args['r'].Reset(new std::string(params.spooler_configuration));
+  args['w'].Reset(new std::string(params.stratum0));
+  args['t'].Reset(new std::string(temp_dir));
+  args['m'].Reset(new std::string(manifest_path));
+  args['p'].Reset(new std::string(public_key_path));
+  args['f'].Reset(new std::string(repo_name));
+  args['e'].Reset(new std::string(params.hash_alg_str));
+  args['a'].Reset(new std::string(repo_tag.name_));
+  args['c'].Reset(new std::string(repo_tag.channel_));
+  args['D'].Reset(new std::string(repo_tag.description_));
 
   UniquePtr<swissknife::CommandEditTag> edit_cmd(
       new swissknife::CommandEditTag());
   const int ret = edit_cmd->Main(args);
-
-  for (swissknife::ArgumentList::iterator it = args.begin(); it != args.end();
-       ++it) {
-    delete it->second;
-  }
 
   if (ret) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret,
