@@ -261,7 +261,7 @@ TEST_F(T_Libcvmfs, Templating) {
   ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
   cvmfs_option_map *opts_repo = cvmfs_options_clone(opts);
-  cvmfs_options_set(opts_repo, "CVMFS_DEBUG_LOG", "/tmp/@fqrn@.debug.log");
+  cvmfs_options_set(opts_repo, "CVMFS_DEBUGLOG", "/tmp/@fqrn@.debug.log");
   cvmfs_context *ctx = reinterpret_cast<cvmfs_context *>(1);
   // This will not actually load a repository
   // however it should reparse the attributes anyway...
@@ -269,7 +269,7 @@ TEST_F(T_Libcvmfs, Templating) {
 
   EXPECT_STREQ("/tmp/test/", cvmfs_options_get(opts_repo, "CVMFS_CACHE_DIR"));
   EXPECT_STREQ("/tmp/test.cern.ch.debug.log",
-    cvmfs_options_get(opts_repo, "CVMFS_DEBUG_LOG"));
+    cvmfs_options_get(opts_repo, "CVMFS_DEBUGLOG"));
   cvmfs_options_fini(opts_repo);
 
   cvmfs_fini();
