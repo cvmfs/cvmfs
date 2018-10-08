@@ -5,6 +5,8 @@
 #ifndef CVMFS_NOTIFY_WEBSOCKET_CONTEXT_H_
 #define CVMFS_NOTIFY_WEBSOCKET_CONTEXT_H_
 
+#include <string>
+
 #include "libwebsockets.h"
 
 #include "url.h"

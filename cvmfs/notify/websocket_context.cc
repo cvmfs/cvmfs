@@ -15,7 +15,7 @@
 
 namespace {
 
-//const LogFacilities& kLogInfo = DefaultLogging::info;
+// const LogFacilities& kLogInfo = DefaultLogging::info;
 const LogFacilities& kLogError = DefaultLogging::error;
 
 const unsigned char kPingToken = 123;
