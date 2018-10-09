@@ -72,11 +72,11 @@ running_on_osx() {
 
 get_xattr() {
   local extended_attr="$1"
-  local repo="$2"
+  local path="$2"
   if running_on_osx; then
-    xattr -p user.$extended_attr "$repo"
+    xattr -p user.$extended_attr "$path"
   else
-    attr -qg $extended_attr "$repo"
+    attr -qg $extended_attr "$path"
   fi
 }
 

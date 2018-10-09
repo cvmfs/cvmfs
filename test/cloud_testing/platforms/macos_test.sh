@@ -33,6 +33,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/056-lowspeedlimit                        \
                                    src/057-parallelmakecache                    \
                                    src/061-systemdnokill                        \
+                                   src/074-oom                                  \
                                    --                                           \
                                    src/0*
 

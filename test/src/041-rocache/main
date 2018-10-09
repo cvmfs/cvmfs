@@ -20,13 +20,11 @@ cleanup() {
   if [ "x$CVMFS_TEST_041_TMPDIR" != "x" ]; then
     # releasing the space in OSX
     if running_on_osx; then
-      # TODO(jblomer)
-      # we have to force umount
-      # cvmfs_umount atlas.cern.ch
-      # sudo umount $CVMFS_TEST_041_TMPDIR
-      # if [ "x$CVMFS_TEST_041_OSXMOUNTPOINT" != "x" ]; then
-      #  sudo hdiutil detach $CVMFS_TEST_041_OSXMOUNTPOINT
-      # fi
+      cvmfs_umount atlas.cern.ch
+      sudo umount -f $CVMFS_TEST_041_TMPDIR
+      if [ "x$CVMFS_TEST_041_OSXMOUNTPOINT" != "x" ]; then
+        sudo hdiutil detach $CVMFS_TEST_041_OSXMOUNTPOINT
+      fi
       sudo rmdir "$CVMFS_TEST_041_TMPDIR"
     else
       sudo umount -l $CVMFS_TEST_041_TMPDIR
@@ -51,12 +49,10 @@ cvmfs_run_test() {
 
   echo "mount ramdisk"
   if running_on_osx; then
-    :
-    # TODO(jblomer): OS X
     # on OSX we firstly have to reserve the space
-    # CVMFS_TEST_041_OSXMOUNTPOINT=$(sudo hdid -nomount ram://256000)
-    # sudo newfs_hfs $CVMFS_TEST_041_OSXMOUNTPOINT || return 10
-    # sudo mount -t hfs $CVMFS_TEST_041_OSXMOUNTPOINT "$CVMFS_TEST_041_TMPDIR" || return 11
+    CVMFS_TEST_041_OSXMOUNTPOINT=$(sudo hdid -nomount ram://256000)
+    sudo newfs_hfs $CVMFS_TEST_041_OSXMOUNTPOINT || return 10
+    sudo mount -t hfs $CVMFS_TEST_041_OSXMOUNTPOINT "$CVMFS_TEST_041_TMPDIR" || return 11
   else
     sudo mount -t tmpfs tmpfs $CVMFS_TEST_041_TMPDIR || return 1
   fi
@@ -76,6 +72,10 @@ cvmfs_run_test() {
 
   echo "try to remount without open r/w descriptors (should work)"
   sudo cvmfs_talk -i atlas.cern.ch tear down to read-only || return 3
-  sudo mount -o remount,ro $CVMFS_TEST_041_TMPDIR || return 10
+  if running_on_osx; then
+    sudo mount -u -r $CVMFS_TEST_041_OSXMOUNTPOINT || return 20
+  else
+    sudo mount -o remount,ro $CVMFS_TEST_041_TMPDIR || return 20
+  fi
 }
 

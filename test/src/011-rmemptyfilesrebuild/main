@@ -37,6 +37,12 @@ cvmfs_run_test() {
   local cvmfs_pid=$(sudo cvmfs_talk -i ${repo} pid cachemgr)
   sudo kill -9 $cvmfs_pid
 
+  # on macOS the broken pipe to the cache manager is not immediately picked up by the fuse client
+  if running_on_osx; then
+    sleep 2
+    cat /cvmfs/${repo}/.cvmfsdirtab
+  fi
+
   echo "*** let stale helper unmount the repository"
   sleep 10
 
