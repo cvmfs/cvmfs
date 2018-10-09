@@ -152,11 +152,10 @@ int main(int argc, char **argv) {
       if (c == params[j].key()) {
         assert(c != swissknife::Command::kGenericParam);
         valid_option = true;
-        string *argument = NULL;
+        args[c].Reset();
         if (!params[j].switch_only()) {
-          argument = new string(optarg);
+          args[c].Reset(new string(optarg));
         }
-        args[c] = argument;
         break;
       }
     }
