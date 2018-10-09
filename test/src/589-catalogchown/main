@@ -1,5 +1,6 @@
 cvmfs_test_name="Map UID and GID in Repository on Catalog Level"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 id_exists() {
   local id_type=$1

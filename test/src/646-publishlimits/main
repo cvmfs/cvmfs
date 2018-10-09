@@ -1,5 +1,6 @@
 cvmfs_test_name="Publish limits"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 addfiles() {
   local path=$1

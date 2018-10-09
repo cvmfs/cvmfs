@@ -125,13 +125,13 @@ fi
 
 # Disable service start rate limiting for apache and autofs
 echo "Turning off service rate limit"
-mkdir -p /lib/systemd/system/apache2.service.d
-cat << EOF > /lib/systemd/system/apache2.service.d/cvmfs-test.conf
+sudo mkdir -p /lib/systemd/system/apache2.service.d
+sudo cat << EOF > /lib/systemd/system/apache2.service.d/cvmfs-test.conf
 [Unit]
 StartLimitIntervalSec=0
 EOF
-mkdir -p /lib/systemd/system/autofs.service.d
-cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
+sudo mkdir -p /lib/systemd/system/autofs.service.d
+sudo cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
 [Unit]
 StartLimitIntervalSec=0
 EOF

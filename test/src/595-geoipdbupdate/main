@@ -1,5 +1,6 @@
 cvmfs_test_name="Update GeoIP Database"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 #
 # Location of the system-wide GeoIP databases

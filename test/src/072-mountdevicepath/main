@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Mount a repository that is also a path"
+cvmfs_test_suites="quick"
 # See CVM-1160
 
 CVMFS_TEST072_MOUNTPOINT=

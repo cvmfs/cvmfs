@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Post Mortem Stacktrace Retrieval"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
@@ -32,7 +33,7 @@ cvmfs_run_test() {
   # clean up the broken mount point (should fail!)
   # CernVM-FS should umount the broken mount point on its own
   sudo umount -l /cvmfs/${repo} && return 7
-  
+
   return 0
 }
 

@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Failover on 404"
+cvmfs_test_suites="quick"
 
 do_faulty_mount() {
   cvmfs_mount "atlas.cern.ch"          \

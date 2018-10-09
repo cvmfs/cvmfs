@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Extended attributes"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 # Requires aufs ready for extended attributes
 
@@ -49,7 +50,7 @@ cvmfs_run_test() {
   fi
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
-  
+
   echo "Split catalogs and create a nested catalog having files with xattrs"
   start_transaction $CVMFS_TEST_REPO || return $?
   touch /cvmfs/$CVMFS_TEST_REPO/dir/.cvmfscatalog
@@ -61,7 +62,7 @@ cvmfs_run_test() {
   fi
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
-  
+
   echo "Merge the catalogs back"
   start_transaction $CVMFS_TEST_REPO || return $?
   rm -f /cvmfs/$CVMFS_TEST_REPO/dir/.cvmfscatalog

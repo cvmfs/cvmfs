@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Killing all cvmfs2 instances"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1

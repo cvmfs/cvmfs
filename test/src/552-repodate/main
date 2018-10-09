@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Access repository tags by date"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1

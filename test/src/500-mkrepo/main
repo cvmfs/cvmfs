@@ -1,5 +1,6 @@
 cvmfs_test_name="Populate Repository"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST500_LONG_REPONAME=
 

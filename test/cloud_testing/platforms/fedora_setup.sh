@@ -59,13 +59,13 @@ install_from_repo unzip
 install_from_repo redhat-rpm-config
 
 # Disable service start rate limiting for apache and autofs
-mkdir -p /lib/systemd/system/httpd.service.d
-cat << EOF > /lib/systemd/system/httpd.service.d/cvmfs-test.conf
+sudo mkdir -p /lib/systemd/system/httpd.service.d
+sudo cat << EOF > /lib/systemd/system/httpd.service.d/cvmfs-test.conf
 [Unit]
 StartLimitIntervalSec=0
 EOF
-mkdir -p /lib/systemd/system/autofs.service.d
-cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
+sudo mkdir -p /lib/systemd/system/autofs.service.d
+sudo cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
 [Unit]
 StartLimitIntervalSec=0
 EOF

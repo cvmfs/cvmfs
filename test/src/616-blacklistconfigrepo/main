@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Blacklist in config repository"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 TEST_616_MOUNTPOINT_MORE=""
 TEST_616_EXTRA_REPO=""

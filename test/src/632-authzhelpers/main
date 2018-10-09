@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Test authz helper interface"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 TEST632_PRIVATE_MOUNT=
 
@@ -9,7 +10,7 @@ secure_mount() {
   TEST632_PRIVATE_MOUNT="$mntpnt"
   do_local_mount_as_root "$mntpnt"          \
                          "$CVMFS_TEST_REPO" \
-                         "http://localhost/cvmfs/$CVMFS_TEST_REPO" \
+                         "$(get_repo_url $CVMFS_TEST_REPO)" \
                          "" \
                          "CVMFS_AUTHZ_ENV_TEST=ABC" || return 1
 }
@@ -103,7 +104,7 @@ cvmfs_run_test() {
   echo "new authz helper pid $authz_helper_pid_new"
   [ "x$authz_helper_pid_new" = "x" ] && return 76
   [ "x$authz_helper_pid" = "x$authz_helper_pid_new" ] && return 77
-  
+
   echo "checking authz attribute"
   attr -l $mntpnt || return 72
   local authz_attr=$(get_xattr authz $mntpnt)

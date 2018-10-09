@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Find Intermediate Revisions after Garbage Collection on Stratum0"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_577_REPLICA_NAME=""
 cleanup() {

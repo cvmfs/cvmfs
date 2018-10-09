@@ -1,12 +1,13 @@
 
 cvmfs_test_name="Proper application of CVMFS_MAX_TTL"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount "lhcb.cern.ch" \
     "CVMFS_MAX_TTL=1" || return 1
-  
+
   ls /cvmfs/lhcb.cern.ch
   RETVAL=$?
   if [ $RETVAL -ne 0 ]; then
@@ -17,7 +18,7 @@ cvmfs_run_test() {
   if [ "$ttl" != "1 minutes" ]; then
     echo "wrong ttl, expected 1 minutes got $ttl"
     return 3
-  fi 
+  fi
 
   return 0
 }

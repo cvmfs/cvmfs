@@ -1,5 +1,6 @@
 
 cvmfs_test_name="CVMFS_WORKSPACE"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1

@@ -1,15 +1,28 @@
 
 cvmfs_test_name="Mount over a directory in cvmfs and reload"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_076_OSXMOUNTPOINT=
 
 cleanup() {
   sudo umount /cvmfs/cvmfs-config.cern.ch/etc/cvmfs
+  if [ "x$CVMFS_TEST_076_OSXMOUNTPOINT" != "x" ]; then
+    sudo hdiutil detach $CVMFS_TEST_076_OSXMOUNTPOINT
+  fi
 }
 
 cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount cvmfs-config.cern.ch || return 1
-  sudo mount -t proc none /cvmfs/cvmfs-config.cern.ch/etc/cvmfs || return 2
+  if running_on_osx; then
+    CVMFS_TEST_076_OSXMOUNTPOINT=$(sudo hdid -nomount ram://256000)
+    sudo newfs_hfs $CVMFS_TEST_076_OSXMOUNTPOINT || return 2
+    sudo mount -t hfs $CVMFS_TEST_076_OSXMOUNTPOINT /cvmfs/cvmfs-config.cern.ch/etc/cvmfs || return 3
+    sudo mkdir /cvmfs/cvmfs-config.cern.ch/etc/cvmfs/self || return 4
+  else
+    sudo mount -t proc none /cvmfs/cvmfs-config.cern.ch/etc/cvmfs || return 2
+  fi
   trap cleanup EXIT HUP INT TERM
 
   ls /cvmfs/cvmfs-config.cern.ch/etc/cvmfs/self || return 10
@@ -19,4 +32,3 @@ cvmfs_run_test() {
 
   return 0
 }
-
