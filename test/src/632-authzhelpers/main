@@ -10,7 +10,7 @@ secure_mount() {
   TEST632_PRIVATE_MOUNT="$mntpnt"
   do_local_mount_as_root "$mntpnt"          \
                          "$CVMFS_TEST_REPO" \
-                         "http://localhost/cvmfs/$CVMFS_TEST_REPO" \
+                         "$(get_repo_url $CVMFS_TEST_REPO)" \
                          "" \
                          "CVMFS_AUTHZ_ENV_TEST=ABC" || return 1
 }

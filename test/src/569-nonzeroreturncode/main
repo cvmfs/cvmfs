@@ -111,7 +111,7 @@ cvmfs_run_test() {
   sudo cvmfs_server resign $CVMFS_TEST_REPO && return 16
 
   echo "save whitelist and remove repository"
-  cp /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfswhitelist .
+  curl $(get_repo_url)/.cvmfswhitelist > .cvmfswhitelist
   destroy_repo $CVMFS_TEST_REPO || return $?
 
   echo "remove again (should fail)"

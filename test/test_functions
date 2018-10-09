@@ -70,6 +70,10 @@ running_on_osx() {
   [ "x$(uname)" == "xDarwin" ]
 }
 
+running_on_s3() {
+  [ "x$CVMFS_TEST_S3_CONFIG" != "x" ]
+}
+
 get_xattr() {
   local extended_attr="$1"
   local path="$2"
@@ -1657,7 +1661,7 @@ get_object_from_manifest() {
   local name=$1
   local type=$2
 
-  local url="http://localhost/cvmfs/$name"
+  local url="$(get_repo_url $name)"
   hash=$(cvmfs_swissknife info -r $url -R | grep "^$type" | tr -d $type)
   echo "${hash}${type}"
 }
