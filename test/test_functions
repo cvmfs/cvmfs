@@ -2413,8 +2413,7 @@ EOF'
     echo "  Modifying test repo configuration"
     local repo_server_config=/etc/cvmfs/repositories.d/test.repo.org/server.conf
     local original_upstream=$(grep CVMFS_UPSTREAM_STORAGE $repo_server_config | cut -d'=' -f2-)
-    sudo sed -i -e 's/local,/gw,/' $repo_server_config
-    sudo sed -i -e 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:4929\/api\/v1/g' $repo_server_config
+    sudo bash -c "echo CVMFS_UPSTREAM_STORAGE=gw,/srv/cvmfs/test.repo.org/txn,http://localhost:4929/api/v1 >> $repo_server_config"
     sudo bash -c "echo TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE=$original_upstream >> $repo_server_config"
     sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 
