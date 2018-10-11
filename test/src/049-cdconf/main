@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Change directory to config file being parsed"
+cvmfs_test_suites="quick"
 
 create_config_files() {
   sudo sh -c "echo 'echo Working-Dir-\$PWD > /tmp/cvmfs_pwd' > /etc/cvmfs/default.d/50-testcdconf.conf" || return 1

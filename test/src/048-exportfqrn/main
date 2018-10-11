@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Export CVMFS_FQRN"
+cvmfs_test_suites="quick"
 
 create_config_files() {
   sudo sh -c "echo 'echo fqrn-\$CVMFS_FQRN > /tmp/cvmfs_fqrn' > /etc/cvmfs/default.d/50-testfqrn.conf" || return 1

@@ -1,9 +1,10 @@
 
 cvmfs_test_name="Probing oasis"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
-  
+
   cvmfs_mount oasis.opensciencegrid.org,atlas.cern.ch \
     "CVMFS_HTTP_PROXY=DIRECT" || return 3
 

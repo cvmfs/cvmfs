@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Detect Catalog Load Failures during Garbage Collection"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 produce_files_1_in() { # REVISION 3
   local working_dir=$1

@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Touch a Nested Catalog"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 produce_files_in() {
   local working_dir=$1

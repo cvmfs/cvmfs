@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Blacklist"
+cvmfs_test_suites="quick"
 
 cleanup_blacklist() {
   sudo rm -f /etc/cvmfs/blacklist

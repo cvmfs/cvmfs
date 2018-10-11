@@ -1,6 +1,7 @@
 
 cvmfs_test_name="OverlayFS Validation"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 set_up_work_dir() {
     fs_type=$1

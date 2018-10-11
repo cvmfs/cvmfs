@@ -1,11 +1,12 @@
 
 cvmfs_test_name="ls -l"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount sft.cern.ch || return 1
-  
+
   local lsout
   lsout=$(ls -l /cvmfs/sft.cern.ch 2>&1 1>/dev/null)
   if [ "x$lsout" != "x" ]; then

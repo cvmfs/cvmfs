@@ -1,8 +1,6 @@
 cvmfs_test_name="Repository info JSON file"
 cvmfs_test_autofs_on_startup=false
-
-# TODO(rmeusel): Make this S3 compliant after CVM-980 is implemented
-
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_608_REPLICA_NAME=
 cleanup() {
@@ -97,7 +95,7 @@ cvmfs_run_test() {
   CVMFS_TEST_608_REPLICA_NAME=""
 
   echo "check that $CVMFS_TEST_REPO is registerd but $replica_name is gone"
-  repo_is_registered $CVMFS_TEST_REPO                    || return 17
+  repo_is_registered $CVMFS_TEST_REPO   || return 17
   ! replica_is_registered $CVMFS_TEST_REPO $replica_name || return 18
 
   return 0

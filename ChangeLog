@@ -12,6 +12,7 @@
   * Fix debian packaging warnings and errors
 
 2.5.2:
+  * Fix cache control headers for objects pushed to S3 (CVM-1606)
   * Fix building on macOS 10.14
   * Fix potential memory corruption in catalog traversal
   * Reimplement cvmfs_talk in C++ to improve efficiency

@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Cleanup left-over pipes"
+cvmfs_test_suites="quick"
 
 cleanup() {
   cvmfs_enable_config_repository

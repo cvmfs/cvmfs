@@ -234,6 +234,10 @@ class S3FanoutManager : SingleCopy {
   bool DoSingleJob(JobInfo *info) const;
 
  private:
+  // Reflects the default Apache configuration of the local backend
+  static const char *kCacheControlData;  // Cache-Control: max-age=259200
+  static const char *kCacheControlMutable;  // Cache-Control: max-age=61
+
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainUpload(void *data);
