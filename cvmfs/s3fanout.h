@@ -217,7 +217,7 @@ class S3FanoutManager : SingleCopy {
   S3FanoutManager();
   ~S3FanoutManager();
 
-  void Init(const unsigned max_pool_handles);
+  void Init(const unsigned max_pool_handles, bool dns_buckets);
   void Fini();
   void Spawn();
 
@@ -273,7 +273,11 @@ class S3FanoutManager : SingleCopy {
   std::string MkUrl(const std::string &host,
                     const std::string &bucket,
                     const std::string &objkey2) const {
-    return "http://" + bucket + "." + host + "/" + objkey2;
+    if (dns_buckets_) {
+      return "http://" + bucket + "." + host + "/" + objkey2;
+    } else {
+      return "http://" + host + "/" + bucket + "/" + objkey2;
+    }
   }
 
   Prng prng_;
@@ -285,6 +289,9 @@ class S3FanoutManager : SingleCopy {
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;
+
+  bool dns_buckets_;
+
   /**
    * AWS4 signing keys are derived from the secret key, a region and a date.
    * They can be cached.
