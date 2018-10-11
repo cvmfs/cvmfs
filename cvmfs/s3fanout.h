@@ -273,7 +273,7 @@ class S3FanoutManager : SingleCopy {
   std::string MkUrl(const std::string &host,
                     const std::string &bucket,
                     const std::string &objkey2) const {
-    return "http://" + host + "/" + bucket + "/" + objkey2;
+    return "http://" + bucket + "." + host + "/" + objkey2;
   }
 
   Prng prng_;
