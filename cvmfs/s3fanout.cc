@@ -20,6 +20,10 @@ using namespace std;  // NOLINT
 
 namespace s3fanout {
 
+const char *S3FanoutManager::kCacheControlData =
+  "Cache-Control: max-age=259200";
+const char *S3FanoutManager::kCacheControlMutable = "Cache-Control: max-age=61";
+
 /**
  * Called by curl for every HTTP header. Not called for file:// transfers.
  */
@@ -836,9 +840,11 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     }
 
     if (info->request == JobInfo::kReqPutNoCache) {
-      std::string cache_control = "Cache-Control: no-cache";
       info->http_headers =
-          curl_slist_append(info->http_headers, cache_control.c_str());
+          curl_slist_append(info->http_headers, kCacheControlMutable);
+    } else {
+      info->http_headers =
+          curl_slist_append(info->http_headers, kCacheControlData);
     }
   }
 
