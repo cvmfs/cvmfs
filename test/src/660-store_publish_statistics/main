@@ -1,6 +1,7 @@
 # This file contains $NR_OF_TESTS tests for checking the store publish statistics feature (checking the database integrity)
 cvmfs_test_name="Store publish statistics in a SQLite database"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_660_NR_OF_TESTS=4
 CVMFS_TEST_660_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db

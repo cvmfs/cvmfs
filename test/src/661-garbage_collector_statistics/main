@@ -1,6 +1,7 @@
-# This file 
+# This file
 cvmfs_test_name="Gather garbage collector statistics"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_661_ERROR_BYTES=101
 CVMFS_TEST_661_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db

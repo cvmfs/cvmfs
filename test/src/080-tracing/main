@@ -1,66 +1,77 @@
 cvmfs_test_name="tracing"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST080_TRACELOG=
 
 cleanup() {
+  if [ "x$CVMFS_TEST080_TRACELOG" != "x" ]; then
     sudo rm -f /tmp/cvmfs-$repo.trace.log 2> /dev/null
+  fi
 }
 
 cvmfs_run_test() {
-    logfile=$1
-    local repo="grid.cern.ch"
-    echo "*** Setup..."
-    cleanup
-    trap cleanup HUP EXIT TERM INT || return 4
-    echo "*** Mounting test repository..."
-    cvmfs_mount $repo "GLITE_VERSION=util" "CVMFS_TRACEFILE=/tmp/cvmfs-@fqrn@.trace.log" "CVMFS_TRACEBUFFER=4096" "CVMFS_TRACEBUFFER_THRESHOLD=2048" > /dev/null
+  logfile=$1
+  local repo="grid.cern.ch"
+  CVMFS_TEST080_TRACELOG=/tmp/cvmfs-$repo.trace.log
+  echo "*** Setup..."
+  cleanup
+  trap cleanup HUP EXIT TERM INT || return 4
+  echo "*** Mounting test repository..."
+  cvmfs_mount $repo "GLITE_VERSION=util" \
+    "CVMFS_TRACEFILE=$CVMFS_TEST080_TRACELOG" \
+    "CVMFS_TRACEBUFFER=4096" \
+    "CVMFS_TRACEBUFFER_THRESHOLD=2048" > /dev/null
 
-    echo "Checking trace log creation..."
-    sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
+  echo "Checking trace log creation..."
+  sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
 
-    if [ ! -f /tmp/cvmfs-$repo.trace.log ]; then
-        echo "*** ERROR: Log file was not created"
-        return 2
-    fi
+  if [ ! -f $CVMFS_TEST080_TRACELOG ]; then
+    echo "*** ERROR: Log file was not created"
+    return 2
+  fi
 
-    sudo truncate -s0 /tmp/cvmfs-$repo.trace.log > /dev/null
+  sudo truncate -s0 $CVMFS_TEST080_TRACELOG > /dev/null
 
-    echo "*** Executing a few operations to check tracing..."
+  echo "*** Executing a few operations to check tracing..."
 
-    ls /cvmfs/$repo/
-    ls /cvmfs/$repo/vc/bin
-    cat /cvmfs/$repo/README
-    df -P /cvmfs/$repo/README
-    list_xattrs /cvmfs/$repo/README
-    #getfattr -d -m ".*" /cvmfs/$repo/README
-    ls /cvmfs/$repo/glite
+  ls /cvmfs/$repo/vc/bin
+  stat /cvmfs/$repo/README
+  ls /cvmfs/$repo/
+  cat /cvmfs/$repo/README
+  df -P /cvmfs/$repo/README
+  list_xattrs /cvmfs/$repo/README
+  #getfattr -d -m ".*" /cvmfs/$repo/README
+  ls /cvmfs/$repo/glite
 
-    sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
+  sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
 
-    if ! (check_trace 2 opendir ""\
-        && check_trace 6 getattr ""\
-        && check_trace 4 lookup "/vc"\
-        && check_trace 4 lookup "/vc/bin"\
-        && check_trace 2 opendir "/vc/bin"\
-        && check_trace 4 lookup "/README"\
-        && check_trace 1 open "/README"\
-        && check_trace 6 getattr "/README"\
-        && check_trace 5 statfs "/README"\
-        && check_trace 7 listxattr "/README"\
-        && check_trace 8 getxattr "/README"\
-        && check_trace 4 lookup "/glite"\
-        && check_trace 3 readlink "/glite"\
-        && check_trace 4 lookup "/util"\
-        && check_trace 2 opendir "/util"\
+  if ! (check_trace 2 opendir ""\
+    && check_trace 4 lookup "/vc"\
+    && check_trace 4 lookup "/vc/bin"\
+    && check_trace 2 opendir "/vc/bin"\
+    && check_trace 4 lookup "/README"\
+    && check_trace 1 open "/README"\
+    && check_trace 5 statfs "/README"\
+    && check_trace 7 listxattr "/README"\
+    && check_trace 8 getxattr "/README"\
+    && check_trace 4 lookup "/glite"\
+    && check_trace 3 readlink "/glite"\
+    && check_trace 4 lookup "/util"\
+    && check_trace 2 opendir "/util"\
 
-        ); then 
-            return 3
-    fi
-    
-    return 0
+    ); then
+      return 3
+  fi
+
+  return 0
 }
 
 check_trace() {
-    if ! sudo grep -q "\"$1\",\"$3\",\"$2()\"" /tmp/cvmfs-$repo.trace.log; then
-        echo "*** Log did not trace $2 of $3"
-        return 3
-    fi
+  if ! sudo grep -q "\"$1\",\"$3\",\"$2()\"" $CVMFS_TEST080_TRACELOG; then
+    echo "*** Log did not trace $2 of $3"
+    echo "----- Full Log -----"
+    sudo cat $CVMFS_TEST080_TRACELOG
+    echo "----- EOF -----"
+    return 1
+  fi
 }
