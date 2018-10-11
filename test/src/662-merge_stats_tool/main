@@ -1,6 +1,7 @@
 # This file contains $NR_OF_TESTS tests for checking the store publish statistics feature (checking the database integrity)
 cvmfs_test_name="Merge two database files"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_662_ERROR_MERGE_PUBLISH_TABLE=101
 CVMFS_TEST_662_ERROR_MERGE_GC_TABLE=102
@@ -57,7 +58,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "*** perform basic garbage collection"
-  cvmfs_server gc -r1 -f $CVMFS_TEST_REPO || return 4  
+  cvmfs_server gc -r1 -f $CVMFS_TEST_REPO || return 4
 
   echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?

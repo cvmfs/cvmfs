@@ -1,6 +1,7 @@
 # This file contains $NR_OF_TESTS tests for checking the print publish statistics feature
 cvmfs_test_name="Print publish statistics"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_659_NR_OF_TESTS=4
 CVMFS_TEST_659_ERROR_FILES_ADDED=101
