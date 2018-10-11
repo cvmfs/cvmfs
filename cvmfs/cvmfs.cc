@@ -1547,6 +1547,16 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     return;
   }
 
+  // from attr(5) the extended user attributes are only allowed for
+  // regular files and directories
+  if (!(d.IsRegular() || d.IsDirectory())) {
+    if (size == 0)
+      fuse_reply_xattr(req, 0);
+    else
+      fuse_reply_buf(req, NULL, 0);
+    return;
+  }
+
   const char base_list[] = "user.pid\0user.version\0user.revision\0"
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
