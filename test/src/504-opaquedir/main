@@ -113,8 +113,6 @@ cvmfs_run_test() {
   echo "*** change exactly the same stuff in the scratch space"
   change_files_in $reference_dir || return $?
 
-#return 999
-
   echo "*** creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 

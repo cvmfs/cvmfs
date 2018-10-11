@@ -1,0 +1,57 @@
+cvmfs_test_name="Handling of many small catalogs"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  local N=100
+
+  echo "*** create deep directory structure"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  for i in $(seq 1 $N); do
+    mkdir /cvmfs/$CVMFS_TEST_REPO/$i
+    touch /cvmfs/$CVMFS_TEST_REPO/$i/.cvmfscatalog
+    for j in $(seq 1 $N); do
+      mkdir /cvmfs/$CVMFS_TEST_REPO/$i/$j
+      touch /cvmfs/$CVMFS_TEST_REPO/$i/$j/.cvmfscatalog
+    done
+  done
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** create deep symlinks"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  for i in $(seq 1 $N); do
+    for j in $(seq 1 $N); do
+      ln -s . /cvmfs/$CVMFS_TEST_REPO/$i/$j/a
+      ln -s . /cvmfs/$CVMFS_TEST_REPO/$i/$j/b
+      ln -s . /cvmfs/$CVMFS_TEST_REPO/$i/$j/c
+      ln -s . /cvmfs/$CVMFS_TEST_REPO/$i/$j/d
+    done
+  done
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "*** remove deep symlinks, create one new to trigger defragmentation"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  for i in $(seq 1 $N); do
+    for j in $(seq 1 $N); do
+      rm -f /cvmfs/$CVMFS_TEST_REPO/$i/$j/a
+      rm -f /cvmfs/$CVMFS_TEST_REPO/$i/$j/b
+      rm -f /cvmfs/$CVMFS_TEST_REPO/$i/$j/c
+      rm -f /cvmfs/$CVMFS_TEST_REPO/$i/$j/d
+      ln -s . /cvmfs/$CVMFS_TEST_REPO/$i/$j/x
+    done
+  done
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}
+
