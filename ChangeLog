@@ -1,4 +1,7 @@
 2.5.2:
+  * New S3 config parameter CVMFS_S3_DNS_BUCKETS=false disables DNS-style
+    bucket URLs when S3 backend doesn't support them (e.g. Minio) (CVM-1641)
+  * Add support for URL subpaths and DNS buckets in the S3 backend (CVM-1641)
   * Fix content type header for objects pushed to S3
   * Fix cache control headers for objects pushed to S3 (CVM-1606)
   * Fix building on macOS 10.14
