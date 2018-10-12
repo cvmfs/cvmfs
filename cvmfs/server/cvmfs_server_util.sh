@@ -83,7 +83,8 @@ make_s3_upstream() {
   local s3_config=$2
   local subpath=$3
   local repo_alias
-  if [ x"$subpath" != x"" ]; then
+  local disable_dns_buckets=$(cat $s3_config | grep "CVMFS_S3_DNS_BUCKETS=false")
+  if [ x"$disable_dns_buckets" = x"" ] && [ x"$subpath" != x"" ]; then
     repo_alias=$subpath/$repo_name
   else
     repo_alias=$repo_name
