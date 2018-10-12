@@ -22,7 +22,7 @@ cvmfs_server_transaction() {
   local retry=0
   local init_retry_delay=5 # seconds
   local max_retry_delay=300 # seconds
-  local num_retries=50
+  local num_retries=100
 
   # optional parameter handling
   OPTIND=1
