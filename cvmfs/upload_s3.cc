@@ -26,6 +26,7 @@ namespace upload {
 
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   : AbstractUploader(spooler_definition)
+  , dns_buckets_(true)
   , num_parallel_uploads_(kDefaultNumParallelUploads)
   , num_retries_(kDefaultNumRetries)
   , timeout_sec_(kDefaultTimeoutSec)
@@ -42,7 +43,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
     abort();
   }
 
-  s3fanout_mgr_.Init(num_parallel_uploads_);
+  s3fanout_mgr_.Init(num_parallel_uploads_, dns_buckets_);
   s3fanout_mgr_.SetTimeout(timeout_sec_);
   s3fanout_mgr_.SetRetryParameters(
     num_retries_, kDefaultBackoffInitMs, kDefaultBackoffMaxMs);
@@ -117,6 +118,11 @@ bool S3Uploader::ParseSpoolerDefinition(
              "Failed to parse CVMFS_S3_BUCKET from '%s'.",
              config_path.c_str());
     return false;
+  }
+  if (options_manager.GetValue("CVMFS_S3_DNS_BUCKETS", &parameter)) {
+    if (parameter == "false") {
+      dns_buckets_ = false;
+    }
   }
   if (options_manager.GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS",
                                &parameter))

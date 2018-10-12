@@ -6,6 +6,55 @@
 # Utility functions used by the  "cvmfs_server" script
 #
 
+parse_url() {
+  local input_url=$1
+  local key=$2
+
+  local proto host port path url
+
+  local has_proto=$(echo $input_url | grep '://')
+  if [ x"$has_proto" != x"" ]; then
+      proto=$(echo $input_url | cut -d':' -f1)
+      url=$(echo $input_url | cut -d'/' -f3-)
+  else
+      url=$input_url
+  fi
+
+  local has_path=$(echo $url | grep '/')
+  if [ x"$has_path" != x"" ]; then
+      path=$(echo $url | cut -d'/' -f2-)
+      url=$(echo $url | cut -d'/' -f1)
+  fi
+
+  local has_port=$(echo $url | grep ':')
+  if [ x"$has_port" != x"" ]; then
+      port=$(echo $url | cut -d':' -f2)
+      host=$(echo $url | cut -d':' -f1)
+  else
+      host=$url
+  fi
+
+  case $key in
+    proto)
+        echo "$proto"
+        ;;
+    host)
+        echo "$host"
+        ;;
+    port)
+        echo "$port"
+        ;;
+    path)
+        echo "$path"
+        ;;
+    *)
+        echo "proto: $proto"
+        echo "host: $host"
+        echo "port: $port"
+        echo "path: $path"
+  esac
+}
+
 
 mangle_local_cvmfs_url() {
   local repo_name=$1
@@ -32,7 +81,15 @@ make_upstream() {
 make_s3_upstream() {
   local repo_name=$1
   local s3_config=$2
-  make_upstream "S3" "/var/spool/cvmfs/${repo_name}/tmp" "${repo_name}@${s3_config}"
+  local subpath=$3
+  local repo_alias
+  local disable_dns_buckets=$(cat $s3_config | grep "CVMFS_S3_DNS_BUCKETS=false")
+  if [ x"$disable_dns_buckets" = x"" ] && [ x"$subpath" != x"" ]; then
+    repo_alias=$subpath/$repo_name
+  else
+    repo_alias=$repo_name
+  fi
+  make_upstream "S3" "/var/spool/cvmfs/${repo_name}/tmp" "${repo_alias}@${s3_config}"
 }
 
 
