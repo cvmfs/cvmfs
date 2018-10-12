@@ -19,13 +19,30 @@ cvmfs_server_transaction() {
   local force=0
   local retcode=0
 
+  local retry=0
+  local init_retry_delay=5 # seconds
+  local max_retry_delay=300 # seconds
+  local num_retries=50
+
   # optional parameter handling
   OPTIND=1
-  while getopts "fe" option
+  while getopts "fri:m:n:" option
   do
     case $option in
       f)
         force=1
+      ;;
+      r)
+        retry=1
+      ;;
+      i)
+        init_retry_delay=$OPTARG
+      ;;
+      m)
+        max_retry_delay=$OPTARG
+      ;;
+      n)
+        num_retries=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -78,7 +95,34 @@ cvmfs_server_transaction() {
     # the cvmfs_swissknife lease command needs to be used to acquire a new lease
     if [ x"$upstream_type" = xgw ]; then
         local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
-        __swissknife lease -a acquire -u $repo_services_url -k $gw_key_file -p $name"/"$subpath || { echo "Could not acquire a new lease for repository $name"; retcode=1; continue; }
+
+        set +e
+
+        local res=1
+        local r=1
+        local delay=$init_retry_delay
+        while true ; do
+          __swissknife lease -a acquire -u $repo_services_url -k $gw_key_file -p $name"/"$subpath
+          res=$?
+          if [ $res -eq 0 ] || [ $retry -eq 0 ] || [ $r -gt $num_retries ]; then
+            break
+          fi
+          echo "Retry $r/$num_retries, waiting: $delay"
+          r=$((r + 1))
+          sleep $delay
+          delay=$((delay * 2))
+          if [ $delay -gt $max_retry_delay ]; then
+            delay=$max_retry_delay
+          fi
+        done
+
+        set -e
+
+        if [ $res -ne 0 ]; then
+          echo "Could not acquire a new lease for repository $name"
+          retcode=1
+          continue
+        fi
     fi
     open_transaction $name $
 

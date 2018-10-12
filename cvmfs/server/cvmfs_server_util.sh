@@ -1079,7 +1079,11 @@ Supported Commands:
                   [-r repair reflog problems]
                   <fully qualified name>
                   Checks if the repository is sane
-  transaction     <fully qualified name>
+  transaction     [-r (retry if unable to acquire lease]
+                  [-i INT (initial retry delay seconds)]
+                  [-m INT (max retry delay seconds)]
+                  [-n INT (max number of retries)]
+                  <fully qualified name>
                   Start to edit a repository
   snapshot        [-t fail if other snapshot is in progress]
                   <fully qualified name>
