@@ -123,19 +123,7 @@ if [ "x$ubuntu_release" = "xxenial" ] || [ "x$ubuntu_release" = "xbionic" ]; the
   fi
 fi
 
-# Disable service start rate limiting for apache and autofs
-echo "Turning off service rate limit"
-sudo mkdir -p /lib/systemd/system/apache2.service.d
-sudo cat << EOF > /lib/systemd/system/apache2.service.d/cvmfs-test.conf
-[Unit]
-StartLimitIntervalSec=0
-EOF
-sudo mkdir -p /lib/systemd/system/autofs.service.d
-sudo cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
-[Unit]
-StartLimitIntervalSec=0
-EOF
-sudo systemctl daemon-reload || true
+disable_systemd_rate_limit
 
 # setting up the AUFS kernel module
 echo -n "loading AUFS kernel module..."
