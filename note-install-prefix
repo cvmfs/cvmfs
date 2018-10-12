@@ -1,2 +1,0 @@
- cmake -DCMAKE_INSTALL_PREFIX:PATH=/tmp/cvmfs-install
-make install DESTDIR=/tmp/cvmfs-install
