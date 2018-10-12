@@ -14,7 +14,6 @@ option (BUILD_GEOAPI            "Build the geo api service"                     
 option (BUILD_LIBCVMFS          "Build the CernVM-FS client library"                               ON)
 option (BUILD_LIBCVMFS_CACHE    "Build the cache plugin library"                                   ON)
 option (BUILD_PRELOADER         "Build the alien cache pre-loader"                                 OFF)
-option (BUILD_OCTOPUS           "Build the octopus REST server"                                    OFF)
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
@@ -22,7 +21,7 @@ option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"          
 option (BUILD_QC_TESTS          "Build the QuickCheck property random tests"                       OFF)
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
-option (BUILD_ALL               "Build client, server, lib, preload, octopus, unit tests"          OFF)
+option (BUILD_ALL               "Build client, server, lib, preload, shrinkwrap, unit tests"       OFF)
 
 option (ENABLE_ASAN             "Enable the Address Sanitizer"                                     OFF)
 
@@ -45,7 +44,6 @@ if (BUILD_ALL)
     set (BUILD_LIBCVMFS ON)
     set (BUILD_LIBCVMFS_CACHE ON)
     set (BUILD_PRELOADER ON)
-    set (BUILD_OCTOPUS ON)
   endif (!MACOSX)
 endif (BUILD_ALL)
 

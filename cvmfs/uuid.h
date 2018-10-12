@@ -17,8 +17,8 @@ namespace cvmfs {
  * does not yet exist, created and stored in a file.  This is how it is used to
  * identify a cvmfs cache directory.
  *
- * In order to create many UUIDs for short-lived objects (see webapi/macaroon),
- * use the CreateOneTime factory method.
+ * In order to create many UUIDs for short-lived objects, use the CreateOneTime
+ * factory method.
  */
 class Uuid {
  public:

@@ -672,31 +672,6 @@ if (BUILD_LIBCVMFS)
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
 endif(BUILD_LIBCVMFS)
 
-if (BUILD_OCTOPUS)
-  set (CVMFS_OCTOPUS_SOURCES
-    encrypt.cc
-    hash.cc
-    json_document.cc
-    logging.cc
-    pathspec/pathspec.cc
-    pathspec/pathspec_pattern.cc
-	  sanitizer.cc
-    util/posix.cc
-    util/string.cc
-    uuid.cc
-		webapi/fcgi.cc
-    webapi/macaroon.cc
-    webapi/octopus.cc
-    webapi/uri_map.cc
-  )
-
-  add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
-  target_link_libraries(cvmfs_octopus.fcgi
-                        ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES}
-                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
-endif (BUILD_OCTOPUS)
-
-
 if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
@@ -891,15 +866,6 @@ if (BUILD_SERVER)
     DESTINATION    "/var/www/wsgi-scripts/cvmfs-server"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
-
-  if (BUILD_OCTOPUS)
-    install(
-      TARGETS      cvmfs_octopus.fcgi
-      RUNTIME
-      DESTINATION  "/usr/share/cvmfs-server/webapi"
-      PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    )
-  endif (BUILD_OCTOPUS)
 
   install(
     CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server)"
