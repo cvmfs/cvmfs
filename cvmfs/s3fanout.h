@@ -95,8 +95,8 @@ struct Statistics {
 struct JobInfo {
   enum RequestType {
     kReqHead = 0,
-    kReqPut,
-    kReqPutNoCache,
+    kReqPutCas,  // immutable data object
+    kReqPutDotCvmfs,  // one of the /.cvmfs... top level files
     kReqDelete,
   };
 
@@ -179,7 +179,7 @@ struct JobInfo {
     callback = NULL;
     mmf = NULL;
     origin_file = NULL;
-    request = kReqPut;
+    request = kReqPutCas;
     error_code = kFailOk;
     num_retries = 0;
     backoff_ms = 0;
@@ -235,8 +235,8 @@ class S3FanoutManager : SingleCopy {
 
  private:
   // Reflects the default Apache configuration of the local backend
-  static const char *kCacheControlData;  // Cache-Control: max-age=259200
-  static const char *kCacheControlMutable;  // Cache-Control: max-age=61
+  static const char *kCacheControlCas;  // Cache-Control: max-age=259200
+  static const char *kCacheControlDotCvmfs;  // Cache-Control: max-age=61
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
