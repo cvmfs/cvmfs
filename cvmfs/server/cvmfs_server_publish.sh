@@ -83,8 +83,8 @@ cvmfs_server_publish() {
       check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
     fi
 
-    # Check if the repo name contains a subpath for locking, e.g. repo.cern.ch/sub/path/for/locking
-    local subpath=$(echo $name | cut -d'/' -f2- -s)
+    # Ignore any subpath appended to the repository e.g. repo.cern.ch/sub/path/for/locking
+    # Providing a subpath for the "cvmfs_server publish" command is no longer needed.
     name=$(echo $name | cut -d'/' -f1)
 
     load_repo_config $name
@@ -210,12 +210,11 @@ cvmfs_server_publish() {
       sync_command="$sync_command -J $tag_description"
     fi
 
-    # If the upstream type is "gw", we need to pass additional parameters
-    # to the `cvmfs_swissknife sync` command: the username and the
-    # subpath of the active lease
+    # If the upstream type is "gw", we need to additionally pass
+    # the names of the file containing the gateway key and of the
+    # one containing the session token
     if [ x"$upstream_type" = xgw ]; then
-      local session_token_file="/var/spool/cvmfs/$name/session_token_$(echo $subpath | sed -e "s:/:_:g")"
-      sync_command="$sync_command -P ${session_token_file} -H $gw_key_file"
+      sync_command="$sync_command -H $gw_key_file -P ${spool_dir}/session_token"
     fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
