@@ -182,7 +182,8 @@ cvmfs_server_mkfs() {
   # upstream generation (defaults to local upstream)
   if [ x"$upstream" = x"" ]; then
     if [ x"$s3_config" != x"" ]; then
-      upstream=$(make_s3_upstream $name $s3_config)
+      local subpath=$(parse_url $stratum0 path)
+      upstream=$(make_s3_upstream $name $s3_config $subpath)
     else
       upstream=$(make_local_upstream $name)
     fi

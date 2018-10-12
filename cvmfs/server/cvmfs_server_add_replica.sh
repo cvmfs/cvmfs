@@ -88,7 +88,8 @@ cvmfs_server_add_replica() {
   # upstream generation (defaults to local upstream)
   if [ x"$upstream" = x"" ]; then
     if [ x"$s3_config" != x"" ]; then
-      upstream=$(make_s3_upstream $alias_name $s3_config)
+      local subpath=$(parse_url $stratum0 path)
+      upstream=$(make_s3_upstream $alias_name $s3_config $subpath)
     else
       upstream=$(make_local_upstream $alias_name)
     fi

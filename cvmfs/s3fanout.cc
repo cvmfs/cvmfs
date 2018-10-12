@@ -1092,6 +1092,8 @@ S3FanoutManager::S3FanoutManager() {
   curl_multi_ = NULL;
   user_agent_ = NULL;
 
+  dns_buckets_ = true;
+
   atomic_init32(&multi_threaded_);
   watch_fds_ = NULL;
   watch_fds_size_ = 0;
@@ -1141,8 +1143,8 @@ S3FanoutManager::~S3FanoutManager() {
   free(curl_handle_lock_);
 }
 
-
-void S3FanoutManager::Init(const unsigned int max_pool_handles) {
+void S3FanoutManager::Init(const unsigned int max_pool_handles,
+                           bool dns_buckets) {
   atomic_init32(&multi_threaded_);
   CURLcode retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
@@ -1151,9 +1153,9 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   curl_sharehandles_ = new map<CURL *, S3FanOutDnsEntry *>;
   sharehandles_ = new set<S3FanOutDnsEntry *>;
   pool_max_handles_ = max_pool_handles;
-  watch_fds_max_ = 4*pool_max_handles_;
+  watch_fds_max_ = 4 * pool_max_handles_;
 
-  max_available_jobs_ = 4*pool_max_handles_;
+  max_available_jobs_ = 4 * pool_max_handles_;
   available_jobs_ = new Semaphore(max_available_jobs_);
   assert(NULL != available_jobs_);
 
@@ -1161,6 +1163,8 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   statistics_ = new Statistics();
   user_agent_ = new string();
   *user_agent_ = "User-Agent: cvmfs " + string(VERSION);
+
+  dns_buckets_ = dns_buckets;
 
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
@@ -1183,8 +1187,7 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
     opt_ipv4_only_ = true;
   }
 
-  watch_fds_ =
-      static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
+  watch_fds_ = static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
   watch_fds_size_ = 2;
   watch_fds_inuse_ = 0;
 
@@ -1192,7 +1195,6 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
 
   resolver_ = dns::CaresResolver::Create(opt_ipv4_only_, 2, 2000);
 }
-
 
 void S3FanoutManager::Fini() {
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
