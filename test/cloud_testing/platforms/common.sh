@@ -177,6 +177,29 @@ get_number_of_cpu_cores() {
   fi
 }
 
+# Disable service start rate limiting for apache and autofs
+disable_systemd_rate_limit() {
+  echo "Turning off service rate limit"
+  local autofsdir=/lib/systemd/system/autofs.service.d
+  local apachedir=/lib/systemd/system/httpd.service.d
+  if [ ! -f /lib/systemd/system/httpd.service ]; then
+    apachedir=/lib/systemd/system/apache2.service.d
+  fi
+
+  sudo mkdir -p $apachedir
+  sudo mkdir -p $autofsdir
+
+  cat << EOF > cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+  sudo cp cvmfs-test.conf $apachedir/cvmfs-test.conf
+  sudo cp cvmfs-test.conf $autofsdir/cvmfs-test.conf
+  rm cvmfs-test.conf
+
+  sudo systemctl daemon-reload || true
+}
+
 
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #

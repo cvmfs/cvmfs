@@ -83,18 +83,7 @@ echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
 
-# Disable service start rate limiting for apache and autofs
-sudo mkdir -p /lib/systemd/system/httpd.service.d
-sudo cat << EOF > /lib/systemd/system/httpd.service.d/cvmfs-test.conf
-[Unit]
-StartLimitIntervalSec=0
-EOF
-sudo mkdir -p /lib/systemd/system/autofs.service.d
-sudo cat << EOF > /lib/systemd/system/autofs.service.d/cvmfs-test.conf
-[Unit]
-StartLimitIntervalSec=0
-EOF
-sudo systemctl daemon-reload
+disable_systemd_rate_limit
 
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"

@@ -215,7 +215,7 @@ void S3Uploader::FileUpload(
                           local_path);
 
   if (HasPrefix(remote_path, ".cvmfs", false /*ignore_case*/)) {
-    info->request = s3fanout::JobInfo::kReqPutNoCache;
+    info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
   } else {
 #ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
     info->request = s3fanout::JobInfo::kReqHead;
