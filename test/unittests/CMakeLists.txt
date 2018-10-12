@@ -69,7 +69,6 @@ set(CVMFS_UNITTEST_FILES
   t_libcvmfs.cc
   t_logging.cc
   t_lru.cc
-  t_macaroon.cc
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
@@ -112,7 +111,6 @@ set(CVMFS_UNITTEST_FILES
   t_upload_facility.cc
   t_uploaders.cc
   t_gateway_uploader.cc
-  t_uri_map.cc
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
@@ -242,9 +240,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/uuid.cc
-  ${CVMFS_SOURCE_DIR}/webapi/fcgi.cc
-  ${CVMFS_SOURCE_DIR}/webapi/macaroon.cc
-  ${CVMFS_SOURCE_DIR}/webapi/uri_map.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
