@@ -9,7 +9,8 @@
 
 -module(cvmfs_path_util).
 
--export([are_overlapping/2]).
+-export([are_overlapping/2
+        ,split_repo_path/1]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -33,3 +34,13 @@ drop_leading_slash(<<"/",Rest/binary>>) ->
     Rest;
 drop_leading_slash(Path) ->
     Path.
+
+
+-spec split_repo_path(Path :: binary()) -> {Repo :: binary(), Subpath :: binary()}.
+split_repo_path(Path) when is_binary(Path) ->
+    case binary:split(Path, <<"/">>) of
+        [Repo | []] ->
+            {Repo, <<"">>};
+        [Repo, Subpath] ->
+            {Repo, Subpath}
+    end.
