@@ -140,7 +140,7 @@ run_transactions() {
     echo "New file" > /cvmfs/test.repo.org/new/c/another_file.txt
 
     echo "  Publishing changes 6"
-    cvmfs_server publish test.repo.org/new/c
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
@@ -153,7 +153,7 @@ run_transactions() {
     echo "New file" > /cvmfs/test.repo.org/new/invalid_file.txt
 
     echo "  Publishing changes 7"
-    cvmfs_server publish test.repo.org/new/c
+    cvmfs_server publish test.repo.org
     cvmfs_server check test.repo.org
 
     echo "  Copy the contents of the repository"
