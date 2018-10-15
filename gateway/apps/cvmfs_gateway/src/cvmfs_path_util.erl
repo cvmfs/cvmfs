@@ -21,6 +21,8 @@
 %% @end
 %%--------------------------------------------------------------------
 -spec are_overlapping(Path1 :: binary(), Path2 :: binary()) -> boolean().
+are_overlapping(Path1, Path2) when size(Path1) == 0; size(Path2) == 0 ->
+    true;
 are_overlapping(Path1, Path2) when size(Path1) > 0, size(Path2) > 0 ->
     SplitPath1 = filename:split(drop_leading_slash(Path1)),
     SplitPath2 = filename:split(drop_leading_slash(Path2)),
