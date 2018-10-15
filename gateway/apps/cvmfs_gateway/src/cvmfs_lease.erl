@@ -27,11 +27,11 @@
 
 -define(SERVER, ?MODULE).
 
--record(lease, { path   :: binary()   % subpath which is locked
-               , key_id   :: binary()   % user identifier
-               , public :: binary()   % public string used for token generation
-               , secret :: binary()   % secret used for token generation
-               , time   :: integer()  % timestamp (time when lease acquired)
+-record(lease, { path   :: {binary(), binary()}  % repository with subpath which is locked
+               , key_id :: binary()  % user identifier
+               , public :: binary()  % public string used for token generation
+               , secret :: binary()  % secret used for token generation
+               , time   :: integer() % timestamp (time when lease acquired)
                }).
 -type lease() :: #lease{}.
 
@@ -182,8 +182,8 @@ handle_call({lease_req, get_lease_secret, Public}, _From, State) ->
     {reply, Reply, State};
 handle_call({lease_req, get_lease_path, Public}, _From, State) ->
     Reply = case p_get_lease(Public) of
-                {ok, #lease{path = Path}} ->
-                    {ok, Path};
+                {ok, #lease{path = {Repo, Path}}} ->
+                    {ok, <<Repo/binary, Path/binary>>};
                 Other ->
                     Other
             end,
@@ -258,14 +258,16 @@ code_change(OldVsn, State, _Extra) ->
 p_new_lease(KeyId, Path, Public, Secret, _State) ->
     {ok, MaxLeaseTime} = application:get_env(cvmfs_gateway, max_lease_time),
 
+    {Repo, Subpath} = cvmfs_path_util:split_repo_path(Path),
+
     %% Match statement that selects all rows with a given repo,
     %% returning a list of {Path, Time} pairs
-    MS = ets:fun2ms(fun(#lease{path = P} = Lease) when P =:= Path ->
+    MS = ets:fun2ms(fun(#lease{path = {R, _}} = Lease) when R =:= Repo ->
                             Lease
                     end),
 
-    AreOverlapping = fun(#lease{path = P}) ->
-                             cvmfs_path_util:are_overlapping(P, Path)
+    AreOverlapping = fun(#lease{path = {_, P}}) ->
+                             cvmfs_path_util:are_overlapping(P, Subpath)
                      end,
 
     T = fun() ->
@@ -275,7 +277,7 @@ p_new_lease(KeyId, Path, Public, Secret, _State) ->
                 %% We filter out entries which don't overlap with Path
                 case lists:filter(AreOverlapping, mnesia:select(lease, MS)) of
                     %% An everlapping path was found
-                    [#lease{path = Path, time = Time} | _] ->
+                    [#lease{path = ConflictingPath, time = Time} | _] ->
                         RemainingTime = MaxLeaseTime - (CurrentTime - Time),
                         case RemainingTime > 0 of
                             %% The old lease is still valid, return busy message
@@ -283,12 +285,12 @@ p_new_lease(KeyId, Path, Public, Secret, _State) ->
                                 {busy, RemainingTime};
                             %% The old lease is expired. Delete it and insert the new one
                             false ->
-                                mnesia:delete({lease, Path}),
-                                p_write_row(KeyId, Path, Public, Secret)
+                                mnesia:delete({lease, {Repo, ConflictingPath}}),
+                                p_write_row(KeyId, Repo, Subpath, Public, Secret)
                         end;
                     %% No overlapping paths were found; just insert the new entry
                     _ ->
-                        p_write_row(KeyId, Path, Public, Secret)
+                        p_write_row(KeyId, Repo, Subpath, Public, Secret)
                 end
         end,
     {atomic, Result} = mnesia:sync_transaction(T),
@@ -358,13 +360,14 @@ p_clear_leases() ->
     Result.
 
 
--spec p_write_row(KeyId, Path, Public, Secret) -> ok
+-spec p_write_row(KeyId, Repo, Path, Public, Secret) -> ok
                                                      when KeyId :: binary(),
+                                                          Repo :: binary(),
                                                           Path :: binary(),
                                                           Public :: binary(),
                                                           Secret :: binary().
-p_write_row(KeyId, Path, Public, Secret) ->
-    mnesia:write(#lease{path = Path,
+p_write_row(KeyId, Repo, Path, Public, Secret) ->
+    mnesia:write(#lease{path = {Repo, Path},
                         key_id = KeyId,
                         public = Public,
                         secret = Secret,
