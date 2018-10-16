@@ -1,3 +1,6 @@
+0.3.1:
+  * Fix bug allowing conflicting leases to be acquired (CVM-1642)
+
 0.3.0:
   * Updated the RPM packaging: when installing RPMs, the setup.sh script
     no longer needs to be explicitly run, it's steps have been integrated
