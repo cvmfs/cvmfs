@@ -9,7 +9,8 @@
 
 -module(cvmfs_path_util).
 
--export([are_overlapping/2]).
+-export([are_overlapping/2
+        ,split_repo_path/1]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -21,6 +22,8 @@
 %% @end
 %%--------------------------------------------------------------------
 -spec are_overlapping(Path1 :: binary(), Path2 :: binary()) -> boolean().
+are_overlapping(Path1, Path2) when size(Path1) == 0; size(Path2) == 0 ->
+    true;
 are_overlapping(Path1, Path2) when size(Path1) > 0, size(Path2) > 0 ->
     SplitPath1 = filename:split(drop_leading_slash(Path1)),
     SplitPath2 = filename:split(drop_leading_slash(Path2)),
@@ -31,3 +34,13 @@ drop_leading_slash(<<"/",Rest/binary>>) ->
     Rest;
 drop_leading_slash(Path) ->
     Path.
+
+
+-spec split_repo_path(Path :: binary()) -> {Repo :: binary(), Subpath :: binary()}.
+split_repo_path(Path) when is_binary(Path) ->
+    case binary:split(Path, <<"/">>) of
+        [Repo | []] ->
+            {Repo, <<"">>};
+        [Repo, Subpath] ->
+            {Repo, Subpath}
+    end.
