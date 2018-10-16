@@ -16,10 +16,11 @@
         ,init_per_testcase/2, end_per_testcase/2]).
 
 -export([new_lease/1, new_lease_busy/1, new_lease_expired/1
-        ,remove_lease_existing/1, remove_lease_nonexisting/1
-        ,check_lease_valid/1, check_lease_expired/1, check_invalid_lease/1
-        ,get_lease_path_valid/1, get_lease_path_expired/1, get_lease_path_invalid/1
-        ,clear_leases/1]).
+        ,new_lease_conflict/1, remove_lease_existing/1
+        ,remove_lease_nonexisting/1, check_lease_valid/1
+        ,check_lease_expired/1, check_invalid_lease/1
+        ,get_lease_path_valid/1, get_lease_path_expired/1
+        ,get_lease_path_invalid/1, clear_leases/1]).
 
 
 %% Tests description
@@ -33,7 +34,8 @@ all() ->
 groups() ->
     [{new_leases, [], [new_lease
                       ,new_lease_busy
-                      ,new_lease_expired]}
+                      ,new_lease_expired
+                      ,new_lease_conflict]}
     ,{end_leases, [], [remove_lease_existing
                       ,remove_lease_nonexisting
                       ,clear_leases]}
@@ -85,7 +87,7 @@ new_lease(_Config) ->
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    [{lease, P, U, Public, Secret, _}] = cvmfs_lease:get_leases().
+    [{lease, {P, <<>>}, U, Public, Secret, _}] = cvmfs_lease:get_leases().
 
 
 new_lease_busy(_Config) ->
@@ -105,7 +107,20 @@ new_lease_expired(Config) ->
     SleepTime = ?config(max_lease_time, Config) * 1000 + 10,
     ct:sleep(SleepTime),
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    [{lease, P, U, Public, Secret, _}] = cvmfs_lease:get_leases().
+    [{lease, {P, <<>>}, U, Public, Secret, _}] = cvmfs_lease:get_leases().
+
+new_lease_conflict(_Config) ->
+    U = <<"user">>,
+    P1 = <<"path">>,
+    P2 = <<"path/below/the/first/one">>,
+    Public1 = <<"public1">>,
+    Public2 = <<"public2">>,
+    Secret = <<"secret">>,
+    ok = cvmfs_lease:request_lease(U, P1, Public1, Secret),
+    {busy, _} = cvmfs_lease:request_lease(U, P2, Public2, Secret),
+    ok = cvmfs_lease:end_lease(Public1),
+    ok = cvmfs_lease:request_lease(U, P2, Public2, Secret),
+    {busy, _} = cvmfs_lease:request_lease(U, P1, Public1, Secret).
 
 remove_lease_existing(_Config) ->
     U = <<"user">>,
@@ -125,7 +140,7 @@ clear_leases(_Config) ->
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    [{lease, P, U, Public, Secret, _}] = cvmfs_lease:get_leases(),
+    [{lease, {P, <<>>}, U, Public, Secret, _}] = cvmfs_lease:get_leases(),
     ok = cvmfs_lease:clear_leases(),
     [] = cvmfs_lease:get_leases().
 
@@ -176,4 +191,3 @@ get_lease_path_invalid(_Config) ->
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
     {error, invalid_lease} = cvmfs_lease:get_lease_path(<<"invalid_user">>).
-
