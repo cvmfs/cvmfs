@@ -3,13 +3,9 @@
 export RUNNER_LOG_DIR=/var/log/cvmfs-gateway
 
 if [ x"$(which systemctl)" != x"" ]; then
-    echo "  - restarting rsyslog"
     systemctl restart rsyslog
-
-    echo "  - installing systemd service file"
     systemctl daemon-reload
 else
-    echo "  - restarting rsyslog"
     service rsyslog restart
 fi
 
@@ -17,7 +13,6 @@ fi
 echo "Setting up the Mnesia"
 
 cvmfs_mnesia_root=/var/lib/cvmfs-gateway
-echo "  - (re)creating schema directory at $cvmfs_mnesia_root"
 rm -rf $cvmfs_mnesia_root && sudo mkdir -p $cvmfs_mnesia_root
 
 echo "  - creating Mnesia schema"
