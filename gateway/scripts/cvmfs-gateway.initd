@@ -33,6 +33,8 @@ LOCKFILE=/var/lock/subsys/cvmfs-gateway
 
 prog_agent="/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh"
 
+# Erlang needs the HOME env var set
+export HOME=/root
 
 is_root() {
   [ $(id -u) -eq 0 ] && return 0
