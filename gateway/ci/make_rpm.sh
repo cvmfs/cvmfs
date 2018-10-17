@@ -55,7 +55,7 @@ if [ "x$PLATFORM" = "xcc7" ]; then
 else
     mkdir -p root/etc/init.d
     togo file exclude root/etc/init.d
-    cp -v root/user/libexec/cvmfs-gateway/scripts/cvmfs-gateway.initd \
+    cp -v root/usr/libexec/cvmfs-gateway/scripts/cvmfs-gateway.initd \
           root/etc/init.d/cvmfs-gateway
     togo file flag config-nr root/etc/init.d/cvmfs-gateway
 
