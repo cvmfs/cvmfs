@@ -53,6 +53,12 @@ if [ "x$PLATFORM" = "xcc7" ]; then
         root/etc/logrotate.d
     togo file flag config-nr root/etc/logrotate.d/90-cvmfs-gateway-rotate-systemd
 else
+    mkdir -p root/etc/init.d
+    togo file exclude root/etc/init.d
+    cp -v root/user/libexec/cvmfs-gateway/scripts/cvmfs-gateway.initd \
+          root/etc/init.d/cvmfs-gateway
+    togo file flag config-nr root/etc/init.d/cvmfs-gateway
+
     cp -v root/usr/libexec/cvmfs-gateway/scripts/90-cvmfs-gateway-rotate \
         root/etc/logrotate.d
     togo file flag config-nr root/etc/logrotate.d/90-cvmfs-gateway-rotate
