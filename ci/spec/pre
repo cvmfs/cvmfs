@@ -6,6 +6,6 @@ if [ x"$(pidof systemd >/dev/null && echo yes || echo no)" = "xyes" ]; then
     fi
 else
     if [ -x /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh ]; then
-        /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
+        /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop || true
     fi
 fi
