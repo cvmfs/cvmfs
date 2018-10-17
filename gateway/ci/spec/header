@@ -35,7 +35,7 @@ Source0: %{name}.tar
 
 # If this package has prerequisites, uncomment this line and
 #  list them here - examples are already listed
-#Requires: bash, python >= 2.7
+Requires: cvmfs-server >= 2.5.1
 
 # A more verbose description of your package
 %description
