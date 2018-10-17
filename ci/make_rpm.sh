@@ -69,6 +69,7 @@ togo file flag config-nr root/etc/cvmfs/gateway/user.json
 
 # Mnesia db location
 mkdir -p root/var/lib/cvmfs-gateway
+togo file exclude root/var/lib
 
 # Copy spec file fragments into place
 echo "Copying RPM spec file fragments"
