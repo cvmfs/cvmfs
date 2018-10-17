@@ -31,6 +31,43 @@ tar xf $BUILD_LOCATION/$TARBALL
 cd $BUILD_LOCATION/togo/cvmfs-gateway
 togo file exclude root/usr/libexec
 
+# Place and flag config files in the togo workspace
+
+# systemlog configuration
+mkdir -p root/etc/{rsyslog.d,logrotate.d}
+togo file exclude root/etc/rsyslog.d
+togo file exclude root/etc/logrotate.d
+cp -v root/usr/libexec/cvmfs-gateway/scripts/90-cvmfs-gateway.conf \
+      root/etc/rsyslog.d
+togo file flag config-nr root/etc/rsyslog.d/90-cvmfs-gateway.conf
+
+# CentOS 7 uses systemd
+if [ "x$PLATFORM" = "xcc7" ]; then
+    mkdir -p root/etc/systemd/system
+    togo file exclude root/etc/systemd/system
+    cp -v root/usr/libexec/cvmfs-gateway/scripts/cvmfs-gateway.service \
+          root/etc/systemd/system/
+    togo file flag config-nr root/etc/systemd/system/cvmfs-gateway.service
+
+    cp -v root/usr/libexec/cvmfs-gateway/scripts/90-cvmfs-gateway-rotate-systemd \
+        root/etc/logrotate.d
+    togo file flag config-nr root/etc/logrotate.d/90-cvmfs-gateway-rotate-systemd
+else
+    cp -v root/usr/libexec/cvmfs-gateway/scripts/90-cvmfs-gateway-rotate \
+        root/etc/logrotate.d
+    togo file flag config-nr root/etc/logrotate.d/90-cvmfs-gateway-rotate
+fi
+
+# cvmfs-gateway configuration files
+mkdir -p root/etc/cvmfs/gateway
+togo file exclude root/etc
+togo file exclude root/etc/cvmfs
+cp -v root/usr/libexec/cvmfs-gateway/etc/repo.json root/etc/cvmfs/gateway/
+cp -v root/usr/libexec/cvmfs-gateway/etc/user.json root/etc/cvmfs/gateway/
+togo file flag config-nr root/etc/cvmfs/gateway/repo.json
+togo file flag config-nr root/etc/cvmfs/gateway/user.json
+
+
 # Copy spec file fragments into place
 echo "Copying RPM spec file fragments"
 cp -v $SCRIPT_LOCATION/spec/* ./spec/
