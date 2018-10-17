@@ -10,10 +10,6 @@ else
 fi
 
 # Setup Mnesia
-echo "Setting up the Mnesia"
-
 cvmfs_mnesia_root=/var/lib/cvmfs-gateway
 rm -rf $cvmfs_mnesia_root && sudo mkdir -p $cvmfs_mnesia_root
-
-echo "  - creating Mnesia schema"
 /usr/libexec/cvmfs-gateway/bin/cvmfs_gateway escript scripts/setup_mnesia.escript $cvmfs_mnesia_root
