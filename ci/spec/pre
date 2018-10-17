@@ -1,6 +1,6 @@
 %pre
 
-if [ x"$(pidof systemd >/dev/null && echo yes || echo no)" != x"" ]; then
+if [ x"$(pidof systemd >/dev/null && echo yes || echo no)" = "xyes" ]; then
     if [ "x$(systemctl list-unit-files | grep cvmfs-gateway)" != "x" ]; then
         systemctl stop cvmfs-gateway
     fi
