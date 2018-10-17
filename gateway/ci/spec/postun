@@ -10,4 +10,4 @@ else
 fi
 
 # Mnesia
-rm -rfv /var/lib/cvmfs-gateway
+rm -rf /var/lib/cvmfs-gateway
