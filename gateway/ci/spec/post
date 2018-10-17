@@ -10,4 +10,5 @@ else
 fi
 
 # Setup Mnesia
+rm -rf /var/lib/cvmfs-gateway/*
 /usr/libexec/cvmfs-gateway/bin/cvmfs_gateway escript scripts/setup_mnesia.escript /var/lib/cvmfs-gateway
