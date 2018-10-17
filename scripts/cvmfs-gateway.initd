@@ -29,7 +29,6 @@
 # 8--199  - reserved (8--99 LSB, 100--149 distrib, 150--199 appl)
 
 RETVAL=0
-LOCKFILE=/var/lock/subsys/cvmfs-gateway
 
 prog_agent="/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh"
 
@@ -52,7 +51,6 @@ start() {
   if [ $RETVAL -eq 0 ]; then
     echo_success
     echo
-    touch ${LOCKFILE}
   else
     echo_failure
     echo
@@ -68,11 +66,8 @@ stop() {
   echo -n $"Shutting down CernVM-FS Repository Gateway: "
   $prog_agent stop
   RETVAL=$?
-  rm -f $PIFDILE
   echo_success
   echo
-
-  [ $RETVAL -eq 0 ] && rm -f ${LOCKFILE}
 
   return $RETVAL
 }
