@@ -1,4 +1,5 @@
 cvmfs_test_name="shrinkwrap"
+cvmfs_test_suites="quick"
 
 CVMFS_TEST081_SHRINKWRAP_DEST=
 CVMFS_TEST081_REPO=
@@ -57,9 +58,9 @@ cvmfs_run_test() {
     echo
 
     echo "*** Creating shrinkwrapped repository..."
-    sudo cvmfs_shrinkwrap -r $repo \
-      -f "$test_location/$repo.config" \
-      -t /tmp/cvmfs-$repo.spec.txt \
+    sudo cvmfs_shrinkwrap --repo $repo \
+      --src-config "$test_location/$repo.config" \
+      --spec-file /tmp/cvmfs-$repo.spec.txt \
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 4
 
@@ -79,8 +80,18 @@ cvmfs_run_test() {
     sudo stat $CVMFS_TEST081_SHRINKWRAP_DEST/.data || return 11
     ls $CVMFS_TEST081_SHRINKWRAP_DEST/.provenance || return 12
 
-    ls /tmp/cvmfs/sft.cern.ch/.cvmfsdirtab
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/.cvmfsdirtab
     [ $? -ne 0 ] || return 20
+
+    echo "*** Update destination..."
+    echo | sudo tee -a /tmp/cvmfs-$repo.spec.txt
+    echo "^/.cvmfsdirtab" | sudo tee -a /tmp/cvmfs-$repo.spec.txt
+    sudo cvmfs_shrinkwrap --repo $repo \
+      --src-config "$test_location/$repo.config" \
+      --spec-file /tmp/cvmfs-$repo.spec.txt \
+      --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
+    [ $? -eq 0 ] || return 30
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/.cvmfsdirtab || return 31
 
     return 0
 }
