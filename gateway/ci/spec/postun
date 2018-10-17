@@ -8,6 +8,3 @@ if [ x"$(which systemctl)" != x"" ]; then
 else
     service rsyslog restart
 fi
-
-# Mnesia
-rm -rf /var/lib/cvmfs-gateway
