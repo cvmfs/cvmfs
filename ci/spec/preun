@@ -1,7 +1,7 @@
 %preun
 
 if [ x"$(which systemctl)" != x"" ]; then
-    if [ "x$(systemctl list-unit-files | greo cvmfs-gateway)" != "x" ]; then
+    if [ "x$(systemctl list-unit-files | grep cvmfs-gateway)" != "x" ]; then
         systemctl stop cvmfs-gateway
     fi
 else
