@@ -40,13 +40,13 @@ if [ x"$(uname)" = x"Linux" ] && which gcc > /dev/null 2>&1; then
   fi
 fi
 
-# if we are on Mac OS X switch off both the server and the libcvmfs builds
+# if we are on Mac OS X switch off the server build
 build_server="yes"
-build_libcvmfs="yes"
 if [ x"$(uname)" = x"Darwin" ]; then
   build_server="no"
-  build_libcvmfs="no"
 fi
+build_libcvmfs="yes"
+build_shrinkwrap="yes"
 
 # We need to disable GEOAPI on CentOS < 6
 build_geoapi="ON"
@@ -55,12 +55,13 @@ if is_redhat && [ "$(get_redhat_version)" -lt "6" ]; then
 fi
 
 echo "configuring using CMake..."
-cmake -DBUILD_SERVER=$build_server       \
-      -DBUILD_SERVER_DEBUG=$build_server \
-      -DBUILD_UNITTESTS=yes              \
-      -DBUILD_LIBCVMFS=$build_libcvmfs   \
-      -DBUILD_GEOAPI=$build_geoapi       \
-      -DBUILD_PRELOAD=yes                \
+cmake -DBUILD_SERVER=$build_server          \
+      -DBUILD_SERVER_DEBUG=$build_server    \
+      -DBUILD_UNITTESTS=yes                 \
+      -DBUILD_LIBCVMFS=$build_libcvmfs      \
+      -DBUILD_SHRINKWRAP=$build_shrinkwrap  \
+      -DBUILD_GEOAPI=$build_geoapi          \
+      -DBUILD_PRELOAD=yes                   \
       $CVMFS_SOURCE_LOCATION
 
 echo "building using make ($CVMFS_CONCURRENT_BUILD_JOBS concurrent jobs)..."
