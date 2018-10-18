@@ -10,7 +10,7 @@ set -e
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
-export RUNNER_LOG_DIR=/var/log/cvmfs-gateway
+export RUNNER_LOG_DIR=/var/log/cvmfs-gateway-runner
 
 # Install syslog configuration file
 echo "Installing the syslog configuration file"
