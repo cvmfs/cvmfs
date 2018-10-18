@@ -183,7 +183,7 @@ handle_call({lease_req, get_lease_secret, Public}, _From, State) ->
 handle_call({lease_req, get_lease_path, Public}, _From, State) ->
     Reply = case p_get_lease(Public) of
                 {ok, #lease{path = {Repo, <<>>}}} ->
-                    {ok, Repo};
+                    {ok, <<Repo/binary, "/">>};
                 {ok, #lease{path = {Repo, Path}}} ->
                     {ok, <<Repo/binary, "/", Path/binary>>};
                 Other ->
