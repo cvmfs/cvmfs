@@ -70,14 +70,19 @@ fi
 # run the cache plugin unittests
 if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
   CVMFS_CACHE_UNITTESTS="$(dirname $CVMFS_UNITTESTS_BINARY)/cvmfs_test_cache"
-  CVMFS_CACHE_LOCATOR=tcp=127.0.0.1:4224
+  CVMFS_CACHE_LOCATOR_PORT=4224
   CVMFS_CACHE_CONFIG=$(mktemp /tmp/cvmfs-unittests-XXXXX)
-  echo "CVMFS_CACHE_PLUGIN_LOCATOR=$CVMFS_CACHE_LOCATOR" > $CVMFS_CACHE_CONFIG
-  echo "CVMFS_CACHE_PLUGIN_SIZE=1000" >> $CVMFS_CACHE_CONFIG
+  echo "CVMFS_CACHE_PLUGIN_SIZE=1000" > $CVMFS_CACHE_CONFIG
   echo "CVMFS_CACHE_PLUGIN_TEST=yes" >> $CVMFS_CACHE_CONFIG
+  i=0
   for plugin in $(echo $CVMFS_CACHE_PLUGIN | tr : " "); do
     if [ -x $plugin ]; then
-      echo "running unit tests for cache plugin $plugin"
+      # Use a different port for every plugin
+      CVMFS_CACHE_LOCATOR_PORT=$((CVMFS_CACHE_LOCATOR_PORT + i))
+      i=$((i + 1))
+      CVMFS_CACHE_LOCATOR=tcp=127.0.0.1:$CVMFS_CACHE_LOCATOR_PORT
+      echo "CVMFS_CACHE_PLUGIN_LOCATOR=$CVMFS_CACHE_LOCATOR" >> $CVMFS_CACHE_CONFIG
+      echo "running unit tests for cache plugin $plugin on $CVMFS_CACHE_LOCATOR"
       # All our plugins take a configuration file as a parameter
       plugin_pid="$($plugin $CVMFS_CACHE_CONFIG)"
       echo "cache plugin started as PID $plugin_pid"
