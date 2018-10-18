@@ -1,4 +1,5 @@
 2.6.0:
+  * New parameter CVMFS_CATALOG_WATERMARK to release as of $n$ pinned catalogs
   * Add support for bearer token authentication (CVM-1320)
   * New build option ENABLE_ASAN for address sanitizer
   * New libcvmfs methods for extended attribs, catalogs, and multi-threading
