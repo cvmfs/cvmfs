@@ -172,7 +172,7 @@ get_lease_path_valid(_Config) ->
     Public = <<"public">>,
     Secret = <<"secret">>,
     ok = cvmfs_lease:request_lease(U, P, Public, Secret),
-    {ok, <<"path">>} = cvmfs_lease:get_lease_path(Public).
+    {ok, <<"path/">>} = cvmfs_lease:get_lease_path(Public).
 
 get_lease_path_expired(Config) ->
     U = <<"user">>,
