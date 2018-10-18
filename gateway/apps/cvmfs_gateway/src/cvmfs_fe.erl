@@ -8,10 +8,7 @@
 
 -module(cvmfs_fe).
 
--export([start_link/1, api_version/0]).
-
--define(API_VERSION, 1).
--define(API_ROOT, "/api/v" ++ integer_to_list(?API_VERSION)).
+-export([start_link/1]).
 
 
 %%--------------------------------------------------------------------
@@ -25,10 +22,10 @@ start_link([TcpPort]) ->
     %% to a set of handler modules. The handler modules implement the init/2 callback
     %% required by Cowboy
     Dispatch = cowboy_router:compile([{'_', [
-                                             {?API_ROOT, cvmfs_root_handler, []},
-                                             {?API_ROOT ++ "/repos/[:id]", cvmfs_repos_handler, []},
-                                             {?API_ROOT ++ "/leases/[:token]", cvmfs_leases_handler, []},
-                                             {?API_ROOT ++ "/payloads/[:id]", cvmfs_payloads_handler, []}
+                                             {cvmfs_version:api_root(), cvmfs_root_handler, []},
+                                             {cvmfs_version:api_root() ++ "/repos/[:id]", cvmfs_repos_handler, []},
+                                             {cvmfs_version:api_root() ++ "/leases/[:token]", cvmfs_leases_handler, []},
+                                             {cvmfs_version:api_root() ++ "/payloads/[:id]", cvmfs_payloads_handler, []}
                                             ]}]),
     %% Start the HTTP listener process configured with the routing table
     cowboy:start_clear(cvmfs_fe,
@@ -37,7 +34,3 @@ start_link([TcpPort]) ->
                          idle_timeout => cvmfs_app_util:get_max_lease_time(),
                          inactivity_timeout => cvmfs_app_util:get_max_lease_time()}).
 
-
--spec api_version() -> integer().
-api_version() ->
-    ?API_VERSION.

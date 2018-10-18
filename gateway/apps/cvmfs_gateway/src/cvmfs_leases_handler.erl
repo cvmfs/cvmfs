@@ -141,7 +141,7 @@ p_handle_new_lease(Req0, State, Uid) ->
                                 #{<<"path">> := Path, <<"api_version">> := ClientApiVersion} ->
                                     Rep = case p_check_hmac(Uid, Data, KeyId, ClientHMAC) of
                                         true ->
-                                            p_new_lease(Uid, KeyId, Path, binary_to_integer(ClientApiVersion));
+                                            p_new_lease(Uid, KeyId, Path, p_to_integer(ClientApiVersion));
                                         false ->
                                             #{<<"status">> => <<"error">>,
                                               <<"reason">> => <<"invalid_hmac">>}
@@ -245,14 +245,28 @@ p_check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) ->
 
 
 p_new_lease(Uid, KeyId, Path, ClientApiVersion) ->
-    case cvmfs_be:new_lease(Uid, KeyId, Path) of
-        {ok, Token} ->
-            #{<<"status">> => <<"ok">>,
-              <<"session_token">> => Token,
-              <<"max_api_version">> => integer_to_binary(erlang:min(cvmfs_fe:api_version(),
-                                                                    ClientApiVersion))};
-        {path_busy, Time} ->
-            #{<<"status">> => <<"path_busy">>, <<"time_remaining">> => Time};
-        {error, Reason} ->
-            #{<<"status">> => <<"error">>, <<"reason">> => atom_to_binary(Reason, latin1)}
+    case ClientApiVersion >= cvmfs_version:min_api_version() of
+        true ->
+            case cvmfs_be:new_lease(Uid, KeyId, Path) of
+                {ok, Token} ->
+                    #{<<"status">> => <<"ok">>,
+                      <<"session_token">> => Token,
+                      <<"max_api_version">> => integer_to_binary(erlang:min(cvmfs_version:api_version(),
+                                                                            ClientApiVersion))};
+                {path_busy, Time} ->
+                    #{<<"status">> => <<"path_busy">>, <<"time_remaining">> => Time};
+                {error, Reason} ->
+                    #{<<"status">> => <<"error">>, <<"reason">> => atom_to_binary(Reason, latin1)}
+            end;
+        false ->
+            Msg = "incompatible version: " ++ integer_to_list(ClientApiVersion)
+                  ++ ", min version: " ++ integer_to_list(cvmfs_version:min_api_version()),
+            #{<<"status">> => <<"error">>, <<"error">> => list_to_binary(Msg)}
     end.
+
+
+p_to_integer(V) when is_binary(V) ->
+    binary_to_integer(V);
+p_to_integer(V) when is_integer(V) ->
+    V.
+
