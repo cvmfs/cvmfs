@@ -1157,6 +1157,8 @@ TEST_F(T_Util, HasPrefix) {
   EXPECT_TRUE(HasPrefix("hasprefix", "HAs", true));
   EXPECT_TRUE(HasPrefix("HAsprefix", "HAs", true));
   EXPECT_TRUE(HasPrefix("HAsprefix", "", true));
+  EXPECT_TRUE(HasPrefix("", "", false));
+  EXPECT_TRUE(HasPrefix("X", "X", false));
 }
 
 TEST_F(T_Util, SplitString) {
@@ -1744,4 +1746,13 @@ TEST_F(T_Util, GetAbsolutePath) {
   EXPECT_FALSE(FileExists(GetAbsolutePath("xxx")));
   CreateFile("xxx", 0600, ignore_failure);
   EXPECT_TRUE(FileExists(GetAbsolutePath("xxx")));
+}
+
+TEST_F(T_Util, DiffTree) {
+  MkdirDeep("./subdir", 0600);
+  MkdirDeep("./subdir2", 0600);
+  CreateFile("./file", 0600);
+  EXPECT_TRUE(DiffTree(".", "."));
+  EXPECT_TRUE(DiffTree("./.", "."));
+  EXPECT_FALSE(DiffTree(".", "/"));
 }

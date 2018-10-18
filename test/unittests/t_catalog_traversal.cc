@@ -55,6 +55,7 @@ class T_CatalogTraversal : public ::testing::Test {
 
  protected:
   void SetUp() {
+    MockCatalog::ResetGlobalState();
     dice_.InitLocaltime();
     SetupDummyCatalogs();
     EXPECT_EQ(initial_catalog_instances, MockCatalog::instances);

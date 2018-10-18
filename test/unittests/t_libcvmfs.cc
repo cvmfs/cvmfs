@@ -276,47 +276,50 @@ TEST_F(T_Libcvmfs, Templating) {
   cvmfs_options_fini(opts);
 }
 
+namespace {
 // Create some default hashes for DirSpec
-const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
-                        "26ab0db90d72e28ad0ba1e22ee510510000000",
-                        "6d7fce9fee471194aa8b5b6e47267f03000000",
-                        "48a24b70a0b376535542b996af517398000000",
-                        "1dcca23355272056f04fe8bf20edfce0000000",
-                        "11111111111111111111111111111111111111"};
+const char* g_hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
+                         "26ab0db90d72e28ad0ba1e22ee510510000000",
+                         "6d7fce9fee471194aa8b5b6e47267f03000000",
+                         "48a24b70a0b376535542b996af517398000000",
+                         "1dcca23355272056f04fe8bf20edfce0000000",
+                         "11111111111111111111111111111111111111"};
 
-const off_t file_size = 4096;
+const size_t g_file_size = 4096;
+}  // anonymous namespace
 
 // Create directory specification for later repositories
 DirSpec MakeBaseSpec() {
   DirSpec spec;
 
   // adding "/dir"
-  EXPECT_TRUE(spec.AddDirectory("dir", "", file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir", "", g_file_size));
 
   // adding "/dir/file1"
-  EXPECT_TRUE(spec.AddFile("file1", "dir", hashes[0], file_size));
+  EXPECT_TRUE(spec.AddFile("file1", "dir", g_hashes[0], g_file_size));
 
   // adding "/dir/dir"
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir", file_size));
-  EXPECT_TRUE(spec.AddDirectory("dir2", "dir", file_size));
-  EXPECT_TRUE(spec.AddDirectory("dir3", "dir", file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir",  "dir", g_file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir2", "dir", g_file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir3", "dir", g_file_size));
 
   // adding "/file3"
-  EXPECT_TRUE(spec.AddFile("file3", "", hashes[2], file_size));
+  EXPECT_TRUE(spec.AddFile("file3", "", g_hashes[2], g_file_size));
 
   // adding "/dir/dir/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir", hashes[1], file_size));
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir", g_hashes[1], g_file_size));
 
   // adding "/dir/dir2/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir2", hashes[3], file_size));
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir2", g_hashes[3], g_file_size));
 
   // adding "/dir/dir3/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir3", hashes[4], file_size));
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir3", g_hashes[4], g_file_size));
 
   // Adding Deeply nested catalog
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir", file_size));
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir/dir", file_size));
-  EXPECT_TRUE(spec.AddFile("file1",  "dir/dir/dir/dir", hashes[0], file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir", g_file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir/dir", g_file_size));
+  EXPECT_TRUE(
+    spec.AddFile("file1",  "dir/dir/dir/dir", g_hashes[0], g_file_size));
 
   return spec;
 }
@@ -390,7 +393,7 @@ TEST_F(T_Libcvmfs, Attr) {
 
   // Create file structure
   DirSpec spec = MakeBaseSpec();
-  EXPECT_TRUE(spec.LinkFile("link", "dir", "file1", file_size));
+  EXPECT_TRUE(spec.LinkFile("link", "dir", "file1", g_file_size));
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
 
   // Find directory entry for use later
@@ -435,7 +438,7 @@ TEST_F(T_Libcvmfs, Attr) {
   // Compare hash and size
   EXPECT_STREQ(file1_hash, attr->cvm_checksum);
   // Verify the file size
-  EXPECT_EQ(file_size, attr->st_size);
+  EXPECT_EQ(static_cast<int>(g_file_size), attr->st_size);
   EXPECT_EQ(NULL, attr->cvm_xattrs);
   cvmfs_attr_free(attr);
 

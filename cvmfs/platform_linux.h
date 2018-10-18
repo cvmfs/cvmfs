@@ -308,15 +308,14 @@ inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".so";
 }
 
-inline const char *platform_getexepath() {
-  static char buf[PATH_MAX] = {0};
-  if (strlen(buf) == 0) {
-    int ret = readlink("/proc/self/exe", buf, PATH_MAX);
-    if (ret > 0 && ret < static_cast<int>(PATH_MAX)) {
-      buf[ret] = 0;
-    }
+inline std::string platform_getexepath() {
+  char buf[PATH_MAX + 1];
+  int ret = readlink("/proc/self/exe", buf, PATH_MAX);
+  if (ret > 0) {
+    buf[ret] = '\0';
+    return std::string(buf);
   }
-  return buf;
+  return "";
 }
 
 inline uint64_t platform_monotonic_time() {

@@ -1,0 +1,98 @@
+cvmfs_test_name="shrinkwrap"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST081_SHRINKWRAP_DEST=
+CVMFS_TEST081_REPO=
+
+cleanup() {
+    echo "*** [Cleanup]"
+    sudo rm -f /tmp/cvmfs-$CVMFS_TEST081_REPO.trace.log 2> /dev/null
+    sudo rm -f /tmp/cvmfs-$CVMFS_TEST081_REPO.spec.txt  2> /dev/null
+
+    sudo rm -rf $CVMFS_TEST081_SHRINKWRAP_DEST 2> /dev/null
+    sudo rm -rf /var/lib/cvmfs/shrinkwrap 2> /dev/null
+}
+
+cvmfs_run_test() {
+    logfile=$1
+    local test_location=$2
+    CVMFS_TEST081_SHRINKWRAP_DEST="$PWD/shrinkwrap-base"
+
+    local repo="sft.cern.ch"
+    CVMFS_TEST081_REPO=$repo
+    echo "*** Setup..."
+    cleanup
+    trap cleanup HUP EXIT TERM INT || return 4
+
+    echo "*** Mounting test repository..."
+    cvmfs_mount $repo "GLITE_VERSION=util" \
+      "CVMFS_TRACEFILE=/tmp/cvmfs-@fqrn@.trace.log" \
+      "CVMFS_TRACEBUFFER=4096" \
+      "CVMFS_TRACEBUFFER_THRESHOLD=2048"
+
+    echo "Checking trace log creation..."
+    sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
+
+    if [ ! -f /tmp/cvmfs-$repo.trace.log ]; then
+        echo "*** ERROR: Trace file was not created"
+        return 2
+    fi
+
+    sudo truncate -s0 /tmp/cvmfs-$repo.trace.log
+
+    echo "*** Executing a few operations to check tracing..."
+    for f in $(find /cvmfs/$repo -type f | head -n 3); do
+      cat $f > /dev/null
+    done
+    sudo cvmfs_talk -i $repo tracebuffer flush
+    sudo cat /tmp/cvmfs-$repo.trace.log
+
+    echo "*** Creating specification file..."
+    sudo python /usr/libexec/cvmfs/shrinkwrap/spec_builder.py \
+      --policy=exact \
+      --filters=opendir \
+      /tmp/cvmfs-$repo.trace.log \
+      /tmp/cvmfs-$repo.spec.txt
+    [ $? -eq 0 ] || return 3
+    cat /tmp/cvmfs-$repo.spec.txt
+    echo
+
+    echo "*** Creating shrinkwrapped repository..."
+    sudo cvmfs_shrinkwrap --repo $repo \
+      --src-config "$test_location/$repo.config" \
+      --spec-file /tmp/cvmfs-$repo.spec.txt \
+      --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
+    [ $? -eq 0 ] || return 4
+
+    # This verifies the file exists, but was not part of the spec.
+    # Used later to verify the creation and mount were successful.
+    ls /cvmfs/sft.cern.ch/.cvmfsdirtab
+    [ $? -eq 0 ] || return 5
+
+    echo "*** Lookup shrinkwrapped files ($CVMFS_TEST081_SHRINKWRAP_DEST)..."
+    ls -la $CVMFS_TEST081_SHRINKWRAP_DEST/$repo
+    local nfiles=$(find $CVMFS_TEST081_SHRINKWRAP_DEST/$repo -type f | wc -l)
+    # The 3 shrinkwrapped files plus the "do not modify" file
+    if [ $nfiles -ne 4 ]; then
+      find $CVMFS_TEST081_SHRINKWRAP_DEST/$repo -type f
+      return 10
+    fi
+    sudo stat $CVMFS_TEST081_SHRINKWRAP_DEST/.data || return 11
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/.provenance || return 12
+
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/.cvmfsdirtab
+    [ $? -ne 0 ] || return 20
+
+    echo "*** Update destination..."
+    echo | sudo tee -a /tmp/cvmfs-$repo.spec.txt
+    echo "^/.cvmfsdirtab" | sudo tee -a /tmp/cvmfs-$repo.spec.txt
+    sudo cvmfs_shrinkwrap --repo $repo \
+      --src-config "$test_location/$repo.config" \
+      --spec-file /tmp/cvmfs-$repo.spec.txt \
+      --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
+    [ $? -eq 0 ] || return 30
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/.cvmfsdirtab || return 31
+
+    return 0
+}
+

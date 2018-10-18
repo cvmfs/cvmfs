@@ -10,7 +10,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/common.sh
 
 usage() {
-  echo "Usage: $0 [-q only quick tests] [-l preload library path] \\"
+  echo "Usage: $0 [-q only quick tests] [-s shrinkwrap test binary]\\"
   echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
@@ -18,23 +18,27 @@ usage() {
 }
 
 CVMFS_UNITTESTS_QUICK=0
-CVMFS_LIBRARY_PATH=
+CVMFS_SHRINKWRAP_TEST_BINARY=
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
 
-while getopts "ql:c:g:" option; do
+while getopts "qc:g:s:l:" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
-    ;;
-    l)
-      CVMFS_LIBRARY_PATH=$OPTARG
     ;;
     c)
       CVMFS_CACHE_PLUGIN=$OPTARG
     ;;
     g)
       CVMFS_GEOAPI_SOURCES=$OPTARG
+    ;;
+    s)
+      CVMFS_SHRINKWRAP_TEST_BINARY=$OPTARG
+    ;;
+    l)
+      # Preloading a library now unused
+      :
     ;;
     ?)
       usage
@@ -49,18 +53,6 @@ fi
 
 CVMFS_UNITTESTS_BINARY=$1
 CVMFS_UNITTESTS_RESULT_LOCATION=$2
-
-# configure manual library path if needed
-if [ ! -z $CVMFS_LIBRARY_PATH ]; then
-  echo "using custom library path: '$CVMFS_LIBRARY_PATH'"
-  if is_linux; then
-    export LD_LIBRARY_PATH="$CVMFS_LIBRARY_PATH"
-  elif is_macos; then
-    export DYLD_LIBRARY_PATH="$CVMFS_LIBRARY_PATH"
-  else
-    die "who am i on? $(uname -a)"
-  fi
-fi
 
 # check if only a quick subset of the unittests should be run
 test_filter='-'
@@ -97,6 +89,14 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
     fi
   done
   rm -f $CVMFS_CACHE_CONFIG
+fi
+
+# run the shrinkwrap tests
+if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
+  echo "running shrinkwrap tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
+  $CVMFS_SHRINKWRAP_TEST_BINARY --gtest_shuffle                                     \
+    --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.shrinkwrap \
+    --gtest_filter=$test_filter
 fi
 
 # run the unit tests
