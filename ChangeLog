@@ -1,4 +1,5 @@
 0.3.1:
+  * Updated DEB: Debian/Ubuntu package depends on cvmfs-server
   * Updated RPM: depends on cvmfs-server, modified config files are kept,
     adds an init.d script for SLC6, and other fixes (CVM-1615)
   * Fix bug allowing conflicting leases to be acquired (CVM-1642)
