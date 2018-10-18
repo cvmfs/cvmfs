@@ -35,6 +35,7 @@ fpm -s tar \
     -t deb \
     --prefix /usr/libexec/cvmfs-gateway \
     --package DEBS/$PACKAGE_NAME \
+    --depends 'cvmfs-server > 2.5.0'
     --version $VERSION \
     --name cvmfs-gateway \
     --maintainer "Radu Popescu <radu.popescu@cern.ch>" \
