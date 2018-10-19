@@ -747,6 +747,9 @@ close_transaction() {
   run_suid_helper rw_mount $name
   release_lock "$tx_lock"
 
+  # Remove session_token file, used for gateway transactions, if it exists
+  rm -f ${CVMFS_SPOOL_DIR}/session_token
+
   local fallback_msg=""
   [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
   to_syslog_for_repo $name "closed transaction $fallback_msg $async_msg"

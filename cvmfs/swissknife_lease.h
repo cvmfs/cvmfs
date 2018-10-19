@@ -32,7 +32,6 @@ class CommandLease : public Command {
     std::string action;
     std::string key_file;
     std::string lease_path;
-    std::string token_file_suffix;
   };
 };
 
