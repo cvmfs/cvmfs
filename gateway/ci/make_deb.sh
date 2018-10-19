@@ -47,7 +47,7 @@ cp -v ${BUILD_LOCATION}/scripts/cvmfs-gateway.service \
 
 pushd $WORKSPACE
 fpm -s dir -t deb \
-    --package ${BUILD_LOCATION}/DEBS/$PACKAGE_NAME \
+    --package ../DEBS/$PACKAGE_NAME \
     --version $VERSION \
     --name cvmfs-gateway \
     --maintainer "Radu Popescu <radu.popescu@cern.ch>" \
