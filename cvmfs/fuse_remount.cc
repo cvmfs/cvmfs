@@ -123,26 +123,25 @@ void FuseRemounter::EnterMaintenanceMode() {
   invalidator_handle_.WaitFor();
 }
 
-
-FuseRemounter::FuseRemounter(
-  MountPoint *mountpoint,
-  cvmfs::InodeGenerationInfo *inode_generation_info,
-  struct fuse_chan **fuse_channel)
-  : mountpoint_(mountpoint)
-  , inode_generation_info_(inode_generation_info)
-  , invalidator_(new FuseInvalidator(mountpoint->inode_tracker(), fuse_channel))
-  , invalidator_handle_(mountpoint->kcache_timeout_sec())
-  , fence_(new Fence())
-  , offline_mode_(false)
-  , catalogs_valid_until_(MountPoint::kIndefiniteDeadline)
-{
+FuseRemounter::FuseRemounter(MountPoint *mountpoint,
+                             cvmfs::InodeGenerationInfo *inode_generation_info,
+                             struct fuse_chan **fuse_channel,
+                             bool use_fuse_notify_invalidation)
+    : mountpoint_(mountpoint),
+      inode_generation_info_(inode_generation_info),
+      invalidator_(new FuseInvalidator(mountpoint->inode_tracker(),
+                                       fuse_channel,
+                                       use_fuse_notify_invalidation)),
+      invalidator_handle_(mountpoint->kcache_timeout_sec()),
+      fence_(new Fence()),
+      offline_mode_(false),
+      catalogs_valid_until_(MountPoint::kIndefiniteDeadline) {
   memset(&thread_remount_trigger_, 0, sizeof(thread_remount_trigger_));
   pipe_remount_trigger_[0] = pipe_remount_trigger_[1] = -1;
   atomic_init32(&drainout_mode_);
   atomic_init32(&maintenance_mode_);
   atomic_init32(&critical_section_);
 }
-
 
 FuseRemounter::~FuseRemounter() {
   if (HasRemountTrigger()) {
