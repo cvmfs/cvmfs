@@ -1,4 +1,5 @@
 2.5.2:
+  * Session tokens for gateway transactions are deleted after use (CVM-1643)
   * Automatically apply lease path to abort and publish commands (CVM-1601)
   * Add retry support for `cvmfs_server transaction` (CVM-1611)
   * New S3 config parameter CVMFS_S3_DNS_BUCKETS=false disables DNS-style
