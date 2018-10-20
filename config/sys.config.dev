@@ -1,10 +1,7 @@
 [
  {lager, [{log_root, "/tmp"},
           {crash_log, "crash.log"},
-          {handlers, [{lager_console_backend, [{level, debug}]},
-                      {lager_syslog_backend, ["cvmfs_gateway", local1, debug]}]},
-          {extra_sinks, [{error_logger_lager_event, [{handlers, [{lager_syslog_backend,
-                                                                  ["erlang_error_logger", local1, info]}]}]}]}]},
+          {handlers, [{lager_console_backend, [{level, debug}]}]}]},
 
  {mnesia, [{schema_location, disc}]},
 
@@ -15,6 +12,6 @@
                                        cvmfs_receiver_pool,
                                        cvmfs_fast_receiver_pool,
                                        cvmfs_commit_sup]},
-                   {repo_config, {file, "./config/ct_repo.json"}},
-                   {user_config, {file, "./config/ct_user.json"}}]}
+                   {repo_config, {file, "/etc/cvmfs/gateway/repo.json"}},
+                   {user_config, {file, "/etc/cvmfs/gateway/user.json"}}]}
 ].
