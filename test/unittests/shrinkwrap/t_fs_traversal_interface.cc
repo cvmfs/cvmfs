@@ -585,7 +585,9 @@ TEST_P(T_FsInterface, LinkUnlink) {
   EXPECT_EQ(ENOENT, errno);
   EXPECT_EQ(-1, fs_instance_->interface->do_unlink(
     context_, "/LinkUnlink-bar/foobar/foobar"));
+#ifndef __APPLE__
   EXPECT_EQ(EISDIR, errno);
+#endif
 }
 
 
