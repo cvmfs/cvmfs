@@ -107,7 +107,7 @@ int PosixSetMeta(const char *path,
     {stat_info->mtime, 0},
     {stat_info->mtime, 0}
   };
-  res = utimes(path, times);
+  res = lutimes(path, times);
   if (res != 0) return -1;
 #endif
   return 0;
