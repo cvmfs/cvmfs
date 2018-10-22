@@ -901,6 +901,10 @@ class RemoveTreeHelper {
     if (retval != 0)
       success = false;
   }
+  bool TryRemoveDir(const std::string &parent_path, const std::string &name) {
+    int retval = rmdir((parent_path + "/" + name).c_str());
+    return (retval != 0);
+  }
 };
 
 
@@ -923,6 +927,7 @@ bool RemoveTree(const std::string &path) {
   traversal.fn_new_socket = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_fifo = &RemoveTreeHelper::RemoveFile;
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
+  traversal.fn_new_dir_prefix = &RemoveTreeHelper::TryRemoveDir;
   traversal.Recurse(path);
   bool result = remove_tree_helper->success;
   delete remove_tree_helper;
