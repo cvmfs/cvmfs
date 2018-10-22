@@ -1817,7 +1817,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   bool use_fuse_notify_invalidation = true;
   std::string buf;
-  if (cvmfs::options_mgr_->GetValue("CVMFS_USE_FUSE_NOTIFY_INVALIDATION",
+  if (cvmfs::options_mgr_->GetValue("CVMFS_FUSE_NOTIFY_INVALIDATION",
                                     &buf)) {
     if (buf == "false") {
       use_fuse_notify_invalidation = false;
