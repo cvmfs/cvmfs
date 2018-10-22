@@ -3,6 +3,9 @@
  */
 #include "helpers.h"
 
+#ifdef __GLIBC__
+#include <gnu/libc-version.h>
+#endif
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -21,6 +24,17 @@
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "util/posix.h"
 #include "xattr.h"
+
+#ifdef __GLIBC__
+  #if __GLIBC_MINOR__ < 6
+    #warning No lutimes support, glibc >= 2.6 required
+  #else
+    #define CVMFS_HAS_LUTIMES 1
+  #endif
+#else
+  #define CVMFS_HAS_LUTIMES 1
+#endif
+
 
 void InitialFsOperations(struct fs_traversal_context *ctx) {
   InitializeDataDirectory(ctx);
@@ -88,12 +102,14 @@ int PosixSetMeta(const char *path,
       }
     }
   }
+#ifdef CVMFS_HAS_LUTIMES
   const struct timeval times[2] = {
     {stat_info->mtime, 0},
     {stat_info->mtime, 0}
   };
-  res = lutimes(path, times);
+  res = utimes(path, times);
   if (res != 0) return -1;
+#endif
   return 0;
 }
 
