@@ -196,7 +196,9 @@ TEST_F(T_FsPosix, TouchLinkUnlink) {
   EXPECT_EQ(-1, interface_->do_unlink(interface_->context_, "/foo.txt"));
   EXPECT_EQ(ENOENT, errno);
   EXPECT_EQ(-1, interface_->do_unlink(interface_->context_, "/def"));
+#ifndef __APPLE__
   EXPECT_EQ(EISDIR, errno);
+#endif
 
   // Check if link produces actual hardlink (same inode)
   EXPECT_EQ(0, interface_->touch(interface_->context_, stat));
@@ -277,7 +279,7 @@ TEST_F(T_FsPosix, ReadWrite) {
   EXPECT_EQ(0, interface_->do_fclose(handle));
 
   // Read (check) and append with posix (content should be foo)
-  fd = fopen(path.c_str(), "a+");
+  fd = fopen(path.c_str(), "r+");
   EXPECT_EQ(3U, fread(buf1, sizeof(char), 3, fd));
   buf1[3] = '\0';
   EXPECT_STREQ("foo", buf1);
