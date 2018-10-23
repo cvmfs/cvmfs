@@ -16,7 +16,8 @@
 void PosixCheckDirStructure(
   std::string cur_path,
   mode_t mode,
-  unsigned int depth = 1) {
+  unsigned depth = 1)
+{
   std::string max_dir_name = std::string(kDigitsPerDirLevel, 'f');
   // Build current base path
   if (depth == 1) {

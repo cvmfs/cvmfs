@@ -351,7 +351,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 
 
   static int ram_abort_txn(uint64_t txn_id) {
-    ObjectHeader *txn_object;
+    ObjectHeader *txn_object = NULL;
     int retval = Me()->transactions_.Lookup(txn_id, &txn_object);
     assert(retval);
     Me()->transactions_.Erase(txn_id);

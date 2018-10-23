@@ -131,7 +131,7 @@ FuseRemounter::FuseRemounter(
   : mountpoint_(mountpoint)
   , inode_generation_info_(inode_generation_info)
   , invalidator_(new FuseInvalidator(mountpoint->inode_tracker(), fuse_channel))
-  , invalidator_handle_(mountpoint->kcache_timeout_sec())
+  , invalidator_handle_(static_cast<int>(mountpoint->kcache_timeout_sec()))
   , fence_(new Fence())
   , offline_mode_(false)
   , catalogs_valid_until_(MountPoint::kIndefiniteDeadline)

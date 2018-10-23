@@ -63,6 +63,7 @@ class WebReply {
  */
 class UriHandler {
  public:
+  virtual ~UriHandler() { }
   virtual void OnRequest(const struct mg_request_info *req_info,
                          struct mg_connection *conn) = 0;
 };
