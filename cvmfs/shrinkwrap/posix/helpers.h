@@ -18,8 +18,8 @@
 #define POSIX_GC_STAT_FILES_REMOVED "Files removed"
 #define POSIX_GC_STAT_BYTES_REMOVED "Bytes removed"
 
-const char kDirLevels = 2;
-const char kDigitsPerDirLevel = 2;
+const unsigned kDirLevels = 2;
+const unsigned kDigitsPerDirLevel = 2;
 
 struct fs_traversal_posix_context {
   int num_threads;

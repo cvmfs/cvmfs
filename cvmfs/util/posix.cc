@@ -4,7 +4,9 @@
  * Some common functions.
  */
 
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 #include "cvmfs_config.h"
 #include "posix.h"
@@ -1494,7 +1496,7 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
       sum_written_blocks += iov[iov_idx].iov_len;
       iov_idx++;
       if (iov_idx == iovcnt) {
-        assert(sum_written_blocks == retval);
+        assert(sum_written_blocks == static_cast<size_t>(retval));
         return true;
       }
     }
