@@ -9,8 +9,9 @@
 #include "cvmfs_config.h"
 #include "uri_map.h"
 
+#include <inttypes.h>
+
 #include <cassert>
-#include <cinttypes>
 
 using namespace std;  // NOLINT
 
