@@ -1819,7 +1819,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   std::string buf;
   if (cvmfs::options_mgr_->GetValue("CVMFS_FUSE_NOTIFY_INVALIDATION",
                                     &buf)) {
-    if (buf == "false") {
+    if (!cvmfs::options_mgr_->IsOn(buf)) {
       use_fuse_notify_invalidation = false;
     }
   }
