@@ -512,9 +512,9 @@ get_item() {
   load_repo_config $name
 
   if [ x"$noproxy" != x"" ]; then
-    unset http_proxy && curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
+    unset http_proxy && curl -f $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
   else
-    curl $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
+    curl -f $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
   fi
 }
 
@@ -746,6 +746,9 @@ close_transaction() {
   run_suid_helper rdonly_mount $name > /dev/null
   run_suid_helper rw_mount $name
   release_lock "$tx_lock"
+
+  # Remove session_token file, used for gateway transactions, if it exists
+  rm -f ${CVMFS_SPOOL_DIR}/session_token
 
   local fallback_msg=""
   [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"

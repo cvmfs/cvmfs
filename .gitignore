@@ -1,4 +1,5 @@
 test/test.log
+test/mylog
 *.DS_Store
 *._.DS_Store
 ._*
@@ -28,28 +29,3 @@ externals/build_*/
 externals/.decompressionDone
 externals_build
 externals_install
-
-# CMake stuff
-cvmfs_config.h
-CMakeCache.txt
-CMakeFiles/
-CPackConfig.cmake
-CPackSourceConfig.cmake
-CTestTestfile.cmake
-cmake_install.cmake
-cvmfs/cmake_install.cmake
-mount/cmake_install.cmake
-test/unittests/CTestTestfile.cmake
-test/unittests/cmake_install.cmake
-cvmfs/Makefile
-mount/Makefile
-test/unittests/Makefile
-
-# Outputs
-cvmfs/*.dylib
-cvmfs/cvmfs2
-cvmfs/cvmfs_fsck
-cvmfs/cvmfs_suid_helper
-cvmfs/cvmfs_swissknife
-mount/mount_cvmfs
-test/unittests/cvmfs_unittests

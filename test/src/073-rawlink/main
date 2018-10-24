@@ -1,11 +1,17 @@
 
 cvmfs_test_name="Getting rawlink extended attribute"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount cms.cern.ch || return 1
-  local rawlink="$(sudo attr -Rqg rawlink /cvmfs/cms.cern.ch/SITECONF/local)"
+  local rawlink=
+  if running_on_osx; then
+    rawlink="$(xattr -sp user.rawlink /cvmfs/cms.cern.ch/SITECONF/local)"
+  else
+    rawlink="$(sudo attr -Rqg rawlink /cvmfs/cms.cern.ch/SITECONF/local)"
+  fi
   echo "*** rawlink is $rawlink"
   if [ "x$rawlink" != 'x$(CMS_LOCAL_SITE)' ]; then
     return 2

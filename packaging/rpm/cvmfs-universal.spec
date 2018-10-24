@@ -187,6 +187,13 @@ Conflicts: cvmfs-server < 2.1
 %description server
 CernVM-FS tools to maintain Stratum 0/1 repositories
 
+%package shrinkwrap
+Summary: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
+Group: Application/System
+%description shrinkwrap
+CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container
+images.
+
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
@@ -220,13 +227,28 @@ export CXXFLAGS="$CXXFLAGS -O0"
 %endif
 
 %if 0%{?suse_version}
-cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
+cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
+  -DBUILD_SERVER=yes \
+  -DBUILD_SERVER_DEBUG=yes \
+  -DBUILD_LIBCVMFS=yes \
+  -DBUILD_LIBCVMFS_CACHE=yes \
+  -DBUILD_SHRINKWRAP=yes \
+  -DBUILD_UNITTESTS=yes \
+  -DINSTALL_UNITTESTS=yes \
+  -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
 EXTRA_CMAKE_OPTS=""
 %if 0%{?el5} || 0%{?el4}
 EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
 %endif
-%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
+%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
+  -DBUILD_SERVER=yes \
+  -DBUILD_SERVER_DEBUG=yes \
+  -DBUILD_LIBCVMFS=yes \
+  -DBUILD_LIBCVMFS_CACHE=yes \
+  -DBUILD_SHRINKWRAP=yes \
+  -DBUILD_UNITTESTS=yes \
+  -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
 %endif
 
 make %{?_smp_mflags}
@@ -475,13 +497,22 @@ fi
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
 
+%files shrinkwrap
+%defattr(-,root,root)
+%{_bindir}/cvmfs_shrinkwrap
+/usr/libexec/cvmfs/shrinkwrap/spec_builder.py*
+%doc COPYING AUTHORS README.md ChangeLog
+
 %files unittests
 %defattr(-,root,root)
 %{_bindir}/cvmfs_unittests
 %{_bindir}/cvmfs_test_cache
+%{_bindir}/cvmfs_test_shrinkwrap
 %doc COPYING AUTHORS README.md ChangeLog
 
 %changelog
+* Wed Sep 26 2018 Jakob Blomer <jblomer@cern.ch> - 2.6.0
+- Add shrinkwrap sub package
 * Tue Aug 07 2018 Dave Dykstra <dwd@fnal.gov> - 2.5.1
 - Add python-setuptools build requirement, and disable building geoapi
   on el4 & el5

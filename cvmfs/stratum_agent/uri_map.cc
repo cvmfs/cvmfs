@@ -2,8 +2,14 @@
  * This file is part of the CernVM File System
  */
 
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include "cvmfs_config.h"
 #include "uri_map.h"
+
+#include <inttypes.h>
 
 #include <cassert>
 
@@ -41,7 +47,7 @@ void WebReply::Send(Code code, const string &msg, struct mg_connection *conn) {
   mg_printf(conn,
             "%s"
             "Content-Type: text/plain\r\n"
-            "Content-Length: %lu\r\n"
+            "Content-Length: %" PRIuPTR "\r\n"
             "\r\n"
             "%s", header.c_str(), msg.length(), msg.c_str());
 }

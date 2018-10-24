@@ -1,5 +1,6 @@
 cvmfs_test_name="HTTP headers for cache expiry"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 get_header() {
   local url="$1"
@@ -18,7 +19,14 @@ get_epoch() {
 
 get_expiry_time() {
   local url="$1"
-  get_epoch "$(get_header $url 'Expires')"
+  local expires="$(get_header $url 'Expires')"
+  if [ "x$expires" != x ]; then
+    get_epoch "$(get_header $url 'Expires')"
+  else
+    # S3 doesn't send the expiry header
+    local maxage="$(get_max_age $url)"
+    echo "$(($(get_epoch now) + $maxage))"
+  fi
 }
 
 get_max_age() {
@@ -57,8 +65,8 @@ cvmfs_run_test() {
   local xcvmfs_maxage=61      # 61 seconds
   local default_maxage=259200 # 3 days
 
-  echo "check HTTP headers for .cvmfspublished"
   local murl="${url}/.cvmfspublished"
+  echo "check HTTP headers for .cvmfspublished [$murl]"
   [ $(get_epoch "1 minutes") -lt $(get_expiry_time $murl) ] || return  2
   [ $(get_epoch "3 minutes") -gt $(get_expiry_time $murl) ] || return  3
   [ $(get_max_age $murl)     -eq $xcvmfs_maxage           ] || return  4
@@ -175,23 +183,25 @@ cvmfs_run_test() {
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-  url=$(get_repo_url info)
-  local jsontype="application/json"
-  local jsonmaxage=61
+  if ! running_on_s3; then
+    url=$(get_repo_url info)
+    local jsontype="application/json"
+    local jsonmaxage=61
 
-  echo "check HTTP headers for /cvmfs/info/v1/repositories.json"
-  local irurl="${url}/v1/repositories.json"
-  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $irurl) ] || return 60
-  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $irurl) ] || return 61
-  [ $(get_max_age $irurl)    -eq $jsonmaxage               ] || return 62
-  [ x"$(get_header $irurl "Content-Type")" = x"$jsontype"  ] || return 63
+    echo "check HTTP headers for /cvmfs/info/v1/repositories.json"
+    local irurl="${url}/v1/repositories.json"
+    [ $(get_epoch "1 minutes") -lt $(get_expiry_time $irurl) ] || return 60
+    [ $(get_epoch "3 minutes") -gt $(get_expiry_time $irurl) ] || return 61
+    [ $(get_max_age $irurl)    -eq $jsonmaxage               ] || return 62
+    [ x"$(get_header $irurl "Content-Type")" = x"$jsontype"  ] || return 63
 
-  echo "check HTTP headers for /cvmfs/info/v1/meta.json"
-  local imurl="${url}/v1/meta.json"
-  [ $(get_epoch "1 minutes") -lt $(get_expiry_time $imurl) ] || return 74
-  [ $(get_epoch "3 minutes") -gt $(get_expiry_time $imurl) ] || return 75
-  [ $(get_max_age $imurl)    -eq $jsonmaxage               ] || return 76
-  [ x"$(get_header $imurl "Content-Type")" = x"$jsontype"  ] || return 77
+    echo "check HTTP headers for /cvmfs/info/v1/meta.json"
+    local imurl="${url}/v1/meta.json"
+    [ $(get_epoch "1 minutes") -lt $(get_expiry_time $imurl) ] || return 74
+    [ $(get_epoch "3 minutes") -gt $(get_expiry_time $imurl) ] || return 75
+    [ $(get_max_age $imurl)    -eq $jsonmaxage               ] || return 76
+    [ x"$(get_header $imurl "Content-Type")" = x"$jsontype"  ] || return 77
+  fi
 
   return 0
 }

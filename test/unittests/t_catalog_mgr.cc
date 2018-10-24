@@ -32,22 +32,25 @@ class T_CatalogManager : public ::testing::Test {
    *   +-file1
    *   |
    *   +-dir
+   *   | |
+   *   | +-dir
+   *   |   |
+   *   |   +-file2
+   *   |   |
+   *   |   +-dir (NESTED CATALOG)
+   *   |     |
+   *   |     +-file3
+   *   |     |
+   *   |     +-file4
+   *   |     |
+   *   |     +-dir
+   *   |       |
+   *   |       +-dir (NESTED CATALOG)
+   *   |        |
+   *   |        +-file5
+   *   +-nested (NESTED CATALOG)
    *     |
-   *     +-dir
-   *       |
-   *       +-file2
-   *       |
-   *       +-dir (NESTED CATALOG)
-   *         |
-   *         +-file3
-   *         |
-   *         +-file4
-   *         |
-   *         +-dir
-   *           |
-   *           +-dir (NESTED CATALOG)
-   *             |
-   *             +-file5
+   *     +-file6
    *
    */
   void AddTree() {
@@ -114,8 +117,19 @@ class T_CatalogManager : public ::testing::Test {
     new_catalog_2->AddFile(hash, file_size, "/dir/dir/dir/dir/dir", "file5");
     // we haven't mounted the third catalog yet!
     ASSERT_EQ(1, catalog_mgr_.GetNumCatalogs());
+
+    MockCatalog *new_catalog_3 = new MockCatalog("/nested", shash::Any(),
+                                                 4096, 1, 0, false,
+                                                 root_catalog, NULL);
+    ASSERT_NE(static_cast<MockCatalog*>(NULL), new_catalog_3);
+    hash = shash::Any(shash::kSha1,
+                      reinterpret_cast<const unsigned char*>(hashes[6]),
+                      suffix);
+    new_catalog_3->AddFile(hash, file_size, "/nested", "file6");
+
     catalog_mgr_.RegisterNewCatalog(new_catalog);
     catalog_mgr_.RegisterNewCatalog(new_catalog_2);
+    catalog_mgr_.RegisterNewCatalog(new_catalog_3);
   }
 
  protected:
@@ -130,7 +144,8 @@ const char *T_CatalogManager::hashes[] = {
      "6d7fce9fee471194aa8b5b6e47267f03000000",
      "48a24b70a0b376535542b996af517398000000",
      "1dcca23355272056f04fe8bf20edfce0000000",
-     "11111111111111111111111111111111111111"
+     "11111111111111111111111111111111111111",
+     "11111111111111111111111111111111111000"
 };
 
 
@@ -191,6 +206,13 @@ TEST_F(T_CatalogManager, Lookup) {
                                       kLookupSole, &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+
+  // load the next catalog
+  EXPECT_FALSE(catalog_mgr_.LookupPath("/nested_not_available",
+                                       kLookupSole, &dirent));
+  EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/nested", kLookupSole, &dirent));
+  EXPECT_EQ(4, catalog_mgr_.GetNumCatalogs());
 }
 
 TEST_F(T_CatalogManager, LongLookup) {
@@ -233,6 +255,11 @@ TEST_F(T_CatalogManager, Listing) {
     reinterpret_cast<const unsigned char*>(hashes[5]), 'C');
   EXPECT_EQ(hash_nested,
     catalog_mgr_.GetNestedCatalogHash(PathString("/dir/dir/dir")));
+
+  del.clear();
+  EXPECT_TRUE(catalog_mgr_.Listing("/nested", &del));
+  EXPECT_EQ(1u, del.size());
+  EXPECT_EQ(4, catalog_mgr_.GetNumCatalogs());
 }
 
 TEST_F(T_CatalogManager, LongListing) {
@@ -296,6 +323,25 @@ TEST_F(T_CatalogManager, Remount) {
   LoadError le;
   EXPECT_EQ(kLoadNew, le = catalog_mgr_.Remount(true));
   EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
+}
+
+TEST_F(T_CatalogManager, Watermark) {
+  DirectoryEntryList ls;
+  ASSERT_TRUE(catalog_mgr_.Init());
+  EXPECT_EQ(1, catalog_mgr_.GetNumCatalogs());
+  AddTree();
+
+  catalog_mgr_.SetCatalogWatermark(2);
+  EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir", &ls));
+  EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
+
+  // Overspend budget
+  EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir", &ls));
+  EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+
+  // Now the other tree should get detached
+  EXPECT_TRUE(catalog_mgr_.Listing("/nested", &ls));
+  EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
 }
 
 }  // namespace catalog

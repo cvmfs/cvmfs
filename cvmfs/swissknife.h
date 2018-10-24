@@ -16,6 +16,7 @@
 #include "server_tool.h"
 #include "signature.h"
 #include "statistics.h"
+#include "util/shared_ptr.h"
 
 namespace download {
 class DownloadManager;
@@ -68,7 +69,7 @@ class Parameter {
 };
 
 typedef std::vector<Parameter> ParameterList;
-typedef std::map<char, std::string *> ArgumentList;
+typedef std::map<char, SharedPtr<std::string> > ArgumentList;
 
 class Command : public ServerTool {
  public:

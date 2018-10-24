@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Delete and Recreate Directory"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 produce_files_in() {
   local working_dir=$1
@@ -111,8 +112,6 @@ cvmfs_run_test() {
 
   echo "*** change exactly the same stuff in the scratch space"
   change_files_in $reference_dir || return $?
-
-#return 999
 
   echo "*** creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?

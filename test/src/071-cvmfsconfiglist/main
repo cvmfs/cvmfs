@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Check listing repositories in cvmfs_config"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1

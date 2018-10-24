@@ -1,5 +1,6 @@
 cvmfs_test_name="Local Backend File Permissions with umask"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 get_upstream_type() {
   local upstream=$1

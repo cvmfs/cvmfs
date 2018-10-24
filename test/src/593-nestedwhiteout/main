@@ -1,5 +1,6 @@
 cvmfs_test_name="Rename of Directory containing Changes"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 produce_initial_files_in() {
   local working_dir=$1

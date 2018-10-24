@@ -1,36 +1,51 @@
-List of Contributors:
-Jakob Blomer (jakob.blomer@cern.ch)
-Predrag Buncic (predrag.buncic@cern.ch)
-Rene Meusel (rene@renemeusel.de)
-Jose Molina 
+Current and Former Core Contributors:
+Jakob Blomer
 Brian Bockelman
 Dan Bradley
+Predrag Buncic
+Daniel-Florin Dosaru
 Dave Dykstra
 Sébastien Fabbro
 Simon Fayer
+Gerardo Ganis
 Manuel Giffels
+Nikola Hardi
+Nick Hazekamp
 Seppo Heikkila
-Joshua C. Randall (jcrandall@alum.mit.edu)
+René Meusel
+Jose Molina
+Simone Mosciatti
+Radu Popescu
+Joshua C. Randall
 Francesco Ruvolo
-Steve Traylen 
+Tim Shaffer
+Douglas Thain
+Samuel Teuber
+Steve Traylen
+Derek Weitzel
 Jesse Williamson
 
 Many thanks to 
 Carlos Aguado Sanchez
 Mike Anderson
 Doug Benjamin
+Enrico Bocchi
 Ian Collier
+Ben Couturier
+Carsten Burgard
 John DeStefano
-Dave Dykstra
+Tom Downes
 Alessandra Forti
 Artem Harutyunyan
 Elisa Lanciotti
 Todd Olson
 Sam Skipsey
 Ronald Starink
+Hervé Rousseau
+Dan van der Ster
+Ryan Taylor
+Ben Tovar
 Mattias Wadenstein
 Gordon Watts
-Yushu Yao 
+Yushu Yao
 Rik Yoshida
-for reporting tricky bugs and for various
-fruitful discussions!

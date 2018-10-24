@@ -1,2 +1,3 @@
 usr/bin/cvmfs_unittests
 usr/bin/cvmfs_test_cache
+usr/bin/cvmfs_test_shrinkwrap

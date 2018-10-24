@@ -118,8 +118,7 @@ int main(int argc, char *argv[]) {
 
   // load some default arguments
   swissknife::ArgumentList args;
-  string default_num_threads = "4";
-  args['n'] = &default_num_threads;
+  args['n'].Reset(new string("4"));
 
   string option_string = "u:r:k:m:x:d:n:vh";
   int c;
@@ -128,7 +127,7 @@ int main(int argc, char *argv[]) {
       swissknife::Usage();
       return 0;
     }
-    args[c] = new string(optarg);
+    args[c].Reset(new string(optarg));
   }
 
   // check all mandatory parameters are included
@@ -144,11 +143,11 @@ int main(int argc, char *argv[]) {
     string fqrn = GetFileName(*args['u']);
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: guessing fqrn from URL: %s",
              fqrn.c_str());
-    args['m'] = new string(fqrn);
+    args['m'].Reset(new string(fqrn));
   }
 
   if (args.find('x') == args.end())
-    args['x'] = new string(*args['r'] + "/txn");
+    args['x'].Reset(new string(*args['r'] + "/txn"));
 
   const string cache_directory = *args['r'];
   const string fqrn = *args['m'];
@@ -157,18 +156,18 @@ int main(int argc, char *argv[]) {
   const string dirtab_in_cache = cache_directory + "/dirtab." + fqrn;
 
   // Default network parameters: 5 seconds timeout, 2 retries
-  args['t'] = new string("5");
-  args['a'] = new string("2");
+  args['t'].Reset(new string("5"));
+  args['a'].Reset(new string("2"));
 
   // first create the alien cache
-  string *alien_cache_dir = args['r'];
-  retval = MkdirDeep(*alien_cache_dir, 0770);
+  const string& alien_cache_dir = *(args['r']);
+  retval = MkdirDeep(alien_cache_dir, 0770);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create %s",
-      alien_cache_dir->c_str());
+      alien_cache_dir.c_str());
     return 1;
   }
-  retval = MakeCacheDirectories(*alien_cache_dir, 0770);
+  retval = MakeCacheDirectories(alien_cache_dir, 0770);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create cache skeleton");
     return 1;
@@ -196,10 +195,10 @@ int main(int argc, char *argv[]) {
       reinterpret_cast<const unsigned char*>(gCernIt5PublicKey),
       sizeof(gCernIt5PublicKey), cern_pk_it5_path));
     char path_separator = ':';
-    args['k'] = new string(cern_pk_path     + path_separator +
+    args['k'].Reset(new string(cern_pk_path     + path_separator +
                            cern_pk_it1_path + path_separator +
                            cern_pk_it4_path + path_separator +
-                           cern_pk_it5_path);
+                           cern_pk_it5_path));
   }
 
   // now launch swissknife_pull
@@ -210,9 +209,9 @@ int main(int argc, char *argv[]) {
   // load the command
   if (HasDirtabChanged(dirtab, dirtab_in_cache)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: new dirtab, forced run");
-    args['z'] = NULL;  // look into existing catalogs, too
+    args['z'].Reset();  // look into existing catalogs, too
   }
-  args['c'] = NULL;
+  args['c'].Reset();
   retval = swissknife::CommandPull().Main(args);
 
   // Copy dirtab file

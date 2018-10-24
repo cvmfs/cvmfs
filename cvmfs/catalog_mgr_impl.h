@@ -31,6 +31,7 @@ AbstractCatalogManager<CatalogT>::AbstractCatalogManager(
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
   revision_cache_ = 0;
+  catalog_watermark_ = 0;
   volatile_flag_ = false;
   has_authz_cache_ = false;
   inode_annotation_ = NULL;
@@ -65,6 +66,11 @@ void AbstractCatalogManager<CatalogT>::SetOwnerMaps(const OwnerMap &uid_map,
 {
   uid_map_ = uid_map;
   gid_map_ = gid_map;
+}
+
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::SetCatalogWatermark(unsigned limit) {
+  catalog_watermark_ = limit;
 }
 
 template <class CatalogT>
@@ -799,6 +805,10 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
     return NULL;
   }
 
+  if ((catalog_watermark_ > 0) && (catalogs_.size() >= catalog_watermark_)) {
+    DetachSiblings(mountpoint);
+  }
+
   return attached_catalog;
 }
 
@@ -902,6 +912,32 @@ void AbstractCatalogManager<CatalogT>::DetachSubtree(CatalogT *catalog) {
   }
 
   DetachCatalog(catalog);
+}
+
+
+/**
+ * Detaches all nested catalogs that are not on a prefix of the given tree.
+ * Used when the catalog_watermark_ is surpassed.
+ */
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::DetachSiblings(
+  const PathString &current_tree)
+{
+  bool again;
+  do {
+    again = false;
+    unsigned N = catalogs_.size();
+    for (unsigned i = 0; i < N; ++i) {
+      if (!HasPrefix(current_tree.ToString(),
+                     catalogs_[i]->mountpoint().ToString(),
+                     false /* ignore_case */))
+      {
+        DetachSubtree(catalogs_[i]);
+        again = true;
+        break;
+      }
+    }
+  } while (again);
 }
 
 

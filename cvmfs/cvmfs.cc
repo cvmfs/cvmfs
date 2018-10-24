@@ -24,7 +24,10 @@
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 #define FUSE_USE_VERSION 26
+
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 // sys/xattr.h conflicts with linux/xattr.h and needs to be loaded very early
 #include <sys/xattr.h>  // NOLINT

@@ -177,6 +177,29 @@ get_number_of_cpu_cores() {
   fi
 }
 
+# Disable service start rate limiting for apache and autofs
+disable_systemd_rate_limit() {
+  echo "Turning off service rate limit"
+  local autofsdir=/lib/systemd/system/autofs.service.d
+  local apachedir=/lib/systemd/system/httpd.service.d
+  if [ ! -f /lib/systemd/system/httpd.service ]; then
+    apachedir=/lib/systemd/system/apache2.service.d
+  fi
+
+  sudo mkdir -p $apachedir
+  sudo mkdir -p $autofsdir
+
+  cat << EOF > cvmfs-test.conf
+[Unit]
+StartLimitIntervalSec=0
+EOF
+  sudo cp cvmfs-test.conf $apachedir/cvmfs-test.conf
+  sudo cp cvmfs-test.conf $autofsdir/cvmfs-test.conf
+  rm cvmfs-test.conf
+
+  sudo systemctl daemon-reload || true
+}
+
 
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -381,6 +404,7 @@ CVMFS_S3_PORT=$TEST_S3_PORT
 CVMFS_S3_ACCESS_KEY=not
 CVMFS_S3_SECRET_KEY=important
 CVMFS_S3_BUCKETS_PER_ACCOUNT=1
+CVMFS_S3_DNS_BUCKETS=false
 CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10
 CVMFS_S3_BUCKET=$TEST_S3_BUCKET
 EOF
@@ -445,8 +469,23 @@ check_result() {
 
 run_unittests() {
   echo -n "running CernVM-FS unit tests... "
+  local skip_filter=
+  if [ "x$CVMFS_TEST_SUITES" != "x" ]; then
+    local skip=1
+    for suite in $CVMFS_TEST_SUITES; do
+      if [ "x$suite" = "xunittests" ]; then
+        skip=0
+      fi
+    done
+    if [ $skip -eq 1 ]; then
+      echo -n "[skipped by suite restriction] "
+      # We still run the unit test in order to output the xml files but we don't run any actual tests
+      skip_filter="--gtest_filter=skip"
+    fi
+  fi
+
   local xml_output="${UNITTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}"
-  /usr/bin/cvmfs_unittests --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
+  /usr/bin/cvmfs_unittests $skip_filter --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
   local ut_retval=$?
   check_result $ut_retval
 

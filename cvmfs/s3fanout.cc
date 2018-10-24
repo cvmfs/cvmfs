@@ -20,6 +20,10 @@ using namespace std;  // NOLINT
 
 namespace s3fanout {
 
+const char *S3FanoutManager::kCacheControlCas = "Cache-Control: max-age=259200";
+const char *S3FanoutManager::kCacheControlDotCvmfs =
+  "Cache-Control: max-age=61";
+
 /**
  * Called by curl for every HTTP header. Not called for file:// transfers.
  */
@@ -748,9 +752,9 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
   switch (info.request) {
     case JobInfo::kReqHead:
       return "HEAD";
-    case JobInfo::kReqPut:
+    case JobInfo::kReqPutCas:
       // fall through
-    case JobInfo::kReqPutNoCache:
+    case JobInfo::kReqPutDotCvmfs:
       return "PUT";
     case JobInfo::kReqDelete:
       return "DELETE";
@@ -766,10 +770,10 @@ string S3FanoutManager::GetContentType(const JobInfo &info) const {
       // fall through
     case JobInfo::kReqDelete:
       return "";
-    case JobInfo::kReqPut:
-      // fall through
-    case JobInfo::kReqPutNoCache:
-      return "binary/octet-stream";
+    case JobInfo::kReqPutCas:
+      return "application/octet-stream";
+    case JobInfo::kReqPutDotCvmfs:
+      return "application/x-cvmfs";
     default:
       abort();
   }
@@ -835,10 +839,12 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       }
     }
 
-    if (info->request == JobInfo::kReqPutNoCache) {
-      std::string cache_control = "Cache-Control: no-cache";
+    if (info->request == JobInfo::kReqPutDotCvmfs) {
       info->http_headers =
-          curl_slist_append(info->http_headers, cache_control.c_str());
+          curl_slist_append(info->http_headers, kCacheControlDotCvmfs);
+    } else {
+      info->http_headers =
+          curl_slist_append(info->http_headers, kCacheControlCas);
     }
   }
 
@@ -1014,7 +1020,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       (info->request == JobInfo::kReqHead)) {
     LogCvmfs(kLogS3Fanout, kLogDebug, "not found: %s, uploading",
              info->object_key.c_str());
-    info->request = JobInfo::kReqPut;
+    info->request = JobInfo::kReqPutCas;
     curl_slist_free_all(info->http_headers);
     info->http_headers = NULL;
     s3fanout::Failures init_failure = InitializeRequest(info,
@@ -1041,8 +1047,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     try_again = CanRetry(info);
   }
   if (try_again) {
-    if (info->request == JobInfo::kReqPut ||
-        info->request == JobInfo::kReqPutNoCache) {
+    if (info->request == JobInfo::kReqPutCas ||
+        info->request == JobInfo::kReqPutDotCvmfs) {
       LogCvmfs(kLogS3Fanout, kLogDebug, "Trying again to upload %s",
                info->object_key.c_str());
       // Reset origin
@@ -1085,6 +1091,8 @@ S3FanoutManager::S3FanoutManager() {
   pool_max_handles_ = 0;
   curl_multi_ = NULL;
   user_agent_ = NULL;
+
+  dns_buckets_ = true;
 
   atomic_init32(&multi_threaded_);
   watch_fds_ = NULL;
@@ -1135,8 +1143,8 @@ S3FanoutManager::~S3FanoutManager() {
   free(curl_handle_lock_);
 }
 
-
-void S3FanoutManager::Init(const unsigned int max_pool_handles) {
+void S3FanoutManager::Init(const unsigned int max_pool_handles,
+                           bool dns_buckets) {
   atomic_init32(&multi_threaded_);
   CURLcode retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
@@ -1145,9 +1153,9 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   curl_sharehandles_ = new map<CURL *, S3FanOutDnsEntry *>;
   sharehandles_ = new set<S3FanOutDnsEntry *>;
   pool_max_handles_ = max_pool_handles;
-  watch_fds_max_ = 4*pool_max_handles_;
+  watch_fds_max_ = 4 * pool_max_handles_;
 
-  max_available_jobs_ = 4*pool_max_handles_;
+  max_available_jobs_ = 4 * pool_max_handles_;
   available_jobs_ = new Semaphore(max_available_jobs_);
   assert(NULL != available_jobs_);
 
@@ -1155,6 +1163,8 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   statistics_ = new Statistics();
   user_agent_ = new string();
   *user_agent_ = "User-Agent: cvmfs " + string(VERSION);
+
+  dns_buckets_ = dns_buckets;
 
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
@@ -1177,8 +1187,7 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
     opt_ipv4_only_ = true;
   }
 
-  watch_fds_ =
-      static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
+  watch_fds_ = static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
   watch_fds_size_ = 2;
   watch_fds_inuse_ = 0;
 
@@ -1186,7 +1195,6 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
 
   resolver_ = dns::CaresResolver::Create(opt_ipv4_only_, 2, 2000);
 }
-
 
 void S3FanoutManager::Fini() {
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {

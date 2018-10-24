@@ -83,6 +83,10 @@ if (BUILD_COVERAGE AND NOT USING_CLANG)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fprofile-arcs -ftest-coverage -fPIC")
 endif (BUILD_COVERAGE AND NOT USING_CLANG)
 
+if (ENABLE_ASAN)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+endif (ENABLE_ASAN)
+
 # Check for old Linux version that don't have a complete inotify implementation
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   try_compile(HAS_INOTIFY_INIT1 ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/cmake/check_inotify_init1.c)

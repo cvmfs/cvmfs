@@ -267,9 +267,8 @@ inline std::string platform_libname(const std::string &base_name) {
   return "lib" + base_name + ".dylib";
 }
 
-inline const char *platform_getexepath() {
-  static const char *path = _dyld_get_image_name(0);
-  return path;
+inline std::string platform_getexepath() {
+  return std::string(_dyld_get_image_name(0));
 }
 
 /**

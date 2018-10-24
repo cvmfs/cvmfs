@@ -1,4 +1,8 @@
 2.6.0:
+  * New parameter CVMFS_CATALOG_WATERMARK to release as of $n$ pinned catalogs
+  * Add cvmfs_shrinkwrap utility and sub package (CVM-1578)
+  * Add support for bearer token authentication (CVM-1320)
+  * New build option ENABLE_ASAN for address sanitizer
   * New libcvmfs methods for extended attribs, catalogs, and multi-threading
   * Publication statistics are saved to an SQLite file (CVM-1567)
   * Optionally print statistics at the end of publication (CVM-1566)
@@ -11,6 +15,15 @@
   * Fix debian packaging warnings and errors
 
 2.5.2:
+  * Session tokens for gateway transactions are deleted after use (CVM-1643)
+  * Automatically apply lease path to abort and publish commands (CVM-1601)
+  * Add retry support for `cvmfs_server transaction` (CVM-1611)
+  * New S3 config parameter CVMFS_S3_DNS_BUCKETS=false disables DNS-style
+    bucket URLs when S3 backend doesn't support them (e.g. Minio) (CVM-1641)
+  * Add support for URL subpaths and DNS buckets in the S3 backend (CVM-1641)
+  * Fix content type header for objects pushed to S3
+  * Fix cache control headers for objects pushed to S3 (CVM-1606)
+  * Fix building on macOS 10.14
   * Fix potential memory corruption in catalog traversal
   * Reimplement cvmfs_talk in C++ to improve efficiency
   * Fix busy waiting in cache manager communication under heavy load (CVM-1618)

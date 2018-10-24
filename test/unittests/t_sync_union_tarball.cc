@@ -67,7 +67,7 @@ class T_SyncUnionTarball : public ::testing::Test {
 TEST_F(T_SyncUnionTarball, Init) {
   std::string tar_filename = CreateTarFile("tar.tar", simple_tar);
   publish::SyncUnionTarball sync_union(m_sync_mediator_, "", tar_filename,
-                                       "/tmp/lala", "");
+                                       "/tmp/lala", "", false);
 
   EXPECT_CALL(*m_sync_mediator_, RegisterUnionEngine(_)).Times(1);
   EXPECT_TRUE(sync_union.Initialize());

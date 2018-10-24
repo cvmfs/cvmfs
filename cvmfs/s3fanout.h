@@ -95,8 +95,8 @@ struct Statistics {
 struct JobInfo {
   enum RequestType {
     kReqHead = 0,
-    kReqPut,
-    kReqPutNoCache,
+    kReqPutCas,  // immutable data object
+    kReqPutDotCvmfs,  // one of the /.cvmfs... top level files
     kReqDelete,
   };
 
@@ -179,7 +179,7 @@ struct JobInfo {
     callback = NULL;
     mmf = NULL;
     origin_file = NULL;
-    request = kReqPut;
+    request = kReqPutCas;
     error_code = kFailOk;
     num_retries = 0;
     backoff_ms = 0;
@@ -217,7 +217,7 @@ class S3FanoutManager : SingleCopy {
   S3FanoutManager();
   ~S3FanoutManager();
 
-  void Init(const unsigned max_pool_handles);
+  void Init(const unsigned max_pool_handles, bool dns_buckets);
   void Fini();
   void Spawn();
 
@@ -234,6 +234,10 @@ class S3FanoutManager : SingleCopy {
   bool DoSingleJob(JobInfo *info) const;
 
  private:
+  // Reflects the default Apache configuration of the local backend
+  static const char *kCacheControlCas;  // Cache-Control: max-age=259200
+  static const char *kCacheControlDotCvmfs;  // Cache-Control: max-age=61
+
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainUpload(void *data);
@@ -269,7 +273,11 @@ class S3FanoutManager : SingleCopy {
   std::string MkUrl(const std::string &host,
                     const std::string &bucket,
                     const std::string &objkey2) const {
-    return "http://" + host + "/" + bucket + "/" + objkey2;
+    if (dns_buckets_) {
+      return "http://" + bucket + "." + host + "/" + objkey2;
+    } else {
+      return "http://" + host + "/" + bucket + "/" + objkey2;
+    }
   }
 
   Prng prng_;
@@ -281,6 +289,9 @@ class S3FanoutManager : SingleCopy {
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;
+
+  bool dns_buckets_;
+
   /**
    * AWS4 signing keys are derived from the secret key, a region and a date.
    * They can be cached.

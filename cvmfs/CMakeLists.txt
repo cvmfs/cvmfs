@@ -187,6 +187,25 @@ set (CVMFS_TALK_SOURCES
   util/string.cc
 )
 
+set (CVMFS_SHRINKWRAP_SOURCES
+  hash.cc
+  logging.cc
+  monitor.cc
+  shrinkwrap/fs_traversal.cc
+  shrinkwrap/fs_traversal_libcvmfs.cc
+  shrinkwrap/posix/data_dir_mgmt.cc
+  shrinkwrap/posix/garbage_collector.cc
+  shrinkwrap/posix/helpers.cc
+  shrinkwrap/posix/interface.cc
+  shrinkwrap/shrinkwrap.cc
+  shrinkwrap/spec_tree.cc
+  shrinkwrap/util.cc
+  statistics.cc
+  util/posix.cc
+  util/string.cc
+  util_concurrency.cc
+  xattr.cc
+)
 
 set (CVMFS_SWISSKNIFE_SOURCES
   backoff.cc
@@ -504,6 +523,8 @@ set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -
 
 set (LIBCVMFS_CACHE_CFLAGS "${LIBCVMFS_CACHE_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 
+set (CVMFS_SHRINKWRAP_CFLAGS "${CVMFS_SHRINKWRAP_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
+
 #
 # set some include and linking stuff
 #
@@ -688,31 +709,42 @@ if (BUILD_LIBCVMFS)
                                  ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
 
   target_link_libraries(test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${TEST_LIBCVMFS_LIBS})
+
+  if (BUILD_CVMFS_SHRINKWRAP)
+    add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
+    add_dependencies (cvmfs_shrinkwrap cache.pb.generated)
+    add_dependencies (cvmfs_shrinkwrap libcvmfs)
+
+    set (CVMFS_SHRINKWRAP_LIBS
+                          ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                          ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                          ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                          ${PROTOBUF_LITE_LIBRARY}
+                          ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl
+                          )
+
+    set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
+    target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
+  endif(BUILD_CVMFS_SHRINKWRAP)
 endif(BUILD_LIBCVMFS)
 
-if (BUILD_OCTOPUS)
-  set (CVMFS_OCTOPUS_SOURCES
-    encrypt.cc
-    hash.cc
-    json_document.cc
-    logging.cc
-    pathspec/pathspec.cc
-    pathspec/pathspec_pattern.cc
-	  sanitizer.cc
-    util/posix.cc
-    util/string.cc
-    uuid.cc
-		webapi/fcgi.cc
-    webapi/macaroon.cc
-    webapi/octopus.cc
-    webapi/uri_map.cc
-  )
+if (BUILD_SHRINKWRAP)
+  add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
+  add_dependencies (cvmfs_shrinkwrap libcvmfs)
 
-  add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
-  target_link_libraries(cvmfs_octopus.fcgi
-                        ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${VJSON_LIBRARIES} ${OPENSSL_LIBRARIES}
-                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread)
-endif (BUILD_OCTOPUS)
+  set (CVMFS_SHRINKWRAP_LIBS
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                        ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                        ${PROTOBUF_LITE_LIBRARY}
+                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+
+  set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
+  target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
+endif(BUILD_SHRINKWRAP)
+
 
 
 if (BUILD_SERVER)
@@ -835,6 +867,21 @@ if (BUILD_LIBCVMFS)
   )
 endif (BUILD_LIBCVMFS)
 
+
+if (BUILD_SHRINKWRAP)
+  install (
+    TARGETS      cvmfs_shrinkwrap
+    RUNTIME
+    DESTINATION    bin
+  )
+
+  install (
+    FILES          shrinkwrap/scripts/spec_builder.py
+    DESTINATION    ${CVMFS_LIBEXEC_DIR}/shrinkwrap
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+endif (BUILD_SHRINKWRAP)
+
 if (BUILD_LIBCVMFS_CACHE)
   install (
     FILES          ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
@@ -910,15 +957,6 @@ if (BUILD_SERVER)
     DESTINATION    "/var/www/wsgi-scripts/cvmfs-server"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
-
-  if (BUILD_OCTOPUS)
-    install(
-      TARGETS      cvmfs_octopus.fcgi
-      RUNTIME
-      DESTINATION  "/usr/share/cvmfs-server/webapi"
-      PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    )
-  endif (BUILD_OCTOPUS)
 
   install(
     CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server)"

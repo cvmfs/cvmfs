@@ -38,6 +38,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/519-importlegacyrepo                     \
                                src/522-missingchunkfailover                 \
                                src/523-corruptchunkfailover                 \
+                               src/524-corruptmanifestfailover              \
                                src/525-bigrepo                              \
                                src/528-recreatespoolarea                    \
                                src/530-recreatespoolarea_defaultkey         \
@@ -59,10 +60,11 @@ if [ $s3_retval -eq 0 ]; then
                                src/605-resurrectancientcatalog              \
                                src/607-noapache                             \
                                src/608-infofile                             \
+                               src/609-metainfofile                         \
                                src/610-altpath                              \
                                src/614-geoservice                           \
                                src/622-gracefulrmfs                         \
-                               src/626-cacheexpiry                          \
+                               src/647-bearercvmfs                          \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

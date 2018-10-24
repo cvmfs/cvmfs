@@ -41,8 +41,8 @@ cvmfs_run_test() {
       -r $repo_url \
       -f $CVMFS_TEST_REPO \
       -t $signed)"
- echo "Verified letter is $verified" 
-  
+ echo "Verified letter is $verified"
+
   if [ x"$letter" = x"$verified" ]; then
     echo "Expected failure"
     return 5

@@ -10,7 +10,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/common.sh
 
 usage() {
-  echo "Usage: $0 [-q only quick tests] [-l preload library path] \\"
+  echo "Usage: $0 [-q only quick tests] [-s shrinkwrap test binary]\\"
   echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
@@ -18,23 +18,27 @@ usage() {
 }
 
 CVMFS_UNITTESTS_QUICK=0
-CVMFS_LIBRARY_PATH=
+CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
 
-while getopts "ql:c:g:" option; do
+while getopts "qc:g:s:l:" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
-    ;;
-    l)
-      CVMFS_LIBRARY_PATH=$OPTARG
     ;;
     c)
       CVMFS_CACHE_PLUGIN=$OPTARG
     ;;
     g)
       CVMFS_GEOAPI_SOURCES=$OPTARG
+    ;;
+    s)
+      CVMFS_SHRINKWRAP_TEST_BINARY=$OPTARG
+    ;;
+    l)
+      # Preloading a library now unused
+      :
     ;;
     ?)
       usage
@@ -49,18 +53,6 @@ fi
 
 CVMFS_UNITTESTS_BINARY=$1
 CVMFS_UNITTESTS_RESULT_LOCATION=$2
-
-# configure manual library path if needed
-if [ ! -z $CVMFS_LIBRARY_PATH ]; then
-  echo "using custom library path: '$CVMFS_LIBRARY_PATH'"
-  if is_linux; then
-    export LD_LIBRARY_PATH="$CVMFS_LIBRARY_PATH"
-  elif is_macos; then
-    export DYLD_LIBRARY_PATH="$CVMFS_LIBRARY_PATH"
-  else
-    die "who am i on? $(uname -a)"
-  fi
-fi
 
 # check if only a quick subset of the unittests should be run
 test_filter='-'
@@ -78,14 +70,19 @@ fi
 # run the cache plugin unittests
 if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
   CVMFS_CACHE_UNITTESTS="$(dirname $CVMFS_UNITTESTS_BINARY)/cvmfs_test_cache"
-  CVMFS_CACHE_LOCATOR=tcp=127.0.0.1:4224
+  CVMFS_CACHE_LOCATOR_PORT=4224
   CVMFS_CACHE_CONFIG=$(mktemp /tmp/cvmfs-unittests-XXXXX)
-  echo "CVMFS_CACHE_PLUGIN_LOCATOR=$CVMFS_CACHE_LOCATOR" > $CVMFS_CACHE_CONFIG
-  echo "CVMFS_CACHE_PLUGIN_SIZE=1000" >> $CVMFS_CACHE_CONFIG
+  echo "CVMFS_CACHE_PLUGIN_SIZE=1000" > $CVMFS_CACHE_CONFIG
   echo "CVMFS_CACHE_PLUGIN_TEST=yes" >> $CVMFS_CACHE_CONFIG
+  i=0
   for plugin in $(echo $CVMFS_CACHE_PLUGIN | tr : " "); do
     if [ -x $plugin ]; then
-      echo "running unit tests for cache plugin $plugin"
+      # Use a different port for every plugin
+      CVMFS_CACHE_LOCATOR_PORT=$((CVMFS_CACHE_LOCATOR_PORT + i))
+      i=$((i + 1))
+      CVMFS_CACHE_LOCATOR=tcp=127.0.0.1:$CVMFS_CACHE_LOCATOR_PORT
+      echo "CVMFS_CACHE_PLUGIN_LOCATOR=$CVMFS_CACHE_LOCATOR" >> $CVMFS_CACHE_CONFIG
+      echo "running unit tests for cache plugin $plugin on $CVMFS_CACHE_LOCATOR"
       # All our plugins take a configuration file as a parameter
       plugin_pid="$($plugin $CVMFS_CACHE_CONFIG)"
       echo "cache plugin started as PID $plugin_pid"
@@ -97,6 +94,14 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
     fi
   done
   rm -f $CVMFS_CACHE_CONFIG
+fi
+
+# run the shrinkwrap tests
+if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
+  echo "running shrinkwrap tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
+  $CVMFS_SHRINKWRAP_TEST_BINARY --gtest_shuffle                                     \
+    --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.shrinkwrap \
+    --gtest_filter=$test_filter
 fi
 
 # run the unit tests

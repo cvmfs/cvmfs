@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Ingest same tarball in same location multiple times"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 produce_tarball() {
   local tarball_name=$1
@@ -46,7 +47,7 @@ cvmfs_run_test() {
   cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
   echo "*** 2. ingesting the tarball in the directory $dir"
   cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
-  
+
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 

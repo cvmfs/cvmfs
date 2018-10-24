@@ -55,6 +55,7 @@ void WritePipe(int fd, const void *buf, size_t nbyte);
 void ReadPipe(int fd, void *buf, size_t nbyte);
 void ReadHalfPipe(int fd, void *buf, size_t nbyte);
 void ClosePipe(int pipe_fd[2]);
+bool DiffTree(const std::string &path_a, const std::string &path_b);
 
 void Nonblock2Block(int filedes);
 void Block2Nonblock(int filedes);

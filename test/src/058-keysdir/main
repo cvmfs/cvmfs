@@ -1,5 +1,6 @@
 
 cvmfs_test_name="CVMFS_PUBLIC_KEY has precedence over CVMFS_KEYS_DIR"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1

@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Warn on high inode watermark"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
@@ -8,10 +9,10 @@ cvmfs_run_test() {
   sudo rm -f /tmp/usyslog*
   cvmfs_mount "lhcb.cern.ch" \
     "CVMFS_INITIAL_GENERATION=4294967295" \
-    "CVMFS_USYSLOG=/tmp/usyslog" 
+    "CVMFS_USYSLOG=/tmp/usyslog"
   df | grep lhcb.cern.ch || return 2
 
-  sudo sh -c "cat /tmp/usyslog | grep 32bit"  
+  sudo sh -c "cat /tmp/usyslog | grep 32bit"
   RETVAL=$?
 
   sudo rm -f /tmp/usyslog*

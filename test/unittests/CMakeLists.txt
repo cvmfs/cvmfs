@@ -5,6 +5,7 @@
 set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 set (PROJECT_TEST_CACHE_NAME "cvmfs_test_cache")
+set (PROJECT_TEST_SHRINKWRAP_NAME "cvmfs_test_shrinkwrap")
 
 # Add the test/common directory to the include path
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
@@ -69,7 +70,6 @@ set(CVMFS_UNITTEST_FILES
   t_libcvmfs.cc
   t_logging.cc
   t_lru.cc
-  t_macaroon.cc
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
@@ -113,7 +113,6 @@ set(CVMFS_UNITTEST_FILES
   t_upload_facility.cc
   t_uploaders.cc
   t_gateway_uploader.cc
-  t_uri_map.cc
   t_url.cc
   t_util.cc
   t_util_concurrency.cc
@@ -246,12 +245,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/uuid.cc
-  ${CVMFS_SOURCE_DIR}/webapi/fcgi.cc
-  ${CVMFS_SOURCE_DIR}/webapi/macaroon.cc
-  ${CVMFS_SOURCE_DIR}/webapi/uri_map.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
+
   cache.pb.cc cache.pb.h
 )
 
@@ -304,15 +301,120 @@ set (CVMFS_TEST_CACHE_SOURCES
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
 )
 
+
+set (CVMFS_CLIENT_SOURCES
+  ${CVMFS_SOURCE_DIR}/authz/authz.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_curl.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
+  ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/cache.cc
+  cache.pb.cc cache.pb.h
+  ${CVMFS_SOURCE_DIR}/cache_extern.cc
+  ${CVMFS_SOURCE_DIR}/cache_posix.cc
+  ${CVMFS_SOURCE_DIR}/cache_ram.cc
+  ${CVMFS_SOURCE_DIR}/cache_tiered.cc
+  ${CVMFS_SOURCE_DIR}/cache_transport.cc
+  ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
+  ${CVMFS_SOURCE_DIR}/clientctx.cc
+  ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc
+  ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/fetch.cc
+  ${CVMFS_SOURCE_DIR}/file_chunk.cc
+  ${CVMFS_SOURCE_DIR}/file_watcher.cc
+  ${CVMFS_SOURCE_DIR}/globals.cc
+  ${CVMFS_SOURCE_DIR}/glue_buffer.cc
+  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/history_sql.cc
+  ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+  ${CVMFS_SOURCE_DIR}/json_document.cc
+  ${CVMFS_SOURCE_DIR}/kvstore.cc
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/malloc_arena.cc
+  ${CVMFS_SOURCE_DIR}/malloc_heap.cc
+  ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/monitor.cc
+  ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/options.cc
+  ${CVMFS_SOURCE_DIR}/quota.cc
+  ${CVMFS_SOURCE_DIR}/quota_posix.cc
+  ${CVMFS_SOURCE_DIR}/resolv_conf_event_handler.cc
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/signature.cc
+  ${CVMFS_SOURCE_DIR}/sql.cc
+  ${CVMFS_SOURCE_DIR}/sqlitemem.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/tracer.cc
+  ${CVMFS_SOURCE_DIR}/uuid.cc
+  ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/string.cc
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
+  ${CVMFS_SOURCE_DIR}/whitelist.cc
+  ${CVMFS_SOURCE_DIR}/wpad.cc
+  ${CVMFS_SOURCE_DIR}/xattr.cc
+)
+
+if (APPLE)
+  list(APPEND CVMFS_CLIENT_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc)
+else(APPLE)
+  if (CVMFS_ENABLE_INOTIFY)
+    list(APPEND CVMFS_CLIENT_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_inotify.cc)
+    add_definitions(-DCVMFS_ENABLE_INOTIFY)
+  endif(CVMFS_ENABLE_INOTIFY)
+endif (APPLE)
+
+
+set (LIBCVMFS_SOURCES
+  ${CVMFS_CLIENT_SOURCES}
+
+  ${CVMFS_SOURCE_DIR}/libcvmfs.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
+)
+
+set (CVMFS_TEST_SHRINKWRAP_SOURCES
+  shrinkwrap/main.cc
+
+  ../common/env.cc
+
+  shrinkwrap/t_fs_traversal_interface.cc
+  shrinkwrap/t_fs_posix.cc
+  shrinkwrap/t_spec_tree.cc
+  shrinkwrap/testutil_shrinkwrap.cc
+
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/fs_traversal.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/data_dir_mgmt.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/garbage_collector.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/helpers.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/interface.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/fs_traversal_libcvmfs.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/util.cc
+
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/spec_tree.cc
+
+  ${LIBCVMFS_SOURCES}
+)
+
 #
 # Compiler and Linker Flags for unit tests
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
+set (CVMFS_TEST_SHRINKWRAP_CFLAGS "${CVMFS_UNITTESTS_CFLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
 set (CVMFS_TEST_CACHE_CFLAGS "${CVMFS_TEST_CACHE_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_TEST_CACHE_LD_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
+set (CVMFS_TEST_SHRINKWRAP_LD_FLAGS "${CVMFS_TEST_SHRINKWRAP_LD_FLAGS}")
 
 #
 # build CernVM-FS test cases
@@ -331,6 +433,11 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
     add_executable (${PROJECT_TEST_CACHE_NAME} ${CVMFS_TEST_CACHE_SOURCES})
     add_dependencies (${PROJECT_TEST_CACHE_NAME} cache.pb.generated-unittests)
   endif (BUILD_LIBCVMFS_CACHE)
+
+  if (BUILD_SHRINKWRAP)
+    add_executable (${PROJECT_TEST_SHRINKWRAP_NAME} ${CVMFS_TEST_SHRINKWRAP_SOURCES})
+    add_dependencies (${PROJECT_TEST_SHRINKWRAP_NAME} cache.pb.generated-unittests)
+  endif (BUILD_SHRINKWRAP)
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
@@ -353,6 +460,9 @@ endif (BUILD_UNITTESTS_DEBUG)
 if (BUILD_LIBCVMFS_CACHE)
   set_target_properties (${PROJECT_TEST_CACHE_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_CACHE_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
 endif (BUILD_LIBCVMFS_CACHE)
+if (BUILD_SHRINKWRAP)
+  set_target_properties (${PROJECT_TEST_SHRINKWRAP_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_SHRINKWRAP_LD_FLAGS}")
+endif (BUILD_SHRINKWRAP)
 
 
 #
@@ -383,6 +493,18 @@ if (BUILD_LIBCVMFS_CACHE)
 endif (BUILD_LIBCVMFS_CACHE)
 
 
+if (BUILD_SHRINKWRAP)
+  target_link_libraries (${PROJECT_TEST_SHRINKWRAP_NAME}
+                          ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+                          ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
+                          ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
+                          ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
+                          ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
+                          ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                          ${PROTOBUF_LITE_LIBRARY}  ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
+endif (BUILD_SHRINKWRAP)
+
+
 #
 # Install the generated unit test binary
 #
@@ -400,6 +522,14 @@ if (INSTALL_UNITTESTS)
       DESTINATION    bin
     )
   endif (BUILD_LIBCVMFS_CACHE)
+
+  if (BUILD_SHRINKWRAP)
+    install (
+      TARGETS        ${PROJECT_TEST_SHRINKWRAP_NAME}
+      RUNTIME
+      DESTINATION    bin
+    )
+  endif (BUILD_SHRINKWRAP)
 endif (INSTALL_UNITTESTS)
 
 if (INSTALL_UNITTESTS_DEBUG)

@@ -7,7 +7,9 @@
  * the SQlite file once opened.  It works purely on the file descriptor.
  */
 
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 #include "cvmfs_config.h"
 #include "sqlitevfs.h"

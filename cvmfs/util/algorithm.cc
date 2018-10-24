@@ -4,7 +4,9 @@
  * Some common functions.
  */
 
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 #include "cvmfs_config.h"
 #include "util/algorithm.h"

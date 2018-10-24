@@ -70,13 +70,17 @@ running_on_osx() {
   [ "x$(uname)" == "xDarwin" ]
 }
 
+running_on_s3() {
+  [ "x$CVMFS_TEST_S3_CONFIG" != "x" ]
+}
+
 get_xattr() {
   local extended_attr="$1"
-  local repo="$2"
+  local path="$2"
   if running_on_osx; then
-    xattr -p user.$extended_attr "$repo"
+    xattr -p user.$extended_attr "$path"
   else
-    attr -qg $extended_attr "$repo"
+    attr -qg $extended_attr "$path"
   fi
 }
 
@@ -315,6 +319,33 @@ apache_switch() {
   if service_should_switch $1 $?; then
     service_switch $APACHE_SERVICE $1
   fi
+}
+
+# Checks whether the given test case is marked with any of the given
+# test suite tags.  If there are no labels, execute the test
+# @return        0 on success
+is_in_suite() {
+  local testdir=$1
+  shift
+  local labels=$@
+
+  if [ "x$labels" = "x" ]; then
+    return 0;
+  fi
+
+  (
+    unset cvmfs_test_suites
+    . $t/main
+    for wanted_label in $labels; do
+      for test_label in $cvmfs_test_suites; do
+        if [ "$wanted_label" = "$test_label" ]; then
+          exit 0;
+        fi
+      done
+    done
+    exit 1
+  )
+  return $?
 }
 
 
@@ -1630,7 +1661,7 @@ get_object_from_manifest() {
   local name=$1
   local type=$2
 
-  local url="http://localhost/cvmfs/$name"
+  local url="$(get_repo_url $name)"
   hash=$(cvmfs_swissknife info -r $url -R | grep "^$type" | tr -d $type)
   echo "${hash}${type}"
 }
@@ -2382,8 +2413,7 @@ EOF'
     echo "  Modifying test repo configuration"
     local repo_server_config=/etc/cvmfs/repositories.d/test.repo.org/server.conf
     local original_upstream=$(grep CVMFS_UPSTREAM_STORAGE $repo_server_config | cut -d'=' -f2-)
-    sudo sed -i -e 's/local,/gw,/' $repo_server_config
-    sudo sed -i -e 's/txn,\/srv\/cvmfs\/test.repo.org/txn,http:\/\/localhost:4929\/api\/v1/g' $repo_server_config
+    sudo bash -c "echo CVMFS_UPSTREAM_STORAGE=gw,/srv/cvmfs/test.repo.org/txn,http://localhost:4929/api/v1 >> $repo_server_config"
     sudo bash -c "echo TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE=$original_upstream >> $repo_server_config"
     sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 

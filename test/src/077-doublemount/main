@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Prevent double mount"
+cvmfs_test_suites="quick"
 
 CVMFS_TEST077_MOUNTPOINT_ONE=
 CVMFS_TEST077_MOUNTPOINT_TWO=
