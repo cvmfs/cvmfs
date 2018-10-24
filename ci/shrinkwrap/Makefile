@@ -67,8 +67,8 @@ $(ROOTFS)/.done_minbase: $(ROOTFS)/busybox
 	mkdir -p $(ROOTFS)/unpacked
 	mkdir -p $(ROOTFS)/var/lib/cvmfs
 	ln -s /cache $(ROOTFS)/var/lib/cvmfs/shrinkwrap
-	touch /cvmfs.local
-	ln -s /etc/cvmfs/default.d/42-shrinkwrap.conf /cvmfs.conf
+	touch $(ROOTFS)/cvmfs.local
+	ln -s /etc/cvmfs/default.d/42-shrinkwrap.conf $(ROOTFS)/cvmfs.conf
 	mkdir -p $(ROOTFS)/bin
 	mkdir -p $(ROOTFS)/dev
 	mkdir -p $(ROOTFS)/lib

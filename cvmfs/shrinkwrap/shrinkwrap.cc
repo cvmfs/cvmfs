@@ -87,7 +87,7 @@ void Usage() {
         " -s --src-type    Source filesystem type [default:cvmfs]\n"
         " -b --src-base    Source base location [default:/cvmfs/]\n"
         " -c --src-cache   Source cache\n"
-        " -f --src-config  Source config [default:cvmfs.conf]\n"
+        " -f --src-config  Source config [default:cvmfs.conf:cvmfs.local]\n"
         " -d --dest-type   Dest filesystem type [default:posix]\n"
         " -x --dest-base   Dest base [default:/unpacked/cvmfs]\n"
         " -y --dest-cache  Dest cache [default:$BASE/.data]\n"
