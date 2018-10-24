@@ -47,7 +47,7 @@ class FuseRemounter : SingleCopy {
   FuseRemounter(MountPoint *mountpoint,
                 cvmfs::InodeGenerationInfo *inode_generation_info,
                 struct fuse_chan **fuse_channel,
-                bool use_fuse_notify_invalidation);
+                bool fuse_notify_invalidation);
   ~FuseRemounter();
   void Spawn();
 

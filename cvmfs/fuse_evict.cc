@@ -48,7 +48,7 @@ const unsigned FuseInvalidator::kTimeoutSafetyMarginSec = 1;
 const unsigned FuseInvalidator::kCheckTimeoutFreqMs = 100;
 const unsigned FuseInvalidator::kCheckTimeoutFreqOps = 256;
 
-bool FuseInvalidator::use_fuse_notify_invalidation_ = true;
+bool FuseInvalidator::g_fuse_notify_invalidation_ = true;
 
 bool FuseInvalidator::HasFuseNotifyInval() {
   /**
@@ -61,19 +61,19 @@ bool FuseInvalidator::HasFuseNotifyInval() {
    * that doesn't support active invalidation?  How old does the kernel need
    * to be?  Probably that situation is never triggered in practice.
    */
-  return FuseInvalidator::use_fuse_notify_invalidation_ && (FUSE_VERSION >= 29);
+  return FuseInvalidator::g_fuse_notify_invalidation_ && (FUSE_VERSION >= 29);
 }
 
 
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
   struct fuse_chan **fuse_channel,
-  bool use_fuse_notify_invalidation)
+  bool fuse_notify_invalidation)
   : inode_tracker_(inode_tracker)
   , fuse_channel_(fuse_channel)
   , spawned_(false)
 {
-  use_fuse_notify_invalidation_ = use_fuse_notify_invalidation;
+  g_fuse_notify_invalidation_ = fuse_notify_invalidation;
   MakePipe(pipe_ctrl_);
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
   atomic_init32(&terminated_);
