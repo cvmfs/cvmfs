@@ -53,10 +53,15 @@ char *cvmfs_options_dump(SimpleOptionsParser *opts) {
 
 
 SimpleOptionsParser *cvmfs_options_init() {
+  return cvmfs_options_init_v2(0);
+}
+
+
+SimpleOptionsParser *cvmfs_options_init_v2(int taint_environ) {
   SimpleOptionsParser *result = new SimpleOptionsParser();
   // In contrast to the fuse module, we don't want to taint the process'
   // environment with parameters from the cvmfs configuration in libcvmfs
-  result->set_taint_environment(false);
+  result->set_taint_environment(taint_environ);
   // Not strictly necessary but avoids a failure log message
   result->SetValue("CVMFS_MOUNT_DIR", "/cvmfs");
   return result;

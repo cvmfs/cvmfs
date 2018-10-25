@@ -160,7 +160,8 @@ struct fs_traversal_context *libcvmfs_initialize(
   result->data = NULL;
   result->config = NULL;
 
-  cvmfs_option_map *options_mgr = cvmfs_options_init();
+  // Make cvmfs options part of the environment
+  cvmfs_option_map *options_mgr = cvmfs_options_init_v2(1);
   if (config) {
     result->config = strdup(config);
   } else {

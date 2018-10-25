@@ -16,7 +16,7 @@ cvmfs_run_test() {
   cvmfs_shrinkwrap --repo cms.cern.ch \
     --src-config "$test_location/cvmfs.config:local.config" \
     --spec-file "$test_location/cms.cern.ch.spec" \
-    --dest-base "$unpacked"
+    --dest-base "${unpacked}/cvmfs"
   [ $? -eq 0 ] || return 1
 
   local local_link=$(readlink $unpacked/cvmfs/cms.cern.ch/SITECONF/local)
