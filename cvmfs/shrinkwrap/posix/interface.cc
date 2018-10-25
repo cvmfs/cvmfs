@@ -14,6 +14,7 @@
 #include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "garbage_collector.h"
 #include "hash.h"

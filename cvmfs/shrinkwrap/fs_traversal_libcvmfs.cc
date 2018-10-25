@@ -7,6 +7,7 @@
 
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "fs_traversal_interface.h"
 #include "fs_traversal_libcvmfs.h"
