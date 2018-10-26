@@ -1844,8 +1844,18 @@ static int Init(const loader::LoaderExports *loader_exports) {
   struct fuse_chan **channel = NULL;
   if (loader_exports->version >= 4)
     channel = loader_exports->fuse_channel;
-  cvmfs::fuse_remounter_ = new FuseRemounter(
-    cvmfs::mount_point_, &cvmfs::inode_generation_info_, channel);
+
+  bool fuse_notify_invalidation = true;
+  std::string buf;
+  if (cvmfs::options_mgr_->GetValue("CVMFS_FUSE_NOTIFY_INVALIDATION",
+                                    &buf)) {
+    if (!cvmfs::options_mgr_->IsOn(buf)) {
+      fuse_notify_invalidation = false;
+    }
+  }
+  cvmfs::fuse_remounter_ =
+      new FuseRemounter(cvmfs::mount_point_, &cvmfs::inode_generation_info_,
+                        channel, fuse_notify_invalidation);
 
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {
