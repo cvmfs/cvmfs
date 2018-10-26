@@ -15,8 +15,8 @@
   * Fix debian packaging warnings and errors
 
 2.5.2:
-  * New parameter CVMFS_FUSE_NOTIFY_INVALIDATION; disabling it fixes some
-	  stability issues on macOS (CVM-1638)
+  * New parameter CVMFS_FUSE_NOTIFY_INVALIDATION; disabling it fixes 
+    stability issues on macOS (CVM-1638)
   * Fix permissions on temporary directory used by the receiver
   * Session tokens for gateway transactions are deleted after use (CVM-1643)
   * Automatically apply lease path to abort and publish commands (CVM-1601)
