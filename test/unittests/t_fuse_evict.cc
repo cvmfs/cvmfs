@@ -15,7 +15,7 @@ unsigned fuse_lowlevel_notify_inval_inode_cnt = 0;
 class T_FuseInvalidator : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    invalidator_ = new FuseInvalidator(&inode_tracker_, NULL);
+    invalidator_ = new FuseInvalidator(&inode_tracker_, NULL, true);
     invalidator_->Spawn();
   }
 
@@ -31,12 +31,12 @@ class T_FuseInvalidator : public ::testing::Test {
 
 TEST_F(T_FuseInvalidator, StartStop) {
   FuseInvalidator *idle_invalidator =
-    new FuseInvalidator(&inode_tracker_, NULL);
+    new FuseInvalidator(&inode_tracker_, NULL, true);
   EXPECT_FALSE(idle_invalidator->spawned_);
   delete idle_invalidator;
 
   FuseInvalidator *noop_invalidator =
-    new FuseInvalidator(&inode_tracker_, NULL);
+    new FuseInvalidator(&inode_tracker_, NULL, true);
   noop_invalidator->Spawn();
   EXPECT_TRUE(noop_invalidator->spawned_);
   EXPECT_GE(noop_invalidator->pipe_ctrl_[0], 0);
