@@ -52,7 +52,7 @@ struct Params {
     , src_data_dir()
     , dst_type("posix")
     , dst_config_path()
-    , dst_base_dir("/unpacked/cvmfs")
+    , dst_base_dir("/export/cvmfs")
     , dst_data_dir()
     , spec_trace_path()
     , num_parallel(0)
@@ -89,7 +89,7 @@ void Usage() {
         " -c --src-cache   Source cache\n"
         " -f --src-config  Source config [default:cvmfs.conf:cvmfs.local]\n"
         " -d --dest-type   Dest filesystem type [default:posix]\n"
-        " -x --dest-base   Dest base [default:/unpacked/cvmfs]\n"
+        " -x --dest-base   Dest base [default:/export/cvmfs]\n"
         " -y --dest-cache  Dest cache [default:$BASE/.data]\n"
         " -z --dest-config Dest config\n"
         " -t --spec-file   Specification file [default=$REPO.spec]\n"

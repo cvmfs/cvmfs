@@ -65,7 +65,7 @@ $(ROOTFS)/busybox: | $(ROOTFS)/.busybox-$(BB_VERSION)
 
 $(ROOTFS)/.done_minbase: $(ROOTFS)/busybox
 	mkdir -p $(ROOTFS)/cache
-	mkdir -p $(ROOTFS)/unpacked
+	mkdir -p $(ROOTFS)/export
 	mkdir -p $(ROOTFS)/var/lib/cvmfs
 	ln -s /cache $(ROOTFS)/var/lib/cvmfs/shrinkwrap
 	touch $(ROOTFS)/cvmfs.local
