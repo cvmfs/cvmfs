@@ -33,7 +33,8 @@
 // 24: add LIBCVMFS_ERR_REVISION_BLACKLISTED
 // 25: CernVM-FS 2.4.0
 // 26: CernVM-FS 2.5.0
-#define LIBCVMFS_REVISION 26
+// 27: Add cvmfs_options_init_v2
+#define LIBCVMFS_REVISION 27
 
 #include <stdint.h>
 #include <sys/stat.h>
@@ -180,6 +181,11 @@ char *cvmfs_statistics_format(cvmfs_context *ctx);
  * An option map must be created an populated before calling cvmfs_init_v2().
  */
 cvmfs_option_map *cvmfs_options_init();
+/**
+ * Like cvmfs_options_init but let decide whether or not cvmfs options make it
+ * to the process environment. Relevant for resolving symbolic links.
+ */
+cvmfs_option_map *cvmfs_options_init_v2(int taint_environ);
 
 
 void cvmfs_enable_threaded(cvmfs_context *ctx);
@@ -435,10 +441,10 @@ int cvmfs_stat_nc(
   struct cvmfs_nc_attr *ncst);
 
 /**
-* Get list of nested catalog at path. The list contents includes the empty string 
-* for the base and each nested catalog needed to reach this location. It also 
+* Get list of nested catalog at path. The list contents includes the empty string
+* for the base and each nested catalog needed to reach this location. It also
 * contains the list of nested catalogs reachable directly from the nested catalog
-* serving this location. If this is a transition point, the nested catalog at this 
+* serving this location. If this is a transition point, the nested catalog at this
 * location is used.
 *
 * On return, the array will contain a NULL-terminated list of strings.  The

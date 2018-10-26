@@ -4,14 +4,17 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <cstring>
 #include <string>
+#include <vector>
 
 #include "fs_traversal_interface.h"
 #include "fs_traversal_libcvmfs.h"
 #include "libcvmfs.h"
 #include "logging.h"
 #include "smalloc.h"
-#include "string.h"
+#include "util/string.h"
 
 #define MAX_INTEGER_DIGITS 20
 
@@ -158,7 +161,8 @@ struct fs_traversal_context *libcvmfs_initialize(
   result->data = NULL;
   result->config = NULL;
 
-  cvmfs_option_map *options_mgr = cvmfs_options_init();
+  // Make cvmfs options part of the environment
+  cvmfs_option_map *options_mgr = cvmfs_options_init_v2(1);
   if (config) {
     result->config = strdup(config);
   } else {
@@ -168,11 +172,14 @@ struct fs_traversal_context *libcvmfs_initialize(
     result->config = strdup(def_config);
     free(def_config);
   }
-  retval = cvmfs_options_parse(options_mgr, result->config);
-  if (retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "CVMFS Options failed to parse from : %s", result->config);
-    return NULL;
+  std::vector<std::string> config_files = SplitString(result->config, ':');
+  for (unsigned i = 0; i < config_files.size(); ++i) {
+    retval = cvmfs_options_parse(options_mgr, config_files[i].c_str());
+    if (retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "CVMFS Options failed to parse from : %s", config_files[i].c_str());
+      return NULL;
+    }
   }
 
   // Override repository name even if specified

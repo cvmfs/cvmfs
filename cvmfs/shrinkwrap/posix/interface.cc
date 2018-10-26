@@ -11,8 +11,10 @@
 #include <sys/types.h>
 #include <utime.h>
 
+#include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "garbage_collector.h"
 #include "hash.h"
@@ -22,8 +24,8 @@
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/util.h"
 #include "smalloc.h"
-#include "string.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "xattr.h"
 
 struct posix_file_handle {
@@ -537,69 +539,54 @@ bool posix_archive_config(
   std::string config_name,
   std::string prov_name
 ) {
-  int retval;
-  FILE *config = fopen(config_name.c_str(), "r");
-  if (config == NULL) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Failed to open : %s : %d : %s\n",
-      config_name.c_str(), errno, strerror(errno));
-    return 1;
-  }
-
   FILE *prov = fopen(prov_name.c_str(), "w");
   if (prov == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-      "Failed to open : %s : %d : %s\n",
+      "Archive config: failed to open : %s : %d : %s\n",
       prov_name.c_str(), errno, strerror(errno));
-    return 1;
+    return false;
   }
 
-  size_t bytes_transferred = 0;
-  bool result = true;
-  while (1) {
-    char buffer[COPY_BUFFER_SIZE];
-
-    size_t actual_read = 0;
-    actual_read = fread(&buffer, sizeof(char), sizeof(buffer), config);
-    if (actual_read < sizeof(buffer) && ferror(config) != 0) {
+  std::vector<std::string> config_files = SplitString(config_name, ':');
+  for (unsigned i = 0; i < config_files.size(); ++i) {
+    FILE *config = fopen(config_files[i].c_str(), "r");
+    if (config == NULL) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-        "Read failed : %d %s\n", errno, strerror(errno));
-      goto posix_archive_config_close_files;
-      result = false;
-    }
-    bytes_transferred+=actual_read;
-    size_t written_len = fwrite(buffer, sizeof(char), actual_read, prov);
-    if (written_len != actual_read) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-        "Write failed : %d %s\n", errno, strerror(errno));
-      result = false;
-      goto posix_archive_config_close_files;
-    }
-
-    if (actual_read < COPY_BUFFER_SIZE) {
-      break;
-    }
-  }
-  posix_archive_config_close_files:
-    retval = fclose(config);
-    if (retval != 0) {
-      // Handle error
-      LogCvmfs(kLogCvmfs, kLogStderr,
-        "Failed close config file : %s : %d : %s\n",
+        "Archive config: failed to open : %s : %d : %s\n",
         config_name.c_str(), errno, strerror(errno));
-      result = false;
+      fclose(prov);
+      return false;
     }
 
-    retval = fclose(prov);
-    if (retval != 0) {
-      // Handle error
-      LogCvmfs(kLogCvmfs, kLogStderr,
-        "Failed close provenance file : %s : %d : %s\n",
-        prov_name.c_str(), errno, strerror(errno));
-      result = false;
-    }
+    while (1) {
+      char buffer[COPY_BUFFER_SIZE];
 
-  return result;
+      size_t nbytes = 0;
+      nbytes = fread(&buffer, sizeof(char), sizeof(buffer), config);
+      if (nbytes < sizeof(buffer) && ferror(config) != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+          "Archive config: read failed : %d %s\n", errno, strerror(errno));
+        fclose(config);
+        fclose(prov);
+        return false;
+      }
+
+      size_t written_len = fwrite(buffer, sizeof(char), nbytes, prov);
+      if (written_len != nbytes) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Archive config: write failed : %d %s\n",
+                 errno, strerror(errno));
+        fclose(config);
+        fclose(prov);
+        return false;
+      }
+
+      if (nbytes < COPY_BUFFER_SIZE)
+        break;
+    }
+  }
+
+  return true;
 }
 
 void posix_write_provenance_info(

@@ -58,8 +58,9 @@ cvmfs_run_test() {
     echo
 
     echo "*** Creating shrinkwrapped repository..."
+    echo "CVMFS_HTTP_PROXY=DIRECT" > local.config
     sudo cvmfs_shrinkwrap --repo $repo \
-      --src-config "$test_location/$repo.config" \
+      --src-config "$test_location/$repo.config:local.config" \
       --spec-file /tmp/cvmfs-$repo.spec.txt \
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 4
@@ -87,7 +88,7 @@ cvmfs_run_test() {
     echo | sudo tee -a /tmp/cvmfs-$repo.spec.txt
     echo "^/.cvmfsdirtab" | sudo tee -a /tmp/cvmfs-$repo.spec.txt
     sudo cvmfs_shrinkwrap --repo $repo \
-      --src-config "$test_location/$repo.config" \
+      --src-config "$test_location/$repo.config:local.config" \
       --spec-file /tmp/cvmfs-$repo.spec.txt \
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 30

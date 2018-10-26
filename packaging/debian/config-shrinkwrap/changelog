@@ -1,0 +1,5 @@
+cvmfs-config-shrinkwrap (1.0-1) lucid; urgency=low
+
+  * Initial packaging
+
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 24 Oct 2018 12:00:00 +0000
