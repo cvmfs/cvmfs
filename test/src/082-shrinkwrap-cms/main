@@ -5,21 +5,22 @@ cvmfs_run_test() {
   logfile=$1
   local test_location=$2
 
-  local unpacked="$PWD/unpacked"
+  local export="$PWD/export"
   local cache="$PWD/cache"
 
   echo "*** Preparing local configuration"
   echo "CVMFS_CACHE_DIR=$cache" > local.config
+  echo "CVMFS_CLAIM_OWNERSHIP=yes" >> local.config
   echo "CMS_LOCAL_SITE=foo" >> local.config
 
   echo "*** Creating shrinkwrapped repository..."
   cvmfs_shrinkwrap --repo cms.cern.ch \
     --src-config "$test_location/cvmfs.config:local.config" \
     --spec-file "$test_location/cms.cern.ch.spec" \
-    --dest-base "${unpacked}/cvmfs"
+    --dest-base "${export}/cvmfs"
   [ $? -eq 0 ] || return 1
 
-  local local_link=$(readlink $unpacked/cvmfs/cms.cern.ch/SITECONF/local)
+  local local_link=$(readlink $export/cvmfs/cms.cern.ch/SITECONF/local)
   echo "*** Local link is $local_link"
   [ x"$local_link" = "xfoo" ] || return 10
 
