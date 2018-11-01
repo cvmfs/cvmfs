@@ -11,8 +11,8 @@
 -export([api_protocol_version/0, min_api_protocol_version/0, api_root/0]).
 
 
--define(API_VERSION, 1).
--define(API_ROOT, "/api/v" ++ integer_to_list(?API_VERSION)).
+-define(API_PROTOCOL_VERSION, 2).
+-define(API_ROOT, "/api/v1").
 
 
 -spec api_protocol_version() -> integer().
