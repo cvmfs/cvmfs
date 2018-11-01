@@ -245,13 +245,13 @@ p_check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) ->
 
 
 p_new_lease(Uid, KeyId, Path, ClientApiVersion) ->
-    case ClientApiVersion >= cvmfs_version:min_api_version() of
+    case ClientApiVersion >= cvmfs_version:min_api_protocol_version() of
         true ->
             case cvmfs_be:new_lease(Uid, KeyId, Path) of
                 {ok, Token} ->
                     #{<<"status">> => <<"ok">>,
                       <<"session_token">> => Token,
-                      <<"max_api_version">> => integer_to_binary(erlang:min(cvmfs_version:api_version(),
+                      <<"max_api_version">> => integer_to_binary(erlang:min(cvmfs_version:api_protocol_version(),
                                                                             ClientApiVersion))};
                 {path_busy, Time} ->
                     #{<<"status">> => <<"path_busy">>, <<"time_remaining">> => Time};
@@ -260,7 +260,7 @@ p_new_lease(Uid, KeyId, Path, ClientApiVersion) ->
             end;
         false ->
             Msg = "incompatible version: " ++ integer_to_list(ClientApiVersion)
-                  ++ ", min version: " ++ integer_to_list(cvmfs_version:min_api_version()),
+                  ++ ", min version: " ++ integer_to_list(cvmfs_version:min_api_protocol_version()),
             #{<<"status">> => <<"error">>, <<"reason">> => list_to_binary(Msg)}
     end.
 
