@@ -261,7 +261,7 @@ p_new_lease(Uid, KeyId, Path, ClientApiVersion) ->
         false ->
             Msg = "incompatible version: " ++ integer_to_list(ClientApiVersion)
                   ++ ", min version: " ++ integer_to_list(cvmfs_version:min_api_version()),
-            #{<<"status">> => <<"error">>, <<"error">> => list_to_binary(Msg)}
+            #{<<"status">> => <<"error">>, <<"reason">> => list_to_binary(Msg)}
     end.
 
 
