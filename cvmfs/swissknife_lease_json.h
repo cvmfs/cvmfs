@@ -15,7 +15,8 @@ enum LeaseReply {
   kLeaseReplyFailure
 };
 
-LeaseReply ParseAcquireReply(const CurlBuffer& buffer, std::string* session_token);
+LeaseReply ParseAcquireReply(const CurlBuffer& buffer,
+                             std::string* session_token);
 LeaseReply ParseDropReply(const CurlBuffer& buffer);
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_JSON_H_

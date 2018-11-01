@@ -10,7 +10,8 @@
 
 #include "logging.h"
 
-LeaseReply ParseAcquireReply(const CurlBuffer &buffer, std::string *session_token) {
+LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
+                             std::string *session_token) {
   if (buffer.data.size() == 0 || session_token == NULL) {
     return kLeaseReplyFailure;
   }
