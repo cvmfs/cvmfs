@@ -9,7 +9,14 @@
 
 #include <string>
 
-bool ParseAcquireReply(const CurlBuffer& buffer, std::string* session_token);
-bool ParseDropReply(const CurlBuffer& buffer);
+enum LeaseReply {
+  kLeaseReplySuccess,
+  kLeaseReplyBusy,
+  kLeaseReplyFailure
+};
+
+LeaseReply ParseAcquireReply(const CurlBuffer& buffer,
+                             std::string* session_token);
+LeaseReply ParseDropReply(const CurlBuffer& buffer);
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_JSON_H_
