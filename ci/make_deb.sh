@@ -54,7 +54,7 @@ fpm -s dir -t deb \
     --description "CernVM-FS Repository Gateway" \
     --url "http://cernvm.cern.ch" \
     --license "BSD-3-Clause" \
-    --depends "cvmfs-server > 2.5.0" \
+    --depends "cvmfs-server > 2.5.1" \
     --directories usr/libexec/cvmfs-gateway \
     --config-files etc/rsyslog.d/90-cvmfs-gateway.conf \
     --config-files etc/logrotate.d/90-cvmfs-gateway-rotate-systemd \

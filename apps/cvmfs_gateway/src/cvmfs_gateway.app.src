@@ -27,7 +27,8 @@
              cvmfs_repos_handler,
              cvmfs_root_handler,
              cvmfs_gateway_app,
-             cvmfs_gateway_sup
+             cvmfs_gateway_sup,
+             cvmfs_version
             ]},
 
   {maintainers, []}
