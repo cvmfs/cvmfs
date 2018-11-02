@@ -1,5 +1,6 @@
 2.5.2:
-  * New parameter CVMFS_FUSE_NOTIFY_INVALIDATION; disabling it fixes 
+  * Repository gateway protocol version bumped to 2 (CVM-1626).
+  * New parameter CVMFS_FUSE_NOTIFY_INVALIDATION; disabling it fixes
     stability issues on macOS (CVM-1638)
   * Fix permissions on temporary directory used by the receiver
   * Session tokens for gateway transactions are deleted after use (CVM-1643)
