@@ -1,4 +1,6 @@
 0.3.1:
+  * Refactored protocol version checks with clients. Protocol version is now 2
+    (CVM-1626).
   * DEB package now also runs post-install tasks automatically
   * Updated DEB: Debian/Ubuntu package depends on cvmfs-server
   * Updated RPM: depends on cvmfs-server, modified config files are kept,
