@@ -218,11 +218,12 @@ bool AuthzSessionManager::LookupAuthzData(
              session_key.sid, authz_data->membership.c_str(),
              authz_data->status);
     const bool granted = authz_data->IsGranted(membership);
-    if (granted)
+    if (granted) {
       perf::Inc(n_grant_);
-    else
-      perf::Inc(n_deny_);
-    return granted;
+      return granted;
+    }
+    LogCvmfs(kLogAuthz, kLogDebug,
+          "cached authz data did not match, proceeding to fetch");
   }
 
   // Not found in cache, ask for help
