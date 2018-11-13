@@ -85,6 +85,10 @@ Please upgrade CernVM-FS to manipulate this repository."
   #   138 --> 139
   #     -> use nodev mount option in /etc/fstab
   #
+  #   139 --> 140
+  #     -> update apache configs on stratum 1s that have them to ignore 
+  #        If-Modified-Since headers (CVM-1655)
+  #
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
@@ -153,6 +157,13 @@ Please upgrade CernVM-FS to manipulate this repository."
   fi
 
   # After this point all creator versions are numeric
+
+  if [ "$creator" -eq 139 ] && \
+      ( ! is_stratum1 $name || \
+        !  has_apache_config_file $(get_apache_conf_filename $name) ); then
+      # skip this migrate if not on stratum1 or no apache config
+      creator=140
+  fi
 
   if [ "$creator" -lt "$(cvmfs_layout_revision)" ]; then
     _repo_is_incompatible "$creator" $nokill
