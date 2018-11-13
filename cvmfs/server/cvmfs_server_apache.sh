@@ -271,6 +271,7 @@ Alias /cvmfs/${name} ${storage_dir}
     </FilesMatch>
 
     Header unset Last-Modified
+    RequestHeader unset If-Modified-Since
     FileETag None
 
     ExpiresActive On
