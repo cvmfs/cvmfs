@@ -1228,14 +1228,21 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetProxyChain(proxies, fallback_proxies,
                                download::DownloadManager::kSetProxyBoth);
 
-  if (options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  bool do_geosort = options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
+                    options_mgr_->IsOn(optarg);
+  if (do_geosort) {
     download_mgr_->ProbeGeo();
-    return SetupExternalDownloadMgr(true);
   }
-
-  return SetupExternalDownloadMgr(false);
+  if (options_mgr_->GetValue("CVMFS_MAX_SERVERS", &optarg)) {
+    unsigned max_servers = String2Uint64(optarg);
+    std::vector<std::string> host_chain;
+    download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
+    if (max_servers > 0 && max_servers < host_chain.size()) {
+      host_chain.resize(max_servers);
+      download_mgr_->SetHostChain(host_chain);
+    }
+  }
+  return SetupExternalDownloadMgr(do_geosort);
 }
 
 bool MountPoint::CreateResolvConfWatcher() {
@@ -1696,6 +1703,16 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     }
   } else {
     external_download_mgr_->SetHostChain("");
+  }
+
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_MAX_SERVERS", &optarg)) {
+    unsigned max_servers = String2Uint64(optarg);
+    std::vector<std::string> host_chain;
+    external_download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
+    if (max_servers > 0 && max_servers < host_chain.size()) {
+      host_chain.resize(max_servers);
+      external_download_mgr_->SetHostChain(host_chain);
+    }
   }
 
   string proxies = "DIRECT";
