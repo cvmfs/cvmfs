@@ -1025,7 +1025,9 @@ is_subcommand() {
 
 # Flushes data to disk; we might at some point want to do more than just sync
 syncfs() {
-  sync
+  if [ "x$CVMFS_DISABLE_SYNCFS" != "xtrue" ]; then
+    sync
+  fi
 }
 
 

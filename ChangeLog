@@ -1,4 +1,5 @@
 2.5.2:
+  * Skip sync calls in cvmfs_server if CVMFS_DISABLE_SYNCFS=true (CVM-1646)
   * Repository gateway protocol version bumped to 2 (CVM-1626).
   * New parameter CVMFS_FUSE_NOTIFY_INVALIDATION; disabling it fixes
     stability issues on macOS (CVM-1638)
