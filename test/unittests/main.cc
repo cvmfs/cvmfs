@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <openssl/rand.h>
+
 #include <cassert>
 
 #include "env.h"
@@ -17,6 +19,9 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   ::testing::AddGlobalTestEnvironment(env);
+  // Open /dev/[u]random before starting the unit tests to make sure that the
+  // counting of open file descriptors is accurate
+  RAND_poll();
   int result = RUN_ALL_TESTS();
   delete watchdog;
   return result;
