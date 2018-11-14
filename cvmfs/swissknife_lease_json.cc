@@ -10,14 +10,15 @@
 
 #include "logging.h"
 
-bool ParseAcquireReply(const CurlBuffer &buffer, std::string *session_token) {
+LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
+                             std::string *session_token) {
   if (buffer.data.size() == 0 || session_token == NULL) {
-    return false;
+    return kLeaseReplyFailure;
   }
 
   const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
   if (!reply || !reply->IsValid()) {
-    return false;
+    return kLeaseReplyFailure;
   }
 
   const JSON *result =
@@ -25,45 +26,46 @@ bool ParseAcquireReply(const CurlBuffer &buffer, std::string *session_token) {
   if (result != NULL) {
     const std::string status = result->string_value;
     if (status == "ok") {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Status: ok");
+      LogCvmfs(kLogCvmfs, kLogStdout, "Gateway reply: ok");
       const JSON *token = JsonDocument::SearchInObject(
           reply->root(), "session_token", JSON_STRING);
       if (token != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Session token: %s",
+        LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
                  token->string_value);
         *session_token = token->string_value;
-        return true;
+        return kLeaseReplySuccess;
       }
     } else if (status == "path_busy") {
       const JSON *time_remaining = JsonDocument::SearchInObject(
           reply->root(), "time_remaining", JSON_INT);
       if (time_remaining != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Path busy. Time remaining = %d",
+        LogCvmfs(kLogCvmfs, kLogStdout, "Path busy. Time remaining = %d",
                  time_remaining->int_value);
+        return kLeaseReplyBusy;
       }
     } else if (status == "error") {
       const JSON *reason =
           JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
       if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Error: %s", reason->string_value);
+        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->string_value);
       }
     } else {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Unknown reply. Status: %s",
+      LogCvmfs(kLogCvmfs, kLogStdout, "Unknown reply. Status: %s",
                status.c_str());
     }
   }
 
-  return false;
+  return kLeaseReplyFailure;
 }
 
-bool ParseDropReply(const CurlBuffer &buffer) {
+LeaseReply ParseDropReply(const CurlBuffer &buffer) {
   if (buffer.data.size() == 0) {
-    return false;
+    return kLeaseReplyFailure;
   }
 
   const UniquePtr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
   if (!reply || !reply->IsValid()) {
-    return false;
+    return kLeaseReplyFailure;
   }
 
   const JSON *result =
@@ -71,21 +73,21 @@ bool ParseDropReply(const CurlBuffer &buffer) {
   if (result != NULL) {
     const std::string status = result->string_value;
     if (status == "ok") {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Status: ok");
-      return true;
+      LogCvmfs(kLogCvmfs, kLogStdout, "Gateway reply: ok");
+      return kLeaseReplySuccess;
     } else if (status == "invalid_token") {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Error: invalid session token");
+      LogCvmfs(kLogCvmfs, kLogStdout, "Error: invalid session token");
     } else if (status == "error") {
       const JSON *reason =
           JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
       if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Error: %s", reason->string_value);
+        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->string_value);
       }
     } else {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Unknown reply. Status: %s",
+      LogCvmfs(kLogCvmfs, kLogStdout, "Unknown reply. Status: %s",
                status.c_str());
     }
   }
 
-  return false;
+  return kLeaseReplyFailure;
 }

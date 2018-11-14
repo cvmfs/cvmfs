@@ -11,7 +11,7 @@
 
 namespace gateway {
 
-int APIVersion() { return 1; }
+int APIVersion() { return 2; }
 
 bool ReadKeys(const std::string& key_file_name, std::string* key_id,
               std::string* secret) {
