@@ -14,11 +14,6 @@ private_mount() {
                  "CVMFS_QUOTA_LIMIT=180" || return 1
 }
 
-private_unmount() {
-  sudo umount $TEST665_PRIVATE_MOUNT
-  TEST665_PRIVATE_MOUNT=
-}
-
 cleanup() {
   echo "running cleanup()..."
   if [ "x$TEST665_PRIVATE_MOUNT" != "x" ]; then
