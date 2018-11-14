@@ -880,7 +880,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
        iEnd = hardlinks.end(); i != iEnd; ++i)
   {
     if (i->second.hardlinks.size() != i->second.master.GetUnionLinkcount()) {
-      LogCvmfs(kLogPublish, kLogStderr, "Hardlinks across directories (%s)",
+      LogCvmfs(kLogPublish, kLogStdout, "Hardlinks across directories (%s)",
                i->second.master.GetUnionPath().c_str());
       if (!params_->ignore_xdir_hardlinks)
         abort();
