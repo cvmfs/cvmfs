@@ -872,6 +872,7 @@ TEST_F(T_MountPoint, MaxServers) {
     UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->external_download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
+    // Host chain has been set to one empty string in SetupExternalDownloadMgr
     EXPECT_EQ(1U, host_chain.size());
   }
 
