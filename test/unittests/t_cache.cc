@@ -138,6 +138,8 @@ class TestQuotaManager : public QuotaManager {
     bool is_catalog;
   };
 
+  TestQuotaManager() : size(0) { }
+
   virtual bool HasCapability(Capabilities capability) { return true; }
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
@@ -209,7 +211,7 @@ class TestQuotaManager : public QuotaManager {
   }
   virtual uint64_t GetMaxFileSize() { return 50*1024*1024; }
   virtual uint64_t GetCapacity() { return 100*1024*1024; }
-  virtual uint64_t GetSize() { return 0; }
+  virtual uint64_t GetSize() { return size; }
   virtual uint64_t GetSizePinned() { return 0; }
   virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
 
@@ -218,6 +220,7 @@ class TestQuotaManager : public QuotaManager {
   virtual uint32_t GetProtocolRevision() { return 0; }
 
   LastCommand last_cmd;
+  uint64_t size;
 };
 
 
@@ -769,12 +772,13 @@ TEST_F(T_CacheManager, StartTxn) {
   cache_mgr_->quota_mgr_ = quota_mgr;
   EXPECT_EQ(-ENOSPC,
     cache_mgr_->StartTxn(rnd_hash, quota_mgr->GetMaxFileSize() + 1, txn));
+  quota_mgr->size = quota_mgr->GetCapacity() - 1;
   fd = cache_mgr_->StartTxn(rnd_hash, PosixCacheManager::kBigFile + 1, txn);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(TestQuotaManager::kCmdCleanup, quota_mgr->last_cmd.cmd);
-  EXPECT_EQ(quota_mgr->GetCapacity() - (PosixCacheManager::kBigFile + 1),
-            quota_mgr->last_cmd.size);
+  EXPECT_EQ(quota_mgr->GetCapacity() / 2, quota_mgr->last_cmd.size);
   cache_mgr_->AbortTxn(txn);
+  quota_mgr->size = 0;
   fd = cache_mgr_->StartTxn(rnd_hash, CacheManager::kSizeUnknown, txn);
   EXPECT_GE(fd, 0);
   cache_mgr_->AbortTxn(txn);
