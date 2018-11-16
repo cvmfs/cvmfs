@@ -426,7 +426,6 @@ _migrate_140() {
   local destination_version="140"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
   local apache_repo_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
-  local do_apache_reload=0
 
   load_repo_config $name
   echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
@@ -438,7 +437,8 @@ _migrate_140() {
     # only called on stratum1
     local wsgi="enabled"
     create_apache_config_for_endpoint $name $storage_dir $wsgi
-    do_apache_reload=1
+    echo "--> reloading Apache"
+    reload_apache > /dev/null
   else
     echo "--> skipping foreign apache config ($(basename $apache_repo_conf))"
   fi
