@@ -1599,8 +1599,12 @@ MountPoint::~MountPoint() {
 
 
 void MountPoint::ReEvaluateAuthz() {
+  string old_membership_req = membership_req_;
   has_membership_req_ = catalog_mgr_->GetVOMSAuthz(&membership_req_);
-  authz_attachment_->set_membership(membership_req_);
+  if (old_membership_req != membership_req_) {
+    authz_session_mgr_->ClearSessionCache();
+    authz_attachment_->set_membership(membership_req_);
+  }
 }
 
 
