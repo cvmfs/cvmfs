@@ -352,6 +352,10 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     const int lstat_retval = platform_lstat(candidate.c_str(), &candidate_info);
     assert(lstat_retval == 0);
     if (!S_ISDIR(candidate_info.st_mode)) {
+      LogCvmfs(kLogCatalog, kLogStderr,
+               "WARNING: '%s' dirtab entry does not point to a directory "
+               "but to a file or a symbolic link",
+               candidate_rel.c_str());
       continue;
     }
 

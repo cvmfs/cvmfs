@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Manage Nested Catalogs Using .cvmfsdirtab"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 produce_files_in_1() {
   local working_dir=$1
@@ -44,9 +45,9 @@ produce_files_in_2() {
   mkdir People/Russians/MikhailKalashnikov People/Russians/YuriGagarin People/Russians/VladimirVladimirovichPutin
 
   # add some files to some of the directories
-  cp_bin People/Germans/AlbertEinstein
+  echo 1 > People/Germans/AlbertEinstein/file
   cp /etc/passwd People/Americans/BarackObama
-  cp_usrbin People/Russians/MikhailKalashnikov
+  echo 2 > People/Russians/MikhailKalashnikov/file
 
   # add a file in the French People Directory
   echo "French Don't Believe in Directories" > People/French/NapoleonBonaparte
@@ -136,6 +137,7 @@ check_catalog_presence_4() {
 
 produce_files_in_5() {
   local working_dir=$1
+  local outside_dir=$2
 
   pushdir $working_dir
 
@@ -143,6 +145,12 @@ produce_files_in_5() {
   rm -f People/Germans/JohannWolfgangGoethe/.cvmfscatalog
   rm -f People/Americans/GeorgeWashington/.cvmfscatalog
   rm -f People/Americans/BarackObama/.cvmfscatalog
+
+  # symlink outside the repository
+  ln -s $outside_dir outside_dir
+  ln -s /tmp universe
+  echo "/universe" >> .cvmfsdirtab
+  echo "/outside_dir/nested" >> .cvmfsdirtab
 
   popdir
 }
@@ -237,28 +245,36 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "starting transaction to edit repository"
+  echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the repository"
-  produce_files_in_5 $repo_dir || return 6
+  echo "*** putting some stuff in the repository"
+  mkdir -p donttouch/nested
+  produce_files_in_5 $repo_dir $PWD/donttouch || return 6
 
-  echo "creating CVMFS snapshot (should produce warnings)"
+  echo "*** creating CVMFS snapshot (should produce warnings)"
   local publish_log_3=publish_3.log
   publish_repo $CVMFS_TEST_REPO > $publish_log_3 2>&1 || return $?
+  echo "*** BEGIN Publish Log ***"
+  cat $publish_log_3
+  echo "*** END Publish Log ***"
 
-  echo "look for the warnings"
+  echo "*** ensure catalog markers did not break out repository boundaries"
+  [ -f $PWD/donttouch/nested/.cvmfscatalog ] && return 70
+
+  echo "*** look for the warnings"
   cat $publish_log_3 | grep -q "^WARNING.*JohannWolfgangGoethe" || return 7
   cat $publish_log_3 | grep -q "^WARNING.*GeorgeWashington"     || return 8
   cat $publish_log_3 | grep -q "^WARNING.*BarackObama"          || return 9
+  cat $publish_log_3 | grep -q "^WARNING.*universe"             || return 10
 
-  echo "check catalog and data integrity"
+  echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "check if eventually the right catalogs are present in the repository (5)"
+  echo "*** check if eventually the right catalogs are present in the repository (5)"
   check_catalog_presence_5 $CVMFS_TEST_REPO || return $?
 
-  echo "check that the temporary scratch directory is empty"
+  echo "*** check that the temporary scratch directory is empty"
   [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 53
 
   return 0
