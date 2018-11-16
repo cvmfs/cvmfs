@@ -1,4 +1,5 @@
 2.5.2:
+  * Update Apache config to ignore If-Modified-Since on stratum 1s (CVM-1655)
   * Add support for CVMFS_MAX_[EXTERNAL_]SERVERS (CVM-1631)
   * Fine-grained syncfs control through 
     CVMFS_SYNCFS_LEVEL=[none,default,cautious] (CVM-1646)
