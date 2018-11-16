@@ -8,11 +8,8 @@
 
 #include <cassert>
 #include <cerrno>
+#include <cstdio>
 #include <cstdlib>
-
-#include <fstream>
-#include <iostream>
-#include <sstream>
 #include <string>
 
 #include "util/posix.h"
@@ -69,9 +66,9 @@ void CvmfsEnvironment::CreateSandbox() {
     tmp_base = getenv("CVMFS_TEST_SCRATCH");
   const std::string sandbox = CreateTempDir(tmp_base + "/cvmfs_ut_sandbox");
   if (sandbox.empty()) {
-    std::cerr << "Unittest Setup: Failed to create sandbox directory in /tmp "
-              << " (errno: " << errno << ")."
-              << std::endl;
+    fprintf(stderr,
+            "Unittest Setup: Failed to create sandbox directory in /tmp "
+            "(errno %d)\n", errno);
     abort();
   }
   sandbox_ = sandbox;
@@ -79,9 +76,9 @@ void CvmfsEnvironment::CreateSandbox() {
   // put sandbox path into the environment to be picked up by child processes
   unsetenv(kSandboxEnvVariable);
   if (setenv(kSandboxEnvVariable, sandbox_.c_str(), 1) != 0) {
-    std::cerr << "Unittest Setup: Failed to append sandbox path to environment "
-              << "'" << kSandboxEnvVariable << "' (errno: " << errno << ")."
-              << std::endl;
+    fprintf(stderr,
+            "Unittest Setup: Failed to append sandbox path to environment "
+            "'%s' (errno: %d)\n", kSandboxEnvVariable, errno);
     abort();
   }
 }
@@ -92,17 +89,16 @@ void CvmfsEnvironment::AdoptSandboxFromParent() {
 
   const char *sandbox = getenv(kSandboxEnvVariable);
   if (NULL == sandbox) {
-    std::cerr << "Unittest Setup: Failed to read sandbox path from environment "
-              << "'" << kSandboxEnvVariable << "' (errno: " << errno << ")."
-              << std::endl;
+    fprintf(stderr,
+            "Unittest Setup: Failed to read sandbox path from environment "
+            "'%s' (errno: %d)\n", kSandboxEnvVariable, errno);
     abort();
   }
 
   if (!DirectoryExists(sandbox)) {
-    std::cerr << "Unittest Setup: Failed to find sandbox directory "
-              << "'" << sandbox << "' pointed to by "
-              << "'" << kSandboxEnvVariable << "'"
-              << std::endl;
+    fprintf(stderr,
+            "Unittest Setup: Failed to find sandbox directory '%s' "
+            "pointed to by '%s'\n", sandbox, kSandboxEnvVariable);
     abort();
   }
 
@@ -122,9 +118,9 @@ void CvmfsEnvironment::ChangeDirectoryToSandbox() const {
   assert(!sandbox_.empty());
 
   if (chdir(sandbox_.c_str()) != 0) {
-    std::cerr << "Unittest Setup: Failed to chdir() into sandbox directory "
-              << "'" << sandbox_ << "' (errno: " << errno << ")."
-              << std::endl;
+    fprintf(stderr,
+            "Unittest Setup: Failed to chdir() into sandbox directory '%s' "
+            "(errno: %d)\n", sandbox_.c_str(), errno);
     abort();
   }
 }
