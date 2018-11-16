@@ -1,4 +1,6 @@
 2.5.2:
+  * Fine-grained syncfs control through 
+    CVMFS_SYNCFS_LEVEL=[none,default,cautious] (CVM-1646)
   * Improve printing of warnings during publish (CVM-1630)
   * Add support for CVMFS_SUID config parameter (CVM-1591)
   * Repository gateway protocol version bumped to 2 (CVM-1626).
