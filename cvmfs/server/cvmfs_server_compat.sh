@@ -86,7 +86,7 @@ Please upgrade CernVM-FS to manipulate this repository."
   #     -> use nodev mount option in /etc/fstab
   #
   #   139 --> 140
-  #     -> update apache configs on stratum 1s that have them to ignore 
+  #     -> update apache configs on stratum 1s that have them to ignore
   #        If-Modified-Since headers (CVM-1655)
   #
   # Note: I tried to make this code as verbose as possible
