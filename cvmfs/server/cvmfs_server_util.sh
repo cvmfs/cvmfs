@@ -1023,8 +1023,17 @@ is_subcommand() {
 }
 
 
-# Flushes data to disk; we might at some point want to do more than just sync
+# Flushes data to disk; only flush if the enforced level allowed for the
+# provided level.  The order is
+#  'none' (never sync)
+#  'default' (sync for rare, important operations like mkfs, publish)
+#  'cautious' (always sync)
 syncfs() {
+  local level="${1:-default}"
+  local enforced_level="${CVMFS_SYNCFS_LEVEL:-default}"
+  [ "x$enforced_level" = "xnone" ] && return || true
+  [ "x$enforced_level" = "xdefault" -a "x$level" = "xcautious" ] && return || true
+
   sync
 }
 
