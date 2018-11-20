@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "authz/authz_fetch.h"
@@ -122,7 +123,8 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
 
   FILE *fp_stat = fopen(pid_path, "r");
   if (fp_stat == NULL) {
-    LogCvmfs(kLogAuthz, kLogDebug, "Failed to open status file /proc/%d/stat: (errno=%d) %s", pid, errno, strerror(errno));
+    LogCvmfs(kLogAuthz, kLogDebug, "Failed to open status file /proc/%d/stat: (errno=%d) %s",
+             pid, errno, strerror(errno));
     LogCvmfs(kLogAuthz, kLogSyslogWarn | kLogDebug, "Authorization for session %d disappeared", pid);
     return false;
   }
