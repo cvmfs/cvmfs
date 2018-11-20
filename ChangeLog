@@ -1,4 +1,5 @@
 2.5.2:
+  * Restrict lazy downloads of geodb to once a day (CVM-1647)
   * Improve error reporting for replication/preloading (CVM-1624)
   * Update Apache config to ignore If-Modified-Since on stratum 1s (CVM-1655)
   * Add support for CVMFS_MAX_[EXTERNAL_]SERVERS (CVM-1631)
