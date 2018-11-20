@@ -634,7 +634,7 @@ TEST_F(T_MountPoint, History) {
 
 
 TEST_F(T_MountPoint, MaxServers) {
-  CreateMiniRepository();
+  CreateMiniRepository(&options_mgr_, &repo_path_);
   string server_url;
   ASSERT_TRUE(options_mgr_.GetValue("CVMFS_SERVER_URL", &server_url));
   server_url += ";" + server_url;
