@@ -15,6 +15,7 @@
   * Fix debian packaging warnings and errors
 
 2.5.2:
+  * Log to syslog when session authorization disappears (CVM-1658)
   * Report start of mark and sweep phases during GC
   * Fix cache cleanup logic for chunks >25M (CVM-1625)
   * Fix stale authz session cache when repository membership changes (CVM-1653)
