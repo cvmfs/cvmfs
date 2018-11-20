@@ -1,4 +1,5 @@
 2.5.2:
+  * Fix stale authz session cache when repository membership changes (CVM-1653)
   * Restrict lazy downloads of geodb to once a day (CVM-1647)
   * Improve error reporting for replication/preloading (CVM-1624)
   * Update Apache config to ignore If-Modified-Since on stratum 1s (CVM-1655)
