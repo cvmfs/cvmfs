@@ -15,6 +15,17 @@
   * Fix debian packaging warnings and errors
 
 2.5.2:
+  * Report start of mark and sweep phases during GC
+  * Fix cache cleanup logic for chunks >25M (CVM-1625)
+  * Fix stale authz session cache when repository membership changes (CVM-1653)
+  * Restrict lazy downloads of geodb to once a day (CVM-1647)
+  * Improve error reporting for replication/preloading (CVM-1624)
+  * Update Apache config to ignore If-Modified-Since on stratum 1s (CVM-1655)
+  * Add support for CVMFS_MAX_[EXTERNAL_]SERVERS (CVM-1631)
+  * Fine-grained syncfs control through 
+    CVMFS_SYNCFS_LEVEL=[none,default,cautious] (CVM-1646)
+  * Improve printing of warnings during publish (CVM-1630)
+  * Add support for CVMFS_SUID config parameter (CVM-1591)
   * Repository gateway protocol version bumped to 2 (CVM-1626).
   * New parameter CVMFS_FUSE_NOTIFY_INVALIDATION; disabling it fixes
     stability issues on macOS (CVM-1638)

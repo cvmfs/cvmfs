@@ -482,10 +482,16 @@ int PosixCacheManager::StartTxn(
       return -ENOSPC;
     }
 
-    // Opportunistically clean up cache for large files
+    // For large files, ensure enough free cache space before writing the chunk
     if (size > kBigFile) {
-      assert(quota_mgr_->GetCapacity() >= size);
-      quota_mgr_->Cleanup(quota_mgr_->GetCapacity() - size);
+      uint64_t cache_size = quota_mgr_->GetSize();
+      uint64_t cache_capacity = quota_mgr_->GetCapacity();
+      assert(cache_capacity >= size);
+      if ((cache_size + size) > cache_capacity) {
+        uint64_t leave_size =
+          std::min(cache_capacity / 2, cache_capacity - size);
+        quota_mgr_->Cleanup(leave_size);
+      }
     }
   }
 

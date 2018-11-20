@@ -710,6 +710,11 @@ int main(int argc, char *argv[]) {
     fuse_opt_add_arg(mount_options, "-oro");
   }
   fuse_opt_add_arg(mount_options, "-onodev");
+  if (options_manager->GetValue("CVMFS_SUID", &parameter) &&
+      options_manager->IsOn(parameter))
+  {
+    suid_mode_ = true;
+  }
   if (suid_mode_) {
     if (getuid() != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,

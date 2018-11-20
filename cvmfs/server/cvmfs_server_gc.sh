@@ -253,7 +253,7 @@ __do_gc_cmd()
       fi
     fi
 
-    syncfs
+    syncfs cautious
 }
 
 # this is used for both auto-gc (after publish or snapshot) and non-auto-gc

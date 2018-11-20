@@ -60,6 +60,14 @@ AuthzSessionManager::~AuthzSessionManager() {
 }
 
 
+void AuthzSessionManager::ClearSessionCache() {
+  LockMutex(&lock_session2cred_);
+  session2cred_.Clear();
+  no_session_->Set(0);
+  UnlockMutex(&lock_session2cred_);
+}
+
+
 AuthzSessionManager *AuthzSessionManager::Create(
   AuthzFetcher *authz_fetcher,
   perf::Statistics *statistics)

@@ -399,7 +399,7 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
       //       system to (potentially) unncessarily fetch catalogs
       if (DirectoryExists(scratch_dir_ + candidate_rel) &&
           !FileExists(union_dir_ + candidate_rel + "/.cvmfscatalog")) {
-        LogCvmfs(kLogCatalog, kLogStderr,
+        LogCvmfs(kLogCatalog, kLogStdout,
                  "WARNING: '%s' should be a nested "
                  "catalog according to the dirtab. "
                  "Recreating...",

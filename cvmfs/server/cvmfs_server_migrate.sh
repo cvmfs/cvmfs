@@ -421,6 +421,35 @@ _migrate_139() {
   load_repo_config $name
 }
 
+_migrate_140() {
+  local name=$1
+  local destination_version="140"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  local apache_repo_conf="$(get_apache_conf_path)/$(get_apache_conf_filename $name)"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  # only called when has apache config
+  if _is_generated_apache_conf "$apache_repo_conf"; then
+    echo "--> updating apache config ($(basename $apache_repo_conf))"
+    local storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+    # only called on stratum1
+    local wsgi="enabled"
+    create_apache_config_for_endpoint $name $storage_dir $wsgi
+    echo "--> reloading Apache"
+    reload_apache > /dev/null
+  else
+    echo "--> skipping foreign apache config ($(basename $apache_repo_conf))"
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -539,6 +568,13 @@ cvmfs_server_migrate() {
 
     if [ $creator -lt 139 ]; then
       _migrate_139 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" -lt 140 ] && \
+         is_stratum1 $name && \
+         has_apache_config_file $(get_apache_conf_filename $name); then
+      _migrate_140 $name
       creator="$(repository_creator_version $name)"
     fi
 

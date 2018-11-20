@@ -1,0 +1,30 @@
+
+cvmfs_test_name="Run suid binaries"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local suid_binary=/cvmfs/cernvm-prod.cern.ch/extras/test_suid
+
+  echo "*** run suid binary without special mount option"
+  cvmfs_mount cernvm-prod.cern.ch || return 1
+  $suid_binary || return 2
+  local persona=$($suid_binary)
+  echo "*** Persona: $persona"
+  echo "$persona" | grep -q " $(id -u)/$(id -u)$" || return 3
+
+  echo "*** unmount cernvm-prod.cern.ch"
+  cvmfs_umount cernvm-prod.cern.ch || return 10
+
+  echo "*** re-mount and try again with suid support enabled"
+  cvmfs_mount cernvm-prod.cern.ch \
+    CVMFS_SUID=yes CVMFS_CLAIM_OWNERSHIP=no || return 20
+  $suid_binary || return 21
+  local persona=$($suid_binary)
+  echo "*** Persona: $persona"
+  echo "$persona" | grep -q " $(id -u)/0" || return 22
+
+  return 0
+}
+

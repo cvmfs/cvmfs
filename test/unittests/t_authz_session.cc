@@ -37,7 +37,7 @@ class T_AuthzSession : public ::testing::Test {
  protected:
   virtual void SetUp() {
     authz_session_mgr_ =
-      AuthzSessionManager::Create(&authz_fetcher_, &statistics);
+      AuthzSessionManager::Create(&authz_fetcher_, &statistics_);
   }
 
   virtual void TearDown() {
@@ -46,7 +46,7 @@ class T_AuthzSession : public ::testing::Test {
 
   AuthzSessionManager *authz_session_mgr_;
   TestAuthzFetcher authz_fetcher_;
-  perf::Statistics statistics;
+  perf::Statistics statistics_;
 };
 
 
@@ -144,6 +144,24 @@ TEST_F(T_AuthzSession, IsMemberOf) {
   EXPECT_FALSE(authz_session_mgr_->IsMemberOf(1, "B"));
   EXPECT_FALSE(authz_session_mgr_->IsMemberOf(-1, "A"));
 }
+
+
+TEST_F(T_AuthzSession, ClearSessionCache) {
+  EXPECT_EQ(0, statistics_.Lookup("authz.no_session")->Get());
+  authz_fetcher_.next_status = kAuthzOk;
+  authz_fetcher_.next_ttl = 1000;
+  EXPECT_TRUE(authz_session_mgr_->IsMemberOf(1, "A"));
+  EXPECT_FALSE(authz_session_mgr_->IsMemberOf(1, "B"));
+  EXPECT_EQ(1, statistics_.Lookup("authz.no_session")->Get());
+
+  authz_session_mgr_->ClearSessionCache();
+  EXPECT_EQ(0, statistics_.Lookup("authz.no_session")->Get());
+
+  EXPECT_TRUE(authz_session_mgr_->IsMemberOf(1, "B"));
+  EXPECT_FALSE(authz_session_mgr_->IsMemberOf(1, "A"));
+  EXPECT_EQ(1, statistics_.Lookup("authz.no_session")->Get());
+}
+
 
 
 TEST_F(T_AuthzSession, GetTokenCopy) {

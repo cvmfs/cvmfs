@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <string>
+#include <vector>
 
 #include "cache_posix.h"
 #include "cache_tiered.h"
@@ -628,5 +629,60 @@ TEST_F(T_MountPoint, History) {
   {
     UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
+  }
+}
+
+
+TEST_F(T_MountPoint, MaxServers) {
+  CreateMiniRepository();
+  string server_url;
+  ASSERT_TRUE(options_mgr_.GetValue("CVMFS_SERVER_URL", &server_url));
+  server_url += ";" + server_url;
+  options_mgr_.SetValue("CVMFS_SERVER_URL", server_url);
+
+  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  ASSERT_EQ(loader::kFailOk, fs->boot_status());
+  std::vector<std::string> host_chain;
+
+  options_mgr_.SetValue("CVMFS_MAX_SERVERS", "10");
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    ASSERT_EQ(loader::kFailOk, mp->boot_status());
+    mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
+    EXPECT_EQ(2U, host_chain.size());
+    mp->external_download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
+    EXPECT_EQ(1U, host_chain.size());
+  }
+
+  options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "10");
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    ASSERT_EQ(loader::kFailOk, mp->boot_status());
+    mp->external_download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
+    // Host chain has been set to one empty string in SetupExternalDownloadMgr
+    EXPECT_EQ(1U, host_chain.size());
+  }
+
+  options_mgr_.SetValue("CVMFS_EXTERNAL_URL", server_url);
+  options_mgr_.SetValue("CVMFS_MAX_SERVERS", "1");
+  options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "1");
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    ASSERT_EQ(loader::kFailOk, mp->boot_status());
+    mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
+    EXPECT_EQ(1U, host_chain.size());
+    mp->external_download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
+    EXPECT_EQ(1U, host_chain.size());
+  }
+
+  options_mgr_.SetValue("CVMFS_MAX_SERVERS", "0");
+  options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "0");
+  {
+    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    ASSERT_EQ(loader::kFailOk, mp->boot_status());
+    mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
+    EXPECT_EQ(2U, host_chain.size());
+    mp->external_download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
+    EXPECT_EQ(2U, host_chain.size());
   }
 }
