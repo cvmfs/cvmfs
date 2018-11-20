@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "logging.h"
+#include "util/string.h"
 
 template<class CatalogTraversalT, class HashFilterT>
 const unsigned int GarbageCollector<CatalogTraversalT,
@@ -184,6 +185,8 @@ template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::
   AnalyzePreservedCatalogTree()
 {
+  LogCvmfs(kLogGc, kLogStdout, "  --> marking unreferenced objects [%s]",
+           RfcTimestamp().c_str());
   if (configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStdout | kLogDebug,
              "Preserving data objects in latest revision");
@@ -218,9 +221,8 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions()
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
-  if (configuration_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout | kLogDebug, "Sweeping reference logs");
-  }
+  LogCvmfs(kLogGc, kLogStdout, "  --> sweeping unreferenced objects [%s]",
+           RfcTimestamp().c_str());
 
   const ReflogTN *reflog = configuration_.reflog;
   std::vector<shash::Any> catalogs;
@@ -250,6 +252,8 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
 
   traversal_.UnregisterListener(callback);
   configuration_.uploader->WaitForUpload();
+  LogCvmfs(kLogGc, kLogStdout, "  --> done garbage collecting [%s]",
+           RfcTimestamp().c_str());
   return success && (configuration_.uploader->GetNumberOfErrors() == 0);
 }
 
