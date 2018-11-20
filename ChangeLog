@@ -1,4 +1,5 @@
 2.5.2:
+  * Report start of mark and sweep phases during GC
   * Fix cache cleanup logic for chunks >25M (CVM-1625)
   * Fix stale authz session cache when repository membership changes (CVM-1653)
   * Restrict lazy downloads of geodb to once a day (CVM-1647)
