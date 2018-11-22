@@ -10,7 +10,7 @@ cvmfs_run_test() {
   logfile=$1
 
   local cache_dir=$(get_cvmfs_cachedir grid.cern.ch)
-  echo "mount grid.cern.ch"
+  echo "*** mount grid.cern.ch"
   cvmfs_mount grid.cern.ch || return 1
   cvmfs_umount grid.cern.ch || return 2
   sudo rm -f ${cache_dir}/cvmfschecksum.grid.cern.ch
@@ -21,30 +21,30 @@ cvmfs_run_test() {
   cvmfs_umount grid.cern.ch || return 11
   sudo rm -f ${cache_dir}/cvmfschecksum.grid.cern.ch
 
-  echo "blacklist the grid.cern.ch fingerprint(s)"
-  white="`curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfswhitelist`" || return 10
+  echo "*** blacklist the grid.cern.ch fingerprint(s)"
+  curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfswhitelist > white || return 10
 
-  echo "$white" | cat -v | awk '/^N/{ok=1;next} /^--/{exit} ok==1 {print}'| \
+  awk '/^N/{ok=1;next} /^--/{exit} ok==1 {print}' white | \
     sed 's/ .*//' | sudo sh -c "tee /etc/cvmfs/blacklist"
 
-  echo "attempt to mount the blacklisted repo"
+  echo "*** attempt to mount the blacklisted repo"
   if cvmfs_mount grid.cern.ch; then
     echo "CERTIFICATE BLACKLIST NOT EFFECTIVE"
     return 20
   fi
 
-  echo "remove fingerprint blacklist and remount"
+  echo "*** remove fingerprint blacklist and remount"
   sudo rm -f /etc/cvmfs/blacklist
   service_switch autofs restart || return 30
   cvmfs_mount grid.cern.ch || return 31
 
-  echo "blacklist the grid.cern.ch revision"
-  pub="`curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfspublished`" || return 32
+  echo "*** blacklist the grid.cern.ch revision"
+  curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfspublished > pub || return 32
 
-  echo "$pub" | cat -v | awk '/^S/{r=substr($1,2);print "<grid.cern.ch",r+1;}' \
+  awk '/^S/{r=substr($1,2);print "<grid.cern.ch",r+1;}' pub \
     | sudo sh -c "tee /etc/cvmfs/blacklist"
 
-  echo "force remount which should cause blacklisted repo to unmount"
+  echo "*** force remount which should cause blacklisted repo to unmount"
   sudo cvmfs_talk -i grid.cern.ch remount
   sleep 10
   if grep grid.cern.ch /proc/mounts; then
@@ -52,7 +52,7 @@ cvmfs_run_test() {
     return 40
   fi
 
-  echo "attempt another mount which should also fail"
+  echo "*** attempt another mount which should also fail"
   if cvmfs_mount grid.cern.ch; then
     echo "REVISION BLACKLIST NOT EFFECTIVE FOR MOUNT"
     return 41
