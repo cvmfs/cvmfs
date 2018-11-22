@@ -45,14 +45,14 @@ cvmfs_run_test() {
   echo "*** verify files are unchunked and unique"
   local chunks=
   for i in 1 2 3 4 5; do
-    chunks=$(get_xattr chunks ${repo_dir}/f$i)
+    chunks=$(get_xattr chunks /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f$i)
     [ "x$chunks" = "x1" ] || return 10
   done
-  local hash1=$(get_xattr hash ${repo_dir}/f1)
-  local hash2=$(get_xattr hash ${repo_dir}/f2)
-  local hash3=$(get_xattr hash ${repo_dir}/f3)
-  local hash4=$(get_xattr hash ${repo_dir}/f4)
-  local hash5=$(get_xattr hash ${repo_dir}/f5)
+  local hash1=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f1)
+  local hash2=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f2)
+  local hash3=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f3)
+  local hash4=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f4)
+  local hash5=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f5)
   local count_unique=$(echo -e "$hash1\n$hash2\n$hash3\n$hash4\n$hash5" | sort -u | wc -l)
   [ "x$count_unique" = "x5" ] || return 11
 
