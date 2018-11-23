@@ -68,7 +68,7 @@ cvmfs_run_test() {
   df -h $mntpnt
 
   echo "*** check that cache got cleaned until limit/2"
-  local cache_size_mb=$(df -BM --output=used $mntpnt | tail -n 1 | tr -d M)
+  local cache_size_mb=$(df -BM -P $mntpnt | tail -n 1 | awk '{print $3}' | tr -d M)
   echo "*** cache size is $cache_size_mb MB"
   [ $cache_size_mb -lt 160 ] || return 40
   [ $cache_size_mb -ge 120 ] || return 41
