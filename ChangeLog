@@ -1,4 +1,5 @@
 2.5.2:
+  * Add support for CVMFS_DNS_{MIN,MAX}_TTL (CVM-1659)
   * Disable suid binary integration test (083) on macOS
   * Log to syslog when session authorization disappears (CVM-1658)
   * Report start of mark and sweep phases during GC
