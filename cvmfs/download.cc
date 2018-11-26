@@ -1050,7 +1050,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
              "failed to resolve IP addresses for %s (%d - %s)",
              host.name().c_str(), new_host.status(),
              dns::Code2Ascii(new_host.status()));
-    new_host = dns::Host::ExtendDeadline(host, dns::Resolver::kMinTtl);
+    new_host = dns::Host::ExtendDeadline(host, resolver_->min_ttl());
   } else if (!host.IsEquivalent(new_host)) {
     update_only = false;
   }
@@ -1828,6 +1828,17 @@ void DownloadManager::SetDnsParameters(
 }
 
 
+void DownloadManager::SetDnsTtlLimits(
+  const unsigned min_seconds,
+  const unsigned max_seconds)
+{
+  pthread_mutex_lock(lock_options_);
+  resolver_->set_min_ttl(min_seconds);
+  resolver_->set_max_ttl(max_seconds);
+  pthread_mutex_unlock(lock_options_);
+}
+
+
 void DownloadManager::SetIpPreference(dns::IpPreference preference) {
   pthread_mutex_lock(lock_options_);
   opt_ip_preference_ = preference;
@@ -2519,7 +2530,7 @@ void DownloadManager::SetProxyChain(
                  hosts[num_proxy].name().c_str(), hosts[num_proxy].status(),
                  dns::Code2Ascii(hosts[num_proxy].status()));
         dns::Host failed_host =
-          dns::Host::ExtendDeadline(hosts[num_proxy], dns::Resolver::kMinTtl);
+          dns::Host::ExtendDeadline(hosts[num_proxy], resolver_->min_ttl());
         infos.push_back(ProxyInfo(failed_host, this_group[j]));
         continue;
       }
@@ -2726,6 +2737,7 @@ DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
   clone->Init(pool_max_handles_, use_system_proxy_, statistics);
   if (resolver_) {
     clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
+    clone->SetDnsTtlLimits(resolver_->min_ttl(), resolver_->max_ttl());
     clone->SetMaxIpaddrPerProxy(resolver_->throttle());
   }
   if (!opt_dns_server_.empty())
