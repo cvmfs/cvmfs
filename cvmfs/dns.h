@@ -172,14 +172,14 @@ class Host {
 class Resolver : SingleCopy {
  public:
   /**
-   * Enlarge very small TTLs to 1 minute.
+   * Enlarge very small TTLs by default to 1 minute.
    */
-  static const unsigned kMinTtl = 60;
+  static const unsigned kDefaultMinTtl = 60;
 
   /**
-   * Cut off very large TTLs to 1 day.
+   * Cut off very large TTLs by default to 1 day.
    */
-  static const unsigned kMaxTtl = 84600;
+  static const unsigned kDefaultMaxTtl = 84600;
 
   Resolver(const bool ipv4_only,
            const unsigned retries,
@@ -204,6 +204,10 @@ class Resolver : SingleCopy {
   unsigned timeout_ms() const { return timeout_ms_; }
   void set_throttle(const unsigned throttle) { throttle_ = throttle; }
   unsigned throttle() const { return throttle_; }
+  void set_min_ttl(unsigned seconds) { min_ttl_ = seconds; }
+  unsigned min_ttl() const { return min_ttl_; }
+  void set_max_ttl(unsigned seconds) { max_ttl_ = seconds; }
+  unsigned max_ttl() const { return max_ttl_; }
 
  protected:
   /**
@@ -256,6 +260,16 @@ class Resolver : SingleCopy {
    * throttle_ randomly picked IPs are returned.
    */
   unsigned throttle_;
+
+  /**
+   * Effective minimum TTL, which by default is kDefaultMinTtl
+   */
+  unsigned min_ttl_;
+
+  /**
+   * Effective maximum TTL, which by default is kDefaultMaxTtl
+   */
+  unsigned max_ttl_;
 
   /**
    * Required for picking IP addresses in throttle_

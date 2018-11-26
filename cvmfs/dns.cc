@@ -330,6 +330,8 @@ Resolver::Resolver(
   , retries_(retries)
   , timeout_ms_(timeout_ms)
   , throttle_(0)
+  , min_ttl_(kDefaultMinTtl)
+  , max_ttl_(kDefaultMaxTtl)
 {
   prng_.InitLocaltime();
 }
@@ -378,7 +380,7 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       ipv4_host.name_ = names[i];
       ipv4_host.status_ = kFailOk;
       ipv4_host.ipv4_addresses_.insert(names[i]);
-      ipv4_host.deadline_ = time(NULL) + kMaxTtl;
+      ipv4_host.deadline_ = time(NULL) + max_ttl_;
       hosts->push_back(ipv4_host);
       skip[i] = true;
     } else if ((names[i].length() >= 3) &&
@@ -390,7 +392,7 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       ipv6_host.name_ = names[i];
       ipv6_host.status_ = kFailOk;
       ipv6_host.ipv6_addresses_.insert(names[i]);
-      ipv6_host.deadline_ = time(NULL) + kMaxTtl;
+      ipv6_host.deadline_ = time(NULL) + max_ttl_;
       hosts->push_back(ipv6_host);
       skip[i] = true;
     } else {
@@ -412,10 +414,10 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
     host.status_ = failures[i];
 
     unsigned effective_ttl = ttls[i];
-    if (effective_ttl < kMinTtl) {
-      effective_ttl = kMinTtl;
-    } else if (effective_ttl > kMaxTtl) {
-      effective_ttl = kMaxTtl;
+    if (effective_ttl < min_ttl_) {
+      effective_ttl = min_ttl_;
+    } else if (effective_ttl > max_ttl_) {
+      effective_ttl = max_ttl_;
     }
     host.deadline_ = time(NULL) + effective_ttl;
 
@@ -1108,7 +1110,7 @@ void HostfileResolver::DoResolve(
         (*ipv6_addresses)[i].insert((*ipv6_addresses)[i].end(),
                                     iter->second.ipv6_addresses.begin(),
                                     iter->second.ipv6_addresses.end());
-        (*ttls)[i] = kMinTtl;
+        (*ttls)[i] = min_ttl_;
         (*fqdns)[i] = effective_names[j];
         (*failures)[i] = kFailOk;
         break;
