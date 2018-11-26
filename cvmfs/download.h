@@ -367,6 +367,7 @@ class DownloadManager {
   std::string GetDnsServer() const;
   void SetDnsServer(const std::string &address);
   void SetDnsParameters(const unsigned retries, const unsigned timeout_ms);
+  void SetDnsTtlLimits(const unsigned min_seconds, const unsigned max_seconds);
   void SetIpPreference(const dns::IpPreference preference);
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);

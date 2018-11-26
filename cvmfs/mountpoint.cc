@@ -1701,8 +1701,17 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
     dns_retries = String2Uint64(optarg);
   manager->SetDnsParameters(dns_retries, dns_timeout_ms);
 
-  // Has to be after SetDnsParameters because SetDnsParameters might construct
-  // a new resolver object
+  // Rest has to be after SetDnsParameters because SetDnsParameters might
+  // construct a new resolver object
+
+  unsigned dns_min_ttl = dns::Resolver::kDefaultMinTtl;
+  unsigned dns_max_ttl = dns::Resolver::kDefaultMaxTtl;
+  if (options_mgr_->GetValue("CVMFS_DNS_MIN_TTL", &optarg))
+    dns_min_ttl = String2Uint64(optarg);
+  if (options_mgr_->GetValue("CVMFS_DNS_MAX_TTL", &optarg))
+    dns_max_ttl = String2Uint64(optarg);
+  manager->SetDnsTtlLimits(dns_min_ttl, dns_max_ttl);
+
   if (options_mgr_->GetValue("CVMFS_DNS_SERVER", &optarg)) {
     download_mgr_->SetDnsServer(optarg);
   }
