@@ -267,7 +267,7 @@ class Resolver : SingleCopy {
   unsigned min_ttl_;
 
   /**
-   * Effective maximum TTL, which by default is kDefaultMinTtl
+   * Effective maximum TTL, which by default is kDefaultMaxTtl
    */
   unsigned max_ttl_;
 
