@@ -1118,8 +1118,8 @@ bool DownloadManager::CanRetry(const JobInfo *info) {
   pthread_mutex_unlock(lock_options_);
 
   return !info->nocache && (info->num_retries < max_retries) &&
-    ((info->error_code == kFailProxyConnection) ||
-     (info->error_code == kFailHostConnection));
+    (IsProxyTransferError(info->error_code) ||
+     IsHostTransferError(info->error_code));
 }
 
 
@@ -1317,7 +1317,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if ( same_url_retry || (
          ( (info->error_code == kFailHostResolve) ||
-           (info->error_code == kFailHostConnection) ||
+           IsHostTransferError(info->error_code) ||
            (info->error_code == kFailHostHttp)) &&
          info->probe_hosts &&
          host_chain && (info->num_used_hosts < host_chain->size()))
@@ -1327,7 +1327,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if ( same_url_retry || (
          ( (info->error_code == kFailProxyResolve) ||
-           (info->error_code == kFailProxyConnection) ||
+           IsProxyTransferError(info->error_code) ||
            (info->error_code == kFailProxyHttp)) )
        )
     {
@@ -1421,21 +1421,21 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       case kFailHostAfterProxy:
         switch_host = true;
         break;
-      case kFailProxyConnection:
-        if (same_url_retry)
-          Backoff(info);
-        else
-          switch_proxy = true;
-        break;
-      case kFailHostConnection:
-        if (same_url_retry)
-          Backoff(info);
-        else
-          switch_host = true;
-        break;
       default:
-        // No other errors expected when retrying
-        abort();
+        if (IsProxyTransferError(info->error_code)) {
+          if (same_url_retry)
+            Backoff(info);
+          else
+            switch_proxy = true;
+        } else if (IsHostTransferError(info->error_code)) {
+          if (same_url_retry)
+            Backoff(info);
+          else
+            switch_host = true;
+        } else {
+          // No other errors expected when retrying
+          abort();
+        }
     }
     if (switch_proxy) {
       SwitchProxy(info);

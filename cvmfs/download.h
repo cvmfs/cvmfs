@@ -59,6 +59,30 @@ enum Failures {
 };  // Failures
 
 
+inline bool IsHostTransferError(const Failures error) {
+  switch (error) {
+    case kFailHostConnection:
+    case kFailHostTooSlow:
+    case kFailHostShortTransfer:
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
+
+inline bool IsProxyTransferError(const Failures error) {
+  switch (error) {
+    case kFailProxyConnection:
+    case kFailProxyTooSlow:
+    case kFailProxyShortTransfer:
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
+
 inline const char *Code2Ascii(const Failures error) {
   const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
@@ -82,7 +106,6 @@ inline const char *Code2Ascii(const Failures error) {
   texts[18] = "no text";
   return texts[error];
 }
-
 
 /**
  * Where to store downloaded data.
