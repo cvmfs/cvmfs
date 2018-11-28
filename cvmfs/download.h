@@ -429,6 +429,7 @@ class DownloadManager {
   void RebalanceProxiesUnlocked();
   CURL *AcquireCurlHandle();
   void ReleaseCurlHandle(CURL *handle);
+  void ReleaseCredential(JobInfo *info);
   void InitializeRequest(JobInfo *info, CURL *handle);
   void SetUrlOptions(JobInfo *info);
   void ValidateProxyIpsUnlocked(const std::string &url, const dns::Host &host);

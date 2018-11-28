@@ -1176,6 +1176,19 @@ void DownloadManager::SetRegularCache(JobInfo *info) {
 
 
 /**
+ * Frees the storage associated with the authz attachment from the job
+ */
+void DownloadManager::ReleaseCredential(JobInfo *info) {
+  if (info->cred_data) {
+    assert(credentials_attachment_ != NULL);  // Someone must have set it
+    credentials_attachment_->ReleaseCurlHandle(info->curl_handle,
+                                               info->cred_data);
+    info->cred_data = NULL;
+  }
+}
+
+
+/**
  * Checks the result of a curl download and implements the failure logic, such
  * as changing the proxy server.  Takes care of cleanup.
  *
@@ -1186,13 +1199,6 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            "Verify downloaded url %s, proxy %s (curl error %d)",
            info->url->c_str(), info->proxy.c_str(), curl_error);
   UpdateStatistics(info->curl_handle);
-
-  if (info->cred_data) {
-    assert(credentials_attachment_ != NULL);  // Someone must have set it
-    credentials_attachment_->ReleaseCurlHandle(info->curl_handle,
-                                               info->cred_data);
-    info->cred_data = NULL;
-  }
 
   // Verification and error classification
   switch (curl_error) {
@@ -1432,11 +1438,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         abort();
     }
     if (switch_proxy) {
+      ReleaseCredential(info);
       SwitchProxy(info);
       info->num_used_proxies++;
       SetUrlOptions(info);
     }
     if (switch_host) {
+      ReleaseCredential(info);
       SwitchHost(info);
       info->num_used_hosts++;
       SetUrlOptions(info);
@@ -1447,6 +1455,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
  verify_and_finalize_stop:
   // Finalize, flush destination file
+  ReleaseCredential(info);
   if ((info->destination == kDestinationFile) &&
       fflush(info->destination_file) != 0)
   {
