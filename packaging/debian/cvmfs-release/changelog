@@ -1,4 +1,4 @@
-cvmfs-release (2.1-0) lucid; urgency=low
+cvmfs-release (2.1-1) lucid; urgency=low
 
   * Add Ubuntu 18.04 Bionic repository
 
