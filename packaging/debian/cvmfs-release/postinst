@@ -24,10 +24,10 @@ case "$1" in
 	repolist=/usr/share/cvmfs-release/cernvm.list.${codename}
 	mkdir -p /etc/apt/sources.list.d
 	if [ -f $repolist ]; then
-	  ln -s $repolist /etc/apt/sources.list.d/cernvm.list
+	  ln -f -s $repolist /etc/apt/sources.list.d/cernvm.list
 	else
 	  echo "Warning: this distribution is not supported. Using Ubuntu 12.04 packages as fallback."
-	  ln -s /usr/share/cvmfs-release/cernvm.list.precise \
+	  ln -f -s /usr/share/cvmfs-release/cernvm.list.precise \
 	        /etc/apt/sources.list.d/cernvm.list
 	fi
     ;;
