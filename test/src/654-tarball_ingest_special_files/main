@@ -222,7 +222,7 @@ cvmfs_run_test() {
   fi
 
   echo "*** Checking that we have create a new catalog in the base dir"
-  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir" || return 18
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir$" || return 18
 
   return 0
 }

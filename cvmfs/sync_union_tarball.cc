@@ -170,7 +170,9 @@ void SyncUnionTarball::Traverse() {
       case ARCHIVE_OK: {
         if (first_iteration && create_catalog_on_root_) {
           struct archive_entry *catalog = archive_entry_new();
-          archive_entry_set_pathname(catalog, base_directory_.c_str());
+          std::string catalog_path = ".cvmfscatalog";
+          archive_entry_set_pathname(catalog, catalog_path.c_str());
+          archive_entry_set_size(catalog, 0);
           archive_entry_set_filetype(catalog, AE_IFREG);
           archive_entry_set_perm(catalog, kDefaultFileMode);
           archive_entry_set_gid(catalog, getgid());
@@ -336,6 +338,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
       new SyncItemDummyDir(dirname, filename, this, kItemDir));
 
   ProcessUnmaterializedDirectory(dummy);
+  dirs_[target] = dummy;
   know_directories_.insert(target);
 }
 
