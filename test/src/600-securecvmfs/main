@@ -335,5 +335,17 @@ cvmfs_run_test() {
   authz_attr="$(attr -qg authz $mntpnt)" || return 41
   [ x"$authz_attr" = x"x509%cvmfs:/cvmfs" ]   || return 42
 
+  echo "*** Empty disk cache"
+  sudo cvmfs_talk -p "${mntpnt}c/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}" \
+    cleanup 0 || return 51
+
+  echo "*** Enforce fail-over for following request"
+  sudo cvmfs_talk -p "${mntpnt}c/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}" \
+    host set "https://${TEST600_HOSTNAME}:8443/notavail;https://${TEST600_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO"  || return 52
+  sudo cvmfs_talk -p "${mntpnt}c/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}" host info
+  sudo -u nobody /bin/sh -c \
+    "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world2" || return 53
+  sudo cvmfs_talk -p "${mntpnt}c/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}" host info
+
   return 0
 }

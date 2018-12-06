@@ -2218,7 +2218,7 @@ __do_local_mount() {
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
   local output="$(mktemp ${mountpoint}.log.XXXXX)"
 
-  mkdir $mountpoint $cache
+  mkdir -p $mountpoint $cache
   if [ -z $config_file ]; then
     cat > $config << EOF
 CVMFS_MOUNT_DIR=/cvmfs

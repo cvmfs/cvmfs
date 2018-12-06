@@ -14,6 +14,9 @@
   * Optionally print GC stats with CVMFS_SERVER_FLAGS=-+stats
   * Fix debian packaging warnings and errors
 
+2.5.3:
+  * Fix credentials handling on HTTP retries (CVM-1660)
+
 2.5.2:
   * Add support for CVMFS_DNS_{MIN,MAX}_TTL (CVM-1659)
   * Disable suid binary integration test (083) on macOS
