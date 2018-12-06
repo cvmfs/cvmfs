@@ -50,10 +50,38 @@ enum Failures {
   kFailTooBig,
   kFailOther,
   kFailUnsupportedProtocol,
+  kFailProxyTooSlow,
+  kFailHostTooSlow,
+  kFailProxyShortTransfer,
+  kFailHostShortTransfer,
 
   kFailNumEntries
 };  // Failures
 
+
+inline bool IsHostTransferError(const Failures error) {
+  switch (error) {
+    case kFailHostConnection:
+    case kFailHostTooSlow:
+    case kFailHostShortTransfer:
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
+
+inline bool IsProxyTransferError(const Failures error) {
+  switch (error) {
+    case kFailProxyConnection:
+    case kFailProxyTooSlow:
+    case kFailProxyShortTransfer:
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
 
 inline const char *Code2Ascii(const Failures error) {
   const char *texts[kFailNumEntries + 1];
@@ -71,10 +99,13 @@ inline const char *Code2Ascii(const Failures error) {
   texts[11] = "resource too big to download";
   texts[12] = "unknown network error";
   texts[13] = "Unsupported URL in protocol";
-  texts[14] = "no text";
+  texts[14] = "proxy serving data too slowly";
+  texts[15] = "host serving data too slowly";
+  texts[16] = "proxy data transfer cut short";
+  texts[17] = "host data transfer cut short";
+  texts[18] = "no text";
   return texts[error];
 }
-
 
 /**
  * Where to store downloaded data.
