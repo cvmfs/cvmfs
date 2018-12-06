@@ -153,7 +153,7 @@ void SyncUnionTarball::Traverse() {
           SharedPtr<SyncItem> to_mark = dirs_[*dir];
           assert(to_mark->IsDirectory());
           to_mark->SetCatalogMarker();
-          to_mark->IsPlaceholderDirectory();
+          to_mark->MakePlaceholderDirectory();
           ProcessDirectory(to_mark);
         }
         return;  // Only successful exit point
@@ -235,7 +235,7 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 
   if (sync_entry->IsDirectory()) {
     if (know_directories_.find(complete_path) != know_directories_.end()) {
-      sync_entry->IsPlaceholderDirectory();
+      sync_entry->MakePlaceholderDirectory();
     }
     ProcessUnmaterializedDirectory(sync_entry);
     dirs_[complete_path] = sync_entry;

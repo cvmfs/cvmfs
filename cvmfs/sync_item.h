@@ -167,7 +167,7 @@ class SyncItem {
   }
 
   virtual IngestionSource *CreateIngestionSource() const = 0;
-  virtual void IsPlaceholderDirectory() const = 0;
+  virtual void MakePlaceholderDirectory() const = 0;
   void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   bool operator==(const SyncItem &other) const {
@@ -312,7 +312,7 @@ class SyncItemNative : public SyncItem {
   friend class SyncUnion;
   virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
   virtual IngestionSource *CreateIngestionSource() const;
-  virtual void IsPlaceholderDirectory() const { assert(false); }
+  virtual void MakePlaceholderDirectory() const { assert(false); }
   virtual SyncItemType GetScratchFiletype() const;
   virtual bool IsType(const SyncItemType expected_type) const;
   virtual void StatScratch(const bool refresh = false) const {
