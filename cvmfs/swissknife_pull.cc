@@ -152,12 +152,6 @@ static void ReportDownloadError(const download::JobInfo &download_job) {
                                       "please check the network connection");
       break;
 
-    case download::kFailProxyConnection:
-    case download::kFailHostConnection:
-      LogCvmfs(kLogCvmfs, kLogStderr, "couldn't reach Stratum 0 - "
-                                      "please check the network connection");
-      break;
-
     case download::kFailHostHttp:
       LogCvmfs(kLogCvmfs, kLogStderr, "unexpected HTTP error code %d - "
                "please check the stratum 0 health", http_code);
@@ -169,8 +163,14 @@ static void ReportDownloadError(const download::JobInfo &download_job) {
       break;
 
     default:
-      LogCvmfs(kLogCvmfs, kLogStderr, "unexpected error - feel free to file "
+      if (download::IsProxyTransferError(error_code) ||
+          download::IsHostTransferError(error_code)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "couldn't reach Stratum 0 - "
+                                      "please check the network connection");
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStderr, "unexpected error - feel free to file "
                                       "a bug report");
+      }
   }
 }
 
