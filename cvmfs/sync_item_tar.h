@@ -24,7 +24,7 @@ class SyncItemTar : public SyncItem {
  public:
   virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
   virtual IngestionSource *CreateIngestionSource() const;
-  virtual void IsPlaceholderDirectory() const { rdonly_type_ = kItemDir; }
+  virtual void MakePlaceholderDirectory() const { rdonly_type_ = kItemDir; }
   virtual SyncItemType GetScratchFiletype() const;
   virtual bool IsType(const SyncItemType expected_type) const;
   virtual void StatScratch(const bool refresh = false) const;
