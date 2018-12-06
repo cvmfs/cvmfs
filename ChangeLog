@@ -1,4 +1,5 @@
 2.5.3:
+  * Log more details for host and proxy connection errors (CVM-1662)
   * Fix credentials handling on HTTP retries (CVM-1660)
 
 2.5.2:
