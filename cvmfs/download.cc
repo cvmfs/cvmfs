@@ -1278,13 +1278,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                "X509_CERT_BUNDLE might point to the wrong location.");
       info->error_code = kFailHostConnection;
       break;
-    case CURLE_SSL_CACERT:
-      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "SSL certificate cannot"
-               " be authenticated with known CA certificates. "
-               "X509_CERT_DIR and/or X509_CERT_BUNDLE might point to the wrong "
-               "location.");
-      info->error_code = kFailHostConnection;
-      break;
+    // CURLE_SSL_CACERT is now the same as CURLE_PEER_FAILED_VERIFICATION in curl 7.62.0
     case CURLE_PEER_FAILED_VERIFICATION:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                "invalid SSL certificate of remote host. "
