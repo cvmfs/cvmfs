@@ -120,11 +120,11 @@ int main(int argc, char **argv) {
       {"spec-file",   required_argument, 0, 't'},
       {"threads",     required_argument, 0, 'j'},
       {"retries",     required_argument, 0, 'n'},
-      {"gc",          required_argument, 0, 'g'},
+      {"gc",          no_argument, 0, 'g'},
       {0, 0, 0, 0}
     };
 
-  static const char short_opts[] = "hb:s:r:c:f:d:x:y:t:j:n:gk";
+  static const char short_opts[] = "hb:s:r:c:f:d:x:y:t:j:n:g";
 
   while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0) {
     switch (c) {
