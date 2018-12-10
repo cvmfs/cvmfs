@@ -32,6 +32,7 @@ struct posix_file_handle {
   std::string path;
   FILE *fd;
   struct utimbuf mtimes;
+  int original_mode;
 };
 
 /*
@@ -471,6 +472,15 @@ void *posix_get_handle(struct fs_traversal_context *ctx,
   return file_ctx;
 }
 
+bool EnableWriteAccess(posix_file_handle *handle) {
+  struct stat info;
+  int retval = stat(handle->path.c_str(), &info);
+  if (retval != 0) return false;
+  handle->original_mode = info.st_mode;
+  retval = chmod(handle->path.c_str(), info.st_mode | S_IWUSR | S_IWUSR);
+  return retval == 0;
+}
+
 int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
   struct posix_file_handle *handle =
     reinterpret_cast<posix_file_handle *>(file_ctx);
@@ -481,10 +491,18 @@ int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
     mode = "a";
   }
   if (!BackupMtimes(handle->path, &(handle->mtimes))) return -1;
+  handle->original_mode = 0;
 
   FILE *fd = fopen(handle->path.c_str(), mode);
   if (fd == NULL) {
-    return -1;
+    if (errno == EACCES) {
+      EnableWriteAccess(handle);
+      fd = fopen(handle->path.c_str(), mode);
+      if (fd == NULL)
+        return -1;
+    } else {
+      return -1;
+    }
   }
   handle->fd = fd;
   return 0;
@@ -493,10 +511,19 @@ int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
 int posix_do_fclose(void *file_ctx) {
   struct posix_file_handle *handle =
     reinterpret_cast<posix_file_handle *>(file_ctx);
-  int res = fclose(handle->fd);
-  res |= utime(handle->path.c_str(), &(handle->mtimes));
-  if (res != 0) return -1;
+  int res = 0;
+  if (handle->original_mode != 0) {
+    res = fchmod(fileno(handle->fd), handle->original_mode);
+  }
+  res |= fclose(handle->fd);
   handle->fd = NULL;
+  if (res != 0) {
+    // Opportunistic approach to reset time stamp
+    utime(handle->path.c_str(), &(handle->mtimes));
+    return -1;
+  }
+  res = utime(handle->path.c_str(), &(handle->mtimes));
+  if (res != 0) return -1;
   return 0;
 }
 
