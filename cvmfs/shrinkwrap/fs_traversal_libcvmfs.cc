@@ -18,6 +18,10 @@
 
 #define MAX_INTEGER_DIGITS 20
 
+void libcvmfs_sw_log(const char *msg) {
+  printf("(libcvmfs) %s\n", msg);
+}
+
 void libcvmfs_list_dir(struct fs_traversal_context *ctx,
   const char *dir,
   char ***buf,
@@ -203,6 +207,9 @@ struct fs_traversal_context *libcvmfs_initialize(
     "CVMFS Initilization failed : %s", repo);
     return NULL;
   }
+
+  cvmfs_set_log_fn(libcvmfs_sw_log);
+
   cvmfs_context *ctx;
   retval = cvmfs_attach_repo_v2(repo, options_mgr, &ctx);
   if (retval) {
