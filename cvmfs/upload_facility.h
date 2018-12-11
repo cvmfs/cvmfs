@@ -6,9 +6,11 @@
 #define CVMFS_UPLOAD_FACILITY_H_
 
 #include <fcntl.h>
+#include <stdint.h>
 
 #include <string>
 
+#include "atomic.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "repository_tag.h"
@@ -80,27 +82,27 @@ class AbstractUploader
     enum Type { Upload, Commit, Terminate };
 
     UploadJob(UploadStreamHandle *handle, UploadBuffer buffer,
-              const CallbackTN *callback = NULL)
-        : type(Upload),
-          stream_handle(handle),
-          buffer(buffer),
-          callback(callback) {}
-
-    UploadJob(UploadStreamHandle *handle, const shash::Any &content_hash)
-        : type(Commit),
-          stream_handle(handle),
-          buffer(),
-          callback(NULL),
-          content_hash(content_hash) {}
+              const CallbackTN *callback = NULL);
+    UploadJob(UploadStreamHandle *handle, const shash::Any &content_hash);
 
     UploadJob()
-        : type(Terminate), stream_handle(NULL), buffer(), callback(NULL) {}
+        : type(Terminate)
+        , stream_handle(NULL)
+        , tag_(0)
+        , buffer()
+        , callback(NULL) {}
 
     static UploadJob *CreateQuitBeacon() { return new UploadJob(); }
     bool IsQuitBeacon() { return type == Terminate; }
 
     Type type;
     UploadStreamHandle *stream_handle;
+    /**
+     * Ensure that upload jobs belonging to the same file end up in the same
+     * upload task queue.
+     */
+    int64_t tag_;
+    int64_t tag() { return tag_; }
 
     // type==Upload specific fields
     UploadBuffer buffer;
@@ -118,10 +120,12 @@ class AbstractUploader
   virtual std::string name() const = 0;
 
   /**
-   * Concrete uploaders might want to use more tasks for writing, for instance
-   * one per disk.
+   * Concrete uploaders might want to use a customized setting for multi-stream
+   * writing, for instance one per disk.  Note that the S3 backend uses one task
+   * but this one task uses internally mutliple HTTP streams through curl async
+   * I/O.
    */
-  virtual unsigned GetNumTasks() const { return 1; }
+  virtual unsigned GetNumTasks() const { return num_upload_tasks_; }
 
   /**
    * This is called right after the constructor of AbstractUploader or/and its
@@ -198,7 +202,7 @@ class AbstractUploader
     const CallbackTN *callback = NULL)
   {
     ++jobs_in_flight_;
-    tube_upload_.Enqueue(new UploadJob(handle, buffer, callback));
+    tubes_upload_.Dispatch(new UploadJob(handle, buffer, callback));
   }
 
   /**
@@ -214,7 +218,7 @@ class AbstractUploader
     const shash::Any &content_hash)
   {
     ++jobs_in_flight_;
-    tube_upload_.Enqueue(new UploadJob(handle, content_hash));
+    tubes_upload_.Dispatch(new UploadJob(handle, content_hash));
   }
 
   /**
@@ -348,9 +352,14 @@ class AbstractUploader
  private:
   const SpoolerDefinition spooler_definition_;
 
+  /**
+   * Number of threads used for I/O write calls. Effectively this paramater
+   * sets the I/O depth. Defaults to 1.
+   */
+  unsigned num_upload_tasks_;
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
+  TubeGroup<UploadJob> tubes_upload_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
-  Tube<UploadJob> tube_upload_;
 };  // class AbstractUploader
 
 
@@ -359,8 +368,10 @@ class AbstractUploader
  */
 class TaskUpload : public TubeConsumer<AbstractUploader::UploadJob> {
  public:
-  explicit TaskUpload(AbstractUploader *uploader)
-    : TubeConsumer<AbstractUploader::UploadJob>(&(uploader->tube_upload_))
+  explicit TaskUpload(
+    AbstractUploader *uploader,
+    Tube<AbstractUploader::UploadJob> *tube)
+    : TubeConsumer<AbstractUploader::UploadJob>(tube)
     , uploader_(uploader)
   { }
 
@@ -381,12 +392,16 @@ class TaskUpload : public TubeConsumer<AbstractUploader::UploadJob> {
  */
 struct UploadStreamHandle {
   typedef AbstractUploader::CallbackTN CallbackTN;
+  static atomic_int64 g_upload_stream_tag;
 
   explicit UploadStreamHandle(const CallbackTN *commit_callback)
-      : commit_callback(commit_callback) {}
+      : commit_callback(commit_callback)
+      , tag(atomic_xadd64(&g_upload_stream_tag, 1)) {}
   virtual ~UploadStreamHandle() {}
 
   const CallbackTN *commit_callback;
+
+  int64_t tag;
 };
 
 }  // namespace upload

@@ -647,6 +647,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.max_concurrent_write_jobs = String2Uint64(*args.find('q')->second);
   }
 
+  if (args.find('0') != args.end()) {
+    params.num_upload_tasks = String2Uint64(*args.find('0')->second);
+  }
+
   if (args.find('T') != args.end()) {
     params.ttl_seconds = String2Uint64(*args.find('T')->second);
   }
@@ -689,6 +693,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     spooler_definition.number_of_concurrent_uploads =
         params.max_concurrent_write_jobs;
   }
+  spooler_definition.num_upload_tasks = params.num_upload_tasks;
 
   upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());

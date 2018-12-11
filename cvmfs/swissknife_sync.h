@@ -50,6 +50,7 @@ struct SyncParameters {
         manual_revision(0),
         ttl_seconds(0),
         max_concurrent_write_jobs(0),
+        num_upload_tasks(1),
         is_balanced(false),
         max_weight(kDefaultMaxWeight),
         min_weight(kDefaultMinWeight),
@@ -95,6 +96,7 @@ struct SyncParameters {
   uint64_t manual_revision;
   uint64_t ttl_seconds;
   uint64_t max_concurrent_write_jobs;
+  unsigned num_upload_tasks;
   bool is_balanced;
   unsigned max_weight;
   unsigned min_weight;
@@ -257,6 +259,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('h', "maximal file chunk size in bytes"));
     r.push_back(Parameter::Optional('l', "minimal file chunk size in bytes"));
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
+    r.push_back(Parameter::Optional('0', "number of upload tasks"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('C', "trusted certificates"));
