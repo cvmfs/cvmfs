@@ -181,6 +181,7 @@ struct JobInfo {
     origin_file = NULL;
     request = kReqPutCas;
     error_code = kFailOk;
+    http_error = 0;
     num_retries = 0;
     backoff_ms = 0;
     origin = kOriginPath;
@@ -193,6 +194,7 @@ struct JobInfo {
   FILE *origin_file;
   RequestType request;
   Failures error_code;
+  int http_error;
   unsigned char num_retries;
   unsigned backoff_ms;
 };  // JobInfo

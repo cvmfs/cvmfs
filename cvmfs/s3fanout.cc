@@ -52,10 +52,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
         info->error_code = kFailOther;
         return 0;
       }
-      bool print_error = true;
-      int http_error = String2Int64(string(&header_line[i], 3));
+      info->http_error = String2Int64(string(&header_line[i], 3));
 
-      switch (http_error) {
+      switch (info->http_error) {
         case 503:
         case 502:  // Can happen if the S3 gateway-backend connection breaks
           info->error_code = kFailServiceUnavailable;
@@ -69,14 +68,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
           break;
         case 404:
           info->error_code = kFailNotFound;
-          print_error = false;
           break;
         default:
           info->error_code = kFailOther;
-      }
-      if (print_error) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "S3: HTTP failure '%s'",
-                 header_line.c_str());
       }
       return 0;
     }
@@ -789,6 +783,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   // Initialize internal download state
   info->curl_handle = handle;
   info->error_code = kFailOk;
+  info->http_error = 0;
   info->num_retries = 0;
   info->backoff_ms = 0;
   info->http_headers = NULL;
@@ -1081,6 +1076,11 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
   }
 
+  if ((info->error_code != kFailOk) &&
+      (info->http_error != 0) && (info->http_error != 404))
+  {
+    LogCvmfs(kLogS3Fanout, kLogStderr, "S3: HTTP failure %d", info->http_error);
+  }
   return false;  // stop transfer
 }
 
