@@ -12,6 +12,30 @@
 
 namespace upload {
 
+atomic_int64 UploadStreamHandle::g_upload_stream_tag = 0;
+
+AbstractUploader::UploadJob::UploadJob(
+  UploadStreamHandle *handle,
+  UploadBuffer buffer,
+  const CallbackTN *callback)
+  : type(Upload)
+  , stream_handle(handle)
+  , tag_(handle->tag)
+  , buffer(buffer)
+  , callback(callback)
+{ }
+
+AbstractUploader::UploadJob::UploadJob(
+  UploadStreamHandle *handle,
+  const shash::Any &content_hash)
+  : type(Commit)
+  , stream_handle(handle)
+  , tag_(handle->tag)
+  , buffer()
+  , callback(NULL)
+  , content_hash(content_hash)
+{ }
+
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
   RegisterPlugin<S3Uploader>();
@@ -19,15 +43,19 @@ void AbstractUploader::RegisterPlugins() {
 }
 
 AbstractUploader::AbstractUploader(const SpoolerDefinition &spooler_definition)
-  : spooler_definition_(spooler_definition),
-    jobs_in_flight_(spooler_definition.number_of_concurrent_uploads)
+  : spooler_definition_(spooler_definition)
+  , num_upload_tasks_(spooler_definition.num_upload_tasks)
+  , jobs_in_flight_(spooler_definition.number_of_concurrent_uploads)
 { }
 
 
 bool AbstractUploader::Initialize() {
   for (unsigned i = 0; i < GetNumTasks(); ++i) {
-    tasks_upload_.TakeConsumer(new TaskUpload(this));
+    Tube<UploadJob> *t = new Tube<UploadJob>();
+    tubes_upload_.TakeTube(t);
+    tasks_upload_.TakeConsumer(new TaskUpload(this, t));
   }
+  tubes_upload_.Activate();
   tasks_upload_.Spawn();
   return true;
 }
