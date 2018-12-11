@@ -57,6 +57,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
 
       switch (http_error) {
         case 503:
+        case 502:  // Can happen if the S3 gateway-backend connection breaks
           info->error_code = kFailServiceUnavailable;
           break;
         case 501:
