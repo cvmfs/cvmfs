@@ -78,6 +78,8 @@ class T_Uploaders : public FileSandbox {
   template<typename> struct type {};
 
  public:
+  static const unsigned kTotal429Replies;
+  static const unsigned k429ThrottleSec;
   static atomic_int64 gSeed;
   struct StreamHandle {
     StreamHandle() : handle(NULL), content_hash(shash::kMd5) {
@@ -401,7 +403,7 @@ class T_Uploaders : public FileSandbox {
 
     // Number of 429 retries in a row, should be larger than the number of
     // regular client retries
-    int n429 = 4;
+    int n429 = kTotal429Replies;
 
     struct timeval tv;
     tv.tv_sec = 5;
@@ -463,6 +465,7 @@ class T_Uploaders : public FileSandbox {
 
         n429--;
         string reply = "HTTP/1.1 429 Too Many Requests\r\n"
+          "Retry-After: 1\r\n\r\n"
           "Connection: close\r\n\r\n";
         int n = write(accept_sockfd, reply.c_str(), reply.length());
         ASSERT_GE(n, 0);
@@ -602,6 +605,13 @@ bool T_Uploaders<S3Uploader>::IsS3() const {
 template <class UploadersT>
 atomic_int64 T_Uploaders<UploadersT>::gSeed = 0;
 
+// Shold be larger than the number of regular retries
+template <class UploadersT>
+const unsigned T_Uploaders<UploadersT>::kTotal429Replies = 4;
+
+template <class UploadersT>
+const unsigned T_Uploaders<UploadersT>::k429ThrottleSec = 1;
+
 template <class UploadersT>
 const char T_Uploaders<UploadersT>::sandbox_path[] = "./cvmfs_ut_uploader";
 
@@ -645,7 +655,10 @@ TYPED_TEST(T_Uploaders, RetrySlow) {
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
 
-  EXPECT_GT(s3uploader->GetS3FanoutManager()->GetStatistics().num_retries, 0U);
+  EXPECT_EQ(this->kTotal429Replies,
+            s3uploader->GetS3FanoutManager()->GetStatistics().num_retries);
+  EXPECT_EQ(this->kTotal429Replies * this->k429ThrottleSec * 1000,
+            s3uploader->GetS3FanoutManager()->GetStatistics().ms_throttled);
 }
 
 

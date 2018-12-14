@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "cvmfs_config.h"
+#include "platform.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
 #include "util/posix.h"
@@ -23,6 +24,32 @@ namespace s3fanout {
 const char *S3FanoutManager::kCacheControlCas = "Cache-Control: max-age=259200";
 const char *S3FanoutManager::kCacheControlDotCvmfs =
   "Cache-Control: max-age=61";
+const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
+const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
+const unsigned S3FanoutManager::kThrottleReportIntervalSec = 60;
+
+
+/**
+ * Parses Retry-After and X-Retry-In headers attached to HTTP 429 responses
+ */
+void S3FanoutManager::DetectThrottleIndicator(
+  const std::string &header,
+  JobInfo *info)
+{
+  std::string value_str;
+  if (HasPrefix(header, "retry-after:", true))
+    value_str = header.substr(12);
+  if (HasPrefix(header, "x-retry-in:", true))
+    value_str = header.substr(11);
+
+  value_str = Trim(value_str);
+  if (!value_str.empty()) {
+    unsigned value_ms = String2Uint64(value_str) * 1000;
+    if (value_ms > 0)
+      info->throttle_ms = std::min(value_ms, kMax429ThrottleMs);
+  }
+}
+
 
 /**
  * Called by curl for every HTTP header. Not called for file:// transfers.
@@ -57,7 +84,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       switch (info->http_error) {
         case 429:
           info->error_code = kFailRetry;
-          break;
+          info->throttle_ms = S3FanoutManager::kDefault429ThrottleMs;
+          return num_bytes;
         case 503:
         case 502:  // Can happen if the S3 gateway-backend connection breaks
           info->error_code = kFailServiceUnavailable;
@@ -79,6 +107,10 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     }
   }
 
+  if (info->error_code == kFailRetry) {
+    S3FanoutManager::DetectThrottleIndicator(header_line, info);
+  }
+
   return num_bytes;
 }
 
@@ -90,6 +122,11 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
                                void *info_link) {
   const size_t num_bytes = size*nmemb;
   JobInfo *info = static_cast<JobInfo *>(info_link);
+
+  // In case of 429, we potentially need to read all the headers so we can
+  // only abort the transfer in the (probably empty) data section
+  if (info->error_code == kFailRetry)
+    return 0;
 
   LogCvmfs(kLogS3Fanout, kLogDebug, "Data callback with %d bytes", num_bytes);
 
@@ -294,9 +331,6 @@ void *S3FanoutManager::MainUpload(void *data) {
         CURL *easy_handle = curl_msg->easy_handle;
         int curl_error = curl_msg->data.result;
         curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
-
-        LogCvmfs(kLogS3Fanout, kLogDebug, "Verify before %s",
-                 info->object_key.c_str());
 
         curl_multi_remove_handle(s3fanout_mgr->curl_multi_, easy_handle);
         if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
@@ -789,6 +823,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   info->http_error = 0;
   info->num_retries = 0;
   info->backoff_ms = 0;
+  info->throttle_ms = 0;
   info->http_headers = NULL;
 
   InitializeDnsSettings(handle, info->hostname);
@@ -957,24 +992,33 @@ void S3FanoutManager::Backoff(JobInfo *info) {
   unsigned backoff_max_ms = opt_backoff_max_ms_;
   pthread_mutex_unlock(lock_options_);
 
-  unsigned minimal_backoff_ms = 0;
-  if (info->error_code == kFailRetry) {
-    minimal_backoff_ms = kDefault429BackoffMs;
-  } else {
+  if (info->error_code != kFailRetry)
     info->num_retries++;
-  }
   statistics_->num_retries++;
-  if (info->backoff_ms == 0) {
-    info->backoff_ms = prng_.Next(backoff_init_ms + 1);  // Must be != 0
-    info->backoff_ms = std::max(info->backoff_ms, minimal_backoff_ms);
-  } else {
-    info->backoff_ms *= 2;
-  }
-  if (info->backoff_ms > backoff_max_ms)
-    info->backoff_ms = backoff_max_ms;
 
-  LogCvmfs(kLogS3Fanout, kLogDebug, "backing off for %d ms", info->backoff_ms);
-  SafeSleepMs(info->backoff_ms);
+  if (info->throttle_ms > 0) {
+    LogCvmfs(kLogS3Fanout, kLogDebug, "throttling for %d ms",
+             info->throttle_ms);
+    uint64_t now = platform_monotonic_time();
+    if ((now - timestamp_last_throttle_report_) > kThrottleReportIntervalSec) {
+      LogCvmfs(kLogS3Fanout, kLogStdout,
+               "Warning: S3 backend throttling (%ums)", info->throttle_ms);
+    }
+    statistics_->ms_throttled += info->throttle_ms;
+    SafeSleepMs(info->throttle_ms);
+  } else {
+    if (info->backoff_ms == 0) {
+      info->backoff_ms = prng_.Next(backoff_init_ms + 1);  // Must be != 0
+    } else {
+      info->backoff_ms *= 2;
+    }
+    if (info->backoff_ms > backoff_max_ms)
+      info->backoff_ms = backoff_max_ms;
+
+    LogCvmfs(kLogS3Fanout, kLogDebug, "backing off for %d ms",
+             info->backoff_ms);
+    SafeSleepMs(info->backoff_ms);
+  }
 }
 
 
@@ -994,7 +1038,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   // Verification and error classification
   switch (curl_error) {
     case CURLE_OK:
-      info->error_code = kFailOk;
+      if (info->error_code != kFailRetry)
+        info->error_code = kFailOk;
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
     case CURLE_URL_MALFORMAT:
@@ -1140,6 +1185,7 @@ S3FanoutManager::S3FanoutManager() {
   resolver_ = NULL;
   available_jobs_ = NULL;
   statistics_ = NULL;
+  timestamp_last_throttle_report_ = 0;
 }
 
 

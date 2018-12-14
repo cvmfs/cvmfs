@@ -79,12 +79,14 @@ struct Statistics {
   double transfer_time;
   uint64_t num_requests;
   uint64_t num_retries;
+  uint64_t ms_throttled;  // Total waiting time imposed by HTTP 429 replies
 
   Statistics() {
     transferred_bytes = 0.0;
     transfer_time = 0.0;
     num_requests = 0;
     num_retries = 0;
+    ms_throttled = 0;
   }
 
   std::string Print() const;
@@ -186,6 +188,7 @@ struct JobInfo {
     http_error = 0;
     num_retries = 0;
     backoff_ms = 0;
+    throttle_ms = 0;
     origin = kOriginPath;
   }
   ~JobInfo() {}
@@ -198,7 +201,10 @@ struct JobInfo {
   Failures error_code;
   int http_error;
   unsigned char num_retries;
+  // Exponential backoff with cutoff in case of errors
   unsigned backoff_ms;
+  // Throttle imposed by HTTP 429 reply; mutually exclusive with backoff_ms
+  unsigned throttle_ms;
 };  // JobInfo
 
 struct S3FanOutDnsEntry {
@@ -218,6 +224,15 @@ class S3FanoutManager : SingleCopy {
   typedef SynchronizingCounter<uint32_t> Semaphore;
 
  public:
+  // 250ms pause after HTTP 429 "Too Many Retries"
+  static const unsigned kDefault429ThrottleMs;
+  // Don't throttle for more than a few seconds
+  static const unsigned kMax429ThrottleMs;
+  // Report throttle operations only every so often
+  static const unsigned kThrottleReportIntervalSec;
+
+  static void DetectThrottleIndicator(const std::string &header, JobInfo *info);
+
   S3FanoutManager();
   ~S3FanoutManager();
 
@@ -241,8 +256,6 @@ class S3FanoutManager : SingleCopy {
   // Reflects the default Apache configuration of the local backend
   static const char *kCacheControlCas;  // Cache-Control: max-age=259200
   static const char *kCacheControlDotCvmfs;  // Cache-Control: max-age=61
-  // 250ms pause after HTTP 429 "Too Many Retries"
-  static const unsigned kDefault429BackoffMs = 250;
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -327,6 +340,9 @@ class S3FanoutManager : SingleCopy {
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
   Statistics *statistics_;
+
+  // Report not every occurance of throtteling but only every so often
+  uint64_t timestamp_last_throttle_report_;
 };  // S3FanoutManager
 
 }  // namespace s3fanout
