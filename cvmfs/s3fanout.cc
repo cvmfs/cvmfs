@@ -6,6 +6,7 @@
 
 #include <pthread.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <utility>
 
