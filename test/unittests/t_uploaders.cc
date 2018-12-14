@@ -399,6 +399,10 @@ class T_Uploaders : public FileSandbox {
     listen(listen_sockfd, 5);
     clilen = sizeof(cli_addr);
 
+    // Number of 429 retries in a row, should be larger than the number of
+    // regular client retries
+    int n429 = 4;
+
     struct timeval tv;
     tv.tv_sec = 5;
     tv.tv_usec = 0;
@@ -445,6 +449,24 @@ class T_Uploaders : public FileSandbox {
       if (req_type.compare("PUT") == 0) {
         content_length = GetValue(req_header, "Content-Length");
         ASSERT_GE(content_length, 0);
+      }
+
+      if ((req_file.size() >= 5) &&
+          (req_file.compare(req_file.size() - 5, 5, "RETRY") == 0) &&
+          (n429 > 0))
+      {
+        int left_to_read = content_length;
+        while (left_to_read > 0) {
+          int n = read(accept_sockfd, buffer, kReadBufferSize-1);
+          left_to_read -= n;
+        }
+
+        n429--;
+        string reply = "HTTP/1.1 429 Too Many Requests\r\n"
+          "Connection: close\r\n\r\n";
+        int n = write(accept_sockfd, reply.c_str(), reply.length());
+        ASSERT_GE(n, 0);
+        continue;
       }
 
       // Get content
@@ -593,6 +615,38 @@ const std::string T_Uploaders<UploadersT>::dest_dir =
 
 typedef testing::Types<S3Uploader, LocalUploader> UploadTypes;
 TYPED_TEST_CASE(T_Uploaders, UploadTypes);
+
+
+//------------------------------------------------------------------------------
+
+
+TYPED_TEST(T_Uploaders, RetrySlow) {
+  if (!TestFixture::IsS3()) {
+    SUCCEED();  // Only the S3 uploader has retry logic to test
+    return;
+  }
+
+  const std::string small_file_path = TestFixture::GetSmallFile();
+  const std::string dest_name       = "RETRY";
+
+  upload::S3Uploader *s3uploader =
+    static_cast<upload::S3Uploader *>(this->uploader_);
+  EXPECT_EQ(0U, s3uploader->GetS3FanoutManager()->GetStatistics().num_retries);
+  this->uploader_->Upload(small_file_path, dest_name,
+                          AbstractUploader::MakeClosure(
+                              &UploadCallbacks::SimpleUploadClosure,
+                              &this->delegate_,
+                              UploaderResults(0, small_file_path)));
+  this->uploader_->WaitForUpload();
+
+  EXPECT_TRUE(TestFixture::CheckFile(dest_name));
+  EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
+  TestFixture::CompareFileContents(small_file_path,
+                                   TestFixture::AbsoluteDestinationPath(
+                                       dest_name));
+
+  EXPECT_GT(s3uploader->GetS3FanoutManager()->GetStatistics().num_retries, 0U);
+}
 
 
 //------------------------------------------------------------------------------

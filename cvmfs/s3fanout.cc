@@ -55,6 +55,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       info->http_error = String2Int64(string(&header_line[i], 3));
 
       switch (info->http_error) {
+        case 429:
+          info->error_code = kFailRetry;
+          break;
         case 503:
         case 502:  // Can happen if the S3 gateway-backend connection breaks
           info->error_code = kFailServiceUnavailable;
@@ -937,7 +940,8 @@ bool S3FanoutManager::CanRetry(const JobInfo *info) {
   return
       (info->error_code == kFailHostConnection ||
        info->error_code == kFailHostResolve ||
-       info->error_code == kFailServiceUnavailable) &&
+       info->error_code == kFailServiceUnavailable ||
+       info->error_code == kFailRetry) &&
       (info->num_retries < max_retries);
 }
 
@@ -953,10 +957,16 @@ void S3FanoutManager::Backoff(JobInfo *info) {
   unsigned backoff_max_ms = opt_backoff_max_ms_;
   pthread_mutex_unlock(lock_options_);
 
-  info->num_retries++;
+  unsigned minimal_backoff_ms = 0;
+  if (info->error_code == kFailRetry) {
+    minimal_backoff_ms = kDefault429BackoffMs;
+  } else {
+    info->num_retries++;
+  }
   statistics_->num_retries++;
   if (info->backoff_ms == 0) {
     info->backoff_ms = prng_.Next(backoff_init_ms + 1);  // Must be != 0
+    info->backoff_ms = std::max(info->backoff_ms, minimal_backoff_ms);
   } else {
     info->backoff_ms *= 2;
   }

@@ -49,6 +49,7 @@ enum Failures {
   kFailHostConnection,
   kFailNotFound,
   kFailServiceUnavailable,
+  kFailRetry,
   kFailOther,
 
   kFailNumEntries
@@ -66,6 +67,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[6] = "S3: not found";
   texts[7] = "S3: service not available";
   texts[8] = "S3: unknown service error, perhaps wrong authentication protocol";
+  texts[8] = "S3: too many requests, service asks for backoff and retry";
   texts[9] = "no text";
   return texts[error];
 }
@@ -239,6 +241,8 @@ class S3FanoutManager : SingleCopy {
   // Reflects the default Apache configuration of the local backend
   static const char *kCacheControlCas;  // Cache-Control: max-age=259200
   static const char *kCacheControlDotCvmfs;  // Cache-Control: max-age=61
+  // 250ms pause after HTTP 429 "Too Many Retries"
+  static const unsigned kDefault429BackoffMs = 250;
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
