@@ -189,6 +189,7 @@ struct JobInfo {
     num_retries = 0;
     backoff_ms = 0;
     throttle_ms = 0;
+    throttle_timestamp = 0;
     origin = kOriginPath;
   }
   ~JobInfo() {}
@@ -205,6 +206,8 @@ struct JobInfo {
   unsigned backoff_ms;
   // Throttle imposed by HTTP 429 reply; mutually exclusive with backoff_ms
   unsigned throttle_ms;
+  // Remember when the 429 reply came in to only throttle if still necessary
+  uint64_t throttle_timestamp;
 };  // JobInfo
 
 struct S3FanOutDnsEntry {

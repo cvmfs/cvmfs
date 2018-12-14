@@ -86,6 +86,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
         case 429:
           info->error_code = kFailRetry;
           info->throttle_ms = S3FanoutManager::kDefault429ThrottleMs;
+          info->throttle_timestamp = platform_monotonic_time();
           return num_bytes;
         case 503:
         case 502:  // Can happen if the S3 gateway-backend connection breaks
@@ -825,6 +826,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   info->num_retries = 0;
   info->backoff_ms = 0;
   info->throttle_ms = 0;
+  info->throttle_timestamp = 0;
   info->http_headers = NULL;
 
   InitializeDnsSettings(handle, info->hostname);
@@ -1001,12 +1003,15 @@ void S3FanoutManager::Backoff(JobInfo *info) {
     LogCvmfs(kLogS3Fanout, kLogDebug, "throttling for %d ms",
              info->throttle_ms);
     uint64_t now = platform_monotonic_time();
-    if ((now - timestamp_last_throttle_report_) > kThrottleReportIntervalSec) {
-      LogCvmfs(kLogS3Fanout, kLogStdout,
-               "Warning: S3 backend throttling (%ums)", info->throttle_ms);
+    if ((info->throttle_timestamp + (info->throttle_ms / 1000)) > now) {
+      if ((now - timestamp_last_throttle_report_) > kThrottleReportIntervalSec)
+      {
+        LogCvmfs(kLogS3Fanout, kLogStdout,
+                 "Warning: S3 backend throttling (%ums)", info->throttle_ms);
+      }
+      statistics_->ms_throttled += info->throttle_ms;
+      SafeSleepMs(info->throttle_ms);
     }
-    statistics_->ms_throttled += info->throttle_ms;
-    SafeSleepMs(info->throttle_ms);
   } else {
     if (info->backoff_ms == 0) {
       info->backoff_ms = prng_.Next(backoff_init_ms + 1);  // Must be != 0
