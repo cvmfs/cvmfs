@@ -12,6 +12,7 @@
 #include "atomic.h"
 #include "c_file_sandbox.h"
 #include "hash.h"
+#include "logging.h"
 #include "testutil.h"
 #include "upload_facility.h"
 #include "upload_local.h"
@@ -629,6 +630,9 @@ TYPED_TEST_CASE(T_Uploaders, UploadTypes);
 
 //------------------------------------------------------------------------------
 
+static void LogSupress(const LogSource source, const int mask, const char *msg)
+{
+}
 
 TYPED_TEST(T_Uploaders, RetrySlow) {
   if (!TestFixture::IsS3()) {
@@ -641,6 +645,7 @@ TYPED_TEST(T_Uploaders, RetrySlow) {
 
   upload::S3Uploader *s3uploader =
     static_cast<upload::S3Uploader *>(this->uploader_);
+  SetAltLogFunc(LogSupress);
   EXPECT_EQ(0U, s3uploader->GetS3FanoutManager()->GetStatistics().num_retries);
   this->uploader_->Upload(small_file_path, dest_name,
                           AbstractUploader::MakeClosure(
@@ -648,6 +653,7 @@ TYPED_TEST(T_Uploaders, RetrySlow) {
                               &this->delegate_,
                               UploaderResults(0, small_file_path)));
   this->uploader_->WaitForUpload();
+  SetAltLogFunc(NULL);
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
