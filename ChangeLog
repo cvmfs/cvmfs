@@ -1,4 +1,5 @@
 2.5.3:
+  * [S3] Handle HTTP 429 "too many requests" replies (CVM-1584)
   * [S3] Retry on HTTP 502 errors
   * Add support for server side CVMFS_NUM_UPLOAD_TASKS parameter
   * Log more details for host and proxy connection errors (CVM-1662)
