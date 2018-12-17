@@ -255,6 +255,9 @@ cvmfs_server_publish() {
     if [ "x$CVMFS_FILE_MBYTE_LIMIT" != "x" ]; then
       sync_command="$sync_command -U $CVMFS_FILE_MBYTE_LIMIT"
     fi
+    if [ "x$CVMFS_NUM_UPLOAD_TASKS" != "x" ]; then
+      sync_command="$sync_command -0 $CVMFS_NUM_UPLOAD_TASKS"
+    fi
     if [ "x$manual_revision" != "x" ]; then
       sync_command="$sync_command -v $manual_revision"
     fi

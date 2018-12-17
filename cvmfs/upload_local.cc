@@ -20,7 +20,8 @@ LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition)
     : AbstractUploader(spooler_definition),
       backend_file_mode_(default_backend_file_mode_ ^ GetUmask()),
       upstream_path_(spooler_definition.spooler_configuration),
-      temporary_path_(spooler_definition.temporary_path) {
+      temporary_path_(spooler_definition.temporary_path)
+{
   assert(spooler_definition.IsValid() &&
          spooler_definition.driver_type == SpoolerDefinition::Local);
 

@@ -31,6 +31,7 @@ SpoolerDefinition::SpoolerDefinition(
       avg_file_chunk_size(avg_file_chunk_size),
       max_file_chunk_size(max_file_chunk_size),
       number_of_concurrent_uploads(kDefaultMaxConcurrentUploads),
+      num_upload_tasks(kDefaultNumUploadTasks),
       session_token_file(session_token_file),
       key_file(key_file),
       valid_(false) {
