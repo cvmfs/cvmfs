@@ -469,6 +469,7 @@ void *posix_get_handle(struct fs_traversal_context *ctx,
   const char *identifier) {
   struct posix_file_handle *file_ctx = new struct posix_file_handle;
   file_ctx->path = BuildHiddenPath(ctx, identifier);
+  file_ctx->fd = NULL;
 
   return file_ctx;
 }
@@ -691,6 +692,7 @@ struct fs_traversal_context *posix_initialize(
   fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
   result->lib_version = strdup("1.0");
+  result->type = strdup("posix");
   struct fs_traversal_posix_context *posix_ctx
     = new struct fs_traversal_posix_context;
   posix_ctx->num_threads = num_threads;

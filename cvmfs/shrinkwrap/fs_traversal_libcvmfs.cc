@@ -162,6 +162,7 @@ struct fs_traversal_context *libcvmfs_initialize(
 
   struct fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
+  result->type = strdup("libcvmfs");
   char* major = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
   snprintf(major, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_VERSION_MAJOR);
   char* minor = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));

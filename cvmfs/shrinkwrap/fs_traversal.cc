@@ -19,6 +19,7 @@
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/fs_traversal_libcvmfs.h"
 #include "shrinkwrap/posix/interface.h"
+#include "shrinkwrap/scan/interface.h"
 #include "shrinkwrap/spec_tree.h"
 #include "smalloc.h"
 #include "statistics.h"
@@ -92,14 +93,14 @@ class RecDir {
 
 unsigned             num_parallel_ = 0;
 bool                 recursive = true;
+bool                 scan_ = false;
+int                  stat_update_period_ = 10;
 int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 atomic_int64         copy_queue;
 
 vector<RecDir*>      dirs_;
-
-unsigned             retries_ = 0;
 
 SpecTree             *spec_tree_ = new SpecTree('*');
 
@@ -111,6 +112,8 @@ struct fs_traversal* FindInterface(const char * type)
     return posix_get_interface();
   } else if (!strcmp(type, "cvmfs")) {
     return libcvmfs_get_interface();
+  } else if (!strcmp(type, "scan")) {
+    return scan_get_interface();
   }
   LogCvmfs(kLogCvmfs, kLogStderr,
     "Unknown File System Interface : %s", type);
@@ -164,14 +167,18 @@ bool copyFile(
   const char *dest_name,
   perf::Statistics *pstats
 ) {
-  int retval;
+  int retval = 0;
   bool status = true;
   size_t bytes_transferred = 0;
 
+  // Get file handles from each respective filesystem
   void *src  = src_fs->get_handle(src_fs->context_, src_name);
   void *dest = dest_fs->get_handle(dest_fs->context_, dest_name);
 
-  retval = src_fs->do_fopen(src, fs_open_read);
+  // Do no open file if scanning
+  if (!scan_) {
+    retval = src_fs->do_fopen(src, fs_open_read);
+  }
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
       "Failed open src : %s : %d : %s\n",
@@ -180,6 +187,7 @@ bool copyFile(
     goto copy_fail;
   }
 
+  // File is still created to allow for scan to track data dedup
   retval = dest_fs->do_fopen(dest, fs_open_write);
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -193,7 +201,10 @@ bool copyFile(
     char buffer[COPY_BUFFER_SIZE];
 
     size_t actual_read = 0;
-    retval = src_fs->do_fread(src, buffer, sizeof(buffer), &actual_read);
+    // Do not read in scan
+    if (!scan_) {
+      retval = src_fs->do_fread(src, buffer, sizeof(buffer), &actual_read);
+    }
     if (retval != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
         "Read failed : %d %s\n", errno, strerror(errno));
@@ -202,7 +213,10 @@ bool copyFile(
     }
     bytes_transferred+=actual_read;
 
-    retval = dest_fs->do_fwrite(dest, buffer, actual_read);
+    // Do not write in scan
+    if (!scan_) {
+      retval = dest_fs->do_fwrite(dest, buffer, actual_read);
+    }
     if (retval != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
         "Write failed : %d %s\n", errno, strerror(errno));
@@ -214,15 +228,30 @@ bool copyFile(
       break;
     }
   }
-  pstats->Lookup(SHRINKWRAP_STAT_BYTE_COUNT)->Xadd(bytes_transferred);
 
-  retval = src_fs->do_fclose(src);
-  if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Failed close src : %s : %d : %s\n",
-      src_name, errno, strerror(errno));
-    status = false;
-    goto copy_fail;
+  // When scanning use filesize for data bytes instead of actual bytes
+  if (scan_) {
+    struct cvmfs_attr *st = NULL;
+    st = cvmfs_attr_init();
+    int retval = src_fs->get_stat(src_fs->context_, src_name, st, false);
+    if (retval == 0) {
+      pstats->Lookup(SHRINKWRAP_STAT_DATA_BYTES)->Xadd(st->st_size);
+    }
+    cvmfs_attr_free(st);
+  } else {
+    pstats->Lookup(SHRINKWRAP_STAT_DATA_BYTES)->Xadd(bytes_transferred);
+  }
+
+  // Close open files (not opened in scan)
+  if (!scan_) {
+    retval = src_fs->do_fclose(src);
+    if (retval != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+        "Failed close src : %s : %d : %s\n",
+        src_name, errno, strerror(errno));
+      status = false;
+      goto copy_fail;
+    }
   }
 
   retval = dest_fs->do_fclose(dest);
@@ -300,9 +329,21 @@ bool getNext(
     return false;
   }
   if (is_src) {
-    pstats->Lookup(SHRINKWRAP_STAT_SRC_ENTRIES)->Inc();
+    pstats->Lookup(SHRINKWRAP_STAT_ENTRIES_SRC)->Inc();
+    switch ((*st)->st_mode & S_IFMT) {
+      case S_IFREG:
+        pstats->Lookup(SHRINKWRAP_STAT_COUNT_FILE)->Inc();
+        pstats->Lookup(SHRINKWRAP_STAT_COUNT_BYTE)->Xadd((*st)->st_size);
+        break;
+      case S_IFDIR:
+        pstats->Lookup(SHRINKWRAP_STAT_COUNT_DIR)->Inc();
+        break;
+      case S_IFLNK:
+        pstats->Lookup(SHRINKWRAP_STAT_COUNT_SYMLINK)->Inc();
+        break;
+    }
   } else {
-    pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
+    pstats->Lookup(SHRINKWRAP_STAT_ENTRIES_DEST)->Inc();
   }
   return true;
 }
@@ -349,12 +390,12 @@ bool handle_file(
         errno = 0;
         result = false;
       }
-      pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT)->Inc();
     }
+    pstats->Lookup(SHRINKWRAP_STAT_DATA_FILES)->Inc();
     free(src_ident);
   } else {
-    pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_FILES)->Inc();
-    pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_BYTES)->Xadd(src_st->st_size);
+    pstats->Lookup(SHRINKWRAP_STAT_DATA_FILES_DEDUPED)->Inc();
+    pstats->Lookup(SHRINKWRAP_STAT_DATA_BYTES_DEDUPED)->Xadd(src_st->st_size);
   }
 
   // The target alway exists (either previously existed or just created).
@@ -448,7 +489,7 @@ bool Sync(
               &dest_st, false, false, pstats);
     } else {
       // A destination entry was added
-      pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
+      pstats->Lookup(SHRINKWRAP_STAT_ENTRIES_DEST)->Inc();
     }
 
     // All entries in both have been visited
@@ -550,7 +591,8 @@ bool Sync(
 bool SyncFull(
   struct fs_traversal *src,
   struct fs_traversal *dest,
-  perf::Statistics *pstats) {
+  perf::Statistics *pstats,
+  time_t last_print_time) {
   if (dirs_.empty()) {
     dirs_.push_back(new RecDir("", true));
   }
@@ -562,6 +604,13 @@ bool SyncFull(
       LogCvmfs(kLogCvmfs, kLogStderr,
         "File %s failed to copy\n", next_dir->dir);
       return false;
+    }
+
+    if (time(NULL)-last_print_time > stat_update_period_) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+        "%s",
+        pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
+      last_print_time = time(NULL);
     }
 
     delete next_dir;
@@ -585,19 +634,9 @@ static void *MainWorker(void *data) {
   MainWorkerSpecificContext *sc = static_cast<MainWorkerSpecificContext*>(data);
   MainWorkerContext *mwc = sc->mwc;
   perf::Counter *files_transferred
-    = mwc->pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT);
-  time_t last_print_time = 0;
-  if (sc->num_thread == 0) {
-    last_print_time = time(NULL);
-  }
+    = mwc->pstats->Lookup(SHRINKWRAP_STAT_COUNT_FILE);
 
   while (1) {
-    if (sc->num_thread == 0 && time(NULL)-last_print_time > 10) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
-        "%s",
-        mwc->pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
-      last_print_time = time(NULL);
-    }
     FileCopy next_copy;
     pthread_mutex_lock(&lock_pipe);
     ReadPipe(pipe_chunks[0], &next_copy, sizeof(next_copy));
@@ -627,18 +666,26 @@ static void *MainWorker(void *data) {
 
 perf::Statistics *GetSyncStatTemplate() {
   perf::Statistics *result = new perf::Statistics();
-  result->Register(SHRINKWRAP_STAT_BYTE_COUNT,
-    "The number of bytes transfered from the source to the destination");
-  result->Register(SHRINKWRAP_STAT_FILE_COUNT,
-    "The number of files transfered from the source to the destination");
-  result->Register(SHRINKWRAP_STAT_SRC_ENTRIES,
-    "The number of file system entries processed in the source");
-  result->Register(SHRINKWRAP_STAT_DEST_ENTRIES,
-    "The number of file system entries processed in the destination");
-  result->Register(SHRINKWRAP_STAT_DEDUPED_FILES,
-    "The number of files not copied thanks to deduplication");
-  result->Register(SHRINKWRAP_STAT_DEDUPED_BYTES,
-    "The number of bytes not copied thanks to deduplication");
+  result->Register(SHRINKWRAP_STAT_COUNT_FILE,
+    "Number of files from source repository");
+  result->Register(SHRINKWRAP_STAT_COUNT_DIR,
+    "Number of directories from source repository");
+  result->Register(SHRINKWRAP_STAT_COUNT_SYMLINK,
+    "Number of symlinks from source repository");
+  result->Register(SHRINKWRAP_STAT_COUNT_BYTE,
+    "Byte count of projected repository");
+  result->Register(SHRINKWRAP_STAT_ENTRIES_SRC,
+    "Number of file system entries processed in the source");
+  result->Register(SHRINKWRAP_STAT_ENTRIES_DEST,
+    "Number of file system entries processed in the destination");
+  result->Register(SHRINKWRAP_STAT_DATA_FILES,
+    "Number of data files transfered from source to destination");
+  result->Register(SHRINKWRAP_STAT_DATA_BYTES,
+    "Bytes transfered from source to destination");
+  result->Register(SHRINKWRAP_STAT_DATA_FILES_DEDUPED,
+    "Number of files not copied due to deduplication");
+  result->Register(SHRINKWRAP_STAT_DATA_BYTES_DEDUPED,
+    "Number of bytes not copied due to deduplication");
   return result;
 }
 
@@ -648,9 +695,12 @@ int SyncInit(
   const char *base,
   const char *spec,
   unsigned parallel,
-  unsigned retries) {
+  int stat_period) {
   num_parallel_ = parallel;
-  retries_ = retries;
+  if (!strcmp(dest->context_->type,"scan")) {
+    scan_ = true;
+  }
+  stat_update_period_ = stat_period;
 
   perf::Statistics *pstats = GetSyncStatTemplate();
 
@@ -694,10 +744,18 @@ int SyncInit(
     spec_tree_ = SpecTree::Create(spec);
   }
 
+  time_t last_print_time = 0;
   add_dir_for_sync(base, recursive);
-  int result = !SyncFull(src, dest, pstats);
+  int result = !SyncFull(src, dest, pstats, last_print_time);
 
   while (atomic_read64(&copy_queue) != 0) {
+    if (time(NULL)-last_print_time > stat_update_period_) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+        "%s",
+        pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
+      last_print_time = time(NULL);
+    }
+
     SafeSleepMs(100);
   }
 

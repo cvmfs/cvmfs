@@ -11,6 +11,7 @@
 struct fs_traversal_context {
   uint64_t version;
   uint64_t size;
+  char *type;
 
   char *repo;
   char *base;

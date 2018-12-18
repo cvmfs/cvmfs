@@ -190,6 +190,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
   shrinkwrap/posix/garbage_collector.cc
   shrinkwrap/posix/helpers.cc
   shrinkwrap/posix/interface.cc
+  shrinkwrap/scan/interface.cc
   shrinkwrap/shrinkwrap.cc
   shrinkwrap/spec_tree.cc
   shrinkwrap/util.cc
