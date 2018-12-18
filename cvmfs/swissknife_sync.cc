@@ -24,10 +24,10 @@
 #include "cvmfs_config.h"
 
 #include <errno.h>
-#include <limits.h>
 #include <fcntl.h>
 #include <glob.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <sys/capability.h>
 
 #include <cstdio>
@@ -346,7 +346,7 @@ int GlobStat(const char *name, struct stat *st) {
 }
 
 
-} // anonymous namespace
+}  // anonymous namespace
 
 void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
     const catalog::Dirtab &dirtab,
