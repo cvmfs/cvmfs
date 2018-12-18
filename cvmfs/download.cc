@@ -1278,6 +1278,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                "X509_CERT_BUNDLE might point to the wrong location.");
       info->error_code = kFailHostConnection;
       break;
+#if LIBCURL_VERSION_NUM < 0x073e00
     case CURLE_SSL_CACERT:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "SSL certificate cannot"
                " be authenticated with known CA certificates. "
@@ -1285,6 +1286,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                "location.");
       info->error_code = kFailHostConnection;
       break;
+#endif
     case CURLE_PEER_FAILED_VERIFICATION:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                "invalid SSL certificate of remote host. "

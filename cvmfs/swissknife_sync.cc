@@ -23,9 +23,11 @@
 #include "swissknife_sync.h"
 #include "cvmfs_config.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <sys/capability.h>
 
 #include <cstdio>
@@ -298,6 +300,54 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   return (success) ? 0 : 1;
 }
 
+
+namespace {
+
+// Overwrite directory traversal in the globbing in order to avoid breaking out
+// the repository tree
+
+std::string *g_glob_uniondir = NULL;
+
+bool GlobCheckPath(const char *name) {
+  char resolved_cstr[PATH_MAX];
+  char *retval = realpath(name, resolved_cstr);
+  if (retval == NULL) return false;
+
+  std::string resolved(resolved_cstr);
+  if (resolved == *g_glob_uniondir) return true;
+  if (!HasPrefix(resolved, (*g_glob_uniondir) + "/", false /*ignore_case*/)) {
+    errno = EACCES;
+    return false;
+  }
+  return true;
+}
+
+void *GlobOpendir(const char *name) {
+  if (!GlobCheckPath(name)) return NULL;
+  return opendir(name);
+}
+
+void GlobClosedir(void *dirp) {
+  closedir(static_cast<DIR *>(dirp));
+}
+
+struct dirent *GlobReaddir(void *dirp) {
+  return readdir(static_cast<DIR *>(dirp));
+}
+
+int GlobLstat(const char *name, struct stat *st) {
+  if (!GlobCheckPath(name)) return -1;
+  return lstat(name, st);
+}
+
+int GlobStat(const char *name, struct stat *st) {
+  if (!GlobCheckPath(name)) return -1;
+  return stat(name, st);
+}
+
+
+}  // anonymous namespace
+
 void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
     const catalog::Dirtab &dirtab,
     catalog::SimpleCatalogManager *catalog_manager,
@@ -313,10 +363,19 @@ void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
     // state
     const std::string &glob_string = i->pathspec.GetGlobString();
     const std::string &glob_string_abs = union_dir_ + glob_string;
-    const int glob_flags = GLOB_ONLYDIR | GLOB_NOSORT | GLOB_PERIOD;
+    const int glob_flags = GLOB_ONLYDIR | GLOB_NOSORT | GLOB_PERIOD |
+                           GLOB_ALTDIRFUNC;
     glob_t glob_res;
+    g_glob_uniondir = new std::string(union_dir_);
+    glob_res.gl_opendir = GlobOpendir;
+    glob_res.gl_readdir = GlobReaddir;
+    glob_res.gl_closedir = GlobClosedir;
+    glob_res.gl_lstat = GlobLstat;
+    glob_res.gl_stat = GlobStat;
     const int glob_retval =
         glob(glob_string_abs.c_str(), glob_flags, NULL, &glob_res);
+    delete g_glob_uniondir;
+    g_glob_uniondir = NULL;
 
     if (glob_retval == 0) {
       // found some candidates... filtering by cvmfs catalog structure
@@ -352,6 +411,12 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     const int lstat_retval = platform_lstat(candidate.c_str(), &candidate_info);
     assert(lstat_retval == 0);
     if (!S_ISDIR(candidate_info.st_mode)) {
+      // The GLOB_ONLYDIR flag is only a hint, non-directories can still be
+      // returned
+      LogCvmfs(kLogCatalog, kLogDebug,
+               "The '%s' dirtab entry does not point to a directory "
+               "but to a file or a symbolic link",
+               candidate_rel.c_str());
       continue;
     }
 
