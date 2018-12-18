@@ -31,6 +31,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   , num_retries_(kDefaultNumRetries)
   , timeout_sec_(kDefaultTimeoutSec)
   , authz_method_(s3fanout::kAuthzAwsV2)
+  , peek_before_put_(true)
   , temporary_path_(spooler_definition.temporary_path)
 {
   assert(spooler_definition.IsValid() &&
@@ -138,6 +139,9 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.GetValue("CVMFS_S3_REGION", &region_)) {
     authz_method_ = s3fanout::kAuthzAwsV4;
   }
+  if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
+    peek_before_put_ = options_manager.IsOn(parameter);
+  }
 
   return true;
 }
@@ -222,9 +226,8 @@ void S3Uploader::FileUpload(
   if (HasPrefix(remote_path, ".cvmfs", false /*ignore_case*/)) {
     info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
   } else {
-#ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
-    info->request = s3fanout::JobInfo::kReqHead;
-#endif
+    if (peek_before_put_)
+      info->request = s3fanout::JobInfo::kReqHead;
   }
 
   UploadJobInfo(info);
@@ -344,6 +347,8 @@ void S3Uploader::FinalizeStreamedUpload(
                             static_cast<size_t>(mmf->size()));
   assert(info != NULL);
 
+  if (peek_before_put_)
+      info->request = s3fanout::JobInfo::kReqHead;
   UploadJobInfo(info);
 
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from stream finished: %s",
