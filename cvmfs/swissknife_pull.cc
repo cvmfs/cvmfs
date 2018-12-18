@@ -600,7 +600,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  // download::ActivatePipelining();
   unsigned current_group;
   vector< vector<download::DownloadManager::ProxyInfo> > proxies;
   download_manager()->GetProxyInfo(&proxies, &current_group, NULL);

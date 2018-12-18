@@ -434,7 +434,6 @@ class DownloadManager {
   void SetMaxIpaddrPerProxy(unsigned limit);
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
-  void EnablePipelining();
   void EnableRedirects();
 
   unsigned num_hosts() {
