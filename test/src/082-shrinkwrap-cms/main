@@ -8,6 +8,9 @@ cvmfs_run_test() {
   local export="$PWD/export"
   local cache="$PWD/cache"
 
+  local chunked_file1="/cvmfs/cms.cern.ch/slc6_amd64_gcc700/cms/cmssw/CMSSW_10_2_9/lib/slc6_amd64_gcc700/libFWCoreFramework.so"
+  local chunked_file2="/cvmfs/cms.cern.ch/slc6_amd64_gcc700/cms/cmssw/CMSSW_10_3_0/lib/slc6_amd64_gcc700/libFWCoreFramework.so"
+
   echo "*** Preparing local configuration"
   echo "CVMFS_CACHE_DIR=$cache" > local.config
   echo "CVMFS_CLAIM_OWNERSHIP=yes" >> local.config
@@ -23,6 +26,15 @@ cvmfs_run_test() {
   local local_link=$(readlink $export/cvmfs/cms.cern.ch/SITECONF/local)
   echo "*** Local link is $local_link"
   [ x"$local_link" = "xfoo" ] || return 10
+
+  cvmfs_mount cms.cern.ch || return 20
+  ls -la $export$chunked_file1 || return 21
+  ls -la $chunked_file1 || return 22
+  ls -la $export$chunked_file2 || return 23
+  ls -la $chunked_file2 || return 24
+  diff $chunked_file1 $chunked_file2 && return 25
+  diff $export$chunked_file1 $chunked_file1 || return 26
+  diff $export$chunked_file2 $chunked_file2 || return 27
 
   return 0
 }

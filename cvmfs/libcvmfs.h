@@ -140,7 +140,10 @@ struct cvmfs_attr {
   time_t    mtime;
 
   /* CVMFS related content */
+  int cvm_nchunks;
+  int cvm_is_hash_artificial;
   /* This information is allocated and should be freed */
+  // For chunked files without bulk hash: hash of chunk hashes
   char * cvm_checksum;
   char * cvm_symlink;
   char * cvm_parent;
@@ -157,7 +160,7 @@ struct cvmfs_attr* cvmfs_attr_init();
 
 /**
  * Destroy the cvmfs_attr struct and frees the checksum, symlink,
- * name, and xattrs.
+ * parent, name, and xattrs.
  * @param attr, pointer to a cvmfs_attr struct to be deleted.
  */
 void cvmfs_attr_free(struct cvmfs_attr *attr);

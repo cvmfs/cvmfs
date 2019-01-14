@@ -226,7 +226,10 @@ void posix_list_dir(struct fs_traversal_context *ctx,
 }
 
 int posix_get_stat(struct fs_traversal_context *ctx,
-  const char *path, struct cvmfs_attr *stat_result, bool get_hash) {
+  const char *path,
+  struct cvmfs_attr *stat_result,
+  bool get_hash)
+{
   std::string complete_path = BuildPath(ctx, path);
   struct stat buf;
   int res = lstat(complete_path.c_str(), &buf);
@@ -243,12 +246,10 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   stat_result->st_size = buf.st_size;
   stat_result->mtime = buf.st_mtime;
 
-  // Calculate hash
   if (get_hash && S_ISREG(buf.st_mode)) {
-    shash::Any cvm_checksum = shash::Any(shash::kSha1);
-    shash::HashFile(complete_path, &cvm_checksum);
-    std::string checksum_string = cvm_checksum.ToString();
-    stat_result->cvm_checksum = strdup(checksum_string.c_str());
+    // We cannot reliably figure out the hash
+    // because we don't know the hash algorithm
+    return -1;
   } else {
     // We usually do not calculate the checksum for posix files since it's a
     // destination file system.

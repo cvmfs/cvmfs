@@ -8,6 +8,7 @@
 #include <cassert>
 
 #include "murmur.h"
+#include "platform.h"
 
 using namespace std;  // NOLINT
 
@@ -39,6 +40,25 @@ unsigned FileChunkReflist::FindChunkIdx(const uint64_t off) {
     chunk_idx = idx_low + (idx_high - idx_low) / 2;
   }
   return chunk_idx;
+}
+
+
+/**
+ * Returns a consistent hash over hashes of the chunks. Used by libcvmfs.
+ */
+shash::Any FileChunkReflist::HashChunkList() {
+  shash::Algorithms algo = list->AtPtr(0)->content_hash().algorithm;
+  shash::ContextPtr ctx(algo);
+  ctx.buffer = alloca(ctx.size);
+  shash::Init(ctx);
+  for (unsigned i = 0; i < list->size(); ++i) {
+    shash::Update(list->AtPtr(i)->content_hash().digest,
+                  shash::kDigestSizes[algo],
+                  ctx);
+  }
+  shash::Any result(algo);
+  shash::Final(ctx, &result);
+  return result;
 }
 
 
