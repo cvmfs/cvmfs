@@ -92,14 +92,18 @@ TEST_F(T_FsPosix, Stat) {
   ASSERT_EQ(0, platform_stat("./Stat/abc/testfile1.txt", &stat_reference));
 
   struct cvmfs_attr *stat_traversal = cvmfs_attr_init();
-  EXPECT_EQ(0,
+  EXPECT_EQ(-1,
     interface_->get_stat(
       interface_->context_,
       "/abc/testfile1.txt",
       stat_traversal, true));
+  EXPECT_EQ(0,
+    interface_->get_stat(
+      interface_->context_,
+      "/abc/testfile1.txt",
+      stat_traversal, false));
   // Check empty checksum
-  EXPECT_STREQ("da39a3ee5e6b4b0d3255bfef95601890afd80709",
-               stat_traversal->cvm_checksum);
+  EXPECT_EQ(NULL, stat_traversal->cvm_checksum);
   EXPECT_EQ(stat_reference.st_mode, stat_traversal->st_mode);
   EXPECT_EQ(0, stat_traversal->st_size);
   EXPECT_EQ(stat_reference.st_uid, stat_traversal->st_uid);
@@ -129,7 +133,7 @@ TEST_F(T_FsPosix, SetMetaData) {
     interface_->get_stat(
       interface_->context_,
       "/abc/foo",
-      stat, true));
+      stat, false));
 
   // Change a few easily modifiable values...
   stat->st_mode = 0600;
@@ -150,7 +154,7 @@ TEST_F(T_FsPosix, SetMetaData) {
     interface_->get_stat(
       interface_->context_,
       "/abc/foo",
-      stat, true));
+      stat, false));
 
   EXPECT_EQ(mode_t(0600), (~S_IFMT) & stat->st_mode);
   if (supports_xattrs) {
