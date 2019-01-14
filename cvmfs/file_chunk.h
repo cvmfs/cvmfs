@@ -64,6 +64,7 @@ struct FileChunkReflist {
     , external_data(external) { }
 
   unsigned FindChunkIdx(const uint64_t offset);
+  shash::Any HashChunkList();
 
   FileChunkList     *list;
   PathString         path;

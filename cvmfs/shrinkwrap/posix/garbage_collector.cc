@@ -55,7 +55,6 @@ void InitializeGarbageCollection(struct fs_traversal_context *ctx) {
  * Finalizes the garbage collection
  * Stores the content of the garbage collection hash map in the file at
  * [data directory] + POSIX_GARBAGE_DIR + POSIX_GARBAGE_FLAGGED_FILE
- *
  */
 void FinalizeGarbageCollection(struct fs_traversal_context *ctx) {
   struct fs_traversal_posix_context *posix_ctx
