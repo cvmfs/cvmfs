@@ -1278,13 +1278,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                "X509_CERT_BUNDLE might point to the wrong location.");
       info->error_code = kFailHostConnection;
       break;
-    case CURLE_SSL_CACERT:
-      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "SSL certificate cannot"
-               " be authenticated with known CA certificates. "
-               "X509_CERT_DIR and/or X509_CERT_BUNDLE might point to the wrong "
-               "location.");
-      info->error_code = kFailHostConnection;
-      break;
+    // As of curl 7.62.0, CURLE_SSL_CACERT is the same as
+    // CURLE_PEER_FAILED_VERIFICATION
     case CURLE_PEER_FAILED_VERIFICATION:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                "invalid SSL certificate of remote host. "
@@ -1614,7 +1609,6 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
   curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
                     pool_max_handles_);
-  // curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 
   prng_.InitLocaltime();
 
@@ -2730,11 +2724,6 @@ void DownloadManager::SetProxyTemplates(
 
 void DownloadManager::EnableInfoHeader() {
   enable_info_header_ = true;
-}
-
-
-void DownloadManager::EnablePipelining() {
-  curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 }
 
 

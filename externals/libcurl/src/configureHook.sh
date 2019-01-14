@@ -40,13 +40,15 @@ sh configure CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --disable-ntlm-wb \
   --disable-unix-sockets \
   ${curl_ssl_config} \
+  --without-brotli \
   --without-winssl \
   --without-darwinssl \
   --without-gnutls \
   --without-polarssl \
   --without-mbedtls \
+  --without-wolfssl \
   --without-cyassl \
-  --without-axtls \
+  --without-mesalink \
   --without-nss \
   --without-ca-bundle \
   --without-ca-path \
