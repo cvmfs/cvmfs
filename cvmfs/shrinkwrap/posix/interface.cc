@@ -225,8 +225,7 @@ void posix_list_dir(struct fs_traversal_context *ctx,
   return;
 }
 
-int posix_get_stat(
-  struct fs_traversal_context *ctx,
+int posix_get_stat(struct fs_traversal_context *ctx,
   const char *path,
   struct cvmfs_attr *stat_result,
   bool get_hash)
@@ -249,7 +248,7 @@ int posix_get_stat(
 
   if (get_hash && S_ISREG(buf.st_mode)) {
     // We cannot reliably figure out the hash
-    //because we don't know the hash algorithm
+    // because we don't know the hash algorithm
     return -1;
   } else {
     // We usually do not calculate the checksum for posix files since it's a

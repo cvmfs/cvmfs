@@ -39,8 +39,7 @@ void libcvmfs_list_dir(struct fs_traversal_context *ctx,
 }
 
 
-int libcvmfs_get_stat(
-  struct fs_traversal_context *ctx,
+int libcvmfs_get_stat(struct fs_traversal_context *ctx,
   const char *path,
   struct cvmfs_attr *stat_result,
   bool get_hash)
