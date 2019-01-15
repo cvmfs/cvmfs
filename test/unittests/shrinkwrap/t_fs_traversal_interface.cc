@@ -631,14 +631,14 @@ TEST_P(T_FsInterface, TransferPosixToPosix) {
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
 
-  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
+  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, time(NULL)));
 
   dest->finalize(dest->context_);
   context = dest->initialize(
     dest_name.c_str(), repo_name.c_str(), dest_data.c_str(), NULL, 4);
   dest->context_ = context;
 
-  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics));
+  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, time(NULL)));
   EXPECT_TRUE(DiffTree(repo_name + "/" + dest_name,
                        repo_name + "/" + src_name));
 

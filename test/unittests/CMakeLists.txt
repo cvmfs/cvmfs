@@ -392,6 +392,7 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
   ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/garbage_collector.cc
   ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/helpers.cc
   ${CVMFS_SOURCE_DIR}/shrinkwrap/posix/interface.cc
+  ${CVMFS_SOURCE_DIR}/shrinkwrap/scan/interface.cc
   ${CVMFS_SOURCE_DIR}/shrinkwrap/fs_traversal_libcvmfs.cc
   ${CVMFS_SOURCE_DIR}/shrinkwrap/util.cc
 
