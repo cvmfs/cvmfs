@@ -6,13 +6,13 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <set>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <utime.h>
 
 #include <map>
+#include <set>
 #include <string>
 
 #include "hash.h"

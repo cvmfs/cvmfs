@@ -697,7 +697,7 @@ int SyncInit(
   unsigned parallel,
   int stat_period) {
   num_parallel_ = parallel;
-  if (!strcmp(dest->context_->type,"scan")) {
+  if (!strcmp(dest->context_->type, "scan")) {
     scan_ = true;
   }
   stat_update_period_ = stat_period;
