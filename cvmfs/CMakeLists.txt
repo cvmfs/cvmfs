@@ -216,6 +216,20 @@ set (CVMFS_SHRINKWRAP_SOURCES
   xattr.cc
 )
 
+# TODO(jblomer) Rename to cvmfs_server
+set (CVMFS_PUBLISH_SOURCES
+  logging.cc
+  publish/command.cc
+  publish/main.cc
+  util/posix.cc
+)
+
+set (LIBCVMFS_SERVER_SOURCES
+  publish/command.cc
+  publish/repository.cc
+  publish/settings.cc
+)
+
 set (CVMFS_SWISSKNIFE_SOURCES
   backoff.cc
   catalog.cc
@@ -525,6 +539,7 @@ set (CVMFS_TALK_CFLAGS "-DCVMFS_CLIENT")
 set (LIBCVMFS_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (LIBCVMFS_CACHE_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (CVMFS_SHRINKWRAP_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
+set (CVMFS_PUBLISH "${CVMFS_PUBLISH_CFLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
 
 #
 # set some include and linking stuff
@@ -792,16 +807,34 @@ if (BUILD_SERVER)
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
   add_executable (cvmfs_stratum_agent ${CVMFS_STRATUM_AGENT_SOURCES})
+  add_library (cvmfs_server SHARED ${LIBCVMFS_SERVER_SOURCES})
+  add_executable (cvmfs_publish ${CVMFS_PUBLISH_SOURCES})
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
+  set_target_properties (cvmfs_server PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
+  set_target_properties (cvmfs_publish PROPERTIES COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}" LINK_FLAGS "${CVMFS_PUBLISH_LD_FLAGS}")
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
+  set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
+  list(APPEND LIBCVMFS_SERVER_LINK_LIBRARIES ${CURL_LIBRARIES}
+                                             ${CARES_LIBRARIES}
+                                             ${OPENSSL_LIBRARIES}
+                                             ${SQLITE3_LIBRARY}
+                                             ${ZLIB_LIBRARIES}
+                                             ${SHA3_LIBRARIES}
+                                             ${VJSON_LIBRARIES}
+                                             ${CAP_LIBRARIES}
+                                             ${LibArchive_LIBRARY}
+                                             ${RT_LIBRARY}
+                                             pthread dl)
   target_link_libraries (cvmfs_swissknife
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
                          ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
                          ${LibWebsockets_LIBRARIES} pthread dl)
+  target_link_libraries (cvmfs_server ${LIBCVMFS_SERVER_LIBS} ${LIBCVMFS_SERVER_LINK_LIBRARIES})
+  target_link_libraries (cvmfs_publish cvmfs_server)
 
   target_link_libraries(cvmfs_stratum_agent
                         ${CURL_LIBRARIES} ${CARES_LIBRARIES}
@@ -850,7 +883,7 @@ endif (BUILD_PRELOADER)
 # Generate the "cvmfs_server" script using "make_cvmfs_server.sh"
 #
 add_custom_target (
-  cvmfs_server
+  cvmfs_server_script
   ALL
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./make_cvmfs_server.sh ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server
   COMMENT "Generating the cvmfs_server script"
@@ -956,9 +989,15 @@ endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)
   install (
-    TARGETS     cvmfs_swissknife cvmfs_stratum_agent
+    TARGETS     cvmfs_swissknife cvmfs_stratum_agent cvmfs_publish
     RUNTIME
     DESTINATION    bin
+  )
+
+  install (
+    TARGETS     cvmfs_server
+    LIBRARY
+    DESTINATION    ${CMAKE_INSTALL_LIBDIR}
   )
 
   install(

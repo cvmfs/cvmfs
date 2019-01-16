@@ -84,6 +84,8 @@ _remove_server() {
   do
     rm -f "$pkgdir/usr/bin/$server_bin"
   done
+  rm -f "$pkgdir/usr/lib/libcvmfs_server.so" \
+    "$pkgdir/usr/lib/libcvmfs_server.so.$pkgver"
 }
 
 
@@ -109,7 +111,8 @@ _remove_unittests() {
 
   rm -f "$pkgdir/usr/bin/cvmfs_unittests" \
     "$pkgdir/usr/bin/cvmfs_test_cache" \
-    "$pkgdir/usr/bin/cvmfs_test_shrinkwrap"
+    "$pkgdir/usr/bin/cvmfs_test_shrinkwrap" \
+    "$pkgdir/usr/bin/cvmfs_test_publish"
 }
 
 
