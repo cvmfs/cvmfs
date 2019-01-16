@@ -552,6 +552,8 @@ fi
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
+%{_libdir}/libcvmfs_server.so
+%{_libdir}/libcvmfs_server.so.%{version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
@@ -571,6 +573,7 @@ fi
 %{_bindir}/cvmfs_unittests
 %{_bindir}/cvmfs_test_cache
 %{_bindir}/cvmfs_test_shrinkwrap
+%{_bindir}/cvmfs_test_publish
 %doc COPYING AUTHORS README.md ChangeLog
 
 %if 0%{?build_ducc}

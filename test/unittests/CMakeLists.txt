@@ -6,6 +6,7 @@ set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 set (PROJECT_TEST_CACHE_NAME "cvmfs_test_cache")
 set (PROJECT_TEST_SHRINKWRAP_NAME "cvmfs_test_shrinkwrap")
+set (PROJECT_TEST_PUBLISH_NAME "cvmfs_test_publish")
 
 # Add the test/common directory to the include path
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
@@ -410,6 +411,19 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
   ${LIBCVMFS_SOURCES}
 )
 
+set (CVMFS_TEST_PUBLISH_SOURCES
+  publish/main.cc
+
+  ../common/env.cc
+
+  ${CVMFS_SOURCE_DIR}/publish/command.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository.cc
+  ${CVMFS_SOURCE_DIR}/publish/settings.cc
+
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/util/posix.cc
+)
+
 #
 # Compiler and Linker Flags for unit tests
 #
@@ -417,10 +431,12 @@ set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE
 set (CVMFS_TEST_SHRINKWRAP_CFLAGS "${CVMFS_UNITTESTS_CFLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
 set (CVMFS_TEST_CACHE_CFLAGS "${CVMFS_TEST_CACHE_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -D_GLIBCXX_DEBUG -fexceptions")
+set (CVMFS_TEST_PUBLISH_CFLAGS "${CVMFS_UNITTESTS_CFLAGS}")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_TEST_CACHE_LD_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
 set (CVMFS_TEST_SHRINKWRAP_LD_FLAGS "${CVMFS_TEST_SHRINKWRAP_LD_FLAGS}")
+set (CVMFS_TEST_PUBLISH_LD_FLAGS "${CVMFS_TEST_PUBLISH_LD_FLAGS}")
 
 #
 # build CernVM-FS test cases
@@ -444,6 +460,10 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
     add_executable (${PROJECT_TEST_SHRINKWRAP_NAME} ${CVMFS_TEST_SHRINKWRAP_SOURCES})
     add_dependencies (${PROJECT_TEST_SHRINKWRAP_NAME} cache.pb.generated-unittests)
   endif (BUILD_SHRINKWRAP)
+
+  if (BUILD_SERVER)
+    add_executable (${PROJECT_TEST_PUBLISH_NAME} ${CVMFS_TEST_PUBLISH_SOURCES})
+  endif ()
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
@@ -469,6 +489,9 @@ endif (BUILD_LIBCVMFS_CACHE)
 if (BUILD_SHRINKWRAP)
   set_target_properties (${PROJECT_TEST_SHRINKWRAP_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_SHRINKWRAP_LD_FLAGS}")
 endif (BUILD_SHRINKWRAP)
+if (BUILD_SERVER)
+  set_target_properties (${PROJECT_TEST_PUBLISH_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_PUBLISH_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_PUBLISH_LD_FLAGS}")
+endif (BUILD_SERVER)
 
 
 #
@@ -510,6 +533,16 @@ if (BUILD_SHRINKWRAP)
                           ${PROTOBUF_LITE_LIBRARY}  ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
 endif (BUILD_SHRINKWRAP)
 
+if (BUILD_SERVER)
+  target_link_libraries (${PROJECT_TEST_PUBLISH_NAME}
+                          ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+                          ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
+                          ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
+                          ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
+                          ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                          ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
+endif (BUILD_SERVER)
+
 
 #
 # Install the generated unit test binary
@@ -536,6 +569,14 @@ if (INSTALL_UNITTESTS)
       DESTINATION    bin
     )
   endif (BUILD_SHRINKWRAP)
+
+  if (BUILD_SERVER)
+    install (
+      TARGETS        ${PROJECT_TEST_PUBLISH_NAME}
+      RUNTIME
+      DESTINATION    bin
+    )
+  endif (BUILD_SERVER)
 endif (INSTALL_UNITTESTS)
 
 if (INSTALL_UNITTESTS_DEBUG)
