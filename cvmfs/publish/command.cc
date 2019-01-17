@@ -69,7 +69,8 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
       }
       free(longopts);
 
-      throw EPublish(GetName() + ": unrecognized parameter");
+      throw EPublish(GetName() + ": unrecognized parameter '" +
+                     argv[optind - 1] + "'");
     }
   }
 
