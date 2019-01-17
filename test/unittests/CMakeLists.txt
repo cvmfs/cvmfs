@@ -415,15 +415,21 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
 
 set (CVMFS_TEST_PUBLISH_SOURCES
   publish/main.cc
+  publish/t_command.cc
 
   ../common/env.cc
 
+
+  ${CVMFS_SOURCE_DIR}/publish/cmd_help.cc
+  ${CVMFS_SOURCE_DIR}/publish/cmd_zpipe.cc
   ${CVMFS_SOURCE_DIR}/publish/command.cc
+  ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/string.cc
 )
 
 #
