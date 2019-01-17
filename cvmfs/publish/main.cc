@@ -26,8 +26,11 @@ static void Usage(const std::string &progname,
 {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "CernVM-FS Server Tool %s\n\n"
-    "Usage: %s COMMAND [options] <parameters>\n\n"
-    "Supported Commmands:\n",
+    "Usage:\n"
+    "------\n"
+    "  %s COMMAND [options] <parameters>\n\n"
+    "Supported Commmands\n"
+    "-------------------\n",
     VERSION, progname.c_str());
     const vector<publish::Command *> commands = clist.commands();
 
