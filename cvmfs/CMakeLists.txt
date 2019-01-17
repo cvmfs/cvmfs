@@ -219,13 +219,16 @@ set (CVMFS_SHRINKWRAP_SOURCES
 # TODO(jblomer) Rename to cvmfs_server
 set (CVMFS_PUBLISH_SOURCES
   logging.cc
+  publish/cmd_help.cc
+  publish/cmd_zpipe.cc
   publish/command.cc
+  publish/except.cc
   publish/main.cc
   util/posix.cc
+  util/string.cc
 )
 
 set (LIBCVMFS_SERVER_SOURCES
-  publish/command.cc
   publish/repository.cc
   publish/settings.cc
 )
@@ -539,7 +542,7 @@ set (CVMFS_TALK_CFLAGS "-DCVMFS_CLIENT")
 set (LIBCVMFS_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (LIBCVMFS_CACHE_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (CVMFS_SHRINKWRAP_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
-set (CVMFS_PUBLISH "${CVMFS_PUBLISH_CFLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
+set (CVMFS_PUBLISH_CFLAGS "${CVMFS_PUBLISH_CFLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
 
 #
 # set some include and linking stuff
