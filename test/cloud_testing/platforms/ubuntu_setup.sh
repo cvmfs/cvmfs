@@ -48,6 +48,7 @@ install_deb $CLIENT_PACKAGE
 install_deb $SERVER_PACKAGE
 install_deb $DEVEL_PACKAGE
 install_deb $UNITTEST_PACKAGE
+install_deb $SHRINKWRAP_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."

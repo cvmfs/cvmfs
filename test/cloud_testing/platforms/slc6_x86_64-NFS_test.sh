@@ -30,13 +30,15 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 ./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/001-chksetup                             \
                                  src/010-du                                   \
-			         src/026-tightcache                           \
-				 src/032-workspace                            \
+                                 src/026-tightcache                           \
+                                 src/032-workspace                            \
                                  src/040-aliencache                           \
-				 src/041-rocache                              \
+                                 src/041-rocache                              \
                                  src/043-highinodes                           \
-				 src/068-rocache                              \
-				 src/070-tieredcache                          \
+                                 src/068-rocache                              \
+                                 src/070-tieredcache                          \
+                                 src/081-shrinkwrap                           \
+                                 src/082-shrinkwrap-cms                       \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
