@@ -419,6 +419,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
 
 
   ${CVMFS_SOURCE_DIR}/publish/cmd_help.cc
+  ${CVMFS_SOURCE_DIR}/publish/cmd_mkfs.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_zpipe.cc
   ${CVMFS_SOURCE_DIR}/publish/command.cc
   ${CVMFS_SOURCE_DIR}/publish/except.cc
