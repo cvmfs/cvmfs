@@ -82,6 +82,9 @@ void TaskRead::Process(FileItem *item) {
     }
   } while (nbytes > 0);
 
+  // tell to the OS that we are not going to access the file again in the
+  // foreaseable future.
+  (void)platform_invalidate_kcache(fd, 0, 0);
   close(fd);
 }
 
