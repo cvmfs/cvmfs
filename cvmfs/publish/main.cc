@@ -11,6 +11,7 @@
 
 #include "logging.h"
 #include "publish/cmd_help.h"
+#include "publish/cmd_mkfs.h"
 #include "publish/cmd_zpipe.h"
 #include "publish/command.h"
 
@@ -55,6 +56,7 @@ static void Usage(const std::string &progname,
 
 int main(int argc, char **argv) {
   publish::CommandList commands;
+  commands.TakeCommand(new publish::CmdMkfs());
   commands.TakeCommand(new publish::CmdHelp(&commands));
   commands.TakeCommand(new publish::CmdZpipe());
 

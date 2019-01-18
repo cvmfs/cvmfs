@@ -43,8 +43,8 @@ int CmdHelp::Main(const Options &options) {
   ParameterList params = cmd->GetParams();
   if (params.empty()) return 0;
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Parameters:");
-  LogCvmfs(kLogCvmfs, kLogStdout, "-----------");
+  LogCvmfs(kLogCvmfs, kLogStdout, "Options:");
+  LogCvmfs(kLogCvmfs, kLogStdout, "--------");
   string::size_type max_len = 0;
   for (unsigned i = 0; i < params.size(); ++i) {
     string::size_type l = params[i].key.length();
@@ -64,7 +64,7 @@ int CmdHelp::Main(const Options &options) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, " ");
     LogCvmfs(kLogCvmfs, kLogStdout, "    %s%s",
              params[i].description.c_str(),
-             params[i].is_optional ? " [optional]" : "");
+             params[i].is_optional ? "" : " [mandatory]");
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "");
 
