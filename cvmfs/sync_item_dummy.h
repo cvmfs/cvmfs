@@ -44,7 +44,7 @@ class SyncItemDummyDir : public SyncItemNative {
 
  private:
   static const mode_t kPermision =
-          S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IROTH | S_IXOTH;
+          S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 };
 
 catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
