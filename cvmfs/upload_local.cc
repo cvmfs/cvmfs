@@ -100,18 +100,6 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
                                    const CallbackTN *callback) {
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle *>(handle);
 
-  const off_t offset = lseek(local_handle->file_descriptor, 0, SEEK_CUR);
-  if (offset < 0) {
-    int seek_err = errno;
-    LogCvmfs(kLogSpooler, kLogVerboseMsg,
-             "failed to seek in '%s' (errno: %d)",
-             local_handle->temporary_path.c_str(), seek_err);
-    atomic_inc32(&copy_errors_);
-    Respond(callback,
-            UploaderResults(UploaderResults::kBufferUpload, seek_err));
-    return;
-  }
-
   const size_t bytes_written =
       write(local_handle->file_descriptor, buffer.data, buffer.size);
   if (bytes_written != buffer.size) {
@@ -126,11 +114,6 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
             UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
   }
-
-  // Tell kernel to evict written pages from the page cache.  We don't care if
-  // it succeeds or not.
-  (void)platform_invalidate_kcache(local_handle->file_descriptor, offset,
-                                   bytes_written);
 
   Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
