@@ -308,7 +308,7 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     }
   }
 
-  union_engine_->PostUpload();
+  if (union_engine_) union_engine_->PostUpload();
 
   params_->spooler->UnregisterListeners();
 
