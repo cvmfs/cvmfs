@@ -11,7 +11,6 @@
 
 #include "compression.h"
 #include "logging.h"
-#include "platform.h"
 #include "util/posix.h"
 
 namespace upload {
