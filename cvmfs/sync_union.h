@@ -71,7 +71,7 @@ class SyncUnion {
    */
   virtual void Traverse() = 0;
 
-  virtual void PostUpload() {}
+  virtual void PostUpload() { }
 
   /**
    * This produces a SyncItem and initialises it accordingly. This is the only

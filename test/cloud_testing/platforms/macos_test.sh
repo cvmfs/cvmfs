@@ -34,6 +34,8 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/057-parallelmakecache                    \
                                    src/061-systemdnokill                        \
                                    src/074-oom                                  \
+                                   src/081-shrinkwrap                           \
+                                   src/082-shrinkwrap-cms                       \
                                    src/083-suid                                 \
                                    --                                           \
                                    src/0*

@@ -21,6 +21,8 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/043-highinodes                           \
                                  src/068-rocache                              \
                                  src/070-tieredcache                          \
+                                 src/081-shrinkwrap                           \
+                                 src/082-shrinkwrap-cms                       \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
