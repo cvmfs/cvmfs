@@ -55,6 +55,7 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
   args['a'].Reset(new std::string(repo_tag.name_));
   args['c'].Reset(new std::string(repo_tag.channel_));
   args['D'].Reset(new std::string(repo_tag.description_));
+  args['x'].Reset(new std::string());
 
   UniquePtr<swissknife::CommandEditTag> edit_cmd(
       new swissknife::CommandEditTag());
