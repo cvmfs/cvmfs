@@ -185,6 +185,11 @@ void *S3Uploader::MainCollectResults(void *data) {
       if (info->request == s3fanout::JobInfo::kReqDelete) {
         uploader->Respond(NULL, UploaderResults());
       } else {
+        if (info->request == s3fanout::JobInfo::kReqHead) {
+          // The HEAD request was not transformed into a PUT request, thus this
+          // was a duplicate
+          uploader->CountDuplicates();
+        }
         if (info->origin == s3fanout::kOriginMem) {
           uploader->Respond(static_cast<CallbackTN*>(info->callback),
                             UploaderResults(UploaderResults::kChunkCommit,
@@ -193,6 +198,7 @@ void *S3Uploader::MainCollectResults(void *data) {
           uploader->Respond(static_cast<CallbackTN*>(info->callback),
                             UploaderResults(reply_code, info->origin_path));
         }
+
         assert(info->mmf == NULL);
         assert(info->origin_file == NULL);
       }
@@ -390,6 +396,9 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
 }
 
 
+// TODO(jblomer): this routine does not what one might think it does --
+// peek + upload is currently handled in the S3 fanout manager by secretly
+// changing a HEAD request into a PUT request.  See CVM-1669
 bool S3Uploader::Peek(const std::string& path) const {
   const std::string mangled_path = repository_alias_ + "/" + path;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
