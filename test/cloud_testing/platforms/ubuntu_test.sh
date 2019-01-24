@@ -37,14 +37,14 @@ fi
 if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # Ubuntu 14.04
   # aufs, expected failure
-  CVMFS_EXCLUDE="src/700-overlayfs_validation src/80*-repository_gateway*"
+  CVMFS_EXCLUDE="src/081-shrinkwrap src/700-overlayfs_validation src/80*-repository_gateway*"
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi
 if [ x"$(lsb_release -cs)" = x"precise" ]; then
   # Ubuntu 12.04
   # aufs, expected failure
-  CVMFS_EXCLUDE="src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway*"
+  CVMFS_EXCLUDE="src/081-shrinkwrap src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway*"
 
   echo "Ubuntu 12.04... using aufs instead of overlayfs"
 fi

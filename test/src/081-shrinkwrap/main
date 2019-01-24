@@ -41,6 +41,9 @@ cvmfs_run_test() {
     sudo truncate -s0 /tmp/cvmfs-$repo.trace.log
 
     echo "*** Executing a few operations to check tracing..."
+    # TODO(jblomer): find uses a different order on Ubuntu 12/14 than on new
+    # linuxes.  Therefore, this test is disabled on older Ubuntu.  However,
+    # the test itself should be reliable.
     for f in $(find /cvmfs/$repo -type f | head -n 3); do
       cat $f > /dev/null
     done
