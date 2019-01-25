@@ -458,7 +458,7 @@ if (BUILD_QC_TESTS)
 endif(BUILD_QC_TESTS)
 
 if (BUILD_DUCC)
-  add_subdirectory (ducc/)
+  add_subdirectory (ducc)
 endif(BUILD_DUCC)
 
 #
