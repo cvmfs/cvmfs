@@ -1195,7 +1195,15 @@ cvmfs_killall() {
   local pid=$$
 
   echo -n "Terminating cvmfs_config processes... "
-  local config_pids=$(pgrep -x cvmfs_config)
+  # The exact match (pgrep -x) works only on Linux.  On macOS, one needs to
+  # use the more coarse grained match against the full command line.
+  local pgrep_opt=
+  if [ "$sys_arch" = "Linux" ]; then
+    pgrep_opt="-x"
+  else
+    pgrep_opt="-f"
+  fi
+  local config_pids=$(pgrep $pgrep_opt cvmfs_config)
   other_config_pids=
   for p in $config_pids; do
     if [ $p -ne $pid ]; then
