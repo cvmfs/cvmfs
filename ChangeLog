@@ -16,6 +16,7 @@
   * Fix debian packaging warnings and errors
 
 2.5.3:
+  * [macOS] fix hanging reload during `cvmfs_config reload` 
   * Reduce IOPS during publishing to local backend
   * [S3] Add support for CVMFS_S3_PEEK_BEFORE_PUT
   * Prevent dirtab entries from wandering outside the repository (CVM-1608)
