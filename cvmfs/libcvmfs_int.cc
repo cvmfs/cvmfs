@@ -331,6 +331,29 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
   }
 
   CvmfsAttrFromDirent(dirent, info);
+  // Chunked files without bulk hash need to be treated specially
+  info->cvm_nchunks = 0;
+  info->cvm_is_hash_artificial = 0;
+  if (dirent.IsRegular()) {
+    info->cvm_nchunks = 1;
+    if (dirent.IsChunkedFile()) {
+      FileChunkList *chunks = new FileChunkList();
+      mount_point_->catalog_mgr()->ListFileChunks(
+        p, dirent.hash_algorithm(), chunks);
+      assert(!chunks->IsEmpty());
+      info->cvm_nchunks = chunks->size();
+      if (dirent.checksum().IsNull()) {
+        info->cvm_is_hash_artificial = 1;
+        free(info->cvm_checksum);
+        FileChunkReflist chunks_reflist(
+          chunks, p, dirent.compression_algorithm(), dirent.IsExternalFile());
+        std::string hash_str = chunks_reflist.HashChunkList().ToString();
+        info->cvm_checksum = strdup(hash_str.c_str());
+      }
+      delete chunks;
+    }
+  }
+
   info->cvm_parent = strdup(GetParentPath(c_path).c_str());
   if (dirent.HasXattrs()) {
     XattrList *xattrs = new XattrList();

@@ -274,7 +274,9 @@ Alias /cvmfs/${name} ${storage_dir}
         ForceType application/octet-stream
     </FilesMatch>
 
+    # Avoid Last-Modified and If-Modified-Since because of squid bugs
     Header unset Last-Modified
+    RequestHeader unset If-Modified-Since
     FileETag None
 
     ExpiresActive On

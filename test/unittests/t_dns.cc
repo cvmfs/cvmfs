@@ -526,11 +526,22 @@ TEST_F(T_Dns, ResolverTtlRange) {
 
   time_t now = time(NULL);
   Host host = resolver.Resolve("small-ttl");
-  EXPECT_GE(host.deadline(), now + static_cast<time_t>(Resolver::kMinTtl));
+  EXPECT_GE(host.deadline(),
+            now + static_cast<time_t>(Resolver::kDefaultMinTtl));
 
   host = resolver.Resolve("large-ttl");
   now = time(NULL);
-  EXPECT_LE(host.deadline(), now + static_cast<time_t>(Resolver::kMaxTtl));
+  EXPECT_LE(host.deadline(),
+            now + static_cast<time_t>(Resolver::kDefaultMaxTtl));
+
+  resolver.set_min_ttl(3);
+  resolver.set_max_ttl(17);
+  now = time(NULL);
+  host = resolver.Resolve("small-ttl");
+  EXPECT_GE(host.deadline(), now + static_cast<time_t>(3));
+  host = resolver.Resolve("large-ttl");
+  now = time(NULL);
+  EXPECT_LE(host.deadline(), now + static_cast<time_t>(17));
 }
 
 

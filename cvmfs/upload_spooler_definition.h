@@ -21,6 +21,7 @@ namespace upload {
  */
 struct SpoolerDefinition {
   static const unsigned kDefaultMaxConcurrentUploads = 512;
+  static const unsigned kDefaultNumUploadTasks = 1;
   enum DriverType { S3, Local, Gateway, Mock, Unknown };
 
   /**
@@ -74,7 +75,17 @@ struct SpoolerDefinition {
   size_t avg_file_chunk_size;
   size_t max_file_chunk_size;
 
+  /**
+   * This is the number of concurrently open files to be uploaded. It does not,
+   * however, specify the degree of parallelism of the I/O write operations.
+   */
   unsigned int number_of_concurrent_uploads;
+
+  /**
+   * Number of threads used for I/O write calls. Effectively this paramater
+   * sets the I/O depth.
+   */
+  unsigned int num_upload_tasks;
 
   // The session_token_file parameter is only used for the HTTP driver
   std::string session_token_file;

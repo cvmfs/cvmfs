@@ -609,8 +609,6 @@ class HttpObjectFetcher :
         case download::kFailBadUrl:
         case download::kFailProxyResolve:
         case download::kFailHostResolve:
-        case download::kFailProxyConnection:
-        case download::kFailHostConnection:
         case download::kFailUnsupportedProtocol:
           return BaseTN::kFailNetwork;
 
@@ -625,6 +623,10 @@ class HttpObjectFetcher :
           return BaseTN::kFailBadData;
 
         default:
+          if (download::IsProxyTransferError(retval) ||
+              download::IsHostTransferError(retval)) {
+            return BaseTN::kFailNetwork;
+          }
           return BaseTN::kFailUnknown;
       }
     }

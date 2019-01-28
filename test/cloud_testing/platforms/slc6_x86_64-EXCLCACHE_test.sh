@@ -30,6 +30,8 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 ./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/035-unpinumount                          \
                                  src/042-cleanuppipes                         \
+                                 src/081-shrinkwrap                           \
+                                 src/082-shrinkwrap-cms                       \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

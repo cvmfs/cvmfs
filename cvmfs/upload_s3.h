@@ -70,6 +70,9 @@ class S3Uploader : public AbstractUploader {
   virtual unsigned int GetNumberOfErrors() const;
   int64_t DoGetObjectSize(const std::string &file_name);
 
+  // Only for testing
+  s3fanout::S3FanoutManager *GetS3FanoutManager() { return &s3fanout_mgr_; }
+
  private:
   static const unsigned kDefaultPort = 80;
   static const unsigned kDefaultNumParallelUploads = 16;
@@ -98,6 +101,7 @@ class S3Uploader : public AbstractUploader {
   std::string access_key_;
   std::string secret_key_;
   s3fanout::AuthzMethods authz_method_;
+  bool peek_before_put_;
 
   const std::string temporary_path_;
   mutable atomic_int32 io_errors_;

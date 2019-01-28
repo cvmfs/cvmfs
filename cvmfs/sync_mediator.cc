@@ -308,7 +308,7 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     }
   }
 
-  union_engine_->PostUpload();
+  if (union_engine_) union_engine_->PostUpload();
 
   params_->spooler->UnregisterListeners();
 
@@ -960,7 +960,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
        iEnd = hardlinks.end(); i != iEnd; ++i)
   {
     if (i->second.hardlinks.size() != i->second.master->GetUnionLinkcount()) {
-      LogCvmfs(kLogPublish, kLogStderr, "Hardlinks across directories (%s)",
+      LogCvmfs(kLogPublish, kLogStdout, "Hardlinks across directories (%s)",
                i->second.master->GetUnionPath().c_str());
       if (!params_->ignore_xdir_hardlinks)
         abort();

@@ -31,6 +31,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   , num_retries_(kDefaultNumRetries)
   , timeout_sec_(kDefaultTimeoutSec)
   , authz_method_(s3fanout::kAuthzAwsV2)
+  , peek_before_put_(true)
   , temporary_path_(spooler_definition.temporary_path)
 {
   assert(spooler_definition.IsValid() &&
@@ -139,6 +140,9 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.GetValue("CVMFS_S3_REGION", &region_)) {
     authz_method_ = s3fanout::kAuthzAwsV4;
   }
+  if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
+    peek_before_put_ = options_manager.IsOn(parameter);
+  }
 
   return true;
 }
@@ -181,6 +185,11 @@ void *S3Uploader::MainCollectResults(void *data) {
       if (info->request == s3fanout::JobInfo::kReqDelete) {
         uploader->Respond(NULL, UploaderResults());
       } else {
+        if (info->request == s3fanout::JobInfo::kReqHead) {
+          // The HEAD request was not transformed into a PUT request, thus this
+          // was a duplicate
+          uploader->CountDuplicates();
+        }
         if (info->origin == s3fanout::kOriginMem) {
           uploader->Respond(static_cast<CallbackTN*>(info->callback),
                             UploaderResults(UploaderResults::kChunkCommit,
@@ -189,6 +198,7 @@ void *S3Uploader::MainCollectResults(void *data) {
           uploader->Respond(static_cast<CallbackTN*>(info->callback),
                             UploaderResults(reply_code, info->origin_path));
         }
+
         assert(info->mmf == NULL);
         assert(info->origin_file == NULL);
       }
@@ -223,9 +233,8 @@ void S3Uploader::FileUpload(
   if (HasPrefix(remote_path, ".cvmfs", false /*ignore_case*/)) {
     info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
   } else {
-#ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
-    info->request = s3fanout::JobInfo::kReqHead;
-#endif
+    if (peek_before_put_)
+      info->request = s3fanout::JobInfo::kReqHead;
   }
 
   UploadJobInfo(info);
@@ -346,6 +355,8 @@ void S3Uploader::FinalizeStreamedUpload(
                             static_cast<size_t>(mmf->size()));
   assert(info != NULL);
 
+  if (peek_before_put_)
+      info->request = s3fanout::JobInfo::kReqHead;
   UploadJobInfo(info);
 
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from stream finished: %s",
@@ -385,6 +396,9 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
 }
 
 
+// TODO(jblomer): this routine does not what one might think it does --
+// peek + upload is currently handled in the S3 fanout manager by secretly
+// changing a HEAD request into a PUT request.  See CVM-1669
 bool S3Uploader::Peek(const std::string& path) const {
   const std::string mangled_path = repository_alias_ + "/" + path;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
@@ -406,7 +420,9 @@ bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
 
 
 int64_t S3Uploader::DoGetObjectSize(const std::string &file_name) {
-  return -EOPNOTSUPP;  // TODO(dosarudaniel): use a head request for byte count
+  // TODO(dosarudaniel): use a head request for byte count
+  // Re-enable 661 integration test when done
+  return -EOPNOTSUPP;
 }
 
 }  // namespace upload

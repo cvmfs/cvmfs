@@ -137,38 +137,40 @@ static bool Peek(const shash::Any &remote_hash) {
   return Peek(MakePath(remote_hash));
 }
 
-static void ReportDownloadError(const shash::Any &failed_hash,
-                                const download::Failures error_code) {
+static void ReportDownloadError(const download::JobInfo &download_job) {
+  const download::Failures error_code = download_job.error_code;
+  const int http_code = download_job.http_code;
+  const std::string url = *download_job.url;
+
   LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s)",
-           failed_hash.ToString().c_str(),
-           error_code, download::Code2Ascii(error_code));
+           url.c_str(), error_code, download::Code2Ascii(error_code));
 
   switch (error_code) {
     case download::kFailProxyResolve:
     case download::kFailHostResolve:
-      LogCvmfs(kLogCvmfs, kLogStderr, "DNS lookup for Stratum 0 failed "
-                                      "perhaps check the network path?");
-      break;
-
-    case download::kFailProxyConnection:
-    case download::kFailHostConnection:
-      LogCvmfs(kLogCvmfs, kLogStderr, "couldn't reach Stratum 0 - "
-                                      "perhaps check the network path?");
+      LogCvmfs(kLogCvmfs, kLogStderr, "DNS lookup for Stratum 0 failed - "
+                                      "please check the network connection");
       break;
 
     case download::kFailHostHttp:
-      LogCvmfs(kLogCvmfs, kLogStderr, "unexpected HTTP error code - "
-                                      "perhaps check Stratum 0 health?");
+      LogCvmfs(kLogCvmfs, kLogStderr, "unexpected HTTP error code %d - "
+               "please check the stratum 0 health", http_code);
       break;
 
     case download::kFailBadData:
       LogCvmfs(kLogCvmfs, kLogStderr, "downloaded corrupted data - "
-                                      "perhaps check Stratum 0 health?");
+                                      "please check the stratum 0 health");
       break;
 
     default:
-      LogCvmfs(kLogCvmfs, kLogStderr, "unexpected error - feel free to file "
+      if (download::IsProxyTransferError(error_code) ||
+          download::IsHostTransferError(error_code)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "couldn't reach Stratum 0 - "
+                                      "please check the network connection");
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStderr, "unexpected error - feel free to file "
                                       "a bug report");
+      }
   }
 }
 
@@ -281,7 +283,7 @@ static void *MainWorker(void *data) {
       const download::Failures download_result =
                                        download_manager->Fetch(&download_chunk);
       if (download_result != download::kFailOk) {
-        ReportDownloadError(chunk_hash, download_result);
+        ReportDownloadError(download_chunk);
         abort();
       }
       fclose(fchunk);
@@ -408,7 +410,7 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
                catalog_hash.ToString().c_str());
       goto pull_skip;
     } else {
-      ReportDownloadError(catalog_hash, dl_retval);
+      ReportDownloadError(download_catalog);
       goto pull_cleanup;
     }
   }
@@ -598,7 +600,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  // download::ActivatePipelining();
   unsigned current_group;
   vector< vector<download::DownloadManager::ProxyInfo> > proxies;
   download_manager()->GetProxyInfo(&proxies, &current_group, NULL);
@@ -737,7 +738,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                        &history_hash);
     dl_retval = download_manager()->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
-      ReportDownloadError(history_hash, dl_retval);
+      ReportDownloadError(download_history);
       goto fini;
     }
     const std::string history_db_path = history_path + ".uncompressed";

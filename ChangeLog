@@ -1,4 +1,5 @@
 2.6.0:
+  * Update libcurl to version 7.63.0
   * New parameter CVMFS_CATALOG_WATERMARK to release as of $n$ pinned catalogs
   * Add cvmfs_shrinkwrap utility and sub package (CVM-1578)
   * Add support for bearer token authentication (CVM-1320)
@@ -14,7 +15,36 @@
   * Optionally print GC stats with CVMFS_SERVER_FLAGS=-+stats
   * Fix debian packaging warnings and errors
 
+2.5.3:
+  * [macOS] fix hanging reload during `cvmfs_config reload` 
+  * Reduce IOPS during publishing to local backend
+  * [S3] Add support for CVMFS_S3_PEEK_BEFORE_PUT
+  * Prevent dirtab entries from wandering outside the repository (CVM-1608)
+  * [S3] Handle HTTP 429 "too many requests" replies (CVM-1584)
+  * [S3] Retry on HTTP 502 errors
+  * Add support for server side CVMFS_NUM_UPLOAD_TASKS parameter
+  * Log more details for host and proxy connection errors (CVM-1662)
+  * Fix credentials handling on HTTP retries (CVM-1660)
+
 2.5.2:
+  * Add support for CVMFS_DNS_{MIN,MAX}_TTL (CVM-1659)
+  * Disable suid binary integration test (083) on macOS
+  * Log to syslog when session authorization disappears (CVM-1658)
+  * Report start of mark and sweep phases during GC
+  * Fix cache cleanup logic for chunks >25M (CVM-1625)
+  * Fix stale authz session cache when repository membership changes (CVM-1653)
+  * Restrict lazy downloads of geodb to once a day (CVM-1647)
+  * Improve error reporting for replication/preloading (CVM-1624)
+  * Update Apache config to ignore If-Modified-Since on stratum 1s (CVM-1655)
+  * Add support for CVMFS_MAX_[EXTERNAL_]SERVERS (CVM-1631)
+  * Fine-grained syncfs control through
+    CVMFS_SYNCFS_LEVEL=[none,default,cautious] (CVM-1646)
+  * Improve printing of warnings during publish (CVM-1630)
+  * Add support for CVMFS_SUID config parameter (CVM-1591)
+  * Repository gateway protocol version bumped to 2 (CVM-1626).
+  * New parameter CVMFS_FUSE_NOTIFY_INVALIDATION; disabling it fixes
+    stability issues on macOS (CVM-1638)
+  * Fix permissions on temporary directory used by the receiver
   * Session tokens for gateway transactions are deleted after use (CVM-1643)
   * Automatically apply lease path to abort and publish commands (CVM-1601)
   * Add retry support for `cvmfs_server transaction` (CVM-1611)

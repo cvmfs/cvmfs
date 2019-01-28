@@ -15,6 +15,7 @@
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 
 
 namespace {
@@ -27,49 +28,34 @@ struct Params {
   }
 
   bool Check() {
-    if (spec_trace_path.empty() && spec_base_dir.empty()) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Either base directory or trace file must be specified");
-      return false;
-    }
-    if (!spec_trace_path.empty() && !spec_base_dir.empty()) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Only allowed to specify either base dir or trace file");
-      return false;
-    }
-
-    if (num_parallel < 1) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "There is at least one worker thread required");
-      return false;
-    }
-
     if (!CheckType(src_type) || !CheckType(dst_type)) return false;
 
     return true;
   }
 
   void Complete() {
-    if (src_config_path.empty())
-      src_config_path = repo_name + ".config";
-
     if (dst_data_dir.empty())
       dst_data_dir = dst_base_dir + "/.data";
+
+    if (spec_trace_path.empty())
+      spec_trace_path = repo_name + ".spec";
+
+    if (num_parallel == 0)
+      num_parallel = 2 * GetNumberOfCpuCores();
   }
 
   Params()
     : repo_name()
     , src_type("cvmfs")
     , src_base_dir("/cvmfs")
-    , src_config_path()
+    , src_config_path("cvmfs.conf:cvmfs.local")
     , src_data_dir()
     , dst_type("posix")
     , dst_config_path()
-    , dst_base_dir("/tmp/cvmfs")
+    , dst_base_dir("/export/cvmfs")
     , dst_data_dir()
-    , spec_base_dir()
     , spec_trace_path()
-    , num_parallel(1)
+    , num_parallel(0)
     , retries(0)
     , do_garbage_collection(false)
   { }
@@ -83,7 +69,6 @@ struct Params {
   std::string dst_config_path;
   std::string dst_base_dir;
   std::string dst_data_dir;
-  std::string spec_base_dir;
   std::string spec_trace_path;
   unsigned num_parallel;
   unsigned retries;
@@ -102,14 +87,13 @@ void Usage() {
         " -s --src-type    Source filesystem type [default:cvmfs]\n"
         " -b --src-base    Source base location [default:/cvmfs/]\n"
         " -c --src-cache   Source cache\n"
-        " -f --src-config  Source config [default:$REPO.config]\n"
+        " -f --src-config  Source config [default:cvmfs.conf:cvmfs.local]\n"
         " -d --dest-type   Dest filesystem type [default:posix]\n"
-        " -x --dest-base   Dest base [default:/tmp/cvmfs/]\n"
+        " -x --dest-base   Dest base [default:/export/cvmfs]\n"
         " -y --dest-cache  Dest cache [default:$BASE/.data]\n"
         " -z --dest-config Dest config\n"
-        " -t --spec-file   Specification file\n"
-        " -b --base        Base directory in repo [default=/]\n"
-        " -j --threads     Number of concurrent copy threads [default:0]\n"
+        " -t --spec-file   Specification file [default=$REPO.spec]\n"
+        " -j --threads     Number of concurrent copy threads [default:2*CPUs]\n"
         " -r --retries     Number of retries on copying file [default:0]\n"
         " -g --gc          Perform garbage collection on destination\n",
            VERSION);
@@ -124,7 +108,6 @@ int main(int argc, char **argv) {
   static struct option long_opts[] = {
       /* All of the options require an argument */
       {"help",        no_argument, 0, 'h'},
-      {"base",        required_argument, 0, 'p'},
       {"repo",        required_argument, 0, 'r'},
       {"src-type",    required_argument, 0, 's'},
       {"src-base",    required_argument, 0, 'b'},
@@ -137,20 +120,17 @@ int main(int argc, char **argv) {
       {"spec-file",   required_argument, 0, 't'},
       {"threads",     required_argument, 0, 'j'},
       {"retries",     required_argument, 0, 'n'},
-      {"gc",          required_argument, 0, 'g'},
+      {"gc",          no_argument, 0, 'g'},
       {0, 0, 0, 0}
     };
 
-  static const char short_opts[] = "hp:b:s:r:c:f:d:x:y:t:j:n:gk";
+  static const char short_opts[] = "hb:s:r:c:f:d:x:y:t:j:n:g";
 
   while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0) {
     switch (c) {
       case 'h':
         Usage();
         return 0;
-      case 'p':
-        params.spec_base_dir = optarg;
-        break;
       case 'r':
         params.repo_name = optarg;
         break;
@@ -238,7 +218,7 @@ int main(int argc, char **argv) {
   int result = shrinkwrap::SyncInit(
     src,
     dest,
-    params.spec_base_dir.c_str(),
+    "", /* spec_base_dir, unused */
     params.spec_trace_path.c_str(),
     params.num_parallel,
     params.retries);

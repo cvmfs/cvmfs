@@ -11,8 +11,10 @@
 #include <sys/types.h>
 #include <utime.h>
 
+#include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "garbage_collector.h"
 #include "hash.h"
@@ -22,14 +24,15 @@
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/util.h"
 #include "smalloc.h"
-#include "string.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "xattr.h"
 
 struct posix_file_handle {
   std::string path;
   FILE *fd;
   struct utimbuf mtimes;
+  int original_mode;
 };
 
 /*
@@ -223,7 +226,10 @@ void posix_list_dir(struct fs_traversal_context *ctx,
 }
 
 int posix_get_stat(struct fs_traversal_context *ctx,
-  const char *path, struct cvmfs_attr *stat_result, bool get_hash) {
+  const char *path,
+  struct cvmfs_attr *stat_result,
+  bool get_hash)
+{
   std::string complete_path = BuildPath(ctx, path);
   struct stat buf;
   int res = lstat(complete_path.c_str(), &buf);
@@ -240,12 +246,10 @@ int posix_get_stat(struct fs_traversal_context *ctx,
   stat_result->st_size = buf.st_size;
   stat_result->mtime = buf.st_mtime;
 
-  // Calculate hash
   if (get_hash && S_ISREG(buf.st_mode)) {
-    shash::Any cvm_checksum = shash::Any(shash::kSha1);
-    shash::HashFile(complete_path, &cvm_checksum);
-    std::string checksum_string = cvm_checksum.ToString();
-    stat_result->cvm_checksum = strdup(checksum_string.c_str());
+    // We cannot reliably figure out the hash
+    // because we don't know the hash algorithm
+    return -1;
   } else {
     // We usually do not calculate the checksum for posix files since it's a
     // destination file system.
@@ -469,6 +473,15 @@ void *posix_get_handle(struct fs_traversal_context *ctx,
   return file_ctx;
 }
 
+bool EnableWriteAccess(posix_file_handle *handle) {
+  struct stat info;
+  int retval = stat(handle->path.c_str(), &info);
+  if (retval != 0) return false;
+  handle->original_mode = info.st_mode;
+  retval = chmod(handle->path.c_str(), info.st_mode | S_IWUSR | S_IWUSR);
+  return retval == 0;
+}
+
 int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
   struct posix_file_handle *handle =
     reinterpret_cast<posix_file_handle *>(file_ctx);
@@ -479,10 +492,18 @@ int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
     mode = "a";
   }
   if (!BackupMtimes(handle->path, &(handle->mtimes))) return -1;
+  handle->original_mode = 0;
 
   FILE *fd = fopen(handle->path.c_str(), mode);
   if (fd == NULL) {
-    return -1;
+    if (errno == EACCES) {
+      EnableWriteAccess(handle);
+      fd = fopen(handle->path.c_str(), mode);
+      if (fd == NULL)
+        return -1;
+    } else {
+      return -1;
+    }
   }
   handle->fd = fd;
   return 0;
@@ -491,10 +512,19 @@ int posix_do_fopen(void *file_ctx, fs_open_type op_mode) {
 int posix_do_fclose(void *file_ctx) {
   struct posix_file_handle *handle =
     reinterpret_cast<posix_file_handle *>(file_ctx);
-  int res = fclose(handle->fd);
-  res |= utime(handle->path.c_str(), &(handle->mtimes));
-  if (res != 0) return -1;
+  int res = 0;
+  if (handle->original_mode != 0) {
+    res = fchmod(fileno(handle->fd), handle->original_mode);
+  }
+  res |= fclose(handle->fd);
   handle->fd = NULL;
+  if (res != 0) {
+    // Opportunistic approach to reset time stamp
+    utime(handle->path.c_str(), &(handle->mtimes));
+    return -1;
+  }
+  res = utime(handle->path.c_str(), &(handle->mtimes));
+  if (res != 0) return -1;
   return 0;
 }
 
@@ -537,69 +567,54 @@ bool posix_archive_config(
   std::string config_name,
   std::string prov_name
 ) {
-  int retval;
-  FILE *config = fopen(config_name.c_str(), "r");
-  if (config == NULL) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Failed to open : %s : %d : %s\n",
-      config_name.c_str(), errno, strerror(errno));
-    return 1;
-  }
-
   FILE *prov = fopen(prov_name.c_str(), "w");
   if (prov == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-      "Failed to open : %s : %d : %s\n",
+      "Archive config: failed to open : %s : %d : %s\n",
       prov_name.c_str(), errno, strerror(errno));
-    return 1;
+    return false;
   }
 
-  size_t bytes_transferred = 0;
-  bool result = true;
-  while (1) {
-    char buffer[COPY_BUFFER_SIZE];
-
-    size_t actual_read = 0;
-    actual_read = fread(&buffer, sizeof(char), sizeof(buffer), config);
-    if (actual_read < sizeof(buffer) && ferror(config) != 0) {
+  std::vector<std::string> config_files = SplitString(config_name, ':');
+  for (unsigned i = 0; i < config_files.size(); ++i) {
+    FILE *config = fopen(config_files[i].c_str(), "r");
+    if (config == NULL) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-        "Read failed : %d %s\n", errno, strerror(errno));
-      goto posix_archive_config_close_files;
-      result = false;
-    }
-    bytes_transferred+=actual_read;
-    size_t written_len = fwrite(buffer, sizeof(char), actual_read, prov);
-    if (written_len != actual_read) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-        "Write failed : %d %s\n", errno, strerror(errno));
-      result = false;
-      goto posix_archive_config_close_files;
-    }
-
-    if (actual_read < COPY_BUFFER_SIZE) {
-      break;
-    }
-  }
-  posix_archive_config_close_files:
-    retval = fclose(config);
-    if (retval != 0) {
-      // Handle error
-      LogCvmfs(kLogCvmfs, kLogStderr,
-        "Failed close config file : %s : %d : %s\n",
+        "Archive config: failed to open : %s : %d : %s\n",
         config_name.c_str(), errno, strerror(errno));
-      result = false;
+      fclose(prov);
+      return false;
     }
 
-    retval = fclose(prov);
-    if (retval != 0) {
-      // Handle error
-      LogCvmfs(kLogCvmfs, kLogStderr,
-        "Failed close provenance file : %s : %d : %s\n",
-        prov_name.c_str(), errno, strerror(errno));
-      result = false;
-    }
+    while (1) {
+      char buffer[COPY_BUFFER_SIZE];
 
-  return result;
+      size_t nbytes = 0;
+      nbytes = fread(&buffer, sizeof(char), sizeof(buffer), config);
+      if (nbytes < sizeof(buffer) && ferror(config) != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+          "Archive config: read failed : %d %s\n", errno, strerror(errno));
+        fclose(config);
+        fclose(prov);
+        return false;
+      }
+
+      size_t written_len = fwrite(buffer, sizeof(char), nbytes, prov);
+      if (written_len != nbytes) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Archive config: write failed : %d %s\n",
+                 errno, strerror(errno));
+        fclose(config);
+        fclose(prov);
+        return false;
+      }
+
+      if (nbytes < COPY_BUFFER_SIZE)
+        break;
+    }
+  }
+
+  return true;
 }
 
 void posix_write_provenance_info(

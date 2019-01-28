@@ -13,6 +13,7 @@ cvmfs_attr
 cvmfs_attr_init
 cvmfs_attr_free
 cvmfs_options_init
+cvmfs_options_init_v2
 cvmfs_options_init_legacy
 cvmfs_options_clone
 cvmfs_options_clone_legacy

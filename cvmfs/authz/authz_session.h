@@ -48,6 +48,13 @@ class AuthzSessionManager : SingleCopy {
   AuthzToken *GetTokenCopy(const pid_t pid, const std::string &membership);
   bool IsMemberOf(const pid_t pid, const std::string &membership);
 
+  /**
+   * When the membership string in the root file catalog changes, all entries in
+   * the cache become invalid because they only vouch for the previous
+   * membership entry. This function is called by MountPoint::ReEvaluateAuthz.
+   */
+  void ClearSessionCache();
+
  private:
   /**
    * Sweep caches from old entries not more often than every 5 seconds.

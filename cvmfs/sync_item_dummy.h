@@ -25,6 +25,7 @@ class SyncItemDummyDir : public SyncItemNative {
  public:
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
   SyncItemType GetScratchFiletype() const;
+  virtual void MakePlaceholderDirectory() const { rdonly_type_ = kItemDir; }
 
  protected:
   SyncItemDummyDir(const std::string &relative_parent_path,
@@ -42,8 +43,8 @@ class SyncItemDummyDir : public SyncItemNative {
   }
 
  private:
-  static const mode_t kPermision =
-          S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR | S_IROTH | S_IXOTH;
+  static const mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR |
+                                   S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 };
 
 catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {

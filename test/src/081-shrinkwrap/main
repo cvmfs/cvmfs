@@ -41,6 +41,9 @@ cvmfs_run_test() {
     sudo truncate -s0 /tmp/cvmfs-$repo.trace.log
 
     echo "*** Executing a few operations to check tracing..."
+    # TODO(jblomer): find uses a different order on Ubuntu 12/14 than on new
+    # linuxes.  Therefore, this test is disabled on older Ubuntu.  However,
+    # the test itself should be reliable.
     for f in $(find /cvmfs/$repo -type f | head -n 3); do
       cat $f > /dev/null
     done
@@ -58,8 +61,9 @@ cvmfs_run_test() {
     echo
 
     echo "*** Creating shrinkwrapped repository..."
+    echo "CVMFS_HTTP_PROXY=DIRECT" > local.config
     sudo cvmfs_shrinkwrap --repo $repo \
-      --src-config "$test_location/$repo.config" \
+      --src-config "$test_location/$repo.config:local.config" \
       --spec-file /tmp/cvmfs-$repo.spec.txt \
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 4
@@ -87,7 +91,7 @@ cvmfs_run_test() {
     echo | sudo tee -a /tmp/cvmfs-$repo.spec.txt
     echo "^/.cvmfsdirtab" | sudo tee -a /tmp/cvmfs-$repo.spec.txt
     sudo cvmfs_shrinkwrap --repo $repo \
-      --src-config "$test_location/$repo.config" \
+      --src-config "$test_location/$repo.config:local.config" \
       --spec-file /tmp/cvmfs-$repo.spec.txt \
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 30

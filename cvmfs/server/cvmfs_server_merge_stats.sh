@@ -39,10 +39,11 @@ cvmfs_server_merge_table() {
 
   cat $TMP_DIR/${table}1.txt > $TMP_DIR/new_db.txt
   cat $TMP_DIR/${table}2.txt >> $TMP_DIR/new_db.txt
-  sqlite3 $db_file_1 -header -separator "," "Select * from ${table}1;" > $TMP_DIR/data
+  # The -separator option is not available on older sqlite3 utilities
+  sqlite3 -header $db_file_1 "Select * from ${table}1;" | tr \| , > $TMP_DIR/data
 
   if [ ! -s $TMP_DIR/data ]; then
-    sqlite3 $db_file_2 -header -separator "," "Select * from ${table}2;" > $TMP_DIR/data
+    sqlite3 -header $db_file_2 "Select * from ${table}2;" | tr \| , > $TMP_DIR/data
     if [ ! -s $TMP_DIR/data ]; then
       echo "At least one ${table} table should have data!"
       return 1

@@ -153,7 +153,7 @@ void SyncUnionTarball::Traverse() {
           SharedPtr<SyncItem> to_mark = dirs_[*dir];
           assert(to_mark->IsDirectory());
           to_mark->SetCatalogMarker();
-          to_mark->IsPlaceholderDirectory();
+          to_mark->MakePlaceholderDirectory();
           ProcessDirectory(to_mark);
         }
         return;  // Only successful exit point
@@ -170,7 +170,9 @@ void SyncUnionTarball::Traverse() {
       case ARCHIVE_OK: {
         if (first_iteration && create_catalog_on_root_) {
           struct archive_entry *catalog = archive_entry_new();
-          archive_entry_set_pathname(catalog, base_directory_.c_str());
+          std::string catalog_path = ".cvmfscatalog";
+          archive_entry_set_pathname(catalog, catalog_path.c_str());
+          archive_entry_set_size(catalog, 0);
           archive_entry_set_filetype(catalog, AE_IFREG);
           archive_entry_set_perm(catalog, kDefaultFileMode);
           archive_entry_set_gid(catalog, getgid());
@@ -233,7 +235,7 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 
   if (sync_entry->IsDirectory()) {
     if (know_directories_.find(complete_path) != know_directories_.end()) {
-      sync_entry->IsPlaceholderDirectory();
+      sync_entry->MakePlaceholderDirectory();
     }
     ProcessUnmaterializedDirectory(sync_entry);
     dirs_[complete_path] = sync_entry;
@@ -336,6 +338,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
       new SyncItemDummyDir(dirname, filename, this, kItemDir));
 
   ProcessUnmaterializedDirectory(dummy);
+  dirs_[target] = dummy;
   know_directories_.insert(target);
 }
 

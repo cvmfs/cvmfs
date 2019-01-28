@@ -61,7 +61,8 @@ class FuseInvalidator : SingleCopy {
   };
 
   FuseInvalidator(glue::InodeTracker *inode_tracker,
-                  struct fuse_chan **fuse_channel);
+                  struct fuse_chan **fuse_channel,
+                  bool fuse_notify_invalidation);
   ~FuseInvalidator();
   void Spawn();
   void InvalidateInodes(Handle *handle);
@@ -94,6 +95,8 @@ class FuseInvalidator : SingleCopy {
    */
   atomic_int32 terminated_;
   BigVector<uint64_t> evict_list_;
+
+  static bool g_fuse_notify_invalidation_;
 };  // class FuseInvalidator
 
 #endif  // CVMFS_FUSE_EVICT_H_

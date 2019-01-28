@@ -1,0 +1,78 @@
+cvmfs_test_name="Cache cleanup for large chunks"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+TEST665_PRIVATE_MOUNT=
+
+private_mount() {
+  local mntpnt="$1"
+  TEST665_PRIVATE_MOUNT="$mntpnt"
+  do_local_mount "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_QUOTA_LIMIT=180" || return 1
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST665_PRIVATE_MOUNT" != "x" ]; then
+    sudo umount $TEST665_PRIVATE_MOUNT
+    sudo rmdir $TEST665_PRIVATE_MOUNT
+    sudo rm -rf "${TEST665_PRIVATE_MOUNT}c"
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir="$(pwd)"
+
+  echo "*** create unchunked repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  echo "CVMFS_USE_FILE_CHUNKING=false" | \
+    sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+
+  echo "*** create 5 files a 40M each"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  for i in 1 2 3 4 5; do
+    dd if=/dev/zero of="${repo_dir}/f$i" bs=40M count=1
+    echo $i >> ${repo_dir}/f$i
+  done
+  publish_repo $CVMFS_TEST_REPO || return 2
+  check_repository $CVMFS_TEST_REPO -i  || return 3
+
+  echo "*** verify files are unchunked and unique"
+  local chunks=
+  for i in 1 2 3 4 5; do
+    chunks=$(get_xattr chunks /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f$i)
+    [ "x$chunks" = "x1" ] || return 10
+  done
+  local hash1=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f1)
+  local hash2=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f2)
+  local hash3=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f3)
+  local hash4=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f4)
+  local hash5=$(get_xattr hash /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/f5)
+  local count_unique=$(echo -e "$hash1\n$hash2\n$hash3\n$hash4\n$hash5" | sort -u | wc -l)
+  [ "x$count_unique" = "x5" ] || return 11
+
+  echo "*** set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+  local mntpnt="${scratch_dir}/private_mnt"
+  echo "*** mount private mount point"
+  private_mount $mntpnt || return 20
+
+  echo "*** access large files"
+  df -h $mntpnt
+  cat $mntpnt/f* > /dev/null || return 30
+  df -h $mntpnt
+
+  echo "*** check that cache got cleaned until limit/2"
+  local cache_size_mb=$(df -BM -P $mntpnt | tail -n 1 | awk '{print $3}' | tr -d M)
+  echo "*** cache size is $cache_size_mb MB"
+  [ $cache_size_mb -lt 160 ] || return 40
+  [ $cache_size_mb -ge 120 ] || return 41
+
+  return 0
+}
+

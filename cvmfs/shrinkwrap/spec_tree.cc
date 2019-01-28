@@ -109,6 +109,10 @@ void SpecTree::Parse(FILE *spec_file) {
   SpecTreeNode *cur_node;
   // Whether there is a path on the stack disallowing inclusion
   while (GetLineFile(spec_file, &line)) {  // Go through spec file lines
+    line = Trim(line);
+    if (line.empty() || line[0] == '#')
+      continue;
+
     // FIND inclusion_mode (START)
     inclusion_mode = 0;
     if (line.at(0) == '^' || line.at(0) == '!') {

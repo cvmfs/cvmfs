@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstring>
 #include <vector>
 
 #include "file_chunk.h"
@@ -87,4 +88,22 @@ TEST_F(T_FileChunk, Simple) {
   simple_.Release(2);
   simple_.Release(3);
   EXPECT_EQ(0, simple_.Add(NewChunks()));
+}
+
+
+TEST_F(T_FileChunk, HashChunkList) {
+  FileChunkList single;
+  FileChunkReflist reflist(&single, PathString(""), zlib::kZlibDefault, false);
+
+  single.PushBack(FileChunk(shash::Any(shash::kSha1), 0, 1));
+  single.PushBack(FileChunk(shash::Any(shash::kSha1), 1, 1));
+
+  shash::Any h = reflist.HashChunkList();
+  EXPECT_EQ(shash::kSha1, h.algorithm);
+
+  unsigned char buf[40];
+  memset(buf, 0, 40);
+  shash::Any hash_cmp(shash::kSha1);
+  HashMem(buf, 40, &hash_cmp);
+  EXPECT_EQ(h, hash_cmp);
 }

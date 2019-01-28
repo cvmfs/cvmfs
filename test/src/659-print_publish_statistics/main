@@ -16,6 +16,7 @@ CVMFS_TEST_659_ERROR_BYTES_REMOVED=109
 CVMFS_TEST_659_ERROR_BYTES_UPLOADED=110
 CVMFS_TEST_659_TAR_FILE=tarfile.tar
 CVMFS_TEST_659_TAR_DIR=newTarDir
+CVMFS_TEST_659_REPO=
 
 test1() {
   local working_dir=$1
@@ -60,54 +61,64 @@ test3() {
   popdir
 }
 
+cleanup() {
+  if [ "x$CVMFS_TEST_659_REPO" != "x" ]; then
+    destroy_repo $CVMFS_TEST_659_REPO
+  fi
+}
+
 cvmfs_run_test() {
   logfile=$1
-  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  # We need a fresh name in order to start with an empty S3 space
+  local repo_name=test-659.cern.ch
+  local repo_dir=/cvmfs/$repo_name
   local scratch_dir=$(pwd)
   local tar_file_path=$scratch_dir/tmp_dir/$CVMFS_TEST_659_TAR_FILE
 
-  echo "*** Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and CVMFS_PRINT_STATISTICS=true"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
-  sudo bash -c "echo CVMFS_PRINT_STATISTICS=true >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf"
+  echo "*** Create a fresh repository named $repo_name with user $CVMFS_TEST_USER and CVMFS_PRINT_STATISTICS=true"
+  create_empty_repo $repo_name $CVMFS_TEST_USER || return $?
+  CVMFS_TEST_659_REPO=$repo_name
+  trap cleanup EXIT HUP INT TERM
+  sudo bash -c "echo CVMFS_PRINT_STATISTICS=true >> /etc/cvmfs/repositories.d/$repo_name/server.conf"
 
   # ============================ Test1 =============================
 
   echo "*** starting transaction to edit repository"
-  start_transaction $CVMFS_TEST_REPO || return $?
+  start_transaction $repo_name || return $?
 
   echo "*** Test 1 - putting some stuff in the new repository"
   test1 $repo_dir || return 1
 
   echo "*** creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO > test_659_1 || return $?
+  publish_repo $repo_name > test_659_1 || return $?
 
   # ============================ Test2 =============================
 
-  echo "*** init a new transaction to change something in repository $CVMFS_TEST_REPO"
-  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** init a new transaction to change something in repository $repo_name"
+  start_transaction $repo_name || return $?
 
   echo "*** Test 2 - change stuff in the repository"
   test2 $repo_dir || return 2
 
   echo "*** creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO > test_659_2 || return $?
+  publish_repo $repo_name > test_659_2 || return $?
 
   # ============================ Test3 =============================
 
   echo "*** Test 3 - making a tar and execute ingest command"
   mkdir tmp_dir
   test3 $scratch_dir/tmp_dir || return 3
-  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_659_TAR_DIR $CVMFS_TEST_REPO > test_659_3 || return $?
+  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_659_TAR_DIR $repo_name > test_659_3 || return $?
 
   # ============================ Test4 =============================
 
   echo "*** Test 4 - overwrite the tar file"
-  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_659_TAR_DIR $CVMFS_TEST_REPO > test_659_4 || return $?
+  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_659_TAR_DIR $repo_name > test_659_4 || return $?
 
   # =========================================================================================================
 
   echo "*** check catalog and data integrity"
-  check_repository $CVMFS_TEST_REPO -i || return $?
+  check_repository $repo_name -i || return $?
 
   # Reference test values
   declare -A test_results

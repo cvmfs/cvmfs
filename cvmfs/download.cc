@@ -1050,7 +1050,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
              "failed to resolve IP addresses for %s (%d - %s)",
              host.name().c_str(), new_host.status(),
              dns::Code2Ascii(new_host.status()));
-    new_host = dns::Host::ExtendDeadline(host, dns::Resolver::kMinTtl);
+    new_host = dns::Host::ExtendDeadline(host, resolver_->min_ttl());
   } else if (!host.IsEquivalent(new_host)) {
     update_only = false;
   }
@@ -1118,8 +1118,8 @@ bool DownloadManager::CanRetry(const JobInfo *info) {
   pthread_mutex_unlock(lock_options_);
 
   return !info->nocache && (info->num_retries < max_retries) &&
-    ((info->error_code == kFailProxyConnection) ||
-     (info->error_code == kFailHostConnection));
+    (IsProxyTransferError(info->error_code) ||
+     IsHostTransferError(info->error_code));
 }
 
 
@@ -1176,6 +1176,19 @@ void DownloadManager::SetRegularCache(JobInfo *info) {
 
 
 /**
+ * Frees the storage associated with the authz attachment from the job
+ */
+void DownloadManager::ReleaseCredential(JobInfo *info) {
+  if (info->cred_data) {
+    assert(credentials_attachment_ != NULL);  // Someone must have set it
+    credentials_attachment_->ReleaseCurlHandle(info->curl_handle,
+                                               info->cred_data);
+    info->cred_data = NULL;
+  }
+}
+
+
+/**
  * Checks the result of a curl download and implements the failure logic, such
  * as changing the proxy server.  Takes care of cleanup.
  *
@@ -1186,13 +1199,6 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            "Verify downloaded url %s, proxy %s (curl error %d)",
            info->url->c_str(), info->proxy.c_str(), curl_error);
   UpdateStatistics(info->curl_handle);
-
-  if (info->cred_data) {
-    assert(credentials_attachment_ != NULL);  // Someone must have set it
-    credentials_attachment_->ReleaseCurlHandle(info->curl_handle,
-                                               info->cred_data);
-    info->cred_data = NULL;
-  }
 
   // Verification and error classification
   switch (curl_error) {
@@ -1245,12 +1251,18 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_COULDNT_RESOLVE_HOST:
       info->error_code = kFailHostResolve;
       break;
-    case CURLE_COULDNT_CONNECT:
     case CURLE_OPERATION_TIMEDOUT:
+      info->error_code = (info->proxy == "DIRECT") ?
+                         kFailHostTooSlow : kFailProxyTooSlow;
+      break;
     case CURLE_PARTIAL_FILE:
     case CURLE_GOT_NOTHING:
     case CURLE_RECV_ERROR:
+      info->error_code = (info->proxy == "DIRECT") ?
+                         kFailHostShortTransfer : kFailProxyShortTransfer;
+      break;
     case CURLE_FILE_COULDNT_READ_FILE:
+    case CURLE_COULDNT_CONNECT:
       if (info->proxy != "DIRECT")
         // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
@@ -1266,13 +1278,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                "X509_CERT_BUNDLE might point to the wrong location.");
       info->error_code = kFailHostConnection;
       break;
-    case CURLE_SSL_CACERT:
-      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "SSL certificate cannot"
-               " be authenticated with known CA certificates. "
-               "X509_CERT_DIR and/or X509_CERT_BUNDLE might point to the wrong "
-               "location.");
-      info->error_code = kFailHostConnection;
-      break;
+    // As of curl 7.62.0, CURLE_SSL_CACERT is the same as
+    // CURLE_PEER_FAILED_VERIFICATION
     case CURLE_PEER_FAILED_VERIFICATION:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                "invalid SSL certificate of remote host. "
@@ -1311,7 +1318,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if ( same_url_retry || (
          ( (info->error_code == kFailHostResolve) ||
-           (info->error_code == kFailHostConnection) ||
+           IsHostTransferError(info->error_code) ||
            (info->error_code == kFailHostHttp)) &&
          info->probe_hosts &&
          host_chain && (info->num_used_hosts < host_chain->size()))
@@ -1321,7 +1328,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if ( same_url_retry || (
          ( (info->error_code == kFailProxyResolve) ||
-           (info->error_code == kFailProxyConnection) ||
+           IsProxyTransferError(info->error_code) ||
            (info->error_code == kFailProxyHttp)) )
        )
     {
@@ -1415,28 +1422,30 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       case kFailHostAfterProxy:
         switch_host = true;
         break;
-      case kFailProxyConnection:
-        if (same_url_retry)
-          Backoff(info);
-        else
-          switch_proxy = true;
-        break;
-      case kFailHostConnection:
-        if (same_url_retry)
-          Backoff(info);
-        else
-          switch_host = true;
-        break;
       default:
-        // No other errors expected when retrying
-        abort();
+        if (IsProxyTransferError(info->error_code)) {
+          if (same_url_retry)
+            Backoff(info);
+          else
+            switch_proxy = true;
+        } else if (IsHostTransferError(info->error_code)) {
+          if (same_url_retry)
+            Backoff(info);
+          else
+            switch_host = true;
+        } else {
+          // No other errors expected when retrying
+          abort();
+        }
     }
     if (switch_proxy) {
+      ReleaseCredential(info);
       SwitchProxy(info);
       info->num_used_proxies++;
       SetUrlOptions(info);
     }
     if (switch_host) {
+      ReleaseCredential(info);
       SwitchHost(info);
       info->num_used_hosts++;
       SetUrlOptions(info);
@@ -1447,6 +1456,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
  verify_and_finalize_stop:
   // Finalize, flush destination file
+  ReleaseCredential(info);
   if ((info->destination == kDestinationFile) &&
       fflush(info->destination_file) != 0)
   {
@@ -1599,7 +1609,6 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
   curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
                     pool_max_handles_);
-  // curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 
   prng_.InitLocaltime();
 
@@ -1824,6 +1833,17 @@ void DownloadManager::SetDnsParameters(
   resolver_ =
     dns::NormalResolver::Create(opt_ipv4_only_, retries, timeout_ms);
   assert(resolver_);
+  pthread_mutex_unlock(lock_options_);
+}
+
+
+void DownloadManager::SetDnsTtlLimits(
+  const unsigned min_seconds,
+  const unsigned max_seconds)
+{
+  pthread_mutex_lock(lock_options_);
+  resolver_->set_min_ttl(min_seconds);
+  resolver_->set_max_ttl(max_seconds);
   pthread_mutex_unlock(lock_options_);
 }
 
@@ -2519,7 +2539,7 @@ void DownloadManager::SetProxyChain(
                  hosts[num_proxy].name().c_str(), hosts[num_proxy].status(),
                  dns::Code2Ascii(hosts[num_proxy].status()));
         dns::Host failed_host =
-          dns::Host::ExtendDeadline(hosts[num_proxy], dns::Resolver::kMinTtl);
+          dns::Host::ExtendDeadline(hosts[num_proxy], resolver_->min_ttl());
         infos.push_back(ProxyInfo(failed_host, this_group[j]));
         continue;
       }
@@ -2707,11 +2727,6 @@ void DownloadManager::EnableInfoHeader() {
 }
 
 
-void DownloadManager::EnablePipelining() {
-  curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
-}
-
-
 void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
 }
@@ -2726,6 +2741,7 @@ DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
   clone->Init(pool_max_handles_, use_system_proxy_, statistics);
   if (resolver_) {
     clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
+    clone->SetDnsTtlLimits(resolver_->min_ttl(), resolver_->max_ttl());
     clone->SetMaxIpaddrPerProxy(resolver_->throttle());
   }
   if (!opt_dns_server_.empty())

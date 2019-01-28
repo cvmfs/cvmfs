@@ -1,0 +1,11 @@
+cvmfs-config-shrinkwrap (1.1-1) lucid; urgency=low
+
+  * Add UNL HPC stratum 1, enable Geo-API
+
+ -- Jakob Blomer <jblomer@cern.ch>  Fri, 26 Oct 2018 12:00:00 +0000
+
+cvmfs-config-shrinkwrap (1.0-1) lucid; urgency=low
+
+  * Initial packaging
+
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 24 Oct 2018 12:00:00 +0000

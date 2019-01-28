@@ -445,7 +445,7 @@ cvmfs_version_string() {
 
 # Tracks changes to the organization of files and directories.
 # Stored in CVMFS_CREATOR_VERSION.  Started with 137.
-cvmfs_layout_revision() { echo "139"; }
+cvmfs_layout_revision() { echo "140"; }
 
 version_major() { echo $1 | cut --delimiter=. --fields=1 | grep -oe '^[0-9]\+'; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2 | grep -oe '^[0-9]\+'; }
@@ -887,6 +887,16 @@ _update_geodb_lazy_install_slot() {
   [ "`date +%k`" -ge "$CVMFS_UPDATEGEO_HOUR" ]
 }
 
+_update_geodb_lazy_attempted_today() {
+  local attemptdayfile="${CVMFS_UPDATEGEO_DIR}/.last_attempt_day"
+  local today="`date +%j`"
+  if [ "`cat $attemptdayfile 2>/dev/null`" = "$today" ]; then
+    return 0
+  fi
+  echo "$today" >$attemptdayfile
+  return 1
+}
+
 _to_syslog_for_geoip() {
   to_syslog "(GeoIP) $1"
 }
@@ -976,18 +986,23 @@ _update_geodb() {
   else
     local days_old=$(_update_geodb_days_since_update)
     if [ $days_old -gt $CVMFS_UPDATEGEO_MAXDAYS ]; then
+      if _update_geodb_lazy_attempted_today; then
+        # already attempted today, wait until tomorrow
+        return 0
+      fi
       echo -n "GeoIP Database is very old. Updating... "
     elif [ $days_old -gt $CVMFS_UPDATEGEO_MINDAYS ]; then
       if _update_geodb_lazy_install_slot; then
+        if _update_geodb_lazy_attempted_today; then
+          # already attempted today, wait until next week
+          return 0
+        fi
         echo -n "GeoIP Database is expired. Updating... "
       else
         echo "GeoIP Database is expired, but waiting for install time slot."
         return 0
       fi
     else
-      if ! $lazy; then
-        echo "GeoIP Database is up to date ($days_old days old). Nothing to do."
-      fi
       return 0
     fi
   fi
@@ -1023,8 +1038,17 @@ is_subcommand() {
 }
 
 
-# Flushes data to disk; we might at some point want to do more than just sync
+# Flushes data to disk; only flush if the enforced level allowed for the
+# provided level.  The order is
+#  'none' (never sync)
+#  'default' (sync for rare, important operations like mkfs, publish)
+#  'cautious' (always sync)
 syncfs() {
+  local level="${1:-default}"
+  local enforced_level="${CVMFS_SYNCFS_LEVEL:-default}"
+  [ "x$enforced_level" = "xnone" ] && return || true
+  [ "x$enforced_level" = "xdefault" -a "x$level" = "xcautious" ] && return || true
+
   sync
 }
 

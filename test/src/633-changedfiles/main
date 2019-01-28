@@ -81,6 +81,7 @@ cvmfs_run_test() {
   TEST633_TAIL_LARGE=$!
 
   echo "*** add contents to files in repository"
+  ls -lisa ${mntpnt}/dir/*
   start_transaction $CVMFS_TEST_REPO                    || return $?
   echo "modified" >> /cvmfs/$CVMFS_TEST_REPO/dir/small  || return 30
   echo "modified" >> /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 30
@@ -93,6 +94,7 @@ cvmfs_run_test() {
   [ $revision_new -gt $revision_old ] || return 42
 
   echo "*** verify new content"
+  ls -lisa ${mntpnt}/dir/*
   [ "x$(tail -n 1 ${mntpnt}/dir/small)" = "xmodified" ] || return 50
   [ "x$(tail -n 1 ${mntpnt}/dir/large)" = "xmodified" ] || return 51
 

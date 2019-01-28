@@ -233,7 +233,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   const std::string spooler_temp_dir =
       GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
-  assert(MkdirDeep(spooler_temp_dir + "/receiver", 0666, true));
+  assert(MkdirDeep(spooler_temp_dir + "/receiver", 0770, true));
   temp_dir_ =
       RaiiTempDir::Create(spooler_temp_dir + "/receiver/payload_processor");
 

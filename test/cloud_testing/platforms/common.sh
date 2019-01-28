@@ -189,10 +189,19 @@ disable_systemd_rate_limit() {
   sudo mkdir -p $apachedir
   sudo mkdir -p $autofsdir
 
-  cat << EOF > cvmfs-test.conf
+  local systemd_version=$(systemctl --version | head -1 | cut -d' ' -f2)
+  if [ "$systemd_version" -lt "230" ]; then
+      cat << EOF > cvmfs-test.conf
+[Service]
+StartLimitInterval=0
+EOF
+  else
+    cat << EOF > cvmfs-test.conf
 [Unit]
 StartLimitIntervalSec=0
 EOF
+  fi
+
   sudo cp cvmfs-test.conf $apachedir/cvmfs-test.conf
   sudo cp cvmfs-test.conf $autofsdir/cvmfs-test.conf
   rm cvmfs-test.conf

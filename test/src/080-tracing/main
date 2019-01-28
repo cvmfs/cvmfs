@@ -40,28 +40,28 @@ cvmfs_run_test() {
   cat /cvmfs/$repo/README
   df -P /cvmfs/$repo/README
   list_xattrs /cvmfs/$repo/README
-  #getfattr -d -m ".*" /cvmfs/$repo/README
+  get_xattr revision /cvmfs/$repo/README
   ls /cvmfs/$repo/glite
 
   sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
 
-  if ! (check_trace 2 opendir ""\
-    && check_trace 4 lookup "/vc"\
-    && check_trace 4 lookup "/vc/bin"\
-    && check_trace 2 opendir "/vc/bin"\
-    && check_trace 4 lookup "/README"\
-    && check_trace 1 open "/README"\
-    && check_trace 5 statfs "/README"\
-    && check_trace 7 listxattr "/README"\
-    && check_trace 8 getxattr "/README"\
-    && check_trace 4 lookup "/glite"\
-    && check_trace 3 readlink "/glite"\
-    && check_trace 4 lookup "/util"\
-    && check_trace 2 opendir "/util"\
-
-    ); then
-      return 3
+  check_trace 2 opendir ""           || return 10
+  check_trace 4 lookup "/vc"         || return 11
+  check_trace 4 lookup "/vc/bin"     || return 12
+  check_trace 2 opendir "/vc/bin"    || return 13
+  check_trace 4 lookup "/README"     || return 14
+  check_trace 1 open "/README"       || return 15
+  if running_on_osx; then
+    check_trace 5 statfs ""          || return 16
+  else
+    check_trace 5 statfs "/README"   || return 16
   fi
+  check_trace 7 listxattr "/README"  || return 17
+  check_trace 8 getxattr "/README"   || return 18
+  check_trace 4 lookup "/glite"      || return 19
+  check_trace 3 readlink "/glite"    || return 20
+  check_trace 4 lookup "/util"       || return 21
+  check_trace 2 opendir "/util"      || return 22
 
   return 0
 }

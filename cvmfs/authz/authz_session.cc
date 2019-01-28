@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "authz/authz_fetch.h"
@@ -57,6 +58,14 @@ AuthzSessionManager::~AuthzSessionManager() {
         free((session2cred_.values() + i)->token.data);
     }
   }
+}
+
+
+void AuthzSessionManager::ClearSessionCache() {
+  LockMutex(&lock_session2cred_);
+  session2cred_.Clear();
+  no_session_->Set(0);
+  UnlockMutex(&lock_session2cred_);
 }
 
 
@@ -122,7 +131,11 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
 
   FILE *fp_stat = fopen(pid_path, "r");
   if (fp_stat == NULL) {
-    LogCvmfs(kLogAuthz, kLogDebug, "Failed to open status file.");
+    LogCvmfs(kLogAuthz, kLogDebug,
+             "Failed to open status file /proc/%d/stat: (errno=%d) %s",
+             pid, errno, strerror(errno));
+    LogCvmfs(kLogAuthz, kLogSyslogWarn | kLogDebug,
+             "Authorization for session %d disappeared", pid);
     return false;
   }
 
@@ -281,7 +294,8 @@ bool AuthzSessionManager::LookupSessionKey(
     return true;
   }
 
-  // Not found in cache, get session information from OS
+  LogCvmfs(kLogAuthz, kLogDebug,
+           "Session key not found in cache, getting information from OS");
   PidKey sid_key;
   if (!GetPidInfo(pid_key->sid, &sid_key))
     return false;

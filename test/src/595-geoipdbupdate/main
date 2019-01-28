@@ -8,6 +8,7 @@ cvmfs_test_suites="quick"
 #    in cvmfs_server changes
 #
 CVMFS_TEST_595_GEODB="/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb"
+CVMFS_TEST_595_ATTEMPT_FILE="/var/lib/cvmfs-server/geo/.last_attempt_day"
 CVMFS_TEST_595_SERVER_HOOKS="/etc/cvmfs/cvmfs_server_hooks.sh"
 
 CVMFS_TEST_595_REPLICA_NAME=
@@ -95,7 +96,7 @@ cvmfs_run_test() {
   cvmfs_stash GEODB
   cvmfs_stash SERVER_HOOKS
 
-  echo "create initial $CVMFS_TEST_595_SERVER_HOOKS in necessary"
+  echo "create initial $CVMFS_TEST_595_SERVER_HOOKS if necessary"
   recreate_server_hooks_from_stashed_if_needed || return 50
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
@@ -131,6 +132,7 @@ cvmfs_run_test() {
 
   echo "manually start a lazy GeoIP database update as '$CVMFS_TEST_USER' (should fail as well)"
   local update_2_log="update_geodb_2.log"
+  rm -f $CVMFS_TEST_595_ATTEMPT_FILE
   cvmfs_server update-geodb -l > $update_2_log 2>&1 && return 10
 
   echo "check output logs for the expected error messages"
@@ -139,6 +141,7 @@ cvmfs_run_test() {
 
   echo "manually start a lazy GeoIP database update as 'root' (should work but not update)"
   local update_3_log="update_geodb_3.log"
+  rm -f $CVMFS_TEST_595_ATTEMPT_FILE
   sudo -E cvmfs_server update-geodb -l > $update_3_log 2>&1 || return 13
 
   echo "manually start a GeoIP database update as 'root' (should work and update)"
@@ -182,6 +185,7 @@ cvmfs_run_test() {
 
   echo "do a lazy update as 'root' (should work and force the update)"
   local update_5_log="update_geodb_5.log"
+  sudo rm -f $CVMFS_TEST_595_ATTEMPT_FILE
   sudo -E cvmfs_server update-geodb -l > $update_5_log 2>&1 || return 22
 
   echo "do a lazy update as 'root' (should work but not update again)"
@@ -191,24 +195,30 @@ cvmfs_run_test() {
   echo "set mtime of the GeoIP database to $old days ago (old)"
   sudo touch -d "$old days ago" $CVMFS_TEST_595_GEODB || return 24
 
-  echo "do a lazy update as 'root' (should work and update)"
+  echo "do a lazy update of older db without removing last attempt file (should not update)"
   local update_7_log="update_geodb_7.log"
   sudo -E cvmfs_server update-geodb -l > $update_7_log 2>&1 || return 25
 
+  echo "do a lazy update as 'root' (should work and update)"
+  local update_8_log="update_geodb_8.log"
+  sudo rm -f $CVMFS_TEST_595_ATTEMPT_FILE
+  sudo -E cvmfs_server update-geodb -l > $update_8_log 2>&1 || return 26
+
   echo "check output logs for the expected status messages"
-  cat $update_5_log | grep -e "very old.* Updating"   || return 26
-  test -z "`cat $update_6_log`"                       || return 27
-  cat $update_7_log | grep -e "is expired.* Updating" || return 28
+  cat $update_5_log | grep -e "very old.* Updating"   || return 27
+  test -z "`cat $update_6_log`"                       || return 28
+  test -z "`cat $update_7_log`"                       || return 29
+  cat $update_8_log | grep -e "is expired.* Updating" || return 30
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "set mtime of the GeoIP database to $old days ago (old)"
-  sudo touch -d "$old days ago" $CVMFS_TEST_595_GEODB || return 29
+  sudo touch -d "$old days ago" $CVMFS_TEST_595_GEODB || return 31
 
   if [ $current_hour -lt 23 ]; then
     local next_hour=$(( $current_hour + 1 ))
     echo "change GeoIP database update policy (hour: $next_hour)"
-    sudo sed -i -e "s/^\(CVMFS_UPDATEGEO_HOUR\)=.*$/\1=$next_hour/" $CVMFS_TEST_595_SERVER_HOOKS || return 30
+    sudo sed -i -e "s/^\(CVMFS_UPDATEGEO_HOUR\)=.*$/\1=$next_hour/" $CVMFS_TEST_595_SERVER_HOOKS || return 32
 
     echo
     echo "$CVMFS_TEST_595_SERVER_HOOKS"
@@ -216,11 +226,12 @@ cvmfs_run_test() {
     echo
 
     echo "do a lazy update as 'root' (should work but refrain from updating)"
-    local update_8_log="update_geodb_8.log"
-    sudo -E cvmfs_server update-geodb -l > $update_8_log 2>&1 || return 31
+    local update_10_log="update_geodb_10.log"
+    sudo rm -f $CVMFS_TEST_595_ATTEMPT_FILE
+    sudo -E cvmfs_server update-geodb -l > $update_10_log 2>&1 || return 33
 
     echo "check output logs for the expected status messages"
-    cat $update_8_log | grep -e "waiting for install time slot" || return 32
+    cat $update_10_log | grep -e "waiting for install time slot" || return 34
   else
     echo "WARNING: It's nearly midnight cannot easily test the update time slot."
   fi
@@ -228,8 +239,8 @@ cvmfs_run_test() {
   echo "change GeoIP database update policy"
   local yesterday_weekday=$(( $current_weekday - 1 ))
   [ $yesterday_weekday -ge 0 ] || yesterday_weekday=6
-  sudo sed -i -e "s/^\(CVMFS_UPDATEGEO_HOUR\)=.*$/\1=$current_hour/"     $CVMFS_TEST_595_SERVER_HOOKS || return 33
-  sudo sed -i -e "s/^\(CVMFS_UPDATEGEO_DAY\)=.*$/\1=$yesterday_weekday/" $CVMFS_TEST_595_SERVER_HOOKS || return 34
+  sudo sed -i -e "s/^\(CVMFS_UPDATEGEO_HOUR\)=.*$/\1=$current_hour/"     $CVMFS_TEST_595_SERVER_HOOKS || return 35
+  sudo sed -i -e "s/^\(CVMFS_UPDATEGEO_DAY\)=.*$/\1=$yesterday_weekday/" $CVMFS_TEST_595_SERVER_HOOKS || return 36
 
   echo
   echo "$CVMFS_TEST_595_SERVER_HOOKS"
@@ -237,37 +248,38 @@ cvmfs_run_test() {
   echo
 
   echo "do a lazy update as 'root' (should work but refrain from updating)"
-  local update_9_log="update_geodb_9.log"
-  sudo -E cvmfs_server update-geodb -l > $update_9_log 2>&1 || return 35
+  local update_11_log="update_geodb_11.log"
+  sudo rm -f $CVMFS_TEST_595_ATTEMPT_FILE
+  sudo -E cvmfs_server update-geodb -l > $update_11_log 2>&1 || return 37
 
   echo "check output logs for the expected status messages"
-  cat $update_9_log | grep -e "waiting for install time slot" || return 36
+  cat $update_11_log | grep -e "waiting for install time slot" || return 38
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "change ownership of $CVMFS_TEST_595_GEODB to '$CVMFS_TEST_USER'"
   group="`id -g ${CVMFS_TEST_USER}`"
-  sudo chown ${CVMFS_TEST_USER}:${group} $(dirname $CVMFS_TEST_595_GEODB) || return 37
-  sudo chown ${CVMFS_TEST_USER}:${group} $CVMFS_TEST_595_GEODB            || return 38
+  sudo chown ${CVMFS_TEST_USER}:${group} $(dirname $CVMFS_TEST_595_GEODB) || return 39
+  sudo chown ${CVMFS_TEST_USER}:${group} $CVMFS_TEST_595_GEODB            || return 40
 
   echo "try to update the GeoIP database as user '$CVMFS_TEST_USER' (should work and update)"
-  local update_10_log="update_geodb_10.log"
-  cvmfs_server update-geodb > $update_10_log 2>&1 || return 40
+  local update_12_log="update_geodb_12.log"
+  cvmfs_server update-geodb > $update_12_log 2>&1 || return 41
 
   echo "check output logs for the expected status messages"
-  cat $update_10_log | grep -e "Updating GeoIP Database" || return 41
+  cat $update_12_log | grep -e "Updating GeoIP Database" || return 42
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "removing $CVMFS_TEST_595_SERVER_HOOKS"
-  recreate_server_hooks_from_stashed_if_needed || return 42
+  recreate_server_hooks_from_stashed_if_needed || return 43
 
   echo "create a stratum1 snapshot (should find database up to date)"
   local snapshot_1_log="snapshot_1.log"
-  cvmfs_server snapshot $replica_name > $snapshot_1_log 2>&1 || return 43
+  cvmfs_server snapshot $replica_name > $snapshot_1_log 2>&1 || return 44
 
   echo "change ownership of $CVMFS_TEST_595_GEODB to 'root'"
-  sudo chown root:root $CVMFS_TEST_595_GEODB || return 44
+  sudo chown root:root $CVMFS_TEST_595_GEODB || return 45
 
   echo "create a stratum1 snapshot (should 'fail' due to permissions)"
   local snapshot_2_log="snapshot_2.log"

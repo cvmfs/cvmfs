@@ -35,6 +35,8 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/005-asetup                               \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
+                                 src/081-shrinkwrap                           \
+                                 src/082-shrinkwrap-cms                       \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

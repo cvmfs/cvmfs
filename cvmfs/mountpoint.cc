@@ -1255,14 +1255,21 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetProxyChain(proxies, fallback_proxies,
                                download::DownloadManager::kSetProxyBoth);
 
-  if (options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  bool do_geosort = options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
+                    options_mgr_->IsOn(optarg);
+  if (do_geosort) {
     download_mgr_->ProbeGeo();
-    return SetupExternalDownloadMgr(true);
   }
-
-  return SetupExternalDownloadMgr(false);
+  if (options_mgr_->GetValue("CVMFS_MAX_SERVERS", &optarg)) {
+    unsigned max_servers = String2Uint64(optarg);
+    std::vector<std::string> host_chain;
+    download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
+    if (max_servers > 0 && max_servers < host_chain.size()) {
+      host_chain.resize(max_servers);
+      download_mgr_->SetHostChain(host_chain);
+    }
+  }
+  return SetupExternalDownloadMgr(do_geosort);
 }
 
 bool MountPoint::CreateResolvConfWatcher() {
@@ -1643,8 +1650,12 @@ MountPoint::~MountPoint() {
 
 
 void MountPoint::ReEvaluateAuthz() {
+  string old_membership_req = membership_req_;
   has_membership_req_ = catalog_mgr_->GetVOMSAuthz(&membership_req_);
-  authz_attachment_->set_membership(membership_req_);
+  if (old_membership_req != membership_req_) {
+    authz_session_mgr_->ClearSessionCache();
+    authz_attachment_->set_membership(membership_req_);
+  }
 }
 
 
@@ -1690,8 +1701,17 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
     dns_retries = String2Uint64(optarg);
   manager->SetDnsParameters(dns_retries, dns_timeout_ms);
 
-  // Has to be after SetDnsParameters because SetDnsParameters might construct
-  // a new resolver object
+  // Rest has to be after SetDnsParameters because SetDnsParameters might
+  // construct a new resolver object
+
+  unsigned dns_min_ttl = dns::Resolver::kDefaultMinTtl;
+  unsigned dns_max_ttl = dns::Resolver::kDefaultMaxTtl;
+  if (options_mgr_->GetValue("CVMFS_DNS_MIN_TTL", &optarg))
+    dns_min_ttl = String2Uint64(optarg);
+  if (options_mgr_->GetValue("CVMFS_DNS_MAX_TTL", &optarg))
+    dns_max_ttl = String2Uint64(optarg);
+  manager->SetDnsTtlLimits(dns_min_ttl, dns_max_ttl);
+
   if (options_mgr_->GetValue("CVMFS_DNS_SERVER", &optarg)) {
     download_mgr_->SetDnsServer(optarg);
   }
@@ -1738,6 +1758,16 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     }
   } else {
     external_download_mgr_->SetHostChain("");
+  }
+
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_MAX_SERVERS", &optarg)) {
+    unsigned max_servers = String2Uint64(optarg);
+    std::vector<std::string> host_chain;
+    external_download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
+    if (max_servers > 0 && max_servers < host_chain.size()) {
+      host_chain.resize(max_servers);
+      external_download_mgr_->SetHostChain(host_chain);
+    }
   }
 
   string proxies = "DIRECT";

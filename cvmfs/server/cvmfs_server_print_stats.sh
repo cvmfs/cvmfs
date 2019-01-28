@@ -4,7 +4,7 @@
 # Implementation of the "cvmfs_server stats command"
 
 cvmfs_server_print_stats() {
-  local output_file="/dev/stdout"
+  local output_file=""
   local repo_name=""
   local repo_stats=""
   local separator='|'
@@ -37,7 +37,12 @@ cvmfs_server_print_stats() {
   check_multiple_repository_existence $repo_name
   repo_stats="/var/spool/cvmfs/$repo_name/stats.db"
   if [ -e $repo_stats ]; then
-    sqlite3 $repo_stats -header -separator $separator "SELECT * from $db_table;" > $output_file
+    # On an older Linux > /dev/stdout does not work
+    if [ "x$output_file" = "x" ]; then
+      sqlite3 -header $repo_stats "SELECT * from $db_table;" | tr \| $separator
+    else
+      sqlite3 -header $repo_stats "SELECT * from $db_table;" | tr \| $separator > $output_file
+    fi
   else
     echo "No statistics database file for $repo_name repository."
   fi
