@@ -13,12 +13,24 @@ namespace msg {
 
 enum Version { kProtocolVersion = 1 };
 
+/**
+ * The base class of all notification messages
+ *
+ * All notifications inherit from this base class and need to implement
+ * the JSON serialization and deserialization methods.
+ */
 class Message {
  public:
   virtual void ToJSONString(std::string* s) = 0;
   virtual bool FromJSONString(const std::string& s) = 0;
 };
 
+/**
+ * Activity notification
+ *
+ * The activity message informs about the current revision of a repository. It
+ * contains a timestamp, repository name and the repository manifest.
+ */
 class Activity : public Message {
  public:
   Activity();

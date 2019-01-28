@@ -9,12 +9,28 @@
 
 namespace notify {
 
+/**
+ * Base class for publishing to the notification system
+ */
 class Publisher {
  public:
   virtual ~Publisher();
 
+  /**
+   * Perform (optional) initialization tasks before publishing
+   */
   virtual bool Init();
+
+  /**
+   * Publish a message with the specified topic
+   *
+   * The message body and the message topic are given as strings
+   */
   virtual bool Publish(const std::string& msg, const std::string& topic) = 0;
+
+  /**
+   * Perform (optional) finalization tasks after publishing the message
+   */
   virtual bool Finalize();
 };
 
