@@ -4,7 +4,7 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 CVMFS_TEST_660_NR_OF_TESTS=4
-CVMFS_TEST_660_DB_PATH=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db
+CVMFS_TEST_660_DB_PATH=/var/spool/cvmfs/test-660.cern.ch/stats.db
 CVMFS_TEST_660_ERROR_FILES_ADDED=101
 CVMFS_TEST_660_ERROR_FILES_REMOVED=102
 CVMFS_TEST_660_ERROR_FILES_CHANGED=103
@@ -17,8 +17,9 @@ CVMFS_TEST_660_ERROR_BYTES_REMOVED=109
 CVMFS_TEST_660_ERROR_BYTES_UPLOADED=110
 CVMFS_TEST_660_TAR_FILE=tarfile.tar
 CVMFS_TEST_660_TAR_DIR=newTarDir
-CVMFS_TEST_660_OLD_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_old.db
-CVMFS_TEST_660_MERGED_DB=/var/spool/cvmfs/$CVMFS_TEST_REPO/stats_merged.db
+CVMFS_TEST_660_OLD_DB=/var/spool/cvmfs/test-660.cern.ch/stats_old.db
+CVMFS_TEST_660_MERGED_DB=/var/spool/cvmfs/test-660.cern.ch/stats_merged.db
+CVMFS_TEST_660_REPO=
 
 
 test1() {
@@ -64,49 +65,58 @@ test3() {
   popdir
 }
 
+cleanup() {
+  if [ "x$CVMFS_TEST_660_REPO" != "x" ]; then
+    destroy_repo $CVMFS_TEST_660_REPO
+  fi
+}
+
 cvmfs_run_test() {
   logfile=$1
-  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_name=test-660.cern.ch
+  local repo_dir=/cvmfs/$repo_name
   local scratch_dir=$(pwd)
   local tar_file_path=$scratch_dir/tmp_dir/$CVMFS_TEST_660_TAR_FILE
 
-  echo "*** Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  echo "*** Create a fresh repository named $repo_name with user $CVMFS_TEST_USER"
+  create_empty_repo $repo_name $CVMFS_TEST_USER || return $?
+  CVMFS_TEST_660_REPO=$repo_name
+  trap cleanup EXIT HUP INT TERM
 
   # # just to be written in log file
   # echo "*** Activate the statistics by writing in server.conf file CVMFS_PRINT_STATISTICS=true"
-  # cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf | grep CVMFS_PRINT_STATISTICS
+  # cat /etc/cvmfs/repositories.d/$repo_name/server.conf | grep CVMFS_PRINT_STATISTICS
   # if [ $? -eq 0 ]; then   # just change the value
   #   echo "*** Found CVMFS_PRINT_STATISTICS variable, value overwritten with true."
-  #   sed -i 's/CVMFS_PRINT_STATISTICS=.*/CVMFS_PRINT_STATISTICS=true/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  #   sed -i 's/CVMFS_PRINT_STATISTICS=.*/CVMFS_PRINT_STATISTICS=true/' /etc/cvmfs/repositories.d/$repo_name/server.conf
   # else
   #   echo "*** CVMFS_PRINT_STATISTICS not found, append CVMFS_PRINT_STATISTICS=true in server.conf"
-  #   echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  #   echo "CVMFS_PRINT_STATISTICS=true" >> /etc/cvmfs/repositories.d/$repo_name/server.conf
   # fi
 
   # ============================ Test1 =============================
 
   echo "*** starting transaction to edit repository"
-  start_transaction $CVMFS_TEST_REPO || return $?
+  start_transaction $repo_name || return $?
 
   echo "*** Test 1 - putting some stuff in the new repository"
   test1 $repo_dir || return 1
 
   echo "*** creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  publish_repo $repo_name || return $?
   # get the last inserted data
   sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_1
 
   # ============================ Test2 =============================
 
-  echo "*** init a new transaction to change something in repository $CVMFS_TEST_REPO"
-  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "*** init a new transaction to change something in repository $repo_name"
+  start_transaction $repo_name || return $?
 
   echo "*** Test 2 - change stuff in the repository"
   test2 $repo_dir || return 2
 
   echo "*** creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  publish_repo $repo_name || return $?
   # get the last inserted data
   sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_2
 
@@ -115,21 +125,21 @@ cvmfs_run_test() {
   echo "*** Test 3 - making a tar and execute ingest command"
   mkdir tmp_dir
   test3 $scratch_dir/tmp_dir || return 3
-  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_660_TAR_DIR $CVMFS_TEST_REPO || return $?
+  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_660_TAR_DIR $repo_name || return $?
   # get the last inserted data
   sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_3
 
   # ============================ Test4 =============================
 
   echo "*** Test 4 - overwrite the tar file"
-  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_660_TAR_DIR $CVMFS_TEST_REPO || return $?
+  cvmfs_server ingest -t $tar_file_path -b $CVMFS_TEST_660_TAR_DIR $repo_name || return $?
   # get the last inserted data
   sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1 > test_660_4
 
   # =========================================================================================================
 
   echo "*** check catalog and data integrity"
-  check_repository $CVMFS_TEST_REPO -i || return $?
+  check_repository $repo_name -i || return $?
 
   # Reference test values
   declare -A test_results
