@@ -39,9 +39,9 @@ cvmfs_server_print_stats() {
   if [ -e $repo_stats ]; then
     # On an older Linux > /dev/stdout does not work
     if [ "x$output_file" = "x" ]; then
-      sqlite3 $repo_stats -header "SELECT * from $db_table;" | tr \| $separator
+      sqlite3 -header $repo_stats "SELECT * from $db_table;" | tr \| $separator
     else
-      sqlite3 $repo_stats -header "SELECT * from $db_table;" | tr \| $separator > $output_file
+      sqlite3 -header $repo_stats "SELECT * from $db_table;" | tr \| $separator > $output_file
     fi
   else
     echo "No statistics database file for $repo_name repository."
