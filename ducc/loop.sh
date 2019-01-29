@@ -29,7 +29,7 @@ do
 		if [ $pull_status -eq 0 ]; then
 			break;
 		else
-			$update_error_count=$(( update_error_count+1))
+			update_error_count=$(( update_error_count+1))
 		fi
 	done
 
