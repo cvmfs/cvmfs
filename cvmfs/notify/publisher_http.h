@@ -11,6 +11,11 @@
 
 namespace notify {
 
+/**
+ * Implementation of Publisher based on HTTP
+ *
+ * Messsages are published to the notification system backend using cURL
+ */
 class PublisherHTTP : public Publisher {
  public:
   explicit PublisherHTTP(const std::string& server_url);

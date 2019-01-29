@@ -16,6 +16,12 @@ namespace notify {
 class SubscriberWS;
 struct ConnectionData;
 
+/**
+ * Establishes and maintains a Websocket connection to the notification system
+ *
+ * The Websocket connection state-machine is implemented here. Includes basic
+ * connection retry and keep-alive (WS ping/pong) support.
+ */
 class WebsocketContext {
  public:
   enum Status { kOk, kError };

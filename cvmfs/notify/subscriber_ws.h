@@ -12,6 +12,9 @@
 
 namespace notify {
 
+/**
+ * Notification system subscriber based on Websockets
+ */
 class SubscriberWS : public Subscriber {
   /**
    * The WebsocketContext class needs to call the Subscriber::Consume

@@ -9,11 +9,19 @@
 
 namespace notify {
 
+/**
+ * Base class for creating a subscription to the notification system
+ */
 class Subscriber {
  public:
   Subscriber() {}
   virtual ~Subscriber() {}
 
+  /**
+   * Subscribe to a specific message topic
+   *
+   * Returns false if an error occurred.
+   */
   virtual bool Subscribe(const std::string& topic) = 0;
 
  protected:

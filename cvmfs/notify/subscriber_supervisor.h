@@ -13,6 +13,9 @@ namespace notify {
 
 class Subscriber;
 
+/**
+ * Supervise the subscription to the notification system backend
+ */
 class SubscriberSupervisor : public Supervisor {
  public:
   SubscriberSupervisor(notify::Subscriber* s, std::string t, int max_retries,
