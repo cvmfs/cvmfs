@@ -21,6 +21,13 @@ Activity::Activity() : version_(0), timestamp_(), repository_(), manifest_() {}
 
 Activity::~Activity() {}
 
+bool Activity::operator==(const Activity& other) const {
+  return (this->version_ == other.version_) &&
+         (this->timestamp_ == other.timestamp_) &&
+         (this->repository_ == other.repository_) &&
+         (this->manifest_ == other.manifest_);
+}
+
 void Activity::ToJSONString(std::string* s) {
   assert(s);
 
@@ -44,6 +51,11 @@ bool Activity::FromJSONString(const std::string& s) {
   if (message_type != "activity") {
     LogCvmfs(kLogCvmfs, kLogDebug, "Invalid message type: %s.",
              message_type.c_str());
+    return false;
+  }
+
+  if (!GetFromJSON(m->root(), "version", &version_)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Could not read version.");
     return false;
   }
 
