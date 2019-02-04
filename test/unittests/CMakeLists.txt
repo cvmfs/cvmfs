@@ -73,6 +73,7 @@ set(CVMFS_UNITTEST_FILES
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
+  t_notify_messages.cc
   t_mountpoint.cc
   t_object_fetcher.cc
   t_options.cc
@@ -191,6 +192,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/notify/messages.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc

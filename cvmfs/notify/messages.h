@@ -36,6 +36,8 @@ class Activity : public Message {
   Activity();
   virtual ~Activity();
 
+  bool operator==(const Activity& other) const;
+
   virtual void ToJSONString(std::string* s);
   virtual bool FromJSONString(const std::string& s);
 
