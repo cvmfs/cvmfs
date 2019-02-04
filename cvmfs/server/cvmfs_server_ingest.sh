@@ -23,7 +23,14 @@ cvmfs_server_ingest() {
   local force_native=0
   local force_external=0
 
+  local retry=0
+  local init_retry_delay=5 # seconds
+  local max_retry_delay=300 # seconds
+  local num_retries=100
 
+  # if we use the gateway we cannot easily accept multiple deletion
+  local multiple_delete=0 
+  
   while [ "$2" != "" ]; do
     case $1 in
       -b | --base_dir )
@@ -38,11 +45,24 @@ cvmfs_server_ingest() {
           to_delete=$2
         else
           to_delete=$to_delete:$2
+	  multiple_delete=1
         fi
         ;;
       -c | --catalog )
         create_catalog=true
         ;;
+      -r | --retry )
+        retry=1
+        ;;
+      -i | --retry_delay )
+        init_retry_delay=$2
+        ;;
+      -m | --max_retry_delay )
+        max_retry_delay=$2
+      ;;
+      -n | --number_retry )
+        num_retries=$2
+      ;;
     esac
     shift
   done
@@ -200,7 +220,7 @@ cvmfs_server_ingest() {
 
   if [ ! x"$to_delete" = "x" ]; then
     ingest_command="$ingest_command -D $to_delete"
-  fi
+  fiGG
 
   if [ "$create_catalog" = true ]; then
     ingest_command="$ingest_command -C true"
@@ -209,6 +229,63 @@ cvmfs_server_ingest() {
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
     ingest_command="$ingest_command -+stats"
   fi
+
+        ############# WIP ##########
+   
+  local upstream_storage=$CVMFS_UPSTREAM_STORAGE
+  local upstream_type=$(get_upstream_type $upstream_storage)
+  gw_key_file=/etc/cvmfs/keys/${name}.gw
+
+
+  if [ x"$upstream_type" = xgw ]; then
+
+    if [ $multiple_delete -eq 1 ]; then
+      die "Could not delete multiple paths using a gateway in a single transaction."
+    fi
+
+    if [ ! x"$tar_file" = "x" ] && [ ! x"$to_delete" = "x" ]; then
+      die "Could not delete and add a file in the same transaction while using gateway."
+    fi
+
+    if [ ! x"$tar_file" = "x" ]; then
+      subpath=$tar_file
+    fi
+    
+    if [ ! x"$to_delete" = "x" ]; then
+      subpath=$to_delete
+    fi
+
+    local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
+ 
+    set +e
+ 
+    local res=1
+    local r=1
+    local delay=$init_retry_delay
+    while true ; do
+      __swissknife lease -a acquire -u $repo_services_url -k $gw_key_file -p $name"/"$subpath
+      res=$?
+      if [ $res -eq 0 ] || [ $retry -eq 0 ] || [ $r -gt $num_retries ]; then
+        break
+      fi
+      echo "Retry $r/$num_retries, waiting: $delay"
+      r=$((r + 1))
+      sleep $delay
+      delay=$((delay * 2))
+      if [ $delay -gt $max_retry_delay ]; then
+        delay=$max_retry_delay
+      fi
+    done
+ 
+    set -e
+ 
+    if [ $res -ne 0 ]; then
+      die "Could not acquire a new lease for repository $name"
+    fi
+  fi
+
+        ############# WIP ##########
+
 
   # ---> do it! (from here on we are changing things)
   publish_before_hook $name
