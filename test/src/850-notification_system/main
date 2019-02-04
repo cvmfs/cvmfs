@@ -1,0 +1,66 @@
+cvmfs_test_name="Notification system"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+TEST850_PRIVATE_MOUNT=
+
+TEST850_NOTIFICATION_SERVER_URL="http://localhost:4930/api/v1"
+
+private_mount() {
+  local mntpnt="$1"
+  TEST850_PRIVATE_MOUNT="$mntpnt"
+  do_local_mount "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" "" \
+                 CVMFS_NOTIFICATION_SERVER=$TEST850_NOTIFICATION_SERVER_URL/subscribe || return 1
+}
+
+clean_up() {
+    echo "Cleaning up"
+  if [ "x$TEST850_PRIVATE_MOUNT" != "x" ]; then
+    sudo umount $TEST850_PRIVATE_MOUNT
+    sudo rmdir $TEST850_PRIVATE_MOUNT
+    sudo rm -rf "${TEST850_PRIVATE_MOUNT}c"
+  fi
+}
+
+check_status() {
+    echo $(( $1 || 0 ))
+}
+
+run_tests() {
+    set_up_notification_system
+
+    create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+    echo "Creating a private mount for $CVMFS_TEST_REPO"
+    local mntpnt="$(pwd)/private_mnt"
+    private_mount $mntpnt || return 20
+
+    local rev0=$(attr -g revision $mntpnt | tail -1)
+    local t0=$(date +%s)
+    echo "Current revision number is: $rev0"
+
+    # Run the subscriber tool which blocks until a notification is received
+    cvmfs_swissknife notify -s \
+        -u $TEST850_NOTIFICATION_SERVER_URL/subscribe \
+        -t $CVMFS_TEST_REPO -m $rev0 &
+
+    sudo cvmfs_server transaction $CVMFS_TEST_REPO
+    sudo cvmfs_server publish $CVMFS_TEST_REPO
+
+    cvmfs_swissknife notify -p \
+        -u $TEST850_NOTIFICATION_SERVER_URL/publish \
+        -r http://localhost/cvmfs/$CVMFS_TEST_REPO
+}
+
+cvmfs_run_test() {
+    trap clean_up EXIT HUP INT TERM || return $?
+
+    run_tests
+    local status=$?
+
+    return $(check_status $status)
+}
+

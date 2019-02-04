@@ -2420,3 +2420,18 @@ EOF'
     echo "  Starting repository gateway"
     sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
 }
+
+# Sets up the CVMFS notification system
+set_up_notification_system() {
+  echo "Setting up CVMFS notification system"
+
+  sudo bash -c 'cat <<EOF > /etc/cvmfs/notify/config.json
+{
+    "port": 4930,
+    "log_level": "debug",
+    "testing_mode": true
+}
+EOF'
+
+  sudo systemctl restart cvmfs-notify
+}
