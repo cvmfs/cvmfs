@@ -118,10 +118,12 @@ if [ "x$ubuntu_release" = "xxenial" ] || [ "x$ubuntu_release" = "xbionic" ]; the
   if [ "x$(uname -m)" = "xx86_64" ]; then
     echo "Installing repository gateway"
     package_map=pkgmap.ubuntu1604_x86_64
-    download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
-    install_deb $(cat gateway_package_name)
-    sudo /usr/libexec/cvmfs-gateway/scripts/setup.sh
-  fi
+    install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+
+    # Install notification server
+    echo "Installing notification server"
+    package_map=pkgmap.cc7_x86_64
+    install_package ${NOTIFY_SRV_BUILD_URL} $package_map || die "fail (downloading cvmfs-notify)"  fi
 fi
 
 disable_systemd_rate_limit
