@@ -11,13 +11,25 @@
 #include "notify/subscriber.h"
 
 namespace signature {
-  class SignatureManager;
+class SignatureManager;
 }
 
+/**
+ * Notification system client running inside the mountpoint process
+ *
+ * This class implements a client for the repository notification system, meant
+ * to run inside the mountpoint process. Constructor arguments are:
+ * @param config - configuration string to connect to the notification system
+ * (currently the URL of the notification server)
+ * @param repo_name - name of the repository associated with the mount point
+ * @param remounter - a pointer to a FuseRemounter object; upon receiving valid
+ * notifications about repository activity, a remount is triggered
+ * @param sig_mgr - a pointer to a SignatureManager object used to verify
+ * messages received from the notification system
+ */
 class NotificationClient {
  public:
-  NotificationClient(const std::string& config,
-                     const std::string& repo_name,
+  NotificationClient(const std::string& config, const std::string& repo_name,
                      FuseRemounter* remounter,
                      signature::SignatureManager* sig_mgr);
   virtual ~NotificationClient();
