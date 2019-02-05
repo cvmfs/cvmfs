@@ -2,31 +2,26 @@ cvmfs_test_name="Notification system"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-TEST850_PRIVATE_MOUNT=
-
-TEST850_NOTIFICATION_SERVER_URL="http://localhost:4930/api/v1"
-
-private_mount() {
-  local mntpnt="$1"
-  TEST850_PRIVATE_MOUNT="$mntpnt"
-  do_local_mount "$mntpnt"          \
-                 "$CVMFS_TEST_REPO" \
-                 "$(get_repo_url $CVMFS_TEST_REPO)" \
-                 "" "" \
-                 CVMFS_NOTIFICATION_SERVER=$TEST850_NOTIFICATION_SERVER_URL/subscribe || return 1
-}
+NOTIFICATION_SERVER_URL="http://localhost:4930/api/v1"
 
 clean_up() {
     echo "Cleaning up"
-  if [ "x$TEST850_PRIVATE_MOUNT" != "x" ]; then
-    sudo umount $TEST850_PRIVATE_MOUNT
-    sudo rmdir $TEST850_PRIVATE_MOUNT
-    sudo rm -rf "${TEST850_PRIVATE_MOUNT}c"
-  fi
 }
 
 check_status() {
     echo $(( $1 || 0 ))
+}
+
+publish_and_notify() {
+    sleep 1
+
+    sudo cvmfs_server transaction $CVMFS_TEST_REPO
+    echo "Test" > /cvmfs/$CVMFS_TEST_REPO/marker.txt
+    sudo cvmfs_server publish $CVMFS_TEST_REPO
+
+    cvmfs_swissknife notify -p \
+        -u $NOTIFICATION_SERVER_URL/publish \
+        -r http://localhost/cvmfs/$CVMFS_TEST_REPO
 }
 
 run_tests() {
@@ -34,25 +29,18 @@ run_tests() {
 
     create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-    echo "Creating a private mount for $CVMFS_TEST_REPO"
-    local mntpnt="$(pwd)/private_mnt"
-    private_mount $mntpnt || return 20
-
-    local rev0=$(attr -g revision $mntpnt | tail -1)
-    local t0=$(date +%s)
-    echo "Current revision number is: $rev0"
+    publish_and_notify &
 
     # Run the subscriber tool which blocks until a notification is received
-    cvmfs_swissknife notify -s \
-        -u $TEST850_NOTIFICATION_SERVER_URL/subscribe \
-        -t $CVMFS_TEST_REPO -m $rev0 &
+    echo "Wait for notification that repository is at revision > 2"
+    local rev1=$(cvmfs_swissknife notify -s \
+        -u $NOTIFICATION_SERVER_URL/subscribe \
+        -t $CVMFS_TEST_REPO -m 2 | awk '{print $NF}' | cut -c1)
 
-    sudo cvmfs_server transaction $CVMFS_TEST_REPO
-    sudo cvmfs_server publish $CVMFS_TEST_REPO
-
-    cvmfs_swissknife notify -p \
-        -u $TEST850_NOTIFICATION_SERVER_URL/publish \
-        -r http://localhost/cvmfs/$CVMFS_TEST_REPO
+    if [ $((rev1)) -lt 3 ]; then
+        echo "Repository revision $rev should be > 2"
+        return 1
+    fi
 }
 
 cvmfs_run_test() {
