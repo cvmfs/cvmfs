@@ -578,7 +578,8 @@ bool SyncFull(
       return false;
     }
 
-    if (time(NULL)-last_print_time > stat_update_period_) {
+    if (stat_update_period_ > 0 &&
+        time(NULL)-last_print_time > stat_update_period_) {
       LogCvmfs(kLogCvmfs, kLogStdout,
         "%s",
         pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
