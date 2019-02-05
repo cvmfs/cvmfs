@@ -1889,7 +1889,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
       options->GetValue("CVMFS_NOTIFICATION_SERVER", &config);
       const std::string repo_name = cvmfs::mount_point_->fqrn();
       cvmfs::notification_client_ =
-          new NotificationClient(config, repo_name, cvmfs::fuse_remounter_);
+          new NotificationClient(config, repo_name, cvmfs::fuse_remounter_,
+                                 cvmfs::mount_point_->signature_mgr());
     }
   }
 

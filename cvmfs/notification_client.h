@@ -10,11 +10,16 @@
 #include "fuse_remount.h"
 #include "notify/subscriber.h"
 
+namespace signature {
+  class SignatureManager;
+}
+
 class NotificationClient {
  public:
   NotificationClient(const std::string& config,
-                     const std::string& repo_name_,
-                     FuseRemounter* remounter);
+                     const std::string& repo_name,
+                     FuseRemounter* remounter,
+                     signature::SignatureManager* sig_mgr);
   virtual ~NotificationClient();
 
   void Spawn();
@@ -25,6 +30,7 @@ class NotificationClient {
   std::string config_;
   std::string repo_name_;
   FuseRemounter* remounter_;
+  signature::SignatureManager* sig_mgr_;
 };
 
 #endif  // CVMFS_NOTIFICATION_CLIENT_H_

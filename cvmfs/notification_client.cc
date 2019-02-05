@@ -12,6 +12,7 @@
 #include "notify/messages.h"
 #include "notify/subscriber_supervisor.h"
 #include "notify/subscriber_ws.h"
+#include "signature.h"
 #include "supervisor.h"
 #include "util/posix.h"
 
@@ -19,8 +20,9 @@ namespace {
 
 class ActivitySubscriber : public notify::SubscriberWS {
  public:
-  ActivitySubscriber(const std::string& server_url, FuseRemounter* remounter)
-      : SubscriberWS(server_url), remounter_(remounter) {}
+  ActivitySubscriber(const std::string& server_url, FuseRemounter* remounter,
+                     signature::SignatureManager* sig_mgr)
+      : SubscriberWS(server_url), remounter_(remounter), sig_mgr_(sig_mgr) {}
 
   virtual ~ActivitySubscriber() {}
 
@@ -30,6 +32,13 @@ class ActivitySubscriber : public notify::SubscriberWS {
     if (!msg.FromJSONString(msg_text)) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
                "ActivitySubscriber - Could not decode message.");
+      return false;
+    }
+
+    if (!sig_mgr_->VerifyLetter(
+            reinterpret_cast<const unsigned char*>(msg.manifest_.data()),
+            msg.manifest_.size(), false)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Manifest has invalid signature.");
       return false;
     }
 
@@ -79,14 +88,19 @@ class ActivitySubscriber : public notify::SubscriberWS {
 
  private:
   FuseRemounter* remounter_;
+  signature::SignatureManager* sig_mgr_;
 };
 
 }  // namespace
 
 NotificationClient::NotificationClient(const std::string& config,
                                        const std::string& repo_name,
-                                       FuseRemounter* remounter)
-    : config_(config), repo_name_(repo_name), remounter_(remounter) {}
+                                       FuseRemounter* remounter,
+                                       signature::SignatureManager* sig_mgr)
+    : config_(config),
+      repo_name_(repo_name),
+      remounter_(remounter),
+      sig_mgr_(sig_mgr) {}
 
 NotificationClient::~NotificationClient() {}
 
@@ -103,7 +117,7 @@ void* NotificationClient::Run(void* data) {
   NotificationClient* cl = static_cast<NotificationClient*>(data);
 
   UniquePtr<ActivitySubscriber> sub(
-      new ActivitySubscriber(cl->config_, cl->remounter_));
+      new ActivitySubscriber(cl->config_, cl->remounter_, cl->sig_mgr_));
 
   LogCvmfs(
       kLogCvmfs, kLogSyslog,
