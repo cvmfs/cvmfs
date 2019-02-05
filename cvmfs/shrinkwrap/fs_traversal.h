@@ -11,12 +11,17 @@
 #include "fs_traversal_interface.h"
 #include "statistics.h"
 
-#define SHRINKWRAP_STAT_BYTE_COUNT "byteCnt"
-#define SHRINKWRAP_STAT_FILE_COUNT "fileCnt"
-#define SHRINKWRAP_STAT_SRC_ENTRIES "srcEntries"
-#define SHRINKWRAP_STAT_DEST_ENTRIES "destEntries"
-#define SHRINKWRAP_STAT_DEDUPED_FILES "dedupedFiles"
-#define SHRINKWRAP_STAT_DEDUPED_BYTES "dedupedBytes"
+
+#define SHRINKWRAP_STAT_COUNT_FILE "cntFile"
+#define SHRINKWRAP_STAT_COUNT_DIR "cntDir"
+#define SHRINKWRAP_STAT_COUNT_SYMLINK "cntSymlink"
+#define SHRINKWRAP_STAT_COUNT_BYTE "cntByte"
+#define SHRINKWRAP_STAT_ENTRIES_SRC "entriesSrc"
+#define SHRINKWRAP_STAT_ENTRIES_DEST "entriesDest"
+#define SHRINKWRAP_STAT_DATA_FILES "dataFiles"
+#define SHRINKWRAP_STAT_DATA_BYTES "dataBytes"
+#define SHRINKWRAP_STAT_DATA_FILES_DEDUPED "dataFilesDeduped"
+#define SHRINKWRAP_STAT_DATA_BYTES_DEDUPED "dataBytesDeduped"
 
 namespace shrinkwrap {
 
@@ -27,7 +32,7 @@ int SyncInit(struct fs_traversal *src,
              const char *base,
              const char *spec,
              unsigned parallel,
-             unsigned retries);
+             int stat_period);
 
 int GarbageCollect(struct fs_traversal *fs);
 
@@ -35,7 +40,8 @@ int GarbageCollect(struct fs_traversal *fs);
 bool SyncFull(
   struct fs_traversal *src,
   struct fs_traversal *dest,
-  perf::Statistics *pstats);
+  perf::Statistics *pstats,
+  time_t last_print_time);
 
 // Exported for testing purposes:
 perf::Statistics *GetSyncStatTemplate();

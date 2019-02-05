@@ -56,7 +56,7 @@ struct Params {
     , dst_data_dir()
     , spec_trace_path()
     , num_parallel(0)
-    , retries(0)
+    , stat_period(10)
     , do_garbage_collection(false)
   { }
 
@@ -71,7 +71,7 @@ struct Params {
   std::string dst_data_dir;
   std::string spec_trace_path;
   unsigned num_parallel;
-  unsigned retries;
+  unsigned stat_period;
   bool do_garbage_collection;
 };
 
@@ -81,7 +81,7 @@ void Usage() {
        "This tool takes a cvmfs repository and outputs\n"
        "to a destination files system.\n"
        "Usage: cvmfs_shrinkwrap "
-       "[-r][-sbcf][-dxyz][-t|b][-jrg]\n"
+       "[-r][-sbcf][-dxyz][-t][-jrg]\n"
         "Options:\n"
         " -r --repo        Repository name [required]\n"
         " -s --src-type    Source filesystem type [default:cvmfs]\n"
@@ -94,7 +94,7 @@ void Usage() {
         " -z --dest-config Dest config\n"
         " -t --spec-file   Specification file [default=$REPO.spec]\n"
         " -j --threads     Number of concurrent copy threads [default:2*CPUs]\n"
-        " -r --retries     Number of retries on copying file [default:0]\n"
+        " -p --stat-period Frequency of stat prints, 0 disables [default:10]\n"
         " -g --gc          Perform garbage collection on destination\n",
            VERSION);
 }
@@ -119,12 +119,12 @@ int main(int argc, char **argv) {
       {"dest-config", required_argument, 0, 'z'},
       {"spec-file",   required_argument, 0, 't'},
       {"threads",     required_argument, 0, 'j'},
-      {"retries",     required_argument, 0, 'n'},
+      {"stat-period", required_argument, 0, 'p'},
       {"gc",          no_argument, 0, 'g'},
       {0, 0, 0, 0}
     };
 
-  static const char short_opts[] = "hb:s:r:c:f:d:x:y:t:j:n:g";
+  static const char short_opts[] = "hb:s:r:c:f:d:x:y:t:j:p:g";
 
   while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) >= 0) {
     switch (c) {
@@ -164,11 +164,11 @@ int main(int argc, char **argv) {
       case 'j':
         params.num_parallel = atoi(optarg);
         break;
-      case 'n':
-        params.retries = atoi(optarg);
-        break;
       case 'g':
         params.do_garbage_collection = true;
+        break;
+      case 'p':
+        params.stat_period = atoi(optarg);
         break;
       case '?':
       default:
@@ -221,7 +221,7 @@ int main(int argc, char **argv) {
     "", /* spec_base_dir, unused */
     params.spec_trace_path.c_str(),
     params.num_parallel,
-    params.retries);
+    params.stat_period);
 
   src->finalize(src->context_);
   if (params.do_garbage_collection) {
