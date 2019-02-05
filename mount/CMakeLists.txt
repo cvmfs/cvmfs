@@ -26,7 +26,7 @@ if (MACOSX)
   add_executable (auto_cvmfs ${CVMFS_AUTO_SOURCES})
 
   install (
-    FILES         auto_cvmfs
+    TARGETS       auto_cvmfs
     DESTINATION   "${SYSCONF_INSTALL_DIR}"
     PERMISSIONS   OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
