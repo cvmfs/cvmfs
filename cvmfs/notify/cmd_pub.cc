@@ -35,11 +35,13 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
               bool verbose) {
   const std::string repo_url = MakeCanonicalPath(repository_url);
 
-  LogCvmfs(kLogCvmfs, kLogInfo, "Parameters: ");
-  LogCvmfs(kLogCvmfs, kLogInfo, "  CVMFS repository URL: %s",
-           repo_url.c_str());
-  LogCvmfs(kLogCvmfs, kLogInfo, "  Notification server URL: %s",
-           server_url.c_str());
+  if (verbose) {
+    LogCvmfs(kLogCvmfs, kLogInfo, "Parameters: ");
+    LogCvmfs(kLogCvmfs, kLogInfo, "  CVMFS repository URL: %s",
+            repo_url.c_str());
+    LogCvmfs(kLogCvmfs, kLogInfo, "  Notification server URL: %s",
+            server_url.c_str());
+  }
 
   // Extract repository name from repository URL
   const std::vector<std::string> repo_url_tokens = SplitString(repo_url, '/');
@@ -74,11 +76,11 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
   } else {
     int fd = open(manifest_url.c_str(), O_RDONLY);
     if (fd == -1) {
-      LogCvmfs(kLogCvmfs, kLogInfo, "Could not open manifest file");
+      LogCvmfs(kLogCvmfs, kLogError, "Could not open manifest file");
       return 7;
     }
     if (!SafeReadToString(fd, &manifest_contents)) {
-      LogCvmfs(kLogCvmfs, kLogInfo, "Could not read manifest file");
+      LogCvmfs(kLogCvmfs, kLogError, "Could not read manifest file");
       close(fd);
       return 8;
     }

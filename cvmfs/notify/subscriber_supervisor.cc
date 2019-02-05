@@ -9,7 +9,7 @@
 
 namespace {
 
-const LogFacilities& kLogInfo = DefaultLogging::info;
+const LogFacilities& kLogError = DefaultLogging::error;
 
 }  // namespace
 
@@ -25,10 +25,10 @@ bool SubscriberSupervisor::Task() {
   bool ret = subscriber_->Subscribe(topic_);
   if (ret) {
     LogCvmfs(
-        kLogCvmfs, kLogInfo,
+        kLogCvmfs, kLogDebug,
         "SubscriberSupervisor - Subcription ended successfully. Stopping.");
   } else {
-    LogCvmfs(kLogCvmfs, kLogInfo,
+    LogCvmfs(kLogCvmfs, kLogError,
              "SubscriberSupervisor - Subcription failed. Retrying.");
   }
   return ret;
