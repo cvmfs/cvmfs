@@ -20,9 +20,15 @@ set (CVMFS_MOUNT_CFLAGS "${CVMFS_MOUNT_CFLAGS} -I${CMAKE_SOURCE_DIR}/cvmfs")
 set_target_properties (${MOUNT_TARGET_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_MOUNT_CFLAGS}")
 
 if (MACOSX)
+  set (CVMFS_AUTO_SOURCES
+    auto.cvmfs.cc
+  )
+  add_executable (auto_cvmfs ${CVMFS_AUTO_SOURCES})
+
   install (
     FILES         auto_cvmfs
     DESTINATION   "${SYSCONF_INSTALL_DIR}"
+    PERMISSIONS   OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
   install (
