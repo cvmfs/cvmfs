@@ -23,11 +23,6 @@ cvmfs_server_ingest() {
   local force_native=0
   local force_external=0
 
-  local retry=0
-  local init_retry_delay=5 # seconds
-  local max_retry_delay=300 # seconds
-  local num_retries=100
-
   # if we use the gateway we cannot easily accept multiple deletion
   local multiple_delete=0
 
