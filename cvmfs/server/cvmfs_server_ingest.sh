@@ -230,12 +230,9 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -+stats"
   fi
 
-        ############# WIP ##########
-
   local upstream_storage=$CVMFS_UPSTREAM_STORAGE
   local upstream_type=$(get_upstream_type $upstream_storage)
   gw_key_file=/etc/cvmfs/keys/${name}.gw
-
 
   if [ x"$upstream_type" = xgw ]; then
 
@@ -247,44 +244,8 @@ cvmfs_server_ingest() {
       die "Could not delete and add a file in the same transaction while using gateway."
     fi
 
-    if [ ! x"$tar_file" = "x" ]; then
-      subpath=$tar_file
-    fi
-
-    if [ ! x"$to_delete" = "x" ]; then
-      subpath=$to_delete
-    fi
-
-    local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
-
-    set +e
-
-    local res=1
-    local r=1
-    local delay=$init_retry_delay
-    while true ; do
-      __swissknife lease -a acquire -u $repo_services_url -k $gw_key_file -p $name"/"$subpath
-      res=$?
-      if [ $res -eq 0 ] || [ $retry -eq 0 ] || [ $r -gt $num_retries ]; then
-        break
-      fi
-      echo "Retry $r/$num_retries, waiting: $delay"
-      r=$((r + 1))
-      sleep $delay
-      delay=$((delay * 2))
-      if [ $delay -gt $max_retry_delay ]; then
-        delay=$max_retry_delay
-      fi
-    done
-
-    set -e
-
-    if [ $res -ne 0 ]; then
-      die "Could not acquire a new lease for repository $name"
-    fi
+    ingest_command="$ingest_command -H $gw_key_file -P ${spool_dir}/session_token"
   fi
-
-        ############# WIP ##########
 
 
   # ---> do it! (from here on we are changing things)
