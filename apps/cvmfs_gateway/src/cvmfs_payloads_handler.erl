@@ -66,7 +66,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                                 #{<<"session_token">> := Token
                                  ,<<"payload_digest">> := PayloadDigest
                                  ,<<"header_size">> := HeaderSize
-                                 ,<<"api_version">> := ClientApiVersion} ->
+                                 ,<<"api_version">> := ReqProtoVer} ->
                                     Rep = case cvmfs_be:check_hmac(Uid, JSONMessage, KeyId, ClientHMAC) of
                                               true ->
                                                   p_submit_payload(Uid,
@@ -74,7 +74,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
                                                                     Payload,
                                                                     PayloadDigest,
                                                                     binary_to_integer(HeaderSize)},
-                                                                   ClientApiVersion);
+                                                                   ReqProtoVer);
                                               false ->
                                                   #{<<"status">> => <<"error">>,
                                                     <<"reason">> => <<"invalid_hmac">>}
@@ -96,7 +96,7 @@ init(Req0 = #{method := <<"POST">>}, State) ->
 %% Private functions
 
 
-p_submit_payload(Uid, SubmissionData, _ClientApiVersion) ->
+p_submit_payload(Uid, SubmissionData, _ReqProtoVer) ->
     case cvmfs_be:submit_payload(Uid, SubmissionData) of
         {ok, payload_added} ->
             #{<<"status">> => <<"ok">>};
