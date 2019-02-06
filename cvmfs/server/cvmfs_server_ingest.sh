@@ -220,7 +220,7 @@ cvmfs_server_ingest() {
 
   if [ ! x"$to_delete" = "x" ]; then
     ingest_command="$ingest_command -D $to_delete"
-  fiGG
+  fi
 
   if [ "$create_catalog" = true ]; then
     ingest_command="$ingest_command -C true"
@@ -231,7 +231,7 @@ cvmfs_server_ingest() {
   fi
 
         ############# WIP ##########
-   
+
   local upstream_storage=$CVMFS_UPSTREAM_STORAGE
   local upstream_type=$(get_upstream_type $upstream_storage)
   gw_key_file=/etc/cvmfs/keys/${name}.gw
@@ -250,15 +250,15 @@ cvmfs_server_ingest() {
     if [ ! x"$tar_file" = "x" ]; then
       subpath=$tar_file
     fi
-    
+
     if [ ! x"$to_delete" = "x" ]; then
       subpath=$to_delete
     fi
 
     local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
- 
+
     set +e
- 
+
     local res=1
     local r=1
     local delay=$init_retry_delay
@@ -276,9 +276,9 @@ cvmfs_server_ingest() {
         delay=$max_retry_delay
       fi
     done
- 
+
     set -e
- 
+
     if [ $res -ne 0 ]; then
       die "Could not acquire a new lease for repository $name"
     fi
