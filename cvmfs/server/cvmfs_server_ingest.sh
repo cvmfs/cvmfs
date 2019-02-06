@@ -29,8 +29,8 @@ cvmfs_server_ingest() {
   local num_retries=100
 
   # if we use the gateway we cannot easily accept multiple deletion
-  local multiple_delete=0 
-  
+  local multiple_delete=0
+
   while [ "$2" != "" ]; do
     case $1 in
       -b | --base_dir )
@@ -45,24 +45,12 @@ cvmfs_server_ingest() {
           to_delete=$2
         else
           to_delete=$to_delete:$2
-	  multiple_delete=1
+          multiple_delete=1
         fi
         ;;
       -c | --catalog )
         create_catalog=true
         ;;
-      -r | --retry )
-        retry=1
-        ;;
-      -i | --retry_delay )
-        init_retry_delay=$2
-        ;;
-      -m | --max_retry_delay )
-        max_retry_delay=$2
-      ;;
-      -n | --number_retry )
-        num_retries=$2
-      ;;
     esac
     shift
   done
