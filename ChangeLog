@@ -1,3 +1,5 @@
+1.0.0:
+
 0.3.1:
   * Refactored protocol version checks with clients. Protocol version is now 2
     (CVM-1626).
