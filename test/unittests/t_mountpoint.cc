@@ -411,11 +411,15 @@ TEST_F(T_MountPoint, CrashGuard) {
 
 
 TEST_F(T_MountPoint, LockWorkspace) {
+  int pipe_sync[2];
+  MakePipe(pipe_sync);
+
   pid_t pid;
   switch (pid = fork()) {
     case -1:
       abort();
     case 0:
+      read(pipe_sync[0], &pid, sizeof(pid));
       UniquePtr<FileSystem> fs01(FileSystem::Create(fs_info_));
       switch (fs01->boot_status()) {
         case loader::kFailOk:
@@ -428,6 +432,7 @@ TEST_F(T_MountPoint, LockWorkspace) {
   }
 
   UniquePtr<FileSystem> fs01(FileSystem::Create(fs_info_));
+  write(pipe_sync[1], &pid, sizeof(pid));
   int stat_loc;
   int retval = waitpid(pid, &stat_loc, 0);
   EXPECT_NE(retval, -1);
@@ -435,6 +440,7 @@ TEST_F(T_MountPoint, LockWorkspace) {
   EXPECT_TRUE(((fs01->boot_status() == 0) && (WEXITSTATUS(stat_loc) == 1)) ||
               ((fs01->boot_status() == loader::kFailLockWorkspace) &&
                   (WEXITSTATUS(stat_loc) == 0)));
+  ClosePipe(pipe_sync);
 }
 
 
