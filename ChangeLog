@@ -1,4 +1,5 @@
 2.6.0:
+  * Update c-ares to version 1.15.0
   * Update libcurl to version 7.63.0
   * New parameter CVMFS_CATALOG_WATERMARK to release as of $n$ pinned catalogs
   * Add cvmfs_shrinkwrap utility and sub package (CVM-1578)
