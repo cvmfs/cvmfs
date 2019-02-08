@@ -1,5 +1,5 @@
 [
- {lager, [{log_root, "/tmp"},
+ {lager, [{log_root, "/var/log/cvmfs-gateway"},
           {crash_log, "crash.log"},
           {handlers, [{lager_console_backend, [{level, debug}]},
                       {lager_syslog_backend, ["cvmfs_gateway", local1, debug]}]},
