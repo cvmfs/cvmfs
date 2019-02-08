@@ -4,10 +4,15 @@ set -e
 
 static_result_dir=src/static
 
+FIX_COMP=""
+if [ x"$(uname)" == x"Darwin" ]; then
+  FIX_COMP="CC=/usr/bin/clang CXX=/usr/bin/clang++"
+fi
+
 echo "make clean && make for libpacparser (omitting test execution)..."
 [ -d $static_result_dir ] && rm -fR $static_result_dir
 make -C src clean
-make CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS" -j1 -C src pacparser.o libjs.a # default target runs tests!
+make $FIX_COMP CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS" -j1 -C src pacparser.o libjs.a # default target runs tests!
 echo "finished internal build of libpacparser"
 
 echo "creating static link library for libpacparser..."
