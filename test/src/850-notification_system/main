@@ -8,10 +8,6 @@ clean_up() {
     echo "Cleaning up"
 }
 
-check_status() {
-    echo $(( $1 || 0 ))
-}
-
 publish_and_notify() {
     sleep 1
 
