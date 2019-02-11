@@ -71,10 +71,6 @@ class ActivitySubscriber : public notify::SubscriberWS {
         LogCvmfs(kLogCvmfs, kLogSyslog,
                  "NotificationClient - catalog up to date");
         break;
-      case FuseRemounter::kStatusDraining:
-        LogCvmfs(kLogCvmfs, kLogSyslog,
-                 "NotificationClient - new revision applied");
-        break;
       case FuseRemounter::kStatusMaintenance:
         LogCvmfs(kLogCvmfs, kLogSyslog,
                  "NotificationClient - in maintenance mode");
