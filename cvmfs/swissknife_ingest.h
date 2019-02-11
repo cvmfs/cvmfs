@@ -38,6 +38,9 @@ class Ingest : public Command {
     r.push_back(Parameter::Optional(
         'C', "create a new catalog where the tar file is extracted"));
 
+    r.push_back(Parameter::Optional('P', "session_token_file"));
+    r.push_back(Parameter::Optional('H', "key file for HTTP API"));
+
     return r;
   }
   int Main(const ArgumentList &args);
