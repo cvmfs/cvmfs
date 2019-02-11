@@ -397,7 +397,7 @@ install_package() {
   if [ x"$(echo $package_file_name | grep .rpm)" != x"" ]; then
     install_rpm $package_file_name
   else
-    install_rpm $package_file_name
+    install_deb $package_file_name
   fi
 
   return 0;

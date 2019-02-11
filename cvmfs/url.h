@@ -21,14 +21,22 @@ class Url {
    *     and port <port>
    */
   static const int kDefaultPort;
-  static const std::string kDefaultProtocol;
+  static const char* kDefaultProtocol;
 
+  /**
+   * Parse an URL string
+   *
+   * Parse an URL string and extract the protocol, host, port, and path
+   * components. The method can be called with protocol and port values that are
+   * used when the input string doesn't contain these parts. The default
+   * protocol is "http" and the default port is 80
+   */
   static Url* Parse(const std::string& url,
                     const std::string& default_protocol = kDefaultProtocol,
                     int default_port = kDefaultPort);
   static bool ValidateHost(const std::string& host);
 
-  virtual ~Url();
+  ~Url();
 
   std::string protocol() const { return protocol_; }
   std::string address() const { return address_; }
@@ -44,8 +52,8 @@ class Url {
   std::string protocol_;
   std::string host_;
   std::string path_;
-  std::string address_;
   int port_;
+  std::string address_;
 };
 
 #endif  // CVMFS_URL_H_

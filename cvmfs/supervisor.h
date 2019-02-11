@@ -28,7 +28,7 @@
  */
 class Supervisor {
  public:
-  Supervisor(int max_retries, uint64_t interval_sec);
+  Supervisor(uint64_t max_retries, uint64_t interval_sec);
   virtual ~Supervisor();
 
   virtual bool Task() = 0;
@@ -36,7 +36,7 @@ class Supervisor {
   void Run();
 
  private:
-  int max_retries_;
+  uint64_t max_retries_;
   uint64_t interval_;
 };
 

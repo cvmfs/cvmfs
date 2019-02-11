@@ -7,13 +7,13 @@
 #include "logging.h"
 #include "platform.h"
 
-Supervisor::Supervisor(int max_retries, uint64_t interval_sec)
+Supervisor::Supervisor(uint64_t max_retries, uint64_t interval_sec)
     : max_retries_(max_retries), interval_(interval_sec) {}
 
 Supervisor::~Supervisor() {}
 
 void Supervisor::Run() {
-  int retries = 0;
+  uint64_t retries = 0;
   uint64_t t0 = platform_monotonic_time();
   bool result = false;
   do {
@@ -25,5 +25,5 @@ void Supervisor::Run() {
       t0 = t1;
       retries = 0;
     }
-  } while (!result && (retries < max_retries_));
+  } while (!result && (retries <= max_retries_));
 }

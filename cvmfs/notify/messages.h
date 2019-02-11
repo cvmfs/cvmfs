@@ -23,6 +23,8 @@ class Message {
  public:
   virtual void ToJSONString(std::string* s) = 0;
   virtual bool FromJSONString(const std::string& s) = 0;
+
+  virtual ~Message() {}
 };
 
 /**

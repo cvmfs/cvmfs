@@ -9,7 +9,7 @@
 #include "util/string.h"
 
 const int Url::kDefaultPort = 80;
-const std::string Url::kDefaultProtocol = "http";
+const char* Url::kDefaultProtocol = "http";
 
 Url* Url::Parse(const std::string& url, const std::string& default_protocol,
                 int default_port) {
@@ -108,13 +108,19 @@ bool Url::ValidateHost(const std::string& host) {
   return true;
 }
 
-Url::Url() : protocol_(), host_(), path_(), address_(), port_() {}
+Url::Url() : protocol_(), host_(), path_(), port_(), address_() {}
 
 Url::Url(const std::string& protocol, const std::string& host,
          const std::string& path, int port)
     : protocol_(protocol),
       host_(host),
       path_(path),
-      address_(protocol + "://" + host + path),
-      port_(port) {}
+      port_(port),
+      address_() {
+  if (port_ != kDefaultPort) {
+    address_ = protocol + "://" + host + ":" + StringifyInt(port_) + path;
+  } else {
+    address_ = protocol + "://" + host + path;
+  }
+}
 Url::~Url() {}

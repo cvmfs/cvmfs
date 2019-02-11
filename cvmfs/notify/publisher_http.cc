@@ -4,7 +4,7 @@
 
 #include "publisher_http.h"
 
-#include "curl/curl.h"
+#include "duplex_curl.h"
 
 #include "cvmfs_config.h"
 

@@ -114,16 +114,21 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
 fi
 
 # On Ubuntu 16.04+ 64bit install the repository gateway
-if [ "x$ubuntu_release" = "xxenial" ] || [ "x$ubuntu_release" = "xbionic" ]; then
-  if [ "x$(uname -m)" = "xx86_64" ]; then
+if [ "x$(uname -m)" = "xx86_64" ]; then
+  package_map=""
+  if [ "x$ubuntu_release" = "xxenial" ]; then
+    package_map="pkgmap.ubuntu1604_x86_64"
+  elif [ "x$ubuntu_release" = "xbionic" ]; then
+    package_map="pkgmap.ubuntu1804_x86_64"
+  fi
+
+  if [ "x$package_map" != "x" ]; then
     echo "Installing repository gateway"
-    package_map=pkgmap.ubuntu1604_x86_64
     install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
 
-    # Install notification server
     echo "Installing notification server"
-    package_map=pkgmap.cc7_x86_64
-    install_package ${NOTIFY_SRV_BUILD_URL} $package_map || die "fail (downloading cvmfs-notify)"  fi
+    install_package ${NOTIFY_SRV_BUILD_URL} $package_map || die "fail (downloading cvmfs-notify)"
+  fi
 fi
 
 disable_systemd_rate_limit

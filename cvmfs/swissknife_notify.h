@@ -17,7 +17,7 @@ class CommandNotify : public Command {
 
   virtual std::string GetName() const { return "notify"; }
   virtual std::string GetDescription() const {
-    return "Publish/subscribe client for the CMFS notification system";
+    return "Publish/subscribe client for the CVMFS notification system";
   }
 
   virtual ParameterList GetParams() const;

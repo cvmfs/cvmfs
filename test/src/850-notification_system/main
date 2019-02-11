@@ -47,8 +47,6 @@ cvmfs_run_test() {
     trap clean_up EXIT HUP INT TERM || return $?
 
     run_tests
-    local status=$?
-
-    return $(check_status $status)
+    return $?
 }
 

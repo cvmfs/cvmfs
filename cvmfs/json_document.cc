@@ -224,11 +224,13 @@ bool GetFromJSON<std::string>(const JSON *object, const std::string &name,
                               std::string *value) {
   const JSON *o = JsonDocument::SearchInObject(object, name, JSON_STRING);
 
-  if (o == NULL || value == NULL) {
+  if (o == NULL) {
     return false;
   }
 
-  *value = o->string_value;
+  if (value) {
+    *value = o->string_value;
+  }
 
   return true;
 }

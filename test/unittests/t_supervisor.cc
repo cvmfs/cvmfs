@@ -52,7 +52,7 @@ TEST_F(T_Supervisor, kMaxRetriesGiveUp) {
   TestSupervisor r(2, 1);
   r.result_ = false;
   r.Run();
-  ASSERT_EQ(2, r.runs_);
+  ASSERT_EQ(3, r.runs_);
 }
 
 TEST_F(T_Supervisor, kCooldownSlow) {

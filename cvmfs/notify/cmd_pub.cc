@@ -23,7 +23,7 @@ const LogFacilities& kLogInfo = DefaultLogging::info;
 const LogFacilities& kLogError = DefaultLogging::error;
 
 const int kMaxPoolHandles = 1;
-const bool kUseSystemPorxy = true;
+const bool kUseSystemProxy = true;
 const unsigned kDownloadTimeout = 60;  // 1 minute
 const unsigned kDownloadRetries = 1;   // 2 attempts in total
 
@@ -55,7 +55,7 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
     UniquePtr<download::DownloadManager> download_manager(
         new download::DownloadManager());
     assert(download_manager.IsValid());
-    download_manager->Init(kMaxPoolHandles, kUseSystemPorxy,
+    download_manager->Init(kMaxPoolHandles, kUseSystemProxy,
                            perf::StatisticsTemplate("download", &stats));
 
     download_manager->SetTimeout(kDownloadTimeout, kDownloadTimeout);

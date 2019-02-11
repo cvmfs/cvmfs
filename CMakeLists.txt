@@ -198,7 +198,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
     set(ENV{BUILD_QC_TESTS} "")
-    endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+  endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
   # point to the prefix where the libraries are installed. This path will take precedence
