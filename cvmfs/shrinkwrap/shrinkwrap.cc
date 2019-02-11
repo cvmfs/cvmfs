@@ -70,8 +70,8 @@ struct Params {
   std::string dst_base_dir;
   std::string dst_data_dir;
   std::string spec_trace_path;
-  unsigned num_parallel;
-  unsigned stat_period;
+  uint64_t num_parallel;
+  uint64_t stat_period;
   bool do_garbage_collection;
 };
 
@@ -105,6 +105,8 @@ int main(int argc, char **argv) {
   Params params;
 
   int c;
+  char *endptr = NULL;
+  long long tmp_value = 0; // NOLINT
   static struct option long_opts[] = {
       /* All of the options require an argument */
       {"help",        no_argument, 0, 'h'},
@@ -162,13 +164,43 @@ int main(int argc, char **argv) {
         params.spec_trace_path = optarg;
         break;
       case 'j':
-        params.num_parallel = atoi(optarg);
+        errno = 0;
+        endptr = NULL;
+        tmp_value = strtoll(optarg, &endptr, 10);
+        if ((strlen(optarg) == 0) || (endptr != (optarg + strlen(optarg))) ||
+             (tmp_value < 0)) {
+          errno = EINVAL;
+        }
+        if (errno != 0) {
+          LogCvmfs(kLogCvmfs, kLogStderr,
+            "Invalid value passed to 'j': %s : only non-negative integers",
+             optarg);
+          Usage();
+          return 1;
+        } else {
+          params.num_parallel = tmp_value;
+        }
         break;
       case 'g':
         params.do_garbage_collection = true;
         break;
       case 'p':
-        params.stat_period = atoi(optarg);
+        errno = 0;
+        endptr = NULL;
+        tmp_value = strtoll(optarg, &endptr, 10);
+        if ((strlen(optarg) == 0) || (endptr != (optarg + strlen(optarg))) ||
+             (tmp_value < 0)) {
+          errno = EINVAL;
+        }
+        if (errno != 0) {
+          LogCvmfs(kLogCvmfs, kLogStderr,
+            "Invalid value passed to 'p': %s : only non-negative integers",
+             optarg);
+          Usage();
+          return 1;
+        } else {
+          params.stat_period = tmp_value;
+        }
         break;
       case '?':
       default:

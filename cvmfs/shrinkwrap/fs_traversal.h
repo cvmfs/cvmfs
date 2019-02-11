@@ -31,8 +31,8 @@ int SyncInit(struct fs_traversal *src,
              struct fs_traversal *dest,
              const char *base,
              const char *spec,
-             unsigned parallel,
-             int stat_period);
+             uint64_t parallel,
+             uint64_t stat_period);
 
 int GarbageCollect(struct fs_traversal *fs);
 
@@ -41,7 +41,7 @@ bool SyncFull(
   struct fs_traversal *src,
   struct fs_traversal *dest,
   perf::Statistics *pstats,
-  time_t last_print_time);
+  uint64_t last_print_time);
 
 // Exported for testing purposes:
 perf::Statistics *GetSyncStatTemplate();

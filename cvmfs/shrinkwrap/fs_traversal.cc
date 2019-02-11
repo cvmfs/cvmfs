@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <time.h>
 
 #include <fstream>
 #include <map>
@@ -15,6 +14,7 @@
 #include "cvmfs_config.h"
 #include "libcvmfs.h"
 #include "logging.h"
+#include "platform.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/fs_traversal_libcvmfs.h"
@@ -92,7 +92,7 @@ class RecDir {
 
 unsigned             num_parallel_ = 0;
 bool                 recursive = true;
-int                  stat_update_period_ = 10;
+uint64_t             stat_update_period_ = 0;  // Off for testing
 int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
@@ -564,7 +564,7 @@ bool SyncFull(
   struct fs_traversal *src,
   struct fs_traversal *dest,
   perf::Statistics *pstats,
-  time_t last_print_time) {
+  uint64_t last_print_time) {
   if (dirs_.empty()) {
     dirs_.push_back(new RecDir("", true));
   }
@@ -579,11 +579,11 @@ bool SyncFull(
     }
 
     if (stat_update_period_ > 0 &&
-        time(NULL)-last_print_time > stat_update_period_) {
+      platform_monotonic_time()-last_print_time > stat_update_period_) {
       LogCvmfs(kLogCvmfs, kLogStdout,
         "%s",
         pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
-      last_print_time = time(NULL);
+      last_print_time = platform_monotonic_time();
     }
 
     delete next_dir;
@@ -667,8 +667,8 @@ int SyncInit(
   struct fs_traversal *dest,
   const char *base,
   const char *spec,
-  unsigned parallel,
-  int stat_period) {
+  uint64_t parallel,
+  uint64_t stat_period) {
   num_parallel_ = parallel;
   stat_update_period_ = stat_period;
 
@@ -714,16 +714,16 @@ int SyncInit(
     spec_tree_ = SpecTree::Create(spec);
   }
 
-  time_t last_print_time = 0;
+  uint64_t last_print_time = 0;
   add_dir_for_sync(base, recursive);
   int result = !SyncFull(src, dest, pstats, last_print_time);
 
   while (atomic_read64(&copy_queue) != 0) {
-    if (time(NULL)-last_print_time > stat_update_period_) {
+    if (platform_monotonic_time() -last_print_time > stat_update_period_) {
       LogCvmfs(kLogCvmfs, kLogStdout,
         "%s",
         pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
-      last_print_time = time(NULL);
+      last_print_time = platform_monotonic_time();
     }
 
     SafeSleepMs(100);
@@ -758,9 +758,9 @@ int SyncInit(
 int GarbageCollect(struct fs_traversal *fs) {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "Performing garbage collection...");
-  time_t start_time = time(NULL);
+  uint64_t start_time = platform_monotonic_time();
   int retval = fs->garbage_collector(fs->context_);
-  time_t end_time = time(NULL);
+  uint64_t end_time = platform_monotonic_time();
   LogCvmfs(kLogCvmfs, kLogStdout,
     "Garbage collection took %d seconds.",
   (end_time-start_time));
