@@ -31,7 +31,8 @@ class TriggerSubscriber : public notify::SubscriberWS {
   virtual ~TriggerSubscriber() {}
 
  private:
-  virtual notify::Subscriber::Status Consume(const std::string& repo, const std::string& msg_text) {
+  virtual notify::Subscriber::Status Consume(const std::string& repo,
+                                             const std::string& msg_text) {
     notify::msg::Activity msg;
     if (!msg.FromJSONString(msg_text)) {
       LogCvmfs(kLogCvmfs, kLogError, "Could not decode message.");

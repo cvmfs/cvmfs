@@ -149,7 +149,10 @@ bool WebsocketContext::Connect() {
   return lws_client_connect_via_info(&i) != NULL;
 }
 
-void WebsocketContext::Finish(Status s) { status_ = s; SetState(kFinished); }
+void WebsocketContext::Finish(Status s) {
+  status_ = s;
+  SetState(kFinished);
+}
 
 int WebsocketContext::MainCallback(struct lws* wsi,
                                    enum lws_callback_reasons reason, void* user,
@@ -300,8 +303,8 @@ int WebsocketContext::SubscribedCallback(ConnectionData* cd, struct lws* wsi,
       memcpy(&(cd->ctx->message_[current_size]), in, len);
 
       if (lws_is_final_fragment(wsi)) {
-        notify::Subscriber::Status st = cd->ctx->subscriber_->Consume(cd->ctx->topic_,
-                                           cd->ctx->message_);
+        notify::Subscriber::Status st =
+            cd->ctx->subscriber_->Consume(cd->ctx->topic_, cd->ctx->message_);
         switch (st) {
           case notify::Subscriber::kContinue:
             break;
