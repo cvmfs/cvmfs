@@ -65,6 +65,7 @@ Url* Url::Parse(const std::string& url, const std::string& default_protocol,
     }
   }
 
+  // At the moment, host name validation is very basic
   if (!ValidateHost(host)) {
     return NULL;
   }
@@ -81,28 +82,6 @@ bool Url::ValidateHost(const std::string& host) {
   uint64_t test;
   if (String2Uint64Parse(host, &test)) {
     return false;
-  }
-
-  int num_dots = std::count(host.begin(), host.end(), '.');
-  // If host does not contain exactly 3 dots, then parts must not be numbers;
-  if (num_dots != 3) {
-    size_t cursor = 0;
-    while (cursor < host.size()) {
-      size_t dot_pos = host.find('.', cursor);
-      std::string part;
-      if (dot_pos == std::string::npos) {
-        part = host.substr(cursor);
-      } else {
-        part = host.substr(cursor, dot_pos - cursor);
-      }
-      if (String2Uint64Parse(part, &test)) {
-        return false;
-      }
-      if (dot_pos == std::string::npos) {
-        break;
-      }
-      cursor = dot_pos + 1;
-    }
   }
 
   return true;
