@@ -43,10 +43,6 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
             server_url.c_str());
   }
 
-  // Extract repository name from repository URL
-  const std::vector<std::string> repo_url_tokens = SplitString(repo_url, '/');
-  const std::string repository_name = repo_url_tokens.back();
-
   // Download repository manifest
   std::string manifest_contents;
   const std::string manifest_url = repo_url + "/.cvmfspublished";
@@ -95,6 +91,8 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
     LogCvmfs(kLogCvmfs, kLogInfo, "Current repository manifest:\n%s",
              manifest->ExportString().c_str());
   }
+
+  const std::string repository_name = manifest->repository_name();
 
   // Publish message
   UniquePtr<notify::Publisher> publisher(new notify::PublisherHTTP(server_url));
