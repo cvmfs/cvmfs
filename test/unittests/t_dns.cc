@@ -13,6 +13,7 @@
 #include <string>
 
 #include "dns.h"
+#include "platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -763,20 +764,22 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
 
 
 TEST_F(T_Dns, CaresResolverTimeout) {
-  // Because of backoff, timeout can actually be as high as 2s
-  UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 3, 200));
+  // As of c-ares 1.15, the timeout algorithm changed to exponential backoff
+  // without cutoff.  This should result in a total of 4 queries with timeouts
+  // of 256, 256, 512, 1024, which sums up to a little over 2 seconds
+  UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 3, 256));
   ASSERT_TRUE(quick_resolver.IsValid());
 
-  vector<string> bad_resolvers;
-  bad_resolvers.push_back("127.0.0.2");
-  bool retval = quick_resolver->SetResolvers(bad_resolvers);
+  vector<string> bad_address;
+  bad_address.push_back("127.0.0.2");
+  bool retval = quick_resolver->SetResolvers(bad_address);
   ASSERT_EQ(retval, true);
-  time_t before = time(NULL);
+  uint64_t before = platform_monotonic_time();
   Host host = quick_resolver->Resolve("a.root-servers.net");
-  time_t after = time(NULL);
+  uint64_t after = platform_monotonic_time();
   // C-ares oddity: why is it kFailInvalidResolvers in CaresResolverBadResolver?
-  EXPECT_EQ(host.status(), kFailTimeout);
-  EXPECT_LE(after-before, 3);
+  EXPECT_EQ(kFailTimeout, host.status());
+  EXPECT_LE(after-before, 3U);
 }
 
 
