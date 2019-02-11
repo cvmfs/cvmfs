@@ -99,17 +99,6 @@ run_transactions() {
         echo "*** Error, delete directory is still present: "
         return 7
     fi
-
-    echo "Testing ingestion while a path is locked"
-    cvmfs_server transaction test.repo.org/locked/
-    cvmfs_server ingest --tar_file $tarfile --base_dir free/ test.repo.org
-    res=$?
-    if [ $res -ne 0 ]; then
-        echo "*** Error during ingestion on a path not locked"
-        return 8
-    fi
-    cvmfs_server abort -f test.repo.org/locked/
-
     
     clean_up
 }
