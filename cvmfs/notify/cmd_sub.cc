@@ -31,11 +31,11 @@ class TriggerSubscriber : public notify::SubscriberWS {
   virtual ~TriggerSubscriber() {}
 
  private:
-  virtual bool Consume(const std::string& repo, const std::string& msg_text) {
+  virtual notify::Subscriber::Status Consume(const std::string& repo, const std::string& msg_text) {
     notify::msg::Activity msg;
     if (!msg.FromJSONString(msg_text)) {
       LogCvmfs(kLogCvmfs, kLogError, "Could not decode message.");
-      return false;
+      return notify::Subscriber::kError;
     }
 
     signature::SignatureManager sig_mgr;
@@ -43,14 +43,14 @@ class TriggerSubscriber : public notify::SubscriberWS {
     std::string cert_path = "/etc/cvmfs/keys/" + repo + ".crt";
     if (!sig_mgr.LoadCertificatePath(cert_path)) {
       LogCvmfs(kLogCvmfs, kLogError, "Could not load repository certificate.");
-      return false;
+      return notify::Subscriber::kError;
     }
 
     if (!sig_mgr.VerifyLetter(
             reinterpret_cast<const unsigned char*>(msg.manifest_.data()),
             msg.manifest_.size(), false)) {
       LogCvmfs(kLogCvmfs, kLogError, "Manifest has invalid signature.");
-      return false;
+      return notify::Subscriber::kError;
     }
 
     const UniquePtr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
@@ -59,7 +59,7 @@ class TriggerSubscriber : public notify::SubscriberWS {
 
     if (!manifest.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogError, "Could not parse manifest.");
-      return false;
+      return notify::Subscriber::kError;
     }
 
     uint64_t new_revision = manifest->revision();
@@ -75,10 +75,10 @@ class TriggerSubscriber : public notify::SubscriberWS {
     }
 
     if (!continuous_ && triggered) {
-      return false;
+      return notify::Subscriber::kFinish;
     }
 
-    return true;
+    return notify::Subscriber::kContinue;
   }
 
   uint64_t revision_;

@@ -45,7 +45,7 @@ bool SubscriberWS::Subscribe(const std::string& topic) {
   WebsocketContext::Status status = ctx->Run();
   if (status != WebsocketContext::kOk) {
     LogCvmfs(kLogCvmfs, kLogError,
-             "SubscriberWS - event loop finished witherror: %d", status);
+             "SubscriberWS - event loop finished with error.");
     return false;
   }
 

@@ -14,6 +14,12 @@ namespace notify {
  */
 class Subscriber {
  public:
+  enum Status {
+    kContinue,
+    kFinish,
+    kError,
+  };
+
   Subscriber() {}
   virtual ~Subscriber() {}
 
@@ -28,11 +34,11 @@ class Subscriber {
   /**
    * Consume a message
    *
-   * Consume the message and returns true or false, if the subscription
-   * should continue or stop, respectively.
+   * Consume the message and return the status value that can be used
+   * to exit the subscription loop.
    */
-  virtual bool Consume(const std::string& topic,
-                       const std::string& msg_text) = 0;
+  virtual Status Consume(const std::string& topic,
+                         const std::string& msg_text) = 0;
 };
 
 }  // namespace notify

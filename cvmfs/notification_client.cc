@@ -26,20 +26,20 @@ class ActivitySubscriber : public notify::SubscriberWS {
 
   virtual ~ActivitySubscriber() {}
 
-  virtual bool Consume(const std::string& repo_name,
+  virtual notify::Subscriber::Status Consume(const std::string& repo_name,
                        const std::string& msg_text) {
     notify::msg::Activity msg;
     if (!msg.FromJSONString(msg_text)) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
                "ActivitySubscriber - Could not decode message.");
-      return false;
+      return notify::Subscriber::kError;
     }
 
     if (!sig_mgr_->VerifyLetter(
             reinterpret_cast<const unsigned char*>(msg.manifest_.data()),
             msg.manifest_.size(), false)) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Manifest has invalid signature.");
-      return false;
+      return notify::Subscriber::kError;
     }
 
     const UniquePtr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
@@ -49,7 +49,7 @@ class ActivitySubscriber : public notify::SubscriberWS {
     if (!manifest.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
                "ActivitySubscriber - Could not parse manifest.");
-      return false;
+      return notify::Subscriber::kError;
     }
 
     uint64_t new_revision = manifest->revision();
@@ -79,7 +79,7 @@ class ActivitySubscriber : public notify::SubscriberWS {
         LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - internal error");
     }
 
-    return true;
+    return notify::Subscriber::kContinue;
   }
 
  private:

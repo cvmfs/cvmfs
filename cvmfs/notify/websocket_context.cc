@@ -300,10 +300,17 @@ int WebsocketContext::SubscribedCallback(ConnectionData* cd, struct lws* wsi,
       memcpy(&(cd->ctx->message_[current_size]), in, len);
 
       if (lws_is_final_fragment(wsi)) {
-        if (!cd->ctx->subscriber_->Consume(cd->ctx->topic_,
-                                           cd->ctx->message_)) {
-          cd->ctx->Finish(kOk);
-          return -1;
+        notify::Subscriber::Status st = cd->ctx->subscriber_->Consume(cd->ctx->topic_,
+                                           cd->ctx->message_);
+        switch (st) {
+          case notify::Subscriber::kContinue:
+            break;
+          case notify::Subscriber::kFinish:
+            cd->ctx->Finish(kOk);
+            return -1;
+          case notify::Subscriber::kError:
+            cd->ctx->Finish(kError);
+            return -1;
         }
       }
       break;
