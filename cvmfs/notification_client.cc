@@ -100,17 +100,23 @@ NotificationClient::NotificationClient(const std::string& config,
     : config_(config),
       repo_name_(repo_name),
       remounter_(remounter),
-      sig_mgr_(sig_mgr) {}
+      sig_mgr_(sig_mgr),
+      thread_(),
+      spawned_(false) {}
 
-NotificationClient::~NotificationClient() {}
+NotificationClient::~NotificationClient() {
+  if (spawned_) {
+    pthread_join(thread_, NULL);
+    spawned_ = false;
+  }
+}
 
 void NotificationClient::Spawn() {
-  pthread_t th;
-  if (pthread_create(&th, NULL, NotificationClient::Run, this)) {
+  if (pthread_create(&thread_, NULL, NotificationClient::Run, this)) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "ActivitySubscriber - Could not start background thread");
   }
-  pthread_detach(th);
+  spawned_ = true;
 }
 
 void* NotificationClient::Run(void* data) {

@@ -9,6 +9,7 @@
 
 #include "fuse_remount.h"
 #include "notify/subscriber.h"
+#include "util/single_copy.h"
 
 namespace signature {
 class SignatureManager;
@@ -27,7 +28,7 @@ class SignatureManager;
  * @param sig_mgr - a pointer to a SignatureManager object used to verify
  * messages received from the notification system
  */
-class NotificationClient {
+class NotificationClient : public SingleCopy {
  public:
   NotificationClient(const std::string& config, const std::string& repo_name,
                      FuseRemounter* remounter,
@@ -43,6 +44,8 @@ class NotificationClient {
   std::string repo_name_;
   FuseRemounter* remounter_;
   signature::SignatureManager* sig_mgr_;
+  pthread_t thread_;
+  bool spawned_;
 };
 
 #endif  // CVMFS_NOTIFICATION_CLIENT_H_
