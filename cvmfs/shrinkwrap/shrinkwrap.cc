@@ -164,42 +164,24 @@ int main(int argc, char **argv) {
         params.spec_trace_path = optarg;
         break;
       case 'j':
-        errno = 0;
-        endptr = NULL;
-        tmp_value = strtoll(optarg, &endptr, 10);
-        if ((strlen(optarg) == 0) || (endptr != (optarg + strlen(optarg))) ||
-             (tmp_value < 0)) {
-          errno = EINVAL;
-        }
-        if (errno != 0) {
+        if (!String2Uint64Parse(optarg, &params.num_parallel)) {
           LogCvmfs(kLogCvmfs, kLogStderr,
             "Invalid value passed to 'j': %s : only non-negative integers",
              optarg);
           Usage();
           return 1;
-        } else {
-          params.num_parallel = tmp_value;
         }
         break;
       case 'g':
         params.do_garbage_collection = true;
         break;
       case 'p':
-        errno = 0;
-        endptr = NULL;
-        tmp_value = strtoll(optarg, &endptr, 10);
-        if ((strlen(optarg) == 0) || (endptr != (optarg + strlen(optarg))) ||
-             (tmp_value < 0)) {
-          errno = EINVAL;
-        }
-        if (errno != 0) {
+        if (!String2Uint64Parse(optarg, &params.stat_period)) {
           LogCvmfs(kLogCvmfs, kLogStderr,
             "Invalid value passed to 'p': %s : only non-negative integers",
              optarg);
           Usage();
           return 1;
-        } else {
-          params.stat_period = tmp_value;
         }
         break;
       case '?':
