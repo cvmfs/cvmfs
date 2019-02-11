@@ -10,9 +10,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <ctime>
-
 #include "libcvmfs.h"
+#include "platform.h"
 #include "statistics.h"
 #include "util/posix.h"
 #include "xattr.h"
@@ -631,14 +630,16 @@ TEST_P(T_FsInterface, TransferPosixToPosix) {
 
   perf::Statistics *statistics = shrinkwrap::GetSyncStatTemplate();
 
-  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, time(NULL)));
+  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics,
+                                   platform_monotonic_time()));
 
   dest->finalize(dest->context_);
   context = dest->initialize(
     dest_name.c_str(), repo_name.c_str(), dest_data.c_str(), NULL, 4);
   dest->context_ = context;
 
-  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics, time(NULL)));
+  EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics,
+                                   platform_monotonic_time()));
   EXPECT_TRUE(DiffTree(repo_name + "/" + dest_name,
                        repo_name + "/" + src_name));
 
