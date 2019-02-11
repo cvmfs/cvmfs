@@ -14,23 +14,6 @@ check_status() {
     echo $(( $1 || 0 ))
 }
 
-compare_file_checksum() {
-    local file_name=$1
-    local target_checksum=$2
-    local checksum=$(md5sum $file_name | cut -d' ' -f1)
-    echo "Checksum of $file_name is $checksum"
-    if [ "$checksum" != "$target_checksum" ]; then
-        echo "Checksum mismatch for $file_name. Expected $target_checksum. Found $checksum"
-        exit 1
-    fi
-}
-
-save_repo_contents() {
-    local dest=$1
-    rm -rf $dest
-    mkdir -p $dest
-    cp -r /cvmfs/test.repo.org/* $dest/
-}
 
 produce_tarball() {
   local tarball_name=$1
@@ -83,7 +66,7 @@ run_transactions() {
     cvmfs_server ingest --tar_file $tarfile --base_dir foo test.repo.org
     res=$?
     if [ $res -eq 0 ]; then
-        echo "*** Error, Ingestion successed during a transaction"
+        echo "*** Error, Ingestion succeed during a transaction"
         return 3
     fi
     cvmfs_server abort -f test.repo.org
@@ -116,6 +99,17 @@ run_transactions() {
         echo "*** Error, delete directory is still present: "
         return 7
     fi
+
+    echo "Testing ingestion while a path is locked"
+    cvmfs_server transaction test.repo.org/locked/
+    cvmfs_server ingest --tar_file $tarfile --base_dir free/ test.repo.org
+    res=$?
+    if [ $res -ne 0 ]; then
+        echo "*** Error during ingestion on a path not locked"
+        return 8
+    fi
+    cvmfs_server abort -f test.repo.org/locked/
+
     
     clean_up
 }
