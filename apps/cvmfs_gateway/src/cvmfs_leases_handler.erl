@@ -129,7 +129,7 @@ init(Req0 = #{method := <<"DELETE">>}, State) ->
 %% "session_token" - if status is "ok", this is the session token that
 %%                   should be used for all subsequent requests
 %% "time_remaining" - if status is "path_busy", this represents the
-%%                    time remaining on the current active lease
+%%                    time remaining (in seconds) on the current active lease
 %% "reason" - if status is "error", this is a description of the error.
 %% @end
 %%--------------------------------------------------------------------
@@ -254,7 +254,7 @@ p_new_lease(Uid, KeyId, Path, ReqProtoVer) ->
                       <<"max_api_version">> => integer_to_binary(erlang:min(cvmfs_version:api_protocol_version(),
                                                                             ReqProtoVer))};
                 {path_busy, Time} ->
-                    #{<<"status">> => <<"path_busy">>, <<"time_remaining">> => Time};
+                    #{<<"status">> => <<"path_busy">>, <<"time_remaining">> => Time div 1000 };
                 {error, Reason} ->
                     #{<<"status">> => <<"error">>, <<"reason">> => atom_to_binary(Reason, latin1)}
             end;
