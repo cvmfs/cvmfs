@@ -324,7 +324,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 			outputImage.GetSimpleName(),
 			pushOptions)
 		if errImgPush != nil {
-			err = fmt.Errorf("Error in pushing the image: ", errImgPush)
+			err = fmt.Errorf("Error in pushing the image: %s", errImgPush)
 			return err
 		}
 		b, _ := ioutil.ReadAll(res)

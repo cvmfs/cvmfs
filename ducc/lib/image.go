@@ -527,7 +527,7 @@ func (img Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend d
 
 		} else {
 			Log().Warning("Received status code ", resp.StatusCode)
-			err = fmt.Errorf("Layer not received, status code: %s", resp.StatusCode)
+			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
 		}
 	}
 	return
