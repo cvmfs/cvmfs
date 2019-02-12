@@ -32,7 +32,7 @@
 -type new_lease_result() :: {ok, LeaseToken :: binary()} |
                             {error, invalid_key} |
                             {error, invalid_path} |
-                            {path_busy, TimeRemaining :: binary()}.
+                            {path_busy, TimeRemaining :: integer()}.
 
 
 %%%===================================================================
