@@ -39,7 +39,7 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
       const JSON *time_remaining = JsonDocument::SearchInObject(
           reply->root(), "time_remaining", JSON_INT);
       if (time_remaining != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Path busy. Time remaining = %d",
+        LogCvmfs(kLogCvmfs, kLogStdout, "Path busy. Time remaining = %d s",
                  time_remaining->int_value);
         return kLeaseReplyBusy;
       }
