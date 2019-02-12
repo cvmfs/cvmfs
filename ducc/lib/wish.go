@@ -13,9 +13,7 @@ type Wish struct {
 
 type WishFriendly struct {
 	Id         int
-	InputId    int
 	InputName  string
-	OutputId   int
 	OutputName string
 	CvmfsRepo  string
 	Converted  bool
@@ -44,8 +42,6 @@ func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string
 	wish.OutputName = outputImg.WholeName()
 
 	wish.Id = 0
-	wish.InputId = 0
-	wish.OutputId = 0
 	wish.CvmfsRepo = cvmfsRepo
 	wish.UserInput = userInput
 	wish.UserOutput = userOutput
