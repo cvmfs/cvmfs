@@ -1,4 +1,6 @@
 1.0.0:
+  * A "path_busy" reply to a "new_lease" request now provides the remaining lease time
+    in seconds
   * systemd service file: `cvmfs-gateway` is automatically restarted (CVM-1680)
 
 0.3.1:
