@@ -10,12 +10,12 @@
            {schema_location, disc}]},
 
  {cvmfs_gateway, [{enabled_services, [cvmfs_fe,
-                                       cvmfs_be,
-                                       cvmfs_auth,
-                                       cvmfs_lease,
-                                       cvmfs_receiver_pool,
-                                       cvmfs_fast_receiver_pool,
-                                       cvmfs_commit_sup]},
+                                      cvmfs_be,
+                                      cvmfs_auth,
+                                      cvmfs_lease,
+                                      cvmfs_receiver_pool,
+                                      cvmfs_fast_receiver_pool,
+                                      cvmfs_commit_sup]},
                    {repo_config, {file, "/etc/cvmfs/gateway/repo.json"}},
                    {user_config, {file, "/etc/cvmfs/gateway/user.json"}}]}
 ].
