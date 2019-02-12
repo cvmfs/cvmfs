@@ -11,6 +11,11 @@
             "id" : "example_key",
             "secret" : "SECRET",
             "repo_subpath" : "/"
+        },
+        {
+            "type": "file",
+            "file_name": "/etc/cvmfs/keys/example_repo.domain.org.gw",
+            "repo_subpath": "/"
         }
     ]
 }

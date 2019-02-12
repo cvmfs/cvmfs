@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1
+-export([start_link/0
         ,check_key_for_repo_path/3
         ,add_key/3, remove_key/1
         ,add_repo/2, remove_repo/1
@@ -54,11 +54,11 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
-                              when Args :: term(), Pid :: pid(),
-                                   Error :: {already_start, pid()} | term().
-start_link(Args) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
+-spec start_link() -> {ok, Pid} | ignore | {error, Error}
+                          when Pid :: pid(),
+                               Error :: {already_start, pid()} | term().
+start_link() ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 
 -spec check_key_for_repo_path(KeyId, Repo, Path) -> ok | {error,
@@ -131,7 +131,7 @@ reload_repo_config() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init({RepoList, Keys}) ->
+init([]) ->
     {ok, MnesiaSchemaLocation} = application:get_env(mnesia, schema_location),
     AllNodes = [node() | nodes()],
     CopyMode = case MnesiaSchemaLocation of
@@ -144,6 +144,7 @@ init({RepoList, Keys}) ->
                               ,{type, set}
                               ,{attributes, record_info(fields, repo)}]),
     ok = mnesia:wait_for_tables([repo], 10000),
+
     p_populate_repos(RepoList),
     lager:info("Repository list initialized."),
 

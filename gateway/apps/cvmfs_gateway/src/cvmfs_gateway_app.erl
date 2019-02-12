@@ -18,11 +18,8 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    RepoVars = cvmfs_app_util:read_vars(repo_config,
-                                        cvmfs_app_util:default_repo_config()),
-
-    UserVars = cvmfs_app_util:read_vars(user_config,
-                                        cvmfs_app_util:default_user_config()),
+    Repos = config:get_repo_names(config:read_var(repo_config, config:default_repo_config())),
+    UserVars = config:read_var(user_config, config:default_user_config()),
 
     LogLevel = maps:get(log_level, UserVars, <<"info">>),
     ok = set_lager_log_level(LogLevel),
@@ -54,10 +51,9 @@ start(_StartType, _StartArgs) ->
     Services2 = lists:delete(cvmfs_fe, Services),
 
     cvmfs_gateway_sup:start_link({Services2,
-                                   maps:get(repos, RepoVars),
-                                   maps:get(keys, RepoVars),
-                                   ReceiverPoolConfig2,
-                                   ReceiverWorkerConfig}).
+                                  Repos,
+                                  ReceiverPoolConfig2,
+                                  ReceiverWorkerConfig}).
 
 
 stop(_State) ->
