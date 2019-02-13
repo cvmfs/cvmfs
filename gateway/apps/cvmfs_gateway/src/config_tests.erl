@@ -7,7 +7,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-get_repos_adds_default_keys_test() ->
+load_repos_adds_default_keys_test() ->
     RepoCfg = [
         #{domain => <<"test1.domain.org">>,
           keys => [<<"testkey1">>]},
@@ -22,7 +22,7 @@ get_repos_adds_default_keys_test() ->
     ?assert(Keys =:= [<<"test3.domain.org">>]).
 
 
-get_keys_adds_missing_key_definition_test() ->
+load_keys_adds_missing_key_definition_test() ->
     KeyCfg = [
         #{type => <<"plain_text">>,
           id => <<"testkey1">>,
