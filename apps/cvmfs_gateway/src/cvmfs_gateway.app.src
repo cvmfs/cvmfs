@@ -12,6 +12,7 @@
    ]},
   {env,[]},
   {modules, [
+             config,
              cvmfs_auth,
              cvmfs_auth_util,
              cvmfs_be,
@@ -28,7 +29,8 @@
              cvmfs_root_handler,
              cvmfs_gateway_app,
              cvmfs_gateway_sup,
-             cvmfs_version
+             cvmfs_version,
+             keys
             ]},
 
   {maintainers, []}

@@ -143,17 +143,13 @@ init([]) ->
     mnesia:create_table(repo, [CopyMode
                               ,{type, set}
                               ,{attributes, record_info(fields, repo)}]),
-    ok = mnesia:wait_for_tables([repo], 10000),
-
-    p_populate_repos(RepoList),
-    lager:info("Repository list initialized."),
-
     mnesia:create_table(key, [CopyMode
                              ,{type, set}
                              ,{attributes, record_info(fields, key)}]),
-    ok = mnesia:wait_for_tables([key], 10000),
-    p_populate_keys(Keys),
-    lager:info("Key list initialized."),
+    ok = mnesia:wait_for_tables([repo, key], 10000),
+
+    p_reload_repo_config(),
+    lager:info("Repository configuration finished."),
 
     {ok, []}.
 
@@ -359,69 +355,45 @@ p_check_hmac(Message, KeyId, HMAC) ->
     end.
 
 
--spec p_populate_keys(Keys :: [#{binary() := binary()}]) -> boolean().
-p_populate_keys(Keys) ->
+-spec populate_key_table(Keys :: [#{atom() := binary()}]) -> boolean().
+populate_key_table(Keys) ->
     T = fun() ->
-                lists:foreach(fun(KeyDesc) ->
-                                      {KeyType,
-                                       KeyId,
-                                       Secret,
-                                       Path} = case KeyDesc of
-                                                   #{type := <<"file">>,
-                                                     file_name := FileName,
-                                                     repo_subpath := SubPath} ->
-                                                       {T, I, S} = p_parse_key_file(FileName),
-                                                       {T, I, S, SubPath};
-                                                   #{type := <<"plain_text">>,
-                                                     id := Id,
-                                                     secret := Sec,
-                                                     repo_subpath := SubPath} ->
-                                                       {<<"plain_text">>, Id, Sec, SubPath}
-                                               end,
-                                      case KeyType of
-                                          <<"plain_text">> ->
-                                              mnesia:write(#key{key_id = KeyId, secret = Secret, path = Path});
-                                          _ ->
-                                              lager:warning("Ignoring invalid key ~p with key type ~p.",
-                                                            [KeyId, KeyType])
-                                      end
-                              end,
-                              Keys),
-                true
-        end,
+        lists:foreach(
+            fun(#{id := Id, secret := Secret, path := Path}) ->
+                mnesia:write(#key{key_id = Id, secret = Secret, path = Path})
+            end,
+            Keys)
+    end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
 
 
--spec p_populate_repos(RepoList :: #{binary() => [binary()]}) -> boolean().
-p_populate_repos(RepoList) ->
+-spec populate_repo_table(RepoList :: #{binary() => [binary()]}) -> boolean().
+populate_repo_table(RepoList) ->
     T = fun() ->
-                lists:all(fun(V) -> V =:= ok end,
-                          [mnesia:write(
-                             #repo{name = Repo, key_ids = KeyIds}) || #{domain := Repo,
-                                                                        keys := KeyIds} <- RepoList])
-        end,
+        lists:all(
+            fun(V) -> V =:= ok end,
+            [mnesia:write(
+                #repo{name = Repo, key_ids = KeyIds}) || #{domain := Repo,
+                                                           keys := KeyIds} <- RepoList])
+    end,
     {atomic, Result} = mnesia:sync_transaction(T),
     Result.
-
-
--spec p_parse_key_file(FileName :: [list() | binary()]) -> {KeyType :: binary(),
-                                                            KeyId :: binary(),
-                                                            Secret :: binary()}.
-p_parse_key_file(FileName) ->
-    {ok, Body} = file:read_file(FileName),
-    cvmfs_auth_util:parse_key_binary(Body).
 
 
 -spec p_reload_repo_config() -> ok | {error, Reason}
                                     when Reason :: term().
 p_reload_repo_config() ->
-    RepoVars = cvmfs_app_util:read_vars(repo_config,
-                                        cvmfs_app_util:default_repo_config()),
-    Repos = maps:get(repos, RepoVars),
+    Cfg = config:read(repo_config, config:default_repo_config()),
+    RepoCfg = maps:get(repos, Cfg),
+    KeyCfg = maps:get(keys, Cfg),
+
     {atomic, ok} = mnesia:clear_table(repo),
-    p_populate_repos(Repos),
-    Keys = maps:get(keys, RepoVars),
     {atomic, ok} = mnesia:clear_table(key),
-    p_populate_keys(Keys),
+
+    Repos = config:load_repos(RepoCfg),
+    Keys = config:load_keys(KeyCfg, Repos),
+
+    populate_repo_table(Repos),
+    populate_key_table(Keys),
     ok.
