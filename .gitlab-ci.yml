@@ -9,5 +9,5 @@ test_and_package:
     - docker
   script:
     - rebar3 dialyzer
-    - rebar3 ct
+    - rebar3 as test eunit,ct
     - rebar3 as prod tar
