@@ -114,16 +114,16 @@ reload_config(_Config) ->
 
 normal(_Config) ->
     Data = <<"plain_text id secret">>,
-    {<<"plain_text">>, <<"id">>, <<"secret">>} = cvmfs_auth_util:parse_key_binary(Data).
+    {<<"plain_text">>, <<"id">>, <<"secret">>} = keys:parse_binary(Data).
 
 whitespace(_Config) ->
     Data = <<"    plain_text   id   secret    ">>,
-    {<<"plain_text">>, <<"id">>, <<"secret">>} = cvmfs_auth_util:parse_key_binary(Data).
+    {<<"plain_text">>, <<"id">>, <<"secret">>} = keys:parse_binary(Data).
 
 tabs(_Config) ->
     Data = <<"\tplain_text\tid\tsecret\t">>,
-    {<<"plain_text">>, <<"id">>, <<"secret">>} = cvmfs_auth_util:parse_key_binary(Data).
+    {<<"plain_text">>, <<"id">>, <<"secret">>} = keys:parse_binary(Data).
 
 everything(_Config) ->
     Data = <<" \t   plain_text \t  id \t  secret \t \n  ">>,
-    {<<"plain_text">>, <<"id">>, <<"secret">>} = cvmfs_auth_util:parse_key_binary(Data).
+    {<<"plain_text">>, <<"id">>, <<"secret">>} = keys:parse_binary(Data).
