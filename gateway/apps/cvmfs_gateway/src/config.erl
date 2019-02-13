@@ -7,6 +7,8 @@
 
 -module(config).
 
+-compile([{parse_transform, lager_transform}]).
+
 -export([read/2,
          default_repo_config/0,
          default_user_config/0,
@@ -49,6 +51,9 @@ get_repo_names(Repos) ->
     lists:map(Extract, Repos).
 
 
+-spec load_repos(RepoCfg) -> FixedRepoCfg
+    when RepoCfg :: [binary() | #{atom() => binary() | [binary()]}],
+         FixedRepoCfg :: [#{atom() => binary() | [binary()]}].
 load_repos(RepoCfg) ->
     AddDefaultKeyId =
         fun(Name) when is_binary(Name) ->

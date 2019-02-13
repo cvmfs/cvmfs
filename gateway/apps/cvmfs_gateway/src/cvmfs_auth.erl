@@ -368,7 +368,7 @@ populate_key_table(Keys) ->
     Result.
 
 
--spec populate_repo_table(RepoList :: #{binary() => [binary()]}) -> boolean().
+-spec populate_repo_table(RepoList :: [#{atom() => binary() | [binary()]}]) -> boolean().
 populate_repo_table(RepoList) ->
     T = fun() ->
         lists:all(
