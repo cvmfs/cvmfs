@@ -63,13 +63,10 @@ load(Cfg, KeyLoader) ->
     end.
 
 
--spec load_repos(RepoCfg) -> {ok, FixedRepoCfg}
-    when RepoCfg :: [binary() | #{atom() => binary() | [binary()]}],
-         FixedRepoCfg :: [#{atom() => binary() | [binary()]}].
 load_repos(RepoCfg) ->
     AddDefaultKeyId =
         fun(Name) when is_binary(Name) ->
-                #{domain => Name, keys => [Name]};
+                #{domain => Name, keys => default};
            (#{domain := _Name, keys := _Keys} = R) ->
                 R
         end,
@@ -77,32 +74,30 @@ load_repos(RepoCfg) ->
 
 
 load_keys(KeyCfg, Repos, KeyLoader) ->
-    RepoNames = sets:from_list(get_repo_names(Repos)),
+    SpecifiedKeys = lists:map(KeyLoader, KeyCfg),
 
-    ExtractKeyIds = fun(#{keys := Keys}) -> Keys end,
-    ReferencedKeyIds = sets:from_list(lists:flatmap(ExtractKeyIds, Repos)),
+    ProcessDefaultKey = fun(R, {AccRepos, AccKeys}) ->
+        #{domain := Name, keys := K} = R,
+        case K of
+            default ->
+                Key = KeyLoader(#{type => <<"file">>,
+                                  file_name => <<"/etc/cvmfs/keys/", Name/binary, ".gw">>,
+                                  repo_subpath => <<"/">>}),
+                #{id := KeyId} = Key,
+                case lists:search(fun(#{id := Id}) -> Id =:= KeyId end, SpecifiedKeys) of
+                    false ->
+                        {[#{domain => Name, keys => [KeyId]} | AccRepos],
+                         [Key | AccKeys]};
+                    _ ->
+                        {[R | AccRepos], AccKeys}
+                end;
+            _ ->
+                {[R | AccRepos], AccKeys}
+        end
+    end,
 
-    DefinedKeys = lists:map(KeyLoader, KeyCfg),
-    DefinedKeyIds = sets:from_list(lists:map(fun(#{id := Id}) -> Id end, DefinedKeys)),
-
-    ExtraKeyIds = sets:to_list(sets:subtract(ReferencedKeyIds, DefinedKeyIds)),
-
-    AddIfDefaultKeyId = fun(Id, Acc) ->
-        case sets:is_element(Id, RepoNames) of
-            true ->
-                [#{type => <<"file">>,
-                   file_name => <<"/etc/cvmfs/keys/", Id/binary, ".gw">>,
-                   repo_subpath => <<"/">>} | Acc];
-            false ->
-                lager:warning("Referenced key id: ~p has not been defined. "
-                              ++ "It may not be possible to take leases on repositories "
-                              ++ "configured with that key.", [Id]),
-                Acc
-            end
-        end,
-    DefaultKeys = lists:foldl(AddIfDefaultKeyId, [], ExtraKeyIds),
-
-    {ok, Repos, DefinedKeys ++ lists:map(KeyLoader, DefaultKeys)}.
+    {UpdatedRepos, DefaultKeys} = lists:foldl(ProcessDefaultKey, {[], []}, Repos),
+    {ok, UpdatedRepos, SpecifiedKeys ++ DefaultKeys}.
 
 
 %%% Private functions
@@ -139,20 +134,21 @@ load_repos_adds_default_keys_test() ->
     ],
 
     {ok, Repos} = load_repos(RepoCfg),
-    #{domain := Name, keys := KeyIds} = lists:last(Repos),
+    {value, #{domain := Name, keys := KeyIds}} = lists:search(
+        fun(#{domain := D}) -> D =:= <<"test3.domain.org">> end, Repos),
     ?assert(Name =:= <<"test3.domain.org">>),
-    ?assert(KeyIds =:= [<<"test3.domain.org">>]),
+    ?assert(KeyIds =:= default),
 
     ok.
 
 load_keys_adds_missing_key_definition_test() ->
-    Repos = [
+    RepoCfg = [
         #{domain => <<"test1.domain.org">>,
           keys => [<<"testkey1">>]},
         #{domain => <<"test2.domain.org">>,
           keys => [<<"testkey1">>, <<"testkey2">>]},
         #{domain => <<"test3.domain.org">>,
-          keys => [<<"test3.domain.org">>]}
+          keys => default}
     ],
     KeyCfg = [
         #{type => <<"plain_text">>,
@@ -165,13 +161,14 @@ load_keys_adds_missing_key_definition_test() ->
           repo_subpath => <<"/path">>}
     ],
 
-    {ok, Repos, Keys} = load_keys(KeyCfg, Repos, fun(K) -> mock_load_key(K) end),
+    {ok, Repos, Keys} = load_keys(KeyCfg, RepoCfg, fun(K) -> mock_load_key(K) end),
 
-    #{secret := Secret} = lists:last(Keys),
+    {value, #{secret := Secret}} = lists:search(
+        fun(#{id := Id}) -> Id =:= <<"test3.domain.org">> end, Keys),
     ?assert(Secret =:= <<"mocksecret">>).
 
 mock_load_key(#{type := <<"plain_text">>, id := Id, secret := Secret, repo_subpath := Path}) ->
     #{id => Id, secret => Secret, path => Path};
 mock_load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
-    Id = lists:last(binary:split(FileName, <<"/">>, [global])),
+    [Id | _] = binary:split(lists:last(binary:split(FileName, <<"/">>, [global])), <<".gw">>),
     #{id => Id, secret => <<"mocksecret">>, path => Path}.
