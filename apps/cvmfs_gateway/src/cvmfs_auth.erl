@@ -385,15 +385,13 @@ populate_repo_table(RepoList) ->
                                     when Reason :: term().
 p_reload_repo_config() ->
     Cfg = config:read(repo_config, config:default_repo_config()),
-    RepoCfg = maps:get(repos, Cfg),
-    KeyCfg = maps:get(keys, Cfg),
-
-    {atomic, ok} = mnesia:clear_table(repo),
-    {atomic, ok} = mnesia:clear_table(key),
-
-    Repos = config:load_repos(RepoCfg),
-    Keys = config:load_keys(KeyCfg, Repos),
-
-    populate_repo_table(Repos),
-    populate_key_table(Keys),
-    ok.
+    case config:load(Cfg) of
+        {ok, Repos, Keys} ->
+            {atomic, ok} = mnesia:clear_table(repo),
+            {atomic, ok} = mnesia:clear_table(key),
+            populate_key_table(Keys),
+            populate_repo_table(Repos),
+            ok;
+        {error, Reason} ->
+            {error, Reason}
+    end.
