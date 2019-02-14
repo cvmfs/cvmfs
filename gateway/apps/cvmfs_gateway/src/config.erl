@@ -9,13 +9,13 @@
 
 -compile([{parse_transform, lager_transform}]).
 
+-include_lib("eunit/include/eunit.hrl").
+
 -export([read/2,
          default_repo_config/0,
          default_user_config/0,
-         get_repo_names/1,
-         load_repos/1,
-         load_keys/2,
-         load_keys/3]).
+         load/1,
+         load/2]).
 
 read(VarName, Defaults) ->
     case application:get_env(VarName) of
@@ -42,16 +42,19 @@ default_user_config() ->
       log_level => <<"info">>}.
 
 
-get_repo_names(Repos) ->
-    Extract = fun(#{domain := RepoName}) ->
-                    RepoName;
-                 (RepoName) when is_binary(RepoName) ->
-                    RepoName
-              end,
-    lists:map(Extract, Repos).
+load(Cfg) ->
+    load(Cfg, fun(K) -> load_key(K) end).
 
 
--spec load_repos(RepoCfg) -> FixedRepoCfg
+load(Cfg, KeyLoader) ->
+    RepoCfg = maps:get(repos, Cfg),
+    KeyCfg = maps:get(keys, Cfg),
+    {ok, Repos} = load_repos(RepoCfg),
+    {ok, UpdatedRepos, Keys} = load_keys(KeyCfg, Repos, KeyLoader),
+    {ok, UpdatedRepos, Keys}.
+
+
+-spec load_repos(RepoCfg) -> {ok, FixedRepoCfg}
     when RepoCfg :: [binary() | #{atom() => binary() | [binary()]}],
          FixedRepoCfg :: [#{atom() => binary() | [binary()]}].
 load_repos(RepoCfg) ->
@@ -61,11 +64,7 @@ load_repos(RepoCfg) ->
            (#{domain := _Name, keys := _Keys} = R) ->
                 R
         end,
-    lists:map(AddDefaultKeyId, RepoCfg).
-
-
-load_keys(KeyCfg, Repos) ->
-    load_keys(KeyCfg, Repos, fun(K) -> load_key(K) end).
+    {ok, lists:map(AddDefaultKeyId, RepoCfg)}.
 
 
 load_keys(KeyCfg, Repos, KeyLoader) ->
@@ -94,7 +93,7 @@ load_keys(KeyCfg, Repos, KeyLoader) ->
         end,
     DefaultKeys = lists:foldl(AddIfDefaultKeyId, [], ExtraKeyIds),
 
-    DefinedKeys ++ lists:map(KeyLoader, DefaultKeys).
+    {ok, Repos, DefinedKeys ++ lists:map(KeyLoader, DefaultKeys)}.
 
 
 %%% Private functions
@@ -113,3 +112,56 @@ load_key(#{type := <<"plain_text">>, id := Id, secret := Secret, repo_subpath :=
 load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
     {<<"plain_text">>, I, S} = keys:parse_file(FileName),
     #{id => I, secret => S, path => Path}.
+
+
+get_repo_names(Repos) ->
+    lists:map(fun(#{domain := Name}) -> Name end, Repos).
+
+%%% Tests
+
+load_repos_adds_default_keys_test() ->
+    RepoCfg = [
+        #{domain => <<"test1.domain.org">>,
+        keys => [<<"testkey1">>]},
+        #{domain => <<"test2.domain.org">>,
+        keys => [<<"testkey1">>, <<"testkey2">>]},
+        <<"test3.domain.org">>
+    ],
+
+    {ok, Repos} = load_repos(RepoCfg),
+    #{domain := Name, keys := KeyIds} = lists:last(Repos),
+    ?assert(Name =:= <<"test3.domain.org">>),
+    ?assert(KeyIds =:= [<<"test3.domain.org">>]),
+
+    ok.
+
+load_keys_adds_missing_key_definition_test() ->
+    Repos = [
+        #{domain => <<"test1.domain.org">>,
+          keys => [<<"testkey1">>]},
+        #{domain => <<"test2.domain.org">>,
+          keys => [<<"testkey1">>, <<"testkey2">>]},
+        #{domain => <<"test3.domain.org">>,
+          keys => [<<"test3.domain.org">>]}
+    ],
+    KeyCfg = [
+        #{type => <<"plain_text">>,
+          id => <<"testkey1">>,
+          secret => <<"SECRET1">>,
+          repo_subpath => <<"/">>},
+        #{type => <<"plain_text">>,
+          id => <<"testkey2">>,
+          secret => <<"SECRET2">>,
+          repo_subpath => <<"/path">>}
+    ],
+
+    {ok, Repos, Keys} = load_keys(KeyCfg, Repos, fun(K) -> mock_load_key(K) end),
+
+    #{secret := Secret} = lists:last(Keys),
+    ?assert(Secret =:= <<"mocksecret">>).
+
+mock_load_key(#{type := <<"plain_text">>, id := Id, secret := Secret, repo_subpath := Path}) ->
+    #{id => Id, secret => Secret, path => Path};
+mock_load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
+    Id = lists:last(binary:split(FileName, <<"/">>, [global])),
+    #{id => Id, secret => <<"mocksecret">>, path => Path}.
