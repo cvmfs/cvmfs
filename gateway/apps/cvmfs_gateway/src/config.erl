@@ -17,6 +17,7 @@
          load/1,
          load/2]).
 
+
 read(VarName, Defaults) ->
     case application:get_env(VarName) of
         {ok, {file, ConfigFile}} ->
@@ -29,7 +30,7 @@ read(VarName, Defaults) ->
 
 
 default_repo_config() ->
-    #{repos => [], keys => []}.
+    #{version => 2, repos => [], keys => []}.
 
 
 default_user_config() ->
@@ -49,9 +50,17 @@ load(Cfg) ->
 load(Cfg, KeyLoader) ->
     RepoCfg = maps:get(repos, Cfg),
     KeyCfg = maps:get(keys, Cfg),
-    {ok, Repos} = load_repos(RepoCfg),
-    {ok, UpdatedRepos, Keys} = load_keys(KeyCfg, Repos, KeyLoader),
-    {ok, UpdatedRepos, Keys}.
+
+    CfgVer = maps:get(version, Cfg, 1),
+    case CfgVer of
+        1 ->
+            Keys = lists:map(KeyLoader, KeyCfg),
+            {ok, RepoCfg, Keys};
+        _ ->
+            {ok, Repos} = load_repos(RepoCfg),
+            {ok, UpdatedRepos, Keys} = load_keys(KeyCfg, Repos, KeyLoader),
+            {ok, UpdatedRepos, Keys}
+    end.
 
 
 -spec load_repos(RepoCfg) -> {ok, FixedRepoCfg}
@@ -116,6 +125,7 @@ load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
 
 get_repo_names(Repos) ->
     lists:map(fun(#{domain := Name}) -> Name end, Repos).
+
 
 %%% Tests
 
