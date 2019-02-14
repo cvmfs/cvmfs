@@ -18,9 +18,6 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    Cfg = config:read(repo_config, config:default_repo_config()),
-    RepoCfg = maps:get(repos, Cfg),
-    RepoNames = config:get_repo_names(config:load_repos(RepoCfg)),
     UserVars = config:read(user_config, config:default_user_config()),
 
     LogLevel = maps:get(log_level, UserVars, <<"info">>),
@@ -53,7 +50,6 @@ start(_StartType, _StartArgs) ->
     Services2 = lists:delete(cvmfs_fe, Services),
 
     cvmfs_gateway_sup:start_link({Services2,
-                                  RepoNames,
                                   ReceiverPoolConfig2,
                                   ReceiverWorkerConfig}).
 
