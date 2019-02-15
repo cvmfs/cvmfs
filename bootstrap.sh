@@ -238,6 +238,7 @@ build_lib() {
       ;;
     libwebsockets)
       do_extract "libwebsockets" "libwebsockets-${LIBWEBSOCKETS_VERSION}.tar.gz"
+      patch_external "libwebsockets" "CMakeLists.patch" "private.patch" "poll.patch"
       do_build "libwebsockets"
       ;;
     *)
