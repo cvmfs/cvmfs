@@ -46,8 +46,8 @@ load(Cfg) ->
 
 
 load(Cfg, KeyLoader) ->
-    RepoCfg = maps:get(repos, Cfg, #{}),
-    KeyCfg = maps:get(keys, Cfg, #{}),
+    RepoCfg = maps:get(repos, Cfg, []),
+    KeyCfg = maps:get(keys, Cfg, []),
 
     CfgVer = maps:get(version, Cfg, 1),
     case CfgVer of
@@ -191,6 +191,12 @@ load_keys_adds_missing_key_definition_test() ->
     {value, #{keys := KeyIds}} = lists:search(
         fun(#{domain := D}) -> D =:= <<"test3.domain.org">> end, Repos),
     ?assert(KeyIds =:= [#{id => <<"test3.domain.org">>, path => <<"/">>}]).
+
+
+load_with_empty_config_test() ->
+    {ok, _, _} = load(#{}, fun(K) -> load_key(K) end),
+    {ok, _, _} = load(#{version => 1}, fun(K) -> load_key(K) end),
+    {ok, _, _} = load(#{version => 2}, fun(K) -> load_key(K) end).
 
 mock_load_key(#{type := <<"plain_text">>, id := Id, secret := Secret}) ->
     #{id => Id, secret => Secret};
