@@ -26,21 +26,6 @@
 
 -define(SERVER, ?MODULE).
 
-%% Records
-
--record(repo, {
-          % the FQDN of the repository
-          name :: binary(),
-          % public id of the keys registered to modify this repo
-          key_ids :: [binary()]
-         }).
-
--record(key, {
-          key_id :: binary(),
-          secret :: binary(),
-          path :: binary()
-         }).
-
 
 %%%===================================================================
 %%% API
@@ -70,7 +55,7 @@ check_key_for_repo_path(KeyId, Repo, Path) ->
     gen_server:call(?MODULE, {auth_req, check_key_for_repo_path, {KeyId, Repo, Path}}).
 
 
--spec get_repos() -> Repos :: [{binary(), [binary()]}].
+-spec get_repos() -> Repos :: [{binary(), [binary() | #{atom() => binary()}]}].
 get_repos() ->
     gen_server:call(?MODULE, {auth_req, get_repos}).
 
@@ -83,8 +68,8 @@ check_hmac(Message, KeyId, HMAC) ->
     gen_server:call(?MODULE, {auth_req, check_hmac, {Message, KeyId, HMAC}}).
 
 
--spec reload_repo_config() -> ok | {error, Reason}
-                                  when Reason :: term().
+-spec reload_repo_config() -> {ok, CfgVer} | {error, Reason}
+                                  when CfgVer :: integer(), Reason :: term().
 reload_repo_config() ->
     gen_server:call(?MODULE, {auth_req, reload_repo_config}).
 
@@ -105,26 +90,13 @@ reload_repo_config() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    {ok, MnesiaSchemaLocation} = application:get_env(mnesia, schema_location),
-    AllNodes = [node() | nodes()],
-    CopyMode = case MnesiaSchemaLocation of
-                   disc ->
-                       {disc_copies, AllNodes};
-                   ram ->
-                       {ram_copies, AllNodes}
-               end,
-    mnesia:create_table(repo, [CopyMode
-                              ,{type, set}
-                              ,{attributes, record_info(fields, repo)}]),
-    mnesia:create_table(key, [CopyMode
-                             ,{type, set}
-                             ,{attributes, record_info(fields, key)}]),
-    ok = mnesia:wait_for_tables([repo, key], 10000),
+    ets:new(repos, [set, named_table, private]),
+    ets:new(keys, [set, named_table, private]),
 
     case p_reload_repo_config() of
-        ok ->
+        {ok, CfgVer} ->
             lager:info("Repository configuration finished."),
-            {ok, []};
+            {ok, #{config_version => CfgVer}};
         {error, Reason} ->
             lager:error("Error in auth module initialization: ~p", [Reason]),
             {stop, Reason}
@@ -138,8 +110,9 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({auth_req, check_key_for_repo_path, {KeyId, Repo, Path}}, _From, State) ->
-    Reply = p_check_key_for_repo_path(KeyId, Repo, Path),
+handle_call({auth_req, check_key_for_repo_path, {KeyId, Repo, Path}},
+            _From, #{config_version := CfgVer} = State) ->
+    Reply = p_check_key_for_repo_path(KeyId, Repo, Path, CfgVer),
     {reply, Reply, State};
 handle_call({auth_req, get_repos}, _From, State) ->
     Reply = p_get_repos(),
@@ -149,7 +122,12 @@ handle_call({auth_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
     {reply, Reply, State};
 handle_call({auth_req, reload_repo_config}, _From, State) ->
     Reply = p_reload_repo_config(),
-    {reply, Reply, State}.
+    case Reply of
+        {ok, CfgVer} ->
+            {reply, Reply, #{config_version => CfgVer}};
+        _ ->
+            {reply, Reply, State}
+        end.
 
 
 %%--------------------------------------------------------------------
@@ -203,111 +181,134 @@ code_change(OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec p_check_key_for_repo_path(KeyId, Repo, Path) -> ok | {error,
-                                                            invalid_repo |
-                                                            invalid_key |
-                                                            invalid_path}
+-spec p_check_key_for_repo_path(KeyId, Repo, Path, CfgVer) -> ok | {error,
+                                                                    invalid_repo |
+                                                                    invalid_key |
+                                                                    invalid_path}
                                    when KeyId :: binary(),
                                         Repo :: binary(),
-                                        Path :: binary().
-p_check_key_for_repo_path(KeyId, Repo, Path) ->
-    T1 = fun() ->
-                 case mnesia:read(repo, Repo) of
-                     [#repo{key_ids = KeyIds} | _] ->
-                         KeyValidForRepo = lists:member(KeyId, KeyIds),
-                         case KeyValidForRepo of
-                             true ->
-                                 case mnesia:read(key, KeyId) of
-                                     [#key{path = AllowedPath} | _] ->
-                                         Overlapping = cvmfs_path_util:are_overlapping(Path, AllowedPath),
-                                         IsSubPath = size(Path) >= size(AllowedPath),
-                                         case Overlapping and IsSubPath of
-                                             true ->
-                                                 ok;
-                                             false ->
-                                                 {error, invalid_path}
-                                         end;
-                                     _ ->
-                                         {error, invalid_path}
-                                 end;
-                             false ->
-                                 {error, invalid_key}
-                         end;
-                     _ ->
-                         {error, invalid_repo}
-                 end
-         end,
-    {atomic, Result} = mnesia:transaction(T1),
-    Result.
+                                        Path :: binary(),
+                                        CfgVer :: integer().
+p_check_key_for_repo_path(KeyId, Repo, Path, CfgVer) ->
+    case CfgVer of
+        1 ->
+            case ets:lookup(repos, Repo) of
+                [{Repo, KeyIds} | _] ->
+                    KeyValidForRepo = lists:member(KeyId, KeyIds),
+                    case KeyValidForRepo of
+                        true ->
+                            case ets:lookup(keys, KeyId) of
+                                [{_, _, AllowedPath} | _] ->
+                                    Overlapping = cvmfs_path_util:are_overlapping(Path, AllowedPath),
+                                    IsSubPath = size(Path) >= size(AllowedPath),
+                                    case Overlapping and IsSubPath of
+                                        true ->
+                                            ok;
+                                        false ->
+                                            {error, invalid_path}
+                                    end;
+                                _ ->
+                                    {error, invalid_path}
+                            end;
+                        false ->
+                            {error, invalid_key}
+                    end;
+                _ ->
+                    {error, invalid_repo}
+            end;
+        _ ->
+            case ets:lookup(repos, Repo) of
+                [{Repo, KeyIds} | _] ->
+                    case lists:search(fun(#{id := Id}) -> Id =:= KeyId end, KeyIds) of
+                        {value, #{path := AllowedPath}} ->
+                            Overlapping = cvmfs_path_util:are_overlapping(Path, AllowedPath),
+                            IsSubPath = size(Path) >= size(AllowedPath),
+                            case Overlapping and IsSubPath of
+                                true ->
+                                    ok;
+                                false ->
+                                    {error, invalid_path}
+                            end;
+                        false ->
+                            {error, invalid_key}
+                    end;
+                _ ->
+                    {error, invalid_repo}
+            end
+    end.
 
 
--spec p_get_repos() -> Repos :: [{binary(), [binary()]}].
+-spec p_get_repos() -> Repos :: [{binary(), [binary() | #{atom() => binary()}]}].
 p_get_repos() ->
-    T = fun() ->
-                mnesia:foldl(fun(#repo{name = Repo, key_ids = KeyIds}, Acc) ->
-                                     [{Repo, KeyIds} | Acc]
-                             end, [], repo)
-        end,
-    {atomic, Result} = mnesia:transaction(T),
-    Result.
+    ets:foldl(fun({Repo, KeyIds}, Acc) -> [{Repo, KeyIds} | Acc] end, [], repos).
 
 
 -spec p_check_hmac(Message :: binary(), KeyId :: binary(), HMAC :: binary()) -> boolean().
 p_check_hmac(Message, KeyId, HMAC) ->
-    T = fun() ->
-                case mnesia:read(key, KeyId) of
-                    [#key{key_id = KeyId, secret = Secret} | _] ->
-                        {ok, Secret};
-                    _ ->
-                        error
-                end
-        end,
-    {atomic, Result} = mnesia:transaction(T),
+    Result = case ets:lookup(keys, KeyId) of
+        [{KeyId, Secret} | _] ->
+            {ok, Secret};
+        [{KeyId, Secret, _} | _] ->
+            {ok, Secret};
+        _ ->
+            error
+    end,
     case Result of
-        {ok, Secret} ->
-            HMAC =:= cvmfs_auth_util:compute_hmac(Secret, Message);
+        {ok, Sec} ->
+            HMAC =:= cvmfs_auth_util:compute_hmac(Sec, Message);
         _ ->
             false
     end.
 
 
--spec populate_key_table(Keys :: [#{atom() := binary()}]) -> boolean().
-populate_key_table(Keys) ->
-    T = fun() ->
-        lists:foreach(
-            fun(#{id := Id, secret := Secret, path := Path}) ->
-                mnesia:write(#key{key_id = Id, secret = Secret, path = Path})
-            end,
-            Keys)
-    end,
-    {atomic, Result} = mnesia:sync_transaction(T),
-    Result.
-
-
--spec populate_repo_table(RepoList :: [#{atom() => binary() | [binary()]}]) -> boolean().
-populate_repo_table(RepoList) ->
-    T = fun() ->
-        lists:all(
-            fun(V) -> V =:= ok end,
-            [mnesia:write(
-                #repo{name = Repo, key_ids = KeyIds}) || #{domain := Repo,
-                                                           keys := KeyIds} <- RepoList])
-    end,
-    {atomic, Result} = mnesia:sync_transaction(T),
-    Result.
-
-
--spec p_reload_repo_config() -> ok | {error, Reason}
-                                    when Reason :: term().
+-spec p_reload_repo_config() -> {ok, CfgVer} | {error, Reason}
+                                    when CfgVer :: integer(), Reason :: term().
 p_reload_repo_config() ->
     Cfg = config:read(repo_config, config:default_repo_config()),
+
+    CfgVer = maps:get(version, Cfg, 1),
+
+    ets:delete_all_objects(repos),
+    ets:delete_all_objects(keys),
+
     case config:load(Cfg) of
         {ok, Repos, Keys} ->
-            {atomic, ok} = mnesia:clear_table(repo),
-            {atomic, ok} = mnesia:clear_table(key),
-            populate_key_table(Keys),
+            case CfgVer of
+                1 ->
+                    populate_key_table_v1(Keys);
+                _ ->
+                    populate_key_table(Keys)
+            end,
             populate_repo_table(Repos),
-            ok;
+            {ok, CfgVer};
         {error, Reason} ->
             {error, Reason}
     end.
+
+-spec populate_key_table(Keys :: [#{atom() := binary()}]) -> ok.
+populate_key_table(Keys) ->
+    lists:foreach(
+        fun(#{id := Id, secret := Secret}) ->
+            ets:insert(keys, {Id, Secret})
+        end,
+        Keys),
+    ok.
+
+
+-spec populate_key_table_v1(Keys :: [#{atom() := binary()}]) -> ok.
+populate_key_table_v1(Keys) ->
+    lists:foreach(
+        fun(#{id := Id, secret := Secret, path := Path}) ->
+            ets:insert(keys, {Id, Secret, Path})
+        end,
+        Keys),
+    ok.
+
+
+-spec populate_repo_table(RepoList :: [#{atom() => binary() | [binary()]}]) -> ok.
+populate_repo_table(RepoList) ->
+    [ets:insert(repos, {Repo, KeyIds}) || #{domain := Repo,
+                                            keys := KeyIds} <- RepoList],
+    ok.
+
+
