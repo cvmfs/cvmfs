@@ -54,6 +54,21 @@ if is_redhat && [ "$(get_redhat_version)" -lt "6" ]; then
   build_geoapi="OFF"
 fi
 
+# ducc get build only if the version of the go compiler is >= 1.11.4
+build_ducc="OFF"
+if which go > /dev/null 2>&1; then
+  go_version=$(go version)
+  go_major=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\1/p')
+  go_minor=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\2/p')
+  go_patch=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\3/p')
+
+  if [ $go_minor -ge 11 ]; then
+    if [ $go_patch -ge 4 ]; then
+      build_ducc="ON"
+    fi
+  fi
+fi
+
 echo "configuring using CMake..."
 cmake -DBUILD_SERVER=$build_server          \
       -DBUILD_SERVER_DEBUG=$build_server    \
@@ -62,6 +77,7 @@ cmake -DBUILD_SERVER=$build_server          \
       -DBUILD_SHRINKWRAP=$build_shrinkwrap  \
       -DBUILD_GEOAPI=$build_geoapi          \
       -DBUILD_PRELOAD=yes                   \
+      -DBUILD_DUCC=$build_ducc              \
       $CVMFS_SOURCE_LOCATION
 
 echo "building using make ($CVMFS_CONCURRENT_BUILD_JOBS concurrent jobs)..."

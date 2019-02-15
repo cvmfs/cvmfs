@@ -457,6 +457,10 @@ if (BUILD_QC_TESTS)
   add_subdirectory (test/quickcheck)
 endif(BUILD_QC_TESTS)
 
+if (BUILD_DUCC)
+  add_subdirectory (ducc)
+endif(BUILD_DUCC)
+
 #
 # Documentation
 #

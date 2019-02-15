@@ -38,6 +38,8 @@ option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* comman
 # libraries are picked up from the system
 option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party libraries"               ON)
 
+option (BUILD_DUCC              "Build cvmfs_ducc, it requires a modern go compiler > 1.11.5"      OFF)
+
 if (BUILD_ALL)
   set (BUILD_CVMFS ON)
   set (BUILD_UNITTESTS ON)
