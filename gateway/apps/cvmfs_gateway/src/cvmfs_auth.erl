@@ -148,10 +148,15 @@ init([]) ->
                              ,{attributes, record_info(fields, key)}]),
     ok = mnesia:wait_for_tables([repo, key], 10000),
 
-    p_reload_repo_config(),
-    lager:info("Repository configuration finished."),
+    case p_reload_repo_config() of
+        ok ->
+            lager:info("Repository configuration finished."),
+            {ok, []};
+        {error, Reason} ->
+            lager:error("Error in auth module initialization: ~p", [Reason]),
+            {stop, Reason}
+    end.
 
-    {ok, []}.
 
 %%--------------------------------------------------------------------
 %% @private
