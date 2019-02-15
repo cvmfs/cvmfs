@@ -26,6 +26,31 @@ enum LogFacilities {
   kLogCustom2 = 0x100,
 };
 
+/**
+ * Default logging facilities
+ *
+ * Classes which are reused in different parts of CVMFS may need to log to
+ * different facilities. For example, in the client logging should be done
+ * to the system log, while in cvmfs_swissknife it should be done to stdout.
+ *
+ * When logging to the default facilities:
+ *
+ * LogCvmfs(kLogCvmfs, DefaultLogging::info, ...)
+ *
+ * the facilities can be changed as needed, without modifying the caller code.
+ *
+ * The default facilities are kLogStdout and kLogStderr.
+ */
+struct DefaultLogging {
+  /**
+   * Change the default logging facilities
+   */
+  static void Set(LogFacilities info, LogFacilities error);
+
+  static LogFacilities info;  // default kLogStdout
+  static LogFacilities error;  // default kLogStderr
+};
+
 enum LogFlags {
   kLogNoLinebreak = 0x200,
   kLogShowSource = 0x400,

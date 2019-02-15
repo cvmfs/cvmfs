@@ -38,6 +38,14 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 static void LogCustom(unsigned id, const std::string &message);
 
+LogFacilities DefaultLogging::info = kLogSyslog;
+LogFacilities DefaultLogging::error = kLogSyslogErr;
+
+void DefaultLogging::Set(LogFacilities info, LogFacilities error) {
+  DefaultLogging::info = info;
+  DefaultLogging::error = error;
+}
+
 namespace {
 
 const unsigned kMicroSyslogMax = 500 * 1024;  // rotate after 500kB
