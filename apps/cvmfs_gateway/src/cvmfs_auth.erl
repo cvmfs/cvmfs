@@ -16,9 +16,7 @@
 %% API
 -export([start_link/0
         ,check_key_for_repo_path/3
-        ,add_key/3, remove_key/1
-        ,add_repo/2, remove_repo/1
-        ,get_repos/0, get_keys/0
+        ,get_repos/0
         ,check_hmac/3
         ,reload_repo_config/0]).
 
@@ -72,34 +70,9 @@ check_key_for_repo_path(KeyId, Repo, Path) ->
     gen_server:call(?MODULE, {auth_req, check_key_for_repo_path, {KeyId, Repo, Path}}).
 
 
--spec add_key(KeyId :: binary(), Secret :: binary(), Path :: binary())-> ok.
-add_key(KeyId, Secret, Path) ->
-    gen_server:call(?MODULE, {auth_req, add_key, {KeyId, Secret, Path}}).
-
-
--spec remove_key(KeyId :: binary()) -> ok.
-remove_key(KeyId) ->
-    gen_server:call(?MODULE, {auth_req, remove_key, KeyId}).
-
-
--spec add_repo(Repo :: binary(), KeyIds :: [binary()]) -> ok.
-add_repo(Repo, KeyIds) ->
-    gen_server:call(?MODULE, {auth_req, add_repo, {Repo, KeyIds}}).
-
-
--spec remove_repo(Repo :: binary()) -> ok.
-remove_repo(Repo) ->
-    gen_server:call(?MODULE, {auth_req, remove_repo, Repo}).
-
-
 -spec get_repos() -> Repos :: [{binary(), [binary()]}].
 get_repos() ->
     gen_server:call(?MODULE, {auth_req, get_repos}).
-
-
--spec get_keys() -> Keys :: [{binary(), binary()}].
-get_keys() ->
-    gen_server:call(?MODULE, {auth_req, get_keys}).
 
 
 -spec check_hmac(Message, KeyId, HMAC) -> boolean()
@@ -168,23 +141,8 @@ init([]) ->
 handle_call({auth_req, check_key_for_repo_path, {KeyId, Repo, Path}}, _From, State) ->
     Reply = p_check_key_for_repo_path(KeyId, Repo, Path),
     {reply, Reply, State};
-handle_call({auth_req, add_key, {KeyId, Secret, Path}}, _From, State) ->
-    Reply = p_add_key(KeyId, Secret, Path),
-    {reply, Reply, State};
-handle_call({auth_req, remove_key, Key}, _From, State) ->
-    Reply = p_remove_key(Key),
-    {reply, Reply, State};
-handle_call({auth_req, add_repo, {Repo, KeyIds}}, _From, State) ->
-    Reply = p_add_repo(Repo, KeyIds),
-    {reply, Reply, State};
-handle_call({auth_req, remove_repo, Repo}, _From, State) ->
-    Reply = p_remove_repo(Repo),
-    {reply, Reply, State};
 handle_call({auth_req, get_repos}, _From, State) ->
     Reply = p_get_repos(),
-    {reply, Reply, State};
-handle_call({auth_req, get_keys}, _From, State) ->
-    Reply = p_get_keys(),
     {reply, Reply, State};
 handle_call({auth_req, check_hmac, {Message, KeyId, HMAC}}, _From, State) ->
     Reply = p_check_hmac(Message, KeyId, HMAC),
@@ -283,59 +241,12 @@ p_check_key_for_repo_path(KeyId, Repo, Path) ->
     Result.
 
 
--spec p_add_key(KeyId :: binary(), Secret :: binary(), Path :: binary()) -> ok.
-p_add_key(KeyId, Secret, Path) ->
-    T = fun() ->
-                mnesia:write(#key{key_id = KeyId, secret = Secret, path = Path})
-        end,
-    {atomic, Result} = mnesia:sync_transaction(T),
-    Result.
-
-
--spec p_remove_key(Key :: binary()) -> ok.
-p_remove_key(Key) ->
-    T = fun() ->
-                mnesia:delete({key, Key})
-        end,
-    {atomic, Result} = mnesia:sync_transaction(T),
-    Result.
-
-
--spec p_add_repo(Repo :: binary(), KeyIds :: [binary()]) -> ok.
-p_add_repo(Repo, KeyIds) ->
-    T = fun() ->
-                mnesia:write(#repo{name = Repo, key_ids = KeyIds})
-        end,
-    {atomic, Result} = mnesia:sync_transaction(T),
-    Result.
-
-
--spec p_remove_repo(Repo :: binary()) -> ok.
-p_remove_repo(Repo) ->
-    T = fun() ->
-                mnesia:delete({repo, Repo})
-        end,
-    {atomic, Result} = mnesia:sync_transaction(T),
-    Result.
-
-
 -spec p_get_repos() -> Repos :: [{binary(), [binary()]}].
 p_get_repos() ->
     T = fun() ->
                 mnesia:foldl(fun(#repo{name = Repo, key_ids = KeyIds}, Acc) ->
                                      [{Repo, KeyIds} | Acc]
                              end, [], repo)
-        end,
-    {atomic, Result} = mnesia:transaction(T),
-    Result.
-
-
--spec p_get_keys() -> Keys :: [{binary(), binary()}].
-p_get_keys() ->
-    T = fun() ->
-                mnesia:foldl(fun(#key{key_id = Id, path = Path}, Acc) ->
-                                     [{Id, Path} | Acc]
-                             end, [], key)
         end,
     {atomic, Result} = mnesia:transaction(T),
     Result.
