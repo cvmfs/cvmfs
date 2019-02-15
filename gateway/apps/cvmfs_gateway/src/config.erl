@@ -46,8 +46,8 @@ load(Cfg) ->
 
 
 load(Cfg, KeyLoader) ->
-    RepoCfg = maps:get(repos, Cfg),
-    KeyCfg = maps:get(keys, Cfg),
+    RepoCfg = maps:get(repos, Cfg, #{}),
+    KeyCfg = maps:get(keys, Cfg, #{}),
 
     CfgVer = maps:get(version, Cfg, 1),
     case CfgVer of
