@@ -779,7 +779,8 @@ if (BUILD_SERVER)
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
                            ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                            ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
-                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
+                           ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
+                           ${LibWebsockets_LIBRARIES} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
