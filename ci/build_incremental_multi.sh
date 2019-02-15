@@ -76,7 +76,7 @@ cmake -DBUILD_SERVER=$build_server          \
       -DBUILD_LIBCVMFS=$build_libcvmfs      \
       -DBUILD_SHRINKWRAP=$build_shrinkwrap  \
       -DBUILD_GEOAPI=$build_geoapi          \
-      -DBUILD_PRELOAD=yes                   \
+      -DBUILD_PRELOADER=yes                 \
       -DBUILD_DUCC=$build_ducc              \
       $CVMFS_SOURCE_LOCATION
 
