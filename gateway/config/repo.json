@@ -1,21 +1,21 @@
 {
+    "version": 2,
     "repos" : [
         {
             "domain" : "example_repo.domain.org",
-            "keys" : ["example_key"]
+            "keys" : [
+                {
+                    "id": "example_key",
+                    "path": "/"
+                }
+            ]
         }
     ],
     "keys" : [
         {
             "type" : "plain_text",
             "id" : "example_key",
-            "secret" : "SECRET",
-            "repo_subpath" : "/"
-        },
-        {
-            "type": "file",
-            "file_name": "/etc/cvmfs/keys/example_repo.domain.org.gw",
-            "repo_subpath": "/"
+            "secret" : "SECRET"
         }
     ]
 }
