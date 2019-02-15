@@ -58,8 +58,7 @@ load(Cfg, KeyLoader) ->
             {ok, RepoCfg, Keys};
         _ ->
             {ok, Repos} = load_repos(RepoCfg),
-            {ok, UpdatedRepos, Keys} = load_keys(KeyCfg, Repos, KeyLoader),
-            {ok, UpdatedRepos, Keys}
+            load_keys(KeyCfg, Repos, KeyLoader)
     end.
 
 
@@ -74,33 +73,46 @@ load_repos(RepoCfg) ->
 
 
 load_keys(KeyCfg, Repos, KeyLoader) ->
-    SpecifiedKeys = lists:map(KeyLoader, KeyCfg),
-
-    ProcessDefaultKey = fun(R, {AccRepos, AccKeys}) ->
-        #{domain := Name, keys := K} = R,
-        case K of
-            default ->
-                Key = KeyLoader(#{type => <<"file">>,
-                                  file_name => <<"/etc/cvmfs/keys/", Name/binary, ".gw">>,
-                                  repo_subpath => <<"/">>}),
-                #{id := KeyId} = Key,
-                case lists:search(fun(#{id := Id}) -> Id =:= KeyId end, SpecifiedKeys) of
-                    false ->
-                        {[#{domain => Name, keys => [KeyId]} | AccRepos],
-                         [Key | AccKeys]};
+    try lists:map(KeyLoader, KeyCfg) of
+        SpecifiedKeys ->
+            ProcessDefaultKey = fun(R, {AccRepos, AccKeys}) ->
+                #{domain := Name, keys := K} = R,
+                case K of
+                    default ->
+                        try KeyLoader(#{type => <<"file">>,
+                                        file_name => <<"/etc/cvmfs/keys/", Name/binary, ".gw">>,
+                                        repo_subpath => <<"/">>}) of
+                            Key ->
+                                #{id := KeyId} = Key,
+                                case lists:search(fun(#{id := Id}) -> Id =:= KeyId end,
+                                                  SpecifiedKeys) of
+                                    false ->
+                                        {[#{domain => Name, keys => [KeyId]} | AccRepos],
+                                        [Key | AccKeys]};
+                                    _ ->
+                                        {[R | AccRepos], AccKeys}
+                                end
+                        catch throw:Reason -> {error, Reason}
+                    end;
                     _ ->
                         {[R | AccRepos], AccKeys}
-                end;
-            _ ->
-                {[R | AccRepos], AccKeys}
-        end
-    end,
+                end
+            end,
 
-    {UpdatedRepos, DefaultKeys} = lists:foldl(ProcessDefaultKey, {[], []}, Repos),
-    {ok, UpdatedRepos, SpecifiedKeys ++ DefaultKeys}.
+            {UpdatedRepos, DefaultKeys} = lists:foldl(ProcessDefaultKey, {[], []}, Repos),
+            {ok, UpdatedRepos, SpecifiedKeys ++ DefaultKeys}
+    catch
+        throw:Reason -> {error, Reason}
+    end.
 
 
-%%% Private functions
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%    Private functions    %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 
 read_config_file(File) ->
     case file:read_file(File) of
@@ -114,15 +126,21 @@ read_config_file(File) ->
 load_key(#{type := <<"plain_text">>, id := Id, secret := Secret, repo_subpath := Path}) ->
     #{id => Id, secret => Secret, path => Path};
 load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
-    {<<"plain_text">>, I, S} = keys:parse_file(FileName),
-    #{id => I, secret => S, path => Path}.
+    case keys:parse_file(FileName) of
+        {ok, <<"plain_text">>, I, S} ->
+            #{id => I, secret => S, path => Path};
+        {error, Reason} ->
+            lager:error("Error parsing key file ~p: ~p", [FileName, Reason]),
+            throw(Reason)
+    end.
 
 
-get_repo_names(Repos) ->
-    lists:map(fun(#{domain := Name}) -> Name end, Repos).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%    Tests    %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-%%% Tests
 
 load_repos_adds_default_keys_test() ->
     RepoCfg = [
@@ -161,7 +179,7 @@ load_keys_adds_missing_key_definition_test() ->
           repo_subpath => <<"/path">>}
     ],
 
-    {ok, Repos, Keys} = load_keys(KeyCfg, RepoCfg, fun(K) -> mock_load_key(K) end),
+    {ok, _Repos, Keys} = load_keys(KeyCfg, RepoCfg, fun(K) -> mock_load_key(K) end),
 
     {value, #{secret := Secret}} = lists:search(
         fun(#{id := Id}) -> Id =:= <<"test3.domain.org">> end, Keys),
