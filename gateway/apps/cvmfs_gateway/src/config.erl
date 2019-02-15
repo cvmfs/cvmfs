@@ -7,8 +7,6 @@
 
 -module(config).
 
--compile([{parse_transform, lager_transform}]).
-
 -include_lib("eunit/include/eunit.hrl").
 
 -export([read/2,
@@ -80,15 +78,14 @@ load_keys(KeyCfg, Repos, KeyLoader) ->
                 case K of
                     default ->
                         try KeyLoader(#{type => <<"file">>,
-                                        file_name => <<"/etc/cvmfs/keys/", Name/binary, ".gw">>,
-                                        repo_subpath => <<"/">>}) of
+                                        file_name => <<"/etc/cvmfs/keys/", Name/binary, ".gw">>}) of
                             Key ->
                                 #{id := KeyId} = Key,
                                 case lists:search(fun(#{id := Id}) -> Id =:= KeyId end,
                                                   SpecifiedKeys) of
                                     false ->
-                                        {[#{domain => Name, keys => [KeyId]} | AccRepos],
-                                        [Key | AccKeys]};
+                                        {[maps:put(keys, [#{id => KeyId, path => <<"/">>}], R) | AccRepos],
+                                         [Key | AccKeys]};
                                     _ ->
                                         {[R | AccRepos], AccKeys}
                                 end
@@ -125,12 +122,20 @@ read_config_file(File) ->
 
 load_key(#{type := <<"plain_text">>, id := Id, secret := Secret, repo_subpath := Path}) ->
     #{id => Id, secret => Secret, path => Path};
+load_key(#{type := <<"plain_text">>, id := Id, secret := Secret}) ->
+    #{id => Id, secret => Secret};
 load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
     case keys:parse_file(FileName) of
         {ok, <<"plain_text">>, I, S} ->
             #{id => I, secret => S, path => Path};
         {error, Reason} ->
-            lager:error("Error parsing key file ~p: ~p", [FileName, Reason]),
+            throw(Reason)
+    end;
+load_key(#{type := <<"file">>, file_name := FileName}) ->
+    case keys:parse_file(FileName) of
+        {ok, <<"plain_text">>, I, S} ->
+            #{id => I, secret => S};
+        {error, Reason} ->
             throw(Reason)
     end.
 
@@ -145,9 +150,10 @@ load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
 load_repos_adds_default_keys_test() ->
     RepoCfg = [
         #{domain => <<"test1.domain.org">>,
-        keys => [<<"testkey1">>]},
+          keys => [#{id => <<"testkey1">>, path => <<"/">>}]},
         #{domain => <<"test2.domain.org">>,
-        keys => [<<"testkey1">>, <<"testkey2">>]},
+          keys => [#{id => <<"testkey1">>, path => <<"/">>},
+                   #{id => <<"testkey2">>, path => <<"/">>}]},
         <<"test3.domain.org">>
     ],
 
@@ -155,38 +161,39 @@ load_repos_adds_default_keys_test() ->
     {value, #{domain := Name, keys := KeyIds}} = lists:search(
         fun(#{domain := D}) -> D =:= <<"test3.domain.org">> end, Repos),
     ?assert(Name =:= <<"test3.domain.org">>),
-    ?assert(KeyIds =:= default),
-
-    ok.
+    ?assert(KeyIds =:= default).
 
 load_keys_adds_missing_key_definition_test() ->
     RepoCfg = [
         #{domain => <<"test1.domain.org">>,
-          keys => [<<"testkey1">>]},
+          keys => [#{id => <<"testkey1">>, path => <<"/">>}]},
         #{domain => <<"test2.domain.org">>,
-          keys => [<<"testkey1">>, <<"testkey2">>]},
+          keys => [#{id => <<"testkey1">>, path => <<"/">>},
+                   #{id => <<"testkey2">>, path => <<"/">>}]},
         #{domain => <<"test3.domain.org">>,
           keys => default}
     ],
     KeyCfg = [
         #{type => <<"plain_text">>,
           id => <<"testkey1">>,
-          secret => <<"SECRET1">>,
-          repo_subpath => <<"/">>},
+          secret => <<"SECRET1">>},
         #{type => <<"plain_text">>,
           id => <<"testkey2">>,
-          secret => <<"SECRET2">>,
-          repo_subpath => <<"/path">>}
+          secret => <<"SECRET2">>}
     ],
 
-    {ok, _Repos, Keys} = load_keys(KeyCfg, RepoCfg, fun(K) -> mock_load_key(K) end),
+    {ok, Repos, Keys} = load_keys(KeyCfg, RepoCfg, fun(K) -> mock_load_key(K) end),
 
     {value, #{secret := Secret}} = lists:search(
         fun(#{id := Id}) -> Id =:= <<"test3.domain.org">> end, Keys),
-    ?assert(Secret =:= <<"mocksecret">>).
+    ?assert(Secret =:= <<"mocksecret">>),
 
-mock_load_key(#{type := <<"plain_text">>, id := Id, secret := Secret, repo_subpath := Path}) ->
-    #{id => Id, secret => Secret, path => Path};
-mock_load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
+    {value, #{keys := KeyIds}} = lists:search(
+        fun(#{domain := D}) -> D =:= <<"test3.domain.org">> end, Repos),
+    ?assert(KeyIds =:= [#{id => <<"test3.domain.org">>, path => <<"/">>}]).
+
+mock_load_key(#{type := <<"plain_text">>, id := Id, secret := Secret}) ->
+    #{id => Id, secret => Secret};
+mock_load_key(#{type := <<"file">>, file_name := FileName}) ->
     [Id | _] = binary:split(lists:last(binary:split(FileName, <<"/">>, [global])), <<".gw">>),
-    #{id => Id, secret => <<"mocksecret">>, path => Path}.
+    #{id => Id, secret => <<"mocksecret">>}.
