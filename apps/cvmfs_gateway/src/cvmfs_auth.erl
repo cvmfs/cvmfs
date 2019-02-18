@@ -264,14 +264,14 @@ p_check_hmac(Message, KeyId, HMAC) ->
 -spec p_reload_repo_config() -> {ok, CfgVer} | {error, Reason}
                                     when CfgVer :: integer(), Reason :: term().
 p_reload_repo_config() ->
-    Cfg = config:read(repo_config, config:default_repo_config()),
+    Cfg = cvmfs_config:read(repo_config, cvmfs_config:default_repo_config()),
 
     CfgVer = maps:get(version, Cfg, 1),
 
     ets:delete_all_objects(repos),
     ets:delete_all_objects(keys),
 
-    case config:load(Cfg) of
+    case cvmfs_config:load(Cfg) of
         {ok, Repos, Keys} ->
             case CfgVer of
                 1 ->

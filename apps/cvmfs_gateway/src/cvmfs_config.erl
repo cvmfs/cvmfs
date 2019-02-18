@@ -5,7 +5,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(config).
+-module(cvmfs_config).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -49,7 +49,7 @@ default_user_config() ->
 % Load the repository and user configuration
 %
 % Load the repository and user configuration from a configuration map.
-% The output of the "config:read" function returns a configuration map
+% The output of the "cvmfs_config:read" function returns a configuration map
 % that can be passed to this function.
 load(Cfg) ->
     load(Cfg, fun(K) -> load_key(K) end).
@@ -137,14 +137,14 @@ load_key(#{type := <<"plain_text">>, id := Id, secret := Secret, repo_subpath :=
 load_key(#{type := <<"plain_text">>, id := Id, secret := Secret}) ->
     #{id => Id, secret => Secret};
 load_key(#{type := <<"file">>, file_name := FileName, repo_subpath := Path}) ->
-    case keys:parse_file(FileName) of
+    case cvmfs_keys:parse_file(FileName) of
         {ok, <<"plain_text">>, I, S} ->
             #{id => I, secret => S, path => Path};
         {error, Reason} ->
             throw(Reason)
     end;
 load_key(#{type := <<"file">>, file_name := FileName}) ->
-    case keys:parse_file(FileName) of
+    case cvmfs_keys:parse_file(FileName) of
         {ok, <<"plain_text">>, I, S} ->
             #{id => I, secret => S};
         {error, Reason} ->
