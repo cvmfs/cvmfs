@@ -21,14 +21,11 @@
 
 -behaviour(supervisor).
 
--export([start_link/1, init/1, commit/4]).
+-export([start_link/0, init/1, commit/4]).
 
 
-start_link(Repos) ->
-    Sup = supervisor:start_link({local, ?MODULE}, ?MODULE, []),
-    lists:foreach(fun(#{domain := RepoName}) -> add_worker(RepoName) end,
-                  Repos),
-    Sup.
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 
 init([]) ->
@@ -57,6 +54,11 @@ add_worker(RepoName) ->
                              Error :: cvmfs_common_types:commit_error().
 commit(LeasePath, OldRootHash, NewRootHash, RepoTag) ->
     RepoName = hd(binary:split(LeasePath, <<"/">>)),
-    {RepoName, Pid} = hd(ets:lookup(commit_workers, RepoName)),
-    cvmfs_commit_worker:commit(Pid, LeasePath, OldRootHash, NewRootHash, RepoTag).
+    case ets:lookup(commit_workers, RepoName) of
+        [] ->
+            add_worker(RepoName),
+            commit(LeasePath, OldRootHash, NewRootHash, RepoTag);
+        [{RepoName, Pid} | _] ->
+            cvmfs_commit_worker:commit(Pid, LeasePath, OldRootHash, NewRootHash, RepoTag)
+    end.
 

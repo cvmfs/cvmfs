@@ -7,7 +7,7 @@
 %%%
 %%%-------------------------------------------------------------------
 
--module(cvmfs_auth_SUITE).
+-module(cvmfs_auth_v1_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -43,7 +43,7 @@ init_per_suite(Config) ->
     ok = application:load(cvmfs_gateway),
     ok = application:set_env(cvmfs_gateway, enabled_services, [cvmfs_auth]),
     ok = application:set_env(cvmfs_gateway, repo_config,
-                             cvmfs_test_util:make_test_repo_config()),
+                             cvmfs_test_util:make_test_repo_config_v1()),
     {ok, _} = application:ensure_all_started(cvmfs_gateway),
     Config.
 

@@ -10,7 +10,8 @@
 -module(cvmfs_test_util).
 
 -export([make_test_user_vars/1,
-         make_test_repo_config/0]).
+         make_test_repo_config/0,
+         make_test_repo_config_v1/0]).
 
 make_test_user_vars(MaxLeaseTime) ->
     #{max_lease_time => MaxLeaseTime,
@@ -23,6 +24,23 @@ make_test_user_vars(MaxLeaseTime) ->
      }.
 
 make_test_repo_config() ->
+    #{version => 2,
+      repos => [#{domain => <<"repo1.domain1.org">>,
+                  keys => [#{id => <<"key1">>, path => <<"/">>}]},
+                #{domain => <<"repo2.domain2.org">>,
+                  keys => [#{id => <<"key1">>, path => <<"/">>}]},
+                #{domain => <<"repo3.domain3.org">>,
+                  keys => [#{id => <<"key1">>, path => <<"/">>},
+                           #{id => <<"key2">>, path => <<"/subpath">>}]}],
+      keys => [#{type => <<"plain_text">>,
+                 id => <<"key1">>,
+                 secret => <<"secret1">>},
+               #{type => <<"plain_text">>,
+                 id => <<"key2">>,
+                 secret => <<"secret2">>}]
+     }.
+
+make_test_repo_config_v1() ->
     #{repos => [#{domain => <<"repo1.domain1.org">>,
                   keys => [<<"key1">>]},
                 #{domain => <<"repo2.domain2.org">>,
