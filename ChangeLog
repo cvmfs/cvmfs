@@ -1,4 +1,5 @@
 1.0.0:
+  * More robust and less verbose repository and key configuration (CVM-1679)
   * A "path_busy" reply to a "new_lease" request now provides the remaining lease time
     in seconds
   * systemd service file: `cvmfs-gateway` is automatically restarted (CVM-1680)
