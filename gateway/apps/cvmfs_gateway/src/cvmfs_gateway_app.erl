@@ -18,7 +18,7 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    UserVars = config:read(user_config, config:default_user_config()),
+    UserVars = cvmfs_config:read(user_config, cvmfs_config:default_user_config()),
 
     LogLevel = maps:get(log_level, UserVars, <<"info">>),
     ok = set_lager_log_level(LogLevel),
