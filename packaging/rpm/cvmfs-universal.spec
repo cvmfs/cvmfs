@@ -200,6 +200,13 @@ Group: Application/System
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
+%package ducc
+Summary: ducc: Daemon Unpacker Containers in CVMFS
+Group: Application/System
+BuildRequires: golang > 1.11.4
+%description ducc
+Daemon to automatically unpack and expose containers images into CernVM-FS
+
 %prep
 %setup -q
 
@@ -234,6 +241,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
   -DBUILD_UNITTESTS=yes \
+  -DBUILD_DUCC=yes \
   -DINSTALL_UNITTESTS=yes \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
@@ -248,6 +256,7 @@ EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
   -DBUILD_UNITTESTS=yes \
+  -DBUILD_DUCC=yes \
   -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
 %endif
 
@@ -509,6 +518,9 @@ fi
 %{_bindir}/cvmfs_test_cache
 %{_bindir}/cvmfs_test_shrinkwrap
 %doc COPYING AUTHORS README.md ChangeLog
+
+%files ducc
+%{_bindir}/cvmfs_ducc
 
 %changelog
 * Wed Sep 26 2018 Jakob Blomer <jblomer@cern.ch> - 2.6.0
