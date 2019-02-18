@@ -24,6 +24,7 @@
 #include "swissknife_letter.h"
 #include "swissknife_lsrepo.h"
 #include "swissknife_migrate.h"
+#include "swissknife_notify.h"
 #include "swissknife_pull.h"
 #include "swissknife_reflog.h"
 #include "swissknife_scrub.h"
@@ -74,6 +75,9 @@ void Usage() {
 
 
 int main(int argc, char **argv) {
+  // Set default logging facilities
+  DefaultLogging::Set(kLogStdout, kLogStderr);
+
   command_list.push_back(new swissknife::CommandCreate());
   command_list.push_back(new swissknife::CommandUpload());
   command_list.push_back(new swissknife::CommandRemove());
@@ -102,6 +106,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandReconstructReflog());
   command_list.push_back(new swissknife::CommandLease());
   command_list.push_back(new swissknife::Ingest());
+  command_list.push_back(new swissknife::CommandNotify());
 
   if (argc < 2) {
     Usage();

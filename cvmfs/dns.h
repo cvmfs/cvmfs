@@ -285,7 +285,10 @@ class CaresResolver : public Resolver {
   friend class NormalResolver;
  public:
   /**
-   * More IP addresses for a single name will be ignored.
+   * More IP addresses for a single name will be ignored.  Due to c-ares
+   * exponential backoff, the number of retries should be limited to 2.
+   * That results in 2 apptempts with the given timeout and a third one with
+   * the timeout doubled.
    */
   static const unsigned kMaxAddresses = 16;
 

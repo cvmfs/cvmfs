@@ -1,4 +1,6 @@
 2.6.0:
+  * New notification system to announce repository changes (CVM-1575, CVM-1634)
+  * New tool suite ducc, daemon that unpacks container images into cvmfs
   * Fix building on macOS Mojave
   * Update sqlite to version 3.26.0
   * Update c-ares to version 1.15.0

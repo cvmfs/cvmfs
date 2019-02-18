@@ -364,37 +364,41 @@ set_nofile_limit() {
   echo "root soft nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
 }
 
-download_gateway_package() {
-  local gateway_build_url=$1
+install_package() {
+  local build_url=$1
   local package_map_file=$2
-  local package_map_url=$gateway_build_url/pkgmap/$package_map_file
+  local package_map_url=$build_url/pkgmap/$package_map_file
 
   echo "Downloading package map from: $package_map_url"
-  curl -s -o gateway_package_map $package_map_url
+  curl -s -o package_map $package_map_url
 
   local ret=$?
 
   if [ "x$ret" != "x0" ]; then
-    echo "Could not download cvmfs-gateway package map"
+    echo "Could not download package map"
     return 1;
   fi
 
-  local cvmfs_gateway_package_url=${gateway_build_url}/$(tail -1 gateway_package_map | cut -d'=' -f2)
-  local cvmfs_gateway_package_file_name=$(echo $cvmfs_gateway_package_url | awk -F'/' {'print $NF'})
+  local package_url=${build_url}/$(tail -1 package_map | cut -d'=' -f2)
+  local package_file_name=$(echo $package_url | awk -F'/' {'print $NF'})
 
-  rm -f gateway_package_map
+  rm -f package_map
 
-  echo "Downloading cvmfs-gateway package from: $cvmfs_gateway_package_url"
-  curl -s $cvmfs_gateway_package_url > $cvmfs_gateway_package_file_name
+  echo "Downloading package from: $package_url"
+  curl -s $package_url > $package_file_name
 
   ret=$?
 
   if [ "x$ret" != "x0" ]; then
-    echo "Could not download cvmfs-gateway package"
+    echo "Could not download package"
     return 2;
   fi
 
-  echo $cvmfs_gateway_package_file_name > gateway_package_name
+  if [ x"$(echo $package_file_name | grep .rpm)" != x"" ]; then
+    install_rpm $package_file_name
+  else
+    install_deb $package_file_name
+  fi
 
   return 0;
 }
