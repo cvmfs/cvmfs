@@ -109,3 +109,8 @@ echo "running unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
 $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
+
+echo "running ducc unit tests"
+pushd ${SCRIPT_LOCATION}/../ducc
+go test -mod=vendor ./...
+popd
