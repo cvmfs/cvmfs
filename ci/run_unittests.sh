@@ -21,8 +21,9 @@ CVMFS_UNITTESTS_QUICK=0
 CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
+CVMFS_TEST_DUCC=0
 
-while getopts "qc:g:s:l:" option; do
+while getopts "qc:g:s:l:d" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
@@ -39,6 +40,9 @@ while getopts "qc:g:s:l:" option; do
     l)
       # Preloading a library now unused
       :
+    ;;
+    d)
+      CVMFS_TEST_DUCC=1
     ;;
     ?)
       usage
@@ -110,7 +114,10 @@ $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
 
-echo "running ducc unit tests"
-pushd ${SCRIPT_LOCATION}/../ducc
-go test -mod=vendor ./...
-popd
+if [ $CVMFS_TEST_DUCC = 1 ]; then
+  echo "running ducc unit tests"
+  pushd ${SCRIPT_LOCATION}/../ducc
+  go get github.com/jstemmer/go-junit-report
+  go test -v -mod=vendor ./... 2>&1 | go-junit-report >> $CVMFS_UNITTESTS_RESULT_LOCATION
+  popd
+fi
