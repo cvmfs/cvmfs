@@ -39,7 +39,7 @@ GATEWAY_BUILD_URL=""
 NOTIFY_SRV_BUILD_URL=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:d:k:t:g:l:w:p:" option; do
+while getopts "s:c:d:k:t:g:l:w:n:p:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
