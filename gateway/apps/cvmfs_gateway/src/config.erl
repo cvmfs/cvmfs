@@ -16,14 +16,20 @@
          load/2]).
 
 
-read(VarName, Defaults) ->
+% Read application configuration (either user_config or repo_config)
+%
+% Read an application configuration variable or return a default value
+% if the variable is undefined. If the variable is set to {file, FileName},
+% FileName will be read using read_config_file, otherwise the contents of
+% the variable itself are returned
+read(VarName, Default) ->
     case application:get_env(VarName) of
         {ok, {file, ConfigFile}} ->
             read_config_file(ConfigFile);
         {ok, ConfigMap} ->
             ConfigMap;
         undefined ->
-            Defaults
+            Default
     end.
 
 
@@ -40,11 +46,17 @@ default_user_config() ->
           #{executable_path => "/usr/bin/cvmfs_receiver"},
       log_level => <<"info">>}.
 
-
+% Load the repository and user configuration
+%
+% Load the repository and user configuration from a configuration map.
+% The output of the "config:read" function returns a configuration map
+% that can be passed to this function.
 load(Cfg) ->
     load(Cfg, fun(K) -> load_key(K) end).
 
 
+% Load the repository and user configuration using a specific
+% key loading function
 load(Cfg, KeyLoader) ->
     RepoCfg = maps:get(repos, Cfg, []),
     KeyCfg = maps:get(keys, Cfg, []),
@@ -55,12 +67,12 @@ load(Cfg, KeyLoader) ->
             Keys = lists:map(KeyLoader, KeyCfg),
             {ok, RepoCfg, Keys};
         _ ->
-            {ok, Repos} = load_repos(RepoCfg),
-            load_keys(KeyCfg, Repos, KeyLoader)
+            {ok, Repos} = process_repos(RepoCfg),
+            process_keys(KeyCfg, Repos, KeyLoader)
     end.
 
 
-load_repos(RepoCfg) ->
+process_repos(RepoCfg) ->
     AddDefaultKeyId =
         fun(Name) when is_binary(Name) ->
                 #{domain => Name, keys => default};
@@ -70,7 +82,7 @@ load_repos(RepoCfg) ->
     {ok, lists:map(AddDefaultKeyId, RepoCfg)}.
 
 
-load_keys(KeyCfg, Repos, KeyLoader) ->
+process_keys(KeyCfg, Repos, KeyLoader) ->
     try lists:map(KeyLoader, KeyCfg) of
         SpecifiedKeys ->
             ProcessDefaultKey = fun(R, {AccRepos, AccKeys}) ->
@@ -147,7 +159,7 @@ load_key(#{type := <<"file">>, file_name := FileName}) ->
 
 
 
-load_repos_adds_default_keys_test() ->
+process_repos_adds_default_keys_test() ->
     RepoCfg = [
         #{domain => <<"test1.domain.org">>,
           keys => [#{id => <<"testkey1">>, path => <<"/">>}]},
@@ -157,13 +169,13 @@ load_repos_adds_default_keys_test() ->
         <<"test3.domain.org">>
     ],
 
-    {ok, Repos} = load_repos(RepoCfg),
+    {ok, Repos} = process_repos(RepoCfg),
     {value, #{domain := Name, keys := KeyIds}} = lists:search(
         fun(#{domain := D}) -> D =:= <<"test3.domain.org">> end, Repos),
     ?assert(Name =:= <<"test3.domain.org">>),
     ?assert(KeyIds =:= default).
 
-load_keys_adds_missing_key_definition_test() ->
+process_keys_adds_missing_key_definition_test() ->
     RepoCfg = [
         #{domain => <<"test1.domain.org">>,
           keys => [#{id => <<"testkey1">>, path => <<"/">>}]},
@@ -182,7 +194,7 @@ load_keys_adds_missing_key_definition_test() ->
           secret => <<"SECRET2">>}
     ],
 
-    {ok, Repos, Keys} = load_keys(KeyCfg, RepoCfg, fun(K) -> mock_load_key(K) end),
+    {ok, Repos, Keys} = process_keys(KeyCfg, RepoCfg, fun(K) -> mock_load_key(K) end),
 
     {value, #{secret := Secret}} = lists:search(
         fun(#{id := Id}) -> Id =:= <<"test3.domain.org">> end, Keys),
