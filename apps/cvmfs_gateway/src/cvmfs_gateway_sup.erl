@@ -30,7 +30,7 @@ start_link(Args) ->
 %%====================================================================
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
+init({EnabledWorkers, PoolConfig, WorkerConfig}) ->
     SupervisorSpecs = #{strategy => one_for_all,
                         intensity => 5,
                         period => 5},
@@ -44,7 +44,7 @@ init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
                               lists:keystore(size, 1, PoolConfig, {size, 1})],
     WorkerSpecs = #{
       cvmfs_auth => #{id => cvmfs_auth,
-                      start => {cvmfs_auth, start_link, [{Repos, Keys}]},
+                      start => {cvmfs_auth, start_link, []},
                       restart => permanent,
                       shutdown => 2000,
                       type => worker,
@@ -70,7 +70,7 @@ init({EnabledWorkers, Repos, Keys, PoolConfig, WorkerConfig}) ->
                                                      FastReceiverPoolConfig,
                                                      WorkerConfig),
       cvmfs_commit_sup => #{id => cvmfs_commit_sup,
-                            start => {cvmfs_commit_sup, start_link, [Repos]},
+                            start => {cvmfs_commit_sup, start_link, []},
                             restart => permanent,
                             shutdown => infinity,
                             type => supervisor,
