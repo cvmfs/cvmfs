@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #
 # This script wraps the unit test run of CernVM-FS.
@@ -56,7 +56,7 @@ if [ $# -lt 2 ]; then
 fi
 
 CVMFS_UNITTESTS_BINARY=$1
-CVMFS_UNITTESTS_RESULT_LOCATION=$2
+CVMFS_UNITTESTS_RESULT_LOCATION=$(readlink -f $2)
 
 # check if only a quick subset of the unittests should be run
 test_filter='-'
@@ -114,10 +114,9 @@ $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
 
-if [ $CVMFS_TEST_DUCC = 1 ]; then
-  echo "running ducc unit tests"
-  pushd ${SCRIPT_LOCATION}/../ducc
-  go get github.com/jstemmer/go-junit-report
+if [ $CVMFS_TEST_DUCC = 1 ] && [ $(can_build_ducc) -ge 1 ]; then
+  echo "running ducc unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report >> $CVMFS_UNITTESTS_RESULT_LOCATION
-  popd
+  popd > /dev/null
 fi
