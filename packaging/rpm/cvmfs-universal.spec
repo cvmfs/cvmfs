@@ -35,7 +35,7 @@ Summary: CernVM File System
 Name: cvmfs
 Version: 2.6.0
 Release: 1%{?dist}
-Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/source.tar.gz
+Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
 Source1: cvmfs.te
 Source2: cvmfs.fc
@@ -201,7 +201,7 @@ Group: Application/System
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
 %package ducc
-Summary: ducc: Daemon Unpacker Containers in CVMFS
+Summary: ducc: Daemon Unpacking Containers in CVMFS
 Group: Application/System
 BuildRequires: golang >= 1.11.4
 %description ducc
@@ -523,6 +523,8 @@ fi
 %{_bindir}/cvmfs_ducc
 
 %changelog
+* Tue Feb 19 2019 Simone Mosciatti <simone.mosciatti@cern.ch> - 2.6.0
+- Add ducc sub package
 * Wed Sep 26 2018 Jakob Blomer <jblomer@cern.ch> - 2.6.0
 - Add shrinkwrap sub package
 * Tue Aug 07 2018 Dave Dykstra <dwd@fnal.gov> - 2.5.1
