@@ -112,6 +112,7 @@ generate_package_map() {
   local unittests="$5"
   local config="$6"
   local shrinkwrap="$7"
+  local ducc="$8"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
@@ -121,6 +122,7 @@ devel=$devel
 shrinkwrap=$shrinkwrap
 unittests=$unittests
 config=$config
+ducc=$ducc
 EOF
 }
 
