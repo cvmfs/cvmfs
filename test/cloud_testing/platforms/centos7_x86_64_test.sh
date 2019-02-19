@@ -45,6 +45,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/6*                                       \
                                  src/7*                                       \
                                  src/8*                                       \
+                                 src/9*                                       \
                               || retval=1
 
 
