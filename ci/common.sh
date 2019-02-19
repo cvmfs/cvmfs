@@ -94,6 +94,7 @@ create_cvmfs_source_tarball() {
         ${source_directory}/externals          \
         ${source_directory}/mount              \
         ${source_directory}/test               \
+        ${source_directory}/ducc               \
         $tar_name
   tar czf $destination_path $tar_name || true
   local retval=$?
