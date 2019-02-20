@@ -11,7 +11,7 @@
 %if 0%{?el7} || 0%{?fedora}
 %define selinux_cvmfs_server 1
 %endif
-%if 0%{?el7} || 0%{?fc29}
+%if 0%{?el7} || 0%{?fedora} >= 29
 %define build_ducc 1
 %endif
 %if 0%{?dist:1}
