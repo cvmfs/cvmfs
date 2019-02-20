@@ -122,7 +122,9 @@ devel=$devel
 shrinkwrap=$shrinkwrap
 unittests=$unittests
 config=$config
-ducc=$ducc
+$(if [ "x$ducc" != "x" ]; then 
+        echo "ducc=$ducc"
+fi)
 EOF
 }
 
