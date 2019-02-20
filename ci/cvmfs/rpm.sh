@@ -83,5 +83,6 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
     "$(basename $(find . -regex '.*cvmfs-devel-[0-9].*\.rpm'))"               \
     "$(basename $(find . -regex '.*cvmfs-unittests-[0-9].*\.rpm'))"           \
     "$CVMFS_CONFIG_PACKAGE"                                                   \
-    "$(basename $(find . -regex '.*cvmfs-shrinkwrap-[0-9].*\.rpm'))"
+    "$(basename $(find . -regex '.*cvmfs-shrinkwrap-[0-9].*\.rpm'))"          \
+    "$(basename $(find . -regex '.*cvmfs-ducc-[0-9].*\.rpm'))"
 fi

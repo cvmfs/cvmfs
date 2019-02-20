@@ -94,6 +94,7 @@ create_cvmfs_source_tarball() {
         ${source_directory}/externals          \
         ${source_directory}/mount              \
         ${source_directory}/test               \
+        ${source_directory}/ducc               \
         $tar_name
   tar czf $destination_path $tar_name || true
   local retval=$?
@@ -111,6 +112,7 @@ generate_package_map() {
   local unittests="$5"
   local config="$6"
   local shrinkwrap="$7"
+  local ducc="$8"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
@@ -120,6 +122,9 @@ devel=$devel
 shrinkwrap=$shrinkwrap
 unittests=$unittests
 config=$config
+$(if [ "x$ducc" != "x" ]; then 
+        echo "ducc=$ducc"
+fi)
 EOF
 }
 
