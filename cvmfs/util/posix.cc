@@ -48,6 +48,8 @@
 #include "logging.h"
 #include "platform.h"
 
+#include "util_concurrency.h"
+
 //using namespace std;  // NOLINT
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -564,18 +566,6 @@ void SendMsg2Socket(const int fd, const std::string &msg) {
 }
 
 
-void LockMutex(pthread_mutex_t *mutex) {
-  int retval = pthread_mutex_lock(mutex);
-  assert(retval == 0);
-}
-
-
-void UnlockMutex(pthread_mutex_t *mutex) {
-  int retval = pthread_mutex_unlock(mutex);
-  assert(retval == 0);
-}
-
-
 /**
  * set(e){g/u}id wrapper.
  */
@@ -1071,10 +1061,9 @@ bool GetGidOf(const std::string &groupname, gid_t *gid) {
  *       this function and beware of scalability bottlenecks
  */
 mode_t GetUmask() {
-  LockMutex(&getumask_mutex);
+  MutexLockGuard m(&getumask_mutex);
   const mode_t my_umask = umask(0);
   umask(my_umask);
-  UnlockMutex(&getumask_mutex);
   return my_umask;
 }
 

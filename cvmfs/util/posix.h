@@ -60,8 +60,6 @@ bool DiffTree(const std::string &path_a, const std::string &path_b);
 void Nonblock2Block(int filedes);
 void Block2Nonblock(int filedes);
 void SendMsg2Socket(const int fd, const std::string &msg);
-void LockMutex(pthread_mutex_t *mutex);
-void UnlockMutex(pthread_mutex_t *mutex);
 
 bool SwitchCredentials(const uid_t uid, const gid_t gid,
                        const bool temporarily);
