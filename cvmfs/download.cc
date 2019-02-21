@@ -2588,7 +2588,6 @@ void DownloadManager::GetProxyInfo(vector< vector<ProxyInfo> > *proxy_chain,
     *current_group = opt_proxy_groups_current_;
   if (fallback_group != NULL)
     *fallback_group = opt_proxy_groups_fallback_;
-
 }
 
 string DownloadManager::GetProxyList() {
@@ -2644,7 +2643,6 @@ void DownloadManager::SwitchProxyGroup() {
   //          "switching proxy from %s to %s (manual group change)",
   //          old_proxy.c_str(),
   //          (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str());
-
 }
 
 
