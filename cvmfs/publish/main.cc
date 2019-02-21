@@ -14,6 +14,7 @@
 #include "publish/cmd_mkfs.h"
 #include "publish/cmd_zpipe.h"
 #include "publish/command.h"
+#include "publish/except.h"
 
 using namespace std;  // NOLINT
 
@@ -80,6 +81,11 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  publish::Command::Options options = command->ParseOptions(argc, argv);
-  return command->Main(options);
+  try {
+    publish::Command::Options options = command->ParseOptions(argc, argv);
+    return command->Main(options);
+  } catch (const publish::EPublish& e) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
+    return 1;
+  }
 }

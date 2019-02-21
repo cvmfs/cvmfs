@@ -21,6 +21,8 @@ class CmdMkfs : public Command {
       "HTTP endpoint of the authoritative storage if not localhost"));
     p.push_back(Parameter::Optional("storage", 'u', "upstream storage",
       "Upstream storage definition if other than local file system"));
+    p.push_back(Parameter::Optional("owner", 'o', "user name",
+      "User account that should own the published files"));
     p.push_back(Parameter::Switch("replicable", 'm',
       "Enable to mark the repository as source for stratum 1 copies"));
     p.push_back(Parameter::Optional("unionfs", 'f', "aufs | overlayfs",
@@ -54,6 +56,7 @@ class CmdMkfs : public Command {
   virtual std::string GetUsage() const {
     return "[options] <fully qualified repository name>";
   }
+  virtual unsigned GetMinPlainArgs() const { return 1; }
 
   virtual int Main(const Options &options);
 };
