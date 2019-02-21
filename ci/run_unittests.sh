@@ -12,6 +12,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 usage() {
   echo "Usage: $0 [-q only quick tests] [-s shrinkwrap test binary]\\"
   echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
+  echo "          [-d run the ducc unittests] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
   exit 1
@@ -108,15 +109,19 @@ if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
     --gtest_filter=$test_filter
 fi
 
-# run the unit tests
-echo "running unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
-$CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
-                        --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
-                        --gtest_filter=$test_filter
-
+echo "Test ducc variable: $CVMFS_TEST_DUCC"
+echo "can_build_ducc: $(can_build_ducc)"
 if [ $CVMFS_TEST_DUCC = 1 ] && [ $(can_build_ducc) -ge 1 ]; then
   echo "running ducc unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
   pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report >> $CVMFS_UNITTESTS_RESULT_LOCATION
   popd > /dev/null
 fi
+
+# run the unit tests
+echo "running unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
+$CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
+                        --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
+                        --gtest_filter=$test_filter
+
+
