@@ -39,6 +39,7 @@
 #include "util/posix.h"
 #include "util/shared_ptr.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -260,9 +261,10 @@ static void *MainWorker(void *data) {
 
   while (1) {
     ChunkJob next_chunk;
-    pthread_mutex_lock(&lock_pipe);
-    ReadPipe(pipe_chunks[0], &next_chunk, sizeof(next_chunk));
-    pthread_mutex_unlock(&lock_pipe);
+    {
+      MutexLockGuard m(&lock_pipe);
+      ReadPipe(pipe_chunks[0], &next_chunk, sizeof(next_chunk));
+    }
     if (next_chunk.IsTerminateJob())
       break;
 
