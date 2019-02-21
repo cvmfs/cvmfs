@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "atomic.h"
+#include "util_concurrency.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
