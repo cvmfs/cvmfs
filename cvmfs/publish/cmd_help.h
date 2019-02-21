@@ -19,6 +19,7 @@ class CmdHelp : public Command {
     return "Prints information about a command";
   }
   virtual std::string GetUsage() const { return "<command>"; }
+  virtual unsigned GetMinPlainArgs() const { return 1; }
   virtual ParameterList GetParams() const { return ParameterList(); }
 
   virtual int Main(const Options &options);

@@ -225,6 +225,7 @@ set (CVMFS_PUBLISH_SOURCES
   publish/command.cc
   publish/except.cc
   publish/main.cc
+  publish/settings.cc
   util/posix.cc
   util/string.cc
 )
@@ -232,6 +233,7 @@ set (CVMFS_PUBLISH_SOURCES
 set (LIBCVMFS_SERVER_SOURCES
   publish/repository.cc
   publish/settings.cc
+  util/string.cc
 )
 
 set (CVMFS_SWISSKNIFE_SOURCES
@@ -815,7 +817,9 @@ if (BUILD_SERVER)
   add_executable (cvmfs_publish ${CVMFS_PUBLISH_SOURCES})
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
-  set_target_properties (cvmfs_server PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
+  set_target_properties (cvmfs_server PROPERTIES
+    VERSION ${CernVM-FS_VERSION_STRING}
+    COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS}")
   set_target_properties (cvmfs_publish PROPERTIES COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}" LINK_FLAGS "${CVMFS_PUBLISH_LD_FLAGS}")
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)

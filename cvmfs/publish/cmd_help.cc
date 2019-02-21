@@ -16,12 +16,6 @@ using namespace std;  // NOLINT
 namespace publish {
 
 int CmdHelp::Main(const Options &options) {
-  if (options.plain_args().size() != 1) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Usage: %s help %s",
-             progname().c_str(), GetUsage().c_str());
-    return 1;
-  }
-
   Command *cmd = commands_->Find(options.plain_args()[0].value_str);
   if (cmd == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "No help for '%s'",
