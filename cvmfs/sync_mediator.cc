@@ -854,10 +854,11 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
              "Error: nested catalog marker in root directory");
     abort();
   } else {
-    // Push the file to the spooler, remember the entry for the path
-    pthread_mutex_lock(&lock_file_queue_);
-    file_queue_[entry->GetUnionPath()] = entry;
-    pthread_mutex_unlock(&lock_file_queue_);
+    {
+      // Push the file to the spooler, remember the entry for the path
+      MutexLockGuard m(&lock_file_queue_);
+      file_queue_[entry->GetUnionPath()] = entry;
+    }
     // Spool the file
     params_->spooler->Process(entry->CreateIngestionSource());
   }
