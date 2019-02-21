@@ -694,14 +694,15 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     stream_listing.capacity = 0;
 
   // Save the directory listing and return a handle to the listing
-  pthread_mutex_lock(&lock_directory_handles_);
-  LogCvmfs(kLogCvmfs, kLogDebug,
-           "linking directory handle %d to dir inode: %" PRIu64,
-           next_directory_handle_, uint64_t(ino));
-  (*directory_handles_)[next_directory_handle_] = stream_listing;
-  fi->fh = next_directory_handle_;
-  ++next_directory_handle_;
-  pthread_mutex_unlock(&lock_directory_handles_);
+  {
+    MutexLockGuard m(&lock_directory_handles_);
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "linking directory handle %d to dir inode: %" PRIu64,
+             next_directory_handle_, uint64_t(ino));
+    (*directory_handles_)[next_directory_handle_] = stream_listing;
+    fi->fh = next_directory_handle_;
+    ++next_directory_handle_;
+  }
   perf::Inc(file_system_->n_fs_dir_open());
   perf::Inc(file_system_->no_open_dirs());
 
@@ -721,20 +722,19 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
 
   int reply = 0;
 
-  pthread_mutex_lock(&lock_directory_handles_);
-  DirectoryHandles::iterator iter_handle =
-    directory_handles_->find(fi->fh);
-  if (iter_handle != directory_handles_->end()) {
-    if (iter_handle->second.capacity == 0)
-      smunmap(iter_handle->second.buffer);
-    else
-      free(iter_handle->second.buffer);
-    directory_handles_->erase(iter_handle);
-    pthread_mutex_unlock(&lock_directory_handles_);
-    perf::Dec(file_system_->no_open_dirs());
-  } else {
-    pthread_mutex_unlock(&lock_directory_handles_);
-    reply = EINVAL;
+  {
+    MutexLockGuard m(&lock_directory_handles_);
+    DirectoryHandles::iterator iter_handle = directory_handles_->find(fi->fh);
+    if (iter_handle != directory_handles_->end()) {
+      if (iter_handle->second.capacity == 0)
+        smunmap(iter_handle->second.buffer);
+      else
+        free(iter_handle->second.buffer);
+      directory_handles_->erase(iter_handle);
+      perf::Dec(file_system_->no_open_dirs());
+    } else {
+      reply = EINVAL;
+    }
   }
 
   fuse_reply_err(req, reply);
@@ -769,18 +769,16 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
   DirectoryListing listing;
 
-  pthread_mutex_lock(&lock_directory_handles_);
+  MutexLockGuard m(&lock_directory_handles_);
   DirectoryHandles::const_iterator iter_handle =
     directory_handles_->find(fi->fh);
   if (iter_handle != directory_handles_->end()) {
     listing = iter_handle->second;
-    pthread_mutex_unlock(&lock_directory_handles_);
 
     ReplyBufferSlice(req, listing.buffer, listing.size, off, size);
     return;
   }
 
-  pthread_mutex_unlock(&lock_directory_handles_);
   fuse_reply_err(req, EINVAL);
 }
 
