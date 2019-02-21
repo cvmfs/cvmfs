@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "logging.h"
 #include "smalloc.h"
 #include "publish/except.h"
 #include "util/string.h"
@@ -88,6 +89,12 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
 
   for (int i = optind; i < argc; ++i) {
     result.AppendPlain(Argument(argv[i]));
+  }
+
+  if (result.plain_args().size() < GetMinPlainArgs()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Usage: %s %s %s",
+             progname().c_str(), GetName().c_str(), GetUsage().c_str());
+    throw EPublish(GetName() + ": missing argument");
   }
 
   return result;

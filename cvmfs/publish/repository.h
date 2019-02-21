@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "publish/settings.h"
 #include "util/single_copy.h"
 
 namespace publish {
@@ -30,9 +31,9 @@ class Repository : SingleCopy {
   Storage storage_;
 };
 
-class Stratum0 : public Repository {
+class Publisher : public Repository {
  public:
-  static Stratum0 *Create();
+  static Publisher *Create(const SettingsPublisher &settings);
   void UpdateMetaInfo();
   void Publish();
   void Ingest();
@@ -42,9 +43,9 @@ class Stratum0 : public Repository {
   void Migrate();
 };
 
-class Stratum1 : public Repository {
+class Replica : public Repository {
  public:
-  static Stratum1 *Create();
+  static Replica *Create();
   void Snapshot();
 };
 

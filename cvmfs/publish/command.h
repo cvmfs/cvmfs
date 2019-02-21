@@ -142,6 +142,10 @@ class Command {
   virtual ParameterList GetParams() const = 0;
   virtual std::string GetUsage() const { return "[options]"; }
   /**
+   * The command needs at least so many non-parameter arguments (e.g. fqrn)
+   */
+  virtual unsigned GetMinPlainArgs() const { return 0; }
+  /**
    * Internal commands can be added that will be omitted from the printed list
    * of available commands.  By default, commands are visible though.
    */
@@ -168,7 +172,7 @@ class CommandList : SingleCopy {
   void TakeCommand(Command *command);
   Command *Find(const std::string &name);
 
-  const std::vector<Command *> commands() const { return commands_; }
+  const std::vector<Command *>& commands() const { return commands_; }
 
  private:
   std::vector<Command *> commands_;
