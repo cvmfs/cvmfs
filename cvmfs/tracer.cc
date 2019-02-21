@@ -17,6 +17,7 @@
 #include "atomic.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -93,10 +94,9 @@ int32_t Tracer::DoTrace(
   atomic_inc32(&commit_buffer_[pos]);
 
   if (my_seq_no - atomic_read32(&flushed_) == flush_threshold_) {
-    LockMutex(&sig_flush_mutex_);
+    MutexLockGuard m(&sig_flush_mutex_);
     int err_code __attribute__((unused)) = pthread_cond_signal(&sig_flush_);
     assert(err_code == 0 && "Could not signal flush thread");
-    UnlockMutex(&sig_flush_mutex_);
   }
 
   return my_seq_no;
@@ -113,10 +113,11 @@ void Tracer::Flush() {
     int retval;
 
     atomic_cas32(&flush_immediately_, 0, 1);
-    LockMutex(&sig_flush_mutex_);
-    retval = pthread_cond_signal(&sig_flush_);
-    assert(retval == 0);
-    UnlockMutex(&sig_flush_mutex_);
+    {
+      MutexLockGuard m(&sig_flush_mutex_);
+      retval = pthread_cond_signal(&sig_flush_);
+      assert(retval == 0);
+    }
 
     GetTimespecRel(250, &timeout);
     retval = pthread_mutex_lock(&sig_continue_trace_mutex_);
@@ -146,7 +147,7 @@ void Tracer::GetTimespecRel(const int64_t ms, timespec *ts) {
 void *Tracer::MainFlush(void *data) {
   Tracer *tracer = reinterpret_cast<Tracer *>(data);
   int retval;
-  LockMutex(&tracer->sig_flush_mutex_);
+  MutexLockGuard m(&tracer->sig_flush_mutex_);
   FILE *f = fopen(tracer->trace_file_.c_str(), "a");
   assert(f != NULL && "Could not open trace file");
   struct timespec timeout;
@@ -193,15 +194,15 @@ void *Tracer::MainFlush(void *data) {
     atomic_xadd32(&tracer->flushed_, i);
     atomic_cas32(&tracer->flush_immediately_, 1, 0);
 
-    LockMutex(&tracer->sig_continue_trace_mutex_);
-    retval = pthread_cond_broadcast(&tracer->sig_continue_trace_);
-    assert(retval == 0);
-    UnlockMutex(&tracer->sig_continue_trace_mutex_);
+    {
+      MutexLockGuard l(&tracer->sig_continue_trace_mutex_);
+      retval = pthread_cond_broadcast(&tracer->sig_continue_trace_);
+      assert(retval == 0);
+    }
   } while ((atomic_read32(&tracer->terminate_flush_thread_) == 0) ||
            (atomic_read32(&tracer->flushed_) <
              atomic_read32(&tracer->seq_no_)));
 
-  UnlockMutex(&tracer->sig_flush_mutex_);
   retval = fclose(f);
   assert(retval == 0);
   return NULL;
@@ -245,10 +246,11 @@ Tracer::~Tracer() {
 
     // Trigger flushing and wait for it
     atomic_inc32(&terminate_flush_thread_);
-    LockMutex(&sig_flush_mutex_);
-    retval = pthread_cond_signal(&sig_flush_);
-    assert(retval == 0);
-    UnlockMutex(&sig_flush_mutex_);
+    {
+      MutexLockGuard m(&sig_flush_mutex_);
+      retval = pthread_cond_signal(&sig_flush_);
+      assert(retval == 0);
+    }
     retval = pthread_join(thread_flush_, NULL);
     assert(retval == 0);
   }
