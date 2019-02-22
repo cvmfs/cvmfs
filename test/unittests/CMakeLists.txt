@@ -419,7 +419,6 @@ set (CVMFS_TEST_PUBLISH_SOURCES
 
   ../common/env.cc
 
-
   ${CVMFS_SOURCE_DIR}/publish/cmd_help.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_mkfs.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_zpipe.cc
@@ -428,7 +427,39 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
+  ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/gateway_util.cc
+  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item_mem.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/pipeline.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_hash.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_read.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_register.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_write.cc
+  ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/malloc_arena.cc
+  ${CVMFS_SOURCE_DIR}/options.cc
+  ${CVMFS_SOURCE_DIR}/pack.cc
+  ${CVMFS_SOURCE_DIR}/s3fanout.cc
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/session_context.cc
+  ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
+  ${CVMFS_SOURCE_DIR}/upload.cc
+  ${CVMFS_SOURCE_DIR}/upload_facility.cc
+  ${CVMFS_SOURCE_DIR}/upload_gateway.cc
+  ${CVMFS_SOURCE_DIR}/upload_local.cc
+  ${CVMFS_SOURCE_DIR}/upload_s3.cc
+  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
+  ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
 )

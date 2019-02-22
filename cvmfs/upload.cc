@@ -57,6 +57,10 @@ bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   return true;
 }
 
+bool Spooler::Create() {
+  return uploader_->Create();
+}
+
 void Spooler::Process(IngestionSource *source, const bool allow_chunking) {
   ingestion_pipeline_->Process(source, allow_chunking);
 }

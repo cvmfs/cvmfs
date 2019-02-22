@@ -29,6 +29,8 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
 
   virtual std::string name() const { return "GCMock"; }
 
+  virtual bool Create() { return true; }
+
   upload::UploadStreamHandle *InitStreamedUpload(
       const CallbackTN *callback = NULL) {
     return NULL;

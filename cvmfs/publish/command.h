@@ -112,8 +112,17 @@ class Command {
     bool Has(const std::string &key) const {
       return map_.count(Parameter(key)) > 0;
     }
+    bool HasNot(const std::string &key) const {
+      return !Has(key);
+    }
     Argument Get(const std::string &key) const {
       return map_.find(Parameter(key))->second;
+    }
+    std::string GetString(const std::string &key) const {
+      return map_.find(Parameter(key))->second.value_str;
+    }
+    int GetInt(const std::string &key) const {
+      return map_.find(Parameter(key))->second.value_int;
     }
     unsigned GetSize() const { return map_.size(); }
     const std::vector<Argument>& plain_args() const { return plain_args_; }
