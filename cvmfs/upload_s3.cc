@@ -153,6 +153,15 @@ bool S3Uploader::WillHandle(const SpoolerDefinition &spooler_definition) {
 }
 
 
+bool S3Uploader::Create() {
+  s3fanout::JobInfo *info = CreateJobInfo(repository_alias_);
+  info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
+  bool rv = s3fanout_mgr_.DoSingleJob(info);
+  delete info;
+  return rv;
+}
+
+
 unsigned int S3Uploader::GetNumberOfErrors() const {
   return atomic_read32(&io_errors_);
 }

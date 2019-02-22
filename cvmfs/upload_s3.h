@@ -45,6 +45,8 @@ class S3Uploader : public AbstractUploader {
 
   virtual std::string name() const { return "S3"; }
 
+  virtual bool Create();
+
   /**
    * Upload() is not done concurrently in the current implementation of the
    * S3Spooler, since it is a simple move or copy of a file without CPU

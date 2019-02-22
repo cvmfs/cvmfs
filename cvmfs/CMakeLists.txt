@@ -218,6 +218,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
 
 # TODO(jblomer) Rename to cvmfs_server
 set (CVMFS_PUBLISH_SOURCES
+  hash.cc
   logging.cc
   publish/cmd_help.cc
   publish/cmd_mkfs.cc
@@ -226,13 +227,49 @@ set (CVMFS_PUBLISH_SOURCES
   publish/except.cc
   publish/main.cc
   publish/settings.cc
+  sanitizer.cc
+  upload_spooler_definition.cc
   util/posix.cc
   util/string.cc
 )
 
 set (LIBCVMFS_SERVER_SOURCES
+  backoff.cc
+  compression.cc
+  dns.cc
+  gateway_util.cc
+  hash.cc
+  ingestion/chunk_detector.cc
+  ingestion/item.cc
+  ingestion/item_mem.cc
+  ingestion/pipeline.cc
+  ingestion/task_chunk.cc
+  ingestion/task_compress.cc
+  ingestion/task_hash.cc
+  ingestion/task_read.cc
+  ingestion/task_register.cc
+  ingestion/task_write.cc
+  json_document.cc
+  logging.cc
+  malloc_arena.cc
+  options.cc
+  pack.cc
   publish/repository.cc
   publish/settings.cc
+  s3fanout.cc
+  sanitizer.cc
+  session_context.cc
+  statistics.cc
+  swissknife_lease_curl.cc
+  upload.cc
+  upload_facility.cc
+  upload_gateway.cc
+  upload_local.cc
+  upload_s3.cc
+  upload_spooler_definition.cc
+  util_concurrency.cc
+  util/mmap_file.cc
+  util/posix.cc
   util/string.cc
 )
 

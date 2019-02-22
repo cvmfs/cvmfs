@@ -133,6 +133,12 @@ class AbstractUploader
   virtual std::string name() const = 0;
 
   /**
+   * Initializes a new repository storage area, e.g. create directory layout
+   * for local backend or create bucket for S3 backend.
+   */
+  virtual bool Create() = 0;
+
+  /**
    * Concrete uploaders might want to use a customized setting for multi-stream
    * writing, for instance one per disk.  Note that the S3 backend uses one task
    * but this one task uses internally mutliple HTTP streams through curl async

@@ -18,6 +18,7 @@ namespace upload {
 LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition)
     : AbstractUploader(spooler_definition),
       backend_file_mode_(default_backend_file_mode_ ^ GetUmask()),
+      backend_dir_mode_(default_backend_dir_mode_ ^ GetUmask()),
       upstream_path_(spooler_definition.spooler_configuration),
       temporary_path_(spooler_definition.temporary_path)
 {
@@ -33,6 +34,10 @@ bool LocalUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
 
 unsigned int LocalUploader::GetNumberOfErrors() const {
   return atomic_read32(&copy_errors_);
+}
+
+bool LocalUploader::Create() {
+  return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_);
 }
 
 void LocalUploader::FileUpload(const std::string &local_path,

@@ -8,17 +8,11 @@
 #include <string>
 
 #include "publish/settings.h"
+#include "upload.h"
+#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace publish {
-
-class Storage : SingleCopy {
- public:
-  void Put(const std::string &local_src, const std::string &remote_dst);
-  void Get(const std::string &remote_src, const std::string &local_dst);
-  bool Peek(const std::string &path);
-  void Scrub();
-};
 
 class Repository : SingleCopy {
  public:
@@ -28,12 +22,15 @@ class Repository : SingleCopy {
   void Diff();
 
  protected:
-  Storage storage_;
+  UniquePtr<upload::Spooler> spooler_;
 };
 
-class Publisher : public Repository {
+class __attribute__((visibility("default"))) Publisher : public Repository {
  public:
   static Publisher *Create(const SettingsPublisher &settings);
+
+  Publisher(const SettingsPublisher &settings) : settings_(settings) {}
+
   void UpdateMetaInfo();
   void Publish();
   void Ingest();
@@ -41,6 +38,9 @@ class Publisher : public Repository {
   void Rollback();
   void Resign();
   void Migrate();
+
+ private:
+  SettingsPublisher settings_;
 };
 
 class Replica : public Repository {
