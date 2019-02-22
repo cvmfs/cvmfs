@@ -127,6 +127,12 @@ class T_Util : public ::testing::Test {
 };
 
 
+TEST_F(T_Util, GetUserName) {
+  ASSERT_TRUE(getenv("USER") != NULL);
+  EXPECT_STREQ(getenv("USER"), GetUserName().c_str());
+}
+
+
 TEST_F(T_Util, GetUidOf) {
   uid_t uid;
   gid_t gid;
