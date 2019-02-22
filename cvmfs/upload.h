@@ -151,6 +151,11 @@ class Spooler : public Observable<SpoolerResult> {
   std::string backend_name() const;
 
   /**
+   * Calls the concrete uploder to create a new repository area
+   */
+  bool Create();
+
+  /**
    * Schedules a copy job that transfers a file found at local_path to the
    * location pointed to by remote_path. Copy Jobs do not hash or compress the
    * given file. They simply upload it.

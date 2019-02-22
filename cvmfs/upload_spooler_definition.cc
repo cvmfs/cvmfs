@@ -11,6 +11,9 @@
 
 namespace upload {
 
+const char* SpoolerDefinition::kDriverNames[] =
+  {"S3", "local", "gw", "mock", "unknown"};
+
 SpoolerDefinition::SpoolerDefinition(
     const std::string& definition_string,
     const shash::Algorithms hash_algorithm,

@@ -42,6 +42,8 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
 
   virtual std::string name() const { return "UFMock"; }
 
+  virtual bool Create() { return true; }
+
   upload::UploadStreamHandle *InitStreamedUpload(
       const CallbackTN *callback = NULL) {
     last_offset = 0;

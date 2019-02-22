@@ -22,6 +22,7 @@ namespace upload {
 struct SpoolerDefinition {
   static const unsigned kDefaultMaxConcurrentUploads = 512;
   static const unsigned kDefaultNumUploadTasks = 1;
+  static const char* kDriverNames[];  ///< corresponds to DriverType
   enum DriverType { S3, Local, Gateway, Mock, Unknown };
 
   /**

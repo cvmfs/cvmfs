@@ -41,6 +41,13 @@ namespace publish {
 class AbstractSyncMediator;
 class SyncMediator;
 
+enum UnionFsType {
+  kUnionFsUnknown,
+  kUnionFsAufs,
+  kUnionFsOverlay,
+  kUnionFsTarball,
+};
+
 /**
  * Interface definition of repository synchronization based on
  * a union filesystem overlay on top of a mounted CVMFS volume.
