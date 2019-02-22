@@ -1011,6 +1011,25 @@ std::vector<std::string> FindDirectories(const std::string &parent_dir) {
   return result;
 }
 
+
+std::string GetUserName() {
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(geteuid(), &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return "";
+  }
+  std::string user_name = pwd.pw_name;
+  free(buf);
+  return user_name;
+}
+
 /**
  * Name -> UID from passwd database
  */
