@@ -88,6 +88,7 @@ std::vector<std::string> FindFilesByPrefix(const std::string &dir,
                                            const std::string &prefix);
 std::vector<std::string> FindDirectories(const std::string &parent_dir);
 
+std::string GetUserName();
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid);
 bool GetGidOf(const std::string &groupname, gid_t *gid);
 mode_t GetUmask();
