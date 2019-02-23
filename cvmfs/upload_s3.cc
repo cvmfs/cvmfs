@@ -154,8 +154,23 @@ bool S3Uploader::WillHandle(const SpoolerDefinition &spooler_definition) {
 
 
 bool S3Uploader::Create() {
-  s3fanout::JobInfo *info = CreateJobInfo(repository_alias_);
-  info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
+  if (!dns_buckets_)
+    return false;
+
+  s3fanout::JobInfo *info = CreateJobInfo("");
+  info->request = s3fanout::JobInfo::kReqPutBucket;
+  std::string request_content;
+  if (!region_.empty()) {
+    request_content =
+      std::string("<CreateBucketConfiguration xmlns="
+        "\"http://s3.amazonaws.com/doc/2006-03-01/\">"
+        "<LocationConstraint>") + region_ + "</LocationConstraint>"
+        "</CreateBucketConfiguration>";
+    info->origin = s3fanout::kOriginMem;
+    info->origin_mem.size = request_content.length();
+    info->origin_mem.data =
+      reinterpret_cast<const unsigned char *>(request_content.data());
+  }
   bool rv = s3fanout_mgr_.DoSingleJob(info);
   delete info;
   return rv;
