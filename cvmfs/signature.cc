@@ -14,6 +14,7 @@
 #include "cvmfs_config.h"
 #include "signature.h"
 
+#include <openssl/bn.h>
 #include <openssl/evp.h>
 #include <openssl/pkcs7.h>
 #include <openssl/x509v3.h>
@@ -66,6 +67,7 @@ static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {
 
 SignatureManager::SignatureManager() {
   private_key_ = NULL;
+  private_master_key_ = NULL;
   certificate_ = NULL;
   x509_store_ = NULL;
   x509_lookup_ = NULL;
@@ -112,19 +114,16 @@ void SignatureManager::Init() {
 void SignatureManager::Fini() {
   if (certificate_) X509_free(certificate_);
   certificate_ = NULL;
-  if (private_key_) EVP_PKEY_free(private_key_);
-  private_key_ = NULL;
-  if (!public_keys_.empty()) {
-    for (unsigned i = 0; i < public_keys_.size(); ++i)
-      RSA_free(public_keys_[i]);
-    public_keys_.clear();
-  }
+  UnloadPrivateKey();
+  UnloadPrivateMasterKey();
+  UnloadPublicRsaKeys();
   // Lookup is freed automatically
   if (x509_store_) X509_STORE_free(x509_store_);
 
   EVP_cleanup();
 
   private_key_ = NULL;
+  private_master_key_ = NULL;
   certificate_ = NULL;
   x509_store_ = NULL;
   x509_lookup_ = NULL;
@@ -172,6 +171,15 @@ bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
 void SignatureManager::UnloadPrivateKey() {
   if (private_key_) EVP_PKEY_free(private_key_);
   private_key_ = NULL;
+}
+
+
+/**
+ * Clears the memory storing the private RSA master key (whitelist signing).
+ */
+void SignatureManager::UnloadPrivateMasterKey() {
+  if (private_master_key_) RSA_free(private_master_key_);
+  private_master_key_ = NULL;
 }
 
 
@@ -242,11 +250,7 @@ bool SignatureManager::LoadCertificateMem(const unsigned char *buffer,
  * Loads a list of public RSA keys separated by ":".
  */
 bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
-  if (!public_keys_.empty()) {
-    for (unsigned i = 0; i < public_keys_.size(); ++i)
-      RSA_free(public_keys_[i]);
-    public_keys_.clear();
-  }
+  UnloadPublicRsaKeys();
 
   if (path_list == "")
     return true;
@@ -295,6 +299,15 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
 }
 
 
+void SignatureManager::UnloadPublicRsaKeys() {
+  if (!public_keys_.empty()) {
+    for (unsigned i = 0; i < public_keys_.size(); ++i)
+      RSA_free(public_keys_[i]);
+    public_keys_.clear();
+  }
+}
+
+
 std::string SignatureManager::GenerateKeyText(RSA *pubkey) {
   if (!pubkey) {return "";}
 
@@ -328,6 +341,27 @@ std::string SignatureManager::GetActivePubkeys() {
   // NOTE: we do not add the pubkey of the certificate here, as it is
   // not used for the whitelist verification.
   return pubkeys;
+}
+
+
+void SignatureManager::GenerateRsaKeys() {
+  UnloadPrivateMasterKey();
+  UnloadPublicRsaKeys();
+
+  int retval = RAND_status();
+  assert(retval == 1);
+
+  RSA *rsa = RSA_new();
+  BIGNUM *bn = BN_new();
+  retval = BN_set_word(bn, RSA_F4);
+  assert(retval == 1);
+  retval = RSA_generate_key_ex(rsa, 2048, bn, NULL);
+  assert(retval == 1);
+  BN_free(bn);
+
+  private_master_key_ = RSAPrivateKey_dup(rsa);
+  public_keys_.push_back(RSAPublicKey_dup(rsa));
+  RSA_free(rsa);
 }
 
 /**
@@ -595,6 +629,40 @@ bool SignatureManager::Sign(const unsigned char *buffer,
   }
 
   return result;
+}
+
+
+/**
+ * Signs a data block using the loaded private master key.
+ *
+ * \return True on sucess, false otherwise
+ */
+bool SignatureManager::SignRsa(const unsigned char *buffer,
+                               const unsigned buffer_size,
+                               unsigned char **signature,
+                               unsigned *signature_size)
+{
+  if (!private_master_key_) {
+    *signature_size = 0;
+    *signature = NULL;
+    return false;
+  }
+
+  unsigned char *to = (unsigned char *)smalloc(RSA_size(private_master_key_));
+  unsigned char *from = (unsigned char *)smalloc(buffer_size);
+  memcpy(from, buffer, buffer_size);
+
+  int size = RSA_private_encrypt(buffer_size, from, to,
+                                 private_master_key_, RSA_PKCS1_PADDING);
+  free(from);
+  if (size < 0) {
+    *signature_size = 0;
+    *signature = NULL;
+    return false;
+  }
+  *signature = to;
+  *signature_size = size;
+  return true;
 }
 
 

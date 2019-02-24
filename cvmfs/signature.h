@@ -47,6 +47,8 @@ class SignatureManager {
   static shash::Any MkFromFingerprint(const std::string &fingerprint);
 
   bool LoadPublicRsaKeys(const std::string &path_list);
+  void UnloadPublicRsaKeys();
+  void UnloadPrivateMasterKey();
   bool LoadBlacklist(const std::string &path_blacklist, bool append);
   std::vector<std::string> GetBlacklist();
 
@@ -54,6 +56,8 @@ class SignatureManager {
 
   bool Sign(const unsigned char *buffer, const unsigned buffer_size,
             unsigned char **signature, unsigned *signature_size);
+  bool SignRsa(const unsigned char *buffer, const unsigned buffer_size,
+                unsigned char **signature, unsigned *signature_size);
   bool Verify(const unsigned char *buffer, const unsigned buffer_size,
               const unsigned char *signature, unsigned signature_size);
   bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
@@ -73,12 +77,15 @@ class SignatureManager {
   // and that from the current certificate).
   std::string GetActivePubkeys();
 
+  void GenerateRsaKeys();
+
  private:
   std::string GenerateKeyText(RSA *pubkey);
 
   void InitX509Store();
 
   EVP_PKEY *private_key_;
+  RSA *private_master_key_;
   X509 *certificate_;
   std::vector<RSA *> public_keys_;  /**< Contains cvmfs public master keys */
   pthread_mutex_t lock_blacklist_;
