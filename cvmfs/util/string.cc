@@ -162,6 +162,25 @@ std::string IsoTimestamp() {
 }
 
 
+/**
+ * UTC time in format YYYYMMDDHHMMSS.  Used in cvmfs whitelists.
+ */
+std::string WhitelistTimestamp(time_t when) {
+  struct tm timestamp;
+  gmtime_r(&when, &timestamp);
+
+  char buffer[15];
+  snprintf(buffer, sizeof(buffer), "%04d%02d%02d%02d%02d%02d",
+           timestamp.tm_year + 1900,
+           timestamp.tm_mon + 1,
+           timestamp.tm_mday,
+           timestamp.tm_hour,
+           timestamp.tm_min,
+           timestamp.tm_sec);
+  return string(buffer);
+}
+
+
 string StringifyTimeval(const timeval value) {
   char buffer[64];
   int64_t msec = value.tv_sec * 1000;
