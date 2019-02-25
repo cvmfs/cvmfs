@@ -31,10 +31,13 @@ class SignatureManager {
   void Fini();
   std::string GetCryptoError();
 
+  void UnloadPrivateKey();
+  void UnloadPublicRsaKeys();
+  void UnloadPrivateMasterKey();
+  void UnloadCertificate();
+
   bool LoadPrivateKeyPath(const std::string &file_pem,
                           const std::string &password);
-  void UnloadPrivateKey();
-
   bool LoadCertificatePath(const std::string &file_pem);
   bool LoadCertificateMem(const unsigned char *buffer,
                           const unsigned buffer_size);
@@ -47,8 +50,6 @@ class SignatureManager {
   static shash::Any MkFromFingerprint(const std::string &fingerprint);
 
   bool LoadPublicRsaKeys(const std::string &path_list);
-  void UnloadPublicRsaKeys();
-  void UnloadPrivateMasterKey();
   bool LoadBlacklist(const std::string &path_blacklist, bool append);
   std::vector<std::string> GetBlacklist();
 
@@ -77,9 +78,11 @@ class SignatureManager {
   // and that from the current certificate).
   std::string GetActivePubkeys();
 
-  void GenerateRsaKeys();
+  void GenerateMasterKeyPair();
+  void GenerateCertificate(const std::string &cn);
 
  private:
+  RSA *GenerateRsaKeyPair();
   std::string GenerateKeyText(RSA *pubkey);
 
   void InitX509Store();

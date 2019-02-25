@@ -26,12 +26,22 @@ class T_Signature : public ::testing::Test {
 };
 
 TEST_F(T_Signature, Rsa) {
-  sign_mgr_.GenerateRsaKeys();
+  sign_mgr_.GenerateMasterKeyPair();
   const unsigned char *buffer = reinterpret_cast<const unsigned char *>("abc");
   unsigned char *signature;
   unsigned signature_size;
   ASSERT_TRUE(sign_mgr_.SignRsa(buffer, 3, &signature, &signature_size));
   EXPECT_TRUE(sign_mgr_.VerifyRsa(buffer, 3, signature, signature_size));
+  free(signature);
+}
+
+TEST_F(T_Signature, Certificate) {
+  sign_mgr_.GenerateCertificate("test.cvmfs.io");
+  const unsigned char *buffer = reinterpret_cast<const unsigned char *>("abc");
+  unsigned char *signature;
+  unsigned signature_size;
+  ASSERT_TRUE(sign_mgr_.Sign(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.Verify(buffer, 3, signature, signature_size));
   free(signature);
 }
 
