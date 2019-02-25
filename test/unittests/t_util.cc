@@ -1083,6 +1083,11 @@ TEST_F(T_Util, IsoTimestamp) {
   EXPECT_LE(converted, now + 5);
 }
 
+TEST_F(T_Util, WhitelistTimestamp) {
+  string timestamp = WhitelistTimestamp(0);
+  EXPECT_STREQ("19700101000000", timestamp.c_str());
+}
+
 TEST_F(T_Util, StringifyTimeval) {
   timeval t1 = CreateTimeval(12, 3123123);
   timeval t2 = CreateTimeval(0, 0);

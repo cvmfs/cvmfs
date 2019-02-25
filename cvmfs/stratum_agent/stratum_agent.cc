@@ -274,7 +274,7 @@ class UriHandlerReplicate : public UriHandler {
     }
     whitelist::Whitelist whitelist(config->fqrn, config->download_mgr,
                                    config->signature_mgr);
-    whitelist::Failures retval_wl = whitelist.Load(config->stratum0_url);
+    whitelist::Failures retval_wl = whitelist.LoadUrl(config->stratum0_url);
     if (retval_wl == whitelist::kFailOk)
       retval_wl = whitelist.VerifyLoadedCertificate();
     if (retval_wl != whitelist::kFailOk) {

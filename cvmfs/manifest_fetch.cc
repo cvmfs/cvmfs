@@ -122,7 +122,7 @@ static Failures DoFetch(
   }
 
   // Load whitelist and verify
-  retval_wl = whitelist.Load(base_url);
+  retval_wl = whitelist.LoadUrl(base_url);
   if (retval_wl != whitelist::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "whitelist verification failed (%d): %s",
