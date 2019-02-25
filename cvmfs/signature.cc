@@ -32,6 +32,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "platform.h"
+#include "prng.h"
 #include "smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -112,8 +113,7 @@ void SignatureManager::Init() {
 
 
 void SignatureManager::Fini() {
-  if (certificate_) X509_free(certificate_);
-  certificate_ = NULL;
+  UnloadCertificate();
   UnloadPrivateKey();
   UnloadPrivateMasterKey();
   UnloadPublicRsaKeys();
@@ -171,6 +171,12 @@ bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
 void SignatureManager::UnloadPrivateKey() {
   if (private_key_) EVP_PKEY_free(private_key_);
   private_key_ = NULL;
+}
+
+
+void SignatureManager::UnloadCertificate() {
+  if (certificate_) X509_free(certificate_);
+  certificate_ = NULL;
 }
 
 
@@ -344,10 +350,7 @@ std::string SignatureManager::GetActivePubkeys() {
 }
 
 
-void SignatureManager::GenerateRsaKeys() {
-  UnloadPrivateMasterKey();
-  UnloadPublicRsaKeys();
-
+RSA *SignatureManager::GenerateRsaKeyPair() {
   int retval = RAND_status();
   assert(retval == 1);
 
@@ -358,10 +361,66 @@ void SignatureManager::GenerateRsaKeys() {
   retval = RSA_generate_key_ex(rsa, 2048, bn, NULL);
   assert(retval == 1);
   BN_free(bn);
+  return rsa;
+}
 
+
+/**
+ * Creates the RSA master key pair for whitelist signing
+ */
+void SignatureManager::GenerateMasterKeyPair() {
+  UnloadPrivateMasterKey();
+  UnloadPublicRsaKeys();
+
+  RSA *rsa = GenerateRsaKeyPair();
   private_master_key_ = RSAPrivateKey_dup(rsa);
   public_keys_.push_back(RSAPublicKey_dup(rsa));
   RSA_free(rsa);
+}
+
+/**
+ * Creates a new RSA key pair (private key) and a self-signed certificate
+ */
+void SignatureManager::GenerateCertificate(const std::string &cn) {
+  UnloadPrivateKey();
+  UnloadCertificate();
+  int retval;
+
+  RSA *rsa = GenerateRsaKeyPair();
+  private_key_ = EVP_PKEY_new();
+  retval = EVP_PKEY_set1_RSA(private_key_, RSAPrivateKey_dup(rsa));
+  assert(retval == 1);
+  EVP_PKEY *pkey = EVP_PKEY_new();
+  retval = EVP_PKEY_set1_RSA(pkey, RSAPrivateKey_dup(rsa));
+  assert(retval == 1);
+  RSA_free(rsa);
+
+  certificate_ = X509_new();
+  X509_set_version(certificate_, 2L);
+  X509_set_pubkey(certificate_, pkey);
+
+  Prng prng;
+  prng.InitLocaltime();
+  unsigned long rnd_serial_no = prng.Next(uint64_t(1) + uint32_t(-1));
+  rnd_serial_no = rnd_serial_no |
+    uint64_t(prng.Next(uint64_t(1) + uint32_t(-1))) << 32;
+  ASN1_INTEGER_set(X509_get_serialNumber(certificate_), rnd_serial_no);
+
+  // valid as of now
+  X509_gmtime_adj((ASN1_TIME *)X509_get0_notBefore(certificate_), 0);
+  // valid for 1 year (validity range is unused)
+  X509_gmtime_adj((ASN1_TIME *)X509_get0_notAfter(certificate_),
+                  3600 * 24 * 365);
+
+  X509_NAME *name = X509_get_subject_name(certificate_);
+  X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
+    reinterpret_cast<const unsigned char *>(cn.c_str()), -1, -1, 0);
+  retval = X509_set_issuer_name(certificate_, name);
+  assert(retval == 1);
+
+  retval = X509_sign(certificate_, pkey, EVP_sha256());
+  EVP_PKEY_free(pkey);
+  assert(retval > 0);
 }
 
 /**
