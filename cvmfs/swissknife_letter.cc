@@ -133,7 +133,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
 
     whitelist::Whitelist whitelist(fqrn, download_manager(),
                                    signature_manager());
-    retval_wl = whitelist.Load(repository_url);
+    retval_wl = whitelist.LoadUrl(repository_url);
     if (retval_wl != whitelist::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load whitelist (%d): %s",
                retval_wl, whitelist::Code2Ascii(retval_wl));
@@ -168,7 +168,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
         LogCvmfs(kLogCvmfs, kLogStderr, "reloading whitelist");
         whitelist::Whitelist refresh(fqrn, download_manager(),
                                      signature_manager());
-        retval_wl = refresh.Load(repository_url);
+        retval_wl = refresh.LoadUrl(repository_url);
         if (retval_wl == whitelist::kFailOk)
           whitelist = refresh;
       }

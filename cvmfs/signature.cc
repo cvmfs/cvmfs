@@ -391,9 +391,8 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
   retval = EVP_PKEY_set1_RSA(private_key_, RSAPrivateKey_dup(rsa));
   assert(retval == 1);
   EVP_PKEY *pkey = EVP_PKEY_new();
-  retval = EVP_PKEY_set1_RSA(pkey, RSAPrivateKey_dup(rsa));
+  retval = EVP_PKEY_set1_RSA(pkey, rsa);
   assert(retval == 1);
-  RSA_free(rsa);
 
   certificate_ = X509_new();
   X509_set_version(certificate_, 2L);
