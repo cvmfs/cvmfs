@@ -8,28 +8,47 @@
 #include <string>
 
 #include "publish/settings.h"
-#include "upload.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
+
+namespace signature {
+class SignatureManager;
+}
+namespace upload {
+class Spooler;
+}
+namespace whitelist {
+class Whitelist;
+}
 
 namespace publish {
 
 class Repository : SingleCopy {
  public:
+  Repository();
+  ~Repository();
+
   void Check();
   void GarbageCollect();
   void List();
   void Diff();
 
+  void TakeSpooler(upload::Spooler *spooler) { spooler_ = spooler; }
+  upload::Spooler *spooler() { return spooler_; }
+
+  void TakeWhitelist(whitelist::Whitelist *wl) { whitelist_ = wl; }
+  whitelist::Whitelist *whitelist() { return whitelist_; }
+
  protected:
-  UniquePtr<upload::Spooler> spooler_;
+  upload::Spooler *spooler_;
+  whitelist::Whitelist *whitelist_;
 };
 
 class __attribute__((visibility("default"))) Publisher : public Repository {
  public:
   static Publisher *Create(const SettingsPublisher &settings);
 
-  Publisher(const SettingsPublisher &settings) : settings_(settings) {}
+  Publisher(const SettingsPublisher &settings);
+  ~Publisher();
 
   void UpdateMetaInfo();
   void Publish();
@@ -39,8 +58,12 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Resign();
   void Migrate();
 
+  signature::SignatureManager *signature_mgr() { return signature_mgr_; }
+
  private:
   SettingsPublisher settings_;
+
+  signature::SignatureManager *signature_mgr_;
 };
 
 class Replica : public Repository {

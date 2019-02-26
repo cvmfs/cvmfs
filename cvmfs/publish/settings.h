@@ -5,6 +5,8 @@
 #ifndef CVMFS_PUBLISH_SETTINGS_H_
 #define CVMFS_PUBLISH_SETTINGS_H_
 
+#include <unistd.h>
+
 #include <string>
 
 #include "compression.h"
@@ -91,6 +93,32 @@ class SettingsStorage {
   std::string endpoint_;
 };
 
+class SettingsKeychain {
+ public:
+  explicit SettingsKeychain(const std::string &fqrn)
+    : fqrn_(fqrn)
+    , master_private_key_path_(
+        std::string("/etc/cvmfs/keys/") + fqrn_ + ".masterkey")
+    , master_public_key_path_(std::string("/etc/cvmfs/keys/") + fqrn_ + ".pub")
+    , private_key_path_(std::string("/etc/cvmfs/keys/") + fqrn_ + ".key")
+    , certificate_path_(std::string("/etc/cvmfs/keys/") + fqrn_ + ".crt")
+  {}
+
+  void SetKeychainDir(const std::string &keychain_dir);
+
+  bool HasDanglingMasterKeys() const;
+  bool HasMasterKeys() const;
+  bool HasDanglingRepositoryKeys() const;
+  bool HasRepositoryKeys() const;
+
+ private:
+  std::string fqrn_;
+  std::string master_private_key_path_;
+  std::string master_public_key_path_;
+  std::string private_key_path_;
+  std::string certificate_path_;
+};
+
 /**
  * Description of an editable repository.
  */
@@ -99,25 +127,38 @@ class SettingsPublisher {
   SettingsPublisher(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn_)
+    , owner_uid_(0)
+    , owner_gid_(0)
+    , whitelist_validity_days_(30)
     , storage_(fqrn_)
     , transaction_(fqrn_)
+    , keychain_(fqrn_)
   { }
 
   void SetUrl(const std::string &url);
+  void SetOwner(const std::string &user_name);
+
+  std::string fqrn() const { return fqrn_; }
+  unsigned whitelist_validity_days() const { return whitelist_validity_days_; }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
+  const SettingsKeychain &keychain() const { return keychain_; }
   SettingsStorage *GetStorage() { return &storage_; }
   SettingsTransaction *GetTransaction() { return &transaction_; }
+  SettingsKeychain *GetKeychain() { return &keychain_; }
 
  private:
   std::string fqrn_;
   std::string url_;
-  std::string owner_;
+  uid_t owner_uid_;
+  gid_t owner_gid_;
+  unsigned whitelist_validity_days_;
 
   SettingsGc gc_;
   SettingsStorage storage_;
   SettingsTransaction transaction_;
+  SettingsKeychain keychain_;
 };
 
 /**

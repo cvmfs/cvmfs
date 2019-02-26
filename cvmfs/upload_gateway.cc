@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "gateway_util.h"
+#include "logging.h"
 #include "util/string.h"
 
 namespace upload {
@@ -69,6 +70,12 @@ GatewayUploader::~GatewayUploader() {
   if (session_context_) {
     delete session_context_;
   }
+}
+
+bool GatewayUploader::Create() {
+  LogCvmfs(kLogUploadGateway, kLogStderr,
+           "cannot create repository storage area when using the gateway");
+  return false;
 }
 
 bool GatewayUploader::Initialize() {
