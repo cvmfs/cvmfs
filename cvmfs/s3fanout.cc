@@ -540,6 +540,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   string date = timestamp.substr(0, 8);
   vector<string> tokens = SplitString(info.hostname, ':');
   string host_only = tokens[0];
+  if (dns_buckets_) host_only = info.bucket + "." + host_only;
 
   string signed_headers;
   string canonical_headers;
@@ -556,10 +557,13 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
     "x-amz-date:" + timestamp + "\n";
 
   string scope = date + "/" + info.region + "/s3/aws4_request";
+  string uri = dns_buckets_ ?
+                 (string("/") + info.object_key) :
+                 (string("/") + info.bucket + "/" + info.object_key);
 
   string canonical_request =
     GetRequestString(info) + "\n" +
-    GetUriEncode("/" + info.bucket + "/" + info.object_key, false) + "\n" +
+    GetUriEncode(uri, false) + "\n" +
     "\n" +
     canonical_headers + "\n" +
     signed_headers + "\n" +

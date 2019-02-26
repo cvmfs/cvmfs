@@ -1,6 +1,6 @@
 #!/bin/sh
 
-./configure \
+./configure CFLAGS="$CFLAGS $CVMFS_BASE_C_FLAGS" \
     --enable-static \
     --disable-shared \
     --disable-bsdtar \
