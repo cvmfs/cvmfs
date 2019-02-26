@@ -237,6 +237,7 @@ set (LIBCVMFS_SERVER_SOURCES
   backoff.cc
   compression.cc
   dns.cc
+  download.cc
   gateway_util.cc
   hash.cc
   ingestion/chunk_detector.cc
@@ -259,6 +260,7 @@ set (LIBCVMFS_SERVER_SOURCES
   s3fanout.cc
   sanitizer.cc
   session_context.cc
+  signature.cc
   statistics.cc
   swissknife_lease_curl.cc
   upload.cc
@@ -268,9 +270,11 @@ set (LIBCVMFS_SERVER_SOURCES
   upload_s3.cc
   upload_spooler_definition.cc
   util_concurrency.cc
+  util/algorithm.cc
   util/mmap_file.cc
   util/posix.cc
   util/string.cc
+  whitelist.cc
 )
 
 set (CVMFS_SWISSKNIFE_SOURCES

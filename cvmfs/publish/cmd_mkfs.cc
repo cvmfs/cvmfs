@@ -25,13 +25,38 @@ int CmdMkfs::Main(const Options &options) {
   }
   SettingsPublisher settings(fqrn);
 
+  std::string user_name = GetUserName();
+  if (options.HasNot("owner")) {
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Owner of %s [%s]: ",
+             fqrn.c_str(), user_name.c_str());
+    std::string input;
+    int c;
+    while ((c = getchar()) != EOF) {
+      if (c == '\n') break;
+      input.push_back(c);
+    }
+    if (!input.empty()) user_name = input;
+  }
+  settings.SetOwner(user_name);
+
   // Sanity checks
   if (geteuid() != 0) {
     bool can_unprivileged =
       options.Has("no-publisher") && options.Has("no-apache") &&
-      (options.HasNot("owner") || options.GetString("owner") == GetUserName());
+      (user_name == GetUserName());
     if (!can_unprivileged) throw EPublish("root privileges required");
   }
+  if (options.Has("no-autotags") && options.Has("autotag-span")) {
+    throw EPublish(
+        "options 'no-autotags' and 'autotag-span' are mutually exclusive");
+  }
+  if (options.HasNot("no-autotags") && options.HasNot("autotag-span") &&
+      options.Has("gc"))
+  {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Note: Autotagging all revisions impedes garbage collection");
+  }
+
 
   // Storage configuration
   if (options.Has("storage")) {

@@ -87,10 +87,55 @@ void SettingsStorage::SetLocator(const std::string &locator) {
 
 //------------------------------------------------------------------------------
 
+void SettingsKeychain::SetKeychainDir(const std::string &keychain_dir) {
+  master_private_key_path_ = keychain_dir + "/" + fqrn_ + ".masterkey";
+  master_public_key_path_ = keychain_dir + "/" + fqrn_ + ".pub";
+  private_key_path_ = keychain_dir + "/" + fqrn_ + ".key";
+  certificate_path_ = keychain_dir + "/" + fqrn_ + ".crt";
+}
+
+
+bool SettingsKeychain::HasDanglingMasterKeys() const {
+  return (FileExists(master_private_key_path_) &&
+          !FileExists(master_public_key_path_)) ||
+         (!FileExists(master_private_key_path_) &&
+          FileExists(master_public_key_path_));
+}
+
+
+bool SettingsKeychain::HasMasterKeys() const {
+  return FileExists(master_private_key_path_) &&
+         FileExists(master_public_key_path_);
+}
+
+
+bool SettingsKeychain::HasDanglingRepositoryKeys() const {
+  return (FileExists(private_key_path_) &&
+          !FileExists(certificate_path_)) ||
+         (!FileExists(private_key_path_) &&
+          FileExists(certificate_path_));
+}
+
+
+bool SettingsKeychain::HasRepositoryKeys() const {
+  return FileExists(private_key_path_) &&
+         FileExists(certificate_path_);
+}
+
+//------------------------------------------------------------------------------
+
 
 void SettingsPublisher::SetUrl(const std::string &url) {
   // TODO(jblomer): sanitiation, check availability
   url_ = url;
+}
+
+
+void SettingsPublisher::SetOwner(const std::string &user_name) {
+  bool retval = GetUidOf(user_name, &owner_uid_, &owner_gid_);
+  if (!retval) {
+    throw EPublish("unknown user name for repository owner");
+  }
 }
 
 }  // namespace publish

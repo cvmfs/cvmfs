@@ -48,8 +48,8 @@ class GatewayUploader : public AbstractUploader {
 
   virtual bool Initialize();
 
-  // Nothing to do, the storage is managed by the gateway service
-  virtual bool Create() { return true; }
+  // Can't "create" a repository storage area with the gateway backend
+  virtual bool Create();
 
   virtual bool FinalizeSession(bool commit, const std::string& old_root_hash,
                                const std::string& new_root_hash,

@@ -53,8 +53,11 @@ class CmdMkfs : public Command {
     p.push_back(Parameter::Optional("compression", 'Z', "algorithm",
       "Select the compression algorithm: zlib (default) or none"));
 
-    p.push_back(Parameter::Optional("keychain", 'k', "directory",
+    p.push_back(Parameter::Optional("import-keychain", 'k', "directory",
       "Use existing keys instead of creating new ones"));
+
+    p.push_back(Parameter::Optional("export-keychain", 'K', "directory",
+      "Write repository keychain to directory different from /etc/cvmfs/keys"));
 
     p.push_back(Parameter::Switch("no-apache", 'p',
       "Disable creation of Apache config files, e.g. for S3 backend"));
