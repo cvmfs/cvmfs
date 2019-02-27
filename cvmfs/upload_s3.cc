@@ -189,6 +189,7 @@ void *S3Uploader::MainCollectResults(void *data) {
           // The HEAD request was not transformed into a PUT request, thus this
           // was a duplicate
           uploader->CountDuplicates();
+          uploader->CountUploadedBytes(-(info->payload_size));
         }
         if (info->origin == s3fanout::kOriginMem) {
           uploader->Respond(static_cast<CallbackTN*>(info->callback),

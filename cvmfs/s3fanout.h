@@ -119,7 +119,6 @@ struct JobInfo {
   const std::string bucket;
   const std::string object_key;
   const std::string origin_path;
-  bool test_and_set;
   void *callback;  // Callback to be called when job is finished
   MemoryMappedFile *mmf;
 
@@ -176,13 +175,13 @@ struct JobInfo {
   void JobInfoInit() {
     curl_handle = NULL;
     http_headers = NULL;
-    test_and_set = false;
     origin_mem.pos = 0;
     origin_mem.size = 0;
     origin_mem.data = NULL;
     callback = NULL;
     mmf = NULL;
     origin_file = NULL;
+    payload_size = 0;
     request = kReqPutCas;
     error_code = kFailOk;
     http_error = 0;
@@ -198,6 +197,7 @@ struct JobInfo {
   CURL *curl_handle;
   struct curl_slist *http_headers;
   FILE *origin_file;
+  uint64_t payload_size;
   RequestType request;
   Failures error_code;
   int http_error;
