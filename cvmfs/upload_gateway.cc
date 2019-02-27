@@ -108,10 +108,9 @@ void GatewayUploader::DoRemoveAsync(const std::string& /*file_to_delete*/) {
   Respond(NULL, UploaderResults());
 }
 
-bool GatewayUploader::Peek(const std::string& /*path*/) const { return false; }
+bool GatewayUploader::Peek(const std::string& /*path*/) { return false; }
 
-bool GatewayUploader::PlaceBootstrappingShortcut(
-    const shash::Any& /*object*/) const {
+bool GatewayUploader::PlaceBootstrappingShortcut(const shash::Any& /*object*/) {
   return false;
 }
 
