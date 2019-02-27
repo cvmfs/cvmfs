@@ -112,9 +112,8 @@ fi
 echo "Test ducc variable: $CVMFS_TEST_DUCC"
 echo "can_build_ducc: $(can_build_ducc)"
 if [ $CVMFS_TEST_DUCC = 1 ] && [ $(can_build_ducc) -ge 1 ]; then
-  echo "running ducc unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
   pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
-  go test -v -mod=vendor ./... 2>&1 | go-junit-report >> $CVMFS_UNITTESTS_RESULT_LOCATION
+  go test -v -mod=vendor ./... 2>&1 | go-junit-report >> ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc
   popd > /dev/null
 fi
 
