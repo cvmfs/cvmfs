@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #
 # This script wraps the unit test run of CernVM-FS.
@@ -12,6 +12,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 usage() {
   echo "Usage: $0 [-q only quick tests] [-s shrinkwrap test binary]\\"
   echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
+  echo "          [-d run the ducc unittests] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
   exit 1
@@ -21,8 +22,9 @@ CVMFS_UNITTESTS_QUICK=0
 CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
+CVMFS_TEST_DUCC=0
 
-while getopts "qc:g:s:l:" option; do
+while getopts "qc:g:s:l:d" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
@@ -40,6 +42,9 @@ while getopts "qc:g:s:l:" option; do
       # Preloading a library now unused
       :
     ;;
+    d)
+      CVMFS_TEST_DUCC=1
+    ;;
     ?)
       usage
     ;;
@@ -52,7 +57,7 @@ if [ $# -lt 2 ]; then
 fi
 
 CVMFS_UNITTESTS_BINARY=$1
-CVMFS_UNITTESTS_RESULT_LOCATION=$2
+CVMFS_UNITTESTS_RESULT_LOCATION=$(readlink -f $2)
 
 # check if only a quick subset of the unittests should be run
 test_filter='-'
@@ -104,8 +109,17 @@ if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
     --gtest_filter=$test_filter
 fi
 
+if [ $CVMFS_TEST_DUCC = 1 ] && [ $(can_build_ducc) -ge 1 ]; then
+  echo "running ducc unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
+  go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc
+  popd > /dev/null
+fi
+
 # run the unit tests
 echo "running unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
 $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
+
+
