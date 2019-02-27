@@ -759,13 +759,6 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
 
 
 bool S3FanoutManager::MkPayloadSize(const JobInfo &info, uint64_t *size) const {
-  if ((info.request == JobInfo::kReqHead) ||
-      (info.request == JobInfo::kReqDelete))
-  {
-    *size = 0;
-    return true;
-  }
-
   int64_t file_size;
   switch (info.origin) {
     case kOriginMem:
@@ -836,8 +829,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   InitializeDnsSettings(handle, info->hostname);
 
   bool retval_b;
-  uint64_t payload_size;
-  retval_b = MkPayloadSize(*info, &payload_size);
+  retval_b = MkPayloadSize(*info, &info->payload_size);
   if (!retval_b)
     return kFailLocalIO;
 
@@ -868,7 +860,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                              static_cast<curl_off_t>(payload_size));
+                              static_cast<curl_off_t>(info->payload_size));
     assert(retval == CURLE_OK);
     if (info->origin == kOriginPath) {
       assert(info->origin_file == NULL);
