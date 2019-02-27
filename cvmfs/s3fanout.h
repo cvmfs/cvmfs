@@ -98,7 +98,8 @@ struct Statistics {
  */
 struct JobInfo {
   enum RequestType {
-    kReqHead = 0,
+    kReqHeadOnly = 0,  // peek
+    kReqHeadPut,  // conditional upload of content-addressed objects
     kReqPutCas,  // immutable data object
     kReqPutDotCvmfs,  // one of the /.cvmfs... top level files
     kReqDelete,
@@ -199,6 +200,7 @@ struct JobInfo {
   struct curl_slist *http_headers;
   FILE *origin_file;
   RequestType request;
+  bool peek_before_put;
   Failures error_code;
   int http_error;
   unsigned char num_retries;
@@ -252,8 +254,6 @@ class S3FanoutManager : SingleCopy {
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
-
-  bool DoSingleJob(JobInfo *info) const;
 
  private:
   // Reflects the default Apache configuration of the local backend
