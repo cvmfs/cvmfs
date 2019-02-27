@@ -137,9 +137,9 @@ void SqliteMemoryManager::AssignGlobalArenas() {
   if (assigned_) return;
   int retval;
 
-  //retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, scratch_memory_,
-  //                        kScratchSlotSize, kScratchNoSlots);
-  //assert(retval == SQLITE_OK);
+  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, scratch_memory_,
+                          kScratchSlotSize, kScratchNoSlots);
+  assert(retval == SQLITE_OK);
 
   retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, page_cache_memory_,
                           kPageCacheSlotSize, kPageCacheNoSlots);
@@ -258,8 +258,8 @@ SqliteMemoryManager::~SqliteMemoryManager() {
   if (assigned_) {
     // Reset sqlite to default values
     int retval;
-    //retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, NULL, 0, 0);
-    //assert(retval == SQLITE_OK);
+    retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, NULL, 0, 0);
+    assert(retval == SQLITE_OK);
     retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, NULL, 0, 0);
     assert(retval == SQLITE_OK);
     retval = sqlite3_config(SQLITE_CONFIG_MALLOC, &sqlite3_mem_vanilla_);
