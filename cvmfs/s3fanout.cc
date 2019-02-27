@@ -687,7 +687,8 @@ int S3FanoutManager::InitializeDnsSettings(
 bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
   const
 {
-  if ((info.request == JobInfo::kReqHead) ||
+  if ((info.request == JobInfo::kReqHeadOnly) ||
+      (info.request == JobInfo::kReqHeadPut) ||
       (info.request == JobInfo::kReqDelete))
   {
     switch (info.authz_method) {
@@ -781,10 +782,10 @@ bool S3FanoutManager::MkPayloadSize(const JobInfo &info, uint64_t *size) const {
 
 string S3FanoutManager::GetRequestString(const JobInfo &info) const {
   switch (info.request) {
-    case JobInfo::kReqHead:
+    case JobInfo::kReqHeadOnly:
+    case JobInfo::kReqHeadPut:
       return "HEAD";
     case JobInfo::kReqPutCas:
-      // fall through
     case JobInfo::kReqPutDotCvmfs:
       return "PUT";
     case JobInfo::kReqDelete:
@@ -797,8 +798,8 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
 
 string S3FanoutManager::GetContentType(const JobInfo &info) const {
   switch (info.request) {
-    case JobInfo::kReqHead:
-      // fall through
+    case JobInfo::kReqHeadOnly:
+    case JobInfo::kReqHeadPut:
     case JobInfo::kReqDelete:
       return "";
     case JobInfo::kReqPutCas:
@@ -834,8 +835,9 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     return kFailLocalIO;
 
   CURLcode retval;
-  if (info->request == JobInfo::kReqHead ||
-      info->request == JobInfo::kReqDelete)
+  if ((info->request == JobInfo::kReqHeadOnly) ||
+      (info->request == JobInfo::kReqHeadPut) ||
+      (info->request == JobInfo::kReqDelete))
   {
     retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 0);
     assert(retval == CURLE_OK);
@@ -1070,7 +1072,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
   // Transform HEAD to PUT request
   if ((info->error_code == kFailNotFound) &&
-      (info->request == JobInfo::kReqHead)) {
+      (info->request == JobInfo::kReqHeadPut))
+  {
     LogCvmfs(kLogS3Fanout, kLogDebug, "not found: %s, uploading",
              info->object_key.c_str());
     info->request = JobInfo::kReqPutCas;
@@ -1376,34 +1379,6 @@ void S3FanoutManager::PushNewJob(JobInfo *info) {
   pthread_mutex_lock(jobs_todo_lock_);
   jobs_todo_.push_back(info);
   pthread_mutex_unlock(jobs_todo_lock_);
-}
-
-
-/**
- * Performs given job synchronously.
- *
- * @return true if exists, otherwise false
- */
-bool S3FanoutManager::DoSingleJob(JobInfo *info) const {
-  bool retme = false;
-
-  CURL *handle = AcquireCurlHandle();
-  if (handle == NULL) {
-    LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
-    assert(handle != NULL);
-  }
-
-  InitializeRequest(info, handle);
-  SetUrlOptions(info);
-
-  CURLcode resl = curl_easy_perform(handle);
-  if (resl == CURLE_OK && info->error_code == kFailOk) {
-    retme = true;
-  }
-
-  ReleaseCurlHandle(info, handle);
-
-  return retme;
 }
 
 //------------------------------------------------------------------------------

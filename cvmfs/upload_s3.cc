@@ -174,18 +174,27 @@ void *S3Uploader::MainCollectResults(void *data) {
       s3fanout::JobInfo *info = jobs[i];
       int reply_code = 0;
       if (info->error_code != s3fanout::kFailOk) {
-        LogCvmfs(kLogUploadS3, kLogStderr,
-                 "Upload job for '%s' failed. (error code: %d - %s)",
-                 info->object_key.c_str(),
-                 info->error_code,
-                 s3fanout::Code2Ascii(info->error_code));
-        reply_code = 99;
-        atomic_inc32(&uploader->io_errors_);
+        if ((info->request != s3fanout::JobInfo::kReqHeadOnly) ||
+            (info->error_code != s3fanout::kFailNotFound))
+        {
+          LogCvmfs(kLogUploadS3, kLogStderr,
+                   "Upload job for '%s' failed. (error code: %d - %s)",
+                   info->object_key.c_str(),
+                   info->error_code,
+                   s3fanout::Code2Ascii(info->error_code));
+          reply_code = 99;
+          atomic_inc32(&uploader->io_errors_);
+        }
       }
       if (info->request == s3fanout::JobInfo::kReqDelete) {
         uploader->Respond(NULL, UploaderResults());
+      } else if (info->request == s3fanout::JobInfo::kReqHeadOnly) {
+        if (info->error_code == s3fanout::kFailNotFound) reply_code = 1;
+        uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                          UploaderResults(UploaderResults::kLookup,
+                                          reply_code));
       } else {
-        if (info->request == s3fanout::JobInfo::kReqHead) {
+        if (info->request == s3fanout::JobInfo::kReqHeadPut) {
           // The HEAD request was not transformed into a PUT request, thus this
           // was a duplicate
           uploader->CountDuplicates();
@@ -235,7 +244,7 @@ void S3Uploader::FileUpload(
     info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
   } else {
     if (peek_before_put_)
-      info->request = s3fanout::JobInfo::kReqHead;
+      info->request = s3fanout::JobInfo::kReqHeadPut;
   }
 
   UploadJobInfo(info);
@@ -357,7 +366,7 @@ void S3Uploader::FinalizeStreamedUpload(
   assert(info != NULL);
 
   if (peek_before_put_)
-      info->request = s3fanout::JobInfo::kReqHead;
+      info->request = s3fanout::JobInfo::kReqHeadPut;
   UploadJobInfo(info);
 
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from stream finished: %s",
@@ -397,25 +406,39 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
 }
 
 
-// TODO(jblomer): this routine does not what one might think it does --
-// peek + upload is currently handled in the S3 fanout manager by secretly
-// changing a HEAD request into a PUT request.  See CVM-1669
-bool S3Uploader::Peek(const std::string& path) const {
-  const std::string mangled_path = repository_alias_ + "/" + path;
-  s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
-
-  info->request = s3fanout::JobInfo::kReqHead;
-  bool retme = s3fanout_mgr_.DoSingleJob(info);
-  if (retme) {
-    CountDuplicates();
-  }
-
-  delete info;
-  return retme;
+void S3Uploader::OnPeekCopmlete(
+  const upload::UploaderResults &results,
+  PeekCtrl *ctrl)
+{
+  ctrl->exists = (results.return_code == 0);
+  char c = 'c';
+  WritePipe(ctrl->pipe_wait[1], &c, 1);
 }
 
 
-bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
+bool S3Uploader::Peek(const std::string& path) {
+  const std::string mangled_path = repository_alias_ + "/" + path;
+  s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
+
+  PeekCtrl peek_ctrl;
+  MakePipe(peek_ctrl.pipe_wait);
+  info->request = s3fanout::JobInfo::kReqHeadOnly;
+  info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
+    &S3Uploader::OnPeekCopmlete, this, &peek_ctrl)));
+
+  IncJobsInFlight();
+  UploadJobInfo(info);
+  char c;
+  ReadPipe(peek_ctrl.pipe_wait[0], &c, 1);
+  assert(c == 'c');
+  ClosePipe(peek_ctrl.pipe_wait);
+
+  delete info;
+  return peek_ctrl.exists;
+}
+
+
+bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) {
   return false;  // TODO(rmeusel): implement
 }
 

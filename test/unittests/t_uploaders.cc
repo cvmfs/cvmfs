@@ -410,7 +410,8 @@ class T_Uploaders : public FileSandbox {
     tv.tv_sec = 5;
     tv.tv_usec = 0;
     fd_set rfds;
-    while (true) {
+    bool quit = false;
+    while (!quit) {
       // Wait for traffic
       FD_ZERO(&rfds);
       FD_SET(listen_sockfd, &rfds);
@@ -496,11 +497,14 @@ class T_Uploaders : public FileSandbox {
       std::string reply = "HTTP/1.1 200 OK\r\n";
       if (req_type.compare("HEAD") == 0) {
         if (req_file.size() >= 4 &&
-            req_file.compare(req_file.size() - 4, 4, "EXIT") == 0) {
-          return;
-        }
-        if (FileExists(T_Uploaders::dest_dir + "/" + req_file) == false)
+            req_file.compare(req_file.size() - 4, 4, "EXIT") == 0)
+        {
           reply = "HTTP/1.1 404 Not Found\r\n";
+          quit = true;
+        } else {
+          if (FileExists(T_Uploaders::dest_dir + "/" + req_file) == false)
+            reply = "HTTP/1.1 404 Not Found\r\n";
+        }
       } else if (req_type.compare("DELETE") == 0) {
         std::string path = T_Uploaders::dest_dir + "/" + req_file;
         if (FileExists(path)) {
