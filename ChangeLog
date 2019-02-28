@@ -21,6 +21,7 @@
   * Fix debian packaging warnings and errors
 
 2.5.3:
+  * [S3] fix rare crash during file upload
   * [macOS] fix hanging reload during `cvmfs_config reload` 
   * Reduce IOPS during publishing to local backend
   * [S3] Add support for CVMFS_S3_PEEK_BEFORE_PUT
