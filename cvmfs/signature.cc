@@ -406,9 +406,9 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
   ASN1_INTEGER_set(X509_get_serialNumber(certificate_), rnd_serial_no);
 
   // valid as of now
-  X509_gmtime_adj((ASN1_TIME *)X509_get0_notBefore(certificate_), 0);
+  X509_gmtime_adj((ASN1_TIME *)X509_get_notBefore(certificate_), 0);
   // valid for 1 year (validity range is unused)
-  X509_gmtime_adj((ASN1_TIME *)X509_get0_notAfter(certificate_),
+  X509_gmtime_adj((ASN1_TIME *)X509_get_notAfter(certificate_),
                   3600 * 24 * 365);
 
   X509_NAME *name = X509_get_subject_name(certificate_);
