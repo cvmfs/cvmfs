@@ -98,32 +98,31 @@ int Fetcher::Fetch(
 
   ThreadLocalStorage *tls = GetTls();
 
-  {
-    // Synchronization point: either act as a master thread for this object or
-    // enqueue to the list of waiting threads.
-    MutexLockGuard m(lock_queues_download_);
-    ThreadQueues::iterator iDownloadQueue = queues_download_.find(id);
-    if (iDownloadQueue != queues_download_.end()) {
-      LogCvmfs(kLogCache, kLogDebug, "waiting for download of %s",
-               name.c_str());
+  // Synchronization point: either act as a master thread for this object or
+  // enqueue to the list of waiting threads.
+  pthread_mutex_lock(lock_queues_download_);
+  ThreadQueues::iterator iDownloadQueue = queues_download_.find(id);
+  if (iDownloadQueue != queues_download_.end()) {
+    LogCvmfs(kLogCache, kLogDebug, "waiting for download of %s", name.c_str());
 
-      iDownloadQueue->second->push_back(tls->pipe_wait[1]);
-      ReadPipe(tls->pipe_wait[0], &fd_return, sizeof(int));
+    iDownloadQueue->second->push_back(tls->pipe_wait[1]);
+    pthread_mutex_unlock(lock_queues_download_);
+    ReadPipe(tls->pipe_wait[0], &fd_return, sizeof(int));
 
-      LogCvmfs(kLogCache, kLogDebug,
-               "received from another thread fd %d for %s", fd_return,
-               name.c_str());
+    LogCvmfs(kLogCache, kLogDebug, "received from another thread fd %d for %s",
+             fd_return, name.c_str());
+    return fd_return;
+  } else {
+    // Seems we are the first one, check again in the cache (race condition)
+    fd_return = OpenSelect(id, name, object_type);
+    if (fd_return >= 0) {
+      pthread_mutex_unlock(lock_queues_download_);
       return fd_return;
-    } else {
-      // Seems we are the first one, check again in the cache (race condition)
-      fd_return = OpenSelect(id, name, object_type);
-      if (fd_return >= 0) {
-        return fd_return;
-      }
-
-      // Create a new queue for this chunk
-      queues_download_[id] = &tls->other_pipes_waiting;
     }
+
+    // Create a new queue for this chunk
+    queues_download_[id] = &tls->other_pipes_waiting;
+    pthread_mutex_unlock(lock_queues_download_);
   }
 
   perf::Inc(n_downloads);
