@@ -57,7 +57,7 @@ if [ $# -lt 2 ]; then
 fi
 
 CVMFS_UNITTESTS_BINARY=$1
-CVMFS_UNITTESTS_RESULT_LOCATION=$(readlink -f $2)
+CVMFS_UNITTESTS_RESULT_LOCATION=$2
 
 # check if only a quick subset of the unittests should be run
 test_filter='-'
