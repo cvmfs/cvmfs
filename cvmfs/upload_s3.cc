@@ -171,9 +171,21 @@ bool S3Uploader::Create() {
     info->origin_mem.data =
       reinterpret_cast<const unsigned char *>(request_content.data());
   }
-  bool rv = s3fanout_mgr_.DoSingleJob(info);
+
+  RequestCtrl req_ctrl;
+  MakePipe(req_ctrl.pipe_wait);
+  info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
+    &S3Uploader::OnReqComplete, this, &req_ctrl)));
+
+  IncJobsInFlight();
+  UploadJobInfo(info);
+  char c;
+  ReadPipe(req_ctrl.pipe_wait[0], &c, 1);
+  assert(c == 'c');
+  ClosePipe(req_ctrl.pipe_wait);
+
   delete info;
-  return rv;
+  return req_ctrl.return_code == 0;
 }
 
 
@@ -431,11 +443,11 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
 }
 
 
-void S3Uploader::OnPeekCopmlete(
+void S3Uploader::OnReqComplete(
   const upload::UploaderResults &results,
-  PeekCtrl *ctrl)
+  RequestCtrl *ctrl)
 {
-  ctrl->exists = (results.return_code == 0);
+  ctrl->return_code = results.return_code;
   char c = 'c';
   WritePipe(ctrl->pipe_wait[1], &c, 1);
 }
@@ -445,21 +457,21 @@ bool S3Uploader::Peek(const std::string& path) {
   const std::string mangled_path = repository_alias_ + "/" + path;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
 
-  PeekCtrl peek_ctrl;
-  MakePipe(peek_ctrl.pipe_wait);
+  RequestCtrl req_ctrl;
+  MakePipe(req_ctrl.pipe_wait);
   info->request = s3fanout::JobInfo::kReqHeadOnly;
   info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
-    &S3Uploader::OnPeekCopmlete, this, &peek_ctrl)));
+    &S3Uploader::OnReqComplete, this, &req_ctrl)));
 
   IncJobsInFlight();
   UploadJobInfo(info);
   char c;
-  ReadPipe(peek_ctrl.pipe_wait[0], &c, 1);
+  ReadPipe(req_ctrl.pipe_wait[0], &c, 1);
   assert(c == 'c');
-  ClosePipe(peek_ctrl.pipe_wait);
+  ClosePipe(req_ctrl.pipe_wait);
 
   delete info;
-  return peek_ctrl.exists;
+  return req_ctrl.return_code == 0;
 }
 
 

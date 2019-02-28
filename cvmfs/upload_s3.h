@@ -83,14 +83,14 @@ class S3Uploader : public AbstractUploader {
   static const unsigned kDefaultBackoffInitMs = 100;
   static const unsigned kDefaultBackoffMaxMs = 2000;
 
-  // Used to make the async HEAD requests synchronous in Peek()
-  struct PeekCtrl {
-    PeekCtrl() : exists(false) { pipe_wait[0] = pipe_wait[1] = 0; }
-    bool exists;
+  // Used to make the async HTTP requests synchronous in Peek() and Create()
+  struct RequestCtrl {
+    RequestCtrl() : return_code(-1) { pipe_wait[0] = pipe_wait[1] = 0; }
+    int return_code;
     int pipe_wait[2];
   };
 
-  void OnPeekCopmlete(const upload::UploaderResults &results, PeekCtrl *ctrl);
+  void OnReqComplete(const upload::UploaderResults &results, RequestCtrl *ctrl);
 
   static void *MainCollectResults(void *data);
 
