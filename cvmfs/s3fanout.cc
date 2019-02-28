@@ -101,7 +101,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
           break;
         case 404:
           info->error_code = kFailNotFound;
-          break;
+          return num_bytes;
         default:
           info->error_code = kFailOther;
       }
@@ -1047,8 +1047,11 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   // Verification and error classification
   switch (curl_error) {
     case CURLE_OK:
-      if (info->error_code != kFailRetry)
+      if ((info->error_code != kFailRetry) &&
+          (info->error_code != kFailNotFound))
+      {
         info->error_code = kFailOk;
+      }
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
     case CURLE_URL_MALFORMAT:
