@@ -450,6 +450,36 @@ _migrate_140() {
   load_repo_config $name
 }
 
+
+_migrate_141() {
+  local name=$1
+  local destination_version="141"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  local client_conf="/etc/cvmfs/repositories.d/${name}/client.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  # only called when this is a stratum 0
+  if [ -f $client_conf ]; then
+    echo "--> updating client.conf"
+    if ! grep -q "CVMFS_NFILES" $client_conf; then
+      echo "CVMFS_NFILES=65536" >> $client_conf
+    else
+      sed -i -e "s/^\(CVMFS_NFILES\)=.*/\1=65536/" $client_conf
+    fi
+  else
+    echo "--> skipping client configuration on stratum 1"
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -575,6 +605,11 @@ cvmfs_server_migrate() {
          is_stratum1 $name && \
          has_apache_config_file $(get_apache_conf_filename $name); then
       _migrate_140 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" -lt 141 ] && is_stratum0 $name; then
+      _migrate_141 $name
       creator="$(repository_creator_version $name)"
     fi
 
