@@ -45,7 +45,10 @@ void S3FanoutManager::DetectThrottleIndicator(
 
   value_str = Trim(value_str);
   if (!value_str.empty()) {
-    unsigned value_ms = String2Uint64(value_str) * 1000;
+    unsigned value_numeric = String2Uint64(value_str);
+    unsigned value_ms =
+      HasSuffix(value_str, "ms", true /* ignore_case */) ?
+        value_numeric : (value_numeric * 1000);
     if (value_ms > 0)
       info->throttle_ms = std::min(value_ms, kMax429ThrottleMs);
   }
@@ -1018,6 +1021,7 @@ void S3FanoutManager::Backoff(JobInfo *info) {
       {
         LogCvmfs(kLogS3Fanout, kLogStdout,
                  "Warning: S3 backend throttling (%ums)", info->throttle_ms);
+        timestamp_last_throttle_report_ = now;
       }
       statistics_->ms_throttled += info->throttle_ms;
       SafeSleepMs(info->throttle_ms);
