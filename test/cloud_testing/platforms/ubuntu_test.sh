@@ -84,14 +84,10 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
 fi
 
 
-if [ x"$(lsb_release -cs)" = x"bionic" ]; then
-  echo "TODO: re-enable migration test case after 2.5.1"
-else
-  echo "running CernVM-FS migration test cases..."
-  CVMFS_TEST_CLASS_NAME=MigrationTests \
-  ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                     migration_tests/*                              \
-                                  || retval=1
-fi
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
 
 exit $retval
