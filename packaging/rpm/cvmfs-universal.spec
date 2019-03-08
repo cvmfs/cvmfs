@@ -12,7 +12,7 @@
 %define selinux_cvmfs_server 1
 %endif
 %if 0%{?el7} || 0%{?fedora} >= 29
-  %if 0%{?_arch} != "aarch64"
+  %if "%{?_arch}" != "aarch64"
     %define build_ducc 1
   %endif
 %endif
