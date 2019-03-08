@@ -34,7 +34,8 @@
 // 25: CernVM-FS 2.4.0
 // 26: CernVM-FS 2.5.0
 // 27: Add cvmfs_options_init_v2
-#define LIBCVMFS_REVISION 27
+// 28: CernVM-FS 2.6.0
+#define LIBCVMFS_REVISION 28
 
 #include <stdint.h>
 #include <sys/stat.h>
