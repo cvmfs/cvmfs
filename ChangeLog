@@ -1,4 +1,5 @@
 2.6.0:
+  * Increase CVMFS_NFILES to 64k on read-only union file system mount
   * RPM: DUCC is disabled on Aarch64 due to missing Golang RPM on RH 7
   * New notification system to announce repository changes (CVM-1575, CVM-1634)
   * New tool suite ducc, daemon that unpacks container images into cvmfs
