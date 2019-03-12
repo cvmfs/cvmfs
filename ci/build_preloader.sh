@@ -20,6 +20,9 @@ REPO_ROOT="$(get_repository_root)"
 
 [ -d $REPO_ROOT ] || die "$REPO_ROOT is malformed"
 
+echo "Build directory: $BUILD_DIR"
+echo "Source directory: $REPO_ROOT"
+
 cd $BUILD_DIR
 cmake -DBUILD_PRELOADER=on \
   -DBUILD_CVMFS=no \
