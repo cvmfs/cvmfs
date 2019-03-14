@@ -11,13 +11,16 @@
 #include <utility>
 #include <vector>
 
+#include "atomic.h"
 #include "c_file_sandbox.h"
 #include "c_mock_uploader.h"
 #include "file_chunk.h"
 #include "hash.h"
 #include "ingestion/pipeline.h"
+#include "prng.h"
 #include "smalloc.h"
 #include "testutil.h"
+#include "util/string.h"
 
 
 class T_IngestionStress : public FileSandbox {
@@ -510,6 +513,12 @@ struct CallbackTest {
     result_chunk_list = result.file_chunks;
   }
 
+  static void CallbackCount(const upload::SpoolerResult &result) {
+    EXPECT_EQ(0, result.return_code);
+    atomic_inc64(&counter);
+  }
+
+  static atomic_int64 counter;
   static shash::Any result_content_hash;
   static std::string result_local_path;
   static FileChunkList result_chunk_list;
@@ -517,6 +526,7 @@ struct CallbackTest {
 shash::Any CallbackTest::result_content_hash;
 std::string CallbackTest::result_local_path;
 FileChunkList CallbackTest::result_chunk_list;
+atomic_int64 CallbackTest::counter = 0;
 }  // anonymous namespace
 
 TEST_F(T_IngestionStress, ProcessingCallbackForSmallFile) {
@@ -550,4 +560,49 @@ TEST_F(T_IngestionStress, ProcessingCallbackForBigFile) {
   EXPECT_EQ(expected_content_hash, CallbackTest::result_content_hash);
   EXPECT_EQ(GetBigFile(), CallbackTest::result_local_path);
   EXPECT_EQ(number_of_chunks, CallbackTest::result_chunk_list.size());
+}
+
+TEST_F(T_IngestionStress, RealWorldSlow) {
+  Prng prng;
+  prng.InitSeed(42);
+
+  // Prepare 100 random files roughly normally distributed around 4k
+  unsigned S = 100;
+  unsigned T = 12;
+  unsigned mean = 4192;
+  std::vector<unsigned char *> buffers;
+  std::vector<unsigned> buffer_sizes;
+  for (unsigned i = 0; i < S; ++i) {
+    uint32_t size = 0;
+    for (unsigned j = 0; j < T; ++j) {
+      size += prng.Next(2 * mean);
+    }
+    size /= T;
+    buffers.push_back(static_cast<unsigned char *>(smalloc(size)));
+    buffer_sizes.push_back(size);
+
+    for (unsigned j = 0; j < size; ++j) {
+      buffers[i][j] = prng.Next(256);
+    }
+  }
+
+  uploader_->keep_results = false;
+  IngestionPipeline pipeline(
+    uploader_, MockSpoolerDefinition(false /* bulk chunks */));
+
+  int N = 100000;
+  pipeline.Spawn();
+  pipeline.RegisterListener(&CallbackTest::CallbackCount);
+  // Process
+  for (int i = 0; i < N; ++i) {
+    MemoryIngestionSource *s = new MemoryIngestionSource(
+      StringifyInt(i), buffers[i % S], buffer_sizes[i % S]);
+    pipeline.Process(s, true /* allow_chunking */);
+  }
+  pipeline.WaitFor();
+
+  for (unsigned i = 0; i < S; ++i) {
+    free(buffers[i]);
+  }
+  EXPECT_EQ(N, CallbackTest::counter);
 }
