@@ -564,7 +564,6 @@ TEST_F(T_IngestionStress, ProcessingCallbackForBigFile) {
 }
 
 TEST_F(T_IngestionStress, RealWorldSlow) {
-  setenv("_CVMFS_SERVER_PIPELINE_MB", "32", 1);
   Prng prng;
   prng.InitSeed(42);
 

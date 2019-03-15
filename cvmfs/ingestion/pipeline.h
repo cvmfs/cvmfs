@@ -36,8 +36,7 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   void OnFileProcessed(const upload::SpoolerResult &spooler_result);
 
  private:
-  static const uint64_t kMemLowWatermark = 786 * 1024 * 1024;
-  static const uint64_t kMemHighWatermark = 1024 * 1024 * 1024;
+  static const uint64_t kMaxPipelineMem;  // 1G
   static const unsigned kMaxFilesInFlight = 8000;
   static const unsigned kNforkRegister = 1;
   static const unsigned kNforkWrite = 1;
