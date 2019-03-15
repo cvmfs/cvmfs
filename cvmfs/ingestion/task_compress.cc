@@ -20,23 +20,20 @@
 void TaskCompress::Process(BlockItem *input_block) {
   assert(input_block->chunk_item() != NULL);
 
-  zlib::Compressor *compressor = input_block->chunk_item()->compressor();
+  zlib::Compressor *compressor = input_block->chunk_item()->GetCompressor();
   const int64_t tag = input_block->tag();
   const bool flush = input_block->type() == BlockItem::kBlockStop;
   unsigned char *input_data = input_block->data();
   size_t remaining_in_input = input_block->size();
 
   BlockItem *output_block = NULL;
-  TagMap::iterator iter_find = tag_map_.find(tag);
-  if (iter_find == tag_map_.end()) {
+  if (!tag_map_.Lookup(tag, &output_block)) {
     // So far unseen chunk, start new stream of compressed blocks
     output_block = new BlockItem(tag, allocator_);
     output_block->SetFileItem(input_block->file_item());
     output_block->SetChunkItem(input_block->chunk_item());
     output_block->MakeData(kCompressedBlockSize);
-    tag_map_[tag] = output_block;
-  } else {
-    output_block = iter_find->second;
+    tag_map_.Insert(tag, output_block);
   }
 
   bool done = false;
@@ -57,16 +54,18 @@ void TaskCompress::Process(BlockItem *input_block) {
       output_block->SetFileItem(input_block->file_item());
       output_block->SetChunkItem(input_block->chunk_item());
       output_block->MakeData(kCompressedBlockSize);
-      tag_map_[tag] = output_block;
+      tag_map_.Insert(tag, output_block);
     }
   } while ((remaining_in_input > 0) || (flush && !done));
 
   if (flush) {
+    input_block->chunk_item()->ReleaseCompressor();
+
     if (output_block->size() > 0)
       tubes_out_->Dispatch(output_block);
     else
       delete output_block;
-    tag_map_.erase(tag);
+    tag_map_.Erase(tag);
 
     BlockItem *stop_block = new BlockItem(tag, allocator_);
     stop_block->MakeStop();

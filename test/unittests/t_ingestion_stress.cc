@@ -16,6 +16,7 @@
 #include "c_mock_uploader.h"
 #include "file_chunk.h"
 #include "hash.h"
+#include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
 #include "prng.h"
 #include "smalloc.h"
@@ -563,6 +564,7 @@ TEST_F(T_IngestionStress, ProcessingCallbackForBigFile) {
 }
 
 TEST_F(T_IngestionStress, RealWorldSlow) {
+  setenv("_CVMFS_SERVER_PIPELINE_MB", "32", 1);
   Prng prng;
   prng.InitSeed(42);
 
@@ -590,9 +592,10 @@ TEST_F(T_IngestionStress, RealWorldSlow) {
   IngestionPipeline pipeline(
     uploader_, MockSpoolerDefinition(false /* bulk chunks */));
 
-  int N = 100000;
+  int N = 250000;
   pipeline.Spawn();
   pipeline.RegisterListener(&CallbackTest::CallbackCount);
+
   // Process
   for (int i = 0; i < N; ++i) {
     MemoryIngestionSource *s = new MemoryIngestionSource(
@@ -601,8 +604,9 @@ TEST_F(T_IngestionStress, RealWorldSlow) {
   }
   pipeline.WaitFor();
 
+  EXPECT_EQ(N, CallbackTest::counter);
+
   for (unsigned i = 0; i < S; ++i) {
     free(buffers[i]);
   }
-  EXPECT_EQ(N, CallbackTest::counter);
 }

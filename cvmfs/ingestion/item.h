@@ -136,7 +136,12 @@ class ChunkItem : SingleCopy {
   uint64_t offset() { return offset_; }
   uint64_t size() { return size_; }
   upload::UploadStreamHandle *upload_handle() { return upload_handle_; }
-  zlib::Compressor *compressor() { return compressor_.weak_ref(); }
+  // An active zlib compression stream requires 256kB of memory.  Therefore,
+  // we create it only for the absolutely necessary duration and free the space
+  // afterwards.
+  zlib::Compressor *GetCompressor();
+  void ReleaseCompressor();
+
   shash::ContextPtr hash_ctx() { return hash_ctx_; }
   shash::Any *hash_ptr() { return &hash_value_; }
 
@@ -161,8 +166,8 @@ class ChunkItem : SingleCopy {
   upload::UploadStreamHandle *upload_handle_;
   UniquePtr<zlib::Compressor> compressor_;
   shash::ContextPtr hash_ctx_;
-  UniquePtr<void> hash_ctx_buffer_;
   shash::Any hash_value_;
+  unsigned char hash_ctx_buffer_[shash::kMaxContextSize];
 };
 
 
@@ -217,13 +222,13 @@ class BlockItem : SingleCopy {
   static uint64_t managed_bytes() { return atomic_read64(&managed_bytes_); }
 
  private:
-  // Forget pointer to the data
-  void Discharge();
-
   /**
    * Total capacity of all BlockItem()
    */
   static atomic_int64 managed_bytes_;
+
+  // Forget pointer to the data
+  void Discharge();
 
   ItemAllocator *allocator_;
   BlockType type_;
