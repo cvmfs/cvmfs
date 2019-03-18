@@ -13,6 +13,8 @@
 #include "ingestion/item.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
+#include "murmur.h"
+#include "smallhash.h"
 #include "util/posix.h"
 
 class ItemAllocator;
@@ -25,12 +27,18 @@ class TaskChunk : public TubeConsumer<BlockItem> {
     : TubeConsumer<BlockItem>(tube_in)
     , tubes_out_(tubes_out)
     , allocator_(allocator)
-  { }
+  {
+    tag_map_.Init(16, -1, hasher_int64t);
+  }
 
  protected:
   virtual void Process(BlockItem *input_block);
 
  private:
+  static inline uint32_t hasher_int64t(const int64_t &value) {
+    return MurmurHash2(&value, sizeof(value), 0x07387a4f);
+  }
+
   /**
    * State of the chunk creation for a file
    */
@@ -68,7 +76,7 @@ class TaskChunk : public TubeConsumer<BlockItem> {
   /**
    * Maps input block tag (hence: file) to the state information on chunks.
    */
-  typedef std::map<int64_t, ChunkInfo> TagMap;
+  typedef SmallHashDynamic<int64_t, ChunkInfo> TagMap;
 
   /**
    * Every new chunk increases the tag sequence counter that is used to annotate

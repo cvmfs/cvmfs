@@ -26,8 +26,7 @@ void TaskChunk::Process(BlockItem *input_block) {
 
   ChunkInfo chunk_info;
   // Do we see blocks of the file for the first time?
-  TagMap::const_iterator iter_find = tag_map_.find(input_tag);
-  if (iter_find == tag_map_.end()) {
+  if (!tag_map_.Lookup(input_tag, &chunk_info)) {
     // We may have only regular chunks, only a bulk chunk, or both.  We may
     // end up in a situation where we produced only a single non-bulk chunk.
     // This needs to be fixed up later in the pipeline by the write task.
@@ -46,9 +45,7 @@ void TaskChunk::Process(BlockItem *input_block) {
       chunk_info.bulk_chunk->set_size(file_item->size());
       chunk_info.output_tag_bulk = atomic_xadd64(&tag_seq_, 1);
     }
-    tag_map_[input_tag] = chunk_info;
-  } else {
-    chunk_info = iter_find->second;
+    tag_map_.Insert(input_tag, chunk_info);
   }
   assert((chunk_info.bulk_chunk != NULL) || (chunk_info.next_chunk != NULL));
 
@@ -76,7 +73,7 @@ void TaskChunk::Process(BlockItem *input_block) {
         block_stop->MakeStop();
         tubes_out_->Dispatch(block_stop);
       }
-      tag_map_.erase(input_tag);
+      tag_map_.Erase(input_tag);
       break;
 
     case BlockItem::kBlockData:
@@ -148,7 +145,7 @@ void TaskChunk::Process(BlockItem *input_block) {
         input_block->Reset();
       }
 
-      tag_map_[input_tag] = chunk_info;
+      tag_map_.Insert(input_tag, chunk_info);
       break;
 
     default:

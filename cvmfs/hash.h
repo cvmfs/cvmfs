@@ -70,6 +70,11 @@ const unsigned kDigestSizes[] =
 const unsigned kMaxDigestSize = 20;
 
 /**
+ * The maximum of GetContextSize()
+ */
+const unsigned kMaxContextSize = 256;
+
+/**
  * Hex representations of hashes with the same length need a suffix
  * to be distinguished from each other.  They should all have one but
  * for backwards compatibility MD5 and SHA-1 have none.  Initialized in hash.cc

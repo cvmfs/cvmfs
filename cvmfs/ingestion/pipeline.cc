@@ -20,6 +20,8 @@
 #include "util/string.h"
 #include "util_concurrency.h"
 
+const uint64_t IngestionPipeline::kMaxPipelineMem = 1024 * 1024 * 1024;
+
 IngestionPipeline::IngestionPipeline(
   upload::AbstractUploader *uploader,
   const upload::SpoolerDefinition &spooler_definition)
@@ -75,13 +77,16 @@ IngestionPipeline::IngestionPipeline(
   }
   tubes_chunk_.Activate();
 
-  uint64_t low = kMemLowWatermark;
-  uint64_t high = kMemHighWatermark;
+  uint64_t high = kMaxPipelineMem;
+  high = std::min(high, platform_memsize() / 5);
   char *fixed_limit_mb = getenv("_CVMFS_SERVER_PIPELINE_MB");
   if (fixed_limit_mb != NULL) {
     high = String2Uint64(fixed_limit_mb) * 1024 * 1024;
-    low = (high * 2) / 3;
   }
+  uint64_t low = (high * 2) / 3;
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "pipeline memory thresholds %" PRIu64 "/%" PRIu64 " M",
+           low / (1024 * 1024), high / (1024 * 1024));
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
     TaskRead *task_read =
       new TaskRead(&tube_input_, &tubes_chunk_, &item_allocator_);
