@@ -1,4 +1,5 @@
 2.6.1:
+  * Fix potential race condition in the stats collector for the S3 uploader
   * Better control of memory consumption in file processing pipeline (CVM-1687)
 
 2.6.0:
