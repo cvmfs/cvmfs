@@ -33,6 +33,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/539-symlinkedvarspoolcvmfs               \
                                  src/600-securecvmfs                          \
+                                 src/628-pythonwrappedcvmfsserver             \
                                  src/647-bearercvmfs                          \
                                  --                                           \
                                  src/5*                                       \
@@ -43,9 +44,9 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 
 # To do: remove me once previous package is available
 echo "NOT running CernVM-FS migration test cases (disabled)..."
-#CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
-#./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-#                                   migration_tests/*                              \
-#                                || retval=1
+CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
 
 exit $retval

@@ -11,7 +11,7 @@ cvmfs_run_test() {
     "CVMFS_AUTO_UPDATE=no" || return 1
 
   echo "Walking through /cvmfs/atlas.cern.ch"
-  find /cvmfs/atlas.cern.ch -ignore_readdir_race > /dev/null
+  sudo find /cvmfs/atlas.cern.ch -ignore_readdir_race > /dev/null
   local retval=$?
   if [ $retval -ne 0 ]; then
     echo "retval $retval"

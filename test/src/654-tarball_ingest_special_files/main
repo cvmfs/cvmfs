@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Ingest weird and complex files"
+cvmfs_test_suites="quick"
 cvmfs_test_autofs_on_startup=false
 
 produce_tarball() {

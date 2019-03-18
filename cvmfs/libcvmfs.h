@@ -17,7 +17,7 @@
 
 #define LIBCVMFS_VERSION 2
 #define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
-#define LIBCVMFS_VERSION_MINOR 6
+#define LIBCVMFS_VERSION_MINOR 7
 // Revision Changelog
 // 13: revision introduced
 // 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
@@ -34,7 +34,8 @@
 // 25: CernVM-FS 2.4.0
 // 26: CernVM-FS 2.5.0
 // 27: Add cvmfs_options_init_v2
-#define LIBCVMFS_REVISION 27
+// 28: CernVM-FS 2.6.0
+#define LIBCVMFS_REVISION 28
 
 #include <stdint.h>
 #include <sys/stat.h>
