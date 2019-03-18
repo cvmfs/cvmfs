@@ -9,10 +9,12 @@ produce_tarball() {
   mkdir tarball_foo
   mkdir -p tarball_foo/a/b/c
   mkdir -p tarball_foo/d/e/f
+  mkdir -p tarball_foo/utf8
 
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/1.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/2.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/3.txt
+
   touch tarball_foo/a/.cvmfscatalog
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/1.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/2.txt
@@ -45,6 +47,9 @@ produce_tarball() {
   # use 0 (zero) as major number to automatically allocate a free major number
   sudo mknod tarball_foo/char_device c 0 42
   sudo mknod tarball_foo/block_device b 0 24
+
+  # test UTF-8 names
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/utf8/🦁❤🐒.txt
 
   echo "*** Generating a tarball in $tarball_name"
   tar -cvf $tarball_name tarball_foo/
@@ -222,8 +227,16 @@ cvmfs_run_test() {
     echo "*** Found also blockdevice $blockdevice"
   fi
 
+  file=$result_dir/utf8/🦁❤🐒.txt
+  if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+    echo "*** Error not found UTF-8 file: $file or found of the wrong dimension"
+    return 18
+  else
+    echo "*** Found also UTF-8 file: $file"
+  fi
+
   echo "*** Checking that we have create a new catalog in the base dir"
-  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir$" || return 18
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir$" || return 19
 
   return 0
 }

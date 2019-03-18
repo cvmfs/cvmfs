@@ -12,6 +12,8 @@ produce_files_in() {
 	echo "meaningless file content" > file
 	echo "more clever file content" > clever
 
+	echo "utf-8 content: 🐒❤🦁 in utf-8 path" > 🦁❤🐒
+
 	mkdir foo
 	mkdir bar
 
