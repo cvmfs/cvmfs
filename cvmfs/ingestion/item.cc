@@ -72,11 +72,10 @@ ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
   , size_(0)
   , is_bulk_chunk_(false)
   , upload_handle_(NULL)
-  , compressor_(zlib::Compressor::Construct(file_item->compression_algorithm()))
+  , compressor_(NULL)
 {
   hash_ctx_.algorithm = file_item->hash_algorithm();
   hash_ctx_.size = shash::GetContextSize(hash_ctx_.algorithm);
-  hash_ctx_buffer_ = smalloc(hash_ctx_.size);
   hash_ctx_.buffer = hash_ctx_buffer_;
   shash::Init(hash_ctx_);
   hash_value_.algorithm = hash_ctx_.algorithm;
@@ -88,6 +87,20 @@ ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
 void ChunkItem::MakeBulkChunk() {
   is_bulk_chunk_ = true;
   hash_value_.suffix = file_item_->hash_suffix();
+}
+
+
+zlib::Compressor *ChunkItem::GetCompressor() {
+  if (!compressor_.IsValid()) {
+    compressor_ =
+      zlib::Compressor::Construct(file_item_->compression_algorithm());
+  }
+  return compressor_.weak_ref();
+}
+
+
+void ChunkItem::ReleaseCompressor() {
+  compressor_.Destroy();
 }
 
 

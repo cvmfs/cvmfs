@@ -9,6 +9,8 @@
 
 #include "ingestion/item.h"
 #include "ingestion/task.h"
+#include "murmur.h"
+#include "smallhash.h"
 #include "util/posix.h"
 
 class ItemAllocator;
@@ -24,17 +26,23 @@ class TaskCompress : public TubeConsumer<BlockItem> {
     : TubeConsumer<BlockItem>(tube_in)
     , tubes_out_(tubes_out)
     , allocator_(allocator)
-  { }
+  {
+    tag_map_.Init(16, -1, hasher_int64t);
+  }
 
  protected:
   virtual void Process(BlockItem *input_block);
 
  private:
+  static inline uint32_t hasher_int64t(const int64_t &value) {
+    return MurmurHash2(&value, sizeof(value), 0x07387a4f);
+  }
+
   /**
    * Maps input block tag (hence: chunk) to the output block with the compressed
    * data.
    */
-  typedef std::map<int64_t, BlockItem *> TagMap;
+  typedef SmallHashDynamic<int64_t, BlockItem *> TagMap;
 
   TubeGroup<BlockItem> *tubes_out_;
   ItemAllocator *allocator_;
