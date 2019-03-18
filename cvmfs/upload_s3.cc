@@ -247,10 +247,11 @@ void S3Uploader::FileUpload(
       info->request = s3fanout::JobInfo::kReqHeadPut;
   }
 
+  int64_t bytes_to_upload = GetFileSize(local_path);
   UploadJobInfo(info);
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from file finished: %s",
            local_path.c_str());
-  CountUploadedBytes(GetFileSize(local_path));
+  CountUploadedBytes(bytes_to_upload);
 }
 
 
