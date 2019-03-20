@@ -1,6 +1,7 @@
 2.6.1:
   * Fix potential race condition in the stats collector for the S3 uploader
   * Better control of memory consumption in file processing pipeline (CVM-1687)
+  * More robust parsing of gateway API keys (CVM-1693)
 
 2.6.0:
   * Increase CVMFS_NFILES to 64k on read-only union file system mount
