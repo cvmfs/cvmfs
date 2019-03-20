@@ -14,6 +14,9 @@ int APIVersion();
 bool ReadKeys(const std::string& key_file_name, std::string* key_id,
               std::string* secret);
 
+bool ParseKey(const std::string& body, std::string* key_id,
+              std::string* secret);
+
 }  // namespace gateway
 
 #endif  // CVMFS_GATEWAY_UTIL_H_

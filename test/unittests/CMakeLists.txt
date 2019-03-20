@@ -58,6 +58,7 @@ set(CVMFS_UNITTEST_FILES
   t_fs_traversal.cc
   t_fuse_evict.cc
   t_garbage_collector.cc
+  t_gateway_key_parser.cc
   t_glue_buffer.cc
   t_hash_filters.cc
   t_header_lists.cc
