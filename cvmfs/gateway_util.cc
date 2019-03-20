@@ -4,10 +4,15 @@
 
 #include "gateway_util.h"
 
+#include <fcntl.h>
+
+#include <algorithm>
 #include <vector>
 
 #include "logging.h"
+#include "util/posix.h"
 #include "util/string.h"
+
 
 namespace gateway {
 
@@ -19,21 +24,30 @@ bool ReadKeys(const std::string& key_file_name, std::string* key_id,
     return false;
   }
 
-  FILE* key_file_fd = std::fopen(key_file_name.c_str(), "r");
+  int key_file_fd = open(key_file_name.c_str(), O_RDONLY);
   if (!key_file_fd) {
     return false;
   }
 
-  std::string line;
-  if (!GetLineFile(key_file_fd, &line)) {
-    fclose(key_file_fd);
+  std::string body;
+  if (!SafeReadToString(key_file_fd, &body)) {
+    close(key_file_fd);
     return false;
   }
 
-  fclose(key_file_fd);
+  close(key_file_fd);
 
-  std::vector<std::string> tokens = SplitString(line, ' ');
-  if (tokens.size() < 2) {
+  return ParseKey(body, key_id, secret);
+}
+
+bool ParseKey(const std::string& body, std::string* key_id,
+              std::string* secret) {
+  std::string line = GetLineMem(body.data(), body.size());
+  std::string l = Trim(ReplaceAll(line, "\t", " "));
+  l.erase(std::unique(l.begin(), l.end()), l.end());
+  std::vector<std::string> tokens = SplitString(l, ' ');
+
+  if (tokens.size() < 2 || tokens.size() > 3) {
     return false;
   }
 
