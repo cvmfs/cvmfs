@@ -9,9 +9,11 @@
 
 #include "catalog.h"
 #include "catalog_rw.h"
+#include "compression.h"
 #include "hash.h"
 #include "shortstring.h"
 #include "testutil.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -390,6 +392,99 @@ TEST_F(T_Catalog, Statistics) {
                                            NULL,
                                            false);
   EXPECT_NE("", catalog->PrintMemStatistics());
+}
+
+namespace {
+// Compressed and slimmed catalog from the NA61 repository that lacks the
+// nested catalog SHA-1 field.
+std::string kCatalogNa61Schema09 =
+"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"
+"XSf/YOw4trezuBdPS4Z1J+M4s17iPwAwivLb";
+} // anonymous namespace
+
+TEST_F(T_Catalog, AttachLegacy) {
+  std::string catalog_debase;
+  bool retval = Debase64(kCatalogNa61Schema09, &catalog_debase);
+  ASSERT_TRUE(retval);
+
+  void *catalog_binary;
+  uint64_t catalog_size;
+  retval = zlib::DecompressMem2Mem(
+    catalog_debase.data(), catalog_debase.length(),
+    &catalog_binary, &catalog_size);
+  ASSERT_TRUE(retval);
+
+  std::string temp_path;
+  FILE *f = CreateTempFile("cvmfs_ut_legacy", 0666, "w+", &temp_path);
+  EXPECT_TRUE(f != NULL);
+  if (f == NULL) {
+    free(catalog);
+    return;
+  }
+  retval = SafeWrite(fileno(f), catalog_binary, catalog_size);
+  free(catalog_binary);
+  fclose(f);
+  EXPECT_TRUE(retval);
+
+  WritableCatalog *catalog =
+    WritableCatalog::AttachFreely("", temp_path, shash::Any());
+  unlink(temp_path.c_str());
+  EXPECT_TRUE(catalog != NULL);
+
+  int nchunk = 0;
+  catalog->AllChunksBegin();
+  shash::Any h;
+  zlib::Algorithms a;
+  while (catalog->AllChunksNext(&h, &a)) {
+    nchunk++;
+  }
+  catalog->AllChunksEnd();
+  EXPECT_EQ(5, nchunk);
+  EXPECT_EQ(5U, catalog->GetReferencedObjects().size());
+
+  EXPECT_FLOAT_EQ(0.9, catalog->schema());
+  EXPECT_EQ(0U, catalog->ListOwnNestedCatalogs().size());
+  EXPECT_TRUE(catalog->IsRoot());
+  EXPECT_EQ(1297959962U, catalog->GetLastModified());
+  shash::Any previous_revision = shash::MkFromHexPtr(
+    shash::HexPtr("5fd3e9d6dd96ffb23228fa0be88356b7347e815e"));
+  EXPECT_EQ(catalog->GetPreviousRevision(), previous_revision);
 }
 
 }  // namespace catalog
