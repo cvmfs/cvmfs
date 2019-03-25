@@ -456,7 +456,7 @@ std::string kCatalogNa61Schema10 =
 "jUZFr5+bihzU9nZVWWjL/scRGODCYfhkoNFkxxMnQa7GtoZSV8es3pIFOvI5aUrKjuCmKt5WNQd8"
 "j6ajjP0AtrJFxSji1Mxcig6ittVxQXcV001N78gWSgodzFa2rOjNzjM29ZJWXt23K5veuPqx5VmH"
 "R9HoJY+fS4YP6tjmMy84gvVv3KA1U38BKyOiUA==";
-} // anonymous namespace
+}  // anonymous namespace
 
 TEST_F(T_Catalog, AttachSchema09) {
   std::string catalog_debase;
