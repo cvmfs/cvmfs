@@ -436,9 +436,29 @@ std::string kCatalogNa61Schema09 =
 "0TlguLb99ESIzugZWMEZU/zDNULXj0RovQaq435QuBCrXRw1/yCSQF17uBKr/9h7A+TpsNrJUfOP"
 "PQnVQziGGlTxJMil1c0cNf94kVDd9zBWv70zBORqH+95sYUzp/IPDwnn1KM/dCe/c7t7aP30zGMR"
 "XSf/YOw4trezuBdPS4Z1J+M4s17iPwAwivLb";
+
+// Compressed and slimmed catalog from the NA61 repository that _has_ the
+// nested catalog SHA-1 field, to make sure we apply the fix only where
+// necessary.
+std::string kCatalogNa61Schema10 =
+"eJztmttqE0EYgGcyObU14IGy1CBMbmxDa7ObTasVBZO6lDS1tWnE9qIs2+zELM0mMbstbQUx4qXg"
+"bV/AFxCvfAMv9EpKfQRFvFAQEQRns5vDpq0WBLHtfMxk/vl35t/5Z3YOm2RhfkYzCS5UarpiYhF4"
+"AYTgBsYAbmwBAPpAm4s0eh25l0YI/oRlY5S/6gOtmn2/Lc9gMP4p8JAfPnCYCc9gMI4SIRoh2gE0"
+"MBiMY8EQDPn9kJ7koccLQyHvC/Ds/dML7x6mvn/a7nn0gZ7GPcmfmcLuWdg4yKOPgAYGg3Fs6ffS"
+"JaF7JYDW/o/QNkBf0A5NGAzGf8C1DIotV2tkXausGbKVGlqlLMSvqAmeKKKY58kKPxbnaaqSFTI2"
+"nhDzE3FF5MWJvFo4P40GIyXFMGW9omoFjaiCyI8LlxPiROJUGg2cM/JFoivCKG/t/wi9Aegz2qUJ"
+"g8E4qvSiAWjP7HQ/isE9y0fmDBqErmVh2n7/fwtoYDAYRxoeIm45VlXMIn8oEnH7/f8boIHBYJwI"
+"ehAHG8uE8/3fd0ADg8E4IQS81s8DwJn/PwANDAbjxOBDEHphiG78QZAHnufoNfzqqcIIfAleUcVf"
+"QQIBTgjDep9WVsmdoJ+LhWHFkjc0dUPOK6ZSqtyTtXJFJU6mdzIrJXMSTs/elBbxnlJ4bhY7CjzU"
+"0ERd93DZrSo1UjadXM+Bhu1iLsu2ShZGsCPFo/XTvgA3PAzrd01lpUTKxDCJ2rRhdGUDzs1yydSM"
+"hLsuWubNIs5Ji7kRbBQVwREn52YXctlkejaHq6tyd6Xb2fStZHYJZ6Ql20A0et3v5+aHIWg4btwv"
+"aSaRlTXT7uBuA7LQpQg+QAEuEoH1ZMOhaq1SJTVTI0Zb8rncaOvx0CrZdFq9rpTWyL4edJR3NZ7W"
+"jUZFr5+bihzU9nZVWWjL/scRGODCYfhkoNFkxxMnQa7GtoZSV8es3pIFOvI5aUrKjuCmKt5WNQd8"
+"j6ajjP0AtrJFxSji1Mxcig6ittVxQXcV001N78gWSgodzFa2rOjNzjM29ZJWXt23K5veuPqx5VmH"
+"R9HoJY+fS4YP6tjmMy84gvVv3KA1U38BKyOiUA==";
 } // anonymous namespace
 
-TEST_F(T_Catalog, AttachLegacy) {
+TEST_F(T_Catalog, AttachSchema09) {
   std::string catalog_debase;
   bool retval = Debase64(kCatalogNa61Schema09, &catalog_debase);
   ASSERT_TRUE(retval);
@@ -478,13 +498,56 @@ TEST_F(T_Catalog, AttachLegacy) {
   EXPECT_EQ(5, nchunk);
   EXPECT_EQ(5U, catalog->GetReferencedObjects().size());
 
+  uint64_t s;
   EXPECT_FLOAT_EQ(0.9, catalog->schema());
   EXPECT_EQ(0U, catalog->ListOwnNestedCatalogs().size());
+  EXPECT_EQ(0U, catalog->ListNestedCatalogs().size());
+  EXPECT_FALSE(catalog->FindNested(PathString("/path"), &h, &s));
   EXPECT_TRUE(catalog->IsRoot());
   EXPECT_EQ(1297959962U, catalog->GetLastModified());
   shash::Any previous_revision = shash::MkFromHexPtr(
     shash::HexPtr("5fd3e9d6dd96ffb23228fa0be88356b7347e815e"));
   EXPECT_EQ(catalog->GetPreviousRevision(), previous_revision);
+}
+
+TEST_F(T_Catalog, AttachSchema10) {
+  std::string catalog_debase;
+  bool retval = Debase64(kCatalogNa61Schema10, &catalog_debase);
+  ASSERT_TRUE(retval);
+
+  void *catalog_binary;
+  uint64_t catalog_size;
+  retval = zlib::DecompressMem2Mem(
+    catalog_debase.data(), catalog_debase.length(),
+    &catalog_binary, &catalog_size);
+  ASSERT_TRUE(retval);
+
+  std::string temp_path;
+  FILE *f = CreateTempFile("cvmfs_ut_legacy", 0666, "w+", &temp_path);
+  EXPECT_TRUE(f != NULL);
+  if (f == NULL) {
+    free(catalog);
+    return;
+  }
+  retval = SafeWrite(fileno(f), catalog_binary, catalog_size);
+  free(catalog_binary);
+  fclose(f);
+  EXPECT_TRUE(retval);
+
+  WritableCatalog *catalog =
+    WritableCatalog::AttachFreely("", temp_path, shash::Any());
+  unlink(temp_path.c_str());
+  EXPECT_TRUE(catalog != NULL);
+
+  shash::Any h;
+  uint64_t s;
+  EXPECT_FLOAT_EQ(1.0, catalog->schema());
+  EXPECT_EQ(1U, catalog->ListOwnNestedCatalogs().size());
+  EXPECT_EQ(1U, catalog->ListNestedCatalogs().size());
+  EXPECT_TRUE(catalog->FindNested(PathString("/path"), &h, &s));
+  shash::Any hash_compare = shash::MkFromHexPtr(
+    shash::HexPtr("0000000000000000000000000000000000000042"));
+  EXPECT_EQ(h, hash_compare);
 }
 
 }  // namespace catalog
