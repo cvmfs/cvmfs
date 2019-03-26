@@ -1,6 +1,7 @@
 2.7.0:
 
 2.6.1:
+  * Add GC support for legacy catalogs before 1.0 schema stabilized (CVM-1698)
   * Fix potential race condition in the stats collector for the S3 uploader
   * Better control of memory consumption in file processing pipeline (CVM-1687)
   * More robust parsing of gateway API keys (CVM-1693)

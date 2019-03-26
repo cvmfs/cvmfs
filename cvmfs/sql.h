@@ -220,6 +220,15 @@ class Database : SingleCopy {
    */
   bool OwnsFile() const { return database_.OwnsFile(); }
 
+  /**
+   * Used when attaching legacy catalogs to set 0.9 schema where mistakenly 1.0
+   * was used.
+   */
+  void EnforceSchema(float version, unsigned revision) {
+    schema_version_ = version;
+    schema_revision_ = revision;
+  }
+
  protected:
   /**
    * Private constructor! Use the factory methods DerivedT::Create() or

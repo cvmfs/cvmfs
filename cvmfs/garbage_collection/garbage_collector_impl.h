@@ -94,6 +94,11 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
                              true).c_str());
       PrintCatalogTreeEntry(data.tree_level, data.catalog);
     }
+    if (data.catalog->schema() < 0.99) {
+      LogCvmfs(kLogGc, kLogStdout | kLogDebug, "Warning: "
+        "legacy catalog does not provide access to nested catalog hierarchy.\n"
+        "         Some unreferenced objects may remain in the repository.");
+    }
   }
 
   // the hash of the actual catalog needs to preserved

@@ -457,6 +457,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
   bool GetVOMSAuthz(std::string *authz) { return false; }
 
+  float schema() const { return 2.5; }
+
  protected:
   // silence coverity
   MockCatalog& operator= (const MockCatalog &other);
