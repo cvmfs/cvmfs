@@ -76,7 +76,7 @@ cvmfs_server_ingest() {
     fi
     # by the chek above we are sure that there is only a tar_file to ingest or a directory to_delete
     # hence we just concatenate them with the name for the transaction
-    cvmfs_server_transaction "$name/$tar_file$to_delete" || die "Impossible to start a transaction"
+    cvmfs_server_transaction "$name/$base_dir$to_delete" || die "Impossible to start a transaction"
   else
     cvmfs_server_transaction $name || die "Impossible to start a transaction"
   fi
