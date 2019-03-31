@@ -1189,7 +1189,8 @@ Supported Commands:
                   Open repository meta info JSON file for editing
   ingest          -t tarfile
                   -b base directory
-                  [-d folder to delete]
+                  [-d <folder to delete>]
+                  [-c create nested catalog in base directory]
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
