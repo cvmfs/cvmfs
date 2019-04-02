@@ -23,7 +23,6 @@
 // inode.  See also integration test #23.
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
-#define FUSE_USE_VERSION 26
 
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
@@ -38,8 +37,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fuse/fuse_lowlevel.h>
-#include <fuse/fuse_opt.h>
 #include <google/dense_hash_map>
 #include <inttypes.h>
 #include <openssl/crypto.h>
@@ -79,6 +76,7 @@
 #include "compression.h"
 #include "directory_entry.h"
 #include "download.h"
+#include "duplex_fuse.h"
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
@@ -1843,9 +1841,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %" PRIu64,
            uint64_t(cvmfs::mount_point_->catalog_mgr()->GetRootInode()));
 
-  struct fuse_chan **channel = NULL;
-  if (loader_exports->version >= 4)
-    channel = loader_exports->fuse_channel;
+  void **channel_or_session = NULL;
+  if (loader_exports->version >= 4) {
+    channel_or_session =
+      reinterpret_cast<void **>(loader_exports->fuse_channel);
+  }
 
   bool fuse_notify_invalidation = true;
   std::string buf;
@@ -1857,7 +1857,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   cvmfs::fuse_remounter_ =
       new FuseRemounter(cvmfs::mount_point_, &cvmfs::inode_generation_info_,
-                        channel, fuse_notify_invalidation);
+                        channel_or_session, fuse_notify_invalidation);
 
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {

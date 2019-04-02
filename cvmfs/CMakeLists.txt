@@ -36,6 +36,7 @@ set (CVMFS_CLIENT_SOURCES
   clientctx.cc
   compression.cc
   directory_entry.cc
+  duplex_fuse.cc
   dns.cc
   download.cc
   fetch.cc
@@ -573,9 +574,13 @@ if (BUILD_CVMFS)
                                         ${PROTOBUF_LITE_LIBRARY}
                                         ${VJSON_LIBRARIES}
                                         ${RT_LIBRARY}
-                                        ${UUID_LIBRARIES}
-                                        ${FUSE_LIBRARIES}
-                                        pthread dl)
+                                        ${UUID_LIBRARIES})
+  if (FUSE3_FOUND)
+    list (APPEND CVMFS_FUSE_LINK_LIBRARIES ${FUSE3_LIBRARIES})
+  else()
+    list (APPEND CVMFS_FUSE_LINK_LIBRARIES ${FUSE_LIBRARIES})
+  endif()
+  list (APPEND CVMFS_FUSE_LINK_LIBRARIES pthread dl)
 
   target_link_libraries (cvmfs2 ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES}
                                 ${CVMFS_FUSE_LINK_LIBRARIES} ${RT_LIBRARY}

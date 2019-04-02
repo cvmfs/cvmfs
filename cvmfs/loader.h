@@ -5,16 +5,16 @@
 #ifndef CVMFS_LOADER_H_
 #define CVMFS_LOADER_H_
 
-#define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
-#include <fuse/fuse_lowlevel.h>
 #include <stdint.h>
 #include <time.h>
 
 #include <cstring>
 #include <string>
 #include <vector>
+
+#include "duplex_fuse.h"
 
 namespace loader {
 

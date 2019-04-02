@@ -6,9 +6,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#ifndef CVMFS_LIBCVMFS
-#include <fuse/fuse_lowlevel.h>
-#endif
 #include <inttypes.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -18,6 +15,8 @@
 #include <climits>
 #include <cstring>
 #include <vector>
+
+#include "duplex_fuse.h"  // NOLINT
 
 #ifndef CVMFS_LIBCVMFS
 #ifdef FUSE_CAP_EXPORT_SUPPORT

@@ -10,7 +10,6 @@
  */
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
-#define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
 #include "cvmfs_config.h"
@@ -19,8 +18,6 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fuse/fuse_lowlevel.h>
-#include <fuse/fuse_opt.h>
 #include <openssl/crypto.h>
 #include <sched.h>
 #include <signal.h>
@@ -41,6 +38,7 @@
 #include <vector>
 
 #include "atomic.h"
+#include "duplex_fuse.h"
 #include "duplex_ssl.h"
 #include "fence.h"
 #include "loader_talk.h"
@@ -858,8 +856,12 @@ int main(int argc, char *argv[]) {
   delete options_manager;
   options_manager = NULL;
 
+#if CVMFS_USE_LIBFUSE == 2
   struct fuse_chan *channel;
   loader_exports_->fuse_channel = &channel;
+#else
+  loader_exports_->fuse_channel = NULL;
+#endif
 
   // Load and initialize cvmfs library
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
@@ -898,6 +900,12 @@ int main(int argc, char *argv[]) {
     }
   }
 
+
+  struct fuse_lowlevel_ops loader_operations;
+  SetFuseOperations(&loader_operations);
+  struct fuse_session *session;
+
+#if CVMFS_USE_LIBFUSE == 2
   channel = fuse_mount(mount_point_->c_str(), mount_options);
   if (!channel) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
@@ -905,6 +913,28 @@ int main(int argc, char *argv[]) {
     cvmfs_exports_->fnFini();
     return kFailMount;
   }
+
+  session = fuse_lowlevel_new(mount_options, &loader_operations,
+                              sizeof(loader_operations), NULL);
+  if (!session) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to create Fuse session");
+    fuse_unmount(mount_point_->c_str(), channel);
+    cvmfs_exports_->fnFini();
+    return kFailMount;
+  }
+
+#else
+  // libfuse3
+  session = fuse_session_new(mount_options, &loader_operations,
+                             sizeof(loader_operations), NULL);
+  if (!session) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to create Fuse session");
+    cvmfs_exports_->fnFini();
+    return kFailMount;
+  }
+#endif
 
   // drop credentials
   if (suid_mode_) {
@@ -915,19 +945,6 @@ int main(int argc, char *argv[]) {
       cvmfs_exports_->fnFini();
       return kFailPermission;
     }
-  }
-
-  struct fuse_lowlevel_ops loader_operations;
-  SetFuseOperations(&loader_operations);
-  struct fuse_session *session;
-  session = fuse_lowlevel_new(mount_options, &loader_operations,
-                              sizeof(loader_operations), NULL);
-  if (!session) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "failed to create Fuse session");
-    fuse_unmount(mount_point_->c_str(), channel);
-    cvmfs_exports_->fnFini();
-    return kFailMount;
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
@@ -944,24 +961,38 @@ int main(int argc, char *argv[]) {
   SetLogMicroSyslog("");
   retval = fuse_set_signal_handlers(session);
   assert(retval == 0);
+#if CVMFS_USE_LIBFUSE == 2
   fuse_session_add_chan(session, channel);
-  if (single_threaded_)
+#endif
+  if (single_threaded_) {
     retval = fuse_session_loop(session);
-  else
+  } else {
+#if CVMFS_USE_LIBFUSE == 2
     retval = fuse_session_loop_mt(session);
+#else
+    retval = fuse_session_loop_mt(session, 1 /* use fd per thread */);
+#endif
+  }
   SetLogMicroSyslog(*usyslog_path_);
 
   loader_talk::Fini();
   cvmfs_exports_->fnFini();
 
   // Unmount
-  fuse_session_remove_chan(channel);
+#if CVMFS_USE_LIBFUSE == 2
   fuse_remove_signal_handlers(session);
+  fuse_session_remove_chan(channel);
   fuse_session_destroy(session);
   fuse_unmount(mount_point_->c_str(), channel);
+  channel = NULL;
+#else
+  // libfuse3
+  fuse_remove_signal_handlers(session);
+  fuse_session_unmount(session);
+  fuse_session_destroy(session);
+#endif
   fuse_opt_free_args(mount_options);
   delete mount_options;
-  channel = NULL;
   session = NULL;
   mount_options = NULL;
 
