@@ -62,6 +62,7 @@ struct CvmfsOptions {
   int cvmfs_suid;
   int disable_watchdog;
   int simple_options_parsing;
+  int foreground;
 
   // Ignored options
   int ign_netdev;
@@ -91,6 +92,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("cvmfs_suid",                cvmfs_suid),
   CVMFS_SWITCH("disable_watchdog",          disable_watchdog),
   CVMFS_SWITCH("simple_options_parsing",    simple_options_parsing),
+  CVMFS_SWITCH("foreground",                foreground),
 
   // Ignore these options
   CVMFS_SWITCH("_netdev",          ign_netdev),
@@ -159,6 +161,7 @@ static void Usage(const string &exename) {
     "  -o parse             Parse and print cvmfs parameters\n"
     "  -o cvmfs_suid        Enable suid mode\n\n"
     "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
+    "  -o foreground        Run in foreground\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
@@ -379,6 +382,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   suid_mode_ = cvmfs_options.cvmfs_suid;
   disable_watchdog_ = cvmfs_options.disable_watchdog;
   simple_options_parsing_ = cvmfs_options.simple_options_parsing;
+  foreground_ = cvmfs_options.foreground;
 
   return mount_options;
 }
