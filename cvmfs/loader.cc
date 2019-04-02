@@ -923,7 +923,6 @@ int main(int argc, char *argv[]) {
     cvmfs_exports_->fnFini();
     return kFailMount;
   }
-
 #else
   // libfuse3
   session = fuse_session_new(mount_options, &loader_operations,
@@ -931,6 +930,13 @@ int main(int argc, char *argv[]) {
   if (!session) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "failed to create Fuse session");
+    cvmfs_exports_->fnFini();
+    return kFailMount;
+  }
+  retval = fuse_session_mount(session, mount_point_->c_str());
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to mount file system");
     cvmfs_exports_->fnFini();
     return kFailMount;
   }
