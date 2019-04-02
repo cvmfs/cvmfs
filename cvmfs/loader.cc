@@ -63,6 +63,7 @@ struct CvmfsOptions {
   int disable_watchdog;
   int simple_options_parsing;
   int foreground;
+  int fuse_debug;
 
   // Ignored options
   int ign_netdev;
@@ -93,6 +94,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("disable_watchdog",          disable_watchdog),
   CVMFS_SWITCH("simple_options_parsing",    simple_options_parsing),
   CVMFS_SWITCH("foreground",                foreground),
+  CVMFS_SWITCH("fuse_debug",                fuse_debug),
 
   // Ignore these options
   CVMFS_SWITCH("_netdev",          ign_netdev),
@@ -383,6 +385,9 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   disable_watchdog_ = cvmfs_options.disable_watchdog;
   simple_options_parsing_ = cvmfs_options.simple_options_parsing;
   foreground_ = cvmfs_options.foreground;
+  if (cvmfs_options.fuse_debug) {
+    fuse_opt_add_arg(mount_options, "-d");
+  }
 
   return mount_options;
 }
@@ -763,11 +768,11 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (!DirectoryExists(*mount_point_)) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "Moint point %s does not exist", mount_point_->c_str());
-    return kFailPermission;
-  }
+  //if (!DirectoryExists(*mount_point_)) {
+  //  LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+  //           "Moint point %s does not exist", mount_point_->c_str());
+  //  return kFailPermission;
+  //}
 
   // Number of file descriptors
   if (options_manager->GetValue("CVMFS_NFILES", &parameter)) {
