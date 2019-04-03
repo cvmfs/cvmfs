@@ -148,6 +148,7 @@ typedef std::vector<LoadEvent *> EventList;
  * CernVM-FS 2.1.8 --> Version 2
  * CernVM-FS 2.2.0 --> Version 3
  * CernVM-FS 2.4.0 --> Version 4
+ * CernVM-FS 2.7.0 --> Version 4, fuse_channel --> fuse_channel_or_session
  */
 struct LoaderExports {
   LoaderExports() :
@@ -157,7 +158,7 @@ struct LoaderExports {
     foreground(false),
     disable_watchdog(false),
     simple_options_parsing(false),
-    fuse_channel(NULL)
+    fuse_channel_or_session(NULL)
   { }
 
   ~LoaderExports() {
@@ -184,7 +185,11 @@ struct LoaderExports {
   bool simple_options_parsing;
 
   // added with CernVM-FS 2.4.0 (LoaderExports Version: 4)
-  struct fuse_chan **fuse_channel;
+  // As of CernVM-FS 2.7, this has been rebranded from
+  // struct fuse_chan **fuse_channel  to
+  // void **fuse_channel_or_session
+  // in order to work with both libfuse2 and libfuse3
+  void **fuse_channel_or_session;
 };
 
 

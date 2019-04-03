@@ -25,15 +25,11 @@
     }
   }
 #else  // CVMFS_LIBCVMFS
-  #ifndef CVMFS_FUSE_LIBVERSION
-    #ifdef HAS_FUSE3
-      #define CVMFS_FUSE_LIBVERSION 3
-    #else
-      #define CVMFS_FUSE_LIBVERSION 2
-    #endif
+  #ifndef CVMFS_USE_LIBFUSE
+    #error "Build system error: CVMFS_USE_LIBFUSE unset"
   #endif
 
-  #if CVMFS_FUSE_LIBVERSION == 2
+  #if CVMFS_USE_LIBFUSE == 2
     #define FUSE_USE_VERSION 26
     #include <fuse/fuse_lowlevel.h>
     #include <fuse/fuse_opt.h>
@@ -53,7 +49,7 @@
       }
     #endif  // FUSE_VERSION < 28
   #else
-    // CVMFS_FUSE_LIBVERSION == 3
+    // CVMFS_USE_LIBFUSE == 3
     #define FUSE_USE_VERSION 31
     #include <fuse3/fuse.h>
     #include <fuse3/fuse_lowlevel.h>

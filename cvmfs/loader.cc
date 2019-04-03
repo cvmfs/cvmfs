@@ -41,6 +41,7 @@
 #include "duplex_fuse.h"
 #include "duplex_ssl.h"
 #include "fence.h"
+#include "fuse_main.h"
 #include "loader_talk.h"
 #include "logging.h"
 #include "options.h"
@@ -72,6 +73,7 @@ struct CvmfsOptions {
   int ign_users;
   int ign_auto;
   int ign_noauto;
+  int ign_libfuse;
 };
 
 enum {
@@ -103,6 +105,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("users",            ign_users),
   CVMFS_SWITCH("auto",             ign_auto),
   CVMFS_SWITCH("noauto",           ign_noauto),
+  CVMFS_OPT("libfuse=%d",          ign_libfuse, 0),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -164,6 +167,7 @@ static void Usage(const string &exename) {
     "  -o cvmfs_suid        Enable suid mode\n\n"
     "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
     "  -o foreground        Run in foreground\n"
+    "  -o libfuse=[2,3]     Enforce a certain libfuse version\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
@@ -384,7 +388,9 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   suid_mode_ = cvmfs_options.cvmfs_suid;
   disable_watchdog_ = cvmfs_options.disable_watchdog;
   simple_options_parsing_ = cvmfs_options.simple_options_parsing;
-  foreground_ = cvmfs_options.foreground;
+  if (cvmfs_options.foreground) {
+    foreground_ = true;
+  }
   if (cvmfs_options.fuse_debug) {
     fuse_opt_add_arg(mount_options, "-d");
   }
@@ -437,7 +443,11 @@ static void CloseLibrary() {
 static CvmfsExports *LoadLibrary(const bool debug_mode,
                                  LoaderExports *loader_exports)
 {
+#if CVMFS_USE_LIBFUSE == 2
   string library_name = string("cvmfs_fuse") + ((debug_mode) ? "_debug" : "");
+#else
+  string library_name = string("cvmfs_fuse3") + ((debug_mode) ? "_debug" : "");
+#endif
   library_name = platform_libname(library_name);
   string error_messages;
 
@@ -602,7 +612,7 @@ static void CleanupLibcryptoMt(void) {
 }
 
 
-int main(int argc, char *argv[]) {
+int FuseMain(int argc, char *argv[]) {
   // Set a decent umask for new files (no write access to group/everyone).
   // We want to allow group write access for the talk-socket.
   umask(007);
@@ -865,11 +875,14 @@ int main(int argc, char *argv[]) {
   delete options_manager;
   options_manager = NULL;
 
+  struct fuse_session *session;
 #if CVMFS_USE_LIBFUSE == 2
   struct fuse_chan *channel;
-  loader_exports_->fuse_channel = &channel;
+  loader_exports_->fuse_channel_or_session = reinterpret_cast<void **>(
+    &channel);
 #else
-  loader_exports_->fuse_channel = NULL;
+  loader_exports_->fuse_channel_or_session = reinterpret_cast<void **>(
+    &session);
 #endif
 
   // Load and initialize cvmfs library
@@ -912,7 +925,6 @@ int main(int argc, char *argv[]) {
 
   struct fuse_lowlevel_ops loader_operations;
   SetFuseOperations(&loader_operations);
-  struct fuse_session *session;
 
 #if CVMFS_USE_LIBFUSE == 2
   channel = fuse_mount(mount_point_->c_str(), mount_options);
@@ -1035,3 +1047,18 @@ int main(int argc, char *argv[]) {
     return kFailFuseLoop;
   return kFailOk;
 }
+
+
+__attribute__((visibility("default")))
+CvmfsStubExports *g_cvmfs_stub_exports = NULL;
+
+static void __attribute__((constructor)) LibraryMain() {
+  g_cvmfs_stub_exports = new CvmfsStubExports();
+  g_cvmfs_stub_exports->fn_main = FuseMain;
+}
+
+static void __attribute__((destructor)) LibraryExit() {
+  delete g_cvmfs_stub_exports;
+  g_cvmfs_stub_exports = NULL;
+}
+

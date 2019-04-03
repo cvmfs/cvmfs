@@ -1843,8 +1843,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   void **channel_or_session = NULL;
   if (loader_exports->version >= 4) {
-    channel_or_session =
-      reinterpret_cast<void **>(loader_exports->fuse_channel);
+    channel_or_session = loader_exports->fuse_channel_or_session;
   }
 
   bool fuse_notify_invalidation = true;
