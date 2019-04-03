@@ -5,10 +5,12 @@ Build status: [![build status](https://travis-ci.org/cvmfs/cvmfs-gateway.svg?bra
 
 The CVMFS repository gateway is part of the CernVM File System.
 
-Build
------
+Build and test
+--------------
 
-    $ rebar3 compile
+```bash
+$ go test -v ./...
+```
 
 License and copyright
 ---------------------
