@@ -1,5 +1,11 @@
-# Language doesn't matter in this case, since we are building in Docker
-language: c++
+language: go
+
+go:
+  - 1.11.x
+  - 1.12.x
+
+env:
+  - GO111MODULE=on
 
 services:
   - docker
@@ -11,5 +17,4 @@ notifications:
     on_success: change
     on_failure: always
 
-script:
-  - ./ci/travis_main.sh
+script: go test -v ./...
