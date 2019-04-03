@@ -59,7 +59,15 @@ _remove_client() {
   rm -f "$pkgdir/usr/lib/libcvmfs_fuse.so" \
     "$pkgdir/usr/lib/libcvmfs_fuse.so.$pkgver" \
     "$pkgdir/usr/lib/libcvmfs_fuse_debug.so" \
-    "$pkgdir/usr/lib/libcvmfs_fuse_debug.so.$pkgver"
+    "$pkgdir/usr/lib/libcvmfs_fuse_debug.so.$pkgver" \
+    "$pkgdir/usr/lib/libcvmfs_fuse3.so" \
+    "$pkgdir/usr/lib/libcvmfs_fuse3.so.$pkgver" \
+    "$pkgdir/usr/lib/libcvmfs_fuse3_debug.so" \
+    "$pkgdir/usr/lib/libcvmfs_fuse3_debug.so.$pkgver" \
+    "$pkgdir/usr/lib/libcvmfs_fuse_stub.so" \
+    "$pkgdir/usr/lib/libcvmfs_fuse_stub.so.$pkgver" \
+    "$pkgdir/usr/lib/libcvmfs_fuse3_stub.so" \
+    "$pkgdir/usr/lib/libcvmfs_fuse3_stub.so.$pkgver"
   rm -rf "$pkgdir/etc/cvmfs/default.d" "$pkgdir/usr/lib/cvmfs" \
     "$pkgdir/etc/bash_completion.d"
 }
