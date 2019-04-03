@@ -1,0 +1,10 @@
+{
+    "port" : 4929,
+    "max_lease_time" : 7200,
+    "etcd_endpoints" : ["localhost:2379"],
+    "s3_endpoint" : "localhost:9000",
+    "s3_force_path_style" : true,
+    "s3_disable_ssl" : true,
+    "log_level" : "info",
+    "log_timestamps" : false
+}
