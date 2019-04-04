@@ -156,6 +156,7 @@ Copyright (c) CERN
 %package fuse3
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
+Requires: cvmfs = %{version}
 Requires: fuse3-libs
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
