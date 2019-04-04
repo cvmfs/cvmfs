@@ -290,7 +290,11 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 static void stub_forget(
   fuse_req_t req,
   fuse_ino_t ino,
+#if CVMFS_USE_LIBFUSE == 2
   unsigned long nlookup  // NOLINT
+#else
+  std::uint64_t nlookup
+#endif
 ) {
   FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);

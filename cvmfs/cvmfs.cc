@@ -460,7 +460,11 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 static void cvmfs_forget(
   fuse_req_t req,
   fuse_ino_t ino,
+#if CVMFS_USE_LIBCVMFS == 2
   unsigned long nlookup  // NOLINT
+#else
+  std::uint64_t nlookup
+#endif
 ) {
   perf::Inc(file_system_->n_fs_forget());
 
@@ -474,8 +478,13 @@ static void cvmfs_forget(
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   // This has been seen to deadlock on the debug log mutex on SL5.  Problem of
   // old kernel/fuse?
+#if CVMFS_USE_LIBCVMFS == 2
   LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %u",
            uint64_t(ino), nlookup);
+#else
+  LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
+           uint64_t(ino), nlookup);
+#endif
   if (!file_system_->IsNfsSource())
     mount_point_->inode_tracker()->VfsPut(ino, nlookup);
   fuse_remounter_->fence()->Leave();
