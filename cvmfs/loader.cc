@@ -293,7 +293,7 @@ static void stub_forget(
 #if CVMFS_USE_LIBFUSE == 2
   unsigned long nlookup  // NOLINT
 #else
-  std::uint64_t nlookup
+  uint64_t nlookup
 #endif
 ) {
   FenceGuard fence_guard(fence_reload_);

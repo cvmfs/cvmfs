@@ -463,7 +463,7 @@ static void cvmfs_forget(
 #if CVMFS_USE_LIBCVMFS == 2
   unsigned long nlookup  // NOLINT
 #else
-  std::uint64_t nlookup
+  uint64_t nlookup
 #endif
 ) {
   perf::Inc(file_system_->n_fs_forget());
