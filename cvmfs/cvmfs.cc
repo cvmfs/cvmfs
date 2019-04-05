@@ -460,7 +460,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 static void cvmfs_forget(
   fuse_req_t req,
   fuse_ino_t ino,
-#if CVMFS_USE_LIBCVMFS == 2
+#if CVMFS_USE_LIBFUSE == 2
   unsigned long nlookup  // NOLINT
 #else
   uint64_t nlookup
