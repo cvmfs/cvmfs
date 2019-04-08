@@ -523,14 +523,14 @@ fi
 %doc COPYING AUTHORS README.md ChangeLog
 
 %if 0%{?build_fuse3}
+%files fuse3
+%defattr(-,root,root)
 %{_libdir}/libcvmfs_fuse3_stub.so
 %{_libdir}/libcvmfs_fuse3_stub.so.%{version}
 %{_libdir}/libcvmfs_fuse3.so
 %{_libdir}/libcvmfs_fuse3.so.%{version}
 %{_libdir}/libcvmfs_fuse3_debug.so
 %{_libdir}/libcvmfs_fuse3_debug.so.%{version}
-%files fuse3
-
 %doc COPYING AUTHORS README.md ChangeLog
 %endif
 
