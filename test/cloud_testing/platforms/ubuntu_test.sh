@@ -59,6 +59,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
                                  src/050-configrepo                           \
+                                 src/084-premounted                           \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \

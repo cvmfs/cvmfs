@@ -83,6 +83,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/005-asetup                               \
                                  src/006-buildkernel                          \
                                  src/024-reload-during-asetup                 \
+                                 src/084-premounted                           \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
