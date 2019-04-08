@@ -13,6 +13,13 @@
 #include "util/posix.h"
 #include "util/string.h"
 
+namespace {
+
+bool BothAreSpaces(const char& c1, const char& c2) {
+  return c1 == ' ' && (c1 == c2);
+}
+
+}
 
 namespace gateway {
 
@@ -44,7 +51,7 @@ bool ParseKey(const std::string& body, std::string* key_id,
               std::string* secret) {
   std::string line = GetLineMem(body.data(), body.size());
   std::string l = Trim(ReplaceAll(line, "\t", " "));
-  l.erase(std::unique(l.begin(), l.end()), l.end());
+  l.erase(std::unique(l.begin(), l.end(), BothAreSpaces), l.end());
   std::vector<std::string> tokens = SplitString(l, ' ');
 
   if (tokens.size() < 2 || tokens.size() > 3) {
