@@ -29,6 +29,7 @@ struct Params {
   size_t nested_kcatalog_limit;
   size_t root_kcatalog_limit;
   size_t file_mbyte_limit;
+  bool garbage_collection;
   bool use_autocatalogs;
   size_t max_weight;
   size_t min_weight;

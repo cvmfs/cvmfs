@@ -90,16 +90,7 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
              "CVMFS_USE_FILE_CHUNKING");
     return false;
   }
-  if (use_chunking_str == "true") {
-    params->use_file_chunking = true;
-  } else if (use_chunking_str == "false") {
-    params->use_file_chunking = false;
-  } else {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Invalid value of repository parameter %s: %s",
-             "CVMFS_USE_FILE_CHUNKING", use_chunking_str.c_str());
-    return false;
-  }
+  params->use_file_chunking = parser.IsOn(use_chunking_str);
 
   std::string min_chunk_size_str;
   if (!parser.GetValue("CVMFS_MIN_CHUNK_SIZE", &min_chunk_size_str)) {
@@ -128,6 +119,15 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
   }
   params->max_chunk_size = String2Uint64(max_chunk_size_str);
 
+  std::string garbage_collection_str;
+  if (!parser.GetValue("CVMFS_GARBAGE_COLLECTION", &garbage_collection_str)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Missing parameter %s in repository configuration file.",
+             "CVMFS_GARBAGE_COLLECTION");
+    return false;
+  }
+  params->garbage_collection = parser.IsOn(garbage_collection_str);
+
   std::string use_autocatalogs_str;
   if (!parser.GetValue("CVMFS_AUTOCATALOGS", &use_autocatalogs_str)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -135,16 +135,7 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
              "CVMFS_AUTOCATALOGS");
     return false;
   }
-  if (use_autocatalogs_str == "true") {
-    params->use_autocatalogs = true;
-  } else if (use_autocatalogs_str == "false") {
-    params->use_autocatalogs = false;
-  } else {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Invalid value of repository parameter %s: %s.",
-             "CVMFS_AUTOCATALOGS", use_autocatalogs_str.c_str());
-    return false;
-  }
+  params->use_autocatalogs = parser.IsOn(use_autocatalogs_str);
 
   std::string max_weight_str;
   if (parser.GetValue("CVMFS_AUTOCATALOGS_MAX_WEIGHT", &max_weight_str)) {
@@ -156,12 +147,9 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     params->min_weight = String2Uint64(min_weight_str);
   }
 
-  params->enforce_limits = false;
   std::string enforce_limits_str;
   if (parser.GetValue("CVMFS_ENFORCE_LIMITS", &enforce_limits_str)) {
-    if (enforce_limits_str == "true") {
-      params->enforce_limits = true;
-    }
+    params->enforce_limits = parser.IsOn(enforce_limits_str);
   }
 
   // TODO(dwd): the next 3 limit variables should take defaults from
