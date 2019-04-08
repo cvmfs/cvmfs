@@ -14,5 +14,7 @@ func main() {
 	}
 	gw.ConfigLogging(cfg)
 
+	gw.Log.Info().Msgf("Configuration read: %+v", cfg)
+
 	gw.Log.Info().Msg("starting repository gateway")
 }
