@@ -272,6 +272,15 @@ CommitProcessor::Result CommitProcessor::Process(
              manifest->catalog_hash().ToString(false).c_str());
   }
 
+  // Ensure CVMFS_ROOT_HASH is not set in
+  // /var/spool/cvmfs/<REPO_NAME>/client.local
+  const std::string fname = "/var/spool/cvmfs/" + repo_name + "/client.local";
+  if (truncate(fname.c_str(), 0) < 0) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Could not truncate %s\n",
+             fname.c_str());
+    return kError;
+  }
+
   return kSuccess;
 }
 
