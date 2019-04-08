@@ -564,7 +564,7 @@ if (BUILD_CVMFS)
                                          COMPILE_FLAGS "${CVMFS_STUB_CFLAGS}"
                                          LINK_FLAGS "${CVMFS_STUB_LD_FLAGS}")
   set_target_properties (cvmfs_fuse_debug PROPERTIES
-                                          COMPILE_FLAGS "${CVMFS_FUSE_CFLAGS}"
+                                          COMPILE_FLAGS "${CVMFS_FUSE_DEBUG_CFLAGS}"
                                           LINK_FLAGS "${CVMFS_FUSE_DEBUG_LD_FLAGS}")
   set_target_properties (cvmfs_fuse PROPERTIES COMPILE_FLAGS "${CVMFS_FUSE_CFLAGS}"
                                                LINK_FLAGS "${CVMFS_FUSE_LD_FLAGS}")
@@ -573,9 +573,9 @@ if (BUILD_CVMFS)
                                             COMPILE_FLAGS "${CVMFS_STUB3_CFLAGS}"
                                             LINK_FLAGS "${CVMFS_STUB_LD_FLAGS}")
     set_target_properties (cvmfs_fuse3_debug PROPERTIES
-                                             COMPILE_FLAGS "${CVMFS_FUSE_CFLAGS}"
+                                             COMPILE_FLAGS "${CVMFS_FUSE3_DEBUG_CFLAGS}"
                                              LINK_FLAGS "${CVMFS_FUSE_DEBUG_LD_FLAGS}")
-    set_target_properties (cvmfs_fuse3 PROPERTIES COMPILE_FLAGS "${CVMFS_FUSE_CFLAGS}"
+    set_target_properties (cvmfs_fuse3 PROPERTIES COMPILE_FLAGS "${CVMFS_FUSE3_CFLAGS}"
                                                   LINK_FLAGS "${CVMFS_FUSE_LD_FLAGS}")
   endif()
   set_target_properties (cvmfs_fsck PROPERTIES COMPILE_FLAGS "${CVMFS_FSCK_CFLAGS}"
