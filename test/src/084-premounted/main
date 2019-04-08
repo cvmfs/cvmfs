@@ -1,0 +1,53 @@
+
+cvmfs_test_name="Pre-mounted startup"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST084_MOUNTPOINT=
+CVMFS_TEST084_FUSEPREMOUNT=
+
+cleanup() {
+  if [ x"$CVMFS_TEST084_FUSEPREMOUNT" != "x" ]; then
+    rm -f "CVMFS_TEST084_FUSEPREMOUNT"
+  fi
+  if [ x"$CVMFS_TEST084_MOUNTPOINT" != "x" ]; then
+    cat /proc/self/mountinfo
+    sudo umount $CVMFS_TEST084_MOUNTPOINT
+    echo "*** unmounted $CVMFS_TEST084_MOUNTPOINT"
+  fi
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local workdir="$2"
+
+  echo "*** creating fuse-premount"
+  cc -o fuse_premount "$workdir/fuse_premount.c" || return 1
+  sudo chown root:root fuse_premount || return 2
+  sudo chmod 4755 fuse_premount || return 3
+  CVMFS_TEST084_FUSEPREMOUNT=/fuse_premount
+  sudo cp fuse_premount $CVMFS_TEST084_FUSEPREMOUNT || return 4
+  ls -lah $CVMFS_TEST084_FUSEPREMOUNT
+  trap cleanup HUP EXIT TERM INT || return 5
+
+  local cache="$PWD/cache"
+  mkdir $cache
+  cat > sft.config << EOF
+CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/sft.cern.ch
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_RELOAD_SOCKETS=$cache
+CVMFS_CACHE_BASE=$cache
+CVMFS_SHARED_CACHE=no
+CVMFS_CLAIM_OWNERSHIP=yes
+CVMFS_KEYS_DIR=/etc/cvmfs/keys/cern.ch
+EOF
+
+  CVMFS_TEST084_MOUNTPOINT="$PWD/mountpoint"
+  echo "*** mounting on $CVMFS_TEST084_MOUNTPOINT"
+  mkdir $CVMFS_TEST084_MOUNTPOINT
+  $CVMFS_TEST084_FUSEPREMOUNT /usr/bin/cvmfs2 -o debug,libfuse=3,config=sft.config sft.cern.ch $CVMFS_TEST084_MOUNTPOINT || return 10
+  ls -lah "$CVMFS_TEST084_MOUNTPOINT" || return 12
+  cat "$CVMFS_TEST084_MOUNTPOINT/.cvmfsdirtab" || return 13
+
+  return 0
+}
+

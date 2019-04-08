@@ -134,6 +134,7 @@ bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
+bool premounted_ = false;
 bool disable_watchdog_ = false;
 bool simple_options_parsing_ = false;
 void *library_handle_;
@@ -173,6 +174,24 @@ static void Usage(const string &exename) {
     "  -o allow_root        allow access to root\n"
     "  -o nonempty          allow mounts over non-empty directory\n",
     PACKAGE_VERSION, exename.c_str());
+}
+
+/**
+ * For an premounted mountpoint, the argument is the file descriptor to
+ * /dev/fuse provided in the form /dev/fd/%d
+ */
+bool CheckPremounted(const std::string &mountpoint) {
+  int len;
+  unsigned fd;
+  bool retval = (sscanf(mountpoint.c_str(), "/dev/fd/%u%n", &fd, &len) == 1) &&
+                (len >= 0) &&
+                (static_cast<unsigned>(len) == mountpoint.length());
+  if (retval) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: pre-mounted on file descriptor %d", fd);
+    return true;
+  }
+  return false;
 }
 
 
@@ -336,6 +355,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
         if (mount_point_)
           return 1;
         mount_point_ = new string(arg);
+        premounted_ = CheckPremounted(*mount_point_);
       }
       return 0;
 
@@ -782,8 +802,7 @@ int FuseMain(int argc, char *argv[]) {
     }
   }
 
-  // TODO(jblomer): don't check this for external mounts
-  if (!DirectoryExists(*mount_point_)) {
+  if (!premounted_ && !DirectoryExists(*mount_point_)) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "Moint point %s does not exist", mount_point_->c_str());
     return kFailPermission;
@@ -832,7 +851,8 @@ int FuseMain(int argc, char *argv[]) {
         (chmod(mount_point_->c_str(), 0755) != 0))
     {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to grab mountpoint (%d)", errno);
+               "Failed to grab mountpoint %s (%d)",
+               mount_point_->c_str(), errno);
       return kFailPermission;
     }
   }
@@ -979,8 +999,10 @@ int FuseMain(int argc, char *argv[]) {
     }
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
-           mount_point_->c_str());
+  if (!premounted_) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
+             mount_point_->c_str());
+  }
   LogCvmfs(kLogCvmfs, kLogSyslog,
            "CernVM-FS: linking %s to repository %s",
            mount_point_->c_str(), repository_name_->c_str());
