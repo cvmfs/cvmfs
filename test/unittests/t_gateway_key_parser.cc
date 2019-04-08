@@ -41,6 +41,15 @@ TEST_F(T_GatewayKeyParser, ValidTabsSpacesAndNewlines) {
                                 &key_id, &secret));
 }
 
+TEST_F(T_GatewayKeyParser, ValidRepeatingChars) {
+  std::string key_id;
+  std::string secret;
+  ASSERT_TRUE(gateway::ParseKey("plain_text key111 sseeccrreett",
+                                &key_id, &secret));
+  ASSERT_EQ("key111", key_id);
+  ASSERT_EQ("sseeccrreett", secret);
+}
+
 TEST_F(T_GatewayKeyParser, InvalidTypo) {
   std::string key_id;
   std::string secret;
