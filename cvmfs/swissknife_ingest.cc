@@ -11,6 +11,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "statistics.h"
+#include "swissknife_capabilities.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
@@ -115,6 +116,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   bool with_gateway =
       spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
+
+  // This may fail, in which case a warning is printed and the process continues
+  ObtainDacReadSearchCapability();
 
   UniquePtr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
