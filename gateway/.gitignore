@@ -15,4 +15,4 @@ logs
 _build
 .idea
 Mnesia.*
-gateway
+/gateway
