@@ -219,7 +219,8 @@ CommitProcessor::Result CommitProcessor::Process(
   SigningTool::Result res = signing_tool.Run(
       new_manifest_path, params.stratum0, params.spooler_configuration,
       temp_dir, certificate, private_key, repo_name, "", "",
-      "/var/spool/cvmfs/" + repo_name + "/reflog.chksum");
+      "/var/spool/cvmfs/" + repo_name + "/reflog.chksum",
+      params.garbage_collection);
   switch (res) {
     case SigningTool::kReflogChecksumMissing:
       LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -269,6 +270,15 @@ CommitProcessor::Result CommitProcessor::Process(
              "CommitProcessor - lease_path: %s, new root hash: %s",
              lease_path.c_str(),
              manifest->catalog_hash().ToString(false).c_str());
+  }
+
+  // Ensure CVMFS_ROOT_HASH is not set in
+  // /var/spool/cvmfs/<REPO_NAME>/client.local
+  const std::string fname = "/var/spool/cvmfs/" + repo_name + "/client.local";
+  if (truncate(fname.c_str(), 0) < 0) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Could not truncate %s\n",
+             fname.c_str());
+    return kError;
   }
 
   return kSuccess;
