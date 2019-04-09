@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AccessConfiguration is the configuration of a single repository
-type AccessConfiguration struct {
+// AccessConfig is the configuration of a single repository
+type AccessConfig struct {
 	Repositories map[string]map[string]string
 	Keys         map[string]string
 }
@@ -49,22 +49,22 @@ type KeyImportFun func(KeySpec) (string, string, string, error)
 
 type rawConfig map[string]json.RawMessage
 
-// NewAccessConfiguration creates an empty repository configuration
-func NewAccessConfiguration() AccessConfiguration {
-	return AccessConfiguration{
+// NewAccessConfig creates an empty repository configuration
+func NewAccessConfig() AccessConfig {
+	return AccessConfig{
 		Repositories: make(map[string]map[string]string),
 		Keys:         make(map[string]string)}
 }
 
 // Load parses a configuration file and populates the repository
 // configuration object
-func (c *AccessConfiguration) Load(fileName string) error {
+func (c *AccessConfig) Load(fileName string) error {
 	return c.LoadWithImporter(fileName, keyImporter)
 }
 
 // LoadWithImporter parses a configuration file and populates the repository
 // configuration object. Uses the specified key importer function
-func (c *AccessConfiguration) LoadWithImporter(fileName string, importer KeyImportFun) error {
+func (c *AccessConfig) LoadWithImporter(fileName string, importer KeyImportFun) error {
 	f, err := os.Open(fileName)
 	if err != nil {
 		return errors.Wrap(err, "could not open input file for reading")
@@ -73,7 +73,7 @@ func (c *AccessConfiguration) LoadWithImporter(fileName string, importer KeyImpo
 	return c.loadFromReader(f, importer)
 }
 
-func (c *AccessConfiguration) loadFromReader(rd io.Reader, importer KeyImportFun) error {
+func (c *AccessConfig) loadFromReader(rd io.Reader, importer KeyImportFun) error {
 	var t rawConfig
 	if err := json.NewDecoder(rd).Decode(&t); err != nil {
 		return errors.Wrap(err, "could not decode JSON input")
@@ -88,7 +88,7 @@ func (c *AccessConfiguration) loadFromReader(rd io.Reader, importer KeyImportFun
 	return c.loadV2(t, importer)
 }
 
-func (c *AccessConfiguration) loadV1(cfg rawConfig, importer KeyImportFun) error {
+func (c *AccessConfig) loadV1(cfg rawConfig, importer KeyImportFun) error {
 	keyPaths := make(map[string]string)
 
 	// Load the keys from the config file and store the KeyID -> Secret mapping
@@ -127,7 +127,7 @@ func (c *AccessConfiguration) loadV1(cfg rawConfig, importer KeyImportFun) error
 	return nil
 }
 
-func (c *AccessConfiguration) loadV2(cfg rawConfig, importer KeyImportFun) error {
+func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 	if rawRepos, present := cfg["repos"]; present {
 		// Load the repository specifications as a list of json.RawMessage
 		rawList := make([]json.RawMessage, 0)
@@ -147,14 +147,15 @@ func (c *AccessConfiguration) loadV2(cfg rawConfig, importer KeyImportFun) error
 				// Item is a string representing the repository name; default key
 				// from /etc/cvmfs/keys/<REPO_NAME>/ will be associated
 				c.Repositories[name] = map[string]string{"default": "default"}
+			} else {
+				// Item is a RepositorySpecV2; associate the key IDs and paths to the
+				// repository
+				ks := make(map[string]string)
+				for _, k := range spec.Keys {
+					ks[k.ID] = k.Path
+				}
+				c.Repositories[spec.Name] = ks
 			}
-			// Item is a RepositorySpecV2; associate the key IDs and paths to the
-			// repository
-			ks := make(map[string]string)
-			for _, k := range spec.Keys {
-				ks[k.ID] = k.Path
-			}
-			c.Repositories[spec.Name] = ks
 		}
 	}
 
