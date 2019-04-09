@@ -96,6 +96,28 @@ cvmfs_server_gc() {
     fi
   done
 
+  # TODO: Once the gateway administration endpoint is in place (CVM-1685), it should be forbidded
+  #       to run GC directly on the gateway
+  # Check if the command is called on a repository gateway, and if so,
+  # abort if there are any active leases
+  if [ -x "/usr/libexec/cvmfs-gateway/scripts/get_leases.sh" ]; then
+    for name in $names; do
+      if [ x"$( /usr/libexec/cvmfs-gateway/scripts/get_leases.sh | grep $name )" != x"" ]; then
+        echo "Active lease found for repository: $name. Aborting"
+        return 1
+      fi
+    done
+    echo "Turning off cvmfs-gateway"
+    if is_systemd; then
+      sudo systemctl stop cvmfs-gateway
+    else
+      sudo service cvmfs-gateway stop
+    fi
+    trap __restore_cvmfs_gateway EXIT HUP INT TERM
+  fi
+
+
+
   # sanity checks
   if [ $dry_run -ne 0 ] && [ $reconstruct_reflog -ne 0 ]; then
     die "Reflog reconstruction needed. Cannot do a dry-run."
@@ -173,6 +195,15 @@ cvmfs_server_gc() {
       # Errors will be in the log.
     fi
   done
+}
+
+__restore_cvmfs_gateway() {
+  echo "Restoring cvmfs-gateway"
+  if is_systemd; then
+    sudo systemctl start cvmfs-gateway
+  else
+    sudo service cvmfs-gateway start
+  fi
 }
 
 # this is used when gc is invoked from the cvmfs_server command line
