@@ -83,7 +83,7 @@ run_transactions() {
     echo "Input hash  : $hash_in"
     echo "Output hash : $hash_out"
     if [ "$hash_in" != "$hash_out" ]; then
-        exit 1
+        return 1
     fi
 
     clean_up

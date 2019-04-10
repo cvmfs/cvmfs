@@ -1,8 +1,10 @@
 2.7.0:
 
 2.6.1:
-  * Fixed a bug preventing GC on the repository gateway (CVM-1705)
-  * Fixed a bug in the gateway key parser when key contained repeated chars
+  * Fix bug where the receiver temp dir caused failure of integrity
+    checks (CVM-1704)
+  * Fix a bug preventing GC on the repository gateway (CVM-1705)
+  * Fix a bug in the gateway key parser when key contained repeated chars
   * Fix transaction lock name for tarball ingest with gateway backend 
   * Add GC support for legacy catalogs before 1.0 schema stabilized (CVM-1698)
   * Fix potential race condition in the stats collector for the S3 uploader
