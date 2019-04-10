@@ -15,16 +15,18 @@ import (
 func Start(services *be.Services, port int, maxLeaseTime int) error {
 	router := mux.NewRouter()
 
-	// Registers the different routes
+	// Register the different routes
 
-	r := router.NewRoute()
-	r.Path(APIRoot + "/")
-	r.HandlerFunc(NewRootHandler())
+	// Root handler
+	router.Path(APIRoot).HandlerFunc(NewRootHandler())
 
-	r = router.NewRoute()
-	r.Path(APIRoot + "/repos")
-	r.Methods("GET")
-	r.HandlerFunc(NewGetReposHandler())
+	// Repositories
+	router.Path(APIRoot + "/repos/{name}").
+		Methods("GET").
+		HandlerFunc(NewGetReposHandler(&services.Access))
+	router.Path(APIRoot + "/repos").
+		Methods("GET").
+		HandlerFunc(NewGetReposHandler(&services.Access))
 
 	// Configure and start the HTTP server
 	timeout := time.Duration(maxLeaseTime) * time.Second
