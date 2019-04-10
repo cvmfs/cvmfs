@@ -21,7 +21,7 @@ compare_file_checksum() {
     echo "Checksum of $file_name is $checksum"
     if [ "$checksum" != "$target_checksum" ]; then
         echo "Checksum mismatch for $file_name. Expected $target_checksum. Found $checksum"
-        exit 1
+        return 1
     fi
 }
 
@@ -180,14 +180,20 @@ run_transactions() {
     cvmfs_server transaction test.repo.org
     echo "New file" > /cvmfs/test.repo.org/marker
 
-    echo "  Publishing changes 9"
+    echo "  Publishing changes 9 and run an integrity check"
     cvmfs_server publish -a specialtag test.repo.org
-    cvmfs_server check test.repo.org
+    cvmfs_server check -i test.repo.org
+    local integrity_check_res=$?
 
     echo "  Check that the named tag has been created"
     specialtag_line=$(cvmfs_server tag -l test.repo.org | grep specialtag)
 
     ## Check results
+
+    if [ $? -ne 0 ]; then
+        echo "Repository integrity check failed: $integrity_check_res"
+        return 1
+    fi
 
     compare_file_checksum /tmp/cvmfs_out_1/new_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
     compare_file_checksum /tmp/cvmfs_out_1/new_repository e5747677debcb10cabe17d87a40e7fa4
@@ -196,7 +202,7 @@ run_transactions() {
 
     if [ -d /tmp/cvmfs_out_3/new_repository ]; then
         echo "/cvmfs/test.repo.org/new_repository should have been deleted in transaction 3"
-        exit 1
+        return 1
     fi
 
     compare_file_checksum /tmp/cvmfs_out_4/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
@@ -207,17 +213,17 @@ run_transactions() {
 
     if [ -f /tmp/cvmfs_out_7/new/invalid_file.txt ]; then
         echo "/cvmfs/test.repo.org/new/invalid_file.txt should not have been create in transaction 7"
-        exit 1
+        return 1
     fi
 
     if [ $num_generic_tags_created -lt 1 ]; then
       echo "Autotags were not created during transaction 8"
-      exit 1
+      return 1
     fi
 
     if [ x"$specialtag_line" = x"" ]; then
       echo "Named tag was not created during transaction 9"
-      exit 1
+      return 1
     fi
 
     clean_up

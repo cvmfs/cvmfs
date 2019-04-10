@@ -64,7 +64,7 @@ run_transactions() {
     echo "Input hash 2  : $hash_in_2"
     echo "Output hash 2 : $hash_out_2"
     if [ x"$hash_in_1" != x"$hash_out_1" ] || [ x"$hash_in_2" != x"$hash_out_2" ]; then
-        exit 1
+        return 1
     fi
 
     clean_up
