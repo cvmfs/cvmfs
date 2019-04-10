@@ -104,6 +104,12 @@ void CommandScrub::DirCallback(
   const std::string &dir_name)
 {
   const string full_path = MakeFullPath(relative_path, dir_name);
+
+  // The directory "/srv/cvmfs/<REPO_NAME>/data/txn/receiver" is whitelisted
+  if (HasSuffix(full_path, "data/txn/receiver", false)) {
+    return;
+  }
+
   // Check for nested subdirs
   if (relative_path.size() > 0) {
     PrintAlert(Alerts::kUnexpectedSubdir, full_path);
