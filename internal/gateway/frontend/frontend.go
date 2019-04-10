@@ -5,20 +5,28 @@ import (
 	"net/http"
 	"time"
 
+	be "github.com/cvmfs/gateway/internal/gateway/backend"
+
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 )
 
-const apiRoot = "/api/v1"
-
 // Start HTTP frontend
-func Start(port int, maxLeaseTime int) error {
+func Start(services *be.Services, port int, maxLeaseTime int) error {
 	router := mux.NewRouter()
+
+	// Registers the different routes
 
 	r := router.NewRoute()
 	r.Path(APIRoot + "/")
 	r.HandlerFunc(NewRootHandler())
 
+	r = router.NewRoute()
+	r.Path(APIRoot + "/repos")
+	r.Methods("GET")
+	r.HandlerFunc(NewGetReposHandler())
+
+	// Configure and start the HTTP server
 	timeout := time.Duration(maxLeaseTime) * time.Second
 	srv := &http.Server{
 		Handler:      router,

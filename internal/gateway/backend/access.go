@@ -1,10 +1,12 @@
-package gateway
+package backend
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+
+	gw "github.com/cvmfs/gateway/internal/gateway"
 
 	"github.com/pkg/errors"
 )
@@ -200,7 +202,7 @@ func keyImporter(ks KeySpec) (string, string, string, error) {
 	case "plain_text":
 		return ks.ID, ks.Secret, ks.Path, nil
 	case "file":
-		id, sec, err := LoadKey(ks.FileName)
+		id, sec, err := gw.LoadKey(ks.FileName)
 		if err != nil {
 			return "", "", "", fmt.Errorf("could not import key from file")
 		}
