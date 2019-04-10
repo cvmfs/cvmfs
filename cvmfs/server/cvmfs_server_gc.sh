@@ -107,13 +107,16 @@ cvmfs_server_gc() {
         return 1
       fi
     done
-    echo "Turning off cvmfs-gateway"
-    if is_systemd; then
-      sudo systemctl stop cvmfs-gateway
-    else
-      sudo service cvmfs-gateway stop
+    # If cvmfs-gateway is running, turn it off for the duration of the GC
+    if [ "x$(sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status)" = "xpong" ]; then
+      echo "Turning off cvmfs-gateway"
+      if is_systemd; then
+        sudo systemctl stop cvmfs-gateway
+      else
+        sudo service cvmfs-gateway stop
+      fi
+      trap __restore_cvmfs_gateway EXIT HUP INT TERM
     fi
-    trap __restore_cvmfs_gateway EXIT HUP INT TERM
   fi
 
 
