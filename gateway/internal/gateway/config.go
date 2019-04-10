@@ -22,9 +22,13 @@ type Config struct {
 	LogTimestamps bool `mapstructure:"log_timestamps"`
 	// AccessConfigFile is the file name of the repository access configuration
 	AccessConfigFile string `mapstructure:"access_config_file"`
+	// NumReceivers is the number of parallel (receiver) workers to run
+	NumReceivers int `mapstructure:"num_receivers"`
+	// ReceiverPath is the path of the cvmfs_receiver executable
+	ReceiverPath string `mapstructure:"receiver_path"`
 }
 
-// ReadConfig read configuration files and populate a Config object
+// ReadConfig reads configuration files and commandline flags, and populates a Config object
 func ReadConfig() (*Config, error) {
 	var configFile string
 	pflag.StringVar(&configFile, "user_config_file", "/etc/cvmfs/gateway/user.json", "config file with user modifiable settings")
@@ -35,6 +39,8 @@ func ReadConfig() (*Config, error) {
 	//pflag.StringSlice("etcd_endpoints", []string{}, "etcd cluster endpoints (for gateway clustering)")
 	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
 	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")
+	pflag.Int("num_receivers", 1, "number of parallel cvmfs_receiver processes to run")
+	pflag.String("receiver_path", "/usr/bin/cvmfs_receiver", "the path of the cvmfs_receiver executable")
 	pflag.Parse()
 
 	viper.SetConfigFile(configFile)
@@ -44,6 +50,38 @@ func ReadConfig() (*Config, error) {
 	var conf Config
 	if err := viper.Unmarshal(&conf); err != nil {
 		return nil, errors.Wrap(err, "could not populate configuration object")
+	}
+
+	// Manually handler legacy parameter names
+
+	if viper.InConfig("fe_tcp_port") {
+		conf.Port = viper.GetInt("fe_tcp_port")
+	}
+
+	var sc1 struct {
+		Size int `mapstructure:"size"`
+	}
+	v1 := viper.Sub("receiver_config")
+	if v1 != nil {
+		if err := v1.Unmarshal(&sc1); err != nil {
+			return nil, errors.Wrap(err, "could not load receiver config")
+		}
+		if !pflag.CommandLine.Changed("num_receivers") {
+			conf.NumReceivers = sc1.Size
+		}
+	}
+
+	var sc2 struct {
+		Executable string `mapstructure:"executable_path"`
+	}
+	v2 := viper.Sub("receiver_worker_config")
+	if v2 != nil {
+		if err := v2.Unmarshal(&sc2); err != nil {
+			return nil, errors.Wrap(err, "could not load receiver config")
+		}
+		if !pflag.CommandLine.Changed("receiver_path") {
+			conf.ReceiverPath = sc2.Executable
+		}
 	}
 
 	return &conf, nil
