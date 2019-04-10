@@ -180,14 +180,20 @@ run_transactions() {
     cvmfs_server transaction test.repo.org
     echo "New file" > /cvmfs/test.repo.org/marker
 
-    echo "  Publishing changes 9"
+    echo "  Publishing changes 9 and run an integrity check"
     cvmfs_server publish -a specialtag test.repo.org
-    cvmfs_server check test.repo.org
+    cvmfs_server check -i test.repo.org
+    local integrity_check_res=$?
 
     echo "  Check that the named tag has been created"
     specialtag_line=$(cvmfs_server tag -l test.repo.org | grep specialtag)
 
     ## Check results
+
+    if [ $? -ne 0 ]; then
+        echo "Repository integrity check failed: $integrity_check_res"
+        exit 1
+    fi
 
     compare_file_checksum /tmp/cvmfs_out_1/new_file.txt d8e8fca2dc0f896fd7cb4cb0031ba249
     compare_file_checksum /tmp/cvmfs_out_1/new_repository e5747677debcb10cabe17d87a40e7fa4
