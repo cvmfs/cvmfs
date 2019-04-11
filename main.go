@@ -13,19 +13,25 @@ func main() {
 	cfg, err := gw.ReadConfig()
 	if err != nil {
 		gw.Log.Error().
+			Str("component", "main").
 			Err(err).
 			Msg("reading configuration failed")
 		os.Exit(1)
 	}
 	gw.ConfigLogging(cfg)
 
-	gw.Log.Debug().Msgf("configuration read: %+v", cfg)
+	gw.Log.Debug().
+		Str("component", "main").
+		Msgf("configuration read: %+v", cfg)
 
-	gw.Log.Info().Msg("starting repository gateway")
+	gw.Log.Info().
+		Str("component", "main").
+		Msg("starting repository gateway")
 
 	services, err := be.Start(cfg)
 	if err != nil {
 		gw.Log.Error().
+			Str("component", "main").
 			Err(err).
 			Msg("could not start backend services")
 		os.Exit(1)
@@ -33,6 +39,7 @@ func main() {
 
 	if err := fe.Start(services, cfg.Port, cfg.MaxLeaseTime); err != nil {
 		gw.Log.Error().
+			Str("component", "main").
 			Err(err).
 			Msg("starting the HTTP front-end failed")
 		os.Exit(1)
