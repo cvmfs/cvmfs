@@ -1,30 +1,33 @@
 package frontend
 
 import (
-	"encoding/json"
 	"net/http"
 
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
 	"github.com/gorilla/mux"
 )
 
-// NewGetReposHandler creates an HTTP handler for the API root
-func NewGetReposHandler(ac *be.AccessConfig) http.HandlerFunc {
+// MakeReposHandler creates an HTTP handler for the API root
+func MakeReposHandler(services *be.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
 		vs := mux.Vars(h)
 
-		var rep []byte
-		var err error
+		msg := make(map[string]interface{})
+
 		if repoName, present := vs["name"]; present {
-			rep, err = json.Marshal(ac.Repositories[repoName])
+			r := services.Access.GetRepo(repoName)
+			if len(r) == 0 {
+				msg["status"] = "error"
+				msg["reason"] = "invalid_repo"
+			} else {
+				msg["status"] = "ok"
+				msg["data"] = r
+			}
 		} else {
-			rep, err = json.Marshal(ac.Repositories)
-		}
-		if err != nil {
-			httpWrapError(err, "JSON serialization failed", &w, http.StatusInternalServerError)
-			return
+			msg["status"] = "ok"
+			msg["data"] = services.Access.GetRepos()
 		}
 
-		w.Write(rep)
+		replyJSON(w, msg)
 	}
 }
