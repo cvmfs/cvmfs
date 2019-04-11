@@ -15,6 +15,9 @@ import (
 func Start(services *be.Services, port int, maxLeaseTime int) error {
 	router := mux.NewRouter()
 
+	// Add the UUID tagging middleware
+	router.Use(MakeTaggingMiddleware())
+
 	// Add the HMAC authorization middleware
 	router.Use(MakeAuthzMiddleware(&services.Access))
 
