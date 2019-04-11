@@ -15,6 +15,9 @@ import (
 func Start(services *be.Services, port int, maxLeaseTime int) error {
 	router := mux.NewRouter()
 
+	// Add the HMAC authorization middleware
+	router.Use(MakeAuthzMiddleware(&services.Access))
+
 	// Register the different routes
 
 	// Root handler
@@ -23,10 +26,15 @@ func Start(services *be.Services, port int, maxLeaseTime int) error {
 	// Repositories
 	router.Path(APIRoot + "/repos/{name}").
 		Methods("GET").
-		HandlerFunc(NewGetReposHandler(&services.Access))
+		HandlerFunc(MakeReposHandler(services))
 	router.Path(APIRoot + "/repos").
 		Methods("GET").
-		HandlerFunc(NewGetReposHandler(&services.Access))
+		HandlerFunc(MakeReposHandler(services))
+
+	// Leases
+	router.Path(APIRoot+"/leases").
+		Methods("GET", "POST").
+		HandlerFunc(MakeLeasesHandler(services))
 
 	// Configure and start the HTTP server
 	timeout := time.Duration(maxLeaseTime) * time.Second

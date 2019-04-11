@@ -11,16 +11,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+// KeyPaths maps from key ID to repository subpath
+type KeyPaths map[string]string
+
 // AccessConfig is the configuration of a single repository
 type AccessConfig struct {
-	Repositories map[string]map[string]string
+	Repositories map[string]KeyPaths
 	Keys         map[string]string
-}
-
-// KeyIDToPath maintains the association of a key with a subpath inside the repository
-type KeyIDToPath struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
 }
 
 // RepositorySpecV1 lists the keys associated with a repository in the configuration file
@@ -31,8 +28,11 @@ type RepositorySpecV1 struct {
 
 // RepositorySpecV2 lists the keys associated with a repository in the configuration file
 type RepositorySpecV2 struct {
-	Name string        `json:"domain"`
-	Keys []KeyIDToPath `json:"keys"`
+	Name string `json:"domain"`
+	Keys []struct {
+		ID   string `json:"id"`
+		Path string `json:"path"`
+	} `json:"keys"`
 }
 
 // KeySpec is a gateway key specification from the configuration file
@@ -54,8 +54,26 @@ type rawConfig map[string]json.RawMessage
 // NewAccessConfig creates an empty repository configuration
 func NewAccessConfig() AccessConfig {
 	return AccessConfig{
-		Repositories: make(map[string]map[string]string),
+		Repositories: make(map[string]KeyPaths),
 		Keys:         make(map[string]string)}
+}
+
+// GetRepos returns a map where the keys are repository names and the
+// values are KeyPaths maps
+func (c *AccessConfig) GetRepos() map[string]KeyPaths {
+	return c.Repositories
+}
+
+// GetRepo returns a map where the keys are key ID registered for the
+// repository and the values are repository subpath where the keys are
+// valid
+func (c *AccessConfig) GetRepo(repoName string) KeyPaths {
+	return c.Repositories[repoName]
+}
+
+// GetSecret returns the secret corresponding to a key ID
+func (c *AccessConfig) GetSecret(keyID string) string {
+	return c.Keys[keyID]
 }
 
 // Load parses a configuration file and populates the repository
