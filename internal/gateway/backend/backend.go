@@ -9,6 +9,7 @@ import (
 // backend services
 type Services struct {
 	Access AccessConfig
+	Leases LeaseDB
 }
 
 // Start initializes the various backend services
@@ -19,5 +20,15 @@ func Start(cfg *gw.Config) (*Services, error) {
 			err, "loading repository access configuration failed")
 	}
 
-	return &Services{Access: ac}, nil
+	leaseDBType := "embedded"
+	if cfg.UseEtcd {
+		leaseDBType = "etcd"
+	}
+	ldb, err := NewLeaseDB(leaseDBType, cfg)
+	if err != nil {
+		return nil, errors.Wrap(
+			err, "could not create lease DB")
+	}
+
+	return &Services{Access: ac, Leases: ldb}, nil
 }

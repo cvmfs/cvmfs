@@ -13,9 +13,9 @@ type Config struct {
 	// MaxLeaseTime is the maximum lease duration in seconds
 	MaxLeaseTime int `mapstructure:"max_lease_time"`
 	// UseEtcd as a consistent data store for lease information (for gateway clustering)
-	//UseEtcd bool `mapstructure:"use_etcd"`
+	UseEtcd bool `mapstructure:"use_etcd"`
 	// EtcdEndpoints is a list of etcd endpoint URLs
-	//EtcdEndpoints []string `mapstructure:"etcd_endpoints"`
+	EtcdEndpoints []string `mapstructure:"etcd_endpoints"`
 	// LogLevel sets the logging level
 	LogLevel string `mapstructure:"log_level"`
 	// LogTimestamps enables timestamps in the logging output
@@ -26,6 +26,8 @@ type Config struct {
 	NumReceivers int `mapstructure:"num_receivers"`
 	// ReceiverPath is the path of the cvmfs_receiver executable
 	ReceiverPath string `mapstructure:"receiver_path"`
+	// WorkDir is where the lease BD stores its data
+	WorkDir string `mapstructure:"work_dir"`
 }
 
 // ReadConfig reads configuration files and commandline flags, and populates a Config object
@@ -35,12 +37,13 @@ func ReadConfig() (*Config, error) {
 	pflag.String("access_config_file", "/etc/cvmfs/gateway/repo.json", "repository access configuration file")
 	pflag.Int("port", 4929, "HTTP frontend port")
 	pflag.Int("max_lease_time", 7200, "maximum lease time in seconds")
-	//pflag.Bool("use_etcd", false, "use etcd as a consistent data store for lease information (for gateway clustering)")
-	//pflag.StringSlice("etcd_endpoints", []string{}, "etcd cluster endpoints (for gateway clustering)")
+	pflag.Bool("use_etcd", false, "use etcd as a consistent data store for lease information (for gateway clustering)")
+	pflag.StringSlice("etcd_endpoints", []string{}, "etcd cluster endpoints (for gateway clustering)")
 	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
 	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")
 	pflag.Int("num_receivers", 1, "number of parallel cvmfs_receiver processes to run")
 	pflag.String("receiver_path", "/usr/bin/cvmfs_receiver", "the path of the cvmfs_receiver executable")
+	pflag.String("work_dir", "/var/lib/cvmfs-gateway", "the working directory for database files")
 	pflag.Parse()
 
 	viper.SetConfigFile(configFile)
