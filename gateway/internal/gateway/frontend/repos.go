@@ -13,7 +13,7 @@ import (
 // MakeReposHandler creates an HTTP handler for the API root
 func MakeReposHandler(services *be.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
-		reqID := h.Context().Value(idKey).(uuid.UUID)
+		reqID, _ := h.Context().Value(idKey).(uuid.UUID)
 		vs := mux.Vars(h)
 
 		msg := make(map[string]interface{})

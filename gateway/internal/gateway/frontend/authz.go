@@ -16,7 +16,7 @@ import (
 func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 	return mux.MiddlewareFunc(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			reqID := req.Context().Value(idKey).(uuid.UUID)
+			reqID, _ := req.Context().Value(idKey).(uuid.UUID)
 			tokens := strings.Split(req.Header.Get("Authorization"), " ")
 			if len(tokens) != 2 {
 				gw.Log.Error().
