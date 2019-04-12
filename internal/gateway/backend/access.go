@@ -49,6 +49,16 @@ type KeySpec struct {
 // (the key ID and secret) and an error
 type KeyImportFun func(KeySpec) (string, string, string, error)
 
+// AuthError is returned as error value by the Check function when
+// there is an authorization error (invalid key, invalid path, or invalid repo)
+type AuthError struct {
+	Reason string
+}
+
+func (ae AuthError) Error() string {
+	return fmt.Sprintf("authorization error: %v", ae.Reason)
+}
+
 type rawConfig map[string]json.RawMessage
 
 // NewAccessConfig creates an empty repository configuration
@@ -74,6 +84,29 @@ func (c *AccessConfig) GetRepo(repoName string) KeyPaths {
 // GetSecret returns the secret corresponding to a key ID
 func (c *AccessConfig) GetSecret(keyID string) string {
 	return c.Keys[keyID]
+}
+
+// Check verifies the given key and path are compatible with the access
+// configuration of the repository
+func (c *AccessConfig) Check(keyID, leasePath, repoName string) error {
+	keys, ok := c.Repositories[repoName]
+	if !ok {
+		return AuthError{"invalid_repo"}
+	}
+
+	p, ok := keys[keyID]
+	if !ok {
+		return AuthError{"invalid_key"}
+	}
+
+	overlapping := CheckPathOverlap(leasePath, p)
+	isSubpath := len(leasePath) >= len(p)
+
+	if !overlapping || !isSubpath {
+		return AuthError{"invalid_path"}
+	}
+
+	return nil
 }
 
 // Load parses a configuration file and populates the repository

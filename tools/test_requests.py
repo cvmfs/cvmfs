@@ -3,6 +3,7 @@
 import argparse
 import base64
 import hmac
+import json
 import requests
 
 def computeHMAC(msg, key):
@@ -25,4 +26,10 @@ if args.request == 'repos':
     headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret)}
     print('Headers: {}'.format(headers))
     rep = requests.get(base_url + '/repos', headers=headers)
+    print('Reply: {}'.format(rep.json()))
+elif args.request == 'new_lease':
+    req = {'path':'/','api_version':2}
+    hmac_msg = json.dumps(req).encode()
+    headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret)}
+    rep = requests.post(base_url + '/leases', json=req, headers=headers)
     print('Reply: {}'.format(rep.json()))

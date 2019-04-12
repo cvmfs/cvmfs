@@ -1,7 +1,9 @@
 package frontend
 
 import (
+	"bytes"
 	"encoding/base64"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -51,16 +53,36 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 			// Different parts of the request are used to compute then HMAC, depending
 			// in HTTP method and route
 
+			var HMACInput []byte
 			if strings.HasPrefix(req.URL.Path, APIRoot+"/repos") {
 				// /repos request, use the path component of the URL to compute HMAC
-				if !CheckHMAC([]byte(req.URL.Path), HMAC, secret) {
-					gw.Log.Error().
-						Str("component", "http").
-						Str("req_id", reqID.String()).
-						Msg("invalid HMAC")
-					replyJSON(&reqID, w, message{"status": "error", "reason": "invalid_hmac"})
-					return
+				HMACInput = []byte(req.URL.Path)
+			} else if strings.HasPrefix(req.URL.Path, APIRoot+"/leases") {
+				token, _ := mux.Vars(req)["token"]
+				if token != "" {
+					// For commit/drop lease requests use the token to compute HMAC
+					HMACInput = []byte(token)
+				} else {
+					// For new lease request used the request body to compute HMAC
+					HMACInput, err = ioutil.ReadAll(req.Body)
+					if err != nil {
+						httpWrapError(&reqID, err, "could not read request body", w, http.StatusBadRequest)
+						return
+					}
+					// Body needs to be read again in the next handler, reset it
+					// using a copy of the original body
+					bodyCopy := ioutil.NopCloser(bytes.NewReader(HMACInput))
+					req.Body.Close()
+					req.Body = bodyCopy
 				}
+			}
+			if !CheckHMAC(HMACInput, HMAC, secret) {
+				gw.Log.Error().
+					Str("component", "http").
+					Str("req_id", reqID.String()).
+					Msg("invalid HMAC")
+				replyJSON(&reqID, w, message{"status": "error", "reason": "invalid_hmac"})
+				return
 			}
 			next.ServeHTTP(w, req)
 		})
