@@ -10,14 +10,14 @@ const accessConfigV1 = `
 {
 	"repos": [
 		{
-			"domain": "test.cern.ch",
+			"domain": "test.repo.org",
 			"keys": ["keyid123"]
 		}
 	],
 	"keys": [
 		{
 			"type": "file",
-			"file_name": "/etc/cvmfs/keys/test.cern.ch.gw",
+			"file_name": "/etc/cvmfs/keys/test.repo.org.gw",
 			"repo_subpath": "/"
 		},
 		{
@@ -33,9 +33,9 @@ const accessConfigV2 = `
 {
 	"version": 2,
 	"repos" : [
-		"test1.cern.ch",
+		"test1.repo.org",
 		{
-			"domain": "test2.cern.ch",
+			"domain": "test2.repo.org",
 			"keys": [
 				{
 					"id": "keyid1",
@@ -51,7 +51,7 @@ const accessConfigV2 = `
 	"keys": [
 		{
 			"type": "file",
-			"file_name": "/etc/cvmfs/keys/test2.cern.ch.gw"
+			"file_name": "/etc/cvmfs/keys/test2.repo.org.gw"
 		},
 		{
 			"type": "plain_text",
@@ -66,7 +66,7 @@ const accessConfigV2NoKeys = `
 {
 	"version": 2,
 	"repos" : [
-		"test1.cern.ch"
+		"test1.repo.org"
 	]
 }
 `
@@ -131,7 +131,7 @@ func TestLoadAccessConfigVersion2(t *testing.T) {
 	if len(ac.Repositories) != 2 && len(ac.Keys) != 2 {
 		t.Fatalf("invalid access config (missing items): %+v", ac)
 	}
-	if _, present := (ac.Repositories["test1.cern.ch"]["keyid123"]); !present {
+	if _, present := (ac.Repositories["test1.repo.org"]["keyid123"]); !present {
 		t.Fatalf("invalid access config (placeholder was not substituted): %+v", ac)
 	}
 	if _, present := ac.Keys["keyid123"]; !present {
@@ -149,10 +149,39 @@ func TestLoadAccessConfigVersion2NoKeys(t *testing.T) {
 	if len(ac.Repositories) != 1 && len(ac.Keys) != 1 {
 		t.Fatalf("invalid access config (missing items): %+v", ac)
 	}
-	if _, present := (ac.Repositories["test1.cern.ch"]["keyid123"]); !present {
+	if _, present := (ac.Repositories["test1.repo.org"]["keyid123"]); !present {
 		t.Fatalf("invalid access config (placeholder was not substituted): %+v", ac)
 	}
 	if _, present := ac.Keys["keyid123"]; !present {
 		t.Fatalf("invalid access config (default key was not loaded): %+v", ac)
 	}
+}
+
+func TestKeyCheck(t *testing.T) {
+	ac := emptyAccessConfig()
+	rd := strings.NewReader(accessConfigV2)
+	err := ac.load(rd, mockKeyImporter)
+	if err != nil {
+		t.Fatalf("access config loading failed: %v", err)
+	}
+	t.Run("valid", func(t *testing.T) {
+		if err := ac.Check("keyid2", "/restricted/to/subdir/below", "test2.repo.org"); err != nil {
+			t.Errorf("valid key was rejected: %v", err)
+		}
+	})
+	t.Run("invalid_repo", func(t *testing.T) {
+		if ac.Check("keyid2", "/restricted/to/subdir/below", "invalid.repo.org") == nil {
+			t.Errorf("invalid repo was accepted")
+		}
+	})
+	t.Run("invalid_key", func(t *testing.T) {
+		if ac.Check("badkey", "/restricted/to/subdir/below", "test2.repo.org") == nil {
+			t.Errorf("invalid key was accepted")
+		}
+	})
+	t.Run("invalid_path", func(t *testing.T) {
+		if ac.Check("keyid2", "/invalid/path", "test2.repo.org") == nil {
+			t.Errorf("invalid path was accepted")
+		}
+	})
 }

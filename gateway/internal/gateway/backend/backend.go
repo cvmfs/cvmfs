@@ -30,13 +30,19 @@ func Start(cfg *gw.Config) (*Services, error) {
 			err, "could not create lease DB")
 	}
 
-	return &Services{Access: ac, Leases: ldb}, nil
+	return &Services{Access: *ac, Leases: ldb}, nil
 }
 
 // RequestNewLease for the specified path, using keyID
 func (s *Services) RequestNewLease(keyID, leasePath string) (string, error) {
-	repoName := strings.Split(leasePath, "/")
-	if err := s.Access.Check(keyID, )
+	repoName, subPath, err := SplitLeasePath(leasePath)
+	if err != nil {
+		return "", errors.Wrap(err, "could not parse lease path")
+	}
+
+	if err := s.Access.Check(keyID, subPath, repoName); err != nil {
+		return "", err
+	}
 
 	return "", nil
 }
