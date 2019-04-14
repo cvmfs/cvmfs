@@ -84,25 +84,25 @@ func mockKeyImporter(ks KeySpec) (string, string, string, error) {
 
 func TestEmptyAccessConfig(t *testing.T) {
 	t.Run("empty no version", func(t *testing.T) {
-		ac := NewAccessConfig()
+		ac := emptyAccessConfig()
 		rd := strings.NewReader("{}")
-		err := ac.loadFromReader(rd, mockKeyImporter)
+		err := ac.load(rd, mockKeyImporter)
 		if err != nil {
 			t.Fatalf("access config loading failed: %v", err)
 		}
 	})
 	t.Run("empty version 1", func(t *testing.T) {
-		ac := NewAccessConfig()
+		ac := emptyAccessConfig()
 		rd := strings.NewReader("{\"version\": 1}")
-		err := ac.loadFromReader(rd, mockKeyImporter)
+		err := ac.load(rd, mockKeyImporter)
 		if err != nil {
 			t.Fatalf("access config loading failed: %v", err)
 		}
 	})
 	t.Run("empty version 2", func(t *testing.T) {
-		ac := NewAccessConfig()
+		ac := emptyAccessConfig()
 		rd := strings.NewReader("{\"version\": 2}")
-		err := ac.loadFromReader(rd, mockKeyImporter)
+		err := ac.load(rd, mockKeyImporter)
 		if err != nil {
 			t.Fatalf("access config loading failed: %v", err)
 		}
@@ -110,9 +110,9 @@ func TestEmptyAccessConfig(t *testing.T) {
 }
 
 func TestLoadAccessConfigVersion1(t *testing.T) {
-	ac := NewAccessConfig()
+	ac := emptyAccessConfig()
 	rd := strings.NewReader(accessConfigV1)
-	err := ac.loadFromReader(rd, mockKeyImporter)
+	err := ac.load(rd, mockKeyImporter)
 	if err != nil {
 		t.Fatalf("access config loading failed: %v", err)
 	}
@@ -122,9 +122,9 @@ func TestLoadAccessConfigVersion1(t *testing.T) {
 }
 
 func TestLoadAccessConfigVersion2(t *testing.T) {
-	ac := NewAccessConfig()
+	ac := emptyAccessConfig()
 	rd := strings.NewReader(accessConfigV2)
-	err := ac.loadFromReader(rd, mockKeyImporter)
+	err := ac.load(rd, mockKeyImporter)
 	if err != nil {
 		t.Fatalf("access config loading failed: %v", err)
 	}
@@ -140,9 +140,9 @@ func TestLoadAccessConfigVersion2(t *testing.T) {
 }
 
 func TestLoadAccessConfigVersion2NoKeys(t *testing.T) {
-	ac := NewAccessConfig()
+	ac := emptyAccessConfig()
 	rd := strings.NewReader(accessConfigV2NoKeys)
-	err := ac.loadFromReader(rd, mockKeyImporter)
+	err := ac.load(rd, mockKeyImporter)
 	if err != nil {
 		t.Fatalf("access config loading failed: %v", err)
 	}

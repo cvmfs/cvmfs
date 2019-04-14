@@ -61,11 +61,9 @@ func (ae AuthError) Error() string {
 
 type rawConfig map[string]json.RawMessage
 
-// NewAccessConfig creates an empty repository configuration
-func NewAccessConfig() AccessConfig {
-	return AccessConfig{
-		Repositories: make(map[string]KeyPaths),
-		Keys:         make(map[string]string)}
+// NewAccessConfig creates an new access configuration from the given file
+func NewAccessConfig(fileName string) (*AccessConfig, error) {
+	return newAccessConfigWithImporter(fileName, keyImporter)
 }
 
 // GetRepos returns a map where the keys are repository names and the
@@ -109,24 +107,32 @@ func (c *AccessConfig) Check(keyID, leasePath, repoName string) error {
 	return nil
 }
 
-// Load parses a configuration file and populates the repository
-// configuration object
-func (c *AccessConfig) Load(fileName string) error {
-	return c.LoadWithImporter(fileName, keyImporter)
-}
+func newAccessConfigWithImporter(fileName string, importer KeyImportFun) (*AccessConfig, error) {
+	ac := emptyAccessConfig()
 
-// LoadWithImporter parses a configuration file and populates the repository
-// configuration object. Uses the specified key importer function
-func (c *AccessConfig) LoadWithImporter(fileName string, importer KeyImportFun) error {
 	f, err := os.Open(fileName)
 	if err != nil {
-		return errors.Wrap(err, "could not open input file for reading")
+		return nil, errors.Wrap(err, "could not open input file for reading")
 	}
 	defer f.Close()
-	return c.loadFromReader(f, importer)
+
+	if err := ac.load(f, importer); err != nil {
+		return nil, err
+	}
+
+	return &ac, nil
 }
 
-func (c *AccessConfig) loadFromReader(rd io.Reader, importer KeyImportFun) error {
+func emptyAccessConfig() AccessConfig {
+	return AccessConfig{
+		Repositories: make(map[string]KeyPaths),
+		Keys:         make(map[string]string),
+	}
+}
+
+// load populates the access config object from the provided reader, using the
+// specified key import function
+func (c *AccessConfig) load(rd io.Reader, importer KeyImportFun) error {
 	var t rawConfig
 	if err := json.NewDecoder(rd).Decode(&t); err != nil {
 		return errors.Wrap(err, "could not decode JSON input")
