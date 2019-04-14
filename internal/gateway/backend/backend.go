@@ -14,8 +14,8 @@ type Services struct {
 
 // Start initializes the various backend services
 func Start(cfg *gw.Config) (*Services, error) {
-	ac := NewAccessConfig()
-	if err := ac.Load(cfg.AccessConfigFile); err != nil {
+	ac, err := NewAccessConfig(cfg.AccessConfigFile)
+	if err != nil {
 		return nil, errors.Wrap(
 			err, "loading repository access configuration failed")
 	}
