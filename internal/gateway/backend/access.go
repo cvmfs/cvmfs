@@ -86,22 +86,22 @@ func (c *AccessConfig) GetSecret(keyID string) string {
 
 // Check verifies the given key and path are compatible with the access
 // configuration of the repository
-func (c *AccessConfig) Check(keyID, leasePath, repoName string) error {
+func (c *AccessConfig) Check(keyID, leasePath, repoName string) *AuthError {
 	keys, ok := c.Repositories[repoName]
 	if !ok {
-		return AuthError{"invalid_repo"}
+		return &AuthError{"invalid_repo"}
 	}
 
 	p, ok := keys[keyID]
 	if !ok {
-		return AuthError{"invalid_key"}
+		return &AuthError{"invalid_key"}
 	}
 
 	overlapping := CheckPathOverlap(leasePath, p)
 	isSubpath := len(leasePath) >= len(p)
 
 	if !overlapping || !isSubpath {
-		return AuthError{"invalid_path"}
+		return &AuthError{"invalid_path"}
 	}
 
 	return nil
