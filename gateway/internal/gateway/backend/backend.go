@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"time"
+
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/pkg/errors"
 )
@@ -10,6 +12,7 @@ import (
 type Services struct {
 	Access AccessConfig
 	Leases LeaseDB
+	Config gw.Config
 }
 
 // Start initializes the various backend services
@@ -30,7 +33,7 @@ func Start(cfg *gw.Config) (*Services, error) {
 			err, "could not create lease DB")
 	}
 
-	return &Services{Access: *ac, Leases: ldb}, nil
+	return &Services{Access: *ac, Leases: ldb, Config: *cfg}, nil
 }
 
 // RequestNewLease for the specified path, using keyID
@@ -44,5 +47,12 @@ func (s *Services) RequestNewLease(keyID, leasePath string) (string, error) {
 		return "", err
 	}
 
-	return "", nil
+	//token, secret, err := NewLeaseToken(
+	token, _, err := NewLeaseToken(
+		leasePath, time.Duration(s.Config.MaxLeaseTime)*time.Second)
+	if err != nil {
+		return "", errors.Wrap(err, "could not generate session token")
+	}
+
+	return token, nil
 }
