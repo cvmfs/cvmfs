@@ -36,6 +36,7 @@ func main() {
 			Msg("could not start backend services")
 		os.Exit(1)
 	}
+	defer services.Close()
 
 	if err := fe.Start(services, cfg.Port, cfg.MaxLeaseTime); err != nil {
 		gw.Log.Error().

@@ -16,6 +16,11 @@ func NewEtcdLeaseDB(endpoints []string, maxLeaseTime time.Duration) (*EtcdLeaseD
 	return nil, nil
 }
 
+// Close the lease database
+func (db *EtcdLeaseDB) Close() error {
+	return nil
+}
+
 // NewLease attemps to acquire a new lease for the given path
 func (db *EtcdLeaseDB) NewLease(
 	keyID, leasePath string, token LeaseToken) error {

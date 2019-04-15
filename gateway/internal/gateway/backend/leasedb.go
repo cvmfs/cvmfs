@@ -24,6 +24,7 @@ func (e *PathBusyError) Remaining() int64 {
 
 // LeaseDB provides a consistent store for repository leases
 type LeaseDB interface {
+	Close() error
 	NewLease(keyID, leasePath string, token LeaseToken) error
 }
 
