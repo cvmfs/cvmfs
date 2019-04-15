@@ -13,7 +13,15 @@ const (
 	tokenSecretLength = 32
 )
 
-// LeaseClaims encode the parameters of the lease (expiration time, repository path, key ID)
+// LeaseToken holds the signed token string, the secret used to sign the token and
+// the expiration of the token
+type LeaseToken struct {
+	TokenStr   string
+	Secret     []byte
+	Expiration time.Time
+}
+
+// LeaseClaims encode the parameters of the lease (expiration time, repository path)
 type LeaseClaims struct {
 	jwt.StandardClaims
 	Path string `json:"path"`
@@ -35,16 +43,16 @@ func (e InvalidTokenError) Error() string {
 }
 
 // NewLeaseToken generates a new lease token for the given repository
-// path, valid for maxLeaseTime. Returns the signed encoded token string
-// and the secret used to sign the token
-func NewLeaseToken(repoPath string, maxLeaseDuration time.Duration) (string, []byte, error) {
+// path, valid for maxLeaseTime. Returns the signed encoded token string, the secret
+// used to sign the token and the expiration time of the token
+func NewLeaseToken(repoPath string, maxLeaseDuration time.Duration) (*LeaseToken, error) {
 	if repoPath == "" {
-		return "", []byte{}, fmt.Errorf("repository path should not be empty")
+		return nil, fmt.Errorf("repository path should not be empty")
 	}
 
 	secret := make([]byte, tokenSecretLength)
 	if n, err := rand.Read(secret); n != tokenSecretLength || err != nil {
-		return "", []byte{}, fmt.Errorf("could not generate token secret")
+		return nil, fmt.Errorf("could not generate token secret")
 	}
 
 	expiration := time.Now().Add(maxLeaseDuration)
@@ -58,10 +66,10 @@ func NewLeaseToken(repoPath string, maxLeaseDuration time.Duration) (string, []b
 
 	tokenStr, err := token.SignedString(secret)
 	if err != nil {
-		return "", []byte{}, errors.Wrap(err, "could not sign token")
+		return nil, errors.Wrap(err, "could not sign token")
 	}
 
-	return tokenStr, secret, nil
+	return &LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: expiration}, nil
 }
 
 // CheckToken with the given secret and return the repository path of
