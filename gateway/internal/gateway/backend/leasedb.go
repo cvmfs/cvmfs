@@ -7,17 +7,6 @@ import (
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
 
-// NewLeaseResult is returned when requesting a new lease. Status is true
-// if the new lease was created, or false if there is a conflicting lease
-// (with Remaining number of seconds). Token represents the session token
-// of the new lease
-type NewLeaseResult struct {
-	Status      string // "ok" | "path_busy" | "error"
-	Token       string
-	Remaining   time.Duration
-	ErrorReason string
-}
-
 // PathBusyError is returned as error value for new lease requests on
 // paths which are already leased
 type PathBusyError struct {
@@ -35,17 +24,18 @@ func (e *PathBusyError) Remaining() int64 {
 
 // LeaseDB provides a consistent store for repository leases
 type LeaseDB interface {
-	NewLease(keyID, leasePath string) (string, error)
+	NewLease(keyID, leasePath string, token LeaseToken) error
 }
 
 // NewLeaseDB creates a new LeaseDB object of the specified type
 // (either "embedded" or "etcd").
 func NewLeaseDB(dbType string, config *gw.Config) (LeaseDB, error) {
+	maxLeaseTime := time.Duration(config.MaxLeaseTime)
 	switch dbType {
 	case "embedded":
-		return NewEmbeddedLeaseDB(config.WorkDir)
+		return NewEmbeddedLeaseDB(config.WorkDir, maxLeaseTime)
 	case "etcd":
-		return NewEtcdLeaseDB(config.EtcdEndpoints)
+		return NewEtcdLeaseDB(config.EtcdEndpoints, maxLeaseTime)
 	default:
 		return nil, fmt.Errorf("unknown lease DB type: %v", dbType)
 	}
