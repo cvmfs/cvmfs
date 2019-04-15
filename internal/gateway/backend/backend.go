@@ -35,6 +35,14 @@ func Start(cfg *gw.Config) (*Services, error) {
 	return &Services{Access: *ac, Leases: ldb, Config: *cfg}, nil
 }
 
+// Close all the backend services
+func (s *Services) Close() error {
+	if err := s.Leases.Close(); err != nil {
+		return errors.Wrap(err, "could not close lease database")
+	}
+	return nil
+}
+
 // RequestNewLease for the specified path, using keyID
 func (s *Services) RequestNewLease(keyID, leasePath string) (string, error) {
 	repoName, subPath, err := SplitLeasePath(leasePath)
