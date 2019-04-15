@@ -29,8 +29,7 @@ func Start(cfg *gw.Config) (*Services, error) {
 	}
 	ldb, err := NewLeaseDB(leaseDBType, cfg)
 	if err != nil {
-		return nil, errors.Wrap(
-			err, "could not create lease DB")
+		return nil, errors.Wrap(err, "could not create lease DB")
 	}
 
 	return &Services{Access: *ac, Leases: ldb, Config: *cfg}, nil
@@ -43,16 +42,22 @@ func (s *Services) RequestNewLease(keyID, leasePath string) (string, error) {
 		return "", errors.Wrap(err, "could not parse lease path")
 	}
 
+	// Check if keyID is allowed to request a lease in the repository
+	// at the specified subpath
 	if err := s.Access.Check(keyID, subPath, repoName); err != nil {
 		return "", err
 	}
 
-	//token, secret, err := NewLeaseToken(
-	token, _, err := NewLeaseToken(
+	// Generate a new token for the lease
+	token, err := NewLeaseToken(
 		leasePath, time.Duration(s.Config.MaxLeaseTime)*time.Second)
 	if err != nil {
 		return "", errors.Wrap(err, "could not generate session token")
 	}
 
-	return token, nil
+	if err := s.Leases.NewLease(keyID, leasePath, *token); err != nil {
+		return "", err
+	}
+
+	return token.TokenStr, nil
 }
