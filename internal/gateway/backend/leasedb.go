@@ -29,11 +29,29 @@ func (e *PathBusyError) Remaining() int64 {
 	return e.remaining.Nanoseconds() / 1000000000
 }
 
+// LeaseExpiredError is returned by the GetLeaseXXXX methods in case a
+// lease exists for the specified path but has already expired
+type LeaseExpiredError struct {
+}
+
+func (e LeaseExpiredError) Error() string {
+	return fmt.Sprintf("lease expired")
+}
+
+// InvalidLeaseError is returned by the GetLeaseXXXX methods in case a
+// lease does not exist for the specified path
+type InvalidLeaseError struct {
+}
+
+func (e InvalidLeaseError) Error() string {
+	return fmt.Sprintf("invalid lease")
+}
+
 // LeaseDB provides a consistent store for repository leases
 type LeaseDB interface {
 	Close() error
 	NewLease(keyID, leasePath string, token LeaseToken) error
-	GetLeases() ([]Lease, error)
+	GetLeases() (map[string]Lease, error)
 	GetLeaseForPath(leasePath string) (*Lease, error)
 	GetLeaseForToken(tokenStr string) (*Lease, error)
 	CancelLeases() error
