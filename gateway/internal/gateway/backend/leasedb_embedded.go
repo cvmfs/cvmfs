@@ -27,7 +27,7 @@ func NewEmbeddedLeaseDB(workDir string, maxLeaseTime time.Duration) (*EmbeddedLe
 	}
 
 	gw.Log.Info().
-		Str("component", "embedded_leasedb").
+		Str("component", "leasedb").
 		Msgf("database opened (work dir: %v)", workDir)
 
 	return &EmbeddedLeaseDB{store, maxLeaseTime}, nil
@@ -88,7 +88,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 			timeLeft := existing.lease.Token.Expiration.Sub(time.Now())
 			if timeLeft > 0 {
 				gw.Log.Debug().
-					Str("component", "embedded_leasedb").
+					Str("component", "leasedb").
 					Msgf("new lease request failed: path_busy, time left: %v s", timeLeft.Seconds())
 				return PathBusyError{timeLeft}
 			}
@@ -103,7 +103,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 		}
 
 		gw.Log.Debug().
-			Str("component", "embedded_leasedb").
+			Str("component", "leasedb").
 			Msgf("new lease request successful")
 
 		return nil
@@ -171,19 +171,20 @@ func (db *EmbeddedLeaseDB) GetLeaseForPath(leasePath string) (*Lease, error) {
 }
 
 // GetLeaseForToken returns the lease for a given token string
-func (db *EmbeddedLeaseDB) GetLeaseForToken(tokenStr string) (*Lease, error) {
+func (db *EmbeddedLeaseDB) GetLeaseForToken(tokenStr string) (string, *Lease, error) {
 	lease := Lease{}
+	var leasePath string
 	err := db.store.View(func(txn *bolt.Tx) error {
 		tokens := txn.Bucket([]byte("tokens"))
 		if tokens == nil {
 			return fmt.Errorf("missing 'tokens' bucket")
 		}
-		leasePath := tokens.Get([]byte(tokenStr))
-		if leasePath == nil {
+		lPath := tokens.Get([]byte(tokenStr))
+		if lPath == nil {
 			return InvalidLeaseError{}
 		}
 
-		repoName, subPath, err := SplitLeasePath(string(leasePath))
+		repoName, subPath, err := SplitLeasePath(string(lPath))
 		if err != nil {
 			return errors.Wrap(err, "invalid lease path")
 		}
@@ -196,10 +197,14 @@ func (db *EmbeddedLeaseDB) GetLeaseForToken(tokenStr string) (*Lease, error) {
 		if err != nil {
 			return err
 		}
+		if l.Token.Expiration.Sub(time.Now()) <= 0 {
+			return LeaseExpiredError{}
+		}
+		leasePath = string(lPath)
 		lease = *l
 		return nil
 	})
-	return &lease, err
+	return leasePath, &lease, err
 }
 
 // CancelLeases cancels all active leases
@@ -211,7 +216,7 @@ func (db *EmbeddedLeaseDB) CancelLeases() error {
 		})
 
 		gw.Log.Debug().
-			Str("component", "embedded_leasedb").
+			Str("component", "leasedb").
 			Msgf("all leases cancelled")
 
 		return nil
@@ -238,7 +243,7 @@ func (db *EmbeddedLeaseDB) CancelLeaseForPath(leasePath string) error {
 		v := bucket.Get([]byte(subPath))
 		if v == nil {
 			gw.Log.Debug().
-				Str("component", "embedded_leasedb").
+				Str("component", "leasedb").
 				Msgf("cancellation failed, invalid lease path: %v", leasePath)
 			return InvalidLeaseError{}
 		}
@@ -251,7 +256,7 @@ func (db *EmbeddedLeaseDB) CancelLeaseForPath(leasePath string) error {
 		tokens.Delete([]byte(lease.Token.TokenStr))
 
 		gw.Log.Debug().
-			Str("component", "embedded_leasedb").
+			Str("component", "leasedb").
 			Msgf("lease cancelled for path: %v", leasePath)
 
 		return nil
@@ -268,7 +273,7 @@ func (db *EmbeddedLeaseDB) CancelLeaseForToken(tokenStr string) error {
 		leasePath := tokens.Get([]byte(tokenStr))
 		if leasePath == nil {
 			gw.Log.Debug().
-				Str("component", "embedded_leasedb").
+				Str("component", "leasedb").
 				Msgf("cancellation failed, invalid token: %v", tokenStr)
 			return InvalidLeaseError{}
 		}
@@ -286,7 +291,7 @@ func (db *EmbeddedLeaseDB) CancelLeaseForToken(tokenStr string) error {
 		tokens.Delete([]byte(tokenStr))
 
 		gw.Log.Debug().
-			Str("component", "embedded_leasedb").
+			Str("component", "leasedb").
 			Msgf("lease cancelled for path: %v, token: %v",
 				leasePath, tokenStr)
 

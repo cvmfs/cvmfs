@@ -38,8 +38,8 @@ func (db *EtcdLeaseDB) GetLeaseForPath(leasePath string) (*Lease, error) {
 }
 
 // GetLeaseForToken returns the lease for a given token string
-func (db *EtcdLeaseDB) GetLeaseForToken(tokenStr string) (*Lease, error) {
-	return nil, nil
+func (db *EtcdLeaseDB) GetLeaseForToken(tokenStr string) (string, *Lease, error) {
+	return "", nil, nil
 }
 
 // CancelLeases cancels all active leases
