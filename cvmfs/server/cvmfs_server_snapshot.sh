@@ -242,6 +242,11 @@ EOF
     local repodir="${replica%/*}"
     repo="${repodir##*/}"
 
+    if [ "$repo" = "*" ]; then
+      # no replica.conf files were found
+      continue
+    fi
+
     if is_inactive_replica $repo; then
       continue
     fi
