@@ -22,10 +22,7 @@ key_id = 'key1'
 secret = b'secret1'
 
 if args.request == 'repos':
-    hmac_msg = b'/api/v1/repos'
-    headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret)}
-    print('Headers: {}'.format(headers))
-    rep = requests.get(base_url + '/repos', headers=headers)
+    rep = requests.get(base_url + '/repos')
     print('Reply: {}'.format(rep.json()))
 elif args.request == 'new_lease':
     req = {'path':'/','api_version':2}
