@@ -73,7 +73,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 		}
 	})
 	t.Run("get lease for token", func(t *testing.T) {
-		lease, err := db.GetLeaseForToken(token1.TokenStr)
+		_, lease, err := db.GetLeaseForToken(token1.TokenStr)
 		if err != nil {
 			t.Fatalf("could not retrieve leases: %v", err)
 		}

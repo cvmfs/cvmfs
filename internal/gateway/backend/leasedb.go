@@ -21,8 +21,8 @@ func (e PathBusyError) Error() string {
 }
 
 // Remaining number of seconds on the existing lease
-func (e *PathBusyError) Remaining() int64 {
-	return e.remaining.Nanoseconds() / 1000000000
+func (e *PathBusyError) Remaining() time.Duration {
+	return e.remaining
 }
 
 // LeaseExpiredError is returned by the GetLeaseXXXX methods in case a
@@ -79,7 +79,7 @@ type LeaseDB interface {
 	NewLease(keyID, leasePath string, token LeaseToken) error
 	GetLeases() (map[string]Lease, error)
 	GetLeaseForPath(leasePath string) (*Lease, error)
-	GetLeaseForToken(tokenStr string) (*Lease, error)
+	GetLeaseForToken(tokenStr string) (string, *Lease, error)
 	CancelLeases() error
 	CancelLeaseForPath(leasePath string) error
 	CancelLeaseForToken(tokenStr string) error
