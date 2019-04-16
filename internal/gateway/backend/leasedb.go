@@ -7,6 +7,13 @@ import (
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
 
+// Lease describes an exclusive lease to a subpath inside the repository:
+// keyID and token ()
+type Lease struct {
+	KeyID string
+	Token LeaseToken
+}
+
 // PathBusyError is returned as error value for new lease requests on
 // paths which are already leased
 type PathBusyError struct {
@@ -26,6 +33,12 @@ func (e *PathBusyError) Remaining() int64 {
 type LeaseDB interface {
 	Close() error
 	NewLease(keyID, leasePath string, token LeaseToken) error
+	GetLeases() ([]Lease, error)
+	GetLeaseForPath(leasePath string) (*Lease, error)
+	GetLeaseForToken(tokenStr string) (*Lease, error)
+	CancelLeases() error
+	CancelLeaseForPath(leasePath string) error
+	CancelLeaseForToken(tokenStr string) error
 }
 
 // NewLeaseDB creates a new LeaseDB object of the specified type

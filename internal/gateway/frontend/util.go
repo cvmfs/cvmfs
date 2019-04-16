@@ -13,7 +13,7 @@ type ctxKey int
 
 const (
 	idKey ctxKey = iota
-	t0Key ctxKey = iota
+	t0Key
 )
 
 type message map[string]interface{}
