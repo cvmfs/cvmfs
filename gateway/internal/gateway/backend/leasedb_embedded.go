@@ -16,11 +16,6 @@ type EmbeddedLeaseDB struct {
 	maxLeaseTime time.Duration
 }
 
-type lease struct {
-	KeyID string
-	Token LeaseToken
-}
-
 // NewEmbeddedLeaseDB creates a new embedded lease DB
 func NewEmbeddedLeaseDB(workDir string, maxLeaseTime time.Duration) (*EmbeddedLeaseDB, error) {
 	store, err := bolt.Open(workDir+"/lease.db", 0666, nil)
@@ -55,7 +50,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 		var buf bytes.Buffer
 		enc := gob.NewEncoder(&buf)
 
-		if err := enc.Encode(lease{KeyID: keyID, Token: token}); err != nil {
+		if err := enc.Encode(Lease{KeyID: keyID, Token: token}); err != nil {
 			return errors.Wrap(err, "serialization error")
 		}
 
@@ -73,7 +68,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 		// and find any conflicting lease (there can be at most 1)
 		var existing struct {
 			path  string
-			lease lease
+			lease Lease
 		}
 
 		cursor := repoBucket.Cursor()
@@ -107,4 +102,34 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 
 		return nil
 	})
+}
+
+// GetLeases returns a list of all active leases
+func (db *EmbeddedLeaseDB) GetLeases() ([]Lease, error) {
+	return []Lease{}, nil
+}
+
+// GetLeaseForPath returns the lease for a given path
+func (db *EmbeddedLeaseDB) GetLeaseForPath(leasePath string) (*Lease, error) {
+	return nil, nil
+}
+
+// GetLeaseForToken returns the lease for a given token string
+func (db *EmbeddedLeaseDB) GetLeaseForToken(tokenStr string) (*Lease, error) {
+	return nil, nil
+}
+
+// CancelLeases cancels all active leases
+func (db *EmbeddedLeaseDB) CancelLeases() error {
+	return nil
+}
+
+// CancelLeaseForPath cancels the leases for a given path
+func (db *EmbeddedLeaseDB) CancelLeaseForPath(leasePath string) error {
+	return nil
+}
+
+// CancelLeaseForToken cancels the lease for a token string
+func (db *EmbeddedLeaseDB) CancelLeaseForToken(tokenStr string) error {
+	return nil
 }
