@@ -1,18 +1,14 @@
 package backend
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	"github.com/pkg/errors"
 )
-
-// Lease describes an exclusive lease to a subpath inside the repository:
-// keyID and token ()
-type Lease struct {
-	KeyID string
-	Token LeaseToken
-}
 
 // PathBusyError is returned as error value for new lease requests on
 // paths which are already leased
@@ -45,6 +41,36 @@ type InvalidLeaseError struct {
 
 func (e InvalidLeaseError) Error() string {
 	return fmt.Sprintf("invalid lease")
+}
+
+// Lease describes an exclusive lease to a subpath inside the repository:
+// keyID and token ()
+type Lease struct {
+	KeyID string
+	Token LeaseToken
+}
+
+// Serialize the lease to a byte buffer
+func (e *Lease) Serialize() ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+
+	if err := enc.Encode(*e); err != nil {
+		return nil, errors.Wrap(err, "serialization error")
+	}
+
+	return buf.Bytes(), nil
+}
+
+// DeserializeLease from a byte buffer
+func DeserializeLease(buf []byte) (*Lease, error) {
+	lease := Lease{}
+	dec := gob.NewDecoder(bytes.NewReader(buf))
+	if err := dec.Decode(&lease); err != nil {
+		return nil, errors.Wrap(err, "deserialization error")
+	}
+
+	return &lease, nil
 }
 
 // LeaseDB provides a consistent store for repository leases
