@@ -28,8 +28,8 @@ func (db *EtcdLeaseDB) NewLease(
 }
 
 // GetLeases returns a list of all active leases
-func (db *EtcdLeaseDB) GetLeases() ([]Lease, error) {
-	return []Lease{}, nil
+func (db *EtcdLeaseDB) GetLeases() (map[string]Lease, error) {
+	return map[string]Lease{}, nil
 }
 
 // GetLeaseForPath returns the lease for a given path

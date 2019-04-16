@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,17 +19,12 @@ type EmbeddedLeaseDB struct {
 
 // NewEmbeddedLeaseDB creates a new embedded lease DB
 func NewEmbeddedLeaseDB(workDir string, maxLeaseTime time.Duration) (*EmbeddedLeaseDB, error) {
+	if err := os.MkdirAll(workDir, 0777); err != nil {
+		return nil, errors.Wrap(err, "could not create directory for backing store")
+	}
 	store, err := bolt.Open(workDir+"/lease.db", 0666, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not open backing store (BoltDB)")
-	}
-	if err := store.Update(func(txn *bolt.Tx) error {
-		if _, err := txn.CreateBucketIfNotExists([]byte("tokens")); err != nil {
-			return errors.Wrap(err, "could not create bucket: 'tokens'")
-		}
-		return nil
-	}); err != nil {
-		return nil, err
 	}
 
 	return &EmbeddedLeaseDB{store, maxLeaseTime}, nil
@@ -54,9 +50,9 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 			return errors.Wrap(err, "serialization error")
 		}
 
-		tokenBucket := txn.Bucket([]byte("tokens"))
-		if tokenBucket == nil {
-			return fmt.Errorf("missing bucket: 'tokens'")
+		tokenBucket, err := txn.CreateBucketIfNotExists([]byte("tokens"))
+		if err != nil {
+			return errors.Wrap(err, "could not create bucket: 'tokens'")
 		}
 
 		repoBucket, err := txn.CreateBucketIfNotExists([]byte(repoName))
@@ -75,28 +71,28 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
 			kPath := string(k)
 			if CheckPathOverlap(kPath, subPath) {
-				existing.path = kPath
 				dec := gob.NewDecoder(bytes.NewReader(v))
 				if err := dec.Decode(&existing.lease); err != nil {
 					return errors.Wrap(err, "deserialization error")
 				}
+				existing.path = kPath
 				break
 			}
 		}
 
 		// If a conflicting lease exists, examine its expiration time
 		if existing.path != "" {
-			timeLeft := time.Now().Sub(existing.lease.Token.Expiration)
-			if timeLeft <= 0 {
-				tokenBucket.Delete([]byte(existing.lease.Token.TokenStr))
-				repoBucket.Delete([]byte(existing.path))
-				tokenBucket.Put([]byte(token.TokenStr), []byte(subPath))
-				repoBucket.Put([]byte(subPath), buf.Bytes())
-			} else {
+			timeLeft := existing.lease.Token.Expiration.Sub(time.Now())
+			if timeLeft > 0 {
 				return PathBusyError{timeLeft}
 			}
+
+			tokenBucket.Delete([]byte(existing.lease.Token.TokenStr))
+			repoBucket.Delete([]byte(existing.path))
+			tokenBucket.Put([]byte(token.TokenStr), []byte(leasePath))
+			repoBucket.Put([]byte(subPath), buf.Bytes())
 		} else {
-			tokenBucket.Put([]byte(token.TokenStr), []byte(subPath))
+			tokenBucket.Put([]byte(token.TokenStr), []byte(leasePath))
 			repoBucket.Put([]byte(subPath), buf.Bytes())
 		}
 
@@ -105,31 +101,165 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 }
 
 // GetLeases returns a list of all active leases
-func (db *EmbeddedLeaseDB) GetLeases() ([]Lease, error) {
-	return []Lease{}, nil
+func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
+	leases := make(map[string]Lease)
+	err := db.store.View(func(txn *bolt.Tx) error {
+		if err := txn.ForEach(func(name []byte, b *bolt.Bucket) error {
+			bucketName := string(name)
+			if bucketName == "tokens" {
+				return nil
+			}
+			if err := b.ForEach(func(k, v []byte) error {
+				leasePath := bucketName + "/" + string(k)
+				lease := Lease{}
+				dec := gob.NewDecoder(bytes.NewReader(v))
+				if err := dec.Decode(&lease); err != nil {
+					return errors.Wrap(err, "deserialization error")
+				}
+				leases[leasePath] = lease
+				return nil
+			}); err != nil {
+				return errors.Wrap(
+					err, fmt.Sprintf("iteration error in bucket: %v", bucketName))
+			}
+			return nil
+		}); err != nil {
+			return errors.Wrap(err, "iteration error over repository buckets")
+		}
+
+		return nil
+	})
+	return leases, err
 }
 
 // GetLeaseForPath returns the lease for a given path
 func (db *EmbeddedLeaseDB) GetLeaseForPath(leasePath string) (*Lease, error) {
-	return nil, nil
+	lease := Lease{}
+	err := db.store.View(func(txn *bolt.Tx) error {
+		repoName, subPath, err := SplitLeasePath(leasePath)
+		if err != nil {
+			return errors.Wrap(err, "invalid lease path")
+		}
+		bucket := txn.Bucket([]byte(repoName))
+		if bucket == nil {
+			return fmt.Errorf("invalid repo name: %v", repoName)
+		}
+		v := bucket.Get([]byte(subPath))
+		if v == nil {
+			return InvalidLeaseError{}
+		}
+		dec := gob.NewDecoder(bytes.NewReader(v))
+		if err := dec.Decode(&lease); err != nil {
+			return errors.Wrap(err, "deserialization error")
+		}
+		if lease.Token.Expiration.Sub(time.Now()) <= 0 {
+			return LeaseExpiredError{}
+		}
+		return nil
+	})
+	return &lease, err
 }
 
 // GetLeaseForToken returns the lease for a given token string
 func (db *EmbeddedLeaseDB) GetLeaseForToken(tokenStr string) (*Lease, error) {
-	return nil, nil
+	lease := Lease{}
+	err := db.store.View(func(txn *bolt.Tx) error {
+		tokens := txn.Bucket([]byte("tokens"))
+		if tokens == nil {
+			return fmt.Errorf("missing 'tokens' bucket")
+		}
+		leasePath := tokens.Get([]byte(tokenStr))
+		if leasePath == nil {
+			return InvalidLeaseError{}
+		}
+
+		repoName, subPath, err := SplitLeasePath(string(leasePath))
+		if err != nil {
+			return errors.Wrap(err, "invalid lease path")
+		}
+		bucket := txn.Bucket([]byte(repoName))
+		if bucket == nil {
+			return fmt.Errorf("invalid repo name: %v", repoName)
+		}
+		v := bucket.Get([]byte(subPath))
+		dec := gob.NewDecoder(bytes.NewReader(v))
+		if err := dec.Decode(&lease); err != nil {
+			return errors.Wrap(err, "deserialization error (lease)")
+		}
+		return nil
+	})
+	return &lease, err
 }
 
 // CancelLeases cancels all active leases
 func (db *EmbeddedLeaseDB) CancelLeases() error {
-	return nil
+	return db.store.Update(func(txn *bolt.Tx) error {
+		txn.ForEach(func(name []byte, b *bolt.Bucket) error {
+			txn.DeleteBucket(name)
+			return nil
+		})
+		return nil
+	})
 }
 
 // CancelLeaseForPath cancels the leases for a given path
 func (db *EmbeddedLeaseDB) CancelLeaseForPath(leasePath string) error {
-	return nil
+	return db.store.Update(func(txn *bolt.Tx) error {
+		repoName, subPath, err := SplitLeasePath(leasePath)
+		if err != nil {
+			return errors.Wrap(err, "invalid lease path")
+		}
+
+		tokens := txn.Bucket([]byte("tokens"))
+		if tokens == nil {
+			return fmt.Errorf("missing 'tokens' bucket")
+		}
+		bucket := txn.Bucket([]byte(repoName))
+		if bucket == nil {
+			return fmt.Errorf("invalid repo name: %v", repoName)
+		}
+
+		v := bucket.Get([]byte(subPath))
+		if v == nil {
+			return InvalidLeaseError{}
+		}
+		lease := Lease{}
+		dec := gob.NewDecoder(bytes.NewReader(v))
+		if err := dec.Decode(&lease); err != nil {
+			return errors.Wrap(err, "deserialization error")
+		}
+
+		bucket.Delete([]byte(subPath))
+		tokens.Delete([]byte(lease.Token.TokenStr))
+
+		return nil
+	})
 }
 
 // CancelLeaseForToken cancels the lease for a token string
 func (db *EmbeddedLeaseDB) CancelLeaseForToken(tokenStr string) error {
-	return nil
+	return db.store.Update(func(txn *bolt.Tx) error {
+		tokens := txn.Bucket([]byte("tokens"))
+		if tokens == nil {
+			return fmt.Errorf("missing 'tokens' bucket")
+		}
+		leasePath := tokens.Get([]byte(tokenStr))
+		if leasePath == nil {
+			return InvalidLeaseError{}
+		}
+
+		repoName, subPath, err := SplitLeasePath(string(leasePath))
+		if err != nil {
+			return errors.Wrap(err, "invalid lease path")
+		}
+		bucket := txn.Bucket([]byte(repoName))
+		if bucket == nil {
+			return fmt.Errorf("invalid repo name: %v", repoName)
+		}
+
+		bucket.Delete([]byte(subPath))
+		tokens.Delete([]byte(tokenStr))
+
+		return nil
+	})
 }
