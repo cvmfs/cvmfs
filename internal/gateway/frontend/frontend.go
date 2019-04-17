@@ -12,7 +12,7 @@ import (
 )
 
 // Start HTTP frontend
-func Start(services *be.Services, port int, maxLeaseTime int) error {
+func Start(services *be.Services, port int, timeout time.Duration) error {
 	router := mux.NewRouter()
 
 	// Add the request tagging middleware
@@ -43,7 +43,6 @@ func Start(services *be.Services, port int, maxLeaseTime int) error {
 		HandlerFunc(MakeLeasesHandler(services))
 
 	// Configure and start the HTTP server
-	timeout := time.Duration(maxLeaseTime) * time.Second
 	srv := &http.Server{
 		Handler:      router,
 		Addr:         fmt.Sprintf(":%d", port),

@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"time"
-
 	"github.com/pkg/errors"
 )
 
@@ -29,8 +27,7 @@ func NewLease(s *Services, keyID, leasePath string) (string, error) {
 	}
 
 	// Generate a new token for the lease
-	token, err := NewLeaseToken(
-		leasePath, time.Duration(s.Config.MaxLeaseTime)*time.Second)
+	token, err := NewLeaseToken(leasePath, s.Config.MaxLeaseTime)
 	if err != nil {
 		return "", errors.Wrap(err, "could not generate session token")
 	}
@@ -84,7 +81,10 @@ func CancelLease(s *Services, tokenStr string) error {
 	}
 
 	if _, err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
-		return err
+		// Allow an expired token to be used to cancel a lease
+		if _, ok := err.(ExpiredTokenError); !ok {
+			return err
+		}
 	}
 
 	if err := s.Leases.CancelLeaseForToken(tokenStr); err != nil {

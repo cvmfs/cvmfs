@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -11,7 +13,7 @@ type Config struct {
 	// Port used by the HTTP frontend
 	Port int `mapstructure:"port"`
 	// MaxLeaseTime is the maximum lease duration in seconds
-	MaxLeaseTime int `mapstructure:"max_lease_time"`
+	MaxLeaseTime time.Duration `mapstructure:"max_lease_time"`
 	// UseEtcd as a consistent data store for lease information (for gateway clustering)
 	UseEtcd bool `mapstructure:"use_etcd"`
 	// EtcdEndpoints is a list of etcd endpoint URLs
@@ -54,6 +56,9 @@ func ReadConfig() (*Config, error) {
 	if err := viper.Unmarshal(&conf); err != nil {
 		return nil, errors.Wrap(err, "could not populate configuration object")
 	}
+
+	// max_lease_time is given in seconds in the config file or at the command line
+	conf.MaxLeaseTime = conf.MaxLeaseTime * time.Second
 
 	// Manually handler legacy parameter names
 
