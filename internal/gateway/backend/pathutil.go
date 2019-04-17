@@ -62,7 +62,6 @@ func SplitLeasePath(leasePath string) (string, string, error) {
 	}
 
 	subPath := strings.TrimPrefix(leasePath, repoName)
-	subPath = strings.TrimPrefix(subPath, "/")
 
 	return repoName, subPath, nil
 }
