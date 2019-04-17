@@ -79,12 +79,11 @@ type LeaseDB interface {
 // NewLeaseDB creates a new LeaseDB object of the specified type
 // (either "embedded" or "etcd").
 func NewLeaseDB(dbType string, config *gw.Config) (LeaseDB, error) {
-	maxLeaseTime := time.Duration(config.MaxLeaseTime)
 	switch dbType {
 	case "embedded":
-		return NewEmbeddedLeaseDB(config.WorkDir, maxLeaseTime)
+		return NewEmbeddedLeaseDB(config.WorkDir)
 	case "etcd":
-		return NewEtcdLeaseDB(config.EtcdEndpoints, maxLeaseTime)
+		return NewEtcdLeaseDB(config.EtcdEndpoints)
 	default:
 		return nil, fmt.Errorf("unknown lease DB type: %v", dbType)
 	}
