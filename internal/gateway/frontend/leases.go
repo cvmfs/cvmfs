@@ -46,14 +46,14 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 	reqID, _ := h.Context().Value(idKey).(uuid.UUID)
 	msg := make(map[string]interface{})
 	if token == "" {
-		leases, err := services.GetLeases()
+		leases, err := be.GetLeases(services)
 		if err != nil {
 			httpWrapError(&reqID, err, err.Error(), w, http.StatusInternalServerError)
 		}
 		msg["status"] = "ok"
 		msg["data"] = leases
 	} else {
-		lease, err := services.GetLease(token)
+		lease, err := be.GetLease(services, token)
 		if err != nil {
 			httpWrapError(&reqID, err, err.Error(), w, http.StatusInternalServerError)
 		}
@@ -92,7 +92,7 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 	} else {
 		// The authorization is expected to have the correct format, since it has already been checked.
 		keyID := strings.Split(h.Header.Get("Authorization"), " ")[0]
-		token, err := services.NewLease(keyID, reqMsg.Path)
+		token, err := be.NewLease(services, keyID, reqMsg.Path)
 		if err != nil {
 			if busyError, ok := err.(be.PathBusyError); ok {
 				msg["status"] = "path_busy"
@@ -132,7 +132,7 @@ func handleDropLease(services *be.Services, token string, w http.ResponseWriter,
 
 	msg := make(map[string]interface{})
 
-	if err := services.CancelLease(token); err != nil {
+	if err := be.CancelLease(services, token); err != nil {
 		msg["status"] = "error"
 		if _, ok := err.(be.InvalidTokenError); ok {
 			msg["reason"] = "invalid_token"
