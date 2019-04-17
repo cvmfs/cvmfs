@@ -126,7 +126,6 @@ get_next_file_again:
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "Invalid cache directory, %s/%s does not exist",
                  g_cache_dir->c_str(), g_current_dir->c_str());
-        pthread_mutex_unlock(&g_lock_traverse);
         exit(kErrorUnfixed);
       }
       goto get_next_file_again;
