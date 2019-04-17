@@ -445,7 +445,7 @@ cvmfs_version_string() {
 
 # Tracks changes to the organization of files and directories.
 # Stored in CVMFS_CREATOR_VERSION.  Started with 137.
-cvmfs_layout_revision() { echo "140"; }
+cvmfs_layout_revision() { echo "141"; }
 
 version_major() { echo $1 | cut --delimiter=. --fields=1 | grep -oe '^[0-9]\+'; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2 | grep -oe '^[0-9]\+'; }
@@ -1189,7 +1189,8 @@ Supported Commands:
                   Open repository meta info JSON file for editing
   ingest          -t tarfile
                   -b base directory
-                  [-d folder to delete]
+                  [-d <folder to delete>]
+                  [-c create nested catalog in base directory]
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.

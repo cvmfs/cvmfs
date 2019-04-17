@@ -58,6 +58,7 @@ set(CVMFS_UNITTEST_FILES
   t_fs_traversal.cc
   t_fuse_evict.cc
   t_garbage_collector.cc
+  t_gateway_key_parser.cc
   t_glue_buffer.cc
   t_hash_filters.cc
   t_header_lists.cc
@@ -73,6 +74,7 @@ set(CVMFS_UNITTEST_FILES
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
+  t_notify_messages.cc
   t_mountpoint.cc
   t_object_fetcher.cc
   t_options.cc
@@ -100,6 +102,7 @@ set(CVMFS_UNITTEST_FILES
   t_sqlitemem.cc
   t_statistics.cc
   t_suid_util.cc
+  t_supervisor.cc
   t_swissknife_lease.cc
   t_sync_union_tarball.cc
   t_synchronizing_counter.cc
@@ -112,6 +115,7 @@ set(CVMFS_UNITTEST_FILES
   t_upload_facility.cc
   t_uploaders.cc
   t_gateway_uploader.cc
+  t_url.cc
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
@@ -189,6 +193,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/notify/messages.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
@@ -217,6 +222,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/supervisor.cc
   ${CVMFS_SOURCE_DIR}/swissknife.cc
   ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
   ${CVMFS_SOURCE_DIR}/swissknife_history.cc
@@ -234,6 +240,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_gateway.cc
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/url.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
@@ -464,13 +471,15 @@ endif (BUILD_SHRINKWRAP)
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
-                             ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
-                             ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
-                             ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
-                             ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
-                             ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                             ${PROTOBUF_LITE_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
+
+list (APPEND UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+                                     ${LibWebsockets_LIBRARIES} ${OPENSSL_LIBRARIES}
+                                     ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                                     ${OPENSSL_LIBRARIES} ${SQLITE3_LIBRARY}
+                                     ${ZLIB_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES}
+                                     ${PACPARSER_LIBRARIES} ${SHA3_LIBRARIES}
+                                     ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
+                                     ${LibArchive_LIBRARY} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 

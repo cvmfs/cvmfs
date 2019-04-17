@@ -38,6 +38,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
                                  src/585-xattrs                               \
+                                 src/600-securecvmfs                          \
                                  src/602-libcvmfs                             \
                                  src/628-pythonwrappedcvmfsserver             \
                                  --                                           \
@@ -45,6 +46,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/6*                                       \
                                  src/7*                                       \
                                  src/8*                                       \
+                                 src/9*                                       \
                               || retval=1
 
 

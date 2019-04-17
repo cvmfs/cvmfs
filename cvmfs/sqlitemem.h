@@ -22,9 +22,9 @@ class MallocArena;
 /**
  * The MemoryManager uses the sqlite hooks to optimize memory allocations.  It
  * is tuned for reading the cvmfs file catalogs.  It provides a page cache of
- * a few MB, a small scratch space and per-database lookaside buffers.  It also
- * contains a "general purpose" malloc/free implementation tailored to the
- * behavior of sqlite memory allocation.
+ * a few MB and per-database lookaside buffers.  It also contains a
+ * "general purpose" malloc/free implementation tailored to the behavior of
+ * sqlite memory allocation.
  *
  * It is implemented as a singleton.  GetInstance() will reserve memory blocks,
  * AssignGlobalArenas will set the global sqlite configuration and
@@ -44,7 +44,9 @@ class SqliteMemoryManager {
  public:
   /**
    * In practice, we hardly ever see scratch memory used.  If it is used,
-   * the allocation size is <8kB
+   * the allocation size is <8kB.
+   * NOTE: The scratch memory allocator has been removed from sqlite as of
+   * version 3.21.
    */
   static const unsigned kScratchSlotSize = 8192;
   /**
@@ -192,7 +194,6 @@ class SqliteMemoryManager {
   struct sqlite3_mem_methods sqlite3_mem_vanilla_;
 
   struct sqlite3_mem_methods mem_methods_;
-  void *scratch_memory_;
   void *page_cache_memory_;
   std::vector<LookasideBufferArena *> lookaside_buffer_arenas_;
   std::vector<MallocArena *> malloc_arenas_;

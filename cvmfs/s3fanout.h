@@ -98,7 +98,8 @@ struct Statistics {
  */
 struct JobInfo {
   enum RequestType {
-    kReqHead = 0,
+    kReqHeadOnly = 0,  // peek
+    kReqHeadPut,  // conditional upload of content-addressed objects
     kReqPutCas,  // immutable data object
     kReqPutDotCvmfs,  // one of the /.cvmfs... top level files
     kReqDelete,
@@ -119,7 +120,6 @@ struct JobInfo {
   const std::string bucket;
   const std::string object_key;
   const std::string origin_path;
-  bool test_and_set;
   void *callback;  // Callback to be called when job is finished
   MemoryMappedFile *mmf;
 
@@ -176,13 +176,13 @@ struct JobInfo {
   void JobInfoInit() {
     curl_handle = NULL;
     http_headers = NULL;
-    test_and_set = false;
     origin_mem.pos = 0;
     origin_mem.size = 0;
     origin_mem.data = NULL;
     callback = NULL;
     mmf = NULL;
     origin_file = NULL;
+    payload_size = 0;
     request = kReqPutCas;
     error_code = kFailOk;
     http_error = 0;
@@ -198,7 +198,9 @@ struct JobInfo {
   CURL *curl_handle;
   struct curl_slist *http_headers;
   FILE *origin_file;
+  uint64_t payload_size;
   RequestType request;
+  bool peek_before_put;
   Failures error_code;
   int http_error;
   unsigned char num_retries;
@@ -252,8 +254,6 @@ class S3FanoutManager : SingleCopy {
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
-
-  bool DoSingleJob(JobInfo *info) const;
 
  private:
   // Reflects the default Apache configuration of the local backend

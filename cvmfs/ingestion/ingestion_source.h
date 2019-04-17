@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cerrno>
 #include <cstdio>
@@ -105,6 +106,35 @@ class FileIngestionSource : public IngestionSource {
   platform_stat64 stat_;
   bool stat_obtained_;
 };
+
+
+/**
+ * Wraps around existing memory without owning it.
+ */
+class MemoryIngestionSource : public IngestionSource {
+ public:
+  MemoryIngestionSource(const std::string &p, unsigned char *d, unsigned s)
+    : path_(p), data_(d), size_(s), pos_(0) {}
+  virtual ~MemoryIngestionSource() {}
+  virtual std::string GetPath() const { return path_; }
+  virtual bool Open() { return true; }
+  virtual ssize_t Read(void* buffer, size_t nbyte) {
+    size_t remaining = size_ - pos_;
+    size_t size = std::min(remaining, nbyte);
+    if (size > 0) memcpy(buffer, data_ + pos_, size);
+    pos_ += size;
+    return size;
+  }
+  virtual bool Close() { return true; }
+  virtual bool GetSize(uint64_t* size) { *size = size_; return true; }
+
+ private:
+  std::string path_;
+  unsigned char *data_;
+  unsigned size_;
+  unsigned pos_;
+};
+
 
 class TarIngestionSource : public IngestionSource {
  public:

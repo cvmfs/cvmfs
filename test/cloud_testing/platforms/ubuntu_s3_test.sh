@@ -72,10 +72,12 @@ if [ $s3_retval -eq 0 ]; then
                                src/571-localbackendumask                    \
                                src/572-proxyfailover                        \
                                src/583-httpredirects                        \
+                               src/584-interleavingsnapshot                 \
                                src/585-xattrs                               \
                                src/591-importrepo                           \
                                src/594-backendoverwrite                     \
                                src/595-geoipdbupdate                        \
+                               src/599-removehardlinks                      \
                                src/600-securecvmfs                          \
                                src/605-resurrectancientcatalog              \
                                src/607-noapache                             \
@@ -85,6 +87,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/614-geoservice                           \
                                src/622-gracefulrmfs                         \
                                src/647-bearercvmfs                          \
+                               src/628-pythonwrappedcvmfsserver             \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

@@ -167,6 +167,20 @@ bool Catalog::OpenDatabase(const string &db_path) {
     return false;
   }
 
+  if (database_->IsEqualSchema(database_->schema_version(), 1.0)) {
+    // Possible fix-up for database layout lacking the content hash of
+    // nested catalogs
+    SqlCatalog sql_has_nested_sha1(database(),
+      "SELECT count(*) FROM sqlite_master "
+      "WHERE type='table' AND name='nested_catalogs' AND sql LIKE '%sha1%';");
+    bool retval = sql_has_nested_sha1.FetchRow();
+    assert(retval == true);
+    bool has_nested_sha1 = sql_has_nested_sha1.RetrieveInt64(0);
+    if (!has_nested_sha1) {
+      database_->EnforceSchema(0.9, 0);
+    }
+  }
+
   InitPreparedStatements();
 
   // Set the database file ownership if requested

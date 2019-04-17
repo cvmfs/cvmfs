@@ -129,8 +129,7 @@ echo "done"
 # Install repository gateway
 echo "Installing repository gateway"
 package_map=pkgmap.slc6_x86_64
-download_gateway_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
-install_rpm $(cat gateway_package_name)
+install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
 
 # rebooting the system (returning 0 value)
 echo "sleep 1 && reboot" > killme.sh

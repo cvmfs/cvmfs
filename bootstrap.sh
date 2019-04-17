@@ -3,7 +3,7 @@
 set -e
 
 SSL_VERSION=2.4.4
-CARES_VERSION=1.13.0
+CARES_VERSION=1.15.0
 CURL_VERSION=7.63.0
 PACPARSER_VERSION=1.3.5
 ZLIB_VERSION=1.2.8
@@ -16,6 +16,7 @@ PROTOBUF_VERSION=2.6.1
 MONGOOSE_VERSION=3.8
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
+LIBWEBSOCKETS_VERSION=3.0.1
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -235,6 +236,11 @@ build_lib() {
       do_extract "libarchive" "libarchive-${LIBARCHIVE_VERSION}.tar.gz"
       do_build "libarchive"
       ;;
+    libwebsockets)
+      do_extract "libwebsockets" "libwebsockets-${LIBWEBSOCKETS_VERSION}.tar.gz"
+      patch_external "libwebsockets" "CMakeLists.patch" "private.patch" "poll.patch"
+      do_build "libwebsockets"
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -245,7 +251,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose libarchive"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose libarchive libwebsockets"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi

@@ -47,8 +47,10 @@ namespace catalog {
 // 2.0 (Aug  6 2012 - Git: c8a81ede603e57fbe4324b6ab6bc8c41e3a2fa5f)
 //     * beginning of CernVM-FS 2.1.x branch ('modern' era)
 //
-// 1.x (earlier - based on SVN :-) )
+// 1.x (earlier - code base still in SVN)
 //     * pre-historic times
+// 0.9 (some time 2011, artifical version)
+//     * 1.0 catalogs that lack the SHA-1 value for nested catalogs
 const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 
@@ -832,6 +834,9 @@ bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
 
 SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
 {
+  // We cannot access nested catalogs where the content hash is missing
+  static const char *stmt_0_9 =
+    "SELECT '', 0 FROM nested_catalogs;";
   static const char *stmt_2_5_ge_4 =
     "SELECT sha1, size FROM nested_catalogs WHERE path=:path "
     "UNION ALL SELECT sha1, size FROM bind_mountpoints WHERE path=:path;";
@@ -850,7 +855,11 @@ SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
   {
     DeferredInit(database.sqlite_db(), stmt_2_5_ge_1_lt_4);
   } else {
-    DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
+    if (database.IsEqualSchema(database.schema_version(), 0.9)) {
+      DeferredInit(database.sqlite_db(), stmt_0_9);
+    } else {
+      DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
+    }
   }
 }
 
@@ -879,6 +888,9 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
 SqlNestedCatalogListing::SqlNestedCatalogListing(
   const CatalogDatabase &database)
 {
+  // We cannot access nested catalogs where the content hash is missing
+  static const char *stmt_0_9 =
+    "SELECT '', '', 0 FROM nested_catalogs;";
   static const char *stmt_2_5_ge_4 =
     "SELECT path, sha1, size FROM nested_catalogs "
     "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";
@@ -897,7 +909,11 @@ SqlNestedCatalogListing::SqlNestedCatalogListing(
   {
     DeferredInit(database.sqlite_db(), stmt_2_5_ge_1_lt_4);
   } else {
-    DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
+    if (database.IsEqualSchema(database.schema_version(), 0.9)) {
+      DeferredInit(database.sqlite_db(), stmt_0_9);
+    } else {
+      DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
+    }
   }
 }
 
@@ -927,6 +943,9 @@ uint64_t SqlNestedCatalogListing::GetSize() const {
 SqlOwnNestedCatalogListing::SqlOwnNestedCatalogListing(
   const CatalogDatabase &database)
 {
+  // We cannot access nested catalogs where the content hash is missing
+  static const char *stmt_0_9 =
+    "SELECT '', '', 0 FROM nested_catalogs;";
   static const char *stmt_2_5_ge_1 =
     "SELECT path, sha1, size FROM nested_catalogs;";
   // Internally converts NULL to 0 for size
@@ -938,7 +957,11 @@ SqlOwnNestedCatalogListing::SqlOwnNestedCatalogListing(
   {
     DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
   } else {
-    DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
+    if (database.IsEqualSchema(database.schema_version(), 0.9)) {
+      DeferredInit(database.sqlite_db(), stmt_0_9);
+    } else {
+      DeferredInit(database.sqlite_db(), stmt_2_5_lt_1);
+    }
   }
 }
 

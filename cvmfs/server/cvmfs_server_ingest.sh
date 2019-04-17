@@ -23,6 +23,8 @@ cvmfs_server_ingest() {
   local force_native=0
   local force_external=0
 
+  # if we use the gateway we cannot easily accept multiple deletion
+  local multiple_delete=0
 
   while [ "$2" != "" ]; do
     case $1 in
@@ -38,6 +40,7 @@ cvmfs_server_ingest() {
           to_delete=$2
         else
           to_delete=$to_delete:$2
+          multiple_delete=1
         fi
         ;;
       -c | --catalog )
@@ -62,8 +65,23 @@ cvmfs_server_ingest() {
     die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR or don't provide the base directory to simply delete entities from the repository"
   fi
 
+  if [ x"$upstream_type" = xgw ]; then
 
-  cvmfs_server_transaction $name || die "Impossible to start a transaction"
+    if [ $multiple_delete -eq 1 ]; then
+      die "Could not delete multiple paths using a gateway in a single transaction."
+    fi
+
+    if [ ! x"$tar_file" = "x" ] && [ ! x"$to_delete" = "x" ]; then
+      die "Could not delete and add a file in the same transaction while using gateway."
+    fi
+    # by the chek above we are sure that there is only a tar_file to ingest or a directory to_delete
+    # hence we just concatenate them with the name for the transaction
+    cvmfs_server_transaction "$name/$base_dir$to_delete" || die "Impossible to start a transaction"
+  else
+    cvmfs_server_transaction $name || die "Impossible to start a transaction"
+  fi
+
+
 
   upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)
@@ -209,6 +227,15 @@ cvmfs_server_ingest() {
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
     ingest_command="$ingest_command -+stats"
   fi
+
+  local upstream_storage=$CVMFS_UPSTREAM_STORAGE
+  local upstream_type=$(get_upstream_type $upstream_storage)
+  gw_key_file=/etc/cvmfs/keys/${name}.gw
+
+  if [ x"$upstream_type" = xgw ]; then
+    ingest_command="$ingest_command -H $gw_key_file -P ${spool_dir}/session_token"
+  fi
+
 
   # ---> do it! (from here on we are changing things)
   publish_before_hook $name

@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <time.h>
 
 #include <fstream>
 #include <map>
@@ -15,6 +14,7 @@
 #include "cvmfs_config.h"
 #include "libcvmfs.h"
 #include "logging.h"
+#include "platform.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/fs_traversal_libcvmfs.h"
@@ -93,14 +93,13 @@ class RecDir {
 
 unsigned             num_parallel_ = 0;
 bool                 recursive = true;
+uint64_t             stat_update_period_ = 0;  // Off for testing
 int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 atomic_int64         copy_queue;
 
 vector<RecDir*>      dirs_;
-
-unsigned             retries_ = 0;
 
 SpecTree             *spec_tree_ = new SpecTree('*');
 
@@ -165,10 +164,11 @@ bool copyFile(
   const char *dest_name,
   perf::Statistics *pstats
 ) {
-  int retval;
+  int retval = 0;
   bool status = true;
   size_t bytes_transferred = 0;
 
+  // Get file handles from each respective filesystem
   void *src  = src_fs->get_handle(src_fs->context_, src_name);
   void *dest = dest_fs->get_handle(dest_fs->context_, dest_name);
 
@@ -215,7 +215,8 @@ bool copyFile(
       break;
     }
   }
-  pstats->Lookup(SHRINKWRAP_STAT_BYTE_COUNT)->Xadd(bytes_transferred);
+
+  pstats->Lookup(SHRINKWRAP_STAT_DATA_BYTES)->Xadd(bytes_transferred);
 
   retval = src_fs->do_fclose(src);
   if (retval != 0) {
@@ -301,9 +302,21 @@ bool getNext(
     return false;
   }
   if (is_src) {
-    pstats->Lookup(SHRINKWRAP_STAT_SRC_ENTRIES)->Inc();
+    pstats->Lookup(SHRINKWRAP_STAT_ENTRIES_SRC)->Inc();
+    switch ((*st)->st_mode & S_IFMT) {
+      case S_IFREG:
+        pstats->Lookup(SHRINKWRAP_STAT_COUNT_FILE)->Inc();
+        pstats->Lookup(SHRINKWRAP_STAT_COUNT_BYTE)->Xadd((*st)->st_size);
+        break;
+      case S_IFDIR:
+        pstats->Lookup(SHRINKWRAP_STAT_COUNT_DIR)->Inc();
+        break;
+      case S_IFLNK:
+        pstats->Lookup(SHRINKWRAP_STAT_COUNT_SYMLINK)->Inc();
+        break;
+    }
   } else {
-    pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
+    pstats->Lookup(SHRINKWRAP_STAT_ENTRIES_DEST)->Inc();
   }
   return true;
 }
@@ -350,12 +363,12 @@ bool handle_file(
         errno = 0;
         result = false;
       }
-      pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT)->Inc();
     }
+    pstats->Lookup(SHRINKWRAP_STAT_DATA_FILES)->Inc();
     free(src_ident);
   } else {
-    pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_FILES)->Inc();
-    pstats->Lookup(SHRINKWRAP_STAT_DEDUPED_BYTES)->Xadd(src_st->st_size);
+    pstats->Lookup(SHRINKWRAP_STAT_DATA_FILES_DEDUPED)->Inc();
+    pstats->Lookup(SHRINKWRAP_STAT_DATA_BYTES_DEDUPED)->Xadd(src_st->st_size);
   }
 
   // The target alway exists (either previously existed or just created).
@@ -449,7 +462,7 @@ bool Sync(
               &dest_st, false, false, pstats);
     } else {
       // A destination entry was added
-      pstats->Lookup(SHRINKWRAP_STAT_DEST_ENTRIES)->Inc();
+      pstats->Lookup(SHRINKWRAP_STAT_ENTRIES_DEST)->Inc();
     }
 
     // All entries in both have been visited
@@ -551,7 +564,8 @@ bool Sync(
 bool SyncFull(
   struct fs_traversal *src,
   struct fs_traversal *dest,
-  perf::Statistics *pstats) {
+  perf::Statistics *pstats,
+  uint64_t last_print_time) {
   if (dirs_.empty()) {
     dirs_.push_back(new RecDir("", true));
   }
@@ -563,6 +577,14 @@ bool SyncFull(
       LogCvmfs(kLogCvmfs, kLogStderr,
         "File %s failed to copy\n", next_dir->dir);
       return false;
+    }
+
+    if (stat_update_period_ > 0 &&
+      platform_monotonic_time()-last_print_time > stat_update_period_) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+        "%s",
+        pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
+      last_print_time = platform_monotonic_time();
     }
 
     delete next_dir;
@@ -586,19 +608,9 @@ static void *MainWorker(void *data) {
   MainWorkerSpecificContext *sc = static_cast<MainWorkerSpecificContext*>(data);
   MainWorkerContext *mwc = sc->mwc;
   perf::Counter *files_transferred
-    = mwc->pstats->Lookup(SHRINKWRAP_STAT_FILE_COUNT);
-  time_t last_print_time = 0;
-  if (sc->num_thread == 0) {
-    last_print_time = time(NULL);
-  }
+    = mwc->pstats->Lookup(SHRINKWRAP_STAT_COUNT_FILE);
 
   while (1) {
-    if (sc->num_thread == 0 && time(NULL)-last_print_time > 10) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
-        "%s",
-        mwc->pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
-      last_print_time = time(NULL);
-    }
     FileCopy next_copy;
     {
       MutexLockGuard m(&lock_pipe);
@@ -629,18 +641,26 @@ static void *MainWorker(void *data) {
 
 perf::Statistics *GetSyncStatTemplate() {
   perf::Statistics *result = new perf::Statistics();
-  result->Register(SHRINKWRAP_STAT_BYTE_COUNT,
-    "The number of bytes transfered from the source to the destination");
-  result->Register(SHRINKWRAP_STAT_FILE_COUNT,
-    "The number of files transfered from the source to the destination");
-  result->Register(SHRINKWRAP_STAT_SRC_ENTRIES,
-    "The number of file system entries processed in the source");
-  result->Register(SHRINKWRAP_STAT_DEST_ENTRIES,
-    "The number of file system entries processed in the destination");
-  result->Register(SHRINKWRAP_STAT_DEDUPED_FILES,
-    "The number of files not copied thanks to deduplication");
-  result->Register(SHRINKWRAP_STAT_DEDUPED_BYTES,
-    "The number of bytes not copied thanks to deduplication");
+  result->Register(SHRINKWRAP_STAT_COUNT_FILE,
+    "Number of files from source repository");
+  result->Register(SHRINKWRAP_STAT_COUNT_DIR,
+    "Number of directories from source repository");
+  result->Register(SHRINKWRAP_STAT_COUNT_SYMLINK,
+    "Number of symlinks from source repository");
+  result->Register(SHRINKWRAP_STAT_COUNT_BYTE,
+    "Byte count of projected repository");
+  result->Register(SHRINKWRAP_STAT_ENTRIES_SRC,
+    "Number of file system entries processed in the source");
+  result->Register(SHRINKWRAP_STAT_ENTRIES_DEST,
+    "Number of file system entries processed in the destination");
+  result->Register(SHRINKWRAP_STAT_DATA_FILES,
+    "Number of data files transfered from source to destination");
+  result->Register(SHRINKWRAP_STAT_DATA_BYTES,
+    "Bytes transfered from source to destination");
+  result->Register(SHRINKWRAP_STAT_DATA_FILES_DEDUPED,
+    "Number of files not copied due to deduplication");
+  result->Register(SHRINKWRAP_STAT_DATA_BYTES_DEDUPED,
+    "Number of bytes not copied due to deduplication");
   return result;
 }
 
@@ -649,10 +669,10 @@ int SyncInit(
   struct fs_traversal *dest,
   const char *base,
   const char *spec,
-  unsigned parallel,
-  unsigned retries) {
+  uint64_t parallel,
+  uint64_t stat_period) {
   num_parallel_ = parallel;
-  retries_ = retries;
+  stat_update_period_ = stat_period;
 
   perf::Statistics *pstats = GetSyncStatTemplate();
 
@@ -696,10 +716,18 @@ int SyncInit(
     spec_tree_ = SpecTree::Create(spec);
   }
 
+  uint64_t last_print_time = 0;
   add_dir_for_sync(base, recursive);
-  int result = !SyncFull(src, dest, pstats);
+  int result = !SyncFull(src, dest, pstats, last_print_time);
 
   while (atomic_read64(&copy_queue) != 0) {
+    if (platform_monotonic_time() -last_print_time > stat_update_period_) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+        "%s",
+        pstats->PrintList(perf::Statistics::kPrintSimple).c_str());
+      last_print_time = platform_monotonic_time();
+    }
+
     SafeSleepMs(100);
   }
 
@@ -732,9 +760,9 @@ int SyncInit(
 int GarbageCollect(struct fs_traversal *fs) {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "Performing garbage collection...");
-  time_t start_time = time(NULL);
+  uint64_t start_time = platform_monotonic_time();
   int retval = fs->garbage_collector(fs->context_);
-  time_t end_time = time(NULL);
+  uint64_t end_time = platform_monotonic_time();
   LogCvmfs(kLogCvmfs, kLogStdout,
     "Garbage collection took %d seconds.",
   (end_time-start_time));

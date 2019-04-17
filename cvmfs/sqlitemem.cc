@@ -137,10 +137,6 @@ void SqliteMemoryManager::AssignGlobalArenas() {
   if (assigned_) return;
   int retval;
 
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, scratch_memory_,
-                          kScratchSlotSize, kScratchNoSlots);
-  assert(retval == SQLITE_OK);
-
   retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, page_cache_memory_,
                           kPageCacheSlotSize, kPageCacheNoSlots);
   assert(retval == SQLITE_OK);
@@ -228,7 +224,6 @@ void *SqliteMemoryManager::GetMemory(int size) {
 
 SqliteMemoryManager::SqliteMemoryManager()
   : assigned_(false)
-  , scratch_memory_(sxmmap(kScratchSize))
   , page_cache_memory_(sxmmap(kPageCacheSize))
   , idx_last_arena_(0)
 {
@@ -258,15 +253,12 @@ SqliteMemoryManager::~SqliteMemoryManager() {
   if (assigned_) {
     // Reset sqlite to default values
     int retval;
-    retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, NULL, 0, 0);
-    assert(retval == SQLITE_OK);
     retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, NULL, 0, 0);
     assert(retval == SQLITE_OK);
     retval = sqlite3_config(SQLITE_CONFIG_MALLOC, &sqlite3_mem_vanilla_);
     assert(retval == SQLITE_OK);
   }
 
-  sxunmap(scratch_memory_, kScratchSize);
   sxunmap(page_cache_memory_, kPageCacheSize);
   for (unsigned i = 0; i < lookaside_buffer_arenas_.size(); ++i)
     delete lookaside_buffer_arenas_[i];

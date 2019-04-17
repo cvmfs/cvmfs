@@ -2292,23 +2292,27 @@ try_automount() {
 #
 # @param optional  a list of files that should be appended to stdout
 cat_syslog() {
-  local syslog_file=""
-  if [ -f "/var/log/syslog" ]; then
-    syslog_file="/var/log/syslog"
-  elif [ -f "/var/log/messages" ]; then
-    syslog_file="/var/log/messages"
-  elif [ -f "/var/log/system.log" ]; then
-    syslog_file="/var/log/system.log"
-  fi
-
-  local cat_retval=0
-  if [ x"$syslog_file" != x"" ]; then
-    sudo cat $syslog_file || cat_retval=$?
-  elif which journalctl > /dev/null 2>&1; then
-    sudo journalctl || cat_retval=$?
+  if running_on_osx; then
+    sync
+    sleep 1
+    log show --style syslog --info --last 4h
   else
-    echo "default syslog not found on this system"
-    cat_retval=1
+    local syslog_file=""
+    if [ -f "/var/log/syslog" ]; then
+      syslog_file="/var/log/syslog"
+    elif [ -f "/var/log/messages" ]; then
+      syslog_file="/var/log/messages"
+    fi
+
+    local cat_retval=0
+    if [ x"$syslog_file" != x"" ]; then
+      sudo cat $syslog_file || cat_retval=$?
+    elif which journalctl > /dev/null 2>&1; then
+      sudo journalctl || cat_retval=$?
+    else
+      echo "default syslog not found on this system"
+      cat_retval=1
+    fi
   fi
 
   if [ x"$CVMFS_TEST_SYSLOG_TARGET" != x"" ]; then
@@ -2419,4 +2423,19 @@ EOF'
 
     echo "  Starting repository gateway"
     sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
+}
+
+# Sets up the CVMFS notification system
+set_up_notification_system() {
+  echo "Setting up CVMFS notification system"
+
+  sudo bash -c 'cat <<EOF > /etc/cvmfs/notify/config.json
+{
+    "port": 4930,
+    "log_level": "debug",
+    "testing_mode": true
+}
+EOF'
+
+  sudo systemctl restart cvmfs-notify
 }

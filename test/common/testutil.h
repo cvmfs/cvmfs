@@ -174,11 +174,11 @@ class AbstractMockUploader : public upload::AbstractUploader {
     assert(AbstractMockUploader::not_implemented);
   }
 
-  virtual bool Peek(const std::string &path) const {
+  virtual bool Peek(const std::string &path) {
     assert(AbstractMockUploader::not_implemented);
   }
 
-  virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const {
+  virtual bool PlaceBootstrappingShortcut(const shash::Any &object) {
     assert(AbstractMockUploader::not_implemented);
   }
 
@@ -456,6 +456,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
                    catalog::DirectoryEntryList *listing) const;
 
   bool GetVOMSAuthz(std::string *authz) { return false; }
+
+  float schema() const { return 2.5; }
 
  protected:
   // silence coverity

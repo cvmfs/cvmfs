@@ -89,6 +89,7 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   tar_stat_.st_mode = entry_stat->st_mode;
   tar_stat_.st_uid = entry_stat->st_uid;
   tar_stat_.st_gid = entry_stat->st_gid;
+  tar_stat_.st_rdev = entry_stat->st_rdev;
   tar_stat_.st_size = entry_stat->st_size;
   tar_stat_.st_mtime = entry_stat->st_mtime;
   tar_stat_.st_nlink = entry_stat->st_nlink;
@@ -132,7 +133,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   }
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
-    dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
+    dirent.size_ = makedev(major(tar_stat_.st_rdev), minor(tar_stat_.st_rdev));
   }
 
   assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() ||

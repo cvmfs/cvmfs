@@ -71,7 +71,8 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
                        "$(basename $(find . -name 'cvmfs-dev*.deb'))"       \
                        "$(basename $(find . -name 'cvmfs-unittests*.deb'))" \
                        "$CVMFS_CONFIG_PACKAGE"                              \
-                       "$(basename $(find . -name 'cvmfs-shrinkwrap*.deb'))"
+                       "$(basename $(find . -name 'cvmfs-shrinkwrap*.deb'))"\
+                       "$(basename $(find . -name 'cvmfs-ducc*.deb'))"
 fi
 
 # clean up the source tree

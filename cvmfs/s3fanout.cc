@@ -45,7 +45,10 @@ void S3FanoutManager::DetectThrottleIndicator(
 
   value_str = Trim(value_str);
   if (!value_str.empty()) {
-    unsigned value_ms = String2Uint64(value_str) * 1000;
+    unsigned value_numeric = String2Uint64(value_str);
+    unsigned value_ms =
+      HasSuffix(value_str, "ms", true /* ignore_case */) ?
+        value_numeric : (value_numeric * 1000);
     if (value_ms > 0)
       info->throttle_ms = std::min(value_ms, kMax429ThrottleMs);
   }
@@ -101,7 +104,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
           break;
         case 404:
           info->error_code = kFailNotFound;
-          break;
+          return num_bytes;
         default:
           info->error_code = kFailOther;
       }
@@ -302,7 +305,14 @@ void *S3FanoutManager::MainUpload(void *data) {
     }
 
     // Activity on curl sockets
-    for (unsigned i = 0; i < s3fanout_mgr->watch_fds_inuse_; ++i) {
+    // Within this loop the curl_multi_socket_action() may cause socket(s)
+    // to be removed from watch_fds_. If a socket is removed it is replaced
+    // by the socket at the end of the array and the inuse count is decreased.
+    // Therefore loop over the array in reverse order.
+    for (int32_t i = s3fanout_mgr->watch_fds_inuse_ - 1; i >= 0; --i) {
+      if (static_cast<uint32_t>(i) >= s3fanout_mgr->watch_fds_inuse_) {
+        continue;
+      }
       if (s3fanout_mgr->watch_fds_[i].revents) {
         int ev_bitmask = 0;
         if (s3fanout_mgr->watch_fds_[i].revents & (POLLIN | POLLPRI))
@@ -539,6 +549,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   string date = timestamp.substr(0, 8);
   vector<string> tokens = SplitString(info.hostname, ':');
   string host_only = tokens[0];
+  if (dns_buckets_) host_only = info.bucket + "." + host_only;
 
   string signed_headers;
   string canonical_headers;
@@ -555,10 +566,13 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
     "x-amz-date:" + timestamp + "\n";
 
   string scope = date + "/" + info.region + "/s3/aws4_request";
+  string uri = dns_buckets_ ?
+                 (string("/") + info.object_key) :
+                 (string("/") + info.bucket + "/" + info.object_key);
 
   string canonical_request =
     GetRequestString(info) + "\n" +
-    GetUriEncode("/" + info.bucket + "/" + info.object_key, false) + "\n" +
+    GetUriEncode(uri, false) + "\n" +
     "\n" +
     canonical_headers + "\n" +
     signed_headers + "\n" +
@@ -682,7 +696,8 @@ int S3FanoutManager::InitializeDnsSettings(
 bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
   const
 {
-  if ((info.request == JobInfo::kReqHead) ||
+  if ((info.request == JobInfo::kReqHeadOnly) ||
+      (info.request == JobInfo::kReqHeadPut) ||
       (info.request == JobInfo::kReqDelete))
   {
     switch (info.authz_method) {
@@ -754,13 +769,6 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
 
 
 bool S3FanoutManager::MkPayloadSize(const JobInfo &info, uint64_t *size) const {
-  if ((info.request == JobInfo::kReqHead) ||
-      (info.request == JobInfo::kReqDelete))
-  {
-    *size = 0;
-    return true;
-  }
-
   int64_t file_size;
   switch (info.origin) {
     case kOriginMem:
@@ -783,10 +791,10 @@ bool S3FanoutManager::MkPayloadSize(const JobInfo &info, uint64_t *size) const {
 
 string S3FanoutManager::GetRequestString(const JobInfo &info) const {
   switch (info.request) {
-    case JobInfo::kReqHead:
+    case JobInfo::kReqHeadOnly:
+    case JobInfo::kReqHeadPut:
       return "HEAD";
     case JobInfo::kReqPutCas:
-      // fall through
     case JobInfo::kReqPutDotCvmfs:
       return "PUT";
     case JobInfo::kReqDelete:
@@ -799,8 +807,8 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
 
 string S3FanoutManager::GetContentType(const JobInfo &info) const {
   switch (info.request) {
-    case JobInfo::kReqHead:
-      // fall through
+    case JobInfo::kReqHeadOnly:
+    case JobInfo::kReqHeadPut:
     case JobInfo::kReqDelete:
       return "";
     case JobInfo::kReqPutCas:
@@ -831,14 +839,14 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   InitializeDnsSettings(handle, info->hostname);
 
   bool retval_b;
-  uint64_t payload_size;
-  retval_b = MkPayloadSize(*info, &payload_size);
+  retval_b = MkPayloadSize(*info, &info->payload_size);
   if (!retval_b)
     return kFailLocalIO;
 
   CURLcode retval;
-  if (info->request == JobInfo::kReqHead ||
-      info->request == JobInfo::kReqDelete)
+  if ((info->request == JobInfo::kReqHeadOnly) ||
+      (info->request == JobInfo::kReqHeadPut) ||
+      (info->request == JobInfo::kReqDelete))
   {
     retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 0);
     assert(retval == CURLE_OK);
@@ -863,7 +871,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                              static_cast<curl_off_t>(payload_size));
+                              static_cast<curl_off_t>(info->payload_size));
     assert(retval == CURLE_OK);
     if (info->origin == kOriginPath) {
       assert(info->origin_file == NULL);
@@ -1011,6 +1019,7 @@ void S3FanoutManager::Backoff(JobInfo *info) {
       {
         LogCvmfs(kLogS3Fanout, kLogStdout,
                  "Warning: S3 backend throttling (%ums)", info->throttle_ms);
+        timestamp_last_throttle_report_ = now;
       }
       statistics_->ms_throttled += info->throttle_ms;
       SafeSleepMs(info->throttle_ms);
@@ -1047,8 +1056,11 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   // Verification and error classification
   switch (curl_error) {
     case CURLE_OK:
-      if (info->error_code != kFailRetry)
+      if ((info->error_code != kFailRetry) &&
+          (info->error_code != kFailNotFound))
+      {
         info->error_code = kFailOk;
+      }
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
     case CURLE_URL_MALFORMAT:
@@ -1077,7 +1089,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
   // Transform HEAD to PUT request
   if ((info->error_code == kFailNotFound) &&
-      (info->request == JobInfo::kReqHead)) {
+      (info->request == JobInfo::kReqHeadPut))
+  {
     LogCvmfs(kLogS3Fanout, kLogDebug, "not found: %s, uploading",
              info->object_key.c_str());
     info->request = JobInfo::kReqPutCas;
@@ -1378,34 +1391,6 @@ void S3FanoutManager::PushNewJob(JobInfo *info) {
 
   MutexLockGuard m(jobs_todo_lock_);
   jobs_todo_.push_back(info);
-}
-
-
-/**
- * Performs given job synchronously.
- *
- * @return true if exists, otherwise false
- */
-bool S3FanoutManager::DoSingleJob(JobInfo *info) const {
-  bool retme = false;
-
-  CURL *handle = AcquireCurlHandle();
-  if (handle == NULL) {
-    LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
-    assert(handle != NULL);
-  }
-
-  InitializeRequest(info, handle);
-  SetUrlOptions(info);
-
-  CURLcode resl = curl_easy_perform(handle);
-  if (resl == CURLE_OK && info->error_code == kFailOk) {
-    retme = true;
-  }
-
-  ReleaseCurlHandle(info, handle);
-
-  return retme;
 }
 
 //------------------------------------------------------------------------------

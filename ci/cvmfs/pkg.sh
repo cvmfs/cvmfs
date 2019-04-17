@@ -108,5 +108,6 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
                        ""                         \
                        ""                         \
                        ""                         \
+                       ""                         \
                        ""
 fi

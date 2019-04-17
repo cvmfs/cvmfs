@@ -11,6 +11,11 @@
 %if 0%{?el7} || 0%{?fedora}
 %define selinux_cvmfs_server 1
 %endif
+%if 0%{?el7} || 0%{?fedora} >= 29
+  %if "%{?_arch}" != "aarch64"
+    %define build_ducc 1
+  %endif
+%endif
 %if 0%{?dist:1}
 %else
   %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
@@ -33,9 +38,9 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.6.0
+Version: 2.7.0
 Release: 1%{?dist}
-Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
+Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
 Source1: cvmfs.te
 Source2: cvmfs.fc
@@ -200,6 +205,15 @@ Group: Application/System
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
+%if 0%{?build_ducc}
+%package ducc
+Summary: ducc: Daemon Unpacking Containers in CVMFS
+Group: Application/System
+BuildRequires: golang >= 1.11.4
+%description ducc
+Daemon to automatically unpack and expose containers images into CernVM-FS
+%endif
+
 %prep
 %setup -q
 
@@ -226,6 +240,11 @@ export CFLAGS="$CFLAGS -O0"
 export CXXFLAGS="$CXXFLAGS -O0"
 %endif
 
+BUILD_DUCC=no
+%if 0%{?build_ducc}
+BUILD_DUCC=yes
+%endif
+
 %if 0%{?suse_version}
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
@@ -234,6 +253,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
   -DBUILD_UNITTESTS=yes \
+  -DBUILD_DUCC=$BUILD_DUCC \
   -DINSTALL_UNITTESTS=yes \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
@@ -248,6 +268,7 @@ EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
   -DBUILD_UNITTESTS=yes \
+  -DBUILD_DUCC=$BUILD_DUCC \
   -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
 %endif
 
@@ -510,7 +531,14 @@ fi
 %{_bindir}/cvmfs_test_shrinkwrap
 %doc COPYING AUTHORS README.md ChangeLog
 
+%if 0%{?build_ducc}
+%files ducc
+%{_bindir}/cvmfs_ducc
+%endif
+
 %changelog
+* Tue Feb 19 2019 Simone Mosciatti <simone.mosciatti@cern.ch> - 2.6.0
+- Add ducc sub package
 * Wed Sep 26 2018 Jakob Blomer <jblomer@cern.ch> - 2.6.0
 - Add shrinkwrap sub package
 * Tue Aug 07 2018 Dave Dykstra <dwd@fnal.gov> - 2.5.1

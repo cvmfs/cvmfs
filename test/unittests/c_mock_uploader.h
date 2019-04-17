@@ -53,7 +53,7 @@ struct MockStreamHandle : public upload::UploadStreamHandle {
 
 /**
  * Mocked uploader that just keeps the processing results in memory for later
- * inspection.
+ * inspection (if keep_results is not set to false).
  */
 class IngestionMockUploader
   : public AbstractMockUploader<IngestionMockUploader> {
@@ -81,6 +81,7 @@ class IngestionMockUploader
   explicit IngestionMockUploader(
     const upload::SpoolerDefinition &spooler_definition)
     : AbstractMockUploader<IngestionMockUploader>(spooler_definition)
+    , keep_results(true)
   { }
 
   virtual std::string name() const { return "IngestionMockUploader"; }
@@ -110,7 +111,8 @@ class IngestionMockUploader
   {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle *>(handle);
     assert(local_handle != NULL);
-    results.push_back(Result(local_handle, content_hash));
+    if (keep_results)
+      results.push_back(Result(local_handle, content_hash));
     const CallbackTN *callback = local_handle->commit_callback;
     delete handle;
     Respond(callback,
@@ -120,6 +122,7 @@ class IngestionMockUploader
   virtual int64_t DoGetObjectSize(const std::string &file_name) { return 0;}
 
   Results results;
+  bool keep_results;
 };
 
 #endif  // TEST_UNITTESTS_C_MOCK_UPLOADER_H_

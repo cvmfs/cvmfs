@@ -64,8 +64,8 @@ class S3Uploader : public AbstractUploader {
                                       const shash::Any &content_hash);
 
   virtual void DoRemoveAsync(const std::string &file_to_delete);
-  virtual bool Peek(const std::string &path) const;
-  virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const;
+  virtual bool Peek(const std::string &path);
+  virtual bool PlaceBootstrappingShortcut(const shash::Any &object);
 
   virtual unsigned int GetNumberOfErrors() const;
   int64_t DoGetObjectSize(const std::string &file_name);
@@ -80,6 +80,15 @@ class S3Uploader : public AbstractUploader {
   static const unsigned kDefaultTimeoutSec = 60;
   static const unsigned kDefaultBackoffInitMs = 100;
   static const unsigned kDefaultBackoffMaxMs = 2000;
+
+  // Used to make the async HEAD requests synchronous in Peek()
+  struct PeekCtrl {
+    PeekCtrl() : exists(false) { pipe_wait[0] = pipe_wait[1] = 0; }
+    bool exists;
+    int pipe_wait[2];
+  };
+
+  void OnPeekCopmlete(const upload::UploaderResults &results, PeekCtrl *ctrl);
 
   static void *MainCollectResults(void *data);
 

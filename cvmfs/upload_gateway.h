@@ -56,9 +56,9 @@ class GatewayUploader : public AbstractUploader {
 
   virtual std::string name() const;
 
-  virtual bool Peek(const std::string& path) const;
+  virtual bool Peek(const std::string& path);
 
-  virtual bool PlaceBootstrappingShortcut(const shash::Any& object) const;
+  virtual bool PlaceBootstrappingShortcut(const shash::Any& object);
 
   virtual unsigned int GetNumberOfErrors() const;
 

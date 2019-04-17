@@ -101,7 +101,7 @@ cvmfs_run_test() {
 
   CVMFS_TEST_050_CONF_EDIT=1
 
-  # because of the different CVMFS_MOUNT_DIR, this cvmfs_mount fails,
+  # because of the different CVMFS_MOUNT_DIR, this cvmfs_mount fails with autofs,
   #  but call it anyway to set up the config
   cvmfs_mount grid.cern.ch
   mkdir grid

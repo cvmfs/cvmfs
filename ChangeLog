@@ -1,4 +1,24 @@
+2.7.0:
+
+2.6.1:
+  * Fix bug where the receiver temp dir caused failure of integrity
+    checks (CVM-1704)
+  * Fix a bug preventing GC on the repository gateway (CVM-1705)
+  * Fix a bug in the gateway key parser when key contained repeated chars
+  * Fix transaction lock name for tarball ingest with gateway backend 
+  * Add GC support for legacy catalogs before 1.0 schema stabilized (CVM-1698)
+  * Fix potential race condition in the stats collector for the S3 uploader
+  * Better control of memory consumption in file processing pipeline (CVM-1687)
+  * More robust parsing of gateway API keys (CVM-1693)
+
 2.6.0:
+  * Increase CVMFS_NFILES to 64k on read-only union file system mount
+  * RPM: DUCC is disabled on Aarch64 due to missing Golang RPM on RH 7
+  * New notification system to announce repository changes (CVM-1575, CVM-1634)
+  * New tool suite ducc, daemon that unpacks container images into cvmfs
+  * Fix building on macOS Mojave
+  * Update sqlite to version 3.27.2
+  * Update c-ares to version 1.15.0
   * Update libcurl to version 7.63.0
   * New parameter CVMFS_CATALOG_WATERMARK to release as of $n$ pinned catalogs
   * Add cvmfs_shrinkwrap utility and sub package (CVM-1578)
@@ -16,6 +36,7 @@
   * Fix debian packaging warnings and errors
 
 2.5.3:
+  * [S3] fix rare crash during file upload
   * [macOS] fix hanging reload during `cvmfs_config reload` 
   * Reduce IOPS during publishing to local backend
   * [S3] Add support for CVMFS_S3_PEEK_BEFORE_PUT

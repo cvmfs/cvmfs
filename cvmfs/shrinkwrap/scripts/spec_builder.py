@@ -92,7 +92,7 @@ class TraceParser:
     self.inputName = args.infile
     self.outputName = args.outfile
     self.policy = ParsingPolicies[args.policy]
-    self.filters = { (f+"()"):True for f in args.filters}
+    self.filters = dict([(f+"()"), True] for f in args.filters)
   def read_log(self):
     pathsToInclude = []
     with open(self.inputName, "r") as logFile:
@@ -137,7 +137,7 @@ class TraceParser:
       specFile.write(str(self.pathSpec[-1]))
 
 TraceParser.blacklist = ["/.Trash","/.Trash-1000"]
-    
+
 
 def parse_args():
   argparser = argparse.ArgumentParser()
@@ -148,7 +148,7 @@ def parse_args():
     help="What files should be included given a traced"
       + " action on a certain file")
 
-  
+
   argparser.add_argument("infile",
     type=str,
     help="The trace log file")

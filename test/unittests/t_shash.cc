@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -19,6 +20,15 @@
 #include "util/string.h"
 
 using namespace std;  // NOLINT
+
+TEST(T_Shash, ContextSize) {
+  unsigned max_size = 0;
+  for (int i = 0; i < shash::kAny; ++i) {
+    max_size = std::max(max_size,
+      shash::GetContextSize(static_cast<shash::Algorithms>(i)));
+  }
+  EXPECT_EQ(max_size, shash::kMaxContextSize);
+}
 
 TEST(T_Shash, TestVectors) {
   shash::Any md5(shash::kMd5);

@@ -94,6 +94,7 @@ create_cvmfs_source_tarball() {
         ${source_directory}/externals          \
         ${source_directory}/mount              \
         ${source_directory}/test               \
+        ${source_directory}/ducc               \
         $tar_name
   tar czf $destination_path $tar_name || true
   local retval=$?
@@ -111,6 +112,7 @@ generate_package_map() {
   local unittests="$5"
   local config="$6"
   local shrinkwrap="$7"
+  local ducc="$8"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
@@ -120,6 +122,9 @@ devel=$devel
 shrinkwrap=$shrinkwrap
 unittests=$unittests
 config=$config
+$(if [ "x$ducc" != "x" ]; then 
+        echo "ducc=$ducc"
+fi)
 EOF
 }
 
@@ -207,4 +212,25 @@ expand_template() {
   done
 
   echo "$tmp"
+}
+
+can_build_ducc() {
+  if which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1 ; then
+    go_version=$(go version)
+    go_major=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\1/p')
+    go_minor=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\2/p')
+    go_patch=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\3/p')
+
+    if [ $go_minor -ge 11 ]; then
+      if [ $go_patch -ge 4 ]; then
+        echo "1"
+      else
+        echo "0"
+      fi
+    else
+      echo "0"
+    fi
+  else
+    echo "0"
+  fi
 }

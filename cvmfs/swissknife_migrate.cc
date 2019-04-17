@@ -1394,9 +1394,9 @@ bool CommandMigrate::MigrationWorker_20x::FixNestedCatalogTransitionPoints(
 
       // Fixing of this mountpoint went well... inform the user that this minor
       // issue occured
-      LogCvmfs(kLogCatalog, kLogStdout, "NOTE: fixed incompatible nested "
-                                        "catalog transition point at: '%s' ",
-               nested_root_path.c_str());
+      LogCvmfs(kLogCatalog, kLogStdout,
+               "NOTE: fixed incompatible nested catalog transition point at: "
+               "'%s' ", nested_root_path.c_str());
     }
   }
 
@@ -1447,6 +1447,9 @@ bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
   catalog::SqlLookupDanglingMountpoints sql_dangling_mountpoints(writable);
   catalog::SqlDirentUpdate save_updated_mountpoint(writable);
 
+  std::vector<catalog::DirectoryEntry> todo_dirent;
+  std::vector<shash::Md5> todo_hash;
+
   // go through the list of dangling nested catalog mountpoints and fix them
   // where needed (check if there is no nested catalog registered for them)
   while (sql_dangling_mountpoints.FetchRow()) {
@@ -1468,12 +1471,14 @@ bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
 
     // the mountpoint was confirmed to be dangling and needs to be removed
     dangling_mountpoint.set_is_nested_catalog_mountpoint(false);
+    todo_dirent.push_back(dangling_mountpoint);
+    todo_hash.push_back(path_hash);
+  }
 
-    // save the updated nested catalog root entry into the catalog
-
-    retval = save_updated_mountpoint.BindPathHash(path_hash)         &&
-             save_updated_mountpoint.BindDirent(dangling_mountpoint) &&
-             save_updated_mountpoint.Execute()                       &&
+  for (unsigned i = 0; i < todo_dirent.size(); ++i) {
+    retval = save_updated_mountpoint.BindPathHash(todo_hash[i])  &&
+             save_updated_mountpoint.BindDirent(todo_dirent[i])  &&
+             save_updated_mountpoint.Execute()                   &&
              save_updated_mountpoint.Reset();
     if (!retval) {
       Error("Failed to remove dangling nested catalog mountpoint entry in "
@@ -1484,7 +1489,7 @@ bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
     // tell the user that this intervention has been taken place
     LogCvmfs(kLogCatalog, kLogStdout, "NOTE: fixed dangling nested catalog "
                                       "mountpoint entry called: '%s' ",
-                                      dangling_mountpoint.name().c_str());
+                                      todo_dirent[i].name().c_str());
   }
 
   return true;

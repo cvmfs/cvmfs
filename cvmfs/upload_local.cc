@@ -180,7 +180,7 @@ void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
   Respond(NULL, UploaderResults());
 }
 
-bool LocalUploader::Peek(const std::string &path) const {
+bool LocalUploader::Peek(const std::string &path) {
   bool retval = FileExists(upstream_path_ + "/" + path);
   if (retval) {
     CountDuplicates();
@@ -188,7 +188,7 @@ bool LocalUploader::Peek(const std::string &path) const {
   return retval;
 }
 
-bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
+bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) {
   const std::string src = "data/" + object.MakePath();
   const std::string dest = upstream_path_ + "/" + object.MakeAlternativePath();
   return SymlinkForced(src, dest);

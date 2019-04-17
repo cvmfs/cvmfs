@@ -1,0 +1,10 @@
+--- lib/event-libs/poll/poll.c.orig	2019-02-15 22:51:58.033098209 +0100
++++ lib/event-libs/poll/poll.c	2019-02-15 22:52:07.246431310 +0100
+@@ -40,4 +40,5 @@
+ 	/* destroy wsi */		NULL,
+ 
+ 	/* periodic_events_available */	1,
+-};
+\ No newline at end of file
++};
++

@@ -36,15 +36,15 @@ if [ x"$(lsb_release -cs)" = x"xenial" ]; then
 fi
 if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # Ubuntu 14.04
-  # aufs, expected failure
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/700-overlayfs_validation src/80*-repository_gateway*"
+  # aufs, expected failure, disable gateway, disable notification system
+  CVMFS_EXCLUDE="src/081-shrinkwrap src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi
 if [ x"$(lsb_release -cs)" = x"precise" ]; then
   # Ubuntu 12.04
-  # aufs, expected failure
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway*"
+  # aufs, expected failure, disable gateway, disable notification system
+  CVMFS_EXCLUDE="src/081-shrinkwrap src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
 
   echo "Ubuntu 12.04... using aufs instead of overlayfs"
 fi
@@ -79,18 +79,15 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/6*                                       \
                                    src/7*                                       \
                                    src/8*                                       \
+                                   src/9*                                       \
                                 || retval=1
 fi
 
 
-if [ x"$(lsb_release -cs)" = x"bionic" ]; then
-  echo "TODO: re-enable migration test case after 2.5.1"
-else
-  echo "running CernVM-FS migration test cases..."
-  CVMFS_TEST_CLASS_NAME=MigrationTests \
-  ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                     migration_tests/*                              \
-                                  || retval=1
-fi
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
 
 exit $retval

@@ -34,7 +34,7 @@ struct UploadCounters {
 };  // UploadCounters
 
 struct UploaderResults {
-  enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove };
+  enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove, kLookup };
 
   UploaderResults(const int return_code, const std::string &local_path)
     : type(kFileUpload),
@@ -271,7 +271,7 @@ class AbstractUploader
    * @param path  the path of the file to be checked
    * @return      true if the file was found in the backend storage
    */
-  virtual bool Peek(const std::string &path) const = 0;
+  virtual bool Peek(const std::string &path) = 0;
 
   /**
    * Creates a top-level shortcut to the given data object. This is particularly
@@ -281,7 +281,7 @@ class AbstractUploader
    * @param object  content hash of the object to be exposed on the top-level
    * @return        true on success
    */
-  virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const = 0;
+  virtual bool PlaceBootstrappingShortcut(const shash::Any &object) = 0;
 
   /**
    * Waits until the current upload queue is empty.
@@ -375,8 +375,16 @@ class AbstractUploader
   }
 
   void CountUploadedBytes(int64_t bytes_written) const;
-
   void CountDuplicates() const;
+
+ protected:
+  /**
+   * Used by concrete implementations when they use callbacks where it's not
+   * already forseen, e.g. S3Uploader::Peek().
+   */
+  void IncJobsInFlight() {
+    ++jobs_in_flight_;
+  }
 
  private:
   const SpoolerDefinition spooler_definition_;

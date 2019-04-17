@@ -54,19 +54,12 @@ if is_redhat && [ "$(get_redhat_version)" -lt "6" ]; then
   build_geoapi="OFF"
 fi
 
-# ducc get build only if the version of the go compiler is >= 1.11.4
+# the function can_build_ducc is defined in ci/common.sh
+# it check a new enough version of the compiler >= 1.11.4
+# and that go-junit-report is installed
 build_ducc="OFF"
-if which go > /dev/null 2>&1; then
-  go_version=$(go version)
-  go_major=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\1/p')
-  go_minor=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\2/p')
-  go_patch=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\3/p')
-
-  if [ $go_minor -ge 11 ]; then
-    if [ $go_patch -ge 4 ]; then
-      build_ducc="ON"
-    fi
-  fi
+if [ $(can_build_ducc) -ge 1]; then
+  build_ducc="ON"
 fi
 
 echo "configuring using CMake..."
@@ -76,7 +69,7 @@ cmake -DBUILD_SERVER=$build_server          \
       -DBUILD_LIBCVMFS=$build_libcvmfs      \
       -DBUILD_SHRINKWRAP=$build_shrinkwrap  \
       -DBUILD_GEOAPI=$build_geoapi          \
-      -DBUILD_PRELOAD=yes                   \
+      -DBUILD_PRELOADER=yes                 \
       -DBUILD_DUCC=$build_ducc              \
       $CVMFS_SOURCE_LOCATION
 
