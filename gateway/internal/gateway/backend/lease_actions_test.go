@@ -29,6 +29,7 @@ func startBackend() *Services {
 func TestLeaseActionsNewLease(t *testing.T) {
 	backend := startBackend()
 	t.Run("new lease busy", func(t *testing.T) {
+		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
 		token1, err := NewLease(backend, keyID, leasePath)
@@ -43,6 +44,7 @@ func TestLeaseActionsNewLease(t *testing.T) {
 		}
 	})
 	t.Run("new lease expired", func(t *testing.T) {
+		backend.Config.MaxLeaseTime = 1 * time.Microsecond
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
 		token1, err := NewLease(backend, keyID, leasePath)
