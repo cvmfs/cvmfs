@@ -38,7 +38,8 @@ func main() {
 	}
 	defer services.Close()
 
-	if err := fe.Start(services, cfg.Port, cfg.MaxLeaseTime); err != nil {
+	timeout := services.Config.MaxLeaseTime
+	if err := fe.Start(services, cfg.Port, timeout); err != nil {
 		gw.Log.Error().
 			Str("component", "main").
 			Err(err).
