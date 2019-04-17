@@ -120,7 +120,7 @@ func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
 				return nil
 			}
 			if err := b.ForEach(func(k, v []byte) error {
-				leasePath := bucketName + "/" + string(k)
+				leasePath := bucketName + string(k)
 				lease, err := DeserializeLease(v)
 				if err != nil {
 					return err

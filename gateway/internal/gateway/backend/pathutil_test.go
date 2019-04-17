@@ -54,7 +54,7 @@ func TestSplitLeasePath(t *testing.T) {
 		if r != "test.repo.org" {
 			t.Fatalf("invalid repository name extracted: %v", r)
 		}
-		if p != "sub/path" {
+		if p != "/sub/path" {
 			t.Fatalf("invalid subpath extracted: %v", p)
 		}
 	})
@@ -66,7 +66,7 @@ func TestSplitLeasePath(t *testing.T) {
 		if r != "test.repo.org" {
 			t.Fatalf("invalid repository name extracted: %v", r)
 		}
-		if p != "" {
+		if p != "/" {
 			t.Fatalf("invalid subpath extracted: %v", p)
 		}
 	})
@@ -78,7 +78,7 @@ func TestSplitLeasePath(t *testing.T) {
 		if r != "very.complex.fqdn.with.many.parts" {
 			t.Fatalf("invalid repository name extracted: %v", r)
 		}
-		if p != "sub/path" {
+		if p != "/sub/path" {
 			t.Fatalf("invalid subpath extracted: %v", p)
 		}
 	})
