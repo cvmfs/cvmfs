@@ -245,14 +245,14 @@ void *S3FanoutManager::MainUpload(void *data) {
 
   while (s3fanout_mgr->thread_upload_run_) {
     JobInfo *info = NULL;
-    pthread_mutex_lock(s3fanout_mgr->jobs_todo_lock_);
-    if (!s3fanout_mgr->jobs_todo_.empty() &&
-        (jobs_in_flight < s3fanout_mgr->pool_max_handles_))
     {
-      info = s3fanout_mgr->jobs_todo_.back();
-      s3fanout_mgr->jobs_todo_.pop_back();
+      MutexLockGuard m(s3fanout_mgr->jobs_todo_lock_);
+      if (!s3fanout_mgr->jobs_todo_.empty() &&
+          (jobs_in_flight < s3fanout_mgr->pool_max_handles_)) {
+        info = s3fanout_mgr->jobs_todo_.back();
+        s3fanout_mgr->jobs_todo_.pop_back();
+      }
     }
-    pthread_mutex_unlock(s3fanout_mgr->jobs_todo_lock_);
 
     if (info != NULL) {
       CURL *handle = s3fanout_mgr->AcquireCurlHandle();
@@ -358,9 +358,8 @@ void *S3FanoutManager::MainUpload(void *data) {
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
           s3fanout_mgr->available_jobs_->Decrement();
 
-          pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
+          MutexLockGuard m(s3fanout_mgr->jobs_completed_lock_);
           s3fanout_mgr->jobs_completed_.push_back(info);
-          pthread_mutex_unlock(s3fanout_mgr->jobs_completed_lock_);
         }
       }
     }
@@ -953,10 +952,12 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   CURL *curl_handle = info->curl_handle;
   CURLcode retval;
 
-  pthread_mutex_lock(lock_options_);
-  retval = curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
-  assert(retval == CURLE_OK);
-  pthread_mutex_unlock(lock_options_);
+  {
+    MutexLockGuard m(lock_options_);
+    retval =
+        curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
+    assert(retval == CURLE_OK);
+  }
 
   string url = MkUrl(info->hostname, info->bucket, (info->object_key));
   retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
@@ -979,9 +980,8 @@ void S3FanoutManager::UpdateStatistics(CURL *handle) {
  * Retry if possible and if not already done too often.
  */
 bool S3FanoutManager::CanRetry(const JobInfo *info) {
-  pthread_mutex_lock(lock_options_);
+  MutexLockGuard m(lock_options_);
   unsigned max_retries = opt_max_retries_;
-  pthread_mutex_unlock(lock_options_);
 
   return
       (info->error_code == kFailHostConnection ||
@@ -998,10 +998,13 @@ bool S3FanoutManager::CanRetry(const JobInfo *info) {
  * \return true if backoff has been performed, false otherwise
  */
 void S3FanoutManager::Backoff(JobInfo *info) {
-  pthread_mutex_lock(lock_options_);
-  unsigned backoff_init_ms = opt_backoff_init_ms_;
-  unsigned backoff_max_ms = opt_backoff_max_ms_;
-  pthread_mutex_unlock(lock_options_);
+  unsigned backoff_init_ms = 0;
+  unsigned backoff_max_ms = 0;
+  {
+    MutexLockGuard m(lock_options_);
+    backoff_init_ms = opt_backoff_init_ms_;
+    backoff_max_ms = opt_backoff_max_ms_;
+  }
 
   if (info->error_code != kFailRetry)
     info->num_retries++;
@@ -1337,9 +1340,8 @@ void S3FanoutManager::Spawn() {
  * DNS, HTTP connect, etc.
  */
 void S3FanoutManager::SetTimeout(const unsigned seconds) {
-  pthread_mutex_lock(lock_options_);
+  MutexLockGuard m(lock_options_);
   opt_timeout_ = seconds;
-  pthread_mutex_unlock(lock_options_);
 }
 
 
@@ -1347,9 +1349,8 @@ void S3FanoutManager::SetTimeout(const unsigned seconds) {
  * Receives the currently active timeout value.
  */
 void S3FanoutManager::GetTimeout(unsigned *seconds) {
-  pthread_mutex_lock(lock_options_);
+  MutexLockGuard m(lock_options_);
   *seconds = opt_timeout_;
-  pthread_mutex_unlock(lock_options_);
 }
 
 
@@ -1361,25 +1362,23 @@ const Statistics &S3FanoutManager::GetStatistics() {
 void S3FanoutManager::SetRetryParameters(const unsigned max_retries,
                                          const unsigned backoff_init_ms,
                                          const unsigned backoff_max_ms) {
-  pthread_mutex_lock(lock_options_);
+  MutexLockGuard m(lock_options_);
   opt_max_retries_ = max_retries;
   opt_backoff_init_ms_ = backoff_init_ms;
   opt_backoff_max_ms_ = backoff_max_ms;
-  pthread_mutex_unlock(lock_options_);
 }
 
 /**
  * Get completed jobs, so they can be cleaned and deleted properly.
  */
 int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
-  pthread_mutex_lock(jobs_completed_lock_);
+  MutexLockGuard m(jobs_completed_lock_);
   std::vector<JobInfo*>::iterator             it    = jobs_completed_.begin();
   const std::vector<JobInfo*>::const_iterator itend = jobs_completed_.end();
   for (; it != itend; ++it) {
     jobs->push_back(*it);
   }
   jobs_completed_.clear();
-  pthread_mutex_unlock(jobs_completed_lock_);
 
   return 0;
 }
@@ -1390,9 +1389,8 @@ int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
 void S3FanoutManager::PushNewJob(JobInfo *info) {
   available_jobs_->Increment();
 
-  pthread_mutex_lock(jobs_todo_lock_);
+  MutexLockGuard m(jobs_todo_lock_);
   jobs_todo_.push_back(info);
-  pthread_mutex_unlock(jobs_todo_lock_);
 }
 
 //------------------------------------------------------------------------------

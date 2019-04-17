@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "atomic.h"
+#include "util_concurrency.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -217,12 +218,11 @@ class PolymorphicConstructionImpl {
     //   fully initialized!
     // See StackOverflow: http://stackoverflow.com/questions/8097439/lazy-initialized-caching-how-do-i-make-it-thread-safe
     if (atomic_read32(&needs_init_)) {
-      pthread_mutex_lock(&init_mutex_);
+      MutexLockGuard m(&init_mutex_);
       if (atomic_read32(&needs_init_)) {
         AbstractProductT::RegisterPlugins();
         atomic_dec32(&needs_init_);
       }
-      pthread_mutex_unlock(&init_mutex_);
     }
 
     assert(!registered_plugins_.empty());

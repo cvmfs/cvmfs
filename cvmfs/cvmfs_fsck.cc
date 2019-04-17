@@ -30,6 +30,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "util/posix.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -82,8 +83,8 @@ static void Usage() {
 static bool GetNextFile(string *relative_path, string *hash_name) {
   platform_dirent64 *d = NULL;
 
-  pthread_mutex_lock(&g_lock_traverse);
- get_next_file_again:
+  MutexLockGuard m(&g_lock_traverse);
+get_next_file_again:
   while (g_DIRP_current && ((d = platform_readdir(g_DIRP_current)) != NULL)) {
     const string name = d->d_name;
     if ((name == ".") || (name == "..")) continue;
@@ -119,23 +120,19 @@ static bool GetNextFile(string *relative_path, string *hash_name) {
       *g_current_dir = string(hex, 2);
 
       if (g_verbose)
-        LogCvmfs(kLogCvmfs, kLogStdout, "Entering %s", g_current_dir->c_str());
+        LogCvmfs(kLogCvmfs, kLogStdout, "Entering %s",
+                 g_current_dir->c_str());
       if ((g_DIRP_current = opendir(hex)) == NULL) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "Invalid cache directory, %s/%s does not exist",
                  g_cache_dir->c_str(), g_current_dir->c_str());
-        pthread_mutex_unlock(&g_lock_traverse);
         exit(kErrorUnfixed);
       }
       goto get_next_file_again;
     }
   }
-  pthread_mutex_unlock(&g_lock_traverse);
 
-  if (d)
-    return true;
-
-  return false;
+  return d != NULL;
 }
 
 

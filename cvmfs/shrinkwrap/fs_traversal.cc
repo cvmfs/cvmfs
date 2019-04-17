@@ -24,6 +24,7 @@
 #include "statistics.h"
 #include "util/posix.h"
 #include "util/string.h"
+#include "util_concurrency.h"
 
 using namespace std; //NOLINT
 
@@ -611,9 +612,10 @@ static void *MainWorker(void *data) {
 
   while (1) {
     FileCopy next_copy;
-    pthread_mutex_lock(&lock_pipe);
-    ReadPipe(pipe_chunks[0], &next_copy, sizeof(next_copy));
-    pthread_mutex_unlock(&lock_pipe);
+    {
+      MutexLockGuard m(&lock_pipe);
+      ReadPipe(pipe_chunks[0], &next_copy, sizeof(next_copy));
+    }
     if (next_copy.IsTerminateJob())
       break;
 
@@ -768,4 +770,3 @@ int GarbageCollect(struct fs_traversal *fs) {
 }
 
 }  // namespace shrinkwrap
-

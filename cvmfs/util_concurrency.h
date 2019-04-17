@@ -24,8 +24,6 @@ namespace CVMFS_NAMESPACE_GUARD {
  * Implements a simple interface to lock objects of derived classes. Classes that
  * inherit from Lockable are also usable with the LockGuard template for scoped
  * locking semantics.
- *
- * Note: a Lockable object should not be copied!
  */
 class Lockable : SingleCopy {
  public:

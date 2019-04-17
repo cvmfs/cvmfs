@@ -712,11 +712,6 @@ TEST_F(T_Util, TcpEndpoints) {
 }
 
 
-TEST_F(T_Util, Mutex) {
-  ASSERT_DEATH(LockMutex(static_cast<pthread_mutex_t*>(NULL)), ".*");
-  ASSERT_DEATH(UnlockMutex(static_cast<pthread_mutex_t*>(NULL)), ".*");
-}
-
 TEST_F(T_Util, SwitchCredentials) {
   // if I am root
   if (getuid() == 0) {
