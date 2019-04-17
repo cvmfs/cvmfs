@@ -242,12 +242,12 @@ uint64_t NfsMapsSqlite::RetryGetInode(const PathString &path, int attempt) {
     inode = FindInode(path);
     if (inode) {
       perf::Inc(n_db_path_found_);
-      pthread_mutex_unlock(lock_);
       return inode;
     }
     // Inode not found, issue a new one
     inode = IssueInode(path);
   }
+
   if (!inode) {
     inode = RetryGetInode(path, attempt + 1);
   }
@@ -271,28 +271,25 @@ uint64_t NfsMapsSqlite::GetInode(const PathString &path) {
  */
 bool NfsMapsSqlite::GetPath(const uint64_t inode, PathString *path) {
   int sqlite_state;
-  {
     MutexLockGuard m(lock_);
-    sqlite_state = sqlite3_bind_int64(stmt_get_path_, 1, inode);
-    assert(sqlite_state == SQLITE_OK);
-    sqlite_state = sqlite3_step(stmt_get_path_);
-    if (sqlite_state == SQLITE_DONE) {
-      // Success, but inode not found!
-      sqlite3_reset(stmt_get_path_);
-      pthread_mutex_unlock(lock_);
-      return false;
-    }
-    if (sqlite_state != SQLITE_ROW) {
-      LogCvmfs(kLogNfsMaps, kLogSyslogErr,
-               "Failed to execute SQL for GetPath (%" PRIu64 "): %s", inode,
-               sqlite3_errmsg(db_));
-      pthread_mutex_unlock(lock_);
-      abort();
-    }
-    const char *raw_path = (const char *)sqlite3_column_text(stmt_get_path_, 0);
-    path->Assign(raw_path, strlen(raw_path));
+
+  sqlite_state = sqlite3_bind_int64(stmt_get_path_, 1, inode);
+  assert(sqlite_state == SQLITE_OK);
+  sqlite_state = sqlite3_step(stmt_get_path_);
+  if (sqlite_state == SQLITE_DONE) {
+    // Success, but inode not found!
     sqlite3_reset(stmt_get_path_);
+    return false;
   }
+  if (sqlite_state != SQLITE_ROW) {
+    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
+             "Failed to execute SQL for GetPath (%" PRIu64 "): %s", inode,
+             sqlite3_errmsg(db_));
+    abort();
+  }
+  const char *raw_path = (const char *)sqlite3_column_text(stmt_get_path_, 0);
+  path->Assign(raw_path, strlen(raw_path));
+  sqlite3_reset(stmt_get_path_);
   perf::Inc(n_db_inode_found_);
   return true;
 }

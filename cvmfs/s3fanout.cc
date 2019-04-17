@@ -348,10 +348,8 @@ void *S3FanoutManager::MainUpload(void *data) {
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
           s3fanout_mgr->available_jobs_->Decrement();
 
-          {
-            MutexLockGuard m(s3fanout_mgr->jobs_completed_lock_);
-            s3fanout_mgr->jobs_completed_.push_back(info);
-          }
+          MutexLockGuard m(s3fanout_mgr->jobs_completed_lock_);
+          s3fanout_mgr->jobs_completed_.push_back(info);
         }
       }
     }
@@ -974,11 +972,8 @@ void S3FanoutManager::UpdateStatistics(CURL *handle) {
  * Retry if possible and if not already done too often.
  */
 bool S3FanoutManager::CanRetry(const JobInfo *info) {
-  unsigned max_retries = 0;
-  {
-    MutexLockGuard m(lock_options_);
-    max_retries = opt_max_retries_;
-  }
+  MutexLockGuard m(lock_options_);
+  unsigned max_retries = opt_max_retries_;
 
   return
       (info->error_code == kFailHostConnection ||

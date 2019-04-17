@@ -1113,11 +1113,8 @@ void DownloadManager::UpdateStatistics(CURL *handle) {
  * Retry if possible if not on no-cache and if not already done too often.
  */
 bool DownloadManager::CanRetry(const JobInfo *info) {
-  unsigned max_retries = 0;
-  {
-    MutexLockGuard m(lock_options_);
-    max_retries = opt_max_retries_;
-  }
+  MutexLockGuard m(lock_options_);
+  unsigned max_retries = opt_max_retries_;
 
   return !info->nocache && (info->num_retries < max_retries) &&
          (IsProxyTransferError(info->error_code) ||
@@ -1798,8 +1795,8 @@ std::string DownloadManager::GetDnsServer() const {
  * default.
  */
 void DownloadManager::SetDnsServer(const string &address) {
-  MutexLockGuard m(lock_options_);
   if (!address.empty()) {
+    MutexLockGuard m(lock_options_);
     opt_dns_server_ = address;
     assert(!opt_dns_server_.empty());
 
@@ -2115,14 +2112,12 @@ void DownloadManager::ProbeHosts() {
     if (host_rtt[i] == INT_MAX) host_rtt[i] = kProbeDown;
   }
 
-  {
-    MutexLockGuard m(lock_options_);
-    delete opt_host_chain_;
-    delete opt_host_chain_rtt_;
-    opt_host_chain_ = new vector<string>(host_chain);
-    opt_host_chain_rtt_ = new vector<int>(host_rtt);
-    opt_host_chain_current_ = 0;
-  }
+  MutexLockGuard m(lock_options_);
+  delete opt_host_chain_;
+  delete opt_host_chain_rtt_;
+  opt_host_chain_ = new vector<string>(host_chain);
+  opt_host_chain_rtt_ = new vector<int>(host_rtt);
+  opt_host_chain_current_ = 0;
 }
 
 bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
@@ -2261,67 +2256,62 @@ bool DownloadManager::ProbeGeo() {
   }
 
   // Re-install host chain and proxy chain
-  {
-    MutexLockGuard m(lock_options_);
-    delete opt_host_chain_;
-    opt_num_proxies_ = 0;
-    opt_host_chain_ = new vector<string>(host_chain.size());
+  MutexLockGuard m(lock_options_);
+  delete opt_host_chain_;
+  opt_num_proxies_ = 0;
+  opt_host_chain_ = new vector<string>(host_chain.size());
 
-    // It's possible that opt_proxy_groups_fallback_ might have changed while
-    // the
-    // lock wasn't held
-    vector<vector<ProxyInfo> > *proxy_groups = new vector<vector<ProxyInfo> >(
-        opt_proxy_groups_fallback_ + proxy_chain.size() - fallback_group);
-    // First copy the non-fallback part of the current proxy chain
-    for (unsigned i = 0; i < opt_proxy_groups_fallback_; ++i) {
-      (*proxy_groups)[i] = (*opt_proxy_groups_)[i];
-      opt_num_proxies_ += (*opt_proxy_groups_)[i].size();
-    }
-
-    // Copy the host chain and fallback proxies by geo order.  Array indices
-    // in geo_order that are smaller than last_geo_host refer to a stratum 1,
-    // and those indices greater than or equal to first_geo_fallback refer to
-    // a fallback proxy.
-    unsigned hosti = 0;
-    unsigned proxyi = opt_proxy_groups_fallback_;
-    for (unsigned i = 0; i < geo_order.size(); ++i) {
-      uint64_t orderval = geo_order[i];
-      if (orderval < (uint64_t)last_geo_host) {
-        // LogCvmfs(kLogCvmfs, kLogSyslog, "this is orderval %u at host index
-        // %u",
-        //          orderval, hosti);
-        (*opt_host_chain_)[hosti++] = host_chain[orderval];
-      } else if (orderval >= (uint64_t)first_geo_fallback) {
-        // LogCvmfs(kLogCvmfs, kLogSyslog,
-        //   "this is orderval %u at proxy index %u, using proxy_chain index
-        //   %u",
-        //   orderval, proxyi, fallback_group + orderval - first_geo_fallback);
-        (*proxy_groups)[proxyi] =
-            proxy_chain[fallback_group + orderval - first_geo_fallback];
-        opt_num_proxies_ += (*proxy_groups)[proxyi].size();
-        proxyi++;
-      }
-    }
-
-    delete opt_proxy_groups_;
-    opt_proxy_groups_ = proxy_groups;
-    // In pathological cases, opt_proxy_groups_current_ can be larger now when
-    // proxies changed in-between.
-    if (opt_proxy_groups_current_ > opt_proxy_groups_->size()) {
-      if (opt_proxy_groups_->size() == 0) {
-        opt_proxy_groups_current_ = 0;
-      } else {
-        opt_proxy_groups_current_ = opt_proxy_groups_->size() - 1;
-      }
-      opt_proxy_groups_current_burned_ = 0;
-    }
-
-    delete opt_host_chain_rtt_;
-    opt_host_chain_rtt_ = new vector<int>(host_chain.size(), kProbeGeo);
-    opt_host_chain_current_ = 0;
-
-    return true;
+  // It's possible that opt_proxy_groups_fallback_ might have changed while
+  // the lock wasn't held
+  vector<vector<ProxyInfo> > *proxy_groups = new vector<vector<ProxyInfo> >(
+      opt_proxy_groups_fallback_ + proxy_chain.size() - fallback_group);
+  // First copy the non-fallback part of the current proxy chain
+  for (unsigned i = 0; i < opt_proxy_groups_fallback_; ++i) {
+    (*proxy_groups)[i] = (*opt_proxy_groups_)[i];
+    opt_num_proxies_ += (*opt_proxy_groups_)[i].size();
   }
+
+  // Copy the host chain and fallback proxies by geo order.  Array indices
+  // in geo_order that are smaller than last_geo_host refer to a stratum 1,
+  // and those indices greater than or equal to first_geo_fallback refer to
+  // a fallback proxy.
+  unsigned hosti = 0;
+  unsigned proxyi = opt_proxy_groups_fallback_;
+  for (unsigned i = 0; i < geo_order.size(); ++i) {
+    uint64_t orderval = geo_order[i];
+    if (orderval < (uint64_t)last_geo_host) {
+      // LogCvmfs(kLogCvmfs, kLogSyslog, "this is orderval %u at host index
+      // %u", orderval, hosti);
+      (*opt_host_chain_)[hosti++] = host_chain[orderval];
+    } else if (orderval >= (uint64_t)first_geo_fallback) {
+      // LogCvmfs(kLogCvmfs, kLogSyslog,
+      // "this is orderval %u at proxy index %u, using proxy_chain index %u",
+      // orderval, proxyi, fallback_group + orderval - first_geo_fallback);
+      (*proxy_groups)[proxyi] =
+          proxy_chain[fallback_group + orderval - first_geo_fallback];
+      opt_num_proxies_ += (*proxy_groups)[proxyi].size();
+      proxyi++;
+    }
+  }
+
+  delete opt_proxy_groups_;
+  opt_proxy_groups_ = proxy_groups;
+  // In pathological cases, opt_proxy_groups_current_ can be larger now when
+  // proxies changed in-between.
+  if (opt_proxy_groups_current_ > opt_proxy_groups_->size()) {
+    if (opt_proxy_groups_->size() == 0) {
+      opt_proxy_groups_current_ = 0;
+    } else {
+      opt_proxy_groups_current_ = opt_proxy_groups_->size() - 1;
+    }
+    opt_proxy_groups_current_burned_ = 0;
+  }
+
+  delete opt_host_chain_rtt_;
+  opt_host_chain_rtt_ = new vector<int>(host_chain.size(), kProbeGeo);
+  opt_host_chain_current_ = 0;
+
+  return true;
 }
 
 

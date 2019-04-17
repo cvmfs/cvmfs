@@ -225,20 +225,18 @@ uint64_t NfsMapsLeveldb::GetInode(const PathString &path) {
   if (inode != 0)
     return inode;
 
-  {
-    MutexLockGuard m(lock_);
-    // Search again to avoid race
-    inode = FindInode(md5_path);
-    if (inode != 0) {
-      return inode;
-    }
-
-    // Issue new inode
-    inode = seq_;
-    seq_ += inode_residue_class_;
-    PutPath2Inode(md5_path, inode);
-    PutInode2Path(inode, path);
+  MutexLockGuard m(lock_);
+  // Search again to avoid race
+  inode = FindInode(md5_path);
+  if (inode != 0) {
+    return inode;
   }
+
+  // Issue new inode
+  inode = seq_;
+  seq_ += inode_residue_class_;
+  PutPath2Inode(md5_path, inode);
+  PutInode2Path(inode, path);
   perf::Inc(n_db_added_);
   return inode;
 }

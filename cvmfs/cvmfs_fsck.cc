@@ -83,61 +83,57 @@ static void Usage() {
 static bool GetNextFile(string *relative_path, string *hash_name) {
   platform_dirent64 *d = NULL;
 
-  {
-    MutexLockGuard m(&g_lock_traverse);
-  get_next_file_again:
-    while (g_DIRP_current && ((d = platform_readdir(g_DIRP_current)) != NULL)) {
-      const string name = d->d_name;
-      if ((name == ".") || (name == "..")) continue;
+  MutexLockGuard m(&g_lock_traverse);
+get_next_file_again:
+  while (g_DIRP_current && ((d = platform_readdir(g_DIRP_current)) != NULL)) {
+    const string name = d->d_name;
+    if ((name == ".") || (name == "..")) continue;
 
-      platform_stat64 info;
-      *relative_path = *g_current_dir + "/" + name;
-      *hash_name = *g_current_dir + name;
-      const string path = *g_cache_dir + "/" + *relative_path;
-      if (platform_lstat(relative_path->c_str(), &info) != 0) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Warning: failed to stat() %s (%d)",
-                 path.c_str(), errno);
-        continue;
-      }
-
-      if (!S_ISREG(info.st_mode)) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Warning: %s is not a regular file",
-                 path.c_str());
-        continue;
-      }
-
-      break;
+    platform_stat64 info;
+    *relative_path = *g_current_dir + "/" + name;
+    *hash_name = *g_current_dir + name;
+    const string path = *g_cache_dir + "/" + *relative_path;
+    if (platform_lstat(relative_path->c_str(), &info) != 0) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Warning: failed to stat() %s (%d)",
+               path.c_str(), errno);
+      continue;
     }
 
-    if (!d) {
-      if (g_DIRP_current) {
-        closedir(g_DIRP_current);
-        g_DIRP_current = NULL;
-      }
-      g_num_dirs++;
-      if (g_num_dirs < 256) {
-        char hex[3];
-        snprintf(hex, sizeof(hex), "%02x", g_num_dirs);
-        *g_current_dir = string(hex, 2);
+    if (!S_ISREG(info.st_mode)) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Warning: %s is not a regular file",
+               path.c_str());
+      continue;
+    }
 
-        if (g_verbose)
-          LogCvmfs(kLogCvmfs, kLogStdout, "Entering %s",
-                   g_current_dir->c_str());
-        if ((g_DIRP_current = opendir(hex)) == NULL) {
-          LogCvmfs(kLogCvmfs, kLogStderr,
-                   "Invalid cache directory, %s/%s does not exist",
-                   g_cache_dir->c_str(), g_current_dir->c_str());
-          pthread_mutex_unlock(&g_lock_traverse);
-          exit(kErrorUnfixed);
-        }
-        goto get_next_file_again;
+    break;
+  }
+
+  if (!d) {
+    if (g_DIRP_current) {
+      closedir(g_DIRP_current);
+      g_DIRP_current = NULL;
+    }
+    g_num_dirs++;
+    if (g_num_dirs < 256) {
+      char hex[3];
+      snprintf(hex, sizeof(hex), "%02x", g_num_dirs);
+      *g_current_dir = string(hex, 2);
+
+      if (g_verbose)
+        LogCvmfs(kLogCvmfs, kLogStdout, "Entering %s",
+                 g_current_dir->c_str());
+      if ((g_DIRP_current = opendir(hex)) == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Invalid cache directory, %s/%s does not exist",
+                 g_cache_dir->c_str(), g_current_dir->c_str());
+        pthread_mutex_unlock(&g_lock_traverse);
+        exit(kErrorUnfixed);
       }
+      goto get_next_file_again;
     }
   }
-  if (d)
-    return true;
 
-  return false;
+  return d != NULL;
 }
 
 
