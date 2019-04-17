@@ -12,12 +12,11 @@ import (
 
 // EmbeddedLeaseDB is a LeaseDB backed by BoltDB
 type EmbeddedLeaseDB struct {
-	store        *bolt.DB
-	maxLeaseTime time.Duration
+	store *bolt.DB
 }
 
 // NewEmbeddedLeaseDB creates a new embedded lease DB
-func NewEmbeddedLeaseDB(workDir string, maxLeaseTime time.Duration) (*EmbeddedLeaseDB, error) {
+func NewEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
 	if err := os.MkdirAll(workDir, 0777); err != nil {
 		return nil, errors.Wrap(err, "could not create directory for backing store")
 	}
@@ -30,7 +29,7 @@ func NewEmbeddedLeaseDB(workDir string, maxLeaseTime time.Duration) (*EmbeddedLe
 		Str("component", "leasedb").
 		Msgf("database opened (work dir: %v)", workDir)
 
-	return &EmbeddedLeaseDB{store, maxLeaseTime}, nil
+	return &EmbeddedLeaseDB{store}, nil
 }
 
 // Close the lease database

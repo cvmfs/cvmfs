@@ -12,12 +12,12 @@ const (
 )
 
 func TestEmbeddedLeaseDBOpen(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "testleasedb")
+	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
 
-	db, err := NewEmbeddedLeaseDB(tmp, maxLeaseTime)
+	db, err := NewEmbeddedLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -25,12 +25,12 @@ func TestEmbeddedLeaseDBOpen(t *testing.T) {
 }
 
 func TestEmbeddedLeaseDBCRUD(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "testleasedb")
+	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
 
-	db, err := NewEmbeddedLeaseDB(tmp, maxLeaseTime)
+	db, err := NewEmbeddedLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -145,12 +145,12 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 }
 
 func TestEmbeddedLeaseDBConflicts(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "testleasedb")
+	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
 
-	db, err := NewEmbeddedLeaseDB(tmp, maxLeaseTime)
+	db, err := NewEmbeddedLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -191,14 +191,14 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 }
 
 func TestEmbeddedLeaseDBExpired(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "testleasedb")
+	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
 
 	shortLeaseTime := 1 * time.Millisecond
 
-	db, err := NewEmbeddedLeaseDB(tmp, shortLeaseTime)
+	db, err := NewEmbeddedLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
