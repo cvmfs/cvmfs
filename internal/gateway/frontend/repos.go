@@ -32,10 +32,11 @@ func MakeReposHandler(services *be.Services) http.HandlerFunc {
 			msg["data"] = services.Access.GetRepos()
 		}
 
+		t0, _ := h.Context().Value(t0Key).(time.Time)
 		gw.Log.Debug().
 			Str("component", "http").
 			Str("req_id", reqID.String()).
-			Float64("duration", time.Since(h.Context().Value(t0Key).(time.Time)).Seconds()).
+			Float64("duration", time.Since(t0).Seconds()).
 			Msg("request processed")
 
 		replyJSON(&reqID, w, msg)

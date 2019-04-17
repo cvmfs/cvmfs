@@ -60,10 +60,11 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 		msg["data"] = lease
 	}
 
+	t0, _ := h.Context().Value(t0Key).(time.Time)
 	gw.Log.Debug().
 		Str("component", "http").
 		Str("req_id", reqID.String()).
-		Float64("duration", time.Since(h.Context().Value(t0Key).(time.Time)).Seconds()).
+		Float64("duration", time.Since(t0).Seconds()).
 		Msg("request processed")
 
 	replyJSON(&reqID, w, msg)
@@ -107,10 +108,11 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 		}
 	}
 
+	t0, _ := h.Context().Value(t0Key).(time.Time)
 	gw.Log.Debug().
 		Str("component", "http").
 		Str("req_id", reqID.String()).
-		Float64("duration", time.Since(h.Context().Value(t0Key).(time.Time)).Seconds()).
+		Float64("duration", time.Since(t0).Seconds()).
 		Msg("request processed")
 
 	replyJSON(&reqID, w, msg)
@@ -144,10 +146,11 @@ func handleDropLease(services *be.Services, token string, w http.ResponseWriter,
 		msg["status"] = "ok"
 	}
 
+	t0, _ := h.Context().Value(t0Key).(time.Time)
 	gw.Log.Debug().
 		Str("component", "http").
 		Str("req_id", reqID.String()).
-		Float64("duration", time.Since(h.Context().Value(t0Key).(time.Time)).Seconds()).
+		Float64("duration", time.Since(t0).Seconds()).
 		Msg("request processed")
 
 	replyJSON(&reqID, w, msg)
