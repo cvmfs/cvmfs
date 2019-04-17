@@ -25,15 +25,6 @@ func (e *PathBusyError) Remaining() time.Duration {
 	return e.remaining
 }
 
-// LeaseExpiredError is returned by the GetLeaseXXXX methods in case a
-// lease exists for the specified path but has already expired
-type LeaseExpiredError struct {
-}
-
-func (e LeaseExpiredError) Error() string {
-	return fmt.Sprintf("lease expired")
-}
-
 // InvalidLeaseError is returned by the GetLeaseXXXX methods in case a
 // lease does not exist for the specified path
 type InvalidLeaseError struct {

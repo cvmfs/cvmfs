@@ -161,9 +161,6 @@ func (db *EmbeddedLeaseDB) GetLeaseForPath(leasePath string) (*Lease, error) {
 		if err != nil {
 			return err
 		}
-		if l.Token.Expiration.Sub(time.Now()) <= 0 {
-			return LeaseExpiredError{}
-		}
 		lease = *l
 		return nil
 	})
@@ -193,12 +190,12 @@ func (db *EmbeddedLeaseDB) GetLeaseForToken(tokenStr string) (string, *Lease, er
 			return fmt.Errorf("invalid repo name: %v", repoName)
 		}
 		v := bucket.Get([]byte(subPath))
+		if v == nil {
+			return InvalidLeaseError{}
+		}
 		l, err := DeserializeLease(v)
 		if err != nil {
 			return err
-		}
-		if l.Token.Expiration.Sub(time.Now()) <= 0 {
-			return LeaseExpiredError{}
 		}
 		leasePath = string(lPath)
 		lease = *l
@@ -293,7 +290,7 @@ func (db *EmbeddedLeaseDB) CancelLeaseForToken(tokenStr string) error {
 		gw.Log.Debug().
 			Str("component", "leasedb").
 			Msgf("lease cancelled for path: %v, token: %v",
-				leasePath, tokenStr)
+				string(leasePath), tokenStr)
 
 		return nil
 	})

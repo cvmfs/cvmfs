@@ -17,7 +17,7 @@ import (
 func MakeLeasesHandler(services *be.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
 		vs := mux.Vars(h)
-		token, hasArg := vs["arg"]
+		token, hasArg := vs["token"]
 		switch h.Method {
 		case "GET":
 			handleGetLeases(services, token, w, h)
@@ -30,7 +30,7 @@ func MakeLeasesHandler(services *be.Services) http.HandlerFunc {
 				handleNewLease(services, w, h)
 			}
 		case "DELETE":
-			handleDropLease(services, w, h)
+			handleDropLease(services, token, w, h)
 		default:
 			reqID, _ := h.Context().Value(idKey).(uuid.UUID)
 			gw.Log.Error().
@@ -42,37 +42,22 @@ func MakeLeasesHandler(services *be.Services) http.HandlerFunc {
 	}
 }
 
-type leaseReturn struct {
-	KeyID     string `json:"key_id,omitempty"`
-	LeasePath string `json:"path,omitempty"`
-	TokenStr  string `json:"token,omitempty"`
-	Expires   string `json:"expires,omitempty"`
-}
-
 func handleGetLeases(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
 	reqID, _ := h.Context().Value(idKey).(uuid.UUID)
 	msg := make(map[string]interface{})
 	if token == "" {
-		leases, err := services.Leases.GetLeases()
+		leases, err := services.GetLeases()
 		if err != nil {
 			httpWrapError(&reqID, err, err.Error(), w, http.StatusInternalServerError)
 		}
 		msg["status"] = "ok"
-		r := make(map[string]interface{})
-		for k, v := range leases {
-			r[k] = leaseReturn{KeyID: v.KeyID, TokenStr: v.Token.TokenStr, Expires: v.Token.Expiration.String()}
-		}
-		msg["data"] = r
+		msg["data"] = leases
 	} else {
-		leasePath, lease, err := services.Leases.GetLeaseForToken(token)
+		lease, err := services.GetLease(token)
 		if err != nil {
 			httpWrapError(&reqID, err, err.Error(), w, http.StatusInternalServerError)
 		}
-		msg["data"] = leaseReturn{
-			KeyID:     lease.KeyID,
-			LeasePath: leasePath,
-			Expires:   lease.Token.Expiration.String(),
-		}
+		msg["data"] = lease
 	}
 
 	gw.Log.Debug().
@@ -106,7 +91,7 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 	} else {
 		// The authorization is expected to have the correct format, since it has already been checked.
 		keyID := strings.Split(h.Header.Get("Authorization"), " ")[0]
-		token, err := services.RequestNewLease(keyID, reqMsg.Path)
+		token, err := services.NewLease(keyID, reqMsg.Path)
 		if err != nil {
 			if busyError, ok := err.(be.PathBusyError); ok {
 				msg["status"] = "path_busy"
@@ -135,6 +120,35 @@ func handleCommitLease(services *be.Services, token string, w http.ResponseWrite
 	http.Error(w, "not implemented", http.StatusNotImplemented)
 }
 
-func handleDropLease(services *be.Services, w http.ResponseWriter, h *http.Request) {
-	http.Error(w, "not implemented", http.StatusNotImplemented)
+func handleDropLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
+	if token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+
+	reqID, _ := h.Context().Value(idKey).(uuid.UUID)
+
+	msg := make(map[string]interface{})
+
+	if err := services.CancelLease(token); err != nil {
+		msg["status"] = "error"
+		if _, ok := err.(be.InvalidTokenError); ok {
+			msg["reason"] = "invalid_token"
+		} else if _, ok := err.(be.ExpiredTokenError); ok {
+			msg["reason"] = "lease_expired"
+		} else {
+			msg["reason"] = err.Error()
+		}
+
+	} else {
+		msg["status"] = "ok"
+	}
+
+	gw.Log.Debug().
+		Str("component", "http").
+		Str("req_id", reqID.String()).
+		Float64("duration", time.Since(h.Context().Value(t0Key).(time.Time)).Seconds()).
+		Msg("request processed")
+
+	replyJSON(&reqID, w, msg)
 }
