@@ -606,6 +606,7 @@ void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
                                           const uint64_t       size,
                                           const DeltaCounters &child_counters) {
   MutexLockGuard guard(lock_);
+  SetDirty();
 
   child_counters.PopulateToParent(&delta_counters_);
 
