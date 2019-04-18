@@ -33,8 +33,8 @@ func Start(cfg *gw.Config) (*Services, error) {
 	return &Services{Access: *ac, Leases: ldb, Config: *cfg}, nil
 }
 
-// Close all the backend services
-func (s *Services) Close() error {
+// Stop all the backend services
+func (s *Services) Stop() error {
 	if err := s.Leases.Close(); err != nil {
 		return errors.Wrap(err, "could not close lease database")
 	}

@@ -9,7 +9,6 @@ import (
 type LeaseReturn struct {
 	KeyID     string `json:"key_id,omitempty"`
 	LeasePath string `json:"path,omitempty"`
-	TokenStr  string `json:"token,omitempty"`
 	Expires   string `json:"expires,omitempty"`
 }
 
@@ -48,7 +47,7 @@ func GetLeases(s *Services) (map[string]LeaseReturn, error) {
 	ret := make(map[string]LeaseReturn)
 	for k, v := range leases {
 		if _, err := CheckToken(v.Token.TokenStr, v.Token.Secret); err == nil {
-			ret[k] = LeaseReturn{KeyID: v.KeyID, TokenStr: v.Token.TokenStr, Expires: v.Token.Expiration.String()}
+			ret[k] = LeaseReturn{KeyID: v.KeyID, Expires: v.Token.Expiration.String()}
 		}
 	}
 	return ret, nil
