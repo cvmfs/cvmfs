@@ -1,4 +1,5 @@
 2.6.1:
+  * Fix overwrite of locked down directories during ingestion
   * Fix ingestion at deeply nested catalog structures (CVM-1721)
   * Fix bug where the receiver temp dir caused failure of integrity
     checks (CVM-1704)
