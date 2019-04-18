@@ -1,4 +1,5 @@
 2.6.1:
+  * Fix ingestion at deeply nested catalog structures (CVM-1721)
   * Fix bug where the receiver temp dir caused failure of integrity
     checks (CVM-1704)
   * Fix a bug preventing GC on the repository gateway (CVM-1705)
