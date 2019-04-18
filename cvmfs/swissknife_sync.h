@@ -320,7 +320,6 @@ class CommandSync : public Command {
   bool ReadFileChunkingArgs(const swissknife::ArgumentList &args,
                             SyncParameters *params);
   bool CheckParams(const SyncParameters &p);
-  bool ObtainDacReadSearchCapability();
 };
 
 }  // namespace swissknife
