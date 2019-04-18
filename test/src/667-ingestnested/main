@@ -1,0 +1,38 @@
+cvmfs_test_name="Ingest tarball on deeply nested catalog structure"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+
+  echo "*** create a simple tarball"
+  mkdir tarball
+  mkdir tarball/etc
+  touch tarball/etc/passwd
+  tar cf tarball.tar tarball || return 5
+
+  local dir=singularity/Ubuntu/default/foo
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+
+  echo "*** create deeply nested catalogs"
+  start_transaction $CVMFS_TEST_REPO
+  mkdir -p /cvmfs/${CVMFS_TEST_REPO}/$dir
+  touch /cvmfs/${CVMFS_TEST_REPO}/singularity/Ubuntu/.cvmfscatalog
+  touch /cvmfs/${CVMFS_TEST_REPO}/singularity/Ubuntu/default/.cvmfscatalog
+  publish_repo $CVMFS_TEST_REPO || return 10
+
+  echo "*** ingesting the tarball in the directory $dir"
+  cvmfs_server ingest --base_dir $dir --tar_file tarball.tar $CVMFS_TEST_REPO || return 20
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 30
+
+  ls -lah $repo_dir/$dir/ || return 40
+
+  return 0
+}
