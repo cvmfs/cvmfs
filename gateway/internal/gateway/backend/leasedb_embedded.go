@@ -103,7 +103,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 
 		gw.Log.Debug().
 			Str("component", "leasedb").
-			Msgf("new lease request successful")
+			Msgf("lease granted with key: %v, path: %v", keyID, leasePath)
 
 		return nil
 	})
@@ -288,8 +288,7 @@ func (db *EmbeddedLeaseDB) CancelLeaseForToken(tokenStr string) error {
 
 		gw.Log.Debug().
 			Str("component", "leasedb").
-			Msgf("lease cancelled for path: %v, token: %v",
-				string(leasePath), tokenStr)
+			Msgf("lease cancelled for path: %v", string(leasePath))
 
 		return nil
 	})
