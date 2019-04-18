@@ -36,7 +36,7 @@ func main() {
 			Msg("could not start backend services")
 		os.Exit(1)
 	}
-	defer services.Close()
+	defer services.Stop()
 
 	timeout := services.Config.MaxLeaseTime
 	if err := fe.Start(services, cfg.Port, timeout); err != nil {

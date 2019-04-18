@@ -136,8 +136,6 @@ func handleDropLease(services *be.Services, token string, w http.ResponseWriter,
 		msg["status"] = "error"
 		if _, ok := err.(be.InvalidTokenError); ok {
 			msg["reason"] = "invalid_token"
-		} else if _, ok := err.(be.ExpiredTokenError); ok {
-			msg["reason"] = "lease_expired"
 		} else {
 			msg["reason"] = err.Error()
 		}
