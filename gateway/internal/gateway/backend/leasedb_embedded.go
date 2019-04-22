@@ -62,6 +62,8 @@ func (db *EmbeddedLeaseDB) Close() error {
 
 // NewLease attemps to acquire a new lease for the given path
 func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) error {
+	t0 := time.Now()
+
 	txn, err := db.store.Begin()
 	if err != nil {
 		return errors.Wrap(err, "could not begin transaction")
@@ -105,7 +107,10 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 		if timeLeft > 0 {
 			gw.Log.Debug().
 				Str("component", "leasedb").
-				Msgf("new lease request failed: path_busy, time left: %v s", timeLeft.Seconds())
+				Str("operation", "new_lease").
+				Str("token", token.TokenStr).
+				Bool("success", false).
+				Msgf("path_busy, time left: %v s", timeLeft.Seconds())
 			return PathBusyError{timeLeft}
 		}
 
@@ -122,19 +127,25 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 		}
 	}
 
-	gw.Log.Debug().
-		Str("component", "leasedb").
-		Msgf("lease granted with key: %v, path: %v", keyID, leasePath)
-
 	if err := txn.Commit(); err != nil {
 		return errors.Wrap(err, "could not commit transaction")
 	}
+
+	gw.Log.Debug().
+		Str("component", "leasedb").
+		Str("operation", "new_lease").
+		Str("token", token.TokenStr).
+		Bool("success", true).
+		Float64("time", time.Now().Sub(t0).Seconds()).
+		Msgf("key: %v, path: %v", keyID, leasePath)
 
 	return nil
 }
 
 // GetLeases returns a list of all active leases
 func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
+	t0 := time.Now()
+
 	matches, err := db.store.Query("SELECT Token, Repository, Path, KeyID, Secret, Expiration from Leases;")
 	if err != nil {
 		return nil, errors.Wrap(err, "query failed")
@@ -157,11 +168,20 @@ func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
 		leases[leasePath] = Lease{KeyID: keyID, Token: token}
 	}
 
+	gw.Log.Debug().
+		Str("component", "leasedb").
+		Str("operation", "get_leases").
+		Bool("success", true).
+		Float64("time", time.Now().Sub(t0).Seconds()).
+		Msgf("found %v leases", len(leases))
+
 	return leases, nil
 }
 
 // GetLease returns the lease for a given token string
 func (db *EmbeddedLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
+	t0 := time.Now()
+
 	var repoName string
 	var subPath string
 	var keyID string
@@ -183,19 +203,45 @@ func (db *EmbeddedLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
 		KeyID: keyID,
 		Token: LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(0, expiration)},
 	}
+
+	gw.Log.Debug().
+		Str("component", "leasedb").
+		Str("operation", "get_lease").
+		Str("token", tokenStr).
+		Bool("success", true).
+		Float64("time", time.Now().Sub(t0).Seconds()).
+		Msgf("success")
+
 	return leasePath, lease, nil
 }
 
 // CancelLeases cancels all active leases
 func (db *EmbeddedLeaseDB) CancelLeases() error {
+	t0 := time.Now()
+
 	txn, err := db.store.Begin()
 	if err != nil {
 		return errors.Wrap(err, "could not begin transaction")
 	}
 	defer txn.Rollback()
 
-	if _, err := txn.Exec("DELETE FROM Leases;"); err != nil {
+	res, err := txn.Exec("DELETE FROM Leases;")
+	if err != nil {
 		return errors.Wrap(err, "statement failed")
+	}
+
+	numRows, err := res.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "statement result inaccessible")
+	}
+
+	if numRows == 0 {
+		gw.Log.Debug().
+			Str("component", "leasedb").
+			Str("operation", "cancel_lease").
+			Bool("success", false).
+			Msgf("cancellation failed")
+		return InvalidLeaseError{}
 	}
 
 	if err := txn.Commit(); err != nil {
@@ -204,6 +250,9 @@ func (db *EmbeddedLeaseDB) CancelLeases() error {
 
 	gw.Log.Debug().
 		Str("component", "leasedb").
+		Str("operation", "cancel_leases").
+		Bool("success", true).
+		Float64("time", time.Now().Sub(t0).Seconds()).
 		Msgf("all leases cancelled")
 
 	return nil
@@ -211,6 +260,8 @@ func (db *EmbeddedLeaseDB) CancelLeases() error {
 
 // CancelLease cancels the lease for a token string
 func (db *EmbeddedLeaseDB) CancelLease(tokenStr string) error {
+	t0 := time.Now()
+
 	txn, err := db.store.Begin()
 	if err != nil {
 		return errors.Wrap(err, "could not begin transaction")
@@ -230,7 +281,10 @@ func (db *EmbeddedLeaseDB) CancelLease(tokenStr string) error {
 	if numRows == 0 {
 		gw.Log.Debug().
 			Str("component", "leasedb").
-			Msgf("cancellation failed, invalid token: %v", tokenStr)
+			Str("operation", "cancel_lease").
+			Str("token", tokenStr).
+			Bool("success", false).
+			Msgf("cancellation failed, invalid token")
 		return InvalidLeaseError{}
 	}
 
@@ -241,6 +295,14 @@ func (db *EmbeddedLeaseDB) CancelLease(tokenStr string) error {
 	gw.Log.Debug().
 		Str("component", "leasedb").
 		Msgf("lease cancelled for token: %v", tokenStr)
+
+	gw.Log.Debug().
+		Str("component", "leasedb").
+		Str("operation", "cancel_lease").
+		Str("token", tokenStr).
+		Bool("success", true).
+		Float64("time", time.Now().Sub(t0).Seconds()).
+		Msgf("lease cancelled")
 
 	return nil
 }
