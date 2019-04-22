@@ -64,7 +64,7 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 	gw.Log.Debug().
 		Str("component", "http").
 		Str("req_id", reqID.String()).
-		Float64("duration", time.Since(t0).Seconds()).
+		Float64("time", time.Since(t0).Seconds()).
 		Msg("request processed")
 
 	replyJSON(&reqID, w, msg)
@@ -112,7 +112,7 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 	gw.Log.Debug().
 		Str("component", "http").
 		Str("req_id", reqID.String()).
-		Float64("duration", time.Since(t0).Seconds()).
+		Float64("time", time.Since(t0).Seconds()).
 		Msg("request processed")
 
 	replyJSON(&reqID, w, msg)
@@ -148,7 +148,7 @@ func handleCancelLease(services *be.Services, token string, w http.ResponseWrite
 	gw.Log.Debug().
 		Str("component", "http").
 		Str("req_id", reqID.String()).
-		Float64("duration", time.Since(t0).Seconds()).
+		Float64("time", time.Since(t0).Seconds()).
 		Msg("request processed")
 
 	replyJSON(&reqID, w, msg)
