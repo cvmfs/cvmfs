@@ -88,13 +88,13 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 	for matches.Next() {
 		token := ""
 		kPath := ""
-		var expiration time.Time
+		var expiration int64
 		if err := matches.Scan(&token, &kPath, &expiration); err != nil {
 			return errors.Wrap(err, "query scan failed")
 		}
 		if CheckPathOverlap(kPath, subPath) {
 			existing.token = token
-			existing.expiration = expiration
+			existing.expiration = time.Unix(0, expiration)
 			break
 		}
 	}
@@ -111,13 +111,13 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 
 		if _, err := txn.Exec(
 			"UPDATE Leases SET Token = ?, Repository = ?, Path = ?, KeyID = ?, Secret = ?, Expiration = ? WHERE Token = ?;",
-			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.Unix(), existing.token); err != nil {
+			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.UnixNano(), existing.token); err != nil {
 			return errors.Wrap(err, "could not update values in backing store")
 		}
 	} else {
 		if _, err := txn.Exec(
 			"INSERT INTO Leases (Token, Repository, Path, KeyID, Secret, Expiration) VALUES (?, ?, ?, ?, ?, ?);",
-			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.Unix()); err != nil {
+			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.UnixNano()); err != nil {
 			return errors.Wrap(err, "could not update values in backing store")
 		}
 	}
@@ -153,7 +153,7 @@ func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
 			return nil, errors.Wrap(err, "query scan failed")
 		}
 		leasePath := repoName + subPath
-		token := LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(expiration, 0)}
+		token := LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(0, expiration)}
 		leases[leasePath] = Lease{KeyID: keyID, Token: token}
 	}
 
@@ -181,7 +181,7 @@ func (db *EmbeddedLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
 	leasePath := repoName + subPath
 	lease := &Lease{
 		KeyID: keyID,
-		Token: LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(expiration, 0)},
+		Token: LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(0, expiration)},
 	}
 	return leasePath, lease, nil
 }
