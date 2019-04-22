@@ -1,28 +1,51 @@
 package backend
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	_ "github.com/mattn/go-sqlite3" // import SQLite3 driver
 	"github.com/pkg/errors"
-	bolt "go.etcd.io/bbolt"
+)
+
+const (
+	// latestSchemaVersion represents the most recent lease DB schema version
+	// know to the application
+	latestSchemaVersion = 1
 )
 
 // EmbeddedLeaseDB is a LeaseDB backed by BoltDB
 type EmbeddedLeaseDB struct {
-	store *bolt.DB
+	store *sql.DB
 }
 
-// NewEmbeddedLeaseDB creates a new embedded lease DB
-func NewEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
+// OpenEmbeddedLeaseDB creates a new embedded lease DB
+func OpenEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
 	if err := os.MkdirAll(workDir, 0777); err != nil {
 		return nil, errors.Wrap(err, "could not create directory for backing store")
 	}
-	store, err := bolt.Open(workDir+"/lease.db", 0666, nil)
+	dbFile := workDir + "/lease.db"
+	createDB := false
+	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
+		createDB = true
+	}
+
+	store, err := sql.Open("sqlite3", "file:"+dbFile+"?mode=rwc")
 	if err != nil {
-		return nil, errors.Wrap(err, "could not open backing store (BoltDB)")
+		return nil, errors.Wrap(err, "could not open backing store (SQLite3)")
+	}
+
+	if createDB {
+		if err := createSchema(store); err != nil {
+			return nil, errors.Wrap(err, "could not initialize backing store (SQLite3)")
+		}
+	}
+
+	if _, err := checkSchemaVersion(store); err != nil {
+		return nil, errors.Wrap(err, "invalid schema version")
 	}
 
 	gw.Log.Info().
@@ -39,257 +62,225 @@ func (db *EmbeddedLeaseDB) Close() error {
 
 // NewLease attemps to acquire a new lease for the given path
 func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) error {
-	return db.store.Update(func(txn *bolt.Tx) error {
-		repoName, subPath, err := SplitLeasePath(leasePath)
-		if err != nil {
-			return errors.Wrap(err, "invalid lease path")
+	txn, err := db.store.Begin()
+	if err != nil {
+		return errors.Wrap(err, "could not begin transaction")
+	}
+	defer txn.Rollback()
+
+	repoName, subPath, err := SplitLeasePath(leasePath)
+	if err != nil {
+		return errors.Wrap(err, "invalid lease path")
+	}
+
+	matches, err := txn.Query(
+		"SELECT Token, Path, Expiration FROM Leases WHERE Repository = ?", repoName)
+	if err != nil {
+		return errors.Wrap(err, "query failed")
+	}
+	defer matches.Close()
+
+	var existing struct {
+		token      string
+		expiration time.Time
+	}
+
+	for matches.Next() {
+		token := ""
+		kPath := ""
+		var expiration time.Time
+		if err := matches.Scan(&token, &kPath, &expiration); err != nil {
+			return errors.Wrap(err, "query scan failed")
+		}
+		if CheckPathOverlap(kPath, subPath) {
+			existing.token = token
+			existing.expiration = expiration
+			break
+		}
+	}
+
+	// If a conflicting lease exists, examine its expiration time
+	if existing.token != "" {
+		timeLeft := existing.expiration.Sub(time.Now())
+		if timeLeft > 0 {
+			gw.Log.Debug().
+				Str("component", "leasedb").
+				Msgf("new lease request failed: path_busy, time left: %v s", timeLeft.Seconds())
+			return PathBusyError{timeLeft}
 		}
 
-		lease := Lease{KeyID: keyID, Token: token}
-		buf, err := lease.Serialize()
-		if err != nil {
-			return err
+		if _, err := txn.Exec(
+			"UPDATE Leases SET Token = ?, Repository = ?, Path = ?, KeyID = ?, Secret = ?, Expiration = ? WHERE Token = ?;",
+			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.Unix(), existing.token); err != nil {
+			return errors.Wrap(err, "could not update values in backing store")
 		}
-
-		tokenBucket, err := txn.CreateBucketIfNotExists([]byte("tokens"))
-		if err != nil {
-			return errors.Wrap(err, "could not create bucket: 'tokens'")
+	} else {
+		if _, err := txn.Exec(
+			"INSERT INTO Leases (Token, Repository, Path, KeyID, Secret, Expiration) VALUES (?, ?, ?, ?, ?, ?);",
+			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.Unix()); err != nil {
+			return errors.Wrap(err, "could not update values in backing store")
 		}
+	}
 
-		repoBucket, err := txn.CreateBucketIfNotExists([]byte(repoName))
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("could not create bucket: '%v'", repoName))
-		}
+	gw.Log.Debug().
+		Str("component", "leasedb").
+		Msgf("lease granted with key: %v, path: %v", keyID, leasePath)
 
-		// Iterate through the key of the bucket corresponding to the repository
-		// and find any conflicting lease (there can be at most 1)
-		var existing struct {
-			path  string
-			lease *Lease
-		}
+	if err := txn.Commit(); err != nil {
+		return errors.Wrap(err, "could not commit transaction")
+	}
 
-		cursor := repoBucket.Cursor()
-		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			kPath := string(k)
-			if CheckPathOverlap(kPath, subPath) {
-				l, err := DeserializeLease(v)
-				if err != nil {
-					return err
-				}
-				existing.lease = l
-				existing.path = kPath
-				break
-			}
-		}
-
-		// If a conflicting lease exists, examine its expiration time
-		if existing.path != "" {
-			timeLeft := existing.lease.Token.Expiration.Sub(time.Now())
-			if timeLeft > 0 {
-				gw.Log.Debug().
-					Str("component", "leasedb").
-					Msgf("new lease request failed: path_busy, time left: %v s", timeLeft.Seconds())
-				return PathBusyError{timeLeft}
-			}
-
-			tokenBucket.Delete([]byte(existing.lease.Token.TokenStr))
-			repoBucket.Delete([]byte(existing.path))
-			tokenBucket.Put([]byte(token.TokenStr), []byte(leasePath))
-			repoBucket.Put([]byte(subPath), buf)
-		} else {
-			tokenBucket.Put([]byte(token.TokenStr), []byte(leasePath))
-			repoBucket.Put([]byte(subPath), buf)
-		}
-
-		gw.Log.Debug().
-			Str("component", "leasedb").
-			Msgf("lease granted with key: %v, path: %v", keyID, leasePath)
-
-		return nil
-	})
+	return nil
 }
 
 // GetLeases returns a list of all active leases
 func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
+	matches, err := db.store.Query("SELECT Token, Repository, Path, KeyID, Secret, Expiration from Leases;")
+	if err != nil {
+		return nil, errors.Wrap(err, "query failed")
+	}
+	defer matches.Close()
+
 	leases := make(map[string]Lease)
-	err := db.store.View(func(txn *bolt.Tx) error {
-		if err := txn.ForEach(func(name []byte, b *bolt.Bucket) error {
-			bucketName := string(name)
-			if bucketName == "tokens" {
-				return nil
-			}
-			if err := b.ForEach(func(k, v []byte) error {
-				leasePath := bucketName + string(k)
-				lease, err := DeserializeLease(v)
-				if err != nil {
-					return err
-				}
-				leases[leasePath] = *lease
-				return nil
-			}); err != nil {
-				return errors.Wrap(
-					err, fmt.Sprintf("iteration error in bucket: %v", bucketName))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "iteration error over repository buckets")
+	for matches.Next() {
+		var tokenStr string
+		var repoName string
+		var subPath string
+		var keyID string
+		secret := []byte{}
+		var expiration int64
+		if err := matches.Scan(&tokenStr, &repoName, &subPath, &keyID, &secret, &expiration); err != nil {
+			return nil, errors.Wrap(err, "query scan failed")
 		}
+		leasePath := repoName + subPath
+		token := LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(expiration, 0)}
+		leases[leasePath] = Lease{KeyID: keyID, Token: token}
+	}
 
-		return nil
-	})
-	return leases, err
+	return leases, nil
 }
 
-// GetLeaseForPath returns the lease for a given path
-func (db *EmbeddedLeaseDB) GetLeaseForPath(leasePath string) (*Lease, error) {
-	lease := Lease{}
-	err := db.store.View(func(txn *bolt.Tx) error {
-		repoName, subPath, err := SplitLeasePath(leasePath)
-		if err != nil {
-			return errors.Wrap(err, "invalid lease path")
-		}
-		bucket := txn.Bucket([]byte(repoName))
-		if bucket == nil {
-			return fmt.Errorf("invalid repo name: %v", repoName)
-		}
-		v := bucket.Get([]byte(subPath))
-		if v == nil {
-			return InvalidLeaseError{}
-		}
-		l, err := DeserializeLease(v)
-		if err != nil {
-			return err
-		}
-		lease = *l
-		return nil
-	})
-	return &lease, err
-}
+// GetLease returns the lease for a given token string
+func (db *EmbeddedLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
+	var repoName string
+	var subPath string
+	var keyID string
+	secret := []byte{}
+	var expiration int64
 
-// GetLeaseForToken returns the lease for a given token string
-func (db *EmbeddedLeaseDB) GetLeaseForToken(tokenStr string) (string, *Lease, error) {
-	lease := Lease{}
-	var leasePath string
-	err := db.store.View(func(txn *bolt.Tx) error {
-		tokens := txn.Bucket([]byte("tokens"))
-		if tokens == nil {
-			return fmt.Errorf("missing 'tokens' bucket")
+	err := db.store.
+		QueryRow("SELECT Repository, Path, KeyID, Secret, Expiration from Leases WHERE Token = ?;", tokenStr).
+		Scan(&repoName, &subPath, &keyID, &secret, &expiration)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil, InvalidLeaseError{}
 		}
-		lPath := tokens.Get([]byte(tokenStr))
-		if lPath == nil {
-			return InvalidLeaseError{}
-		}
+		return "", nil, errors.Wrap(err, "query failed")
+	}
 
-		repoName, subPath, err := SplitLeasePath(string(lPath))
-		if err != nil {
-			return errors.Wrap(err, "invalid lease path")
-		}
-		bucket := txn.Bucket([]byte(repoName))
-		if bucket == nil {
-			return fmt.Errorf("invalid repo name: %v", repoName)
-		}
-		v := bucket.Get([]byte(subPath))
-		if v == nil {
-			return InvalidLeaseError{}
-		}
-		l, err := DeserializeLease(v)
-		if err != nil {
-			return err
-		}
-		leasePath = string(lPath)
-		lease = *l
-		return nil
-	})
-	return leasePath, &lease, err
+	leasePath := repoName + subPath
+	lease := &Lease{
+		KeyID: keyID,
+		Token: LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(expiration, 0)},
+	}
+	return leasePath, lease, nil
 }
 
 // CancelLeases cancels all active leases
 func (db *EmbeddedLeaseDB) CancelLeases() error {
-	return db.store.Update(func(txn *bolt.Tx) error {
-		txn.ForEach(func(name []byte, b *bolt.Bucket) error {
-			txn.DeleteBucket(name)
-			return nil
-		})
+	txn, err := db.store.Begin()
+	if err != nil {
+		return errors.Wrap(err, "could not begin transaction")
+	}
+	defer txn.Rollback()
 
-		gw.Log.Debug().
-			Str("component", "leasedb").
-			Msgf("all leases cancelled")
+	if _, err := txn.Exec("DELETE FROM Leases;"); err != nil {
+		return errors.Wrap(err, "statement failed")
+	}
 
-		return nil
-	})
+	if err := txn.Commit(); err != nil {
+		return errors.Wrap(err, "transaction commit failed")
+	}
+
+	gw.Log.Debug().
+		Str("component", "leasedb").
+		Msgf("all leases cancelled")
+
+	return nil
 }
 
-// CancelLeaseForPath cancels the leases for a given path
-func (db *EmbeddedLeaseDB) CancelLeaseForPath(leasePath string) error {
-	return db.store.Update(func(txn *bolt.Tx) error {
-		repoName, subPath, err := SplitLeasePath(leasePath)
-		if err != nil {
-			return errors.Wrap(err, "invalid lease path")
-		}
+// CancelLease cancels the lease for a token string
+func (db *EmbeddedLeaseDB) CancelLease(tokenStr string) error {
+	txn, err := db.store.Begin()
+	if err != nil {
+		return errors.Wrap(err, "could not begin transaction")
+	}
+	defer txn.Rollback()
 
-		tokens := txn.Bucket([]byte("tokens"))
-		if tokens == nil {
-			return fmt.Errorf("missing 'tokens' bucket")
-		}
-		bucket := txn.Bucket([]byte(repoName))
-		if bucket == nil {
-			return fmt.Errorf("invalid repo name: %v", repoName)
-		}
+	res, err := txn.Exec("DELETE FROM Leases WHERE Token = ?;", tokenStr)
+	if err != nil {
+		return errors.Wrap(err, "statement failed")
+	}
 
-		v := bucket.Get([]byte(subPath))
-		if v == nil {
-			gw.Log.Debug().
-				Str("component", "leasedb").
-				Msgf("cancellation failed, invalid lease path: %v", leasePath)
-			return InvalidLeaseError{}
-		}
-		lease, err := DeserializeLease(v)
-		if err != nil {
-			return err
-		}
+	numRows, err := res.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "statement result inaccessible")
+	}
 
-		bucket.Delete([]byte(subPath))
-		tokens.Delete([]byte(lease.Token.TokenStr))
-
+	if numRows == 0 {
 		gw.Log.Debug().
 			Str("component", "leasedb").
-			Msgf("lease cancelled for path: %v", leasePath)
+			Msgf("cancellation failed, invalid token: %v", tokenStr)
+		return InvalidLeaseError{}
+	}
 
-		return nil
-	})
+	if err := txn.Commit(); err != nil {
+		return errors.Wrap(err, "transaction commit failed")
+	}
+
+	gw.Log.Debug().
+		Str("component", "leasedb").
+		Msgf("lease cancelled for token: %v", tokenStr)
+
+	return nil
 }
 
-// CancelLeaseForToken cancels the lease for a token string
-func (db *EmbeddedLeaseDB) CancelLeaseForToken(tokenStr string) error {
-	return db.store.Update(func(txn *bolt.Tx) error {
-		tokens := txn.Bucket([]byte("tokens"))
-		if tokens == nil {
-			return fmt.Errorf("missing 'tokens' bucket")
-		}
-		leasePath := tokens.Get([]byte(tokenStr))
-		if leasePath == nil {
-			gw.Log.Debug().
-				Str("component", "leasedb").
-				Msgf("cancellation failed, invalid token: %v", tokenStr)
-			return InvalidLeaseError{}
-		}
+func createSchema(db *sql.DB) error {
+	statement := fmt.Sprintf(`
+CREATE TABLE SchemaVersion (
+    VersionNumber integer NOT NULL UNIQUE PRIMARY KEY,
+    ValidFrom timestamp NOT NULL,
+    ValidTo timestamp
+);
+INSERT INTO SchemaVersion (VersionNumber, ValidFrom) VALUES (%v, DATETIME('now'));
+CREATE TABLE IF NOT EXISTS Leases (
+	Token string NOT NULL UNIQUE PRIMARY KEY,
+	Repository string NOT NULL,
+	Path string NOT NULL,
+	KeyID string NOT NULL,
+	Secret blob NOT NULL,
+	Expiration integer NOT NULL
+);
+`,
+		latestSchemaVersion)
+	if _, err := db.Exec(statement); err != nil {
+		return errors.Wrap(err, "could not create table 'SchemaVersion'")
+	}
+	return nil
+}
 
-		repoName, subPath, err := SplitLeasePath(string(leasePath))
-		if err != nil {
-			return errors.Wrap(err, "invalid lease path")
-		}
-		bucket := txn.Bucket([]byte(repoName))
-		if bucket == nil {
-			return fmt.Errorf("invalid repo name: %v", repoName)
-		}
+func checkSchemaVersion(db *sql.DB) (int, error) {
+	var version int
+	if err := db.QueryRow(
+		"SELECT VersionNumber from SchemaVersion;").Scan(&version); err != nil {
+		return 0, errors.Wrap(err, "could not retrieve schema version")
+	}
 
-		bucket.Delete([]byte(subPath))
-		tokens.Delete([]byte(tokenStr))
+	if version > latestSchemaVersion {
+		return 0, fmt.Errorf(
+			"unknown schema version: %v, latest known %v",
+			version, latestSchemaVersion)
+	}
 
-		gw.Log.Debug().
-			Str("component", "leasedb").
-			Msgf("lease cancelled for path: %v", string(leasePath))
-
-		return nil
-	})
+	return version, nil
 }

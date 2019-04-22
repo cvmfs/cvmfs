@@ -21,7 +21,7 @@ func startLeaseActionTestBackend() *Services {
 		os.Exit(2)
 	}
 
-	ldb, err := NewLeaseDB("embedded", cfg)
+	ldb, err := OpenLeaseDB("embedded", cfg)
 
 	return &Services{Access: ac, Leases: ldb, Config: *cfg}
 }

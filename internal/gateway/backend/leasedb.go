@@ -69,21 +69,19 @@ type LeaseDB interface {
 	Close() error
 	NewLease(keyID, leasePath string, token LeaseToken) error
 	GetLeases() (map[string]Lease, error)
-	GetLeaseForPath(leasePath string) (*Lease, error)
-	GetLeaseForToken(tokenStr string) (string, *Lease, error)
+	GetLease(tokenStr string) (string, *Lease, error)
 	CancelLeases() error
-	CancelLeaseForPath(leasePath string) error
-	CancelLeaseForToken(tokenStr string) error
+	CancelLease(tokenStr string) error
 }
 
-// NewLeaseDB creates a new LeaseDB object of the specified type
+// OpenLeaseDB opens or creats a new LeaseDB object of the specified type
 // (either "embedded" or "etcd").
-func NewLeaseDB(dbType string, config *gw.Config) (LeaseDB, error) {
+func OpenLeaseDB(dbType string, config *gw.Config) (LeaseDB, error) {
 	switch dbType {
 	case "embedded":
-		return NewEmbeddedLeaseDB(config.WorkDir)
+		return OpenEmbeddedLeaseDB(config.WorkDir)
 	case "etcd":
-		return NewEtcdLeaseDB(config.EtcdEndpoints)
+		return OpenEtcdLeaseDB(config.EtcdEndpoints)
 	default:
 		return nil, fmt.Errorf("unknown lease DB type: %v", dbType)
 	}
