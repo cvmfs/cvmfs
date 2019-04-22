@@ -31,6 +31,10 @@ if args.request == 'get_repos':
     rep = requests.get(base_url + '/repos')
 elif args.request == 'get_leases':
     rep = requests.get(base_url + '/leases')
+elif args.request == 'get_lease':
+    if args.token:
+        token = args.token
+        rep = requests.get(base_url + '/leases/' + token)
 elif args.request == 'new_lease':
     if args.path:
         req = {'path':args.path,'api_version':2}

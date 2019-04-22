@@ -30,7 +30,7 @@ func MakeLeasesHandler(services *be.Services) http.HandlerFunc {
 				handleNewLease(services, w, h)
 			}
 		case "DELETE":
-			handleDropLease(services, token, w, h)
+			handleCancelLease(services, token, w, h)
 		default:
 			reqID, _ := h.Context().Value(idKey).(uuid.UUID)
 			gw.Log.Error().
@@ -122,7 +122,7 @@ func handleCommitLease(services *be.Services, token string, w http.ResponseWrite
 	http.Error(w, "not implemented", http.StatusNotImplemented)
 }
 
-func handleDropLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
+func handleCancelLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
 	if token == "" {
 		http.Error(w, "missing token", http.StatusBadRequest)
 		return
