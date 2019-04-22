@@ -17,9 +17,15 @@ const (
 	latestSchemaVersion = 1
 )
 
+type statements struct {
+	getLeases *sql.Stmt
+	getLease  *sql.Stmt
+}
+
 // EmbeddedLeaseDB is a LeaseDB backed by BoltDB
 type EmbeddedLeaseDB struct {
 	store *sql.DB
+	st    statements
 }
 
 // OpenEmbeddedLeaseDB creates a new embedded lease DB
@@ -48,16 +54,40 @@ func OpenEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
 		return nil, errors.Wrap(err, "invalid schema version")
 	}
 
+	st1, err := store.Prepare("SELECT Token, Repository, Path, KeyID, Secret, Expiration from Leases;")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not prepare statement for 'get all leases'")
+	}
+	st2, err := store.Prepare("SELECT Repository, Path, KeyID, Secret, Expiration from Leases WHERE Token = ?;")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not prepare statement for 'get lease'")
+	}
+
 	gw.Log.Info().
 		Str("component", "leasedb").
 		Msgf("database opened (work dir: %v)", workDir)
 
-	return &EmbeddedLeaseDB{store}, nil
+	return &EmbeddedLeaseDB{
+		store: store,
+		st:    statements{getLeases: st1, getLease: st2},
+	}, nil
 }
 
 // Close the lease database
 func (db *EmbeddedLeaseDB) Close() error {
-	return db.store.Close()
+	err1 := db.st.getLeases.Close()
+	err2 := db.st.getLease.Close()
+	err3 := db.store.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	if err3 != nil {
+		return err3
+	}
+	return nil
 }
 
 // NewLease attemps to acquire a new lease for the given path
@@ -146,7 +176,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
 	t0 := time.Now()
 
-	matches, err := db.store.Query("SELECT Token, Repository, Path, KeyID, Secret, Expiration from Leases;")
+	matches, err := db.st.getLeases.Query()
 	if err != nil {
 		return nil, errors.Wrap(err, "query failed")
 	}
@@ -188,8 +218,8 @@ func (db *EmbeddedLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
 	secret := []byte{}
 	var expiration int64
 
-	err := db.store.
-		QueryRow("SELECT Repository, Path, KeyID, Secret, Expiration from Leases WHERE Token = ?;", tokenStr).
+	err := db.st.getLease.
+		QueryRow(tokenStr).
 		Scan(&repoName, &subPath, &keyID, &secret, &expiration)
 	if err != nil {
 		if err == sql.ErrNoRows {
