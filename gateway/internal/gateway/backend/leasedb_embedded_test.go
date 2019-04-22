@@ -17,7 +17,7 @@ func TestEmbeddedLeaseDBOpen(t *testing.T) {
 		t.Fatalf("could not create temp dir for test case")
 	}
 
-	db, err := NewEmbeddedLeaseDB(tmp)
+	db, err := OpenEmbeddedLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 		t.Fatalf("could not create temp dir for test case")
 	}
 
-	db, err := NewEmbeddedLeaseDB(tmp)
+	db, err := OpenEmbeddedLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -61,19 +61,8 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 			t.Fatalf("missing lease for %v", leasePath1)
 		}
 	})
-	t.Run("get lease for path", func(t *testing.T) {
-		lease, err := db.GetLeaseForPath(leasePath1)
-		if err != nil {
-			t.Fatalf("could not retrieve leases: %v", err)
-		}
-		if lease.KeyID != keyID1 ||
-			lease.Token.TokenStr != token1.TokenStr ||
-			!bytes.Equal(lease.Token.Secret, token1.Secret) {
-			t.Fatalf("invalid lease returned: %v", lease)
-		}
-	})
 	t.Run("get lease for token", func(t *testing.T) {
-		_, lease, err := db.GetLeaseForToken(token1.TokenStr)
+		_, lease, err := db.GetLease(token1.TokenStr)
 		if err != nil {
 			t.Fatalf("could not retrieve leases: %v", err)
 		}
@@ -96,29 +85,6 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 			t.Fatalf("remaining leases after cancellation")
 		}
 	})
-	t.Run("clear lease for path", func(t *testing.T) {
-		leasePath := "test.repo.org/path/two"
-		token, err := NewLeaseToken(leasePath, maxLeaseTime)
-		if err != nil {
-			t.Fatalf("could not generate session token: %v", err)
-		}
-
-		if err := db.NewLease(keyID1, leasePath, *token); err != nil {
-			t.Fatalf("could not add new lease: %v", err)
-		}
-
-		if err := db.CancelLeaseForPath(leasePath); err != nil {
-			t.Fatalf("could not clear lease for path")
-		}
-
-		leases, err := db.GetLeases()
-		if err != nil {
-			t.Fatalf("could not retrieve leases: %v", err)
-		}
-		if len(leases) > 0 {
-			t.Fatalf("remaining leases after cancellation")
-		}
-	})
 	t.Run("clear lease for token", func(t *testing.T) {
 		leasePath := "test.repo.org/path/three"
 		token, err := NewLeaseToken(leasePath, maxLeaseTime)
@@ -130,7 +96,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 			t.Fatalf("could not add new lease: %v", err)
 		}
 
-		if err := db.CancelLeaseForToken(token.TokenStr); err != nil {
+		if err := db.CancelLease(token.TokenStr); err != nil {
 			t.Fatalf("could not clear lease for token")
 		}
 
@@ -150,7 +116,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 		t.Fatalf("could not create temp dir for test case")
 	}
 
-	db, err := NewEmbeddedLeaseDB(tmp)
+	db, err := OpenEmbeddedLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -198,7 +164,7 @@ func TestEmbeddedLeaseDBExpired(t *testing.T) {
 
 	shortLeaseTime := 1 * time.Millisecond
 
-	db, err := NewEmbeddedLeaseDB(tmp)
+	db, err := OpenEmbeddedLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}

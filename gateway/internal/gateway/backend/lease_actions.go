@@ -55,7 +55,7 @@ func GetLeases(s *Services) (map[string]LeaseReturn, error) {
 
 // GetLease returns the lease associated with a token
 func GetLease(s *Services, tokenStr string) (*LeaseReturn, error) {
-	leasePath, lease, err := s.Leases.GetLeaseForToken(tokenStr)
+	leasePath, lease, err := s.Leases.GetLease(tokenStr)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func GetLease(s *Services, tokenStr string) (*LeaseReturn, error) {
 
 // CancelLease associated with the token
 func CancelLease(s *Services, tokenStr string) error {
-	_, lease, err := s.Leases.GetLeaseForToken(tokenStr)
+	_, lease, err := s.Leases.GetLease(tokenStr)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func CancelLease(s *Services, tokenStr string) error {
 		}
 	}
 
-	if err := s.Leases.CancelLeaseForToken(tokenStr); err != nil {
+	if err := s.Leases.CancelLease(tokenStr); err != nil {
 		return err
 	}
 

@@ -25,7 +25,7 @@ func Start(cfg *gw.Config) (*Services, error) {
 	if cfg.UseEtcd {
 		leaseDBType = "etcd"
 	}
-	ldb, err := NewLeaseDB(leaseDBType, cfg)
+	ldb, err := OpenLeaseDB(leaseDBType, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create lease DB")
 	}
