@@ -2,9 +2,15 @@ package backend
 
 import (
 	"fmt"
+	"sync"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
+
+// ReceiverTask is the common interface of all receiver tasks
+type ReceiverTask interface {
+	Reply() chan<- error
+}
 
 // PayloadTask is the input data for a payload submission task
 type PayloadTask struct {
@@ -12,7 +18,12 @@ type PayloadTask struct {
 	payload    []byte
 	digest     string
 	headerSize int
-	Reply      chan<- error
+	ReplyChan  chan<- error
+}
+
+// Reply returns the reply channel
+func (p PayloadTask) Reply() chan<- error {
+	return p.ReplyChan
 }
 
 // CommitTask is the input data for a commit task
@@ -21,80 +32,96 @@ type CommitTask struct {
 	oldRootHash string
 	newRootHash string
 	tag         RepositoryTag
-	Reply       chan<- error
+	ReplyChan   chan<- error
 }
 
-// WorkerPool maintains a number of parallel receiver workers to service
+// Reply returns the reply channel
+func (p CommitTask) Reply() chan<- error {
+	return p.ReplyChan
+}
+
+// ReceiverPool maintains a number of parallel receiver workers to service
 // payload submission and commit requests. Payload submissions are done in
 // parallel, using Config.NumReceivers workers, while only a single commit
 // request can be treated per repository at a time.
-type WorkerPool struct {
-	payloads chan<- PayloadTask
-	// commitSubmission is a map from repository name -> submission channel
-	commits    map[string]chan<- CommitTask
-	workerExec string
-	mock       bool
+type ReceiverPool struct {
+	tasks       chan<- ReceiverTask
+	commitLocks sync.Map
+	wg          *sync.WaitGroup
+	workerExec  string
+	mock        bool
 }
 
-// StartWorkerPool the receiver pool using the specified executable and number of payload
+// StartReceiverPool the receiver pool using the specified executable and number of payload
 // submission workers
-func StartWorkerPool(workerExec string, numWorkers int, mock bool) (*WorkerPool, error) {
+func StartReceiverPool(workerExec string, numWorkers int, mock bool) (*ReceiverPool, error) {
 	// Start payload submission workers
-	payloads := make(chan PayloadTask)
+	tasks := make(chan ReceiverTask)
+
+	wg := &sync.WaitGroup{}
 
 	for i := 0; i < numWorkers; i++ {
-		go payloadWorker(payloads, fmt.Sprintf("payload - %v", i), workerExec, mock)
+		wg.Add(1)
+		go worker(tasks, wg, i, workerExec, mock)
 	}
-
-	commits := make(map[string]chan<- CommitTask)
 
 	gw.Log.Info().
 		Str("component", "worker_pool").
 		Msg("worker pool started")
 
-	return &WorkerPool{payloads, commits, workerExec, mock}, nil
+	return &ReceiverPool{tasks, sync.Map{}, wg, workerExec, mock}, nil
 }
 
 // Stop all the background workers
-func (p *WorkerPool) Stop() error {
-	close(p.payloads)
-	for _, v := range p.commits {
-		close(v)
-	}
+func (p *ReceiverPool) Stop() error {
+	close(p.tasks)
+	p.wg.Wait()
 	return nil
 }
 
-func (p *WorkerPool) startCommitWorkerIfNeeded(repository string) {
+/*
+func (p *ReceiverPool) startCommitWorkerIfNeeded(repository string) {
 	if _, ok := p.commits[repository]; !ok {
 		cmt := make(chan CommitTask)
 		go commitWorker(cmt, fmt.Sprintf("commit - %v", repository), p.workerExec, p.mock)
 		p.commits[repository] = cmt
 	}
 }
+*/
 
-func payloadWorker(tasks <-chan PayloadTask, workerID string, workerExec string, mock bool) {
+func worker(tasks <-chan ReceiverTask, wg *sync.WaitGroup, workerIdx int, workerExec string, mock bool) {
 	gw.Log.Debug().
 		Str("component", "worker_pool").
-		Str("worker_id", workerID).
+		Int("worker_id", workerIdx).
 		Msg("started")
+
+	defer wg.Done()
 M:
 	for {
 		select {
 		case task, more := <-tasks:
 			receiver, err := NewReceiver(workerExec, mock)
 			if err != nil {
-				task.Reply <- err
+				task.Reply() <- err
 				continue M
 			}
 
-			result := receiver.SubmitPayload(task.leasePath, task.payload, task.digest, task.headerSize)
+			var result error
+			switch t := task.(type) {
+			case PayloadTask:
+				result = receiver.SubmitPayload(t.leasePath, t.payload, t.digest, t.headerSize)
+			case CommitTask:
+				result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
+			default:
+				task.Reply() <- fmt.Errorf("unknown task type")
+			}
 
 			if err := receiver.Quit(); err != nil {
-				task.Reply <- err
+				task.Reply() <- err
 				continue M
 			}
 
-			task.Reply <- result
+			task.Reply() <- result
 
 			if !more {
 				break M
@@ -104,42 +131,6 @@ M:
 
 	gw.Log.Debug().
 		Str("component", "worker_pool").
-		Str("worker_id", workerID).
-		Msg("finished")
-}
-
-func commitWorker(tasks <-chan CommitTask, workerID string, workerExec string, mock bool) {
-	gw.Log.Debug().
-		Str("component", "worker_pool").
-		Str("worker_id", workerID).
-		Msg("started")
-M:
-	for {
-		select {
-		case task, more := <-tasks:
-			receiver, err := NewReceiver(workerExec, mock)
-			if err != nil {
-				task.Reply <- err
-				continue M
-			}
-
-			result := receiver.Commit(task.leasePath, task.oldRootHash, task.newRootHash, task.tag)
-
-			if err := receiver.Quit(); err != nil {
-				task.Reply <- err
-				continue M
-			}
-
-			task.Reply <- result
-
-			if !more {
-				break M
-			}
-		}
-	}
-
-	gw.Log.Debug().
-		Str("component", "worker_pool").
-		Str("worker_id", workerID).
+		Int("worker_id", workerIdx).
 		Msg("finished")
 }
