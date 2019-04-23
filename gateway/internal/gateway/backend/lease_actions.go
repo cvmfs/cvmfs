@@ -3,15 +3,9 @@ package backend
 import (
 	"fmt"
 
+	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/pkg/errors"
 )
-
-// RepositoryTag represents a tag of a CernVM-FS repository
-type RepositoryTag struct {
-	Name        string
-	Channel     string
-	Description string
-}
 
 // LeaseReturn is the response type of lease queries, handed
 // back to the HTTP frontend
@@ -23,7 +17,7 @@ type LeaseReturn struct {
 
 // NewLease for the specified path, using keyID
 func NewLease(s *Services, keyID, leasePath string) (string, error) {
-	repoName, subPath, err := SplitLeasePath(leasePath)
+	repoName, subPath, err := gw.SplitLeasePath(leasePath)
 	if err != nil {
 		return "", errors.Wrap(err, "could not parse lease path")
 	}
@@ -103,6 +97,6 @@ func CancelLease(s *Services, tokenStr string) error {
 }
 
 // CommitLease associated with the token (transaction commit)
-func CommitLease(s *Services, leasePath, oldRootHash, newRootHash string, tag RepositoryTag) error {
+func CommitLease(s *Services, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
 	return fmt.Errorf("not implemented")
 }

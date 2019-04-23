@@ -97,7 +97,7 @@ func (c *AccessConfig) Check(keyID, leasePath, repoName string) *AuthError {
 		return &AuthError{"invalid_key"}
 	}
 
-	overlapping := CheckPathOverlap(leasePath, p)
+	overlapping := gw.CheckPathOverlap(leasePath, p)
 	isSubpath := len(leasePath) >= len(p)
 
 	if !overlapping || !isSubpath {
