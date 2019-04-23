@@ -37,15 +37,44 @@ const (
 	receiverError // Unused
 )
 
-// Receiver provides an interface to the external cvmfs_receiver worker process
-type Receiver struct {
+// ReceiverType desribes the type of receiver to instantiate
+type ReceiverType int
+
+// Can be either a real CvmfsReceiver or a MockReceiver
+const (
+	CvmfsReceiverType ReceiverType = iota
+	MockReceiverType
+)
+
+// Receiver contains the operations that "receiver" worker processes perform
+type Receiver interface {
+	Quit() error
+	Echo() error
+	SubmitPayload(leasePath string, payload []byte, digest string, headerSize int) error
+	Commit(leasePath, oldRootHash, newRootHash string, tag RepositoryTag) error
+}
+
+// NewReceiver is the factory method for Receiver types
+func NewReceiver(execPath string, receiverType ReceiverType) (Receiver, error) {
+	switch receiverType {
+	case CvmfsReceiverType:
+		return NewCvmfsReceiver(execPath)
+	case MockReceiverType:
+		return NewMockReceiver()
+	default:
+		return nil, fmt.Errorf("unknown receiver type: %v", receiverType)
+	}
+}
+
+// CvmfsReceiver spawns an external cvmfs_receiver worker process
+type CvmfsReceiver struct {
 	worker *exec.Cmd
 	stdin  io.Writer
 	stdout io.Reader
 }
 
-// NewReceiver will spawn an external cvmfs_receiver worker process and wait for a command
-func NewReceiver(execPath string) (*Receiver, error) {
+// NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
+func NewCvmfsReceiver(execPath string) (*CvmfsReceiver, error) {
 	if _, err := os.Stat(execPath); os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "worker process executable not found")
 	}
@@ -70,11 +99,11 @@ func NewReceiver(execPath string) (*Receiver, error) {
 		Str("command", "start").
 		Msgf("worker process ready")
 
-	return &Receiver{worker: cmd, stdin: stdin, stdout: stdout}, nil
+	return &CvmfsReceiver{worker: cmd, stdin: stdin, stdout: stdout}, nil
 }
 
 // Quit command is sent to the worker
-func (r *Receiver) Quit() error {
+func (r *CvmfsReceiver) Quit() error {
 	if _, err := r.call(receiverQuit, []byte{}, []byte{}); err != nil {
 		return errors.Wrap(err, "worker 'quit' call failed")
 	}
@@ -92,7 +121,7 @@ func (r *Receiver) Quit() error {
 }
 
 // Echo command is sent to the worker
-func (r *Receiver) Echo() error {
+func (r *CvmfsReceiver) Echo() error {
 	rep, err := r.call(receiverEcho, []byte("Ping"), []byte{})
 	if err != nil {
 		return errors.Wrap(err, "worker 'echo' call failed")
@@ -112,7 +141,7 @@ func (r *Receiver) Echo() error {
 }
 
 // SubmitPayload command is sent to the worker
-func (r *Receiver) SubmitPayload(leasePath string, payload []byte, digest string, headerSize int) error {
+func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload []byte, digest string, headerSize int) error {
 	req := map[string]interface{}{"path": leasePath, "digest": digest, "header_size": headerSize}
 	buf, err := json.Marshal(&req)
 	if err != nil {
@@ -134,7 +163,7 @@ func (r *Receiver) SubmitPayload(leasePath string, payload []byte, digest string
 }
 
 // Commit command is sent to the worker
-func (r *Receiver) Commit(leasePath, oldRootHash, newRootHash string, tag RepositoryTag) error {
+func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag RepositoryTag) error {
 	req := map[string]interface{}{
 		"lease_path":      leasePath,
 		"old_root_hash":   oldRootHash,
@@ -163,14 +192,14 @@ func (r *Receiver) Commit(leasePath, oldRootHash, newRootHash string, tag Reposi
 	return result
 }
 
-func (r *Receiver) call(reqID receiverOp, msg, payload []byte) ([]byte, error) {
+func (r *CvmfsReceiver) call(reqID receiverOp, msg, payload []byte) ([]byte, error) {
 	if err := r.request(reqID, msg, payload); err != nil {
 		return nil, err
 	}
 	return r.reply()
 }
 
-func (r *Receiver) request(reqID receiverOp, msg, payload []byte) error {
+func (r *CvmfsReceiver) request(reqID receiverOp, msg, payload []byte) error {
 	if err := binary.Write(r.stdin, binary.LittleEndian, reqID); err != nil {
 		return errors.Wrap(err, "could not write request id")
 	}
@@ -188,7 +217,7 @@ func (r *Receiver) request(reqID receiverOp, msg, payload []byte) error {
 	return nil
 }
 
-func (r *Receiver) reply() ([]byte, error) {
+func (r *CvmfsReceiver) reply() ([]byte, error) {
 	var repSize int32
 	if err := binary.Read(r.stdout, binary.LittleEndian, &repSize); err != nil {
 		return nil, errors.Wrap(err, "could not read reply size")

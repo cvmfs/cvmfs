@@ -30,6 +30,8 @@ type Config struct {
 	ReceiverPath string `mapstructure:"receiver_path"`
 	// WorkDir is where the lease BD stores its data
 	WorkDir string `mapstructure:"work_dir"`
+	// MockReceiver enables a mocked implementation of the receiver worker
+	MockReceiver bool `mapstructure:"mock_receiver"`
 }
 
 // ReadConfig reads configuration files and commandline flags, and populates a Config object
@@ -46,6 +48,7 @@ func ReadConfig() (*Config, error) {
 	pflag.Int("num_receivers", 1, "number of parallel cvmfs_receiver processes to run")
 	pflag.String("receiver_path", "/usr/bin/cvmfs_receiver", "the path of the cvmfs_receiver executable")
 	pflag.String("work_dir", "/var/lib/cvmfs-gateway", "the working directory for database files")
+	pflag.Bool("mock_receiver", false, "enable the mocked implementation of the receiver process (for testing)")
 	pflag.Parse()
 
 	viper.SetConfigFile(configFile)
