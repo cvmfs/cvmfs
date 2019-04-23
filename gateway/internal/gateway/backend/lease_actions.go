@@ -1,8 +1,17 @@
 package backend
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 )
+
+// RepositoryTag represents a tag of a CernVM-FS repository
+type RepositoryTag struct {
+	Name        string
+	Channel     string
+	Description string
+}
 
 // LeaseReturn is the response type of lease queries, handed
 // back to the HTTP frontend
@@ -72,7 +81,7 @@ func GetLease(s *Services, tokenStr string) (*LeaseReturn, error) {
 	return ret, nil
 }
 
-// CancelLease associated with the token
+// CancelLease associated with the token (transaction rollback)
 func CancelLease(s *Services, tokenStr string) error {
 	_, lease, err := s.Leases.GetLease(tokenStr)
 	if err != nil {
@@ -91,4 +100,9 @@ func CancelLease(s *Services, tokenStr string) error {
 	}
 
 	return nil
+}
+
+// CommitLease associated with the token (transaction commit)
+func CommitLease(s *Services, leasePath, oldRootHash, newRootHash string, tag RepositoryTag) error {
+	return fmt.Errorf("not implemented")
 }

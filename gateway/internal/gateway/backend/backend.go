@@ -13,8 +13,8 @@ type Services struct {
 	Config gw.Config
 }
 
-// Start initializes the various backend services
-func Start(cfg *gw.Config) (*Services, error) {
+// StartBackend initializes the various backend services
+func StartBackend(cfg *gw.Config) (*Services, error) {
 	ac, err := NewAccessConfig(cfg.AccessConfigFile)
 	if err != nil {
 		return nil, errors.Wrap(

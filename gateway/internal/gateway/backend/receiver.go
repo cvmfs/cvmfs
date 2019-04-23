@@ -37,15 +37,6 @@ const (
 	receiverError // Unused
 )
 
-// ReceiverType desribes the type of receiver to instantiate
-type ReceiverType int
-
-// Can be either a real CvmfsReceiver or a MockReceiver
-const (
-	CvmfsReceiverType ReceiverType = iota
-	MockReceiverType
-)
-
 // Receiver contains the operations that "receiver" worker processes perform
 type Receiver interface {
 	Quit() error
@@ -55,15 +46,12 @@ type Receiver interface {
 }
 
 // NewReceiver is the factory method for Receiver types
-func NewReceiver(execPath string, receiverType ReceiverType) (Receiver, error) {
-	switch receiverType {
-	case CvmfsReceiverType:
-		return NewCvmfsReceiver(execPath)
-	case MockReceiverType:
+func NewReceiver(execPath string, mock bool) (Receiver, error) {
+	if mock {
 		return NewMockReceiver()
-	default:
-		return nil, fmt.Errorf("unknown receiver type: %v", receiverType)
 	}
+
+	return NewCvmfsReceiver(execPath)
 }
 
 // CvmfsReceiver spawns an external cvmfs_receiver worker process
