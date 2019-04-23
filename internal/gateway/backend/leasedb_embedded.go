@@ -100,7 +100,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 	}
 	defer txn.Rollback()
 
-	repoName, subPath, err := SplitLeasePath(leasePath)
+	repoName, subPath, err := gw.SplitLeasePath(leasePath)
 	if err != nil {
 		return errors.Wrap(err, "invalid lease path")
 	}
@@ -124,7 +124,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 		if err := matches.Scan(&token, &kPath, &expiration); err != nil {
 			return errors.Wrap(err, "query scan failed")
 		}
-		if CheckPathOverlap(kPath, subPath) {
+		if gw.CheckPathOverlap(kPath, subPath) {
 			existing.token = token
 			existing.expiration = time.Unix(0, expiration)
 			break

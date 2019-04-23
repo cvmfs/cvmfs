@@ -1,4 +1,6 @@
-package backend
+package receiver
+
+import gw "github.com/cvmfs/gateway/internal/gateway"
 
 // MockReceiver is a mocked implementation of the Receiver interface, for testing
 // Can implement fault injection
@@ -27,6 +29,6 @@ func (r *MockReceiver) SubmitPayload(leasePath string, payload []byte, digest st
 }
 
 // Commit command
-func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag RepositoryTag) error {
+func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
 	return nil
 }

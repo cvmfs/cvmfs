@@ -2,6 +2,7 @@ package backend
 
 import (
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	"github.com/cvmfs/gateway/internal/gateway/receiver"
 	"github.com/pkg/errors"
 )
 
@@ -10,6 +11,7 @@ import (
 type Services struct {
 	Access AccessConfig
 	Leases LeaseDB
+	Pool   *receiver.Pool
 	Config gw.Config
 }
 
@@ -30,7 +32,12 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 		return nil, errors.Wrap(err, "could not create lease DB")
 	}
 
-	return &Services{Access: *ac, Leases: ldb, Config: *cfg}, nil
+	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not start receiver pool")
+	}
+
+	return &Services{Access: *ac, Leases: ldb, Pool: pool, Config: *cfg}, nil
 }
 
 // Stop all the backend services

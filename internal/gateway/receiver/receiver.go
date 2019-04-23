@@ -1,4 +1,4 @@
-package backend
+package receiver
 
 import (
 	"encoding/binary"
@@ -13,10 +13,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ReceiverError is returned by the various receiver commands in case of error
-type ReceiverError string
+// Error is returned by the various receiver commands in case of error
+type Error string
 
-func (e ReceiverError) Error() string {
+func (e Error) Error() string {
 	return string(e)
 }
 
@@ -42,7 +42,7 @@ type Receiver interface {
 	Quit() error
 	Echo() error
 	SubmitPayload(leasePath string, payload []byte, digest string, headerSize int) error
-	Commit(leasePath, oldRootHash, newRootHash string, tag RepositoryTag) error
+	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
 }
 
 // NewReceiver is the factory method for Receiver types
@@ -151,7 +151,7 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload []byte, digest s
 }
 
 // Commit command is sent to the worker
-func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag RepositoryTag) error {
+func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
 	req := map[string]interface{}{
 		"lease_path":      leasePath,
 		"old_root_hash":   oldRootHash,
@@ -231,7 +231,7 @@ func toReceiverError(reply []byte) error {
 		}
 
 		if reason, ok := res["reason"]; ok {
-			return ReceiverError(reason)
+			return Error(reason)
 		}
 
 		return fmt.Errorf("invalid reply")
