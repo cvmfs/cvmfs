@@ -28,7 +28,7 @@ func main() {
 		Str("component", "main").
 		Msg("starting repository gateway")
 
-	services, err := be.Start(cfg)
+	services, err := be.StartBackend(cfg)
 	if err != nil {
 		gw.Log.Error().
 			Str("component", "main").

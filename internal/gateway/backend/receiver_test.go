@@ -5,7 +5,7 @@ import (
 )
 
 func TestReceiverCycle(t *testing.T) {
-	receiver, err := NewReceiver("/usr/bin/cvmfs_receiver", MockReceiverType)
+	receiver, err := NewReceiver("/usr/bin/cvmfs_receiver", true)
 	if err != nil {
 		t.Fatalf("could not start receiver: %v", err)
 	}
