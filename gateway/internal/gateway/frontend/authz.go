@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -60,10 +61,7 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 			// in HTTP method and route
 
 			var HMACInput []byte
-			if strings.HasPrefix(req.URL.Path, APIRoot+"/repos") {
-				// /repos request, use the path component of the URL to compute HMAC
-				HMACInput = []byte(req.URL.Path)
-			} else if strings.HasPrefix(req.URL.Path, APIRoot+"/leases") {
+			if strings.HasPrefix(req.URL.Path, APIRoot+"/leases") {
 				token, _ := mux.Vars(req)["token"]
 				if token != "" {
 					// For commit/drop lease requests use the token to compute HMAC
@@ -72,7 +70,7 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 					// For new lease request used the request body to compute HMAC
 					HMACInput, err = ioutil.ReadAll(req.Body)
 					if err != nil {
-						httpWrapError(&reqID, err, "could not read request body", w, http.StatusBadRequest)
+						httpWrapError(&reqID, err, "could not read request body", w, http.StatusInternalServerError)
 						return
 					}
 					// Body needs to be read again in the next handler, reset it
@@ -81,7 +79,28 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 					req.Body.Close()
 					req.Body = bodyCopy
 				}
+			} else if strings.HasPrefix(req.URL.Path, APIRoot+"/payloads") {
+				token, _ := mux.Vars(req)["token"]
+				if token != "" {
+					// For the new style of payload submission requests, use the token to compute HMAC
+					HMACInput = []byte(token)
+				} else {
+					// For legacy payload submission requests, the JSON msg at the beginning of the body
+					// is used to compute the HMAC
+					msgSize, err := strconv.Atoi(req.Header.Get("message-size"))
+					if err != nil {
+						httpWrapError(&reqID, err, "missing message-size header", w, http.StatusBadRequest)
+					}
+					body, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						httpWrapError(&reqID, err, "could not read request body", w, http.StatusInternalServerError)
+					}
+					HMACInput = body[:msgSize]
+					req.Body.Close()
+					req.Body = ioutil.NopCloser(bytes.NewReader(body))
+				}
 			}
+
 			if !CheckHMAC(HMACInput, HMAC, secret) {
 				gw.Log.Error().
 					Str("component", "http").
