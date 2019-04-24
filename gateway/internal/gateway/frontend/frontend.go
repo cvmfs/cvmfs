@@ -42,6 +42,16 @@ func Start(services *be.Services, port int, timeout time.Duration) error {
 		Methods("GET", "DELETE", "POST").
 		HandlerFunc(MakeLeasesHandler(services))
 
+	// Payloads (legacy endpoint)
+	router.Path(APIRoot + "/payloads").
+		Methods("POST").
+		HandlerFunc(MakePayloadsHandler(services))
+
+	// Payloads (new and improved)
+	router.Path(APIRoot + "/payloads/{token}").
+		Methods("POST").
+		HandlerFunc(MakePayloadsHandler(services))
+
 	// Configure and start the HTTP server
 	srv := &http.Server{
 		Handler:      router,
