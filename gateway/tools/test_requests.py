@@ -19,6 +19,8 @@ parser.add_argument(
     help='which command to perform (get_repos|get_leases|new_lease|cancel_lease|submit_payload|commit)')
 parser.add_argument('--path', required=False, help="lease path")
 parser.add_argument('--token', required=False, help='lease token string')
+parser.add_argument('--old_hash', required=False, help='old root hash')
+parser.add_argument('--new_hash', required=False, help='new root hash')
 args = parser.parse_args()
 
 base_url = 'http://localhost:4929/api/v1'
@@ -51,5 +53,20 @@ elif args.request == 'cancel_lease':
         rep = requests.delete(base_url + '/leases/' + token, headers=headers)
     else:
         errMissingArg('--token')
+elif args.request == 'commit_lease':
+    if args.token and args.old_hash and args.new_hash:
+        token = args.token
+        hmac_msg = token.encode()
+        headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret)}
+        req = {'old_root_hash': args.old_hash,
+               'new_root_hash': args.new_hash,
+               'tag_name': 'mytag',
+               'tag_channel': 'mychan',
+               'tag_description': 'mydescription'}
+        rep = requests.post(base_url + '/leases/' + token, json=req, headers=headers)
+    else:
+        errMissingArg('--token')
+        errMissingArg('--old_hash')
+        errMissingArg('--new_hash')
 
 print(json.dumps(rep.json()))
