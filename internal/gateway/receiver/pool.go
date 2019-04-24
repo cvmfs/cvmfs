@@ -98,15 +98,14 @@ func (p *Pool) CommitLease(leasePath, oldRootHash, newRootHash string, tag gw.Re
 	return result
 }
 
-/*
-func (p *ReceiverPool) startCommitWorkerIfNeeded(repository string) {
-	if _, ok := p.commits[repository]; !ok {
-		cmt := make(chan CommitTask)
-		go commitWorker(cmt, fmt.Sprintf("commit - %v", repository), p.workerExec, p.mock)
-		p.commits[repository] = cmt
-	}
+// Run the function while holding the commit lock for a repository
+func (p *Pool) withCommitLock(repository string, task func()) {
+	m, _ := p.commitLocks.LoadOrStore(repository, &sync.Mutex{})
+	mtx := m.(*sync.Mutex)
+	mtx.Lock()
+	task()
+	mtx.Unlock()
 }
-*/
 
 func worker(tasks <-chan task, pool *Pool, workerIdx int) {
 	gw.Log.Debug().
@@ -117,14 +116,25 @@ func worker(tasks <-chan task, pool *Pool, workerIdx int) {
 	defer pool.wg.Done()
 M:
 	for {
-		select {
-		case task, more := <-tasks:
+		task, more := <-tasks
+
+		if !more {
+			break M
+		}
+
+		func() {
 			t0 := time.Now()
 			receiver, err := NewReceiver(pool.workerExec, pool.mock)
 			if err != nil {
 				task.Reply() <- err
-				continue M
+				return
 			}
+			defer func() {
+				if err := receiver.Quit(); err != nil {
+					task.Reply() <- err
+					return
+				}
+			}()
 
 			var taskType string
 			var result error
@@ -136,22 +146,15 @@ M:
 				repository, _, err := gw.SplitLeasePath(t.leasePath)
 				if err != nil {
 					task.Reply() <- err
-					continue M
+					return
 				}
-				// Acquire commit lock for the repository
-				m, _ := pool.commitLocks.LoadOrStore(repository, &sync.Mutex{})
-				mtx := m.(*sync.Mutex)
-				mtx.Lock()
-				result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
-				mtx.Unlock()
+				pool.withCommitLock(repository, func() {
+					result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
+				})
 				taskType = "commit"
 			default:
 				task.Reply() <- fmt.Errorf("unknown task type")
-			}
-
-			if err := receiver.Quit(); err != nil {
-				task.Reply() <- err
-				continue M
+				return
 			}
 
 			task.Reply() <- result
@@ -161,11 +164,7 @@ M:
 				Int("worker_id", workerIdx).
 				Float64("time", time.Now().Sub(t0).Seconds()).
 				Msgf("%v task complete", taskType)
-
-			if !more {
-				break M
-			}
-		}
+		}()
 	}
 
 	gw.Log.Debug().
