@@ -119,7 +119,35 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 }
 
 func handleCommitLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
-	http.Error(w, "not implemented", http.StatusNotImplemented)
+	reqID, _ := h.Context().Value(idKey).(uuid.UUID)
+
+	var reqMsg struct {
+		OldRootHash string `json:"old_root_hash"`
+		NewRootHash string `json:"new_root_hash"`
+		gw.RepositoryTag
+	}
+	if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
+		httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+		return
+	}
+
+	msg := make(map[string]interface{})
+	if err := be.CommitLease(
+		services, token, reqMsg.OldRootHash, reqMsg.NewRootHash, reqMsg.RepositoryTag); err != nil {
+		msg["status"] = "error"
+		msg["reason"] = err.Error()
+	} else {
+		msg["status"] = "ok"
+	}
+
+	t0, _ := h.Context().Value(t0Key).(time.Time)
+	gw.Log.Debug().
+		Str("component", "http").
+		Str("req_id", reqID.String()).
+		Float64("time", time.Since(t0).Seconds()).
+		Msg("request processed")
+
+	replyJSON(&reqID, w, msg)
 }
 
 func handleCancelLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {

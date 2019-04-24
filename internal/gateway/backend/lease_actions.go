@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"fmt"
-
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/pkg/errors"
 )
@@ -97,6 +95,23 @@ func CancelLease(s *Services, tokenStr string) error {
 }
 
 // CommitLease associated with the token (transaction commit)
-func CommitLease(s *Services, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
-	return fmt.Errorf("not implemented")
+func CommitLease(s *Services, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+	_, lease, err := s.Leases.GetLease(tokenStr)
+	if err != nil {
+		return err
+	}
+
+	leasePath, err := CheckToken(tokenStr, lease.Token.Secret)
+	if err != nil {
+		// Allow an expired token to be used to cancel a lease
+		if _, ok := err.(ExpiredTokenError); !ok {
+			return err
+		}
+	}
+
+	if err := s.Pool.CommitLease(leasePath, oldRootHash, newRootHash, tag); err != nil {
+		return err
+	}
+
+	return nil
 }

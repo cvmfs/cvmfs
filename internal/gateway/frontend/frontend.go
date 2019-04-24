@@ -39,7 +39,7 @@ func Start(services *be.Services, port int, timeout time.Duration) error {
 		Methods("GET", "POST").
 		HandlerFunc(MakeLeasesHandler(services))
 	router.Path(APIRoot+"/leases/{token}").
-		Methods("GET", "DELETE").
+		Methods("GET", "DELETE", "POST").
 		HandlerFunc(MakeLeasesHandler(services))
 
 	// Configure and start the HTTP server
