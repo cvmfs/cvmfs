@@ -46,20 +46,20 @@ func (p commitTask) Reply() chan<- error {
 // parallel, using Config.NumReceivers workers, while only a single commit
 // request can be treated per repository at a time.
 type Pool struct {
-	tasks       chan<- task
-	commitLocks sync.Map
-	wg          sync.WaitGroup
-	workerExec  string
-	mock        bool
+	tasks      chan<- task
+	repoLocks  *gw.NamedLocks
+	wg         sync.WaitGroup
+	workerExec string
+	mock       bool
 }
 
 // StartPool the receiver pool using the specified executable and number of payload
 // submission workers
-func StartPool(workerExec string, numWorkers int, mock bool) (*Pool, error) {
+func StartPool(repoLocks *gw.NamedLocks, workerExec string, numWorkers int, mock bool) (*Pool, error) {
 	// Start payload submission workers
 	tasks := make(chan task)
 
-	pool := &Pool{tasks, sync.Map{}, sync.WaitGroup{}, workerExec, mock}
+	pool := &Pool{tasks, repoLocks, sync.WaitGroup{}, workerExec, mock}
 
 	for i := 0; i < numWorkers; i++ {
 		pool.wg.Add(1)
@@ -96,15 +96,6 @@ func (p *Pool) CommitLease(leasePath, oldRootHash, newRootHash string, tag gw.Re
 	p.tasks <- commitTask{leasePath, oldRootHash, newRootHash, tag, reply}
 	result := <-reply
 	return result
-}
-
-// Run the function while holding the commit lock for a repository
-func (p *Pool) withCommitLock(repository string, task func()) {
-	m, _ := p.commitLocks.LoadOrStore(repository, &sync.Mutex{})
-	mtx := m.(*sync.Mutex)
-	mtx.Lock()
-	task()
-	mtx.Unlock()
 }
 
 func worker(tasks <-chan task, pool *Pool, workerIdx int) {
@@ -148,7 +139,7 @@ M:
 					task.Reply() <- err
 					return
 				}
-				pool.withCommitLock(repository, func() {
+				pool.repoLocks.WithLock(repository, func() {
 					result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
 				})
 				taskType = "commit"

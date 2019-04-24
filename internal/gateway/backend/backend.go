@@ -11,6 +11,7 @@ import (
 type Services struct {
 	Access AccessConfig
 	Leases LeaseDB
+	Locks  *gw.NamedLocks // Repository locks
 	Pool   *receiver.Pool
 	Config gw.Config
 }
@@ -32,12 +33,14 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 		return nil, errors.Wrap(err, "could not create lease DB")
 	}
 
-	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver)
+	repoLocks := &gw.NamedLocks{}
+
+	pool, err := receiver.StartPool(repoLocks, cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not start receiver pool")
 	}
 
-	return &Services{Access: *ac, Leases: ldb, Pool: pool, Config: *cfg}, nil
+	return &Services{Access: *ac, Leases: ldb, Locks: repoLocks, Pool: pool, Config: *cfg}, nil
 }
 
 // Stop all the backend services
