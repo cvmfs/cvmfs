@@ -83,12 +83,12 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 	}
 
 	msg := make(map[string]interface{})
-	if reqMsg.Version < MinAPIProtocolVersion() {
+	if reqMsg.Version < MinAPIProtocolVersion {
 		msg["status"] = "error"
 		msg["reason"] = fmt.Sprintf(
 			"incompatible request version: %v, min version: %v",
 			reqMsg.Version,
-			MinAPIProtocolVersion())
+			MinAPIProtocolVersion)
 	} else {
 		// The authorization is expected to have the correct format, since it has already been checked.
 		keyID := strings.Split(h.Header.Get("Authorization"), " ")[0]
@@ -104,7 +104,7 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 		} else {
 			msg["status"] = "ok"
 			msg["session_token"] = token
-			msg["max_api_version"] = MinAPIProtocolVersion()
+			msg["max_api_version"] = MaxAPIVersion(reqMsg.Version)
 		}
 	}
 
