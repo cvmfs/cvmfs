@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -41,7 +42,7 @@ const (
 type Receiver interface {
 	Quit() error
 	Echo() error
-	SubmitPayload(leasePath string, payload []byte, digest string, headerSize int) error
+	SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error
 	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
 }
 
@@ -92,7 +93,7 @@ func NewCvmfsReceiver(execPath string) (*CvmfsReceiver, error) {
 
 // Quit command is sent to the worker
 func (r *CvmfsReceiver) Quit() error {
-	if _, err := r.call(receiverQuit, []byte{}, []byte{}); err != nil {
+	if _, err := r.call(receiverQuit, []byte{}, nil); err != nil {
 		return errors.Wrap(err, "worker 'quit' call failed")
 	}
 
@@ -110,7 +111,7 @@ func (r *CvmfsReceiver) Quit() error {
 
 // Echo command is sent to the worker
 func (r *CvmfsReceiver) Echo() error {
-	rep, err := r.call(receiverEcho, []byte("Ping"), []byte{})
+	rep, err := r.call(receiverEcho, []byte("Ping"), nil)
 	if err != nil {
 		return errors.Wrap(err, "worker 'echo' call failed")
 	}
@@ -129,7 +130,7 @@ func (r *CvmfsReceiver) Echo() error {
 }
 
 // SubmitPayload command is sent to the worker
-func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload []byte, digest string, headerSize int) error {
+func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error {
 	req := map[string]interface{}{"path": leasePath, "digest": digest, "header_size": headerSize}
 	buf, err := json.Marshal(&req)
 	if err != nil {
@@ -165,7 +166,7 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 		return errors.Wrap(err, "request encoding failed")
 	}
 
-	reply, err := r.call(receiverCommit, buf, []byte{})
+	reply, err := r.call(receiverCommit, buf, nil)
 	if err != nil {
 		return errors.Wrap(err, "worker 'commit' call failed")
 	}
@@ -180,14 +181,14 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 	return result
 }
 
-func (r *CvmfsReceiver) call(reqID receiverOp, msg, payload []byte) ([]byte, error) {
+func (r *CvmfsReceiver) call(reqID receiverOp, msg []byte, payload io.Reader) ([]byte, error) {
 	if err := r.request(reqID, msg, payload); err != nil {
 		return nil, err
 	}
 	return r.reply()
 }
 
-func (r *CvmfsReceiver) request(reqID receiverOp, msg, payload []byte) error {
+func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader) error {
 	if err := binary.Write(r.stdin, binary.LittleEndian, reqID); err != nil {
 		return errors.Wrap(err, "could not write request id")
 	}
@@ -198,7 +199,7 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg, payload []byte) error {
 		return errors.Wrap(err, "could not write request body")
 	}
 	if payload != nil {
-		if _, err := r.stdin.Write(payload); err != nil {
+		if _, err := io.Copy(r.stdin, payload); err != nil {
 			return errors.Wrap(err, "could not write request payload")
 		}
 	}
@@ -212,7 +213,8 @@ func (r *CvmfsReceiver) reply() ([]byte, error) {
 	}
 
 	reply := make([]byte, repSize)
-	if _, err := r.stdout.Read(reply); err != nil {
+	reply, err := ioutil.ReadAll(r.stdout)
+	if err != nil {
 		return nil, errors.Wrap(err, "could not read reply body")
 	}
 

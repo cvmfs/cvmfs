@@ -1,7 +1,10 @@
 package frontend
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
@@ -13,45 +16,53 @@ import (
 // MakePayloadsHandler creates an HTTP handler for the API root
 func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
-		token, hasArg := mux.Vars(h)["token"]
-		if hasArg {
-			handlePayload(services, token, w, h)
-		} else {
-			handlePayloadLegacy(services, w, h)
+		token, hasToken := mux.Vars(h)["token"]
+
+		reqID, _ := h.Context().Value(idKey).(uuid.UUID)
+
+		msgSize, err := strconv.Atoi(h.Header.Get("message-size"))
+		if err != nil {
+			httpWrapError(&reqID, err, "missing message-size header", w, http.StatusBadRequest)
+			return
 		}
+
+		var req struct {
+			TokenStr   string `json:"session_token"`
+			Digest     string `json:"payload_digest"`
+			HeaderSize string `json:"header_size"` // cvmfs_swissknife sends this field as a string
+			Version    string `json:"api_version"` // cvmfs_swissknife sends this field as a string
+		}
+
+		msgRdr := io.LimitReader(h.Body, int64(msgSize))
+		if err := json.NewDecoder(msgRdr).Decode(&req); err != nil {
+			httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+			return
+		}
+		headerSize, err := strconv.Atoi(req.HeaderSize)
+		if err != nil {
+			httpWrapError(&reqID, err, "invalid header_size", w, http.StatusBadRequest)
+			return
+		}
+
+		if !hasToken {
+			// For legacy style requests, the token is provided in the request message
+			token = req.TokenStr
+		}
+
+		msg := make(map[string]interface{})
+		if err := be.SubmitPayload(services, token, h.Body, req.Digest, headerSize); err != nil {
+			msg["status"] = "error"
+			msg["reason"] = err.Error()
+		} else {
+			msg["status"] = "ok"
+		}
+
+		t0, _ := h.Context().Value(t0Key).(time.Time)
+		gw.Log.Debug().
+			Str("component", "http").
+			Str("req_id", reqID.String()).
+			Float64("time", time.Since(t0).Seconds()).
+			Msg("request processed")
+		replyJSON(&reqID, w, msg)
 	}
-}
-
-func handlePayload(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
-	reqID, _ := h.Context().Value(idKey).(uuid.UUID)
-
-	gw.Log.Debug().
-		Str("component", "http").
-		Str("req_id", reqID.String()).
-		Msg("brave new world")
-
-	t0, _ := h.Context().Value(t0Key).(time.Time)
-	gw.Log.Debug().
-		Str("component", "http").
-		Str("req_id", reqID.String()).
-		Float64("time", time.Since(t0).Seconds()).
-		Msg("request processed")
-	http.Error(w, "not implemented", http.StatusNotImplemented)
-}
-
-func handlePayloadLegacy(services *be.Services, w http.ResponseWriter, h *http.Request) {
-	reqID, _ := h.Context().Value(idKey).(uuid.UUID)
-
-	gw.Log.Debug().
-		Str("component", "http").
-		Str("req_id", reqID.String()).
-		Msg("legacy")
-
-	t0, _ := h.Context().Value(t0Key).(time.Time)
-	gw.Log.Debug().
-		Str("component", "http").
-		Str("req_id", reqID.String()).
-		Float64("time", time.Since(t0).Seconds()).
-		Msg("request processed")
-	http.Error(w, "not implemented", http.StatusNotImplemented)
 }

@@ -1,6 +1,10 @@
 package receiver
 
-import gw "github.com/cvmfs/gateway/internal/gateway"
+import (
+	"io"
+
+	gw "github.com/cvmfs/gateway/internal/gateway"
+)
 
 // MockReceiver is a mocked implementation of the Receiver interface, for testing
 // Can implement fault injection
@@ -24,7 +28,7 @@ func (r *MockReceiver) Echo() error {
 }
 
 // SubmitPayload command
-func (r *MockReceiver) SubmitPayload(leasePath string, payload []byte, digest string, headerSize int) error {
+func (r *MockReceiver) SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error {
 	return nil
 }
 
