@@ -11,12 +11,8 @@ func TestLeaseToken(t *testing.T) {
 		if err != nil {
 			t.Fatalf("token generation failed: %v", err)
 		}
-		repoPath, err := CheckToken(token.TokenStr, token.Secret)
-		if err != nil {
+		if err := CheckToken(token.TokenStr, token.Secret); err != nil {
 			t.Fatalf("valid token was rejected: %v", err)
-		}
-		if repoPath != "test.repo.org/some/path" {
-			t.Fatalf("invalid path was extracted from the token: %v", repoPath)
 		}
 	})
 	t.Run("reject expired", func(t *testing.T) {
@@ -24,7 +20,7 @@ func TestLeaseToken(t *testing.T) {
 		if err != nil {
 			t.Fatalf("token generation failed: %v", err)
 		}
-		if _, err := CheckToken(token1.TokenStr, token1.Secret); err == nil {
+		if err := CheckToken(token1.TokenStr, token1.Secret); err == nil {
 			t.Fatalf("expired token was accepted")
 		} else {
 			if _, ok := err.(ExpiredTokenError); !ok {
@@ -41,7 +37,7 @@ func TestLeaseToken(t *testing.T) {
 		if err != nil {
 			t.Fatalf("token generation failed: %v", err)
 		}
-		if _, err := CheckToken(token2.TokenStr, token1.Secret); err == nil {
+		if err := CheckToken(token2.TokenStr, token1.Secret); err == nil {
 			t.Fatalf("forget token was accepted")
 		} else {
 			if _, ok := err.(InvalidTokenError); !ok {
@@ -54,7 +50,7 @@ func TestLeaseToken(t *testing.T) {
 		if err != nil {
 			t.Fatalf("token generation failed: %v", err)
 		}
-		if _, err := CheckToken("gsjhfjdklshfjlksadhflkjsd", token.Secret); err == nil {
+		if err := CheckToken("gsjhfjdklshfjlksadhflkjsd", token.Secret); err == nil {
 			t.Fatalf("garbage string was accepted as real token")
 		}
 	})

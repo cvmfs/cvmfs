@@ -47,7 +47,7 @@ func GetLeases(s *Services) (map[string]LeaseReturn, error) {
 	}
 	ret := make(map[string]LeaseReturn)
 	for k, v := range leases {
-		if _, err := CheckToken(v.Token.TokenStr, v.Token.Secret); err == nil {
+		if err := CheckToken(v.Token.TokenStr, v.Token.Secret); err == nil {
 			ret[k] = LeaseReturn{KeyID: v.KeyID, Expires: v.Token.Expiration.String()}
 		}
 	}
@@ -61,7 +61,7 @@ func GetLease(s *Services, tokenStr string) (*LeaseReturn, error) {
 		return nil, err
 	}
 
-	if _, err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
+	if err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
 		return nil, err
 	}
 
@@ -80,7 +80,7 @@ func CancelLease(s *Services, tokenStr string) error {
 		return err
 	}
 
-	if _, err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
+	if err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
 		// Allow an expired token to be used to cancel a lease
 		if _, ok := err.(ExpiredTokenError); !ok {
 			return err
@@ -96,13 +96,12 @@ func CancelLease(s *Services, tokenStr string) error {
 
 // CommitLease associated with the token (transaction commit)
 func CommitLease(s *Services, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
-	_, lease, err := s.Leases.GetLease(tokenStr)
+	leasePath, lease, err := s.Leases.GetLease(tokenStr)
 	if err != nil {
 		return err
 	}
 
-	leasePath, err := CheckToken(tokenStr, lease.Token.Secret)
-	if err != nil {
+	if err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
 		// Allow an expired token to be used to cancel a lease
 		if _, ok := err.(ExpiredTokenError); !ok {
 			return err

@@ -72,24 +72,23 @@ func NewLeaseToken(repoPath string, maxLeaseDuration time.Duration) (*LeaseToken
 	return &LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: expiration}, nil
 }
 
-// CheckToken with the given secret and return the repository path of
-// the lease, if successful. Return ExpiredError if the token is
-// expired
-func CheckToken(tokenStr string, secret []byte) (string, error) {
+// CheckToken with the given secret. Return ExpiredError if the token is
+// expired, or InvalidTokenError if the token cannot be validated
+func CheckToken(tokenStr string, secret []byte) error {
 	token, err := jwt.ParseWithClaims(
 		tokenStr, &LeaseClaims{}, func(t *jwt.Token) (interface{}, error) {
 			return secret, nil
 		})
 	if err != nil {
-		return "", InvalidTokenError{}
+		return InvalidTokenError{}
 	}
 
 	if claims, ok := token.Claims.(*LeaseClaims); ok {
 		if claims.ExpiresAt <= time.Now().Unix() {
-			return "", ExpiredTokenError{}
+			return ExpiredTokenError{}
 		}
-		return claims.Path, nil
+		return nil
 	}
 
-	return "", InvalidTokenError{}
+	return InvalidTokenError{}
 }
