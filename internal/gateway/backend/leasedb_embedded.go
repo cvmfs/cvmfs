@@ -324,10 +324,6 @@ func (db *EmbeddedLeaseDB) CancelLease(tokenStr string) error {
 
 	gw.Log.Debug().
 		Str("component", "leasedb").
-		Msgf("lease cancelled for token: %v", tokenStr)
-
-	gw.Log.Debug().
-		Str("component", "leasedb").
 		Str("operation", "cancel_lease").
 		Str("token", tokenStr).
 		Bool("success", true).
