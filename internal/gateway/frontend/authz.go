@@ -3,6 +3,7 @@ package frontend
 import (
 	"bytes"
 	"encoding/base64"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -90,14 +91,20 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 					msgSize, err := strconv.Atoi(req.Header.Get("message-size"))
 					if err != nil {
 						httpWrapError(&reqID, err, "missing message-size header", w, http.StatusBadRequest)
+						return
 					}
-					body, err := ioutil.ReadAll(req.Body)
+					msgRdr := io.LimitReader(req.Body, int64(msgSize))
+					msg, err := ioutil.ReadAll(msgRdr)
 					if err != nil {
-						httpWrapError(&reqID, err, "could not read request body", w, http.StatusInternalServerError)
+						httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+						return
 					}
-					HMACInput = body[:msgSize]
-					req.Body.Close()
-					req.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+					HMACInput = msg
+
+					// replace the request body with a new ReadCLoser which includes the already-read
+					// head part
+					req.Body = newRecombineReadCloser(msg, req.Body)
 				}
 			}
 
@@ -112,4 +119,24 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 			next.ServeHTTP(w, req)
 		})
 	})
+}
+
+// The recombineReadCloser is used during payload submission requests to recombine the request message,
+// already read inside the authorization middleware with the remaining request body and ensure that the
+// body (io.ReadCloser) is eventually closed and does not leak
+type recombineReadCloser struct {
+	combined io.Reader
+	original io.ReadCloser
+}
+
+func newRecombineReadCloser(head []byte, tail io.ReadCloser) *recombineReadCloser {
+	return &recombineReadCloser{io.MultiReader(bytes.NewReader(head), tail), tail}
+}
+
+func (r recombineReadCloser) Read(p []byte) (int, error) {
+	return r.combined.Read(p)
+}
+
+func (r recombineReadCloser) Close() error {
+	return r.original.Close()
 }
