@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,19 +76,20 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 
 	var reqMsg struct {
 		Path    string `json:"path"`
-		Version int    `json:"api_version"`
+		Version string `json:"api_version"` // cvmfs_swissknife sends this field as a string
 	}
 	if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
 		httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
 		return
 	}
 
+	clientVersion, _ := strconv.Atoi(reqMsg.Version)
 	msg := make(map[string]interface{})
-	if reqMsg.Version < MinAPIProtocolVersion {
+	if clientVersion < MinAPIProtocolVersion {
 		msg["status"] = "error"
 		msg["reason"] = fmt.Sprintf(
 			"incompatible request version: %v, min version: %v",
-			reqMsg.Version,
+			clientVersion,
 			MinAPIProtocolVersion)
 	} else {
 		// The authorization is expected to have the correct format, since it has already been checked.
@@ -104,7 +106,7 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 		} else {
 			msg["status"] = "ok"
 			msg["session_token"] = token
-			msg["max_api_version"] = MaxAPIVersion(reqMsg.Version)
+			msg["max_api_version"] = MaxAPIVersion(clientVersion)
 		}
 	}
 

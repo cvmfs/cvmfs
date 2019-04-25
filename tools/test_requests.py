@@ -10,7 +10,7 @@ def errMissingArg(argument):
     print('Missing argument: "{}"'.format(argument))
 
 def computeHMAC(msg, key):
-    d = hmac.HMAC(key, msg, digestmod='sha1').digest()
+    d = hmac.HMAC(key, msg, digestmod='sha1').hexdigest().encode('utf-8')
     return base64.b64encode(d).decode('utf-8')
 
 parser = argparse.ArgumentParser(description='Test gateway API requests')
@@ -44,7 +44,7 @@ elif args.request == 'get_lease':
 
 elif args.request == 'new_lease':
     if args.path:
-        req = {'path':args.path,'api_version':2}
+        req = {'path':args.path,'api_version':'2'}
         hmac_msg = json.dumps(req).encode()
         headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret)}
         rep = requests.post(base_url + '/leases', json=req, headers=headers)
@@ -81,7 +81,7 @@ elif args.request == 'payload_legacy':
         req = {'session_token': args.token,
                'payload_digest': args.digest,
                'header_size': args.header_size,
-               'api_version': 2}
+               'api_version': '2'}
         hmac_msg = json.dumps(req).encode()
         headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret),
                    'message-size': str(len(json.dumps(req)))}
@@ -96,7 +96,7 @@ elif args.request == 'payload':
         hmac_msg = args.token.encode()
         req = {'payload_digest': args.digest,
                'header_size': args.header_size,
-               'api_version': 3}
+               'api_version': '3'}
         headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret),
                    'message-size': str(len(json.dumps(req)))}
         rep = requests.post(base_url + '/payloads/' + args.token, json=req, headers=headers)
