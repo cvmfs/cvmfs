@@ -213,7 +213,7 @@ func (r *CvmfsReceiver) reply() ([]byte, error) {
 	}
 
 	reply := make([]byte, repSize)
-	reply, err := ioutil.ReadAll(r.stdout)
+	reply, err := ioutil.ReadAll(io.LimitReader(r.stdout, int64(repSize)))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read reply body")
 	}
