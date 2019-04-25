@@ -112,5 +112,9 @@ func CommitLease(s *Services, tokenStr, oldRootHash, newRootHash string, tag gw.
 		return err
 	}
 
+	if err := s.Leases.CancelLease(tokenStr); err != nil {
+		return err
+	}
+
 	return nil
 }
