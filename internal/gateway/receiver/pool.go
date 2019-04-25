@@ -2,6 +2,7 @@ package receiver
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -16,7 +17,7 @@ type task interface {
 // payloadTask is the input data for a payload submission task
 type payloadTask struct {
 	leasePath  string
-	payload    []byte
+	payload    io.Reader
 	digest     string
 	headerSize int
 	replyChan  chan<- error
@@ -82,7 +83,7 @@ func (p *Pool) Stop() error {
 
 // SubmitPayload to be unpacked into the repository
 // TODO: implement timeout or context?
-func (p *Pool) SubmitPayload(leasePath string, payload []byte, digest string, headerSize int) error {
+func (p *Pool) SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error {
 	reply := make(chan error)
 	p.tasks <- payloadTask{leasePath, payload, digest, headerSize, reply}
 	result := <-reply

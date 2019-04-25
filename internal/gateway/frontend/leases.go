@@ -83,7 +83,12 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 		return
 	}
 
-	clientVersion, _ := strconv.Atoi(reqMsg.Version)
+	clientVersion, err := strconv.Atoi(reqMsg.Version)
+	if err != nil {
+		httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+		return
+	}
+
 	msg := make(map[string]interface{})
 	if clientVersion < MinAPIProtocolVersion {
 		msg["status"] = "error"

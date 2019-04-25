@@ -88,8 +88,8 @@ elif args.request == 'payload_legacy':
         rep = requests.post(base_url + '/payloads', json=req, headers=headers)
     else:
         errMissingArg('--token')
-        errMissingArg('--old_hash')
-        errMissingArg('--new_hash')
+        errMissingArg('--digest')
+        errMissingArg('--header_size')
 
 elif args.request == 'payload':
     if args.token and args.digest and args.header_size:
