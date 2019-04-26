@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"context"
+
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
 
@@ -21,31 +23,31 @@ func (db *EtcdLeaseDB) Close() error {
 
 // NewLease attemps to acquire a new lease for the given path
 func (db *EtcdLeaseDB) NewLease(
-	keyID, leasePath string, token LeaseToken) error {
+	ctx context.Context, keyID, leasePath string, token LeaseToken) error {
 	return nil
 }
 
 // GetLeases returns a list of all active leases
-func (db *EtcdLeaseDB) GetLeases() (map[string]Lease, error) {
+func (db *EtcdLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, error) {
 	return map[string]Lease{}, nil
 }
 
 // GetLease returns the lease for a given token string
-func (db *EtcdLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
+func (db *EtcdLeaseDB) GetLease(ctx context.Context, tokenStr string) (string, *Lease, error) {
 	return "", nil, nil
 }
 
 // CancelLeases cancels all active leases
-func (db *EtcdLeaseDB) CancelLeases() error {
+func (db *EtcdLeaseDB) CancelLeases(ctx context.Context) error {
 	return nil
 }
 
 // CancelLease cancels the lease for a token string
-func (db *EtcdLeaseDB) CancelLease(tokenStr string) error {
+func (db *EtcdLeaseDB) CancelLease(ctx context.Context, tokenStr string) error {
 	return nil
 }
 
 // WithLock runs the given task while holding a commit lock for the repository
-func (db *EtcdLeaseDB) WithLock(repository string, task func() error) error {
+func (db *EtcdLeaseDB) WithLock(ctx context.Context, repository string, task func() error) error {
 	return nil
 }

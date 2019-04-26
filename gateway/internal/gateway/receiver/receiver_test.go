@@ -1,11 +1,12 @@
 package receiver
 
 import (
+	"context"
 	"testing"
 )
 
 func TestReceiverCycle(t *testing.T) {
-	receiver, err := NewReceiver("/usr/bin/cvmfs_receiver", true)
+	receiver, err := NewReceiver(context.TODO(), "/usr/bin/cvmfs_receiver", true)
 	if err != nil {
 		t.Fatalf("could not start receiver: %v", err)
 	}

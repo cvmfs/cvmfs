@@ -2,6 +2,7 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -44,12 +45,12 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 			t.Fatalf("could not generate session token: %v", err)
 		}
 
-		if err := db.NewLease(keyID1, leasePath1, *token1); err != nil {
+		if err := db.NewLease(context.TODO(), keyID1, leasePath1, *token1); err != nil {
 			t.Fatalf("could not add new lease: %v", err)
 		}
 	})
 	t.Run("get leases", func(t *testing.T) {
-		leases, err := db.GetLeases()
+		leases, err := db.GetLeases(context.TODO())
 		if err != nil {
 			t.Fatalf("could not retrieve leases: %v", err)
 		}
@@ -62,7 +63,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 		}
 	})
 	t.Run("get lease for token", func(t *testing.T) {
-		_, lease, err := db.GetLease(token1.TokenStr)
+		_, lease, err := db.GetLease(context.TODO(), token1.TokenStr)
 		if err != nil {
 			t.Fatalf("could not retrieve leases: %v", err)
 		}
@@ -73,11 +74,11 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 		}
 	})
 	t.Run("cancel leases", func(t *testing.T) {
-		err := db.CancelLeases()
+		err := db.CancelLeases(context.TODO())
 		if err != nil {
 			t.Fatalf("could not cancel all leases")
 		}
-		leases, err := db.GetLeases()
+		leases, err := db.GetLeases(context.TODO())
 		if err != nil {
 			t.Fatalf("could not retrieve leases: %v", err)
 		}
@@ -92,15 +93,15 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 			t.Fatalf("could not generate session token: %v", err)
 		}
 
-		if err := db.NewLease(keyID1, leasePath, *token); err != nil {
+		if err := db.NewLease(context.TODO(), keyID1, leasePath, *token); err != nil {
 			t.Fatalf("could not add new lease: %v", err)
 		}
 
-		if err := db.CancelLease(token.TokenStr); err != nil {
+		if err := db.CancelLease(context.TODO(), token.TokenStr); err != nil {
 			t.Fatalf("could not clear lease for token")
 		}
 
-		leases, err := db.GetLeases()
+		leases, err := db.GetLeases(context.TODO())
 		if err != nil {
 			t.Fatalf("could not retrieve leases: %v", err)
 		}
@@ -129,7 +130,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	if err := db.NewLease(keyID, leasePath1, *token1); err != nil {
+	if err := db.NewLease(context.TODO(), keyID, leasePath1, *token1); err != nil {
 		t.Fatalf("could not add new lease: %v", err)
 	}
 
@@ -139,7 +140,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	err = db.NewLease(keyID, leasePath2, *token2)
+	err = db.NewLease(context.TODO(), keyID, leasePath2, *token2)
 	if _, ok := err.(PathBusyError); !ok {
 		t.Fatalf("conflicting lease was added for path: %v", leasePath2)
 	}
@@ -150,7 +151,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	err = db.NewLease(keyID, leasePath3, *token3)
+	err = db.NewLease(context.TODO(), keyID, leasePath3, *token3)
 	if _, ok := err.(PathBusyError); !ok {
 		t.Fatalf("conflicting lease was added for path: %v", leasePath3)
 	}
@@ -177,7 +178,7 @@ func TestEmbeddedLeaseDBExpired(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	if err := db.NewLease(keyID, leasePath, *token1); err != nil {
+	if err := db.NewLease(context.TODO(), keyID, leasePath, *token1); err != nil {
 		t.Fatalf("could not add new lease: %v", err)
 	}
 
@@ -188,7 +189,7 @@ func TestEmbeddedLeaseDBExpired(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	if err := db.NewLease(keyID, leasePath, *token2); err != nil {
+	if err := db.NewLease(context.TODO(), keyID, leasePath, *token2); err != nil {
 		t.Fatalf("could not add new lease in place of expired one")
 	}
 }

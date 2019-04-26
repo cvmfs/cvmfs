@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -47,12 +48,12 @@ type Receiver interface {
 }
 
 // NewReceiver is the factory method for Receiver types
-func NewReceiver(execPath string, mock bool) (Receiver, error) {
+func NewReceiver(ctx context.Context, execPath string, mock bool) (Receiver, error) {
 	if mock {
-		return NewMockReceiver()
+		return NewMockReceiver(ctx)
 	}
 
-	return NewCvmfsReceiver(execPath)
+	return NewCvmfsReceiver(ctx, execPath)
 }
 
 // CvmfsReceiver spawns an external cvmfs_receiver worker process
@@ -63,7 +64,7 @@ type CvmfsReceiver struct {
 }
 
 // NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
-func NewCvmfsReceiver(execPath string) (*CvmfsReceiver, error) {
+func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, error) {
 	if _, err := os.Stat(execPath); os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "worker process executable not found")
 	}

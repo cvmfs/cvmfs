@@ -17,7 +17,8 @@ func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
 		token, hasToken := mux.Vars(h)["token"]
 
-		reqID, _ := h.Context().Value(idKey).(uuid.UUID)
+		ctx := h.Context()
+		reqID, _ := ctx.Value(idKey).(uuid.UUID)
 
 		msgSize, err := strconv.Atoi(h.Header.Get("message-size"))
 		if err != nil {
@@ -49,7 +50,7 @@ func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
 		}
 
 		msg := make(map[string]interface{})
-		if err := be.SubmitPayload(services, token, h.Body, req.Digest, headerSize); err != nil {
+		if err := be.SubmitPayload(ctx, services, token, h.Body, req.Digest, headerSize); err != nil {
 			msg["status"] = "error"
 			msg["reason"] = err.Error()
 		} else {

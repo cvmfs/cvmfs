@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"context"
+
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/pkg/errors"
 )
@@ -14,7 +16,7 @@ type LeaseReturn struct {
 }
 
 // NewLease for the specified path, using keyID
-func NewLease(s *Services, keyID, leasePath string) (string, error) {
+func NewLease(ctx context.Context, s *Services, keyID, leasePath string) (string, error) {
 	repoName, subPath, err := gw.SplitLeasePath(leasePath)
 	if err != nil {
 		return "", errors.Wrap(err, "could not parse lease path")
@@ -32,7 +34,7 @@ func NewLease(s *Services, keyID, leasePath string) (string, error) {
 		return "", errors.Wrap(err, "could not generate session token")
 	}
 
-	if err := s.Leases.NewLease(keyID, leasePath, *token); err != nil {
+	if err := s.Leases.NewLease(ctx, keyID, leasePath, *token); err != nil {
 		return "", err
 	}
 
@@ -40,8 +42,8 @@ func NewLease(s *Services, keyID, leasePath string) (string, error) {
 }
 
 // GetLeases returns all active and valid leases
-func GetLeases(s *Services) (map[string]LeaseReturn, error) {
-	leases, err := s.Leases.GetLeases()
+func GetLeases(ctx context.Context, s *Services) (map[string]LeaseReturn, error) {
+	leases, err := s.Leases.GetLeases(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -55,8 +57,8 @@ func GetLeases(s *Services) (map[string]LeaseReturn, error) {
 }
 
 // GetLease returns the lease associated with a token
-func GetLease(s *Services, tokenStr string) (*LeaseReturn, error) {
-	leasePath, lease, err := s.Leases.GetLease(tokenStr)
+func GetLease(ctx context.Context, s *Services, tokenStr string) (*LeaseReturn, error) {
+	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
 		return nil, err
 	}
@@ -74,8 +76,8 @@ func GetLease(s *Services, tokenStr string) (*LeaseReturn, error) {
 }
 
 // CancelLease associated with the token (transaction rollback)
-func CancelLease(s *Services, tokenStr string) error {
-	_, lease, err := s.Leases.GetLease(tokenStr)
+func CancelLease(ctx context.Context, s *Services, tokenStr string) error {
+	_, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
 		return err
 	}
@@ -87,7 +89,7 @@ func CancelLease(s *Services, tokenStr string) error {
 		}
 	}
 
-	if err := s.Leases.CancelLease(tokenStr); err != nil {
+	if err := s.Leases.CancelLease(ctx, tokenStr); err != nil {
 		return err
 	}
 
@@ -95,8 +97,8 @@ func CancelLease(s *Services, tokenStr string) error {
 }
 
 // CommitLease associated with the token (transaction commit)
-func CommitLease(s *Services, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
-	leasePath, lease, err := s.Leases.GetLease(tokenStr)
+func CommitLease(ctx context.Context, s *Services, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
 		return err
 	}
@@ -112,13 +114,13 @@ func CommitLease(s *Services, tokenStr, oldRootHash, newRootHash string, tag gw.
 	if err != nil {
 		return err
 	}
-	if err := s.Leases.WithLock(repository, func() error {
-		return s.Pool.CommitLease(leasePath, oldRootHash, newRootHash, tag)
+	if err := s.Leases.WithLock(ctx, repository, func() error {
+		return s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
 	}); err != nil {
 		return err
 	}
 
-	if err := s.Leases.CancelLease(tokenStr); err != nil {
+	if err := s.Leases.CancelLease(ctx, tokenStr); err != nil {
 		return err
 	}
 
