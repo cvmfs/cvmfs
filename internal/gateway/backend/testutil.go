@@ -2,11 +2,16 @@ package backend
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	"github.com/cvmfs/gateway/internal/gateway/receiver"
 )
 
+// accessConfigV1 is an access configuration using the legacy syntax
 const accessConfigV1 = `
 {
 	"repos": [
@@ -31,6 +36,7 @@ const accessConfigV1 = `
 }
 `
 
+// accessConfigV2 is an access configuration using the new syntax
 const accessConfigV2 = `
 {
 	"version": 2,
@@ -64,6 +70,7 @@ const accessConfigV2 = `
 }
 `
 
+// accessConfigV2NoKeys is a minimal access configuration using the new syntax
 const accessConfigV2NoKeys = `
 {
 	"version": 2,
@@ -73,6 +80,8 @@ const accessConfigV2NoKeys = `
 }
 `
 
+// mockKeyImporter is used by tests, returns a predefined (id, secret) pair
+// instead of reading from file
 func mockKeyImporter(ks KeySpec) (string, string, string, error) {
 	switch ks.KeyType {
 	case "plain_text":
@@ -84,6 +93,7 @@ func mockKeyImporter(ks KeySpec) (string, string, string, error) {
 	}
 }
 
+// testConfig is a set of backend configuration values for use in tests
 func testConfig(workDir string) *gw.Config {
 	return &gw.Config{
 		Port:          4929,
@@ -94,5 +104,35 @@ func testConfig(workDir string) *gw.Config {
 		NumReceivers:  1,
 		ReceiverPath:  "/usr/bin/cvmfs_receiver",
 		WorkDir:       workDir,
+		MockReceiver:  true,
 	}
+}
+
+// StartTestBackend for testing
+func StartTestBackend(name string, maxLeaseTime time.Duration) *Services {
+	tmp, err := ioutil.TempDir("", name)
+	if err != nil {
+		os.Exit(1)
+	}
+	cfg := testConfig(tmp)
+	cfg.MaxLeaseTime = maxLeaseTime
+
+	ac := emptyAccessConfig()
+
+	rd := strings.NewReader(accessConfigV2)
+	if err := ac.load(rd, mockKeyImporter); err != nil {
+		os.Exit(2)
+	}
+
+	ldb, err := OpenLeaseDB("embedded", cfg)
+	if err != nil {
+		os.Exit(3)
+	}
+
+	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver)
+	if err != nil {
+		os.Exit(4)
+	}
+
+	return &Services{Access: ac, Leases: ldb, Pool: pool, Config: *cfg}
 }
