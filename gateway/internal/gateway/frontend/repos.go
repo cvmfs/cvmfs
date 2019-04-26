@@ -5,7 +5,6 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -13,7 +12,6 @@ import (
 func MakeReposHandler(services *be.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
 		ctx := h.Context()
-		reqID, _ := ctx.Value(idKey).(uuid.UUID)
 		vs := mux.Vars(h)
 
 		msg := make(map[string]interface{})
@@ -32,8 +30,8 @@ func MakeReposHandler(services *be.Services) http.HandlerFunc {
 			msg["data"] = services.Access.GetRepos()
 		}
 
-		frontendLog(ctx, gw.InfoLevel, "request processed")
+		gw.LogC(ctx, "http", gw.LogInfo).Msg("request processed")
 
-		replyJSON(&reqID, w, msg)
+		replyJSON(ctx, w, msg)
 	}
 }

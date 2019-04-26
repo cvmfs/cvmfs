@@ -9,7 +9,6 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -32,22 +31,22 @@ func MakeLeasesHandler(services *be.Services) http.HandlerFunc {
 		case "DELETE":
 			handleCancelLease(services, token, w, h)
 		default:
-			frontendLog(h.Context(), gw.ErrorLevel, "invalid HTTP method: %v", h.Method)
+			gw.LogC(h.Context(), "http", gw.LogError).
+				Msgf("invalid HTTP method: %v", h.Method)
 			http.Error(w, "invalid method", http.StatusNotFound)
 			return
 		}
-		frontendLog(h.Context(), gw.InfoLevel, "request processed")
+		gw.LogC(h.Context(), "http", gw.LogInfo).Msg("request processed")
 	}
 }
 
 func handleGetLeases(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
 	ctx := h.Context()
-	reqID, _ := ctx.Value(idKey).(uuid.UUID)
 	msg := make(map[string]interface{})
 	if token == "" {
 		leases, err := be.GetLeases(ctx, services)
 		if err != nil {
-			httpWrapError(&reqID, err, err.Error(), w, http.StatusInternalServerError)
+			httpWrapError(ctx, err, err.Error(), w, http.StatusInternalServerError)
 			return
 		}
 		msg["status"] = "ok"
@@ -55,31 +54,30 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 	} else {
 		lease, err := be.GetLease(ctx, services, token)
 		if err != nil {
-			httpWrapError(&reqID, err, err.Error(), w, http.StatusInternalServerError)
+			httpWrapError(ctx, err, err.Error(), w, http.StatusInternalServerError)
 			return
 		}
 		msg["data"] = lease
 	}
 
-	replyJSON(&reqID, w, msg)
+	replyJSON(ctx, w, msg)
 }
 
 func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Request) {
 	ctx := h.Context()
-	reqID, _ := ctx.Value(idKey).(uuid.UUID)
 
 	var reqMsg struct {
 		Path    string `json:"path"`
 		Version string `json:"api_version"` // cvmfs_swissknife sends this field as a string
 	}
 	if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
-		httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+		httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
 		return
 	}
 
 	clientVersion, err := strconv.Atoi(reqMsg.Version)
 	if err != nil {
-		httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+		httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
 		return
 	}
 
@@ -109,12 +107,11 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 		}
 	}
 
-	replyJSON(&reqID, w, msg)
+	replyJSON(ctx, w, msg)
 }
 
 func handleCommitLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
 	ctx := h.Context()
-	reqID, _ := ctx.Value(idKey).(uuid.UUID)
 
 	var reqMsg struct {
 		OldRootHash string `json:"old_root_hash"`
@@ -122,7 +119,7 @@ func handleCommitLease(services *be.Services, token string, w http.ResponseWrite
 		gw.RepositoryTag
 	}
 	if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
-		httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+		httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
 		return
 	}
 
@@ -135,17 +132,16 @@ func handleCommitLease(services *be.Services, token string, w http.ResponseWrite
 		msg["status"] = "ok"
 	}
 
-	replyJSON(&reqID, w, msg)
+	replyJSON(ctx, w, msg)
 }
 
 func handleCancelLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
 	if token == "" {
-		http.Error(w, "missing token", http.StatusBadRequest)
+		http.Error(w, "missing to ken", http.StatusBadRequest)
 		return
 	}
 
 	ctx := h.Context()
-	reqID, _ := ctx.Value(idKey).(uuid.UUID)
 
 	msg := make(map[string]interface{})
 
@@ -161,5 +157,5 @@ func handleCancelLease(services *be.Services, token string, w http.ResponseWrite
 		msg["status"] = "ok"
 	}
 
-	replyJSON(&reqID, w, msg)
+	replyJSON(ctx, w, msg)
 }

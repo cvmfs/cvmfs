@@ -61,6 +61,7 @@ type CvmfsReceiver struct {
 	worker *exec.Cmd
 	stdin  io.Writer
 	stdout io.Reader
+	ctx    context.Context
 }
 
 // NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
@@ -84,12 +85,11 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 		return nil, errors.Wrap(err, "could not start worker process")
 	}
 
-	gw.Log.Debug().
-		Str("component", "receiver").
+	gw.LogC(ctx, "receiver", gw.LogDebug).
 		Str("command", "start").
-		Msgf("worker process ready")
+		Msg("worker process ready")
 
-	return &CvmfsReceiver{worker: cmd, stdin: stdin, stdout: stdout}, nil
+	return &CvmfsReceiver{worker: cmd, stdin: stdin, stdout: stdout, ctx: ctx}, nil
 }
 
 // Quit command is sent to the worker
@@ -102,10 +102,9 @@ func (r *CvmfsReceiver) Quit() error {
 		return errors.Wrap(err, "waiting for worker process failed")
 	}
 
-	gw.Log.Debug().
-		Str("component", "receiver").
+	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "quit").
-		Msgf("worker process has stopped")
+		Msg("worker process has stopped")
 
 	return nil
 }
@@ -122,8 +121,7 @@ func (r *CvmfsReceiver) Echo() error {
 		return fmt.Errorf("invalid 'echo' reply received: %v", reply)
 	}
 
-	gw.Log.Debug().
-		Str("component", "receiver").
+	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "echo").
 		Msgf("reply: %v", reply)
 
@@ -144,8 +142,7 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 
 	result := toReceiverError(reply)
 
-	gw.Log.Debug().
-		Str("component", "receiver").
+	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "submit payload").
 		Msgf("result: %v", result)
 
@@ -174,8 +171,7 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 
 	result := toReceiverError(reply)
 
-	gw.Log.Debug().
-		Str("component", "receiver").
+	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "commit").
 		Msgf("result: %v", result)
 

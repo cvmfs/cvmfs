@@ -65,8 +65,7 @@ func OpenEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
 		return nil, errors.Wrap(err, "could not prepare statement for 'get lease'")
 	}
 
-	gw.Log.Info().
-		Str("component", "leasedb").
+	gw.Log("leasedb", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
 
 	return &EmbeddedLeaseDB{
@@ -138,11 +137,9 @@ func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string
 	if existing.token != "" {
 		timeLeft := existing.expiration.Sub(time.Now())
 		if timeLeft > 0 {
-			gw.Log.Debug().
-				Str("component", "leasedb").
+			gw.LogC(ctx, "leasedb", gw.LogDebug).
 				Str("operation", "new_lease").
 				Str("token", token.TokenStr).
-				Bool("success", false).
 				Msgf("path_busy, time left: %v s", timeLeft.Seconds())
 			return PathBusyError{timeLeft}
 		}
@@ -164,12 +161,10 @@ func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string
 		return errors.Wrap(err, "could not commit transaction")
 	}
 
-	gw.Log.Debug().
-		Str("component", "leasedb").
+	gw.LogC(ctx, "leasedb", gw.LogDebug).
 		Str("operation", "new_lease").
 		Str("token", token.TokenStr).
-		Bool("success", true).
-		Float64("time", time.Now().Sub(t0).Seconds()).
+		Float64("task_dt", time.Now().Sub(t0).Seconds()).
 		Msgf("key: %v, path: %v", keyID, leasePath)
 
 	return nil
@@ -201,11 +196,9 @@ func (db *EmbeddedLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, err
 		leases[leasePath] = Lease{KeyID: keyID, Token: token}
 	}
 
-	gw.Log.Debug().
-		Str("component", "leasedb").
+	gw.LogC(ctx, "leasedb", gw.LogDebug).
 		Str("operation", "get_leases").
-		Bool("success", true).
-		Float64("time", time.Now().Sub(t0).Seconds()).
+		Float64("task_dt", time.Now().Sub(t0).Seconds()).
 		Msgf("found %v leases", len(leases))
 
 	return leases, nil
@@ -237,12 +230,10 @@ func (db *EmbeddedLeaseDB) GetLease(ctx context.Context, tokenStr string) (strin
 		Token: LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(0, expiration)},
 	}
 
-	gw.Log.Debug().
-		Str("component", "leasedb").
+	gw.LogC(ctx, "leasedb", gw.LogDebug).
 		Str("operation", "get_lease").
 		Str("token", tokenStr).
-		Bool("success", true).
-		Float64("time", time.Now().Sub(t0).Seconds()).
+		Float64("task_dt", time.Now().Sub(t0).Seconds()).
 		Msgf("success")
 
 	return leasePath, lease, nil
@@ -269,10 +260,8 @@ func (db *EmbeddedLeaseDB) CancelLeases(ctx context.Context) error {
 	}
 
 	if numRows == 0 {
-		gw.Log.Debug().
-			Str("component", "leasedb").
+		gw.LogC(ctx, "leasedb", gw.LogDebug).
 			Str("operation", "cancel_lease").
-			Bool("success", false).
 			Msgf("cancellation failed")
 		return InvalidLeaseError{}
 	}
@@ -281,11 +270,9 @@ func (db *EmbeddedLeaseDB) CancelLeases(ctx context.Context) error {
 		return errors.Wrap(err, "transaction commit failed")
 	}
 
-	gw.Log.Debug().
-		Str("component", "leasedb").
+	gw.LogC(ctx, "leasedb", gw.LogDebug).
 		Str("operation", "cancel_leases").
-		Bool("success", true).
-		Float64("time", time.Now().Sub(t0).Seconds()).
+		Float64("task_dt", time.Now().Sub(t0).Seconds()).
 		Msgf("all leases cancelled")
 
 	return nil
@@ -312,11 +299,9 @@ func (db *EmbeddedLeaseDB) CancelLease(ctx context.Context, tokenStr string) err
 	}
 
 	if numRows == 0 {
-		gw.Log.Debug().
-			Str("component", "leasedb").
+		gw.LogC(ctx, "leasedb", gw.LogDebug).
 			Str("operation", "cancel_lease").
 			Str("token", tokenStr).
-			Bool("success", false).
 			Msgf("cancellation failed, invalid token")
 		return InvalidLeaseError{}
 	}
@@ -325,12 +310,10 @@ func (db *EmbeddedLeaseDB) CancelLease(ctx context.Context, tokenStr string) err
 		return errors.Wrap(err, "transaction commit failed")
 	}
 
-	gw.Log.Debug().
-		Str("component", "leasedb").
+	gw.LogC(ctx, "leasedb", gw.LogDebug).
 		Str("operation", "cancel_lease").
 		Str("token", tokenStr).
-		Bool("success", true).
-		Float64("time", time.Now().Sub(t0).Seconds()).
+		Float64("task_dt", time.Now().Sub(t0).Seconds()).
 		Msgf("lease cancelled")
 
 	return nil
