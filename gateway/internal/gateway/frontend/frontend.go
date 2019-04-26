@@ -11,8 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Start HTTP frontend
-func Start(services *be.Services, port int, timeout time.Duration) error {
+// NewFrontend builds and configures a new HTTP server, but does not start it
+func NewFrontend(services *be.Services, port int, timeout time.Duration) *http.Server {
 	router := mux.NewRouter()
 
 	// Add the request tagging middleware
@@ -60,6 +60,12 @@ func Start(services *be.Services, port int, timeout time.Duration) error {
 		ReadTimeout:  timeout,
 	}
 
+	return srv
+}
+
+// Start HTTP frontend
+func Start(services *be.Services, port int, timeout time.Duration) error {
+	srv := NewFrontend(services, port, timeout)
 	if err := srv.ListenAndServe(); err != nil {
 		return errors.Wrap(err, "could not run HTTP front-end")
 	}

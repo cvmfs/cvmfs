@@ -2,33 +2,15 @@ package backend
 
 import (
 	"context"
-	"io/ioutil"
-	"os"
-	"strings"
 	"testing"
 	"time"
+
+	gw "github.com/cvmfs/gateway/internal/gateway"
 )
 
-func startLeaseActionTestBackend() *Services {
-	tmp, err := ioutil.TempDir("", "test_lease_actions")
-	if err != nil {
-		os.Exit(1)
-	}
-	cfg := testConfig(tmp)
-
-	ac := emptyAccessConfig()
-	rd := strings.NewReader(accessConfigV2)
-	if err := ac.load(rd, mockKeyImporter); err != nil {
-		os.Exit(2)
-	}
-
-	ldb, err := OpenLeaseDB("embedded", cfg)
-
-	return &Services{Access: ac, Leases: ldb, Config: *cfg}
-}
-
 func TestLeaseActionsNewLease(t *testing.T) {
-	backend := startLeaseActionTestBackend()
+	backend := StartTestBackend("lease_actions_test", 1*time.Second)
+	defer backend.Stop()
 
 	t.Run("new lease busy", func(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
@@ -74,10 +56,11 @@ func TestLeaseActionsNewLease(t *testing.T) {
 			t.Fatalf("new lease should not have been granted for conflicting path")
 		}
 	})
-	defer backend.Stop()
 }
+
 func TestLeaseActionsCancelLease(t *testing.T) {
-	backend := startLeaseActionTestBackend()
+	backend := StartTestBackend("lease_actions_test", 1*time.Second)
+	defer backend.Stop()
 
 	t.Run("remove existing lease", func(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
@@ -106,11 +89,11 @@ func TestLeaseActionsCancelLease(t *testing.T) {
 			t.Fatalf("cancel operation should have failed for nonexisting lease")
 		}
 	})
-	defer backend.Stop()
 }
 
 func TestLeaseActionsGetLease(t *testing.T) {
-	backend := startLeaseActionTestBackend()
+	backend := StartTestBackend("lease_actions_test", 1*time.Second)
+	defer backend.Stop()
 
 	t.Run("get valid lease", func(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
@@ -166,5 +149,65 @@ func TestLeaseActionsGetLease(t *testing.T) {
 			t.Fatalf("query should have returned an InvalidLeaseError. Instead: %v", err)
 		}
 	})
+}
+
+func TestLeaseActionsCommitLease(t *testing.T) {
+	backend := StartTestBackend("lease_actions_test", 1*time.Second)
 	defer backend.Stop()
+
+	t.Run("commit valid lease", func(t *testing.T) {
+		backend.Config.MaxLeaseTime = 1 * time.Second
+		keyID := "keyid1"
+		leasePath := "test2.repo.org/some/path"
+		token, err := NewLease(context.TODO(), backend, keyID, leasePath)
+		if err != nil {
+			t.Fatalf("could not obtain new lease: %v", err)
+		}
+		if err := CommitLease(
+			context.TODO(), backend, token, "old_hash", "new_hash",
+			gw.RepositoryTag{
+				Name:        "mytag",
+				Channel:     "mychannel",
+				Description: "this is a tag",
+			}); err != nil {
+			t.Fatalf("could not commit existing lease: %v", err)
+			CancelLease(context.TODO(), backend, token)
+		}
+	})
+	t.Run("commit invalid lease", func(t *testing.T) {
+		backend.Config.MaxLeaseTime = 1 * time.Second
+		leasePath := "test2.repo.org/some/path"
+		token, err := NewLeaseToken(leasePath, backend.Config.MaxLeaseTime)
+		if err != nil {
+			t.Fatalf("could not obtain new lease token: %v", err)
+		}
+		if err := CommitLease(
+			context.TODO(), backend, token.TokenStr, "old_hash", "new_hash",
+			gw.RepositoryTag{
+				Name:        "mytag",
+				Channel:     "mychannel",
+				Description: "this is a tag",
+			}); err == nil {
+			t.Fatalf("invalid lease should not have been accepted for commit")
+		}
+	})
+	t.Run("commit expired lease", func(t *testing.T) {
+		backend.Config.MaxLeaseTime = 1 * time.Millisecond
+		keyID := "keyid1"
+		leasePath := "test2.repo.org/some/path"
+		token, err := NewLease(context.TODO(), backend, keyID, leasePath)
+		if err != nil {
+			t.Fatalf("could not obtain new lease: %v", err)
+		}
+		time.Sleep(2 * backend.Config.MaxLeaseTime)
+		if CommitLease(
+			context.TODO(), backend, token, "old_hash", "new_hash",
+			gw.RepositoryTag{
+				Name:        "mytag",
+				Channel:     "mychannel",
+				Description: "this is a tag",
+			}) == nil {
+			t.Fatalf("expired lease should not have been accepted for commit")
+		}
+	})
 }
