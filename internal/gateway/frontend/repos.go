@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"net/http"
-	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -13,7 +12,8 @@ import (
 // MakeReposHandler creates an HTTP handler for the API root
 func MakeReposHandler(services *be.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
-		reqID, _ := h.Context().Value(idKey).(uuid.UUID)
+		ctx := h.Context()
+		reqID, _ := ctx.Value(idKey).(uuid.UUID)
 		vs := mux.Vars(h)
 
 		msg := make(map[string]interface{})
@@ -32,12 +32,7 @@ func MakeReposHandler(services *be.Services) http.HandlerFunc {
 			msg["data"] = services.Access.GetRepos()
 		}
 
-		t0, _ := h.Context().Value(t0Key).(time.Time)
-		gw.Log.Debug().
-			Str("component", "http").
-			Str("req_id", reqID.String()).
-			Float64("time", time.Since(t0).Seconds()).
-			Msg("request processed")
+		frontendLog(ctx, gw.InfoLevel, "request processed")
 
 		replyJSON(&reqID, w, msg)
 	}

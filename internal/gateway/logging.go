@@ -6,6 +6,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// LogLevel encodes the different log levels
+type LogLevel zerolog.Level
+
+// The various log levels
+const (
+	DebugLevel LogLevel = LogLevel(zerolog.DebugLevel)
+	InfoLevel  LogLevel = LogLevel(zerolog.InfoLevel)
+	ErrorLevel LogLevel = LogLevel(zerolog.ErrorLevel)
+)
+
 // Log is the application-wide logger
 var Log zerolog.Logger
 
