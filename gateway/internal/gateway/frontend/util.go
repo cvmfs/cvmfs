@@ -1,11 +1,14 @@
 package frontend
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 )
 
 // private type alias for context keys
@@ -33,4 +36,29 @@ func httpWrapError(reqID *uuid.UUID, err error, msg string, w http.ResponseWrite
 		Str("req_id", reqID.String()).
 		Err(err).Msg(msg)
 	http.Error(w, msg, code)
+}
+
+func frontendLog(ctx context.Context, level gw.LogLevel, format string, args ...interface{}) {
+	reqID, _ := ctx.Value(idKey).(uuid.UUID)
+	t0, _ := ctx.Value(t0Key).(time.Time)
+
+	var event *zerolog.Event
+	switch level {
+	case gw.DebugLevel:
+		event = gw.Log.Debug()
+	case gw.InfoLevel:
+		event = gw.Log.Info()
+	case gw.ErrorLevel:
+		event = gw.Log.Error()
+	default:
+		gw.Log.Error().
+			Str("component", "logger").
+			Msgf("unknown log level: %v", level)
+		return
+	}
+	event.
+		Str("component", "http").
+		Str("req_id", reqID.String()).
+		Float64("time", time.Since(t0).Seconds()).
+		Msgf(format, args...)
 }

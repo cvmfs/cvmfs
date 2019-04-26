@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -57,12 +56,8 @@ func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
 			msg["status"] = "ok"
 		}
 
-		t0, _ := h.Context().Value(t0Key).(time.Time)
-		gw.Log.Debug().
-			Str("component", "http").
-			Str("req_id", reqID.String()).
-			Float64("time", time.Since(t0).Seconds()).
-			Msg("request processed")
+		frontendLog(ctx, gw.InfoLevel, "request_processed")
+
 		replyJSON(&reqID, w, msg)
 	}
 }

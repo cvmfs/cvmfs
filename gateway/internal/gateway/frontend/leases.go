@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -33,13 +32,11 @@ func MakeLeasesHandler(services *be.Services) http.HandlerFunc {
 		case "DELETE":
 			handleCancelLease(services, token, w, h)
 		default:
-			reqID, _ := h.Context().Value(idKey).(uuid.UUID)
-			gw.Log.Error().
-				Str("component", "http").
-				Str("req_id", reqID.String()).
-				Msgf("invalid HTTP method: %v", h.Method)
+			frontendLog(h.Context(), gw.ErrorLevel, "invalid HTTP method: %v", h.Method)
 			http.Error(w, "invalid method", http.StatusNotFound)
+			return
 		}
+		frontendLog(h.Context(), gw.InfoLevel, "request processed")
 	}
 }
 
@@ -50,6 +47,7 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 		leases, err := be.GetLeases(services)
 		if err != nil {
 			httpWrapError(&reqID, err, err.Error(), w, http.StatusInternalServerError)
+			return
 		}
 		msg["status"] = "ok"
 		msg["data"] = leases
@@ -57,16 +55,10 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 		lease, err := be.GetLease(services, token)
 		if err != nil {
 			httpWrapError(&reqID, err, err.Error(), w, http.StatusInternalServerError)
+			return
 		}
 		msg["data"] = lease
 	}
-
-	t0, _ := h.Context().Value(t0Key).(time.Time)
-	gw.Log.Debug().
-		Str("component", "http").
-		Str("req_id", reqID.String()).
-		Float64("time", time.Since(t0).Seconds()).
-		Msg("request processed")
 
 	replyJSON(&reqID, w, msg)
 }
@@ -115,13 +107,6 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 		}
 	}
 
-	t0, _ := h.Context().Value(t0Key).(time.Time)
-	gw.Log.Debug().
-		Str("component", "http").
-		Str("req_id", reqID.String()).
-		Float64("time", time.Since(t0).Seconds()).
-		Msg("request processed")
-
 	replyJSON(&reqID, w, msg)
 }
 
@@ -147,13 +132,6 @@ func handleCommitLease(services *be.Services, token string, w http.ResponseWrite
 		msg["status"] = "ok"
 	}
 
-	t0, _ := h.Context().Value(t0Key).(time.Time)
-	gw.Log.Debug().
-		Str("component", "http").
-		Str("req_id", reqID.String()).
-		Float64("time", time.Since(t0).Seconds()).
-		Msg("request processed")
-
 	replyJSON(&reqID, w, msg)
 }
 
@@ -178,13 +156,6 @@ func handleCancelLease(services *be.Services, token string, w http.ResponseWrite
 	} else {
 		msg["status"] = "ok"
 	}
-
-	t0, _ := h.Context().Value(t0Key).(time.Time)
-	gw.Log.Debug().
-		Str("component", "http").
-		Str("req_id", reqID.String()).
-		Float64("time", time.Since(t0).Seconds()).
-		Msg("request processed")
 
 	replyJSON(&reqID, w, msg)
 }
