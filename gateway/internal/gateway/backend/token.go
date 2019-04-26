@@ -59,7 +59,7 @@ func NewLeaseToken(repoPath string, maxLeaseDuration time.Duration) (*LeaseToken
 
 	claims := LeaseClaims{
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expiration.Unix()},
+			ExpiresAt: expiration.UnixNano()},
 		Path: repoPath}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -84,7 +84,7 @@ func CheckToken(tokenStr string, secret []byte) error {
 	}
 
 	if claims, ok := token.Claims.(*LeaseClaims); ok {
-		if claims.ExpiresAt <= time.Now().Unix() {
+		if claims.ExpiresAt <= time.Now().UnixNano() {
 			return ExpiredTokenError{}
 		}
 		return nil
