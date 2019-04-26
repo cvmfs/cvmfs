@@ -1,4 +1,4 @@
-package gateway
+package backend
 
 import "sync"
 
@@ -10,11 +10,11 @@ type NamedLocks struct {
 
 // WithLock runs the given task, locking the "name" mutex for the
 // duration of the task
-func (l *NamedLocks) WithLock(name string, task func()) {
+func (l *NamedLocks) WithLock(name string, task func() error) error {
 	m, _ := l.locks.LoadOrStore(name, &sync.Mutex{})
 	mtx := m.(*sync.Mutex)
 	mtx.Lock()
 	defer mtx.Unlock()
 
-	task()
+	return task()
 }

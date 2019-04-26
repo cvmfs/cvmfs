@@ -48,7 +48,6 @@ func (p commitTask) Reply() chan<- error {
 // request can be treated per repository at a time.
 type Pool struct {
 	tasks      chan<- task
-	repoLocks  *gw.NamedLocks
 	wg         sync.WaitGroup
 	workerExec string
 	mock       bool
@@ -56,11 +55,11 @@ type Pool struct {
 
 // StartPool the receiver pool using the specified executable and number of payload
 // submission workers
-func StartPool(repoLocks *gw.NamedLocks, workerExec string, numWorkers int, mock bool) (*Pool, error) {
+func StartPool(workerExec string, numWorkers int, mock bool) (*Pool, error) {
 	// Start payload submission workers
 	tasks := make(chan task)
 
-	pool := &Pool{tasks, repoLocks, sync.WaitGroup{}, workerExec, mock}
+	pool := &Pool{tasks, sync.WaitGroup{}, workerExec, mock}
 
 	for i := 0; i < numWorkers; i++ {
 		pool.wg.Add(1)
@@ -135,14 +134,7 @@ M:
 				result = receiver.SubmitPayload(t.leasePath, t.payload, t.digest, t.headerSize)
 				taskType = "payload"
 			case commitTask:
-				repository, _, err := gw.SplitLeasePath(t.leasePath)
-				if err != nil {
-					task.Reply() <- err
-					return
-				}
-				pool.repoLocks.WithLock(repository, func() {
-					result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
-				})
+				result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
 				taskType = "commit"
 			default:
 				task.Reply() <- fmt.Errorf("unknown task type")

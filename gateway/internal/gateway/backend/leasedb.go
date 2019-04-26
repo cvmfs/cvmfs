@@ -72,6 +72,7 @@ type LeaseDB interface {
 	GetLease(tokenStr string) (string, *Lease, error)
 	CancelLeases() error
 	CancelLease(tokenStr string) error
+	WithLock(name string, task func() error) error
 }
 
 // OpenLeaseDB opens or creats a new LeaseDB object of the specified type

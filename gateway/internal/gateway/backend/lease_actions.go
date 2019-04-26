@@ -108,7 +108,13 @@ func CommitLease(s *Services, tokenStr, oldRootHash, newRootHash string, tag gw.
 		}
 	}
 
-	if err := s.Pool.CommitLease(leasePath, oldRootHash, newRootHash, tag); err != nil {
+	repository, _, err := gw.SplitLeasePath(leasePath)
+	if err != nil {
+		return err
+	}
+	if err := s.Leases.WithLock(repository, func() error {
+		return s.Pool.CommitLease(leasePath, oldRootHash, newRootHash, tag)
+	}); err != nil {
 		return err
 	}
 

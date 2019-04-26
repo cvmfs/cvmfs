@@ -44,3 +44,8 @@ func (db *EtcdLeaseDB) CancelLeases() error {
 func (db *EtcdLeaseDB) CancelLease(tokenStr string) error {
 	return nil
 }
+
+// WithLock runs the given task while holding a commit lock for the repository
+func (db *EtcdLeaseDB) WithLock(repository string, task func() error) error {
+	return nil
+}
