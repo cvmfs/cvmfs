@@ -80,8 +80,7 @@ func StartPool(workerExec string, numWorkers int, mock bool) (*Pool, error) {
 		go worker(tasks, pool, i)
 	}
 
-	gw.Log.Info().
-		Str("component", "worker_pool").
+	gw.Log("worker_pool", gw.LogInfo).
 		Msg("worker pool started")
 
 	return pool, nil
@@ -113,8 +112,7 @@ func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootH
 }
 
 func worker(tasks <-chan task, pool *Pool, workerIdx int) {
-	gw.Log.Debug().
-		Str("component", "worker_pool").
+	gw.Log("worker_pool", gw.LogDebug).
 		Int("worker_id", workerIdx).
 		Msg("started")
 
@@ -157,16 +155,14 @@ M:
 
 			task.Reply() <- result
 
-			gw.Log.Debug().
-				Str("component", "worker_pool").
+			gw.LogC(task.Context(), "worker_pool", gw.LogDebug).
 				Int("worker_id", workerIdx).
-				Float64("time", time.Now().Sub(t0).Seconds()).
+				Float64("task_dt", time.Now().Sub(t0).Seconds()).
 				Msgf("%v task complete", taskType)
 		}()
 	}
 
-	gw.Log.Debug().
-		Str("component", "worker_pool").
+	gw.Log("worker_pool", gw.LogDebug).
 		Int("worker_id", workerIdx).
 		Msg("finished")
 }

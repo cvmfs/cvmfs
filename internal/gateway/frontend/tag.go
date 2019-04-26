@@ -16,15 +16,15 @@ func MakeTaggingMiddleware() mux.MiddlewareFunc {
 	return mux.MiddlewareFunc(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			reqID := uuid.New()
-			gw.Log.Info().
-				Str("component", "http").
-				Str("req_id", reqID.String()).
+			t0 := time.Now()
+			ctx := context.WithValue(
+				context.WithValue(req.Context(), gw.IDKey, reqID),
+				gw.T0Key, time.Now())
+			gw.LogC(ctx, "http", gw.LogInfo).
 				Str("method", req.Method).
 				Str("url", req.URL.String()).
+				Str("t0", t0.Format(time.RFC3339)).
 				Msg("request received")
-			ctx := context.WithValue(
-				context.WithValue(req.Context(), idKey, reqID),
-				t0Key, time.Now())
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})

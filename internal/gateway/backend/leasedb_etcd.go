@@ -12,7 +12,8 @@ type EtcdLeaseDB struct {
 
 // OpenEtcdLeaseDB creates a new etcd-backed lease DB
 func OpenEtcdLeaseDB(endpoints []string) (*EtcdLeaseDB, error) {
-	gw.Log.Error().Msg("Etcd-backed lease DB not yet implemented")
+	gw.Log("leasedb", gw.LogError).
+		Msg("Etcd-backed lease DB not yet implemented")
 	return nil, nil
 }
 

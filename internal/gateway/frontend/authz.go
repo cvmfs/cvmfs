@@ -9,12 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
 )
+
+type message map[string]interface{}
 
 // MakeAuthzMiddleware returns an HMAC authorization middleware for use with the gorilla/mux server
 func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
@@ -26,35 +27,29 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 				return
 			}
 
-			reqID, _ := req.Context().Value(idKey).(uuid.UUID)
+			ctx := req.Context()
 			tokens := strings.Split(req.Header.Get("Authorization"), " ")
 			if len(tokens) != 2 {
-				gw.Log.Error().
-					Str("component", "http").
-					Str("req_id", reqID.String()).
+				gw.LogC(ctx, "http", gw.LogError).
 					Msg("missing tokens in authorization header")
-				replyJSON(&reqID, w, message{"status": "error", "reason": "invalid_hmac"})
+				replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
 				return
 			}
 
 			keyID := tokens[0]
 			HMAC, err := base64.StdEncoding.DecodeString(tokens[1])
 			if err != nil {
-				gw.Log.Error().
-					Str("component", "http").
-					Str("req_id", reqID.String()).
+				gw.LogC(ctx, "http", gw.LogError).
 					Err(err).Msg("could not base64 decode HMAC")
-				replyJSON(&reqID, w, message{"status": "error", "reason": "invalid_hmac"})
+				replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
 				return
 			}
 
 			secret := ac.GetSecret(keyID)
 			if len(secret) == 0 {
-				gw.Log.Error().
-					Str("component", "http").
-					Str("req_id", reqID.String()).
+				gw.LogC(ctx, "http", gw.LogError).
 					Msg("invalid key ID specified")
-				replyJSON(&reqID, w, message{"status": "error", "reason": "invalid_hmac"})
+				replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
 				return
 			}
 
@@ -71,7 +66,7 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 					// For new lease request used the request body to compute HMAC
 					HMACInput, err = ioutil.ReadAll(req.Body)
 					if err != nil {
-						httpWrapError(&reqID, err, "could not read request body", w, http.StatusInternalServerError)
+						httpWrapError(ctx, err, "could not read request body", w, http.StatusInternalServerError)
 						return
 					}
 					// Body needs to be read again in the next handler, reset it
@@ -90,13 +85,13 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 					// is used to compute the HMAC
 					msgSize, err := strconv.Atoi(req.Header.Get("message-size"))
 					if err != nil {
-						httpWrapError(&reqID, err, "missing message-size header", w, http.StatusBadRequest)
+						httpWrapError(ctx, err, "missing message-size header", w, http.StatusBadRequest)
 						return
 					}
 					msgRdr := io.LimitReader(req.Body, int64(msgSize))
 					msg, err := ioutil.ReadAll(msgRdr)
 					if err != nil {
-						httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+						httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
 						return
 					}
 
@@ -109,11 +104,9 @@ func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
 			}
 
 			if !CheckHMAC(HMACInput, HMAC, secret) {
-				gw.Log.Error().
-					Str("component", "http").
-					Str("req_id", reqID.String()).
+				gw.LogC(ctx, "http", gw.LogError).
 					Msg("invalid HMAC")
-				replyJSON(&reqID, w, message{"status": "error", "reason": "invalid_hmac"})
+				replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
 				return
 			}
 			next.ServeHTTP(w, req)

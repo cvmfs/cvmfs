@@ -8,7 +8,6 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -18,11 +17,10 @@ func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
 		token, hasToken := mux.Vars(h)["token"]
 
 		ctx := h.Context()
-		reqID, _ := ctx.Value(idKey).(uuid.UUID)
 
 		msgSize, err := strconv.Atoi(h.Header.Get("message-size"))
 		if err != nil {
-			httpWrapError(&reqID, err, "missing message-size header", w, http.StatusBadRequest)
+			httpWrapError(ctx, err, "missing message-size header", w, http.StatusBadRequest)
 			return
 		}
 
@@ -35,12 +33,12 @@ func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
 
 		msgRdr := io.LimitReader(h.Body, int64(msgSize))
 		if err := json.NewDecoder(msgRdr).Decode(&req); err != nil {
-			httpWrapError(&reqID, err, "invalid request body", w, http.StatusBadRequest)
+			httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
 			return
 		}
 		headerSize, err := strconv.Atoi(req.HeaderSize)
 		if err != nil {
-			httpWrapError(&reqID, err, "invalid header_size", w, http.StatusBadRequest)
+			httpWrapError(ctx, err, "invalid header_size", w, http.StatusBadRequest)
 			return
 		}
 
@@ -57,8 +55,8 @@ func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
 			msg["status"] = "ok"
 		}
 
-		frontendLog(ctx, gw.InfoLevel, "request_processed")
+		gw.LogC(ctx, "http", gw.LogInfo).Msg("request_processed")
 
-		replyJSON(&reqID, w, msg)
+		replyJSON(ctx, w, msg)
 	}
 }
