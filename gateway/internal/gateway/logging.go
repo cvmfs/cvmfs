@@ -53,7 +53,7 @@ func LogC(ctx context.Context, component string, level LogLevel) *zerolog.Event 
 
 	return Log(component, level).
 		Str("req_id", reqID.String()).
-		Float64("dt", time.Since(t0).Seconds())
+		Float64("req_dt", time.Since(t0).Seconds())
 }
 
 // Log is a convenience wrapper on top of the global Logger of the gateway
