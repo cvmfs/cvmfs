@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -93,7 +94,7 @@ func (db *EmbeddedLeaseDB) Close() error {
 }
 
 // NewLease attemps to acquire a new lease for the given path
-func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) error {
+func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, token LeaseToken) error {
 	t0 := time.Now()
 
 	txn, err := db.store.Begin()
@@ -175,7 +176,7 @@ func (db *EmbeddedLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) e
 }
 
 // GetLeases returns a list of all active leases
-func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
+func (db *EmbeddedLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, error) {
 	t0 := time.Now()
 
 	matches, err := db.st.getLeases.Query()
@@ -211,7 +212,7 @@ func (db *EmbeddedLeaseDB) GetLeases() (map[string]Lease, error) {
 }
 
 // GetLease returns the lease for a given token string
-func (db *EmbeddedLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
+func (db *EmbeddedLeaseDB) GetLease(ctx context.Context, tokenStr string) (string, *Lease, error) {
 	t0 := time.Now()
 
 	var repoName string
@@ -248,7 +249,7 @@ func (db *EmbeddedLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
 }
 
 // CancelLeases cancels all active leases
-func (db *EmbeddedLeaseDB) CancelLeases() error {
+func (db *EmbeddedLeaseDB) CancelLeases(ctx context.Context) error {
 	t0 := time.Now()
 
 	txn, err := db.store.Begin()
@@ -291,7 +292,7 @@ func (db *EmbeddedLeaseDB) CancelLeases() error {
 }
 
 // CancelLease cancels the lease for a token string
-func (db *EmbeddedLeaseDB) CancelLease(tokenStr string) error {
+func (db *EmbeddedLeaseDB) CancelLease(ctx context.Context, tokenStr string) error {
 	t0 := time.Now()
 
 	txn, err := db.store.Begin()
@@ -336,7 +337,7 @@ func (db *EmbeddedLeaseDB) CancelLease(tokenStr string) error {
 }
 
 // WithLock runs the given task while holding a commit lock for the repository
-func (db *EmbeddedLeaseDB) WithLock(repository string, task func() error) error {
+func (db *EmbeddedLeaseDB) WithLock(ctx context.Context, repository string, task func() error) error {
 	return db.locks.WithLock(repository, task)
 }
 

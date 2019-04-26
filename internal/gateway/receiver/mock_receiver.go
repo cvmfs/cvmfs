@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"context"
 	"io"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
@@ -13,7 +14,7 @@ type MockReceiver struct {
 
 // NewMockReceiver constructs a new MockReceiver object which implements the
 // Receiver interface
-func NewMockReceiver() (Receiver, error) {
+func NewMockReceiver(ctx context.Context) (Receiver, error) {
 	return &MockReceiver{}, nil
 }
 

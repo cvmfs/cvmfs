@@ -1,12 +1,13 @@
 package backend
 
 import (
+	"context"
 	"io"
 )
 
 // SubmitPayload to be unpacked into the repository
-func SubmitPayload(s *Services, token string, payload io.Reader, digest string, headerSize int) error {
-	leasePath, lease, err := s.Leases.GetLease(token)
+func SubmitPayload(ctx context.Context, s *Services, token string, payload io.Reader, digest string, headerSize int) error {
+	leasePath, lease, err := s.Leases.GetLease(ctx, token)
 	if err != nil {
 		return err
 	}
@@ -15,7 +16,7 @@ func SubmitPayload(s *Services, token string, payload io.Reader, digest string, 
 		return err
 	}
 
-	if err := s.Pool.SubmitPayload(leasePath, payload, digest, headerSize); err != nil {
+	if err := s.Pool.SubmitPayload(ctx, leasePath, payload, digest, headerSize); err != nil {
 		return err
 	}
 

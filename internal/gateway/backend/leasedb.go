@@ -2,6 +2,7 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"fmt"
 	"time"
@@ -67,12 +68,12 @@ func DeserializeLease(buf []byte) (*Lease, error) {
 // LeaseDB provides a consistent store for repository leases
 type LeaseDB interface {
 	Close() error
-	NewLease(keyID, leasePath string, token LeaseToken) error
-	GetLeases() (map[string]Lease, error)
-	GetLease(tokenStr string) (string, *Lease, error)
-	CancelLeases() error
-	CancelLease(tokenStr string) error
-	WithLock(name string, task func() error) error
+	NewLease(ctx context.Context, keyID, leasePath string, token LeaseToken) error
+	GetLeases(ctx context.Context) (map[string]Lease, error)
+	GetLease(ctx context.Context, tokenStr string) (string, *Lease, error)
+	CancelLeases(ctx context.Context) error
+	CancelLease(ctx context.Context, tokenStr string) error
+	WithLock(ctx context.Context, name string, task func() error) error
 }
 
 // OpenLeaseDB opens or creats a new LeaseDB object of the specified type
