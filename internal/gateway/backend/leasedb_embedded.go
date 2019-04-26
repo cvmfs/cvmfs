@@ -25,6 +25,7 @@ type statements struct {
 // EmbeddedLeaseDB is a LeaseDB backed by BoltDB
 type EmbeddedLeaseDB struct {
 	store *sql.DB
+	locks NamedLocks // Per-repository commit locks
 	st    statements
 }
 
@@ -69,6 +70,7 @@ func OpenEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
 
 	return &EmbeddedLeaseDB{
 		store: store,
+		locks: NamedLocks{},
 		st:    statements{getLeases: st1, getLease: st2},
 	}, nil
 }
@@ -331,6 +333,11 @@ func (db *EmbeddedLeaseDB) CancelLease(tokenStr string) error {
 		Msgf("lease cancelled")
 
 	return nil
+}
+
+// WithLock runs the given task while holding a commit lock for the repository
+func (db *EmbeddedLeaseDB) WithLock(repository string, task func() error) error {
+	return db.locks.WithLock(repository, task)
 }
 
 func createSchema(db *sql.DB) error {
