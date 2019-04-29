@@ -7,7 +7,7 @@ import (
 )
 
 // SubmitPayload to be unpacked into the repository
-func SubmitPayload(ctx context.Context, s *Services, token string, payload io.Reader, digest string, headerSize int) error {
+func (s *Services) SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error {
 	t0 := time.Now()
 
 	outcome := "success"

@@ -17,7 +17,7 @@ type LeaseReturn struct {
 }
 
 // NewLease for the specified path, using keyID
-func NewLease(ctx context.Context, s *Services, keyID, leasePath string) (string, error) {
+func (s *Services) NewLease(ctx context.Context, keyID, leasePath string) (string, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -53,7 +53,7 @@ func NewLease(ctx context.Context, s *Services, keyID, leasePath string) (string
 }
 
 // GetLeases returns all active and valid leases
-func GetLeases(ctx context.Context, s *Services) (map[string]LeaseReturn, error) {
+func (s *Services) GetLeases(ctx context.Context) (map[string]LeaseReturn, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -74,7 +74,7 @@ func GetLeases(ctx context.Context, s *Services) (map[string]LeaseReturn, error)
 }
 
 // GetLease returns the lease associated with a token
-func GetLease(ctx context.Context, s *Services, tokenStr string) (*LeaseReturn, error) {
+func (s *Services) GetLease(ctx context.Context, tokenStr string) (*LeaseReturn, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -100,7 +100,7 @@ func GetLease(ctx context.Context, s *Services, tokenStr string) (*LeaseReturn, 
 }
 
 // CancelLease associated with the token (transaction rollback)
-func CancelLease(ctx context.Context, s *Services, tokenStr string) error {
+func (s *Services) CancelLease(ctx context.Context, tokenStr string) error {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -129,7 +129,7 @@ func CancelLease(ctx context.Context, s *Services, tokenStr string) error {
 }
 
 // CommitLease associated with the token (transaction commit)
-func CommitLease(ctx context.Context, s *Services, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
 	t0 := time.Now()
 
 	outcome := "success"

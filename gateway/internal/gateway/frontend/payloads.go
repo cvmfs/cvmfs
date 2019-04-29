@@ -48,7 +48,7 @@ func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
 		}
 
 		msg := make(map[string]interface{})
-		if err := be.SubmitPayload(ctx, services, token, h.Body, req.Digest, headerSize); err != nil {
+		if err := services.SubmitPayload(ctx, token, h.Body, req.Digest, headerSize); err != nil {
 			msg["status"] = "error"
 			msg["reason"] = err.Error()
 		} else {

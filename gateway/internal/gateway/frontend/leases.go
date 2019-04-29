@@ -44,7 +44,7 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 	ctx := h.Context()
 	msg := make(map[string]interface{})
 	if token == "" {
-		leases, err := be.GetLeases(ctx, services)
+		leases, err := services.GetLeases(ctx)
 		if err != nil {
 			httpWrapError(ctx, err, err.Error(), w, http.StatusInternalServerError)
 			return
@@ -52,7 +52,7 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 		msg["status"] = "ok"
 		msg["data"] = leases
 	} else {
-		lease, err := be.GetLease(ctx, services, token)
+		lease, err := services.GetLease(ctx, token)
 		if err != nil {
 			httpWrapError(ctx, err, err.Error(), w, http.StatusInternalServerError)
 			return
@@ -91,7 +91,7 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 	} else {
 		// The authorization is expected to have the correct format, since it has already been checked.
 		keyID := strings.Split(h.Header.Get("Authorization"), " ")[0]
-		token, err := be.NewLease(ctx, services, keyID, reqMsg.Path)
+		token, err := services.NewLease(ctx, keyID, reqMsg.Path)
 		if err != nil {
 			if busyError, ok := err.(be.PathBusyError); ok {
 				msg["status"] = "path_busy"
@@ -124,8 +124,8 @@ func handleCommitLease(services *be.Services, token string, w http.ResponseWrite
 	}
 
 	msg := make(map[string]interface{})
-	if err := be.CommitLease(
-		ctx, services, token, reqMsg.OldRootHash, reqMsg.NewRootHash, reqMsg.RepositoryTag); err != nil {
+	if err := services.CommitLease(
+		ctx, token, reqMsg.OldRootHash, reqMsg.NewRootHash, reqMsg.RepositoryTag); err != nil {
 		msg["status"] = "error"
 		msg["reason"] = err.Error()
 	} else {
@@ -145,7 +145,7 @@ func handleCancelLease(services *be.Services, token string, w http.ResponseWrite
 
 	msg := make(map[string]interface{})
 
-	if err := be.CancelLease(ctx, services, token); err != nil {
+	if err := services.CancelLease(ctx, token); err != nil {
 		msg["status"] = "error"
 		if _, ok := err.(be.InvalidTokenError); ok {
 			msg["reason"] = "invalid_token"
