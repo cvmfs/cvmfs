@@ -1,6 +1,9 @@
 package backend
 
 import (
+	"context"
+	"io"
+
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/cvmfs/gateway/internal/gateway/receiver"
 	"github.com/pkg/errors"
@@ -13,6 +16,24 @@ type Services struct {
 	Leases LeaseDB
 	Pool   *receiver.Pool
 	Config gw.Config
+}
+
+// ActionController contains the various actions that can be performed with the backend
+type ActionController interface {
+	GetSecret(keyID string) string
+	GetRepo(repoName string) KeyPaths
+	GetRepos() map[string]KeyPaths
+	NewLease(ctx context.Context, keyID, leasePath string) (string, error)
+	GetLeases(ctx context.Context) (map[string]LeaseReturn, error)
+	GetLease(ctx context.Context, tokenStr string) (*LeaseReturn, error)
+	CancelLease(ctx context.Context, tokenStr string) error
+	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
+	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
+}
+
+// GetSecret associated with a key ID
+func (s *Services) GetSecret(keyID string) string {
+	return s.Access.GetSecret(keyID)
 }
 
 // StartBackend initializes the various backend services
