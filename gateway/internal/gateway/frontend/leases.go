@@ -13,7 +13,7 @@ import (
 )
 
 // MakeLeasesHandler creates an HTTP handler for the API root
-func MakeLeasesHandler(services *be.Services) http.HandlerFunc {
+func MakeLeasesHandler(services be.ActionController) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
 		vs := mux.Vars(h)
 		token, hasArg := vs["token"]
@@ -40,7 +40,7 @@ func MakeLeasesHandler(services *be.Services) http.HandlerFunc {
 	}
 }
 
-func handleGetLeases(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
+func handleGetLeases(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
 	ctx := h.Context()
 	msg := make(map[string]interface{})
 	if token == "" {
@@ -63,7 +63,7 @@ func handleGetLeases(services *be.Services, token string, w http.ResponseWriter,
 	replyJSON(ctx, w, msg)
 }
 
-func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Request) {
+func handleNewLease(services be.ActionController, w http.ResponseWriter, h *http.Request) {
 	ctx := h.Context()
 
 	var reqMsg struct {
@@ -110,7 +110,7 @@ func handleNewLease(services *be.Services, w http.ResponseWriter, h *http.Reques
 	replyJSON(ctx, w, msg)
 }
 
-func handleCommitLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
+func handleCommitLease(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
 	ctx := h.Context()
 
 	var reqMsg struct {
@@ -135,7 +135,7 @@ func handleCommitLease(services *be.Services, token string, w http.ResponseWrite
 	replyJSON(ctx, w, msg)
 }
 
-func handleCancelLease(services *be.Services, token string, w http.ResponseWriter, h *http.Request) {
+func handleCancelLease(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
 	if token == "" {
 		http.Error(w, "missing to ken", http.StatusBadRequest)
 		return

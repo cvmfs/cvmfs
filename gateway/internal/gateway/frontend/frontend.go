@@ -12,14 +12,14 @@ import (
 )
 
 // NewFrontend builds and configures a new HTTP server, but does not start it
-func NewFrontend(services *be.Services, port int, timeout time.Duration) *http.Server {
+func NewFrontend(services be.ActionController, port int, timeout time.Duration) *http.Server {
 	router := mux.NewRouter()
 
 	// Add the request tagging middleware
 	router.Use(MakeTaggingMiddleware())
 
 	// Add the HMAC authorization middleware
-	router.Use(MakeAuthzMiddleware(&services.Access))
+	router.Use(MakeAuthzMiddleware(services))
 
 	// Register the different routes
 

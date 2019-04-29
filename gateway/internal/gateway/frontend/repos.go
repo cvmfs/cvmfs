@@ -9,7 +9,7 @@ import (
 )
 
 // MakeReposHandler creates an HTTP handler for the API root
-func MakeReposHandler(services *be.Services) http.HandlerFunc {
+func MakeReposHandler(services be.ActionController) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
 		ctx := h.Context()
 		vs := mux.Vars(h)
@@ -17,7 +17,7 @@ func MakeReposHandler(services *be.Services) http.HandlerFunc {
 		msg := make(map[string]interface{})
 
 		if repoName, present := vs["name"]; present {
-			r := services.Access.GetRepo(repoName)
+			r := services.GetRepo(repoName)
 			if len(r) == 0 {
 				msg["status"] = "error"
 				msg["reason"] = "invalid_repo"
@@ -27,7 +27,7 @@ func MakeReposHandler(services *be.Services) http.HandlerFunc {
 			}
 		} else {
 			msg["status"] = "ok"
-			msg["data"] = services.Access.GetRepos()
+			msg["data"] = services.GetRepos()
 		}
 
 		gw.LogC(ctx, "http", gw.LogInfo).Msg("request processed")

@@ -18,7 +18,7 @@ import (
 type message map[string]interface{}
 
 // MakeAuthzMiddleware returns an HMAC authorization middleware for use with the gorilla/mux server
-func MakeAuthzMiddleware(ac *be.AccessConfig) mux.MiddlewareFunc {
+func MakeAuthzMiddleware(ac be.ActionController) mux.MiddlewareFunc {
 	return mux.MiddlewareFunc(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			// GET requests do not need authorization

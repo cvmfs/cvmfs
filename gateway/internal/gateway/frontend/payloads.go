@@ -12,7 +12,7 @@ import (
 )
 
 // MakePayloadsHandler creates an HTTP handler for the API root
-func MakePayloadsHandler(services *be.Services) http.HandlerFunc {
+func MakePayloadsHandler(services be.ActionController) http.HandlerFunc {
 	return func(w http.ResponseWriter, h *http.Request) {
 		token, hasToken := mux.Vars(h)["token"]
 
