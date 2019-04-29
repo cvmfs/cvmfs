@@ -56,6 +56,36 @@ func TestLeaseActionsNewLease(t *testing.T) {
 			t.Fatalf("new lease should not have been granted for conflicting path")
 		}
 	})
+	t.Run("new lease invalid key", func(t *testing.T) {
+		backend.Config.MaxLeaseTime = 1 * time.Second
+		keyID := "keyidNO"
+		leasePath := "test2.repo.org/some/path"
+		token1, err := NewLease(context.TODO(), backend, keyID, leasePath)
+		if err == nil {
+			t.Fatalf("invalid key was accepted")
+			CancelLease(context.TODO(), backend, token1)
+		}
+	})
+	t.Run("new lease invalid repo", func(t *testing.T) {
+		backend.Config.MaxLeaseTime = 1 * time.Second
+		keyID := "keyid1"
+		leasePath := "testNO.repo.org/some/path"
+		token1, err := NewLease(context.TODO(), backend, keyID, leasePath)
+		if err == nil {
+			t.Fatalf("invalid repo for key was accepted")
+			CancelLease(context.TODO(), backend, token1)
+		}
+	})
+	t.Run("new lease invalid path", func(t *testing.T) {
+		backend.Config.MaxLeaseTime = 1 * time.Second
+		keyID := "keyid2"
+		leasePath := "test2.repo.org/NO"
+		token1, err := NewLease(context.TODO(), backend, keyID, leasePath)
+		if err == nil {
+			t.Fatalf("invalid path for key was accepted")
+			CancelLease(context.TODO(), backend, token1)
+		}
+	})
 }
 
 func TestLeaseActionsCancelLease(t *testing.T) {
