@@ -21,13 +21,7 @@ func NewLease(ctx context.Context, s *Services, keyID, leasePath string) (string
 	t0 := time.Now()
 
 	outcome := "success"
-	defer func() {
-		gw.LogC(ctx, "actions", gw.LogInfo).
-			Str("action", "new_lease").
-			Str("outcome", outcome).
-			Float64("action_dt", time.Now().Sub(t0).Seconds()).
-			Msg("action complete")
-	}()
+	defer logAction(ctx, "new_lease", &outcome, t0)
 
 	repoName, subPath, err := gw.SplitLeasePath(leasePath)
 	if err != nil {
@@ -63,13 +57,7 @@ func GetLeases(ctx context.Context, s *Services) (map[string]LeaseReturn, error)
 	t0 := time.Now()
 
 	outcome := "success"
-	defer func() {
-		gw.LogC(ctx, "actions", gw.LogInfo).
-			Str("action", "get_leases").
-			Str("outcome", outcome).
-			Float64("action_dt", time.Now().Sub(t0).Seconds()).
-			Msg("action complete")
-	}()
+	defer logAction(ctx, "get_leases", &outcome, t0)
 
 	leases, err := s.Leases.GetLeases(ctx)
 	if err != nil {
@@ -90,13 +78,7 @@ func GetLease(ctx context.Context, s *Services, tokenStr string) (*LeaseReturn, 
 	t0 := time.Now()
 
 	outcome := "success"
-	defer func() {
-		gw.LogC(ctx, "actions", gw.LogInfo).
-			Str("action", "get_lease").
-			Str("outcome", outcome).
-			Float64("action_dt", time.Now().Sub(t0).Seconds()).
-			Msg("action complete")
-	}()
+	defer logAction(ctx, "get_lease", &outcome, t0)
 
 	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
@@ -122,13 +104,7 @@ func CancelLease(ctx context.Context, s *Services, tokenStr string) error {
 	t0 := time.Now()
 
 	outcome := "success"
-	defer func() {
-		gw.LogC(ctx, "actions", gw.LogInfo).
-			Str("action", "cancel_lease").
-			Str("outcome", outcome).
-			Float64("action_dt", time.Now().Sub(t0).Seconds()).
-			Msg("action complete")
-	}()
+	defer logAction(ctx, "cancel_lease", &outcome, t0)
 
 	_, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
@@ -157,13 +133,7 @@ func CommitLease(ctx context.Context, s *Services, tokenStr, oldRootHash, newRoo
 	t0 := time.Now()
 
 	outcome := "success"
-	defer func() {
-		gw.LogC(ctx, "actions", gw.LogInfo).
-			Str("action", "commit_lease").
-			Str("outcome", outcome).
-			Float64("action_dt", time.Now().Sub(t0).Seconds()).
-			Msg("action complete")
-	}()
+	defer logAction(ctx, "commit_lease", &outcome, t0)
 
 	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
