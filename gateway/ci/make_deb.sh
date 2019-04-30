@@ -66,7 +66,7 @@ fpm -s dir -t deb \
     --config-files etc/systemd/system/cvmfs-gateway.service \
     --exclude etc/systemd/system \
     --no-deb-systemd-restart-after-upgrade \
-    --after-install ${CVMFS_GATEWAY_SOURCES}/scripts/setup_deb.sh \
+    --after-install ${CVMFS_GATEWAY_SOURCES}/pkg/setup_deb.sh \
     --chdir $WORKSPACE \
     ./
 popd
