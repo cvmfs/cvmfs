@@ -137,7 +137,7 @@ func handleCommitLease(services be.ActionController, token string, w http.Respon
 
 func handleCancelLease(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
 	if token == "" {
-		http.Error(w, "missing to ken", http.StatusBadRequest)
+		http.Error(w, "missing token", http.StatusBadRequest)
 		return
 	}
 

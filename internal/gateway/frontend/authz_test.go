@@ -31,7 +31,7 @@ func TestAuthorizationMiddlewareGET(t *testing.T) {
 
 		respBody, _ := ioutil.ReadAll(resp.Body)
 		if !bytes.Equal(reqBody, respBody) {
-			t.Errorf("Invalid response body: %v", respBody)
+			t.Errorf("Invalid response body: %v", string(respBody))
 		}
 	})
 }
@@ -180,7 +180,7 @@ func TestAuthorizationMiddlewareSubmitPayloadNew(t *testing.T) {
 	msg, _ := json.Marshal(map[string]string{
 		"payload_digest": "abcdef",
 		"header_size":    "123",
-		"api_version":    "2",
+		"api_version":    "3",
 	})
 
 	HMAC := ComputeHMAC([]byte(token), backend.GetSecret("keyid2"))
