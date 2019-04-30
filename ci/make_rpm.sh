@@ -20,7 +20,7 @@ echo "Script location: $SCRIPT_LOCATION"
 echo "Building package"
 cd ${CVMFS_GATEWAY_SOURCES}
 export GOPATH=${GOPATH:=${CVMFS_GATEWAY_SOURCES}/../go}
-go build
+go build -mod=vendor
 
 echo "Creating togo project"
 mkdir -p ${CVMFS_GATEWAY_SOURCES}/togo
