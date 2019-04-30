@@ -1,10 +1,5 @@
 %postun
 
-export RUNNER_LOG_DIR=/var/log/cvmfs-gateway-runner
-
 if [ x"$(pidof systemd >/dev/null && echo yes || echo no)" = "xyes" ]; then
-    systemctl restart rsyslog
     systemctl daemon-reload
-else
-    service rsyslog restart
 fi

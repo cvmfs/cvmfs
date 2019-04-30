@@ -5,12 +5,17 @@ set -e
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 if [ $# -lt 1 ]; then
-  echo "Usage: $0 <CernVM-FS source directory (the same as the build directory)> [NIGHTLY_NUMBER]"
+  echo "Usage: $0 <source directory> [NIGHTLY_NUMBER]"
   echo "This script builds packages for the current platform."
   exit 1
 fi
 
-CVMFS_BUILD_LOCATION="$1"
+if [ -z ${CVMFS_BUILD_PLATFORM} ]; then
+  echo "CVMFS_BUILD_PLATFORM unset."
+  exit 1
+fi
+
+CVMFS_GATEWAY_SOURCES="$1"
 shift 1
 
 NIGHTLY_NUMBER=
@@ -19,15 +24,7 @@ if [ $# -gt 0 ]; then
   shift 1
 fi
 
-export REBAR_CACHE_DIR=$CVMFS_BUILD_LOCATION/../
-mkdir -p $REBAR_CACHE_DIR
-
-# run the build script
-echo "switching to $CVMFS_BUILD_LOCATION..."
-cd "$CVMFS_BUILD_LOCATION"
-rebar3 as prod compile
-rebar3 as prod release,tar
-REPO_GATEWAY_VERSION=$(grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" apps/cvmfs_gateway/src/cvmfs_gateway.app.src)
+REPO_GATEWAY_VERSION=$(cat $CVMFS_GATEWAY_SOURCES/version)
 
 PACKAGE_VERSION=1
 if [ ! -z "$NIGHTLY_NUMBER" ]; then
@@ -42,8 +39,7 @@ elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xc
 fi
 
 $BUILDER_SCRIPT \
-    _build/prod/rel/cvmfs_gateway/cvmfs_gateway-${REPO_GATEWAY_VERSION}.tar.gz \
-    $(cd ${CVMFS_BUILD_LOCATION}; pwd) \
-    ${CVMFS_BUILD_PLATFORM} \
-    ${REPO_GATEWAY_VERSION} \
-    ${PACKAGE_VERSION}
+  $(cd ${CVMFS_GATEWAY_SOURCES}; pwd) \
+  ${CVMFS_BUILD_PLATFORM} \
+  ${REPO_GATEWAY_VERSION} \
+  ${PACKAGE_VERSION}
