@@ -1,0 +1,139 @@
+#!/bin/sh
+
+# Part of the CernVM File System
+# See: http://cernvm.cern.ch
+
+### BEGIN INIT INFO
+# Provides:           cvmfs-gateway
+# Required-Start:     $local_fs $network $named
+# Should-Start:       $time
+# Required-Stop:
+# Should-Stop:
+# Default-Start:      3 4 5
+# Default-Stop:       0 1 2 6
+# Short-Description:  Starts the cvmfs-gateway service
+# Description:        The cvmfs-gateway manages concurrent publication sessions to a single CernVM-FS repository
+### END INIT INFO
+
+. /etc/init.d/functions
+
+# Return values acc. to LSB for all commands but status:
+# 0	  - success
+# 1       - generic or unspecified error
+# 2       - invalid or excess argument(s)
+# 3       - unimplemented feature (e.g. "reload")
+# 4       - user had insufficient privileges
+# 5       - program is not installed
+# 6       - program is not configured
+# 7       - program is not running
+# 8--199  - reserved (8--99 LSB, 100--149 distrib, 150--199 appl)
+
+RETVAL=0
+
+prog_agent="/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh"
+
+# Erlang needs the HOME env var set
+export HOME=/root
+
+is_root() {
+  [ $(id -u) -eq 0 ] && return 0
+  return 1
+}
+
+
+start() {
+  ! is_root && return 4
+
+  [ -x $prog_agent ] || return 5
+  echo -n $"Starting CernVM-FS Repository Gateway: "
+  $prog_agent start
+  RETVAL=$?
+  if [ $RETVAL -eq 0 ]; then
+    echo_success
+    echo
+  else
+    echo_failure
+    echo
+  fi
+
+  return $RETVAL
+}
+
+
+stop() {
+  [ ! is_root ] && return 4
+
+  echo -n $"Shutting down CernVM-FS Repository Gateway: "
+  $prog_agent stop
+  RETVAL=$?
+  echo_success
+  echo
+
+  return $RETVAL
+}
+
+
+reload() {
+  [ ! is_root ] && return 4
+
+  echo -n $"Reloading CernVM-FS Repository Gateway: "
+  $prog_agent reload
+  RETVAL=$?
+  echo_success
+  echo
+
+  return $RETVAL
+}
+
+
+status() {
+
+  echo -n $"CernVM-FS Repository Gateway Status: "
+  $prog_agent status
+  RETVAL=$?
+
+  return $RETVAL
+}
+
+
+case "$1" in
+  start)
+    start
+    RETVAL=$?
+  ;;
+  stop)
+    stop
+    RETVAL=$?
+  ;;
+  restart|try-restart|condrestart)
+    ## Stop the service and regardless of whether it was
+    ## running or not, start it again.
+    #
+    ## Note: try-restart is now part of LSB (as of 1.9).
+    ## RH has a similar command named condrestart.
+    stop
+    start
+    RETVAL=$?
+  ;;
+    reload|force-reload)
+    reload
+    RETVAL=$?
+  ;;
+  status)
+    # Return value is slightly different for the status command:
+    # 0 - service up and running
+    # 1 - service dead, but /var/run/  pid  file exists
+    # 2 - service dead, but /var/lock/ lock file exists
+    # 3 - service not running (unused)
+    # 4 - service status unknown :-(
+    # 5--199 reserved (5--99 LSB, 100--149 distro, 150--199 appl.)
+    status
+    RETVAL=$?
+  ;;
+  *)
+    echo "Usage: $0 {start|stop|status|try-restart|condrestart|restart|force-reload|reload}"
+    RETVAL=3
+  ;;
+esac
+
+exit $RETVAL

@@ -1,0 +1,15 @@
+[Unit]
+Description=CernVM-FS Repository Gateway
+After=syslog.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cvmfs-gateway
+PIDFile=/var/run/conveyor-server.pid
+StandardOutput=journal
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

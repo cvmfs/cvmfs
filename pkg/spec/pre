@@ -1,11 +1,11 @@
-%preun
+%pre
 
 if [ x"$(pidof systemd >/dev/null && echo yes || echo no)" = "xyes" ]; then
     if [ "x$(systemctl list-unit-files | grep cvmfs-gateway)" != "x" ]; then
         systemctl stop cvmfs-gateway
     fi
 else
-    if [ -x /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh ]; then
-        /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop || true
+    if [ -x /usr/libexec/cvmfs-gateway/run_cvmfs_gateway.sh ]; then
+        /usr/libexec/cvmfs-gateway/run_cvmfs_gateway.sh stop || true
     fi
 fi
