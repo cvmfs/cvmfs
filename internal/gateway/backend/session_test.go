@@ -69,7 +69,7 @@ func TestSessionSubmitWithInvalidToken(t *testing.T) {
 }
 
 func TestSessionSubmitWithExpiredToken(t *testing.T) {
-	backend := StartTestBackend("session_test", 1*time.Second)
+	backend := StartTestBackend("session_test", 1*time.Millisecond)
 	defer backend.Stop()
 
 	ctx := context.TODO()
@@ -131,7 +131,7 @@ func TestSessionCommitWithInvalidToken(t *testing.T) {
 }
 
 func TestSessionCommitWithExpiredToken(t *testing.T) {
-	backend := StartTestBackend("session_test", 1*time.Second)
+	backend := StartTestBackend("session_test", 50*time.Millisecond)
 	defer backend.Stop()
 
 	ctx := context.TODO()
