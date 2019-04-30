@@ -83,7 +83,8 @@ func MakeAuthzMiddleware(ac be.ActionController) mux.MiddlewareFunc {
 				} else {
 					// For legacy payload submission requests, the JSON msg at the beginning of the body
 					// is used to compute the HMAC
-					msgSize, err := strconv.Atoi(req.Header.Get("message-size"))
+					sz := req.Header.Get("message-size")
+					msgSize, err := strconv.Atoi(sz)
 					if err != nil {
 						httpWrapError(ctx, err, "missing message-size header", w, http.StatusBadRequest)
 						return
