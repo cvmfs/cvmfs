@@ -45,7 +45,7 @@ mkdir -p $WORKSPACE/var/lib/cvmfs-gateway
 
 cp -v ${CVMFS_GATEWAY_SOURCES}/gateway $WORKSPACE/usr/bin/cvmfs-gateway
 
-cp -v ${CVMFS_GATEWAY_SOURCES}/scripts/cvmfs-gateway.service \
+cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.service \
     $WORKSPACE/etc/systemd/system/
 cp -v ${CVMFS_GATEWAY_SOURCES}/config/repo.json $WORKSPACE/etc/cvmfs/gateway/
 cp -v ${CVMFS_GATEWAY_SOURCES}/config/user.json $WORKSPACE/etc/cvmfs/gateway/
