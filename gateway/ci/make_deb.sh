@@ -20,6 +20,8 @@ echo "Script location: $SCRIPT_LOCATION"
 echo "Building package"
 cd ${CVMFS_GATEWAY_SOURCES}
 export GOPATH=${GOPATH:=${CVMFS_GATEWAY_SOURCES}/../go}
+export GOCACHE=${CVMFS_GATEWAY_SOURCES}/../gocache
+go env
 go build -mod=vendor
 
 if [ x"$PLATFORM" = xubuntu1604 ]; then
