@@ -1,5 +1,7 @@
 package test
 
+/*
+
 import (
 	"net/http"
 	"os"
@@ -44,3 +46,4 @@ func TestEndToEndFullSession(t *testing.T) {
 		t.Fatalf("could not make GET request to API root")
 	}
 }
+*/
