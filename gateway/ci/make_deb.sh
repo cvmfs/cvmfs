@@ -44,9 +44,13 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
     mkdir -p $WORKSPACE/etc/systemd/system
     mkdir -p $WORKSPACE/etc/cvmfs/gateway
     mkdir -p $WORKSPACE/usr/bin
+    mkdir -p $WORKSPACE/usr/libexec/cvmfs-gateway/scripts
     mkdir -p $WORKSPACE/var/lib/cvmfs-gateway
 
     cp -v ${CVMFS_GATEWAY_SOURCES}/gateway $WORKSPACE/usr/bin/cvmfs-gateway
+
+    # Install the run_cvmfs_gateway.sh script for compatibility with cvmfs-gateway-1.0.0
+    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/run_cvmfs_gateway.sh ${WORKSPACE}/usr/libexec/cvmfs-gateway/scripts/
 
     cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.service \
         $WORKSPACE/etc/systemd/system/
@@ -64,10 +68,15 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
         --license "BSD-3-Clause" \
         --depends "cvmfs-server > 2.5.2" \
         --directories var/lib/cvmfs-gateway \
+        --directories usr/libexec/cvmfs-gateway \
         --config-files etc/cvmfs/gateway/repo.json \
         --config-files etc/cvmfs/gateway/user.json \
         --config-files etc/systemd/system/cvmfs-gateway.service \
         --exclude etc/systemd/system \
+        --exclude etc/cvmfs \
+        --exclude usr/bin \
+        --exclude usr/libexec \
+        --exclude var/lib \
         --no-deb-systemd-restart-after-upgrade \
         --after-install ${CVMFS_GATEWAY_SOURCES}/pkg/setup_deb.sh \
         --chdir $WORKSPACE \

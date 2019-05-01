@@ -36,6 +36,12 @@ mkdir -p ${TOGO_PROJECT}/root/usr/bin
 cp -v ${CVMFS_GATEWAY_SOURCES}/gateway ${TOGO_PROJECT}/root/usr/bin/cvmfs-gateway
 togo file exclude root/usr/bin
 
+### Install the run_cvmfs_gateway.sh script for compatibility with cvmfs-gateway-1.0.0
+mkdir -p ${TOGO_PROJECT}/root/usr/libexec/cvmfs-gateway/scripts
+cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/run_cvmfs_gateway.sh \
+    ${TOGO_PROJECT}/root/usr/libexec/cvmfs-gateway/scripts/
+togo file exclude root/usr/libxec
+
 # Place and flag config files in the togo workspace
 if [ "x$PLATFORM" = "xcc7" ]; then
     mkdir -p ${TOGO_PROJECT}/root/etc/systemd/system
@@ -66,7 +72,7 @@ cp -v ${CVMFS_GATEWAY_SOURCES}/config/user.json ${TOGO_PROJECT}/root/etc/cvmfs/g
 togo file flag config-nr root/etc/cvmfs/gateway/repo.json
 togo file flag config-nr root/etc/cvmfs/gateway/user.json
 
-# Mnesia db location
+# Lease db location
 mkdir -p ${TOGO_PROJECT}/root/var/lib/cvmfs-gateway
 togo file exclude root/var/lib
 
