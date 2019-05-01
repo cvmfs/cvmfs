@@ -40,7 +40,7 @@ togo file exclude root/usr/bin
 mkdir -p ${TOGO_PROJECT}/root/usr/libexec/cvmfs-gateway/scripts
 cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/run_cvmfs_gateway.sh \
     ${TOGO_PROJECT}/root/usr/libexec/cvmfs-gateway/scripts/
-togo file exclude root/usr/libxec
+togo file exclude root/usr/libexec
 
 # Place and flag config files in the togo workspace
 if [ "x$PLATFORM" = "xcc7" ]; then
