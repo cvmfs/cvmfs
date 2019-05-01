@@ -1,6 +1,0 @@
--sname cvmfs_gateway
-
--setcookie cvmfs
-
-+K true
-+A30
