@@ -32,7 +32,7 @@ if [ ! -z "$NIGHTLY_NUMBER" ]; then
 fi
 
 # Create an RPM or DEB package from the tarball
-if [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1604 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1804 ]; then
+if [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1804 ]; then
     BUILDER_SCRIPT=${SCRIPT_LOCATION}/make_deb.sh
 elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
     BUILDER_SCRIPT=${SCRIPT_LOCATION}/make_rpm.sh
