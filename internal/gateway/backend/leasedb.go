@@ -38,8 +38,9 @@ func (e InvalidLeaseError) Error() string {
 // Lease describes an exclusive lease to a subpath inside the repository:
 // keyID and token ()
 type Lease struct {
-	KeyID string
-	Token LeaseToken
+	KeyID           string
+	ProtocolVersion int
+	Token           LeaseToken
 }
 
 // Serialize the lease to a byte buffer
@@ -68,7 +69,7 @@ func DeserializeLease(buf []byte) (*Lease, error) {
 // LeaseDB provides a consistent store for repository leases
 type LeaseDB interface {
 	Close() error
-	NewLease(ctx context.Context, keyID, leasePath string, token LeaseToken) error
+	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error
 	GetLeases(ctx context.Context) (map[string]Lease, error)
 	GetLease(ctx context.Context, tokenStr string) (string, *Lease, error)
 	CancelLeases(ctx context.Context) error

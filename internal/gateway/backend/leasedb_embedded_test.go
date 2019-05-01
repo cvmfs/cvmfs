@@ -26,6 +26,7 @@ func TestEmbeddedLeaseDBOpen(t *testing.T) {
 }
 
 func TestEmbeddedLeaseDBCRUD(t *testing.T) {
+	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
@@ -45,7 +46,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 			t.Fatalf("could not generate session token: %v", err)
 		}
 
-		if err := db.NewLease(context.TODO(), keyID1, leasePath1, *token1); err != nil {
+		if err := db.NewLease(context.TODO(), keyID1, leasePath1, lastProtocolVersion, *token1); err != nil {
 			t.Fatalf("could not add new lease: %v", err)
 		}
 	})
@@ -93,7 +94,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 			t.Fatalf("could not generate session token: %v", err)
 		}
 
-		if err := db.NewLease(context.TODO(), keyID1, leasePath, *token); err != nil {
+		if err := db.NewLease(context.TODO(), keyID1, leasePath, lastProtocolVersion, *token); err != nil {
 			t.Fatalf("could not add new lease: %v", err)
 		}
 
@@ -112,6 +113,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 }
 
 func TestEmbeddedLeaseDBConflicts(t *testing.T) {
+	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
@@ -130,7 +132,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	if err := db.NewLease(context.TODO(), keyID, leasePath1, *token1); err != nil {
+	if err := db.NewLease(context.TODO(), keyID, leasePath1, lastProtocolVersion, *token1); err != nil {
 		t.Fatalf("could not add new lease: %v", err)
 	}
 
@@ -140,7 +142,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	err = db.NewLease(context.TODO(), keyID, leasePath2, *token2)
+	err = db.NewLease(context.TODO(), keyID, leasePath2, lastProtocolVersion, *token2)
 	if _, ok := err.(PathBusyError); !ok {
 		t.Fatalf("conflicting lease was added for path: %v", leasePath2)
 	}
@@ -151,13 +153,14 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	err = db.NewLease(context.TODO(), keyID, leasePath3, *token3)
+	err = db.NewLease(context.TODO(), keyID, leasePath3, lastProtocolVersion, *token3)
 	if _, ok := err.(PathBusyError); !ok {
 		t.Fatalf("conflicting lease was added for path: %v", leasePath3)
 	}
 }
 
 func TestEmbeddedLeaseDBExpired(t *testing.T) {
+	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
@@ -178,7 +181,7 @@ func TestEmbeddedLeaseDBExpired(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	if err := db.NewLease(context.TODO(), keyID, leasePath, *token1); err != nil {
+	if err := db.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion, *token1); err != nil {
 		t.Fatalf("could not add new lease: %v", err)
 	}
 
@@ -189,7 +192,7 @@ func TestEmbeddedLeaseDBExpired(t *testing.T) {
 		t.Fatalf("could not generate session token: %v", err)
 	}
 
-	if err := db.NewLease(context.TODO(), keyID, leasePath, *token2); err != nil {
+	if err := db.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion, *token2); err != nil {
 		t.Fatalf("could not add new lease in place of expired one")
 	}
 }

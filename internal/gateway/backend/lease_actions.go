@@ -17,7 +17,7 @@ type LeaseReturn struct {
 }
 
 // NewLease for the specified path, using keyID
-func (s *Services) NewLease(ctx context.Context, keyID, leasePath string) (string, error) {
+func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -43,7 +43,7 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string) (strin
 		return "", err
 	}
 
-	if err := s.Leases.NewLease(ctx, keyID, leasePath, *token); err != nil {
+	if err := s.Leases.NewLease(ctx, keyID, leasePath, protocolVersion, *token); err != nil {
 		outcome = err.Error()
 		return "", err
 	}

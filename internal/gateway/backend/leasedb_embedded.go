@@ -56,11 +56,11 @@ func OpenEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
 		return nil, errors.Wrap(err, "invalid schema version")
 	}
 
-	st1, err := store.Prepare("SELECT Token, Repository, Path, KeyID, Secret, Expiration from Leases;")
+	st1, err := store.Prepare("SELECT Token, Repository, Path, KeyID, Secret, Expiration, ProtocolVersion from Leases;")
 	if err != nil {
 		return nil, errors.Wrap(err, "could not prepare statement for 'get all leases'")
 	}
-	st2, err := store.Prepare("SELECT Repository, Path, KeyID, Secret, Expiration from Leases WHERE Token = ?;")
+	st2, err := store.Prepare("SELECT Repository, Path, KeyID, Secret, Expiration, ProtocolVersion from Leases WHERE Token = ?;")
 	if err != nil {
 		return nil, errors.Wrap(err, "could not prepare statement for 'get lease'")
 	}
@@ -93,7 +93,7 @@ func (db *EmbeddedLeaseDB) Close() error {
 }
 
 // NewLease attemps to acquire a new lease for the given path
-func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, token LeaseToken) error {
+func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error {
 	t0 := time.Now()
 
 	txn, err := db.store.Begin()
@@ -145,14 +145,14 @@ func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string
 		}
 
 		if _, err := txn.Exec(
-			"UPDATE Leases SET Token = ?, Repository = ?, Path = ?, KeyID = ?, Secret = ?, Expiration = ? WHERE Token = ?;",
-			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.UnixNano(), existing.token); err != nil {
+			"UPDATE Leases SET Token = ?, Repository = ?, Path = ?, KeyID = ?, Secret = ?, Expiration = ?, ProtocolVersion = ? WHERE Token = ?;",
+			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.UnixNano(), protocolVersion, existing.token); err != nil {
 			return errors.Wrap(err, "could not update values in backing store")
 		}
 	} else {
 		if _, err := txn.Exec(
-			"INSERT INTO Leases (Token, Repository, Path, KeyID, Secret, Expiration) VALUES (?, ?, ?, ?, ?, ?);",
-			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.UnixNano()); err != nil {
+			"INSERT INTO Leases (Token, Repository, Path, KeyID, Secret, Expiration, ProtocolVersion) VALUES (?, ?, ?, ?, ?, ?, ?);",
+			token.TokenStr, repoName, subPath, keyID, token.Secret, token.Expiration.UnixNano(), protocolVersion); err != nil {
 			return errors.Wrap(err, "could not update values in backing store")
 		}
 	}
@@ -188,12 +188,13 @@ func (db *EmbeddedLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, err
 		var keyID string
 		secret := []byte{}
 		var expiration int64
-		if err := matches.Scan(&tokenStr, &repoName, &subPath, &keyID, &secret, &expiration); err != nil {
+		var protocolVersion int64
+		if err := matches.Scan(&tokenStr, &repoName, &subPath, &keyID, &secret, &expiration, &protocolVersion); err != nil {
 			return nil, errors.Wrap(err, "query scan failed")
 		}
 		leasePath := repoName + subPath
 		token := LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(0, expiration)}
-		leases[leasePath] = Lease{KeyID: keyID, Token: token}
+		leases[leasePath] = Lease{KeyID: keyID, ProtocolVersion: int(protocolVersion), Token: token}
 	}
 
 	gw.LogC(ctx, "leasedb", gw.LogDebug).
@@ -213,10 +214,10 @@ func (db *EmbeddedLeaseDB) GetLease(ctx context.Context, tokenStr string) (strin
 	var keyID string
 	secret := []byte{}
 	var expiration int64
-
+	var protocolVersion int64
 	err := db.st.getLease.
 		QueryRow(tokenStr).
-		Scan(&repoName, &subPath, &keyID, &secret, &expiration)
+		Scan(&repoName, &subPath, &keyID, &secret, &expiration, &protocolVersion)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", nil, InvalidLeaseError{}
@@ -226,8 +227,9 @@ func (db *EmbeddedLeaseDB) GetLease(ctx context.Context, tokenStr string) (strin
 
 	leasePath := repoName + subPath
 	lease := &Lease{
-		KeyID: keyID,
-		Token: LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(0, expiration)},
+		KeyID:           keyID,
+		ProtocolVersion: int(protocolVersion),
+		Token:           LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(0, expiration)},
 	}
 
 	gw.LogC(ctx, "leasedb", gw.LogDebug).
@@ -338,7 +340,8 @@ CREATE TABLE IF NOT EXISTS Leases (
 	Path string NOT NULL,
 	KeyID string NOT NULL,
 	Secret blob NOT NULL,
-	Expiration integer NOT NULL
+	Expiration integer NOT NULL,
+	ProtocolVersion integer NOT NULL
 );
 `,
 		latestSchemaVersion)
