@@ -24,7 +24,7 @@ func (db *EtcdLeaseDB) Close() error {
 
 // NewLease attemps to acquire a new lease for the given path
 func (db *EtcdLeaseDB) NewLease(
-	ctx context.Context, keyID, leasePath string, token LeaseToken) error {
+	ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error {
 	return nil
 }
 

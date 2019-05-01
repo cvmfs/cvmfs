@@ -23,7 +23,7 @@ type ActionController interface {
 	GetSecret(keyID string) string
 	GetRepo(repoName string) KeyPaths
 	GetRepos() map[string]KeyPaths
-	NewLease(ctx context.Context, keyID, leasePath string) (string, error)
+	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error)
 	GetLeases(ctx context.Context) (map[string]LeaseReturn, error)
 	GetLease(ctx context.Context, tokenStr string) (*LeaseReturn, error)
 	CancelLease(ctx context.Context, tokenStr string) error

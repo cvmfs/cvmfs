@@ -39,7 +39,7 @@ func (db *BoltDBLeaseDB) Close() error {
 }
 
 // NewLease attemps to acquire a new lease for the given path
-func (db *BoltDBLeaseDB) NewLease(keyID, leasePath string, token LeaseToken) error {
+func (db *BoltDBLeaseDB) NewLease(keyID, leasePath string, protocolVersion int, token LeaseToken) error {
 	return db.store.Update(func(txn *bolt.Tx) error {
 		repoName, subPath, err := SplitLeasePath(leasePath)
 		if err != nil {

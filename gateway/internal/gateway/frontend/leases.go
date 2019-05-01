@@ -91,7 +91,8 @@ func handleNewLease(services be.ActionController, w http.ResponseWriter, h *http
 	} else {
 		// The authorization is expected to have the correct format, since it has already been checked.
 		keyID := strings.Split(h.Header.Get("Authorization"), " ")[0]
-		token, err := services.NewLease(ctx, keyID, reqMsg.Path)
+		protocolVersion := MaxAPIVersion(clientVersion)
+		token, err := services.NewLease(ctx, keyID, reqMsg.Path, protocolVersion)
 		if err != nil {
 			if busyError, ok := err.(be.PathBusyError); ok {
 				msg["status"] = "path_busy"
@@ -103,7 +104,7 @@ func handleNewLease(services be.ActionController, w http.ResponseWriter, h *http
 		} else {
 			msg["status"] = "ok"
 			msg["session_token"] = token
-			msg["max_api_version"] = MaxAPIVersion(clientVersion)
+			msg["max_api_version"] = protocolVersion
 		}
 	}
 

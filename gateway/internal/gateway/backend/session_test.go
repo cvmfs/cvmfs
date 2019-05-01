@@ -10,13 +10,14 @@ import (
 )
 
 func TestSessionValid(t *testing.T) {
+	lastProtocolVersion := 3
 	backend := StartTestBackend("session_test", 1*time.Second)
 	defer backend.Stop()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
 	leasePath := "test2.repo.org/some/path"
-	token, err := backend.NewLease(ctx, keyID, leasePath)
+	token, err := backend.NewLease(ctx, keyID, leasePath, lastProtocolVersion)
 	if err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}
@@ -41,13 +42,14 @@ func TestSessionValid(t *testing.T) {
 }
 
 func TestSessionSubmitWithInvalidToken(t *testing.T) {
+	lastProtocolVersion := 3
 	backend := StartTestBackend("session_test", 1*time.Second)
 	defer backend.Stop()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
 	leasePath := "test2.repo.org/some/path"
-	token, err := backend.NewLease(ctx, keyID, leasePath)
+	token, err := backend.NewLease(ctx, keyID, leasePath, lastProtocolVersion)
 	if err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}
@@ -69,13 +71,14 @@ func TestSessionSubmitWithInvalidToken(t *testing.T) {
 }
 
 func TestSessionSubmitWithExpiredToken(t *testing.T) {
+	lastProtocolVersion := 3
 	backend := StartTestBackend("session_test", 1*time.Millisecond)
 	defer backend.Stop()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
 	leasePath := "test2.repo.org/some/path"
-	token, err := backend.NewLease(ctx, keyID, leasePath)
+	token, err := backend.NewLease(ctx, keyID, leasePath, lastProtocolVersion)
 	if err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}
@@ -94,13 +97,14 @@ func TestSessionSubmitWithExpiredToken(t *testing.T) {
 }
 
 func TestSessionCommitWithInvalidToken(t *testing.T) {
+	lastProtocolVersion := 3
 	backend := StartTestBackend("session_test", 1*time.Second)
 	defer backend.Stop()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
 	leasePath := "test2.repo.org/some/path"
-	token, err := backend.NewLease(ctx, keyID, leasePath)
+	token, err := backend.NewLease(ctx, keyID, leasePath, lastProtocolVersion)
 	if err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}
@@ -131,13 +135,14 @@ func TestSessionCommitWithInvalidToken(t *testing.T) {
 }
 
 func TestSessionCommitWithExpiredToken(t *testing.T) {
+	lastProtocolVersion := 3
 	backend := StartTestBackend("session_test", 50*time.Millisecond)
 	defer backend.Stop()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
 	leasePath := "test2.repo.org/some/path"
-	token, err := backend.NewLease(ctx, keyID, leasePath)
+	token, err := backend.NewLease(ctx, keyID, leasePath, lastProtocolVersion)
 	if err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}
@@ -165,6 +170,7 @@ func TestSessionCommitWithExpiredToken(t *testing.T) {
 }
 
 func TestSessionTwoConcurrentValid(t *testing.T) {
+	lastProtocolVersion := 3
 	backend := StartTestBackend("session_test", 1*time.Second)
 	defer backend.Stop()
 
@@ -172,14 +178,14 @@ func TestSessionTwoConcurrentValid(t *testing.T) {
 	keyID := "keyid1"
 
 	leasePath1 := "test2.repo.org/some/path/one"
-	token1, err := backend.NewLease(ctx, keyID, leasePath1)
+	token1, err := backend.NewLease(ctx, keyID, leasePath1, lastProtocolVersion)
 	if err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}
 	defer backend.CancelLease(ctx, token1)
 
 	leasePath2 := "test2.repo.org/some/path/two"
-	token2, err := backend.NewLease(ctx, keyID, leasePath2)
+	token2, err := backend.NewLease(ctx, keyID, leasePath2, lastProtocolVersion)
 	if err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}

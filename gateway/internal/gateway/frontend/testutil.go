@@ -34,7 +34,7 @@ func (b *mockBackend) GetRepos() map[string]be.KeyPaths {
 	}
 }
 
-func (b *mockBackend) NewLease(ctx context.Context, keyID, leasePath string) (string, error) {
+func (b *mockBackend) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error) {
 	return "lease_token_string", nil
 }
 
