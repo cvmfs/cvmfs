@@ -33,10 +33,19 @@ func main() {
 	}
 	defer services.Stop()
 
+	// Write PID file before passing control to the HTTP server
+	pidFile := "/var/run/cvmfs-gateway.pid"
+	if err := gw.WritePIDFile(pidFile); err != nil {
+		gw.Log("main", gw.LogError).
+			Err(err).
+			Msg("could not write PID file")
+		os.Exit(1)
+	}
+	defer os.RemoveAll(pidFile)
+
 	timeout := services.Config.MaxLeaseTime
 	if err := fe.Start(services, cfg.Port, timeout); err != nil {
 		gw.Log("main", gw.LogError).
-			Err(err).
 			Err(err).
 			Msg("starting the HTTP front-end failed")
 		os.Exit(1)
