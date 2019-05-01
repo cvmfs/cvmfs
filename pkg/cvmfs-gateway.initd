@@ -15,8 +15,6 @@
 # Description:        The cvmfs-gateway manages concurrent publication sessions to a single CernVM-FS repository
 ### END INIT INFO
 
-. /etc/init.d/functions
-
 # Return values acc. to LSB for all commands but status:
 # 0	  - success
 # 1       - generic or unspecified error
@@ -28,10 +26,12 @@
 # 7       - program is not running
 # 8--199  - reserved (8--99 LSB, 100--149 distrib, 150--199 appl)
 
-gw_exec=/usr/bin/cvmfs-gateway
-pid_file=/var/run/cvmfs-gateway.pid
-
 RETVAL=0
+PROG="cvmfs-gateway"
+EXEC="/usr/bin/cvmfs-gateway"
+PIDFILE="/var/run/cvmfs-gateway.pid"
+LOCKFILE="/var/lock/subsys/$PROG"
+
 
 is_root() {
   [ $(id -u) -eq 0 ] && return 0
@@ -42,38 +42,54 @@ is_root() {
 start() {
   ! is_root && return 4
 
-  [ -x $gw_exec ] || return 5
+  [ -x $EXEC ] || return 5
 
-  echo -n "Starting CernVM-FS Repository Gateway: "
-  start-stop-daemon --start --oknodo --name $gw_exec --pidfile $pid_file
-  RETVAL=$?
-  return $RETVAL
+  if [ -f $LOCKFILE ]; then
+    echo "$PROG is already running!"
+  else
+    echo -n "Starting $PROG: "
+    nohup $EXEC $OPTIONS >/var/log/cvmfs-gateway.log 2>&1 &
+    RETVAL=$?
+    echo $! > $PIDFILE
+    [ $RETVAL -eq 0 ] && touch $LOCKFILE
+    echo
+    return $RETVAL
+  fi
 }
 
 
 stop() {
   [ ! is_root ] && return 4
 
-  [ -x $gw_exec ] || return 5
+  [ -x $EXEC ] || return 5
 
-  echo -n "Shutting down CernVM-FS Repository Gateway: "
-  start-stop-daemon --stop --oknodo --name $gw_exec --pidfile $pid_file --retry 5
-  RETVAL=$?
-  return $RETVAL
+  if [ ! -f $LOCKFILE ]; then
+    echo "$PROG is not running!"
+  else
+    echo -n "Stopping $PROG: "
+    kill $(cat $PIDFILE)
+    RETVAL=$?
+    [ $RETVAL -eq 0 ] && rm -r $LOCKFILE
+    echo
+    return $RETVAL
+  fi
 }
 
 
 reload() {
-  echo -n "Reloading the CernVM-FS Repository Gateway is not implemented. Please use restart."
+  echo -n "Reloading $PROG is not implemented. Please use restart."
   return 0;
 }
 
 
 status() {
-  echo -n "CernVM-FS Repository Gateway Status: "
-  start-stop-daemon --status --oknodo --name $gw_exec --pidfile $pid_file
-  RETVAL=$?
-  return $RETVAL
+  if [ -f $LOCKFILE ]; then
+    echo "$PROG running"
+    return 0
+  else
+    echo "$PROG not running"
+    return 1
+  fi
 }
 
 
@@ -93,6 +109,7 @@ case "$1" in
     ## Note: try-restart is now part of LSB (as of 1.9).
     ## RH has a similar command named condrestart.
     stop
+    sleep 1
     start
     RETVAL=$?
   ;;
