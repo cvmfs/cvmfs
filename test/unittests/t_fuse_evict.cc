@@ -8,10 +8,6 @@
 #include "glue_buffer.h"
 #include "util/string.h"
 
-extern "C" {
-unsigned fuse_lowlevel_notify_inval_inode_cnt = 0;
-}
-
 class T_FuseInvalidator : public ::testing::Test {
  protected:
   virtual void SetUp() {
@@ -62,7 +58,7 @@ TEST_F(T_FuseInvalidator, InvalidateTimeout) {
 
 
 TEST_F(T_FuseInvalidator, InvalidateOps) {
-  invalidator_->fuse_channel_ = reinterpret_cast<struct fuse_chan **>(this);
+  invalidator_->fuse_channel_or_session_ = reinterpret_cast<void **>(this);
   inode_tracker_.VfsGet(1, PathString(""));
   for (unsigned i = 2; i <= 1024; ++i) {
     inode_tracker_.VfsGet(i, PathString("/" + StringifyInt(i)));

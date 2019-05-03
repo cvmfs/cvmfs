@@ -17,6 +17,7 @@ script_location=$(portable_dirname $0)
 #
 #  SERVER_PACKAGE        location of the CernVM-FS server package to install
 #  CLIENT_PACKAGE        location of the CernVM-FS client package to install
+#  FUSE3_PACKAGE         location of the libcvmfs_fuse3 package
 #  DEVEL_PACKAGE         location of the CernVM-FS devel package to install
 #  CONFIG_PACKAGES       location of the CernVM-FS config packages
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
@@ -29,6 +30,7 @@ script_location=$(portable_dirname $0)
 
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
+FUSE3_PACKAGE=""
 DEVEL_PACKAGE=""
 UNITTEST_PACKAGE=""
 SHRINKWRAP_PACKAGE=""
@@ -39,13 +41,16 @@ GATEWAY_BUILD_URL=""
 NOTIFY_SRV_BUILD_URL=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:d:k:t:g:l:w:n:p:" option; do
+while getopts "s:c:d:k:t:g:l:w:n:p:f:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
       ;;
     c)
       CLIENT_PACKAGE=$OPTARG
+      ;;
+    f)
+      FUSE3_PACKAGE=$OPTARG
       ;;
     d)
       DEVEL_PACKAGE=$OPTARG

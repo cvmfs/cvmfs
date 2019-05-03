@@ -113,6 +113,7 @@ generate_package_map() {
   local config="$6"
   local shrinkwrap="$7"
   local ducc="$8"
+  local fuse3="$9"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
@@ -122,8 +123,11 @@ devel=$devel
 shrinkwrap=$shrinkwrap
 unittests=$unittests
 config=$config
-$(if [ "x$ducc" != "x" ]; then 
+$(if [ "x$ducc" != "x" ]; then
         echo "ducc=$ducc"
+fi)
+$(if [ "x$fuse3" != "x" ]; then
+        echo "fuse3=$fuse3"
 fi)
 EOF
 }

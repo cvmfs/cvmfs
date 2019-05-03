@@ -67,10 +67,10 @@ bool FuseInvalidator::HasFuseNotifyInval() {
 
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
-  struct fuse_chan **fuse_channel,
+  void **fuse_channel_or_session,
   bool fuse_notify_invalidation)
   : inode_tracker_(inode_tracker)
-  , fuse_channel_(fuse_channel)
+  , fuse_channel_or_session_(fuse_channel_or_session)
   , spawned_(false)
 {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
@@ -118,7 +118,9 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 
     // Fallback: drainout by timeout
-    if ((invalidator->fuse_channel_ == NULL) || !HasFuseNotifyInval()) {
+    if ((invalidator->fuse_channel_or_session_ == NULL) ||
+        !HasFuseNotifyInval())
+    {
       while (platform_monotonic_time() < deadline) {
         SafeSleepMs(kCheckTimeoutFreqMs);
         if (atomic_read32(&invalidator->terminated_) == 1) {
@@ -149,8 +151,13 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       if (inode == 0)
         inode = FUSE_ROOT_ID;
       // Can fail, e.g. the inode might be already evicted
-      fuse_lowlevel_notify_inval_inode(
-        *invalidator->fuse_channel_, inode, 0, 0);
+#if CVMFS_USE_LIBFUSE == 2
+      fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_chan**>(
+        invalidator->fuse_channel_or_session_), inode, 0, 0);
+#else
+      fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_session**>(
+        invalidator->fuse_channel_or_session_), inode, 0, 0);
+#endif
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting inode %" PRIu64, inode);
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {

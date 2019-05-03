@@ -30,6 +30,10 @@
 %define systemd_autofs_patch 1
 %endif
 
+%if 0%{?fedora} >= 29
+%define build_fuse3 1
+%endif
+
 %define __strip /bin/true
 %define debug_package %{nil}
 %if 0%{?el6} || 0%{?el5} || 0%{?el4}
@@ -68,6 +72,9 @@ BuildRequires: valgrind-devel
 %endif
 BuildRequires: cmake
 BuildRequires: fuse-devel
+%if 0%{?build_fuse3}
+BuildRequires: fuse3-devel
+%endif
 BuildRequires: libattr-devel
 BuildRequires: openssl-devel
 BuildRequires: patch
@@ -144,6 +151,16 @@ Requires(postun):       /usr/sbin/semodule
 HTTP File System for Distributing Software to CernVM.
 See http://cernvm.cern.ch
 Copyright (c) CERN
+
+%if 0%{?build_fuse3}
+%package fuse3
+Summary: additional libraries to enable libfuse3 support
+Group: Applications/System
+Requires: cvmfs = %{version}
+Requires: fuse3-libs
+%description fuse3
+Shared libraries implementing the CernVM-FS fuse module based on libfuse3
+%endif
 
 %package devel
 Summary: CernVM-FS static client library
@@ -353,6 +370,11 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/serverorder.sh
 
+# Don't install coincidentially built libfuse3 libraries
+%if ! 0%{?build_fuse3}
+rm -f $RPM_BUILD_ROOT%{_libdir}/libcvmfs_fuse3*
+%endif
+
 # Fix docdir on SuSE
 %if 0%{?suse_version}
 mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
@@ -409,6 +431,11 @@ if [ -d /var/run/cvmfs ]; then
 fi
 :
 
+%if 0%{?build_fuse3}
+%post fuse3
+/sbin/ldconfig
+%endif
+
 %post server
 /usr/bin/cvmfs_server fix-permissions || :
 %if 0%{?selinux_cvmfs_server}
@@ -461,6 +488,8 @@ fi
 %files
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
+%{_libdir}/libcvmfs_fuse_stub.so
+%{_libdir}/libcvmfs_fuse_stub.so.%{version}
 %{_libdir}/libcvmfs_fuse.so
 %{_libdir}/libcvmfs_fuse.so.%{version}
 %{_libdir}/libcvmfs_fuse_debug.so
@@ -492,6 +521,18 @@ fi
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
+
+%if 0%{?build_fuse3}
+%files fuse3
+%defattr(-,root,root)
+%{_libdir}/libcvmfs_fuse3_stub.so
+%{_libdir}/libcvmfs_fuse3_stub.so.%{version}
+%{_libdir}/libcvmfs_fuse3.so
+%{_libdir}/libcvmfs_fuse3.so.%{version}
+%{_libdir}/libcvmfs_fuse3_debug.so
+%{_libdir}/libcvmfs_fuse3_debug.so.%{version}
+%doc COPYING AUTHORS README.md ChangeLog
+%endif
 
 %files devel
 %defattr(-,root,root)
@@ -537,6 +578,8 @@ fi
 %endif
 
 %changelog
+* Wed Apr 03 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
+- Add fuse3 sub package
 * Tue Feb 19 2019 Simone Mosciatti <simone.mosciatti@cern.ch> - 2.6.0
 - Add ducc sub package
 * Wed Sep 26 2018 Jakob Blomer <jblomer@cern.ch> - 2.6.0

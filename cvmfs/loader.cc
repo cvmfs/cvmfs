@@ -10,7 +10,6 @@
  */
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
-#define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
 #include "cvmfs_config.h"
@@ -19,8 +18,6 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fuse/fuse_lowlevel.h>
-#include <fuse/fuse_opt.h>
 #include <openssl/crypto.h>
 #include <sched.h>
 #include <signal.h>
@@ -41,8 +38,10 @@
 #include <vector>
 
 #include "atomic.h"
+#include "duplex_fuse.h"
 #include "duplex_ssl.h"
 #include "fence.h"
+#include "fuse_main.h"
 #include "loader_talk.h"
 #include "logging.h"
 #include "options.h"
@@ -64,6 +63,8 @@ struct CvmfsOptions {
   int cvmfs_suid;
   int disable_watchdog;
   int simple_options_parsing;
+  int foreground;
+  int fuse_debug;
 
   // Ignored options
   int ign_netdev;
@@ -72,6 +73,7 @@ struct CvmfsOptions {
   int ign_users;
   int ign_auto;
   int ign_noauto;
+  int ign_libfuse;
 };
 
 enum {
@@ -93,6 +95,8 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("cvmfs_suid",                cvmfs_suid),
   CVMFS_SWITCH("disable_watchdog",          disable_watchdog),
   CVMFS_SWITCH("simple_options_parsing",    simple_options_parsing),
+  CVMFS_SWITCH("foreground",                foreground),
+  CVMFS_SWITCH("fuse_debug",                fuse_debug),
 
   // Ignore these options
   CVMFS_SWITCH("_netdev",          ign_netdev),
@@ -101,6 +105,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("users",            ign_users),
   CVMFS_SWITCH("auto",             ign_auto),
   CVMFS_SWITCH("noauto",           ign_noauto),
+  CVMFS_OPT("libfuse=%d",          ign_libfuse, 0),
 
   FUSE_OPT_KEY("-V",            KEY_VERSION),
   FUSE_OPT_KEY("--version",     KEY_VERSION),
@@ -129,6 +134,7 @@ bool debug_mode_ = false;
 bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
+bool premounted_ = false;
 bool disable_watchdog_ = false;
 bool simple_options_parsing_ = false;
 void *library_handle_;
@@ -161,11 +167,31 @@ static void Usage(const string &exename) {
     "  -o parse             Parse and print cvmfs parameters\n"
     "  -o cvmfs_suid        Enable suid mode\n\n"
     "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
+    "  -o foreground        Run in foreground\n"
+    "  -o libfuse=[2,3]     Enforce a certain libfuse version\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
     "  -o nonempty          allow mounts over non-empty directory\n",
     PACKAGE_VERSION, exename.c_str());
+}
+
+/**
+ * For an premounted mountpoint, the argument is the file descriptor to
+ * /dev/fuse provided in the form /dev/fd/%d
+ */
+bool CheckPremounted(const std::string &mountpoint) {
+  int len;
+  unsigned fd;
+  bool retval = (sscanf(mountpoint.c_str(), "/dev/fd/%u%n", &fd, &len) == 1) &&
+                (len >= 0) &&
+                (static_cast<unsigned>(len) == mountpoint.length());
+  if (retval) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: pre-mounted on file descriptor %d", fd);
+    return true;
+  }
+  return false;
 }
 
 
@@ -283,7 +309,11 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 static void stub_forget(
   fuse_req_t req,
   fuse_ino_t ino,
+#if CVMFS_USE_LIBFUSE == 2
   unsigned long nlookup  // NOLINT
+#else
+  uint64_t nlookup
+#endif
 ) {
   FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
@@ -325,6 +355,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
         if (mount_point_)
           return 1;
         mount_point_ = new string(arg);
+        premounted_ = CheckPremounted(*mount_point_);
       }
       return 0;
 
@@ -381,6 +412,12 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   suid_mode_ = cvmfs_options.cvmfs_suid;
   disable_watchdog_ = cvmfs_options.disable_watchdog;
   simple_options_parsing_ = cvmfs_options.simple_options_parsing;
+  if (cvmfs_options.foreground) {
+    foreground_ = true;
+  }
+  if (cvmfs_options.fuse_debug) {
+    fuse_opt_add_arg(mount_options, "-d");
+  }
 
   return mount_options;
 }
@@ -430,7 +467,11 @@ static void CloseLibrary() {
 static CvmfsExports *LoadLibrary(const bool debug_mode,
                                  LoaderExports *loader_exports)
 {
+#if CVMFS_USE_LIBFUSE == 2
   string library_name = string("cvmfs_fuse") + ((debug_mode) ? "_debug" : "");
+#else
+  string library_name = string("cvmfs_fuse3") + ((debug_mode) ? "_debug" : "");
+#endif
   library_name = platform_libname(library_name);
   string error_messages;
 
@@ -595,7 +636,7 @@ static void CleanupLibcryptoMt(void) {
 }
 
 
-int main(int argc, char *argv[]) {
+int FuseMain(int argc, char *argv[]) {
   // Set a decent umask for new files (no write access to group/everyone).
   // We want to allow group write access for the talk-socket.
   umask(007);
@@ -761,7 +802,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (!DirectoryExists(*mount_point_)) {
+  if (!premounted_ && !DirectoryExists(*mount_point_)) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "Moint point %s does not exist", mount_point_->c_str());
     return kFailPermission;
@@ -810,7 +851,8 @@ int main(int argc, char *argv[]) {
         (chmod(mount_point_->c_str(), 0755) != 0))
     {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to grab mountpoint (%d)", errno);
+               "Failed to grab mountpoint %s (%d)",
+               mount_point_->c_str(), errno);
       return kFailPermission;
     }
   }
@@ -858,8 +900,15 @@ int main(int argc, char *argv[]) {
   delete options_manager;
   options_manager = NULL;
 
+  struct fuse_session *session;
+#if CVMFS_USE_LIBFUSE == 2
   struct fuse_chan *channel;
-  loader_exports_->fuse_channel = &channel;
+  loader_exports_->fuse_channel_or_session = reinterpret_cast<void **>(
+    &channel);
+#else
+  loader_exports_->fuse_channel_or_session = reinterpret_cast<void **>(
+    &session);
+#endif
 
   // Load and initialize cvmfs library
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
@@ -898,6 +947,11 @@ int main(int argc, char *argv[]) {
     }
   }
 
+
+  struct fuse_lowlevel_ops loader_operations;
+  SetFuseOperations(&loader_operations);
+
+#if CVMFS_USE_LIBFUSE == 2
   channel = fuse_mount(mount_point_->c_str(), mount_options);
   if (!channel) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
@@ -905,6 +959,34 @@ int main(int argc, char *argv[]) {
     cvmfs_exports_->fnFini();
     return kFailMount;
   }
+
+  session = fuse_lowlevel_new(mount_options, &loader_operations,
+                              sizeof(loader_operations), NULL);
+  if (!session) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to create Fuse session");
+    fuse_unmount(mount_point_->c_str(), channel);
+    cvmfs_exports_->fnFini();
+    return kFailMount;
+  }
+#else
+  // libfuse3
+  session = fuse_session_new(mount_options, &loader_operations,
+                             sizeof(loader_operations), NULL);
+  if (!session) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to create Fuse session");
+    cvmfs_exports_->fnFini();
+    return kFailMount;
+  }
+  retval = fuse_session_mount(session, mount_point_->c_str());
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to mount file system");
+    cvmfs_exports_->fnFini();
+    return kFailMount;
+  }
+#endif
 
   // drop credentials
   if (suid_mode_) {
@@ -917,21 +999,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  struct fuse_lowlevel_ops loader_operations;
-  SetFuseOperations(&loader_operations);
-  struct fuse_session *session;
-  session = fuse_lowlevel_new(mount_options, &loader_operations,
-                              sizeof(loader_operations), NULL);
-  if (!session) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "failed to create Fuse session");
-    fuse_unmount(mount_point_->c_str(), channel);
-    cvmfs_exports_->fnFini();
-    return kFailMount;
+  if (!premounted_) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
+             mount_point_->c_str());
   }
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: mounted cvmfs on %s",
-           mount_point_->c_str());
   LogCvmfs(kLogCvmfs, kLogSyslog,
            "CernVM-FS: linking %s to repository %s",
            mount_point_->c_str(), repository_name_->c_str());
@@ -944,24 +1015,38 @@ int main(int argc, char *argv[]) {
   SetLogMicroSyslog("");
   retval = fuse_set_signal_handlers(session);
   assert(retval == 0);
+#if CVMFS_USE_LIBFUSE == 2
   fuse_session_add_chan(session, channel);
-  if (single_threaded_)
+#endif
+  if (single_threaded_) {
     retval = fuse_session_loop(session);
-  else
+  } else {
+#if CVMFS_USE_LIBFUSE == 2
     retval = fuse_session_loop_mt(session);
+#else
+    retval = fuse_session_loop_mt(session, 1 /* use fd per thread */);
+#endif
+  }
   SetLogMicroSyslog(*usyslog_path_);
 
   loader_talk::Fini();
   cvmfs_exports_->fnFini();
 
   // Unmount
-  fuse_session_remove_chan(channel);
+#if CVMFS_USE_LIBFUSE == 2
   fuse_remove_signal_handlers(session);
+  fuse_session_remove_chan(channel);
   fuse_session_destroy(session);
   fuse_unmount(mount_point_->c_str(), channel);
+  channel = NULL;
+#else
+  // libfuse3
+  fuse_remove_signal_handlers(session);
+  fuse_session_unmount(session);
+  fuse_session_destroy(session);
+#endif
   fuse_opt_free_args(mount_options);
   delete mount_options;
-  channel = NULL;
   session = NULL;
   mount_options = NULL;
 
@@ -989,3 +1074,18 @@ int main(int argc, char *argv[]) {
     return kFailFuseLoop;
   return kFailOk;
 }
+
+
+__attribute__((visibility("default")))
+CvmfsStubExports *g_cvmfs_stub_exports = NULL;
+
+static void __attribute__((constructor)) LibraryMain() {
+  g_cvmfs_stub_exports = new CvmfsStubExports();
+  g_cvmfs_stub_exports->fn_main = FuseMain;
+}
+
+static void __attribute__((destructor)) LibraryExit() {
+  delete g_cvmfs_stub_exports;
+  g_cvmfs_stub_exports = NULL;
+}
+

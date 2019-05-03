@@ -7,16 +7,15 @@
 #ifndef CVMFS_LRU_MD_H_
 #define CVMFS_LRU_MD_H_
 
-#define FUSE_USE_VERSION 26
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include <fuse/fuse_lowlevel.h>
 #include <stdint.h>
 
 #include "atomic.h"
 #include "directory_entry.h"
+#include "duplex_fuse.h"
 #include "hash.h"
 #include "logging.h"
 #include "lru.h"
