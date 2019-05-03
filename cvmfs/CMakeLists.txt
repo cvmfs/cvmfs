@@ -588,7 +588,6 @@ set (CVMFS_TALK_CFLAGS "-DCVMFS_CLIENT")
 set (LIBCVMFS_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (LIBCVMFS_CACHE_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (CVMFS_SHRINKWRAP_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
-set (CVMFS_PUBLISH_CFLAGS "${CVMFS_PUBLISH_CFLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
 
 #
 # set some include and linking stuff
@@ -852,6 +851,9 @@ endif(BUILD_SHRINKWRAP)
 
 
 if (BUILD_SERVER)
+  set (CVMFS_PUBLISH_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
+  set (LIBCVMFS_SERVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
+
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
