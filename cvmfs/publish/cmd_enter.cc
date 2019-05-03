@@ -7,7 +7,10 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/limits.h>
 #include <sched.h>
+#include <signal.h>
+#include <sys/mount.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -48,7 +51,7 @@ int CmdEnter::Main(const Options &options) {
   const string path_cvmfs2 =
     "/home/jakob/Documents/CERN/git/src/build-arch/cvmfs/cvmfs2";
 
-  int rvi = unshare(CLONE_NEWUSER | CLONE_FS | CLONE_NEWNS);
+  int rvi = unshare(CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWPID);
   LogCvmfs(kLogCvmfs, kLogStdout, "unshare %d (%d), I am %d",
            rvi, errno, getuid());
   if (rvi != 0) throw EPublish("cannot create namespace");
@@ -73,6 +76,42 @@ int CmdEnter::Main(const Options &options) {
 
   rvi = chdir(cwd.c_str());
   if (rvi != 0) throw EPublish("cannot chdir to " + cwd);
+
+
+  printf("Initialize PID namespace, current pid %d\n", getpid());
+  int status;
+  pid_t pid = fork();
+  switch (pid) {
+    case -1:
+      LogCvmfs(kLogCvmfs, kLogStdout, "fork error %d", errno);
+      return 1;
+    case 0:
+      // New init process
+      break;
+    default:
+      // Parent
+      rvi = waitpid(pid, &status, 0);
+      LogCvmfs(kLogCvmfs, kLogStdout, "pid ns bridge process out");
+      return 0;
+      //if (rvi == -1) {
+      //  LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading return code (%d)", errno);
+      //  return 32;
+      //}
+      //if (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)) {
+      //  LogCvmfs(kLogCvmfs, kLogStderr, "Failure mounting");
+      //  return 1;
+      //}
+  }
+  char procpid[PATH_MAX + 1];
+  int len = readlink("/proc/self", procpid, PATH_MAX);
+  procpid[len] = '\0';
+  printf("/proc/self --> %s\n", procpid);
+  rvi = mount("", "/proc", "proc", 0, NULL);
+  if (rvi != 0) throw EPublish("cannot remount /proc");
+  len = readlink("/proc/self", procpid, PATH_MAX);
+  procpid[len] = '\0';
+  printf("Remounted PROC, /proc/self --> %s\n", procpid);
+
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Create workspace %s", workspace.c_str());
   rvb = MkdirDeep(workspace, kPrivateDirMode);
@@ -103,6 +142,10 @@ int CmdEnter::Main(const Options &options) {
   options_manager.SetValue("CVMFS_CACHE_private_SHARED", "on");
   options_manager.SetValue("CVMFS_CACHE_private_QUOTA_LIMIT", "4000");
   options_manager.SetValue("CVMFS_NFILES", "65538");
+  options_manager.SetValue("CVMFS_HTTP_PROXY", "auto");
+  options_manager.SetValue("CVMFS_PAC_URLS", "http://wlcg-wpad.cern.ch/wpad.dat;http://wlcg-wpad.fnal.gov/wpad.dat");
+  options_manager.SetValue("CVMFS_SERVER_URL", "http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@");
+  options_manager.SetValue("CVMFS_KEYS_DIR", "/home/jakob/Documents/CERN/git/src/mount/keys");
   rvb = SafeWriteToFile(options_manager.Dump(), path_config, kPrivateFileMode);
 
   vector<string> args;
@@ -122,7 +165,6 @@ int CmdEnter::Main(const Options &options) {
   }
   close(fd_stdin);
 
-  int status;
   rvi = waitpid(pid_cvmfs, &status, 0);
   if (rvi == -1) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading return code (%d)", errno);
@@ -134,6 +176,11 @@ int CmdEnter::Main(const Options &options) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "mounted read-only branch");
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "bind-mounting to /cvmfs");
+  rvi = mount(path_mount_rdonly.c_str(), "/cvmfs", "", MS_BIND, NULL);
+  if (rvi != 0) throw EPublish("cannot bind mount to /cvmfs");
+
 //  while (true) {
 //    char c;
 //    rvi = read(fd_stdoerr, &c, 1);
@@ -142,6 +189,36 @@ int CmdEnter::Main(const Options &options) {
 //
 //    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%c", c);
 //  }
+
+  LogCvmfs(kLogCvmfs, kLogStdout,
+           "create grand-child user ns to switch back to original user");
+  rvi = unshare(CLONE_NEWUSER);
+  LogCvmfs(kLogCvmfs, kLogStdout, "unshare %d (%d), I am %d",
+           rvi, errno, getuid());
+  if (rvi != 0) throw EPublish("cannot create grand-child user ns");
+  printf("GRAND USER NS after unshare: uid %d   gid %d\n",
+         geteuid(), getegid());
+
+  rvb = SafeWriteToFile(StringifyInt(uid) + " 0 1", "/proc/1/uid_map",
+                        kDefaultFileMode);
+  if (!rvb) throw EPublish("cannot set uid map");
+  rvb = SafeWriteToFile("deny", "/proc/1/setgroups", kDefaultFileMode);
+  if (!rvb) throw EPublish("cannot set setgroups");
+  rvb = SafeWriteToFile(StringifyInt(gid) + " 0 1", "/proc/1/gid_map",
+                        kDefaultFileMode);
+  if (!rvb) throw EPublish("cannot set gid map");
+
+  printf("GRAND USER NS initialized: uid %d/%d   gid %d/%d\n",
+         getuid(), geteuid(), getgid(), getegid());
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "dropping credentials to %d/%d", uid, gid);
+  rvb = SwitchCredentials(uid, gid, false);
+  if (!rvb) throw EPublish("cannot drop privileges");
+
+  execl("/bin/bash", "", (char *)0);
+
+  LogCvmfs(kLogCvmfs, kLogStdout,
+           "exiting pid namespace including process cleanup");
 
   return 0;
 }
