@@ -89,6 +89,7 @@ int CmdEnter::Main(const Options &options) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Generating options for %s", fqrn.c_str());
   BashOptionsManager options_manager;
   options_manager.ParseDefault(fqrn);
+  options_manager.SetValue("CVMFS_MOUNT_DIR", path_mount_rdonly);
   options_manager.SetValue("CVMFS_AUTO_UPDATE", "no");
   options_manager.SetValue("CVMFS_NFS_SOURCE", "no");
   options_manager.SetValue("CVMFS_HIDE_MAGIC_XATTRS", "yes");
