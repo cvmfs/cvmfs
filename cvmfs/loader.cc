@@ -472,6 +472,13 @@ static void CloseLibrary() {
 static CvmfsExports *LoadLibrary(const bool debug_mode,
                                  LoaderExports *loader_exports)
 {
+  std::string local_lib_path = "./";
+  if (getenv("CVMFS_LIBRARY_PATH") != NULL) {
+    local_lib_path = getenv("CVMFS_LIBRARY_PATH");
+    if (!local_lib_path.empty() && (*local_lib_path.rbegin() != '/'))
+      local_lib_path.push_back('/');
+  }
+
 #if CVMFS_USE_LIBFUSE == 2
   string library_name = string("cvmfs_fuse") + ((debug_mode) ? "_debug" : "");
 #else
@@ -482,7 +489,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 
   static vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
   if (library_paths.empty()) {
-    library_paths.push_back(library_name);
+    library_paths.push_back(local_lib_path + library_name);
     library_paths.push_back("/usr/lib/"   + library_name);
     library_paths.push_back("/usr/lib64/" + library_name);
 #ifdef __APPLE__
