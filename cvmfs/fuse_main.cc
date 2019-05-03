@@ -84,10 +84,17 @@ int main(int argc, char **argv) {
     }
   }
 
+  std::string local_lib_path = "./";
+  if (getenv("CVMFS_LIBRARY_PATH") != NULL) {
+    local_lib_path = getenv("CVMFS_LIBRARY_PATH");
+    if (!local_lib_path.empty() && (*local_lib_path.rbegin() != '/'))
+      local_lib_path.push_back('/');
+  }
+
   // Try loading libfuse3 module, else fallback to version 2
   std::vector<std::string> library_paths;
   if ((enforce_libfuse == 0) || (enforce_libfuse == 3)) {
-    library_paths.push_back("./" + libname_fuse3);
+    library_paths.push_back(local_lib_path + libname_fuse3);
     library_paths.push_back("/usr/lib/"   + libname_fuse3);
     library_paths.push_back("/usr/lib64/" + libname_fuse3);
 #ifdef __APPLE__
@@ -95,7 +102,7 @@ int main(int argc, char **argv) {
 #endif
   }
   if ((enforce_libfuse == 0) || (enforce_libfuse == 2)) {
-    library_paths.push_back("./" + libname_fuse2);
+    library_paths.push_back(local_lib_path + libname_fuse2);
     library_paths.push_back("/usr/lib/"   + libname_fuse2);
     library_paths.push_back("/usr/lib64/" + libname_fuse2);
 #ifdef __APPLE__
