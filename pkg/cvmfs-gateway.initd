@@ -28,7 +28,7 @@
 
 RETVAL=0
 PROG="cvmfs-gateway"
-EXEC="/usr/bin/cvmfs-gateway"
+EXEC="/usr/bin/cvmfs_gateway"
 PIDFILE="/var/run/cvmfs-gateway.pid"
 LOCKFILE="/var/lock/subsys/$PROG"
 

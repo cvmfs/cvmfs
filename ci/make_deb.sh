@@ -47,7 +47,7 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
     mkdir -p $WORKSPACE/usr/libexec/cvmfs-gateway/scripts
     mkdir -p $WORKSPACE/var/lib/cvmfs-gateway
 
-    cp -v ${CVMFS_GATEWAY_SOURCES}/gateway $WORKSPACE/usr/bin/cvmfs-gateway
+    cp -v ${CVMFS_GATEWAY_SOURCES}/gateway $WORKSPACE/usr/bin/cvmfs_gateway
 
     # Install the run_cvmfs_gateway.sh script for compatibility with cvmfs-gateway-1.0.0
     cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/run_cvmfs_gateway.sh ${WORKSPACE}/usr/libexec/cvmfs-gateway/scripts/

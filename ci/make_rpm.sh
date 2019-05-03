@@ -33,7 +33,7 @@ cd ${TOGO_PROJECT}
 
 ### Install executable to togo root
 mkdir -p ${TOGO_PROJECT}/root/usr/bin
-cp -v ${CVMFS_GATEWAY_SOURCES}/gateway ${TOGO_PROJECT}/root/usr/bin/cvmfs-gateway
+cp -v ${CVMFS_GATEWAY_SOURCES}/gateway ${TOGO_PROJECT}/root/usr/bin/cvmfs_gateway
 togo file exclude root/usr/bin
 
 ### Install the run_cvmfs_gateway.sh script for compatibility with cvmfs-gateway-1.0.0
