@@ -220,6 +220,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
 set (CVMFS_PUBLISH_SOURCES
   hash.cc
   logging.cc
+  publish/cmd_enter.cc
   publish/cmd_help.cc
   publish/cmd_mkfs.cc
   publish/cmd_zpipe.cc
