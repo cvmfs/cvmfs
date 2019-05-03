@@ -18,8 +18,11 @@ class CmdEnter : public Command {
   virtual std::string GetBrief() const {
     return "Opens an ephemeral namespace to publish content";
   }
-  virtual std::string GetUsage() const { return "[repository name]"; }
+  virtual std::string GetUsage() const {
+    return "[options] <fully qualified repository name>";
+  }
   virtual ParameterList GetParams() const { return ParameterList(); }
+  virtual unsigned GetMinPlainArgs() const { return 1; }
 
   virtual int Main(const Options &options);
 };
