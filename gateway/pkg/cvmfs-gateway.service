@@ -4,7 +4,7 @@ After=syslog.target network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/cvmfs-gateway
+ExecStart=/usr/bin/cvmfs_gateway
 StandardOutput=journal
 Restart=always
 RestartSec=5
