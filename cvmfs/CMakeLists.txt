@@ -231,6 +231,7 @@ set (CVMFS_PUBLISH_SOURCES
   publish/settings.cc
   sanitizer.cc
   upload_spooler_definition.cc
+  util/namespace.cc
   util/posix.cc
   util/string.cc
 )
