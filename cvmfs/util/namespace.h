@@ -21,7 +21,7 @@ int CheckNamespaceFeatures();
 
 bool CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to);
 bool CreateMountNamespace();
-bool CreatePidNamespace();
+bool CreatePidNamespace(int *fd_parent);
 
 bool BindMount(const std::string &from, const std::string &to);
 
