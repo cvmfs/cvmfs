@@ -74,6 +74,7 @@ TEST_F(T_Namespace, User) {
 
 TEST_F(T_Namespace, UserMount) {
   if (!(ns_features_ & kNsFeatureUserEnabled)) return;
+  if (!(ns_features_ & kNsFeatureMount)) return;
 
   int pid = fork();
   ASSERT_GE(pid, 0);
@@ -99,6 +100,8 @@ TEST_F(T_Namespace, UserMount) {
 
 TEST_F(T_Namespace, UserMountPid) {
   if (!(ns_features_ & kNsFeatureUserEnabled)) return;
+  if (!(ns_features_ & kNsFeatureMount)) return;
+  if (!(ns_features_ & kNsFeaturePid)) return;
 
   int pid = fork();
   ASSERT_GE(pid, 0);
@@ -107,9 +110,10 @@ TEST_F(T_Namespace, UserMountPid) {
     return;
   }
 
+  int fd_parent;
   EXPECT_TRUE(CreateUserNamespace(0, 0));
   EXPECT_TRUE(CreateMountNamespace());
-  EXPECT_TRUE(CreatePidNamespace());
+  EXPECT_TRUE(CreatePidNamespace(&fd_parent));
 
   char procpid[128];
   int len = readlink("/proc/self", procpid, 127);
@@ -117,6 +121,9 @@ TEST_F(T_Namespace, UserMountPid) {
   procpid[len] = '\0';
   EXPECT_EQ(StringifyInt(getpid()), std::string(procpid));
   EXPECT_EQ(pid_t(1), getpid());
+  char c = 0;
+  EXPECT_EQ(1, SafeRead(fd_parent, &c, 1));
+  EXPECT_EQ('x', c);
 
   exit(testing::Test::HasFailure());
 }
