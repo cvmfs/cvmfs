@@ -90,12 +90,20 @@ bool CreateMountNamespace() {
 }
 
 
-bool CreatePidNamespace() {
+/**
+ * The fd_parent file descriptor, if passed, is the read end of a pipe whose
+ * write end is connected to the parent process.  This gives the namespace's
+ * init process a means to detect when the parent process is terminated.
+ */
+bool CreatePidNamespace(int *fd_parent) {
 #ifdef __APPLE__
   return false;
 #else
   int rvi = unshare(CLONE_NEWPID);
   if (rvi != 0) return false;
+
+  int pipe_parent[2];
+  MakePipe(pipe_parent);
 
   int max_fd;
   int status;
@@ -112,8 +120,12 @@ bool CreatePidNamespace() {
       // Close all file descriptors
       max_fd = sysconf(_SC_OPEN_MAX);
       for (int fd = 0; fd < max_fd; fd++) {
-        close(fd);
+        if (fd != pipe_parent[1])
+          close(fd);
       }
+
+      char c = 'x';
+      SafeWrite(pipe_parent[1], &c, 1);
 
       rvi = waitpid(pid, &status, 0);
       if (rvi >= 0) {
@@ -122,9 +134,12 @@ bool CreatePidNamespace() {
       }
       exit(127);
   }
+  close(pipe_parent[1]);
+  if (fd_parent != NULL)
+    *fd_parent = pipe_parent[0];
 
-  // TODO(jblomer): setup signal handler
-  // TODO(jblomer): keep pipe to parent open to detect parent being terminated?
+  // Note: only signals for which signal handlers are established can be sent
+  // by other processes of this pid namespace to the init process
 
   rvi = mount("", "/proc", "proc", 0, NULL);
   return rvi == 0;
