@@ -75,8 +75,9 @@ set(CVMFS_UNITTEST_FILES
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
-  t_notify_messages.cc
   t_mountpoint.cc
+  t_namespace.cc
+  t_notify_messages.cc
   t_object_fetcher.cc
   t_options.cc
   t_pack.cc
@@ -246,6 +247,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/url.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
+  ${CVMFS_SOURCE_DIR}/util/namespace.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
