@@ -11,7 +11,6 @@
 #include <sched.h>
 #include <signal.h>
 #include <sys/mount.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -24,6 +23,7 @@
 #include "logging.h"
 #include "options.h"
 #include "publish/except.h"
+#include "util/namespace.h"
 #include "util/posix.h"
 
 
@@ -33,12 +33,12 @@ namespace publish {
 
 int CmdEnter::Main(const Options &options) {
   bool rvb;
+  int rvi;
 
   std::string fqrn = options.plain_args()[0].value_str;
 
   uid_t uid = geteuid();
   gid_t gid = getegid();
-  printf("OUTER NS: uid %d   gid %d\n", uid, gid);
 
   string cwd = GetCurrentWorkingDirectory();
   string workspace = GetHomeDirectory() + "/.cvmfs/" + fqrn;
@@ -52,72 +52,12 @@ int CmdEnter::Main(const Options &options) {
   const string path_cvmfs2 =
     "/home/jakob/Documents/CERN/git/src/build-arch/cvmfs/cvmfs2";
 
-  int rvi = unshare(CLONE_NEWUSER);
-  LogCvmfs(kLogCvmfs, kLogStdout, "unshare %d (%d), I am %d",
-           rvi, errno, getuid());
-  if (rvi != 0) throw EPublish("cannot create namespace");
-  printf("INNER NS after unshare: uid %d   gid %d\n", geteuid(), getegid());
-
-  string str_pid = StringifyInt(getpid());
-  string path_uid_map = string("/proc/") + str_pid + "/uid_map";
-  string path_gid_map = string("/proc/") + str_pid + "/gid_map";
-  string path_setgroups = string("/proc/") + str_pid + "/setgroups";
-
-  rvb = SafeWriteToFile(string("0 ") + StringifyInt(uid) + " 1", path_uid_map,
-                        kDefaultFileMode);
-  if (!rvb) throw EPublish("cannot set uid map");
-  rvb = SafeWriteToFile("deny", path_setgroups, kDefaultFileMode);
-  if (!rvb) throw EPublish("cannot set setgroups");
-  rvb = SafeWriteToFile(string("0 ") + StringifyInt(gid) + " 1", path_gid_map,
-                        kDefaultFileMode);
-  if (!rvb) throw EPublish("cannot set gid map");
-
-  printf("INNER NS initialized: uid %d/%d   gid %d/%d\n",
-         getuid(), geteuid(), getgid(), getegid());
-
-  rvi = unshare(CLONE_NEWNS);
-  if (rvi != 0) throw EPublish("cannot create mount namespace");
-
-  rvi = chdir(cwd.c_str());
-  if (rvi != 0) throw EPublish("cannot chdir to " + cwd);
-
-  rvi = unshare(CLONE_NEWPID);
-  if (rvi != 0) throw EPublish("cannot create pid namespace");
-
-  printf("Initialize PID namespace, current pid %d\n", getpid());
-  int status;
-  pid_t pid = fork();
-  switch (pid) {
-    case -1:
-      LogCvmfs(kLogCvmfs, kLogStdout, "fork error %d", errno);
-      return 1;
-    case 0:
-      // New init process
-      break;
-    default:
-      // Parent
-      rvi = waitpid(pid, &status, 0);
-      LogCvmfs(kLogCvmfs, kLogStdout, "pid ns bridge process out");
-      return 0;
-      //if (rvi == -1) {
-      //  LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading return code (%d)", errno);
-      //  return 32;
-      //}
-      //if (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)) {
-      //  LogCvmfs(kLogCvmfs, kLogStderr, "Failure mounting");
-      //  return 1;
-      //}
-  }
-  char procpid[PATH_MAX + 1];
-  int len = readlink("/proc/self", procpid, PATH_MAX);
-  procpid[len] = '\0';
-  printf("/proc/self --> %s\n", procpid);
-  rvi = mount("", "/proc", "proc", 0, NULL);
-  if (rvi != 0) throw EPublish("cannot remount /proc");
-  len = readlink("/proc/self", procpid, PATH_MAX);
-  procpid[len] = '\0';
-  printf("Remounted PROC, /proc/self --> %s\n", procpid);
-
+  rvb = CreateUserNamespace(0, 0);
+  if (!rvb) throw EPublish("cannot create user namespace");
+  rvb = CreateMountNamespace();
+  if (!rvb) throw EPublish("cannot create mount namespace");
+  rvb = CreatePidNamespace(NULL);
+  if (!rvb) throw EPublish("cannot create pid namespace");
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Create workspace %s", workspace.c_str());
   rvb = MkdirDeep(workspace, kPrivateDirMode);
@@ -173,12 +113,8 @@ int CmdEnter::Main(const Options &options) {
   }
   close(fd_stdin);
 
-  rvi = waitpid(pid_cvmfs, &status, 0);
-  if (rvi == -1) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading return code (%d)", errno);
-    return 32;
-  }
-  if (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)) {
+  int exit_code = WaitForChild(pid_cvmfs);
+  if (exit_code != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failure mounting");
     return 1;
   }
@@ -197,51 +133,41 @@ int CmdEnter::Main(const Options &options) {
                       "/home/jakob/Documents/CERN/git/fuse-overlayfs",
                       args_ovl, false, &pid_ovl);
   if (!rvb) EPublish("failed to mount ovl");
-  rvi = waitpid(pid_ovl, &status, 0);
-  if (rvi == -1) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading ovl return code (%d)",
-             errno);
-    return 1;
+  exit_code = WaitForChild(pid_ovl);
+  if (exit_code != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failure mounting ovl");
+    //return 1;
   }
-  //if (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)) {
-  //  LogCvmfs(kLogCvmfs, kLogStderr, "Failure mounting ovl");
-  //  return 1;
-  //}
+
   LogCvmfs(kLogCvmfs, kLogStdout, "union file system mounted");
 
-//  LogCvmfs(kLogCvmfs, kLogStdout, "bind-mounting to /cvmfs");
-//  rvi = mount(path_mount_union.c_str(), "/cvmfs", "", MS_BIND, NULL);
-//  if (rvi != 0) throw EPublish("cannot bind mount to /cvmfs");
+  rvb = BindMount(path_mount_union, "/cvmfs");
+  if (!rvb) throw EPublish("cannot bind mount to /cvmfs");
 
-//  LogCvmfs(kLogCvmfs, kLogStdout,
-//           "create grand-child user ns to switch back to original user");
-//  rvi = unshare(CLONE_NEWUSER);
-//  LogCvmfs(kLogCvmfs, kLogStdout, "unshare %d (%d), I am %d",
-//           rvi, errno, getuid());
-//  if (rvi != 0) throw EPublish("cannot create grand-child user ns");
-//  printf("GRAND USER NS after unshare: uid %d   gid %d\n",
-//         geteuid(), getegid());
-//
-//  rvb = SafeWriteToFile(StringifyInt(uid) + " 0 1", "/proc/1/uid_map",
-//                        kDefaultFileMode);
-//  if (!rvb) throw EPublish("cannot set uid map");
-//  rvb = SafeWriteToFile("deny", "/proc/1/setgroups", kDefaultFileMode);
-//  if (!rvb) throw EPublish("cannot set setgroups");
-//  rvb = SafeWriteToFile(StringifyInt(gid) + " 0 1", "/proc/1/gid_map",
-//                        kDefaultFileMode);
-//  if (!rvb) throw EPublish("cannot set gid map");
-//
-//  printf("GRAND USER NS initialized: uid %d/%d   gid %d/%d\n",
-//         getuid(), geteuid(), getgid(), getegid());
-//
-//  LogCvmfs(kLogCvmfs, kLogStdout, "dropping credentials to %d/%d", uid, gid);
-//  rvb = SwitchCredentials(uid, gid, false);
-//  if (!rvb) throw EPublish("cannot drop privileges");
+  rvb = CreateUserNamespace(uid, gid);
+  if (!rvb) throw EPublish("cannot create user namespace");
 
-  execl("/bin/bash", "", (char *)0);
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "dropping credentials to %d/%d", uid, gid);
+  rvb = SwitchCredentials(uid, gid, false);
+  if (!rvb) throw EPublish("cannot drop privileges");
+
+  rvi = setenv("PS1", "[CernVM-FS Transaction] ", 1 /* overwrite */);
+  assert(rvi == 0);
+  std::vector<std::string> cmdline;
+  cmdline.push_back(GetShell());
+  std::set<int> preserved_fds;
+  preserved_fds.insert(0);
+  preserved_fds.insert(1);
+  preserved_fds.insert(2);
+  pid_t pid_child;
+  rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
+                    false /* drop_credentials */, false /* double_fork*/,
+                    &pid_child);
+  exit_code = WaitForChild(pid_child);
 
   LogCvmfs(kLogCvmfs, kLogStdout,
-           "exiting pid namespace including process cleanup");
+           "exiting pid namespace including process cleanup (%d)", exit_code);
 
   return 0;
 }
