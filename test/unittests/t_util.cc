@@ -133,6 +133,12 @@ TEST_F(T_Util, GetUserName) {
 }
 
 
+TEST_F(T_Util, GetShell) {
+  ASSERT_TRUE(getenv("SHELL") != NULL);
+  EXPECT_STREQ(getenv("SHELL"), GetShell().c_str());
+}
+
+
 TEST_F(T_Util, GetUidOf) {
   uid_t uid;
   gid_t gid;

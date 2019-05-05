@@ -1030,6 +1030,24 @@ std::string GetUserName() {
   return user_name;
 }
 
+std::string GetShell() {
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(geteuid(), &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return "";
+  }
+  std::string shell = pwd.pw_shell;
+  free(buf);
+  return shell;
+}
+
 /**
  * Name -> UID from passwd database
  */
