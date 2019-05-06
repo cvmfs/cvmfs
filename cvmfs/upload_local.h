@@ -55,8 +55,9 @@ class LocalUploader : public AbstractUploader {
    * This method calls NotifyListeners and invokes a callback for all
    * registered listeners (see the Observable template for details).
    */
-  void FileUpload(const std::string &local_path, const std::string &remote_path,
-                  const CallbackTN *callback = NULL);
+  void DoUploadFile(const std::string &local_path,
+                    const std::string &remote_path,
+                    const CallbackTN *callback = NULL);
 
   UploadStreamHandle *InitStreamedUpload(const CallbackTN *callback = NULL);
   void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,

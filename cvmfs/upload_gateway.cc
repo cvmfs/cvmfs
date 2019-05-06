@@ -125,9 +125,9 @@ unsigned int GatewayUploader::GetNumberOfErrors() const {
   return atomic_read32(&num_errors_);
 }
 
-void GatewayUploader::FileUpload(const std::string& local_path,
-                                 const std::string& remote_path,
-                                 const CallbackTN* callback) {
+void GatewayUploader::DoUploadFile(const std::string& local_path,
+                                   const std::string& remote_path,
+                                   const CallbackTN* callback) {
   UniquePtr<GatewayStreamHandle> handle(
       new GatewayStreamHandle(callback, session_context_->NewBucket()));
 

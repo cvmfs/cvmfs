@@ -40,9 +40,9 @@ bool LocalUploader::Create() {
   return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_);
 }
 
-void LocalUploader::FileUpload(const std::string &local_path,
-                               const std::string &remote_path,
-                               const CallbackTN *callback) {
+void LocalUploader::DoUploadFile(const std::string &local_path,
+                                 const std::string &remote_path,
+                                 const CallbackTN *callback) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "FileUpload call started.");
 
   // create destination in backend storage temporary directory
