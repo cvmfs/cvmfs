@@ -128,9 +128,10 @@ int CmdEnter::Main(const Options &options) {
                      ",upperdir=" + path_mount_scratch +
                      ",workdir=" + path_ovl_work);
   args_ovl.push_back(path_mount_union);
+  printf("OVL: %s\n", JoinStrings(args_ovl, " ").c_str());
   pid_t pid_ovl;
   rvb = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr,
-                      "/home/jakob/Documents/CERN/git/fuse-overlayfs",
+                "/home/jakob/Documents/CERN/git/fuse-overlayfs/fuse-overlayfs",
                       args_ovl, false, &pid_ovl);
   if (!rvb) EPublish("failed to mount ovl");
   exit_code = WaitForChild(pid_ovl);
@@ -147,11 +148,6 @@ int CmdEnter::Main(const Options &options) {
   rvb = CreateUserNamespace(uid, gid);
   if (!rvb) throw EPublish("cannot create user namespace");
 
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "dropping credentials to %d/%d", uid, gid);
-  rvb = SwitchCredentials(uid, gid, false);
-  if (!rvb) throw EPublish("cannot drop privileges");
-
   rvi = setenv("PS1", "[CernVM-FS Transaction] ", 1 /* overwrite */);
   assert(rvi == 0);
   std::vector<std::string> cmdline;
@@ -162,7 +158,7 @@ int CmdEnter::Main(const Options &options) {
   preserved_fds.insert(2);
   pid_t pid_child;
   rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
-                    false /* drop_credentials */, false /* double_fork*/,
+                    false /* drop_credentials */, false /* double_fork */,
                     &pid_child);
   exit_code = WaitForChild(pid_child);
 

@@ -40,12 +40,6 @@ int CmdMkfs::Main(const Options &options) {
   settings.SetOwner(user_name);
 
   // Sanity checks
-  if (geteuid() != 0) {
-    bool can_unprivileged =
-      options.Has("no-publisher") && options.Has("no-apache") &&
-      (user_name == GetUserName());
-    if (!can_unprivileged) throw EPublish("root privileges required");
-  }
   if (options.Has("no-autotags") && options.Has("autotag-span")) {
     throw EPublish(
         "options 'no-autotags' and 'autotag-span' are mutually exclusive");
@@ -56,7 +50,6 @@ int CmdMkfs::Main(const Options &options) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "Note: Autotagging all revisions impedes garbage collection");
   }
-
 
   // Storage configuration
   if (options.Has("storage")) {
@@ -72,6 +65,14 @@ int CmdMkfs::Main(const Options &options) {
   bool configure_apache =
     (settings.storage().type() == upload::SpoolerDefinition::Local) &&
     options.HasNot("no-apache");
+
+  // Permission check
+  if (geteuid() != 0) {
+    bool can_unprivileged =
+      options.Has("no-publisher") && !configure_apache &&
+      (user_name == GetUserName());
+    if (!can_unprivileged) throw EPublish("root privileges required");
+  }
 
   // Stratum 0 URL
   if (options.Has("stratum0")) {
