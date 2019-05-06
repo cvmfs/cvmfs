@@ -38,7 +38,7 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
         . /etc/profile.d/rvm.sh
     fi
 
-    WORKSPACE=${CVMFS_GATEWAY_SOURCES}/pkg_ws
+    WORKSPACE=${CVMFS_GATEWAY_SOURCES}/pkg_ws_${TARGET_PLATFORM}
     mkdir -p $WORKSPACE
 
     mkdir -p $WORKSPACE/etc/systemd/system
@@ -59,6 +59,7 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
 
     pushd $WORKSPACE
     fpm -s dir -t deb \
+        --verbose \
         --package ../DEBS/$PACKAGE_NAME \
         --version $VERSION \
         --name cvmfs-gateway \
@@ -67,16 +68,11 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
         --url "http://cernvm.cern.ch" \
         --license "BSD-3-Clause" \
         --depends "cvmfs-server > 2.5.2" \
-        --directories var/lib/cvmfs-gateway \
         --directories usr/libexec/cvmfs-gateway \
         --config-files etc/cvmfs/gateway/repo.json \
         --config-files etc/cvmfs/gateway/user.json \
         --config-files etc/systemd/system/cvmfs-gateway.service \
         --exclude etc/systemd/system \
-        --exclude etc/cvmfs \
-        --exclude usr/bin \
-        --exclude usr/libexec \
-        --exclude var/lib \
         --no-deb-systemd-restart-after-upgrade \
         --after-install ${CVMFS_GATEWAY_SOURCES}/pkg/setup_deb.sh \
         --chdir $WORKSPACE \
