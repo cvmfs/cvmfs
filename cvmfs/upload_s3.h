@@ -54,9 +54,9 @@ class S3Uploader : public AbstractUploader {
    * This method calls NotifyListeners and invokes a callback for all
    * registered listeners (see the Observable template for details).
    */
-  virtual void FileUpload(const std::string &local_path,
-                          const std::string &remote_path,
-                          const CallbackTN *callback = NULL);
+  virtual void DoUploadFile(const std::string &local_path,
+                            const std::string &remote_path,
+                            const CallbackTN *callback = NULL);
 
   virtual UploadStreamHandle *InitStreamedUpload(
     const CallbackTN *callback = NULL);

@@ -651,8 +651,8 @@ TYPED_TEST(T_Uploaders, RetrySlow) {
     static_cast<upload::S3Uploader *>(this->uploader_);
   SetAltLogFunc(LogSupress);
   EXPECT_EQ(0U, s3uploader->GetS3FanoutManager()->GetStatistics().num_retries);
-  this->uploader_->Upload(small_file_path, dest_name,
-                          AbstractUploader::MakeClosure(
+  this->uploader_->UploadFile(small_file_path, dest_name,
+                              AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
                               UploaderResults(0, small_file_path)));
@@ -687,9 +687,9 @@ TYPED_TEST(T_Uploaders, SimpleFileUpload) {
   const std::string big_file_path = TestFixture::GetBigFile();
   const std::string dest_name     = "big_file";
 
-  this->uploader_->Upload(big_file_path,
-                          dest_name,
-                          AbstractUploader::MakeClosure(
+  this->uploader_->UploadFile(big_file_path,
+                              dest_name,
+                              AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
                               UploaderResults(0, big_file_path)));
@@ -710,8 +710,8 @@ TYPED_TEST(T_Uploaders, PeekIntoStorage) {
   const std::string small_file_path = TestFixture::GetSmallFile();
   const std::string dest_name       = "small_file";
 
-  this->uploader_->Upload(small_file_path, dest_name,
-                          AbstractUploader::MakeClosure(
+  this->uploader_->UploadFile(small_file_path, dest_name,
+                              AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
                               UploaderResults(0, small_file_path)));
@@ -738,8 +738,8 @@ TYPED_TEST(T_Uploaders, RemoveFromStorage) {
   const std::string small_file_path = TestFixture::GetSmallFile();
   const std::string dest_name       = "also_small_file";
 
-  this->uploader_->Upload(small_file_path, dest_name,
-                          AbstractUploader::MakeClosure(
+  this->uploader_->UploadFile(small_file_path, dest_name,
+                              AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
                               UploaderResults(0, small_file_path)));
@@ -773,11 +773,11 @@ TYPED_TEST(T_Uploaders, UploadEmptyFile) {
   const std::string empty_file_path = TestFixture::GetEmptyFile();
   const std::string dest_name       = "empty_file";
 
-  this->uploader_->Upload(empty_file_path, dest_name,
-                          AbstractUploader::MakeClosure(
+  this->uploader_->UploadFile(empty_file_path, dest_name,
+                              AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
-                                  UploaderResults(0, empty_file_path)));
+                              UploaderResults(0, empty_file_path)));
   this->uploader_->WaitForUpload();
 
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
@@ -796,8 +796,8 @@ TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
   const std::string huge_file_path = TestFixture::GetHugeFile();
   const std::string dest_name     = "huge_file";
 
-  this->uploader_->Upload(huge_file_path, dest_name,
-                          AbstractUploader::MakeClosure(
+  this->uploader_->UploadFile(huge_file_path, dest_name,
+                              AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
                               UploaderResults(0, huge_file_path)));
@@ -842,8 +842,8 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
   Files::const_iterator i    = files.begin();
   Files::const_iterator iend = files.end();
   for (; i != iend; ++i) {
-    this->uploader_->Upload(i->first, i->second,
-                            AbstractUploader::MakeClosure(
+    this->uploader_->UploadFile(i->first, i->second,
+                                AbstractUploader::MakeClosure(
                                 &UploadCallbacks::SimpleUploadClosure,
                                 &this->delegate_,
                                 UploaderResults(0, i->first)));
@@ -1024,9 +1024,9 @@ TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
 
   const std::string dest_name = "data/" + digest.MakePath();
 
-  this->uploader_->Upload(big_file_path,
-                          dest_name,
-                          AbstractUploader::MakeClosure(
+  this->uploader_->UploadFile(big_file_path,
+                              dest_name,
+                              AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
                               UploaderResults(0, big_file_path)));

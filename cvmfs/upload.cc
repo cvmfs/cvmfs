@@ -87,7 +87,7 @@ void Spooler::ProcessMetainfo(const std::string &local_path) {
 
 void Spooler::Upload(const std::string &local_path,
                      const std::string &remote_path) {
-  uploader_->Upload(
+  uploader_->UploadFile(
       local_path, remote_path,
       AbstractUploader::MakeCallback(&Spooler::UploadingCallback, this));
 }

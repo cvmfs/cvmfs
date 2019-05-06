@@ -181,13 +181,13 @@ class AbstractUploader
    * @param remote_path  desired path for the file in the backend storage
    * @param callback     (optional) gets notified when the upload was finished
    */
-  void Upload(
+  void UploadFile(
     const std::string &local_path,
     const std::string &remote_path,
     const CallbackTN *callback = NULL)
   {
     ++jobs_in_flight_;
-    FileUpload(local_path, remote_path, callback);
+    DoUploadFile(local_path, remote_path, callback);
   }
 
   /**
@@ -315,9 +315,9 @@ class AbstractUploader
    * @param remote_path  destination to be written in the backend
    * @param callback     callback to be called on completion
    */
-  virtual void FileUpload(const std::string &local_path,
-                          const std::string &remote_path,
-                          const CallbackTN *callback = NULL) = 0;
+  virtual void DoUploadFile(const std::string &local_path,
+                            const std::string &remote_path,
+                            const CallbackTN *callback = NULL) = 0;
 
   /**
    * Implementation of a streamed upload step. See public interface for details.

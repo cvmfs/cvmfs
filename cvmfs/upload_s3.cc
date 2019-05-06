@@ -259,7 +259,7 @@ void *S3Uploader::MainCollectResults(void *data) {
 }
 
 
-void S3Uploader::FileUpload(
+void S3Uploader::DoUploadFile(
   const std::string &local_path,
   const std::string &remote_path,
   const CallbackTN  *callback
