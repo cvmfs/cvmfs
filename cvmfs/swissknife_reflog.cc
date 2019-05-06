@@ -126,7 +126,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   reflog->DropDatabaseFileOwnership();
   const std::string reflog_db = reflog->database_file();
   reflog.Destroy();
-  uploader->Upload(reflog_db, ".cvmfsreflog");
+  uploader->UploadFile(reflog_db, ".cvmfsreflog");
   shash::Any reflog_hash(manifest->GetHashAlgorithm());
   manifest::Reflog::HashDatabase(reflog_db, &reflog_hash);
   uploader->WaitForUpload();
