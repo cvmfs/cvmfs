@@ -89,9 +89,8 @@ func MakeAuthzMiddleware(ac be.ActionController) mux.MiddlewareFunc {
 						httpWrapError(ctx, err, "missing message-size header", w, http.StatusBadRequest)
 						return
 					}
-					msgRdr := io.LimitReader(req.Body, int64(msgSize))
-					msg, err := ioutil.ReadAll(msgRdr)
-					if err != nil {
+					msg := make([]byte, msgSize)
+					if _, err := io.ReadFull(req.Body, msg); err != nil {
 						httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
 						return
 					}
