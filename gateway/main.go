@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"runtime/pprof"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -33,11 +34,33 @@ func main() {
 	}
 	defer services.Stop()
 
-	timeout := services.Config.MaxLeaseTime
-	if err := fe.Start(services, cfg.Port, timeout); err != nil {
-		gw.Log("main", gw.LogError).
-			Err(err).
-			Msg("starting the HTTP front-end failed")
-		os.Exit(1)
+	closeActions := []func(){}
+	if cfg.CPUProfile != "" {
+		gw.Log("main", gw.LogInfo).Msg("start CPU profiling")
+		if err := gw.EnableCPUProfiling(cfg.CPUProfile); err != nil {
+			gw.Log("main", gw.LogError).
+				Err(err).
+				Msg("could not create profiling output file")
+			os.Exit(1)
+		}
+		closeActions = append(closeActions, func() {
+			gw.Log("main", gw.LogInfo).Msg("stop CPU profiling")
+			pprof.StopCPUProfile()
+		})
 	}
+
+	go func() {
+		timeout := services.Config.MaxLeaseTime
+		if err := fe.Start(services, cfg.Port, timeout); err != nil {
+			gw.Log("main", gw.LogError).
+				Err(err).
+				Msg("starting the HTTP front-end failed")
+			os.Exit(1)
+		}
+	}()
+
+	done := gw.SetupCloseHandler(closeActions)
+
+	gw.Log("main", gw.LogInfo).Msg("waiting for interrupt")
+	<-done
 }

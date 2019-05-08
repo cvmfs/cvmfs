@@ -32,6 +32,9 @@ type Config struct {
 	WorkDir string `mapstructure:"work_dir"`
 	// MockReceiver enables a mocked implementation of the receiver worker
 	MockReceiver bool `mapstructure:"mock_receiver"`
+
+	// CpuProfile is the file where profiling information should be saved. Disabled by default
+	CPUProfile string `mapstructure:"cpu_profile"`
 }
 
 // ReadConfig reads configuration files and commandline flags, and populates a Config object
@@ -49,6 +52,7 @@ func ReadConfig() (*Config, error) {
 	pflag.String("receiver_path", "/usr/bin/cvmfs_receiver", "the path of the cvmfs_receiver executable")
 	pflag.String("work_dir", "/var/lib/cvmfs-gateway", "the working directory for database files")
 	pflag.Bool("mock_receiver", false, "enable the mocked implementation of the receiver process (for testing)")
+	pflag.String("cpu_profile", "", "enable CPU profiling and save output to this file")
 	pflag.Parse()
 
 	viper.SetConfigFile(configFile)
