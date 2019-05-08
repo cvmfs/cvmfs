@@ -12,14 +12,14 @@ fi
 action=$1
 
 if [ x"$action" = xstart ]; then
-    if has_systemd; then
+    if $has_systemd; then
         systemctl start cvmfs-gateway
     else
         service cvmfs-gateway start
     fi
     echo "CVMFS repository gateway started."
 elif [ x"$action" = xstop ]; then
-    if has_systemd; then
+    if $has_systemd; then
         systemctl stop cvmfs-gateway
     else
         service cvmfs-gateway stop
@@ -28,14 +28,14 @@ elif [ x"$action" = xstop ]; then
 elif [ x"$action" = xreload ]; then
     echo "Reloading the CVMFS repository gateway is not implemented. Please use restart."
 elif [ x"$action" = xrestart ]; then
-    if has_systemd; then
+    if $has_systemd; then
         systemctl restart cvmfs-gateway
     else
         service cvmfs-gateway restart
     fi
     echo "CVMFS repository gateway restarted."
 elif [ x"$action" = xstatus ]; then
-    if has_systemd; then
+    if $has_systemd; then
         systemctl restart cvmfs-gateway > /dev/null 2>&1
     else
         service cvmfs-gateway restart > /dev/null 2>&1
