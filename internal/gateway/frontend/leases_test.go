@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 )
 
 func TestLeaseHandlerNewLease(t *testing.T) {
@@ -25,7 +25,8 @@ func TestLeaseHandlerNewLease(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler := MakeLeasesHandler(&backend)
 
-	handler.ServeHTTP(w, req)
+	ps := httprouter.Params{}
+	handler(w, req, ps)
 
 	expected, _ := json.Marshal(map[string]interface{}{
 		"status":          "ok",
@@ -52,12 +53,11 @@ func TestLeaseHandlerCancelLease(t *testing.T) {
 	HMAC := ComputeHMAC([]byte(token), backend.GetSecret("keyid2"))
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 
-	req = mux.SetURLVars(req, map[string]string{"token": token})
-
 	w := httptest.NewRecorder()
 	handler := MakeLeasesHandler(&backend)
 
-	handler.ServeHTTP(w, req)
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
+	handler(w, req, ps)
 
 	expected, _ := json.Marshal(map[string]interface{}{
 		"status": "ok",
@@ -91,12 +91,11 @@ func TestLeaseHandlerCommitLease(t *testing.T) {
 	HMAC := ComputeHMAC([]byte(token), backend.GetSecret("keyid2"))
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 
-	req = mux.SetURLVars(req, map[string]string{"token": token})
-
 	w := httptest.NewRecorder()
 	handler := MakeLeasesHandler(&backend)
 
-	handler.ServeHTTP(w, req)
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
+	handler(w, req, ps)
 
 	expected, _ := json.Marshal(map[string]interface{}{
 		"status": "ok",

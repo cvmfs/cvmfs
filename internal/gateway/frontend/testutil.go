@@ -9,9 +9,10 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
+	"github.com/julienschmidt/httprouter"
 )
 
-func forwardBody(w http.ResponseWriter, req *http.Request) {
+func forwardBody(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	buf, _ := ioutil.ReadAll(req.Body)
 	w.Write(buf)
 }

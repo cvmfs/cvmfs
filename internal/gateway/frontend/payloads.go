@@ -8,13 +8,13 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 )
 
 // MakePayloadsHandler creates an HTTP handler for the API root
-func MakePayloadsHandler(services be.ActionController) http.HandlerFunc {
-	return func(w http.ResponseWriter, h *http.Request) {
-		token, hasToken := mux.Vars(h)["token"]
+func MakePayloadsHandler(services be.ActionController) httprouter.Handle {
+	return func(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
+		token := ps.ByName("token")
 
 		ctx := h.Context()
 
@@ -42,7 +42,7 @@ func MakePayloadsHandler(services be.ActionController) http.HandlerFunc {
 			return
 		}
 
-		if !hasToken {
+		if token == "" {
 			// For legacy style requests, the token is provided in the request message
 			token = req.TokenStr
 		}

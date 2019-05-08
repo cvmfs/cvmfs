@@ -5,18 +5,16 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 )
 
 // MakeReposHandler creates an HTTP handler for the API root
-func MakeReposHandler(services be.ActionController) http.HandlerFunc {
-	return func(w http.ResponseWriter, h *http.Request) {
+func MakeReposHandler(services be.ActionController) httprouter.Handle {
+	return func(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
 		ctx := h.Context()
-		vs := mux.Vars(h)
-
 		msg := make(map[string]interface{})
 
-		if repoName, present := vs["name"]; present {
+		if repoName := ps.ByName("name"); repoName != "" {
 			r := services.GetRepo(repoName)
 			if len(r) == 0 {
 				msg["status"] = "error"
