@@ -193,14 +193,13 @@ func (r *CvmfsReceiver) call(reqID receiverOp, msg []byte, payload io.Reader) ([
 }
 
 func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader) error {
-	if err := binary.Write(r.stdin, binary.LittleEndian, reqID); err != nil {
-		return errors.Wrap(err, "could not write request id")
-	}
-	if err := binary.Write(r.stdin, binary.LittleEndian, int32(len(msg))); err != nil {
-		return errors.Wrap(err, "could not write request size")
-	}
-	if _, err := r.stdin.Write(msg); err != nil {
-		return errors.Wrap(err, "could not write request body")
+	buf := make([]byte, 8+len(msg))
+	binary.LittleEndian.PutUint32(buf[:4], uint32(reqID))
+	binary.LittleEndian.PutUint32(buf[4:8], uint32(len(msg)))
+	copy(buf[8:], msg)
+
+	if _, err := r.stdin.Write(buf); err != nil {
+		return errors.Wrap(err, "could not write request")
 	}
 	if payload != nil {
 		if _, err := io.Copy(r.stdin, payload); err != nil {
@@ -211,14 +210,14 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader)
 }
 
 func (r *CvmfsReceiver) reply() ([]byte, error) {
-	var repSize int32
-	if err := binary.Read(r.stdout, binary.LittleEndian, &repSize); err != nil {
+	buf := make([]byte, 4)
+	if _, err := io.ReadFull(r.stdout, buf); err != nil {
 		return nil, errors.Wrap(err, "could not read reply size")
 	}
+	repSize := int32(binary.LittleEndian.Uint32(buf))
 
 	reply := make([]byte, repSize)
-	reply, err := ioutil.ReadAll(io.LimitReader(r.stdout, int64(repSize)))
-	if err != nil {
+	if _, err := io.ReadFull(r.stdout, reply); err != nil {
 		return nil, errors.Wrap(err, "could not read reply body")
 	}
 
