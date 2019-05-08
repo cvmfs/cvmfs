@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -155,7 +155,7 @@ func TestAuthorizationMiddlewareSubmitPayloadLegacy(t *testing.T) {
 	HMAC := ComputeHMAC(msg, backend.GetSecret("keyid2"))
 	req := httptest.NewRequest("POST", "/api/v1/payloads", bytes.NewReader(msg))
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
-	req.Header["Message-Size"] = []string{fmt.Sprintf("%v", len(msg))}
+	req.Header["Message-Size"] = []string{strconv.Itoa(len(msg))}
 	w := httptest.NewRecorder()
 	handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
 
@@ -189,7 +189,7 @@ func TestAuthorizationMiddlewareSubmitPayloadNew(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"token": token})
 
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
-	req.Header["Message-Size"] = []string{fmt.Sprintf("%v", len(msg))}
+	req.Header["Message-Size"] = []string{strconv.Itoa(len(msg))}
 	w := httptest.NewRecorder()
 	handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
 
