@@ -1,12 +1,26 @@
-CVMFS Repository Gateway
-========================
+CernVM-FS Repository Gateway
+============================
 
 Build status: [![build status](https://travis-ci.org/cvmfs/cvmfs-gateway.svg?branch=master)](https://travis-ci.org/cvmfs/cvmfs-gateway)
 
-The CVMFS repository gateway is part of the CernVM File System.
+The CernVM-FS repository gateway exposes a service API which is consumed by the CernVM-FS publisher tools, and mediates all interactions between publisher machines and the repository.
 
-Build and test
---------------
+Building
+--------
+
+Go version 1.11.5 or newer is required to build `cvmfs-gateway`. The packages
+uses standard Go modules for dependency management. To build the package, run:
+```bash
+$ go build
+```
+
+Vendored copies of all dependencies are provided in this repository, for use in CI environments where it is not desirable to depend on external package sources. To build using the vendored dependencies, run:
+```bash
+$ go build -mod=vendor
+```
+
+Running the testsuite
+---------------------
 
 ```bash
 $ go test -v ./...
