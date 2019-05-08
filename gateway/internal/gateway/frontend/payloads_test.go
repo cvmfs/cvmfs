@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 )
 
 func TestPayloadHandlerLegacy(t *testing.T) {
@@ -32,7 +32,8 @@ func TestPayloadHandlerLegacy(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler := MakePayloadsHandler(&backend)
 
-	handler.ServeHTTP(w, req)
+	ps := httprouter.Params{}
+	handler(w, req, ps)
 
 	expected, _ := json.Marshal(map[string]interface{}{
 		"status": "ok",
@@ -66,12 +67,11 @@ func TestPayloadHandlerNew(t *testing.T) {
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 	req.Header["Message-Size"] = []string{fmt.Sprintf("%v", len(msg))}
 
-	req = mux.SetURLVars(req, map[string]string{"token": token})
-
 	w := httptest.NewRecorder()
 	handler := MakePayloadsHandler(&backend)
 
-	handler.ServeHTTP(w, req)
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
+	handler(w, req, ps)
 
 	expected, _ := json.Marshal(map[string]interface{}{
 		"status": "ok",

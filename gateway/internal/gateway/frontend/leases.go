@@ -9,19 +9,18 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 )
 
 // MakeLeasesHandler creates an HTTP handler for the API root
-func MakeLeasesHandler(services be.ActionController) http.HandlerFunc {
-	return func(w http.ResponseWriter, h *http.Request) {
-		vs := mux.Vars(h)
-		token, hasArg := vs["token"]
+func MakeLeasesHandler(services be.ActionController) httprouter.Handle {
+	return func(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
+		token := ps.ByName("token")
 		switch h.Method {
 		case "GET":
 			handleGetLeases(services, token, w, h)
 		case "POST":
-			if hasArg {
+			if token != "" {
 				// Committing an existing lease (transaction)
 				handleCommitLease(services, token, w, h)
 			} else {

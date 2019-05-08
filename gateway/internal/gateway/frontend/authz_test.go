@@ -5,36 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 )
 
-func TestAuthorizationMiddlewareGET(t *testing.T) {
-	backend := mockBackend{}
-	t.Run("GET requires no authorization", func(t *testing.T) {
-		reqBody := []byte("hello")
-		req := httptest.NewRequest("GET", "/api/v1/repos", bytes.NewReader(reqBody))
-		w := httptest.NewRecorder()
-		handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
-
-		handler.ServeHTTP(w, req)
-
-		resp := w.Result()
-
-		if resp.StatusCode != 200 {
-			t.Errorf("Invalid HTTP response status code: %v", resp.StatusCode)
-		}
-
-		respBody, _ := ioutil.ReadAll(resp.Body)
-		if !bytes.Equal(reqBody, respBody) {
-			t.Errorf("Invalid response body: %v", string(respBody))
-		}
-	})
-}
 func TestAuthorizationMiddlewareNewLease(t *testing.T) {
 	backend := mockBackend{}
 	t.Run("POST /leases (new lease OK)", func(t *testing.T) {
@@ -43,9 +20,10 @@ func TestAuthorizationMiddlewareNewLease(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(reqBody))
 		req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 		w := httptest.NewRecorder()
-		handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
+		handler := WithAuthz(&backend, forwardBody)
 
-		handler.ServeHTTP(w, req)
+		ps := httprouter.Params{}
+		handler(w, req, ps)
 
 		resp := w.Result()
 
@@ -58,9 +36,10 @@ func TestAuthorizationMiddlewareNewLease(t *testing.T) {
 		reqBody := []byte("hello")
 		req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(reqBody))
 		w := httptest.NewRecorder()
-		handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
+		handler := WithAuthz(&backend, forwardBody)
 
-		handler.ServeHTTP(w, req)
+		ps := httprouter.Params{}
+		handler(w, req, ps)
 
 		resp := w.Result()
 
@@ -74,9 +53,10 @@ func TestAuthorizationMiddlewareNewLease(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(reqBody))
 		w := httptest.NewRecorder()
 		req.Header["Authorization"] = []string{"rubbish"}
-		handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
+		handler := WithAuthz(&backend, forwardBody)
 
-		handler.ServeHTTP(w, req)
+		ps := httprouter.Params{}
+		handler(w, req, ps)
 
 		resp := w.Result()
 
@@ -91,9 +71,10 @@ func TestAuthorizationMiddlewareNewLease(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(reqBody))
 		w := httptest.NewRecorder()
 		req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
-		handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
+		handler := WithAuthz(&backend, forwardBody)
 
-		handler.ServeHTTP(w, req)
+		ps := httprouter.Params{}
+		handler(w, req, ps)
 
 		resp := w.Result()
 
@@ -112,9 +93,10 @@ func TestAuthorizationMiddlewareCommitLease(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/v1/leases/"+token, nil)
 		req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 		w := httptest.NewRecorder()
-		handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
+		handler := WithAuthz(&backend, forwardBody)
 
-		handler.ServeHTTP(w, req)
+		ps := httprouter.Params{}
+		handler(w, req, ps)
 
 		resp := w.Result()
 
@@ -128,9 +110,10 @@ func TestAuthorizationMiddlewareCommitLease(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/v1/leases/"+token, bytes.NewReader(reqBody))
 		w := httptest.NewRecorder()
 		req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
-		handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
+		handler := WithAuthz(&backend, forwardBody)
 
-		handler.ServeHTTP(w, req)
+		ps := httprouter.Params{}
+		handler(w, req, ps)
 
 		resp := w.Result()
 
@@ -157,9 +140,10 @@ func TestAuthorizationMiddlewareSubmitPayloadLegacy(t *testing.T) {
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 	req.Header["Message-Size"] = []string{strconv.Itoa(len(msg))}
 	w := httptest.NewRecorder()
-	handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
+	handler := WithAuthz(&backend, forwardBody)
 
-	handler.ServeHTTP(w, req)
+	ps := httprouter.Params{}
+	handler(w, req, ps)
 
 	resp := w.Result()
 
@@ -186,14 +170,14 @@ func TestAuthorizationMiddlewareSubmitPayloadNew(t *testing.T) {
 	HMAC := ComputeHMAC([]byte(token), backend.GetSecret("keyid2"))
 	req := httptest.NewRequest("POST", "/api/v1/payloads/"+token, bytes.NewReader(msg))
 
-	req = mux.SetURLVars(req, map[string]string{"token": token})
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
 
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 	req.Header["Message-Size"] = []string{strconv.Itoa(len(msg))}
 	w := httptest.NewRecorder()
-	handler := MakeAuthzMiddleware(&backend)(http.HandlerFunc(forwardBody))
+	handler := WithAuthz(&backend, forwardBody)
 
-	handler.ServeHTTP(w, req)
+	handler(w, req, ps)
 
 	resp := w.Result()
 

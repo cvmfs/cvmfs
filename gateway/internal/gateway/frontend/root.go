@@ -3,11 +3,13 @@ package frontend
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 // NewRootHandler creates an HTTP handler for the API root
-func NewRootHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, h *http.Request) {
+func NewRootHandler() httprouter.Handle {
+	return func(w http.ResponseWriter, h *http.Request, _ httprouter.Params) {
 		msg := make(map[string]interface{})
 		msg["welcome"] = fmt.Sprintf(
 			"You are in an open field on the west side " +

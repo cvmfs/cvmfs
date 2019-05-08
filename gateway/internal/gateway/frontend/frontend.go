@@ -7,50 +7,44 @@ import (
 
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
 
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 )
 
 // NewFrontend builds and configures a new HTTP server, but does not start it
 func NewFrontend(services be.ActionController, port int, timeout time.Duration) *http.Server {
-	router := mux.NewRouter()
+	router := httprouter.New()
 
-	// Add the request tagging middleware
-	router.Use(MakeTaggingMiddleware())
+	// middleware which only tags requests for GET
+	tag := func(h httprouter.Handle) httprouter.Handle {
+		return WithTag(h)
+	}
 
-	// Add the HMAC authorization middleware
-	router.Use(MakeAuthzMiddleware(services))
+	// middleware which tags requests and performs HMAC authorization
+	mw := func(h httprouter.Handle) httprouter.Handle {
+		return WithTag(WithAuthz(services, h))
+	}
 
 	// Register the different routes
 
 	// Root handler
-	router.Path(APIRoot).HandlerFunc(NewRootHandler())
+	router.GET(APIRoot, tag(NewRootHandler()))
 
 	// Repositories
-	router.Path(APIRoot + "/repos/{name}").
-		Methods("GET").
-		HandlerFunc(MakeReposHandler(services))
-	router.Path(APIRoot + "/repos").
-		Methods("GET").
-		HandlerFunc(MakeReposHandler(services))
+	router.GET(APIRoot+"/repos", tag(MakeReposHandler(services)))
+	router.GET(APIRoot+"/repos/:name", tag(MakeReposHandler(services)))
 
 	// Leases
-	router.Path(APIRoot+"/leases").
-		Methods("GET", "POST").
-		HandlerFunc(MakeLeasesHandler(services))
-	router.Path(APIRoot+"/leases/{token}").
-		Methods("GET", "DELETE", "POST").
-		HandlerFunc(MakeLeasesHandler(services))
+	router.GET(APIRoot+"/leases", tag(MakeLeasesHandler(services)))
+	router.GET(APIRoot+"/leases/:token", tag(MakeLeasesHandler(services)))
+	router.POST(APIRoot+"/leases", mw(MakeLeasesHandler(services)))
+	router.POST(APIRoot+"/leases/:token", mw(MakeLeasesHandler(services)))
+	router.DELETE(APIRoot+"/leases/:token", mw(MakeLeasesHandler(services)))
 
 	// Payloads (legacy endpoint)
-	router.Path(APIRoot + "/payloads").
-		Methods("POST").
-		HandlerFunc(MakePayloadsHandler(services))
-
+	router.POST(APIRoot+"/payloads", mw(MakePayloadsHandler(services)))
 	// Payloads (new and improved)
-	router.Path(APIRoot + "/payloads/{token}").
-		Methods("POST").
-		HandlerFunc(MakePayloadsHandler(services))
+	router.POST(APIRoot+"/payloads/:token", mw(MakePayloadsHandler(services)))
 
 	// Configure and start the HTTP server
 	srv := &http.Server{
