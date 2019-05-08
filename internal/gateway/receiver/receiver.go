@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
@@ -59,8 +59,8 @@ func NewReceiver(ctx context.Context, execPath string, mock bool) (Receiver, err
 // CvmfsReceiver spawns an external cvmfs_receiver worker process
 type CvmfsReceiver struct {
 	worker *exec.Cmd
-	stdin  io.Writer
-	stdout io.Reader
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
 	ctx    context.Context
 }
 
@@ -70,16 +70,18 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 		return nil, errors.Wrap(err, "worker process executable not found")
 	}
 
-	cmd := exec.Command(execPath)
+	cmd := exec.Command(execPath, "-i", strconv.Itoa(3), "-o", strconv.Itoa(4))
 
-	stdin, err := cmd.StdinPipe()
+	stdinRead, stdinWrite, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get writable pipe")
+		return nil, errors.Wrap(err, "could not create stdin pipe")
 	}
-	stdout, err := cmd.StdoutPipe()
+	stdoutRead, stdoutWrite, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get readable pipe")
+		return nil, errors.Wrap(err, "could not create stdout pipe")
 	}
+
+	cmd.ExtraFiles = []*os.File{stdinRead, stdoutWrite}
 
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "could not start worker process")
@@ -89,11 +91,16 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 		Str("command", "start").
 		Msg("worker process ready")
 
-	return &CvmfsReceiver{worker: cmd, stdin: stdin, stdout: stdout, ctx: ctx}, nil
+	return &CvmfsReceiver{worker: cmd, stdin: stdinWrite, stdout: stdoutRead, ctx: ctx}, nil
 }
 
 // Quit command is sent to the worker
 func (r *CvmfsReceiver) Quit() error {
+	defer func() {
+		r.stdin.Close()
+		r.stdout.Close()
+	}()
+
 	if _, err := r.call(receiverQuit, []byte{}, nil); err != nil {
 		return errors.Wrap(err, "worker 'quit' call failed")
 	}
