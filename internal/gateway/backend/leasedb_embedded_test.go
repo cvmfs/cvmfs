@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 )
@@ -17,6 +18,7 @@ func TestEmbeddedLeaseDBOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
+	defer os.RemoveAll(tmp)
 
 	db, err := OpenEmbeddedLeaseDB(tmp)
 	if err != nil {
@@ -31,6 +33,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
+	defer os.RemoveAll(tmp)
 
 	db, err := OpenEmbeddedLeaseDB(tmp)
 	if err != nil {
@@ -118,6 +121,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
+	defer os.RemoveAll(tmp)
 
 	db, err := OpenEmbeddedLeaseDB(tmp)
 	if err != nil {
@@ -165,6 +169,7 @@ func TestEmbeddedLeaseDBExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
+	defer os.RemoveAll(tmp)
 
 	shortLeaseTime := 1 * time.Millisecond
 

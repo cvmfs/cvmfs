@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -10,8 +11,11 @@ import (
 
 func TestLeaseActionsNewLease(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("lease_actions_test", 1*time.Second)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	t.Run("new lease busy", func(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
@@ -91,8 +95,11 @@ func TestLeaseActionsNewLease(t *testing.T) {
 
 func TestLeaseActionsCancelLease(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("lease_actions_test", 1*time.Second)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	t.Run("remove existing lease", func(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
@@ -125,8 +132,11 @@ func TestLeaseActionsCancelLease(t *testing.T) {
 
 func TestLeaseActionsGetLease(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("lease_actions_test", 1*time.Second)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	t.Run("get valid lease", func(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
@@ -186,8 +196,11 @@ func TestLeaseActionsGetLease(t *testing.T) {
 
 func TestLeaseActionsCommitLease(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("lease_actions_test", 1*time.Second)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	t.Run("commit valid lease", func(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
