@@ -1,3 +1,8 @@
+1.1.0:
+  * The application was rewritten in Go, with full backward compatibility
+  * Lower memory use during payload submission: object packs are now streamed
+    to receiver
+
 1.0.0:
   * More robust and less verbose repository and key configuration (CVM-1679)
   * A "path_busy" reply to a "new_lease" request now provides the remaining lease time
