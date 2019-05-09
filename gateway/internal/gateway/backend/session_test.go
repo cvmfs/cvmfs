@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -11,8 +12,11 @@ import (
 
 func TestSessionValid(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("session_test", 1*time.Second)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("session_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
@@ -43,8 +47,11 @@ func TestSessionValid(t *testing.T) {
 
 func TestSessionSubmitWithInvalidToken(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("session_test", 1*time.Second)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("session_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
@@ -72,8 +79,11 @@ func TestSessionSubmitWithInvalidToken(t *testing.T) {
 
 func TestSessionSubmitWithExpiredToken(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("session_test", 1*time.Millisecond)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("session_test", 1*time.Millisecond)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
@@ -98,8 +108,11 @@ func TestSessionSubmitWithExpiredToken(t *testing.T) {
 
 func TestSessionCommitWithInvalidToken(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("session_test", 1*time.Second)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("session_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
@@ -136,8 +149,11 @@ func TestSessionCommitWithInvalidToken(t *testing.T) {
 
 func TestSessionCommitWithExpiredToken(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("session_test", 50*time.Millisecond)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("session_test", 50*time.Millisecond)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	ctx := context.TODO()
 	keyID := "keyid1"
@@ -171,8 +187,11 @@ func TestSessionCommitWithExpiredToken(t *testing.T) {
 
 func TestSessionTwoConcurrentValid(t *testing.T) {
 	lastProtocolVersion := 3
-	backend := StartTestBackend("session_test", 1*time.Second)
-	defer backend.Stop()
+	backend, tmp := StartTestBackend("session_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
 
 	ctx := context.TODO()
 	keyID := "keyid1"

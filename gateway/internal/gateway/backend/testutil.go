@@ -109,7 +109,7 @@ func testConfig(workDir string) *gw.Config {
 }
 
 // StartTestBackend for testing
-func StartTestBackend(name string, maxLeaseTime time.Duration) *Services {
+func StartTestBackend(name string, maxLeaseTime time.Duration) (*Services, string) {
 	tmp, err := ioutil.TempDir("", name)
 	if err != nil {
 		os.Exit(1)
@@ -134,5 +134,5 @@ func StartTestBackend(name string, maxLeaseTime time.Duration) *Services {
 		os.Exit(4)
 	}
 
-	return &Services{Access: ac, Leases: ldb, Pool: pool, Config: *cfg}
+	return &Services{Access: ac, Leases: ldb, Pool: pool, Config: *cfg}, tmp
 }
