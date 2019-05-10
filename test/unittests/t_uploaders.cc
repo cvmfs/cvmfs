@@ -714,13 +714,13 @@ TYPED_TEST(T_Uploaders, IngestionSource) {
   std::string content;
   EXPECT_TRUE(SafeReadToString(fd, &content));
   close(fd);
-  StringIngestionSource source("/from/memory", content);
+  StringIngestionSource source(content);
   const std::string dest_name = "string";
 
   this->uploader_->UploadIngestionSource(dest_name, &source,
     AbstractUploader::MakeClosure(&UploadCallbacks::SimpleUploadClosure,
                                   &this->delegate_,
-                                  UploaderResults(0, "/from/memory")));
+                                  UploaderResults(0, "MEM")));
   this->uploader_->WaitForUpload();
 
   const bool file_exists = this->uploader_->Peek(dest_name);

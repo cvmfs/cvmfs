@@ -51,6 +51,10 @@ int CmdMkfs::Main(const Options &options) {
              "Note: Autotagging all revisions impedes garbage collection");
   }
 
+  // Needs to be done before the storage and its temp dir is configured
+  if (options.Has("no-publisher"))
+    settings.GetTransaction()->GetSpoolArea()->SetSystemTempDir();
+
   // Storage configuration
   if (options.Has("storage")) {
     if (options.Has("s3config")) {

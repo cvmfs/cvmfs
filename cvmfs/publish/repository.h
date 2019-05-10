@@ -8,6 +8,8 @@
 #include <string>
 
 #include "publish/settings.h"
+#include "upload_spooler_result.h"
+#include "util/single_copy.h"
 #include "util/single_copy.h"
 
 namespace signature {
@@ -61,6 +63,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   signature::SignatureManager *signature_mgr() { return signature_mgr_; }
 
  private:
+  void OnUpload(const upload::SpoolerResult &result);
+
   SettingsPublisher settings_;
 
   signature::SignatureManager *signature_mgr_;

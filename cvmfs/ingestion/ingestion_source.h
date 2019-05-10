@@ -145,9 +145,9 @@ class MemoryIngestionSource : public IngestionSource {
  */
 class StringIngestionSource : public IngestionSource {
  public:
-  StringIngestionSource(const std::string &p, const std::string &data)
+  explicit StringIngestionSource(const std::string &data)
     : data_(data)
-    , source_(p,
+    , source_("MEM",
               reinterpret_cast<const unsigned char *>(data.data()),
               data.length())
   {}

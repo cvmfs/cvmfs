@@ -73,8 +73,9 @@ int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
       CreateTempPath(spooler_definition_.temporary_path + "/" + "chunk", 0644);
   if (tmp_path.empty()) {
     LogCvmfs(kLogSpooler, kLogStderr,
-             "Failed to create temp file for upload of file chunk (errno: %d).",
-             errno);
+             "Failed to create temp file in %s for upload of file chunk"
+             " (errno: %d).",
+             spooler_definition_.temporary_path.c_str(), errno);
     return -1;
   }
 
