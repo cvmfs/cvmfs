@@ -5,6 +5,7 @@
 #include "cvmfs_config.h"
 #include "publish/settings.h"
 
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,16 @@
 #include "util/string.h"
 
 namespace publish {
+
+void SettingsSpoolArea::SetSystemTempDir() {
+  if (getenv("TMPDIR") != NULL)
+    tmp_dir_ = getenv("TMPDIR");
+  else
+    tmp_dir_ = "/tmp";
+}
+
+
+//------------------------------------------------------------------------------
 
 
 void SettingsTransaction::SetUnionFsType(const std::string &union_fs) {
@@ -62,7 +73,7 @@ void SettingsStorage::MakeS3(
 {
   type_ = upload::SpoolerDefinition::S3;
   tmp_dir_ = spool_area.tmp_dir();
-  endpoint_ = fqrn_ + "@" + s3_config;
+  endpoint_ = "cvmfs/" + fqrn_ + "@" + s3_config;
 }
 
 void SettingsStorage::SetLocator(const std::string &locator) {

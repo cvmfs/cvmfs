@@ -7,6 +7,7 @@
 
 #include <cstddef>
 
+#include "ingestion/ingestion_source.h"
 #include "logging.h"
 #include "publish/settings.h"
 #include "publish/except.h"
@@ -54,12 +55,12 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
     settings.transaction().compression_algorithm());
   UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
   if (!spooler.IsValid()) throw EPublish("could not initialize spooler");
+  spooler->RegisterListener(&Publisher::OnUpload, publisher.weak_ref());
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Creating Backend Storage... ");
   if (!spooler->Create())
     throw EPublish("could not initialize repository storage area");
-  publisher->TakeSpooler(spooler.Release());
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
@@ -67,21 +68,31 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   UniquePtr<whitelist::Whitelist> whitelist(new whitelist::Whitelist(
     settings.fqrn(), NULL, publisher->signature_mgr()));
   assert(whitelist.IsValid());
-  whitelist::Failures rv_wl = whitelist->LoadMem(whitelist::Whitelist::Create(
+  std::string whitelist_data = whitelist::Whitelist::Create(
     settings.fqrn(),
     settings.whitelist_validity_days(),
     settings.transaction().hash_algorithm(),
-    publisher->signature_mgr()));
+    publisher->signature_mgr());
+  whitelist::Failures rv_wl = whitelist->LoadMem(whitelist_data);
   if (rv_wl != whitelist::kFailOk)
     throw EPublish("whitelist generation failed");
   publisher->TakeWhitelist(whitelist.Release());
 
+  StringIngestionSource whitelist_source(whitelist_data);
+  spooler->Upload(".cvmfswhitelist", &whitelist_source);
 
   // Upload whitelist (+ PKCS7) and certificate
   // Create root catalog, upload it together with manifest, reflog
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
+  publisher->TakeSpooler(spooler.Release());
   return publisher.Release();
+}
+
+void Publisher::OnUpload(const upload::SpoolerResult &result) {
+  if (result.return_code != 0) {
+    throw EPublish("cannot write to storage");
+  }
 }
 
 Publisher::Publisher(const SettingsPublisher &settings)
