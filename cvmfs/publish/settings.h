@@ -27,6 +27,8 @@ public:
     , tmp_dir_(spool_area_ + "/tmp")
   { }
 
+  void SetSystemTempDir();
+
   std::string tmp_dir() const { return tmp_dir_; }
 
 private:
