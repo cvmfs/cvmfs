@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"runtime/pprof"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -34,21 +33,6 @@ func main() {
 	}
 	defer services.Stop()
 
-	closeActions := []func(){}
-	if cfg.CPUProfile != "" {
-		gw.Log("main", gw.LogInfo).Msg("start CPU profiling")
-		if err := gw.EnableCPUProfiling(cfg.CPUProfile); err != nil {
-			gw.Log("main", gw.LogError).
-				Err(err).
-				Msg("could not create profiling output file")
-			os.Exit(1)
-		}
-		closeActions = append(closeActions, func() {
-			gw.Log("main", gw.LogInfo).Msg("stop CPU profiling")
-			pprof.StopCPUProfile()
-		})
-	}
-
 	go func() {
 		timeout := services.Config.MaxLeaseTime
 		if err := fe.Start(services, cfg.Port, timeout); err != nil {
@@ -59,7 +43,7 @@ func main() {
 		}
 	}()
 
-	done := gw.SetupCloseHandler(closeActions)
+	done := gw.SetupCloseHandler([]func(){})
 
 	gw.Log("main", gw.LogInfo).Msg("waiting for interrupt")
 	<-done
