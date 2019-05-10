@@ -23,15 +23,15 @@ type statements struct {
 	getLease  *sql.Stmt
 }
 
-// EmbeddedLeaseDB is a LeaseDB backed by BoltDB
-type EmbeddedLeaseDB struct {
+// SqliteLeaseDB is a LeaseDB backed by BoltDB
+type SqliteLeaseDB struct {
 	store *sql.DB
 	locks NamedLocks // Per-repository commit locks
 	st    statements
 }
 
-// OpenEmbeddedLeaseDB creates a new embedded lease DB
-func OpenEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
+// OpenSqliteLeaseDB creates a new embedded lease DB
+func OpenSqliteLeaseDB(workDir string) (*SqliteLeaseDB, error) {
 	if err := os.MkdirAll(workDir, 0777); err != nil {
 		return nil, errors.Wrap(err, "could not create directory for backing store")
 	}
@@ -65,10 +65,10 @@ func OpenEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
 		return nil, errors.Wrap(err, "could not prepare statement for 'get lease'")
 	}
 
-	gw.Log("leasedb", gw.LogInfo).
+	gw.Log("leasedb_sqlite", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
 
-	return &EmbeddedLeaseDB{
+	return &SqliteLeaseDB{
 		store: store,
 		locks: NamedLocks{},
 		st:    statements{getLeases: st1, getLease: st2},
@@ -76,7 +76,7 @@ func OpenEmbeddedLeaseDB(workDir string) (*EmbeddedLeaseDB, error) {
 }
 
 // Close the lease database
-func (db *EmbeddedLeaseDB) Close() error {
+func (db *SqliteLeaseDB) Close() error {
 	err1 := db.st.getLeases.Close()
 	err2 := db.st.getLease.Close()
 	err3 := db.store.Close()
@@ -93,7 +93,7 @@ func (db *EmbeddedLeaseDB) Close() error {
 }
 
 // NewLease attemps to acquire a new lease for the given path
-func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error {
+func (db *SqliteLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error {
 	t0 := time.Now()
 
 	txn, err := db.store.Begin()
@@ -137,7 +137,7 @@ func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string
 	if existing.token != "" {
 		timeLeft := existing.expiration.Sub(time.Now())
 		if timeLeft > 0 {
-			gw.LogC(ctx, "leasedb", gw.LogDebug).
+			gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 				Str("operation", "new_lease").
 				Str("token", token.TokenStr).
 				Msgf("path_busy, time left: %v s", timeLeft.Seconds())
@@ -161,7 +161,7 @@ func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string
 		return errors.Wrap(err, "could not commit transaction")
 	}
 
-	gw.LogC(ctx, "leasedb", gw.LogDebug).
+	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "new_lease").
 		Str("token", token.TokenStr).
 		Float64("task_dt", time.Now().Sub(t0).Seconds()).
@@ -171,7 +171,7 @@ func (db *EmbeddedLeaseDB) NewLease(ctx context.Context, keyID, leasePath string
 }
 
 // GetLeases returns a list of all active leases
-func (db *EmbeddedLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, error) {
+func (db *SqliteLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, error) {
 	t0 := time.Now()
 
 	matches, err := db.st.getLeases.Query()
@@ -197,7 +197,7 @@ func (db *EmbeddedLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, err
 		leases[leasePath] = Lease{KeyID: keyID, ProtocolVersion: int(protocolVersion), Token: token}
 	}
 
-	gw.LogC(ctx, "leasedb", gw.LogDebug).
+	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "get_leases").
 		Float64("task_dt", time.Now().Sub(t0).Seconds()).
 		Msgf("found %v leases", len(leases))
@@ -206,7 +206,7 @@ func (db *EmbeddedLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, err
 }
 
 // GetLease returns the lease for a given token string
-func (db *EmbeddedLeaseDB) GetLease(ctx context.Context, tokenStr string) (string, *Lease, error) {
+func (db *SqliteLeaseDB) GetLease(ctx context.Context, tokenStr string) (string, *Lease, error) {
 	t0 := time.Now()
 
 	var repoName string
@@ -232,7 +232,7 @@ func (db *EmbeddedLeaseDB) GetLease(ctx context.Context, tokenStr string) (strin
 		Token:           LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: time.Unix(0, expiration)},
 	}
 
-	gw.LogC(ctx, "leasedb", gw.LogDebug).
+	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "get_lease").
 		Str("token", tokenStr).
 		Float64("task_dt", time.Now().Sub(t0).Seconds()).
@@ -242,7 +242,7 @@ func (db *EmbeddedLeaseDB) GetLease(ctx context.Context, tokenStr string) (strin
 }
 
 // CancelLeases cancels all active leases
-func (db *EmbeddedLeaseDB) CancelLeases(ctx context.Context) error {
+func (db *SqliteLeaseDB) CancelLeases(ctx context.Context) error {
 	t0 := time.Now()
 
 	txn, err := db.store.Begin()
@@ -262,7 +262,7 @@ func (db *EmbeddedLeaseDB) CancelLeases(ctx context.Context) error {
 	}
 
 	if numRows == 0 {
-		gw.LogC(ctx, "leasedb", gw.LogDebug).
+		gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 			Str("operation", "cancel_lease").
 			Msgf("cancellation failed")
 		return InvalidLeaseError{}
@@ -272,7 +272,7 @@ func (db *EmbeddedLeaseDB) CancelLeases(ctx context.Context) error {
 		return errors.Wrap(err, "transaction commit failed")
 	}
 
-	gw.LogC(ctx, "leasedb", gw.LogDebug).
+	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "cancel_leases").
 		Float64("task_dt", time.Now().Sub(t0).Seconds()).
 		Msgf("all leases cancelled")
@@ -281,7 +281,7 @@ func (db *EmbeddedLeaseDB) CancelLeases(ctx context.Context) error {
 }
 
 // CancelLease cancels the lease for a token string
-func (db *EmbeddedLeaseDB) CancelLease(ctx context.Context, tokenStr string) error {
+func (db *SqliteLeaseDB) CancelLease(ctx context.Context, tokenStr string) error {
 	t0 := time.Now()
 
 	txn, err := db.store.Begin()
@@ -301,7 +301,7 @@ func (db *EmbeddedLeaseDB) CancelLease(ctx context.Context, tokenStr string) err
 	}
 
 	if numRows == 0 {
-		gw.LogC(ctx, "leasedb", gw.LogDebug).
+		gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 			Str("operation", "cancel_lease").
 			Str("token", tokenStr).
 			Msgf("cancellation failed, invalid token")
@@ -312,7 +312,7 @@ func (db *EmbeddedLeaseDB) CancelLease(ctx context.Context, tokenStr string) err
 		return errors.Wrap(err, "transaction commit failed")
 	}
 
-	gw.LogC(ctx, "leasedb", gw.LogDebug).
+	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "cancel_lease").
 		Str("token", tokenStr).
 		Float64("task_dt", time.Now().Sub(t0).Seconds()).
@@ -322,7 +322,7 @@ func (db *EmbeddedLeaseDB) CancelLease(ctx context.Context, tokenStr string) err
 }
 
 // WithLock runs the given task while holding a commit lock for the repository
-func (db *EmbeddedLeaseDB) WithLock(ctx context.Context, repository string, task func() error) error {
+func (db *SqliteLeaseDB) WithLock(ctx context.Context, repository string, task func() error) error {
 	return db.locks.WithLock(repository, task)
 }
 

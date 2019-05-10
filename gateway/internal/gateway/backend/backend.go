@@ -44,7 +44,7 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 			err, "loading repository access configuration failed")
 	}
 
-	leaseDBType := "embedded"
+	leaseDBType := "sqlite"
 	if cfg.UseEtcd {
 		leaseDBType = "etcd"
 	}

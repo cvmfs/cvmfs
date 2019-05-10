@@ -13,21 +13,21 @@ const (
 	maxLeaseTime time.Duration = 100 * time.Second
 )
 
-func TestEmbeddedLeaseDBOpen(t *testing.T) {
+func TestSqliteLeaseDBOpen(t *testing.T) {
 	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
 	defer os.RemoveAll(tmp)
 
-	db, err := OpenEmbeddedLeaseDB(tmp)
+	db, err := OpenSqliteLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
 	defer db.Close()
 }
 
-func TestEmbeddedLeaseDBCRUD(t *testing.T) {
+func TestSqliteLeaseDBCRUD(t *testing.T) {
 	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
@@ -35,7 +35,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 	}
 	defer os.RemoveAll(tmp)
 
-	db, err := OpenEmbeddedLeaseDB(tmp)
+	db, err := OpenSqliteLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestEmbeddedLeaseDBCRUD(t *testing.T) {
 	})
 }
 
-func TestEmbeddedLeaseDBConflicts(t *testing.T) {
+func TestSqliteLeaseDBConflicts(t *testing.T) {
 	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
@@ -123,7 +123,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 	}
 	defer os.RemoveAll(tmp)
 
-	db, err := OpenEmbeddedLeaseDB(tmp)
+	db, err := OpenSqliteLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestEmbeddedLeaseDBConflicts(t *testing.T) {
 	}
 }
 
-func TestEmbeddedLeaseDBExpired(t *testing.T) {
+func TestSqliteLeaseDBExpired(t *testing.T) {
 	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_leasedb")
 	if err != nil {
@@ -173,7 +173,7 @@ func TestEmbeddedLeaseDBExpired(t *testing.T) {
 
 	shortLeaseTime := 1 * time.Millisecond
 
-	db, err := OpenEmbeddedLeaseDB(tmp)
+	db, err := OpenSqliteLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
