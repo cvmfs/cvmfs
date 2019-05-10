@@ -1,7 +1,7 @@
 package backend
 
-/*
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -11,13 +11,14 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// BoltDBLeaseDB is a LeaseDB backed by BoltDB
-type BoltDBLeaseDB struct {
+// BoltLeaseDB is a LeaseDB backed by BoltDB
+type BoltLeaseDB struct {
 	store *bolt.DB
+	locks NamedLocks // Per-repository commit locks
 }
 
-// OpenBoltDBLeaseDB creates a new embedded lease DB
-func OpenBoltDBLeaseDB(workDir string) (*BoltDBLeaseDB, error) {
+// OpenBoltLeaseDB creates a new embedded lease DB
+func OpenBoltLeaseDB(workDir string) (*BoltLeaseDB, error) {
 	if err := os.MkdirAll(workDir, 0777); err != nil {
 		return nil, errors.Wrap(err, "could not create directory for backing store")
 	}
@@ -26,27 +27,27 @@ func OpenBoltDBLeaseDB(workDir string) (*BoltDBLeaseDB, error) {
 		return nil, errors.Wrap(err, "could not open backing store (BoltDB)")
 	}
 
-	gw.Log.Info().
-		Str("component", "leasedb").
+	gw.Log("leasedb_bolt", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
 
-	return &BoltDBLeaseDB{store}, nil
+	return &BoltLeaseDB{store: store, locks: NamedLocks{}}, nil
 }
 
 // Close the lease database
-func (db *BoltDBLeaseDB) Close() error {
+func (db *BoltLeaseDB) Close() error {
 	return db.store.Close()
 }
 
 // NewLease attemps to acquire a new lease for the given path
-func (db *BoltDBLeaseDB) NewLease(keyID, leasePath string, protocolVersion int, token LeaseToken) error {
+func (db *BoltLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error {
 	return db.store.Update(func(txn *bolt.Tx) error {
-		repoName, subPath, err := SplitLeasePath(leasePath)
+		t0 := time.Now()
+		repoName, subPath, err := gw.SplitLeasePath(leasePath)
 		if err != nil {
 			return errors.Wrap(err, "invalid lease path")
 		}
 
-		lease := Lease{KeyID: keyID, Token: token}
+		lease := Lease{KeyID: keyID, ProtocolVersion: protocolVersion, Token: token}
 		buf, err := lease.Serialize()
 		if err != nil {
 			return err
@@ -72,7 +73,7 @@ func (db *BoltDBLeaseDB) NewLease(keyID, leasePath string, protocolVersion int, 
 		cursor := repoBucket.Cursor()
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
 			kPath := string(k)
-			if CheckPathOverlap(kPath, subPath) {
+			if gw.CheckPathOverlap(kPath, subPath) {
 				l, err := DeserializeLease(v)
 				if err != nil {
 					return err
@@ -87,9 +88,10 @@ func (db *BoltDBLeaseDB) NewLease(keyID, leasePath string, protocolVersion int, 
 		if existing.path != "" {
 			timeLeft := existing.lease.Token.Expiration.Sub(time.Now())
 			if timeLeft > 0 {
-				gw.Log.Debug().
-					Str("component", "leasedb").
-					Msgf("new lease request failed: path_busy, time left: %v s", timeLeft.Seconds())
+				gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+					Str("operation", "new_lease").
+					Str("token", token.TokenStr).
+					Msgf("path_busy, time left: %v s", timeLeft.Seconds())
 				return PathBusyError{timeLeft}
 			}
 
@@ -102,16 +104,19 @@ func (db *BoltDBLeaseDB) NewLease(keyID, leasePath string, protocolVersion int, 
 			repoBucket.Put([]byte(subPath), buf)
 		}
 
-		gw.Log.Debug().
-			Str("component", "leasedb").
-			Msgf("lease granted with key: %v, path: %v", keyID, leasePath)
+		gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+			Str("operation", "new_lease").
+			Str("token", token.TokenStr).
+			Float64("task_dt", time.Now().Sub(t0).Seconds()).
+			Msgf("key: %v, path: %v", keyID, leasePath)
 
 		return nil
 	})
 }
 
 // GetLeases returns a list of all active leases
-func (db *BoltDBLeaseDB) GetLeases() (map[string]Lease, error) {
+func (db *BoltLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, error) {
+	t0 := time.Now()
 	leases := make(map[string]Lease)
 	err := db.store.View(func(txn *bolt.Tx) error {
 		if err := txn.ForEach(func(name []byte, b *bolt.Bucket) error {
@@ -138,11 +143,19 @@ func (db *BoltDBLeaseDB) GetLeases() (map[string]Lease, error) {
 
 		return nil
 	})
+
+	gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+		Str("operation", "get_leases").
+		Float64("task_dt", time.Now().Sub(t0).Seconds()).
+		Msgf("found %v leases", len(leases))
+
 	return leases, err
 }
 
 // GetLease returns the lease for a given token string
-func (db *BoltDBLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
+func (db *BoltLeaseDB) GetLease(ctx context.Context, tokenStr string) (string, *Lease, error) {
+	t0 := time.Now()
+
 	lease := Lease{}
 	var leasePath string
 	err := db.store.View(func(txn *bolt.Tx) error {
@@ -155,7 +168,7 @@ func (db *BoltDBLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
 			return InvalidLeaseError{}
 		}
 
-		repoName, subPath, err := SplitLeasePath(string(lPath))
+		repoName, subPath, err := gw.SplitLeasePath(string(lPath))
 		if err != nil {
 			return errors.Wrap(err, "invalid lease path")
 		}
@@ -175,19 +188,29 @@ func (db *BoltDBLeaseDB) GetLease(tokenStr string) (string, *Lease, error) {
 		lease = *l
 		return nil
 	})
+
+	gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+		Str("operation", "get_lease").
+		Str("token", tokenStr).
+		Float64("task_dt", time.Now().Sub(t0).Seconds()).
+		Msgf("success")
+
 	return leasePath, &lease, err
 }
 
 // CancelLeases cancels all active leases
-func (db *BoltDBLeaseDB) CancelLeases() error {
+func (db *BoltLeaseDB) CancelLeases(ctx context.Context) error {
 	return db.store.Update(func(txn *bolt.Tx) error {
+		t0 := time.Now()
+
 		txn.ForEach(func(name []byte, b *bolt.Bucket) error {
 			txn.DeleteBucket(name)
 			return nil
 		})
 
-		gw.Log.Debug().
-			Str("component", "leasedb").
+		gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+			Str("operation", "cancel_leases").
+			Float64("task_dt", time.Now().Sub(t0).Seconds()).
 			Msgf("all leases cancelled")
 
 		return nil
@@ -195,21 +218,24 @@ func (db *BoltDBLeaseDB) CancelLeases() error {
 }
 
 // CancelLease cancels the lease for a token string
-func (db *BoltDBLeaseDB) CancelLease(tokenStr string) error {
+func (db *BoltLeaseDB) CancelLease(ctx context.Context, tokenStr string) error {
 	return db.store.Update(func(txn *bolt.Tx) error {
+		t0 := time.Now()
+
 		tokens := txn.Bucket([]byte("tokens"))
 		if tokens == nil {
 			return fmt.Errorf("missing 'tokens' bucket")
 		}
 		leasePath := tokens.Get([]byte(tokenStr))
 		if leasePath == nil {
-			gw.Log.Debug().
-				Str("component", "leasedb").
-				Msgf("cancellation failed, invalid token: %v", tokenStr)
+			gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+				Str("operation", "cancel_lease").
+				Str("token", tokenStr).
+				Msgf("cancellation failed, invalid token")
 			return InvalidLeaseError{}
 		}
 
-		repoName, subPath, err := SplitLeasePath(string(leasePath))
+		repoName, subPath, err := gw.SplitLeasePath(string(leasePath))
 		if err != nil {
 			return errors.Wrap(err, "invalid lease path")
 		}
@@ -221,11 +247,17 @@ func (db *BoltDBLeaseDB) CancelLease(tokenStr string) error {
 		bucket.Delete([]byte(subPath))
 		tokens.Delete([]byte(tokenStr))
 
-		gw.Log.Debug().
-			Str("component", "leasedb").
-			Msgf("lease cancelled for path: %v", string(leasePath))
+		gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+			Str("operation", "cancel_lease").
+			Str("token", tokenStr).
+			Float64("task_dt", time.Now().Sub(t0).Seconds()).
+			Msgf("lease cancelled")
 
 		return nil
 	})
 }
-*/
+
+// WithLock runs the given task while holding a commit lock for the repository
+func (db *BoltLeaseDB) WithLock(ctx context.Context, repository string, task func() error) error {
+	return db.locks.WithLock(repository, task)
+}
