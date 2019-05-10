@@ -9,29 +9,29 @@ import (
 	"time"
 )
 
-func TestSqliteLeaseDBOpen(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "test_leasedb_sqlite")
+func TestBoltLeaseDBOpen(t *testing.T) {
+	tmp, err := ioutil.TempDir("", "test_leasedb_bolt")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
 	defer os.RemoveAll(tmp)
 
-	db, err := OpenSqliteLeaseDB(tmp)
+	db, err := OpenBoltLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
 	defer db.Close()
 }
 
-func TestSqliteLeaseDBCRUD(t *testing.T) {
+func TestBoltLeaseDBCRUD(t *testing.T) {
 	lastProtocolVersion := 3
-	tmp, err := ioutil.TempDir("", "test_leasedb_sqlite")
+	tmp, err := ioutil.TempDir("", "test_leasedb_bolt")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
 	defer os.RemoveAll(tmp)
 
-	db, err := OpenSqliteLeaseDB(tmp)
+	db, err := OpenBoltLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -111,15 +111,15 @@ func TestSqliteLeaseDBCRUD(t *testing.T) {
 	})
 }
 
-func TestSqliteLeaseDBConflicts(t *testing.T) {
+func TestBoltLeaseDBConflicts(t *testing.T) {
 	lastProtocolVersion := 3
-	tmp, err := ioutil.TempDir("", "test_leasedb_sqlite")
+	tmp, err := ioutil.TempDir("", "test_leasedb_bolt")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
 	defer os.RemoveAll(tmp)
 
-	db, err := OpenSqliteLeaseDB(tmp)
+	db, err := OpenBoltLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
@@ -159,9 +159,9 @@ func TestSqliteLeaseDBConflicts(t *testing.T) {
 	}
 }
 
-func TestSqliteLeaseDBExpired(t *testing.T) {
+func TestBoltLeaseDBExpired(t *testing.T) {
 	lastProtocolVersion := 3
-	tmp, err := ioutil.TempDir("", "test_leasedb_sqlite")
+	tmp, err := ioutil.TempDir("", "test_leasedb_bolt")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
 	}
@@ -169,7 +169,7 @@ func TestSqliteLeaseDBExpired(t *testing.T) {
 
 	shortLeaseTime := 1 * time.Millisecond
 
-	db, err := OpenSqliteLeaseDB(tmp)
+	db, err := OpenBoltLeaseDB(tmp)
 	if err != nil {
 		t.Fatalf("could not create database: %v", err)
 	}
