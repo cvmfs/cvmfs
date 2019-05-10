@@ -115,6 +115,7 @@
 
 #include "file_chunk.h"
 #include "hash.h"
+#include "ingestion/ingestion_source.h"
 #include "ingestion/pipeline.h"
 #include "repository_tag.h"
 #include "upload_facility.h"
@@ -167,6 +168,8 @@ class Spooler : public Observable<SpoolerResult> {
    *                      backend storage
    */
   void Upload(const std::string &local_path, const std::string &remote_path);
+
+  void Upload(const std::string &remote_path, IngestionSource *source);
 
   /**
    * Convenience wrapper to upload the Manifest file into the backend storage
