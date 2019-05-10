@@ -80,6 +80,10 @@ const accessConfigV2NoKeys = `
 }
 `
 
+const (
+	maxLeaseTime time.Duration = 100 * time.Second
+)
+
 // mockKeyImporter is used by tests, returns a predefined (id, secret) pair
 // instead of reading from file
 func mockKeyImporter(ks KeySpec) (string, string, string, error) {
@@ -124,7 +128,7 @@ func StartTestBackend(name string, maxLeaseTime time.Duration) (*Services, strin
 		os.Exit(2)
 	}
 
-	ldb, err := OpenLeaseDB("embedded", cfg)
+	ldb, err := OpenLeaseDB("sqlite", cfg)
 	if err != nil {
 		os.Exit(3)
 	}
