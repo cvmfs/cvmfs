@@ -284,16 +284,26 @@ void S3Uploader::DoUpload(
     local_path = source->GetPath();
   } else {
     // TODO(jblomer): keep small files in memory
+    int tmp_fd = CreateAndOpenTemporaryChunkFile(&local_path);
+    if (tmp_fd < 0) {
+      source->Close();
+      Respond(callback, UploaderResults(100, source->GetPath()));
+      return;
+    }
     unsigned char buffer[kPageSize];
     ssize_t nbytes;
     do {
       nbytes = source->Read(buffer, kPageSize);
-      if (nbytes < 0) {
+      rvb = true;
+      if (nbytes > 0) rvb = SafeWrite(tmp_fd, buffer, nbytes);
+      if (nbytes < 0 || !rvb) {
         source->Close();
+        close(tmp_fd);
         Respond(callback, UploaderResults(100, source->GetPath()));
         return;
       }
     } while (nbytes == kPageSize);
+    close(tmp_fd);
   }
   source->Close();
   info = new s3fanout::JobInfo(access_key_,
@@ -317,6 +327,7 @@ void S3Uploader::DoUpload(
   RequestCtrl req_ctrl;
   MakePipe(req_ctrl.pipe_wait);
   req_ctrl.callback_forward = callback;
+  req_ctrl.original_path = source->GetPath();
   info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
     &S3Uploader::OnReqComplete, this, &req_ctrl)));
 
@@ -489,7 +500,8 @@ void S3Uploader::OnReqComplete(
   WritePipe(ctrl->pipe_wait[1], &c, 1);
   if (ctrl->callback_forward != NULL) {
     // We are already in Respond() so we must not call it again
-    (*(ctrl->callback_forward))(results);
+    upload::UploaderResults fix_path(results.return_code, ctrl->original_path);
+    (*(ctrl->callback_forward))(fix_path);
     delete ctrl->callback_forward;
     ctrl->callback_forward = NULL;
   }

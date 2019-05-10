@@ -95,6 +95,7 @@ class S3Uploader : public AbstractUploader {
 
     int return_code;
     const CallbackTN *callback_forward;
+    std::string original_path;
     int pipe_wait[2];
   };
 

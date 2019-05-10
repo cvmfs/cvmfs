@@ -92,6 +92,13 @@ void Spooler::Upload(const std::string &local_path,
       AbstractUploader::MakeCallback(&Spooler::UploadingCallback, this));
 }
 
+void Spooler::Upload(const std::string &remote_path, IngestionSource *source) {
+  uploader_->UploadIngestionSource(
+      remote_path, source,
+      AbstractUploader::MakeCallback(&Spooler::UploadingCallback, this));
+}
+
+
 void Spooler::UploadManifest(const std::string &local_path) {
   Upload(local_path, ".cvmfspublished");
 }
