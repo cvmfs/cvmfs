@@ -192,6 +192,15 @@ class AbstractUploader
     DoUpload(remote_path, &source, callback);
   }
 
+  void UploadIngestionSource(
+    const std::string &remote_path,
+    IngestionSource *source,
+    const CallbackTN *callback = NULL)
+  {
+    ++jobs_in_flight_;
+    DoUpload(remote_path, source, callback);
+  }
+
   /**
    * This method is called before the first data block of a streamed upload is
    * scheduled (see above implementation of UploadStreamHandle for details).

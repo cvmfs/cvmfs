@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #include <string>
@@ -20,6 +21,7 @@
 #include "upload_spooler_definition.h"
 #include "util/file_guard.h"
 #include "util/string.h"
+#include "util/posix.h"
 
 
 /**
@@ -698,6 +700,33 @@ TYPED_TEST(T_Uploaders, SimpleFileUpload) {
   EXPECT_TRUE(TestFixture::CheckFile(dest_name));
   EXPECT_EQ(1, atomic_read32(&(this->delegate_.simple_upload_invocations)));
   TestFixture::CompareFileContents(big_file_path,
+                                   TestFixture::AbsoluteDestinationPath(
+                                       dest_name));
+}
+
+//------------------------------------------------------------------------------
+
+
+TYPED_TEST(T_Uploaders, IngestionSource) {
+  const std::string small_file_path = TestFixture::GetSmallFile();
+  int fd = open(small_file_path.c_str(), O_RDONLY);
+  ASSERT_GE(fd, 0);
+  std::string content;
+  EXPECT_TRUE(SafeReadToString(fd, &content));
+  close(fd);
+  StringIngestionSource source("/from/memory", content);
+  const std::string dest_name = "string";
+
+  this->uploader_->UploadIngestionSource(dest_name, &source,
+    AbstractUploader::MakeClosure(&UploadCallbacks::SimpleUploadClosure,
+                                  &this->delegate_,
+                                  UploaderResults(0, "/from/memory")));
+  this->uploader_->WaitForUpload();
+
+  const bool file_exists = this->uploader_->Peek(dest_name);
+  EXPECT_TRUE(file_exists);
+  EXPECT_TRUE(TestFixture::CheckFile(dest_name));
+  TestFixture::CompareFileContents(small_file_path,
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
 }
