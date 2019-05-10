@@ -66,9 +66,9 @@ class GatewayUploader : public AbstractUploader {
   virtual unsigned int GetNumberOfErrors() const;
 
  protected:
-  virtual void DoUploadFile(const std::string& local_path,
-                            const std::string& remote_path,
-                            const CallbackTN* callback = NULL);
+  virtual void DoUpload(const std::string& remote_path,
+                        IngestionSource *source,
+                        const CallbackTN* callback = NULL);
 
   virtual UploadStreamHandle* InitStreamedUpload(
       const CallbackTN* callback = NULL);

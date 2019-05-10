@@ -491,6 +491,8 @@ class ContextPtr {
 
   explicit ContextPtr(const Algorithms a) :
     algorithm(a), buffer(NULL), size(GetContextSize(a)) {}
+  ContextPtr(const Algorithms a, void *b) :
+    algorithm(a), buffer(b), size(GetContextSize(a)) {}
 };
 
 void Init(ContextPtr context);

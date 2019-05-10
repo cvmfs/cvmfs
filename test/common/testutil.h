@@ -20,6 +20,7 @@
 #include "catalog_mgr.h"
 #include "directory_entry.h"
 #include "hash.h"
+#include "ingestion/ingestion_source.h"
 #include "history.h"
 #include "object_fetcher.h"
 #include "upload_facility.h"
@@ -146,9 +147,9 @@ class AbstractMockUploader : public upload::AbstractUploader {
     return spooler_definition.driver_type == upload::SpoolerDefinition::Mock;
   }
 
-  virtual void DoUploadFile(const std::string  &local_path,
-                            const std::string  &remote_path,
-                            const CallbackTN   *callback = NULL) {
+  virtual void DoUpload(const std::string  &remote_path,
+                        IngestionSource  *source,
+                        const CallbackTN   *callback = NULL) {
     assert(AbstractMockUploader::not_implemented);
   }
 
