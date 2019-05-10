@@ -42,6 +42,8 @@ github.com/spf13/jwalterweatherman
 github.com/spf13/pflag
 # github.com/spf13/viper v1.3.2
 github.com/spf13/viper
+# go.etcd.io/bbolt v1.3.2
+go.etcd.io/bbolt
 # golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a
 golang.org/x/sys/unix
 # golang.org/x/text v0.3.0
