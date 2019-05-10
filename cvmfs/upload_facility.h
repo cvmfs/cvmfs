@@ -13,6 +13,7 @@
 #include "atomic.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
+#include "ingestion/ingestion_source.h"
 #include "repository_tag.h"
 #include "statistics.h"
 #include "upload_spooler_definition.h"
@@ -187,7 +188,8 @@ class AbstractUploader
     const CallbackTN *callback = NULL)
   {
     ++jobs_in_flight_;
-    DoUploadFile(local_path, remote_path, callback);
+    FileIngestionSource source(local_path);
+    DoUpload(remote_path, &source, callback);
   }
 
   /**
@@ -315,9 +317,9 @@ class AbstractUploader
    * @param remote_path  destination to be written in the backend
    * @param callback     callback to be called on completion
    */
-  virtual void DoUploadFile(const std::string &local_path,
-                            const std::string &remote_path,
-                            const CallbackTN *callback = NULL) = 0;
+  virtual void DoUpload(const std::string &remote_path,
+                        IngestionSource *source,
+                        const CallbackTN *callback = NULL) = 0;
 
   /**
    * Implementation of a streamed upload step. See public interface for details.
