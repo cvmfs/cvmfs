@@ -35,7 +35,7 @@ func OpenSqliteLeaseDB(workDir string) (*SqliteLeaseDB, error) {
 	if err := os.MkdirAll(workDir, 0777); err != nil {
 		return nil, errors.Wrap(err, "could not create directory for backing store")
 	}
-	dbFile := workDir + "/lease.db"
+	dbFile := workDir + "/sqlite_lease.db"
 	createDB := false
 	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
 		createDB = true

@@ -81,10 +81,10 @@ type LeaseDB interface {
 // (either "embedded" or "etcd").
 func OpenLeaseDB(dbType string, config *gw.Config) (LeaseDB, error) {
 	switch dbType {
-	case "sqlite":
-		return OpenSqliteLeaseDB(config.WorkDir)
 	case "boltdb":
 		return OpenBoltLeaseDB(config.WorkDir)
+	case "sqlite":
+		return OpenSqliteLeaseDB(config.WorkDir)
 	case "etcd":
 		return OpenEtcdLeaseDB(config.EtcdEndpoints)
 	default:

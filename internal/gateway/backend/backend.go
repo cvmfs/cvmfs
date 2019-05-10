@@ -44,11 +44,7 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 			err, "loading repository access configuration failed")
 	}
 
-	leaseDBType := "sqlite"
-	if cfg.UseEtcd {
-		leaseDBType = "etcd"
-	}
-	ldb, err := OpenLeaseDB(leaseDBType, cfg)
+	ldb, err := OpenLeaseDB(cfg.LeaseDB, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create lease DB")
 	}

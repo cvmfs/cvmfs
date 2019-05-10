@@ -102,7 +102,7 @@ func testConfig(workDir string) *gw.Config {
 	return &gw.Config{
 		Port:          4929,
 		MaxLeaseTime:  50 * time.Millisecond, // use 50ms leases by default in testing mode
-		UseEtcd:       false,
+		LeaseDB:       "boltdb",
 		LogLevel:      "info",
 		LogTimestamps: false,
 		NumReceivers:  1,
@@ -128,7 +128,7 @@ func StartTestBackend(name string, maxLeaseTime time.Duration) (*Services, strin
 		os.Exit(2)
 	}
 
-	ldb, err := OpenLeaseDB("sqlite", cfg)
+	ldb, err := OpenLeaseDB(cfg.LeaseDB, cfg)
 	if err != nil {
 		os.Exit(3)
 	}

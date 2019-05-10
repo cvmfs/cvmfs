@@ -22,7 +22,7 @@ func OpenBoltLeaseDB(workDir string) (*BoltLeaseDB, error) {
 	if err := os.MkdirAll(workDir, 0777); err != nil {
 		return nil, errors.Wrap(err, "could not create directory for backing store")
 	}
-	store, err := bolt.Open(workDir+"/lease.db", 0666, nil)
+	store, err := bolt.Open(workDir+"/bolt_lease.db", 0666, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not open backing store (BoltDB)")
 	}
