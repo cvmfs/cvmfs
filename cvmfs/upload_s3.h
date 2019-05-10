@@ -14,6 +14,7 @@
 #include "atomic.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
+#include "util/single_copy.h"
 
 namespace upload {
 
@@ -54,9 +55,9 @@ class S3Uploader : public AbstractUploader {
    * This method calls NotifyListeners and invokes a callback for all
    * registered listeners (see the Observable template for details).
    */
-  virtual void DoUploadFile(const std::string &local_path,
-                            const std::string &remote_path,
-                            const CallbackTN *callback = NULL);
+  virtual void DoUpload(const std::string &remote_path,
+                        IngestionSource *source,
+                        const CallbackTN *callback = NULL);
 
   virtual UploadStreamHandle *InitStreamedUpload(
     const CallbackTN *callback = NULL);
@@ -83,10 +84,17 @@ class S3Uploader : public AbstractUploader {
   static const unsigned kDefaultBackoffInitMs = 100;
   static const unsigned kDefaultBackoffMaxMs = 2000;
 
-  // Used to make the async HTTP requests synchronous in Peek() and Create()
-  struct RequestCtrl {
-    RequestCtrl() : return_code(-1) { pipe_wait[0] = pipe_wait[1] = 0; }
+  // Used to make the async HTTP requests synchronous in Peek() Create(),
+  // and Upload() of single bits
+  struct RequestCtrl : SingleCopy {
+    RequestCtrl() : return_code(-1), callback_forward(NULL) {
+      pipe_wait[0] = pipe_wait[1] = -1;
+    }
+
+    void WaitFor();
+
     int return_code;
+    const CallbackTN *callback_forward;
     int pipe_wait[2];
   };
 

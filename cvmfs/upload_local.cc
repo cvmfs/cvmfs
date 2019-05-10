@@ -40,51 +40,70 @@ bool LocalUploader::Create() {
   return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_);
 }
 
-void LocalUploader::DoUploadFile(const std::string &local_path,
-                                 const std::string &remote_path,
-                                 const CallbackTN *callback) {
+void LocalUploader::DoUpload(const std::string &remote_path,
+                             IngestionSource *source,
+                             const CallbackTN *callback) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "FileUpload call started.");
 
   // create destination in backend storage temporary directory
-  std::string tmp_path = CreateTempPath(temporary_path_ + "/upload", 0666);
-  if (tmp_path.empty()) {
+  std::string tmp_path;
+  FILE *ftmp = CreateTempFile(temporary_path_ + "/upload", 0666, "w",
+                              &tmp_path);
+  if (ftmp == NULL) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "failed to create temp path for "
              "upload of file '%s' (errno: %d)",
-             local_path.c_str(), errno);
+             source->GetPath().c_str(), errno);
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(1, local_path));
+    Respond(callback, UploaderResults(1, source->GetPath()));
     return;
   }
 
   // copy file into controlled temporary directory location
-  int retval = CopyPath2Path(local_path, tmp_path);
-  int retcode = retval ? 0 : 100;
-  if (retcode != 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg,
-             "failed to copy file '%s' to staging "
-             "area: '%s'",
-             local_path.c_str(), tmp_path.c_str());
+  bool rvb = source->Open();
+  if (!rvb) {
+    fclose(ftmp);
+    unlink(tmp_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(retcode, local_path));
+    Respond(callback, UploaderResults(100, source->GetPath()));
     return;
   }
+  unsigned char buffer[kPageSize];
+  ssize_t rbytes;
+  do {
+    rbytes = source->Read(buffer, kPageSize);
+    size_t wbytes = 0;
+    if (rbytes > 0) {
+      wbytes = fwrite(buffer, 1, rbytes, ftmp);
+    }
+    if ((rbytes < 0) || (static_cast<size_t>(rbytes) != wbytes)) {
+      source->Close();
+      fclose(ftmp);
+      unlink(tmp_path.c_str());
+      atomic_inc32(&copy_errors_);
+      Respond(callback, UploaderResults(100, source->GetPath()));
+      return;
+    }
+  } while (rbytes == kPageSize);
+  source->Close();
+  fclose(ftmp);
 
   // move the file in place (atomic operation)
-  retcode = Move(tmp_path, remote_path);
-  if (retcode != 0) {
+  int rvi = Move(tmp_path, remote_path);
+  if (rvi != 0) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "failed to move file '%s' from the "
              "staging area to the final location: "
              "'%s'",
              tmp_path.c_str(), remote_path.c_str());
+    unlink(tmp_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(retcode, local_path));
+    Respond(callback, UploaderResults(rvi, source->GetPath()));
     return;
   }
 
   CountUploadedBytes(GetFileSize(remote_path));
-  Respond(callback, UploaderResults(retcode, local_path));
+  Respond(callback, UploaderResults(rvi, source->GetPath()));
 }
 
 UploadStreamHandle *LocalUploader::InitStreamedUpload(

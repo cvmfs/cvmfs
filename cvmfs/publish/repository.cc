@@ -75,6 +75,8 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   if (rv_wl != whitelist::kFailOk)
     throw EPublish("whitelist generation failed");
   publisher->TakeWhitelist(whitelist.Release());
+
+
   // Upload whitelist (+ PKCS7) and certificate
   // Create root catalog, upload it together with manifest, reflog
   LogCvmfs(kLogCvmfs, kLogStdout, "done");

@@ -24,6 +24,14 @@
 
 namespace upload {
 
+void S3Uploader::RequestCtrl::WaitFor() {
+  char c;
+  ReadPipe(pipe_wait[0], &c, 1);
+  assert(c == 'c');
+  ClosePipe(pipe_wait);
+}
+
+
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   : AbstractUploader(spooler_definition)
   , dns_buckets_(true)
@@ -179,10 +187,7 @@ bool S3Uploader::Create() {
 
   IncJobsInFlight();
   UploadJobInfo(info);
-  char c;
-  ReadPipe(req_ctrl.pipe_wait[0], &c, 1);
-  assert(c == 'c');
-  ClosePipe(req_ctrl.pipe_wait);
+  req_ctrl.WaitFor();
 
   delete info;
   return req_ctrl.return_code == 0;
@@ -259,22 +264,48 @@ void *S3Uploader::MainCollectResults(void *data) {
 }
 
 
-void S3Uploader::DoUploadFile(
-  const std::string &local_path,
+void S3Uploader::DoUpload(
   const std::string &remote_path,
-  const CallbackTN  *callback
+  IngestionSource *source,
+  const CallbackTN *callback
 ) {
-  s3fanout::JobInfo *info =
-    new s3fanout::JobInfo(access_key_,
-                          secret_key_,
-                          authz_method_,
-                          host_name_port_,
-                          region_,
-                          bucket_,
-                          repository_alias_ + "/" + remote_path,
-                          const_cast<void*>(
-                              static_cast<void const*>(callback)),
-                          local_path);
+  bool rvb = source->Open();
+  if (!rvb) {
+    Respond(callback, UploaderResults(100, source->GetPath()));
+    return;
+  }
+  std::uint64_t size;
+  rvb = source->GetSize(&size);
+  assert(rvb);
+
+  std::string local_path;
+  s3fanout::JobInfo *info;
+  if (source->IsRealFile()) {
+    local_path = source->GetPath();
+  } else {
+    // TODO(jblomer): keep small files in memory
+    unsigned char buffer[kPageSize];
+    ssize_t nbytes;
+    do {
+      nbytes = source->Read(buffer, kPageSize);
+      if (nbytes < 0) {
+        source->Close();
+        Respond(callback, UploaderResults(100, source->GetPath()));
+        return;
+      }
+    } while (nbytes == kPageSize);
+  }
+  source->Close();
+  info = new s3fanout::JobInfo(access_key_,
+                               secret_key_,
+                               authz_method_,
+                               host_name_port_,
+                               region_,
+                               bucket_,
+                               repository_alias_ + "/" + remote_path,
+                               const_cast<void*>(
+                                   static_cast<void const*>(callback)),
+                               local_path);
 
   if (HasPrefix(remote_path, ".cvmfs", false /*ignore_case*/)) {
     info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
@@ -283,11 +314,17 @@ void S3Uploader::DoUploadFile(
       info->request = s3fanout::JobInfo::kReqHeadPut;
   }
 
-  int64_t bytes_to_upload = GetFileSize(local_path);
+  RequestCtrl req_ctrl;
+  MakePipe(req_ctrl.pipe_wait);
+  req_ctrl.callback_forward = callback;
+  info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
+    &S3Uploader::OnReqComplete, this, &req_ctrl)));
+
   UploadJobInfo(info);
-  LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from file finished: %s",
-           local_path.c_str());
-  CountUploadedBytes(bytes_to_upload);
+  req_ctrl.WaitFor();
+  LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from source finished: %s",
+           source->GetPath().c_str());
+  CountUploadedBytes(size);
 }
 
 
@@ -450,6 +487,12 @@ void S3Uploader::OnReqComplete(
   ctrl->return_code = results.return_code;
   char c = 'c';
   WritePipe(ctrl->pipe_wait[1], &c, 1);
+  if (ctrl->callback_forward != NULL) {
+    // We are already in Respond() so we must not call it again
+    (*(ctrl->callback_forward))(results);
+    delete ctrl->callback_forward;
+    ctrl->callback_forward = NULL;
+  }
 }
 
 
@@ -465,10 +508,7 @@ bool S3Uploader::Peek(const std::string& path) {
 
   IncJobsInFlight();
   UploadJobInfo(info);
-  char c;
-  ReadPipe(req_ctrl.pipe_wait[0], &c, 1);
-  assert(c == 'c');
-  ClosePipe(req_ctrl.pipe_wait);
+  req_ctrl.WaitFor();
 
   delete info;
   return req_ctrl.return_code == 0;
