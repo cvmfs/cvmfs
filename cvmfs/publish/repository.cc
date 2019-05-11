@@ -244,6 +244,7 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Creating Key Chain... ");
   publisher->CreateKeychain();
+  publisher->ExportKeychain();
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
@@ -264,6 +265,25 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   return publisher.Release();
+}
+
+void Publisher::ExportKeychain() {
+  bool rvb;
+  rvb = SafeWriteToFile(signature_mgr_->GetActivePubkeys(),
+                        settings_.keychain().master_public_key_path(), 0644);
+  if (!rvb) throw EPublish("cannot export public master key");
+  rvb = SafeWriteToFile(signature_mgr_->GetCertificate(),
+                        settings_.keychain().certificate_path(), 0644);
+  if (!rvb) throw EPublish("cannot export certificate");
+
+  rvb = SafeWriteToFile(signature_mgr_->GetPrivateKey(),
+                        settings_.keychain().private_key_path(), 0600);
+  if (!rvb) throw EPublish("cannot export private certificate key");
+  rvb = SafeWriteToFile(signature_mgr_->GetPrivateMasterKey(),
+                        settings_.keychain().master_private_key_path(), 0600);
+  if (!rvb) throw EPublish("cannot export private master key");
+
+  // TODO Ownership
 }
 
 void Publisher::OnProcessCertificate(const upload::SpoolerResult &result) {
