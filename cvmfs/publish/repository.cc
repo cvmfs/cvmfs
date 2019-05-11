@@ -94,6 +94,7 @@ void Publisher::CreateRootObjects() {
     throw EPublish("could not create initial file catalog");
   reflog_->AddCatalog(manifest_->catalog_hash());
 
+  manifest_->set_repository_name(settings_.fqrn());
   manifest_->set_ttl(settings_.transaction().ttl_second());
   const bool needs_bootstrap_shortcuts =
     !settings_.transaction().voms_authz().empty();
