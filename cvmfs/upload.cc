@@ -80,9 +80,17 @@ void Spooler::ProcessCertificate(const std::string &local_path) {
                                shash::kSuffixCertificate);
 }
 
+void Spooler::ProcessCertificate(IngestionSource *source) {
+  ingestion_pipeline_->Process(source, false, shash::kSuffixCertificate);
+}
+
 void Spooler::ProcessMetainfo(const std::string &local_path) {
   ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
                                shash::kSuffixMetainfo);
+}
+
+void Spooler::ProcessMetainfo(IngestionSource *source) {
+  ingestion_pipeline_->Process(source, false, shash::kSuffixMetainfo);
 }
 
 void Spooler::Upload(const std::string &local_path,
@@ -96,6 +104,7 @@ void Spooler::Upload(const std::string &remote_path, IngestionSource *source) {
   uploader_->UploadIngestionSource(
       remote_path, source,
       AbstractUploader::MakeCallback(&Spooler::UploadingCallback, this));
+  delete source;
 }
 
 

@@ -7,6 +7,7 @@
 
 #include <unistd.h>
 
+#include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
@@ -117,6 +118,11 @@ int CmdMkfs::Main(const Options &options) {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "PUBLIC MASTER KEY:\n%s",
            publisher->signature_mgr()->GetActivePubkeys().c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "CERTIFICATE:\n%s",
+           publisher->signature_mgr()->GetCertificate().c_str());
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "MANIFEST:\n%s",
+           publisher->manifest()->ExportString().c_str());
 
   return 0;
 }

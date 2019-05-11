@@ -44,7 +44,7 @@ void Whitelist::CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
 }
 
 
-std::string Whitelist::Create(
+std::string Whitelist::CreateString(
   const std::string &fqrn,
   int validity_days,
   shash::Algorithms hash_algorithm,
@@ -71,6 +71,12 @@ std::string Whitelist::Create(
   free(signature);
 
   return whitelist;
+}
+
+
+std::string Whitelist::ExportString() const {
+  if (plain_buf_ == NULL) return "";
+  return std::string(reinterpret_cast<char *>(plain_buf_), plain_size_);
 }
 
 

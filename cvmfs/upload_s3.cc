@@ -312,6 +312,7 @@ void S3Uploader::DoUpload(
       if (nbytes < 0 || !rvb) {
         source->Close();
         close(tmp_fd);
+        unlink(local_path.c_str());
         Respond(callback, UploaderResults(100, source->GetPath()));
         return;
       }
@@ -343,6 +344,8 @@ void S3Uploader::DoUpload(
   req_ctrl.WaitFor();
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from source finished: %s",
            source->GetPath().c_str());
+
+  if (!source->IsRealFile()) unlink(local_path.c_str());
 }
 
 
