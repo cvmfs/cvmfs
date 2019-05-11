@@ -419,6 +419,7 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
 set (CVMFS_TEST_PUBLISH_SOURCES
   publish/main.cc
   publish/t_command.cc
+  publish/t_settings.cc
 
   ../common/env.cc
 
