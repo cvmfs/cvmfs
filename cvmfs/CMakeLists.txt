@@ -218,6 +218,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
 
 # TODO(jblomer) Rename to cvmfs_server
 set (CVMFS_PUBLISH_SOURCES
+  compression.cc
   hash.cc
   logging.cc
   options.cc
@@ -230,6 +231,7 @@ set (CVMFS_PUBLISH_SOURCES
   publish/main.cc
   publish/settings.cc
   sanitizer.cc
+  signature.cc
   upload_spooler_definition.cc
   util/namespace.cc
   util/posix.cc

@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdlib>
+#include <string>
 
 #include "signature.h"
 
@@ -43,6 +44,12 @@ TEST_F(T_Signature, Certificate) {
   ASSERT_TRUE(sign_mgr_.Sign(buffer, 3, &signature, &signature_size));
   EXPECT_TRUE(sign_mgr_.Verify(buffer, 3, signature, signature_size));
   free(signature);
+
+  std::string cert = sign_mgr_.GetCertificate();
+  EXPECT_FALSE(cert.empty());
+  EXPECT_TRUE(sign_mgr_.LoadCertificateMem(
+    reinterpret_cast<const unsigned char *>(cert.data()), cert.length()));
+  EXPECT_TRUE(sign_mgr_.KeysMatch());
 }
 
 }  // namespace signature

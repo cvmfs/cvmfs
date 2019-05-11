@@ -11,6 +11,7 @@
 #include "publish/repository.h"
 #include "publish/settings.h"
 #include "sanitizer.h"
+#include "signature.h"
 #include "upload_spooler_definition.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -113,6 +114,9 @@ int CmdMkfs::Main(const Options &options) {
   // hand it over
   UniquePtr<Publisher> publisher(Publisher::Create(settings));
   //if (options.Has("no-apache"))
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "PUBLIC MASTER KEY:\n%s",
+           publisher->signature_mgr()->GetActivePubkeys().c_str());
 
   return 0;
 }

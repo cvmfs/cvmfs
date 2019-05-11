@@ -74,9 +74,10 @@ class SignatureManager {
                         unsigned *letter_length,
                         unsigned *pos_after_mark);
 
-  // Returns the PEM-encoded text of all loaded pubkeys (both raw RSA keys
-  // and that from the current certificate).
+  // Returns the PEM-encoded text of all loaded RSA pubkeys
   std::string GetActivePubkeys();
+  // The PEM-encoded certificate without private key
+  std::string GetCertificate();
 
   void GenerateMasterKeyPair();
   void GenerateCertificate(const std::string &cn);
