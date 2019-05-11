@@ -17,6 +17,45 @@
 
 namespace publish {
 
+/**
+ * Allows for settings that remember whether they have been explictily
+ * overwritten.  Otherwise, default values can be changed to upstream repository
+ * settings.
+ */
+template <class T>
+class Setting {
+ public:
+  Setting() : value_(), is_default_(true) { }
+  Setting(const T &v) : value_(v), is_default_(true) { }
+
+  Setting& operator=(const T &v) {
+    value_ = v;
+    is_default_ = false;
+    return *this;
+  }
+
+  operator const T& () const {
+    return value_;
+  }
+
+  const T& operator()() const {
+    return value_;
+  }
+
+  bool SetIfDefault(const T &v) {
+    if (!is_default_) return false;
+    value_ = v;
+    is_default_ = false;
+    return true;
+  }
+
+  bool is_default() const { return is_default_; }
+
+ private:
+  T value_;
+  bool is_default_;
+};
+
 // Settings from the point of construction always represent a valid
 // configuration. The constructor sets default values, which can be overwritten
 // by setters. The setters throw errors when invalid options are detected.
