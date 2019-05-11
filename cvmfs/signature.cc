@@ -150,9 +150,28 @@ string SignatureManager::GetCryptoError() {
  *     Password is not saved internally, but the private key is.
  * \return True on success, false otherwise
  */
+bool SignatureManager::LoadPrivateMasterKeyPath(const string &file_pem)
+{
+  UnloadPrivateMasterKey();
+  FILE *fp;
+  if ((fp = fopen(file_pem.c_str(), "r")) == NULL)
+    return false;
+  private_master_key_ = PEM_read_RSAPrivateKey(fp, NULL, NULL, NULL);
+  fclose(fp);
+  return (private_master_key_ != NULL);
+}
+
+
+/**
+ * @param[in] file_pem File name of the PEM key file
+ * @param[in] password Password for the private key.
+ *     Password is not saved internally, but the private key is.
+ * \return True on success, false otherwise
+ */
 bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
                                           const string &password)
 {
+  UnloadPrivateKey();
   bool result;
   FILE *fp = NULL;
   char *tmp = strdupa(password.c_str());
@@ -363,6 +382,39 @@ std::string SignatureManager::GetCertificate() {
   std::string bio_crt_str(bio_crt_text, bytes);
   BIO_free(bp);
   return bio_crt_str;
+}
+
+
+std::string SignatureManager::GetPrivateKey() {
+  if (!private_key_) return "";
+
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  bool rvb = PEM_write_bio_PrivateKey(bp, private_key_, NULL, NULL, 0, 0, NULL);
+  assert(rvb);
+  char *bio_privkey_text;
+  long bytes = BIO_get_mem_data(bp, &bio_privkey_text);  // NOLINT
+  assert(bytes > 0);
+  std::string bio_privkey_str(bio_privkey_text, bytes);
+  BIO_free(bp);
+  return bio_privkey_str;
+}
+
+
+std::string SignatureManager::GetPrivateMasterKey() {
+  if (!private_master_key_) return "";
+
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  bool rvb = PEM_write_bio_RSAPrivateKey(bp, private_master_key_,
+                                         NULL, NULL, 0, 0, NULL);
+  assert(rvb);
+  char *bio_master_privkey_text;
+  long bytes = BIO_get_mem_data(bp, &bio_master_privkey_text);  // NOLINT
+  assert(bytes > 0);
+  std::string bio_master_privkey_str(bio_master_privkey_text, bytes);
+  BIO_free(bp);
+  return bio_master_privkey_str;
 }
 
 

@@ -82,6 +82,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void CreateStorage();
   void CreateRootObjects();
 
+  void ExportKeychain();
+
   void PushCertificate();
   void PushHistory();
   void PushManifest();

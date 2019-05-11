@@ -164,6 +164,13 @@ class SettingsKeychain {
   bool HasDanglingRepositoryKeys() const;
   bool HasRepositoryKeys() const;
 
+  std::string master_private_key_path() const {
+    return master_private_key_path_;
+  }
+  std::string master_public_key_path() const { return master_public_key_path_; }
+  std::string private_key_path() const { return private_key_path_; }
+  std::string certificate_path() const { return certificate_path_; }
+
  private:
   std::string fqrn_;
   std::string master_private_key_path_;
@@ -206,7 +213,7 @@ class SettingsPublisher {
   std::string url_;
   uid_t owner_uid_;
   gid_t owner_gid_;
-  unsigned whitelist_validity_days_;
+  Setting<unsigned> whitelist_validity_days_;
 
   SettingsGc gc_;
   SettingsStorage storage_;

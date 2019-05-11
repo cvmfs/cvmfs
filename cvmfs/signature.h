@@ -36,6 +36,7 @@ class SignatureManager {
   void UnloadPrivateMasterKey();
   void UnloadCertificate();
 
+  bool LoadPrivateMasterKeyPath(const std::string &file_pem);
   bool LoadPrivateKeyPath(const std::string &file_pem,
                           const std::string &password);
   bool LoadCertificatePath(const std::string &file_pem);
@@ -76,8 +77,12 @@ class SignatureManager {
 
   // Returns the PEM-encoded text of all loaded RSA pubkeys
   std::string GetActivePubkeys();
+  // The PEM-encoded private key matching the public master key
+  std::string GetPrivateMasterKey();
   // The PEM-encoded certificate without private key
   std::string GetCertificate();
+  // The PEM-encoded private key matching the certificate
+  std::string GetPrivateKey();
 
   void GenerateMasterKeyPair();
   void GenerateCertificate(const std::string &cn);
