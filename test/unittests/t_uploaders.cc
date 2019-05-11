@@ -714,10 +714,11 @@ TYPED_TEST(T_Uploaders, IngestionSource) {
   std::string content;
   EXPECT_TRUE(SafeReadToString(fd, &content));
   close(fd);
-  StringIngestionSource source(content);
   const std::string dest_name = "string";
 
-  this->uploader_->UploadIngestionSource(dest_name, &source,
+  this->uploader_->UploadIngestionSource(
+    dest_name,
+    new StringIngestionSource(content),
     AbstractUploader::MakeClosure(&UploadCallbacks::SimpleUploadClosure,
                                   &this->delegate_,
                                   UploaderResults(0, "MEM")));

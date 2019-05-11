@@ -69,14 +69,15 @@ TEST_F(T_Whitelist, Create) {
   smgr.GenerateMasterKeyPair();
   smgr.GenerateCertificate("test.cvmfs.io");
   std::string whitelist_valid =
-    Whitelist::Create("test.cvmfs.io", 1, shash::kShake128, &smgr);
+    Whitelist::CreateString("test.cvmfs.io", 1, shash::kShake128, &smgr);
   std::string whitelist_err_fqrn =
-    Whitelist::Create("other.cvmfs.io", 1, shash::kShake128, &smgr);
+    Whitelist::CreateString("other.cvmfs.io", 1, shash::kShake128, &smgr);
   std::string whitelist_err_expired =
-    Whitelist::Create("test.cvmfs.io", -1, shash::kShake128, &smgr);
+    Whitelist::CreateString("test.cvmfs.io", -1, shash::kShake128, &smgr);
 
   wl_ = new Whitelist("test.cvmfs.io", NULL, &smgr);
   EXPECT_EQ(whitelist::kFailOk, wl_->LoadMem(whitelist_valid));
+  EXPECT_EQ(whitelist::kFailOk, wl_->LoadMem(wl_->ExportString()));
   EXPECT_EQ(whitelist::kFailNameMismatch, wl_->LoadMem(whitelist_err_fqrn));
   EXPECT_EQ(whitelist::kFailExpired, wl_->LoadMem(whitelist_err_expired));
 

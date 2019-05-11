@@ -221,6 +221,7 @@ set (CVMFS_PUBLISH_SOURCES
   compression.cc
   hash.cc
   logging.cc
+  manifest.cc
   options.cc
   publish/cmd_enter.cc
   publish/cmd_help.cc
@@ -240,11 +241,20 @@ set (CVMFS_PUBLISH_SOURCES
 
 set (LIBCVMFS_SERVER_SOURCES
   backoff.cc
+  catalog.cc
+  catalog_counters.cc
+  catalog_rw.cc
+  catalog_sql.cc
+  catalog_mgr_ro.cc
+  catalog_mgr_rw.cc
   compression.cc
   dns.cc
   download.cc
   gateway_util.cc
+  globals.cc
   hash.cc
+  history_sql.cc
+  history_sqlite.cc
   ingestion/chunk_detector.cc
   ingestion/item.cc
   ingestion/item_mem.cc
@@ -257,15 +267,20 @@ set (LIBCVMFS_SERVER_SOURCES
   ingestion/task_write.cc
   json_document.cc
   logging.cc
+  manifest.cc
   malloc_arena.cc
   options.cc
   pack.cc
   publish/repository.cc
   publish/settings.cc
+  reflog.cc
+  reflog_sql.cc
   s3fanout.cc
   sanitizer.cc
   session_context.cc
   signature.cc
+  sql.cc
+  sqlitemem.cc
   statistics.cc
   swissknife_lease_curl.cc
   upload.cc
@@ -280,6 +295,7 @@ set (LIBCVMFS_SERVER_SOURCES
   util/posix.cc
   util/string.cc
   whitelist.cc
+  xattr.cc
 )
 
 set (CVMFS_SWISSKNIFE_SOURCES
