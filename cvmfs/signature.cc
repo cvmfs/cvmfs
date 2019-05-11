@@ -350,6 +350,22 @@ std::string SignatureManager::GetActivePubkeys() {
 }
 
 
+std::string SignatureManager::GetCertificate() {
+  if (!certificate_) return "";
+
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  bool rvb = PEM_write_bio_X509(bp, certificate_);
+  assert(rvb);
+  char *bio_crt_text;
+  long bytes = BIO_get_mem_data(bp, &bio_crt_text);  // NOLINT
+  assert(bytes > 0);
+  std::string bio_crt_str(bio_crt_text, bytes);
+  BIO_free(bp);
+  return bio_crt_str;
+}
+
+
 RSA *SignatureManager::GenerateRsaKeyPair() {
   int retval = RAND_status();
   assert(retval == 1);
