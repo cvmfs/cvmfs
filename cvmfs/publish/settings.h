@@ -5,6 +5,7 @@
 #ifndef CVMFS_PUBLISH_SETTINGS_H_
 #define CVMFS_PUBLISH_SETTINGS_H_
 
+#include <stdint.h>
 #include <unistd.h>
 
 #include <string>
@@ -42,6 +43,9 @@ class SettingsTransaction {
   explicit SettingsTransaction(const std::string &fqrn)
     : hash_algorithm_(shash::kSha1)
     , compression_algorithm_(zlib::kZlibDefault)
+    , ttl_second_(240)
+    , is_garbage_collectable_(true)
+    , is_volatile_(false)
     , union_fs_(kUnionFsUnknown)
     , spool_area_(fqrn)
   {}
@@ -53,6 +57,10 @@ class SettingsTransaction {
   zlib::Algorithms compression_algorithm() const {
     return compression_algorithm_;
   }
+  uint32_t ttl_second() const { return ttl_second_; }
+  bool is_garbage_collectable() const { return is_garbage_collectable_; }
+  bool is_volatile() const { return is_volatile_; }
+  std::string voms_authz() const { return voms_authz_; }
 
   const SettingsSpoolArea &spool_area() const { return spool_area_; }
   SettingsSpoolArea *GetSpoolArea() { return &spool_area_; }
@@ -62,6 +70,10 @@ class SettingsTransaction {
 
   shash::Algorithms hash_algorithm_;
   zlib::Algorithms compression_algorithm_;
+  uint32_t ttl_second_;
+  bool is_garbage_collectable_;
+  bool is_volatile_;
+  std::string voms_authz_;
   UnionFsType union_fs_;
 
   SettingsSpoolArea spool_area_;

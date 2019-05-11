@@ -169,6 +169,9 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void Upload(const std::string &local_path, const std::string &remote_path);
 
+  /**
+   * Ownership of source is transferred to the spooler
+   */
   void Upload(const std::string &remote_path, IngestionSource *source);
 
   /**
@@ -227,6 +230,10 @@ class Spooler : public Observable<SpoolerResult> {
    * @param local_path  the location of the source of the certificate file
    */
   void ProcessCertificate(const std::string &local_path);
+  /**
+   * Ownership of source is transferred to the ingestion pipeline
+   */
+  void ProcessCertificate(IngestionSource *source);
 
   /**
    * Convenience wrapper to process a meta info file.
@@ -234,6 +241,10 @@ class Spooler : public Observable<SpoolerResult> {
    * @param local_path  the location of the meta info file
    */
   void ProcessMetainfo(const std::string &local_path);
+  /**
+   * Ownership of source is transferred to the ingestion pipeline
+   */
+  void ProcessMetainfo(IngestionSource *source);
 
   /**
    * Deletes the given file from the repository backend storage.  This requires

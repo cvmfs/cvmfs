@@ -77,7 +77,7 @@ class Whitelist {
     kStAvailable,
   };
 
-  static std::string Create(
+  static std::string CreateString(
     const std::string &fqrn,
     int validity_days,
     shash::Algorithms hash_algorithm,
@@ -97,6 +97,8 @@ class Whitelist {
   time_t expires();
   bool IsExpired() const;
   Failures VerifyLoadedCertificate() const;
+
+  std::string ExportString() const;
 
  private:
   Whitelist();
