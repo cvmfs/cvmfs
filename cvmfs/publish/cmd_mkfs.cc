@@ -67,8 +67,9 @@ int CmdMkfs::Main(const Options &options) {
     }
     settings.GetStorage()->SetLocator(options.GetString("storage"));
   } else if (options.Has("s3config")) {
-    settings.GetStorage()->MakeS3(options.GetString("s3config"),
-                                  settings.transaction().spool_area());
+    settings.GetStorage()->MakeS3(
+      options.GetString("s3config"),
+      settings.transaction().spool_area().tmp_dir());
   }
   bool configure_apache =
     (settings.storage().type() == upload::SpoolerDefinition::Local) &&
