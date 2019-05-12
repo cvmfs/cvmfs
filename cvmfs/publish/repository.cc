@@ -283,7 +283,19 @@ void Publisher::ExportKeychain() {
                         settings_.keychain().master_private_key_path(), 0600);
   if (!rvb) throw EPublish("cannot export private master key");
 
-  // TODO Ownership
+  int rvi;
+  rvi = chown(settings_.keychain().master_public_key_path().c_str(),
+              settings_.owner_uid(), settings_.owner_gid());
+  if (rvi != 0) throw EPublish("cannot set key file ownership");
+  rvi = chown(settings_.keychain().certificate_path().c_str(),
+              settings_.owner_uid(), settings_.owner_gid());
+  if (rvi != 0) throw EPublish("cannot set key file ownership");
+  rvi = chown(settings_.keychain().private_key_path().c_str(),
+              settings_.owner_uid(), settings_.owner_gid());
+  if (rvi != 0) throw EPublish("cannot set key file ownership");
+  rvi = chown(settings_.keychain().master_private_key_path().c_str(),
+              settings_.owner_uid(), settings_.owner_gid());
+  if (rvi != 0) throw EPublish("cannot set key file ownership");
 }
 
 void Publisher::OnProcessCertificate(const upload::SpoolerResult &result) {

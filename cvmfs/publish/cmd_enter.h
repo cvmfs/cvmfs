@@ -25,6 +25,9 @@ class CmdEnter : public Command {
   virtual unsigned GetMinPlainArgs() const { return 1; }
 
   virtual int Main(const Options &options);
+
+ private:
+  void EnterNsRoot();
 };
 
 }  // namespace publish

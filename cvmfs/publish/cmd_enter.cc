@@ -31,6 +31,15 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
+void CmdEnter::EnterNsRoot() {
+  bool rvb = CreateUserNamespace(0, 0);
+  if (!rvb) throw EPublish("cannot create user namespace");
+  rvb = CreateMountNamespace();
+  if (!rvb) throw EPublish("cannot create mount namespace");
+  rvb = CreatePidNamespace(NULL);
+  if (!rvb) throw EPublish("cannot create pid namespace");
+}
+
 int CmdEnter::Main(const Options &options) {
   bool rvb;
   int rvi;
@@ -52,12 +61,7 @@ int CmdEnter::Main(const Options &options) {
   const string path_cvmfs2 =
     "/home/jakob/Documents/CERN/git/src/build-arch/cvmfs/cvmfs2";
 
-  rvb = CreateUserNamespace(0, 0);
-  if (!rvb) throw EPublish("cannot create user namespace");
-  rvb = CreateMountNamespace();
-  if (!rvb) throw EPublish("cannot create mount namespace");
-  rvb = CreatePidNamespace(NULL);
-  if (!rvb) throw EPublish("cannot create pid namespace");
+  EnterNsRoot();
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Create workspace %s", workspace.c_str());
   rvb = MkdirDeep(workspace, kPrivateDirMode);
