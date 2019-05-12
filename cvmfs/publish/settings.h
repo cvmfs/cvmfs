@@ -200,6 +200,8 @@ class SettingsPublisher {
 
   std::string fqrn() const { return fqrn_; }
   unsigned whitelist_validity_days() const { return whitelist_validity_days_; }
+  uid_t owner_uid() const { return owner_uid_; }
+  uid_t owner_gid() const { return owner_gid_; }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
