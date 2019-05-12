@@ -247,6 +247,7 @@ set (LIBCVMFS_SERVER_SOURCES
   catalog_sql.cc
   catalog_mgr_ro.cc
   catalog_mgr_rw.cc
+  catalog_virtual.cc
   compression.cc
   dns.cc
   download.cc
@@ -268,6 +269,7 @@ set (LIBCVMFS_SERVER_SOURCES
   json_document.cc
   logging.cc
   manifest.cc
+  manifest_fetch.cc
   malloc_arena.cc
   options.cc
   pack.cc
@@ -282,7 +284,15 @@ set (LIBCVMFS_SERVER_SOURCES
   sql.cc
   sqlitemem.cc
   statistics.cc
+  swissknife_assistant.cc
   swissknife_lease_curl.cc
+  sync_item.cc
+  sync_item_tar.cc
+  sync_mediator.cc
+  sync_union.cc
+  sync_union_aufs.cc
+  sync_union_overlayfs.cc
+  sync_union_tarball.cc
   upload.cc
   upload_facility.cc
   upload_gateway.cc

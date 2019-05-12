@@ -35,7 +35,7 @@ namespace {
 
 static void EnterRootContainer() {
   bool rvb = CreateUserNamespace(0, 0);
-  if (!rvb) throw publish::EPublish("cannot create user namespace");
+  if (!rvb) throw publish::EPublish("cannot create root user namespace");
   rvb = CreateMountNamespace();
   if (!rvb) throw publish::EPublish("cannot create mount namespace");
   rvb = CreatePidNamespace(NULL);
