@@ -51,10 +51,13 @@ class Setting {
 
   bool is_default() const { return is_default_; }
 
+  T* GetPtr() { return &value_; }
+
  private:
   T value_;
   bool is_default_;
 };
+
 
 // Settings from the point of construction always represent a valid
 // configuration. The constructor sets default values, which can be overwritten
@@ -64,16 +67,17 @@ class SettingsSpoolArea {
 public:
   explicit SettingsSpoolArea(const std::string &fqrn)
     : spool_area_(std::string("/var/spool/cvmfs/") + fqrn)
-    , tmp_dir_(spool_area_ + "/tmp")
+    , tmp_dir_(spool_area_() + "/tmp")
   { }
 
-  void SetSystemTempDir();
+  void UseSystemTempDir();
+  void SetSpoolArea(const std::string &path);
 
   std::string tmp_dir() const { return tmp_dir_; }
 
 private:
-  std::string spool_area_;
-  std::string tmp_dir_;
+  Setting<std::string> spool_area_;
+  Setting<std::string> tmp_dir_;
 };
 
 
@@ -107,13 +111,13 @@ class SettingsTransaction {
  private:
   bool ValidateUnionFs();
 
-  shash::Algorithms hash_algorithm_;
-  zlib::Algorithms compression_algorithm_;
-  uint32_t ttl_second_;
-  bool is_garbage_collectable_;
-  bool is_volatile_;
-  std::string voms_authz_;
-  UnionFsType union_fs_;
+  Setting<shash::Algorithms> hash_algorithm_;
+  Setting<zlib::Algorithms> compression_algorithm_;
+  Setting<uint32_t> ttl_second_;
+  Setting<bool> is_garbage_collectable_;
+  Setting<bool> is_volatile_;
+  Setting<std::string> voms_authz_;
+  Setting<UnionFsType> union_fs_;
 
   SettingsSpoolArea spool_area_;
 };
@@ -128,8 +132,8 @@ class SettingsStorage {
   explicit SettingsStorage(const std::string &fqrn)
     : fqrn_(fqrn)
     , type_(upload::SpoolerDefinition::Local)
-    , tmp_dir_(std::string("/srv/cvmfs/") + fqrn_ + "/data/txn")
-    , endpoint_(std::string("/srv/cvmfs/") + fqrn_)
+    , tmp_dir_(std::string("/srv/cvmfs/") + fqrn + "/data/txn")
+    , endpoint_(std::string("/srv/cvmfs/") + fqrn)
   { }
 
   std::string GetLocator() const;
@@ -140,10 +144,10 @@ class SettingsStorage {
   upload::SpoolerDefinition::DriverType type() const { return type_; }
 
  private:
-  std::string fqrn_;
-  upload::SpoolerDefinition::DriverType type_;
-  std::string tmp_dir_;
-  std::string endpoint_;
+  Setting<std::string> fqrn_;
+  Setting<upload::SpoolerDefinition::DriverType> type_;
+  Setting<std::string> tmp_dir_;
+  Setting<std::string> endpoint_;
 };
 
 class SettingsKeychain {
@@ -151,10 +155,10 @@ class SettingsKeychain {
   explicit SettingsKeychain(const std::string &fqrn)
     : fqrn_(fqrn)
     , master_private_key_path_(
-        std::string("/etc/cvmfs/keys/") + fqrn_ + ".masterkey")
-    , master_public_key_path_(std::string("/etc/cvmfs/keys/") + fqrn_ + ".pub")
-    , private_key_path_(std::string("/etc/cvmfs/keys/") + fqrn_ + ".key")
-    , certificate_path_(std::string("/etc/cvmfs/keys/") + fqrn_ + ".crt")
+        std::string("/etc/cvmfs/keys/") + fqrn + ".masterkey")
+    , master_public_key_path_(std::string("/etc/cvmfs/keys/") + fqrn + ".pub")
+    , private_key_path_(std::string("/etc/cvmfs/keys/") + fqrn + ".key")
+    , certificate_path_(std::string("/etc/cvmfs/keys/") + fqrn + ".crt")
   {}
 
   void SetKeychainDir(const std::string &keychain_dir);
@@ -172,11 +176,11 @@ class SettingsKeychain {
   std::string certificate_path() const { return certificate_path_; }
 
  private:
-  std::string fqrn_;
-  std::string master_private_key_path_;
-  std::string master_public_key_path_;
-  std::string private_key_path_;
-  std::string certificate_path_;
+  Setting<std::string> fqrn_;
+  Setting<std::string> master_private_key_path_;
+  Setting<std::string> master_public_key_path_;
+  Setting<std::string> private_key_path_;
+  Setting<std::string> certificate_path_;
 };
 
 /**
@@ -186,7 +190,7 @@ class SettingsPublisher {
  public:
   SettingsPublisher(const std::string &fqrn)
     : fqrn_(fqrn)
-    , url_(std::string("http://localhost/cvmfs/") + fqrn_)
+    , url_(std::string("http://localhost/cvmfs/") + fqrn)
     , owner_uid_(0)
     , owner_gid_(0)
     , whitelist_validity_days_(30)
@@ -197,6 +201,7 @@ class SettingsPublisher {
 
   void SetUrl(const std::string &url);
   void SetOwner(const std::string &user_name);
+  void SetOwner(uid_t uid, gid_t gid);
 
   std::string fqrn() const { return fqrn_; }
   unsigned whitelist_validity_days() const { return whitelist_validity_days_; }
@@ -211,10 +216,10 @@ class SettingsPublisher {
   SettingsKeychain *GetKeychain() { return &keychain_; }
 
  private:
-  std::string fqrn_;
-  std::string url_;
-  uid_t owner_uid_;
-  gid_t owner_gid_;
+  Setting<std::string> fqrn_;
+  Setting<std::string> url_;
+  Setting<uid_t> owner_uid_;
+  Setting<gid_t> owner_gid_;
   Setting<unsigned> whitelist_validity_days_;
 
   SettingsGc gc_;
@@ -230,14 +235,14 @@ class SettingsReplica {
  public:
   SettingsReplica(const std::string &fqrn)
     : fqrn_(fqrn)
-    , alias_(fqrn_)
-    , url_(std::string("http://localhost/cvmfs/") + alias_)
+    , alias_(fqrn)
+    , url_(std::string("http://localhost/cvmfs/") + alias_())
   {}
 
  private:
-  std::string fqrn_;
-  std::string alias_;
-  std::string url_;
+  Setting<std::string> fqrn_;
+  Setting<std::string> alias_;
+  Setting<std::string> url_;
 };
 
 }  // namespace publish

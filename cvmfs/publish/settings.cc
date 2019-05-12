@@ -15,11 +15,16 @@
 
 namespace publish {
 
-void SettingsSpoolArea::SetSystemTempDir() {
+void SettingsSpoolArea::UseSystemTempDir() {
   if (getenv("TMPDIR") != NULL)
     tmp_dir_ = getenv("TMPDIR");
   else
     tmp_dir_ = "/tmp";
+}
+
+void SettingsSpoolArea::SetSpoolArea(const std::string &path) {
+  spool_area_ = path;
+  tmp_dir_ = spool_area_() + "/tmp";
 }
 
 
@@ -63,8 +68,8 @@ bool SettingsTransaction::ValidateUnionFs() {
 
 std::string SettingsStorage::GetLocator() const {
   return std::string(upload::SpoolerDefinition::kDriverNames[type_]) +
-    "," + tmp_dir_ +
-    "," + endpoint_;
+    "," + tmp_dir_() +
+    "," + endpoint_();
 }
 
 void SettingsStorage::MakeS3(
@@ -73,7 +78,7 @@ void SettingsStorage::MakeS3(
 {
   type_ = upload::SpoolerDefinition::S3;
   tmp_dir_ = spool_area.tmp_dir();
-  endpoint_ = "cvmfs/" + fqrn_ + "@" + s3_config;
+  endpoint_ = "cvmfs/" + fqrn_() + "@" + s3_config;
 }
 
 void SettingsStorage::SetLocator(const std::string &locator) {
@@ -99,10 +104,10 @@ void SettingsStorage::SetLocator(const std::string &locator) {
 //------------------------------------------------------------------------------
 
 void SettingsKeychain::SetKeychainDir(const std::string &keychain_dir) {
-  master_private_key_path_ = keychain_dir + "/" + fqrn_ + ".masterkey";
-  master_public_key_path_ = keychain_dir + "/" + fqrn_ + ".pub";
-  private_key_path_ = keychain_dir + "/" + fqrn_ + ".key";
-  certificate_path_ = keychain_dir + "/" + fqrn_ + ".crt";
+  master_private_key_path_ = keychain_dir + "/" + fqrn_() + ".masterkey";
+  master_public_key_path_ = keychain_dir + "/" + fqrn_() + ".pub";
+  private_key_path_ = keychain_dir + "/" + fqrn_() + ".key";
+  certificate_path_ = keychain_dir + "/" + fqrn_() + ".crt";
 }
 
 
@@ -143,10 +148,15 @@ void SettingsPublisher::SetUrl(const std::string &url) {
 
 
 void SettingsPublisher::SetOwner(const std::string &user_name) {
-  bool retval = GetUidOf(user_name, &owner_uid_, &owner_gid_);
+  bool retval = GetUidOf(user_name, owner_uid_.GetPtr(), owner_gid_.GetPtr());
   if (!retval) {
     throw EPublish("unknown user name for repository owner");
   }
+}
+
+void SettingsPublisher::SetOwner(uid_t uid, gid_t gid) {
+  owner_uid_ = uid;
+  owner_gid_ = gid;
 }
 
 }  // namespace publish

@@ -21,13 +21,15 @@ class CmdEnter : public Command {
   virtual std::string GetUsage() const {
     return "[options] <fully qualified repository name>";
   }
-  virtual ParameterList GetParams() const { return ParameterList(); }
+  virtual ParameterList GetParams() const {
+    ParameterList p;
+    p.push_back(Parameter::Optional("stratum0", 'w', "stratum0 url",
+      "HTTP endpoint of the authoritative storage"));
+    return p;
+  }
   virtual unsigned GetMinPlainArgs() const { return 1; }
 
   virtual int Main(const Options &options);
-
- private:
-  void EnterNsRoot();
 };
 
 }  // namespace publish
