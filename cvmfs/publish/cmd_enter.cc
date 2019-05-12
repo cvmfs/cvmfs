@@ -23,34 +23,51 @@
 #include "logging.h"
 #include "options.h"
 #include "publish/except.h"
+#include "publish/settings.h"
+#include "sanitizer.h"
 #include "util/namespace.h"
 #include "util/posix.h"
 
 
 using namespace std;  // NOLINT
 
-namespace publish {
+namespace {
 
-void CmdEnter::EnterNsRoot() {
+static void EnterRootContainer() {
   bool rvb = CreateUserNamespace(0, 0);
-  if (!rvb) throw EPublish("cannot create user namespace");
+  if (!rvb) throw publish::EPublish("cannot create user namespace");
   rvb = CreateMountNamespace();
-  if (!rvb) throw EPublish("cannot create mount namespace");
+  if (!rvb) throw publish::EPublish("cannot create mount namespace");
   rvb = CreatePidNamespace(NULL);
-  if (!rvb) throw EPublish("cannot create pid namespace");
+  if (!rvb) throw publish::EPublish("cannot create pid namespace");
 }
 
+} // anonymous namespace
+
+
+namespace publish {
+
 int CmdEnter::Main(const Options &options) {
-  bool rvb;
-  int rvi;
-
   std::string fqrn = options.plain_args()[0].value_str;
-
-  uid_t uid = geteuid();
-  gid_t gid = getegid();
+  sanitizer::RepositorySanitizer sanitizer;
+  if (!sanitizer.IsValid(fqrn)) {
+    throw EPublish("malformed repository name: " + fqrn);
+  }
+  SettingsPublisher settings(fqrn);
 
   string cwd = GetCurrentWorkingDirectory();
   string workspace = GetHomeDirectory() + "/.cvmfs/" + fqrn;
+
+  settings.SetOwner(geteuid(), getegid());
+  if (options.Has("stratum0"))
+    settings.SetUrl(options.GetString("stratum0"));
+  settings.GetKeychain()->SetKeychainDir(".");
+  settings.GetTransaction()->GetSpoolArea()->SetSpoolArea(workspace);
+  // TODO(jblomer): Storage configuration must be gateway for the enter command
+
+  bool rvb;
+  int rvi;
+
   const string path_usyslog = workspace + "/usyslog.log";
   const string path_cache = workspace + "/cache";
   const string path_config = workspace + "/client.config";
@@ -61,7 +78,7 @@ int CmdEnter::Main(const Options &options) {
   const string path_cvmfs2 =
     "/home/jakob/Documents/CERN/git/src/build-arch/cvmfs/cvmfs2";
 
-  EnterNsRoot();
+  EnterRootContainer();
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Create workspace %s", workspace.c_str());
   rvb = MkdirDeep(workspace, kPrivateDirMode);
@@ -149,7 +166,7 @@ int CmdEnter::Main(const Options &options) {
   rvb = BindMount(path_mount_union, "/cvmfs");
   if (!rvb) throw EPublish("cannot bind mount to /cvmfs");
 
-  rvb = CreateUserNamespace(uid, gid);
+  rvb = CreateUserNamespace(settings.owner_uid(), settings.owner_gid());
   if (!rvb) throw EPublish("cannot create user namespace");
 
   rvi = setenv("PS1", "[CernVM-FS Transaction] ", 1 /* overwrite */);
