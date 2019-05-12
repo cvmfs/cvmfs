@@ -11,6 +11,9 @@
 #include "upload_spooler_result.h"
 #include "util/single_copy.h"
 
+namespace download {
+class DownloadManager;
+}
 namespace history {
 class History;
 class SqliteHistory;
@@ -18,6 +21,9 @@ class SqliteHistory;
 namespace manifest {
 class Manifest;
 class Reflog;
+}
+namespace perf {
+class Statistics;
 }
 namespace signature {
 class SignatureManager;
@@ -41,10 +47,8 @@ class Repository : SingleCopy {
   void List();
   void Diff();
 
-  void TakeSpooler(upload::Spooler *spooler) { spooler_ = spooler; }
   upload::Spooler *spooler() { return spooler_; }
-
-  void TakeWhitelist(whitelist::Whitelist *wl) { whitelist_ = wl; }
+  download::DownloadManager *download_mgr() { return download_mgr_; }
   whitelist::Whitelist *whitelist() { return whitelist_; }
 
   manifest::Manifest *manifest() { return manifest_; }
@@ -52,11 +56,20 @@ class Repository : SingleCopy {
   history::History *history();
 
  protected:
+  void DownloadRootObjects(
+    const std::string &url,
+    const std::string &fqrn,
+    const std::string &tmp_dir);
+
+  perf::Statistics *statistics_;
+  signature::SignatureManager *signature_mgr_;
+  download::DownloadManager *download_mgr_;
   upload::Spooler *spooler_;
   whitelist::Whitelist *whitelist_;
   manifest::Reflog *reflog_;
   manifest::Manifest *manifest_;
   history::SqliteHistory *history_;
+  // TODO(jblomer): make MetaInfo class
   std::string meta_info_;
 };
 
@@ -106,8 +119,6 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void OnUploadWhitelist(const upload::SpoolerResult &result);
 
   SettingsPublisher settings_;
-
-  signature::SignatureManager *signature_mgr_;
 };
 
 class Replica : public Repository {

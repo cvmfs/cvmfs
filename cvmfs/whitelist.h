@@ -100,6 +100,8 @@ class Whitelist {
 
   std::string ExportString() const;
 
+  Status status() const { return status_; }
+
  private:
   Whitelist();
 
