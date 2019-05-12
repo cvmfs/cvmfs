@@ -23,8 +23,8 @@ void SettingsSpoolArea::UseSystemTempDir() {
 }
 
 void SettingsSpoolArea::SetSpoolArea(const std::string &path) {
-  spool_area_ = path;
-  tmp_dir_ = spool_area_() + "/tmp";
+  workspace_ = path;
+  tmp_dir_ = workspace_() + "/tmp";
 }
 
 
@@ -74,10 +74,10 @@ std::string SettingsStorage::GetLocator() const {
 
 void SettingsStorage::MakeS3(
   const std::string &s3_config,
-  const SettingsSpoolArea &spool_area)
+  const std::string &tmp_dir)
 {
   type_ = upload::SpoolerDefinition::S3;
-  tmp_dir_ = spool_area.tmp_dir();
+  tmp_dir_ = tmp_dir;
   endpoint_ = "cvmfs/" + fqrn_() + "@" + s3_config;
 }
 

@@ -68,6 +68,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   virtual ~Publisher();
 
   void UpdateMetaInfo();
+  void Transaction();
+  void Abort();
   void Publish();
   void Ingest();
   void EditTags();
@@ -78,11 +80,16 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   signature::SignatureManager *signature_mgr() { return signature_mgr_; }
 
  private:
+  // Used by Create
+  Publisher();
+
   void CreateKeychain();
   void CreateStorage();
   void CreateRootObjects();
 
   void ExportKeychain();
+  void CreateDirectoryAsOwner(const std::string &path, int mode);
+  void InitSpoolArea();
 
   void PushCertificate();
   void PushHistory();

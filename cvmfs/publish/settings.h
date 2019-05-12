@@ -66,17 +66,25 @@ class Setting {
 class SettingsSpoolArea {
 public:
   explicit SettingsSpoolArea(const std::string &fqrn)
-    : spool_area_(std::string("/var/spool/cvmfs/") + fqrn)
-    , tmp_dir_(spool_area_() + "/tmp")
+    : workspace_(std::string("/var/spool/cvmfs/") + fqrn)
+    , tmp_dir_(workspace_() + "/tmp")
   { }
 
   void UseSystemTempDir();
   void SetSpoolArea(const std::string &path);
 
+  std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
+  std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
+  std::string union_mnt() const { return workspace_() + "/union"; }
+  std::string scratch_dir() const { return workspace_() + "/scratch/current"; }
+  std::string client_config() const { return workspace_() + "/client.config"; }
+  std::string client_log() const { return workspace_() + "/usyslog.log"; }
+  std::string cache_dir() const { return workspace_() + "/cache"; }
+  std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }
 
 private:
-  Setting<std::string> spool_area_;
+  Setting<std::string> workspace_;
   Setting<std::string> tmp_dir_;
 };
 
@@ -138,8 +146,7 @@ class SettingsStorage {
 
   std::string GetLocator() const;
   void SetLocator(const std::string &locator);
-  void MakeS3(const std::string &s3_config,
-              const SettingsSpoolArea &spool_area);
+  void MakeS3(const std::string &s3_config, const std::string &tmp_dir);
 
   upload::SpoolerDefinition::DriverType type() const { return type_; }
 
@@ -204,6 +211,7 @@ class SettingsPublisher {
   void SetOwner(uid_t uid, gid_t gid);
 
   std::string fqrn() const { return fqrn_; }
+  std::string url() const { return url_; }
   unsigned whitelist_validity_days() const { return whitelist_validity_days_; }
   uid_t owner_uid() const { return owner_uid_; }
   uid_t owner_gid() const { return owner_gid_; }
