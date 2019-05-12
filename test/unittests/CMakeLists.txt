@@ -436,6 +436,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
@@ -458,6 +459,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/reflog.cc
@@ -469,7 +471,15 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
+  ${CVMFS_SOURCE_DIR}/sync_item.cc
+  ${CVMFS_SOURCE_DIR}/sync_item_tar.cc
+  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
+  ${CVMFS_SOURCE_DIR}/sync_union.cc
+  ${CVMFS_SOURCE_DIR}/sync_union_aufs.cc
+  ${CVMFS_SOURCE_DIR}/sync_union_overlayfs.cc
+  ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
   ${CVMFS_SOURCE_DIR}/upload_gateway.cc
