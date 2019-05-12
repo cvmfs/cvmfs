@@ -55,7 +55,7 @@ int CmdMkfs::Main(const Options &options) {
 
   // Needs to be done before the storage and its temp dir is configured
   if (options.Has("no-publisher")) {
-    settings.GetTransaction()->GetSpoolArea()->SetSystemTempDir();
+    settings.GetTransaction()->GetSpoolArea()->UseSystemTempDir();
     settings.GetKeychain()->SetKeychainDir(".");
   }
 
