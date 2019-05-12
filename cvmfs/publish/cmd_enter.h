@@ -11,9 +11,14 @@
 
 namespace publish {
 
+class SettingsPublisher;
+
 class CmdEnter : public Command {
  public:
-  explicit CmdEnter() { }
+  explicit CmdEnter()
+    : cvmfs_binary_("/usr/bin/cvmfs2")
+    , overlayfs_binary_("/usr/bin/fuse-overlayfs")
+  { }
   virtual std::string GetName() const { return "enter"; }
   virtual std::string GetBrief() const {
     return "Opens an ephemeral namespace to publish content";
@@ -30,6 +35,13 @@ class CmdEnter : public Command {
   virtual unsigned GetMinPlainArgs() const { return 1; }
 
   virtual int Main(const Options &options);
+
+ private:
+  void MountCvmfs(const SettingsPublisher &settings);
+  void MountOverlayfs(const SettingsPublisher &settings);
+
+  std::string cvmfs_binary_;
+  std::string overlayfs_binary_;
 };
 
 }  // namespace publish

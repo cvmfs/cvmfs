@@ -240,7 +240,10 @@ void Publisher::PushWhitelist() {
 
 
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
-  UniquePtr<Publisher> publisher(new Publisher(settings));
+  UniquePtr<Publisher> publisher(new Publisher());
+  publisher->settings_ = settings;
+  publisher->signature_mgr_ = new signature::SignatureManager();
+  publisher->signature_mgr_->Init();
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Creating Key Chain... ");
   publisher->CreateKeychain();
@@ -340,11 +343,44 @@ void Publisher::OnUploadWhitelist(const upload::SpoolerResult &result) {
   }
 }
 
+void Publisher::CreateDirectoryAsOwner(const std::string &path, int mode)
+{
+  bool rvb = MkdirDeep(path, kPrivateDirMode);
+  if (!rvb) throw EPublish("cannot create directory " + path);
+  int rvi = chown(path.c_str(), settings_.owner_uid(), settings_.owner_gid());
+  if (rvi != 0) throw EPublish("cannot set ownership on directory " + path);
+}
+
+void Publisher::InitSpoolArea() {
+  CreateDirectoryAsOwner(settings_.transaction().spool_area().workspace(),
+                         kPrivateDirMode);
+  CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
+                         kPrivateDirMode);
+  CreateDirectoryAsOwner(settings_.transaction().spool_area().cache_dir(),
+                         kPrivateDirMode);
+  CreateDirectoryAsOwner(settings_.transaction().spool_area().scratch_dir(),
+                         kPrivateDirMode);
+  CreateDirectoryAsOwner(settings_.transaction().spool_area().ovl_work_dir(),
+                         kPrivateDirMode);
+  CreateDirectoryAsOwner(settings_.transaction().spool_area().readonly_mnt(),
+                         kPrivateDirMode);
+  CreateDirectoryAsOwner(
+    settings_.transaction().spool_area().union_mnt() + "/" + settings_.fqrn(),
+    kPrivateDirMode);
+}
+
+Publisher::Publisher()
+  : settings_("invalid.cvmfs.io")
+  , signature_mgr_(NULL)
+{
+}
+
 Publisher::Publisher(const SettingsPublisher &settings)
   : settings_(settings)
   , signature_mgr_(new signature::SignatureManager())
 {
   signature_mgr_->Init();
+  // TODO(jblomer): check transaction lock
 }
 
 Publisher::~Publisher() {
@@ -352,6 +388,16 @@ Publisher::~Publisher() {
   delete signature_mgr_;
 }
 
+void Publisher::Transaction() {
+  InitSpoolArea();
+  // TODO(jblomer): set transaction lock
+}
+void Publisher::Abort() {
+  // TODO(jblomer): remove transaction lock
+}
+void Publisher::Publish() {
+  // TODO(jblomer): check transaction lock and remove if successful
+}
 void Publisher::EditTags() {}
 void Publisher::Ingest() {}
 void Publisher::Migrate() {}
