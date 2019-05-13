@@ -953,7 +953,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
 
   // If there is a reflog, we want to check it
   if (Exists(".cvmfsreflog") && reflog_chksum_path.empty() &&
-      manifest->reflog_checksum().IsNull()) {
+      manifest->reflog_hash().IsNull()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              ".cvmfsreflog present but no checksum provided, aborting");
     return 1;
@@ -966,7 +966,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   } else {
-    reflog_hash = manifest->reflog_checksum();
+    reflog_hash = manifest->reflog_hash();
   }
 
   // The reflog hash is null here if the reflog doesn't exit, so this does not

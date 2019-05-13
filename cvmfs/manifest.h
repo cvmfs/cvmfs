@@ -39,7 +39,7 @@ class Manifest {
            const bool garbage_collectable,
            const bool has_alt_catalog_path,
            const shash::Any &meta_info,
-           const shash::Any &reflog_checksum)
+           const shash::Any &reflog_hash)
   : catalog_hash_(catalog_hash)
   , catalog_size_(catalog_size)
   , root_path_(root_path)
@@ -53,7 +53,7 @@ class Manifest {
   , garbage_collectable_(garbage_collectable)
   , has_alt_catalog_path_(has_alt_catalog_path)
   , meta_info_(meta_info)
-  , reflog_checksum_(reflog_checksum) {}
+  , reflog_hash_(reflog_hash) {}
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
@@ -97,8 +97,8 @@ class Manifest {
   void set_root_path(const std::string &root_path) {
     root_path_ = shash::Md5(shash::AsciiPtr(root_path));
   }
-  void set_reflog_checksum(const shash::Any& checksum) {
-    reflog_checksum_ = checksum;
+  void set_reflog_hash(const shash::Any& checksum) {
+    reflog_hash_ = checksum;
   }
 
   uint64_t revision() const { return revision_; }
@@ -112,7 +112,7 @@ class Manifest {
   bool garbage_collectable() const { return garbage_collectable_; }
   bool has_alt_catalog_path() const { return has_alt_catalog_path_; }
   shash::Any meta_info() const { return meta_info_; }
-  shash::Any reflog_checksum() const { return reflog_checksum_; }
+  shash::Any reflog_hash() const { return reflog_hash_; }
 
   std::string MakeCatalogPath() const {
     return has_alt_catalog_path_ ? catalog_hash_.MakeAlternativePath() :
@@ -154,7 +154,7 @@ class Manifest {
   /**
    * Hash of the reflog file
    */
-  shash::Any reflog_checksum_;
+  shash::Any reflog_hash_;
 };  // class Manifest
 
 }  // namespace manifest

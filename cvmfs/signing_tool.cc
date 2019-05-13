@@ -70,7 +70,7 @@ SigningTool::Result SigningTool::Run(
   // reflog_chksum_path wasn't given, the reflog checksum can possibly be
   // obtained from the manifest
   if (reflog_chksum_path.empty() || reflog_hash.IsNull()) {
-    reflog_hash = manifest->reflog_checksum();
+    reflog_hash = manifest->reflog_hash();
   }
 
   // Connect to the spooler
@@ -195,7 +195,7 @@ SigningTool::Result SigningTool::Run(
     manifest->set_meta_info(metainfo_hash);
   }
   if (!reflog_hash.IsNull()) {
-    manifest->set_reflog_checksum(reflog_hash);
+    manifest->set_reflog_hash(reflog_hash);
   }
 
   std::string signed_manifest = manifest->ExportString();
