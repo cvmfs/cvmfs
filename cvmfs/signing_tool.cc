@@ -67,8 +67,8 @@ SigningTool::Result SigningTool::Run(
     return kError;
   }
 
-  // reflog_chksum_path wasn't given, the reflog checksum can possibly be obtained
-  // from the manifest
+  // reflog_chksum_path wasn't given, the reflog checksum can possibly be
+  // obtained from the manifest
   if (reflog_chksum_path.empty() || reflog_hash.IsNull()) {
     reflog_hash = manifest->reflog_checksum();
   }
