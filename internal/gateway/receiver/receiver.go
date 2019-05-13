@@ -58,10 +58,12 @@ func NewReceiver(ctx context.Context, execPath string, mock bool) (Receiver, err
 
 // CvmfsReceiver spawns an external cvmfs_receiver worker process
 type CvmfsReceiver struct {
-	worker *exec.Cmd
-	stdin  io.WriteCloser
-	stdout io.ReadCloser
-	ctx    context.Context
+	worker       *exec.Cmd
+	workerCmdIn  io.WriteCloser
+	workerCmdOut io.ReadCloser
+	workerStderr io.ReadCloser
+	workerStdout io.ReadCloser
+	ctx          context.Context
 }
 
 // NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
@@ -72,16 +74,25 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 
 	cmd := exec.Command(execPath, "-i", strconv.Itoa(3), "-o", strconv.Itoa(4))
 
-	stdinRead, stdinWrite, err := os.Pipe()
+	workerInRead, workerInWrite, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create stdin pipe")
+		return nil, errors.Wrap(err, "could not create worker input pipe")
 	}
-	stdoutRead, stdoutWrite, err := os.Pipe()
+	workerOutRead, workerOutWrite, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create stdout pipe")
+		return nil, errors.Wrap(err, "could not create worker output pipe")
 	}
 
-	cmd.ExtraFiles = []*os.File{stdinRead, stdoutWrite}
+	cmd.ExtraFiles = []*os.File{workerInRead, workerOutWrite}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create worker stderr pipe")
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create worker stdout pipe")
+	}
 
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "could not start worker process")
@@ -91,19 +102,37 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 		Str("command", "start").
 		Msg("worker process ready")
 
-	return &CvmfsReceiver{worker: cmd, stdin: stdinWrite, stdout: stdoutRead, ctx: ctx}, nil
+	return &CvmfsReceiver{
+		worker: cmd, workerCmdIn: workerInWrite, workerCmdOut: workerOutRead,
+		workerStderr: stderr, workerStdout: stdout, ctx: ctx}, nil
 }
 
 // Quit command is sent to the worker
 func (r *CvmfsReceiver) Quit() error {
 	defer func() {
-		r.stdin.Close()
-		r.stdout.Close()
+		r.workerCmdIn.Close()
+		r.workerCmdOut.Close()
 	}()
 
 	if _, err := r.call(receiverQuit, []byte{}, nil); err != nil {
 		return errors.Wrap(err, "worker 'quit' call failed")
 	}
+
+	var buf1 []byte
+	if _, err := io.ReadFull(r.workerStderr, buf1); err != nil {
+		return errors.Wrap(err, "could not retrieve worker stderr")
+	}
+	gw.LogC(r.ctx, "receiver", gw.LogDebug).
+		Str("pipe", "stderr").
+		Msg(string(buf1))
+
+	var buf2 []byte
+	if _, err := io.ReadFull(r.workerStdout, buf2); err != nil {
+		return errors.Wrap(err, "could not retrieve worker stdout")
+	}
+	gw.LogC(r.ctx, "receiver", gw.LogDebug).
+		Str("pipe", "stdout").
+		Msg(string(buf2))
 
 	if err := r.worker.Wait(); err != nil {
 		return errors.Wrap(err, "waiting for worker process failed")
@@ -198,11 +227,11 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader)
 	binary.LittleEndian.PutUint32(buf[4:8], uint32(len(msg)))
 	copy(buf[8:], msg)
 
-	if _, err := r.stdin.Write(buf); err != nil {
+	if _, err := r.workerCmdIn.Write(buf); err != nil {
 		return errors.Wrap(err, "could not write request")
 	}
 	if payload != nil {
-		if _, err := io.Copy(r.stdin, payload); err != nil {
+		if _, err := io.Copy(r.workerCmdIn, payload); err != nil {
 			return errors.Wrap(err, "could not write request payload")
 		}
 	}
@@ -211,13 +240,13 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader)
 
 func (r *CvmfsReceiver) reply() ([]byte, error) {
 	buf := make([]byte, 4)
-	if _, err := io.ReadFull(r.stdout, buf); err != nil {
+	if _, err := io.ReadFull(r.workerCmdOut, buf); err != nil {
 		return nil, errors.Wrap(err, "could not read reply size")
 	}
 	repSize := int32(binary.LittleEndian.Uint32(buf))
 
 	reply := make([]byte, repSize)
-	if _, err := io.ReadFull(r.stdout, reply); err != nil {
+	if _, err := io.ReadFull(r.workerCmdOut, reply); err != nil {
 		return nil, errors.Wrap(err, "could not read reply body")
 	}
 
