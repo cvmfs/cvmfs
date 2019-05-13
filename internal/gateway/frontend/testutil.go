@@ -25,13 +25,20 @@ func (b *mockBackend) GetSecret(keyID string) string {
 }
 
 func (b *mockBackend) GetRepo(repoName string) be.KeyPaths {
-	return be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"}
+	return be.KeyPaths{
+		"keyid1": be.KeySettings{Path: "/", Admin: true},
+		"keyid2": be.KeySettings{Path: "/restricted/to/subdir", Admin: false}}
 }
 
 func (b *mockBackend) GetRepos() map[string]be.KeyPaths {
 	return map[string]be.KeyPaths{
-		"test1.repo.org": be.KeyPaths{"keyid123": "/"},
-		"test2.repo.org": be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
+		"test1.repo.org": be.KeyPaths{
+			"keyid123": be.KeySettings{Path: "/", Admin: true},
+		},
+		"test2.repo.org": be.KeyPaths{
+			"keyid1": be.KeySettings{Path: "/", Admin: true},
+			"keyid2": be.KeySettings{Path: "/restricted/to/subdir", Admin: false},
+		},
 	}
 }
 

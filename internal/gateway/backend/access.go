@@ -11,8 +11,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// KeySettings contains the repository subpath associated with a key and a boolean
+// flag showing if the key can be used for administration operations
+type KeySettings struct {
+	Path  string
+	Admin bool
+}
+
 // KeyPaths maps from key ID to repository subpath
-type KeyPaths map[string]string
+type KeyPaths map[string]KeySettings
 
 // AccessConfig is the configuration of a single repository
 type AccessConfig struct {
@@ -30,8 +37,9 @@ type RepositorySpecV1 struct {
 type RepositorySpecV2 struct {
 	Name string `json:"domain"`
 	Keys []struct {
-		ID   string `json:"id"`
-		Path string `json:"path"`
+		ID    string `json:"id"`
+		Admin bool   `json:"admin"`
+		Path  string `json:"path"`
 	} `json:"keys"`
 }
 
@@ -92,13 +100,13 @@ func (c *AccessConfig) Check(keyID, leasePath, repoName string) *AuthError {
 		return &AuthError{"invalid_repo"}
 	}
 
-	p, ok := keys[keyID]
+	keySettings, ok := keys[keyID]
 	if !ok {
 		return &AuthError{"invalid_key"}
 	}
 
-	overlapping := gw.CheckPathOverlap(leasePath, p)
-	isSubpath := len(leasePath) >= len(p)
+	overlapping := gw.CheckPathOverlap(leasePath, keySettings.Path)
+	isSubpath := len(leasePath) >= len(keySettings.Path)
 
 	if !overlapping || !isSubpath {
 		return &AuthError{"invalid_path"}
@@ -175,9 +183,9 @@ func (c *AccessConfig) loadV1(cfg rawConfig, importer KeyImportFun) error {
 			return errors.Wrap(err, "could not import repository specs")
 		}
 		for _, spec := range repos {
-			keyIds := make(map[string]string)
+			keyIds := make(map[string]KeySettings)
 			for _, k := range spec.Keys {
-				keyIds[k] = keyPaths[k]
+				keyIds[k] = KeySettings{Path: keyPaths[k], Admin: false}
 			}
 			c.Repositories[spec.Name] = keyIds
 		}
@@ -205,13 +213,13 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 				}
 				// Item is a string representing the repository name; default key
 				// from /etc/cvmfs/keys/<REPO_NAME>/ will be associated
-				c.Repositories[name] = map[string]string{"default": "default"}
+				c.Repositories[name] = map[string]KeySettings{"default": KeySettings{Path: "default"}}
 			} else {
 				// Item is a RepositorySpecV2; associate the key IDs and paths to the
 				// repository
-				ks := make(map[string]string)
+				ks := make(map[string]KeySettings)
 				for _, k := range spec.Keys {
-					ks[k.ID] = k.Path
+					ks[k.ID] = KeySettings{Path: k.Path, Admin: k.Admin}
 				}
 				c.Repositories[spec.Name] = ks
 			}
@@ -247,7 +255,7 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 			if _, present := c.Keys[keyID]; !present {
 				c.Keys[keyID] = secret
 			}
-			ks[keyID] = "/"
+			ks[keyID] = KeySettings{Path: "/", Admin: false}
 		}
 	}
 
