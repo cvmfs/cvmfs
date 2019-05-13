@@ -47,6 +47,7 @@ const accessConfigV2 = `
 			"keys": [
 				{
 					"id": "keyid1",
+					"admin": true,
 					"path": "/"
 				},
 				{
