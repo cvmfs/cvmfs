@@ -10,25 +10,45 @@ check_status() {
     echo $(( $1 || 0 ))
 }
 
-run_transactions() {
+run_tests() {
     set_up_repository_gateway
 
-    echo "Check transaction with missing reflog"
-    sudo mv /var/spool/cvmfs/test.repo.org/reflog.chksum /tmp
-    cvmfs_server transaction test.repo.org
+    local test_repo="test.repo.org"
 
-    local output=$(cvmfs_server publish test.repo.org 2>&1 | grep "missing_reflog")
+    echo "Check transaction with missing reflog"
+    sudo mv /var/spool/cvmfs/${test_repo}/reflog.chksum /tmp
+    cvmfs_server transaction ${test_repo}
+
+    local output=$(cvmfs_server publish ${test_repo} 2>&1 | grep "missing_reflog")
 
     if [ x"$output" = x"" ]; then
         echo -n "Error: the missing reflog should have been reported "
         echo "as the cause of the publication error"
 
-        cvmfs_server abort -f test.repo.org
+        cvmfs_server abort -f ${test_repo}
 
         return 1;
     fi
 
-    cvmfs_server abort -f test.repo.org
+    cvmfs_server abort -f ${test_repo}
+
+    # Run repository check
+    cvmfs_server check ${test_repo}
+    if [ $? -ne 0 ]; then
+        echo "Repository integrity check failed with \"reflog.chksum\" present"
+        return 1;
+    fi
+
+    # Move reflog.chksum out of the way to reproduce the environment of a
+    # publisher running on a separate machine
+    mv /var/spool/cvmfs/${test_repo}/reflog.chksum /tmp/
+
+    # Re-run repository check
+    cvmfs_server check ${test_repo}
+    if [ $? -ne 0 ]; then
+        echo "Repository integrity check failed with \"reflog.chksum\" missing"
+        return 1;
+    fi
 
     return 0;
 }
@@ -36,7 +56,7 @@ run_transactions() {
 cvmfs_run_test() {
     trap clean_up EXIT HUP INT TERM || return $?
 
-    run_transactions
+    run_tests
     local status=$?
 
     return $(check_status $status)
