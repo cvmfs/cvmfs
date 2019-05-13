@@ -68,6 +68,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   bool garbage_collectable = false;
   bool has_alt_catalog_path = false;
   shash::Any meta_info;
+  shash::Any reflog_checksum;
 
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
@@ -91,11 +92,14 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('M')) != content.end())
     meta_info = MkFromHexPtr(shash::HexPtr(iter->second),
                              shash::kSuffixMetainfo);
+  if ((iter = content.find('Y')) != content.end()) {
+    reflog_checksum = MkFromHexPtr(shash::HexPtr(iter->second));
+  }
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
                       history, publish_timestamp, garbage_collectable,
-                      has_alt_catalog_path, meta_info);
+                      has_alt_catalog_path, meta_info, reflog_checksum);
 }
 
 
@@ -138,6 +142,9 @@ string Manifest::ExportString() const {
     manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
   if (!meta_info_.IsNull())
     manifest += "M" + meta_info_.ToString() + "\n";
+  if (!reflog_checksum_.IsNull()) {
+    manifest += "Y" + reflog_checksum_.ToString() + "\n";
+  }
   // Reserved: Z -> for identification of channel tips
 
   return manifest;
