@@ -931,13 +931,6 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  // If there is a reflog, we want to check it
-  if (reflog_chksum_path.empty() && Exists(".cvmfsreflog")) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             ".cvmfsreflog present but no checksum provided, aborting");
-    return 1;
-  }
-
   // Load Manifest
   UniquePtr<manifest::Manifest> manifest;
   bool successful = true;
@@ -958,12 +951,27 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
+  // If there is a reflog, we want to check it
+  if (Exists(".cvmfsreflog") && reflog_chksum_path.empty() &&
+      manifest->reflog_hash().IsNull()) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             ".cvmfsreflog present but no checksum provided, aborting");
+    return 1;
+  }
+
+  shash::Any reflog_hash;
   if (!reflog_chksum_path.empty()) {
-    shash::Any reflog_hash;
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read reflog checksum");
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read reflog checksum file");
       return 1;
     }
+  } else {
+    reflog_hash = manifest->reflog_hash();
+  }
+
+  // The reflog hash is null here if the reflog doesn't exit, so this does not
+  // represent an error
+  if (!reflog_hash.IsNull()) {
     bool retval = InspectReflog(reflog_hash, manifest);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");

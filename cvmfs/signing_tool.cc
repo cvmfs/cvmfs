@@ -67,6 +67,12 @@ SigningTool::Result SigningTool::Run(
     return kError;
   }
 
+  // reflog_chksum_path wasn't given, the reflog checksum can possibly be
+  // obtained from the manifest
+  if (reflog_chksum_path.empty() || reflog_hash.IsNull()) {
+    reflog_hash = manifest->reflog_hash();
+  }
+
   // Connect to the spooler
   const upload::SpoolerDefinition sd(spooler_definition,
                                      manifest->GetHashAlgorithm());
@@ -187,6 +193,9 @@ SigningTool::Result SigningTool::Run(
   manifest->set_has_alt_catalog_path(bootstrap_shortcuts);
   if (!metainfo_hash.IsNull()) {
     manifest->set_meta_info(metainfo_hash);
+  }
+  if (!reflog_hash.IsNull()) {
+    manifest->set_reflog_hash(reflog_hash);
   }
 
   std::string signed_manifest = manifest->ExportString();
