@@ -3,6 +3,7 @@ package frontend
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -46,10 +47,42 @@ func WithAdminAuthz(ac be.ActionController, next httprouter.Handle) httprouter.H
 			return
 		}
 
-		_, err := base64.StdEncoding.DecodeString(tokens[1])
+		HMAC, err := base64.StdEncoding.DecodeString(tokens[1])
 		if err != nil {
 			gw.LogC(ctx, "http", gw.LogError).
 				Err(err).Msg("could not base64 decode HMAC")
+			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
+			return
+		}
+
+		var HMACInput []byte
+		switch req.Method {
+		case "DELETE":
+			// For DELETE requests, use the path component of the URL to compute the HMAC
+			HMACInput = []byte(req.URL.Path)
+		case "POST":
+			// For POST requests, the request body is used to compute HMAC
+			var err error
+			HMACInput, err = ioutil.ReadAll(req.Body)
+			if err != nil {
+				httpWrapError(ctx, err, "could not read request body", w, http.StatusInternalServerError)
+				return
+			}
+			// Body needs to be read again in the next handler, reset it
+			// using a copy of the original body
+			bodyCopy := ioutil.NopCloser(bytes.NewReader(HMACInput))
+			req.Body.Close()
+			req.Body = bodyCopy
+		default:
+			msg := fmt.Sprintf("authorization middleware not implemented for HTTP method: %v", req.Method)
+			gw.LogC(ctx, "http", gw.LogError).
+				Msgf(msg)
+			http.Error(w, msg, http.StatusMethodNotAllowed)
+		}
+
+		if !CheckHMAC(HMACInput, HMAC, keyCfg.Secret) {
+			gw.LogC(ctx, "http", gw.LogError).
+				Msg("invalid HMAC")
 			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
 			return
 		}
