@@ -25,7 +25,7 @@ func TestPayloadHandlerLegacy(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/api/v1/payloads", bytes.NewReader(msg))
-	HMAC := ComputeHMAC(msg, backend.GetSecret("keyid2"))
+	HMAC := ComputeHMAC(msg, backend.GetKey("keyid2").Secret)
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 	req.Header["Message-Size"] = []string{strconv.Itoa(len(msg))}
 
@@ -63,7 +63,7 @@ func TestPayloadHandlerNew(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/api/v1/payloads", bytes.NewReader(msg))
-	HMAC := ComputeHMAC([]byte(token), backend.GetSecret("keyid2"))
+	HMAC := ComputeHMAC([]byte(token), backend.GetKey("keyid2").Secret)
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 	req.Header["Message-Size"] = []string{fmt.Sprintf("%v", len(msg))}
 

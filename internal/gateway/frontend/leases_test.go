@@ -19,7 +19,7 @@ func TestLeaseHandlerNewLease(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(msg))
-	HMAC := ComputeHMAC(msg, backend.GetSecret("keyid2"))
+	HMAC := ComputeHMAC(msg, backend.GetKey("keyid2").Secret)
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 
 	w := httptest.NewRecorder()
@@ -50,7 +50,7 @@ func TestLeaseHandlerCancelLease(t *testing.T) {
 	backend := mockBackend{}
 	token := "lease_token"
 	req := httptest.NewRequest("DELETE", "/api/v1/leases/"+token, nil)
-	HMAC := ComputeHMAC([]byte(token), backend.GetSecret("keyid2"))
+	HMAC := ComputeHMAC([]byte(token), backend.GetKey("keyid2").Secret)
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 
 	w := httptest.NewRecorder()
@@ -88,7 +88,7 @@ func TestLeaseHandlerCommitLease(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/api/v1/leases/"+token, bytes.NewReader(msg))
-	HMAC := ComputeHMAC([]byte(token), backend.GetSecret("keyid2"))
+	HMAC := ComputeHMAC([]byte(token), backend.GetKey("keyid2").Secret)
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 
 	w := httptest.NewRecorder()

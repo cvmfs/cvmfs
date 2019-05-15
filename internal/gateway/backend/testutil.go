@@ -87,14 +87,14 @@ const (
 
 // mockKeyImporter is used by tests, returns a predefined (id, secret) pair
 // instead of reading from file
-func mockKeyImporter(ks KeySpec) (string, string, string, error) {
+func mockKeyImporter(ks KeySpec) (string, string, string, bool, error) {
 	switch ks.KeyType {
 	case "plain_text":
-		return ks.ID, ks.Secret, ks.Path, nil
+		return ks.ID, ks.Secret, ks.Path, ks.Admin, nil
 	case "file":
-		return "keyid123", "secret123", "/", nil
+		return "keyid123", "secret123", "/", false, nil
 	default:
-		return "", "", "", fmt.Errorf("unknown key type")
+		return "", "", "", false, fmt.Errorf("unknown key type")
 	}
 }
 

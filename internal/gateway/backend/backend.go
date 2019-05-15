@@ -20,8 +20,8 @@ type Services struct {
 
 // ActionController contains the various actions that can be performed with the backend
 type ActionController interface {
-	GetSecret(keyID string) string
-	GetRepo(repoName string) RepositoryConfig
+	GetKey(keyID string) *KeyConfig
+	GetRepo(repoName string) *RepositoryConfig
 	GetRepos() map[string]RepositoryConfig
 	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error)
 	GetLeases(ctx context.Context) (map[string]LeaseReturn, error)
@@ -31,9 +31,9 @@ type ActionController interface {
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 }
 
-// GetSecret associated with a key ID
-func (s *Services) GetSecret(keyID string) string {
-	return s.Access.GetKeyConfig(keyID).Secret
+// GetKey returns the key configuration associated with a key ID
+func (s *Services) GetKey(keyID string) *KeyConfig {
+	return s.Access.GetKeyConfig(keyID)
 }
 
 // StartBackend initializes the various backend services

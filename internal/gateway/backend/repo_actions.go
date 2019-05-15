@@ -1,7 +1,7 @@
 package backend
 
 // GetRepo returns the access configuration of a repository
-func (s *Services) GetRepo(repoName string) RepositoryConfig {
+func (s *Services) GetRepo(repoName string) *RepositoryConfig {
 	return s.Access.GetRepo(repoName)
 }
 
