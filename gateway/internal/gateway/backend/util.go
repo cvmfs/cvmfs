@@ -11,6 +11,6 @@ func logAction(ctx context.Context, actionName string, outcome *string, t0 time.
 	gw.LogC(ctx, "actions", gw.LogInfo).
 		Str("action", actionName).
 		Str("outcome", *outcome).
-		Float64("action_dt", time.Now().Sub(t0).Seconds()).
+		Dur("action_dt", time.Since(t0)).
 		Msg("action complete")
 }

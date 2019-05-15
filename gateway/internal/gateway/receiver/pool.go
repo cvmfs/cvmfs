@@ -157,7 +157,7 @@ M:
 
 			gw.LogC(task.Context(), "worker_pool", gw.LogDebug).
 				Int("worker_id", workerIdx).
-				Float64("task_dt", time.Now().Sub(t0).Seconds()).
+				Dur("task_dt", time.Since(t0)).
 				Msgf("%v task complete", taskType)
 		}()
 	}
