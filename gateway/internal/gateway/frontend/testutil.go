@@ -24,20 +24,30 @@ func (b *mockBackend) GetSecret(keyID string) string {
 	return "big_secret"
 }
 
-func (b *mockBackend) GetRepo(repoName string) be.KeyPaths {
-	return be.KeyPaths{
-		"keyid1": be.KeySettings{Path: "/", Admin: true},
-		"keyid2": be.KeySettings{Path: "/restricted/to/subdir", Admin: false}}
-}
-
-func (b *mockBackend) GetRepos() map[string]be.KeyPaths {
-	return map[string]be.KeyPaths{
-		"test1.repo.org": be.KeyPaths{
-			"keyid123": be.KeySettings{Path: "/", Admin: true},
-		},
-		"test2.repo.org": be.KeyPaths{
+func (b *mockBackend) GetRepo(repoName string) be.RepositoryConfig {
+	return be.RepositoryConfig{
+		Keys: map[string]be.KeySettings{
 			"keyid1": be.KeySettings{Path: "/", Admin: true},
 			"keyid2": be.KeySettings{Path: "/restricted/to/subdir", Admin: false},
+		},
+		Enabled: true,
+	}
+}
+
+func (b *mockBackend) GetRepos() map[string]be.RepositoryConfig {
+	return map[string]be.RepositoryConfig{
+		"test1.repo.org": be.RepositoryConfig{
+			Keys: map[string]be.KeySettings{
+				"keyid123": be.KeySettings{Path: "/", Admin: true},
+			},
+			Enabled: true,
+		},
+		"test2.repo.org": be.RepositoryConfig{
+			Keys: map[string]be.KeySettings{
+				"keyid1": be.KeySettings{Path: "/", Admin: true},
+				"keyid2": be.KeySettings{Path: "/restricted/to/subdir", Admin: false},
+			},
+			Enabled: true,
 		},
 	}
 }

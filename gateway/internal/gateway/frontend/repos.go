@@ -15,13 +15,13 @@ func MakeReposHandler(services be.ActionController) httprouter.Handle {
 		msg := make(map[string]interface{})
 
 		if repoName := ps.ByName("name"); repoName != "" {
-			r := services.GetRepo(repoName)
-			if len(r) == 0 {
+			rc := services.GetRepo(repoName)
+			if len(rc.Keys) == 0 {
 				msg["status"] = "error"
 				msg["reason"] = "invalid_repo"
 			} else {
 				msg["status"] = "ok"
-				msg["data"] = r
+				msg["data"] = rc
 			}
 		} else {
 			msg["status"] = "ok"
