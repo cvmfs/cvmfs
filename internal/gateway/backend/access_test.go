@@ -54,7 +54,7 @@ func TestLoadAccessConfigVersion2(t *testing.T) {
 	if len(ac.Repositories) != 2 && len(ac.Keys) != 2 {
 		t.Fatalf("invalid access config (missing items): %+v", ac)
 	}
-	if _, present := (ac.Repositories["test1.repo.org"]["keyid123"]); !present {
+	if _, present := (ac.Repositories["test1.repo.org"].Keys["keyid123"]); !present {
 		t.Fatalf("invalid access config (placeholder was not substituted): %+v", ac)
 	}
 	if _, present := ac.Keys["keyid123"]; !present {
@@ -72,7 +72,7 @@ func TestLoadAccessConfigVersion2NoKeys(t *testing.T) {
 	if len(ac.Repositories) != 1 && len(ac.Keys) != 1 {
 		t.Fatalf("invalid access config (missing items): %+v", ac)
 	}
-	if _, present := (ac.Repositories["test1.repo.org"]["keyid123"]); !present {
+	if _, present := (ac.Repositories["test1.repo.org"].Keys["keyid123"]); !present {
 		t.Fatalf("invalid access config (placeholder was not substituted): %+v", ac)
 	}
 	if _, present := ac.Keys["keyid123"]; !present {

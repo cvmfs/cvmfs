@@ -14,17 +14,27 @@ import (
 // KeySettings contains the repository subpath associated with a key and a boolean
 // flag showing if the key can be used for administration operations
 type KeySettings struct {
-	Path  string
-	Admin bool
+	Path  string `json:"path"`
+	Admin bool   `json:"admin"`
 }
 
-// KeyPaths maps from key ID to repository subpath
-type KeyPaths map[string]KeySettings
+// RepositoryConfig contains the access configuration (registered keys and
+// enabled status) for a repository
+type RepositoryConfig struct {
+	Keys    map[string]KeySettings `json:"keys"`
+	Enabled bool                   `json:"enabled"`
+}
+
+// KeyConfig contains the secret part and the enabled status of a key
+type KeyConfig struct {
+	Secret  string
+	Enabled bool
+}
 
 // AccessConfig is the configuration of a single repository
 type AccessConfig struct {
-	Repositories map[string]KeyPaths
-	Keys         map[string]string
+	Repositories map[string]RepositoryConfig
+	Keys         map[string]KeyConfig
 }
 
 // RepositorySpecV1 lists the keys associated with a repository in the configuration file
@@ -74,33 +84,59 @@ func NewAccessConfig(fileName string) (*AccessConfig, error) {
 	return newAccessConfigWithImporter(fileName, keyImporter)
 }
 
+// IsRepositoryEnabled returns true if the repository is enabled
+func (c *AccessConfig) IsRepositoryEnabled(name string) bool {
+	return c.Repositories[name].Enabled
+}
+
+// SetRepositoryEnabled sets the enabled status of a repository
+func (c *AccessConfig) SetRepositoryEnabled(name string, enabled bool) {
+	if cfg, present := c.Repositories[name]; present {
+		cfg.Enabled = enabled
+		c.Repositories[name] = cfg
+	}
+}
+
+// IsKeyEnabled returns true if the repository is enabled
+func (c *AccessConfig) IsKeyEnabled(keyID string) bool {
+	return c.Keys[keyID].Enabled
+}
+
+// SetKeyEnabled sets the enabled status of a key
+func (c *AccessConfig) SetKeyEnabled(keyID string, enabled bool) {
+	if cfg, present := c.Keys[keyID]; present {
+		cfg.Enabled = enabled
+		c.Keys[keyID] = cfg
+	}
+}
+
 // GetRepos returns a map where the keys are repository names and the
 // values are KeyPaths maps
-func (c *AccessConfig) GetRepos() map[string]KeyPaths {
+func (c *AccessConfig) GetRepos() map[string]RepositoryConfig {
 	return c.Repositories
 }
 
 // GetRepo returns a map where the keys are key ID registered for the
 // repository and the values are repository subpath where the keys are
 // valid
-func (c *AccessConfig) GetRepo(repoName string) KeyPaths {
+func (c *AccessConfig) GetRepo(repoName string) RepositoryConfig {
 	return c.Repositories[repoName]
 }
 
-// GetSecret returns the secret corresponding to a key ID
-func (c *AccessConfig) GetSecret(keyID string) string {
+// GetKeyConfig returns the key configuration corresponding to a key ID
+func (c *AccessConfig) GetKeyConfig(keyID string) KeyConfig {
 	return c.Keys[keyID]
 }
 
 // Check verifies the given key and path are compatible with the access
 // configuration of the repository
 func (c *AccessConfig) Check(keyID, leasePath, repoName string) *AuthError {
-	keys, ok := c.Repositories[repoName]
+	cfg, ok := c.Repositories[repoName]
 	if !ok {
 		return &AuthError{"invalid_repo"}
 	}
 
-	keySettings, ok := keys[keyID]
+	keySettings, ok := cfg.Keys[keyID]
 	if !ok {
 		return &AuthError{"invalid_key"}
 	}
@@ -133,8 +169,8 @@ func newAccessConfigWithImporter(fileName string, importer KeyImportFun) (*Acces
 
 func emptyAccessConfig() AccessConfig {
 	return AccessConfig{
-		Repositories: make(map[string]KeyPaths),
-		Keys:         make(map[string]string),
+		Repositories: make(map[string]RepositoryConfig),
+		Keys:         make(map[string]KeyConfig),
 	}
 }
 
@@ -171,7 +207,7 @@ func (c *AccessConfig) loadV1(cfg rawConfig, importer KeyImportFun) error {
 				return errors.Wrap(err, fmt.Sprintf("could not import key %v", spec.ID))
 			}
 			keyPaths[keyID] = repoPath
-			c.Keys[keyID] = secret
+			c.Keys[keyID] = KeyConfig{Secret: secret, Enabled: true}
 		}
 	}
 
@@ -187,7 +223,7 @@ func (c *AccessConfig) loadV1(cfg rawConfig, importer KeyImportFun) error {
 			for _, k := range spec.Keys {
 				keyIds[k] = KeySettings{Path: keyPaths[k], Admin: false}
 			}
-			c.Repositories[spec.Name] = keyIds
+			c.Repositories[spec.Name] = RepositoryConfig{Keys: keyIds, Enabled: true}
 		}
 	}
 
@@ -213,7 +249,10 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 				}
 				// Item is a string representing the repository name; default key
 				// from /etc/cvmfs/keys/<REPO_NAME>/ will be associated
-				c.Repositories[name] = map[string]KeySettings{"default": KeySettings{Path: "default"}}
+				c.Repositories[name] = RepositoryConfig{
+					Keys:    map[string]KeySettings{"default": KeySettings{Path: "default"}},
+					Enabled: true,
+				}
 			} else {
 				// Item is a RepositorySpecV2; associate the key IDs and paths to the
 				// repository
@@ -221,7 +260,10 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 				for _, k := range spec.Keys {
 					ks[k.ID] = KeySettings{Path: k.Path, Admin: k.Admin}
 				}
-				c.Repositories[spec.Name] = ks
+				c.Repositories[spec.Name] = RepositoryConfig{
+					Keys:    ks,
+					Enabled: true,
+				}
 			}
 		}
 	}
@@ -237,15 +279,15 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("could not import key %v", spec.ID))
 			}
-			c.Keys[keyID] = secret
+			c.Keys[keyID] = KeyConfig{Secret: secret, Enabled: true}
 		}
 	}
 
 	// Iterate over the repositories and replace "default" keys with actual key IDs
 	// and secrets
-	for repoName, ks := range c.Repositories {
-		if _, present := ks["default"]; present {
-			delete(ks, "default")
+	for repoName, rc := range c.Repositories {
+		if _, present := rc.Keys["default"]; present {
+			delete(rc.Keys, "default")
 			spec := KeySpec{KeyType: "file", FileName: "/etc/cvmfs/keys/" + repoName + ".gw"}
 			keyID, secret, _, err := importer(spec)
 			if err != nil {
@@ -253,9 +295,9 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 					err, fmt.Sprintf("could not import default key for repository: %v", repoName))
 			}
 			if _, present := c.Keys[keyID]; !present {
-				c.Keys[keyID] = secret
+				c.Keys[keyID] = KeyConfig{Secret: secret, Enabled: true}
 			}
-			ks[keyID] = KeySettings{Path: "/", Admin: false}
+			rc.Keys[keyID] = KeySettings{Path: "/", Admin: false}
 		}
 	}
 
