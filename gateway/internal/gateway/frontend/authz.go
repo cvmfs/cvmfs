@@ -17,6 +17,47 @@ import (
 
 type message map[string]interface{}
 
+// WithAdminAuthz returns an HMAC authorization middleware used for administrative
+// operations (disable/enable repositories and keys, cancel leases, trigger GC, etc.)
+func WithAdminAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle {
+	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		ctx := req.Context()
+		tokens := strings.Split(req.Header.Get("Authorization"), " ")
+		if len(tokens) != 2 {
+			gw.LogC(ctx, "http", gw.LogError).
+				Msg("missing tokens in authorization header")
+			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_authorization_header"})
+			return
+		}
+
+		keyID := tokens[0]
+		keyCfg := ac.GetKey(keyID)
+		if keyCfg == nil {
+			gw.LogC(ctx, "http", gw.LogError).
+				Msg("invalid key ID specified")
+			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_key"})
+			return
+		}
+
+		if !keyCfg.Admin {
+			gw.LogC(ctx, "http", gw.LogError).
+				Msg("key does not have admin rights")
+			replyJSON(ctx, w, message{"status": "error", "reason": "no_admin_key"})
+			return
+		}
+
+		_, err := base64.StdEncoding.DecodeString(tokens[1])
+		if err != nil {
+			gw.LogC(ctx, "http", gw.LogError).
+				Err(err).Msg("could not base64 decode HMAC")
+			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
+			return
+		}
+
+		next(w, req, ps)
+	}
+}
+
 // WithAuthz returns an HMAC authorization middleware
 func WithAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
@@ -38,8 +79,8 @@ func WithAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle
 			return
 		}
 
-		secret := ac.GetSecret(keyID)
-		if len(secret) == 0 {
+		keyCfg := ac.GetKey(keyID)
+		if keyCfg == nil {
 			gw.LogC(ctx, "http", gw.LogError).
 				Msg("invalid key ID specified")
 			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
@@ -96,7 +137,7 @@ func WithAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle
 			}
 		}
 
-		if !CheckHMAC(HMACInput, HMAC, secret) {
+		if !CheckHMAC(HMACInput, HMAC, keyCfg.Secret) {
 			gw.LogC(ctx, "http", gw.LogError).
 				Msg("invalid HMAC")
 			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})

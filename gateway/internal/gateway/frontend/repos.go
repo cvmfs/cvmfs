@@ -16,7 +16,7 @@ func MakeReposHandler(services be.ActionController) httprouter.Handle {
 
 		if repoName := ps.ByName("name"); repoName != "" {
 			rc := services.GetRepo(repoName)
-			if len(rc.Keys) == 0 {
+			if rc == nil {
 				msg["status"] = "error"
 				msg["reason"] = "invalid_repo"
 			} else {

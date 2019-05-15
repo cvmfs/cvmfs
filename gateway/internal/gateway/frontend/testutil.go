@@ -20,16 +20,13 @@ func forwardBody(w http.ResponseWriter, req *http.Request, _ httprouter.Params) 
 type mockBackend struct {
 }
 
-func (b *mockBackend) GetSecret(keyID string) string {
-	return "big_secret"
+func (b *mockBackend) GetKey(keyID string) *be.KeyConfig {
+	return &be.KeyConfig{Secret: "big_secret", Admin: false, Enabled: true}
 }
 
-func (b *mockBackend) GetRepo(repoName string) be.RepositoryConfig {
-	return be.RepositoryConfig{
-		Keys: map[string]be.KeySettings{
-			"keyid1": be.KeySettings{Path: "/", Admin: true},
-			"keyid2": be.KeySettings{Path: "/restricted/to/subdir", Admin: false},
-		},
+func (b *mockBackend) GetRepo(repoName string) *be.RepositoryConfig {
+	return &be.RepositoryConfig{
+		Keys:    be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
 		Enabled: true,
 	}
 }
@@ -37,16 +34,11 @@ func (b *mockBackend) GetRepo(repoName string) be.RepositoryConfig {
 func (b *mockBackend) GetRepos() map[string]be.RepositoryConfig {
 	return map[string]be.RepositoryConfig{
 		"test1.repo.org": be.RepositoryConfig{
-			Keys: map[string]be.KeySettings{
-				"keyid123": be.KeySettings{Path: "/", Admin: true},
-			},
+			Keys:    be.KeyPaths{"keyid123": "/"},
 			Enabled: true,
 		},
 		"test2.repo.org": be.RepositoryConfig{
-			Keys: map[string]be.KeySettings{
-				"keyid1": be.KeySettings{Path: "/", Admin: true},
-				"keyid2": be.KeySettings{Path: "/restricted/to/subdir", Admin: false},
-			},
+			Keys:    be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
 			Enabled: true,
 		},
 	}
