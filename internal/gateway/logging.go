@@ -44,8 +44,8 @@ func ConfigLogging(cfg *Config) {
 // LogC is a convenience wrapper on top of the global Logger of the gateway
 // package. It takes a context, the component name (i.e. "http", "leasedb",
 // etc.) and the log level, and returns a *zerolog.Event which is tagged with
-// the component name, unique ID of the request and the time (in seconds as
-// float64) since the request was received. This event can be extended with new
+// the component name, unique ID of the request and the time (in milliseconds as
+// float) since the request was received. This event can be extended with new
 // fields or logged using the Msg/Msgf methods
 func LogC(ctx context.Context, component string, level LogLevel) *zerolog.Event {
 	reqID, _ := ctx.Value(IDKey).(uuid.UUID)
