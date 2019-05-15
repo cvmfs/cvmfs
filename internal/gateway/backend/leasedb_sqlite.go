@@ -164,7 +164,7 @@ func (db *SqliteLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, 
 	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "new_lease").
 		Str("token", token.TokenStr).
-		Float64("task_dt", time.Now().Sub(t0).Seconds()).
+		Dur("task_dt", time.Since(t0)).
 		Msgf("key: %v, path: %v", keyID, leasePath)
 
 	return nil
@@ -199,7 +199,7 @@ func (db *SqliteLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, error
 
 	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "get_leases").
-		Float64("task_dt", time.Now().Sub(t0).Seconds()).
+		Dur("task_dt", time.Since(t0)).
 		Msgf("found %v leases", len(leases))
 
 	return leases, nil
@@ -235,7 +235,7 @@ func (db *SqliteLeaseDB) GetLease(ctx context.Context, tokenStr string) (string,
 	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "get_lease").
 		Str("token", tokenStr).
-		Float64("task_dt", time.Now().Sub(t0).Seconds()).
+		Dur("task_dt", time.Since(t0)).
 		Msgf("success")
 
 	return leasePath, lease, nil
@@ -274,7 +274,7 @@ func (db *SqliteLeaseDB) CancelLeases(ctx context.Context) error {
 
 	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "cancel_leases").
-		Float64("task_dt", time.Now().Sub(t0).Seconds()).
+		Dur("task_dt", time.Since(t0)).
 		Msgf("all leases cancelled")
 
 	return nil
@@ -315,7 +315,7 @@ func (db *SqliteLeaseDB) CancelLease(ctx context.Context, tokenStr string) error
 	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "cancel_lease").
 		Str("token", tokenStr).
-		Float64("task_dt", time.Now().Sub(t0).Seconds()).
+		Dur("task_dt", time.Since(t0)).
 		Msgf("lease cancelled")
 
 	return nil
