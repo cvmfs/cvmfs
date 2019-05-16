@@ -66,6 +66,12 @@ const accessConfigV2 = `
 			"type": "plain_text",
 			"id": "keyid2",
 			"secret": "secret2"
+		},
+		{
+			"type": "plain_text",
+			"id": "admin0",
+			"secret": "big_secret",
+			"admin": true
 		}
 	]
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
@@ -21,7 +22,11 @@ type mockBackend struct {
 }
 
 func (b *mockBackend) GetKey(keyID string) *be.KeyConfig {
-	return &be.KeyConfig{Secret: "big_secret", Admin: false, Enabled: true}
+	admin := false
+	if strings.HasPrefix(keyID, "admin") {
+		admin = true
+	}
+	return &be.KeyConfig{Secret: "big_secret", Admin: admin, Enabled: true}
 }
 
 func (b *mockBackend) GetRepo(repoName string) *be.RepositoryConfig {

@@ -82,22 +82,12 @@ func NewAccessConfig(fileName string) (*AccessConfig, error) {
 	return newAccessConfigWithImporter(fileName, keyImporter)
 }
 
-// IsRepositoryEnabled returns true if the repository is enabled
-func (c *AccessConfig) IsRepositoryEnabled(name string) bool {
-	return c.Repositories[name].Enabled
-}
-
 // SetRepositoryEnabled sets the enabled status of a repository
 func (c *AccessConfig) SetRepositoryEnabled(name string, enabled bool) {
 	if cfg, present := c.Repositories[name]; present {
 		cfg.Enabled = enabled
 		c.Repositories[name] = cfg
 	}
-}
-
-// IsKeyEnabled returns true if the repository is enabled
-func (c *AccessConfig) IsKeyEnabled(keyID string) bool {
-	return c.Keys[keyID].Enabled
 }
 
 // SetKeyEnabled sets the enabled status of a key
