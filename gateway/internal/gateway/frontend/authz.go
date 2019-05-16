@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/pkg/errors"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -23,15 +24,15 @@ type message map[string]interface{}
 func WithAdminAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		ctx := req.Context()
-		tokens := strings.Split(req.Header.Get("Authorization"), " ")
-		if len(tokens) != 2 {
+		keyID, HMAC, err := parseHeader(&req.Header)
+		if err != nil {
 			gw.LogC(ctx, "http", gw.LogError).
-				Msg("missing tokens in authorization header")
+				Err(err).
+				Msg("authorization failure")
 			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_authorization_header"})
 			return
 		}
 
-		keyID := tokens[0]
 		keyCfg := ac.GetKey(keyID)
 		if keyCfg == nil {
 			gw.LogC(ctx, "http", gw.LogError).
@@ -47,14 +48,6 @@ func WithAdminAuthz(ac be.ActionController, next httprouter.Handle) httprouter.H
 			return
 		}
 
-		HMAC, err := base64.StdEncoding.DecodeString(tokens[1])
-		if err != nil {
-			gw.LogC(ctx, "http", gw.LogError).
-				Err(err).Msg("could not base64 decode HMAC")
-			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
-			return
-		}
-
 		var HMACInput []byte
 		switch req.Method {
 		case "DELETE":
@@ -62,17 +55,11 @@ func WithAdminAuthz(ac be.ActionController, next httprouter.Handle) httprouter.H
 			HMACInput = []byte(req.URL.Path)
 		case "POST":
 			// For POST requests, the request body is used to compute HMAC
-			var err error
-			HMACInput, err = ioutil.ReadAll(req.Body)
+			HMACInput, err = readBody(req, req.ContentLength)
 			if err != nil {
 				httpWrapError(ctx, err, "could not read request body", w, http.StatusInternalServerError)
 				return
 			}
-			// Body needs to be read again in the next handler, reset it
-			// using a copy of the original body
-			bodyCopy := ioutil.NopCloser(bytes.NewReader(HMACInput))
-			req.Body.Close()
-			req.Body = bodyCopy
 		default:
 			msg := fmt.Sprintf("authorization middleware not implemented for HTTP method: %v", req.Method)
 			gw.LogC(ctx, "http", gw.LogError).
@@ -95,19 +82,11 @@ func WithAdminAuthz(ac be.ActionController, next httprouter.Handle) httprouter.H
 func WithAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		ctx := req.Context()
-		tokens := strings.Split(req.Header.Get("Authorization"), " ")
-		if len(tokens) != 2 {
-			gw.LogC(ctx, "http", gw.LogError).
-				Msg("missing tokens in authorization header")
-			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
-			return
-		}
-
-		keyID := tokens[0]
-		HMAC, err := base64.StdEncoding.DecodeString(tokens[1])
+		keyID, HMAC, err := parseHeader(&req.Header)
 		if err != nil {
 			gw.LogC(ctx, "http", gw.LogError).
-				Err(err).Msg("could not base64 decode HMAC")
+				Err(err).
+				Msg("authorization failure")
 			replyJSON(ctx, w, message{"status": "error", "reason": "invalid_hmac"})
 			return
 		}
@@ -131,16 +110,11 @@ func WithAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle
 				HMACInput = []byte(token)
 			} else {
 				// For new lease request used the request body to compute HMAC
-				HMACInput, err = ioutil.ReadAll(req.Body)
+				HMACInput, err = readBody(req, req.ContentLength)
 				if err != nil {
 					httpWrapError(ctx, err, "could not read request body", w, http.StatusInternalServerError)
 					return
 				}
-				// Body needs to be read again in the next handler, reset it
-				// using a copy of the original body
-				bodyCopy := ioutil.NopCloser(bytes.NewReader(HMACInput))
-				req.Body.Close()
-				req.Body = bodyCopy
 			}
 		} else if strings.HasPrefix(req.URL.Path, APIRoot+"/payloads") {
 			token := ps.ByName("token")
@@ -156,17 +130,11 @@ func WithAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle
 					httpWrapError(ctx, err, "missing message-size header", w, http.StatusBadRequest)
 					return
 				}
-				msg := make([]byte, msgSize)
-				if _, err := io.ReadFull(req.Body, msg); err != nil {
-					httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
+				HMACInput, err = readBody(req, int64(msgSize))
+				if err != nil {
+					httpWrapError(ctx, err, "could not read request body", w, http.StatusInternalServerError)
 					return
 				}
-
-				HMACInput = msg
-
-				// replace the request body with a new ReadCLoser which includes the already-read
-				// head part
-				req.Body = newRecombineReadCloser(msg, req.Body)
 			}
 		}
 
@@ -198,4 +166,43 @@ func (r recombineReadCloser) Read(p []byte) (int, error) {
 
 func (r recombineReadCloser) Close() error {
 	return r.original.Close()
+}
+
+func parseHeader(h *http.Header) (string, []byte, error) {
+	tokens := strings.Split(h.Get("Authorization"), " ")
+	if len(tokens) != 2 {
+		return "", nil, fmt.Errorf("missing tokens in authoriation header")
+	}
+
+	keyID := tokens[0]
+
+	HMAC, err := base64.StdEncoding.DecodeString(tokens[1])
+	if err != nil {
+		return "", nil, errors.Wrap(err, "could not base64 decode HMAC")
+	}
+
+	return keyID, HMAC, nil
+}
+
+// Read the request body and place and resets the consumed Reader, allowing the
+// body to be re-read in the next HTTP handler. Only the first "readSize" bytes
+// will be read from the body and returned.
+func readBody(req *http.Request, readSize int64) ([]byte, error) {
+	partial := readSize < req.ContentLength
+	body := make([]byte, readSize)
+	if _, err := io.ReadFull(req.Body, body); err != nil {
+		return nil, err
+	}
+
+	if partial {
+		// replace the request body with a new ReadCLoser which includes the already-read
+		// head part
+		req.Body = newRecombineReadCloser(body, req.Body)
+	} else {
+		bodyCopy := ioutil.NopCloser(bytes.NewReader(body))
+		req.Body.Close()
+		req.Body = bodyCopy
+	}
+
+	return body, nil
 }
