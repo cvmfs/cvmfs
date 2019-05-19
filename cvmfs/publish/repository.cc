@@ -291,15 +291,16 @@ void Publisher::PushReflog() {
   reflog_->DropDatabaseFileOwnership();
   delete reflog_;
 
+  shash::Any hash_reflog(settings_.transaction().hash_algorithm());
+  manifest::Reflog::HashDatabase(reflog_path, &hash_reflog);
+
   upload::Spooler::CallbackPtr callback =
     spooler_->RegisterListener(&Publisher::OnUploadReflog, this);
   spooler_->UploadReflog(reflog_path);
   spooler_->WaitForUpload();
   spooler_->UnregisterListener(callback);
 
-  shash::Any hash_reflog(settings_.transaction().hash_algorithm());
-  manifest::Reflog::HashDatabase(reflog_path, &hash_reflog);
-  //TODO(jblomer) set hash in manifest
+  manifest_->set_reflog_hash(hash_reflog);
 
   reflog_ = manifest::Reflog::Open(reflog_path);
   assert(reflog_ != NULL);
