@@ -74,6 +74,14 @@ func (ae AuthError) Error() string {
 	return fmt.Sprintf("authorization error: %v", ae.Reason)
 }
 
+// RepoBusyError is returned by a repository disable action when the repository is busy
+type RepoBusyError struct {
+}
+
+func (ae RepoBusyError) Error() string {
+	return "repository_busy"
+}
+
 type rawConfig map[string]json.RawMessage
 
 // NewAccessConfig creates an new access configuration from the given file
@@ -119,6 +127,10 @@ func (c *AccessConfig) Check(keyID, leasePath, repoName string) *AuthError {
 	cfg, ok := c.Repositories[repoName]
 	if !ok {
 		return &AuthError{"invalid_repo"}
+	}
+
+	if !cfg.Enabled {
+		return &AuthError{"disabled_repo"}
 	}
 
 	keyPath, ok := cfg.Keys[keyID]

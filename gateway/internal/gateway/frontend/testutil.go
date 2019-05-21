@@ -49,6 +49,10 @@ func (b *mockBackend) GetRepos() map[string]be.RepositoryConfig {
 	}
 }
 
+func (b *mockBackend) SetRepoEnabled(ctx context.Context, name string, enabled bool, wait bool) error {
+	return nil
+}
+
 func (b *mockBackend) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error) {
 	return "lease_token_string", nil
 }
