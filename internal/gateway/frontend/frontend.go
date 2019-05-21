@@ -52,7 +52,7 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration) 
 	router.POST(APIRoot+"/payloads/:token", mw(MakePayloadsHandler(services)))
 
 	// Admin routes
-	router.DELETE(APIRoot+"/repos/:name", amw(MakeAdminReposHandler(services)))
+	router.POST(APIRoot+"/repos/:name", amw(MakeAdminReposHandler(services)))
 
 	// Configure and start the HTTP server
 	srv := &http.Server{
