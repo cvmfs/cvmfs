@@ -26,7 +26,7 @@ func (b *mockBackend) GetKey(keyID string) *be.KeyConfig {
 	if strings.HasPrefix(keyID, "admin") {
 		admin = true
 	}
-	return &be.KeyConfig{Secret: "big_secret", Admin: admin, Enabled: true}
+	return &be.KeyConfig{Secret: "big_secret", Admin: admin}
 }
 
 func (b *mockBackend) GetRepo(repoName string) *be.RepositoryConfig {

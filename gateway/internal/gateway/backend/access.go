@@ -23,9 +23,8 @@ type RepositoryConfig struct {
 
 // KeyConfig contains the secret part and the enabled status of a key
 type KeyConfig struct {
-	Secret  string `json:"secret"`
-	Admin   bool   `json:"admin"`
-	Enabled bool   `json:"enabled"`
+	Secret string `json:"secret"`
+	Admin  bool   `json:"admin"`
 }
 
 // AccessConfig is the configuration of a single repository
@@ -87,14 +86,6 @@ func (c *AccessConfig) SetRepositoryEnabled(name string, enabled bool) {
 	if cfg, present := c.Repositories[name]; present {
 		cfg.Enabled = enabled
 		c.Repositories[name] = cfg
-	}
-}
-
-// SetKeyEnabled sets the enabled status of a key
-func (c *AccessConfig) SetKeyEnabled(keyID string, enabled bool) {
-	if cfg, present := c.Keys[keyID]; present {
-		cfg.Enabled = enabled
-		c.Keys[keyID] = cfg
 	}
 }
 
@@ -201,7 +192,7 @@ func (c *AccessConfig) loadV1(cfg rawConfig, importer KeyImportFun) error {
 				return errors.Wrap(err, fmt.Sprintf("could not import key %v", spec.ID))
 			}
 			keyPaths[keyID] = repoPath
-			c.Keys[keyID] = KeyConfig{Secret: secret, Admin: admin, Enabled: true}
+			c.Keys[keyID] = KeyConfig{Secret: secret, Admin: admin}
 		}
 	}
 
@@ -273,7 +264,7 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("could not import key %v", spec.ID))
 			}
-			c.Keys[keyID] = KeyConfig{Secret: secret, Admin: admin, Enabled: true}
+			c.Keys[keyID] = KeyConfig{Secret: secret, Admin: admin}
 		}
 	}
 
@@ -289,7 +280,7 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 					err, fmt.Sprintf("could not import default key for repository: %v", repoName))
 			}
 			if _, present := c.Keys[keyID]; !present {
-				c.Keys[keyID] = KeyConfig{Secret: secret, Admin: admin, Enabled: true}
+				c.Keys[keyID] = KeyConfig{Secret: secret, Admin: admin}
 			}
 			rc.Keys[keyID] = "/"
 		}
