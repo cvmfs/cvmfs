@@ -6,103 +6,173 @@ import hmac
 import json
 import requests
 
+
 def errMissingArg(argument):
     print('Missing argument: "{}"'.format(argument))
+
 
 def computeHMAC(msg, key):
     d = hmac.HMAC(key, msg, digestmod='sha1').hexdigest().encode('utf-8')
     return base64.b64encode(d).decode('utf-8')
 
-parser = argparse.ArgumentParser(description='Test gateway API requests')
-parser.add_argument(
-    '--request', required=True,
-    help='which command to perform (get_repos|get_leases|new_lease|cancel_lease|submit_payload|commit)')
-parser.add_argument('--path', required=False, help="lease path")
-parser.add_argument('--token', required=False, help='lease token string')
-parser.add_argument('--old_hash', required=False, help='old root hash')
-parser.add_argument('--new_hash', required=False, help='new root hash')
-parser.add_argument('--digest', required=False, help='payload digest')
-parser.add_argument('--header_size', required=False, help='payload (object pack) header size')
-args = parser.parse_args()
 
-base_url = 'http://localhost:4929/api/v1'
+def get_repos(args):
+    rep = requests.get(args.gw_url + '/repos')
+    print(json.dumps(rep.json()))
 
-key_id = 'key1'
-secret = b'secret1'
 
-rep = None
-if args.request == 'get_repos':
-    rep = requests.get(base_url + '/repos')
+def toggle_repos(args):
+    req = {'enable': bool(args.enable)}
+    hmac_msg = json.dumps(req).encode()
+    headers = {'authorization': args.key_id +
+                ' ' + computeHMAC(hmac_msg, args.secret)}
+    rep = requests.post(args.gw_url + '/repos/' +
+                        args.repo_name, json=req, headers=headers)
+    print(json.dumps(rep.json()))
 
-elif args.request == 'get_leases':
-    rep = requests.get(base_url + '/leases')
 
-elif args.request == 'get_lease':
-    if args.token:
-        token = args.token
-        rep = requests.get(base_url + '/leases/' + token)
+def get_leases(args):
+    rep = requests.get(args.gw_url + '/leases')
+    print(json.dumps(rep.json()))
 
-elif args.request == 'new_lease':
-    if args.path:
-        req = {'path':args.path,'api_version':'2'}
-        hmac_msg = json.dumps(req).encode()
-        headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret)}
-        rep = requests.post(base_url + '/leases', json=req, headers=headers)
-    else:
-        errMissingArg('--path')
 
-elif args.request == 'cancel_lease':
-    if args.token:
-        token = args.token
-        hmac_msg = token.encode()
-        headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret)}
-        rep = requests.delete(base_url + '/leases/' + token, headers=headers)
-    else:
-        errMissingArg('--token')
+def get_lease(args):
+    rep = requests.get(args.gw_url + '/leases/' + args.token)
+    print(json.dumps(rep.json()))
 
-elif args.request == 'commit_lease':
-    if args.token and args.old_hash and args.new_hash:
-        token = args.token
-        hmac_msg = token.encode()
-        headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret)}
-        req = {'old_root_hash': args.old_hash,
-               'new_root_hash': args.new_hash,
-               'tag_name': 'mytag',
-               'tag_channel': 'mychan',
-               'tag_description': 'mydescription'}
-        rep = requests.post(base_url + '/leases/' + token, json=req, headers=headers)
-    else:
-        errMissingArg('--token')
-        errMissingArg('--old_hash')
-        errMissingArg('--new_hash')
 
-elif args.request == 'payload_legacy':
-    if args.token and args.digest and args.header_size:
+def new_lease(args):
+    req = {'path': args.path, 'api_version': '2'}
+    hmac_msg = json.dumps(req).encode()
+    headers = {'authorization': args.key_id +
+                ' ' + computeHMAC(hmac_msg, args.secret)}
+    rep = requests.post(args.gw_url + '/leases', json=req, headers=headers)
+    print(json.dumps(rep.json()))
+
+
+def cancel_lease(args):
+    token = args.token
+    hmac_msg = token.encode()
+    headers = {'authorization': args.key_id +
+                ' ' + computeHMAC(hmac_msg, args.secret)}
+    rep = requests.delete(args.gw_url + '/leases/' + token, headers=headers)
+    print(json.dumps(rep.json()))
+
+
+def commit_lease(args):
+    token = args.token
+    hmac_msg = token.encode()
+    headers = {'authorization': args.key_id +
+                ' ' + computeHMAC(hmac_msg, args.secret)}
+    req = {'old_root_hash': args.old_hash,
+           'new_root_hash': args.new_hash,
+           'tag_name': 'mytag',
+           'tag_channel': 'mychan',
+           'tag_description': 'mydescription'}
+    rep = requests.post(args.gw_url + '/leases/' + token,
+                        json=req, headers=headers)
+    print(json.dumps(rep.json()))
+
+
+def submit_payload(args):
+    hmac_msg = None
+    req_url = None
+    if args.legacy:
         req = {'session_token': args.token,
-               'payload_digest': args.digest,
-               'header_size': args.header_size,
-               'api_version': '2'}
+                'payload_digest': args.digest,
+                'header_size': args.header_size,
+                'api_version': '2'}
         hmac_msg = json.dumps(req).encode()
-        headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret),
-                   'message-size': str(len(json.dumps(req)))}
-        rep = requests.post(base_url + '/payloads', json=req, headers=headers)
+        req_url = args.gw_url + '/payloads'
     else:
-        errMissingArg('--token')
-        errMissingArg('--digest')
-        errMissingArg('--header_size')
-
-elif args.request == 'payload':
-    if args.token and args.digest and args.header_size:
-        hmac_msg = args.token.encode()
         req = {'payload_digest': args.digest,
-               'header_size': args.header_size,
-               'api_version': '3'}
-        headers = {'authorization': key_id + ' ' + computeHMAC(hmac_msg, secret),
-                   'message-size': str(len(json.dumps(req)))}
-        rep = requests.post(base_url + '/payloads/' + args.token, json=req, headers=headers)
-    else:
-        errMissingArg('--token')
-        errMissingArg('--digest')
-        errMissingArg('--header_size')
+                'header_size': args.header_size,
+                'api_version': '3'}
+        hmac_msg = args.token.encode()
+        req_url = args.gw_url + '/payloads' + args.token
 
-print(json.dumps(rep.json()))
+    headers = {'authorization': args.key_id + ' ' + computeHMAC(hmac_msg, args.secret),
+               'message-size': str(len(json.dumps(req)))}
+    rep = requests.post(req_url, json=req, headers=headers)
+    print(json.dumps(rep.json()))
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Test gateway API requests')
+    parser.add_argument('--gw_url', required=True,
+                        help='URL of the repository gateway API root')
+    parser.add_argument('--key_id', required=True,
+                        help='Public ID of the secret key used to sign the request')
+    parser.add_argument('--secret', required=True,
+                        help='Secret key to be used to sign the request')
+    subparsers = parser.add_subparsers(help='sub-command help')
+
+
+    parser_get_repos = subparsers.add_parser(
+        'get_repos', help='get a list of all repositories'
+    )
+    parser_get_repos.set_defaults(func=get_repos)
+
+
+    parser_toggle_repo = subparsers.add_parser(
+        'toggle_repo', help='enable or disable a repository')
+    parser_toggle_repo.add_argument(
+        '--enable', required=False, action='store_true', default=False, help='enabled state of the repository')
+    parser_toggle_repo.add_argument(
+        '--wait', required=False, action='store_true', default=False, help='wait until the repository can be disabled')
+    parser_toggle_repo.add_argument(
+        '--repo_name', required=True, help='name of the concerned repository')
+    parser_toggle_repo.set_defaults(func=toggle_repos)
+
+
+    parser_get_leases = subparsers.add_parser(
+        'get_leases', help='get active leases'
+    )
+    parser_get_leases.set_defaults(func=get_leases)
+
+
+    parser_get_lease = subparsers.add_parser(
+        'get_lease', help='get an active lease'
+    )
+    parser_get_lease.add_argument('--token', required=True, help='lease token string')
+    parser_get_lease.set_defaults(func=get_lease)
+
+
+    parser_new_lease = subparsers.add_parser(
+        'new_lease', help='request a new active lease'
+    )
+    parser_new_lease.add_argument('--path', required=True, help="lease path")
+    parser_new_lease.set_defaults(func=new_lease)
+
+
+    parser_cancel_lease = subparsers.add_parser(
+        'cancel_lease', help='request a new active lease'
+    )
+    parser_cancel_lease.add_argument('--token', required=True, help='lease token string')
+    parser_cancel_lease.set_defaults(func=cancel_lease)
+
+
+    parser_commit_lease = subparsers.add_parser(
+        'commit_lease', help='request a new active lease'
+    )
+    parser_commit_lease.add_argument('--token', required=True, help='lease token string')
+    parser_commit_lease.add_argument('--old_hash', required=True, help='old root hash')
+    parser_commit_lease.add_argument('--new_hash', required=True, help='new root hash')
+    parser_commit_lease.set_defaults(func=commit_lease)
+
+
+    parser_submit_payload = subparsers.add_parser(
+        'submit_payload', help='request a new active lease'
+    )
+    parser_submit_payload.add_argument('--token', required=True, help='lease token string')
+    parser_submit_payload.add_argument('--digest', required=True, help='payload digest')
+    parser_submit_payload.add_argument('--header_size', required=True, help='payload object pack header size')
+    parser_submit_payload.add_argument(
+        '--legacy', required=False, default=False, action='store_true', help='use legacy request format')
+    parser_submit_payload.set_defaults(func=submit_payload)
+
+    parser.parse_args()
+
+
+if __name__ == '__main__':
+    main()
