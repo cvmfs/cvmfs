@@ -25,7 +25,12 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration) 
 		return WithTag(WithAuthz(services, h))
 	}
 
-	// Register the different routes
+	// middleware with tagging and admin authorization
+	amw := func(h httprouter.Handle) httprouter.Handle {
+		return WithTag(WithAdminAuthz(services, h))
+	}
+
+	// Regular routes
 
 	// Root handler
 	router.GET(APIRoot, tag(NewRootHandler()))
@@ -45,6 +50,9 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration) 
 	router.POST(APIRoot+"/payloads", mw(MakePayloadsHandler(services)))
 	// Payloads (new and improved)
 	router.POST(APIRoot+"/payloads/:token", mw(MakePayloadsHandler(services)))
+
+	// Admin routes
+	router.DELETE(APIRoot+"/repos/:name", amw(MakeAdminReposHandler(services)))
 
 	// Configure and start the HTTP server
 	srv := &http.Server{

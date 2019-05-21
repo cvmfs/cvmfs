@@ -33,3 +33,29 @@ func MakeReposHandler(services be.ActionController) httprouter.Handle {
 		replyJSON(ctx, w, msg)
 	}
 }
+
+// MakeAdminReposHandler creates an HTTP handler for the API root
+func MakeAdminReposHandler(services be.ActionController) httprouter.Handle {
+	return func(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
+		ctx := h.Context()
+		msg := make(map[string]interface{})
+
+		if repoName := ps.ByName("name"); repoName != "" {
+			rc := services.GetRepo(repoName)
+			if rc == nil {
+				msg["status"] = "error"
+				msg["reason"] = "invalid_repo"
+			} else {
+				msg["status"] = "ok"
+				msg["data"] = rc
+			}
+		} else {
+			msg["status"] = "ok"
+			msg["data"] = services.GetRepos()
+		}
+
+		gw.LogC(ctx, "http", gw.LogInfo).Msg("request processed")
+
+		replyJSON(ctx, w, msg)
+	}
+}
