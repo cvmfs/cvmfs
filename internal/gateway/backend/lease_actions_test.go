@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -128,6 +129,34 @@ func TestLeaseActionsCancelLease(t *testing.T) {
 			t.Fatalf("cancel operation should have failed for nonexisting lease")
 		}
 	})
+}
+
+func TestLeaseActionsCancelLeaseByPath(t *testing.T) {
+	lastProtocolVersion := 3
+	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
+
+	backend.Config.MaxLeaseTime = 1 * time.Second
+	keyID := "keyid1"
+	prefix := "test2.repo.org/some"
+	leasePath1 := path.Join(prefix, "path")
+	leasePath2 := "test2.repo.org/another"
+	if _, err := backend.NewLease(context.TODO(), keyID, leasePath1, lastProtocolVersion); err != nil {
+		t.Fatalf("could not obtain new lease: %v", err)
+	}
+	if _, err := backend.NewLease(context.TODO(), keyID, leasePath2, lastProtocolVersion); err != nil {
+		t.Fatalf("could not obtain new lease: %v", err)
+	}
+	if err := backend.CancelLeases(context.TODO(), prefix); err != nil {
+		t.Fatalf("could not cancel existing lease: %v", err)
+	}
+	leases, _ := backend.GetLeases(context.TODO())
+	if len(leases) > 1 {
+		t.Fatalf("only one of the two existing leases should have been cancelled")
+	}
 }
 
 func TestLeaseActionsGetLease(t *testing.T) {

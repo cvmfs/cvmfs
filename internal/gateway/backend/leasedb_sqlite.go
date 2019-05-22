@@ -272,7 +272,7 @@ func (db *SqliteLeaseDB) CancelLeases(ctx context.Context, repoPath string) erro
 	}
 	defer matches.Close()
 
-	tokensForDeletion := make([]string, 0)
+	tokensForDeletion := make([]interface{}, 0)
 	for matches.Next() {
 		var tokenStr string
 		var sp string
@@ -284,27 +284,29 @@ func (db *SqliteLeaseDB) CancelLeases(ctx context.Context, repoPath string) erro
 		}
 	}
 
-	placeholders := "("
-	for i := 0; i < len(tokensForDeletion)-1; i++ {
-		placeholders += "?,"
-	}
-	placeholders += "?);"
+	if len(tokensForDeletion) > 0 {
+		placeholders := "("
+		for i := 0; i < len(tokensForDeletion)-1; i++ {
+			placeholders += "?,"
+		}
+		placeholders += "?);"
 
-	res, err := txn.Exec("DELETE FROM Leases WHERE Token IN "+placeholders, tokensForDeletion)
-	if err != nil {
-		return errors.Wrap(err, "statement failed")
-	}
+		res, err := txn.Exec("DELETE FROM Leases WHERE Token IN "+placeholders, tokensForDeletion...)
+		if err != nil {
+			return errors.Wrap(err, "statement failed")
+		}
 
-	numRows, err := res.RowsAffected()
-	if err != nil {
-		return errors.Wrap(err, "statement result inaccessible")
-	}
+		numRows, err := res.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "statement result inaccessible")
+		}
 
-	if numRows == 0 {
-		gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
-			Str("operation", "cancel_lease").
-			Msg("cancellation failed")
-		return InvalidLeaseError{}
+		if numRows == 0 {
+			gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
+				Str("operation", "cancel_lease").
+				Msg("cancellation failed")
+			return InvalidLeaseError{}
+		}
 	}
 
 	if err := txn.Commit(); err != nil {
