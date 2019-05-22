@@ -17,7 +17,7 @@ func (s *Services) GetRepos() map[string]RepositoryConfig {
 
 // SetRepoEnabled enables or disables a repository. The change does not persist
 // across applications restarts
-func (s *Services) SetRepoEnabled(ctx context.Context, name string, enable bool, wait bool) error {
+func (s *Services) SetRepoEnabled(ctx context.Context, repository string, enable bool, wait bool) error {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -27,8 +27,8 @@ func (s *Services) SetRepoEnabled(ctx context.Context, name string, enable bool,
 		// If wait == true, the repository is disabled while the global commit lock
 		// of the repository is held
 		if wait {
-			s.Leases.WithLock(ctx, name, func() error {
-				s.Access.SetRepositoryEnabled(name, enable)
+			s.Leases.WithLock(ctx, repository, func() error {
+				s.Access.SetRepositoryEnabled(repository, enable)
 				return nil
 			})
 			return nil
@@ -41,7 +41,7 @@ func (s *Services) SetRepoEnabled(ctx context.Context, name string, enable bool,
 		}
 		busy := false
 		for n := range leases {
-			if n == name {
+			if n == repository {
 				busy = true
 				break
 			}
@@ -52,7 +52,7 @@ func (s *Services) SetRepoEnabled(ctx context.Context, name string, enable bool,
 		}
 	}
 
-	s.Access.SetRepositoryEnabled(name, enable)
+	s.Access.SetRepositoryEnabled(repository, enable)
 
 	return nil
 }

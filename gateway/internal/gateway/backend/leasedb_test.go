@@ -11,7 +11,7 @@ import (
 
 func TestLeaseDBOpen(t *testing.T) {
 	runTest := func(dbType string, t *testing.T) {
-		tmp, err := ioutil.TempDir("", "test_lease_db_" + dbType)
+		tmp, err := ioutil.TempDir("", "test_lease_db_"+dbType)
 		if err != nil {
 			t.Fatalf("could not create temp dir for test case")
 		}
@@ -34,7 +34,7 @@ func TestLeaseDBOpen(t *testing.T) {
 func TestLeaseDBCRUD(t *testing.T) {
 	runTest := func(dbType string, t *testing.T) {
 		lastProtocolVersion := 3
-		tmp, err := ioutil.TempDir("", "test_lease_db_" + dbType)
+		tmp, err := ioutil.TempDir("", "test_lease_db_"+dbType)
 		if err != nil {
 			t.Fatalf("could not create temp dir for test case")
 		}
@@ -83,7 +83,7 @@ func TestLeaseDBCRUD(t *testing.T) {
 			}
 		})
 		t.Run("cancel leases", func(t *testing.T) {
-			err := db.CancelLeases(context.TODO())
+			err := db.CancelLeases(context.TODO(), "repo_name")
 			if err != nil {
 				t.Fatalf("could not cancel all leases")
 			}
@@ -130,7 +130,7 @@ func TestLeaseDBCRUD(t *testing.T) {
 func TestLeaseDBConflicts(t *testing.T) {
 	runTest := func(dbType string, t *testing.T) {
 		lastProtocolVersion := 3
-		tmp, err := ioutil.TempDir("", "test_lease_db_" + dbType)
+		tmp, err := ioutil.TempDir("", "test_lease_db_"+dbType)
 		if err != nil {
 			t.Fatalf("could not create temp dir for test case")
 		}
@@ -186,7 +186,7 @@ func TestLeaseDBConflicts(t *testing.T) {
 func TestLeaseDBExpired(t *testing.T) {
 	runTest := func(dbType string, t *testing.T) {
 		lastProtocolVersion := 3
-		tmp, err := ioutil.TempDir("", "test_lease_db_" + dbType)
+		tmp, err := ioutil.TempDir("", "test_lease_db_"+dbType)
 		if err != nil {
 			t.Fatalf("could not create temp dir for test case")
 		}

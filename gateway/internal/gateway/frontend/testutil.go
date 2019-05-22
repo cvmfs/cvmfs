@@ -49,7 +49,7 @@ func (b *mockBackend) GetRepos() map[string]be.RepositoryConfig {
 	}
 }
 
-func (b *mockBackend) SetRepoEnabled(ctx context.Context, name string, enabled bool, wait bool) error {
+func (b *mockBackend) SetRepoEnabled(ctx context.Context, repository string, enabled bool, wait bool) error {
 	return nil
 }
 
@@ -76,6 +76,10 @@ func (b *mockBackend) GetLease(ctx context.Context, tokenStr string) (*be.LeaseR
 		LeasePath: "test2.repo.org/some/path/one",
 		Expires:   time.Now().Add(60 * time.Second).String(),
 	}, nil
+}
+
+func (b *mockBackend) CancelLeases(ctx context.Context, repoPath string) error {
+	return nil
 }
 
 func (b *mockBackend) CancelLease(ctx context.Context, tokenStr string) error {

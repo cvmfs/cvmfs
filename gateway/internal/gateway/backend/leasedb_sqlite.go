@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
@@ -19,8 +20,9 @@ const (
 )
 
 type statements struct {
-	getLeases *sql.Stmt
-	getLease  *sql.Stmt
+	getLeases        *sql.Stmt
+	getLease         *sql.Stmt
+	getLeasesForRepo *sql.Stmt
 }
 
 // SqliteLeaseDB is a LeaseDB backed by BoltDB
@@ -64,6 +66,10 @@ func OpenSqliteLeaseDB(workDir string) (*SqliteLeaseDB, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "could not prepare statement for 'get lease'")
 	}
+	st3, err := store.Prepare("SELECT Token, Path from Leases WHERE Repository = ?;")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not prepare statement for 'get lease for repo'")
+	}
 
 	gw.Log("leasedb_sqlite", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
@@ -71,7 +77,7 @@ func OpenSqliteLeaseDB(workDir string) (*SqliteLeaseDB, error) {
 	return &SqliteLeaseDB{
 		store: store,
 		locks: NamedLocks{},
-		st:    statements{getLeases: st1, getLease: st2},
+		st:    statements{getLeases: st1, getLease: st2, getLeasesForRepo: st3},
 	}, nil
 }
 
@@ -79,7 +85,8 @@ func OpenSqliteLeaseDB(workDir string) (*SqliteLeaseDB, error) {
 func (db *SqliteLeaseDB) Close() error {
 	err1 := db.st.getLeases.Close()
 	err2 := db.st.getLease.Close()
-	err3 := db.store.Close()
+	err3 := db.st.getLeasesForRepo.Close()
+	err4 := db.store.Close()
 	if err1 != nil {
 		return err1
 	}
@@ -88,6 +95,9 @@ func (db *SqliteLeaseDB) Close() error {
 	}
 	if err3 != nil {
 		return err3
+	}
+	if err4 != nil {
+		return err4
 	}
 	return nil
 }
@@ -242,7 +252,7 @@ func (db *SqliteLeaseDB) GetLease(ctx context.Context, tokenStr string) (string,
 }
 
 // CancelLeases cancels all active leases
-func (db *SqliteLeaseDB) CancelLeases(ctx context.Context) error {
+func (db *SqliteLeaseDB) CancelLeases(ctx context.Context, repoPath string) error {
 	t0 := time.Now()
 
 	txn, err := db.store.Begin()
@@ -251,7 +261,36 @@ func (db *SqliteLeaseDB) CancelLeases(ctx context.Context) error {
 	}
 	defer txn.Rollback()
 
-	res, err := txn.Exec("DELETE FROM Leases;")
+	repository, prefix, err := gw.SplitLeasePath(repoPath)
+	if err != nil {
+		return errors.Wrap(err, "invalid path")
+	}
+
+	matches, err := db.st.getLeasesForRepo.Query(repository)
+	if err != nil {
+		return errors.Wrap(err, "query failed")
+	}
+	defer matches.Close()
+
+	tokensForDeletion := make([]string, 0)
+	for matches.Next() {
+		var tokenStr string
+		var sp string
+		if err := matches.Scan(&tokenStr, &sp); err != nil {
+			return errors.Wrap(err, "query scan failed")
+		}
+		if strings.HasPrefix(sp, prefix) {
+			tokensForDeletion = append(tokensForDeletion, tokenStr)
+		}
+	}
+
+	placeholders := "("
+	for i := 0; i < len(tokensForDeletion)-1; i++ {
+		placeholders += "?,"
+	}
+	placeholders += "?);"
+
+	res, err := txn.Exec("DELETE FROM Leases WHERE Token IN "+placeholders, tokensForDeletion)
 	if err != nil {
 		return errors.Wrap(err, "statement failed")
 	}
@@ -264,7 +303,7 @@ func (db *SqliteLeaseDB) CancelLeases(ctx context.Context) error {
 	if numRows == 0 {
 		gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 			Str("operation", "cancel_lease").
-			Msgf("cancellation failed")
+			Msg("cancellation failed")
 		return InvalidLeaseError{}
 	}
 
@@ -275,7 +314,7 @@ func (db *SqliteLeaseDB) CancelLeases(ctx context.Context) error {
 	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
 		Str("operation", "cancel_leases").
 		Dur("task_dt", time.Since(t0)).
-		Msgf("all leases cancelled")
+		Msg("leases cancelled for prefix")
 
 	return nil
 }

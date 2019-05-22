@@ -99,6 +99,21 @@ func (s *Services) GetLease(ctx context.Context, tokenStr string) (*LeaseReturn,
 	return ret, nil
 }
 
+// CancelLeases cancels all the active leases below a repository path
+func (s *Services) CancelLeases(ctx context.Context, repoPath string) error {
+	t0 := time.Now()
+
+	outcome := "success"
+	defer logAction(ctx, "cancel_lease", &outcome, t0)
+
+	if err := s.Leases.CancelLeases(ctx, repoPath); err != nil {
+		outcome = err.Error()
+		return err
+	}
+
+	return nil
+}
+
 // CancelLease associated with the token (transaction rollback)
 func (s *Services) CancelLease(ctx context.Context, tokenStr string) error {
 	t0 := time.Now()
