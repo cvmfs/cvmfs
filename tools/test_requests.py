@@ -53,6 +53,14 @@ def cancel_lease(args):
     rep = requests.delete(args.gw_url + '/leases/' + token, headers=headers)
     print(json.dumps(rep.json()))
 
+def cancel_leases(args):
+    prefix = args.prefix
+    hmac_msg = ('/api/v1/leases-by-path/' + prefix).encode()
+    headers = {'authorization': args.key_id +
+                ' ' + computeHMAC(hmac_msg, args.secret.encode())}
+    rep = requests.delete(args.gw_url + '/leases-by-path/' + prefix, headers=headers)
+    print(json.dumps(rep.json()))
+
 def commit_lease(args):
     token = args.token
     hmac_msg = token.encode()
@@ -129,19 +137,24 @@ def main():
     parser_new_lease.add_argument('--path', required=True, help="lease path")
 
     parser_cancel_lease = subparsers.add_parser(
-        'cancel_lease', help='request a new active lease'
+        'cancel_lease', help='cancel a lease using a token'
     )
     parser_cancel_lease.add_argument('--token', required=True, help='lease token string')
 
+    parser_cancel_leases = subparsers.add_parser(
+        'cancel_leases', help='cancel all leases under a prefix'
+    )
+    parser_cancel_leases.add_argument('--prefix', required=True, help='repository+path prefix')
+
     parser_commit_lease = subparsers.add_parser(
-        'commit_lease', help='request a new active lease'
+        'commit_lease', help='commit a lease'
     )
     parser_commit_lease.add_argument('--token', required=True, help='lease token string')
     parser_commit_lease.add_argument('--old_hash', required=True, help='old root hash')
     parser_commit_lease.add_argument('--new_hash', required=True, help='new root hash')
 
     parser_submit_payload = subparsers.add_parser(
-        'submit_payload', help='request a new active lease'
+        'submit_payload', help='submit a payload'
     )
     parser_submit_payload.add_argument('--token', required=True, help='lease token string')
     parser_submit_payload.add_argument('--digest', required=True, help='payload digest')
@@ -158,6 +171,7 @@ def main():
         'get_lease': get_lease,
         'new_lease': new_lease,
         'cancel_lease': cancel_lease,
+        'cancel_leases': cancel_leases,
         'commit_lease': commit_lease,
         'submit_payload': submit_payload,
     }[args.command](args)

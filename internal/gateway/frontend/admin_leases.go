@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"net/http"
+	"strings"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -15,7 +16,7 @@ func MakeAdminLeasesHandler(services be.ActionController) httprouter.Handle {
 
 		msg := map[string]interface{}{"status": "ok"}
 
-		repoPath := ps.ByName("path")
+		repoPath := strings.TrimPrefix(ps.ByName("path"), "/")
 		if repoPath == "" {
 			errMsg := "missing path argument"
 			gw.LogC(ctx, "http", gw.LogError).Msg(errMsg)
