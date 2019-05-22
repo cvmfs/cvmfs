@@ -6,15 +6,16 @@ import hmac
 import json
 import requests
 
+# Utility functions
 
-def errMissingArg(argument):
-    print('Missing argument: "{}"'.format(argument))
-
-
-def computeHMAC(msg, key):
+def compute_hmac(msg, key):
     d = hmac.HMAC(key, msg, digestmod='sha1').hexdigest().encode('utf-8')
     return base64.b64encode(d).decode('utf-8')
 
+def make_headers(key_id, secret, msg):
+    return {'authorization': key_id + ' ' + compute_hmac(msg.encode(), secret.encode())}
+
+# Request functions follow
 
 def get_repos(args):
     rep = requests.get(args.gw_url + '/repos')
@@ -22,9 +23,7 @@ def get_repos(args):
 
 def toggle_repo(args):
     req = {'enable': bool(args.enable)}
-    hmac_msg = json.dumps(req).encode()
-    headers = {'authorization': args.key_id +
-                ' ' + computeHMAC(hmac_msg, args.secret.encode())}
+    headers = make_headers(args.key_id, args.secret, json.dumps(req))
     rep = requests.post(args.gw_url + '/repos/' +
                         args.repo_name, json=req, headers=headers)
     print(json.dumps(rep.json()))
@@ -39,33 +38,25 @@ def get_lease(args):
 
 def new_lease(args):
     req = {'path': args.path, 'api_version': '2'}
-    hmac_msg = json.dumps(req).encode()
-    headers = {'authorization': args.key_id +
-                ' ' + computeHMAC(hmac_msg, args.secret.encode())}
+    headers = make_headers(args.key_id, args.secret, json.dumps(req))
     rep = requests.post(args.gw_url + '/leases', json=req, headers=headers)
     print(json.dumps(rep.json()))
 
 def cancel_lease(args):
     token = args.token
-    hmac_msg = token.encode()
-    headers = {'authorization': args.key_id +
-                ' ' + computeHMAC(hmac_msg, args.secret.encode())}
+    headers = make_headers(args.key_id, args.secret, token)
     rep = requests.delete(args.gw_url + '/leases/' + token, headers=headers)
     print(json.dumps(rep.json()))
 
 def cancel_leases(args):
     prefix = args.prefix
-    hmac_msg = ('/api/v1/leases-by-path/' + prefix).encode()
-    headers = {'authorization': args.key_id +
-                ' ' + computeHMAC(hmac_msg, args.secret.encode())}
+    headers = make_headers(args.key_id, args.secret, '/api/v1/leases-by-path/' + prefix)
     rep = requests.delete(args.gw_url + '/leases-by-path/' + prefix, headers=headers)
     print(json.dumps(rep.json()))
 
 def commit_lease(args):
     token = args.token
-    hmac_msg = token.encode()
-    headers = {'authorization': args.key_id +
-                ' ' + computeHMAC(hmac_msg, args.secret.encode())}
+    headers = make_headers(args.key_id, args.secret, token)
     req = {'old_root_hash': args.old_hash,
            'new_root_hash': args.new_hash,
            'tag_name': 'mytag',
@@ -83,17 +74,16 @@ def submit_payload(args):
                 'payload_digest': args.digest,
                 'header_size': args.header_size,
                 'api_version': '2'}
-        hmac_msg = json.dumps(req).encode()
+        hmac_msg = json.dumps(req)
         req_url = args.gw_url + '/payloads'
     else:
         req = {'payload_digest': args.digest,
                 'header_size': args.header_size,
                 'api_version': '3'}
-        hmac_msg = args.token.encode()
+        hmac_msg = args.token
         req_url = args.gw_url + '/payloads' + args.token
 
-    headers = {'authorization': args.key_id + ' ' + computeHMAC(hmac_msg, args.secret.encode()),
-               'message-size': str(len(json.dumps(req)))}
+    headers = make_headers(args.key_id, args.secret, hmac_msg)
     rep = requests.post(req_url, json=req, headers=headers)
     print(json.dumps(rep.json()))
 
