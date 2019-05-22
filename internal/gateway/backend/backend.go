@@ -23,10 +23,11 @@ type ActionController interface {
 	GetKey(keyID string) *KeyConfig
 	GetRepo(repoName string) *RepositoryConfig
 	GetRepos() map[string]RepositoryConfig
-	SetRepoEnabled(ctx context.Context, name string, enabled bool, wait bool) error
+	SetRepoEnabled(ctx context.Context, repository string, enabled bool, wait bool) error
 	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error)
 	GetLeases(ctx context.Context) (map[string]LeaseReturn, error)
 	GetLease(ctx context.Context, tokenStr string) (*LeaseReturn, error)
+	CancelLeases(ctx context.Context, repoPath string) error
 	CancelLease(ctx context.Context, tokenStr string) error
 	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error

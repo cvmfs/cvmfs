@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
@@ -199,14 +200,46 @@ func (db *BoltLeaseDB) GetLease(ctx context.Context, tokenStr string) (string, *
 }
 
 // CancelLeases cancels all active leases
-func (db *BoltLeaseDB) CancelLeases(ctx context.Context) error {
+func (db *BoltLeaseDB) CancelLeases(ctx context.Context, repoPath string) error {
 	return db.store.Update(func(txn *bolt.Tx) error {
 		t0 := time.Now()
 
-		txn.ForEach(func(name []byte, b *bolt.Bucket) error {
-			txn.DeleteBucket(name)
+		repository, prefix, err := gw.SplitLeasePath(repoPath)
+		if err != nil {
+			return errors.Wrap(err, "invalid path")
+		}
+
+		tokens := txn.Bucket([]byte("tokens"))
+		if tokens == nil {
+			return fmt.Errorf("missing 'tokens' bucket")
+		}
+
+		leases := txn.Bucket([]byte(repository))
+		if leases == nil {
+			return fmt.Errorf("missing '%v' bucket", repository)
+		}
+
+		tokensForDeletion := make([]string, 0)
+		pathsForDeletion := make([]string, 0)
+		leases.ForEach(func(subPath, leaseBytes []byte) error {
+			sp := string(subPath)
+			if strings.HasPrefix(sp, prefix) {
+				pathsForDeletion = append(pathsForDeletion, sp)
+				l, err := DeserializeLease(leaseBytes)
+				if err != nil {
+					return err
+				}
+				tokensForDeletion = append(tokensForDeletion, l.Token.TokenStr)
+			}
 			return nil
 		})
+
+		for _, t := range tokensForDeletion {
+			tokens.Delete([]byte(t))
+		}
+		for _, p := range pathsForDeletion {
+			leases.Delete([]byte(p))
+		}
 
 		gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
 			Str("operation", "cancel_leases").

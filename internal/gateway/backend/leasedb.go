@@ -72,7 +72,7 @@ type LeaseDB interface {
 	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error
 	GetLeases(ctx context.Context) (map[string]Lease, error)
 	GetLease(ctx context.Context, tokenStr string) (string, *Lease, error)
-	CancelLeases(ctx context.Context) error
+	CancelLeases(ctx context.Context, repoPath string) error
 	CancelLease(ctx context.Context, tokenStr string) error
 	WithLock(ctx context.Context, name string, task func() error) error
 }

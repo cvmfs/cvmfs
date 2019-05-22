@@ -39,7 +39,7 @@ func (db *EtcdLeaseDB) GetLease(ctx context.Context, tokenStr string) (string, *
 }
 
 // CancelLeases cancels all active leases
-func (db *EtcdLeaseDB) CancelLeases(ctx context.Context) error {
+func (db *EtcdLeaseDB) CancelLeases(ctx context.Context, repository string) error {
 	return nil
 }
 
