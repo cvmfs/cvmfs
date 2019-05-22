@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/cvmfs/gateway/internal/gateway"
 )
 
 func TestLeaseDBOpen(t *testing.T) {
@@ -17,7 +19,8 @@ func TestLeaseDBOpen(t *testing.T) {
 		}
 		defer os.RemoveAll(tmp)
 
-		db, err := OpenSqliteLeaseDB(tmp)
+		cfg := gateway.Config{WorkDir: tmp}
+		db, err := OpenLeaseDB(dbType, &cfg)
 		if err != nil {
 			t.Fatalf("could not create database: %v", err)
 		}
@@ -40,7 +43,8 @@ func TestLeaseDBCRUD(t *testing.T) {
 		}
 		defer os.RemoveAll(tmp)
 
-		db, err := OpenSqliteLeaseDB(tmp)
+		cfg := gateway.Config{WorkDir: tmp}
+		db, err := OpenLeaseDB(dbType, &cfg)
 		if err != nil {
 			t.Fatalf("could not create database: %v", err)
 		}
@@ -83,16 +87,37 @@ func TestLeaseDBCRUD(t *testing.T) {
 			}
 		})
 		t.Run("cancel leases", func(t *testing.T) {
-			err := db.CancelLeases(context.TODO(), "repo_name")
+			leasePath1 := "test.repo.org/path/two"
+			token1, err := NewLeaseToken(leasePath1, maxLeaseTime)
 			if err != nil {
-				t.Fatalf("could not cancel all leases")
+				t.Fatalf("could not generate session token: %v", err)
 			}
+			if err := db.NewLease(context.TODO(), keyID1, leasePath1, lastProtocolVersion, *token1); err != nil {
+				t.Fatalf("could not add new lease: %v", err)
+			}
+			leasePath2 := "test.repo.org/another/path"
+			token2, err := NewLeaseToken(leasePath2, maxLeaseTime)
+			if err != nil {
+				t.Fatalf("could not generate session token: %v", err)
+			}
+			if err := db.NewLease(context.TODO(), keyID1, leasePath2, lastProtocolVersion, *token2); err != nil {
+				t.Fatalf("could not add new lease: %v", err)
+			}
+
+			if err := db.CancelLeases(context.TODO(), "test.repo.org/path"); err != nil {
+				t.Fatalf("could not cancel all leases: %v", err)
+			}
+
 			leases, err := db.GetLeases(context.TODO())
 			if err != nil {
 				t.Fatalf("could not retrieve leases: %v", err)
 			}
-			if len(leases) > 0 {
+			if len(leases) > 1 {
 				t.Fatalf("remaining leases after cancellation")
+			}
+
+			if err := db.CancelLeases(context.TODO(), "test.repo.org/"); err != nil {
+				t.Fatalf("could not cancel all leases: %v", err)
 			}
 		})
 		t.Run("clear lease for token", func(t *testing.T) {
@@ -136,7 +161,8 @@ func TestLeaseDBConflicts(t *testing.T) {
 		}
 		defer os.RemoveAll(tmp)
 
-		db, err := OpenSqliteLeaseDB(tmp)
+		cfg := gateway.Config{WorkDir: tmp}
+		db, err := OpenLeaseDB(dbType, &cfg)
 		if err != nil {
 			t.Fatalf("could not create database: %v", err)
 		}
@@ -194,7 +220,8 @@ func TestLeaseDBExpired(t *testing.T) {
 
 		shortLeaseTime := 1 * time.Millisecond
 
-		db, err := OpenSqliteLeaseDB(tmp)
+		cfg := gateway.Config{WorkDir: tmp}
+		db, err := OpenLeaseDB(dbType, &cfg)
 		if err != nil {
 			t.Fatalf("could not create database: %v", err)
 		}
