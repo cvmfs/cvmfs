@@ -480,6 +480,35 @@ _migrate_141() {
 }
 
 
+_migrate_142() {
+  local name=$1
+  local destination_version="142"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  local client_conf="/etc/cvmfs/repositories.d/${name}/client.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  # only called when this is a stratum 0
+  if [ -f $client_conf ]; then
+    echo "--> updating client.conf"
+    if ! grep -q "CVMFS_CATALOG_WATERMARK" $client_conf; then
+      echo "CVMFS_CATALOG_WATERMARK=20000" >> $client_conf
+    else
+      sed -i -e "s/^\(CVMFS_CATALOG_WATERMARK\)=.*/\1=20000/" $client_conf
+    fi
+  else
+    echo "--> skipping client configuration on stratum 1"
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -610,6 +639,11 @@ cvmfs_server_migrate() {
 
     if [ "$creator" -lt 141 ] && is_stratum0 $name; then
       _migrate_141 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" -lt 142 ] && is_stratum0 $name; then
+      _migrate_142 $name
       creator="$(repository_creator_version $name)"
     fi
 

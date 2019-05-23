@@ -92,6 +92,9 @@ Please upgrade CernVM-FS to manipulate this repository."
   #   140 --> 141
   #     -> Set CVMFS_NFILES parameter on publisher node
   #
+  #   141 --> 142
+  #     -> Set CVMFS_CATALOG_WATERMARK parameter on publisher node
+  #
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
