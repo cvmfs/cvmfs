@@ -9,7 +9,8 @@ cvmfs_run_test() {
   # which should not make the client run out of fds.
 
   cvmfs_mount "sft.cern.ch" \
-    "CVMFS_QUOTA_LIMIT=2000" \
+    "CVMFS_QUOTA_LIMIT=20000" \
+    "CVMFS_NFILES=2000" \
     "CVMFS_CHECK_PERMISSIONS=no" \
     "CVMFS_AUTO_UPDATE=no" || return 1
 
@@ -21,6 +22,13 @@ cvmfs_run_test() {
     return 2
   fi
 
+  local num_detach=$(sudo cvmfs_talk -i sft.cern.ch internal affairs | \
+    grep ^catalog_mgr.n_detach_siblings | cut -f2 -d\|)
+  echo "*** number of catalog detachs: $num_detach"
+  [ x"$num_detach" != x"" ] || return 10
+  if [ $num_detach -le 0 ]; then
+    return 11
+  fi
+
   return 0
 }
-
