@@ -71,6 +71,7 @@ struct Statistics {
   perf::Counter *n_lookup_xattrs;
   perf::Counter *n_listing;
   perf::Counter *n_nested_listing;
+  perf::Counter *n_detach_siblings;
 
   explicit Statistics(perf::Statistics *statistics) {
     n_lookup_inode = statistics->Register("catalog_mgr.n_lookup_inode",
@@ -86,6 +87,8 @@ struct Statistics {
         "Number of listings");
     n_nested_listing = statistics->Register("catalog_mgr.n_nested_listing",
         "Number of listings of nested catalogs");
+    n_detach_siblings = statistics->Register("catalog_mgr.n_detach_siblings",
+        "Number of times the CVMFS_CATALOG_WATERMARK was hit");
   }
 };
 
