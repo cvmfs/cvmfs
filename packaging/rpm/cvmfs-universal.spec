@@ -30,7 +30,8 @@
 %define systemd_autofs_patch 1
 %endif
 
-%if 0%{?fedora} >= 29
+# fuse3 is in epel starting with epel6
+%if 0%{?fedora} >= 29 || 0%{?rhel} >= 6
 %define build_fuse3 1
 %endif
 
