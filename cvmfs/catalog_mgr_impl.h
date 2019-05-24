@@ -938,6 +938,7 @@ void AbstractCatalogManager<CatalogT>::DetachSiblings(
       }
     }
   } while (again);
+  perf::Inc(statistics_.n_detach_siblings);
 }
 
 

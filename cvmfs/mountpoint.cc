@@ -1205,6 +1205,11 @@ bool MountPoint::CreateCatalogManager() {
 
   if (options_mgr_->GetValue("CVMFS_CATALOG_WATERMARK", &optarg)) {
     catalog_mgr_->SetCatalogWatermark(String2Uint64(optarg));
+  } else {
+    unsigned soft_limit;
+    unsigned hard_limit;
+    GetLimitNoFile(&soft_limit, &hard_limit);
+    catalog_mgr_->SetCatalogWatermark(soft_limit / 4);
   }
 
   if (catalog_mgr_->volatile_flag()) {

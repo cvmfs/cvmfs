@@ -1733,6 +1733,16 @@ TEST_F(T_Util, SetLimitNoFile) {
 }
 
 
+TEST_F(T_Util, GetLimitNoFile) {
+  unsigned soft_limit = 0;
+  unsigned hard_limit = 0;
+  GetLimitNoFile(&soft_limit, &hard_limit);
+  EXPECT_LT(0U, soft_limit);
+  EXPECT_LE(soft_limit, hard_limit);
+  EXPECT_LT(hard_limit, 1000000U);
+}
+
+
 TEST_F(T_Util, GetAbsolutePath) {
   bool ignore_failure = false;
   EXPECT_EQ("/xxx", GetAbsolutePath("/xxx"));

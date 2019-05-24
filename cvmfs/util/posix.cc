@@ -1118,6 +1118,28 @@ int SetLimitNoFile(unsigned limit_nofile) {
 
 
 /**
+ * Get the file descriptor limits
+ */
+void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit) {
+  *soft_limit = 0;
+  *hard_limit = 0;
+
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  getrlimit(RLIMIT_NOFILE, &rpl);
+  *soft_limit = rpl.rlim_cur;
+
+#ifdef __APPLE__
+  int value = sysconf(_SC_OPEN_MAX);
+  assert(value > 0);
+  *hard_limit = value;
+#else
+  *hard_limit = rpl.rlim_max;
+#endif
+}
+
+
+/**
  * Blocks a signal for the calling thread.
  */
 void BlockSignal(int signum) {

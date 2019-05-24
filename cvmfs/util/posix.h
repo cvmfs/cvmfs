@@ -94,6 +94,7 @@ mode_t GetUmask();
 bool AddGroup2Persona(const gid_t gid);
 
 int SetLimitNoFile(unsigned limit_nofile);
+void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit);
 
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
