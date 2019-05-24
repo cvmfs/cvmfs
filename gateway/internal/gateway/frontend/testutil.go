@@ -93,3 +93,7 @@ func (b *mockBackend) CommitLease(ctx context.Context, tokenStr, oldRootHash, ne
 func (b *mockBackend) SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error {
 	return nil
 }
+
+func (b *mockBackend) RunGC(ctx context.Context, options be.GCOptions) error {
+	return nil
+}
