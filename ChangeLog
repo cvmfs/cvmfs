@@ -1,4 +1,5 @@
 2.6.1:
+  * Fix file descriptor exhaustion when browsing many small catalogs (CVM-1742)
   * Manifest now can include reflog hash, fixing check with gw (CVM-1732)
   * Fix `snapshot -a` when no replicas are defined
   * Fix overwrite of locked down directories during ingestion
