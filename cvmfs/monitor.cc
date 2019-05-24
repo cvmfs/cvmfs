@@ -535,23 +535,9 @@ unsigned GetMaxOpenFiles() {
 
   /* check number of open files (lazy evaluation) */
   if (!already_done) {
-    unsigned int soft_limit = 0;
-    int hard_limit = 0;
-
-    struct rlimit rpl;
-    memset(&rpl, 0, sizeof(rpl));
-    getrlimit(RLIMIT_NOFILE, &rpl);
-    soft_limit = rpl.rlim_cur;
-
-#ifdef __APPLE__
-    hard_limit = sysconf(_SC_OPEN_MAX);
-    if (hard_limit < 0) {
-      LogCvmfs(kLogMonitor, kLogStdout, "Warning: could not retrieve "
-               "hard limit for the number of open files");
-    }
-#else
-    hard_limit = rpl.rlim_max;
-#endif
+    unsigned soft_limit = 0;
+    unsigned hard_limit = 0;
+    GetLimitNoFile(&soft_limit, &hard_limit);
 
     if (soft_limit < kMinOpenFiles) {
       LogCvmfs(kLogMonitor, kLogSyslogWarn | kLogDebug,

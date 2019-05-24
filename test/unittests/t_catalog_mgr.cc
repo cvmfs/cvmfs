@@ -332,16 +332,23 @@ TEST_F(T_CatalogManager, Watermark) {
   AddTree();
 
   catalog_mgr_.SetCatalogWatermark(2);
+  EXPECT_EQ(0, catalog_mgr_.statistics().n_detach_siblings->Get());
   EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir", &ls));
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
+  EXPECT_EQ(1, catalog_mgr_.statistics().n_detach_siblings->Get());
 
   // Overspend budget
   EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir", &ls));
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+  EXPECT_EQ(2, catalog_mgr_.statistics().n_detach_siblings->Get());
 
   // Now the other tree should get detached
   EXPECT_TRUE(catalog_mgr_.Listing("/nested", &ls));
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
+  EXPECT_EQ(3, catalog_mgr_.statistics().n_detach_siblings->Get());
+
+  EXPECT_TRUE(catalog_mgr_.Listing("/nested", &ls));
+  EXPECT_EQ(3, catalog_mgr_.statistics().n_detach_siblings->Get());
 }
 
 }  // namespace catalog
