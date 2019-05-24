@@ -1744,7 +1744,7 @@ TEST_F(T_Util, GetLimitNoFile) {
   GetLimitNoFile(&soft_limit, &hard_limit);
   EXPECT_LT(0U, soft_limit);
   EXPECT_LE(soft_limit, hard_limit);
-  EXPECT_LT(hard_limit, 1000000U);
+  EXPECT_LT(hard_limit, 10000000U);
 }
 
 
