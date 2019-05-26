@@ -251,7 +251,7 @@ const unsigned T_ExternalCacheManager::nfiles = 128;
 TEST_F(T_ExternalCacheManager, Connection) {
   EXPECT_GE(cache_mgr_->session_id(), 0);
   EXPECT_EQ(getpid(), cache_mgr_->quota_mgr()->GetPid());
-  EXPECT_TRUE(cache_mgr_->GetBackingDirectory().empty());
+  EXPECT_FALSE(cache_mgr_->LoadBreadcrumb("").IsValid());
 
   // Invalid query for session information outside callback
   uint64_t id;

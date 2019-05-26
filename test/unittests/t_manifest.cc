@@ -35,6 +35,7 @@ class T_Manifest : public ::testing::Test {
 
 
 TEST_F(T_Manifest, Breadcrumb) {
+  EXPECT_FALSE(Breadcrumb().IsValid());
   EXPECT_FALSE(Breadcrumb(shash::Any(shash::kSha1), 0).IsValid());
   EXPECT_FALSE(Breadcrumb(shash::Any(shash::kShake128), 1).IsValid());
   shash::Any rnd_hash(shash::kRmd160);
@@ -57,27 +58,28 @@ TEST_F(T_Manifest, Breadcrumb) {
 
 
 TEST_F(T_Manifest, ReadBreadcrumb) {
-  Breadcrumb breadcrumb;
-  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_, &breadcrumb));
+  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_).IsValid());
 
   shash::Any rnd_hash(shash::kRmd160);
   rnd_hash.Randomize();
   FILE *f = fopen((tmp_path_ + "/cvmfschecksum.test").c_str(), "w");
   ASSERT_TRUE(f != NULL);
 
-  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_, &breadcrumb));
+  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_).IsValid());
 
   fwrite(rnd_hash.ToString().data(), 1, rnd_hash.ToString().length(), f);
   fflush(f);
-  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_, &breadcrumb));
+  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_).IsValid());
 
   fwrite("T", 1, 1, f);
   fflush(f);
-  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_, &breadcrumb));
+  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_).IsValid());
 
   fwrite("42", 2, 1, f);
   fflush(f);
-  EXPECT_TRUE(Manifest::ReadBreadcrumb("test", tmp_path_, &breadcrumb));
+
+  Breadcrumb breadcrumb = Manifest::ReadBreadcrumb("test", tmp_path_);
+  EXPECT_TRUE(breadcrumb.IsValid());
   EXPECT_TRUE(breadcrumb.IsValid());
   EXPECT_EQ(rnd_hash, breadcrumb.catalog_hash);
   EXPECT_EQ(42U, breadcrumb.timestamp);

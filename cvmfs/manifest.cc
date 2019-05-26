@@ -235,23 +235,21 @@ bool Manifest::ExportBreadcrumb(const string &directory, const int mode) const {
  * Read the hash and the last-modified time stamp from the
  * cvmfschecksum.$repository file in the given directory.
  */
-bool Manifest::ReadBreadcrumb(
+Breadcrumb Manifest::ReadBreadcrumb(
   const std::string &repo_name,
-  const std::string &directory,
-  Breadcrumb *breadcrumb)
+  const std::string &directory)
 {
-  bool result = false;
+  Breadcrumb breadcrumb;
   const string breadcrumb_path = directory + "/cvmfschecksum." + repo_name;
   FILE *fbreadcrumb = fopen(breadcrumb_path.c_str(), "r");
   char tmp[128];
   int read_bytes;
   if (fbreadcrumb && (read_bytes = fread(tmp, 1, 128, fbreadcrumb)) > 0) {
-    *breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
-    result = breadcrumb->IsValid();
+    breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
   }
   if (fbreadcrumb) fclose(fbreadcrumb);
 
-  return result;
+  return breadcrumb;
 }
 
 }  // namespace manifest

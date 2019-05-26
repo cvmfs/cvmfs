@@ -527,6 +527,17 @@ int PosixCacheManager::StartTxn(
 }
 
 
+manifest::Breadcrumb PosixCacheManager::LoadBreadcrumb(const std::string &fqrn)
+{
+  return manifest::Manifest::ReadBreadcrumb(fqrn, cache_path_);
+}
+
+
+bool PosixCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
+  return manifest.ExportBreadcrumb(cache_path_, 0600);
+}
+
+
 void PosixCacheManager::TearDown2ReadOnly() {
   cache_mode_ = kCacheReadOnly;
   while (atomic_read32(&no_inflight_txns_) != 0)

@@ -75,9 +75,8 @@ class Manifest {
   std::string ExportString() const;
   bool Export(const std::string &path) const;
   bool ExportBreadcrumb(const std::string &directory, const int mode) const;
-  static bool ReadBreadcrumb(const std::string &repo_name,
-                             const std::string &directory,
-                             Breadcrumb *breadcrumb);
+  static Breadcrumb ReadBreadcrumb(const std::string &repo_name,
+                                   const std::string &directory);
 
   shash::Algorithms GetHashAlgorithm() const { return catalog_hash_.algorithm; }
 

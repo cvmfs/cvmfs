@@ -63,7 +63,8 @@ class TieredCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
   virtual void Spawn();
 
-  virtual std::string GetBackingDirectory() { return backing_directory_; }
+  virtual manifest::Breadcrumb LoadBreadcrumb(const std::string &fqrn);
+  virtual bool StoreBreadcrumb(const manifest::Manifest &manifest);
 
  protected:
   virtual void *DoSaveState();
@@ -87,7 +88,6 @@ class TieredCacheManager : public CacheManager {
   CacheManager *upper_;
   CacheManager *lower_;
   bool lower_readonly_;
-  std::string backing_directory_;
 };  // class TieredCacheManager
 
 #endif  // CVMFS_CACHE_TIERED_H_
