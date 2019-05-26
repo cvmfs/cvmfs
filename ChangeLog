@@ -1,4 +1,7 @@
 2.7.0:
+  * Add support for pre-mounted mount point with libfuse3
+  * Add support for libfuse3, including new mount option libfuse=[2|3]
+    (CVM-1710, CVM-1744)
 
 2.6.1:
   * Fix file descriptor exhaustion when browsing many small catalogs (CVM-1742)
