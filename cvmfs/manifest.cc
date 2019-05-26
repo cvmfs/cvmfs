@@ -14,6 +14,34 @@ using namespace std;  // NOLINT
 
 namespace manifest {
 
+Breadcrumb::Breadcrumb(const std::string &from_string) {
+  timestamp = 0;
+  int len = from_string.length();
+
+  // Separate hash from timestamp
+  int separator_pos = 0;
+  for (; (separator_pos < len) && (from_string[separator_pos] != 'T');
+       ++separator_pos)
+  { }
+  catalog_hash =
+    shash::MkFromHexPtr(shash::HexPtr(from_string.substr(0, separator_pos)),
+                                      shash::kSuffixCatalog);
+
+  // Get local last modified time
+  if ((from_string[separator_pos] == 'T') && (len > (separator_pos + 1))) {
+    timestamp = String2Uint64(from_string.substr(separator_pos + 1));
+  }
+}
+
+
+std::string Breadcrumb::ToString() const {
+  return catalog_hash.ToString() + "T" + StringifyInt(timestamp);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 Manifest *Manifest::LoadMem(const unsigned char *buffer,
                             const unsigned length)
 {
@@ -178,25 +206,25 @@ bool Manifest::Export(const std::string &path) const {
 /**
  * Writes the cvmfschecksum.$repository file.  Atomic store.
  */
-bool Manifest::ExportChecksum(const string &directory, const int mode) const {
-  string checksum_path = MakeCanonicalPath(directory) + "/cvmfschecksum." +
-                         repository_name_;
-  string checksum_tmp_path;
-  FILE *fchksum = CreateTempFile(checksum_path, mode, "w", &checksum_tmp_path);
-  if (fchksum == NULL)
+bool Manifest::ExportBreadcrumb(const string &directory, const int mode) const {
+  string breadcrumb_path = MakeCanonicalPath(directory) + "/cvmfschecksum." +
+                           repository_name_;
+  string tmp_path;
+  FILE *fbreadcrumb = CreateTempFile(breadcrumb_path, mode, "w", &tmp_path);
+  if (fbreadcrumb == NULL)
     return false;
-  string cache_checksum = catalog_hash_.ToString() + "T" +
-                          StringifyInt(publish_timestamp_);
-  int written = fwrite(&(cache_checksum[0]), 1, cache_checksum.length(),
-                       fchksum);
-  fclose(fchksum);
-  if (static_cast<unsigned>(written) != cache_checksum.length()) {
-    unlink(checksum_tmp_path.c_str());
+  string str_breadcrumb =
+    Breadcrumb(catalog_hash_, publish_timestamp_).ToString();
+  int written = fwrite(&(str_breadcrumb[0]), 1, str_breadcrumb.length(),
+                       fbreadcrumb);
+  fclose(fbreadcrumb);
+  if (static_cast<unsigned>(written) != str_breadcrumb.length()) {
+    unlink(tmp_path.c_str());
     return false;
   }
-  int retval = rename(checksum_tmp_path.c_str(), checksum_path.c_str());
+  int retval = rename(tmp_path.c_str(), breadcrumb_path.c_str());
   if (retval != 0) {
-    unlink(checksum_tmp_path.c_str());
+    unlink(tmp_path.c_str());
     return false;
   }
   return true;
@@ -207,35 +235,21 @@ bool Manifest::ExportChecksum(const string &directory, const int mode) const {
  * Read the hash and the last-modified time stamp from the
  * cvmfschecksum.$repository file in the given directory.
  */
-bool Manifest::ReadChecksum(
+bool Manifest::ReadBreadcrumb(
   const std::string &repo_name,
   const std::string &directory,
-  shash::Any *hash,
-  uint64_t *last_modified)
+  Breadcrumb *breadcrumb)
 {
   bool result = false;
-  const string checksum_path = directory + "/cvmfschecksum." + repo_name;
-  FILE *file_checksum = fopen(checksum_path.c_str(), "r");
+  const string breadcrumb_path = directory + "/cvmfschecksum." + repo_name;
+  FILE *fbreadcrumb = fopen(breadcrumb_path.c_str(), "r");
   char tmp[128];
   int read_bytes;
-  if (file_checksum && (read_bytes = fread(tmp, 1, 128, file_checksum)) > 0) {
-    // Separate hash from timestamp
-    int separator_pos = 0;
-    for (; (separator_pos < read_bytes) && (tmp[separator_pos] != 'T');
-         ++separator_pos) { }
-    *hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)),
-                                shash::kSuffixCatalog);
-
-    // Get local last modified time
-    string str_modified;
-    if ((tmp[separator_pos] == 'T') && (read_bytes > (separator_pos+1))) {
-      str_modified = string(tmp+separator_pos+1,
-                            read_bytes-(separator_pos+1));
-      *last_modified = String2Uint64(str_modified);
-      result = true;
-    }
+  if (fbreadcrumb && (read_bytes = fread(tmp, 1, 128, fbreadcrumb)) > 0) {
+    *breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
+    result = breadcrumb->IsValid();
   }
-  if (file_checksum) fclose(file_checksum);
+  if (fbreadcrumb) fclose(fbreadcrumb);
 
   return result;
 }
