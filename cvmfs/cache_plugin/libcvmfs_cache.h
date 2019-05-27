@@ -72,7 +72,7 @@ enum cvmcache_capabilities {
   CVMCACHE_CAP_SHRINK_RATE = 16,  // cache knows number of cleanup operations
   CVMCACHE_CAP_LIST        = 32,  // cache can return a list of objects
   CVMCACHE_CAP_ALL_V1      = 63,
-  CVMCACHE_CAP_BREADCRUMB  = 64, // cache can load and store breadcrumps
+  CVMCACHE_CAP_BREADCRUMB  = 64,  // cache can load and store breadcrumps
   CVMCACHE_CAP_ALL_V2      = 127,
 };
 
