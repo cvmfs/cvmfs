@@ -90,6 +90,9 @@ class ExternalCacheManager : public CacheManager {
   virtual int OpenFromTxn(void *txn);
   virtual int CommitTxn(void *txn);
 
+  virtual manifest::Breadcrumb LoadBreadcrumb(const std::string &fqrn);
+  virtual bool StoreBreadcrumb(const manifest::Manifest &manifest);
+
   virtual void Spawn();
 
   int64_t session_id() const { return session_id_; }
@@ -182,6 +185,10 @@ class ExternalCacheManager : public CacheManager {
       : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgListReq *msg)
       : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgBreadcrumbLoadReq *msg)
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+    explicit RpcJob(cvmfs::MsgBreadcrumbStoreReq *msg)
+      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
 
     void set_attachment_send(void *data, unsigned size) {
       frame_send_.set_attachment(data, size);
@@ -234,6 +241,13 @@ class ExternalCacheManager : public CacheManager {
     cvmfs::MsgListReply *msg_list_reply() {
       cvmfs::MsgListReply *m = reinterpret_cast<cvmfs::MsgListReply *>(
         frame_recv_.GetMsgTyped());
+      assert(m->req_id() == req_id_);
+      return m;
+    }
+    cvmfs::MsgBreadcrumbReply *msg_breadcrumb_reply() {
+      cvmfs::MsgBreadcrumbReply *m =
+        reinterpret_cast<cvmfs::MsgBreadcrumbReply *>(
+          frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
     }

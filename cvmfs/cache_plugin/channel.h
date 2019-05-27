@@ -17,6 +17,7 @@
 #include "cache.pb.h"
 #include "cache_transport.h"
 #include "hash.h"
+#include "manifest.h"
 #include "murmur.h"
 #include "smallhash.h"
 #include "util/single_copy.h"
@@ -130,6 +131,11 @@ class CachePlugin {
                                         ObjectInfo *item) = 0;
   virtual cvmfs::EnumStatus ListingEnd(int64_t lst_id) = 0;
 
+  virtual cvmfs::EnumStatus LoadBreadcrumb(
+    const std::string &fqrn, manifest::Breadcrumb *breadcrumb) = 0;
+  virtual cvmfs::EnumStatus StoreBreadcrumb(
+    const std::string &fqrn, const manifest::Breadcrumb &breadcrumb) = 0;
+
  private:
   static const unsigned kDefaultMaxObjectSize = 256 * 1024;  // 256kB
   static const unsigned kListingSize = 4 * 1024 * 1024;  // 4MB
@@ -225,6 +231,10 @@ class CachePlugin {
   void HandleInfo(cvmfs::MsgInfoReq *msg_req, CacheTransport *transport);
   void HandleShrink(cvmfs::MsgShrinkReq *msg_req, CacheTransport *transport);
   void HandleList(cvmfs::MsgListReq *msg_req, CacheTransport *transport);
+  void HandleBreadcrumbStore(cvmfs::MsgBreadcrumbStoreReq *msg_req,
+                             CacheTransport *transport);
+  void HandleBreadcrumbLoad(cvmfs::MsgBreadcrumbLoadReq *msg_req,
+                            CacheTransport *transport);
   void HandleIoctl(cvmfs::MsgIoctl *msg_req);
   void SendDetachRequests();
 

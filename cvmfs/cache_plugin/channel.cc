@@ -196,6 +196,59 @@ CachePlugin::~CachePlugin() {
 }
 
 
+void CachePlugin::HandleBreadcrumbStore(
+  cvmfs::MsgBreadcrumbStoreReq *msg_req,
+  CacheTransport *transport)
+{
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  cvmfs::MsgBreadcrumbReply msg_reply;
+  CacheTransport::Frame frame_send(&msg_reply);
+
+  msg_reply.set_req_id(msg_req->req_id());
+  manifest::Breadcrumb breadcrumb;
+  bool retval = transport->ParseMsgHash(msg_req->breadcrumb().hash(),
+                                        &breadcrumb.catalog_hash);
+  if (!retval) {
+    LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
+                    "malformed hash received from client");
+    msg_reply.set_status(cvmfs::STATUS_MALFORMED);
+  } else {
+    breadcrumb.timestamp = msg_req->breadcrumb().timestamp();
+    cvmfs::EnumStatus status =
+      StoreBreadcrumb(msg_req->breadcrumb().fqrn(), breadcrumb);
+    msg_reply.set_status(status);
+  }
+  transport->SendFrame(&frame_send);
+}
+
+
+void CachePlugin::HandleBreadcrumbLoad(
+  cvmfs::MsgBreadcrumbLoadReq *msg_req,
+  CacheTransport *transport)
+{
+  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  cvmfs::MsgBreadcrumbReply msg_reply;
+  CacheTransport::Frame frame_send(&msg_reply);
+
+  msg_reply.set_req_id(msg_req->req_id());
+  manifest::Breadcrumb breadcrumb;
+  cvmfs::EnumStatus status =
+    LoadBreadcrumb(msg_req->fqrn(), &breadcrumb);
+  msg_reply.set_status(status);
+  if (status == cvmfs::STATUS_OK) {
+    assert(breadcrumb.IsValid());
+    cvmfs::MsgHash *msg_hash = new cvmfs::MsgHash();
+    transport->FillMsgHash(breadcrumb.catalog_hash, msg_hash);
+    cvmfs::MsgBreadcrumb *msg_breadcrumb = new cvmfs::MsgBreadcrumb();
+    msg_breadcrumb->set_fqrn(msg_req->fqrn());
+    msg_breadcrumb->set_allocated_hash(msg_hash);
+    msg_breadcrumb->set_timestamp(breadcrumb.timestamp);
+    msg_reply.set_allocated_breadcrumb(msg_breadcrumb);
+  }
+  transport->SendFrame(&frame_send);
+}
+
+
 void CachePlugin::HandleHandshake(
   cvmfs::MsgHandshake *msg_req,
   CacheTransport *transport)
@@ -479,6 +532,14 @@ bool CachePlugin::HandleRequest(int fd_con) {
     cvmfs::MsgListReq *msg_req =
       reinterpret_cast<cvmfs::MsgListReq *>(msg_typed);
     HandleList(msg_req, &transport);
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgBreadcrumbStoreReq") {
+    cvmfs::MsgBreadcrumbStoreReq *msg_req =
+      reinterpret_cast<cvmfs::MsgBreadcrumbStoreReq *>(msg_typed);
+    HandleBreadcrumbStore(msg_req, &transport);
+  } else if (msg_typed->GetTypeName() == "cvmfs.MsgBreadcrumbLoadReq") {
+    cvmfs::MsgBreadcrumbLoadReq *msg_req =
+      reinterpret_cast<cvmfs::MsgBreadcrumbLoadReq *>(msg_typed);
+    HandleBreadcrumbLoad(msg_req, &transport);
   } else {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "unexpected message from client: %s",
