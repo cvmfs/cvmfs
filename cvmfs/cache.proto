@@ -24,6 +24,7 @@ option optimize_for = LITE_RUNTIME;
 
 // # Protocol changelog
 // Version 1: First version
+//   2019-05-27: add breadcrumb handling
 
 
 //------------------------------------------------------------------------------
@@ -76,9 +77,11 @@ enum EnumCapabilities {
   CAP_REFCOUNT    = 2;
   CAP_SHRINK      = 4;   // clients can ask the cache to shrink
   CAP_INFO        = 8;   // cache plugin knows about its size and fill level
-  CAP_SHRINK_RATE = 16;   // cache knows number of cleanup operations
+  CAP_SHRINK_RATE = 16;  // cache knows number of cleanup operations
   CAP_LIST        = 32;  // cache can return a list of objects
   CAP_ALL_V1      = 63;
+  CAP_BREADCRUMB  = 64;  // cache can load and store breadcrumps
+  CAP_ALL_V2      = 127;
 }
 
 
@@ -94,6 +97,13 @@ message MsgListRecord {
   required MsgHash hash       = 1;
   optional bool pinned        = 2;
   optional string description = 3;
+}
+
+// Contents of the local .cvmfschecksum file
+message MsgBreadcrumb {
+  required string fqrn      = 1;
+  required MsgHash hash     = 2;
+  required uint64 timestamp = 3;
 }
 
 
@@ -297,6 +307,26 @@ message MsgListReply {
   repeated MsgListRecord list_record = 5;
 }
 
+// Request to store and load .cvmfschecksum file
+message MsgBreadcrumbStoreReq {
+  required uint64 session_id         = 1;
+  required uint64 req_id             = 2;
+  required MsgBreadcrumb breadcrumb  = 3;
+}
+
+message MsgBreadcrumbLoadReq {
+  required uint64 session_id         = 1;
+  required uint64 req_id             = 2;
+  required string fqrn               = 3;
+}
+
+message MsgBreadcrumbReply {
+  required uint64 req_id             = 1;
+  required EnumStatus status         = 2;
+  // Only set for successful load request
+  optional MsgBreadcrumb breadcrumb  = 3;
+}
+
 
 //------------------------------------------------------------------------------
 // # RPC Wrapper
@@ -305,36 +335,40 @@ message MsgListReply {
 message MsgRpc {
   oneof message_type {
     // Frequent and performance-critical calls
-    MsgRefcountReq msg_refcount_req          = 1;
-    MsgRefcountReply msg_refcount_reply      = 2;
+    MsgRefcountReq msg_refcount_req                = 1;
+    MsgRefcountReply msg_refcount_reply            = 2;
 
-    MsgReadReq msg_read_req                  = 3;
-    MsgReadReply msg_read_reply              = 4;
+    MsgReadReq msg_read_req                        = 3;
+    MsgReadReply msg_read_reply                    = 4;
 
-    MsgObjectInfoReq msg_object_info_req     = 5;
-    MsgObjectInfoReply msg_object_info_reply = 6;
+    MsgObjectInfoReq msg_object_info_req           = 5;
+    MsgObjectInfoReply msg_object_info_reply       = 6;
 
-    MsgStoreReq msg_store_req                = 7;
-    MsgStoreAbortReq msg_store_abort_req     = 8;
-    MsgStoreReply msg_store_reply            = 9;
+    MsgStoreReq msg_store_req                      = 7;
+    MsgStoreAbortReq msg_store_abort_req           = 8;
+    MsgStoreReply msg_store_reply                  = 9;
 
 
     // Rare RPCs
-    MsgHandshake msg_handshake               = 16;
-    MsgHandshakeAck msg_handshake_ack        = 17;
-    MsgQuit msg_quit                         = 18;
+    MsgHandshake msg_handshake                     = 16;
+    MsgHandshakeAck msg_handshake_ack              = 17;
+    MsgQuit msg_quit                               = 18;
 
-    MsgInfoReq msg_info_req                  = 19;
-    MsgInfoReply msg_info_reply              = 20;
+    MsgInfoReq msg_info_req                        = 19;
+    MsgInfoReply msg_info_reply                    = 20;
 
-    MsgShrinkReq msg_shrink_req              = 21;
-    MsgShrinkReply msg_shrink_reply          = 22;
+    MsgShrinkReq msg_shrink_req                    = 21;
+    MsgShrinkReply msg_shrink_reply                = 22;
 
-    MsgListReq msg_list_req                  = 23;
-    MsgListReply msg_list_reply              = 24;
+    MsgListReq msg_list_req                        = 23;
+    MsgListReply msg_list_reply                    = 24;
 
-    MsgDetach msg_detach                     = 25;
+    MsgDetach msg_detach                           = 25;
 
-    MsgIoctl msg_ioctl                       = 26;
+    MsgIoctl msg_ioctl                             = 26;
+
+    MsgBreadcrumbStoreReq msg_breadcrumb_store_req = 27;
+    MsgBreadcrumbLoadReq msg_breadcrumb_load_req   = 28;
+    MsgBreadcrumbReply msg_breadcrumb_reply        = 29;
   }
 }

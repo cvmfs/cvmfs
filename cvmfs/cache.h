@@ -14,6 +14,7 @@
 #include <string>
 
 #include "hash.h"
+#include "manifest.h"
 #include "util/pointer.h"
 
 
@@ -209,7 +210,12 @@ class CacheManager : SingleCopy {
    * cached manifest copy, the cvmfschecksum.$reponame file. This is important
    * to make pre-loaded alien caches work, even in a tiered setup.
    */
-  virtual std::string GetBackingDirectory() { return ""; }
+  virtual manifest::Breadcrumb LoadBreadcrumb(const std::string & /*fqrn*/) {
+    return manifest::Breadcrumb();
+  }
+  virtual bool StoreBreadcrumb(const manifest::Manifest &/*manifest*/) {
+    return false;
+  }
 
  protected:
   CacheManager();

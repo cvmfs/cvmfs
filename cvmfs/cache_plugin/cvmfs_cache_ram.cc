@@ -433,6 +433,28 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     return CVMCACHE_STATUS_OK;
   }
 
+
+  static int ram_breadcrumb_store(
+    const char *fqrn,
+    const cvmcache_breadcrumb *breadcrumb)
+  {
+    Me()->breadcrumbs_[fqrn] = *breadcrumb;
+    return CVMCACHE_STATUS_OK;
+  }
+
+
+  static int ram_breadcrumb_load(
+    const char *fqrn,
+    cvmcache_breadcrumb *breadcrumb)
+  {
+    map<std::string, cvmcache_breadcrumb>::const_iterator itr =
+      Me()->breadcrumbs_.find(fqrn);
+    if (itr == Me()->breadcrumbs_.end())
+      return CVMCACHE_STATUS_NOENTRY;
+    *breadcrumb = itr->second;
+    return CVMCACHE_STATUS_OK;
+  }
+
  private:
   static const uint64_t kMinSize;  // 100 * 1024 * 1024;
   static const double kShrinkFactor;  //  = 0.75;
@@ -586,6 +608,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   SmallHashDynamic<uint64_t, Listing *> listings_;
   lru::LruCache<ComparableHash, ObjectHeader *> *objects_all_;
   lru::LruCache<ComparableHash, ObjectHeader *> *objects_volatile_;
+  map<std::string, cvmcache_breadcrumb> breadcrumbs_;
   MallocHeap *storage_;
   bool in_danger_zone_;
 };  // class PluginRamCache
@@ -657,7 +680,9 @@ int main(int argc, char **argv) {
   callbacks.cvmcache_listing_begin = plugin->ram_listing_begin;
   callbacks.cvmcache_listing_next = plugin->ram_listing_next;
   callbacks.cvmcache_listing_end = plugin->ram_listing_end;
-  callbacks.capabilities = CVMCACHE_CAP_ALL_V1;
+  callbacks.cvmcache_breadcrumb_store = plugin->ram_breadcrumb_store;
+  callbacks.cvmcache_breadcrumb_load = plugin->ram_breadcrumb_load;
+  callbacks.capabilities = CVMCACHE_CAP_ALL_V2;
 
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, locator);

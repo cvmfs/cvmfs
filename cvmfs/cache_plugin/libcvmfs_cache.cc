@@ -18,6 +18,7 @@
 #include "cache_plugin/channel.h"
 #include "cache_transport.h"
 #include "hash.h"
+#include "manifest.h"
 #include "monitor.h"
 #include "util/pointer.h"
 
@@ -76,6 +77,10 @@ class ForwardCachePlugin : public CachePlugin {
       assert(callbacks->cvmcache_listing_begin != NULL);
       assert(callbacks->cvmcache_listing_next != NULL);
       assert(callbacks->cvmcache_listing_end != NULL);
+    }
+    if (callbacks->capabilities & CVMCACHE_CAP_BREADCRUMB) {
+      assert(callbacks->cvmcache_breadcrumb_store != NULL);
+      assert(callbacks->cvmcache_breadcrumb_load != NULL);
     }
   }
   virtual ~ForwardCachePlugin() { }
@@ -238,6 +243,36 @@ class ForwardCachePlugin : public CachePlugin {
       return cvmfs::STATUS_NOSUPPORT;
 
     int result = callbacks_.cvmcache_listing_end(lst_id);
+    return static_cast<cvmfs::EnumStatus>(result);
+  }
+
+  virtual cvmfs::EnumStatus LoadBreadcrumb(
+    const std::string &fqrn, manifest::Breadcrumb *breadcrumb)
+  {
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_BREADCRUMB))
+      return cvmfs::STATUS_NOSUPPORT;
+
+    cvmcache_breadcrumb c_breadcrumb;
+    int result =
+      callbacks_.cvmcache_breadcrumb_load(fqrn.c_str(), &c_breadcrumb);
+    if (result == CVMCACHE_STATUS_OK) {
+      breadcrumb->catalog_hash = Chash2Cpphash(&c_breadcrumb.catalog_hash);
+      breadcrumb->timestamp = c_breadcrumb.timestamp;
+    }
+    return static_cast<cvmfs::EnumStatus>(result);
+  }
+
+  virtual cvmfs::EnumStatus StoreBreadcrumb(
+    const std::string &fqrn, const manifest::Breadcrumb &breadcrumb)
+  {
+    if (!(callbacks_.capabilities & CVMCACHE_CAP_BREADCRUMB))
+      return cvmfs::STATUS_NOSUPPORT;
+
+    cvmcache_breadcrumb c_breadcrumb;
+    c_breadcrumb.catalog_hash = Cpphash2Chash(breadcrumb.catalog_hash);
+    c_breadcrumb.timestamp = breadcrumb.timestamp;
+    int result =
+      callbacks_.cvmcache_breadcrumb_store(fqrn.c_str(), &c_breadcrumb);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 

@@ -34,36 +34,55 @@ class T_Manifest : public ::testing::Test {
 };
 
 
-TEST_F(T_Manifest, ReadChecksum) {
-  shash::Any retrieved_hash;
-  uint64_t last_modified = 0;
+TEST_F(T_Manifest, Breadcrumb) {
+  EXPECT_FALSE(Breadcrumb().IsValid());
+  EXPECT_FALSE(Breadcrumb(shash::Any(shash::kSha1), 0).IsValid());
+  EXPECT_FALSE(Breadcrumb(shash::Any(shash::kShake128), 1).IsValid());
+  shash::Any rnd_hash(shash::kRmd160);
+  rnd_hash.Randomize();
+  EXPECT_FALSE(Breadcrumb(rnd_hash, 0).IsValid());
+  EXPECT_TRUE(Breadcrumb(rnd_hash, 1).IsValid());
+
+  EXPECT_FALSE(Breadcrumb("").IsValid());
+  EXPECT_FALSE(Breadcrumb("0").IsValid());
+  EXPECT_FALSE(Breadcrumb("T").IsValid());
+  EXPECT_FALSE(Breadcrumb("TTT").IsValid());
+  EXPECT_FALSE(Breadcrumb("T0").IsValid());
+  EXPECT_FALSE(Breadcrumb("T1").IsValid());
+  EXPECT_FALSE(Breadcrumb("0T").IsValid());
+  EXPECT_TRUE(
+    Breadcrumb("0000000000000000000000000000000000000001T1").IsValid());
   EXPECT_FALSE(
-    Manifest::ReadChecksum("test", tmp_path_, &retrieved_hash, &last_modified));
+    Breadcrumb("0000000000000000000000000000000000000001T0").IsValid());
+}
+
+
+TEST_F(T_Manifest, ReadBreadcrumb) {
+  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_).IsValid());
 
   shash::Any rnd_hash(shash::kRmd160);
   rnd_hash.Randomize();
   FILE *f = fopen((tmp_path_ + "/cvmfschecksum.test").c_str(), "w");
   ASSERT_TRUE(f != NULL);
 
-  EXPECT_FALSE(
-    Manifest::ReadChecksum("test", tmp_path_, &retrieved_hash, &last_modified));
+  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_).IsValid());
 
   fwrite(rnd_hash.ToString().data(), 1, rnd_hash.ToString().length(), f);
   fflush(f);
-  EXPECT_FALSE(
-    Manifest::ReadChecksum("test", tmp_path_, &retrieved_hash, &last_modified));
+  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_).IsValid());
 
   fwrite("T", 1, 1, f);
   fflush(f);
-  EXPECT_FALSE(
-    Manifest::ReadChecksum("test", tmp_path_, &retrieved_hash, &last_modified));
+  EXPECT_FALSE(Manifest::ReadBreadcrumb("test", tmp_path_).IsValid());
 
   fwrite("42", 2, 1, f);
   fflush(f);
-  EXPECT_TRUE(
-    Manifest::ReadChecksum("test", tmp_path_, &retrieved_hash, &last_modified));
-  EXPECT_EQ(rnd_hash, retrieved_hash);
-  EXPECT_EQ(42U, last_modified);
+
+  Breadcrumb breadcrumb = Manifest::ReadBreadcrumb("test", tmp_path_);
+  EXPECT_TRUE(breadcrumb.IsValid());
+  EXPECT_TRUE(breadcrumb.IsValid());
+  EXPECT_EQ(rnd_hash, breadcrumb.catalog_hash);
+  EXPECT_EQ(42U, breadcrumb.timestamp);
 
   fclose(f);
 }

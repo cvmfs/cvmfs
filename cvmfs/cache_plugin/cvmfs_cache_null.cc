@@ -60,6 +60,7 @@ struct ComparableHash {
 map<uint64_t, TxnInfo> transactions;
 map<ComparableHash, Object> storage;
 map<uint64_t, Listing> listings;
+map<std::string, cvmcache_breadcrumb> breadcrumbs;
 
 struct cvmcache_context *ctx;
 
@@ -265,6 +266,26 @@ static int null_listing_end(int64_t listing_id) {
   return CVMCACHE_STATUS_OK;
 }
 
+static int null_breadcrumb_store(
+  const char *fqrn,
+  const cvmcache_breadcrumb *breadcrumb)
+{
+  breadcrumbs[fqrn] = *breadcrumb;
+  return CVMCACHE_STATUS_OK;
+}
+
+static int null_breadcrumb_load(
+  const char *fqrn,
+  cvmcache_breadcrumb *breadcrumb)
+{
+  map<std::string, cvmcache_breadcrumb>::const_iterator itr =
+    breadcrumbs.find(fqrn);
+  if (itr == breadcrumbs.end())
+    return CVMCACHE_STATUS_NOENTRY;
+  *breadcrumb = itr->second;
+  return CVMCACHE_STATUS_OK;
+}
+
 static void Usage(const char *progname) {
   printf("%s <config file>\n", progname);
 }
@@ -308,7 +329,9 @@ int main(int argc, char **argv) {
   callbacks.cvmcache_listing_begin = null_listing_begin;
   callbacks.cvmcache_listing_next = null_listing_next;
   callbacks.cvmcache_listing_end = null_listing_end;
-  callbacks.capabilities = CVMCACHE_CAP_ALL_V1;
+  callbacks.cvmcache_breadcrumb_store = null_breadcrumb_store;
+  callbacks.cvmcache_breadcrumb_load = null_breadcrumb_load;
+  callbacks.capabilities = CVMCACHE_CAP_ALL_V2;
 
   ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(ctx, locator);

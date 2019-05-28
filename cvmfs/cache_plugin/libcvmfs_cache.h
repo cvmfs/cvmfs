@@ -11,7 +11,9 @@
 //   - Add CVMCACHE_CAP_WRITE capability, adjust other capability constants
 // 2 --> 3:
 //   - Add cvmcache_get_session()
-#define LIBCVMFS_CACHE_REVISION 3
+// 3 --> 4:
+//   - Add breadcrumb management
+#define LIBCVMFS_CACHE_REVISION 4
 
 #include <stdint.h>
 
@@ -67,9 +69,11 @@ enum cvmcache_capabilities {
   CVMCACHE_CAP_REFCOUNT    = 2,
   CVMCACHE_CAP_SHRINK      = 4,   // clients can ask the cache to shrink
   CVMCACHE_CAP_INFO        = 8,   // cache plugin knows about its fill level
-  CVMCACHE_CAP_SHRINK_RATE = 16,   // cache knows number of cleanup operations
+  CVMCACHE_CAP_SHRINK_RATE = 16,  // cache knows number of cleanup operations
   CVMCACHE_CAP_LIST        = 32,  // cache can return a list of objects
-  CVMCACHE_CAP_ALL_V1      = 63
+  CVMCACHE_CAP_ALL_V1      = 63,
+  CVMCACHE_CAP_BREADCRUMB  = 64,  // cache can load and store breadcrumps
+  CVMCACHE_CAP_ALL_V2      = 127,
 };
 
 #define CVMCACHE_SIZE_UNKNOWN (uint64_t(-1))
@@ -100,6 +104,11 @@ struct cvmcache_session {
   uint64_t id;
   char *repository_name;
   char *client_instance;
+};
+
+struct cvmcache_breadcrumb {
+  struct cvmcache_hash catalog_hash;
+  uint64_t timestamp;
 };
 
 /**
@@ -162,6 +171,11 @@ struct cvmcache_callbacks {
   int (*cvmcache_listing_next)(int64_t lst_id,
                                struct cvmcache_object_info *item);
   int (*cvmcache_listing_end)(int64_t lst_id);
+
+  int (*cvmcache_breadcrumb_store)(const char *fqrn,
+                                   const cvmcache_breadcrumb *breadcrumb);
+  int (*cvmcache_breadcrumb_load)(const char *fqrn,
+                                  cvmcache_breadcrumb *breadcrumb);
 
   int capabilities;
 };

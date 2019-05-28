@@ -16,6 +16,23 @@
 namespace manifest {
 
 /**
+ * The breadcrumb stores the catalog root hash and a time stamp.  It is used
+ * to store the last known copy of the catalog in the cache.
+ */
+struct Breadcrumb {
+  Breadcrumb() : catalog_hash(), timestamp(0) {}
+  Breadcrumb(const shash::Any &h, uint64_t t) : catalog_hash(h), timestamp(t) {}
+  explicit Breadcrumb(const std::string &from_string);
+
+  std::string ToString() const;
+  bool IsValid() const { return !catalog_hash.IsNull() && (timestamp > 0); }
+
+  shash::Any catalog_hash;
+  uint64_t timestamp;
+};
+
+
+/**
  * The Manifest is the bootstrap snippet for a repository.  It is stored in
  * .cvmfspublished.
  */
@@ -57,11 +74,9 @@ class Manifest {
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
-  bool ExportChecksum(const std::string &directory, const int mode) const;
-  static bool ReadChecksum(const std::string &repo_name,
-                           const std::string &directory,
-                           shash::Any *hash,
-                           uint64_t *last_modified);
+  bool ExportBreadcrumb(const std::string &directory, const int mode) const;
+  static Breadcrumb ReadBreadcrumb(const std::string &repo_name,
+                                   const std::string &directory);
 
   shash::Algorithms GetHashAlgorithm() const { return catalog_hash_.algorithm; }
 

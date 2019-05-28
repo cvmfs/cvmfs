@@ -128,6 +128,9 @@ void CacheTransport::Frame::Release() {
   msg_rpc_.release_msg_list_req();
   msg_rpc_.release_msg_list_reply();
   msg_rpc_.release_msg_detach();
+  msg_rpc_.release_msg_breadcrumb_store_req();
+  msg_rpc_.release_msg_breadcrumb_load_req();
+  msg_rpc_.release_msg_breadcrumb_reply();
 }
 
 
@@ -200,6 +203,15 @@ void CacheTransport::Frame::WrapMsg() {
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgListReply") {
     msg_rpc_.set_allocated_msg_list_reply(
       reinterpret_cast<cvmfs::MsgListReply *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgBreadcrumbStoreReq") {
+    msg_rpc_.set_allocated_msg_breadcrumb_store_req(
+      reinterpret_cast<cvmfs::MsgBreadcrumbStoreReq *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgBreadcrumbLoadReq") {
+    msg_rpc_.set_allocated_msg_breadcrumb_load_req(
+      reinterpret_cast<cvmfs::MsgBreadcrumbLoadReq *>(msg_typed_));
+  } else if (msg_typed_->GetTypeName() == "cvmfs.MsgBreadcrumbReply") {
+    msg_rpc_.set_allocated_msg_breadcrumb_reply(
+      reinterpret_cast<cvmfs::MsgBreadcrumbReply *>(msg_typed_));
   } else if (msg_typed_->GetTypeName() == "cvmfs.MsgDetach") {
     msg_rpc_.set_allocated_msg_detach(
       reinterpret_cast<cvmfs::MsgDetach *>(msg_typed_));
@@ -251,6 +263,12 @@ void CacheTransport::Frame::UnwrapMsg() {
     msg_typed_ = msg_rpc_.mutable_msg_list_req();
   } else if (msg_rpc_.has_msg_list_reply()) {
     msg_typed_ = msg_rpc_.mutable_msg_list_reply();
+  } else if (msg_rpc_.has_msg_breadcrumb_store_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_breadcrumb_store_req();
+  } else if (msg_rpc_.has_msg_breadcrumb_load_req()) {
+    msg_typed_ = msg_rpc_.mutable_msg_breadcrumb_load_req();
+  } else if (msg_rpc_.has_msg_breadcrumb_reply()) {
+    msg_typed_ = msg_rpc_.mutable_msg_breadcrumb_reply();
   } else if (msg_rpc_.has_msg_detach()) {
     msg_typed_ = msg_rpc_.mutable_msg_detach();
     is_msg_out_of_band_ = true;

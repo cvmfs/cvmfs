@@ -128,34 +128,6 @@ CacheManager *TieredCacheManager::Create(
   delete cache_mgr->quota_mgr_;
   cache_mgr->quota_mgr_ = upper_cache->quota_mgr();
 
-  // The backing directory for the tiered cache manager is tricky.  If there is
-  // only one backing directory set, take it.  If both layers have backing
-  // directories, prefer the upper layer unless the lower layer provides a
-  // .cvmfschecksum... file
-  if (upper_cache->GetBackingDirectory().empty() &&
-      !lower_cache->GetBackingDirectory().empty())
-  {
-    cache_mgr->backing_directory_ = lower_cache->GetBackingDirectory();
-  } else if (!upper_cache->GetBackingDirectory().empty() &&
-             lower_cache->GetBackingDirectory().empty())
-  {
-    cache_mgr->backing_directory_ = upper_cache->GetBackingDirectory();
-  } else if (!upper_cache->GetBackingDirectory().empty() &&
-             !lower_cache->GetBackingDirectory().empty())
-  {
-    if (!FindFilesByPrefix(upper_cache->GetBackingDirectory(),
-                           "cvmfschecksum.").empty())
-    {
-      cache_mgr->backing_directory_ = upper_cache->GetBackingDirectory();
-    } else if (!FindFilesByPrefix(lower_cache->GetBackingDirectory(),
-                                  "cvmfschecksum.").empty())
-    {
-      cache_mgr->backing_directory_ = lower_cache->GetBackingDirectory();
-    } else {
-      cache_mgr->backing_directory_ = upper_cache->GetBackingDirectory();
-    }
-  }
-
   return cache_mgr;
 }
 
@@ -218,6 +190,24 @@ int TieredCacheManager::CommitTxn(void *txn) {
   }
 
   return (upper_result < 0) ? upper_result : lower_result;
+}
+
+
+manifest::Breadcrumb TieredCacheManager::LoadBreadcrumb(const std::string &fqrn)
+{
+  manifest::Breadcrumb breadcrumb = upper_->LoadBreadcrumb(fqrn);
+  if (!breadcrumb.IsValid())
+    breadcrumb = lower_->LoadBreadcrumb(fqrn);
+  return breadcrumb;
+}
+
+
+bool TieredCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
+  bool upper_success = upper_->StoreBreadcrumb(manifest);
+  bool lower_success = true;
+  if (!lower_readonly_)
+    lower_success = lower_->StoreBreadcrumb(manifest);
+  return upper_success && lower_success;
 }
 
 
