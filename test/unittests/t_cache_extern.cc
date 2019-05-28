@@ -15,6 +15,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -38,7 +39,7 @@ class MockCachePlugin : public CachePlugin {
 
   MockCachePlugin(const string &socket_path, bool read_only)
     : CachePlugin(read_only ? (cvmfs::CAP_ALL_V1 & ~cvmfs::CAP_WRITE)
-                            : cvmfs::CAP_ALL_V1)
+                            : cvmfs::CAP_ALL_V2)
   {
     bool retval = Listen("unix=" + socket_path);
     assert(retval);
@@ -74,6 +75,7 @@ class MockCachePlugin : public CachePlugin {
   uint64_t last_id;
   char *last_reponame;
   char *last_client_instance;
+  std::map<std::string, manifest::Breadcrumb> breadcrumbs;
 
  protected:
   virtual cvmfs::EnumStatus ChangeRefcount(
@@ -208,6 +210,24 @@ class MockCachePlugin : public CachePlugin {
   virtual cvmfs::EnumStatus ListingEnd(int64_t lst_id) {
     return cvmfs::STATUS_OK;
   }
+
+  virtual cvmfs::EnumStatus LoadBreadcrumb(
+    const std::string &fqrn, manifest::Breadcrumb *breadcrumb)
+  {
+    map<std::string, manifest::Breadcrumb>::const_iterator itr =
+      breadcrumbs.find(fqrn);
+    if (itr == breadcrumbs.end())
+      return cvmfs::STATUS_NOENTRY;
+    *breadcrumb = itr->second;
+    return cvmfs::STATUS_OK;
+  }
+
+  virtual cvmfs::EnumStatus StoreBreadcrumb(
+    const std::string &fqrn, const manifest::Breadcrumb &breadcrumb)
+  {
+    breadcrumbs[fqrn] = breadcrumb;
+    return cvmfs::STATUS_OK;
+  }
 };
 
 const unsigned MockCachePlugin::kMockCacheSize = 10 * 1024 * 1024;
@@ -251,7 +271,6 @@ const unsigned T_ExternalCacheManager::nfiles = 128;
 TEST_F(T_ExternalCacheManager, Connection) {
   EXPECT_GE(cache_mgr_->session_id(), 0);
   EXPECT_EQ(getpid(), cache_mgr_->quota_mgr()->GetPid());
-  EXPECT_TRUE(cache_mgr_->GetBackingDirectory().empty());
 
   // Invalid query for session information outside callback
   uint64_t id;
@@ -554,6 +573,24 @@ TEST_F(T_ExternalCacheManager, Listing) {
   EXPECT_EQ(empty, quota_mgr_->ListCatalogs());
   EXPECT_EQ(empty, quota_mgr_->ListVolatile());
   EXPECT_EQ(empty, quota_mgr_->ListPinned());
+}
+
+TEST_F(T_ExternalCacheManager, Breadcrumbs) {
+  manifest::Breadcrumb breadcrumb;
+  breadcrumb = cache_mgr_->LoadBreadcrumb("test");
+  EXPECT_FALSE(breadcrumb.IsValid());
+
+  shash::Any hash(shash::kShake128);
+  hash.Randomize();
+  manifest::Manifest manifest(hash, 1, "");
+  manifest.set_repository_name("test");
+  manifest.set_publish_timestamp(1);
+  EXPECT_TRUE(cache_mgr_->StoreBreadcrumb(manifest));
+
+  breadcrumb = cache_mgr_->LoadBreadcrumb("test");
+  EXPECT_TRUE(breadcrumb.IsValid());
+  EXPECT_EQ(hash, breadcrumb.catalog_hash);
+  EXPECT_EQ(1U, breadcrumb.timestamp);
 }
 
 namespace {

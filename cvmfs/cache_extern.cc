@@ -510,6 +510,8 @@ void *ExternalCacheManager::MainRead(void *data) {
       req_id = reinterpret_cast<cvmfs::MsgShrinkReply *>(msg)->req_id();
     } else if (msg->GetTypeName() == "cvmfs.MsgListReply") {
       req_id = reinterpret_cast<cvmfs::MsgListReply *>(msg)->req_id();
+    } else if (msg->GetTypeName() == "cvmfs.MsgBreadcrumbReply") {
+      req_id = reinterpret_cast<cvmfs::MsgBreadcrumbReply *>(msg)->req_id();
     } else if (msg->GetTypeName() == "cvmfs.MsgDetach") {
       // Release pinned catalogs
       cache_mgr->quota_mgr_->BroadcastBackchannels("R");
@@ -655,6 +657,57 @@ int ExternalCacheManager::Reset(void *txn) {
   transaction->transaction_id = NextRequestId();
   transaction->flushed = false;
   return Ack2Errno(msg_reply->status());
+}
+
+
+manifest::Breadcrumb ExternalCacheManager::LoadBreadcrumb(
+  const std::string &fqrn)
+{
+  if (!(capabilities_ & cvmfs::CAP_BREADCRUMB))
+    return manifest::Breadcrumb();
+
+  cvmfs::MsgBreadcrumbLoadReq msg_breadcrumb_load;
+  msg_breadcrumb_load.set_session_id(session_id_);
+  msg_breadcrumb_load.set_req_id(NextRequestId());
+  msg_breadcrumb_load.set_fqrn(fqrn);
+  RpcJob rpc_job(&msg_breadcrumb_load);
+  CallRemotely(&rpc_job);
+
+  manifest::Breadcrumb breadcrumb;
+  cvmfs::MsgBreadcrumbReply *msg_reply = rpc_job.msg_breadcrumb_reply();
+  if (msg_reply->status() == cvmfs::STATUS_OK) {
+    assert(msg_reply->has_breadcrumb());
+    assert(msg_reply->breadcrumb().fqrn() == fqrn);
+    bool rv = transport_.ParseMsgHash(msg_reply->breadcrumb().hash(),
+                                      &breadcrumb.catalog_hash);
+    assert(rv);
+    breadcrumb.timestamp = msg_reply->breadcrumb().timestamp();
+  }
+  return breadcrumb;
+}
+
+
+bool ExternalCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
+  if (!(capabilities_ & cvmfs::CAP_BREADCRUMB))
+    return false;
+
+  cvmfs::MsgHash hash;
+  transport_.FillMsgHash(manifest.catalog_hash(), &hash);
+  cvmfs::MsgBreadcrumb breadcrumb;
+  breadcrumb.set_fqrn(manifest.repository_name());
+  breadcrumb.set_allocated_hash(&hash);
+  breadcrumb.set_timestamp(manifest.publish_timestamp());
+  cvmfs::MsgBreadcrumbStoreReq msg_breadcrumb_store;
+  msg_breadcrumb_store.set_session_id(session_id_);
+  msg_breadcrumb_store.set_req_id(NextRequestId());
+  msg_breadcrumb_store.set_allocated_breadcrumb(&breadcrumb);
+  RpcJob rpc_job(&msg_breadcrumb_store);
+  CallRemotely(&rpc_job);
+  msg_breadcrumb_store.release_breadcrumb();
+  breadcrumb.release_hash();
+
+  cvmfs::MsgBreadcrumbReply *msg_reply = rpc_job.msg_breadcrumb_reply();
+  return msg_reply->status() == cvmfs::STATUS_OK;
 }
 
 

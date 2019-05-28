@@ -884,7 +884,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     }
 
     if (preload_cache) {
-      bool retval = ensemble.manifest->ExportChecksum(*preload_cachedir, 0660);
+      bool retval =
+        ensemble.manifest->ExportBreadcrumb(*preload_cachedir, 0660);
       assert(retval);
     } else {
       // pkcs#7 structure contains content + certificate + signature

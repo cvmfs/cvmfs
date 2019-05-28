@@ -216,7 +216,7 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
       fs->cache_mgr())->upper_->id());
     EXPECT_EQ(kPosixCacheManager, reinterpret_cast<TieredCacheManager *>(
       fs->cache_mgr())->lower_->id());
-    EXPECT_EQ(".", fs->cache_mgr()->GetBackingDirectory());
+    EXPECT_FALSE(fs->cache_mgr()->LoadBreadcrumb(fs_info_.name).IsValid());
   }
 
   options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "ram_lower");
@@ -271,16 +271,7 @@ TEST_F(T_MountPoint, TieredComplex) {
     EXPECT_EQ(kRamCacheManager, upper->lower_->id());
     EXPECT_EQ(kPosixCacheManager, lower->upper_->id());
     EXPECT_EQ(kPosixCacheManager, lower->lower_->id());
-    EXPECT_EQ(tmp_path_ + "/lu/unit-test",
-              fs->cache_mgr()->GetBackingDirectory());
-  }
-
-  CreateFile(tmp_path_ + "/ll/unit-test/cvmfschecksum.unit-test", 0600);
-  {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
-    EXPECT_EQ(loader::kFailOk, fs->boot_status()) << fs->boot_error();
-    EXPECT_EQ(tmp_path_ + "/ll/unit-test",
-              fs->cache_mgr()->GetBackingDirectory());
+    EXPECT_FALSE(fs->cache_mgr()->LoadBreadcrumb(fs_info_.name).IsValid());
   }
 }
 
@@ -324,7 +315,6 @@ TEST_F(T_MountPoint, CacheSettings) {
     EXPECT_EQ(tmp_path_ + "/alien",
               reinterpret_cast<PosixCacheManager *>(
                 fs->cache_mgr())->cache_path());
-    EXPECT_EQ(tmp_path_ + "/alien", fs->cache_mgr()->GetBackingDirectory());
   }
 
   fs_info_.type = FileSystem::kFsFuse;
@@ -335,7 +325,6 @@ TEST_F(T_MountPoint, CacheSettings) {
     EXPECT_EQ(tmp_path_ + "/alien",
               reinterpret_cast<PosixCacheManager *>(
                 fs->cache_mgr())->cache_path());
-    EXPECT_EQ(tmp_path_ + "/alien", fs->cache_mgr()->GetBackingDirectory());
   }
 
   RemoveTree(tmp_path_ + "/unit-test");
@@ -351,7 +340,6 @@ TEST_F(T_MountPoint, CacheSettings) {
       fs->cache_mgr())->cache_path());
     EXPECT_EQ(".", fs->workspace());
     EXPECT_EQ(tmp_path_ + "/nfs", fs->nfs_maps_dir_);
-    EXPECT_EQ(".", fs->cache_mgr()->GetBackingDirectory());
   }
 
   options_mgr_.SetValue("CVMFS_CACHE_DIR", tmp_path_ + "/cachedir_direct");
@@ -363,7 +351,6 @@ TEST_F(T_MountPoint, CacheSettings) {
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
-    EXPECT_EQ(".", fs->cache_mgr()->GetBackingDirectory());
   }
 }
 
@@ -481,6 +468,7 @@ TEST_F(T_MountPoint, MountLatest) {
     UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     EXPECT_EQ(root_hash, mp->catalog_mgr()->GetRootHash().ToString());
+    EXPECT_TRUE(fs->cache_mgr()->LoadBreadcrumb("keys.cern.ch").IsValid());
   }
 
   // Again to check proper cleanup

@@ -406,3 +406,27 @@ TEST_F(T_CachePlugin, List) {
     EXPECT_EQ(0, cache_mgr_->Close(*i));
   }
 }
+
+
+TEST_F(T_CachePlugin, Breadcrumbs) {
+  if (!(cache_mgr_->capabilities() & cvmfs::CAP_BREADCRUMB)) {
+    printf("Skipping\n");
+    return;
+  }
+
+  manifest::Breadcrumb breadcrumb;
+  breadcrumb = cache_mgr_->LoadBreadcrumb("test");
+  EXPECT_FALSE(breadcrumb.IsValid());
+
+  shash::Any hash(shash::kShake128);
+  hash.Randomize();
+  manifest::Manifest manifest(hash, 1, "");
+  manifest.set_repository_name("test");
+  manifest.set_publish_timestamp(1);
+  EXPECT_TRUE(cache_mgr_->StoreBreadcrumb(manifest));
+
+  breadcrumb = cache_mgr_->LoadBreadcrumb("test");
+  EXPECT_TRUE(breadcrumb.IsValid());
+  EXPECT_EQ(hash, breadcrumb.catalog_hash);
+  EXPECT_EQ(1U, breadcrumb.timestamp);
+}

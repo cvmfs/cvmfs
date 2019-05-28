@@ -138,15 +138,14 @@ LoadError ClientCatalogManager::LoadCatalog(
   }
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
-  string checksum_dir = fetcher_->cache_mgr()->GetBackingDirectory();
-  if (checksum_dir.empty())
-    checksum_dir = ".";
   shash::Any cache_hash(shash::kSha1, shash::kSuffixCatalog);
   uint64_t cache_last_modified = 0;
 
-  retval = manifest::Manifest::ReadChecksum(
-    repo_name_, checksum_dir, &cache_hash, &cache_last_modified);
+  manifest::Breadcrumb breadcrumb =
+    fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
   if (retval) {
+    cache_hash = breadcrumb.catalog_hash;
+    cache_last_modified = breadcrumb.timestamp;
     LogCvmfs(kLogCache, kLogDebug, "cached copy publish date %s (hash %s)",
              StringifyTime(cache_last_modified, true).c_str(),
              cache_hash.ToString().c_str());
@@ -231,7 +230,7 @@ LoadError ClientCatalogManager::LoadCatalog(
   fetcher_->cache_mgr()->CommitFromMem(ensemble.manifest->certificate(),
                                        ensemble.cert_buf, ensemble.cert_size,
                                        "certificate for " + repo_name_);
-  ensemble.manifest->ExportChecksum(workspace_, 0600);
+  fetcher_->cache_mgr()->StoreBreadcrumb(*ensemble.manifest);
   return catalog::kLoadNew;
 }
 
