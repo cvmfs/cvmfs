@@ -250,7 +250,7 @@ TEST_F(T_Libcvmfs, Attachv2) {
   cvmfs_options_fini(opts);
 }
 
-TEST_F(T_Libcvmfs, Templating) {
+TEST_F(T_Libcvmfs, TemplatingSlow) {
   cvmfs_option_map *opts = cvmfs_options_init();
 
   cvmfs_options_set(opts, "CVMFS_CACHE_DIR", "/tmp/@org@/");
