@@ -115,7 +115,6 @@ LoadError ClientCatalogManager::LoadCatalog(
   string cvmfs_path = "file catalog at " + repo_name_ + ":" +
     (mountpoint.IsEmpty() ?
       "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
-  bool retval;
 
   // send the catalog hash to a blind memory position if it zero (save some ifs)
   shash::Any blind_hash;
@@ -143,7 +142,7 @@ LoadError ClientCatalogManager::LoadCatalog(
 
   manifest::Breadcrumb breadcrumb =
     fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
-  if (retval) {
+  if (breadcrumb.IsValid()) {
     cache_hash = breadcrumb.catalog_hash;
     cache_last_modified = breadcrumb.timestamp;
     LogCvmfs(kLogCache, kLogDebug, "cached copy publish date %s (hash %s)",
