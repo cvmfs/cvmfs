@@ -398,18 +398,23 @@ bool GetLineFd(const int fd, std::string *line) {
 /**
  * Removes leading and trailing whitespaces.
  */
-string Trim(const string &raw) {
+string Trim(const string &raw, bool trim_newline) {
   if (raw.empty()) return "";
 
   unsigned start_pos = 0;
   for (; (start_pos < raw.length()) &&
-         (raw[start_pos] == ' ' || raw[start_pos] == '\t');
-       ++start_pos) {
+         (raw[start_pos] == ' ' || raw[start_pos] == '\t' ||
+         (trim_newline && (raw[start_pos] == '\n' || raw[start_pos] == '\r')));
+       ++start_pos)
+  {
   }
   unsigned end_pos = raw.length() - 1;  // at least one character in raw
   for (;
-       (end_pos >= start_pos) && (raw[end_pos] == ' ' || raw[end_pos] == '\t');
-       --end_pos) {
+       (end_pos >= start_pos) &&
+         (raw[end_pos] == ' ' || raw[end_pos] == '\t' ||
+         (trim_newline && (raw[end_pos] == '\n' || raw[end_pos] == '\r')));
+       --end_pos)
+  {
   }
 
   return raw.substr(start_pos, end_pos - start_pos + 1);

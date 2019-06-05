@@ -49,7 +49,7 @@ bool ParseKeyvalPath(const std::string &filename,
 std::string GetLineMem(const char *text, const int text_size);
 bool GetLineFile(FILE *f, std::string *line);
 bool GetLineFd(const int fd, std::string *line);
-std::string Trim(const std::string &raw);
+std::string Trim(const std::string &raw, bool trim_newline = false);
 std::string ToUpper(const std::string &mixed_case);
 std::string ReplaceAll(const std::string &haystack, const std::string &needle,
                        const std::string &replace_by);

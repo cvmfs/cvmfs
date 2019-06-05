@@ -43,7 +43,7 @@ void S3FanoutManager::DetectThrottleIndicator(
   if (HasPrefix(header, "x-retry-in:", true))
     value_str = header.substr(11);
 
-  value_str = Trim(value_str);
+  value_str = Trim(value_str, true /* trim_newline */);
   if (!value_str.empty()) {
     unsigned value_numeric = String2Uint64(value_str);
     unsigned value_ms =
