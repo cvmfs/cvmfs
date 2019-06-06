@@ -814,10 +814,14 @@ int FuseMain(int argc, char *argv[]) {
     if (retval == -2) {
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running under valgrind");
     } else if (retval == -1) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to set maximum number of open files, "
-               "insufficient permissions");
-      return kFailPermission;
+      unsigned soft_limit, hard_limit;
+      GetLimitNoFile(&soft_limit, &hard_limit);
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogWarn,
+               "Failed to set requested number of open files, "
+               "using maximum number %u", hard_limit);
+      if (hard_limit > soft_limit) {
+        (void) SetLimitNoFile(hard_limit);
+      }
     }
   }
 
