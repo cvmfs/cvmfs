@@ -334,6 +334,13 @@ int main(int argc, char **argv) {
   string cvmfs_user;
   string cachedir;
   string workspace;
+  bool premounted = (mountpoint.substr(0, 8) == "/dev/fd/");
+  int premounted_fd;
+  int *premounted_fdp = NULL;
+  if (premounted) {
+    premounted_fd = String2Int64(mountpoint.substr(8, string::npos));
+    premounted_fdp = &premounted_fd;
+  }
   // Environment checks
   retval = WaitForReload(mountpoint);
   if (!retval) return 1;
@@ -343,8 +350,10 @@ int main(int argc, char **argv) {
   dedicated_cachedir = (retval && (cachedir != workspace));
   retval = GetCvmfsUser(&cvmfs_user);
   if (!retval) return 1;
-  retval = CheckFuse();
-  if (!retval) return 1;
+  if (!premounted) {
+    retval = CheckFuse();
+    if (!retval) return 1;
+  }
   retval = CheckStrictMount(fqrn);
   if (!retval) return 1;
   retval = CheckProxy();
@@ -378,13 +387,16 @@ int main(int argc, char **argv) {
   gid_t gid_cvmfs;
   gid_t gid_fuse;
   bool has_fuse_group = false;
-  retval = GetUidOf(cvmfs_user, &uid_cvmfs, &gid_cvmfs);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to find user %s in passwd database",
-             cvmfs_user.c_str());
-    return 1;
+  if (!premounted) {
+    retval = GetUidOf(cvmfs_user, &uid_cvmfs, &gid_cvmfs);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to find user %s in passwd database",
+               cvmfs_user.c_str());
+      return 1;
+    }
+    has_fuse_group = GetGidOf("fuse", &gid_fuse);
   }
-  has_fuse_group = GetGidOf("fuse", &gid_fuse);
 
   // Prepare workspace and cache directory
   retval = MkdirDeep(workspace, 0755, false);
@@ -406,31 +418,35 @@ int main(int argc, char **argv) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create socket directory");
     return 1;
   }
-  sysret = chown(workspace.c_str(), uid_cvmfs, getegid());
-  if (sysret != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to transfer ownership of %s to %s",
-             workspace.c_str(), cvmfs_user.c_str());
-    return 1;
-  }
-  if (dedicated_cachedir) {
-    sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
+  if (!premounted) {
+    sysret = chown(workspace.c_str(), uid_cvmfs, getegid());
     if (sysret != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Failed to transfer ownership of %s to %s",
-               cachedir.c_str(), cvmfs_user.c_str());
+               workspace.c_str(), cvmfs_user.c_str());
+      return 1;
+    }
+    if (dedicated_cachedir) {
+      sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
+      if (sysret != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Failed to transfer ownership of %s to %s",
+                 cachedir.c_str(), cvmfs_user.c_str());
+        return 1;
+      }
+    }
+    sysret = chown("/var/run/cvmfs", uid_cvmfs, getegid());
+    if (sysret != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to transfer ownership of %s to %s",
+               "/var/run/cvmfs", cvmfs_user.c_str());
       return 1;
     }
   }
-  sysret = chown("/var/run/cvmfs", uid_cvmfs, getegid());
-  if (sysret != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to transfer ownership of %s to %s",
-             "/var/run/cvmfs", cvmfs_user.c_str());
-    return 1;
-  }
 
   // Set maximum number of files
-#ifdef __APPLE__
   string param;
+#ifdef __APPLE__
   if (options_manager_.GetValue("CVMFS_NFILES", &param)) {
     sanitizer::IntegerSanitizer integer_sanitizer;
     if (!integer_sanitizer.IsValid(param)) {
@@ -480,10 +496,12 @@ int main(int argc, char **argv) {
 #endif
 
   AddMountOption("fsname=cvmfs2", &mount_options);
-  AddMountOption("allow_other", &mount_options);
-  AddMountOption("grab_mountpoint", &mount_options);
-  AddMountOption("uid=" + StringifyInt(uid_cvmfs), &mount_options);
-  AddMountOption("gid=" + StringifyInt(gid_cvmfs), &mount_options);
+  if (!premounted) {
+    AddMountOption("allow_other", &mount_options);
+    AddMountOption("grab_mountpoint", &mount_options);
+    AddMountOption("uid=" + StringifyInt(uid_cvmfs), &mount_options);
+    AddMountOption("gid=" + StringifyInt(gid_cvmfs), &mount_options);
+  }
   if (options_manager_.IsDefined("CVMFS_DEBUGLOG"))
     AddMountOption("debug", &mount_options);
 
@@ -522,7 +540,7 @@ int main(int argc, char **argv) {
   cvmfs_args.push_back(JoinStrings(mount_options, ","));
   cvmfs_args.push_back(fqrn);
   cvmfs_args.push_back(mountpoint);
-  retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr,
+  retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, premounted_fdp,
                          cvmfs_binary, cvmfs_args, false, &pid_cvmfs);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to launch %s",
