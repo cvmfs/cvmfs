@@ -289,7 +289,7 @@ class UriHandlerReplicate : public UriHandler {
     argv.push_back("snapshot");
     argv.push_back(config->alias);
     bool retval_b = ExecuteBinary(
-      &job->fd_stdin, &job->fd_stdout, &job->fd_stderr,
+      &job->fd_stdin, &job->fd_stdout, &job->fd_stderr, NULL,
       exe, argv, false, &job->pid);
     if (!retval_b) {
       WebReply::Send(WebReply::k500,

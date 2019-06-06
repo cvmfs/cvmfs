@@ -1226,6 +1226,7 @@ bool ExecuteBinary(
   int *fd_stdin,
   int *fd_stdout,
   int *fd_stderr,
+  int *fd_preserve,
   const std::string &binary_path,
   const std::vector<std::string> &argv,
   const bool double_fork,
@@ -1242,6 +1243,9 @@ bool ExecuteBinary(
   preserve_fildes.insert(0);
   preserve_fildes.insert(1);
   preserve_fildes.insert(2);
+  if (fd_preserve != NULL) {
+    preserve_fildes.insert(*fd_preserve);
+  }
   std::map<int, int> map_fildes;
   map_fildes[pipe_stdin[0]] = 0;  // Reading end of pipe_stdin
   map_fildes[pipe_stdout[1]] = 1;  // Writing end of pipe_stdout
@@ -1279,7 +1283,7 @@ bool ExecuteBinary(
  */
 bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
   const bool double_fork = true;
-  return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh",
+  return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, NULL, "/bin/sh",
                        std::vector<std::string>(), double_fork);
 }
 

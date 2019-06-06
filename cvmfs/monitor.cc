@@ -93,6 +93,7 @@ string Watchdog::GenerateStackTrace(const string &exe_path, pid_t pid) {
   retval = ExecuteBinary(&fd_stdin,
                          &fd_stdout,
                          &fd_stderr,
+                         NULL,
 #ifdef __APPLE__
                           "lldb",
 #else

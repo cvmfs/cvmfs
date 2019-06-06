@@ -104,6 +104,7 @@ bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ExecuteBinary(int *fd_stdin,
                    int *fd_stdout,
                    int *fd_stderr,
+                   int *fd_preserve,
                    const std::string &binary_path,
                    const std::vector<std::string>  &argv,
                    const bool double_fork = true,
