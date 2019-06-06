@@ -1011,7 +1011,7 @@ void S3FanoutManager::Backoff(JobInfo *info) {
     LogCvmfs(kLogS3Fanout, kLogDebug, "throttling for %d ms",
              info->throttle_ms);
     uint64_t now = platform_monotonic_time();
-    if ((info->throttle_timestamp + (info->throttle_ms / 1000)) > now) {
+    if ((info->throttle_timestamp + (info->throttle_ms / 1000)) >= now) {
       if ((now - timestamp_last_throttle_report_) > kThrottleReportIntervalSec)
       {
         LogCvmfs(kLogS3Fanout, kLogStdout,
@@ -1130,6 +1130,11 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
     }
     Backoff(info);
+    info->error_code = kFailOk;
+    info->http_error = 0;
+    info->throttle_ms = 0;
+    info->backoff_ms = 0;
+    info->throttle_timestamp = 0;
     return true;  // try again
   }
 
