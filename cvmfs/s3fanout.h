@@ -303,7 +303,11 @@ class S3FanoutManager : SingleCopy {
   }
 
   Prng prng_;
+  /**
+   * This is not strictly necessary but it helps the debugging
+   */
   std::set<JobInfo *> *active_requests_;
+
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
   std::set<S3FanOutDnsEntry *> *sharehandles_;
