@@ -214,9 +214,13 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       if ((info->http_code / 100) == 5) {
         // 5XX returned by host
         info->error_code = kFailHostHttp;
-      } else if ((info->http_code == 400) || (info->http_code == 404)) {
+      } else if ((info->http_code == 400) ||
+                 (info->http_code == 404) ||
+                 (info->http_code == 429))
+      {
         // 400: error from the GeoAPI module
         // 404: the stratum 1 does not have the newest files
+        // 429: rate throttling (we ignore the backoff hint for the time being)
         info->error_code = kFailHostHttp;
       } else {
         info->error_code = (info->proxy == "DIRECT") ? kFailHostHttp :
