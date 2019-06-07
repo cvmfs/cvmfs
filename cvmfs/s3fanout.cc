@@ -128,11 +128,6 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   const size_t num_bytes = size*nmemb;
   JobInfo *info = static_cast<JobInfo *>(info_link);
 
-  // In case of 429, we potentially need to read all the headers so we can
-  // only abort the transfer in the (probably empty) data section
-  if (info->error_code == kFailRetry)
-    return 0;
-
   LogCvmfs(kLogS3Fanout, kLogDebug, "Data callback with %d bytes", num_bytes);
 
   if (num_bytes == 0)
@@ -159,6 +154,16 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   }
 
   return CURL_READFUNC_ABORT;
+}
+
+
+/**
+ * For the time being, ignore all received information in the HTTP body
+ */
+static size_t CallbackCurlBody(
+  char * /*ptr*/, size_t size, size_t nmemb, void * /*userdata*/)
+{
+  return size * nmemb;
 }
 
 
@@ -406,6 +411,8 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
                               CallbackCurlHeader);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_READFUNCTION, CallbackCurlData);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlBody);
     assert(retval == CURLE_OK);
   } else {
     handle = *(pool_handles_idle_->begin());
@@ -928,7 +935,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   // Set curl parameters
   retval = curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
   assert(retval == CURLE_OK);
-  retval = curl_easy_setopt(handle, CURLOPT_WRITEHEADER,
+  retval = curl_easy_setopt(handle, CURLOPT_HEADERDATA,
                             static_cast<void *>(info));
   assert(retval == CURLE_OK);
   retval = curl_easy_setopt(handle, CURLOPT_READDATA,
