@@ -272,6 +272,7 @@ void *S3FanoutManager::MainUpload(void *data) {
       s3fanout_mgr->SetUrlOptions(info);
 
       curl_multi_add_handle(s3fanout_mgr->curl_multi_, handle);
+      s3fanout_mgr->active_requests_->insert(info);
       jobs_in_flight++;
       int still_running = 0, retval = 0;
       retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
@@ -355,6 +356,7 @@ void *S3FanoutManager::MainUpload(void *data) {
         } else {
           // Return easy handle into pool and write result back
           jobs_in_flight--;
+          s3fanout_mgr->active_requests_->erase(info);
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
           s3fanout_mgr->available_jobs_->Decrement();
 
@@ -1167,6 +1169,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 S3FanoutManager::S3FanoutManager() {
+  active_requests_ = NULL;
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
   sharehandles_ = NULL;
@@ -1232,6 +1235,7 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles,
   atomic_init32(&multi_threaded_);
   CURLcode retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
+  active_requests_ = new set<JobInfo *>;
   pool_handles_idle_ = new set<CURL *>;
   pool_handles_inuse_ = new set<CURL *>;
   curl_sharehandles_ = new map<CURL *, S3FanOutDnsEntry *>;
@@ -1303,12 +1307,14 @@ void S3FanoutManager::Fini() {
   pool_handles_idle_->clear();
   curl_sharehandles_->clear();
   sharehandles_->clear();
+  delete active_requests_;
   delete pool_handles_idle_;
   delete pool_handles_inuse_;
   delete curl_sharehandles_;
   delete sharehandles_;
   delete user_agent_;
   curl_multi_cleanup(curl_multi_);
+  active_requests_ = NULL;
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
   curl_sharehandles_ = NULL;
