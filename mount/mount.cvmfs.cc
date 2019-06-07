@@ -479,6 +479,7 @@ int main(int argc, char **argv) {
   }
 #endif
 
+  AddMountOption("system_mount", &mount_options);
   AddMountOption("fsname=cvmfs2", &mount_options);
   AddMountOption("allow_other", &mount_options);
   AddMountOption("grab_mountpoint", &mount_options);

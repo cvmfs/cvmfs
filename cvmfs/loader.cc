@@ -59,6 +59,7 @@ struct CvmfsOptions {
   char *config;
   int uid;
   int gid;
+  int system_mount;
   int grab_mountpoint;
   int cvmfs_suid;
   int disable_watchdog;
@@ -91,6 +92,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_OPT("config=%s",                    config, 0),
   CVMFS_OPT("uid=%d",                       uid, 0),
   CVMFS_OPT("gid=%d",                       gid, 0),
+  CVMFS_SWITCH("system_mount",              system_mount),
   CVMFS_SWITCH("grab_mountpoint",           grab_mountpoint),
   CVMFS_SWITCH("cvmfs_suid",                cvmfs_suid),
   CVMFS_SWITCH("disable_watchdog",          disable_watchdog),
@@ -131,6 +133,7 @@ gid_t gid_ = 0;
 bool single_threaded_ = false;
 bool foreground_ = false;
 bool debug_mode_ = false;
+bool system_mount_ = false;
 bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
@@ -162,6 +165,7 @@ static void Usage(const string &exename) {
     "  -o config=FILES      colon-separated path list of config files\n"
     "  -o uid=UID           Drop credentials to another user\n"
     "  -o gid=GID           Drop credentials to another group\n"
+    "  -o system_mount      Indicate that mount is system-wide\n"
     "  -o grab_mountpoint   give ownership of the mountpoint to the user "
                             "before mounting (required for autofs)\n"
     "  -o parse             Parse and print cvmfs parameters\n"
@@ -408,6 +412,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   }
   uid_ = cvmfs_options.uid;
   gid_ = cvmfs_options.gid;
+  system_mount_ = cvmfs_options.system_mount;
   grab_mountpoint_ = cvmfs_options.grab_mountpoint;
   suid_mode_ = cvmfs_options.cvmfs_suid;
   disable_watchdog_ = cvmfs_options.disable_watchdog;
@@ -814,6 +819,12 @@ int FuseMain(int argc, char *argv[]) {
     if (retval == -2) {
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running under valgrind");
     } else if (retval == -1) {
+      if (system_mount_) {
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                 "Failed to set maximum number of open files, "
+                 "insufficient permissions");
+        return kFailPermission;
+      }
       unsigned soft_limit, hard_limit;
       GetLimitNoFile(&soft_limit, &hard_limit);
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogWarn,
