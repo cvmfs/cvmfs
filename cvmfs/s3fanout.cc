@@ -1015,7 +1015,10 @@ void S3FanoutManager::Backoff(JobInfo *info) {
       if ((now - timestamp_last_throttle_report_) > kThrottleReportIntervalSec)
       {
         LogCvmfs(kLogS3Fanout, kLogStdout,
-                 "Warning: S3 backend throttling (%ums)", info->throttle_ms);
+                 "Warning: S3 backend throttling %ums "
+                 "(total backoff time so far %ums)",
+                 info->throttle_ms,
+                 statistics_->ms_throttled);
         timestamp_last_throttle_report_ = now;
       }
       statistics_->ms_throttled += info->throttle_ms;
