@@ -27,7 +27,7 @@ const char *S3FanoutManager::kCacheControlDotCvmfs =
   "Cache-Control: max-age=61";
 const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
-const unsigned S3FanoutManager::kThrottleReportIntervalSec = 60;
+const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
 
 
 /**
