@@ -97,10 +97,11 @@ class GeoTest(unittest.TestCase):
                                     CERNgeo['latitude'], CERNgeo['longitude']))
 
     def test2AddrGeoinfo(self):
-        self.assertEqual(CERNgeo, addr_geoinfo(CERNaddrs[0]))
-        self.assertEqual(FNALgeo, addr_geoinfo(FNALaddrs[0]))
-        self.assertEqual(IHEPgeo, addr_geoinfo(IHEPaddrs[0]))
-        self.assertEqual(RALgeo,  addr_geoinfo(RALaddrs[0]))
+        now = 0
+        self.assertEqual(CERNgeo, addr_geoinfo(now, CERNaddrs[0]))
+        self.assertEqual(FNALgeo, addr_geoinfo(now, FNALaddrs[0]))
+        self.assertEqual(IHEPgeo, addr_geoinfo(now, IHEPaddrs[0]))
+        self.assertEqual(RALgeo,  addr_geoinfo(now, RALaddrs[0]))
 
     def test3NameGeoinfo(self):
         self.assertEqual(0, len(cvmfs_geo.geo_cache))
