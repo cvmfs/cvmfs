@@ -200,7 +200,6 @@ struct JobInfo {
   FILE *origin_file;
   uint64_t payload_size;
   RequestType request;
-  bool peek_before_put;
   Failures error_code;
   int http_error;
   unsigned char num_retries;

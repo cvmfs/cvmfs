@@ -229,7 +229,7 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
       }
       break;
     default:
-      break;
+      abort();
   }
 
   return 0;
@@ -342,33 +342,34 @@ void *S3FanoutManager::MainUpload(void *data) {
     CURLMsg *curl_msg;
     int msgs_in_queue;
     while ((curl_msg = curl_multi_info_read(s3fanout_mgr->curl_multi_,
-                                            &msgs_in_queue))) {
-      if (curl_msg->msg == CURLMSG_DONE) {
-        s3fanout_mgr->statistics_->num_requests++;
-        JobInfo *info;
-        CURL *easy_handle = curl_msg->easy_handle;
-        int curl_error = curl_msg->data.result;
-        curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
+                                            &msgs_in_queue)))
+    {
+      assert(curl_msg->msg == CURLMSG_DONE);
 
-        curl_multi_remove_handle(s3fanout_mgr->curl_multi_, easy_handle);
-        if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
-          curl_multi_add_handle(s3fanout_mgr->curl_multi_, easy_handle);
-          int still_running = 0;
-          curl_multi_socket_action(s3fanout_mgr->curl_multi_,
-                                   CURL_SOCKET_TIMEOUT,
-                                   0,
-                                   &still_running);
-        } else {
-          // Return easy handle into pool and write result back
-          jobs_in_flight--;
-          s3fanout_mgr->active_requests_->erase(info);
-          s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
-          s3fanout_mgr->available_jobs_->Decrement();
+      s3fanout_mgr->statistics_->num_requests++;
+      JobInfo *info;
+      CURL *easy_handle = curl_msg->easy_handle;
+      int curl_error = curl_msg->data.result;
+      curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
 
-          pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
-          s3fanout_mgr->jobs_completed_.push_back(info);
-          pthread_mutex_unlock(s3fanout_mgr->jobs_completed_lock_);
-        }
+      curl_multi_remove_handle(s3fanout_mgr->curl_multi_, easy_handle);
+      if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
+        curl_multi_add_handle(s3fanout_mgr->curl_multi_, easy_handle);
+        int still_running = 0;
+        curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+                                 CURL_SOCKET_TIMEOUT,
+                                 0,
+                                 &still_running);
+      } else {
+        // Return easy handle into pool and write result back
+        jobs_in_flight--;
+        s3fanout_mgr->active_requests_->erase(info);
+        s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
+        s3fanout_mgr->available_jobs_->Decrement();
+
+        pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
+        s3fanout_mgr->jobs_completed_.push_back(info);
+        pthread_mutex_unlock(s3fanout_mgr->jobs_completed_lock_);
       }
     }
   }
