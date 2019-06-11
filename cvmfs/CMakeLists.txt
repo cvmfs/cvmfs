@@ -983,7 +983,7 @@ if (BUILD_SERVER)
     )
 
     install(
-      FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py webapi/cvmfs_globals.py
+      FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
       DESTINATION    "/usr/share/cvmfs-server/webapi"
       PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
     )

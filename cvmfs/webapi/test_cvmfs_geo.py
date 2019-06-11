@@ -1,8 +1,6 @@
 from __future__ import print_function
 import unittest
 import socket
-import cvmfs_globals
-cvmfs_globals.CVMFS_UNITTESTS = True
 
 import cvmfs_geo
 from cvmfs_geo import distance_on_unit_sphere
