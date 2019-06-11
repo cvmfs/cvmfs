@@ -75,8 +75,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     if (header_line[i] == '2') {
       return num_bytes;
     } else {
-      LogCvmfs(kLogS3Fanout, kLogDebug, "http status error code: %s",
-               header_line.c_str());
+      LogCvmfs(kLogS3Fanout, kLogDebug, "http status error code [info %p]: %s",
+               info, header_line.c_str());
       if (header_line.length() < i+3) {
         LogCvmfs(kLogS3Fanout, kLogStderr, "S3: invalid HTTP response '%s'",
                  header_line.c_str());
@@ -965,6 +965,10 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
 
   pthread_mutex_lock(lock_options_);
   retval = curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
+  assert(retval == CURLE_OK);
+  curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, kLowSpeedLimit);
+  assert(retval == CURLE_OK);
+  curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_);
   assert(retval == CURLE_OK);
   pthread_mutex_unlock(lock_options_);
 

@@ -258,6 +258,7 @@ class S3FanoutManager : SingleCopy {
   // Reflects the default Apache configuration of the local backend
   static const char *kCacheControlCas;  // Cache-Control: max-age=259200
   static const char *kCacheControlDotCvmfs;  // Cache-Control: max-age=61
+  static const unsigned kLowSpeedLimit = 1024;  // Require at least 1kB/s
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
