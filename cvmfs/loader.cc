@@ -827,7 +827,7 @@ int FuseMain(int argc, char *argv[]) {
       }
       unsigned soft_limit, hard_limit;
       GetLimitNoFile(&soft_limit, &hard_limit);
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogWarn,
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
                "Failed to set requested number of open files, "
                "using maximum number %u", hard_limit);
       if (hard_limit > soft_limit) {
