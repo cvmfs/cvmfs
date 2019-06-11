@@ -7,7 +7,16 @@ import socket
 import cvmfs_api
 import time
 import threading
-import maxminddb
+
+# Open the geodb.  Only import maxminddb here (and only once) because it
+#  is not available in the unit test.
+imported_maxminddb = False
+def open_geodb(dbname):
+    global imported_maxminddb
+    if not imported_maxminddb:
+        imported_maxminddb = True
+        import maxminddb
+    return maxminddb.open_database(dbname)
 
 gidb="/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb"
 gireader=None
@@ -52,7 +61,7 @@ def lookup_geoinfo(now, addr):
             if modtime != gimodtime:
                 # database was modified, reopen it
                 oldgireader = gireader
-                gireader = maxminddb.open_database(gidb)
+                gireader = open_geodb(gidb)
                 gimodtime = modtime
                 print 'cvmfs_geo: opened ' + gidb
         lock.release()
