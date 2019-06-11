@@ -10,11 +10,10 @@ import threading
 
 # Open the geodb.  Only import maxminddb here (and only once) because it
 #  is not available in the unit test.
-imported_maxminddb = False
+maxminddb = None
 def open_geodb(dbname):
-    global imported_maxminddb
-    if not imported_maxminddb:
-        imported_maxminddb = True
+    global maxminddb
+    if maxminddb is None:
         import maxminddb
     return maxminddb.open_database(dbname)
 
