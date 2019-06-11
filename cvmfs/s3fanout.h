@@ -351,6 +351,8 @@ class S3FanoutManager : SingleCopy {
 
   // Report not every occurance of throtteling but only every so often
   uint64_t timestamp_last_throttle_report_;
+
+  bool is_curl_debug_;
 };  // S3FanoutManager
 
 }  // namespace s3fanout

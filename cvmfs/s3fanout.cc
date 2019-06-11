@@ -966,10 +966,15 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   pthread_mutex_lock(lock_options_);
   retval = curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
   assert(retval == CURLE_OK);
-  curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, kLowSpeedLimit);
+  retval = curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT,
+                            kLowSpeedLimit);
   assert(retval == CURLE_OK);
-  curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_);
+  retval = curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_);
   assert(retval == CURLE_OK);
+  if (is_curl_debug_) {
+    retval = curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1);
+    assert(retval == CURLE_OK);
+  }
   pthread_mutex_unlock(lock_options_);
 
   string url = MkUrl(info->hostname, info->bucket, (info->object_key));
@@ -1228,6 +1233,7 @@ S3FanoutManager::S3FanoutManager() {
   available_jobs_ = NULL;
   statistics_ = NULL;
   timestamp_last_throttle_report_ = 0;
+  is_curl_debug_ = (getenv("_CVMFS_CURL_DEBUG") != NULL);
 }
 
 
