@@ -54,6 +54,44 @@ Repository::Repository()
   signature_mgr_->Init();
 }
 
+Repository::Repository(const SettingsRepository &settings)
+  : statistics_(new perf::Statistics())
+  , signature_mgr_(new signature::SignatureManager())
+  , download_mgr_(NULL)
+  , spooler_(NULL)
+  , whitelist_(NULL)
+  , reflog_(NULL)
+  , manifest_(NULL)
+  , history_(NULL)
+{
+  signature_mgr_->Init();
+
+  int rvb;
+  std::string keys = JoinStrings(FindFilesBySuffix(
+    settings.keychain().keychain_dir(), ".pub"), ":");
+  rvb = signature_mgr_->LoadPublicRsaKeys(keys);
+  if (!rvb) {
+    signature_mgr_->Fini();
+    delete signature_mgr_;
+    delete statistics_;
+    throw EPublish("cannot load public rsa key");
+  }
+
+  download_mgr_ = new download::DownloadManager();
+  download_mgr_->Init(16, false,
+                      perf::StatisticsTemplate("download", statistics_));
+  try {
+    DownloadRootObjects(settings.url(), settings.fqrn(), settings.tmp_dir());
+  } catch (const EPublish& e) {
+    signature_mgr_->Fini();
+    download_mgr_->Fini();
+    delete signature_mgr_;
+    delete download_mgr_;
+    delete statistics_;
+    throw;
+  }
+}
+
 Repository::~Repository() {
   if (signature_mgr_ != NULL) signature_mgr_->Fini();
   if (download_mgr_ != NULL) download_mgr_->Fini();
@@ -107,6 +145,7 @@ void Repository::DownloadRootObjects(
   delete reflog_;
   reflog_ = manifest::Reflog::Open(reflog_path);
   if (reflog_ == NULL) throw EPublish("cannot open reflog");
+  reflog_->TakeDatabaseFileOwnership();
 
   std::string tags_path;
   FILE *tags_fd =
@@ -125,6 +164,18 @@ void Repository::DownloadRootObjects(
   delete history_;
   history_ = history::SqliteHistory::OpenWritable(tags_path);
   if (history_ == NULL) throw EPublish("cannot open tag database");
+  history_->TakeDatabaseFileOwnership();
+}
+
+
+std::string Repository::GetFqrnFromUrl(const std::string &url) {
+  return GetFileName(MakeCanonicalPath(url));
+}
+
+std::string Repository::GetMetainfo() {
+  if (manifest_->meta_info().IsNull()) return "n/a";
+
+  return "TODO";
 }
 
 
@@ -567,8 +618,11 @@ void Publisher::UpdateMetaInfo() {}
 //------------------------------------------------------------------------------
 
 
-Replica::~Replica() {
+Replica::Replica(const SettingsReplica &settings) {
+}
 
+
+Replica::~Replica() {
 }
 
 }  // namespace publish

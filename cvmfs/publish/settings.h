@@ -161,11 +161,11 @@ class SettingsKeychain {
  public:
   explicit SettingsKeychain(const std::string &fqrn)
     : fqrn_(fqrn)
-    , master_private_key_path_(
-        std::string("/etc/cvmfs/keys/") + fqrn + ".masterkey")
-    , master_public_key_path_(std::string("/etc/cvmfs/keys/") + fqrn + ".pub")
-    , private_key_path_(std::string("/etc/cvmfs/keys/") + fqrn + ".key")
-    , certificate_path_(std::string("/etc/cvmfs/keys/") + fqrn + ".crt")
+    , keychain_dir_("/etc/cvmfs/keys")
+    , master_private_key_path_(keychain_dir_() + fqrn + ".masterkey")
+    , master_public_key_path_(keychain_dir_() + fqrn + ".pub")
+    , private_key_path_(keychain_dir_() + fqrn + ".key")
+    , certificate_path_(keychain_dir_() + fqrn + ".crt")
   {}
 
   void SetKeychainDir(const std::string &keychain_dir);
@@ -175,6 +175,7 @@ class SettingsKeychain {
   bool HasDanglingRepositoryKeys() const;
   bool HasRepositoryKeys() const;
 
+  std::string keychain_dir() const { return keychain_dir_; }
   std::string master_private_key_path() const {
     return master_private_key_path_;
   }
@@ -184,11 +185,43 @@ class SettingsKeychain {
 
  private:
   Setting<std::string> fqrn_;
+  Setting<std::string> keychain_dir_;
   Setting<std::string> master_private_key_path_;
   Setting<std::string> master_public_key_path_;
   Setting<std::string> private_key_path_;
   Setting<std::string> certificate_path_;
 };
+
+
+/**
+ * Description of a read-only repository
+ */
+class SettingsRepository {
+ public:
+  SettingsRepository(const std::string &fqrn)
+    : fqrn_(fqrn)
+    , url_(std::string("http://localhost/cvmfs/") + fqrn_())
+    , tmp_dir_("/tmp")
+    , keychain_(fqrn)
+  {}
+
+  void SetUrl(const std::string &url);
+
+  std::string fqrn() const { return fqrn_; }
+  std::string url() const { return url_; }
+  std::string tmp_dir() const { return tmp_dir_; }
+
+  const SettingsKeychain &keychain() const { return keychain_; }
+  SettingsKeychain *GetKeychain() { return &keychain_; }
+
+ private:
+  Setting<std::string> fqrn_;
+  Setting<std::string> url_;
+  Setting<std::string> tmp_dir_;
+
+  SettingsKeychain keychain_;
+};
+
 
 /**
  * Description of an editable repository.
