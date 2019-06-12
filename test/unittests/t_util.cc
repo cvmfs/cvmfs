@@ -1347,6 +1347,8 @@ TEST_F(T_Util, Trim) {
   EXPECT_EQ("hello", Trim("        hello    "));
   EXPECT_EQ("he llo how are you", Trim("    he llo how are you   "));
   EXPECT_EQ("hell o", Trim("  hell o"));
+  EXPECT_EQ("hell o\n", Trim("  hell o\n"));
+  EXPECT_EQ("hell o", Trim(" \r  hell o   \n", true));
 }
 
 TEST_F(T_Util, ToUpper) {

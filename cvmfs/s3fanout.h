@@ -200,7 +200,6 @@ struct JobInfo {
   FILE *origin_file;
   uint64_t payload_size;
   RequestType request;
-  bool peek_before_put;
   Failures error_code;
   int http_error;
   unsigned char num_retries;
@@ -259,6 +258,7 @@ class S3FanoutManager : SingleCopy {
   // Reflects the default Apache configuration of the local backend
   static const char *kCacheControlCas;  // Cache-Control: max-age=259200
   static const char *kCacheControlDotCvmfs;  // Cache-Control: max-age=61
+  static const unsigned kLowSpeedLimit = 1024;  // Require at least 1kB/s
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -303,6 +303,11 @@ class S3FanoutManager : SingleCopy {
   }
 
   Prng prng_;
+  /**
+   * This is not strictly necessary but it helps the debugging
+   */
+  std::set<JobInfo *> *active_requests_;
+
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
   std::set<S3FanOutDnsEntry *> *sharehandles_;
@@ -346,6 +351,8 @@ class S3FanoutManager : SingleCopy {
 
   // Report not every occurance of throtteling but only every so often
   uint64_t timestamp_last_throttle_report_;
+
+  bool is_curl_debug_;
 };  // S3FanoutManager
 
 }  // namespace s3fanout
