@@ -104,6 +104,7 @@ void SettingsStorage::SetLocator(const std::string &locator) {
 //------------------------------------------------------------------------------
 
 void SettingsKeychain::SetKeychainDir(const std::string &keychain_dir) {
+  keychain_dir_ = keychain_dir;
   master_private_key_path_ = keychain_dir + "/" + fqrn_() + ".masterkey";
   master_public_key_path_ = keychain_dir + "/" + fqrn_() + ".pub";
   private_key_path_ = keychain_dir + "/" + fqrn_() + ".key";
@@ -137,6 +138,15 @@ bool SettingsKeychain::HasRepositoryKeys() const {
   return FileExists(private_key_path_) &&
          FileExists(certificate_path_);
 }
+
+//------------------------------------------------------------------------------
+
+
+void SettingsRepository::SetUrl(const std::string &url) {
+  // TODO(jblomer): sanitiation, check availability
+  url_ = url;
+}
+
 
 //------------------------------------------------------------------------------
 

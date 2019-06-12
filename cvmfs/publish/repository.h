@@ -37,10 +37,12 @@ class Whitelist;
 
 namespace publish {
 
-class Repository : SingleCopy {
+class __attribute__((visibility("default"))) Repository : SingleCopy {
  public:
-  Repository();
+  explicit Repository(const SettingsRepository &settings);
   virtual ~Repository();
+
+  static std::string GetFqrnFromUrl(const std::string &url);
 
   void Check();
   void GarbageCollect();
@@ -55,7 +57,10 @@ class Repository : SingleCopy {
   // Inheritance of History and SqliteHisty unknown in the header
   history::History *history();
 
+  std::string GetMetainfo();
+
  protected:
+  Repository();
   void DownloadRootObjects(
     const std::string &url,
     const std::string &fqrn,
@@ -77,7 +82,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
  public:
   static Publisher *Create(const SettingsPublisher &settings);
 
-  Publisher(const SettingsPublisher &settings);
+  explicit Publisher(const SettingsPublisher &settings);
   virtual ~Publisher();
 
   void UpdateMetaInfo();
@@ -121,10 +126,12 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   SettingsPublisher settings_;
 };
 
-class Replica : public Repository {
+class __attribute__((visibility("default"))) Replica : public Repository {
  public:
-  virtual ~Replica();
   static Replica *Create();
+  explicit Replica(const SettingsReplica &settings);
+  virtual ~Replica();
+
   void Snapshot();
 };
 
