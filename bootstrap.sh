@@ -13,7 +13,6 @@ GOOGLETEST_VERSION=1.8.0
 IPADDRESS_VERSION=1.0.22
 MAXMINDDB_VERSION=1.4.0
 PROTOBUF_VERSION=2.6.1
-MONGOOSE_VERSION=3.8
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
 LIBWEBSOCKETS_VERSION=3.0.1
@@ -221,11 +220,6 @@ build_lib() {
       do_copy "sha3"
       do_build "sha3"
       ;;
-    mongoose)
-      do_extract "mongoose" "mongoose-${MONGOOSE_VERSION}.tar.gz"
-      patch_external "mongoose" "keep_sigchld.patch"
-      do_build "mongoose"
-      ;;
     rapidcheck)
       if [ x"$BUILD_QC_TESTS" != x"" ]; then
         do_extract "rapidcheck" "rapidcheck-${RAPIDCHECK_VERSION}.tar.gz"
@@ -251,7 +245,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 mongoose libarchive libwebsockets"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive libwebsockets"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi
