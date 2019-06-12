@@ -27,7 +27,7 @@ const char *S3FanoutManager::kCacheControlDotCvmfs =
   "Cache-Control: max-age=61";
 const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
-const unsigned S3FanoutManager::kThrottleReportIntervalSec = 60;
+const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
 
 
 /**
@@ -43,7 +43,7 @@ void S3FanoutManager::DetectThrottleIndicator(
   if (HasPrefix(header, "x-retry-in:", true))
     value_str = header.substr(11);
 
-  value_str = Trim(value_str);
+  value_str = Trim(value_str, true /* trim_newline */);
   if (!value_str.empty()) {
     unsigned value_numeric = String2Uint64(value_str);
     unsigned value_ms =
@@ -75,8 +75,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     if (header_line[i] == '2') {
       return num_bytes;
     } else {
-      LogCvmfs(kLogS3Fanout, kLogDebug, "http status error code: %s",
-               header_line.c_str());
+      LogCvmfs(kLogS3Fanout, kLogDebug, "http status error code [info %p]: %s",
+               info, header_line.c_str());
       if (header_line.length() < i+3) {
         LogCvmfs(kLogS3Fanout, kLogStderr, "S3: invalid HTTP response '%s'",
                  header_line.c_str());
@@ -128,11 +128,6 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   const size_t num_bytes = size*nmemb;
   JobInfo *info = static_cast<JobInfo *>(info_link);
 
-  // In case of 429, we potentially need to read all the headers so we can
-  // only abort the transfer in the (probably empty) data section
-  if (info->error_code == kFailRetry)
-    return 0;
-
   LogCvmfs(kLogS3Fanout, kLogDebug, "Data callback with %d bytes", num_bytes);
 
   if (num_bytes == 0)
@@ -159,6 +154,16 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   }
 
   return CURL_READFUNC_ABORT;
+}
+
+
+/**
+ * For the time being, ignore all received information in the HTTP body
+ */
+static size_t CallbackCurlBody(
+  char * /*ptr*/, size_t size, size_t nmemb, void * /*userdata*/)
+{
+  return size * nmemb;
 }
 
 
@@ -224,7 +229,7 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
       }
       break;
     default:
-      break;
+      abort();
   }
 
   return 0;
@@ -272,6 +277,7 @@ void *S3FanoutManager::MainUpload(void *data) {
       s3fanout_mgr->SetUrlOptions(info);
 
       curl_multi_add_handle(s3fanout_mgr->curl_multi_, handle);
+      s3fanout_mgr->active_requests_->insert(info);
       jobs_in_flight++;
       int still_running = 0, retval = 0;
       retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
@@ -336,32 +342,34 @@ void *S3FanoutManager::MainUpload(void *data) {
     CURLMsg *curl_msg;
     int msgs_in_queue;
     while ((curl_msg = curl_multi_info_read(s3fanout_mgr->curl_multi_,
-                                            &msgs_in_queue))) {
-      if (curl_msg->msg == CURLMSG_DONE) {
-        s3fanout_mgr->statistics_->num_requests++;
-        JobInfo *info;
-        CURL *easy_handle = curl_msg->easy_handle;
-        int curl_error = curl_msg->data.result;
-        curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
+                                            &msgs_in_queue)))
+    {
+      assert(curl_msg->msg == CURLMSG_DONE);
 
-        curl_multi_remove_handle(s3fanout_mgr->curl_multi_, easy_handle);
-        if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
-          curl_multi_add_handle(s3fanout_mgr->curl_multi_, easy_handle);
-          int still_running = 0;
-          curl_multi_socket_action(s3fanout_mgr->curl_multi_,
-                                   CURL_SOCKET_TIMEOUT,
-                                   0,
-                                   &still_running);
-        } else {
-          // Return easy handle into pool and write result back
-          jobs_in_flight--;
-          s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
-          s3fanout_mgr->available_jobs_->Decrement();
+      s3fanout_mgr->statistics_->num_requests++;
+      JobInfo *info;
+      CURL *easy_handle = curl_msg->easy_handle;
+      int curl_error = curl_msg->data.result;
+      curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
 
-          pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
-          s3fanout_mgr->jobs_completed_.push_back(info);
-          pthread_mutex_unlock(s3fanout_mgr->jobs_completed_lock_);
-        }
+      curl_multi_remove_handle(s3fanout_mgr->curl_multi_, easy_handle);
+      if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
+        curl_multi_add_handle(s3fanout_mgr->curl_multi_, easy_handle);
+        int still_running = 0;
+        curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+                                 CURL_SOCKET_TIMEOUT,
+                                 0,
+                                 &still_running);
+      } else {
+        // Return easy handle into pool and write result back
+        jobs_in_flight--;
+        s3fanout_mgr->active_requests_->erase(info);
+        s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
+        s3fanout_mgr->available_jobs_->Decrement();
+
+        pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
+        s3fanout_mgr->jobs_completed_.push_back(info);
+        pthread_mutex_unlock(s3fanout_mgr->jobs_completed_lock_);
       }
     }
   }
@@ -404,6 +412,8 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
                               CallbackCurlHeader);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_READFUNCTION, CallbackCurlData);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlBody);
     assert(retval == CURLE_OK);
   } else {
     handle = *(pool_handles_idle_->begin());
@@ -926,7 +936,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   // Set curl parameters
   retval = curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
   assert(retval == CURLE_OK);
-  retval = curl_easy_setopt(handle, CURLOPT_WRITEHEADER,
+  retval = curl_easy_setopt(handle, CURLOPT_HEADERDATA,
                             static_cast<void *>(info));
   assert(retval == CURLE_OK);
   retval = curl_easy_setopt(handle, CURLOPT_READDATA,
@@ -956,6 +966,15 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   pthread_mutex_lock(lock_options_);
   retval = curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
   assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT,
+                            kLowSpeedLimit);
+  assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_);
+  assert(retval == CURLE_OK);
+  if (is_curl_debug_) {
+    retval = curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1);
+    assert(retval == CURLE_OK);
+  }
   pthread_mutex_unlock(lock_options_);
 
   string url = MkUrl(info->hostname, info->bucket, (info->object_key));
@@ -1011,11 +1030,14 @@ void S3FanoutManager::Backoff(JobInfo *info) {
     LogCvmfs(kLogS3Fanout, kLogDebug, "throttling for %d ms",
              info->throttle_ms);
     uint64_t now = platform_monotonic_time();
-    if ((info->throttle_timestamp + (info->throttle_ms / 1000)) > now) {
+    if ((info->throttle_timestamp + (info->throttle_ms / 1000)) >= now) {
       if ((now - timestamp_last_throttle_report_) > kThrottleReportIntervalSec)
       {
         LogCvmfs(kLogS3Fanout, kLogStdout,
-                 "Warning: S3 backend throttling (%ums)", info->throttle_ms);
+                 "Warning: S3 backend throttling %ums "
+                 "(total backoff time so far %ums)",
+                 info->throttle_ms,
+                 statistics_->ms_throttled);
         timestamp_last_throttle_report_ = now;
       }
       statistics_->ms_throttled += info->throttle_ms;
@@ -1130,6 +1152,11 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
     }
     Backoff(info);
+    info->error_code = kFailOk;
+    info->http_error = 0;
+    info->throttle_ms = 0;
+    info->backoff_ms = 0;
+    info->throttle_timestamp = 0;
     return true;  // try again
   }
 
@@ -1159,6 +1186,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 S3FanoutManager::S3FanoutManager() {
+  active_requests_ = NULL;
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
   sharehandles_ = NULL;
@@ -1205,6 +1233,7 @@ S3FanoutManager::S3FanoutManager() {
   available_jobs_ = NULL;
   statistics_ = NULL;
   timestamp_last_throttle_report_ = 0;
+  is_curl_debug_ = (getenv("_CVMFS_CURL_DEBUG") != NULL);
 }
 
 
@@ -1224,6 +1253,7 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles,
   atomic_init32(&multi_threaded_);
   CURLcode retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
+  active_requests_ = new set<JobInfo *>;
   pool_handles_idle_ = new set<CURL *>;
   pool_handles_inuse_ = new set<CURL *>;
   curl_sharehandles_ = new map<CURL *, S3FanOutDnsEntry *>;
@@ -1295,12 +1325,14 @@ void S3FanoutManager::Fini() {
   pool_handles_idle_->clear();
   curl_sharehandles_->clear();
   sharehandles_->clear();
+  delete active_requests_;
   delete pool_handles_idle_;
   delete pool_handles_inuse_;
   delete curl_sharehandles_;
   delete sharehandles_;
   delete user_agent_;
   curl_multi_cleanup(curl_multi_);
+  active_requests_ = NULL;
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
   curl_sharehandles_ = NULL;

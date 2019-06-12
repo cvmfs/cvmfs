@@ -31,7 +31,7 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
                           perf::StatisticsTemplate("download", statistics()));
 
   download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);
-  download_manager_->SetRetryParameters(kDownloadRetries, 500, 2000);
+  download_manager_->SetRetryParameters(kDownloadRetries, 2000, 5000);
 
   if (follow_redirects) {
     download_manager_->EnableRedirects();

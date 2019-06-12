@@ -56,7 +56,7 @@ class ServerTool {
 
  private:
   static const unsigned kDownloadTimeout = 60;  // 1 minute
-  static const unsigned kDownloadRetries = 1;   // 2 attempts in total
+  static const unsigned kDownloadRetries = 3;   // 4 attempts in total
 };
 
 #include "server_tool_impl.h"
