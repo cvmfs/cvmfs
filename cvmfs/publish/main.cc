@@ -12,6 +12,7 @@
 #include "logging.h"
 #include "publish/cmd_enter.h"
 #include "publish/cmd_help.h"
+#include "publish/cmd_info.h"
 #include "publish/cmd_mkfs.h"
 #include "publish/cmd_zpipe.h"
 #include "publish/command.h"
@@ -60,6 +61,7 @@ int main(int argc, char **argv) {
   publish::CommandList commands;
   commands.TakeCommand(new publish::CmdMkfs());
   commands.TakeCommand(new publish::CmdEnter());
+  commands.TakeCommand(new publish::CmdInfo());
   commands.TakeCommand(new publish::CmdHelp(&commands));
   commands.TakeCommand(new publish::CmdZpipe());
 
