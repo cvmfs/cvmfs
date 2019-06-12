@@ -105,6 +105,7 @@ cvmfs_run_test() {
 
   sleep_time=3
   echo "sleeping $sleep_time seconds to let ttl expire but not kernel cache"
+  sleep $sleep_time
   ls -l $TEST_611_MOUNTPOINT || return 33
   stat $TEST_611_MOUNTPOINT/newfile || return 34
 
