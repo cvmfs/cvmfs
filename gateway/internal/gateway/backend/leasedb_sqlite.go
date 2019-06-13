@@ -76,6 +76,21 @@ func OpenSqliteLeaseDB(workDir string) (*SqliteLeaseDB, error) {
 		return nil, errors.Wrap(err, "could not prepare statement for 'get disabled repo'")
 	}
 
+	// Enable all repos
+	txn, err := store.Begin()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not begin transaction")
+	}
+	defer txn.Rollback()
+
+	if _, err := txn.Exec("DELETE FROM DisabledRepos;"); err != nil {
+		return nil, errors.Wrap(err, "could not clear DisabledRepos table")
+	}
+
+	if err := txn.Commit(); err != nil {
+		return nil, errors.Wrap(err, "transaction commit failed")
+	}
+
 	gw.Log("leasedb_sqlite", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
 

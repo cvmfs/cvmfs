@@ -29,6 +29,10 @@ func OpenBoltLeaseDB(workDir string) (*BoltLeaseDB, error) {
 	}
 
 	store.Update(func(txn *bolt.Tx) error {
+		// Enable all repos
+		if txn.Bucket([]byte("disabled_repos")) != nil {
+			txn.DeleteBucket([]byte("disabled_repos"))
+		}
 		_, err := txn.CreateBucketIfNotExists([]byte("disabled_repos"))
 		if err != nil {
 			return errors.Wrap(err, "could not create bucket: 'disabled_repos'")
