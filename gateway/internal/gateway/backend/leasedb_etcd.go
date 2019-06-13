@@ -52,3 +52,14 @@ func (db *EtcdLeaseDB) CancelLease(ctx context.Context, tokenStr string) error {
 func (db *EtcdLeaseDB) WithLock(ctx context.Context, repository string, task func() error) error {
 	return nil
 }
+
+// SetRepositoryEnabled sets the enabled/disabled status for a given repository
+func (db *EtcdLeaseDB) SetRepositoryEnabled(
+	ctx context.Context, repository string, enable bool) error {
+	return nil
+}
+
+// GetRepositoryEnabled returns the enabled status of a repository
+func (db *EtcdLeaseDB) GetRepositoryEnabled(ctx context.Context, repository string) bool {
+	return true
+}

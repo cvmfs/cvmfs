@@ -35,6 +35,10 @@ func (e InvalidLeaseError) Error() string {
 	return fmt.Sprintf("invalid lease")
 }
 
+// ErrRepoDisabled signals that a new lease cannot be acquired due to the repository
+// being disabled
+var ErrRepoDisabled = fmt.Errorf("repo_disabled")
+
 // Lease describes an exclusive lease to a subpath inside the repository:
 // keyID and token ()
 type Lease struct {
@@ -75,6 +79,8 @@ type LeaseDB interface {
 	CancelLeases(ctx context.Context, repoPath string) error
 	CancelLease(ctx context.Context, tokenStr string) error
 	WithLock(ctx context.Context, name string, task func() error) error
+	SetRepositoryEnabled(ctx context.Context, repository string, enable bool) error
+	GetRepositoryEnabled(ctx context.Context, repository string) bool
 }
 
 // OpenLeaseDB opens or creats a new LeaseDB object of the specified type

@@ -89,14 +89,6 @@ func NewAccessConfig(fileName string) (*AccessConfig, error) {
 	return newAccessConfigWithImporter(fileName, keyImporter)
 }
 
-// SetRepositoryEnabled sets the enabled status of a repository
-func (c *AccessConfig) SetRepositoryEnabled(name string, enabled bool) {
-	if cfg, present := c.Repositories[name]; present {
-		cfg.Enabled = enabled
-		c.Repositories[name] = cfg
-	}
-}
-
 // GetRepos returns a map where the keys are repository names and the
 // values are KeyPaths maps
 func (c *AccessConfig) GetRepos() map[string]RepositoryConfig {
@@ -127,10 +119,6 @@ func (c *AccessConfig) Check(keyID, leasePath, repoName string) *AuthError {
 	cfg, ok := c.Repositories[repoName]
 	if !ok {
 		return &AuthError{"invalid_repo"}
-	}
-
-	if !cfg.Enabled {
-		return &AuthError{"disabled_repo"}
 	}
 
 	keyPath, ok := cfg.Keys[keyID]
@@ -220,7 +208,7 @@ func (c *AccessConfig) loadV1(cfg rawConfig, importer KeyImportFun) error {
 			for _, k := range spec.Keys {
 				keyIds[k] = keyPaths[k]
 			}
-			c.Repositories[spec.Name] = RepositoryConfig{Keys: keyIds, Enabled: true}
+			c.Repositories[spec.Name] = RepositoryConfig{Keys: keyIds}
 		}
 	}
 
@@ -247,8 +235,7 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 				// Item is a string representing the repository name; default key
 				// from /etc/cvmfs/keys/<REPO_NAME>/ will be associated
 				c.Repositories[name] = RepositoryConfig{
-					Keys:    KeyPaths{"default": "default"},
-					Enabled: true,
+					Keys: KeyPaths{"default": "default"},
 				}
 			} else {
 				// Item is a RepositorySpecV2; associate the key IDs and paths to the
@@ -258,8 +245,7 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 					ks[k.ID] = k.Path
 				}
 				c.Repositories[spec.Name] = RepositoryConfig{
-					Keys:    ks,
-					Enabled: true,
+					Keys: ks,
 				}
 			}
 		}

@@ -31,20 +31,17 @@ func (b *mockBackend) GetKey(keyID string) *be.KeyConfig {
 
 func (b *mockBackend) GetRepo(repoName string) *be.RepositoryConfig {
 	return &be.RepositoryConfig{
-		Keys:    be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
-		Enabled: true,
+		Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
 	}
 }
 
 func (b *mockBackend) GetRepos() map[string]be.RepositoryConfig {
 	return map[string]be.RepositoryConfig{
 		"test1.repo.org": be.RepositoryConfig{
-			Keys:    be.KeyPaths{"keyid123": "/"},
-			Enabled: true,
+			Keys: be.KeyPaths{"keyid123": "/"},
 		},
 		"test2.repo.org": be.RepositoryConfig{
-			Keys:    be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
-			Enabled: true,
+			Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
 		},
 	}
 }
