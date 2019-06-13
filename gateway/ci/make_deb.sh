@@ -54,6 +54,8 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
 
     cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.service \
         $WORKSPACE/etc/systemd/system/
+    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway@.service \
+        $WORKSPACE/etc/systemd/system/
     cp -v ${CVMFS_GATEWAY_SOURCES}/config/repo.json $WORKSPACE/etc/cvmfs/gateway/
     cp -v ${CVMFS_GATEWAY_SOURCES}/config/user.json $WORKSPACE/etc/cvmfs/gateway/
 
@@ -72,6 +74,7 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
         --config-files etc/cvmfs/gateway/repo.json \
         --config-files etc/cvmfs/gateway/user.json \
         --config-files etc/systemd/system/cvmfs-gateway.service \
+        --config-files etc/systemd/system/cvmfs-gateway@.service \
         --exclude etc/systemd/system \
         --no-deb-systemd-restart-after-upgrade \
         --after-install ${CVMFS_GATEWAY_SOURCES}/pkg/setup_deb.sh \

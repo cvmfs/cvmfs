@@ -48,7 +48,10 @@ if [ "x$PLATFORM" = "xcc7" ]; then
     togo file exclude root/etc/systemd/system
     cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.service \
         ${TOGO_PROJECT}/root/etc/systemd/system/
+    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway@.service \
+        ${TOGO_PROJECT}/root/etc/systemd/system/
     togo file flag config-nr root/etc/systemd/system/cvmfs-gateway.service
+    togo file flag config-nr root/etc/systemd/system/cvmfs-gateway@.service
 else
     mkdir -p ${TOGO_PROJECT}/root/etc/init.d
     togo file exclude root/etc/init.d
