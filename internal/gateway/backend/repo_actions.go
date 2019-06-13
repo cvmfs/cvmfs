@@ -7,12 +7,21 @@ import (
 
 // GetRepo returns the access configuration of a repository
 func (s *Services) GetRepo(repoName string) *RepositoryConfig {
-	return s.Access.GetRepo(repoName)
+	repo := s.Access.GetRepo(repoName)
+	if repo != nil {
+		repo.Enabled = s.Leases.GetRepositoryEnabled(context.TODO(), repoName)
+	}
+	return repo
 }
 
 // GetRepos returns a map with repository access configurations
 func (s *Services) GetRepos() map[string]RepositoryConfig {
-	return s.Access.GetRepos()
+	repos := s.Access.GetRepos()
+	for repoName, cfg := range repos {
+		cfg.Enabled = s.Leases.GetRepositoryEnabled(context.TODO(), repoName)
+		repos[repoName] = cfg
+	}
+	return repos
 }
 
 // SetRepoEnabled enables or disables a repository. The change does not persist
@@ -28,8 +37,7 @@ func (s *Services) SetRepoEnabled(ctx context.Context, repository string, enable
 		// of the repository is held
 		if wait {
 			s.Leases.WithLock(ctx, repository, func() error {
-				s.Access.SetRepositoryEnabled(repository, enable)
-				return nil
+				return s.Leases.SetRepositoryEnabled(ctx, repository, false)
 			})
 			return nil
 		}
@@ -52,7 +60,5 @@ func (s *Services) SetRepoEnabled(ctx context.Context, repository string, enable
 		}
 	}
 
-	s.Access.SetRepositoryEnabled(repository, enable)
-
-	return nil
+	return s.Leases.SetRepositoryEnabled(ctx, repository, enable)
 }

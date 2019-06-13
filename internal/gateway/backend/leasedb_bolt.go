@@ -28,6 +28,20 @@ func OpenBoltLeaseDB(workDir string) (*BoltLeaseDB, error) {
 		return nil, errors.Wrap(err, "could not open backing store (BoltDB)")
 	}
 
+	store.Update(func(txn *bolt.Tx) error {
+		_, err := txn.CreateBucketIfNotExists([]byte("disabled_repos"))
+		if err != nil {
+			return errors.Wrap(err, "could not create bucket: 'disabled_repos'")
+		}
+
+		_, err = txn.CreateBucketIfNotExists([]byte("tokens"))
+		if err != nil {
+			return errors.Wrap(err, "could not create bucket: 'tokens'")
+		}
+
+		return nil
+	})
+
 	gw.Log("leasedb_bolt", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
 
@@ -54,11 +68,12 @@ func (db *BoltLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, pr
 			return err
 		}
 
-		tokenBucket, err := txn.CreateBucketIfNotExists([]byte("tokens"))
-		if err != nil {
-			return errors.Wrap(err, "could not create bucket: 'tokens'")
+		disabledRepos := txn.Bucket([]byte("disabled_repos"))
+		if disabledRepos.Get([]byte(repoName)) != nil {
+			return ErrRepoDisabled
 		}
 
+		tokenBucket := txn.Bucket([]byte("tokens"))
 		repoBucket, err := txn.CreateBucketIfNotExists([]byte(repoName))
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("could not create bucket: '%v'", repoName))
@@ -161,9 +176,6 @@ func (db *BoltLeaseDB) GetLease(ctx context.Context, tokenStr string) (string, *
 	var leasePath string
 	err := db.store.View(func(txn *bolt.Tx) error {
 		tokens := txn.Bucket([]byte("tokens"))
-		if tokens == nil {
-			return fmt.Errorf("missing 'tokens' bucket")
-		}
 		lPath := tokens.Get([]byte(tokenStr))
 		if lPath == nil {
 			return InvalidLeaseError{}
@@ -210,9 +222,6 @@ func (db *BoltLeaseDB) CancelLeases(ctx context.Context, repoPath string) error 
 		}
 
 		tokens := txn.Bucket([]byte("tokens"))
-		if tokens == nil {
-			return fmt.Errorf("missing 'tokens' bucket")
-		}
 
 		leases := txn.Bucket([]byte(repository))
 		if leases == nil {
@@ -256,9 +265,6 @@ func (db *BoltLeaseDB) CancelLease(ctx context.Context, tokenStr string) error {
 		t0 := time.Now()
 
 		tokens := txn.Bucket([]byte("tokens"))
-		if tokens == nil {
-			return fmt.Errorf("missing 'tokens' bucket")
-		}
 		leasePath := tokens.Get([]byte(tokenStr))
 		if leasePath == nil {
 			gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
@@ -293,4 +299,54 @@ func (db *BoltLeaseDB) CancelLease(ctx context.Context, tokenStr string) error {
 // WithLock runs the given task while holding a commit lock for the repository
 func (db *BoltLeaseDB) WithLock(ctx context.Context, repository string, task func() error) error {
 	return db.locks.WithLock(repository, task)
+}
+
+// SetRepositoryEnabled sets the enabled/disabled status for a given repository
+func (db *BoltLeaseDB) SetRepositoryEnabled(
+	ctx context.Context, repository string, enable bool) error {
+	return db.store.Update(func(txn *bolt.Tx) error {
+		t0 := time.Now()
+
+		disabledRepos := txn.Bucket([]byte("disabled_repos"))
+
+		if enable {
+			disabledRepos.Delete([]byte(repository))
+		} else {
+			disabledRepos.Put([]byte(repository), []byte{})
+		}
+
+		gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+			Str("operation", "set_repo_enabled").
+			Dur("task_dt", time.Since(t0)).
+			Str("repository", repository).
+			Bool("enabled", enable).
+			Msgf("repository status changed")
+
+		return nil
+	})
+}
+
+// GetRepositoryEnabled returns the enabled status of a repository
+func (db *BoltLeaseDB) GetRepositoryEnabled(ctx context.Context, repository string) bool {
+	enabled := true
+	db.store.View(func(txn *bolt.Tx) error {
+		t0 := time.Now()
+
+		disabledRepos := txn.Bucket([]byte("disabled_repos"))
+
+		if disabledRepos.Get([]byte(repository)) != nil {
+			enabled = false
+		}
+
+		gw.LogC(ctx, "leasedb_bolt", gw.LogDebug).
+			Str("operation", "get_repo_enabled").
+			Dur("task_dt", time.Since(t0)).
+			Str("repository", repository).
+			Bool("enabled", enabled).
+			Msgf("repository status queried")
+
+		return nil
+	})
+
+	return enabled
 }

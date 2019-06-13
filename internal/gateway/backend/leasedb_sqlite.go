@@ -23,6 +23,7 @@ type statements struct {
 	getLeases        *sql.Stmt
 	getLease         *sql.Stmt
 	getLeasesForRepo *sql.Stmt
+	getDisabledRepo  *sql.Stmt
 }
 
 // SqliteLeaseDB is a LeaseDB backed by BoltDB
@@ -70,6 +71,10 @@ func OpenSqliteLeaseDB(workDir string) (*SqliteLeaseDB, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "could not prepare statement for 'get lease for repo'")
 	}
+	st4, err := store.Prepare("SELECT Name from DisabledRepos WHERE Name = ?;")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not prepare statement for 'get disabled repo'")
+	}
 
 	gw.Log("leasedb_sqlite", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
@@ -77,7 +82,7 @@ func OpenSqliteLeaseDB(workDir string) (*SqliteLeaseDB, error) {
 	return &SqliteLeaseDB{
 		store: store,
 		locks: NamedLocks{},
-		st:    statements{getLeases: st1, getLease: st2, getLeasesForRepo: st3},
+		st:    statements{getLeases: st1, getLease: st2, getLeasesForRepo: st3, getDisabledRepo: st4},
 	}, nil
 }
 
@@ -115,6 +120,12 @@ func (db *SqliteLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, 
 	repoName, subPath, err := gw.SplitLeasePath(leasePath)
 	if err != nil {
 		return errors.Wrap(err, "invalid lease path")
+	}
+
+	row := db.st.getDisabledRepo.QueryRow(repoName)
+	var n string
+	if row.Scan(&n) != sql.ErrNoRows {
+		return ErrRepoDisabled
 	}
 
 	matches, err := txn.Query(
@@ -367,6 +378,73 @@ func (db *SqliteLeaseDB) WithLock(ctx context.Context, repository string, task f
 	return db.locks.WithLock(repository, task)
 }
 
+// SetRepositoryEnabled sets the enabled/disabled status for a given repository
+func (db *SqliteLeaseDB) SetRepositoryEnabled(
+	ctx context.Context, repository string, enable bool) error {
+	t0 := time.Now()
+
+	txn, err := db.store.Begin()
+	if err != nil {
+		return errors.Wrap(err, "could not begin transaction")
+	}
+	defer txn.Rollback()
+
+	if enable {
+		if _, err := txn.Exec(
+			"DELETE FROM DisabledRepos WHERE Name = ?;", repository); err != nil {
+			return errors.Wrap(err, "statement failed")
+		}
+	} else {
+		row := db.st.getDisabledRepo.QueryRow(repository)
+		var n string
+		if err := row.Scan(&n); err != nil {
+			if err == sql.ErrNoRows {
+				if _, err := txn.Exec(
+					"INSERT INTO DisabledRepos (Name) VALUES (?);", repository); err != nil {
+					return errors.Wrap(err, "statement failed")
+				}
+			} else {
+				return errors.Wrap(err, "query failed")
+			}
+		}
+	}
+
+	if err := txn.Commit(); err != nil {
+		return errors.Wrap(err, "transaction commit failed")
+	}
+
+	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
+		Str("operation", "set_repo_enabled").
+		Dur("task_dt", time.Since(t0)).
+		Str("repository", repository).
+		Bool("enabled", enable).
+		Msgf("repository status changed")
+
+	return nil
+}
+
+// GetRepositoryEnabled returns the enabled status of a repository
+func (db *SqliteLeaseDB) GetRepositoryEnabled(ctx context.Context, repository string) bool {
+	t0 := time.Now()
+
+	enabled := true
+
+	row := db.st.getDisabledRepo.QueryRow(repository)
+	var n string
+	if row.Scan(&n) != sql.ErrNoRows {
+		enabled = false
+	}
+
+	gw.LogC(ctx, "leasedb_sqlite", gw.LogDebug).
+		Str("operation", "get_repo_enabled").
+		Dur("task_dt", time.Since(t0)).
+		Str("repository", repository).
+		Bool("enabled", enabled).
+		Msgf("repository status queried")
+
+	return enabled
+}
+
 func createSchema(db *sql.DB) error {
 	statement := fmt.Sprintf(`
 CREATE TABLE SchemaVersion (
@@ -383,6 +461,9 @@ CREATE TABLE IF NOT EXISTS Leases (
 	Secret blob NOT NULL,
 	Expiration integer NOT NULL,
 	ProtocolVersion integer NOT NULL
+);
+CREATE TABLE IF NOT EXISTS DisabledRepos (
+	Name string NOT NULL UNIQUE PRIMARY KEY
 );
 `,
 		latestSchemaVersion)
