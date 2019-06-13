@@ -137,7 +137,7 @@ func (db *BoltLeaseDB) GetLeases(ctx context.Context) (map[string]Lease, error) 
 	err := db.store.View(func(txn *bolt.Tx) error {
 		if err := txn.ForEach(func(name []byte, b *bolt.Bucket) error {
 			bucketName := string(name)
-			if bucketName == "tokens" {
+			if bucketName == "tokens" || bucketName == "disabled_repos" {
 				return nil
 			}
 			if err := b.ForEach(func(k, v []byte) error {

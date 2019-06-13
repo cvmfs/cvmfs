@@ -30,7 +30,7 @@ func (s *Services) SetRepoEnabled(ctx context.Context, repository string, enable
 	t0 := time.Now()
 
 	outcome := "success"
-	defer logAction(ctx, "new_lease", &outcome, t0)
+	defer logAction(ctx, "set_repo_enabled", &outcome, t0)
 
 	if !enable {
 		// If wait == true, the repository is disabled while the global commit lock
