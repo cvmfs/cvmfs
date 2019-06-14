@@ -36,23 +36,24 @@ func (s *Services) SetRepoEnabled(ctx context.Context, repository string, enable
 		// If wait == true, the repository is disabled while the global commit lock
 		// of the repository is held
 		if wait {
-			s.Leases.WithLock(ctx, repository, func() error {
+			return s.Leases.WithLock(ctx, repository, func() error {
+				busy, err := s.checkBusy(ctx, repository)
+				if err != nil {
+					outcome = err.Error()
+					return err
+				}
+				if busy {
+					outcome = "repository_busy"
+					return RepoBusyError{}
+				}
 				return s.Leases.SetRepositoryEnabled(ctx, repository, false)
 			})
-			return nil
 		}
 
-		leases, err := s.GetLeases(ctx)
+		busy, err := s.checkBusy(ctx, repository)
 		if err != nil {
 			outcome = err.Error()
 			return err
-		}
-		busy := false
-		for n := range leases {
-			if n == repository {
-				busy = true
-				break
-			}
 		}
 		if busy {
 			outcome = "repository_busy"
@@ -61,4 +62,20 @@ func (s *Services) SetRepoEnabled(ctx context.Context, repository string, enable
 	}
 
 	return s.Leases.SetRepositoryEnabled(ctx, repository, enable)
+}
+
+func (s *Services) checkBusy(ctx context.Context, repository string) (bool, error) {
+	leases, err := s.GetLeases(ctx)
+	if err != nil {
+		return false, err
+	}
+	busy := false
+	for n := range leases {
+		if n == repository {
+			busy = true
+			break
+		}
+	}
+
+	return busy, nil
 }
