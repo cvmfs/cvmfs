@@ -46,7 +46,7 @@ func (b *mockBackend) GetRepos(ctx context.Context) map[string]be.RepositoryConf
 	}
 }
 
-func (b *mockBackend) SetRepoEnabled(ctx context.Context, repository string, enabled bool, wait bool) error {
+func (b *mockBackend) SetRepoEnabled(ctx context.Context, repository string, enabled bool) error {
 	return nil
 }
 
