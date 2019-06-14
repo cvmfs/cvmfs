@@ -6,19 +6,19 @@ import (
 )
 
 // GetRepo returns the access configuration of a repository
-func (s *Services) GetRepo(repoName string) *RepositoryConfig {
+func (s *Services) GetRepo(ctx context.Context, repoName string) *RepositoryConfig {
 	repo := s.Access.GetRepo(repoName)
 	if repo != nil {
-		repo.Enabled = s.Leases.GetRepositoryEnabled(context.TODO(), repoName)
+		repo.Enabled = s.Leases.GetRepositoryEnabled(ctx, repoName)
 	}
 	return repo
 }
 
 // GetRepos returns a map with repository access configurations
-func (s *Services) GetRepos() map[string]RepositoryConfig {
+func (s *Services) GetRepos(ctx context.Context) map[string]RepositoryConfig {
 	repos := s.Access.GetRepos()
 	for repoName, cfg := range repos {
-		cfg.Enabled = s.Leases.GetRepositoryEnabled(context.TODO(), repoName)
+		cfg.Enabled = s.Leases.GetRepositoryEnabled(ctx, repoName)
 		repos[repoName] = cfg
 	}
 	return repos

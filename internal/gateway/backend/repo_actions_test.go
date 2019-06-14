@@ -14,16 +14,24 @@ func TestRepoActionsToggleRepo(t *testing.T) {
 		os.RemoveAll(tmp)
 	}()
 
-	repos := backend.GetRepos()
+	ctx := context.TODO()
+	repos := backend.GetRepos(ctx)
 	repoName := "test1.repo.org"
 	if !repos[repoName].Enabled {
 		t.Fatalf("Repository %v should be enabled by default", repoName)
 	}
 
-	backend.SetRepoEnabled(context.TODO(), repoName, false, false)
+	backend.SetRepoEnabled(ctx, repoName, false)
 
-	repos = backend.GetRepos()
+	repos = backend.GetRepos(ctx)
 	if repos[repoName].Enabled {
 		t.Fatalf("Repository %v should have been disabled", repoName)
+	}
+
+	backend.SetRepoEnabled(ctx, repoName, true)
+
+	repos = backend.GetRepos(ctx)
+	if !repos[repoName].Enabled {
+		t.Fatalf("Repository %v should have been reenabled", repoName)
 	}
 }

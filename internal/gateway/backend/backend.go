@@ -20,9 +20,9 @@ type Services struct {
 
 // ActionController contains the various actions that can be performed with the backend
 type ActionController interface {
-	GetKey(keyID string) *KeyConfig
-	GetRepo(repoName string) *RepositoryConfig
-	GetRepos() map[string]RepositoryConfig
+	GetKey(ctx context.Context, keyID string) *KeyConfig
+	GetRepo(ctx context.Context, repoName string) *RepositoryConfig
+	GetRepos(ctx context.Context) map[string]RepositoryConfig
 	SetRepoEnabled(ctx context.Context, repository string, enabled bool, wait bool) error
 	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error)
 	GetLeases(ctx context.Context) (map[string]LeaseReturn, error)
@@ -35,7 +35,7 @@ type ActionController interface {
 }
 
 // GetKey returns the key configuration associated with a key ID
-func (s *Services) GetKey(keyID string) *KeyConfig {
+func (s *Services) GetKey(ctx context.Context, keyID string) *KeyConfig {
 	return s.Access.GetKeyConfig(keyID)
 }
 

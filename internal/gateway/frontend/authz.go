@@ -33,7 +33,7 @@ func WithAdminAuthz(ac be.ActionController, next httprouter.Handle) httprouter.H
 			return
 		}
 
-		keyCfg := ac.GetKey(keyID)
+		keyCfg := ac.GetKey(ctx, keyID)
 		if keyCfg == nil {
 			gw.LogC(ctx, "http", gw.LogError).
 				Msg("invalid key ID specified")
@@ -91,7 +91,7 @@ func WithAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle
 			return
 		}
 
-		keyCfg := ac.GetKey(keyID)
+		keyCfg := ac.GetKey(ctx, keyID)
 		if keyCfg == nil {
 			gw.LogC(ctx, "http", gw.LogError).
 				Msg("invalid key ID specified")

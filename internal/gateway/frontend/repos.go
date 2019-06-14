@@ -16,7 +16,7 @@ func MakeReposHandler(services be.ActionController) httprouter.Handle {
 		msg := make(map[string]interface{})
 
 		if repoName := ps.ByName("name"); repoName != "" {
-			rc := services.GetRepo(repoName)
+			rc := services.GetRepo(ctx, repoName)
 			if rc == nil {
 				msg["status"] = "error"
 				msg["reason"] = "invalid_repo"
@@ -26,7 +26,7 @@ func MakeReposHandler(services be.ActionController) httprouter.Handle {
 			}
 		} else {
 			msg["status"] = "ok"
-			msg["data"] = services.GetRepos()
+			msg["data"] = services.GetRepos(ctx)
 		}
 
 		gw.LogC(ctx, "http", gw.LogInfo).Msg("request processed")

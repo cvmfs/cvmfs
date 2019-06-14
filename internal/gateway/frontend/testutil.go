@@ -21,7 +21,7 @@ func forwardBody(w http.ResponseWriter, req *http.Request, _ httprouter.Params) 
 type mockBackend struct {
 }
 
-func (b *mockBackend) GetKey(keyID string) *be.KeyConfig {
+func (b *mockBackend) GetKey(ctx context.Context, keyID string) *be.KeyConfig {
 	admin := false
 	if strings.HasPrefix(keyID, "admin") {
 		admin = true
@@ -29,13 +29,13 @@ func (b *mockBackend) GetKey(keyID string) *be.KeyConfig {
 	return &be.KeyConfig{Secret: "big_secret", Admin: admin}
 }
 
-func (b *mockBackend) GetRepo(repoName string) *be.RepositoryConfig {
+func (b *mockBackend) GetRepo(ctx context.Context, repoName string) *be.RepositoryConfig {
 	return &be.RepositoryConfig{
 		Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
 	}
 }
 
-func (b *mockBackend) GetRepos() map[string]be.RepositoryConfig {
+func (b *mockBackend) GetRepos(ctx context.Context) map[string]be.RepositoryConfig {
 	return map[string]be.RepositoryConfig{
 		"test1.repo.org": be.RepositoryConfig{
 			Keys: be.KeyPaths{"keyid123": "/"},

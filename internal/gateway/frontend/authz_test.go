@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
@@ -17,7 +18,7 @@ func TestAuthorizationMiddlewareNewLease(t *testing.T) {
 	backend := mockBackend{}
 	t.Run("POST /leases (new lease OK)", func(t *testing.T) {
 		reqBody := []byte("hello")
-		HMAC := ComputeHMAC(reqBody, backend.GetKey("keyid2").Secret)
+		HMAC := ComputeHMAC(reqBody, backend.GetKey(context.TODO(), "keyid2").Secret)
 		req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(reqBody))
 		req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 		w := httptest.NewRecorder()
@@ -68,7 +69,7 @@ func TestAuthorizationMiddlewareNewLease(t *testing.T) {
 	})
 	t.Run("POST /leases (new lease invalid HMAC)", func(t *testing.T) {
 		reqBody := []byte("hello")
-		HMAC := ComputeHMAC([]byte("other HMAC input"), backend.GetKey("keyid2").Secret)
+		HMAC := ComputeHMAC([]byte("other HMAC input"), backend.GetKey(context.TODO(), "keyid2").Secret)
 		req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(reqBody))
 		w := httptest.NewRecorder()
 		req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
@@ -90,7 +91,7 @@ func TestAuthorizationMiddlewareCommitLease(t *testing.T) {
 	backend := mockBackend{}
 	token := "lease_token"
 	t.Run("POST /leases/$token (commit lease OK)", func(t *testing.T) {
-		HMAC := ComputeHMAC([]byte(token), backend.GetKey("keyid2").Secret)
+		HMAC := ComputeHMAC([]byte(token), backend.GetKey(context.TODO(), "keyid2").Secret)
 		req := httptest.NewRequest("POST", "/api/v1/leases/"+token, nil)
 		req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 		w := httptest.NewRecorder()
@@ -107,7 +108,7 @@ func TestAuthorizationMiddlewareCommitLease(t *testing.T) {
 	})
 	t.Run("POST /leases (commit lease invalid HMAC)", func(t *testing.T) {
 		reqBody := []byte("hello")
-		HMAC := ComputeHMAC([]byte("other HMAC input"), backend.GetKey("keyid2").Secret)
+		HMAC := ComputeHMAC([]byte("other HMAC input"), backend.GetKey(context.TODO(), "keyid2").Secret)
 		req := httptest.NewRequest("POST", "/api/v1/leases/"+token, bytes.NewReader(reqBody))
 		w := httptest.NewRecorder()
 		req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
@@ -136,7 +137,7 @@ func TestAuthorizationMiddlewareSubmitPayloadLegacy(t *testing.T) {
 		"api_version":    "2",
 	})
 
-	HMAC := ComputeHMAC(msg, backend.GetKey("keyid2").Secret)
+	HMAC := ComputeHMAC(msg, backend.GetKey(context.TODO(), "keyid2").Secret)
 	req := httptest.NewRequest("POST", "/api/v1/payloads", bytes.NewReader(msg))
 	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
 	req.Header["Message-Size"] = []string{strconv.Itoa(len(msg))}
@@ -168,7 +169,7 @@ func TestAuthorizationMiddlewareSubmitPayloadNew(t *testing.T) {
 		"api_version":    "3",
 	})
 
-	HMAC := ComputeHMAC([]byte(token), backend.GetKey("keyid2").Secret)
+	HMAC := ComputeHMAC([]byte(token), backend.GetKey(context.TODO(), "keyid2").Secret)
 	req := httptest.NewRequest("POST", "/api/v1/payloads/"+token, bytes.NewReader(msg))
 
 	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
@@ -196,7 +197,7 @@ func TestAdminAuthorizationMiddleware(t *testing.T) {
 	backend := mockBackend{}
 
 	t.Run("Non-admin key is rejected", func(t *testing.T) {
-		HMAC := ComputeHMAC([]byte("/api/v1/repos/test1.repo.org"), backend.GetKey("keyid2").Secret)
+		HMAC := ComputeHMAC([]byte("/api/v1/repos/test1.repo.org"), backend.GetKey(context.TODO(), "keyid2").Secret)
 		req := httptest.NewRequest("DELETE", "/api/v1/repos/test1.repo.org", nil)
 		ps := httprouter.Params{}
 
@@ -218,7 +219,7 @@ func TestAdminAuthorizationMiddleware(t *testing.T) {
 		}
 	})
 	t.Run("Invalid HTTP method", func(t *testing.T) {
-		HMAC := ComputeHMAC([]byte("/api/v1/repos/test1.repo.org"), backend.GetKey("admin0").Secret)
+		HMAC := ComputeHMAC([]byte("/api/v1/repos/test1.repo.org"), backend.GetKey(context.TODO(), "admin0").Secret)
 		req := httptest.NewRequest("PUT", "/api/v1/repos/test1.repo.org", nil)
 		ps := httprouter.Params{}
 
@@ -237,7 +238,7 @@ func TestAdminAuthorizationMiddleware(t *testing.T) {
 	t.Run("DELETE", func(t *testing.T) {
 		msg := []byte("hello")
 
-		HMAC := ComputeHMAC([]byte("/api/v1/repos/test1.repo.org"), backend.GetKey("admin0").Secret)
+		HMAC := ComputeHMAC([]byte("/api/v1/repos/test1.repo.org"), backend.GetKey(context.TODO(), "admin0").Secret)
 		req := httptest.NewRequest("DELETE", "/api/v1/repos/test1.repo.org", bytes.NewReader(msg))
 		ps := httprouter.Params{}
 
@@ -264,7 +265,7 @@ func TestAdminAuthorizationMiddleware(t *testing.T) {
 	t.Run("POST", func(t *testing.T) {
 		msg := []byte("hello")
 
-		HMAC := ComputeHMAC(msg, backend.GetKey("admin0").Secret)
+		HMAC := ComputeHMAC(msg, backend.GetKey(context.TODO(), "admin0").Secret)
 		req := httptest.NewRequest("POST", "/api/v1/repos/test1.repo.org", bytes.NewReader(msg))
 		ps := httprouter.Params{}
 
