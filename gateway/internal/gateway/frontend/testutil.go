@@ -91,6 +91,6 @@ func (b *mockBackend) SubmitPayload(ctx context.Context, token string, payload i
 	return nil
 }
 
-func (b *mockBackend) RunGC(ctx context.Context, options be.GCOptions) error {
-	return nil
+func (b *mockBackend) RunGC(ctx context.Context, options be.GCOptions) (string, error) {
+	return "", nil
 }

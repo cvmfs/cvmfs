@@ -2,31 +2,55 @@ package backend
 
 import (
 	"context"
+	"os/exec"
+	"strconv"
 	"time"
 )
-
-/*
-gc              [-r number of revisions to preserve]
-[-t time stamp after which revisions are preserved]
-[-l print deleted objects] [-L log of deleted objects]
-[-f force] [-d dry run]
-[-a collect all garbage-collectable repos, log to gc.log |
-  <fully qualified name> ]
-*/
 
 // GCOptions represents the different options supplied for a garbace collection run
 type GCOptions struct {
 	Repository   string    `json:"repo"`
 	NumRevisions int       `json:"num_revisions"`
 	Timestamp    time.Time `json:"timestamp"`
-	Force        bool      `json:"force"`
 	DryRun       bool      `json:"dry_run"`
-	All          bool      `json:"all"`
-	// Verbose is similar to the "-l" parameter, return a list of deleted objects to the caller
-	// Verbose bool `json:"verbose"`
+	Verbose      bool      `json:"verbose"`
 }
 
 // RunGC triggers garbage collection on the specified repository
-func (s *Services) RunGC(ctx context.Context, options GCOptions) error {
-	return nil
+func (s *Services) RunGC(ctx context.Context, options GCOptions) (string, error) {
+	t0 := time.Now()
+
+	outcome := "success"
+	defer logAction(ctx, "garbage_collection", &outcome, t0)
+
+	baseArgs := []string{"gc", "-f"}
+	if options.NumRevisions != 0 {
+		baseArgs = append(baseArgs, "-r", strconv.Itoa(options.NumRevisions))
+	}
+	if !options.Timestamp.IsZero() {
+		baseArgs = append(baseArgs, "-t", options.Timestamp.String())
+	}
+	if options.DryRun {
+		baseArgs = append(baseArgs, "-d")
+	}
+	if options.Verbose {
+		baseArgs = append(baseArgs, "-l")
+	}
+
+	var output string
+	args := append(baseArgs, options.Repository)
+	if err := s.Leases.WithLock(ctx, options.Repository, func() error {
+		cmd := exec.Command("cvmfs_server", args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return err
+		}
+		output = string(out)
+		return nil
+	}); err != nil {
+		outcome = err.Error()
+		return "", err
+	}
+
+	return output, nil
 }

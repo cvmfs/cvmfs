@@ -25,7 +25,7 @@ def toggle_repo(args):
     req = {'enable': bool(args.enable)}
     headers = make_headers(args.key_id, args.secret, json.dumps(req))
     rep = requests.post(args.gw_url + '/repos/' +
-                        args.repo_name, json=req, headers=headers)
+                        args.repo, json=req, headers=headers)
     print(json.dumps(rep.json()))
 
 def get_leases(args):
@@ -87,6 +87,18 @@ def submit_payload(args):
     rep = requests.post(req_url, json=req, headers=headers)
     print(json.dumps(rep.json()))
 
+def gc(args):
+    req = {
+        'repo': args.repo,
+        'num_revisions': args.num_revisions,
+        'timestamp': args.timestamp,
+        'dry_run': args.dry_run,
+        'verbose': args.verbose
+    }
+    headers = make_headers(args.key_id, args.secret, json.dumps(req))
+    rep = requests.post(args.gw_url + '/gc', json=req, headers=headers)
+    print(json.dumps(rep.json()))
+
 def main():
     parser = argparse.ArgumentParser(description='Test gateway API requests')
     parser.add_argument('--gw_url', required=True,
@@ -110,7 +122,7 @@ def main():
     parser_toggle_repo.add_argument(
         '--wait', required=False, action='store_true', default=False, help='wait until the repository can be disabled')
     parser_toggle_repo.add_argument(
-        '--repo_name', required=True, help='name of the concerned repository')
+        '--repo', required=True, help='name of the concerned repository')
 
     subparsers.add_parser(
         'get_leases', help='get active leases'
@@ -152,6 +164,15 @@ def main():
     parser_submit_payload.add_argument(
         '--legacy', required=False, default=False, action='store_true', help='use legacy request format')
 
+    parser_gc = subparsers.add_parser(
+        'gc', help='trigger garbage collection for a repository'
+    )
+    parser_gc.add_argument('--repo', required=True, help='name of the repository')
+    parser_gc.add_argument('--num_revisions', required=False, help='number of revisions to keep')
+    parser_gc.add_argument('--timestamp', required=False, help='threshold timestamp for garbage collection')
+    parser_gc.add_argument('--dry_run', required=False, default=False, action='store_true', help='dry run')
+    parser_gc.add_argument('--verbose', required=False, default=False, action='store_true', help='verbose output')
+
     args = parser.parse_args()
 
     {
@@ -164,6 +185,7 @@ def main():
         'cancel_leases': cancel_leases,
         'commit_lease': commit_lease,
         'submit_payload': submit_payload,
+        'gc': gc,
     }[args.command](args)
 
 

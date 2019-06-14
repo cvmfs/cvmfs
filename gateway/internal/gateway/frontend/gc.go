@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
 	"github.com/julienschmidt/httprouter"
 )
@@ -20,9 +21,15 @@ func MakeGCHandler(services be.ActionController) httprouter.Handle {
 		}
 
 		msg := map[string]interface{}{"status": "ok"}
-		if err := services.RunGC(ctx, options); err != nil {
+		if output, err := services.RunGC(ctx, options); err != nil {
 			msg["status"] = "error"
 			msg["reason"] = err.Error()
+		} else {
+			msg["output"] = output
 		}
+
+		gw.LogC(ctx, "http", gw.LogInfo).Msg("request processed")
+
+		replyJSON(ctx, w, msg)
 	}
 }
