@@ -5,6 +5,7 @@ import base64
 import hmac
 import json
 import requests
+import time
 
 # Utility functions
 
@@ -99,6 +100,18 @@ def gc(args):
     rep = requests.post(args.gw_url + '/gc', json=req, headers=headers)
     print(json.dumps(rep.json()))
 
+def publish_manifest(args):
+    manifest = requests.get(args.manifest).text
+    req = {
+        'version': 1,
+        'timestamp': time.strftime('%d %b %Y %H:%M:%S', time.gmtime()),
+        'type': 'activity',
+        'repository': args.repo,
+        'manifest': manifest
+    }
+    rep = requests.post(args.gw_url + "/notifications/publish", json=req)
+    print(json.dumps(rep.json()))
+
 def main():
     parser = argparse.ArgumentParser(description='Test gateway API requests')
     parser.add_argument('--gw_url', required=True,
@@ -173,6 +186,12 @@ def main():
     parser_gc.add_argument('--dry_run', required=False, default=False, action='store_true', help='dry run')
     parser_gc.add_argument('--verbose', required=False, default=False, action='store_true', help='verbose output')
 
+    parser_publish_manifest = subparsers.add_parser(
+        'publish_manifest', help='publish a manifest to the notification system'
+    )
+    parser_publish_manifest.add_argument('--repo', required=True, help='name of the repository')
+    parser_publish_manifest.add_argument('--manifest', required=True, help='URL of the repository manifest')
+
     args = parser.parse_args()
 
     {
@@ -186,6 +205,7 @@ def main():
         'commit_lease': commit_lease,
         'submit_payload': submit_payload,
         'gc': gc,
+        'publish_manifest': publish_manifest
     }[args.command](args)
 
 
