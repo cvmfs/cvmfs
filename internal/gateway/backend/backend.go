@@ -32,6 +32,7 @@ type ActionController interface {
 	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 	RunGC(ctx context.Context, options GCOptions) (string, error)
+	PublishManifest(ctx context.Context, repository string, message []byte) error
 }
 
 // GetKey returns the key configuration associated with a key ID

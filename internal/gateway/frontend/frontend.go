@@ -51,6 +51,10 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration) 
 	// Payloads (new and improved)
 	router.POST(APIRoot+"/payloads/:token", mw(MakePayloadsHandler(services)))
 
+	// Notification system endpoints
+	router.POST(APIRoot+"/notifications/publish", tag(MakeNotificationsHandler(services)))
+	router.GET(APIRoot+"/notifications/subscribe", tag(MakeNotificationsHandler(services)))
+
 	// Admin routes
 	router.POST(APIRoot+"/repos/:name", amw(MakeAdminReposHandler(services)))
 	router.DELETE(APIRoot+"/leases-by-path/*path", amw(MakeAdminLeasesHandler(services)))

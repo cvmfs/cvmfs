@@ -94,3 +94,7 @@ func (b *mockBackend) SubmitPayload(ctx context.Context, token string, payload i
 func (b *mockBackend) RunGC(ctx context.Context, options be.GCOptions) (string, error) {
 	return "", nil
 }
+
+func (b *mockBackend) PublishManifest(ctx context.Context, repository string, message []byte) error {
+	return nil
+}
