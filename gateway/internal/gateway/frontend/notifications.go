@@ -18,15 +18,16 @@ type reply map[string]interface{}
 func MakeNotificationsHandler(services be.ActionController) httprouter.Handle {
 	return func(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
 		if h.Method == "POST" && strings.HasSuffix(h.URL.Path, "publish") {
-			handlePublish(w, h, ps)
+			handlePublish(services, w, h, ps)
 		} else {
-			handleSubscribe(w, h, ps)
+			handleSubscribe(services, w, h, ps)
 		}
 
 	}
 }
 
-func handlePublish(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
+func handlePublish(
+	services be.ActionController, w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
 	ctx := h.Context()
 
 	var req struct {
@@ -50,15 +51,21 @@ func handlePublish(w http.ResponseWriter, h *http.Request, ps httprouter.Params)
 
 	rep := map[string]interface{}{"status": "ok"}
 
+	if err := services.PublishManifest(ctx, req.Repository, body.Bytes()); err != nil {
+		rep["status"] = "error"
+		rep["reason"] = err.Error()
+	}
+
 	gw.LogC(ctx, "http", gw.LogInfo).Msg("request_processed")
 
 	replyJSON(ctx, w, rep)
 }
 
-func handleSubscribe(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
+func handleSubscribe(
+	services be.ActionController, w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
 	ctx := h.Context()
 
-	rep := make(map[string]interface{})
+	rep := map[string]interface{}{"status": "ok"}
 
 	gw.LogC(ctx, "http", gw.LogInfo).Msg("request_processed")
 
