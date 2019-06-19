@@ -300,6 +300,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_notify.cc
   swissknife_pull.cc
   swissknife_reflog.cc
+  swissknife_filestats.cc
   swissknife_scrub.cc
   swissknife_sign.cc
   swissknife_sync.cc
