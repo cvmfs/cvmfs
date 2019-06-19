@@ -12,10 +12,11 @@ import (
 // Services is a container for the various
 // backend services
 type Services struct {
-	Access AccessConfig
-	Leases LeaseDB
-	Pool   *receiver.Pool
-	Config gw.Config
+	Access        AccessConfig
+	Leases        LeaseDB
+	Pool          *receiver.Pool
+	Notifications *NotificationSystem
+	Config        gw.Config
 }
 
 // ActionController contains the various actions that can be performed with the backend
@@ -58,7 +59,12 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 		return nil, errors.Wrap(err, "could not start receiver pool")
 	}
 
-	return &Services{Access: *ac, Leases: ldb, Pool: pool, Config: *cfg}, nil
+	ns, err := NewNotificationSystem(cfg.WorkDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not initialize notification system")
+	}
+
+	return &Services{Access: *ac, Leases: ldb, Pool: pool, Notifications: ns, Config: *cfg}, nil
 }
 
 // Stop all the backend services
