@@ -1,4 +1,5 @@
 1.1.0:
+  * Administrative operations and GC (CVM-1685)
   * The application was rewritten in Go, with full backward compatibility
   * Lower memory use during payload submission: object packs are now streamed
     to receiver
