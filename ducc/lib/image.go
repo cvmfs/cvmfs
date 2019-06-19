@@ -250,7 +250,7 @@ func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity
 	}
 	defer os.RemoveAll(singularityTempCache)
 	err = ExecCommand("singularity", "build", "--force", "--sandbox", dir, img.GetSingularityLocation()).Env(
-		"SINGULARITY_CACHEDIR", singularityTempCache).Start()
+		"SINGULARITY_CACHEDIR", singularityTempCache).Env("PATH", os.Getenv("PATH")).Start()
 	if err != nil {
 		LogE(err).Error("Error in downloading the singularity image")
 		return
