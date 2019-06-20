@@ -98,3 +98,7 @@ func (b *mockBackend) RunGC(ctx context.Context, options be.GCOptions) (string, 
 func (b *mockBackend) PublishManifest(ctx context.Context, repository string, message []byte) error {
 	return nil
 }
+
+func (b *mockBackend) SubscribeToNotifications(ctx context.Context, repository string) <-chan be.NotificationMessage {
+	return make(chan be.NotificationMessage)
+}

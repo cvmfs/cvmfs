@@ -34,6 +34,7 @@ type ActionController interface {
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 	RunGC(ctx context.Context, options GCOptions) (string, error)
 	PublishManifest(ctx context.Context, repository string, message []byte) error
+	SubscribeToNotifications(ctx context.Context, repository string) <-chan NotificationMessage
 }
 
 // GetKey returns the key configuration associated with a key ID

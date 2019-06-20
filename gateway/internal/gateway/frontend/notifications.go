@@ -6,10 +6,15 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
 	"github.com/julienschmidt/httprouter"
+)
+
+const (
+	notificationTimeout = 2 * time.Hour
 )
 
 type reply map[string]interface{}
@@ -65,9 +70,48 @@ func handleSubscribe(
 	services be.ActionController, w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
 	ctx := h.Context()
 
-	rep := map[string]interface{}{"status": "ok"}
+	var req struct {
+		Version    int    `json:"version"`
+		Repository string `json:"repository"`
+	}
 
-	gw.LogC(ctx, "http", gw.LogInfo).Msg("request_processed")
+	if err := json.NewDecoder(h.Body).Decode(&req); err != nil {
+		httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
+		return
+	}
 
-	replyJSON(ctx, w, rep)
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+
+	gw.LogC(ctx, "http", gw.LogInfo).Msg("event stream starting")
+
+	eventSource := services.SubscribeToNotifications(ctx, req.Repository)
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		msg := "response writer does not support flushing"
+		gw.LogC(ctx, "http", gw.LogError).Msg(msg)
+		http.Error(w, msg, http.StatusInternalServerError)
+	}
+	for {
+		timeout := time.NewTimer(notificationTimeout)
+		select {
+		case event, ok := <-eventSource:
+			if ok {
+				if _, err := w.Write([]byte("data: " + event + "\n\n")); err != nil {
+					httpWrapError(ctx, err, "could not write event", w, http.StatusInternalServerError)
+					return
+				}
+				flusher.Flush()
+			} else {
+				break
+			}
+			timeout.Stop()
+		case <-timeout.C:
+			gw.LogC(ctx, "http", gw.LogInfo).Msg("notification timeout")
+			replyJSON(ctx, w, map[string]interface{}{"status": "timeout"})
+			return
+		}
+	}
 }
