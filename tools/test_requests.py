@@ -109,8 +109,20 @@ def publish_manifest(args):
         'repository': args.repo,
         'manifest': manifest
     }
-    rep = requests.post(args.gw_url + "/notifications/publish", json=req)
+    rep = requests.post(args.gw_url + '/notifications/publish', json=req)
     print(json.dumps(rep.json()))
+
+def subscribe(args):
+    req = {
+        'version': 1,
+        'repository': args.repo
+    }
+    rep = requests.get(args.gw_url + '/notifications/subscribe', json=req, stream=True)
+
+    for line in rep.iter_lines():
+        decoded_line = line.decode('utf-8')
+        msg = decoded_line[6:]
+        print(json.dumps(msg))
 
 def main():
     parser = argparse.ArgumentParser(description='Test gateway API requests')
@@ -192,6 +204,11 @@ def main():
     parser_publish_manifest.add_argument('--repo', required=True, help='name of the repository')
     parser_publish_manifest.add_argument('--manifest', required=True, help='URL of the repository manifest')
 
+    parser_subscribe = subparsers.add_parser(
+        'subscribe', help='subscribe to repository notifications'
+    )
+    parser_subscribe.add_argument('--repo', required=True, help="name of the repository")
+
     args = parser.parse_args()
 
     {
@@ -205,7 +222,8 @@ def main():
         'commit_lease': commit_lease,
         'submit_payload': submit_payload,
         'gc': gc,
-        'publish_manifest': publish_manifest
+        'publish_manifest': publish_manifest,
+        'subscribe': subscribe
     }[args.command](args)
 
 
