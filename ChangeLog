@@ -1,4 +1,5 @@
 2.7.0:
+  * Add support for CVMFS_LIBRARY_PATH to simplify standalone deployment
   * Enforce CVMFS_NFILES only if mounted via mount helper
   * Add support for pre-mounted mount point with libfuse3
   * Add support for libfuse3, including new mount option libfuse=[2|3]
