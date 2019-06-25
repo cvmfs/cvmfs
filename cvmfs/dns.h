@@ -358,8 +358,9 @@ class HostfileResolver : public Resolver {
     std::vector<std::string> ipv4_addresses;
     std::vector<std::string> ipv6_addresses;
   };
+  static const int kIpMaxLength = 45;
+  static const int kHostnameMaxLength = 253;
   void ParseHostFile();
-
   /**
    * Host names to lists of IPv4 and IPv6 addresses.  Reverse lookup in the
    * hosts file.
