@@ -551,7 +551,6 @@ fi
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
-%{_bindir}/cvmfs_stratum_agent
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
@@ -579,6 +578,8 @@ fi
 %endif
 
 %changelog
+* Wed Jun 12 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
+- Remove cvmfs_stratum_agent
 * Wed Apr 03 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
 - Add fuse3 sub package
 * Tue Feb 19 2019 Simone Mosciatti <simone.mosciatti@cern.ch> - 2.6.0

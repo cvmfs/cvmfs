@@ -416,10 +416,8 @@ if (BUILD_CVMFS)
   endif (MACOSX)
 endif (BUILD_CVMFS)
 
-# Server only: unzip, libcap, mongoose
+# Server only: unzip, libcap
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
-  find_package(Mongoose REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MONGOOSE_INCLUDE_DIRS})
   find_package(PythonLibs REQUIRED)
   find_package(LibCAP REQUIRED)
   find_program(UNZIP_EXE NAMES unzip)

@@ -399,29 +399,6 @@ set (CVMFS_PRELOADER_SOURCES
   xattr.cc
 )
 
-set (CVMFS_STRATUM_AGENT_SOURCES
-  compression.cc
-  dns.cc
-  download.cc
-  hash.cc
-  letter.cc
-  logging.cc
-  options.cc
-  pathspec/pathspec.cc
-  pathspec/pathspec_pattern.cc
-  sanitizer.cc
-  signature.cc
-  statistics.cc
-  stratum_agent/stratum_agent.cc
-  stratum_agent/uri_map.cc
-  util/algorithm.cc
-  util/posix.cc
-  util/string.cc
-  util_concurrency.cc
-  uuid.cc
-  whitelist.cc
-)
-
 
 if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
@@ -791,7 +768,6 @@ if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
-  add_executable (cvmfs_stratum_agent ${CVMFS_STRATUM_AGENT_SOURCES})
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
@@ -802,13 +778,6 @@ if (BUILD_SERVER)
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
                          ${LibWebsockets_LIBRARIES} pthread dl)
-
-  target_link_libraries(cvmfs_stratum_agent
-                        ${CURL_LIBRARIES} ${CARES_LIBRARIES}
-                        ${SHA3_LIBRARIES} ${SHA2_LIBRARIES} ${ZLIB_LIBRARIES}
-                        ${MONGOOSE_LIBRARIES} ${OPENSSL_LIBRARIES}
-                        ${UUID_LIBRARIES} ${VJSON_LIBRARIES}
-                        ${RT_LIBRARY} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_SOURCES})
@@ -956,15 +925,9 @@ endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)
   install (
-    TARGETS     cvmfs_swissknife cvmfs_stratum_agent
+    TARGETS     cvmfs_swissknife
     RUNTIME
     DESTINATION    bin
-  )
-
-  install(
-    FILES        stratum_agent/cvmfs_stratum_agent.service stratum_agent/cvmfs_stratum_agent.initd
-    DESTINATION  "/usr/share/cvmfs-server/agent"
-    PERMISSIONS  OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
   install (
