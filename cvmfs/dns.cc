@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -1142,46 +1143,64 @@ void HostfileResolver::ParseHostFile() {
 
   string line;
   while (GetLineFile(fhosts_, &line)) {
-    const unsigned len = line.length();
-    unsigned i = 0;
-    string address;
-    while (i < len) {
-      if (line[i] == '#')
-        break;
+    char address[kIpMaxLength + 1];
+    char hostname[kHostnameMaxLength + 1];
+    int bytes_read = 0;
+    size_t str_offset = 0;
 
-      while (((line[i] == ' ') || (line[i] == '\t')) && (i < len))
-        ++i;
+    // strip comments
+    size_t hash_pos = line.find_first_of('#');
+    if (hash_pos != string::npos) line = line.substr(0, hash_pos);
 
-      string token;
-      while ((line[i] != ' ') && (line[i] != '\t') && (line[i] != '#') &&
-             (i < len))
-      {
-        token += line[i];
-        ++i;
+    // First token is an IP address
+    int ip_start_pos, ip_end_pos;
+    sscanf(line.c_str(), " %n%*s%n", &ip_start_pos, &ip_end_pos);
+    if (ip_start_pos == ip_end_pos)
+      continue;
+    if (ip_end_pos - ip_start_pos > kIpMaxLength) {
+      LogCvmfs(kLogDns, kLogSyslogWarn,
+               "Skipping line in hosts file due to invalid IP address format");
+      continue;
+    }
+
+    sscanf(line.c_str(), " %s%n", address, &bytes_read);
+    str_offset += bytes_read;
+
+    // Next tokens are hostnames and aliases (we treat them as equal)
+    while (str_offset < line.length()) {
+      int hostname_start_pos, hostname_end_pos;
+      sscanf(line.c_str() + str_offset, " %n%*s%n",  // check hostname length
+             &hostname_start_pos, &hostname_end_pos);
+      if (hostname_start_pos == hostname_end_pos) {
+        str_offset += hostname_end_pos;
+        continue;
+      }
+      if (hostname_end_pos - hostname_start_pos > kHostnameMaxLength) {
+        LogCvmfs(kLogDns, kLogSyslogWarn,
+                 "Skipping invalid (too long) hostname in hosts file");
+        str_offset += hostname_end_pos;
+        continue;
       }
 
-      if (address == "") {
-        address = token;
-      } else {
-        if (token[token.length()-1] == '.')
-          token = token.substr(0, token.length()-1);
+      sscanf(line.c_str() + str_offset, " %s%n", hostname, &bytes_read);
+      str_offset += bytes_read;
 
-        map<string, HostEntry>::iterator iter = host_map_.find(token);
-        if (iter == host_map_.end()) {
-          HostEntry entry;
-          if (IsIpv4Address(address))
-            entry.ipv4_addresses.push_back(address);
-          else
-            if (!ipv4_only()) entry.ipv6_addresses.push_back(address);
-          // printf("ADD %s -> %s\n", token.c_str(), address.c_str());
-          host_map_[token] = entry;
-        } else {
-          if (IsIpv4Address(address))
-            iter->second.ipv4_addresses.push_back(address);
-          else
-            if (!ipv4_only()) iter->second.ipv6_addresses.push_back(address);
-          // printf("PUSHING %s -> %s\n", token.c_str(), address.c_str());
-        }
+      if (hostname[strlen(hostname)-1] == '.')
+        hostname[strlen(hostname)-1] = 0;  // strip the last character
+
+      map<string, HostEntry>::iterator iter = host_map_.find(hostname);
+      if (iter == host_map_.end()) {
+        HostEntry entry;
+        if (IsIpv4Address(address))
+          entry.ipv4_addresses.push_back(address);
+        else
+          if (!ipv4_only()) entry.ipv6_addresses.push_back(address);
+        host_map_[hostname] = entry;
+      } else {
+        if (IsIpv4Address(address))
+          iter->second.ipv4_addresses.push_back(address);
+        else
+          if (!ipv4_only()) iter->second.ipv6_addresses.push_back(address);
       }
     }  // Current line
   }  // Hosts file
