@@ -99,6 +99,11 @@ func (b *mockBackend) PublishManifest(ctx context.Context, repository string, me
 	return nil
 }
 
-func (b *mockBackend) SubscribeToNotifications(ctx context.Context, repository string) <-chan be.NotificationMessage {
+func (b *mockBackend) SubscribeToNotifications(ctx context.Context, repository string) be.SubscriberHandle {
 	return make(chan be.NotificationMessage)
+}
+
+func (b *mockBackend) UnsubscribeFromNotifications(
+	ctx context.Context, repository string, handle be.SubscriberHandle) error {
+	return nil
 }
