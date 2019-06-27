@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"path"
 )
 
@@ -9,7 +10,7 @@ import (
 type NotificationMessage string
 
 // SubscriberHandle is the writable end of a channel of notification messages
-type SubscriberHandle chan<- NotificationMessage
+type SubscriberHandle chan NotificationMessage
 
 // SubscriberSet is a set of subscriber handles (implemented as a map handler -> void)
 type SubscriberSet map[SubscriberHandle]struct{}
@@ -60,4 +61,23 @@ func (ns *NotificationSystem) Subscribe(
 		subsForRepo[handle] = struct{}{}
 		ns.Subscribers[repository] = subsForRepo
 	}
+}
+
+// Unsubscribe from messages for the given repository
+func (ns *NotificationSystem) Unsubscribe(
+	ctx context.Context, repository string, handle SubscriberHandle) error {
+
+	subsForRepo, hasSubs := ns.Subscribers[repository]
+	if !hasSubs {
+		return fmt.Errorf("no_subscriptions_for_repository")
+	}
+
+	_, found := subsForRepo[handle]
+	if !found {
+		return fmt.Errorf("invalid_handle")
+	}
+
+	delete(subsForRepo, handle)
+
+	return nil
 }

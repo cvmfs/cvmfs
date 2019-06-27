@@ -88,6 +88,7 @@ func handleSubscribe(
 	gw.LogC(ctx, "http", gw.LogInfo).Msg("event stream starting")
 
 	eventSource := services.SubscribeToNotifications(ctx, req.Repository)
+	defer services.UnsubscribeFromNotifications(ctx, req.Repository, eventSource)
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		msg := "response writer does not support flushing"

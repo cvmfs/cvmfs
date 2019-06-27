@@ -15,8 +15,8 @@ func (s *Services) PublishManifest(ctx context.Context, repository string, messa
 	return s.Notifications.Publish(ctx, repository, message)
 }
 
-// SubscribeToNotifications to activity messages for a repository
-func (s *Services) SubscribeToNotifications(ctx context.Context, repository string) <-chan NotificationMessage {
+// SubscribeToNotifications for a repository
+func (s *Services) SubscribeToNotifications(ctx context.Context, repository string) SubscriberHandle {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -25,4 +25,15 @@ func (s *Services) SubscribeToNotifications(ctx context.Context, repository stri
 	source := make(chan NotificationMessage, 1000)
 	s.Notifications.Subscribe(ctx, repository, source)
 	return source
+}
+
+// UnsubscribeFromNotifications for a repository
+func (s *Services) UnsubscribeFromNotifications(
+	ctx context.Context, repository string, handle SubscriberHandle) error {
+	t0 := time.Now()
+
+	outcome := "success"
+	defer logAction(ctx, "unsubscribe_from_notifications", &outcome, t0)
+
+	return s.Notifications.Unsubscribe(ctx, repository, handle)
 }
