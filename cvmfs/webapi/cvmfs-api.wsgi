@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python2
 
 import os, sys, re
 import cvmfs_api
