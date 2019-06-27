@@ -256,6 +256,15 @@ inline uint64_t platform_monotonic_time() {
   return val_ns * 1e-9;
 }
 
+inline double platform_monotonic_time_ns() {
+  uint64_t val_abs = mach_absolute_time();
+  // Doing the conversion every time is slow but thread-safe
+  mach_timebase_info_data_t info;
+  mach_timebase_info(&info);
+  uint64_t val_ns = val_abs * (info.numer / info.denom);
+  return val_ns;
+}
+
 /**
  * strdupa does not exist on OSX
  */
