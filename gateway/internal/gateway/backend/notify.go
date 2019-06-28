@@ -3,7 +3,12 @@ package backend
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
+
+	gw "github.com/cvmfs/gateway/internal/gateway"
+	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 // NotificationMessage is an alias for a UTF-8 string
@@ -23,13 +28,27 @@ type SubscriberMap map[string]SubscriberSet
 type NotificationSystem struct {
 	Subscribers SubscriberMap
 	WorkDir     string
+	Store       *bolt.DB
 }
 
 // NewNotificationSystem is a constructor function for the NotificationSystem type
 func NewNotificationSystem(workDir string) (*NotificationSystem, error) {
+	workDir = path.Join(workDir, "notify")
+	if err := os.MkdirAll(workDir, 0777); err != nil {
+		return nil, errors.Wrap(err, "could not create directory for backing store")
+	}
+	store, err := bolt.Open(workDir+"/messages.db", 0666, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not open backing store")
+	}
+
+	gw.Log("notify", gw.LogInfo).
+		Msgf("database opened (work dir: %v)", workDir)
+
 	ns := &NotificationSystem{
 		Subscribers: make(SubscriberMap),
-		WorkDir:     path.Join(workDir, "notify"),
+		WorkDir:     workDir,
+		Store:       store,
 	}
 	return ns, nil
 }
@@ -43,6 +62,11 @@ func (ns *NotificationSystem) Publish(
 			s <- NotificationMessage(message)
 		}
 	}
+
+	gw.LogC(ctx, "notify", gw.LogDebug).
+		Str("repository", repository).
+		Msg("manifest published")
+
 	return nil
 }
 
@@ -50,16 +74,25 @@ func (ns *NotificationSystem) Publish(
 func (ns *NotificationSystem) Subscribe(
 	ctx context.Context, repository string, handle SubscriberHandle) {
 
+	added := false
 	subsForRepo, present := ns.Subscribers[repository]
 	if present {
 		_, pres := subsForRepo[handle]
 		if !pres {
 			subsForRepo[handle] = struct{}{}
+			added = true
 		}
 	} else {
 		subsForRepo = make(SubscriberSet)
 		subsForRepo[handle] = struct{}{}
+		added = true
 		ns.Subscribers[repository] = subsForRepo
+	}
+
+	if added {
+		gw.LogC(ctx, "notify", gw.LogDebug).
+			Str("repository", repository).
+			Msg("subscription added")
 	}
 }
 
@@ -78,6 +111,10 @@ func (ns *NotificationSystem) Unsubscribe(
 	}
 
 	delete(subsForRepo, handle)
+
+	gw.LogC(ctx, "notify", gw.LogDebug).
+		Str("repository", repository).
+		Msg("subscription removed")
 
 	return nil
 }
