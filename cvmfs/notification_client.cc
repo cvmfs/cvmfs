@@ -11,18 +11,18 @@
 #include "manifest.h"
 #include "notify/messages.h"
 #include "notify/subscriber_supervisor.h"
-#include "notify/subscriber_ws.h"
+#include "notify/subscriber_sse.h"
 #include "signature.h"
 #include "supervisor.h"
 #include "util/posix.h"
 
 namespace {
 
-class ActivitySubscriber : public notify::SubscriberWS {
+class ActivitySubscriber : public notify::SubscriberSSE {
  public:
   ActivitySubscriber(const std::string& server_url, FuseRemounter* remounter,
                      signature::SignatureManager* sig_mgr)
-      : SubscriberWS(server_url), remounter_(remounter), sig_mgr_(sig_mgr) {}
+      : SubscriberSSE(server_url), remounter_(remounter), sig_mgr_(sig_mgr) {}
 
   virtual ~ActivitySubscriber() {}
 

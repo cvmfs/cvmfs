@@ -9,7 +9,7 @@
 #include "notify/messages.h"
 #include "signature.h"
 #include "subscriber_supervisor.h"
-#include "subscriber_ws.h"
+#include "subscriber_sse.h"
 #include "supervisor.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -20,11 +20,11 @@ namespace {
 const LogFacilities& kLogInfo = DefaultLogging::info;
 const LogFacilities& kLogError = DefaultLogging::error;
 
-class TriggerSubscriber : public notify::SubscriberWS {
+class TriggerSubscriber : public notify::SubscriberSSE {
  public:
   TriggerSubscriber(const std::string& server_url, uint64_t min_revision,
                     bool continuous, bool verbose)
-      : notify::SubscriberWS(server_url),
+      : notify::SubscriberSSE(server_url),
         revision_(min_revision),
         continuous_(continuous),
         verbose_(verbose) {}

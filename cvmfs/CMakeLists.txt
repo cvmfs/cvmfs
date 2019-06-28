@@ -113,8 +113,7 @@ set (CVMFS2_DEBUG_SOURCES
   notification_client.cc
   notify/messages.cc
   notify/subscriber_supervisor.cc
-  notify/subscriber_ws.cc
-  notify/websocket_context.cc
+  notify/subscriber_sse.cc
   quota_listener.cc
   supervisor.cc
   talk.cc
@@ -249,8 +248,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   notify/publisher.cc
   notify/publisher_http.cc
   notify/subscriber_supervisor.cc
-  notify/subscriber_ws.cc
-  notify/websocket_context.cc
+  notify/subscriber_sse.cc
   options.cc
   pack.cc
   path_filters/dirtab.cc
