@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -42,6 +43,17 @@ func NewNotificationSystem(workDir string) (*NotificationSystem, error) {
 		return nil, errors.Wrap(err, "could not open backing store")
 	}
 
+	// Create a bucket in the backing store to hold the last message published for
+	// each repository
+	store.Update(func(txn *bolt.Tx) error {
+		_, err := txn.CreateBucketIfNotExists([]byte("last_message"))
+		if err != nil {
+			return errors.Wrap(err, "could not create bucket: 'last_message'")
+		}
+
+		return nil
+	})
+
 	gw.Log("notify", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
 
@@ -50,17 +62,29 @@ func NewNotificationSystem(workDir string) (*NotificationSystem, error) {
 		WorkDir:     workDir,
 		Store:       store,
 	}
+
 	return ns, nil
 }
 
 // Publish a new repository manifest to the notification system
 func (ns *NotificationSystem) Publish(
 	ctx context.Context, repository string, message []byte) error {
-	subsForRepo, present := ns.Subscribers[repository]
-	if present {
-		for s := range subsForRepo {
-			s <- NotificationMessage(message)
+
+	shouldNotify := false
+	ns.Store.Update(func(txn *bolt.Tx) error {
+		existing := getLastMessage(txn, repository)
+		if existing == nil || !bytes.Equal(message, existing) {
+			if err := setMessage(txn, repository, message); err != nil {
+				return err
+			}
+			shouldNotify = true
 		}
+
+		return nil
+	})
+
+	if shouldNotify {
+		ns.notify(repository, message)
 	}
 
 	gw.LogC(ctx, "notify", gw.LogDebug).
@@ -90,6 +114,16 @@ func (ns *NotificationSystem) Subscribe(
 	}
 
 	if added {
+		message := make([]byte, 0)
+		ns.Store.View(func(txn *bolt.Tx) error {
+			message = getLastMessage(txn, repository)
+			return nil
+		})
+
+		if message != nil {
+			ns.notify(repository, message)
+		}
+
 		gw.LogC(ctx, "notify", gw.LogDebug).
 			Str("repository", repository).
 			Msg("subscription added")
@@ -117,4 +151,23 @@ func (ns *NotificationSystem) Unsubscribe(
 		Msg("subscription removed")
 
 	return nil
+}
+
+func (ns *NotificationSystem) notify(repository string, message []byte) {
+	subsForRepo, present := ns.Subscribers[repository]
+	if present {
+		for s := range subsForRepo {
+			s <- NotificationMessage(message)
+		}
+	}
+}
+
+func getLastMessage(txn *bolt.Tx, repository string) []byte {
+	b := txn.Bucket([]byte("last_message"))
+	return b.Get([]byte(repository))
+}
+
+func setMessage(txn *bolt.Tx, repository string, message []byte) error {
+	b := txn.Bucket([]byte("last_message"))
+	return b.Put([]byte(repository), message)
 }

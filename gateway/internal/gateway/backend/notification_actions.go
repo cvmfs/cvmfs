@@ -12,7 +12,13 @@ func (s *Services) PublishManifest(ctx context.Context, repository string, messa
 	outcome := "success"
 	defer logAction(ctx, "publish_manifest", &outcome, t0)
 
-	return s.Notifications.Publish(ctx, repository, message)
+	err := s.Notifications.Publish(ctx, repository, message)
+
+	if err != nil {
+		outcome = err.Error()
+	}
+
+	return err
 }
 
 // SubscribeToNotifications for a repository
@@ -35,5 +41,11 @@ func (s *Services) UnsubscribeFromNotifications(
 	outcome := "success"
 	defer logAction(ctx, "unsubscribe_from_notifications", &outcome, t0)
 
-	return s.Notifications.Unsubscribe(ctx, repository, handle)
+	err := s.Notifications.Unsubscribe(ctx, repository, handle)
+
+	if err != nil {
+		outcome = err.Error()
+	}
+
+	return err
 }
