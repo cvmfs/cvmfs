@@ -1,4 +1,5 @@
 2.6.1:
+  * Periodically reload Geo-IP database (CVM-1739)
   * Enable extra compiler assertions in unit tests
   * Fix host file parsing in DNS resolver, triggered by gcc9 (CVM-1763)
   * Fix usage of singularity in container publishing service
