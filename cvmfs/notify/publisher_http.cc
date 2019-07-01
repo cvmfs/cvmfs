@@ -36,7 +36,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 namespace notify {
 
 PublisherHTTP::PublisherHTTP(const std::string& server_url)
-    : server_url_(server_url) {}
+    : server_url_(server_url + "/notifications/publish") {}
 
 PublisherHTTP::~PublisherHTTP() {}
 

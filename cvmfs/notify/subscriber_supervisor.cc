@@ -26,10 +26,10 @@ bool SubscriberSupervisor::Task() {
   if (ret) {
     LogCvmfs(
         kLogCvmfs, kLogDebug,
-        "SubscriberSupervisor - Subcription ended successfully. Stopping.");
+        "SubscriberSupervisor - Subscription ended successfully. Stopping.");
   } else {
     LogCvmfs(kLogCvmfs, kLogError,
-             "SubscriberSupervisor - Subcription failed. Retrying.");
+             "SubscriberSupervisor - Subscription failed. Retrying.");
   }
   return ret;
 }

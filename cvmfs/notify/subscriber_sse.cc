@@ -6,13 +6,12 @@
 
 #include <vector>
 
-#include "duplex_curl.h"
-
 #include "cvmfs_config.h"
 
 #include "logging.h"
 #include "url.h"
 #include "util/pointer.h"
+#include "util/string.h"
 
 namespace {
 
@@ -24,7 +23,10 @@ const LogFacilities& kLogError = DefaultLogging::error;
 namespace notify {
 
 SubscriberSSE::SubscriberSSE(const std::string& server_url)
-    : server_url_(server_url) {}
+    : server_url_(server_url + "/notifications/subscribe"),
+      topic_(),
+      buffer_(),
+      should_quit_(false) {}
 
 SubscriberSSE::~SubscriberSSE() {}
 
@@ -38,15 +40,19 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
     return false;
   }
 
+  this->topic_ = topic;
+
+  std::string request = "{\"version\":1,\"repository\":\"" + topic + "\"}";
+
   const char* user_agent_string = "cvmfs/" VERSION;
 
   CURL* h_curl = curl_easy_init();
 
   if (h_curl) {
-    curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
+    curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(h_curl, CURLOPT_USERAGENT, user_agent_string);
     curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
-    curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, "GET");
   }
 
   if (!h_curl) {
@@ -54,25 +60,87 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
     return false;
   }
 
-  CurlBuffer buffer;
   // Make request to acquire lease from repo services
   curl_easy_setopt(h_curl, CURLOPT_URL, server_url_.c_str());
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
-                   static_cast<curl_off_t>(msg.length()));
-  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, msg.c_str());
-  curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
-  curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, &buffer);
+                   static_cast<curl_off_t>(request.length()));
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, request.c_str());
+  curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, CurlRecvCB);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, this);
+  curl_easy_setopt(h_curl, CURLOPT_XFERINFOFUNCTION, CurlProgressCB);
+  curl_easy_setopt(h_curl, CURLOPT_XFERINFODATA, this);
 
+  bool success = true;
   CURLcode ret = curl_easy_perform(h_curl);
-  if (ret) {
-    LogCvmfs(kLogCvmfs, kLogError, "SubscriberSSE - event loop finished with error: %d. Reply: %s", ret,
-             buffer.data.c_str());
+  if (ret && ret != CURLE_ABORTED_BY_CALLBACK) {
+    LogCvmfs(kLogCvmfs, kLogError,
+             "SubscriberSSE - event loop finished with error: %d. Reply: %s\n",
+             ret, this->buffer_.c_str());
+    success = false;
   }
 
   curl_easy_cleanup(h_curl);
   h_curl = NULL;
 
-  return !ret;
+  return success;
+}
+
+void SubscriberSSE::AppendToBuffer(const std::string& s) {
+  size_t start = 0;
+  if (s.substr(0, 6) == "data: ") {
+    start = 6;
+  }
+  buffer_ += s.substr(start);
+}
+
+void SubscriberSSE::ClearBuffer() { buffer_.clear(); }
+
+size_t SubscriberSSE::CurlRecvCB(void* buffer, size_t size, size_t nmemb,
+                                 void* userp) {
+  notify::SubscriberSSE* sub = static_cast<notify::SubscriberSSE*>(userp);
+
+  if (size * nmemb < 1) {
+    return 0;
+  }
+
+  std::string buf(static_cast<char*>(buffer));
+
+  std::vector<std::string> lines = SplitString(buf, '\n');
+
+  if (lines.size() == 1) {
+    sub->AppendToBuffer(lines[0]);
+  } else {
+    sub->AppendToBuffer(lines[0]);
+    notify::Subscriber::Status st = sub->Consume(sub->topic(), sub->buffer());
+    sub->ClearBuffer();
+    for (size_t i = 1; i < lines.size(); ++i) {
+      if (lines[i].substr(0, 5) == "data: ") {
+        sub->AppendToBuffer(lines[i]);
+      }
+    }
+    switch (st) {
+      case notify::Subscriber::kFinish:
+        sub->RequestQuit();
+        break;
+      case notify::Subscriber::kError:
+        return 0;
+      default:
+        break;
+    }
+  }
+
+  return size * nmemb;
+}
+
+int SubscriberSSE::CurlProgressCB(void* clientp, curl_off_t dltotal,
+                                  curl_off_t dlnow, curl_off_t ultotal,
+                                  curl_off_t ulnow) {
+  notify::SubscriberSSE* sub = static_cast<notify::SubscriberSSE*>(clientp);
+  if (sub->should_quit()) {
+    return 1;
+  }
+
+  return 0;
 }
 
 }  // namespace notify

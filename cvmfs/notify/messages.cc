@@ -39,41 +39,41 @@ void Activity::ToJSONString(std::string* s) {
 bool Activity::FromJSONString(const std::string& s) {
   const UniquePtr<JsonDocument> m(JsonDocument::Create(s));
   if (!m.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Could not create JSON document.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Could not create JSON document.");
     return false;
   }
 
   std::string message_type;
   if (!GetFromJSON(m->root(), "type", &message_type)) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Could not read message type.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read message type.");
     return false;
   }
   if (message_type != "activity") {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Invalid message type: %s.",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Invalid message type: %s.",
              message_type.c_str());
     return false;
   }
 
   if (!GetFromJSON(m->root(), "version", &version_)) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Could not read version.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read version.");
     return false;
   }
 
   if (!GetFromJSON(m->root(), "timestamp", &timestamp_)) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Could not read timestamp.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read timestamp.");
     return false;
   }
   if (!GetFromJSON(m->root(), "repository", &repository_)) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Could not read repository.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read repository.");
     return false;
   }
   std::string manifest_b64;
   if (!GetFromJSON(m->root(), "manifest", &manifest_b64)) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Could not read manifest.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read manifest.");
     return false;
   }
   if (!Debase64(manifest_b64, &manifest_)) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Could not debase64 manifest.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Could not debase64 manifest.");
     return false;
   }
 
