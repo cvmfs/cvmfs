@@ -1,18 +1,27 @@
 import math
 import string
+import os
 import re
 import bisect
 import socket
 import cvmfs_api
 import time
 import threading
-import cvmfs_globals
 
-# TODO(jblomer): we should better separate the code that needs the maxminddb
-# dependency from the code that doesn't
-if not cvmfs_globals.CVMFS_UNITTESTS:
-    import maxminddb
-    gireader = maxminddb.open_database("/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb")
+# Open the geodb.  Only import maxminddb here (and only once) because it
+#  is not available in the unit test.
+maxminddb = None
+def open_geodb(dbname):
+    global maxminddb
+    if maxminddb is None:
+        import maxminddb
+    return maxminddb.open_database(dbname)
+
+gidb="/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb"
+gireader=None
+oldgireader=None
+gichecktime=0
+gimodtime=0
 
 positive_expire_secs = 60*60  # 1 hour
 
@@ -25,6 +34,38 @@ geo_cache_max_entries = 100000  # a ridiculously large but manageable number
 # than caching geo information but it's simpler and slightly more
 # efficient to cache the geo information.
 geo_cache = {}
+
+# look up geo info for an address
+# Also periodically check for an update to the database and
+#   reopen it if it changed
+def lookup_geoinfo(now, addr):
+    global gireader, oldgireader
+    global gichecktime
+    global gimodtime
+
+    if gireader is None or now > gichecktime + geo_cache_secs:
+        lock = threading.Lock()
+        lock.acquire()
+        # gichecktime might have changed before acquiring the lock, look again
+        if gireader is None or now > gichecktime + geo_cache_secs:
+            if oldgireader is not None:
+                # By now we're sure nobody is still using the previous
+                #  gireader, so close it.  This delay avoids having to
+                #  acquire the lock for every lookup.
+                oldgireader.close()
+                oldgireader = None
+                print 'cvmfs_geo: closed old ' + gidb
+            gichecktime = now
+            modtime = os.stat(gidb).st_mtime
+            if modtime != gimodtime:
+                # database was modified, reopen it
+                oldgireader = gireader
+                gireader = open_geodb(gidb)
+                gimodtime = modtime
+                print 'cvmfs_geo: opened ' + gidb
+        lock.release()
+
+    return gireader.get(addr)
 
 # function came from http://www.johndcook.com/python_longitude_latitude.html
 def distance_on_unit_sphere(lat1, long1, lat2, long2):
@@ -69,11 +110,11 @@ addr_pattern = re.compile('^[0-9a-zA-Z.:-]*$')
 
 # Look up geo info for IPv4 or IPv6 address.
 # Will return None if the address does not exist in the DB.
-def addr_geoinfo(addr):
+def addr_geoinfo(now, addr):
     if (len(addr) > 256) or not addr_pattern.search(addr):
         return None
 
-    response = gireader.get(addr)
+    response = lookup_geoinfo(now, addr)
     if response == None:
         return None
 
@@ -115,13 +156,13 @@ def name_geoinfo(now, name):
     for info in ai:
         # look for IPv4 address first
         if info[0] == socket.AF_INET:
-            gir = gireader.get(info[4][0])
+            gir = lookup_geoinfo(now, info[4][0])
             break
     if gir == None:
         # look for an IPv6 address if no IPv4 record found
         for info in ai:
             if info[0] == socket.AF_INET6:
-                gir = gireader.get(info[4][0])
+                gir = lookup_geoinfo(now, info[4][0])
                 break
     if gir != None:
         gir = gir['location']
@@ -218,7 +259,7 @@ def api(path_info, repo_name, version, start_response, environ):
     if gir_rem is None:
         if 'HTTP_CF_CONNECTING_IP' in environ:
             # IP address of client connecting to Cloudflare
-            gir_rem = addr_geoinfo(environ['HTTP_CF_CONNECTING_IP'])
+            gir_rem = addr_geoinfo(now, environ['HTTP_CF_CONNECTING_IP'])
             if gir_rem is not None:
                 # Servers probably using Cloudflare Content Delivery Network too
                 trycdn = True
@@ -230,10 +271,10 @@ def api(path_info, repo_name, version, start_response, environ):
             start = string.rfind(forwarded_for, ' ') + 1
             if (start == 0):
                 start = string.rfind(forwarded_for, ',') + 1
-            gir_rem = addr_geoinfo(forwarded_for[start:])
+            gir_rem = addr_geoinfo(now, forwarded_for[start:])
         if gir_rem is None and 'REMOTE_ADDR' in environ:
             # IP address connecting to web server
-            gir_rem = addr_geoinfo(environ['REMOTE_ADDR'])
+            gir_rem = addr_geoinfo(now, environ['REMOTE_ADDR'])
 
     if gir_rem is None:
         return cvmfs_api.bad_request(start_response, 'remote addr not found in database')
