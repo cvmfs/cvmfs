@@ -107,7 +107,7 @@ def publish_manifest(args):
         'timestamp': time.strftime('%d %b %Y %H:%M:%S', time.gmtime()),
         'type': 'activity',
         'repository': args.repo,
-        'manifest': manifest
+        'manifest': base64.b64encode(manifest.encode('utf-8')).decode('utf-8')
     }
     rep = requests.post(args.gw_url + '/notifications/publish', json=req)
     print(json.dumps(rep.json()))

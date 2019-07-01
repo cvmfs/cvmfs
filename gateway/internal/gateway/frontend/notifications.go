@@ -83,7 +83,6 @@ func handleSubscribe(
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
 
 	gw.LogC(ctx, "http", gw.LogInfo).Msg("event stream starting")
 
@@ -100,10 +99,7 @@ func handleSubscribe(
 		select {
 		case event, ok := <-eventSource:
 			if ok {
-				if _, err := w.Write([]byte("data: " + event + "\n\n")); err != nil {
-					httpWrapError(ctx, err, "could not write event", w, http.StatusInternalServerError)
-					return
-				}
+				w.Write([]byte("data: " + event + "\n\n"))
 				flusher.Flush()
 			} else {
 				break
