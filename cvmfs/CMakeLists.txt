@@ -560,7 +560,6 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_LINK_LIBRARIES "")
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${CURL_LIBRARIES}
                                         ${CARES_LIBRARIES}
-                                        ${LibWebsockets_LIBRARIES}
                                         ${OPENSSL_LIBRARIES}
                                         ${PACPARSER_LIBRARIES}
                                         ${SQLITE3_LIBRARY}
@@ -667,7 +666,7 @@ if (BUILD_LIBCVMFS)
   add_dependencies (cvmfs_only cache.pb.generated)
 
   set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CURL_LIBRARIES}
-                     ${LibWebsockets_LIBRARIES} ${PACPARSER_LIBRARIES}
+                     ${PACPARSER_LIBRARIES}
                      ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
                      ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
                      ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
@@ -703,7 +702,7 @@ if (BUILD_LIBCVMFS)
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
   add_dependencies(test_libcvmfs libcvmfs)
 
-  list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${LibWebsockets_LIBRARIES}
+  list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
                                  ${CARES_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES}
                                  ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
 
@@ -760,7 +759,7 @@ if (BUILD_SERVER)
                          ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
-                         ${LibWebsockets_LIBRARIES} pthread dl)
+                         pthread dl)
 
   target_link_libraries(cvmfs_stratum_agent
                         ${CURL_LIBRARIES} ${CARES_LIBRARIES}
@@ -779,7 +778,7 @@ if (BUILD_SERVER)
                            ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                            ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                            ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
-                           ${LibWebsockets_LIBRARIES} pthread dl)
+                           pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
