@@ -103,9 +103,9 @@ cvmfs_run_test() {
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  sleep_time=3
-  echo "sleeping $sleep_time seconds to let ttl expire but not kernel cache"
-  sleep $sleep_time
+  echo "trigger synchronized remount"
+  sudo cvmfs_talk -p $(get_cache_directory $mountpoint)/$CVMFS_TEST_REPO/cvmfs_io.${CVMFS_TEST_REPO} \
+    remount sync
   ls -l $TEST_611_MOUNTPOINT || return 33
   stat $TEST_611_MOUNTPOINT/newfile || return 34
 
