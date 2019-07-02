@@ -62,7 +62,9 @@ cvmfs_run_test() {
   TEST_611_MOUNTPOINT="$(pwd)/local_mount"
   do_local_mount "$TEST_611_MOUNTPOINT" \
                  "$CVMFS_TEST_REPO"     \
-                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 4
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_FUSE_NOTIFY_INVALIDATION=false" || return 4
 
   stat $TEST_611_MOUNTPOINT/nested/updated
   if [ $? -eq 0 ]; then
@@ -104,7 +106,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "trigger synchronized remount"
-  sudo cvmfs_talk -p $(get_cache_directory $mountpoint)/$CVMFS_TEST_REPO/cvmfs_io.${CVMFS_TEST_REPO} \
+  sudo cvmfs_talk -p ${cache_dir}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO} \
     remount sync
   ls -l $TEST_611_MOUNTPOINT || return 33
   stat $TEST_611_MOUNTPOINT/newfile || return 34
