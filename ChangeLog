@@ -1,4 +1,5 @@
 2.6.1:
+  * Fix potential hang during reload if a config repository is used (CVM-1466)
   * Disable active cache eviction as work around for stale negative entries
     (CVM-1759)
   * Fix small memory leak in S3 uploader
