@@ -965,6 +965,42 @@ cvmfs_status() {
 }
 
 
+
+_cvmfs_reload_pause() {
+  # Helper function to put a particular repository in sleep mode
+  local mountpoint="$1"
+
+  cd "$mountpoint" 2>/dev/null || return
+  get_attr fqrn ${mountpoint}; fqrn=$attr_value
+  get_attr pid ${mountpoint}; pid=$attr_value
+  if [ -z "$fqrn" ] || [ -z "$pid" ]; then
+    # This repository must have been unmounted just now
+    cd /
+    return
+  fi
+  echo "Pausing ${fqrn} on ${mountpoint}"
+  cd "$mountpoint" &&
+    rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$mountpoint" | base64_nowrap) && \
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+    awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
+  cd /
+  echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
+  echo ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused >> "${CVMFS_RELOAD_SOCKETS}/guard_files"
+}
+
+_cvmfs_reload_waitfor() {
+  local guard_file="$1"
+  # Helper function to wait for a particular repository being put into pause mode
+  while [ ! -f ${guard_file}* ]; do
+    sleep 1
+  done
+  if [ -f ${guard_file}.crashed ]; then
+    echo "RELOADING FAILED (${guard_file}.crashed)" 1>&2
+    rm -f "$(dirname $guard_file)/pid.$(basename $guard_file)" ${guard_file}.crashed
+  fi
+}
+
+
 cvmfs_reload() {
   # Run the reload command with clean environment to remove potential cvmfs
   # dependencies
@@ -1032,34 +1068,28 @@ cvmfs_reload() {
   local m
   for m in $mount_list
   do
-    cd "$m" 2>/dev/null || continue
-    get_attr fqrn ${m}; fqrn=$attr_value
-    get_attr pid ${m}; pid=$attr_value
-    if [ -z "$fqrn" ] || [ -z "$pid" ]; then
-      # This repository must have been unmounted just now
-      cd /
+    if [ x"$m" = x"${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" ]; then
+      # We need to finish pausing the other repositories first because they
+      # might try to load the blacklist from the config repository as part of
+      # their reload
       continue
     fi
-    echo "Pausing ${fqrn} on ${m}"
-    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap) && \
-      cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
-      awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
-    cd /
-    echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
-    echo ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused >> "${CVMFS_RELOAD_SOCKETS}/guard_files"
+    _cvmfs_reload_pause "$m"
   done
   if [ -f "${CVMFS_RELOAD_SOCKETS}/guard_files" ]; then
+    # Wait for the repository to be hybernated
     sort -u "${CVMFS_RELOAD_SOCKETS}/guard_files" > "${CVMFS_RELOAD_SOCKETS}/guard_files.tmp"
     mv "${CVMFS_RELOAD_SOCKETS}/guard_files.tmp" "${CVMFS_RELOAD_SOCKETS}/guard_files"
     for guard_file in $(cat "${CVMFS_RELOAD_SOCKETS}/guard_files"); do
-      while [ ! -f ${guard_file}* ]; do
-        sleep 1
-      done
-      if [ -f ${guard_file}.crashed ]; then
-        echo "RELOADING FAILED (${guard_file}.crashed)" 1>&2
-        rm -f "$(dirname $guard_file)/pid.$(basename $guard_file)" ${guard_file}.crashed
-      fi
+      _cvmfs_reload_waitfor "$guard_file"
     done
+
+    if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
+      # If we have a config repository, now is the time to pause it at the very end
+      _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}"
+      _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
+    fi
+
     rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
   fi
 
