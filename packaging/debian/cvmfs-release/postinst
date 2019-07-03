@@ -26,8 +26,8 @@ case "$1" in
 	if [ -f $repolist ]; then
 	  ln -f -s $repolist /etc/apt/sources.list.d/cernvm.list
 	else
-	  echo "Warning: this distribution is not supported. Using Ubuntu 12.04 packages as fallback."
-	  ln -f -s /usr/share/cvmfs-release/cernvm.list.precise \
+	  echo "Warning: this distribution is not supported. Using Ubuntu 16.04 packages as fallback."
+	  ln -f -s /usr/share/cvmfs-release/cernvm.list.xenial \
 	        /etc/apt/sources.list.d/cernvm.list
 	fi
     ;;
