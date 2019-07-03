@@ -1,3 +1,9 @@
+cvmfs-release (3.0-1) lucid; urgency=low
+
+  * Fall back to Ubuntu 16.04 on non-LTS platforms
+
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 03 July 2019 11:00:00 +0000
+
 cvmfs-release (2.1-2) lucid; urgency=low
 
   * Properly handle package removal and upgrades
