@@ -363,6 +363,7 @@ mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
 mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
+mkdir -p $RPM_BUILD_ROOT/usr/share/cvmfs-server
 
 # Keys and configs are in cvmfs-config
 rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
