@@ -1,4 +1,6 @@
 2.6.1:
+  * Disable active cache eviction as work around for stale negative entries
+    (CVM-1759)
   * Fix small memory leak in S3 uploader
   * Periodically reload Geo-IP database (CVM-1739)
   * Enable extra compiler assertions in unit tests
