@@ -120,7 +120,7 @@ add_custom_target(cache.pb.generated-qc
 #
 # Compiler and Linker Flags for quickcheck tests
 #
-set (CVMFS_QC_CFLAGS "${CVMFS_QC_CFLAGS} -fexceptions -std=c++11 -DCVMFS_LIBCVMFS")
+set (CVMFS_QC_CFLAGS "${CVMFS_QC_CFLAGS} -fexceptions -std=c++11 -DCVMFS_LIBCVMFS -D_GLIBCXX_DEBUG")
 set (CVMFS_QC_LDFLAGS "${CVMFS_QC_LDFLAGS}")
 
 #

@@ -212,6 +212,7 @@ void *S3Uploader::MainCollectResults(void *data) {
         assert(info->mmf == NULL);
         assert(info->origin_file == NULL);
       }
+      delete info;
     }
 #ifdef _POSIX_PRIORITY_SCHEDULING
     sched_yield();
@@ -434,7 +435,6 @@ bool S3Uploader::Peek(const std::string& path) {
   assert(c == 'c');
   ClosePipe(peek_ctrl.pipe_wait);
 
-  delete info;
   return peek_ctrl.exists;
 }
 
