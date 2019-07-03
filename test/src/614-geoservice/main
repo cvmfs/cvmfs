@@ -167,25 +167,29 @@ cvmfs_run_test() {
     cvmfs_check_georesult "$result" $me ihep,cern,fnal || return 11
   fi
 
+  echo "checking CDN with proxy name"
+  result="`curl -s -H "$cdnheader: anything" http://localhost/$api/$fnal/$ihepcdn,$fnalcdn,$cerncdn|head -5`"
+  cvmfs_check_georesult "$result" $fnal ihep,fnal,cern || return 12
+
   echo "checking IPv6-only server"
   result="`curl -s http://$ipv4addr/$api/x/$ipv6,$cern,$fnal|head -5`"
-  cvmfs_check_georesult "$result" ipv6onlytest ipv6,cern,fnal || return 12
+  cvmfs_check_georesult "$result" ipv6onlytest ipv6,cern,fnal || return 20
 
   echo "checking proxy name IPv4"
   result="`curl -s http://localhost/$api/$other/$cern,$ipv6,$other|head -5`"
-  cvmfs_check_georesult "$result" $other $cern,$ipv6,$other || return 13
+  cvmfs_check_georesult "$result" $other $cern,$ipv6,$other || return 21
 
   echo "checking proxy name IPv6"
   result="`curl -s http://localhost/$api/$ipv6/$ipv6,$fnal,$other|head -5`"
-  cvmfs_check_georesult "$result" $ipv6 $ipv6,$fnal,$other || return 14
+  cvmfs_check_georesult "$result" $ipv6 $ipv6,$fnal,$other || return 22
 
   echo "checking ordering from CERN fallback proxy"
   result="`curl -s http://localhost/$api/$fnalbp/$fnal,$ihep,$cern,$sep,$cernbp|head -5`"
-  cvmfs_check_geosepresult "$result" $cernbp fnal,ihep,cern || return 15
+  cvmfs_check_geosepresult "$result" $cernbp fnal,ihep,cern || return 23
 
   echo "checking ordering from FNAL fallback proxy"
   result="`curl -s http://localhost/$api/$other/$cern,$fnal,$ihep,$sep,$fnalbp|head -5`"
-  cvmfs_check_geosepresult "$result" $fnalbp cern,fnal,ihep || return 16
+  cvmfs_check_geosepresult "$result" $fnalbp cern,fnal,ihep || return 24
 
   echo "checking parallelism and cache limit (could take a couple of minutes)"
   # The number of api processing threads is 64, and cache limit is 100k.
@@ -243,7 +247,7 @@ cvmfs_run_test() {
   local pid
   for pid in $pids; do
     # wait individually in order to check the return codes
-    wait $pid || return 17
+    wait $pid || return 30
   done
   echo "parallelism test completed successfully"
 
