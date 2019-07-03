@@ -44,11 +44,18 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
     abort();
   }
 
-  s3fanout_mgr_.Init(num_parallel_uploads_, dns_buckets_);
-  s3fanout_mgr_.SetTimeout(timeout_sec_);
-  s3fanout_mgr_.SetRetryParameters(
+  s3fanout_mgr_ = new s3fanout::S3FanoutManager(access_key_,
+                                                secret_key_,
+                                                authz_method_,
+                                                host_name_port_,
+                                                region_,
+                                                bucket_,
+                                                dns_buckets_);
+  s3fanout_mgr_->Init(num_parallel_uploads_);
+  s3fanout_mgr_->SetTimeout(timeout_sec_);
+  s3fanout_mgr_->SetRetryParameters(
     num_retries_, kDefaultBackoffInitMs, kDefaultBackoffMaxMs);
-  s3fanout_mgr_.Spawn();
+  s3fanout_mgr_->Spawn();
 
   int retval = pthread_create(
     &thread_collect_results_, NULL, MainCollectResults, this);
@@ -57,9 +64,10 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
 
 
 S3Uploader::~S3Uploader() {
-  s3fanout_mgr_.Fini();
+  s3fanout_mgr_->Fini();
   atomic_inc32(&terminate_);
   pthread_join(thread_collect_results_, NULL);
+  delete s3fanout_mgr_;
 }
 
 
@@ -168,7 +176,7 @@ void *S3Uploader::MainCollectResults(void *data) {
   std::vector<s3fanout::JobInfo *> jobs;
   while (atomic_read32(&uploader->terminate_) == 0) {
     jobs.clear();
-    uploader->s3fanout_mgr_.PopCompletedJobs(&jobs);
+    uploader->s3fanout_mgr_->PopCompletedJobs(&jobs);
     for (unsigned i = 0; i < jobs.size(); ++i) {
       // Report completed job
       s3fanout::JobInfo *info = jobs[i];
@@ -230,13 +238,7 @@ void S3Uploader::FileUpload(
   const CallbackTN  *callback
 ) {
   s3fanout::JobInfo *info =
-    new s3fanout::JobInfo(access_key_,
-                          secret_key_,
-                          authz_method_,
-                          host_name_port_,
-                          region_,
-                          bucket_,
-                          repository_alias_ + "/" + remote_path,
+    new s3fanout::JobInfo(repository_alias_ + "/" + remote_path,
                           const_cast<void*>(
                               static_cast<void const*>(callback)),
                           local_path);
@@ -264,10 +266,10 @@ void S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
            "--> Host:   '%s'\n",
            info->origin_mem.data != NULL ? "buffer" : "file",
            info->object_key.c_str(),
-           info->bucket.c_str(),
-           info->hostname.c_str());
+           bucket_.c_str(),
+           host_name_port_.c_str());
 
-  s3fanout_mgr_.PushNewJob(info);
+  s3fanout_mgr_->PushNewJob(info);
 }
 
 
@@ -352,13 +354,7 @@ void S3Uploader::FinalizeStreamedUpload(
     repository_alias_ + "/data/" + content_hash.MakePath());
 
   s3fanout::JobInfo *info =
-      new s3fanout::JobInfo(access_key_,
-                            secret_key_,
-                            authz_method_,
-                            host_name_port_,
-                            region_,
-                            bucket_,
-                            final_path,
+      new s3fanout::JobInfo(final_path,
                             const_cast<void*>(
                                 static_cast<void const*>(
                                     handle->commit_callback)),
@@ -382,13 +378,7 @@ void S3Uploader::FinalizeStreamedUpload(
 
 
 s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
-  return new s3fanout::JobInfo(access_key_,
-                               secret_key_,
-                               authz_method_,
-                               host_name_port_,
-                               region_,
-                               bucket_,
-                               path,
+  return new s3fanout::JobInfo(path,
                                NULL,
                                NULL,
                                NULL,
@@ -403,8 +393,8 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
   info->request = s3fanout::JobInfo::kReqDelete;
 
   LogCvmfs(kLogUploadS3, kLogDebug, "Asynchronously removing %s/%s",
-           info->bucket.c_str(), info->object_key.c_str());
-  s3fanout_mgr_.PushNewJob(info);
+           bucket_.c_str(), info->object_key.c_str());
+  s3fanout_mgr_->PushNewJob(info);
 }
 
 

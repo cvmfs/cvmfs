@@ -472,17 +472,17 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info, vector<string> *headers)
                    content_type + "\n" +
                    timestamp + "\n" +
                    "x-amz-acl:public-read" + "\n" +  // default ACL
-                   "/" + info.bucket + "/" + info.object_key;
+                   "/" + bucket_ + "/" + info.object_key;
   LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign for: %s",
            request.c_str(), info.object_key.c_str());
 
   shash::Any hmac;
   hmac.algorithm = shash::kSha1;
-  shash::Hmac(info.secret_key,
+  shash::Hmac(secret_key_,
               reinterpret_cast<const unsigned char *>(to_sign.data()),
               to_sign.length(), &hmac);
 
-  headers->push_back("Authorization: AWS " + info.access_key + ":" +
+  headers->push_back("Authorization: AWS " + access_key_ + ":" +
                      Base64(string(reinterpret_cast<char *>(hmac.digest),
                                    hmac.GetDigestSize())));
   headers->push_back("Date: " + timestamp);
@@ -525,17 +525,15 @@ string S3FanoutManager::GetUriEncode(const string &val, bool encode_slash)
 }
 
 
-string S3FanoutManager::GetAwsV4SigningKey(
-  const JobInfo &info,
-  const string &date) const
+string S3FanoutManager::GetAwsV4SigningKey(const string &date) const
 {
-  string id = info.secret_key + info.region + date;
+  string id = secret_key_ + region_ + date;
   map<string, string>::const_iterator iter = signing_keys_.find(id);
   if (iter != signing_keys_.end())
     return iter->second;
 
-  string date_key = shash::Hmac256("AWS4" + info.secret_key, date, true);
-  string date_region_key = shash::Hmac256(date_key, info.region, true);
+  string date_key = shash::Hmac256("AWS4" + secret_key_, date, true);
+  string date_region_key = shash::Hmac256(date_key, region_, true);
   string date_region_service_key = shash::Hmac256(date_region_key, "s3", true);
   string signing_key =
     shash::Hmac256(date_region_service_key, "aws4_request", true);
@@ -558,13 +556,13 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   string content_type = GetContentType(info);
   string timestamp = IsoTimestamp();
   string date = timestamp.substr(0, 8);
-  vector<string> tokens = SplitString(info.hostname, ':');
+  vector<string> tokens = SplitString(hostname_, ':');
   assert(tokens.size() <= 2);
   string canonical_hostname = tokens[0];
   if (tokens.size() == 2 && String2Uint64(tokens[1]) != kDefaultHTTPPort)
     canonical_hostname += ":" + tokens[1];
 
-  if (dns_buckets_) canonical_hostname = info.bucket + "." + canonical_hostname;
+  if (dns_buckets_) canonical_hostname = bucket_ + "." + canonical_hostname;
 
   string signed_headers;
   string canonical_headers;
@@ -580,10 +578,10 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
     "x-amz-content-sha256:" + payload_hash + "\n" +
     "x-amz-date:" + timestamp + "\n";
 
-  string scope = date + "/" + info.region + "/s3/aws4_request";
+  string scope = date + "/" + region_ + "/s3/aws4_request";
   string uri = dns_buckets_ ?
                  (string("/") + info.object_key) :
-                 (string("/") + info.bucket + "/" + info.object_key);
+                 (string("/") + bucket_ + "/" + info.object_key);
 
   string canonical_request =
     GetRequestString(info) + "\n" +
@@ -601,7 +599,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
     scope + "\n" +
     hash_request;
 
-  string signing_key = GetAwsV4SigningKey(info, date);
+  string signing_key = GetAwsV4SigningKey(date);
   string signature = shash::Hmac256(signing_key, string_to_sign);
 
   headers->push_back("X-Amz-Acl: public-read");
@@ -609,7 +607,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   headers->push_back("X-Amz-Date: " + timestamp);
   headers->push_back(
     "Authorization: AWS4-HMAC-SHA256 "
-    "Credential=" + info.access_key + "/" + scope + ","
+    "Credential=" + access_key_ + "/" + scope + ","
     "SignedHeaders=" + signed_headers + ","
     "Signature=" + signature);
   return true;
@@ -715,7 +713,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
       (info.request == JobInfo::kReqHeadPut) ||
       (info.request == JobInfo::kReqDelete))
   {
-    switch (info.authz_method) {
+    switch (authz_method_) {
       case kAuthzAwsV2:
         hex_hash->clear();
         break;
@@ -736,7 +734,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
 
   switch (info.origin) {
     case kOriginMem:
-      switch (info.authz_method) {
+      switch (authz_method_) {
         case kAuthzAwsV2:
           shash::HashMem(info.origin_mem.data, info.origin_mem.size,
                          &payload_hash);
@@ -752,7 +750,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
           abort();
       }
     case kOriginPath:
-      switch (info.authz_method) {
+      switch (authz_method_) {
         case kAuthzAwsV2:
           retval = shash::HashFile(info.origin_path, &payload_hash);
           if (!retval) {
@@ -851,9 +849,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   info->throttle_timestamp = 0;
   info->http_headers = NULL;
 
-  InitializeDnsSettings(handle, (dns_buckets_) ?
-                                (info->bucket + "." + info->hostname) :
-                                 info->hostname);
+  InitializeDnsSettings(handle, hostname_);
 
   bool retval_b;
   retval_b = MkPayloadSize(*info, &info->payload_size);
@@ -911,7 +907,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
 
   // Authorization
   vector<string> authz_headers;
-  switch (info->authz_method) {
+  switch (authz_method_) {
     case kAuthzAwsV2:
       retval_b = MkV2Authz(*info, &authz_headers);
       break;
@@ -987,7 +983,7 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
     assert(retval == CURLE_OK);
   }
 
-  string url = MkUrl(info->hostname, info->bucket, (info->object_key));
+  string url = MkUrl(hostname_, bucket_, info->object_key);
   retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   assert(retval == CURLE_OK);
 }
@@ -1197,7 +1193,20 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   return false;  // stop transfer
 }
 
-S3FanoutManager::S3FanoutManager() {
+S3FanoutManager::S3FanoutManager(const std::string access_key,
+                                 const std::string secret_key,
+                                 const AuthzMethods authz_method,
+                                 const std::string hostname,
+                                 const std::string region,
+                                 const std::string bucket,
+                                 bool dns_buckets)
+                                 : access_key_(access_key)
+                                 , secret_key_(secret_key)
+                                 , authz_method_(authz_method)
+                                 , hostname_(hostname)
+                                 , region_(region)
+                                 , bucket_(bucket)
+                                 , dns_buckets_(dns_buckets) {
   active_requests_ = NULL;
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
@@ -1206,8 +1215,6 @@ S3FanoutManager::S3FanoutManager() {
   pool_max_handles_ = 0;
   curl_multi_ = NULL;
   user_agent_ = NULL;
-
-  dns_buckets_ = true;
 
   atomic_init32(&multi_threaded_);
   watch_fds_ = NULL;
@@ -1260,8 +1267,7 @@ S3FanoutManager::~S3FanoutManager() {
   free(curl_handle_lock_);
 }
 
-void S3FanoutManager::Init(const unsigned int max_pool_handles,
-                           bool dns_buckets) {
+void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   atomic_init32(&multi_threaded_);
   CURLcode retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
@@ -1281,8 +1287,6 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles,
   statistics_ = new Statistics();
   user_agent_ = new string();
   *user_agent_ = "User-Agent: cvmfs " + string(VERSION);
-
-  dns_buckets_ = dns_buckets;
 
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
