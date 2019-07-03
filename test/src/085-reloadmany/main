@@ -4,20 +4,23 @@ cvmfs_test_name="Repository reload stress test"
 cvmfs_run_test() {
   logfile=$1
 
-  for repo in atlas.cern.ch cms.cern.ch alice.cern.ch lhcb.cern.ch \
+  local repos="atlas.cern.ch cms.cern.ch alice.cern.ch lhcb.cern.ch \
     grid.cern.ch geant4.cern.ch cernvm-prod.cern.ch sft.cern.ch \
     lhcbdev.cern.ch cms-ib.cern.ch sft-nightlies.cern.ch \
     na62.cern.ch ams.cern.ch fcc.cern.ch clicdp.cern.ch na61.cern.ch na49.cern.ch \
-    atlas-condb.cern.ch alice-ocdb.cern.ch lhcb-condb.cern.ch
-  do
-    echo "*** mounting $repo"
-    cvmfs_mount $repo "CVMFS_KCACHE_TIMEOUT=3" || return 1
+    atlas-condb.cern.ch alice-ocdb.cern.ch lhcb-condb.cern.ch"
+  for r in $repos; do
+    echo "*** mounting $r"
+    cvmfs_mount $r "CVMFS_KCACHE_TIMEOUT=3" || return 1
   done
 
   mount | grep cvmfs-config.cern.ch || return 10
 
   for i in $(seq 1 100); do
-    sudo cvmfs_config reload || return 20
+    for r in $repos; do
+      sudo cvmfs_talk -i $r remount || return 20
+    done
+    sudo cvmfs_config reload || return 21
   done
 
   return 0
