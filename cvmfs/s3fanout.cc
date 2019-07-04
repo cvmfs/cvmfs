@@ -556,13 +556,11 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   string content_type = GetContentType(info);
   string timestamp = IsoTimestamp();
   string date = timestamp.substr(0, 8);
-  vector<string> tokens = SplitString(hostname_, ':');
+  vector<string> tokens = SplitString(complete_hostname_, ':');
   assert(tokens.size() <= 2);
   string canonical_hostname = tokens[0];
   if (tokens.size() == 2 && String2Uint64(tokens[1]) != kDefaultHTTPPort)
     canonical_hostname += ":" + tokens[1];
-
-  if (dns_buckets_) canonical_hostname = bucket_ + "." + canonical_hostname;
 
   string signed_headers;
   string canonical_headers;
@@ -849,7 +847,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   info->throttle_timestamp = 0;
   info->http_headers = NULL;
 
-  InitializeDnsSettings(handle, hostname_);
+  InitializeDnsSettings(handle, complete_hostname_);
 
   bool retval_b;
   retval_b = MkPayloadSize(*info, &info->payload_size);
@@ -983,7 +981,7 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
     assert(retval == CURLE_OK);
   }
 
-  string url = MkUrl(hostname_, bucket_, info->object_key);
+  string url = MkUrl(info->object_key);
   retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   assert(retval == CURLE_OK);
 }
@@ -1203,7 +1201,10 @@ S3FanoutManager::S3FanoutManager(const std::string access_key,
                                  : access_key_(access_key)
                                  , secret_key_(secret_key)
                                  , authz_method_(authz_method)
-                                 , hostname_(hostname)
+                                 , complete_hostname_(MkCompleteHostname(
+                                                        hostname,
+                                                        bucket,
+                                                        dns_buckets))
                                  , region_(region)
                                  , bucket_(bucket)
                                  , dns_buckets_(dns_buckets) {

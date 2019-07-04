@@ -211,7 +211,7 @@ class S3FanoutManager : SingleCopy {
   const std::string access_key_;
   const std::string secret_key_;
   const AuthzMethods authz_method_;
-  const std::string hostname_;
+  const std::string complete_hostname_;
   const std::string region_;
   const std::string bucket_;
   const bool dns_buckets_;
@@ -277,13 +277,20 @@ class S3FanoutManager : SingleCopy {
                  std::vector<std::string> *headers) const;
   bool MkV4Authz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
-  std::string MkUrl(const std::string &host,
-                    const std::string &bucket,
-                    const std::string &objkey2) const {
+  std::string MkUrl(const std::string &objkey) const {
     if (dns_buckets_) {
-      return "http://" + bucket + "." + host + "/" + objkey2;
+      return "http://" + complete_hostname_ + "/" + objkey;
     } else {
-      return "http://" + host + "/" + bucket + "/" + objkey2;
+      return "http://" + complete_hostname_ + "/" + bucket_ + "/" + objkey;
+    }
+  }
+  static std::string MkCompleteHostname(const std::string &hostname,
+                                        const std::string &bucket,
+                                        const bool &dns_buckets) {
+    if (dns_buckets) {
+      return bucket + "." + hostname;
+    } else {
+      return hostname;
     }
   }
 
