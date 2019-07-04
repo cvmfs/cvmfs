@@ -70,7 +70,7 @@ cvmfs_run_test() {
 
     # This verifies the file exists, but was not part of the spec.
     # Used later to verify the creation and mount were successful.
-    ls /cvmfs/sft.cern.ch/.cvmfsdirtab
+    ls /cvmfs/sft.cern.ch/lcg/lastUpdate
     [ $? -eq 0 ] || return 5
 
     echo "*** Lookup shrinkwrapped files ($CVMFS_TEST081_SHRINKWRAP_DEST)..."
@@ -84,19 +84,18 @@ cvmfs_run_test() {
     sudo stat $CVMFS_TEST081_SHRINKWRAP_DEST/.data || return 11
     ls $CVMFS_TEST081_SHRINKWRAP_DEST/.provenance || return 12
 
-    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/.cvmfsdirtab
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate
     [ $? -ne 0 ] || return 20
 
     echo "*** Update destination..."
     echo | sudo tee -a /tmp/cvmfs-$repo.spec.txt
-    echo "^/.cvmfsdirtab" | sudo tee -a /tmp/cvmfs-$repo.spec.txt
+    echo "^/lcg/lastUpdate" | sudo tee -a /tmp/cvmfs-$repo.spec.txt
     sudo cvmfs_shrinkwrap --repo $repo \
       --src-config "$test_location/$repo.config:local.config" \
       --spec-file /tmp/cvmfs-$repo.spec.txt \
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 30
-    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/.cvmfsdirtab || return 31
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate || return 31
 
     return 0
 }
-
