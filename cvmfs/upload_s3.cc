@@ -398,7 +398,7 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
 }
 
 
-void S3Uploader::OnPeekCopmlete(
+void S3Uploader::OnPeekComplete(
   const upload::UploaderResults &results,
   PeekCtrl *ctrl)
 {
@@ -416,7 +416,7 @@ bool S3Uploader::Peek(const std::string& path) {
   MakePipe(peek_ctrl.pipe_wait);
   info->request = s3fanout::JobInfo::kReqHeadOnly;
   info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
-    &S3Uploader::OnPeekCopmlete, this, &peek_ctrl)));
+    &S3Uploader::OnPeekComplete, this, &peek_ctrl)));
 
   IncJobsInFlight();
   UploadJobInfo(info);

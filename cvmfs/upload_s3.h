@@ -88,7 +88,7 @@ class S3Uploader : public AbstractUploader {
     int pipe_wait[2];
   };
 
-  void OnPeekCopmlete(const upload::UploaderResults &results, PeekCtrl *ctrl);
+  void OnPeekComplete(const upload::UploaderResults &results, PeekCtrl *ctrl);
 
   static void *MainCollectResults(void *data);
 
