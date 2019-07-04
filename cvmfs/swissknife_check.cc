@@ -951,14 +951,6 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  // If there is a reflog, we want to check it
-  if (Exists(".cvmfsreflog") && reflog_chksum_path.empty() &&
-      manifest->reflog_hash().IsNull()) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             ".cvmfsreflog present but no checksum provided, aborting");
-    return 1;
-  }
-
   shash::Any reflog_hash;
   if (!reflog_chksum_path.empty()) {
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
@@ -969,13 +961,28 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     reflog_hash = manifest->reflog_hash();
   }
 
-  // The reflog hash is null here if the reflog doesn't exit, so this does not
-  // represent an error
-  if (!reflog_hash.IsNull()) {
+  if (Exists(".cvmfsreflog")) {
+    if (reflog_hash.IsNull()) {
+      // If there is a reflog, we want to check it
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               ".cvmfsreflog present but no checksum provided, aborting");
+      return 1;
+    }
     bool retval = InspectReflog(reflog_hash, manifest);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");
       return 1;
+    }
+  } else {
+    if (!reflog_hash.IsNull()) {
+      // There is a checksum but no reflog; possibly the checksum is for the
+      // from the manifest for the stratum 0 reflog
+      if (!reflog_chksum_path.empty()) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "local reflog checksum set but reflog itself is missing, "
+                 "aborting");
+        return 1;
+      }
     }
   }
 
