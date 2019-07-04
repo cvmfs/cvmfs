@@ -847,7 +847,9 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   info->throttle_timestamp = 0;
   info->http_headers = NULL;
 
-  InitializeDnsSettings(handle, info->hostname);
+  InitializeDnsSettings(handle, (dns_buckets_) ?
+                                (info->bucket + "." + info->hostname) :
+                                 info->hostname);
 
   bool retval_b;
   retval_b = MkPayloadSize(*info, &info->payload_size);
