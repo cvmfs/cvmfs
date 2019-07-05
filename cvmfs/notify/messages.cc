@@ -13,6 +13,12 @@
 #include "util/pointer.h"
 #include "util/string.h"
 
+namespace {
+
+const LogFacilities& kLogError = DefaultLogging::error;
+
+}  // namespace
+
 namespace notify {
 
 namespace msg {
@@ -39,41 +45,41 @@ void Activity::ToJSONString(std::string* s) {
 bool Activity::FromJSONString(const std::string& s) {
   const UniquePtr<JsonDocument> m(JsonDocument::Create(s));
   if (!m.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Could not create JSON document.");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not create JSON document.");
     return false;
   }
 
   std::string message_type;
   if (!GetFromJSON(m->root(), "type", &message_type)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read message type.");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not read message type.");
     return false;
   }
   if (message_type != "activity") {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Invalid message type: %s.",
+    LogCvmfs(kLogCvmfs, kLogError, "Invalid message type: %s.",
              message_type.c_str());
     return false;
   }
 
   if (!GetFromJSON(m->root(), "version", &version_)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read version.");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not read version.");
     return false;
   }
 
   if (!GetFromJSON(m->root(), "timestamp", &timestamp_)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read timestamp.");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not read timestamp.");
     return false;
   }
   if (!GetFromJSON(m->root(), "repository", &repository_)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read repository.");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not read repository.");
     return false;
   }
   std::string manifest_b64;
   if (!GetFromJSON(m->root(), "manifest", &manifest_b64)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Could not read manifest.");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not read manifest.");
     return false;
   }
   if (!Debase64(manifest_b64, &manifest_)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Could not debase64 manifest.");
+    LogCvmfs(kLogCvmfs, kLogError, "Could not debase64 manifest.");
     return false;
   }
 

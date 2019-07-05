@@ -34,6 +34,7 @@ class NotificationClient : public SingleCopy {
  public:
   NotificationClient(const std::string& config, const std::string& repo_name,
                      FuseRemounter* remounter,
+                     download::DownloadManager* dl_mgr,
                      signature::SignatureManager* sig_mgr);
   virtual ~NotificationClient();
 

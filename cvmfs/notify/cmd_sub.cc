@@ -4,9 +4,12 @@
 
 #include "cmd_sub.h"
 
+#include "download.h"
 #include "logging.h"
 #include "manifest.h"
+#include "manifest_fetch.h"
 #include "notify/messages.h"
+#include "options.h"
 #include "signature.h"
 #include "subscriber_sse.h"
 #include "subscriber_supervisor.h"
@@ -20,37 +23,76 @@ namespace {
 const LogFacilities& kLogInfo = DefaultLogging::info;
 const LogFacilities& kLogError = DefaultLogging::error;
 
-class TriggerSubscriber : public notify::SubscriberSSE {
+const int kMaxPoolHandles = 1;
+const bool kUseSystemProxy = true;
+const unsigned kDownloadTimeout = 60;  // 1 minute
+const unsigned kDownloadRetries = 1;   // 2 attempts in total
+
+class SwissknifeSubscriber : public notify::SubscriberSSE {
  public:
-  TriggerSubscriber(const std::string& server_url, uint64_t min_revision,
-                    bool continuous, bool verbose)
+  SwissknifeSubscriber(const std::string& server_url,
+                       const std::string& repository, uint64_t min_revision,
+                       bool continuous, bool verbose)
       : notify::SubscriberSSE(server_url),
+        repository_(repository),
+        stats_(),
+        dl_mgr_(new download::DownloadManager()),
+        sig_mgr_(new signature::SignatureManager()),
         revision_(min_revision),
         continuous_(continuous),
         verbose_(verbose) {}
-  virtual ~TriggerSubscriber() {}
+  virtual ~SwissknifeSubscriber() {}
+
+  bool Init() {
+    const std::string config_file =
+        "/etc/cvmfs/repositories.d/" + repository_ + "/client.conf";
+    SimpleOptionsParser options;
+    if (!options.TryParsePath(config_file)) {
+      LogCvmfs(kLogCvmfs, kLogError,
+               "SwissknifeSubscriber - could not parse configuration file");
+      return false;
+    }
+
+    dl_mgr_->Init(kMaxPoolHandles, kUseSystemProxy,
+                  perf::StatisticsTemplate("download", &stats_));
+
+    std::string arg;
+    if (options.GetValue("CVMFS_SERVER_URL", &arg)) {
+      dl_mgr_->SetHostChain(arg);
+    }
+
+    sig_mgr_->Init();
+
+    std::string public_keys =
+        JoinStrings(FindFilesBySuffix("/etc/cvmfs/keys", ".pub"), ":");
+    if (!sig_mgr_->LoadPublicRsaKeys(public_keys)) {
+      LogCvmfs(kLogCvmfs, kLogError,
+               "SwissknifeSubscriber - could not load public keys");
+      return false;
+    }
+
+    return true;
+  }
 
  private:
   virtual notify::Subscriber::Status Consume(const std::string& repo,
                                              const std::string& msg_text) {
     notify::msg::Activity msg;
     if (!msg.FromJSONString(msg_text)) {
-      LogCvmfs(kLogCvmfs, kLogError, "Could not decode message.");
+      LogCvmfs(kLogCvmfs, kLogError,
+               "SwissknifeSubscriber - could not decode message.");
       return notify::Subscriber::kError;
     }
 
-    signature::SignatureManager sig_mgr;
+    manifest::ManifestEnsemble ensemble;
+    manifest::Failures res = manifest::Verify(
+        &(msg.manifest_[0]), msg.manifest_.size(), "", repo, 0, NULL,
+        sig_mgr_.weak_ref(), dl_mgr_.weak_ref(), &ensemble);
 
-    std::string cert_path = "/etc/cvmfs/keys/" + repo + ".crt";
-    if (!sig_mgr.LoadCertificatePath(cert_path)) {
-      LogCvmfs(kLogCvmfs, kLogError, "Could not load repository certificate.");
-      return notify::Subscriber::kError;
-    }
-
-    if (!sig_mgr.VerifyLetter(
-            reinterpret_cast<const unsigned char*>(msg.manifest_.data()),
-            msg.manifest_.size(), false)) {
-      LogCvmfs(kLogCvmfs, kLogError, "Manifest has invalid signature.");
+    if (res != manifest::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogError,
+               "SwissknifeSubscriber - manifest has invalid signature: %d",
+               res);
       return notify::Subscriber::kError;
     }
 
@@ -59,14 +101,16 @@ class TriggerSubscriber : public notify::SubscriberSSE {
         msg.manifest_.size()));
 
     if (!manifest.IsValid()) {
-      LogCvmfs(kLogCvmfs, kLogError, "Could not parse manifest.");
+      LogCvmfs(kLogCvmfs, kLogError,
+               "SwissknifeSubscriber - could not parse manifest.");
       return notify::Subscriber::kError;
     }
 
     uint64_t new_revision = manifest->revision();
     bool triggered = false;
     if (new_revision > revision_) {
-      LogCvmfs(kLogCvmfs, kLogInfo, "Repository %s is now at revision %lu.",
+      LogCvmfs(kLogCvmfs, kLogInfo,
+               "SwissknifeSubscriber - repository %s is now at revision %lu.",
                repo.c_str(), new_revision, revision_);
       if (verbose_) {
         LogCvmfs(kLogCvmfs, kLogInfo, "%s", msg_text.c_str());
@@ -82,6 +126,12 @@ class TriggerSubscriber : public notify::SubscriberSSE {
     return notify::Subscriber::kContinue;
   }
 
+  std::string repository_;
+
+  perf::Statistics stats_;
+  UniquePtr<download::DownloadManager> dl_mgr_;
+  UniquePtr<signature::SignatureManager> sig_mgr_;
+
   uint64_t revision_;
   bool continuous_;
   bool verbose_;
@@ -93,7 +143,13 @@ namespace notify {
 
 int DoSubscribe(const std::string& server_url, const std::string& repo,
                 uint64_t min_revision, bool continuous, bool verbose) {
-  TriggerSubscriber subscriber(server_url, min_revision, continuous, verbose);
+  SwissknifeSubscriber subscriber(server_url, repo, min_revision, continuous,
+                                  verbose);
+
+  if (!subscriber.Init()) {
+    LogCvmfs(kLogCvmfs, kLogError, "Could not initialize SwissknifeSubscriber");
+    return 1;
+  }
 
   // Retry settings: accept no more than 10 failures in the last minute
   const int num_retries = 10;

@@ -57,7 +57,8 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
   }
 
   if (!h_curl) {
-    LogCvmfs(kLogCvmfs, kLogError, "Error initializing CURL context.");
+    LogCvmfs(kLogCvmfs, kLogError,
+             "SubscriberSSE - error initializing CURL context.");
     return false;
   }
 
