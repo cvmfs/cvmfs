@@ -76,7 +76,7 @@ running_on_s3() {
 
 running_with_external_cache() {
   local repo="$1"
-  sudo cvmfs_talk -i lhcb.cern.ch cache instance | head -1 | grep -q External
+  sudo cvmfs_talk -i $repo cache instance | head -1 | grep -q External
 }
 
 get_xattr() {

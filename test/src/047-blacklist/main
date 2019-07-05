@@ -12,14 +12,14 @@ cvmfs_run_test() {
   local cache_dir=$(get_cvmfs_cachedir grid.cern.ch)
   echo "*** mount grid.cern.ch"
   cvmfs_mount grid.cern.ch || return 1
+  cvmfs_remove_breadcrumb grid.cern.ch
   cvmfs_umount grid.cern.ch || return 2
-  sudo rm -f ${cache_dir}/cvmfschecksum.grid.cern.ch
 
   trap cleanup_blacklist EXIT HUP INT TERM
   sudo touch /etc/cvmfs/blacklist
   cvmfs_mount grid.cern.ch || return 10
+  cvmfs_remove_breadcrumb grid.cern.ch
   cvmfs_umount grid.cern.ch || return 11
-  sudo rm -f ${cache_dir}/cvmfschecksum.grid.cern.ch
 
   echo "*** blacklist the grid.cern.ch fingerprint(s)"
   curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfswhitelist > white || return 10
