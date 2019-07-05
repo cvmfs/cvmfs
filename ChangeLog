@@ -8,6 +8,8 @@
     (CVM-1710, CVM-1744)
 
 2.6.1:
+  * Fix Cloudflare geo API with proxy name (CVM-1774)
+  * Fix DNS resolution in S3 backend with DNS style buckets
   * Fix potential hang during reload if a config repository is used (CVM-1466)
   * Disable active cache eviction as work around for stale negative entries
     (CVM-1759)

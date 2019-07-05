@@ -69,7 +69,7 @@ SigningTool::Result SigningTool::Run(
 
   // reflog_chksum_path wasn't given, the reflog checksum can possibly be
   // obtained from the manifest
-  if (reflog_chksum_path.empty() || reflog_hash.IsNull()) {
+  if (reflog_chksum_path.empty()) {
     reflog_hash = manifest->reflog_hash();
   }
 

@@ -681,6 +681,7 @@ manifest::Breadcrumb ExternalCacheManager::LoadBreadcrumb(
     bool rv = transport_.ParseMsgHash(msg_reply->breadcrumb().hash(),
                                       &breadcrumb.catalog_hash);
     assert(rv);
+    breadcrumb.catalog_hash.suffix = shash::kSuffixCatalog;
     breadcrumb.timestamp = msg_reply->breadcrumb().timestamp();
   }
   return breadcrumb;

@@ -55,6 +55,7 @@ install_from_repo libuuid-devel
 # install stuff necessary to build `cvmfs_preload`
 install_from_repo cmake
 install_from_repo patch
+install_from_repo zlib-devel
 install_from_repo libattr-devel
 install_from_repo python-devel
 install_from_repo unzip

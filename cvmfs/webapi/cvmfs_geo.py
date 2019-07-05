@@ -250,19 +250,21 @@ def api(path_info, repo_name, version, start_response, environ):
     # TODO(jblomer): Can this be switched to monotonic time?
     now = int(time.time())
 
+    trycdn = False
+    if 'HTTP_CF_CONNECTING_IP' in environ:
+        # Request is coming from Cloudflare Content Delivery Network;
+        #  servers are probably using Cloudflare too.
+        trycdn = True
+
     gir_rem = None
     if caching_string.find('.'):
         # might be a FQDN, use it if it resolves to a geo record
         gir_rem = name_geoinfo(now, caching_string)
 
-    trycdn = False
     if gir_rem is None:
         if 'HTTP_CF_CONNECTING_IP' in environ:
             # IP address of client connecting to Cloudflare
             gir_rem = addr_geoinfo(now, environ['HTTP_CF_CONNECTING_IP'])
-            if gir_rem is not None:
-                # Servers probably using Cloudflare Content Delivery Network too
-                trycdn = True
         if gir_rem is None and 'HTTP_X_FORWARDED_FOR' in environ:
             # List of IP addresses forwarded through squid
             # Try the last IP, in case there's a reverse proxy squid
