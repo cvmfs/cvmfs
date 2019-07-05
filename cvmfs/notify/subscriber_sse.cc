@@ -87,7 +87,13 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
   return success;
 }
 
-void SubscriberSSE::Unsubscribe() { RequestQuit(); }
+void SubscriberSSE::Unsubscribe() {
+  atomic_write32(&should_quit_, 1);
+}
+
+bool SubscriberSSE::ShouldQuit() const {
+  return atomic_read32(&should_quit_);
+}
 
 void SubscriberSSE::AppendToBuffer(const std::string& s) {
   size_t start = 0;
@@ -115,7 +121,7 @@ size_t SubscriberSSE::CurlRecvCB(void* buffer, size_t size, size_t nmemb,
     sub->AppendToBuffer(lines[0]);
   } else {
     sub->AppendToBuffer(lines[0]);
-    notify::Subscriber::Status st = sub->Consume(sub->topic(), sub->buffer());
+    notify::Subscriber::Status st = sub->Consume(sub->topic_, sub->buffer_);
     sub->ClearBuffer();
     for (size_t i = 1; i < lines.size(); ++i) {
       if (lines[i].substr(0, 5) == "data: ") {
@@ -124,7 +130,7 @@ size_t SubscriberSSE::CurlRecvCB(void* buffer, size_t size, size_t nmemb,
     }
     switch (st) {
       case notify::Subscriber::kFinish:
-        sub->RequestQuit();
+        sub->Unsubscribe();
         break;
       case notify::Subscriber::kError:
         return 0;
@@ -140,7 +146,7 @@ int SubscriberSSE::CurlProgressCB(void* clientp, curl_off_t dltotal,
                                   curl_off_t dlnow, curl_off_t ultotal,
                                   curl_off_t ulnow) {
   notify::SubscriberSSE* sub = static_cast<notify::SubscriberSSE*>(clientp);
-  if (sub->should_quit()) {
+  if (sub->ShouldQuit()) {
     LogCvmfs(kLogCvmfs, kLogInfo,
              "SubscriberSSE - quit request received. Stopping.");
     return 1;
