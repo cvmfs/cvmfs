@@ -9,6 +9,7 @@
 #include <alloca.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -169,11 +170,20 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     return instance_;
   }
 
+  static PluginRamCache *GetInstance() {
+    assert(instance_ != NULL);
+    return instance_;
+  }
+
   ~PluginRamCache() {
     delete storage_;
     delete objects_all_;
     delete objects_volatile_;
     instance_ = NULL;
+  }
+
+  void DropBreadcrumbs() {
+    breadcrumbs_.clear();
   }
 
   static int ram_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
@@ -626,6 +636,16 @@ static void Usage(const char *progname) {
 }
 
 
+/**
+ * For testing and debugging purposes, the cache manager drops its
+ * breadcrumb cache upon SIGUSR2 retrieval
+ */
+void DropBreadcrumbs(int sig, siginfo_t *siginfo, void *context) {
+  LogCvmfs(kLogCache, kLogSyslog | kLogDebug, "dropping breadcrumbs");
+  PluginRamCache::GetInstance()->DropBreadcrumbs();
+}
+
+
 int main(int argc, char **argv) {
   if (argc < 2) {
     Usage(argv[0]);
@@ -665,6 +685,13 @@ int main(int argc, char **argv) {
     cvmcache_spawn_watchdog(NULL);
 
   PluginRamCache *plugin = PluginRamCache::Create(mem_size);
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = DropBreadcrumbs;
+  sa.sa_flags = SA_SIGINFO;
+  sigfillset(&sa.sa_mask);
+  int retval = sigaction(SIGUSR2, &sa, NULL);
+  assert(retval == 0);
 
   struct cvmcache_callbacks callbacks;
   memset(&callbacks, 0, sizeof(callbacks));
@@ -685,7 +712,7 @@ int main(int argc, char **argv) {
   callbacks.capabilities = CVMCACHE_CAP_ALL_V2;
 
   ctx = cvmcache_init(&callbacks);
-  int retval = cvmcache_listen(ctx, locator);
+  retval = cvmcache_listen(ctx, locator);
   if (!retval) {
     LogCvmfs(kLogCache, kLogStderr, "failed to listen on %s", locator);
     return 1;
