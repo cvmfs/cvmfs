@@ -7,8 +7,10 @@
 
 #include <string>
 
+#include "download.h"
 #include "fuse_remount.h"
 #include "notify/subscriber.h"
+#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace signature {
@@ -43,7 +45,9 @@ class NotificationClient : public SingleCopy {
   std::string config_;
   std::string repo_name_;
   FuseRemounter* remounter_;
+  download::DownloadManager* dl_mgr_;
   signature::SignatureManager* sig_mgr_;
+  UniquePtr<notify::Subscriber> subscriber_;
   pthread_t thread_;
   bool spawned_;
 };

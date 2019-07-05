@@ -33,7 +33,7 @@ class Supervisor {
 
   virtual bool Task() = 0;
 
-  void Run();
+  bool Run();
 
  private:
   uint64_t max_retries_;

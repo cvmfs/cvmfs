@@ -12,7 +12,7 @@ Supervisor::Supervisor(uint64_t max_retries, uint64_t interval_sec)
 
 Supervisor::~Supervisor() {}
 
-void Supervisor::Run() {
+bool Supervisor::Run() {
   uint64_t retries = 0;
   uint64_t t0 = platform_monotonic_time();
   bool result = false;
@@ -26,4 +26,6 @@ void Supervisor::Run() {
       retries = 0;
     }
   } while (!result && (retries <= max_retries_));
+
+  return result;
 }

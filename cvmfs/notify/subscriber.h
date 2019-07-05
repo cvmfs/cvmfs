@@ -30,6 +30,13 @@ class Subscriber {
    */
   virtual bool Subscribe(const std::string& topic) = 0;
 
+  /**
+   * Unsubscribe
+   *
+   * Quit the subscription loop
+   */
+  virtual void Unsubscribe() {}
+
  protected:
   /**
    * Consume a message

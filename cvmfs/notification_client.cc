@@ -92,15 +92,21 @@ class ActivitySubscriber : public notify::SubscriberSSE {
 NotificationClient::NotificationClient(const std::string& config,
                                        const std::string& repo_name,
                                        FuseRemounter* remounter,
+                                       download::DownloadManager* dl_mgr,
                                        signature::SignatureManager* sig_mgr)
     : config_(config),
       repo_name_(repo_name),
       remounter_(remounter),
+      dl_mgr_(dl_mgr),
       sig_mgr_(sig_mgr),
+      subscriber_(),
       thread_(),
       spawned_(false) {}
 
 NotificationClient::~NotificationClient() {
+  if (subscriber_.IsValid()) {
+    subscriber_->Unsubscribe();
+  }
   if (spawned_) {
     pthread_join(thread_, NULL);
     spawned_ = false;
@@ -108,18 +114,20 @@ NotificationClient::~NotificationClient() {
 }
 
 void NotificationClient::Spawn() {
-  if (pthread_create(&thread_, NULL, NotificationClient::Run, this)) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr,
-             "ActivitySubscriber - Could not start background thread");
+  if (!spawned_) {
+    if (pthread_create(&thread_, NULL, NotificationClient::Run, this)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+               "NotificationClient - Could not start background thread");
+    }
+    spawned_ = true;
   }
-  spawned_ = true;
 }
 
 void* NotificationClient::Run(void* data) {
   NotificationClient* cl = static_cast<NotificationClient*>(data);
 
-  UniquePtr<ActivitySubscriber> sub(
-      new ActivitySubscriber(cl->config_, cl->remounter_, cl->sig_mgr_));
+  cl->subscriber_ = new ActivitySubscriber(cl->config_, cl->remounter_,
+                                           cl->dl_mgr_, cl->sig_mgr_);
 
   LogCvmfs(
       kLogCvmfs, kLogSyslog,
@@ -129,8 +137,8 @@ void* NotificationClient::Run(void* data) {
   // Retry settings: accept no more than 10 failures in the last minute
   const int num_retries = 10;
   const uint64_t interval = 60;
-  notify::SubscriberSupervisor supervisor(sub.weak_ref(), cl->repo_name_,
-                                          num_retries, interval);
+  notify::SubscriberSupervisor supervisor(
+      cl->subscriber_.weak_ref(), cl->repo_name_, num_retries, interval);
   supervisor.Run();
 
   return NULL;

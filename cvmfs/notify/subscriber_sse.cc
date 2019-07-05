@@ -23,7 +23,8 @@ const LogFacilities& kLogError = DefaultLogging::error;
 namespace notify {
 
 SubscriberSSE::SubscriberSSE(const std::string& server_url)
-    : server_url_(server_url + "/notifications/subscribe"),
+    : Subscriber(),
+      server_url_(server_url + "/notifications/subscribe"),
       topic_(),
       buffer_(),
       should_quit_(false) {}
@@ -85,6 +86,8 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
   return success;
 }
 
+void SubscriberSSE::Unsubscribe() { RequestQuit(); }
+
 void SubscriberSSE::AppendToBuffer(const std::string& s) {
   size_t start = 0;
   if (s.substr(0, 6) == "data: ") {
@@ -137,6 +140,8 @@ int SubscriberSSE::CurlProgressCB(void* clientp, curl_off_t dltotal,
                                   curl_off_t ulnow) {
   notify::SubscriberSSE* sub = static_cast<notify::SubscriberSSE*>(clientp);
   if (sub->should_quit()) {
+    LogCvmfs(kLogCvmfs, kLogInfo,
+             "SubscriberSSE - quit request received. Stopping.");
     return 1;
   }
 

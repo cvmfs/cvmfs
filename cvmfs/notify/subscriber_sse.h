@@ -10,6 +10,7 @@
 
 #include <string>
 
+#include "atomic.h"
 #include "duplex_curl.h"
 
 namespace notify {
@@ -23,14 +24,15 @@ class SubscriberSSE : public Subscriber {
   virtual ~SubscriberSSE();
 
   virtual bool Subscribe(const std::string& topic);
+  virtual void Unsubscribe();
 
   const std::string& topic() const { return topic_; }
   const std::string& buffer() const { return buffer_; }
-  bool should_quit() const { return should_quit_; }
+  bool should_quit() const { return atomic_read32(&should_quit_); }
 
   void AppendToBuffer(const std::string& s);
   void ClearBuffer();
-  void RequestQuit() { should_quit_ = true; }
+  void RequestQuit() { atomic_write32(&should_quit_, 1); }
 
  private:
   static size_t CurlRecvCB(void* buffer, size_t size, size_t nmemb,
@@ -42,7 +44,7 @@ class SubscriberSSE : public Subscriber {
   std::string topic_;
   std::string buffer_;
 
-  bool should_quit_;
+  mutable atomic_int32 should_quit_;
 };
 
 }  // namespace notify
