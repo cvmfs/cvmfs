@@ -74,6 +74,11 @@ running_on_s3() {
   [ "x$CVMFS_TEST_S3_CONFIG" != "x" ]
 }
 
+running_with_external_cache() {
+  local repo="$1"
+  sudo cvmfs_talk -i lhcb.cern.ch cache instance | head -1 | grep -q External
+}
+
 get_xattr() {
   local extended_attr="$1"
   local path="$2"
@@ -512,6 +517,20 @@ cvmfs_umount() {
   done
 
   return 0
+}
+
+
+cvmfs_remove_breadcrumb() {
+  local repo="$1"
+  if running_with_external_cache $repo; then
+    local pid_cache=$(sudo cvmfs_talk -i $repo pid cachemgr)
+    # Send SIGUSR2 and wait a bit
+    sudo kill -12 $pid_cache
+    sleep 2
+  else
+    echo "--- removing $(get_cvmfs_cachedir ${repo})/cvmfschecksum.${repo}"
+    sudo rm -f "$(get_cvmfs_cachedir ${repo})/cvmfschecksum.${repo}" || return 1
+  fi
 }
 
 
