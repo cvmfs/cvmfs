@@ -145,6 +145,7 @@ func (ns *NotificationSystem) Unsubscribe(
 	}
 
 	delete(subsForRepo, handle)
+	close(handle)
 
 	gw.LogC(ctx, "notify", gw.LogDebug).
 		Str("repository", repository).
