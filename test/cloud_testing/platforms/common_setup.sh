@@ -24,7 +24,6 @@ script_location=$(portable_dirname $0)
 #  SHRINKWRAP_PACKAGE    location of the CernVM-FS shrinkwrap package
 #  LOG_DIRECTORY         location of the test log files to be created
 #  GATEWAY_BUILD_URL     location of the repository gateway build to install
-#  NOTIFY_SRV_BUILD_URL  location of the notification server build to install
 #
 
 SERVER_PACKAGE=""
@@ -36,7 +35,6 @@ CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
 LOG_DIRECTORY=""
 GATEWAY_BUILD_URL=""
-NOTIFY_SRV_BUILD_URL=""
 
 # parse script parameters (same for all platforms)
 while getopts "s:c:d:k:t:g:l:w:n:p:" option; do
@@ -68,9 +66,6 @@ while getopts "s:c:d:k:t:g:l:w:n:p:" option; do
     w)
       GATEWAY_BUILD_URL=$OPTARG
       ;;
-    n)
-      NOTIFY_SRV_BUILD_URL=$OPTARG
-      ;;
     ?)
       shift $(($OPTIND-2))
       usage "Unrecognized option: $1"
@@ -91,7 +86,6 @@ if [ "x$(uname -s)" != "xDarwin" ]; then
        [ "x$UNITTEST_PACKAGE"      = "x" ] ||
        [ "x$SHRINKWRAP_PACKAGE"    = "x" ] ||
        [ "x$GATEWAY_BUILD_URL"     = "x" ] ||
-       [ "x$NOTIFY_SRV_BUILD_URL"  = "x" ] ||
        [ "x$DEVEL_PACKAGE"         = "x" ]; then
       echo "missing parameter(s), cannot run platform dependent test script"
       exit 200

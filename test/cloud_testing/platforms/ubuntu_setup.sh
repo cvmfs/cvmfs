@@ -125,9 +125,6 @@ if [ "x$(uname -m)" = "xx86_64" ]; then
   if [ "x$package_map" != "x" ]; then
     echo "Installing repository gateway"
     install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
-
-    echo "Installing notification server"
-    install_package ${NOTIFY_SRV_BUILD_URL} $package_map || die "fail (downloading cvmfs-notify)"
   fi
 fi
 
