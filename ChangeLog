@@ -1,8 +1,9 @@
 1.1.0:
-  * Administrative operations and GC (CVM-1685)
-  * The application was rewritten in Go, with full backward compatibility
+  * Added notification system functionality
+  * Added HTTP endpoints for administrative tasks (CVM-1685, CVM-1712)
   * Lower memory use during payload submission: object packs are now streamed
     to receiver
+  * The application was rewritten in Go, with full backward compatibility
 
 1.0.0:
   * More robust and less verbose repository and key configuration (CVM-1679)
