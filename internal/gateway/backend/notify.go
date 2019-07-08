@@ -102,7 +102,7 @@ func (ns *NotificationSystem) Subscribe(
 	ctx context.Context, repository string, handle SubscriberHandle) {
 
 	added := false
-	go func() {
+	func() {
 		ns.SubscriberLock.Lock()
 		defer ns.SubscriberLock.Unlock()
 		subsForRepo, present := ns.Subscribers[repository]
