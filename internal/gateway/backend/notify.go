@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/pkg/errors"
@@ -27,9 +28,10 @@ type SubscriberMap map[string]SubscriberSet
 // NotificationSystem encapsulates the functionality of the repository
 // activity notification system
 type NotificationSystem struct {
-	Subscribers SubscriberMap
-	WorkDir     string
-	Store       *bolt.DB
+	Subscribers    SubscriberMap
+	SubscriberLock sync.RWMutex
+	WorkDir        string
+	Store          *bolt.DB
 }
 
 // NewNotificationSystem is a constructor function for the NotificationSystem type
@@ -58,9 +60,10 @@ func NewNotificationSystem(workDir string) (*NotificationSystem, error) {
 		Msgf("database opened (work dir: %v)", workDir)
 
 	ns := &NotificationSystem{
-		Subscribers: make(SubscriberMap),
-		WorkDir:     workDir,
-		Store:       store,
+		Subscribers:    make(SubscriberMap),
+		SubscriberLock: sync.RWMutex{},
+		WorkDir:        workDir,
+		Store:          store,
 	}
 
 	return ns, nil
@@ -99,19 +102,23 @@ func (ns *NotificationSystem) Subscribe(
 	ctx context.Context, repository string, handle SubscriberHandle) {
 
 	added := false
-	subsForRepo, present := ns.Subscribers[repository]
-	if present {
-		_, pres := subsForRepo[handle]
-		if !pres {
+	go func() {
+		ns.SubscriberLock.Lock()
+		defer ns.SubscriberLock.Unlock()
+		subsForRepo, present := ns.Subscribers[repository]
+		if present {
+			_, pres := subsForRepo[handle]
+			if !pres {
+				subsForRepo[handle] = struct{}{}
+				added = true
+			}
+		} else {
+			subsForRepo = make(SubscriberSet)
 			subsForRepo[handle] = struct{}{}
 			added = true
+			ns.Subscribers[repository] = subsForRepo
 		}
-	} else {
-		subsForRepo = make(SubscriberSet)
-		subsForRepo[handle] = struct{}{}
-		added = true
-		ns.Subscribers[repository] = subsForRepo
-	}
+	}()
 
 	if added {
 		message := make([]byte, 0)
@@ -130,10 +137,12 @@ func (ns *NotificationSystem) Subscribe(
 	}
 }
 
-// Unsubscribe from messages for the given repository
+// Unsubscribe from messages for the given repository. Closes the subscriber handle (chan)
 func (ns *NotificationSystem) Unsubscribe(
 	ctx context.Context, repository string, handle SubscriberHandle) error {
 
+	ns.SubscriberLock.Lock()
+	defer ns.SubscriberLock.Unlock()
 	subsForRepo, hasSubs := ns.Subscribers[repository]
 	if !hasSubs {
 		return fmt.Errorf("no_subscriptions_for_repository")
@@ -155,6 +164,8 @@ func (ns *NotificationSystem) Unsubscribe(
 }
 
 func (ns *NotificationSystem) notify(repository string, message []byte) {
+	ns.SubscriberLock.RLock()
+	defer ns.SubscriberLock.RUnlock()
 	subsForRepo, present := ns.Subscribers[repository]
 	if present {
 		for s := range subsForRepo {
