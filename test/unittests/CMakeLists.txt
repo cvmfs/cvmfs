@@ -474,7 +474,7 @@ endif (BUILD_SHRINKWRAP)
 #
 
 list (APPEND UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
-                                     ${LibWebsockets_LIBRARIES} ${OPENSSL_LIBRARIES}
+                                     ${OPENSSL_LIBRARIES}
                                      ${CURL_LIBRARIES} ${CARES_LIBRARIES}
                                      ${OPENSSL_LIBRARIES} ${SQLITE3_LIBRARY}
                                      ${ZLIB_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES}

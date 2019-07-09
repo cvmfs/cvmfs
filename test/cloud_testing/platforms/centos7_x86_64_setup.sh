@@ -93,8 +93,3 @@ sudo systemctl restart httpd || die "failure in final Apache restart"
 echo "Installing repository gateway"
 package_map=pkgmap.cc7_x86_64
 install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
-
-# Install notification server
-echo "Installing notification server"
-package_map=pkgmap.cc7_x86_64
-install_package ${NOTIFY_SRV_BUILD_URL} $package_map || die "fail (downloading cvmfs-notify)"
