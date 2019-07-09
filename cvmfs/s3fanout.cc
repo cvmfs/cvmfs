@@ -28,6 +28,7 @@ const char *S3FanoutManager::kCacheControlDotCvmfs =
 const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
 const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
+const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
 
 
 /**
@@ -559,8 +560,12 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   string timestamp = IsoTimestamp();
   string date = timestamp.substr(0, 8);
   vector<string> tokens = SplitString(info.hostname, ':');
-  string host_only = tokens[0];
-  if (dns_buckets_) host_only = info.bucket + "." + host_only;
+  assert(tokens.size() <= 2);
+  string canonical_hostname = tokens[0];
+  if (tokens.size() == 2 && String2Uint64(tokens[1]) != kDefaultHTTPPort)
+    canonical_hostname += ":" + tokens[1];
+
+  if (dns_buckets_) canonical_hostname = info.bucket + "." + canonical_hostname;
 
   string signed_headers;
   string canonical_headers;
@@ -571,7 +576,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   }
   signed_headers += "host;x-amz-acl;x-amz-content-sha256;x-amz-date";
   canonical_headers +=
-    "host:" + host_only + "\n" +
+    "host:" + canonical_hostname + "\n" +
     "x-amz-acl:public-read\n"
     "x-amz-content-sha256:" + payload_hash + "\n" +
     "x-amz-date:" + timestamp + "\n";
