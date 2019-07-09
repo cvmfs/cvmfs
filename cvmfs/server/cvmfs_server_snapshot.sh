@@ -178,13 +178,14 @@ __do_all_snapshots() {
   local separate_logs=0
   local logrotate_nowarn=0
   local skip_noninitial=0
+  local snapshot_group
   local log
   local fullog
   local repo
   local repos
 
   OPTIND=1
-  while getopts "sni" option; do
+  while getopts "snig:" option; do
     case $option in
       s)
         separate_logs=1
@@ -194,6 +195,9 @@ __do_all_snapshots() {
       ;;
       i)
         skip_noninitial=1
+      ;;
+      g)
+        snapshot_group=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -251,7 +255,16 @@ EOF
       continue
     fi
 
+    # unset this first, for backward compatibility with versions that
+    #  did not set it
+    unset CVMFS_SNAPSHOT_GROUP
+
     load_repo_config $repo
+
+    if [ "x$CVMFS_SNAPSHOT_GROUP" != "x$snapshot_group" ]; then
+      continue
+    fi
+
     local upstream=$CVMFS_UPSTREAM_STORAGE
     local snapshot_time=0
     if is_local_upstream $upstream; then
@@ -309,13 +322,16 @@ cvmfs_server_snapshot() {
   local allopts=""
 
   OPTIND=1
-  while getopts "atsni" option; do
+  while getopts "atsnig:" option; do
     case $option in
       a)
         do_all=1
       ;;
       s|n|i)
         allopts="$allopts -$option"
+      ;;
+      g)
+        allopts="$allopts -g $OPTARG"
       ;;
       t)
         abort_on_conflict=1
