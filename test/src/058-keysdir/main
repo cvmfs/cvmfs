@@ -7,8 +7,9 @@ cvmfs_run_test() {
 
   cvmfs_mount grid.cern.ch || return 1
 
+  cvmfs_remove_breadcrumb grid.cern.ch
   cvmfs_umount grid.cern.ch
-  sudo rm -rf "/var/lib/cvmfs/shared" "/var/lib/cvmfs/grid.cern.ch"
+
   cvmfs_mount grid.cern.ch "CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/egi.eu/egi.eu.pub"
   if [ $? -eq 0 ]; then
     return 10
