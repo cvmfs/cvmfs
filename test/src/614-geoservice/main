@@ -191,19 +191,23 @@ cvmfs_run_test() {
   result="`curl -s http://localhost/$api/$other/$cern,$fnal,$ihep,$sep,$fnalbp|head -5`"
   cvmfs_check_geosepresult "$result" $fnalbp cern,fnal,ihep || return 24
 
-  echo "checking parallelism and cache limit (could take a couple of minutes)"
+  echo "checking parallelism and cache limit (could take several minutes)"
   # The number of api processing threads is 64, and cache limit is 100k.
   # We want to surpass each limit.  Surpass number of parallel threads
   #  by a factor of 4, to 256.  Use IP addresses instead of dns names so
-  #  it doesn't actually contact the DNS.  There's 256*258 (65k) IPv4
+  #  it doesn't actually contact the DNS.  There's 256*256 (65k) IPv4
   #  addresses available in a class B network, so using two of them will
   #  surpass the 100k limit.  Use the process number as part of the IP
-  #  address so only unique names are used.
+  #  address and also the process number with the lowest bit flipped, so
+  #  each name is used twice.
 
+  local namelookups="`curl -s http://localhost/$api/_namelookups_/`"
   local pids procn site classb expected subn addr urls
+  local partnerprocn numresults nextexpect
   procn=0
   while [ $procn -lt 256 ]; do
     (
+      let partnerprocn="$procn^1"
       for site in cern fnal; do 
         case $site in
           cern)
@@ -216,26 +220,36 @@ cvmfs_run_test() {
             ;;
         esac
         subn=0
-        # send 256 urls at a time to curl; otherwise it is too slow
+        # send 512 urls at a time to curl; otherwise it is too slow
         urls=""
         while [ $subn -lt 256 ]; do
-          addr=$classb.$subn.$procn
-          urls="$urls http://localhost/$api/$addr/$cern,$fnal,$ihep"
-          let subn=$subn+1
+          for lowname in procn partnerprocn; do
+            eval addr=$classb.$subn.\$$lowname
+            urls="$urls http://localhost/$api/$addr/$cern,$fnal,$ihep"
+          done
+          let subn+=1
         done
         curl -s $urls 2>&1 | \
           (
           subn=0
+          numresults=0
+          nextexpect=procn
           while read result; do
-            addr=$classb.$subn.$procn
+            eval addr=$classb.$subn.\$$nextexpect
             if [ "$result" != "$expected" ]; then
               echo "query on $addr failed! expected $expected, got $result"
               return 1
             fi
-            let subn=$subn+1
+            let numresults+=1
+            if [ $nextexpect = procn ]; then
+              nextexpect=partnerprocn
+            else
+              nextexpect=procn
+              let subn+=1
+            fi
           done
-          if [ $subn -ne 256 ]; then
-            echo "expected 256 results in proc $procn for $classb, got $subn"
+          if [ $numresults -ne 512 ]; then
+            echo "expected 512 results in proc $procn for $classb, got $numresults"
             return 1
           fi
           ) || return 1
@@ -244,12 +258,20 @@ cvmfs_run_test() {
     pids="$pids $!"
     let procn=$procn+1
   done
-  local pid
+  local pid numfail
+  numfail=0
   for pid in $pids; do
     # wait individually in order to check the return codes
-    wait $pid || return 30
+    wait $pid || let numfail+=1
   done
-  echo "parallelism test completed successfully"
+  let namelookups="`curl -s http://localhost/$api/_namelookups_/` - $namelookups"
+  echo "number of name lookups done in test: $namelookups"
+  if [ $numfail = 0 ]; then
+    echo "parallelism test completed successfully"
+  else
+    echo "$numfail procs failed"
+    return 30
+  fi
 
   return 0
 }
