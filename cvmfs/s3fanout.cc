@@ -184,8 +184,9 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
     return 0;
 
   // Find s in watch_fds_
+  // First 2 fds are job and terminate pipes (not curl related)
   unsigned index;
-  for (index = 0; index < s3fanout_mgr->watch_fds_inuse_; ++index) {
+  for (index = 2; index < s3fanout_mgr->watch_fds_inuse_; ++index) {
     if (s3fanout_mgr->watch_fds_[index].fd == s)
       break;
   }
@@ -244,29 +245,48 @@ void *S3FanoutManager::MainUpload(void *data) {
   LogCvmfs(kLogS3Fanout, kLogDebug, "Upload I/O thread started");
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(data);
 
+  s3fanout_mgr->InitPipeWatchFds();
+
   // Don't schedule more jobs into the multi handle than the maximum number of
   // parallel connections.  This should prevent starvation and thus a timeout
   // of the authorization header (CVM-1339).
   unsigned jobs_in_flight = 0;
 
-  while (s3fanout_mgr->thread_upload_run_) {
-    JobInfo *info = NULL;
-    {
-      MutexLockGuard m(s3fanout_mgr->jobs_todo_lock_);
-      if (!s3fanout_mgr->jobs_todo_.empty() &&
-          (jobs_in_flight < s3fanout_mgr->pool_max_handles_)) {
-        info = s3fanout_mgr->jobs_todo_.back();
-        s3fanout_mgr->jobs_todo_.pop_back();
+  while (true) {
+    // Check events with 1ms timeout
+    int timeout = 1;
+    int retval = poll(s3fanout_mgr->watch_fds_, s3fanout_mgr->watch_fds_inuse_,
+                      timeout);
+    if (retval == 0) {
+      // Handle timeout
+      int still_running = 0;
+      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+                                        CURL_SOCKET_TIMEOUT,
+                                        0,
+                                        &still_running);
+      if (retval != CURLM_OK) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "Error, timeout due to: %d", retval);
+        assert(retval == CURLM_OK);
       }
+    } else if (retval < 0) {
+      assert(errno == EINTR);
+      continue;
     }
 
-    if (info != NULL) {
+    // Terminate I/O thread
+    if (s3fanout_mgr->watch_fds_[0].revents)
+      break;
+
+    // New job incoming
+    if (s3fanout_mgr->watch_fds_[1].revents) {
+      s3fanout_mgr->watch_fds_[1].revents = 0;
+      JobInfo *info;
+      ReadPipe(s3fanout_mgr->pipe_jobs_[0], &info, sizeof(info));
       CURL *handle = s3fanout_mgr->AcquireCurlHandle();
       if (handle == NULL) {
         LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
         assert(handle != NULL);
       }
-
       s3fanout::Failures init_failure =
         s3fanout_mgr->InitializeRequest(info, handle);
       if (init_failure != s3fanout::kFailOk) {
@@ -291,32 +311,14 @@ void *S3FanoutManager::MainUpload(void *data) {
                retval, still_running);
     }
 
-    // Check events with 1ms timeout
-    int timeout = 1;
-    int retval = poll(s3fanout_mgr->watch_fds_, s3fanout_mgr->watch_fds_inuse_,
-                      timeout);
-    if (retval == 0) {
-      // Handle timeout
-      int still_running = 0;
-      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
-                                        CURL_SOCKET_TIMEOUT,
-                                        0,
-                                        &still_running);
-      if (retval != CURLM_OK) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "Error, timeout due to: %d", retval);
-        assert(retval == CURLM_OK);
-      }
-    } else if (retval < 0) {
-      assert(errno == EINTR);
-      continue;
-    }
 
     // Activity on curl sockets
     // Within this loop the curl_multi_socket_action() may cause socket(s)
     // to be removed from watch_fds_. If a socket is removed it is replaced
     // by the socket at the end of the array and the inuse count is decreased.
     // Therefore loop over the array in reverse order.
-    for (int32_t i = s3fanout_mgr->watch_fds_inuse_ - 1; i >= 0; --i) {
+    // First 2 fds are job and terminate pipes (not curl related)
+    for (int32_t i = s3fanout_mgr->watch_fds_inuse_ - 1; i >= 2; --i) {
       if (static_cast<uint32_t>(i) >= s3fanout_mgr->watch_fds_inuse_) {
         continue;
       }
@@ -451,6 +453,18 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
   pool_handles_inuse_->erase(elem);
 }
 
+void S3FanoutManager::InitPipeWatchFds() {
+  assert(watch_fds_inuse_ == 0);
+  assert(watch_fds_size_ >= 2);
+  watch_fds_[0].fd = pipe_terminate_[0];
+  watch_fds_[0].events = POLLIN | POLLPRI;
+  watch_fds_[0].revents = 0;
+  ++watch_fds_inuse_;
+  watch_fds_[1].fd = pipe_jobs_[0];
+  watch_fds_[1].events = POLLIN | POLLPRI;
+  watch_fds_[1].revents = 0;
+  ++watch_fds_inuse_;
+}
 
 /**
  * The Amazon AWS 2 authorization header according to
@@ -1223,6 +1237,9 @@ S3FanoutManager::S3FanoutManager(const std::string access_key,
   watch_fds_inuse_ = 0;
   watch_fds_max_ = 0;
 
+  pipe_terminate_[0] = pipe_terminate_[1] = -1;
+  pipe_jobs_[0] = pipe_jobs_[1] = -1;
+
   lock_options_ =
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_options_, NULL);
@@ -1248,7 +1265,6 @@ S3FanoutManager::S3FanoutManager(const std::string access_key,
 
   max_available_jobs_ = 0;
   thread_upload_ = 0;
-  thread_upload_run_ = false;
   resolver_ = NULL;
   available_jobs_ = NULL;
   statistics_ = NULL;
@@ -1310,8 +1326,8 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
     opt_ipv4_only_ = true;
   }
 
-  watch_fds_ = static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
-  watch_fds_size_ = 2;
+  watch_fds_ = static_cast<struct pollfd *>(smalloc(4 * sizeof(struct pollfd)));
+  watch_fds_size_ = 4;
   watch_fds_inuse_ = 0;
 
   SetRetryParameters(3, 100, 2000);
@@ -1322,8 +1338,14 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
 void S3FanoutManager::Fini() {
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
-    thread_upload_run_ = false;
+    char buf = 'T';
+    WritePipe(pipe_terminate_[1], &buf, 1);
     pthread_join(thread_upload_, NULL);
+
+    close(pipe_terminate_[1]);
+    close(pipe_terminate_[0]);
+    close(pipe_jobs_[1]);
+    close(pipe_jobs_[0]);
   }
 
   set<CURL *>::iterator             i    = pool_handles_idle_->begin();
@@ -1372,7 +1394,9 @@ void S3FanoutManager::Fini() {
 void S3FanoutManager::Spawn() {
   LogCvmfs(kLogS3Fanout, kLogDebug, "S3FanoutManager spawned");
 
-  thread_upload_run_ = true;
+  MakePipe(pipe_terminate_);
+  MakePipe(pipe_jobs_);
+
   int retval = pthread_create(&thread_upload_, NULL, MainUpload,
                               static_cast<void *>(this));
   assert(retval == 0);
@@ -1434,9 +1458,7 @@ int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
  */
 void S3FanoutManager::PushNewJob(JobInfo *info) {
   available_jobs_->Increment();
-
-  MutexLockGuard m(jobs_todo_lock_);
-  jobs_todo_.push_back(info);
+  WritePipe(pipe_jobs_[1], &info, sizeof(info));
 }
 
 //------------------------------------------------------------------------------

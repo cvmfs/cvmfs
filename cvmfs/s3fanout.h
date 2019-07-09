@@ -257,6 +257,7 @@ class S3FanoutManager : SingleCopy {
 
   CURL *AcquireCurlHandle() const;
   void ReleaseCurlHandle(JobInfo *info, CURL *handle) const;
+  void InitPipeWatchFds();
   int InitializeDnsSettings(CURL *handle,
                             std::string remote_host) const;
   void InitializeDnsSettingsCurl(CURL *handle, CURLSH *sharehandle,
@@ -316,13 +317,15 @@ class S3FanoutManager : SingleCopy {
   mutable std::map<std::string, std::string> signing_keys_;
 
   pthread_t thread_upload_;
-  bool thread_upload_run_;
   atomic_int32 multi_threaded_;
 
   struct pollfd *watch_fds_;
   uint32_t watch_fds_size_;
   uint32_t watch_fds_inuse_;
   uint32_t watch_fds_max_;
+
+  int pipe_terminate_[2];
+  int pipe_jobs_[2];
 
   pthread_mutex_t *lock_options_;
   unsigned opt_timeout_;
