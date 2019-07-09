@@ -73,7 +73,7 @@ struct UploadStreamHandle;
 class AbstractUploader
   : public PolymorphicConstruction<AbstractUploader, SpoolerDefinition>
   , public Callbackable<UploaderResults>
-{
+  , public SingleCopy {
   friend class TaskUpload;
 
  public:

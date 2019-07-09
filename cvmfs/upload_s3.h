@@ -14,6 +14,7 @@
 #include "atomic.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
+#include "util/pointer.h"
 
 namespace upload {
 
@@ -97,7 +98,7 @@ class S3Uploader : public AbstractUploader {
 
   s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
 
-  s3fanout::S3FanoutManager *s3fanout_mgr_;
+  UniquePtr<s3fanout::S3FanoutManager> s3fanout_mgr_;
   std::string repository_alias_;
   std::string host_name_port_;
   std::string host_name_;

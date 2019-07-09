@@ -206,39 +206,42 @@ class S3FanoutManager : SingleCopy {
   static const unsigned kThrottleReportIntervalSec;
   static const unsigned kDefaultHTTPPort;
 
+  struct S3Config {
+    S3Config() {
+      authz_method = kAuthzAwsV2;
+      dns_buckets = true;
+      pool_max_handles = 0;
+      opt_timeout_sec = 20;
+      opt_max_retries = 3;
+      opt_backoff_init_ms = 100;
+      opt_backoff_max_ms = 2000;
+    }
+    std::string access_key;
+    std::string secret_key;
+    std::string hostname_port;
+    AuthzMethods authz_method;
+    std::string region;
+    std::string bucket;
+    bool dns_buckets;
+    uint32_t pool_max_handles;
+    unsigned opt_timeout_sec;
+    unsigned opt_max_retries;
+    unsigned opt_backoff_init_ms;
+    unsigned opt_backoff_max_ms;
+  };
+
   static void DetectThrottleIndicator(const std::string &header, JobInfo *info);
 
-  const std::string access_key_;
-  const std::string secret_key_;
-  const AuthzMethods authz_method_;
-  const std::string complete_hostname_;
-  const std::string region_;
-  const std::string bucket_;
-  const bool dns_buckets_;
-
-  S3FanoutManager(const std::string access_key,
-                  const std::string secret_key,
-                  const AuthzMethods authz_method,
-                  const std::string hostname,
-                  const std::string region,
-                  const std::string bucket,
-                  bool dns_buckets);
+  explicit S3FanoutManager(const S3Config &config);
 
   ~S3FanoutManager();
 
-  void Init(const unsigned max_pool_handles);
-  void Fini();
   void Spawn();
 
   void PushNewJob(JobInfo *info);
   int PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs);
 
   const Statistics &GetStatistics();
-  void SetTimeout(const unsigned seconds);
-  void GetTimeout(unsigned *seconds);
-  void SetRetryParameters(const unsigned max_retries,
-                          const unsigned backoff_init_ms,
-                          const unsigned backoff_max_ms);
 
  private:
   // Reflects the default Apache configuration of the local backend
@@ -279,21 +282,23 @@ class S3FanoutManager : SingleCopy {
   bool MkV4Authz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &objkey) const {
-    if (dns_buckets_) {
+    if (config_.dns_buckets) {
       return "http://" + complete_hostname_ + "/" + objkey;
     } else {
-      return "http://" + complete_hostname_ + "/" + bucket_ + "/" + objkey;
+      return "http://" + complete_hostname_ + "/" + config_.bucket +
+             "/" + objkey;
     }
   }
-  static std::string MkCompleteHostname(const std::string &hostname,
-                                        const std::string &bucket,
-                                        const bool &dns_buckets) {
-    if (dns_buckets) {
-      return bucket + "." + hostname;
+  std::string MkCompleteHostname() {
+    if (config_.dns_buckets) {
+      return config_.bucket + "." + config_.hostname_port;
     } else {
-      return hostname;
+      return config_.hostname_port;
     }
   }
+
+  const S3Config config_;
+  std::string complete_hostname_;
 
   Prng prng_;
   /**
@@ -306,15 +311,14 @@ class S3FanoutManager : SingleCopy {
   std::set<S3FanOutDnsEntry *> *sharehandles_;
   std::map<CURL *, S3FanOutDnsEntry *> *curl_sharehandles_;
   dns::CaresResolver *resolver_;
-  uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;
 
   /**
    * AWS4 signing keys are derived from the secret key, a region and a date.
-   * They can be cached.
+   * The signing key for current day can be cached.
    */
-  mutable std::map<std::string, std::string> signing_keys_;
+  mutable std::pair<std::string, std::string> last_signing_key_;
 
   pthread_t thread_upload_;
   atomic_int32 multi_threaded_;
@@ -324,15 +328,14 @@ class S3FanoutManager : SingleCopy {
   uint32_t watch_fds_inuse_;
   uint32_t watch_fds_max_;
 
+  // A pipe used to signal termination from S3FanoutManager to MainUpload
+  // thread. Anything written into it results in MainUpload thread exit.
   int pipe_terminate_[2];
+  // A pipe to used to push jobs from S3FanoutManager to MainUpload thread.
+  // S3FanoutManager writes a JobInfo* pointer. MainUpload then reads the
+  // pointer and processes the job.
   int pipe_jobs_[2];
 
-  pthread_mutex_t *lock_options_;
-  unsigned opt_timeout_;
-
-  unsigned opt_max_retries_;
-  unsigned opt_backoff_init_ms_;
-  unsigned opt_backoff_max_ms_;
   bool opt_ipv4_only_;
 
   unsigned int max_available_jobs_;

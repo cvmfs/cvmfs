@@ -44,17 +44,21 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
     abort();
   }
 
-  s3fanout_mgr_ = new s3fanout::S3FanoutManager(access_key_,
-                                                secret_key_,
-                                                authz_method_,
-                                                host_name_port_,
-                                                region_,
-                                                bucket_,
-                                                dns_buckets_);
-  s3fanout_mgr_->Init(num_parallel_uploads_);
-  s3fanout_mgr_->SetTimeout(timeout_sec_);
-  s3fanout_mgr_->SetRetryParameters(
-    num_retries_, kDefaultBackoffInitMs, kDefaultBackoffMaxMs);
+  s3fanout::S3FanoutManager::S3Config s3config;
+  s3config.access_key = access_key_;
+  s3config.secret_key = secret_key_;
+  s3config.hostname_port = host_name_port_;
+  s3config.authz_method = authz_method_;
+  s3config.region = region_;
+  s3config.bucket = bucket_;
+  s3config.dns_buckets = dns_buckets_;
+  s3config.pool_max_handles = num_parallel_uploads_;
+  s3config.opt_timeout_sec = timeout_sec_;
+  s3config.opt_max_retries = num_retries_;
+  s3config.opt_backoff_init_ms = kDefaultBackoffInitMs;
+  s3config.opt_backoff_max_ms = kDefaultBackoffMaxMs;
+
+  s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
   s3fanout_mgr_->Spawn();
 
   int retval = pthread_create(
@@ -64,10 +68,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
 
 
 S3Uploader::~S3Uploader() {
-  s3fanout_mgr_->Fini();
   atomic_inc32(&terminate_);
   pthread_join(thread_collect_results_, NULL);
-  delete s3fanout_mgr_;
 }
 
 
