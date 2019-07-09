@@ -1,4 +1,5 @@
 1.1.0:
+  * This package now obsoletes `cvmfs-notify`
   * Added notification system functionality
   * Added HTTP endpoints for administrative tasks (CVM-1685, CVM-1712)
   * Lower memory use during payload submission: object packs are now streamed
