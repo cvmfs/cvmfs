@@ -149,7 +149,7 @@ import_keychain() {
       cp "${keys_location}/${keyfile}" $global_key_dir || return 2
     fi
     local key_mode=400
-    if echo "$keyfile" | grep -vq '.*key$'; then
+    if echo "$keyfile" | grep -vq '.*key$\|.gw$'; then
       key_mode=444
     fi
     chmod $key_mode "${global_key_dir}/${keyfile}"   || return 3
