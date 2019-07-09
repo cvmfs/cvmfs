@@ -20,52 +20,35 @@ using namespace std;  // NOLINT
 namespace manifest {
 
 /**
- * Downloads and verifies the manifest, the certificate, and the whitelist.
+ * Verifies the manifest, the certificate, and the whitelist.
  * If base_url is empty, uses the probe_hosts feature from download manager.
  */
-static Failures DoFetch(
-  const std::string &base_url,
-  const std::string &repository_name,
-  const uint64_t minimum_timestamp,
-  const shash::Any *base_catalog,
-  signature::SignatureManager *signature_manager,
-  download::DownloadManager *download_manager,
-  ManifestEnsemble *ensemble)
-{
+static Failures DoVerify(char *manifest_data, size_t manifest_size,
+                         const std::string &base_url,
+                         const std::string &repository_name,
+                         const uint64_t minimum_timestamp,
+                         const shash::Any *base_catalog,
+                         signature::SignatureManager *signature_manager,
+                         download::DownloadManager *download_manager,
+                         ManifestEnsemble *ensemble) {
   assert(ensemble);
   const bool probe_hosts = base_url == "";
   Failures result = kFailUnknown;
   bool retval_b;
   download::Failures retval_dl;
   whitelist::Failures retval_wl;
-  whitelist::Whitelist whitelist(repository_name,
-                                 download_manager,
+  whitelist::Whitelist whitelist(repository_name, download_manager,
                                  signature_manager);
-
-  const string manifest_url = base_url + string("/.cvmfspublished");
-  download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
-  shash::Any certificate_hash;
   string certificate_url = base_url + "/";  // rest is in manifest
+  shash::Any certificate_hash;
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
                                          &certificate_hash);
 
-  retval_dl = download_manager->Fetch(&download_manifest);
-  if (retval_dl != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-             "failed to download repository manifest (%d - %s)",
-             retval_dl, download::Code2Ascii(retval_dl));
-    return kFailLoad;
-  }
-
   // Load Manifest
-  ensemble->raw_manifest_buf =
-    reinterpret_cast<unsigned char *>(download_manifest.destination_mem.data);
-  ensemble->raw_manifest_size = download_manifest.destination_mem.pos;
-  ensemble->manifest =
-    manifest::Manifest::LoadMem(ensemble->raw_manifest_buf,
-                                ensemble->raw_manifest_size);
-  if (!ensemble->manifest)
-    return kFailIncomplete;
+  unsigned char *manifest_buf =
+      reinterpret_cast<unsigned char *>(manifest_data);
+  ensemble->manifest = manifest::Manifest::LoadMem(manifest_buf, manifest_size);
+  if (!ensemble->manifest) return kFailIncomplete;
 
   // Basic manifest sanity check
   if (ensemble->manifest->repository_name() != repository_name) {
@@ -97,10 +80,10 @@ static Failures DoFetch(
     retval_dl = download_manager->Fetch(&download_certificate);
     if (retval_dl != download::kFailOk) {
       result = kFailLoad;
-        goto cleanup;
+      goto cleanup;
     }
     ensemble->cert_buf = reinterpret_cast<unsigned char *>(
-      download_certificate.destination_mem.data);
+        download_certificate.destination_mem.data);
     ensemble->cert_size = download_certificate.destination_mem.pos;
   }
   retval_b = signature_manager->LoadCertificateMem(ensemble->cert_buf,
@@ -111,9 +94,8 @@ static Failures DoFetch(
   }
 
   // Verify manifest
-  retval_b = signature_manager->VerifyLetter(ensemble->raw_manifest_buf,
-                                             ensemble->raw_manifest_size,
-                                             false);
+  retval_b =
+      signature_manager->VerifyLetter(manifest_buf, manifest_size, false);
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository manifest");
@@ -125,8 +107,8 @@ static Failures DoFetch(
   retval_wl = whitelist.Load(base_url);
   if (retval_wl != whitelist::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "whitelist verification failed (%d): %s",
-             retval_wl, whitelist::Code2Ascii(retval_wl));
+             "whitelist verification failed (%d): %s", retval_wl,
+             whitelist::Code2Ascii(retval_wl));
     result = kFailBadWhitelist;
     goto cleanup;
   }
@@ -140,14 +122,13 @@ static Failures DoFetch(
     goto cleanup;
   }
 
-  whitelist.CopyBuffers(&ensemble->whitelist_size,
-                        &ensemble->whitelist_buf,
+  whitelist.CopyBuffers(&ensemble->whitelist_size, &ensemble->whitelist_buf,
                         &ensemble->whitelist_pkcs7_size,
                         &ensemble->whitelist_pkcs7_buf);
 
   return kFailOk;
 
- cleanup:
+cleanup:
   delete ensemble->manifest;
   ensemble->manifest = NULL;
   if (ensemble->raw_manifest_buf) free(ensemble->raw_manifest_buf);
@@ -166,6 +147,37 @@ static Failures DoFetch(
 }
 
 /**
+ * Downloads and verifies the manifest, the certificate, and the whitelist.
+ * If base_url is empty, uses the probe_hosts feature from download manager.
+ */
+static Failures DoFetch(const std::string &base_url,
+                        const std::string &repository_name,
+                        const uint64_t minimum_timestamp,
+                        const shash::Any *base_catalog,
+                        signature::SignatureManager *signature_manager,
+                        download::DownloadManager *download_manager,
+                        ManifestEnsemble *ensemble) {
+  assert(ensemble);
+  const bool probe_hosts = base_url == "";
+  download::Failures retval_dl;
+  const string manifest_url = base_url + string("/.cvmfspublished");
+  download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
+
+  retval_dl = download_manager->Fetch(&download_manifest);
+  if (retval_dl != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to download repository manifest (%d - %s)", retval_dl,
+             download::Code2Ascii(retval_dl));
+    return kFailLoad;
+  }
+
+  return DoVerify(download_manifest.destination_mem.data,
+                  download_manifest.destination_mem.pos, base_url,
+                  repository_name, minimum_timestamp, base_catalog,
+                  signature_manager, download_manager, ensemble);
+}
+
+/**
  * If the whitelist or the manifest are corrupted, fail-over once to another
  * stratum 1 if more than a single stratum 1 is known.
  */
@@ -173,23 +185,32 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
                const uint64_t minimum_timestamp, const shash::Any *base_catalog,
                signature::SignatureManager *signature_manager,
                download::DownloadManager *download_manager,
-               ManifestEnsemble *ensemble)
-{
+               ManifestEnsemble *ensemble) {
   Failures result =
-    DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
-            signature_manager, download_manager, ensemble);
+      DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
+              signature_manager, download_manager, ensemble);
   if ((result != kFailOk) && (result != kFailLoad) &&
-      (download_manager->num_hosts() > 1))
-  {
+      (download_manager->num_hosts() > 1)) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
              "failed to fetch manifest (%d - %s), trying another stratum 1",
              result, Code2Ascii(result));
     download_manager->SwitchHost();
-    result =
-      DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
-              signature_manager, download_manager, ensemble);
+    result = DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
+                     signature_manager, download_manager, ensemble);
   }
   return result;
+}
+
+Failures Verify(char *manifest_data, size_t manifest_size,
+                const std::string &base_url, const std::string &repository_name,
+                const uint64_t minimum_timestamp,
+                const shash::Any *base_catalog,
+                signature::SignatureManager *signature_manager,
+                download::DownloadManager *download_manager,
+                ManifestEnsemble *ensemble) {
+  return DoVerify(manifest_data, manifest_size, base_url, repository_name,
+                  minimum_timestamp, base_catalog, signature_manager,
+                  download_manager, ensemble);
 }
 
 }  // namespace manifest

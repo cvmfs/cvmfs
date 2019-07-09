@@ -26,9 +26,18 @@ class Subscriber {
   /**
    * Subscribe to a specific message topic
    *
-   * Returns false if an error occurred.
+   * The only topics currently used by the notification system are repository
+   * names. The subscription delivers activity messages containing the current
+   * repository manifest. Returns false if an error occurred.
    */
   virtual bool Subscribe(const std::string& topic) = 0;
+
+  /**
+   * Unsubscribe
+   *
+   * Cancel an active subscription
+   */
+  virtual void Unsubscribe() {}
 
  protected:
   /**

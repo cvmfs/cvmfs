@@ -2,7 +2,7 @@ cvmfs_test_name="Notification system"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-NOTIFICATION_SERVER_URL="http://localhost:4930/api/v1"
+NOTIFICATION_SERVER_URL="http://localhost:4929/api/v1"
 
 clean_up() {
     echo "Cleaning up"
@@ -14,12 +14,12 @@ publish_and_notify() {
     sudo cvmfs_server publish $CVMFS_TEST_REPO
 
     cvmfs_swissknife notify -p \
-        -u $NOTIFICATION_SERVER_URL/publish \
+        -u $NOTIFICATION_SERVER_URL \
         -r http://localhost/cvmfs/$CVMFS_TEST_REPO
 }
 
 run_tests() {
-    set_up_notification_system
+    set_up_repository_gateway
 
     create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
@@ -32,8 +32,8 @@ run_tests() {
 
     # Run the subscriber tool
     local rev1=$(cvmfs_swissknife notify -s \
-        -u $NOTIFICATION_SERVER_URL/subscribe \
-        -t $CVMFS_TEST_REPO | awk '{print $NF}' | cut -c1)
+        -u $NOTIFICATION_SERVER_URL \
+        -t $CVMFS_TEST_REPO | head -1 | awk '{print $NF}' | cut -c1)
     echo "Repository is now at revision: $rev1"
 
     if [ $((rev1)) -lt 3 ]; then

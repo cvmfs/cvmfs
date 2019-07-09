@@ -8,6 +8,7 @@
     (CVM-1710, CVM-1744)
 
 2.6.1:
+  * Move from WebSockets notifications to server-sent events
   * Fix AWSv4 S3 authentication when using a non standard port
   * Fix Cloudflare geo API with proxy name (CVM-1774)
   * Fix DNS resolution in S3 backend with DNS style buckets

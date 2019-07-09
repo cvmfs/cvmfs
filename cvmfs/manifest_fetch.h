@@ -57,7 +57,6 @@ inline const char *Code2Ascii(const Failures error) {
   return texts[error];
 }
 
-
 /**
  * A manifest requires the certificate and the whitelist to be verified.
  * All three (for with the pkcs7 signature of the whitelist) are an ensemble.
@@ -76,7 +75,7 @@ struct ManifestEnsemble {
     if (whitelist_pkcs7_buf) free(whitelist_pkcs7_buf);
   }
   // Can be overwritte to fetch certificate from cache
-  virtual void FetchCertificate(const shash::Any &hash) { }
+  virtual void FetchCertificate(const shash::Any &hash) {}
 
   Manifest *manifest;
   unsigned char *raw_manifest_buf;
@@ -96,6 +95,13 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
                download::DownloadManager *download_manager,
                ManifestEnsemble *ensemble);
 
+Failures Verify(char *manifest_data, size_t manifest_size,
+                const std::string &base_url, const std::string &repository_name,
+                const uint64_t minimum_timestamp,
+                const shash::Any *base_catalog,
+                signature::SignatureManager *signature_manager,
+                download::DownloadManager *download_manager,
+                ManifestEnsemble *ensemble);
 
 }  // namespace manifest
 

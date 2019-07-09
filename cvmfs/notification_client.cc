@@ -9,36 +9,45 @@
 
 #include "logging.h"
 #include "manifest.h"
+#include "manifest_fetch.h"
 #include "notify/messages.h"
+#include "notify/subscriber_sse.h"
 #include "notify/subscriber_supervisor.h"
-#include "notify/subscriber_ws.h"
 #include "signature.h"
 #include "supervisor.h"
 #include "util/posix.h"
 
 namespace {
 
-class ActivitySubscriber : public notify::SubscriberWS {
+class ActivitySubscriber : public notify::SubscriberSSE {
  public:
   ActivitySubscriber(const std::string& server_url, FuseRemounter* remounter,
+                     download::DownloadManager* dl_mgr,
                      signature::SignatureManager* sig_mgr)
-      : SubscriberWS(server_url), remounter_(remounter), sig_mgr_(sig_mgr) {}
+      : SubscriberSSE(server_url),
+        remounter_(remounter),
+        dl_mgr_(dl_mgr),
+        sig_mgr_(sig_mgr) {}
 
   virtual ~ActivitySubscriber() {}
 
   virtual notify::Subscriber::Status Consume(const std::string& repo_name,
-                       const std::string& msg_text) {
+                                             const std::string& msg_text) {
     notify::msg::Activity msg;
     if (!msg.FromJSONString(msg_text)) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
-               "ActivitySubscriber - Could not decode message.");
+               "NotificationClient - could not decode message.");
       return notify::Subscriber::kError;
     }
 
-    if (!sig_mgr_->VerifyLetter(
-            reinterpret_cast<const unsigned char*>(msg.manifest_.data()),
-            msg.manifest_.size(), false)) {
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Manifest has invalid signature.");
+    manifest::ManifestEnsemble ensemble;
+    manifest::Failures res =
+        manifest::Verify(&(msg.manifest_[0]), msg.manifest_.size(), "",
+                         repo_name, 0, NULL, sig_mgr_, dl_mgr_, &ensemble);
+
+    if (res != manifest::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+               "NotificationClient - manifest has invalid signature.");
       return notify::Subscriber::kError;
     }
 
@@ -48,13 +57,14 @@ class ActivitySubscriber : public notify::SubscriberWS {
 
     if (!manifest.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
-               "ActivitySubscriber - Could not parse manifest.");
+               "NotificationClient - could not parse manifest.");
       return notify::Subscriber::kError;
     }
 
     uint64_t new_revision = manifest->revision();
     LogCvmfs(kLogCvmfs, kLogSyslog,
-             "Repository %s is now at revision %lu, root hash: %s",
+             "NotificationClient - repository %s is now at revision %lu, root "
+             "hash: %s",
              repo_name.c_str(), new_revision,
              manifest->catalog_hash().ToString().c_str());
 
@@ -78,12 +88,12 @@ class ActivitySubscriber : public notify::SubscriberWS {
       default:
         LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - internal error");
     }
-
     return notify::Subscriber::kContinue;
   }
 
  private:
   FuseRemounter* remounter_;
+  download::DownloadManager* dl_mgr_;
   signature::SignatureManager* sig_mgr_;
 };
 
@@ -92,15 +102,21 @@ class ActivitySubscriber : public notify::SubscriberWS {
 NotificationClient::NotificationClient(const std::string& config,
                                        const std::string& repo_name,
                                        FuseRemounter* remounter,
+                                       download::DownloadManager* dl_mgr,
                                        signature::SignatureManager* sig_mgr)
     : config_(config),
       repo_name_(repo_name),
       remounter_(remounter),
+      dl_mgr_(dl_mgr),
       sig_mgr_(sig_mgr),
+      subscriber_(),
       thread_(),
       spawned_(false) {}
 
 NotificationClient::~NotificationClient() {
+  if (subscriber_.IsValid()) {
+    subscriber_->Unsubscribe();
+  }
   if (spawned_) {
     pthread_join(thread_, NULL);
     spawned_ = false;
@@ -108,18 +124,20 @@ NotificationClient::~NotificationClient() {
 }
 
 void NotificationClient::Spawn() {
-  if (pthread_create(&thread_, NULL, NotificationClient::Run, this)) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr,
-             "ActivitySubscriber - Could not start background thread");
+  if (!spawned_) {
+    if (pthread_create(&thread_, NULL, NotificationClient::Run, this)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+               "NotificationClient - Could not start background thread");
+    }
+    spawned_ = true;
   }
-  spawned_ = true;
 }
 
 void* NotificationClient::Run(void* data) {
   NotificationClient* cl = static_cast<NotificationClient*>(data);
 
-  UniquePtr<ActivitySubscriber> sub(
-      new ActivitySubscriber(cl->config_, cl->remounter_, cl->sig_mgr_));
+  cl->subscriber_ = new ActivitySubscriber(cl->config_, cl->remounter_,
+                                           cl->dl_mgr_, cl->sig_mgr_);
 
   LogCvmfs(
       kLogCvmfs, kLogSyslog,
@@ -129,8 +147,8 @@ void* NotificationClient::Run(void* data) {
   // Retry settings: accept no more than 10 failures in the last minute
   const int num_retries = 10;
   const uint64_t interval = 60;
-  notify::SubscriberSupervisor supervisor(sub.weak_ref(), cl->repo_name_,
-                                          num_retries, interval);
+  notify::SubscriberSupervisor supervisor(
+      cl->subscriber_.weak_ref(), cl->repo_name_, num_retries, interval);
   supervisor.Run();
 
   return NULL;
