@@ -70,6 +70,7 @@ for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
         --url "http://cernvm.cern.ch" \
         --license "BSD-3-Clause" \
         --depends "cvmfs-server > 2.5.2" \
+        --replaces "cvmfs-notify" \
         --directories usr/libexec/cvmfs-gateway \
         --config-files etc/cvmfs/gateway/repo.json \
         --config-files etc/cvmfs/gateway/user.json \
