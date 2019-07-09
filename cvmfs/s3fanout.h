@@ -234,6 +234,7 @@ class S3FanoutManager : SingleCopy {
   static const unsigned kMax429ThrottleMs;
   // Report throttle operations only every so often
   static const unsigned kThrottleReportIntervalSec;
+  static const unsigned kDefaultHTTPPort;
 
   static void DetectThrottleIndicator(const std::string &header, JobInfo *info);
 
