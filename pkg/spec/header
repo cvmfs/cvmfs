@@ -37,6 +37,10 @@ Source0: %{name}.tar
 #  list them here - examples are already listed
 Requires: cvmfs-server >= 2.5.2
 
+# cvmfs-gateway >= 1.1.0 includes the notification system server,
+# obsoleting the cvmfs-notify package
+Obsoletes: cvmfs-notify
+
 # A more verbose description of your package
 %description
 CernVM-FS Repository Gateway
