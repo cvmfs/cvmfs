@@ -1,4 +1,5 @@
 2.6.1:
+  * Fix file mode for gateway keys in cvmfs_server import_keychain (CVM-1746)
   * Move from WebSockets notifications to server-sent events
   * Fix AWSv4 S3 authentication when using a non standard port
   * Fix Cloudflare geo API with proxy name (CVM-1774)
