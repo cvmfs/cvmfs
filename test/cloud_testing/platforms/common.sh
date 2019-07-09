@@ -280,7 +280,7 @@ install_deb() {
 
     # install DEB package
     echo -n "Installing DEB package '$deb_name' ... "
-    deb_output=$(sudo gdebi --non-interactive --quiet $this_deb)
+    deb_output=$(sudo DEBIAN_FRONTEND=noninteractive gdebi --non-interactive --quiet $this_deb)
     check_package_manager_response $? "DPKG" "$deb_output"
   done
 }
