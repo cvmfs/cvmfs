@@ -41,7 +41,10 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
         revision_(min_revision),
         continuous_(continuous),
         verbose_(verbose) {}
-  virtual ~SwissknifeSubscriber() {}
+  virtual ~SwissknifeSubscriber() {
+    sig_mgr_->Fini();
+    dl_mgr_->Fini();
+  }
 
   bool Init() {
     const std::string config_file =

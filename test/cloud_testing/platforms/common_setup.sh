@@ -66,6 +66,9 @@ while getopts "s:c:d:k:t:g:l:w:n:p:" option; do
     w)
       GATEWAY_BUILD_URL=$OPTARG
       ;;
+    n)
+      echo "WARNING: the -n parameter is obsolete"
+      ;;
     ?)
       shift $(($OPTIND-2))
       usage "Unrecognized option: $1"

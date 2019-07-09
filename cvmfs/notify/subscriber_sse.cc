@@ -4,9 +4,9 @@
 
 #include "subscriber_sse.h"
 
-#include <vector>
-
 #include "cvmfs_config.h"
+
+#include <vector>
 
 #include "logging.h"
 #include "url.h"
@@ -36,7 +36,7 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
 
   if (!url.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogError,
-             "SubscriberSSE - could not parse notification server url",
+             "SubscriberSSE - could not parse notification server url: %s\n",
              server_url_.c_str());
     return false;
   }
@@ -48,6 +48,10 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
   const char* user_agent_string = "cvmfs/" VERSION;
 
   CURL* h_curl = curl_easy_init();
+  if (h_curl == NULL) {
+    LogCvmfs(kLogCvmfs, kLogError, "Could not create Curl handle\n");
+    return false;
+  }
 
   if (h_curl) {
     curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 0L);
@@ -58,7 +62,7 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
 
   if (!h_curl) {
     LogCvmfs(kLogCvmfs, kLogError,
-             "SubscriberSSE - error initializing CURL context.");
+             "SubscriberSSE - error initializing CURL context\n");
     return false;
   }
 
@@ -148,7 +152,7 @@ int SubscriberSSE::CurlProgressCB(void* clientp, curl_off_t dltotal,
   notify::SubscriberSSE* sub = static_cast<notify::SubscriberSSE*>(clientp);
   if (sub->ShouldQuit()) {
     LogCvmfs(kLogCvmfs, kLogInfo,
-             "SubscriberSSE - quit request received. Stopping.");
+             "SubscriberSSE - quit request received. Stopping\n");
     return 1;
   }
 
