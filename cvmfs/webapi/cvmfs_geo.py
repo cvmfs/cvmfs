@@ -23,17 +23,19 @@ oldgireader=None
 gichecktime=0
 gimodtime=0
 
-positive_expire_secs = 60*60  # 1 hour
-
 geo_cache_secs = 5*60   # 5 minutes
 
 geo_cache_max_entries = 100000  # a ridiculously large but manageable number
+namelookups = 0
 
 # geo_cache entries are indexed by name and contain a tuple of
 # (update time, geo record).  Caching DNS lookups is more important
 # than caching geo information but it's simpler and slightly more
 # efficient to cache the geo information.
 geo_cache = {}
+
+gilock = threading.Lock()
+namelock = threading.Lock()
 
 # look up geo info for an address
 # Also periodically check for an update to the database and
@@ -44,8 +46,7 @@ def lookup_geoinfo(now, addr):
     global gimodtime
 
     if gireader is None or now > gichecktime + geo_cache_secs:
-        lock = threading.Lock()
-        lock.acquire()
+        gilock.acquire()
         # gichecktime might have changed before acquiring the lock, look again
         if gireader is None or now > gichecktime + geo_cache_secs:
             if oldgireader is not None:
@@ -63,7 +64,7 @@ def lookup_geoinfo(now, addr):
                 gireader = open_geodb(gidb)
                 gimodtime = modtime
                 print 'cvmfs_geo: opened ' + gidb
-        lock.release()
+        gilock.release()
 
     return gireader.get(addr)
 
@@ -130,22 +131,23 @@ def name_geoinfo(now, name):
     if (len(name) > 256) or not addr_pattern.search(name):
         return None
 
-    lock = threading.Lock()
-    lock.acquire()
+    global namelookups
+    namelock.acquire()
     if name in geo_cache:
         (stamp, gir) = geo_cache[name]
         if now <= stamp + geo_cache_secs:
             # still good, use it
-            lock.release()
+            namelock.release()
             return gir
         # update the timestamp so only one thread needs to wait
         #  when a lookup is slow
         geo_cache[name] = (now, gir)
     elif len(geo_cache) >= geo_cache_max_entries:
-        # avoid denial of service by removing one random entry
+        # avoid denial of service by removing one arbitrary entry
         #   before we add one
         geo_cache.popitem()
-    lock.release()
+    namelookups += 1
+    namelock.release()
 
     ai = ()
     try:
@@ -167,13 +169,13 @@ def name_geoinfo(now, name):
     if gir != None:
         gir = gir['location']
 
-    lock.acquire()
+    namelock.acquire()
     if gir == None and name in geo_cache:
         # reuse expired entry
         gir = geo_cache[name][1]
 
     geo_cache[name] = (now, gir)
-    lock.release()
+    namelock.release()
 
     return gir
 
@@ -247,6 +249,10 @@ def api(path_info, repo_name, version, start_response, environ):
     caching_string = path_info[0:slash]
     servers = string.split(path_info[slash+1:], ",")
 
+    if caching_string == "_namelookups_":
+        # this is a special debugging URL
+        return cvmfs_api.good_request(start_response, str(namelookups) + '\n')
+
     # TODO(jblomer): Can this be switched to monotonic time?
     now = int(time.time())
 
@@ -309,11 +315,5 @@ def api(path_info, repo_name, version, start_response, environ):
 
     response_body = string.join((str(i+1) for i in indexes), ',') + '\n'
 
-    status = '200 OK'
-    response_headers = [('Content-Type', 'text/plain'),
-                  ('Cache-Control', 'max-age=' + str(positive_expire_secs)),
-                  ('Content-Length', str(len(response_body)))]
-    start_response(status, response_headers)
-
-    return [response_body]
+    return cvmfs_api.good_request(start_response, response_body)
 
