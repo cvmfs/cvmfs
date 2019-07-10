@@ -45,9 +45,10 @@ static Failures DoVerify(char *manifest_data, size_t manifest_size,
                                          &certificate_hash);
 
   // Load Manifest
-  unsigned char *manifest_buf =
-      reinterpret_cast<unsigned char *>(manifest_data);
-  ensemble->manifest = manifest::Manifest::LoadMem(manifest_buf, manifest_size);
+  ensemble->raw_manifest_buf = reinterpret_cast<unsigned char *>(manifest_data);
+  ensemble->raw_manifest_size = manifest_size;
+  ensemble->manifest = manifest::Manifest::LoadMem(
+    ensemble->raw_manifest_buf, ensemble->raw_manifest_size);
   if (!ensemble->manifest) return kFailIncomplete;
 
   // Basic manifest sanity check
@@ -94,8 +95,10 @@ static Failures DoVerify(char *manifest_data, size_t manifest_size,
   }
 
   // Verify manifest
-  retval_b =
-      signature_manager->VerifyLetter(manifest_buf, manifest_size, false);
+  retval_b = signature_manager->VerifyLetter(
+        ensemble->raw_manifest_buf,
+        ensemble->raw_manifest_size,
+        false);
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository manifest");
