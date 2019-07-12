@@ -76,12 +76,15 @@ cvmfs_run_test() {
   echo "*** Micro Syslog"
   cat ${CVMFS_TEST_900_MOUNTPOINT}.log
   echo "***"
-  local nbefore=$(grep "NotificationClient - repository $CVMFS_TEST_REPO is now at revision $rev_before" \
+  local nbefore=$(grep "NotificationClient - repository $CVMFS_TEST_REPO is now at revision" \
     ${CVMFS_TEST_900_MOUNTPOINT}.log | wc -l)
 
   publish_and_notify
   sleep 2
-  local nafter=$(grep "NotificationClient - repository $CVMFS_TEST_REPO is now at revision $rev_before" \
+  echo "*** Micro Syslog"
+  cat ${CVMFS_TEST_900_MOUNTPOINT}.log
+  echo "***"
+  local nafter=$(grep "NotificationClient - repository $CVMFS_TEST_REPO is now at revision" \
     ${CVMFS_TEST_900_MOUNTPOINT}.log | wc -l)
   [ $nafter -gt $nbefore ] || return 30
 
