@@ -3,9 +3,25 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 NOTIFICATION_SERVER_URL="http://localhost:4929/api/v1"
+CVMFS_TEST_900_MOUNTPOINT=
 
 clean_up() {
     echo "Cleaning up"
+    if [ "x$CVMFS_TEST_900_MOUNTPOINT" != "x" ]; then
+      sudo umount $CVMFS_TEST_900_MOUNTPOINT
+      sudo rmdir $CVMFS_TEST_900_MOUNTPOINT
+      sudo rm -rf "${CVMFS_TEST_900_MOUNTPOINT}c"
+    fi
+}
+
+private_mount() {
+  local mntpnt="$1"
+  CVMFS_TEST_900_MOUNTPOINT="$mntpnt"
+  do_local_mount "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_NOTIFICATION_SERVER=${NOTIFICATION_SERVER_URL}" || return 1
 }
 
 publish_and_notify() {
@@ -18,7 +34,7 @@ publish_and_notify() {
         -r http://localhost/cvmfs/$CVMFS_TEST_REPO
 }
 
-run_tests() {
+run_standalone_tests() {
     set_up_repository_gateway
 
     create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -43,9 +59,32 @@ run_tests() {
 }
 
 cvmfs_run_test() {
-    trap clean_up EXIT HUP INT TERM || return $?
+  logfile=$1
+  local scratch_dir="$(pwd)"
 
-    run_tests
-    return $?
+  trap clean_up EXIT HUP INT TERM || return $?
+
+  run_standalone_tests || return $?
+
+  local mntpnt="${scratch_dir}/private_mnt"
+  echo "*** mount private mount point"
+  private_mount $mntpnt || return 20
+  ls $CVMFS_TEST_900_MOUNTPOINT || return 21
+
+  local rev_before=$(attr -qg revision $CVMFS_TEST_900_MOUNTPOINT)
+  echo "*** mounted revision $rev_before"
+  echo "*** Micro Syslog"
+  cat ${CVMFS_TEST_900_MOUNTPOINT}.log
+  echo "***"
+  local nbefore=$(grep "NotificationClient - repository $CVMFS_TEST_REPO is now at revision $rev_before" \
+    ${CVMFS_TEST_900_MOUNTPOINT}.log | wc -l)
+
+  publish_and_notify
+  sleep 2
+  local nafter=$(grep "NotificationClient - repository $CVMFS_TEST_REPO is now at revision $rev_before" \
+    ${CVMFS_TEST_900_MOUNTPOINT}.log | wc -l)
+  [ $nafter -gt $nbefore ] || return 30
+
+  return 0
 }
 
