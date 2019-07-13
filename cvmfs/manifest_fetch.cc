@@ -8,11 +8,13 @@
 #include <vector>
 
 #include <cassert>
+#include <cstring>
 
 #include "download.h"
 #include "hash.h"
 #include "manifest.h"
 #include "signature.h"
+#include "smalloc.h"
 #include "whitelist.h"
 
 using namespace std;  // NOLINT
@@ -22,6 +24,7 @@ namespace manifest {
 /**
  * Verifies the manifest, the certificate, and the whitelist.
  * If base_url is empty, uses the probe_hosts feature from download manager.
+ * Ownership of manifest_data is transferred to the ensemble.
  */
 static Failures DoVerify(char *manifest_data, size_t manifest_size,
                          const std::string &base_url,
@@ -45,9 +48,10 @@ static Failures DoVerify(char *manifest_data, size_t manifest_size,
                                          &certificate_hash);
 
   // Load Manifest
-  unsigned char *manifest_buf =
-      reinterpret_cast<unsigned char *>(manifest_data);
-  ensemble->manifest = manifest::Manifest::LoadMem(manifest_buf, manifest_size);
+  ensemble->raw_manifest_buf = reinterpret_cast<unsigned char *>(manifest_data);
+  ensemble->raw_manifest_size = manifest_size;
+  ensemble->manifest = manifest::Manifest::LoadMem(
+    ensemble->raw_manifest_buf, ensemble->raw_manifest_size);
   if (!ensemble->manifest) return kFailIncomplete;
 
   // Basic manifest sanity check
@@ -94,8 +98,10 @@ static Failures DoVerify(char *manifest_data, size_t manifest_size,
   }
 
   // Verify manifest
-  retval_b =
-      signature_manager->VerifyLetter(manifest_buf, manifest_size, false);
+  retval_b = signature_manager->VerifyLetter(
+        ensemble->raw_manifest_buf,
+        ensemble->raw_manifest_size,
+        false);
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository manifest");
@@ -208,7 +214,9 @@ Failures Verify(char *manifest_data, size_t manifest_size,
                 signature::SignatureManager *signature_manager,
                 download::DownloadManager *download_manager,
                 ManifestEnsemble *ensemble) {
-  return DoVerify(manifest_data, manifest_size, base_url, repository_name,
+  char *manifest_copy = reinterpret_cast<char *>(smalloc(manifest_size));
+  memcpy(manifest_copy, manifest_data, manifest_size);
+  return DoVerify(manifest_copy, manifest_size, base_url, repository_name,
                   minimum_timestamp, base_catalog, signature_manager,
                   download_manager, ensemble);
 }
