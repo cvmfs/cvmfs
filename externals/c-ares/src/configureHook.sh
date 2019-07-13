@@ -5,7 +5,7 @@
 #              Also remember to start XCode at least once and agree to the EULA.
 
 FIX_COMP=""
-if [ x"$(uname)" == x"Darwin" ]; then
+if [ x"$(uname)" = x"Darwin" ]; then
   FIX_COMP="CC=/usr/bin/clang CXX=/usr/bin/clang++"
 fi
 
