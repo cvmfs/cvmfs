@@ -5,7 +5,7 @@ set -e
 static_result_dir=src/static
 
 FIX_COMP=""
-if [ x"$(uname)" == x"Darwin" ]; then
+if [ x"$(uname)" = x"Darwin" ]; then
   FIX_COMP="CC=/usr/bin/clang CXX=/usr/bin/clang++"
 fi
 
