@@ -33,6 +33,8 @@ masterkeycard_available() {
     reason="yubico-piv-tool (from yubico-piv-tool package) not found"
   elif yubico-piv-tool -a status 2>&1 | grep -q "Failed to connect"; then
     reason="yubico-piv-tool failed to connect to device"
+  elif ! pkcs11-tool -I >/dev/null 2>&1; then
+    reason="pkcs11-tool -I failed"
   fi
   if [ -n "$reason" ]; then
     echo "$reason"
