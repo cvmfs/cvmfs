@@ -33,8 +33,6 @@ masterkeycard_available() {
     reason="yubico-piv-tool (from yubico-piv-tool package) not found"
   elif yubico-piv-tool -a status 2>&1 | grep -q "Failed to connect"; then
     reason="yubico-piv-tool failed to connect to device"
-  elif ! openssl engine pkcs11 2>/dev/null|grep -q "pkcs11 engine"; then
-    reason="openssl engine pkcs11 (from engine_pkcs11 rpm or libengine-pkcs11-openssl deb) not found"
   fi
   if [ -n "$reason" ]; then
     echo "$reason"
@@ -85,12 +83,11 @@ masterkeycard_sign() {
   local hashfile=$1
   local sigfile=$2
 
-  local sslout
-  # Capture output in a variable to bypass annoying 'engine (pkcs11) set'
-  #  message that normally goes to stderr, while still checking the exit
-  #  code from openssl.
-  if ! sslout="`openssl rsautl -engine pkcs11 -passin pass:${CVMFS_MASTERKEYCARD_PIN:-123456} -inkey pkcs11: -keyform engine -sign -in $hashfile -out $sigfile 2>&1`"; then
-    echo "$sslout" >&2
+  local pkcsout
+  # Capture output in a variable to bypass annoying "Using" messages that
+  #  normally go to stderr, while still checking the exit code from pkcs11-tool.
+  if ! pkcsout="`pkcs11-tool -p ${CVMFS_MASTERKEYCARD_PIN:-123456} -s -m RSA-PKCS -i $hashfile -o $sigfile 2>&1`"; then
+    echo "$pkcsout" >&2
     return 1
   fi
 }
