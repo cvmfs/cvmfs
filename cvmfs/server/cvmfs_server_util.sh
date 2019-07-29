@@ -1081,6 +1081,7 @@ Supported Commands:
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]
+                  [-g snapshot group]
                   <stratum 0 url> <public key | keys directory>
                   Creates a Stratum 1 replica of a Stratum 0 repository
   import          [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -1172,6 +1173,7 @@ Supported Commands:
   snapshot -a     [-s use separate logs in /var/log/cvmfs for each repository]
                   [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
                   [-i skip repositories that have not run initial snapshot]
+                  [-g group (do only the repositories in snapshot group)]
                   Do snapshot on all active replica repositories
   mount           [-a | <fully qualified name>]
                   Mount repositories in /cvmfs, for instance after reboot

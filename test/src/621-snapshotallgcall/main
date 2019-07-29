@@ -30,18 +30,24 @@ cvmfs_run_test() {
 
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
 
-  CVMFS_TEST_621_REPLICA_NAMES="${replica_name}-1 ${replica_name}-2 ${replica_name}-3 ${replica_name}-4"
+  CVMFS_TEST_621_REPLICA_NAMES="${replica_name}-1 ${replica_name}-2 ${replica_name}-3 ${replica_name}-4 ${replica_name}-5"
   echo "*** install a cleanup function"
   trap cleanup EXIT HUP INT TERM || return $?
 
-  echo "*** create 4 Stratum1 repositories on the same machine"
+  echo "*** create 5 Stratum1 replicas on the same machine"
   load_repo_config $CVMFS_TEST_REPO
 
-  for num in 1 2 3 4; do
+  for num in 1 2 3 4 5; do
+    local groupopt
+    groupopt=""
+    if [ "$num" -eq 4 ]; then
+      groupopt="-g other"
+    fi
     create_stratum1 ${replica_name}-$num                   \
                     $CVMFS_TEST_USER                       \
                     $CVMFS_STRATUM0                        \
                     /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                    $groupopt                              \
                     || return $num
   done
 
@@ -59,19 +65,30 @@ cvmfs_run_test() {
   echo "*** running cvmfs_server snapshot -a"
   cvmfs_server snapshot -an || return 5
 
-  echo "*** download manifests of stratum 0 and replica 1 and 4"
+  echo "*** download manifests of stratum 0 and replica 1 and 5"
   curl -so mr1 "$(get_repo_url ${replica_name}-1)/.cvmfspublished" || return 6
-  curl -so mr4 "$(get_repo_url ${replica_name}-4)/.cvmfspublished" || return 7
+  curl -so mr5 "$(get_repo_url ${replica_name}-5)/.cvmfspublished" || return 7
   curl -so ms0 "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"  || return 8
 
-  echo "*** checking if snapshot worked on replicas 1 and 4"
+  echo "*** checking if snapshot worked on replicas 1 and 5"
   cmp ms0 mr1 || return  9
-  cmp ms0 mr4 || return 10
+  cmp ms0 mr5 || return 10
 
   echo "*** checking if replica 2 was skipped"
   curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" && return 11
   echo "*** checking if replica 3 detected an error"
   curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" && return 12
+  echo "*** checking if replica 4 was skipped"
+  curl -f -sI "$(get_repo_url ${replica_name}-4)/.cvmfspublished" && return 13
+
+  echo "*** running cvmfs_server snapshot -a -g other"
+  cvmfs_server snapshot -an -g other || return 14
+
+  echo "*** download manifest of replica 4"
+  curl -so mr4 "$(get_repo_url ${replica_name}-5)/.cvmfspublished" || return 15
+
+  echo "*** checking if snapshot worked on replica 4"
+  cmp ms0 mr4 || return  16
 
   echo "*** restoring replica 3's download URL"
   sudo $SHELL -c "sed -i 's,Bogus,,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
@@ -79,12 +96,12 @@ cvmfs_run_test() {
   echo '*** checking snapshot wildcard "*-?"'
   # make sure wildcard expansion does not happen in current working dir
   touch "afilewithadash-1"
-  cvmfs_server snapshot "*-?" || return 13
+  cvmfs_server snapshot "*-?" || return 17
 
   echo "*** checking that replicas 2 & 3 worked this time"
   # the wildcard does not look at CVMFS_REPLICA_ACTIVE
-  curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" || return 14
-  curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" || return 15
+  curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" || return 18
+  curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" || return 19
 
   echo "*** corrupting third replica's download URL again"
   sudo $SHELL -c "sed -i 's,^\(CVMFS_STRATUM0=.*\),\1Bogus,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"

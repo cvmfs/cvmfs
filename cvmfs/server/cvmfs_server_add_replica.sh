@@ -21,10 +21,11 @@ cvmfs_server_add_replica() {
   local configure_apache=1
   local enable_auto_gc=0
   local s3_config
+  local snapshot_group
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:w:azs:p" option
+  while getopts "o:u:n:w:azs:pg:" option
   do
     case $option in
       u)
@@ -50,6 +51,9 @@ cvmfs_server_add_replica() {
       ;;
       p)
         configure_apache=0
+      ;;
+      g)
+        snapshot_group=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -146,6 +150,7 @@ CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_STRATUM1=$stratum1
 CVMFS_UPSTREAM_STORAGE=$upstream
+CVMFS_SNAPSHOT_GROUP=$snapshot_group
 EOF
   cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
 # Created by cvmfs_server.
