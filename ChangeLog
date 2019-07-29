@@ -1,4 +1,5 @@
 2.6.1:
+  * Add -g snapshot group option to cvmfs_server (CVM-1779)
   * Fix syntax errors in external libraries build system (CVM-1781, CVM-1782)
   * Fix master key card handling with openssl-pkcs11 >= 0.4.7 (CVM-1788)
   * Fix locking logic in Geo-API web service (CVM-1777)
