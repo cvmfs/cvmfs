@@ -18,6 +18,21 @@ verify_hello_world() {
   return 0
 }
 
+verify_empty() {
+  local output=$1
+  if [ "`echo "$output" | grep '^size' | tr '=' ' ' | awk '{print $2;}'`" -ne 0 ]; then
+    echo "Graft produced wrong size."
+    return 2
+  fi
+
+  if [ `echo "$output" | grep '^checksum' | tr '=' ' ' | awk '{print $2;}'` != "e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78" ]; then
+    echo "Graft produced wrong checksum."
+    return 3
+  fi
+  echo "Valid empty file."
+  return 0
+}
+
 cvmfs_run_test() {
   logfile=$1
 
@@ -30,6 +45,20 @@ cvmfs_run_test() {
   echo "$output"
 
   verify_hello_world "$output"
+  local verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  #################################################################
+  echo "Test empty file"
+  output=$(cat /dev/null | cvmfs_swissknife graft -i - -Z zlib)
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  echo "$output"
+
+  verify_empty "$output"
   local verify_result=$?
   if [ $verify_result -ne 0 ]; then
     return $verify_result
