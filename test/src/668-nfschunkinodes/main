@@ -38,13 +38,11 @@ cvmfs_run_test() {
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  local md5_orig
   local size=$((32*1024*1024))
   echo "*** put a a large file into $CVMFS_TEST_REPO"
   start_transaction $CVMFS_TEST_REPO                              || return $?
   mkdir /cvmfs/$CVMFS_TEST_REPO/dir                               || return 3
   yes | head -c $size > /cvmfs/$CVMFS_TEST_REPO/dir/large         || return 3
-  md5_orig=$(md5sum /cvmfs/$CVMFS_TEST_REPO/dir/large | awk '{print $1}')                                          || return 3
   publish_repo $CVMFS_TEST_REPO -v                                || return $?
 
   local mntpnt="${scratch_dir}/private_mnt"
