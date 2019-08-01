@@ -10,13 +10,15 @@ cvmfs_run_test() {
   linux_source=/cvmfs/sft.cern.ch/lcg/external/experimental/linux/linux-2.6.32.57
 
   echo "*** Taring $linux_source with COLD cache"
-  tar cf kernel.tar $linux_source || return 2
+  # Avoid ._* files on macOS
+  COPYFILE_DISABLE=y tar cf kernel.tar $linux_source || return 2
   local digest_cold
   digest_cold=$(md5sum kernel.tar | awk '{print $1}')
   rm -f kernel.tar
 
   echo "*** Taring $linux_source with WARM cache"
-  tar cf kernel.tar $linux_source || return 3
+  # Avoid ._* files on macOS
+  COPYFILE_DISABLE=y tar cf kernel.tar $linux_source || return 3
   local digest_warm
   digest_warm=$(md5sum kernel.tar | awk '{print $1}')
   rm -f kernel.tar
