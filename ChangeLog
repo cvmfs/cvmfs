@@ -1,4 +1,6 @@
 2.7.0:
+  * Add S3 standalone benchmark utility along with -DCVMFS_STRESS_TESTS build
+    option (CVM-1749)
   * Explicitly specify python2 in webapi/cvmfs-api.py shebang
   * Remove cvmfs_stratum_agent and the mongoose external library
   * Add support for CVMFS_LIBRARY_PATH to simplify standalone deployment
