@@ -103,8 +103,10 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
     chunk_checksums->push_back(chunk_hash);
   }
 
-  // Zero-size chunks are not allowed;
-  if (do_chunk && (chunk_offsets->back() == *file_size)) {
+  // Zero-size chunks are not allowed; except if there is only one chunk
+  if (do_chunk && (chunk_offsets->back() == *file_size) &&
+      (chunk_offsets->size() > 1))
+  {
     chunk_offsets->pop_back();
     chunk_checksums->pop_back();
   }
