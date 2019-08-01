@@ -12,6 +12,7 @@
 #include <sys/time.h>
 
 #include <cassert>
+#include <cmath>
 #include <cstdlib>
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -48,6 +49,30 @@ class Prng {
       static_cast<double>(18446744073709551616.0);
     return (uint32_t)scaled_val % boundary;
   }
+
+  /**
+   * Returns random double in range [0, 1]
+   */
+  double NextDouble() {
+    state_ = a*state_ + c;
+    double unit_val = static_cast<double>(state_) /
+      static_cast<double>(18446744073709551616.0);
+    return unit_val;
+  }
+  /**
+   * Returns normally distributed random numbers
+   * with mean 0 and variance 1 using the
+   * Box-Muller transform algorithm
+   */
+  double NextNormal() {
+    double z, u1, u2;
+    double pi = atan(1) * 4;
+    u1 = NextDouble();
+    u2 = NextDouble();
+    z = sqrt(-2.0 * log(u1)) * cos(2 * pi * u2);
+    return z;
+  }
+
 
  private:
   // Magic numbers from MMIX

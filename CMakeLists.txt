@@ -464,6 +464,10 @@ if (BUILD_DUCC)
   add_subdirectory (ducc)
 endif(BUILD_DUCC)
 
+if (BUILD_STRESS_TESTS)
+  include(test/stress/CMakeLists.txt)
+endif (BUILD_STRESS_TESTS)
+
 #
 # Documentation
 #

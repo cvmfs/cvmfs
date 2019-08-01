@@ -72,3 +72,26 @@ TEST_F(T_Prng, Deterministic) {
     ASSERT_EQ(prng_->Next(0xFFFFFFF), (uint32_t)buffer[i]);
   }
 }
+
+TEST_F(T_Prng, NormalDistribution) {
+  const int n = 100000;
+  prng_->InitLocaltime();
+  double rands[n];
+  for (int i = 0; i < n; ++i) {
+    rands[i] = prng_->NextNormal();
+  }
+  double mean = 0;
+  for (int i = 0; i < n; ++i) {
+    mean += rands[i];
+  }
+  mean /= n;
+  // Margin of error wide enough to pass every time
+  EXPECT_TRUE(-0.05 < mean && mean < 0.05);
+  double variance = 0;
+  for (int i = 0; i < n; ++i) {
+    variance += (rands[i] - mean)*(rands[i] - mean);
+  }
+  variance /= n-1;
+  // Margin of error wide enough to pass every time
+  EXPECT_TRUE(0.95 < variance && variance < 1.05);
+}

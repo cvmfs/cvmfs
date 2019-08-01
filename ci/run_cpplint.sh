@@ -44,7 +44,7 @@ fi
 
 
 # define locations and file extensions of source files
-SOURCE_DIRS="cvmfs mount test/unittests test/micro-benchmarks"
+SOURCE_DIRS="cvmfs mount test/unittests test/micro-benchmarks test/stress"
 
 ################################################################################
 
