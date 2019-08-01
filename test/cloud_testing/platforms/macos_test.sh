@@ -29,6 +29,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/040-aliencache                           \
                                    src/045-oasis                                \
                                    src/052-roundrobindns                        \
+                                   src/050-configrepo                           \
                                    src/055-ownership                            \
                                    src/056-lowspeedlimit                        \
                                    src/057-parallelmakecache                    \

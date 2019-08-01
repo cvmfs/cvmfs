@@ -10,9 +10,9 @@ cvmfs_run_test() {
 
   # this used to be --max-depth=3 instead of -d 3, but it had to be changed for compatibility with
   if running_on_osx; then
-    sudo du -ch -d 3 /cvmfs/sft.cern.ch || return 2
+    sudo du -ch -d 3 /cvmfs/sft.cern.ch/lcg/releases || return 2
   else
-    sudo du -ch --max-depth 3 /cvmfs/sft.cern.ch || return 3
+    sudo du -ch --max-depth 3 /cvmfs/sft.cern.ch/lcg/releases || return 3
   fi
   local working_dir="$(pwd)"
   cd /cvmfs/sft.cern.ch

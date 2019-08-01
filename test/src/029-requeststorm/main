@@ -37,7 +37,7 @@ cvmfs_run_test() {
   seconds=$(stop_watch load_catalog $logfile /cvmfs/sft.cern.ch/lcg/external $repeat)
   [ $seconds -lt 8 ] && return 2
 
-  seconds=$(stop_watch cat_file $logfile /cvmfs/sft.cern.ch/.cvmfsdirtab $repeat)
+  seconds=$(stop_watch cat_file $logfile /cvmfs/sft.cern.ch/.well-known $repeat)
   [ $seconds -lt 8 ] && return 3
 
   return 0

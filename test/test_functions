@@ -618,7 +618,7 @@ check_memory() {
   local instance=$1
   local limit=$2
 
-  local pid=$(attr -qg pid /cvmfs/$instance)             || return 100
+  local pid=$(get_xattr pid /cvmfs/$instance)            || return 100
   local rss="$(sudo cat /proc/$pid/status | grep VmRSS)" || return 101
   local rss_kb=$(echo $rss | awk '{print $2}')
 
