@@ -93,30 +93,6 @@ struct Statistics {
 };
 
 
-class InodeGenerationAnnotation : public InodeAnnotation {
- public:
-  InodeGenerationAnnotation() { inode_offset_ = 0; }
-  ~InodeGenerationAnnotation() { }
-  bool ValidInode(const uint64_t inode) {
-    return inode >= inode_offset_;
-  }
-  inode_t Annotate(const inode_t raw_inode) {
-    return raw_inode + inode_offset_;
-  }
-  inode_t Strip(const inode_t annotated_inode) {
-    return annotated_inode - inode_offset_;
-  }
-  void IncGeneration(const uint64_t by) {
-    inode_offset_ += by;
-    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %lu",
-             inode_offset_);
-  }
-  inode_t GetGeneration() { return inode_offset_; }
-
- private:
-  uint64_t inode_offset_;
-};
-
 template <class CatalogT>
 class AbstractCatalogManager;
 
@@ -325,6 +301,65 @@ class AbstractCatalogManager : public SingleCopy {
   InodeRange AcquireInodes(uint64_t size);
   void ReleaseInodes(const InodeRange chunk);
 };  // class CatalogManager
+
+class InodeGenerationAnnotation : public InodeAnnotation {
+ public:
+  InodeGenerationAnnotation() { inode_offset_ = 0; }
+  virtual ~InodeGenerationAnnotation() { }
+  virtual bool ValidInode(const uint64_t inode) {
+    return inode >= inode_offset_;
+  }
+  virtual inode_t Annotate(const inode_t raw_inode) {
+    return raw_inode + inode_offset_;
+  }
+  virtual inode_t Strip(const inode_t annotated_inode) {
+    return annotated_inode - inode_offset_;
+  }
+  virtual void IncGeneration(const uint64_t by) {
+    inode_offset_ += by;
+    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %lu",
+             inode_offset_);
+  }
+  virtual inode_t GetGeneration() { return inode_offset_; }
+
+ private:
+  uint64_t inode_offset_;
+};
+
+/**
+ * In NFS mode, the root inode has to be always 256. Otherwise the inode maps
+ * lookup fails. In general, the catalog manager inodes in NFS mode are only
+ * used for the chunk tables.
+ */
+class InodeNfsGenerationAnnotation : public InodeAnnotation {
+ public:
+  InodeNfsGenerationAnnotation() { inode_offset_ = 0; }
+  virtual ~InodeNfsGenerationAnnotation() { }
+  virtual bool ValidInode(const uint64_t inode) {
+    return (inode >= inode_offset_) || (inode == kRootInode);
+  }
+  virtual inode_t Annotate(const inode_t raw_inode) {
+    if (raw_inode <= kRootInode)
+      return kRootInode;
+    return raw_inode + inode_offset_;
+  }
+  virtual inode_t Strip(const inode_t annotated_inode) {
+    if (annotated_inode == kRootInode)
+      return annotated_inode;
+    return annotated_inode - inode_offset_;
+  }
+  virtual void IncGeneration(const uint64_t by) {
+    inode_offset_ += by;
+    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %lu",
+             inode_offset_);
+  }
+  virtual inode_t GetGeneration() { return inode_offset_; }
+
+ private:
+  static const uint64_t kRootInode =
+    AbstractCatalogManager<Catalog>::kInodeOffset + 1;
+  uint64_t inode_offset_;
+};
 
 }  // namespace catalog
 
