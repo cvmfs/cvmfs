@@ -1,5 +1,6 @@
 cvmfs_test_name="Repository gateway - missing reflog"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 
 clean_up() {
@@ -15,7 +16,7 @@ run_tests() {
 
     local test_repo="test.repo.org"
 
-    echo "Check transaction with missing reflog"
+    echo "*** Check transaction with missing reflog"
     sudo mv /var/spool/cvmfs/${test_repo}/reflog.chksum /tmp
     cvmfs_server transaction ${test_repo}
 
@@ -30,9 +31,11 @@ run_tests() {
         return 1;
     fi
 
+    echo "*** Aborting transaction"
     cvmfs_server abort -f ${test_repo}
 
     # Run repository check
+    echo "*** Repository verification"
     cvmfs_server check ${test_repo}
     if [ $? -ne 0 ]; then
         echo "Repository integrity check failed with \"reflog.chksum\" present"
