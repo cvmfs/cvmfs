@@ -16,6 +16,7 @@ set(CVMFS_UBENCHMARKS_FILES
   b_smallhash.cc
   b_syscalls.cc
   b_messaging.cc
+  b_utils.cc
 )
 
 #
