@@ -5,24 +5,24 @@ cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount sft.cern.ch || return 1
-  
+
   local linux_source
-  linux_source=/cvmfs/sft.cern.ch/lcg/external/experimental/linux/linux-2.6.32.57  
+  linux_source=/cvmfs/sft.cern.ch/lcg/external/experimental/linux/linux-2.6.32.57
 
-  echo "cold cache"
-  tar cf kernel.tar.gz $linux_source || return 2
+  echo "*** Taring $linux_source with COLD cache"
+  tar cf kernel.tar $linux_source || return 2
   local digest_cold
-  digest_cold=$(md5sum kernel.tar.gz | awk '{print $1}')
-  rm -f kernel.tar.gz
+  digest_cold=$(md5sum kernel.tar | awk '{print $1}')
+  rm -f kernel.tar
 
-  echo "warm cache"
-  tar cf kernel.tar.gz $linux_source || return 3 
+  echo "*** Taring $linux_source with WARM cache"
+  tar cf kernel.tar $linux_source || return 3
   local digest_warm
-  digest_warm=$(md5sum kernel.tar.gz | awk '{print $1}')
-  rm -f kernel.tar.gz
+  digest_warm=$(md5sum kernel.tar | awk '{print $1}')
+  rm -f kernel.tar
 
   if [ "x$digest_cold" != "x$digest_warm" ]; then
-    echo "Digest mismatch: $digest_old $digest_warm"
+    echo "Digest mismatch: $digest_cold $digest_warm"
     return 4
   fi
 
