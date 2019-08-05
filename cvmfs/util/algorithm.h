@@ -11,12 +11,19 @@
 #include <cassert>
 #include <string>
 #include <vector>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
+#include <sstream>
+#define BUFFSIZE 150
+using namespace std;
 
 #include "murmur.h"
 // TODO(jblomer): should be also part of algorithm
 #include "prng.h"
 #include "util/single_copy.h"
-
+#include "atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -107,6 +114,59 @@ class StopWatch : SingleCopy {
   timeval start_, end_;
 };
 
+
+class Log2Hist
+{
+private:
+  uint number_of_bins;
+  atomic_int32 *bins;
+  uint *boundary_values;
+  uint count_digits(ulong n)
+  {
+    return (uint)floor(log10(n) + 1);
+  }
+  string generate_stars(uint n)
+  {
+    uint i = 0;
+    string stars = "";
+    for (i = 0; i < n; i++)
+    {
+      stars += "*";
+    }
+    return stars;
+  }
+  string to_string(uint n)
+  {
+    stringstream s;
+    s << n;
+    return s.str();
+  }
+public:
+  explicit Log2Hist(uint n);
+  ~Log2Hist();
+  void Add(float value)
+  {
+    uint i;
+    uint flag = 1; 
+
+    for (i = 1; i <= this->number_of_bins; i++)
+    {
+      if (value < this->boundary_values[i])
+      {
+        atomic_inc32(&(this->bins[i]));
+        flag = 0;
+        return;
+      }
+    }
+    if (flag)
+    {
+      atomic_inc32(&(this->bins[0])); // add to overflow bin.
+    }
+  }
+  atomic_int32 *GetBins();
+  string Print();
+  void PrintLog2Hist();
+};
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
