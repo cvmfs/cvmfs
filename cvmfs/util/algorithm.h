@@ -9,21 +9,21 @@
 
 #include <algorithm>
 #include <cassert>
-#include <string>
-#include <vector>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <cmath>
 #include <sstream>
+#include <string>
+#include <vector>
 #define BUFFSIZE 150
-using namespace std;
+using namespace std; //NOLINT
 
+#include "atomic.h"
 #include "murmur.h"
 // TODO(jblomer): should be also part of algorithm
 #include "prng.h"
 #include "util/single_copy.h"
-#include "atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -117,11 +117,11 @@ class StopWatch : SingleCopy {
 
 class Log2Hist
 {
-private:
+ private:
   uint number_of_bins;
   atomic_int32 *bins;
   uint *boundary_values;
-  uint count_digits(ulong n)
+  uint count_digits(uint64_t n)
   {
     return (uint)floor(log10(n) + 1);
   }
@@ -141,13 +141,13 @@ private:
     s << n;
     return s.str();
   }
-public:
+ public:
   explicit Log2Hist(uint n);
   ~Log2Hist();
   void Add(float value)
   {
     uint i;
-    uint flag = 1; 
+    uint flag = 1;
 
     for (i = 1; i <= this->number_of_bins; i++)
     {
@@ -160,7 +160,7 @@ public:
     }
     if (flag)
     {
-      atomic_inc32(&(this->bins[0])); // add to overflow bin.
+      atomic_inc32(&(this->bins[0]));  // add to overflow bin.
     }
   }
   atomic_int32 *GetBins();

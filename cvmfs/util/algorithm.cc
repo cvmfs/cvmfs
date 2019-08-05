@@ -73,8 +73,8 @@ Log2Hist::Log2Hist(uint n)
 {
   assert(n != 0);
   this->number_of_bins = n;
-  this->bins = new atomic_int32[n + 1]; // +1 for overflow bin.
-  this->boundary_values = new uint[n + 1]; // +1 to avoid giant if statement
+  this->bins = new atomic_int32[n + 1];  // +1 for overflow bin.
+  this->boundary_values = new uint[n + 1];  // +1 to avoid giant if statement
   memset(this->bins, 0, sizeof(atomic_int32) * (n + 1));
   memset(this->boundary_values, 0, sizeof(uint) * (n + 1));
 
@@ -125,13 +125,15 @@ string Log2Hist::Print()
 
   max_stars = max_bins * total_stars / total_sum_of_bins;
 
-  string format = " %" + to_string(max_left_boundary_count < 2 ? 2 : max_left_boundary_count) +
+  string format = " %" + to_string(max_left_boundary_count < 2 ?
+                                  2 : max_left_boundary_count) +
                   "d -> %" + to_string(max_right_boundary_count) +
                   "d :     %" + to_string(max_value_count) + "d | %" +
                   to_string(max_stars) + "s |\n";
 
   string title_format = " %" +
-                  to_string((max_left_boundary_count < 2 ? 2 : max_left_boundary_count) +
+                  to_string((max_left_boundary_count < 2 ?
+                              2 : max_left_boundary_count) +
                               max_right_boundary_count +
                               4) +
                   "s | %" + to_string(max_value_count + 4) +
@@ -160,7 +162,8 @@ string Log2Hist::Print()
 
   for (i = 1; i <= number_of_bins; i++)
   {
-    uint n_of_stars = (uint)atomic_read32(&bins[i]) * total_stars / total_sum_of_bins;
+    uint n_of_stars = (uint)atomic_read32(&bins[i]) * total_stars /
+                                                  total_sum_of_bins;
     snprintf(buffer,
             BUFFSIZE,
             format.c_str(),
@@ -172,7 +175,8 @@ string Log2Hist::Print()
     memset(buffer, 0, sizeof(buffer));
   }
 
-  uint n_of_stars = (uint)atomic_read32(&bins[0]) * total_stars / total_sum_of_bins;
+  uint n_of_stars = (uint)atomic_read32(&bins[0]) * total_stars /
+                                                  total_sum_of_bins;
   snprintf(buffer,
           BUFFSIZE,
           overflow_format.c_str(),
