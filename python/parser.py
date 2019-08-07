@@ -1,4 +1,5 @@
 import math
+from datetime import datetime
 
 class Counter:
     def __init__(self, name, number, description):
@@ -31,10 +32,11 @@ class Counter:
 
 
 class Parser:
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, timestamp=datetime.now(tz=None)):
         self.counters = {}
         self.warm_cache = False
         self.repository = ""
+        self.current_timestamp = timestamp.replace(microsecond=0).isoformat()
         if filename is not None:
             self.parse(filename)
 
@@ -67,9 +69,10 @@ class Parser:
 
     def to_csv(self, filename):
         csv = open(filename, "w")
-        csv.write(";" + self.repository)
-        for counter in self.counters:
-            csv.write(counter.name + ";" + str(counter.avg()))
+
+        csv.write(self.current_timestamp + ";" + self.repository + "\n")
+        for counter in self.counters.values():
+            csv.write(counter.name + ";" + str(counter.avg()) + "\n")
         csv.close()
 
     @staticmethod
