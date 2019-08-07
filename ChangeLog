@@ -9,7 +9,11 @@
   * Add support for libfuse3, including new mount option libfuse=[2|3]
     (CVM-1710, CVM-1744)
 
+2.6.2:
+
 2.6.1:
+  * Fix potential mix-up of chunked files in NFS mode (CVM-1791)
+  * Fix grafting of empty files (CVM-1785)
   * Add -g snapshot group option to cvmfs_server (CVM-1779)
   * Fix syntax errors in external libraries build system (CVM-1781, CVM-1782)
   * Fix master key card handling with openssl-pkcs11 >= 0.4.7 (CVM-1788)

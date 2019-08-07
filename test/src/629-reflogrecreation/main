@@ -108,7 +108,7 @@ cvmfs_run_test() {
 
   echo "*** {3} removing Reflog from Stratum0"
   delete_from_backend $CVMFS_TEST_REPO ".cvmfsreflog" || return 72
-  rm -f "$reflog_checksum" || return 73
+  echo -n "0000000000000000000000000000000000000000" > $reflog_checksum
 
   echo "*** {3} creating a tag in Stratum0"
   cvmfs_server tag -a "foobar"                          \

@@ -1843,14 +1843,16 @@ void MountPoint::SetupHttpTuning() {
 void MountPoint::SetupInodeAnnotation() {
   string optarg;
 
-  inode_annotation_ = new catalog::InodeGenerationAnnotation();
+  if (file_system_->IsNfsSource()) {
+    inode_annotation_ = new catalog::InodeNfsGenerationAnnotation();
+  } else {
+    inode_annotation_ = new catalog::InodeGenerationAnnotation();
+  }
   if (options_mgr_->GetValue("CVMFS_INITIAL_GENERATION", &optarg)) {
     inode_annotation_->IncGeneration(String2Uint64(optarg));
   }
 
-  if ((file_system_->type() == FileSystem::kFsFuse) &&
-      !file_system_->IsNfsSource())
-  {
+  if (file_system_->type() == FileSystem::kFsFuse) {
     catalog_mgr_->SetInodeAnnotation(inode_annotation_);
   }
 }

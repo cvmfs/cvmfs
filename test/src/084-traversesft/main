@@ -9,7 +9,7 @@ cvmfs_run_test() {
   # which should not make the client run out of fds.
 
   cvmfs_mount "sft.cern.ch" \
-    "CVMFS_QUOTA_LIMIT=20000" \
+    "CVMFS_QUOTA_LIMIT=10000" \
     "CVMFS_NFILES=2000" \
     "CVMFS_CHECK_PERMISSIONS=no" \
     "CVMFS_AUTO_UPDATE=no" || return 1

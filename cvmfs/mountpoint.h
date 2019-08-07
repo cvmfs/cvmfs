@@ -29,7 +29,7 @@ class BackoffThrottle;
 class CacheManager;
 namespace catalog {
 class ClientCatalogManager;
-class InodeGenerationAnnotation;
+class InodeAnnotation;
 }
 struct ChunkTables;
 namespace cvmfs {
@@ -394,7 +394,7 @@ class MountPoint : SingleCopy, public BootFactory {
   FileSystem *file_system() { return file_system_; }
   bool has_membership_req() { return has_membership_req_; }
   bool hide_magic_xattrs() { return hide_magic_xattrs_; }
-  catalog::InodeGenerationAnnotation *inode_annotation() {
+  catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
   glue::InodeTracker *inode_tracker() { return inode_tracker_; }
@@ -502,7 +502,7 @@ class MountPoint : SingleCopy, public BootFactory {
   download::DownloadManager *external_download_mgr_;
   cvmfs::Fetcher *fetcher_;
   cvmfs::Fetcher *external_fetcher_;
-  catalog::InodeGenerationAnnotation *inode_annotation_;
+  catalog::InodeAnnotation *inode_annotation_;
   catalog::ClientCatalogManager *catalog_mgr_;
   ChunkTables *chunk_tables_;
   SimpleChunkTables *simple_chunk_tables_;

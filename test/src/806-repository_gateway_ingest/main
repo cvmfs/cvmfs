@@ -1,4 +1,4 @@
-cvmfs_test_name="Repository gateway"
+cvmfs_test_name="Ingesting into repository gateway"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
@@ -53,7 +53,7 @@ run_transactions() {
     fi
 
     echo "Testing if possible to open a transaction after an ingestion"
-    cvmfs_server transaction test.repo.org || 
+    cvmfs_server transaction test.repo.org ||
         {
             echo "*** Error, not possible to open a transaction after the ingestion"
             return 2
@@ -86,10 +86,10 @@ run_transactions() {
         return 5
     fi
 
-    cvmfs_server list-catalogs -x test.repo.org | grep "foo/tarball_foo/a" || 
-        { 
-            echo "*** Error, catalog not found in foo/tarball_foo/a"; 
-            return 6; 
+    cvmfs_server list-catalogs -x test.repo.org | grep "foo/tarball_foo/a" ||
+        {
+            echo "*** Error, catalog not found in foo/tarball_foo/a";
+            return 6;
         }
 
     echo "Ingesting deletion of folders"
@@ -99,7 +99,7 @@ run_transactions() {
         echo "*** Error, delete directory is still present: "
         return 7
     fi
-    
+
     clean_up
 }
 

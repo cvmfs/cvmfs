@@ -46,7 +46,7 @@ guess_package_url() {
   elif [ x$(lsb_release --id --short 2>/dev/null) = x"CentOS" ]; then
     local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9\.][0-9\.]* .*$/\1/')
     local architecture=$(uname -m)
-    package_file_name="${package_name}-${cvmfs_version_string}.el${slc_major_version}.centos.${architecture}.rpm"
+    package_file_name="${package_name}-${cvmfs_version_string}.el${slc_major_version}.${architecture}.rpm"
 
   # Fedora
   elif [ -f /etc/fedora-release ]; then
