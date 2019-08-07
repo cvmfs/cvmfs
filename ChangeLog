@@ -1,3 +1,5 @@
+2.6.2:
+
 2.6.1:
   * Fix potential mix-up of chunked files in NFS mode (CVM-1791)
   * Fix grafting of empty files (CVM-1785)
