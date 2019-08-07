@@ -8,10 +8,17 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
 #include "cvmfs_config.h"
 #include "util/algorithm.h"
+#include "util/string.h"
 
-using namespace std;  // NOLINT
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -69,90 +76,89 @@ double StopWatch::GetTime() const {
   return DiffTimeSeconds(start_, end_);
 }
 
-Log2Hist::Log2Hist(uint n)
-{
-  assert(n != 0);
-  this->number_of_bins = n;
-  this->bins = new atomic_int32[n + 1];  // +1 for overflow bin.
-  this->boundary_values = new uint[n + 1];  // +1 to avoid giant if statement
-  memset(this->bins, 0, sizeof(atomic_int32) * (n + 1));
-  memset(this->boundary_values, 0, sizeof(uint) * (n + 1));
+namespace {
 
-  uint i;
-  for (i = 1; i <= n; i++)
-  {
-    this->boundary_values[i] = (1 << ((i - 1) + 1));
+static unsigned int CountDigits(uint64_t n) {
+  return (unsigned int)floor(log10(n) + 1);
+}
+
+static std::string GenerateStars(unsigned int n) {
+  return std::string(n, '*');
+}
+
+}  // anonymous namespace
+
+Log2Histogram::Log2Histogram(unsigned int nbins) {
+  assert(nbins != 0);
+  this->bins_.assign(nbins + 1, 0);  // +1 for overflow bin.
+  this->boundary_values_.assign(nbins + 1, 0);  // +1 to avoid big if statement
+
+  unsigned int i;
+  for (i = 1; i <= nbins; i++) {
+    this->boundary_values_[i] = (1 << ((i - 1) + 1));
   }
 }
 
-Log2Hist::~Log2Hist()
-{
-  delete[] bins;
-  delete[] boundary_values;
+std::vector<atomic_int32> UTLog2Histogram::GetBins(const Log2Histogram &h) {
+  return h.bins_;
 }
 
-atomic_int32* Log2Hist::GetBins()
-{
-  return this->bins;
-}
+std::string Log2Histogram::ToString() {
+  unsigned int i = 0;
 
-string Log2Hist::Print()
-{
-  uint i = 0;
+  unsigned int max_left_boundary_count = 1;
+  unsigned int max_right_boundary_count = 1;
+  unsigned int max_value_count = 1;
+  unsigned int max_stars = 0;
+  unsigned int max_bins = 0;
+  unsigned int total_stars = 38;
+  unsigned int total_sum_of_bins = 0;
 
-  uint max_left_boundary_count = 1;
-  uint max_right_boundary_count = 1;
-  uint max_value_count = 1;
-  uint max_stars = 0;
-  uint max_bins = 0;
-  uint total_stars = 38;
-  uint total_sum_of_bins = 0;
-
-  for (i = 1; i <= number_of_bins; i++)
-  {
-    max_left_boundary_count = max(max_left_boundary_count,
-                                count_digits(boundary_values[i] / 2));
-    max_right_boundary_count = max(max_right_boundary_count,
-                                count_digits(boundary_values[i] - 1));
-    max_value_count = max(max_value_count, count_digits(bins[i]));
-    max_bins = max(max_bins, (uint)atomic_read32(&bins[i]));
-    total_sum_of_bins += (uint)atomic_read32(&bins[i]);
+  for (i = 1; i <= this->bins_.size() - 1; i++) {
+    max_left_boundary_count = std::max(max_left_boundary_count,
+                                CountDigits(boundary_values_[i] / 2));
+    max_right_boundary_count = std::max(max_right_boundary_count,
+                                CountDigits(boundary_values_[i] - 1));
+    max_value_count = std::max(max_value_count, CountDigits(this->bins_[i]));
+    max_bins = std::max(max_bins, (unsigned int)
+                                atomic_read32(&(this->bins_[i])));
+    total_sum_of_bins += (unsigned int)atomic_read32(&(this->bins_[i]));
   }
 
-  max_bins = max(max_bins, (uint)atomic_read32(&bins[0]));
-  total_sum_of_bins += (uint)atomic_read32(&bins[0]);
-
+  max_bins = std::max(max_bins, (unsigned int)atomic_read32(&(this->bins_[0])));
+  total_sum_of_bins += (unsigned int)atomic_read32(&(this->bins_[0]));
 
   max_stars = max_bins * total_stars / total_sum_of_bins;
 
-  string format = " %" + to_string(max_left_boundary_count < 2 ?
+  std::string format = " %" + StringifyUint(max_left_boundary_count < 2 ?
                                   2 : max_left_boundary_count) +
-                  "d -> %" + to_string(max_right_boundary_count) +
-                  "d :     %" + to_string(max_value_count) + "d | %" +
-                  to_string(max_stars) + "s |\n";
+                  "d -> %" + StringifyUint(max_right_boundary_count) +
+                  "d :     %" + StringifyUint(max_value_count) + "d | %" +
+                  StringifyUint(max_stars) + "s |\n";
 
-  string title_format = " %" +
-                  to_string((max_left_boundary_count < 2 ?
+  std::string title_format = " %" +
+                  StringifyUint((max_left_boundary_count < 2 ?
                               2 : max_left_boundary_count) +
                               max_right_boundary_count +
                               4) +
-                  "s | %" + to_string(max_value_count + 4) +
-                  "s | %" + to_string(max_stars) + "s |\n";
+                  "s | %" + StringifyUint(max_value_count + 4) +
+                  "s | %" + StringifyUint(max_stars) + "s |\n";
 
-  string overflow_format = "%" +
-                  to_string(max_left_boundary_count +
+  std::string overflow_format = "%" +
+                  StringifyUint(max_left_boundary_count +
                               max_right_boundary_count +
                               5) +
-                  "s : %" + to_string(max_value_count + 4) +
-                  "d | %" + to_string(max_stars) + "s |\n";
+                  "s : %" + StringifyUint(max_value_count + 4) +
+                  "d | %" + StringifyUint(max_stars) + "s |\n";
 
-  string result_string = "";
+  std::string result_string = "";
 
-  char buffer[BUFFSIZE];
+  const unsigned int kBufSize = 150;
+  char buffer[kBufSize];
   memset(buffer, 0, sizeof(buffer));
 
   snprintf(buffer,
-      BUFFSIZE,
+      kBufSize,
       title_format.c_str(),
       "usec",
       "count",
@@ -160,39 +166,38 @@ string Log2Hist::Print()
   result_string += buffer;
   memset(buffer, 0, sizeof(buffer));
 
-  for (i = 1; i <= number_of_bins; i++)
-  {
-    uint n_of_stars = (uint)atomic_read32(&bins[i]) * total_stars /
-                                                  total_sum_of_bins;
+  for (i = 1; i <= this->bins_.size() - 1; i++) {
+    unsigned int n_of_stars = (unsigned int)
+                              atomic_read32(&(this->bins_[i])) *
+                              total_stars / total_sum_of_bins;
     snprintf(buffer,
-            BUFFSIZE,
+            kBufSize,
             format.c_str(),
-            boundary_values[i - 1],
-            boundary_values[i] - 1,
-            (uint)atomic_read32(&bins[i]),
-            generate_stars(n_of_stars).c_str());
+            boundary_values_[i - 1],
+            boundary_values_[i] - 1,
+            (unsigned int)atomic_read32(&this->bins_[i]),
+            GenerateStars(n_of_stars).c_str());
     result_string += buffer;
     memset(buffer, 0, sizeof(buffer));
   }
 
-  uint n_of_stars = (uint)atomic_read32(&bins[0]) * total_stars /
-                                                  total_sum_of_bins;
+  unsigned int n_of_stars = (unsigned int)
+                              atomic_read32(&(this->bins_[0])) *
+                              total_stars / total_sum_of_bins;
   snprintf(buffer,
-          BUFFSIZE,
+          kBufSize,
           overflow_format.c_str(),
           "overflow",
-          (uint)atomic_read32(&bins[0]),
-          generate_stars(n_of_stars).c_str());
+          (unsigned int)atomic_read32(&(this->bins_[0])),
+          GenerateStars(n_of_stars).c_str());
   result_string += buffer;
   memset(buffer, 0, sizeof(buffer));
 
   return result_string;
 }
 
-void Log2Hist::PrintLog2Hist()
-{
-  printf("%s", this->Print().c_str());
-  fflush(stdout);
+void Log2Histogram::PrintLog2Histogram() {
+  printf("%s", this->ToString().c_str());
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

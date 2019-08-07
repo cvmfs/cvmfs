@@ -8,16 +8,8 @@
 #include <sys/time.h>
 
 #include <algorithm>
-#include <cassert>
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
-#define BUFFSIZE 150
-using namespace std; //NOLINT
 
 #include "atomic.h"
 #include "murmur.h"
@@ -114,58 +106,55 @@ class StopWatch : SingleCopy {
   timeval start_, end_;
 };
 
+/**
+ * Log2Histogram is a simple implementation of 
+ * log2 histogram data structure which stores 
+ * and prints log2 histogram. It is used for
+ * getting and printing latency metrics of 
+ * CVMFS fuse calls.
+ * 
+ * Log2Histogram hist(2);
+ * hist.Add(1);
+ * hist.Add(2);
+ * hist.PrintLog2Histogram();
+ */
 
-class Log2Hist
-{
- private:
-  uint number_of_bins;
-  atomic_int32 *bins;
-  uint *boundary_values;
-  uint count_digits(uint64_t n)
-  {
-    return (uint)floor(log10(n) + 1);
-  }
-  string generate_stars(uint n)
-  {
-    uint i = 0;
-    string stars = "";
-    for (i = 0; i < n; i++)
-    {
-      stars += "*";
-    }
-    return stars;
-  }
-  string to_string(uint n)
-  {
-    stringstream s;
-    s << n;
-    return s.str();
-  }
+class Log2Histogram {
  public:
-  explicit Log2Hist(uint n);
-  ~Log2Hist();
-  void Add(float value)
-  {
-    uint i;
-    uint flag = 1;
+  explicit Log2Histogram(unsigned int nbins);
 
-    for (i = 1; i <= this->number_of_bins; i++)
-    {
-      if (value < this->boundary_values[i])
-      {
-        atomic_inc32(&(this->bins[i]));
+  void Add(unsigned int value) {
+    unsigned int i;
+    unsigned int flag = 1;
+
+    for (i = 1; i <= this->bins_.size(); i++) {
+      if (value < this->boundary_values_[i]) {
+        atomic_inc32(&(this->bins_[i]));
         flag = 0;
         return;
       }
     }
-    if (flag)
-    {
-      atomic_inc32(&(this->bins[0]));  // add to overflow bin.
+    if (flag) {
+      atomic_inc32(&(this->bins_[0]));  // add to overflow bin.
     }
   }
-  atomic_int32 *GetBins();
-  string Print();
-  void PrintLog2Hist();
+
+  std::string ToString();
+
+  void PrintLog2Histogram();
+
+  friend class UTLog2Histogram;
+
+ private:
+  std::vector<atomic_int32> bins_;
+  // boundary_values_ handle the largest value a certain
+  // bin can store in itself.
+  std::vector<unsigned int> boundary_values_;
+};
+
+class UTLog2Histogram {
+ public:
+  std::vector<atomic_int32> GetBins(const Log2Histogram &h);
 };
 
 #ifdef CVMFS_NAMESPACE_GUARD
