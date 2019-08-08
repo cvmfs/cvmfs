@@ -134,7 +134,7 @@ std::string Log2Histogram::ToString() {
                                   2 : max_left_boundary_count) +
                   "d -> %" + StringifyUint(max_right_boundary_count) +
                   "d :     %" + StringifyUint(max_value_count) + "d | %" +
-                  StringifyUint(max_stars) + "s |\n";
+                  StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
 
   std::string title_format = " %" +
                   StringifyUint((max_left_boundary_count < 2 ?
@@ -142,14 +142,14 @@ std::string Log2Histogram::ToString() {
                               max_right_boundary_count +
                               4) +
                   "s | %" + StringifyUint(max_value_count + 4) +
-                  "s | %" + StringifyUint(max_stars) + "s |\n";
+                  "s | %" + StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
 
   std::string overflow_format = "%" +
                   StringifyUint(max_left_boundary_count +
                               max_right_boundary_count +
                               5) +
                   "s : %" + StringifyUint(max_value_count + 4) +
-                  "d | %" + StringifyUint(max_stars) + "s |\n";
+                  "d | %" + StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
 
   std::string result_string = "";
 
@@ -160,7 +160,7 @@ std::string Log2Histogram::ToString() {
   snprintf(buffer,
       kBufSize,
       title_format.c_str(),
-      "usec",
+      "nsec",
       "count",
       "distribution");
   result_string += buffer;
