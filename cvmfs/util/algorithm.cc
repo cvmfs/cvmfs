@@ -142,20 +142,22 @@ std::string Log2Histogram::ToString() {
                               max_right_boundary_count +
                               4) +
                   "s | %" + StringifyUint(max_value_count + 4) +
-                  "s | %" + StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
+                  "s | %" + StringifyUint(max_stars < 12 ? 12 : max_stars) +
+                  "s |\n";
 
   std::string overflow_format = "%" +
                   StringifyUint(max_left_boundary_count +
                               max_right_boundary_count +
                               5) +
                   "s : %" + StringifyUint(max_value_count + 4) +
-                  "d | %" + StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
+                  "d | %" + StringifyUint(max_stars < 12 ? 12 : max_stars) +
+                  "s |\n";
 
   std::string total_format = "%" +
                   StringifyUint(max_left_boundary_count +
                               max_right_boundary_count +
                               5 < 8 ? 8 : max_left_boundary_count +
-                              max_right_boundary_count + 5) + 
+                              max_right_boundary_count + 5) +
                   "s : %" + StringifyUint(max_value_count + 4) + "lld\n";
 
   std::string result_string = "";

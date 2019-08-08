@@ -164,11 +164,11 @@ class UTLog2Histogram {
 
 class HighPrecisionTimer : SingleCopy {
  public:
-  explicit HighPrecisionTimer(Log2Histogram *recorder) 
-    : timestamp_start_(platform_monotonic_time_ns()) 
+  explicit HighPrecisionTimer(Log2Histogram *recorder)
+    : timestamp_start_(platform_monotonic_time_ns())
     , recorder_(recorder)
   { }
-  
+
   ~HighPrecisionTimer() {
     recorder_->Add(platform_monotonic_time_ns() - timestamp_start_);
   }
