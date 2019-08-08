@@ -18,6 +18,7 @@
 #include <limits>
 #include <vector>
 
+#include "atomic.h"
 #include "shortstring.h"
 #include "smalloc.h"
 #include "testutil.h"
@@ -1762,4 +1763,61 @@ TEST_F(T_Util, DiffTree) {
   EXPECT_TRUE(DiffTree(".", "."));
   EXPECT_TRUE(DiffTree("./.", "."));
   EXPECT_FALSE(DiffTree(".", "/"));
+}
+
+TEST(Log2Histogram, 2BinEmpty) {
+  Log2Histogram log2hist(2);
+  log2hist.Add(10);
+  log2hist.Add(11);
+  log2hist.Add(12);
+
+  UTLog2Histogram unit_test;
+
+  std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
+  unsigned int res[3] = {3, 0, 0};
+  for (int i = 0; i < 3; i++) {
+    EXPECT_EQ(res[i], atomic_read32(&bins[i]));
+  }
+}
+
+TEST(Log2Histogram, 2Bins) {
+  Log2Histogram log2hist(2);
+  log2hist.Add(0);
+  log2hist.Add(1);
+  log2hist.Add(1);
+  log2hist.Add(2);
+  log2hist.Add(3);
+  log2hist.Add(4);
+
+  UTLog2Histogram unit_test;
+
+  std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
+  unsigned int res[3] = {1, 3, 2};
+  for (int i = 0; i < 3; i++) {
+    EXPECT_EQ(res[i], atomic_read32(&bins[i]));
+  }
+}
+
+TEST(Log2Histogram, 3Bins) {
+  Log2Histogram log2hist(3);
+  log2hist.Add(0);
+  log2hist.Add(0);
+  log2hist.Add(1);
+  log2hist.Add(1);
+  log2hist.Add(1);
+  log2hist.Add(2);
+  log2hist.Add(3);
+  log2hist.Add(4);
+  log2hist.Add(5);
+  log2hist.Add(5);
+  log2hist.Add(7);
+  log2hist.Add(8);
+
+  UTLog2Histogram unit_test;
+
+  std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
+  unsigned int res[4] = {1, 5, 2, 4};
+  for (int i = 0; i < 4; i++) {
+    EXPECT_EQ(res[i], atomic_read32(&bins[i]));
+  }
 }

@@ -8,15 +8,14 @@
 #include <sys/time.h>
 
 #include <algorithm>
-#include <cassert>
 #include <string>
 #include <vector>
 
+#include "atomic.h"
 #include "murmur.h"
 // TODO(jblomer): should be also part of algorithm
 #include "prng.h"
 #include "util/single_copy.h"
-
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -107,6 +106,58 @@ class StopWatch : SingleCopy {
   timeval start_, end_;
 };
 
+/**
+ * Log2Histogram is a simple implementation of 
+ * log2 histogram data structure which stores 
+ * and prints log2 histogram. It is used for
+ * getting and printing latency metrics of 
+ * CVMFS fuse calls.
+ * 
+ * Log2Histogram hist(2);
+ * hist.Add(1);
+ * hist.Add(2);
+ * hist.PrintLog2Histogram();
+ */
+
+class Log2Histogram {
+friend class UTLog2Histogram;
+
+ public:
+  explicit Log2Histogram(unsigned int nbins);
+
+  void Add(unsigned int value) {
+    unsigned int i;
+    const unsigned int n = this->bins_.size() - 1;
+
+    for (i = 1; i <= n; i++) {
+      if (value < this->boundary_values_[i]) {
+        atomic_inc32(&(this->bins_[i]));
+        return;
+      }
+    }
+
+    atomic_inc32(&(this->bins_[0]));  // add to overflow bin.
+  }
+
+  std::string ToString();
+
+  void PrintLog2Histogram();
+
+ private:
+  std::vector<atomic_int32> bins_;
+  // boundary_values_ handle the largest value a certain
+  // bin can store in itself.
+  std::vector<unsigned int> boundary_values_;
+};
+
+/**
+ * UTLog2Histogram class is a helper for the unit tests
+ * to extract internals from Log2Histogram.
+ */
+class UTLog2Histogram {
+ public:
+  std::vector<atomic_int32> GetBins(const Log2Histogram &h);
+};
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
