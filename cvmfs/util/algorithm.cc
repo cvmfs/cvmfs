@@ -153,7 +153,7 @@ std::string Log2Histogram::ToString() {
 
   std::string result_string = "";
 
-  const unsigned int kBufSize = 150;
+  const unsigned int kBufSize = 200;
   char buffer[kBufSize];
   memset(buffer, 0, sizeof(buffer));
 

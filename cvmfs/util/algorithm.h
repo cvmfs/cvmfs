@@ -120,30 +120,28 @@ class StopWatch : SingleCopy {
  */
 
 class Log2Histogram {
+friend class UTLog2Histogram;
+
  public:
   explicit Log2Histogram(unsigned int nbins);
 
   void Add(unsigned int value) {
     unsigned int i;
-    unsigned int flag = 1;
+    const unsigned int n = this->bins_.size() - 1;
 
-    for (i = 1; i <= this->bins_.size(); i++) {
+    for (i = 1; i <= n; i++) {
       if (value < this->boundary_values_[i]) {
         atomic_inc32(&(this->bins_[i]));
-        flag = 0;
         return;
       }
     }
-    if (flag) {
-      atomic_inc32(&(this->bins_[0]));  // add to overflow bin.
-    }
+
+    atomic_inc32(&(this->bins_[0]));  // add to overflow bin.
   }
 
   std::string ToString();
 
   void PrintLog2Histogram();
-
-  friend class UTLog2Histogram;
 
  private:
   std::vector<atomic_int32> bins_;
@@ -152,6 +150,10 @@ class Log2Histogram {
   std::vector<unsigned int> boundary_values_;
 };
 
+/**
+ * UTLog2Histogram class is a helper for the unit tests
+ * to extract internals from Log2Histogram.
+ */
 class UTLog2Histogram {
  public:
   std::vector<atomic_int32> GetBins(const Log2Histogram &h);

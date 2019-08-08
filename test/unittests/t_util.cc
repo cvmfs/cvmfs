@@ -1775,8 +1775,7 @@ TEST(Log2Histogram, 2BinEmpty) {
 
   std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
   unsigned int res[3] = {3, 0, 0};
-  for (int i = 0; i < 3; i++)
-  {
+  for (int i = 0; i < 3; i++) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
   }
 }
@@ -1794,8 +1793,7 @@ TEST(Log2Histogram, 2Bins) {
 
   std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
   unsigned int res[3] = {1, 3, 2};
-  for (int i = 0; i < 3; i++)
-  {
+  for (int i = 0; i < 3; i++) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
   }
 }
@@ -1819,8 +1817,7 @@ TEST(Log2Histogram, 3Bins) {
 
   std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
   unsigned int res[4] = {1, 5, 2, 4};
-  for (int i = 0; i < 4; i++)
-  {
+  for (int i = 0; i < 4; i++) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
   }
 }
