@@ -1,3 +1,9 @@
+cvmfs-config-default (1.8-1) lucid; urgency=low
+
+  * Turn off config repository as a work around for CVM-1795
+
+ -- Jakob Blomer <jblomer@cern.ch>  Mon, 12 Aug 2019 18:00:00 +0000
+
 cvmfs-config-default (1.7-1) lucid; urgency=low
 
   * Replace BNL and FNAL stratum 1s with their OSG aliases

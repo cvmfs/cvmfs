@@ -1,6 +1,6 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.7
+Version: 1.8
 Release: 1
 Source0: cern.ch.pub
 Source1: cern-it1.cern.ch.pub
@@ -74,8 +74,11 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Mon Aug 12 2019 Jakob Blomer <jblomer@cern.ch> - 1.8-1
+- Turn off config repository as a work around for CVM-1795
+
 * Fri May 25 2018 Dave Dykstra <dwd@fnal.gov> - 1.7-1
-- Skipped versions 1.5 and 1.6 because debian packages with those 
+- Skipped versions 1.5 and 1.6 because debian packages with those
   versions already exist
 - Replace BNL and FNAL stratum 1s with their OSG aliases for the
   cern.ch domain
