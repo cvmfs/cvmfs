@@ -992,7 +992,7 @@ _cvmfs_reload_pause() {
   if [ -z "$fqrn" ] || [ -z "$pid" ]; then
     # This repository must have been unmounted just now
     cd /
-    return
+    return 1
   fi
   echo "Pausing ${fqrn} on ${mountpoint}"
   cd "$mountpoint" &&
@@ -1002,6 +1002,7 @@ _cvmfs_reload_pause() {
   cd /
   echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
   echo ${CVMFS_RELOAD_SOCKETS}/cvmfs.${fqrn}.paused >> "${CVMFS_RELOAD_SOCKETS}/guard_files"
+  return 0
 }
 
 _cvmfs_reload_waitfor() {
@@ -1102,8 +1103,8 @@ cvmfs_reload() {
 
     if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
       # If we have a config repository, now is the time to pause it at the very end
-      _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}"
-      _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
+      _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
+        _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
     fi
 
     rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
