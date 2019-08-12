@@ -1,4 +1,5 @@
 2.6.2:
+  * Fix reload if config repository is set but unmountable (CVM-1795)
 
 2.6.1:
   * Fix potential mix-up of chunked files in NFS mode (CVM-1791)
