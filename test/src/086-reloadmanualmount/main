@@ -1,0 +1,19 @@
+
+cvmfs_test_name="Repository reload with config repository and manual mount"
+cvmfs_test_suites="quick"
+cvmfs_test_autofs_on_startup=false
+
+# Test for CVM-1755
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount_direct sft.cern.ch || return 1
+  mount | grep cvmfs-config.cern.ch || return 2
+
+  cvmfs_umount cvmfs-config.cern.ch || return 10
+  mount | grep cvmfs-config.cern.ch && return 11
+
+  sudo cvmfs_config reload || return 20
+
+  return 0
+}
