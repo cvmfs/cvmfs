@@ -216,16 +216,16 @@ void FileSystem::CreateStatistics() {
   no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
                   "Number of currently opened directories");
 
-  hist_fs_lookup_ = new Log2Histogram(20);
-  hist_fs_forget_ = new Log2Histogram(20);
-  hist_fs_getattr_ = new Log2Histogram(20);
-  hist_fs_readlink_ = new Log2Histogram(20);
-  hist_fs_opendir_ = new Log2Histogram(20);
-  hist_fs_releasedir_ = new Log2Histogram(20);
-  hist_fs_readdir_ = new Log2Histogram(20);
-  hist_fs_open_ = new Log2Histogram(20);
-  hist_fs_read_ = new Log2Histogram(20);
-  hist_fs_release_ = new Log2Histogram(20);
+  hist_fs_lookup_ = new Log2Histogram(30);
+  hist_fs_forget_ = new Log2Histogram(30);
+  hist_fs_getattr_ = new Log2Histogram(30);
+  hist_fs_readlink_ = new Log2Histogram(30);
+  hist_fs_opendir_ = new Log2Histogram(30);
+  hist_fs_releasedir_ = new Log2Histogram(30);
+  hist_fs_readdir_ = new Log2Histogram(30);
+  hist_fs_open_ = new Log2Histogram(30);
+  hist_fs_read_ = new Log2Histogram(30);
+  hist_fs_release_ = new Log2Histogram(30);
 }
 
 
