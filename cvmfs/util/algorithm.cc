@@ -128,7 +128,9 @@ std::string Log2Histogram::ToString() {
   max_bins = std::max(max_bins, (unsigned int)atomic_read32(&(this->bins_[0])));
   total_sum_of_bins += (unsigned int)atomic_read32(&(this->bins_[0]));
 
-  max_stars = max_bins * total_stars / total_sum_of_bins;
+  if (total_sum_of_bins != 0) {
+    max_stars = max_bins * total_stars / total_sum_of_bins;
+  }
 
   std::string format = " %" + StringifyUint(max_left_boundary_count < 2 ?
                                   2 : max_left_boundary_count) +
@@ -176,9 +178,12 @@ std::string Log2Histogram::ToString() {
   memset(buffer, 0, sizeof(buffer));
 
   for (i = 1; i <= this->bins_.size() - 1; i++) {
-    unsigned int n_of_stars = (unsigned int)
-                              atomic_read32(&(this->bins_[i])) *
+    unsigned int n_of_stars = 0;
+    if (total_sum_of_bins != 0) {
+      n_of_stars = (unsigned int) atomic_read32(&(this->bins_[i])) *
                               total_stars / total_sum_of_bins;
+    }
+
     snprintf(buffer,
             kBufSize,
             format.c_str(),
@@ -190,9 +195,12 @@ std::string Log2Histogram::ToString() {
     memset(buffer, 0, sizeof(buffer));
   }
 
-  unsigned int n_of_stars = (unsigned int)
-                              atomic_read32(&(this->bins_[0])) *
-                              total_stars / total_sum_of_bins;
+  unsigned int n_of_stars = 0;
+  if (total_sum_of_bins != 0) {
+    n_of_stars = (unsigned int) atomic_read32(&(this->bins_[0])) *
+                            total_stars / total_sum_of_bins;
+  }
+
   snprintf(buffer,
           kBufSize,
           overflow_format.c_str(),
