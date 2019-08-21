@@ -78,12 +78,12 @@ BENCHMARK_REGISTER_F(BM_SmallHash, Baseline)->Repetitions(3);
 
 BENCHMARK_DEFINE_F(BM_SmallHash, InsertIntDirent)(benchmark::State &st) {
   SmallHashFixed<uint64_t, catalog::DirectoryEntry> htable;
-  htable.Init(st.range_x(), 0, hasher_uint64t);
+  htable.Init(st.range(0), 0, hasher_uint64t);
   catalog::DirectoryEntry value;
 
   unsigned i = 0;
   while (st.KeepRunning()) {
-    uint64_t key = values_int_[i % st.range_x()];
+    uint64_t key = values_int_[i % st.range(0)];
     htable.Insert(key, value);
     ++i;
   }
@@ -99,12 +99,12 @@ BENCHMARK_REGISTER_F(BM_SmallHash, InsertIntDirent)->Repetitions(3)->Arg(5000);
 
 BENCHMARK_DEFINE_F(BM_SmallHash, InsertIntPath)(benchmark::State &st) {
   SmallHashFixed<uint64_t, PathString> htable;
-  htable.Init(st.range_x(), 0, hasher_uint64t);
+  htable.Init(st.range(0), 0, hasher_uint64t);
   PathString value;
 
   unsigned i = 0;
   while (st.KeepRunning()) {
-    uint64_t key = values_int_[i % st.range_x()];
+    uint64_t key = values_int_[i % st.range(0)];
     htable.Insert(key, value);
     ++i;
   }
@@ -120,12 +120,12 @@ BENCHMARK_REGISTER_F(BM_SmallHash, InsertIntPath)->Repetitions(3)->Arg(5000);
 
 BENCHMARK_DEFINE_F(BM_SmallHash, InsertMd5Dirent)(benchmark::State &st) {
   SmallHashFixed<shash::Md5, catalog::DirectoryEntry> htable;
-  htable.Init(st.range_x(), shash::Md5(shash::AsciiPtr("!")), hasher_md5);
+  htable.Init(st.range(0), shash::Md5(shash::AsciiPtr("!")), hasher_md5);
   catalog::DirectoryEntry value;
 
   unsigned i = 0;
   while (st.KeepRunning()) {
-    htable.Insert(values_md5_[i % st.range_x()], value);
+    htable.Insert(values_md5_[i % st.range(0)], value);
     ++i;
   }
 

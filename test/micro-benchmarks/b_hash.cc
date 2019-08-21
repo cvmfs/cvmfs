@@ -53,7 +53,7 @@ BENCHMARK_REGISTER_F(BM_Hash, LongPath)->Repetitions(3);
 
 
 BENCHMARK_DEFINE_F(BM_Hash, Sha1)(benchmark::State &st) {
-  unsigned size = st.range_x();
+  unsigned size = st.range(0);
   unsigned char buffer[size];
   shash::Any content_hash(shash::kSha1);
   while (st.KeepRunning()) {
