@@ -109,12 +109,12 @@ class StopWatch : SingleCopy {
 
 
 /**
- * Log2Histogram is a simple implementation of 
- * log2 histogram data structure which stores 
+ * Log2Histogram is a simple implementation of
+ * log2 histogram data structure which stores
  * and prints log2 histogram. It is used for
- * getting and printing latency metrics of 
+ * getting and printing latency metrics of
  * CVMFS fuse calls.
- * 
+ *
  * Log2Histogram hist(2);
  * hist.Add(1);
  * hist.Add(2);
@@ -164,13 +164,16 @@ class UTLog2Histogram {
 
 class HighPrecisionTimer : SingleCopy {
  public:
+  static bool g_is_enabled;  // false by default
+
   explicit HighPrecisionTimer(Log2Histogram *recorder)
-    : timestamp_start_(platform_monotonic_time_ns())
+    : timestamp_start_(g_is_enabled ? platform_monotonic_time_ns() : 0)
     , recorder_(recorder)
   { }
 
   ~HighPrecisionTimer() {
-    recorder_->Add(platform_monotonic_time_ns() - timestamp_start_);
+    if (g_is_enabled)
+      recorder_->Add(platform_monotonic_time_ns() - timestamp_start_);
   }
 
  private:

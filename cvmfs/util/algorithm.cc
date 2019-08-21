@@ -24,6 +24,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+bool HighPrecisionTimer::g_is_enabled = false;
+
 
 double DiffTimeSeconds(struct timeval start, struct timeval end) {
   // Time substraction, from GCC documentation
