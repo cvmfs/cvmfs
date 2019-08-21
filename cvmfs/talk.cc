@@ -560,6 +560,19 @@ void *TalkManager::MainResponder(void *data) {
       result += "\nPer-Connection Memory Statistics:\n" +
                 mount_point->catalog_mgr()->PrintAllMemStatistics();
 
+      result += "\nLatency distribution of system calls:\n";
+
+      result += "Lookup\n" + file_system->hist_fs_lookup()->ToString();
+      result += "Forget\n" + file_system->hist_fs_forget()->ToString();
+      result += "Getattr\n" + file_system->hist_fs_getattr()->ToString();
+      result += "Readlink\n" + file_system->hist_fs_readlink()->ToString();
+      result += "Opendir\n" + file_system->hist_fs_opendir()->ToString();
+      result += "Releasedir\n" + file_system->hist_fs_releasedir()->ToString();
+      result += "Readdir\n" + file_system->hist_fs_readdir()->ToString();
+      result += "Open\n" + file_system->hist_fs_open()->ToString();
+      result += "Read\n" + file_system->hist_fs_read()->ToString();
+      result += "Release\n" + file_system->hist_fs_release()->ToString();
+
       result += "\nRaw Counters:\n" +
         mount_point->statistics()->PrintList(perf::Statistics::kPrintHeader);
 

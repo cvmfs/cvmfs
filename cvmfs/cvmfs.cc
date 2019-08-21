@@ -368,6 +368,8 @@ static void inline TraceInode(const int event,
  * We do check catalog TTL here (and reload, if necessary).
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_lookup());
+
   perf::Inc(file_system_->n_fs_lookup());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
@@ -466,6 +468,8 @@ static void cvmfs_forget(
   uint64_t nlookup
 #endif
 ) {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_forget());
+
   perf::Inc(file_system_->n_fs_forget());
 
   // The libfuse high-level library does the same
@@ -512,6 +516,8 @@ static void ReplyNegative(const catalog::DirectoryEntry &dirent,
 static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_getattr());
+
   perf::Inc(file_system_->n_fs_stat());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
@@ -547,6 +553,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  * Reads a symlink from the catalog.  Environment variables are expanded.
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_readlink());
+
   perf::Inc(file_system_->n_fs_readlink());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
@@ -605,6 +613,8 @@ static void AddToDirListing(const fuse_req_t req,
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_opendir());
+
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   fuse_remounter_->TryFinish();
@@ -725,6 +735,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
                              struct fuse_file_info *fi)
 {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_releasedir());
+
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %" PRIu64
            ", handle %d", uint64_t(ino), fi->fh);
@@ -772,6 +784,8 @@ static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
 static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                           off_t off, struct fuse_file_info *fi)
 {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_readdir());
+
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_readdir on inode %" PRIu64 " reading %d bytes from offset %d",
            uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)), size, off);
@@ -801,6 +815,8 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                        struct fuse_file_info *fi)
 {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_open());
+
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   fuse_remounter_->fence()->Enter();
@@ -996,6 +1012,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi)
 {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_read());
+
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_read inode: %" PRIu64 " reading %d bytes from offset %d "
            "fd %d", uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)),
@@ -1139,6 +1157,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_release());
+
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %" PRIu64,
            uint64_t(ino));

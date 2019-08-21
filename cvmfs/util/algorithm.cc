@@ -112,7 +112,7 @@ std::string Log2Histogram::ToString() {
   unsigned int max_stars = 0;
   unsigned int max_bins = 0;
   unsigned int total_stars = 38;
-  unsigned int total_sum_of_bins = 0;
+  uint64_t total_sum_of_bins = 0;
 
   for (i = 1; i <= this->bins_.size() - 1; i++) {
     max_left_boundary_count = std::max(max_left_boundary_count,
@@ -128,13 +128,15 @@ std::string Log2Histogram::ToString() {
   max_bins = std::max(max_bins, (unsigned int)atomic_read32(&(this->bins_[0])));
   total_sum_of_bins += (unsigned int)atomic_read32(&(this->bins_[0]));
 
-  max_stars = max_bins * total_stars / total_sum_of_bins;
+  if (total_sum_of_bins != 0) {
+    max_stars = max_bins * total_stars / total_sum_of_bins;
+  }
 
   std::string format = " %" + StringifyUint(max_left_boundary_count < 2 ?
                                   2 : max_left_boundary_count) +
                   "d -> %" + StringifyUint(max_right_boundary_count) +
                   "d :     %" + StringifyUint(max_value_count) + "d | %" +
-                  StringifyUint(max_stars) + "s |\n";
+                  StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
 
   std::string title_format = " %" +
                   StringifyUint((max_left_boundary_count < 2 ?
@@ -142,14 +144,23 @@ std::string Log2Histogram::ToString() {
                               max_right_boundary_count +
                               4) +
                   "s | %" + StringifyUint(max_value_count + 4) +
-                  "s | %" + StringifyUint(max_stars) + "s |\n";
+                  "s | %" + StringifyUint(max_stars < 12 ? 12 : max_stars) +
+                  "s |\n";
 
   std::string overflow_format = "%" +
                   StringifyUint(max_left_boundary_count +
                               max_right_boundary_count +
                               5) +
                   "s : %" + StringifyUint(max_value_count + 4) +
-                  "d | %" + StringifyUint(max_stars) + "s |\n";
+                  "d | %" + StringifyUint(max_stars < 12 ? 12 : max_stars) +
+                  "s |\n";
+
+  std::string total_format = "%" +
+                  StringifyUint(max_left_boundary_count +
+                              max_right_boundary_count +
+                              5 < 8 ? 8 : max_left_boundary_count +
+                              max_right_boundary_count + 5) +
+                  "s : %" + StringifyUint(max_value_count + 4) + "lld\n";
 
   std::string result_string = "";
 
@@ -160,16 +171,19 @@ std::string Log2Histogram::ToString() {
   snprintf(buffer,
       kBufSize,
       title_format.c_str(),
-      "usec",
+      "nsec",
       "count",
       "distribution");
   result_string += buffer;
   memset(buffer, 0, sizeof(buffer));
 
   for (i = 1; i <= this->bins_.size() - 1; i++) {
-    unsigned int n_of_stars = (unsigned int)
-                              atomic_read32(&(this->bins_[i])) *
+    unsigned int n_of_stars = 0;
+    if (total_sum_of_bins != 0) {
+      n_of_stars = (unsigned int) atomic_read32(&(this->bins_[i])) *
                               total_stars / total_sum_of_bins;
+    }
+
     snprintf(buffer,
             kBufSize,
             format.c_str(),
@@ -181,15 +195,26 @@ std::string Log2Histogram::ToString() {
     memset(buffer, 0, sizeof(buffer));
   }
 
-  unsigned int n_of_stars = (unsigned int)
-                              atomic_read32(&(this->bins_[0])) *
-                              total_stars / total_sum_of_bins;
+  unsigned int n_of_stars = 0;
+  if (total_sum_of_bins != 0) {
+    n_of_stars = (unsigned int) atomic_read32(&(this->bins_[0])) *
+                            total_stars / total_sum_of_bins;
+  }
+
   snprintf(buffer,
           kBufSize,
           overflow_format.c_str(),
           "overflow",
           (unsigned int)atomic_read32(&(this->bins_[0])),
           GenerateStars(n_of_stars).c_str());
+  result_string += buffer;
+  memset(buffer, 0, sizeof(buffer));
+
+  snprintf(buffer,
+          kBufSize,
+          total_format.c_str(),
+          "total",
+          total_sum_of_bins);
   result_string += buffer;
   memset(buffer, 0, sizeof(buffer));
 

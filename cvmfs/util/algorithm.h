@@ -14,6 +14,7 @@
 #include "atomic.h"
 #include "murmur.h"
 // TODO(jblomer): should be also part of algorithm
+#include "platform.h"
 #include "prng.h"
 #include "util/single_copy.h"
 
@@ -106,6 +107,7 @@ class StopWatch : SingleCopy {
   timeval start_, end_;
 };
 
+
 /**
  * Log2Histogram is a simple implementation of 
  * log2 histogram data structure which stores 
@@ -157,6 +159,23 @@ friend class UTLog2Histogram;
 class UTLog2Histogram {
  public:
   std::vector<atomic_int32> GetBins(const Log2Histogram &h);
+};
+
+
+class HighPrecisionTimer : SingleCopy {
+ public:
+  explicit HighPrecisionTimer(Log2Histogram *recorder)
+    : timestamp_start_(platform_monotonic_time_ns())
+    , recorder_(recorder)
+  { }
+
+  ~HighPrecisionTimer() {
+    recorder_->Add(platform_monotonic_time_ns() - timestamp_start_);
+  }
+
+ private:
+  uint64_t timestamp_start_;
+  Log2Histogram *recorder_;
 };
 
 #ifdef CVMFS_NAMESPACE_GUARD
