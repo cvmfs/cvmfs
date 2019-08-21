@@ -216,6 +216,13 @@ void FileSystem::CreateStatistics() {
   no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
                   "Number of currently opened directories");
 
+  string optarg;
+  if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    HighPrecisionTimer::g_is_enabled = true;
+  }
+
   hist_fs_lookup_ = new Log2Histogram(30);
   hist_fs_forget_ = new Log2Histogram(30);
   hist_fs_getattr_ = new Log2Histogram(30);
