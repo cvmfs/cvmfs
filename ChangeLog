@@ -1,4 +1,6 @@
 2.7.0:
+  * Add fuse callback performance instrumentation through new switch 
+    CVMFS_INSTRUMENT_FUSE (CVM-1770)
   * Add S3 standalone benchmark utility along with -DCVMFS_STRESS_TESTS build
     option (CVM-1749)
   * Explicitly specify python2 in webapi/cvmfs-api.py shebang
