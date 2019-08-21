@@ -20,6 +20,7 @@
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "loader.h"
+#include "util/algorithm.h"
 #include "util/pointer.h"
 
 class AuthzAttachment;
@@ -171,6 +172,17 @@ class FileSystem : SingleCopy, public BootFactory {
   std::string cache_mgr_instance() { return cache_mgr_instance_; }
   std::string exe_path() { return exe_path_; }
   bool found_previous_crash() { return found_previous_crash_; }
+  Log2Histogram *hist_fs_lookup() { return hist_fs_lookup_; }
+  Log2Histogram *hist_fs_forget() { return hist_fs_forget_; }
+  Log2Histogram *hist_fs_getattr() { return hist_fs_getattr_; }
+  Log2Histogram *hist_fs_readlink() { return hist_fs_readlink_; }
+  Log2Histogram *hist_fs_opendir() { return hist_fs_opendir_; }
+  Log2Histogram *hist_fs_releasedir() { return hist_fs_releasedir_; }
+  Log2Histogram *hist_fs_readdir() { return hist_fs_readdir_; }
+  Log2Histogram *hist_fs_open() { return hist_fs_open_; }
+  Log2Histogram *hist_fs_read() { return hist_fs_read_; }
+  Log2Histogram *hist_fs_release() { return hist_fs_release_; }
+
   perf::Counter *n_fs_dir_open() { return n_fs_dir_open_; }
   perf::Counter *n_fs_forget() { return n_fs_forget_; }
   perf::Counter *n_fs_lookup() { return n_fs_lookup_; }
@@ -279,6 +291,17 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *no_open_files_;
   perf::Counter *no_open_dirs_;
   perf::Statistics *statistics_;
+
+  Log2Histogram *hist_fs_lookup_;
+  Log2Histogram *hist_fs_forget_;
+  Log2Histogram *hist_fs_getattr_;
+  Log2Histogram *hist_fs_readlink_;
+  Log2Histogram *hist_fs_opendir_;
+  Log2Histogram *hist_fs_releasedir_;
+  Log2Histogram *hist_fs_readdir_;
+  Log2Histogram *hist_fs_open_;
+  Log2Histogram *hist_fs_read_;
+  Log2Histogram *hist_fs_release_;
 
   /**
    * A writeable local directory.  Only small amounts of data (few bytes) will

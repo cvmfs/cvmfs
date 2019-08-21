@@ -215,6 +215,24 @@ void FileSystem::CreateStatistics() {
                                          "Number of currently opened files");
   no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
                   "Number of currently opened directories");
+
+  string optarg;
+  if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    HighPrecisionTimer::g_is_enabled = true;
+  }
+
+  hist_fs_lookup_ = new Log2Histogram(30);
+  hist_fs_forget_ = new Log2Histogram(30);
+  hist_fs_getattr_ = new Log2Histogram(30);
+  hist_fs_readlink_ = new Log2Histogram(30);
+  hist_fs_opendir_ = new Log2Histogram(30);
+  hist_fs_releasedir_ = new Log2Histogram(30);
+  hist_fs_readdir_ = new Log2Histogram(30);
+  hist_fs_open_ = new Log2Histogram(30);
+  hist_fs_read_ = new Log2Histogram(30);
+  hist_fs_release_ = new Log2Histogram(30);
 }
 
 
@@ -389,6 +407,16 @@ FileSystem::~FileSystem() {
   sqlite3_shutdown();
   SqliteMemoryManager::CleanupInstance();
 
+  delete hist_fs_lookup_;
+  delete hist_fs_forget_;
+  delete hist_fs_getattr_;
+  delete hist_fs_readlink_;
+  delete hist_fs_opendir_;
+  delete hist_fs_releasedir_;
+  delete hist_fs_readdir_;
+  delete hist_fs_open_;
+  delete hist_fs_read_;
+  delete hist_fs_release_;
   delete statistics_;
 
   SetLogSyslogPrefix("");

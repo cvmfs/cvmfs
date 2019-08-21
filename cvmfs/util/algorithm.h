@@ -14,6 +14,7 @@
 #include "atomic.h"
 #include "murmur.h"
 // TODO(jblomer): should be also part of algorithm
+#include "platform.h"
 #include "prng.h"
 #include "util/single_copy.h"
 
@@ -106,13 +107,14 @@ class StopWatch : SingleCopy {
   timeval start_, end_;
 };
 
+
 /**
- * Log2Histogram is a simple implementation of 
- * log2 histogram data structure which stores 
+ * Log2Histogram is a simple implementation of
+ * log2 histogram data structure which stores
  * and prints log2 histogram. It is used for
- * getting and printing latency metrics of 
+ * getting and printing latency metrics of
  * CVMFS fuse calls.
- * 
+ *
  * Log2Histogram hist(2);
  * hist.Add(1);
  * hist.Add(2);
@@ -157,6 +159,26 @@ friend class UTLog2Histogram;
 class UTLog2Histogram {
  public:
   std::vector<atomic_int32> GetBins(const Log2Histogram &h);
+};
+
+
+class HighPrecisionTimer : SingleCopy {
+ public:
+  static bool g_is_enabled;  // false by default
+
+  explicit HighPrecisionTimer(Log2Histogram *recorder)
+    : timestamp_start_(g_is_enabled ? platform_monotonic_time_ns() : 0)
+    , recorder_(recorder)
+  { }
+
+  ~HighPrecisionTimer() {
+    if (g_is_enabled)
+      recorder_->Add(platform_monotonic_time_ns() - timestamp_start_);
+  }
+
+ private:
+  uint64_t timestamp_start_;
+  Log2Histogram *recorder_;
 };
 
 #ifdef CVMFS_NAMESPACE_GUARD

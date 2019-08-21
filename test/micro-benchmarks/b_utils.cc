@@ -6,6 +6,7 @@
 
 #include "bm_util.h"
 #include "platform.h"
+#include "util/algorithm.h"
 
 class BM_Utils : public benchmark::Fixture {
  protected:
@@ -23,5 +24,33 @@ BENCHMARK_DEFINE_F(BM_Utils, GetPreciseTime)(benchmark::State &st) {
   st.SetItemsProcessed(st.iterations());
 }
 BENCHMARK_REGISTER_F(BM_Utils, GetPreciseTime)->Repetitions(3)->
+  UseRealTime();
+
+
+BENCHMARK_DEFINE_F(BM_Utils, HighPrecisionTimer)(benchmark::State &st) {
+  HighPrecisionTimer::g_is_enabled = true;
+  Log2Histogram recorder(30);
+  while (st.KeepRunning()) {
+    {
+      HighPrecisionTimer timer(&recorder);
+    }
+  }
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Utils, HighPrecisionTimer)->Repetitions(3)->
+  UseRealTime();
+
+
+BENCHMARK_DEFINE_F(BM_Utils, HighPrecisionTimerIdle)(benchmark::State &st) {
+  HighPrecisionTimer::g_is_enabled = false;
+  Log2Histogram recorder(30);
+  while (st.KeepRunning()) {
+    {
+      HighPrecisionTimer timer(&recorder);
+    }
+  }
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Utils, HighPrecisionTimerIdle)->Repetitions(3)->
   UseRealTime();
 
