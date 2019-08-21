@@ -44,10 +44,10 @@ BENCHMARK_DEFINE_F(BM_Messaging, CacheHandshake)(benchmark::State &st) {
                                  &socket_size);
       assert(fd_connection >= 0);
       CacheTransport transport(fd_connection);
-      char buffer[st.range_x()];
+      char buffer[st.range(0)];
       while (true) {
         CacheTransport::Frame frame_recv;
-        frame_recv.set_attachment(buffer, st.range_x());
+        frame_recv.set_attachment(buffer, st.range(0));
         retval = transport.RecvFrame(&frame_recv);
         assert(retval);
         google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
@@ -76,12 +76,12 @@ BENCHMARK_DEFINE_F(BM_Messaging, CacheHandshake)(benchmark::State &st) {
   assert(fd_client >= 0);
   CacheTransport transport(fd_client);
 
-  char buffer[st.range_x()];
+  char buffer[st.range(0)];
   while (st.KeepRunning()) {
     cvmfs::MsgHandshake msg_handshake;
     msg_handshake.set_protocol_version(1);
     CacheTransport::Frame frame_send(&msg_handshake);
-    frame_send.set_attachment(buffer, st.range_x());
+    frame_send.set_attachment(buffer, st.range(0));
     transport.SendFrame(&frame_send);
 
     CacheTransport::Frame frame_recv;
@@ -94,7 +94,7 @@ BENCHMARK_DEFINE_F(BM_Messaging, CacheHandshake)(benchmark::State &st) {
     assert(msg_ack->session_id() == 42);
   }
   st.SetItemsProcessed(st.iterations());
-  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range_x()));
+  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range(0)));
 
   cvmfs::MsgQuit msg_quit;
   msg_quit.set_session_id(42);

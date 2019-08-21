@@ -22,7 +22,7 @@ class BM_Compression : public benchmark::Fixture {
 
 
 BENCHMARK_DEFINE_F(BM_Compression, Zlib)(benchmark::State &st) {
-  unsigned size = st.range_x();
+  unsigned size = st.range(0);
   unsigned char buffer[size];
   while (st.KeepRunning()) {
     void *out_buf;

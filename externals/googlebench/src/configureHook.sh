@@ -7,11 +7,12 @@ if [ ! -f CMakeLists.txt ]; then
   git init
   git remote add origin https://github.com/google/benchmark.git
   git fetch
-  git checkout 2149577f892116d4080d16fbf0b0455b1026b219
+  git checkout 090faecb454fbd6e6e17a75ef8146acb037118d4
 fi
 
 CVMFS_PATCHED_CXXFLAGS="$CVMFS_BASE_CXX_FLAGS -fexceptions"
 
 CXXFLAGS="$CXXFLAGS $CVMFS_PATCHED_CXXFLAGS" cmake -DCMAKE_BUILD_TYPE=Release \
+  -DBENCHMARK_ENABLE_GTEST_TESTS=off \
   -DCMAKE_INSTALL_PREFIX=$EXTERNALS_INSTALL_LOCATION .
 

@@ -52,7 +52,7 @@ BENCHMARK_REGISTER_F(BM_Syscalls, Stat)->Repetitions(3)->
 
 BENCHMARK_DEFINE_F(BM_Syscalls, Read)(benchmark::State &st) {
   int fd = open("/dev/zero", O_RDONLY);
-  unsigned size = st.range_x();
+  unsigned size = st.range(0);
   char *buf[size];
   assert(fd >= 0);
 
@@ -135,7 +135,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, InprocPipe)(benchmark::State &st) {
   int retval =
     pthread_create(&thread_reader, NULL, MainPipeReader, &pipe_test[0]);
   assert(retval == 0);
-  char data_buf[st.range_x()];
+  char data_buf[st.range(0)];
 
   while (st.KeepRunning()) {
     WritePipe(pipe_test[1], data_buf, sizeof(data_buf));
@@ -156,7 +156,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Pipe)(benchmark::State &st) {
   int pipe_cmd[2];
   int pipe_data[2];
   char cmd_buf[100];
-  char data_buf[st.range_x()];
+  char data_buf[st.range(0)];
 
   MakePipe(pipe_cmd);
   MakePipe(pipe_data);
@@ -183,7 +183,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Pipe)(benchmark::State &st) {
     ClobberMemory();
   }
   st.SetItemsProcessed(st.iterations());
-  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range_x()));
+  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range(0)));
 
 
   close(pipe_data[0]);
@@ -199,7 +199,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Socket)(benchmark::State &st) {
   int sock_cmd[2];
   int sock_data[2];
   char cmd_buf[100];
-  char data_buf[st.range_x()];
+  char data_buf[st.range(0)];
 
   rc = socketpair(AF_UNIX, SOCK_STREAM, 0, sock_cmd);
   assert(rc == 0);
@@ -228,7 +228,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Socket)(benchmark::State &st) {
     ClobberMemory();
   }
   st.SetItemsProcessed(st.iterations());
-  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range_x()));
+  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range(0)));
 
 
   close(sock_data[0]);
@@ -244,14 +244,14 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFd)(benchmark::State &st) {
   int sock_cmd[2];
   int sock_data[2];
   char cmd_buf[100];
-  char data_buf[st.range_x()];
+  char data_buf[st.range(0)];
 
   const char *shm_path = "/cvmfs_socketfd.test";
   int memfd = shm_open(shm_path, O_RDWR|O_CREAT|O_TRUNC, 0666);
   assert(memfd >= 0);
   rc = shm_unlink(shm_path);
   assert(rc == 0);
-  rc = ftruncate(memfd, st.range_x());
+  rc = ftruncate(memfd, st.range(0));
   assert(rc == 0);
 
   rc = socketpair(SOL_SOCKET, SOCK_STREAM, 0, sock_cmd);
@@ -327,16 +327,16 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFd)(benchmark::State &st) {
       }
     }
     assert(cmsg);
-    void *mapped_buf = mmap(NULL, st.range_x(), PROT_READ,
+    void *mapped_buf = mmap(NULL, st.range(0), PROT_READ,
                             MAP_PRIVATE, memfd, 0);
     assert(mapped_buf != MAP_FAILED);
     close(memfd);
-    memcpy(data_buf, mapped_buf, st.range_x());
-    munmap(mapped_buf, st.range_x());
+    memcpy(data_buf, mapped_buf, st.range(0));
+    munmap(mapped_buf, st.range(0));
     ClobberMemory();
   }
   st.SetItemsProcessed(st.iterations());
-  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range_x()));
+  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range(0)));
 
 
   close(sock_data[0]);
@@ -353,14 +353,14 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFdRead)(benchmark::State &st) {
   int sock_cmd[2];
   int sock_data[2];
   char cmd_buf[100];
-  char data_buf[st.range_x()];
+  char data_buf[st.range(0)];
 
   const char *shm_path = "/cvmfs_socketfd.test";
   int memfd = shm_open(shm_path, O_RDWR|O_CREAT|O_TRUNC, 0666);
   assert(memfd >= 0);
   rc = shm_unlink(shm_path);
   assert(rc == 0);
-  rc = ftruncate(memfd, st.range_x());
+  rc = ftruncate(memfd, st.range(0));
   assert(rc == 0);
 
   rc = socketpair(SOL_SOCKET, SOCK_STREAM, 0, sock_cmd);
@@ -441,7 +441,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFdRead)(benchmark::State &st) {
     ClobberMemory();
   }
   st.SetItemsProcessed(st.iterations());
-  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range_x()));
+  st.SetBytesProcessed(int64_t(st.iterations()) * int64_t(st.range(0)));
 
 
   close(sock_data[0]);

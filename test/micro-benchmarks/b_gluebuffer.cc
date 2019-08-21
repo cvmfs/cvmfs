@@ -99,7 +99,7 @@ BENCHMARK_REGISTER_F(BM_InodeTracker, GetPut)->Repetitions(3);
 
 
 BENCHMARK_DEFINE_F(BM_InodeTracker, FindPath)(benchmark::State &st) {
-  unsigned size = st.range_x();
+  unsigned size = st.range(0);
   for (unsigned i = 0; i < size; ++i)
     inode_tracker_->VfsGet(inodes_[i], paths_[i]);
 
@@ -118,7 +118,7 @@ BENCHMARK_REGISTER_F(BM_InodeTracker, FindPath)->Repetitions(3)->Arg(10000);
 
 
 BENCHMARK_DEFINE_F(BM_InodeTracker, FindInode)(benchmark::State &st) {
-  unsigned size = st.range_x();
+  unsigned size = st.range(0);
   for (unsigned i = 0; i < size; ++i)
     inode_tracker_->VfsGet(inodes_[i], paths_[i]);
 
