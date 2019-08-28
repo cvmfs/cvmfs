@@ -953,6 +953,34 @@ TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
   EXPECT_EQ(host.ipv6_addresses(), expected_ipv6);
 }
 
+TEST_F(T_Dns, HostfileResolverBlankLines) {
+  CreateHostfile("   \n  #comment\n127.0.0.1 localhost\n\n");
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(kFailOk, host.status());
+  set<string> expected_ipv4;
+  expected_ipv4.insert("127.0.0.1");
+  EXPECT_EQ(host.ipv4_addresses(), expected_ipv4);
+}
+
+TEST_F(T_Dns, HostfileResolverTooLong) {
+  string long_host = "localhost.localhost.localhost.localhost.localhost"
+                 ".localhost.localhost.localhost.localhost.localhost.localhost"
+                 ".localhost.localhost.localhost.localhost.localhost.localhost"
+                 ".localhost.localhost.localhost.localhost.localhost.localhost"
+                 ".localhost.localhost.localhost.localhost.localhost.localhost";
+  CreateHostfile(string("ABCD:ABCD:ABCD:ABCD:ABCD:ABCD:192.168.158.1901 "
+                 "localhost\n127.0.0.2 ") + long_host + "\n");
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(kFailUnknownHost, host.status());
+  EXPECT_EQ(host.ipv4_addresses().size(), (unsigned) 0);
+  EXPECT_EQ(host.ipv6_addresses().size(), (unsigned) 0);
+
+  host = hostfile_resolver->Resolve(long_host);
+  EXPECT_EQ(kFailUnknownHost, host.status());
+  EXPECT_EQ(host.ipv4_addresses().size(), (unsigned) 0);
+  EXPECT_EQ(host.ipv6_addresses().size(), (unsigned) 0);
+}
+
 
 TEST_F(T_Dns, NormalResolverConstruct) {
   UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
