@@ -14,6 +14,7 @@
 
 #include "swissknife_check.h"
 #include "swissknife_diff.h"
+#include "swissknife_filestats.h"
 #include "swissknife_gc.h"
 #include "swissknife_graft.h"
 #include "swissknife_hash.h"
@@ -107,6 +108,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandLease());
   command_list.push_back(new swissknife::Ingest());
   command_list.push_back(new swissknife::CommandNotify());
+  command_list.push_back(new swissknife::CommandFileStats());
 
   if (argc < 2) {
     Usage();
