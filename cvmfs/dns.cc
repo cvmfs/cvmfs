@@ -1163,8 +1163,8 @@ void HostfileResolver::ParseHostFile() {
       continue;
     if (ip_end_pos - ip_start_pos > kIpMaxLength) {
       LogCvmfs(kLogDns, kLogSyslogWarn,
-        string("Skipping line in hosts file due to invalid IP address format: "
-        + line).c_str());
+        "Skipping line in hosts file due to invalid IP address format: %s",
+        line.c_str());
       continue;
     }
 
@@ -1189,8 +1189,8 @@ void HostfileResolver::ParseHostFile() {
 
       if (hostname_end_pos - hostname_start_pos > kHostnameMaxLength) {
         LogCvmfs(kLogDns, kLogSyslogWarn,
-          string("Skipping invalid (too long) hostname in hosts file on line: "
-          + line).c_str());
+          "Skipping invalid (too long) hostname in hosts file on line: %s",
+          line.c_str());
         str_offset += hostname_end_pos;
         continue;
       }
