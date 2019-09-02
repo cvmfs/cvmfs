@@ -11,8 +11,10 @@
 #include <cstdio>
 #include <ctime>
 #include <string>
+#include <vector>
 
 #include "dns.h"
+#include "logging.h"
 #include "platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -61,6 +63,28 @@ class T_Dns : public ::testing::Test {
     fflush(fhostfile);
   }
 
+  struct LogMessage {
+    LogSource source;
+    int mask;
+    string message;
+
+    explicit LogMessage(LogSource source, int mask, string message) {
+      this->source = source;
+      this->mask = mask;
+      this->message = message;
+    }
+    bool operator==(const LogMessage &other) const {
+      return (source == other.source) &&
+            (mask == other.mask) &&
+            (message == other.message);
+    }
+  };
+
+  static void TDnsAltLogFunc(LogSource source, int mask, const char *msg) {
+    logMessages.push_back(LogMessage(source, mask, msg));
+  }
+  static vector<LogMessage> logMessages;
+
   CaresResolver *default_resolver;
   CaresResolver *ipv4_resolver;
   HostfileResolver *hostfile_resolver;
@@ -68,6 +92,7 @@ class T_Dns : public ::testing::Test {
   string hostfile;
 };
 
+vector<T_Dns::LogMessage> T_Dns::logMessages;
 
 class DummyResolver : public Resolver {
  public:
@@ -963,6 +988,7 @@ TEST_F(T_Dns, HostfileResolverBlankLines) {
 }
 
 TEST_F(T_Dns, HostfileResolverTooLong) {
+  SetAltLogFunc(TDnsAltLogFunc);
   string long_host = "localhost.localhost.localhost.localhost.localhost"
                  ".localhost.localhost.localhost.localhost.localhost.localhost"
                  ".localhost.localhost.localhost.localhost.localhost.localhost"
@@ -979,6 +1005,34 @@ TEST_F(T_Dns, HostfileResolverTooLong) {
   EXPECT_EQ(kFailUnknownHost, host.status());
   EXPECT_EQ(host.ipv4_addresses().size(), (unsigned) 0);
   EXPECT_EQ(host.ipv6_addresses().size(), (unsigned) 0);
+
+  vector<LogMessage>::iterator it;
+  LogMessage message_long_ip = LogMessage(kLogDns, kLogSyslogWarn,
+    "Skipping line in hosts file due to invalid IP address format: "
+    "ABCD:ABCD:ABCD:ABCD:ABCD:ABCD:192.168.158.1901 localhost");
+  it = find(logMessages.begin(), logMessages.end(), message_long_ip);
+  EXPECT_NE(it, logMessages.end());
+
+  LogMessage message_long_host = LogMessage(kLogDns, kLogSyslogWarn,
+    "Skipping invalid (too long) hostname in hosts file on line: 127.0.0.2 "
+    + long_host);
+  it = find(logMessages.begin(), logMessages.end(), message_long_host);
+  EXPECT_NE(it, logMessages.end());
+}
+
+TEST_F(T_Dns, HostfileResolverBadFormat) {
+  SetAltLogFunc(TDnsAltLogFunc);
+  CreateHostfile("127.0.0.1\nlocalhost localhost2\n");
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(kFailUnknownHost, host.status());
+  host = hostfile_resolver->Resolve("localhost2");
+  EXPECT_EQ(kFailNoAddress, host.status());
+
+  vector<LogMessage>::iterator it;
+  LogMessage message_bad_ip = LogMessage(kLogDns, kLogDebug | kLogSyslogWarn,
+    "host name localhost2 resolves to invalid IPv6 address localhost");
+  it = find(logMessages.begin(), logMessages.end(), message_bad_ip);
+  EXPECT_NE(it, logMessages.end());
 }
 
 
