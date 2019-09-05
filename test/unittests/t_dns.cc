@@ -1018,6 +1018,7 @@ TEST_F(T_Dns, HostfileResolverTooLong) {
     + long_host);
   it = find(logMessages.begin(), logMessages.end(), message_long_host);
   EXPECT_NE(it, logMessages.end());
+  SetAltLogFunc(NULL);
 }
 
 TEST_F(T_Dns, HostfileResolverBadFormat) {
@@ -1033,6 +1034,7 @@ TEST_F(T_Dns, HostfileResolverBadFormat) {
     "host name localhost2 resolves to invalid IPv6 address localhost");
   it = find(logMessages.begin(), logMessages.end(), message_bad_ip);
   EXPECT_NE(it, logMessages.end());
+  SetAltLogFunc(NULL);
 }
 
 
