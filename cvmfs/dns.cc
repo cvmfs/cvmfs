@@ -1145,7 +1145,7 @@ void HostfileResolver::ParseHostFile() {
   while (GetLineFile(fhosts_, &line)) {
     char address[kIpMaxLength + 1];
     char hostname[kHostnameMaxLength + 1];
-    int bytes_read = 0;
+    int bytes_read;
     size_t str_offset = 0;
 
     // strip comments
@@ -1153,36 +1153,53 @@ void HostfileResolver::ParseHostFile() {
     if (hash_pos != string::npos) line = line.substr(0, hash_pos);
 
     // First token is an IP address
-    int ip_start_pos, ip_end_pos;
-    sscanf(line.c_str(), " %n%*s%n", &ip_start_pos, &ip_end_pos);
+    int ip_start_pos = -1, ip_end_pos = -1, scan_result;
+    scan_result = sscanf(line.c_str(), " %n%*s%n", &ip_start_pos, &ip_end_pos);
+    if (scan_result == EOF)
+      continue;
+    assert(ip_start_pos != -1);
+    assert(ip_end_pos != -1);
     if (ip_start_pos == ip_end_pos)
       continue;
     if (ip_end_pos - ip_start_pos > kIpMaxLength) {
       LogCvmfs(kLogDns, kLogSyslogWarn,
-               "Skipping line in hosts file due to invalid IP address format");
+        "Skipping line in hosts file due to invalid IP address format: %s",
+        line.c_str());
       continue;
     }
 
-    sscanf(line.c_str(), " %s%n", address, &bytes_read);
+    bytes_read = -1;
+    scan_result = sscanf(line.c_str(), " %s%n", address, &bytes_read);
+    assert(scan_result == 1);
+    assert(bytes_read != -1);
     str_offset += bytes_read;
 
     // Next tokens are hostnames and aliases (we treat them as equal)
     while (str_offset < line.length()) {
-      int hostname_start_pos, hostname_end_pos;
-      sscanf(line.c_str() + str_offset, " %n%*s%n",  // check hostname length
-             &hostname_start_pos, &hostname_end_pos);
-      if (hostname_start_pos == hostname_end_pos) {
-        str_offset += hostname_end_pos;
-        continue;
-      }
+      // check hostname length
+      int hostname_start_pos = -1, hostname_end_pos = -1;
+      scan_result = sscanf(line.c_str() + str_offset, " %n%*s%n",
+                           &hostname_start_pos, &hostname_end_pos);
+      if (scan_result == EOF)
+        break;
+      assert(hostname_start_pos != -1);
+      assert(hostname_end_pos != -1);
+      if (hostname_start_pos == hostname_end_pos)
+        break;
+
       if (hostname_end_pos - hostname_start_pos > kHostnameMaxLength) {
         LogCvmfs(kLogDns, kLogSyslogWarn,
-                 "Skipping invalid (too long) hostname in hosts file");
+          "Skipping invalid (too long) hostname in hosts file on line: %s",
+          line.c_str());
         str_offset += hostname_end_pos;
         continue;
       }
 
-      sscanf(line.c_str() + str_offset, " %s%n", hostname, &bytes_read);
+      bytes_read = -1;
+      scan_result = sscanf(line.c_str() + str_offset, " %s%n", hostname,
+                           &bytes_read);
+      assert(scan_result == 1);
+      assert(bytes_read != -1);
       str_offset += bytes_read;
 
       if (hostname[strlen(hostname)-1] == '.')

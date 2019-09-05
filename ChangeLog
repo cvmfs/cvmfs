@@ -13,6 +13,7 @@
     (CVM-1710, CVM-1744)
 
 2.6.3:
+  * Fix parsing of /etc/hosts (CVM-1796, CVM-1797)
 
 2.6.2:
   * Fix reload if config repository is set but unmountable (CVM-1795)
