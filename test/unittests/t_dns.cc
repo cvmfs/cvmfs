@@ -57,9 +57,10 @@ class T_Dns : public ::testing::Test {
     int retval = ftruncate(fileno(fhostfile), 0);
     rewind(fhostfile);
     ASSERT_EQ(0, retval);
-    int num = fprintf(fhostfile, "%s", content.c_str());
-    ASSERT_LT(0, num);
-    ASSERT_EQ(unsigned(num), content.length());
+    for (unsigned i = 0; i < content.length(); ++i) {
+      int nbytes = fprintf(fhostfile, "%c", content[i]);
+      ASSERT_EQ(1, nbytes);
+    }
     fflush(fhostfile);
   }
 
@@ -81,9 +82,9 @@ class T_Dns : public ::testing::Test {
   };
 
   static void TDnsAltLogFunc(LogSource source, int mask, const char *msg) {
-    logMessages.push_back(LogMessage(source, mask, msg));
+    g_log_messages.push_back(LogMessage(source, mask, msg));
   }
-  static vector<LogMessage> logMessages;
+  static vector<LogMessage> g_log_messages;
 
   CaresResolver *default_resolver;
   CaresResolver *ipv4_resolver;
@@ -92,7 +93,7 @@ class T_Dns : public ::testing::Test {
   string hostfile;
 };
 
-vector<T_Dns::LogMessage> T_Dns::logMessages;
+vector<T_Dns::LogMessage> T_Dns::g_log_messages;
 
 class DummyResolver : public Resolver {
  public:
@@ -948,8 +949,8 @@ TEST_F(T_Dns, HostfileResolverComment) {
 
 
 TEST_F(T_Dns, HostfileResolverWhitespace) {
-  CreateHostfile("127.0.0.1 localhost\n\n\n  127.0.0.2 localhost2\n"
-                 "127.0.0.3   localhost3   ");
+  CreateHostfile("127.0.0.1 localhost\n\n\n  127.0.0.2\tlocalhost2\n"
+                 "127.0.0.3   \tlocalhost3\t   ");
   Host host = hostfile_resolver->Resolve("localhost");
   EXPECT_EQ(kFailOk, host.status());
   ExpectResolvedName(host, "localhost", "127.0.0.1", "");
@@ -974,17 +975,21 @@ TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
   expected_ipv6.insert("[::1]");
   expected_ipv6.insert("[::2]");
   EXPECT_EQ(kFailOk, host.status());
-  EXPECT_EQ(host.ipv4_addresses(), expected_ipv4);
-  EXPECT_EQ(host.ipv6_addresses(), expected_ipv6);
+  EXPECT_EQ(expected_ipv4, host.ipv4_addresses());
+  EXPECT_EQ(expected_ipv6, host.ipv6_addresses());
 }
 
 TEST_F(T_Dns, HostfileResolverBlankLines) {
-  CreateHostfile("   \n  #comment\n127.0.0.1 localhost\n\n");
+  g_log_messages.clear();
+  SetAltLogFunc(TDnsAltLogFunc);
+  CreateHostfile("   \n  #comment\n\n\n127.0.0.1 localhost\n\n");
   Host host = hostfile_resolver->Resolve("localhost");
   EXPECT_EQ(kFailOk, host.status());
   set<string> expected_ipv4;
   expected_ipv4.insert("127.0.0.1");
-  EXPECT_EQ(host.ipv4_addresses(), expected_ipv4);
+  EXPECT_EQ(expected_ipv4, host.ipv4_addresses());
+  EXPECT_EQ(0U, g_log_messages.size());
+  SetAltLogFunc(NULL);
 }
 
 TEST_F(T_Dns, HostfileResolverTooLong) {
@@ -998,42 +1003,52 @@ TEST_F(T_Dns, HostfileResolverTooLong) {
                  "localhost\n127.0.0.2 ") + long_host + "\n");
   Host host = hostfile_resolver->Resolve("localhost");
   EXPECT_EQ(kFailUnknownHost, host.status());
-  EXPECT_EQ(host.ipv4_addresses().size(), (unsigned) 0);
-  EXPECT_EQ(host.ipv6_addresses().size(), (unsigned) 0);
+  EXPECT_EQ(0U, host.ipv4_addresses().size());
+  EXPECT_EQ(0U, host.ipv6_addresses().size());
 
   host = hostfile_resolver->Resolve(long_host);
   EXPECT_EQ(kFailUnknownHost, host.status());
-  EXPECT_EQ(host.ipv4_addresses().size(), (unsigned) 0);
-  EXPECT_EQ(host.ipv6_addresses().size(), (unsigned) 0);
+  EXPECT_EQ(0U, host.ipv4_addresses().size());
+  EXPECT_EQ(0U, host.ipv6_addresses().size());
 
   vector<LogMessage>::iterator it;
   LogMessage message_long_ip = LogMessage(kLogDns, kLogSyslogWarn,
     "Skipping line in hosts file due to invalid IP address format: "
     "ABCD:ABCD:ABCD:ABCD:ABCD:ABCD:192.168.158.1901 localhost");
-  it = find(logMessages.begin(), logMessages.end(), message_long_ip);
-  EXPECT_NE(it, logMessages.end());
+  it = find(g_log_messages.begin(), g_log_messages.end(), message_long_ip);
+  EXPECT_NE(it, g_log_messages.end());
 
   LogMessage message_long_host = LogMessage(kLogDns, kLogSyslogWarn,
     "Skipping invalid (too long) hostname in hosts file on line: 127.0.0.2 "
     + long_host);
-  it = find(logMessages.begin(), logMessages.end(), message_long_host);
-  EXPECT_NE(it, logMessages.end());
+  it = find(g_log_messages.begin(), g_log_messages.end(), message_long_host);
+  EXPECT_NE(it, g_log_messages.end());
   SetAltLogFunc(NULL);
 }
 
 TEST_F(T_Dns, HostfileResolverBadFormat) {
   SetAltLogFunc(TDnsAltLogFunc);
-  CreateHostfile("127.0.0.1\nlocalhost localhost2\n");
+  std::string silly_hostname = "foo";
+  // Parsing stops at null character
+  silly_hostname.push_back('\0');
+  silly_hostname += "bar";
+  std::string host_content =
+    "127.0.0.1\nlocalhost localhost2\n127.0.0.2 " + silly_hostname;
+  CreateHostfile(host_content);
   Host host = hostfile_resolver->Resolve("localhost");
   EXPECT_EQ(kFailUnknownHost, host.status());
   host = hostfile_resolver->Resolve("localhost2");
   EXPECT_EQ(kFailNoAddress, host.status());
+  host = hostfile_resolver->Resolve(silly_hostname);
+  EXPECT_EQ(kFailUnknownHost, host.status());
+  host = hostfile_resolver->Resolve("foo");
+  EXPECT_EQ(kFailOk, host.status());
 
   vector<LogMessage>::iterator it;
   LogMessage message_bad_ip = LogMessage(kLogDns, kLogDebug | kLogSyslogWarn,
     "host name localhost2 resolves to invalid IPv6 address localhost");
-  it = find(logMessages.begin(), logMessages.end(), message_bad_ip);
-  EXPECT_NE(it, logMessages.end());
+  it = find(g_log_messages.begin(), g_log_messages.end(), message_bad_ip);
+  EXPECT_NE(it, g_log_messages.end());
   SetAltLogFunc(NULL);
 }
 
