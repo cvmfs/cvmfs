@@ -37,6 +37,7 @@ class Parser:
         self.warm_cache = False
         self.repository = ""
         self.current_timestamp = timestamp.replace(microsecond=0).isoformat()
+        self.seen_header = False
         if filename is not None:
             self.parse(filename)
 
@@ -53,13 +54,17 @@ class Parser:
             elif parameter[0] == "repo":
                 self.repository = parameter[1].split(".")[0]
         else:
-            params = line.strip().split("|")
-            if len(params) == 3:
-                counter = Counter(params[0], params[1], params[2])
-                if counter.name in self.counters:
-                    self.counters[counter.name].values += counter.values
-                else:
-                    self.counters[counter.name] = counter
+            # Parse only lines which come after the header line
+            if self.seen_header:
+                params = line.strip().split("|")
+                if len(params) == 3:
+                    counter = Counter(params[0], params[1], params[2])
+                    if counter.name in self.counters:
+                        self.counters[counter.name].values += counter.values
+                    else:
+                        self.counters[counter.name] = counter
+            elif line.strip() == "Name|Value|Description":
+                self.seen_header = True
 
     def parse(self, filename):
         datafile = open(filename, "r")
