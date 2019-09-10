@@ -19,8 +19,7 @@ TEST(T_S3Fanout, Init) {
 }
 
 TEST(T_S3Fanout, DetectThrottleIndicator) {
-  s3fanout::JobInfo info(
-    "", "", s3fanout::kAuthzAwsV2, "", "", "", "", NULL, "");
+  s3fanout::JobInfo info("", NULL, "");
   info.throttle_ms = 1;
 
   s3fanout::S3FanoutManager::DetectThrottleIndicator("", &info);
