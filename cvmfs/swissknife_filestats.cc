@@ -113,6 +113,8 @@ void *CommandFileStats::MainProcessing(void *data) {
   int processed = 0;
   int32_t downloaded = atomic_read32(&repo_stats->num_downloaded_);
   int32_t fin = atomic_read32(&repo_stats->finished_);
+
+  repo_stats->db_->BeginTransaction();
   while (fin == 0 || processed < downloaded) {
     if (processed < downloaded) {
       LogCvmfs(kLogCatalog, kLogStdout, "Processing catalog %d", processed);
@@ -124,6 +126,8 @@ void *CommandFileStats::MainProcessing(void *data) {
     downloaded = atomic_read32(&repo_stats->num_downloaded_);
     fin = atomic_read32(&repo_stats->finished_);
   }
+  repo_stats->db_->CommitTransaction();
+
   return NULL;
 }
 
@@ -151,8 +155,6 @@ void CommandFileStats::ProcessCatalog(string db_path) {
     new sqlite::Sql(cat_db->sqlite_db(),
                     "SELECT md5path_1, md5path_2, size, hash FROM chunks "
                     "ORDER BY md5path_1 ASC, md5path_2 ASC;");
-
-  db_->BeginTransaction();
 
   while (catalog_list->FetchRow()) {
     const void *hash = catalog_list->RetrieveBlob(0);
@@ -186,8 +188,6 @@ void CommandFileStats::ProcessCatalog(string db_path) {
     old_md5path_1 = md5path_1;
     old_md5path_2 = md5path_2;
   }
-
-  db_->CommitTransaction();
 
   delete catalog_list;
   delete chunks_list;
