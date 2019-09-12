@@ -184,6 +184,36 @@ the singularity one, finally we upload the output image to the registry.
 
 It does not support dowloading images that are not public.
 
-In order to publish images to a repository is necessary to sign up in the
+In order to publish images to a registry is necessary to sign up in the
 docker hub. It will use the user from the recipe, while it will read the
 password from the `DOCKER2CVMFS_DOCKER_REGISTRY_PASS` environment variable.
+
+## Run as daemon
+
+DUCC provides also a unit file suitable to be used by systemd. While used as a
+daemon DUCC will run the `loop` command.
+
+Environmental variables are used in order to provide input for DUCC. Two
+variables need to be set:
+1. `$RECIPE_FILE`
+2. `$DOCKER2CVMFS_DOCKER_REGISTRY_PASS`
+
+The `$RECIPE_FILE` variable need to point to the recipe.yaml file that you want
+to convert.
+
+The `$DOCKER2CVMFS_DOCKER_REGISTRY_PASS` is exactly the same variable described
+above. It needs to be set to the password of the docker registry that DUCC will
+use to publish the docker images.
+
+In order to set those variable, the simplest thing is to create an override
+file.
+
+`systemctl edif cvmfs_ducc.service`
+
+And then insert something like:
+
+```unit
+[Service]
+Environment="RECIPE_FILE=UPDATE_THIS_VALUE.yaml"
+Environment="DOCKER2CVMFS_DOCKER_REGISTRY_PASS=UPDATE_THIS_VALUE"
+```
