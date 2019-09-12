@@ -12,6 +12,8 @@
   * Add support for libfuse3, including new mount option libfuse=[2|3]
     (CVM-1710, CVM-1744)
 
+2.6.4:
+
 2.6.3:
   * Fix parsing of /etc/hosts (CVM-1796, CVM-1797)
 
