@@ -207,7 +207,10 @@ void *S3Uploader::MainCollectResults(void *data) {
         if (info->request == s3fanout::JobInfo::kReqHeadPut) {
           // The HEAD request was not transformed into a PUT request, thus this
           // was a duplicate
+          // Uploaded catalogs are always unique ->
+          // assume this was a regular file and decrease appropriate counters
           uploader->CountDuplicates();
+          uploader->DecUploadedChunks();
           uploader->CountUploadedBytes(-(info->payload_size));
         }
         if (info->origin == s3fanout::kOriginMem) {
@@ -252,11 +255,9 @@ void S3Uploader::FileUpload(
       info->request = s3fanout::JobInfo::kReqHeadPut;
   }
 
-  int64_t bytes_to_upload = GetFileSize(local_path);
   UploadJobInfo(info);
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from file finished: %s",
            local_path.c_str());
-  CountUploadedBytes(bytes_to_upload);
 }
 
 
@@ -315,7 +316,6 @@ void S3Uploader::StreamedUpload(
             UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
   }
-  CountUploadedBytes(buffer.size);
   Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
@@ -364,6 +364,7 @@ void S3Uploader::FinalizeStreamedUpload(
                             reinterpret_cast<unsigned char *>(mmf->buffer()),
                             static_cast<size_t>(mmf->size()));
   assert(info != NULL);
+  size_t bytes_uploaded = mmf->size();
 
   if (peek_before_put_)
       info->request = s3fanout::JobInfo::kReqHeadPut;
@@ -376,6 +377,16 @@ void S3Uploader::FinalizeStreamedUpload(
   retval = unlink(local_handle->temporary_path.c_str());
   assert(retval == 0);
   delete local_handle;
+
+  // Update statistics counters
+  if (!content_hash.HasSuffix() ||
+      content_hash.suffix == shash::kSuffixPartial) {
+    CountUploadedChunks();
+    CountUploadedBytes(bytes_uploaded);
+  } else if (content_hash.suffix == shash::kSuffixCatalog) {
+    CountUploadedCatalogs();
+    CountUploadedCatalogBytes(bytes_uploaded);
+  }
 }
 
 
