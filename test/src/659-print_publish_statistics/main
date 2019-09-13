@@ -7,10 +7,10 @@ CVMFS_TEST_659_NR_OF_TESTS=4
 CVMFS_TEST_659_ERROR_FILES_ADDED=101
 CVMFS_TEST_659_ERROR_FILES_REMOVED=102
 CVMFS_TEST_659_ERROR_FILES_CHANGED=103
-CVMFS_TEST_659_ERROR_DUPLICATED_FILES=104
-CVMFS_TEST_659_ERROR_DIR_ADDED=105
-CVMFS_TEST_659_ERROR_DIR_REMOVED=106
-CVMFS_TEST_659_ERROR_DIR_CHANGED=107
+CVMFS_TEST_659_ERROR_FILES_DUPLICATED=104
+CVMFS_TEST_659_ERROR_DIRS_ADDED=105
+CVMFS_TEST_659_ERROR_DIRS_REMOVED=106
+CVMFS_TEST_659_ERROR_DIRS_CHANGED=107
 CVMFS_TEST_659_ERROR_BYTES_ADDED=108
 CVMFS_TEST_659_ERROR_BYTES_REMOVED=109
 CVMFS_TEST_659_ERROR_BYTES_UPLOADED=110
@@ -126,7 +126,7 @@ cvmfs_run_test() {
   test_results[1,1]=5     # n_files_added
   test_results[1,2]=0     # n_files_removed
   test_results[1,3]=0     # n_files_changed
-  test_results[1,4]=0     # n_duplicated_files
+  test_results[1,4]=0     # n_files_duplicated
   test_results[1,5]=2     # n_directories_added
   test_results[1,6]=0     # n_directories_removed
   test_results[1,7]=0     # n_directories_changed
@@ -173,7 +173,7 @@ cvmfs_run_test() {
     local files_added=$(cat test_659_$i | grep n_files_added |cut -d '|' -f 2)
     local files_removed=$(cat test_659_$i |  grep n_files_removed |cut -d '|' -f 2)
     local files_changed=$(cat test_659_$i |  grep n_files_changed |cut -d '|' -f 2)
-    local duplicated_files=$(cat test_659_$i |  grep n_duplicated_files |cut -d '|' -f 2)
+    local files_duplicated=$(cat test_659_$i |  grep n_files_duplicated |cut -d '|' -f 2)
     local directories_added=$(cat test_659_$i | grep n_directories_added |cut -d '|' -f 2)
     local directories_removed=$(cat test_659_$i |  grep n_directories_removed |cut -d '|' -f 2)
     local directories_changed=$(cat test_659_$i |  grep n_directories_changed |cut -d '|' -f 2)
@@ -196,25 +196,25 @@ cvmfs_run_test() {
             ($files_changed vs ref:${test_results[$i,3]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_FILES_CHANGED
     fi
-    if [ "x$duplicated_files" != "x${test_results[$i,4]}" ]; then
+    if [ "x$files_duplicated" != "x${test_results[$i,4]}" ]; then
       echo "*** Test $i.4 - number of duplicated files - \
-            ($duplicated_files vs ref:${test_results[$i,4]}) FAILED!"
-      return $CVMFS_TEST_659_ERROR_DUPLICATED_FILES
+            ($files_duplicated vs ref:${test_results[$i,4]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_FILES_DUPLICATED
     fi
     if [ "x$directories_added" != "x${test_results[$i,5]}" ]; then
       echo "*** Test $i.5 - number of added directories - \
             ($directories_added vs ref:${test_results[$i,5]}) FAILED!"
-      return $CVMFS_TEST_659_ERROR_DIR_ADDED
+      return $CVMFS_TEST_659_ERROR_DIRS_ADDED
     fi
     if [ "x$directories_removed" != "x${test_results[$i,6]}" ]; then
       echo "*** Test $i.6 - number of removed directories \
             - ($directories_removed vs ref:${test_results[$i,6]}) FAILED!"
-      return $CVMFS_TEST_659_ERROR_DIR_REMOVED
+      return $CVMFS_TEST_659_ERROR_DIRS_REMOVED
     fi
     if [ "x$directories_changed" != "x${test_results[$i,7]}" ]; then
       echo "*** Test $i.7 - number of changed directories - \
             ($directories_changed vs ref:${test_results[$i,7]}) FAILED!"
-      return $CVMFS_TEST_659_ERROR_DIR_CHANGED
+      return $CVMFS_TEST_659_ERROR_DIRS_CHANGED
     fi
     if [ "x$bytes_added" != "x${test_results[$i,8]}" ]; then
       echo "*** Test $i.8 - number of added bytes - \
