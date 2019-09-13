@@ -855,6 +855,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
+  perf::Counter *revision_counter = statistics()->Register("Publish.revision",
+                                                  "Published revision number");
+  revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
+
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
   params.spooler->WaitForUpload();
