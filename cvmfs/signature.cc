@@ -419,12 +419,9 @@ std::string SignatureManager::GetPrivateMasterKey() {
 
 
 RSA *SignatureManager::GenerateRsaKeyPair() {
-  int retval = RAND_status();
-  assert(retval == 1);
-
   RSA *rsa = RSA_new();
   BIGNUM *bn = BN_new();
-  retval = BN_set_word(bn, RSA_F4);
+  int retval = BN_set_word(bn, RSA_F4);
   assert(retval == 1);
   retval = RSA_generate_key_ex(rsa, 2048, bn, NULL);
   assert(retval == 1);
