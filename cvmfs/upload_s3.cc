@@ -288,7 +288,7 @@ void S3Uploader::DoUpload(
     Respond(callback, UploaderResults(100, source->GetPath()));
     return;
   }
-  std::uint64_t size;
+  uint64_t size;
   rvb = source->GetSize(&size);
   assert(rvb);
 
