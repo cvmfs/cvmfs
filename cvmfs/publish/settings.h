@@ -26,7 +26,7 @@ template <class T>
 class Setting {
  public:
   Setting() : value_(), is_default_(true) { }
-  Setting(const T &v) : value_(v), is_default_(true) { }
+  explicit Setting(const T &v) : value_(v), is_default_(true) { }
 
   Setting& operator=(const T &v) {
     value_ = v;
@@ -64,7 +64,7 @@ class Setting {
 // by setters. The setters throw errors when invalid options are detected.
 
 class SettingsSpoolArea {
-public:
+ public:
   explicit SettingsSpoolArea(const std::string &fqrn)
     : workspace_(std::string("/var/spool/cvmfs/") + fqrn)
     , tmp_dir_(workspace_() + "/tmp")
@@ -83,7 +83,7 @@ public:
   std::string cache_dir() const { return workspace_() + "/cache"; }
   std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }
 
-private:
+ private:
   Setting<std::string> workspace_;
   Setting<std::string> tmp_dir_;
 };
@@ -198,7 +198,7 @@ class SettingsKeychain {
  */
 class SettingsRepository {
  public:
-  SettingsRepository(const std::string &fqrn)
+  explicit SettingsRepository(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn_())
     , tmp_dir_("/tmp")
@@ -228,7 +228,7 @@ class SettingsRepository {
  */
 class SettingsPublisher {
  public:
-  SettingsPublisher(const std::string &fqrn)
+  explicit SettingsPublisher(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn)
     , owner_uid_(0)
@@ -274,7 +274,7 @@ class SettingsPublisher {
  */
 class SettingsReplica {
  public:
-  SettingsReplica(const std::string &fqrn)
+  explicit SettingsReplica(const std::string &fqrn)
     : fqrn_(fqrn)
     , alias_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + alias_())

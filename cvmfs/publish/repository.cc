@@ -17,8 +17,8 @@
 #include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#include "publish/settings.h"
 #include "publish/except.h"
+#include "publish/settings.h"
 #include "reflog.h"
 #include "signature.h"
 #include "statistics.h"
@@ -132,7 +132,7 @@ void Repository::DownloadRootObjects(
     CreateTempFile(tmp_dir + "/reflog", kPrivateFileMode, "w", &reflog_path);
   std::string reflog_url = url + "/.cvmfsreflog";
   // TODO(jblomer): verify reflog hash
-  //shash::Any reflog_hash(manifest_->GetHashAlgorithm());
+  // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
   download::JobInfo download_reflog(
        &reflog_url,
        false /* compressed */,
@@ -395,7 +395,7 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   publisher->PushMetainfo();
   publisher->PushReflog();
   publisher->PushManifest();
-  // TODO: meta-info
+  // TODO(jblomer): meta-info
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   return publisher.Release();
@@ -570,8 +570,7 @@ void Publisher::Publish() {
     statistics_,
     false /* auto balance */,
     1000,
-    100000
-  );
+    100000);
   catalog_mgr.Init();
 
   SyncParameters params;
@@ -583,9 +582,9 @@ void Publisher::Publish() {
   params.dir_temp = settings_.transaction().spool_area().tmp_dir();
   params.base_hash = manifest_->catalog_hash();
   params.stratum0 = settings_.url();
-  //params.manifest_path = SHOULD NOT BE NEEDED
+  // params.manifest_path = SHOULD NOT BE NEEDED
   // params.spooler_definition = SHOULD NOT BE NEEDED;
-  params.union_fs_type = "overlayfs";  // TODO
+  params.union_fs_type = "overlayfs";  // TODO(jblomer): select union fs type
   params.print_changeset = true;
   SyncMediator mediator(&catalog_mgr, &params,
                         perf::StatisticsTemplate("Publish", statistics_));

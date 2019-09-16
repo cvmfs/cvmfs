@@ -15,7 +15,7 @@ class SettingsPublisher;
 
 class CmdEnter : public Command {
  public:
-  explicit CmdEnter()
+  CmdEnter()
     : cvmfs_binary_("/usr/bin/cvmfs2")
     , overlayfs_binary_("/usr/bin/fuse-overlayfs")
   { }

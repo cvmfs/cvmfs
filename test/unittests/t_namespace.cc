@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include <unistd.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <cassert>
 

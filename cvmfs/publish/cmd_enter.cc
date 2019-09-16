@@ -42,7 +42,7 @@ static void EnterRootContainer() {
   if (!rvb) throw publish::EPublish("cannot create pid namespace");
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 
 namespace publish {
@@ -85,9 +85,6 @@ void CmdEnter::MountCvmfs(const SettingsPublisher &settings) {
   pid_t pid_cvmfs;
   rvb = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, cvmfs_binary_, args,
                       false /* double_fork */, &pid_cvmfs);
-  //close(fd_stdin);
-  //close(fd_stdout);
-  //close(fd_stderr);
   if (!rvb) throw EPublish("cannot run " + cvmfs_binary_);
 
   int exit_code = WaitForChild(pid_cvmfs);
@@ -109,9 +106,6 @@ void CmdEnter::MountOverlayfs(const SettingsPublisher &settings) {
   pid_t pid_ovl;
   bool rvb = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, overlayfs_binary_,
                            args, false /* double_fork */, &pid_ovl);
-  //close(fd_stdin);
-  //close(fd_stdout);
-  //close(fd_stderr);
   if (!rvb) EPublish("cannot run " + overlayfs_binary_);
   int exit_code = WaitForChild(pid_ovl);
   if (exit_code != 0) EPublish("cannot mount overlay file system");

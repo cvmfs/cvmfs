@@ -8,7 +8,7 @@
 
 #include "publish/command.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace publish {
 
@@ -30,7 +30,6 @@ class CommandTest : public Command {
 class T_Command : public ::testing::Test {
  protected:
   virtual void SetUp() {
-
   }
 
  protected:

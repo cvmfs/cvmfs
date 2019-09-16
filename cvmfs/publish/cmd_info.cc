@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "cmd_info.h"
 
+#include <string>
+
 #include "logging.h"
 #include "publish/except.h"
 #include "publish/repository.h"

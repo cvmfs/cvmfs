@@ -20,8 +20,8 @@
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"
 #include "util/file_guard.h"
-#include "util/string.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 
 /**

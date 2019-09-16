@@ -11,9 +11,9 @@
 #include <string>
 
 #include "atomic.h"
+#include "ingestion/ingestion_source.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
-#include "ingestion/ingestion_source.h"
 #include "repository_tag.h"
 #include "statistics.h"
 #include "upload_spooler_definition.h"

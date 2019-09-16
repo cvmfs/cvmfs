@@ -468,16 +468,17 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
 
   Prng prng;
   prng.InitLocaltime();
-  unsigned long rnd_serial_no = prng.Next(uint64_t(1) + uint32_t(-1));
+  unsigned long rnd_serial_no = prng.Next(uint64_t(1) + uint32_t(-1));  //NOLINT
   rnd_serial_no = rnd_serial_no |
     uint64_t(prng.Next(uint64_t(1) + uint32_t(-1))) << 32;
   ASN1_INTEGER_set(X509_get_serialNumber(certificate_), rnd_serial_no);
 
   // valid as of now
-  X509_gmtime_adj((ASN1_TIME *)X509_get_notBefore(certificate_), 0);
+  X509_gmtime_adj(reinterpret_cast<ASN1_TIME *>(
+    X509_get_notBefore(certificate_)), 0);
   // valid for 1 year (validity range is unused)
-  X509_gmtime_adj((ASN1_TIME *)X509_get_notAfter(certificate_),
-                  3600 * 24 * 365);
+  X509_gmtime_adj(reinterpret_cast<ASN1_TIME *>(
+    X509_get_notAfter(certificate_)), 3600 * 24 * 365);
 
   X509_NAME *name = X509_get_subject_name(certificate_);
   X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,

@@ -7,6 +7,8 @@
 
 #include <unistd.h>
 
+#include <string>
+
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository.h"
@@ -111,13 +113,13 @@ int CmdMkfs::Main(const Options &options) {
   }
 
   if (configure_apache) {
-
+    // TODO(jblomer): Apache configuration
   }
 
-  // TODO: for local backend we need to create the path as root and then
-  // hand it over
+  // TODO(jblomer): for local backend we need to create the path as root and
+  // then hand it over
   UniquePtr<Publisher> publisher(Publisher::Create(settings));
-  //if (options.Has("no-apache"))
+  // if (options.Has("no-apache"))
 
   LogCvmfs(kLogCvmfs, kLogStdout, "PUBLIC MASTER KEY:\n%s",
            publisher->signature_mgr()->GetActivePubkeys().c_str());

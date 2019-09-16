@@ -10,14 +10,13 @@
 
 #include "publish/settings.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace publish {
 
 class T_Settings : public ::testing::Test {
  protected:
   virtual void SetUp() {
-
   }
 
  protected:

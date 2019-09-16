@@ -2,8 +2,10 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_PUBLISH_CMD_STAT_H_
-#define CVMFS_PUBLISH_CMD_STAT_H_
+#ifndef CVMFS_PUBLISH_CMD_INFO_H_
+#define CVMFS_PUBLISH_CMD_INFO_H_
+
+#include <string>
 
 #include "publish/command.h"
 
@@ -35,4 +37,4 @@ class CmdInfo : public Command {
 
 }  // namespace publish
 
-#endif  // CVMFS_PUBLISH_CMD_STAT_H_
+#endif  // CVMFS_PUBLISH_CMD_INFO_H_

@@ -5,6 +5,8 @@
 #ifndef CVMFS_PUBLISH_CMD_MKFS_H_
 #define CVMFS_PUBLISH_CMD_MKFS_H_
 
+#include <string>
+
 #include "publish/command.h"
 
 namespace publish {
