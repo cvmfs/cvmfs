@@ -1,4 +1,5 @@
 2.7.0:
+  * Add 'list_reflog' command to cvmfs_swissknife (CVM-1760)
   * Add 'filestats' command to cvmfs_swissknife (CVM-1756)
   * Add fuse callback performance instrumentation through new switch 
     CVMFS_INSTRUMENT_FUSE (CVM-1770)
