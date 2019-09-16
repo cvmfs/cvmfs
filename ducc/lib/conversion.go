@@ -400,7 +400,7 @@ func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionR
 }
 
 func GetPassword() (string, error) {
-	envVar := "DOCKER2CVMFS_DOCKER_REGISTRY_PASS"
+	envVar := "DUCC_DOCKER_REGISTRY_PASS"
 	pass := os.Getenv(envVar)
 	if pass == "" {
 		err := fmt.Errorf(

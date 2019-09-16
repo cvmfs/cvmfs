@@ -16,7 +16,7 @@ clean_up() {
     cvmfs_server rmfs -f $repository >> /dev/null
     printf "done\n"
     
-    export DOCKER2CVMFS_DOCKER_REGISTRY_PASS=""
+    export DUCC_DOCKER_REGISTRY_PASS=""
     
     # delete the recipe file
     rm $recipe
@@ -84,7 +84,7 @@ EOL
     printf "done\n"
     
     # set the password to access the docker hub
-    export DOCKER2CVMFS_DOCKER_REGISTRY_PASS=mock_pass
+    export DUCC_DOCKER_REGISTRY_PASS=mock_pass
     
     # crete the repository where to store the content
     printf "Creating CVMFS repo..."
