@@ -199,7 +199,6 @@ bool S3Uploader::Create() {
   UploadJobInfo(info);
   req_ctrl.WaitFor();
 
-  delete info;
   return req_ctrl.return_code == 0;
 }
 
@@ -530,7 +529,6 @@ bool S3Uploader::Peek(const std::string& path) {
   UploadJobInfo(info);
   req_ctrl.WaitFor();
 
-  delete info;
   return req_ctrl.return_code == 0;
 }
 
