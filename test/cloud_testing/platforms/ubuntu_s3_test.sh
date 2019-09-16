@@ -88,6 +88,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/622-gracefulrmfs                         \
                                src/647-bearercvmfs                          \
                                src/628-pythonwrappedcvmfsserver             \
+                               src/670-listreflog                           \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

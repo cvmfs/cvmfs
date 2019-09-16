@@ -294,6 +294,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_lease_curl.cc
   swissknife_lease_json.cc
   swissknife_letter.cc
+  swissknife_list_reflog.cc
   swissknife_lsrepo.cc
   swissknife_main.cc
   swissknife_migrate.cc
