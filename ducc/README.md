@@ -190,7 +190,7 @@ password from the `DOCKER2CVMFS_DOCKER_REGISTRY_PASS` environment variable.
 
 ## Run as daemon
 
-DUCC provides also a unit file suitable to be used by systemd. While used as a
+DUCC provides an unit file suitable to be used by systemd. While used as a
 daemon DUCC will run the `loop` command.
 
 Environmental variables are used in order to provide input for DUCC. Two
@@ -201,19 +201,18 @@ variables need to be set:
 The `$RECIPE_FILE` variable need to point to the recipe.yaml file that you want
 to convert.
 
-The `$DOCKER2CVMFS_DOCKER_REGISTRY_PASS` is exactly the same variable described
+The `$DOCKER2CVMFS_DOCKER_REGISTRY_PASS` is the variable described
 above. It needs to be set to the password of the docker registry that DUCC will
 use to publish the docker images.
 
-In order to set those variable, the simplest thing is to create an override
-file.
+In order to set those variable, create an override file.
 
-`systemctl edif cvmfs_ducc.service`
+`systemctl edit cvmfs_ducc.service`
 
-And then insert something like:
+And then edit like the following:
 
 ```unit
 [Service]
-Environment="RECIPE_FILE=UPDATE_THIS_VALUE.yaml"
-Environment="DOCKER2CVMFS_DOCKER_REGISTRY_PASS=UPDATE_THIS_VALUE"
+Environment="RECIPE_FILE=UPDATE-ME.yaml"
+Environment="DOCKER2CVMFS_DOCKER_REGISTRY_PASS=UPDATE-ME"
 ```

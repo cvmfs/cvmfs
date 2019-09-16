@@ -1,5 +1,5 @@
 [Unit]
-Description=DUCC Daemon Unpacker Containers in CVMFs
+Description=DUCC Daemon Unpacking Containers in CVMFS
 After=network.target dockerd.service
 Requires=dockerd.service
 
