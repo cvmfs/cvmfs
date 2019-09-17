@@ -4,8 +4,8 @@ After=network.target dockerd.service
 Requires=dockerd.service
 
 [Service]
-Environment="DUCC_RECIPE_FILE=YourRecipeFile_UPDATE_THIS_VALUE.yaml"
-Environment="DUCC_DOCKER_REGISTRY_PASS=ThePassOfTheUserForTheImageRegistry_UPDATE_THIS_VALUE"
+Environment="DUCC_RECIPE_FILE=UPDATE-ME.yaml"
+Environment="DUCC_DOCKER_REGISTRY_PASS=UPDATE-ME"
 
 ExecStart=@CMAKE_INSTALL_PREFIX@/bin/cvmfs_ducc loop $RECIPE_FILE
 
