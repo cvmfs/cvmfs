@@ -21,6 +21,7 @@
 #include "shortstring.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
+#include "logging_internal.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -135,7 +136,7 @@ void Panic();
 // The first argument, `source` should have type LogSource, which should be
 // imported by `logging.h`, unfortunately it seems like import `logging.h` break
 // the compilation process. To investigate further.
-void Panic(const int source, const int mask, const char *format, ...);
+void Panic(const LogSource source, const int mask, const char *format, ...);
 
 struct Pipe : public SingleCopy {
   Pipe() {
