@@ -129,14 +129,18 @@ class T_Util : public ::testing::Test {
 
 
 TEST_F(T_Util, GetUserName) {
-  ASSERT_TRUE(getenv("USER") != NULL);
-  EXPECT_STREQ(getenv("USER"), GetUserName().c_str());
+  EXPECT_FALSE(GetUserName().empty());
+  if (getenv("USER") != NULL) {
+    EXPECT_STREQ(getenv("USER"), GetUserName().c_str());
+  }
 }
 
 
 TEST_F(T_Util, GetShell) {
-  ASSERT_TRUE(getenv("SHELL") != NULL);
-  EXPECT_STREQ(getenv("SHELL"), GetShell().c_str());
+  EXPECT_FALSE(GetShell().empty());
+  if (getenv("SHELL") != NULL) {
+    EXPECT_STREQ(getenv("SHELL"), GetShell().c_str());
+  }
 }
 
 
