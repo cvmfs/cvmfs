@@ -15,12 +15,15 @@
 #include "util/posix.h"
 #include "util/string.h"
 
-// Might otherwise not compile on older Linux kernels
+// Might otherwise not compile on older Linux kernels or glibc versions
 #ifndef CLONE_NEWUSER
 #define CLONE_NEWUSER 0x10000000
 #endif
 #ifndef CLONE_NEWPID
 #define CLONE_NEWPID 0x20000000
+#endif
+#ifndef MS_REC
+#define MS_REC 0x4000
 #endif
 
 
