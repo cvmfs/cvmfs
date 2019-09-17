@@ -39,6 +39,7 @@ int CheckNamespaceFeatures() {
   result |= kNsFeatureUserAvailable;
   char enabled = 0;
   SafeRead(fd, &enabled, 1);
+  close(fd);
   return (enabled != '1') ? result : (result | kNsFeatureUserEnabled);
 #endif
 }
