@@ -27,6 +27,7 @@ set(CVMFS_UNITTEST_FILES
   t_authz_session.cc
   t_backoff.cc
   t_base64.cc
+  t_bigqueue.cc
   t_bigvector.cc
   t_blocking_counter.cc
   t_cache.cc
