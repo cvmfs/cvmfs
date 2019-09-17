@@ -137,9 +137,10 @@ TEST_F(T_Util, GetUserName) {
 
 
 TEST_F(T_Util, GetShell) {
-  EXPECT_FALSE(GetShell().empty());
   if (getenv("SHELL") != NULL) {
     EXPECT_STREQ(getenv("SHELL"), GetShell().c_str());
+  } else {
+    EXPECT_TRUE(GetShell().empty());
   }
 }
 
