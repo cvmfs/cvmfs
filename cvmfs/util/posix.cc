@@ -1573,6 +1573,48 @@ bool SafeWriteToFile(const std::string &content,
   return retval;
 }
 
+void Panic() {
+#ifdef LIB_CVMFS_SERVER
+  throw "panic";
+#else
+  abort();
+#endif
+}
+
+// Most likely useless at this stage
+//
+// void Panic(const std::string msg) {
+//   LogCvmfs(kLogCvmfs, kLogDebug, "Panic: %s", msg);
+//
+//   #ifdef LIB_CVMFS_SERVER
+//     throw msg;
+//   #else
+//     abort();
+//   #endif
+// }
+//
+
+void Panic(const LogSource source, const int mask, const char *format, ...) {
+  // Format the message string
+  char *msg_buffer = NULL;
+  va_list variadic_list;
+
+  va_start(variadic_list, format);
+  int retval = vasprintf(&msg_buffer, format, variadic_list);
+  assert(retval != -1);  // else: out of memory
+  va_end(variadic_list);
+
+  const std::string msg(msg_buffer);
+  free(msg_buffer);
+
+  LogCvmfs(source, mask, msg.c_str());
+#ifdef LIB_CVMFS_SERVER
+  throw msg;
+#else
+  abort();
+#endif
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

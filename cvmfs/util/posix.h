@@ -127,6 +127,15 @@ bool SafeReadToString(int fd, std::string *final_result);
 bool SafeWriteToFile(const std::string &content,
                      const std::string &path, int mode);
 
+// Abort the process or throwh an execption, depending on the compilation flags
+void Panic();
+// Most likely useless at this stage
+// void Panic(const char *msg, ...);
+//
+// The first argument, `source` should have type LogSource, which should be
+// imported by `logging.h`, unfortunately it seems like import `logging.h` break
+// the compilation process. To investigate further.
+void Panic(const int source, const int mask, const char *format, ...);
 
 struct Pipe : public SingleCopy {
   Pipe() {
