@@ -19,6 +19,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "util/async.h"
+#include "util/posix.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -151,10 +152,9 @@ class FileSystemTraversal {
              path.c_str(), parent_path.c_str(), dir_name.c_str());
     dip = opendir(path.c_str());
     if (!dip) {
-      LogCvmfs(kLogFsTraversal, kLogStderr, "Failed to open %s (%d).\n"
+      Panic(kLogFsTraversal, kLogStderr, "Failed to open %s (%d).\n"
                "Please check directory permissions.",
                path.c_str(), errno);
-      abort();
     }
     Notify(fn_enter_dir, parent_path, dir_name);
 
