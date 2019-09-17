@@ -503,8 +503,6 @@ void S3Uploader::OnReqComplete(
   RequestCtrl *ctrl)
 {
   ctrl->return_code = results.return_code;
-  char c = 'c';
-  WritePipe(ctrl->pipe_wait[1], &c, 1);
   if (ctrl->callback_forward != NULL) {
     // We are already in Respond() so we must not call it again
     upload::UploaderResults fix_path(results.return_code, ctrl->original_path);
@@ -512,6 +510,8 @@ void S3Uploader::OnReqComplete(
     delete ctrl->callback_forward;
     ctrl->callback_forward = NULL;
   }
+  char c = 'c';
+  WritePipe(ctrl->pipe_wait[1], &c, 1);
 }
 
 
