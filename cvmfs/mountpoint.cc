@@ -1398,6 +1398,13 @@ void MountPoint::CreateStatistics() {
                         "overall number of successful path lookups");
   statistics_->Register("inode_tracker.n_miss_path",
                         "overall number of unsuccessful path lookups");
+
+  statistics_->Register("nentry_tracker.n_insert",
+                        "overall number of added negative cache entries");
+  statistics_->Register("nentry_tracker.n_remove",
+                        "overall number of evicted negative cache entries");
+  statistics_->Register("nentry_tracker.n_prune",
+                        "overall number of prune calls");
 }
 
 
@@ -1429,6 +1436,7 @@ void MountPoint::CreateTables() {
                                          statistics_);
 
   inode_tracker_ = new glue::InodeTracker();
+  nentry_tracker_ = new glue::NentryTracker(kcache_timeout_sec_);
 }
 
 /**
@@ -1627,6 +1635,7 @@ MountPoint::MountPoint(
   , md5path_cache_(NULL)
   , tracer_(NULL)
   , inode_tracker_(NULL)
+  , nentry_tracker_(NULL)
   , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
@@ -1642,6 +1651,7 @@ MountPoint::MountPoint(
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
+  delete nentry_tracker_;
   delete inode_tracker_;
   delete tracer_;
   delete md5path_cache_;
@@ -1707,6 +1717,7 @@ void MountPoint::SetupBehavior() {
     // Can be negative and should then be interpreted as 0.0
     kcache_timeout_sec_ =
       std::max(0.0, static_cast<double>(String2Int64(optarg)));
+    nentry_tracker_->SetTimeout(kcache_timeout_sec_);
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));

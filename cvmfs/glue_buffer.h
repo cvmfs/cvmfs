@@ -655,7 +655,6 @@ class NentryTracker {
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics() : num_insert(0), num_remove(0), num_prune(0) {}
-    std::string Print();
     uint64_t num_insert;
     uint64_t num_remove;
     uint64_t num_prune;

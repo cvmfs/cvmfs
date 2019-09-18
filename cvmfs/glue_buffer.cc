@@ -172,12 +172,4 @@ void NentryTracker::EndEnumerate(Cursor *cursor) {
   Unlock();
 }
 
-
-std::string NentryTracker::Statistics::Print() {
-  return
-    "inserts: " + StringifyInt(num_insert) +
-    "  removes: " + StringifyInt(num_remove) +
-    "  prune-calls: " + StringifyInt(num_prune);
-}
-
 }  // namespace glue
