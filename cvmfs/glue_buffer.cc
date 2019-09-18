@@ -106,6 +106,7 @@ InodeTracker::~InodeTracker() {
 NentryTracker::NentryTracker(unsigned timeout_s)
   : version_(kVersion)
   , timeout_s_(timeout_s)
+  , is_active_(true)
 {
   InitLock();
 }
@@ -126,6 +127,13 @@ void NentryTracker::InitLock() {
 void NentryTracker::SetTimeout(unsigned seconds) {
   Lock();
   timeout_s_ = seconds;
+  Unlock();
+}
+
+
+void NentryTracker::Disable() {
+  Lock();
+  is_active_ = false;
   Unlock();
 }
 

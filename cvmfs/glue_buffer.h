@@ -666,6 +666,8 @@ class NentryTracker {
   ~NentryTracker();
 
   void Add(const uint64_t inode_parent, const char *name) {
+    if (!is_active_) return;
+
     uint64_t now = platform_monotonic_time();
     Lock();
     entries_.PushBack(Entry(now + timeout_s_, inode_parent, name));
@@ -676,6 +678,11 @@ class NentryTracker {
 
   void Prune();
   void SetTimeout(unsigned seconds);
+  /**
+   * The nentry tracker is only needed for active cache eviction and can
+   * otherwise ignore new entries.
+   */
+  void Disable();
 
   Cursor BeginEnumerate();
   bool NextEntry(Cursor *cursor, uint64_t *inode_parent, NameString *name);
@@ -709,6 +716,7 @@ class NentryTracker {
   unsigned version_;
   unsigned timeout_s_;
   Statistics statistics_;
+  bool is_active_;
   BigQueue<Entry> entries_;
 };  // class NentryTracker
 

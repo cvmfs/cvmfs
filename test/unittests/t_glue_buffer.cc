@@ -100,7 +100,14 @@ TEST_F(T_GlueBuffer, NentryTracker) {
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
 
+  tracker.Disable();
+
   tracker.DoPrune(platform_monotonic_time() + 100000 + 1);
+  cursor = tracker.BeginEnumerate();
+  EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
+  tracker.EndEnumerate(&cursor);
+
+  tracker.Add(3, "ignore_me");
   cursor = tracker.BeginEnumerate();
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
