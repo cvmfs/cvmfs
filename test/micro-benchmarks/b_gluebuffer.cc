@@ -51,9 +51,12 @@ class BM_InodeTracker : public benchmark::Fixture {
 
     inode_tracker_ = new glue::InodeTracker();
     inode_tracker_->VfsGet(kNumInodes + 1, PathString("/", 1));
+
+    nentry_tracker_ = new glue::NentryTracker(1000); // Don't prune during Add()
   }
 
   virtual void TearDown(const benchmark::State &st) {
+    delete nentry_tracker_;
     delete inode_tracker_;
     inodes_.clear();
     paths_.clear();
@@ -65,6 +68,7 @@ class BM_InodeTracker : public benchmark::Fixture {
   vector<uint64_t> inodes_;
   vector<PathString> paths_;
   glue::InodeTracker *inode_tracker_;
+  glue::NentryTracker *nentry_tracker_;
 };
 
 
@@ -133,3 +137,15 @@ BENCHMARK_DEFINE_F(BM_InodeTracker, FindInode)(benchmark::State &st) {
   st.SetItemsProcessed(st.iterations());
 }
 BENCHMARK_REGISTER_F(BM_InodeTracker, FindInode)->Repetitions(3)->Arg(10000);
+
+
+BENCHMARK_DEFINE_F(BM_InodeTracker, Nadd)(benchmark::State &st) {
+  unsigned size = st.range(0);
+  while (st.KeepRunning()) {
+    glue::NentryTracker tracker(1000);
+    for (unsigned i = 0; i < size; ++i)
+      tracker.Add(0, "libCore.so");
+  }
+  st.SetItemsProcessed(st.iterations() * size);
+}
+BENCHMARK_REGISTER_F(BM_InodeTracker, Nadd)->Repetitions(3)->Arg(100000);

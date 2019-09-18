@@ -35,7 +35,7 @@ class BigQueue : SingleCopy {
 
   void PushBack(const Item &item) {
     if (GetAvailableSpace() == 0)
-      Migrate(2 * capacity_);
+      Migrate(1.9 * float(capacity_));
     new (buffer_ + size_) Item(item);
     size_++;
   }

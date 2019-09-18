@@ -4,7 +4,10 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "glue_buffer.h"
+#include "platform.h"
 #include "shortstring.h"
 
 namespace glue {
@@ -73,6 +76,34 @@ TEST_F(T_GlueBuffer, InodeTracker) {
   EXPECT_FALSE(inode_tracker_.NextEntry(&cursor, &inode_parent, &name));
   EXPECT_FALSE(inode_tracker_.NextInode(&cursor, &inode));
   inode_tracker_.EndEnumerate(&cursor);
+}
+
+
+TEST_F(T_GlueBuffer, NentryTracker) {
+  NentryTracker tracker(100000);  // Don't auto-prune
+
+  uint64_t parent_inode = 0;
+  NameString name;
+  NentryTracker::Cursor cursor = tracker.BeginEnumerate();
+  EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
+  tracker.EndEnumerate(&cursor);
+
+  tracker.Add(1, "zero");
+  tracker.Add(2, "one");
+  cursor = tracker.BeginEnumerate();
+  EXPECT_TRUE(tracker.NextEntry(&cursor, &parent_inode, &name));
+  EXPECT_EQ(1U, parent_inode);
+  EXPECT_EQ(std::string("zero"), name.ToString());
+  EXPECT_TRUE(tracker.NextEntry(&cursor, &parent_inode, &name));
+  EXPECT_EQ(2U, parent_inode);
+  EXPECT_EQ(std::string("one"), name.ToString());
+  EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
+  tracker.EndEnumerate(&cursor);
+
+  tracker.DoPrune(platform_monotonic_time() + 100000 + 1);
+  cursor = tracker.BeginEnumerate();
+  EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
+  tracker.EndEnumerate(&cursor);
 }
 
 }  // namespace glue

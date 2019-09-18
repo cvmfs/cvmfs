@@ -8,6 +8,7 @@
  * functions.
  */
 
+#include <gtest/gtest_prod.h>
 #include <pthread.h>
 #include <sched.h>
 #include <stdint.h>
@@ -19,8 +20,10 @@
 #include <vector>
 
 #include "atomic.h"
+#include "bigqueue.h"
 #include "bigvector.h"
 #include "hash.h"
+#include "platform.h"
 #include "shortstring.h"
 #include "smallhash.h"
 #include "smalloc.h"
@@ -620,6 +623,80 @@ class InodeTracker {
   InodeReferences inode_references_;
   Statistics statistics_;
 };  // class InodeTracker
+
+
+/**
+ * Tracks fuse negative cache replies for active cache eviction
+ */
+class NentryTracker {
+ FRIEND_TEST(T_GlueBuffer, NentryTracker);
+
+ private:
+  struct Entry {
+    Entry() : expiry(0), inode_parent(0) {}
+    Entry(uint64_t e, uint64_t p, const char *n)
+      : expiry(e)
+      , inode_parent(p)
+      , name(n, strlen(n))
+    {}
+    uint64_t expiry;
+    uint64_t inode_parent;
+    NameString name;
+  };
+
+ public:
+  struct Cursor {
+    explicit Cursor(Entry *h) : head(h), pos(0) {}
+    Entry *head;
+    size_t pos;
+  };
+
+  explicit NentryTracker(unsigned timeout_s);
+  ~NentryTracker();
+
+  void Add(const uint64_t inode_parent, const char *name) {
+    uint64_t now = platform_monotonic_time();
+    Lock();
+    entries_.PushBack(Entry(now + timeout_s_, inode_parent, name));
+    DoPrune(now);
+    Unlock();
+  }
+
+  void Prune();
+  void SetTimeout(unsigned seconds);
+
+  Cursor BeginEnumerate();
+  bool NextEntry(Cursor *cursor, uint64_t *inode_parent, NameString *name);
+  void EndEnumerate(Cursor *cursor);
+
+ private:
+  static const unsigned kVersion = 0;
+
+  void InitLock();
+  //void CopyFrom(const InodeTracker &other);
+  inline void Lock() const {
+    int retval = pthread_mutex_lock(lock_);
+    assert(retval == 0);
+  }
+  inline void Unlock() const {
+    int retval = pthread_mutex_unlock(lock_);
+    assert(retval == 0);
+  }
+
+  void DoPrune(uint64_t now) {
+    Entry *entry;
+    while (entries_.Peek(&entry)) {
+      if (entry->expiry >= now)
+        break;
+      entries_.PopFront();
+    }
+  }
+
+  pthread_mutex_t *lock_;
+  unsigned version_;
+  unsigned timeout_s_;
+  BigQueue<Entry> entries_;
+};  // class NentryTracker
 
 
 }  // namespace glue

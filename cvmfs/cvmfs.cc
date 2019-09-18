@@ -498,7 +498,9 @@ static void cvmfs_forget(
 
 /**
  * Looks into dirent to decide if this is an EIO negative reply or an
- * ENOENT negative reply
+ * ENOENT negative reply.  We do not need to store the reply in the negative
+ * cache tracker because ReplyNegative is called on inode queries.  Inodes,
+ * however, change anyway when a new catalog is applied.
  */
 static void ReplyNegative(const catalog::DirectoryEntry &dirent,
                           fuse_req_t req)

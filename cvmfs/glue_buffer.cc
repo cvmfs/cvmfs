@@ -99,4 +99,69 @@ InodeTracker::~InodeTracker() {
   free(lock_);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+NentryTracker::NentryTracker(unsigned timeout_s)
+  : version_(kVersion)
+  , timeout_s_(timeout_s)
+{
+  InitLock();
+}
+
+
+NentryTracker::~NentryTracker() {
+}
+
+
+void NentryTracker::InitLock() {
+  lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_, NULL);
+  assert(retval == 0);
+}
+
+
+void NentryTracker::SetTimeout(unsigned seconds) {
+  Lock();
+  timeout_s_ = seconds;
+  Unlock();
+}
+
+
+void NentryTracker::Prune() {
+  Lock();
+  DoPrune(platform_monotonic_time());
+  Unlock();
+}
+
+
+NentryTracker::Cursor NentryTracker::BeginEnumerate() {
+  Entry *head = NULL;
+  Lock();
+  entries_.Peek(&head);
+  return Cursor(head);
+}
+
+
+bool NentryTracker::NextEntry(Cursor *cursor,
+  uint64_t *inode_parent, NameString *name)
+{
+    if (cursor->head == NULL)
+      return false;
+    if (cursor->pos >= entries_.size())
+      return false;
+    Entry *e = cursor->head + cursor->pos;
+    *inode_parent = e->inode_parent;
+    *name = e->name;
+    cursor->pos++;
+    return true;
+  }
+
+
+void NentryTracker::EndEnumerate(Cursor *cursor) {
+  Unlock();
+}
+
 }  // namespace glue
