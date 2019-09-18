@@ -88,15 +88,15 @@ TEST_F(T_GlueBuffer, NentryTracker) {
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
 
-  tracker.Add(1, "zero");
-  tracker.Add(2, "one");
+  tracker.Add(1, "one");
+  tracker.Add(2, "two");
   cursor = tracker.BeginEnumerate();
   EXPECT_TRUE(tracker.NextEntry(&cursor, &parent_inode, &name));
   EXPECT_EQ(1U, parent_inode);
-  EXPECT_EQ(std::string("zero"), name.ToString());
+  EXPECT_EQ(std::string("one"), name.ToString());
   EXPECT_TRUE(tracker.NextEntry(&cursor, &parent_inode, &name));
   EXPECT_EQ(2U, parent_inode);
-  EXPECT_EQ(std::string("one"), name.ToString());
+  EXPECT_EQ(std::string("two"), name.ToString());
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
 
@@ -104,6 +104,10 @@ TEST_F(T_GlueBuffer, NentryTracker) {
   cursor = tracker.BeginEnumerate();
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
+
+  EXPECT_EQ(2U, tracker.GetStatistics().num_insert);
+  EXPECT_EQ(2U, tracker.GetStatistics().num_remove);
+  EXPECT_EQ(3U, tracker.GetStatistics().num_prune);
 }
 
 }  // namespace glue

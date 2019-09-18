@@ -651,6 +651,17 @@ class NentryTracker {
     size_t pos;
   };
 
+  // Cannot be moved to the statistics manager because it has to survive
+  // reloads.  Added manually in the fuse module initialization and in talk.cc.
+  struct Statistics {
+    Statistics() : num_insert(0), num_remove(0), num_prune(0) {}
+    std::string Print();
+    uint64_t num_insert;
+    uint64_t num_remove;
+    uint64_t num_prune;
+  };
+  Statistics GetStatistics() { return statistics_; }
+
   explicit NentryTracker(unsigned timeout_s);
   ~NentryTracker();
 
@@ -658,6 +669,7 @@ class NentryTracker {
     uint64_t now = platform_monotonic_time();
     Lock();
     entries_.PushBack(Entry(now + timeout_s_, inode_parent, name));
+    statistics_.num_insert++;
     DoPrune(now);
     Unlock();
   }
@@ -673,7 +685,6 @@ class NentryTracker {
   static const unsigned kVersion = 0;
 
   void InitLock();
-  //void CopyFrom(const InodeTracker &other);
   inline void Lock() const {
     int retval = pthread_mutex_lock(lock_);
     assert(retval == 0);
@@ -689,12 +700,15 @@ class NentryTracker {
       if (entry->expiry >= now)
         break;
       entries_.PopFront();
+      statistics_.num_remove++;
     }
+    statistics_.num_prune++;
   }
 
   pthread_mutex_t *lock_;
   unsigned version_;
   unsigned timeout_s_;
+  Statistics statistics_;
   BigQueue<Entry> entries_;
 };  // class NentryTracker
 
