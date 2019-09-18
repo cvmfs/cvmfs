@@ -44,6 +44,8 @@ main() {
     printf "Changing the docker configuration to run thin images..."
     
     # saving old docker configuration
+    mkdir -p /etc/docker
+    touch /etc/docker/daemon.json
     mv /etc/docker/daemon.json /etc/docker/daemon.json.bk
     
     # installing thin image plugin
@@ -61,7 +63,8 @@ main() {
 EOL
     
     # finally restarting docker
-    systemctl restart docker
+    systemctl restart docker.service
+    docker plugin enable cvmfs/graphdriver
     printf "done\n"
     
 
@@ -118,6 +121,8 @@ EOL
     
     singularity exec /cvmfs/$repository/registry.hub.docker.com/library/ubuntu\:latest/ echo token-abc | grep "token-abc" || return 103
     singularity exec /cvmfs/$repository/registry.hub.docker.com/library/centos\:centos6/ echo token-xyz | grep "token-xyz" || return 104
+
+    systemctl restart docker.service
 
     docker run "localhost:5000/mock/library/ubuntu:latest" echo "token-123" | grep "token-123" || return 105
     docker run "localhost:5000/mock/library/centos:centos6" echo "token-321" | grep "token-321" || return 106
