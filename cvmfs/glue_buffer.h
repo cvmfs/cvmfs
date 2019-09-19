@@ -662,6 +662,8 @@ class NentryTracker {
   Statistics GetStatistics() { return statistics_; }
 
   explicit NentryTracker(unsigned timeout_s);
+  explicit NentryTracker(const NentryTracker &other);
+  NentryTracker &operator= (const NentryTracker &other);
   ~NentryTracker();
 
   void Add(const uint64_t inode_parent, const char *name) {
@@ -689,6 +691,8 @@ class NentryTracker {
 
  private:
   static const unsigned kVersion = 0;
+
+  void CopyFrom(const NentryTracker &other);
 
   void InitLock();
   inline void Lock() const {

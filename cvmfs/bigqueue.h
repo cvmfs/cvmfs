@@ -13,10 +13,9 @@
 #include <new>
 
 #include "smalloc.h"
-#include "util/single_copy.h"
 
 template<class Item>
-class BigQueue : SingleCopy {
+class BigQueue {
  public:
   BigQueue() {
     Alloc(kNumInit);
@@ -27,6 +26,19 @@ class BigQueue : SingleCopy {
     assert(num_items > 0);
     Alloc(num_items);
     size_ = 0;
+  }
+
+  BigQueue(const BigQueue<Item> &other) {
+    CopyFrom(other);
+  }
+
+  BigQueue<Item> &operator= (const BigQueue<Item> &other) {
+    if (&other == this)
+      return *this;
+
+    Dealloc();
+    CopyFrom(other);
+    return *this;
   }
 
   ~BigQueue() {
@@ -72,8 +84,10 @@ class BigQueue : SingleCopy {
   static const size_t kCompactThreshold = 64;
   static const size_t kMmapThreshold = 128*1024;
 
-  size_t GetHeadOffset() { return head_ - buffer_; }
-  size_t GetAvailableSpace() { return capacity_ - (size_ + GetHeadOffset()); }
+  size_t GetHeadOffset() const { return head_ - buffer_; }
+  size_t GetAvailableSpace() const {
+    return capacity_ - (size_ + GetHeadOffset());
+  }
 
   void Alloc(const size_t num_elements) {
     size_t num_bytes = sizeof(Item) * num_elements;
@@ -121,6 +135,14 @@ class BigQueue : SingleCopy {
       else
         free(buf);
     }
+  }
+
+  void CopyFrom(const BigQueue<Item> &other) {
+    Alloc(other.size_);
+    for (size_t i = 0; i < other.size_; ++i) {
+      new (buffer_ + i) Item(*(other.buffer_ + other.GetHeadOffset() + i));
+    }
+    size_ = other.size_;
   }
 
   Item *buffer_;
