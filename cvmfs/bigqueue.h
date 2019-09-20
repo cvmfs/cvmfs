@@ -8,6 +8,7 @@
 #ifndef CVMFS_BIGQUEUE_H_
 #define CVMFS_BIGQUEUE_H_
 
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <new>
@@ -23,8 +24,7 @@ class BigQueue {
   }
 
   explicit BigQueue(const size_t num_items) {
-    assert(num_items > 0);
-    Alloc(num_items);
+    Alloc(std::max(num_items, kNumInit));
     size_ = 0;
   }
 
@@ -46,8 +46,10 @@ class BigQueue {
   }
 
   void PushBack(const Item &item) {
-    if (GetAvailableSpace() == 0)
+    if (GetAvailableSpace() == 0) {
       Migrate(1.9 * float(capacity_));
+      assert(GetAvailableSpace() > 0);
+    }
     new (buffer_ + size_) Item(item);
     size_++;
   }
@@ -138,7 +140,7 @@ class BigQueue {
   }
 
   void CopyFrom(const BigQueue<Item> &other) {
-    Alloc(other.size_);
+    Alloc(std::max(other.size_, kNumInit));
     for (size_t i = 0; i < other.size_; ++i) {
       new (buffer_ + i) Item(*(other.buffer_ + other.GetHeadOffset() + i));
     }
