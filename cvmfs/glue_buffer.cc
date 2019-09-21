@@ -133,11 +133,22 @@ NentryTracker &NentryTracker::operator= (const NentryTracker &other) {
 
 void NentryTracker::CopyFrom(const NentryTracker &other) {
   assert(other.version_ == kVersion);
+
   version_ = kVersion;
   timeout_s_ = other.timeout_s_;
   statistics_ = other.statistics_;
   is_active_ = other.is_active_;
   entries_ = other.entries_;
+}
+
+
+NentryTracker *NentryTracker::Move() {
+  Lock();
+  NentryTracker *new_tracker = new NentryTracker(*this);
+  statistics_.num_remove += entries_.size();
+  entries_.Clear();
+  Unlock();
+  return new_tracker;
 }
 
 

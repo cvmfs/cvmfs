@@ -666,6 +666,11 @@ class NentryTracker {
   NentryTracker &operator= (const NentryTracker &other);
   ~NentryTracker();
 
+  /**
+   * Lock object during copy
+   */
+  NentryTracker *Move();
+
   void Add(const uint64_t inode_parent, const char *name) {
     if (!is_active_) return;
 

@@ -62,9 +62,7 @@ cvmfs_run_test() {
   TEST_611_MOUNTPOINT="$(pwd)/local_mount"
   do_local_mount "$TEST_611_MOUNTPOINT" \
                  "$CVMFS_TEST_REPO"     \
-                 "$(get_repo_url $CVMFS_TEST_REPO)" \
-                 "" \
-                 "CVMFS_FUSE_NOTIFY_INVALIDATION=false" || return 4
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 4
 
   stat $TEST_611_MOUNTPOINT/nested/updated
   if [ $? -eq 0 ]; then
@@ -98,9 +96,11 @@ cvmfs_run_test() {
 
   echo "add another new file"
   touch $repo_dir/newfile || return 31
+  touch $repo_dir/nested/foo || return 31
 
   echo "attempt to access the file before publishing, expect missing"
   stat $TEST_611_MOUNTPOINT/newfile && return 32
+  stat $TEST_611_MOUNTPOINT/nested/foo && return 32
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -108,8 +108,10 @@ cvmfs_run_test() {
   echo "trigger synchronized remount"
   sudo cvmfs_talk -p ${cache_dir}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO} \
     remount sync
-  ls -l $TEST_611_MOUNTPOINT || return 33
+  ls -lisa $TEST_611_MOUNTPOINT || return 33
+  ls -lisa $TEST_611_MOUNTPOINT/nested || return 33
   stat $TEST_611_MOUNTPOINT/newfile || return 34
+  stat $TEST_611_MOUNTPOINT/nested/foo || return 34
 
   return 0
 }
