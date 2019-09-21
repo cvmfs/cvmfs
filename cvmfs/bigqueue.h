@@ -24,7 +24,8 @@ class BigQueue {
   }
 
   explicit BigQueue(const size_t num_items) {
-    Alloc(std::max(num_items, kNumInit));
+    size_t min_items = kNumInit;
+    Alloc(std::max(num_items, min_items));
     size_ = 0;
   }
 
@@ -140,7 +141,8 @@ class BigQueue {
   }
 
   void CopyFrom(const BigQueue<Item> &other) {
-    Alloc(std::max(other.size_, kNumInit));
+    size_t min_items = kNumInit;
+    Alloc(std::max(other.size_, min_items));
     for (size_t i = 0; i < other.size_; ++i) {
       new (buffer_ + i) Item(*(other.buffer_ + other.GetHeadOffset() + i));
     }
