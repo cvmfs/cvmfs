@@ -41,7 +41,7 @@ TEST_F(T_BigQueue, SmallCycle) {
   EXPECT_FALSE(queue_->Peek(&value));
 
   EXPECT_EQ(queue_->size(), (unsigned)0);
-  EXPECT_LT(queue_->capacity(), (unsigned)120);
+  EXPECT_LT(queue_->capacity(), (unsigned)200);
 }
 
 TEST_F(T_BigQueue, BigCycle) {
@@ -61,7 +61,7 @@ TEST_F(T_BigQueue, BigCycle) {
   EXPECT_FALSE(queue_->Peek(&value));
 
   EXPECT_EQ(queue_->size(), (unsigned)0);
-  EXPECT_LT(queue_->capacity(), (unsigned)100);
+  EXPECT_LT(queue_->capacity(), (unsigned)200);
 }
 
 

@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  *
- * Similar to bigvector, but queue semantics.
- * Allocate with mmap for large arrays.
+ * Similar to bigvector, but queue semantics. Used by the negative entry
+ * tracker. Allocates with mmap in order to avoid memory fragmentation.
  */
 
 #ifndef CVMFS_BIGQUEUE_H_
@@ -83,9 +83,8 @@ class BigQueue {
   size_t capacity() const { return capacity_; }
 
  private:
-  static const size_t kNumInit = 16;
+  static const size_t kNumInit = 64;
   static const size_t kCompactThreshold = 64;
-  static const size_t kMmapThreshold = 128*1024;
 
   size_t GetHeadOffset() const { return head_ - buffer_; }
   size_t GetAvailableSpace() const {
@@ -94,19 +93,13 @@ class BigQueue {
 
   void Alloc(const size_t num_elements) {
     size_t num_bytes = sizeof(Item) * num_elements;
-    if (num_bytes >= kMmapThreshold) {
-      buffer_ = static_cast<Item *>(smmap(num_bytes));
-      large_alloc_ = true;
-    } else {
-      buffer_ = static_cast<Item *>(smalloc(num_bytes));
-      large_alloc_ = false;
-    }
+    buffer_ = static_cast<Item *>(smmap(num_bytes));
     capacity_ = num_elements;
     head_ = buffer_;
   }
 
   void Dealloc() {
-    FreeBuffer(buffer_, GetHeadOffset() + size_, large_alloc_);
+    FreeBuffer(buffer_, GetHeadOffset() + size_);
     buffer_ = NULL;
     head_ = NULL;
     capacity_ = 0;
@@ -119,25 +112,20 @@ class BigQueue {
 
     size_t head_offset = GetHeadOffset();
     Item *old_buffer = buffer_;
-    bool old_large_alloc = large_alloc_;
 
     Alloc(new_capacity);
     for (size_t i = 0; i < size_; ++i)
       new (buffer_ + i) Item(old_buffer[head_offset + i]);
 
-    FreeBuffer(old_buffer, head_offset + size_, old_large_alloc);
+    FreeBuffer(old_buffer, head_offset + size_);
   }
 
-  void FreeBuffer(Item *buf, const size_t nitems, const bool large) {
+  void FreeBuffer(Item *buf, const size_t nitems) {
     for (size_t i = 0; i < nitems; ++i)
       buf[i].~Item();
 
-    if (buf) {
-      if (large)
-        smunmap(buf);
-      else
-        free(buf);
-    }
+    if (buf)
+      smunmap(buf);
   }
 
   void CopyFrom(const BigQueue<Item> &other) {
@@ -153,7 +141,6 @@ class BigQueue {
   Item *head_;
   size_t size_;
   size_t capacity_;
-  bool large_alloc_;
 };
 
 #endif  // CVMFS_BIGQUEUE_H_
