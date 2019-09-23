@@ -417,14 +417,19 @@ std::string SignatureManager::GetPrivateMasterKey() {
   return bio_master_privkey_str;
 }
 
-
 RSA *SignatureManager::GenerateRsaKeyPair() {
-  RSA *rsa = RSA_new();
+  RSA *rsa = NULL;
   BIGNUM *bn = BN_new();
   int retval = BN_set_word(bn, RSA_F4);
   assert(retval == 1);
+#ifdef OPENSSL_API_INTERFACE_V09
+  rsa = RSA_generate_key(2048, RSA_F4, NULL, NULL);
+  assert(rsa != NULL);
+#else
+  rsa = RSA_new();
   retval = RSA_generate_key_ex(rsa, 2048, bn, NULL);
   assert(retval == 1);
+#endif
   BN_free(bn);
   return rsa;
 }
@@ -478,12 +483,23 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
     X509_get_notAfter(certificate_)), 3600 * 24 * 365);
 
   X509_NAME *name = X509_get_subject_name(certificate_);
+#ifdef OPENSSL_API_INTERFACE_V09
+  X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
+    const_cast<unsigned char *>(
+      reinterpret_cast<const unsigned char *>(cn.c_str())),
+    -1, -1, 0);
+#else
   X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
     reinterpret_cast<const unsigned char *>(cn.c_str()), -1, -1, 0);
+#endif
   retval = X509_set_issuer_name(certificate_, name);
   assert(retval == 1);
 
+#ifdef OPENSSL_API_INTERFACE_V09
+  retval = X509_sign(certificate_, pkey, EVP_sha1());
+#else
   retval = X509_sign(certificate_, pkey, EVP_sha256());
+#endif
   EVP_PKEY_free(pkey);
   assert(retval > 0);
 }
