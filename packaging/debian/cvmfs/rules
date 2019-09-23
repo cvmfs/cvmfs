@@ -52,6 +52,8 @@ install: build debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-uni
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/domain.d/*.conf
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/default.d/*.conf
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/serverorder.sh
+	rm -f ${CURDIR}/debian/tmp/usr/lib/libcvmfs_server*
+	rm -f ${CURDIR}/debian/tmp/usr/bin/cvmfs_publish
 	dh_install --fail-missing --sourcedir=${CURDIR}/debian/tmp
 
 # Build architecture-independent files here.
