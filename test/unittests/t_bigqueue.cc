@@ -64,6 +64,34 @@ TEST_F(T_BigQueue, BigCycle) {
   EXPECT_LT(queue_->capacity(), (unsigned)100);
 }
 
+
+TEST_F(T_BigQueue, JigSaw) {
+  unsigned N = kNumSmall;
+  for (unsigned i = 0; i < N/2; ++i) {
+    queue_->PushBack(i);
+  }
+  EXPECT_EQ(queue_->size(), N/2);
+
+  unsigned *value = NULL;
+  for (unsigned i = 0; i < N/4; ++i) {
+    ASSERT_TRUE(queue_->Peek(&value));
+    EXPECT_EQ(*value, i);
+    queue_->PopFront();
+  }
+
+  for (unsigned i = 0; i < N/2; ++i) {
+    queue_->PushBack(i);
+  }
+  EXPECT_EQ(queue_->size(), N - N/4);
+
+  for (unsigned i = 0; i < N/4; ++i) {
+    ASSERT_TRUE(queue_->Peek(&value));
+    EXPECT_EQ(*value, i + N/4);
+    queue_->PopFront();
+  }
+}
+
+
 TEST_F(T_BigQueue, Copy) {
   unsigned N = kNumBig;
   for (unsigned i = 0; i < N; ++i) {

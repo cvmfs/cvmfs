@@ -51,7 +51,7 @@ class BigQueue {
       Migrate(1.9 * static_cast<float>(capacity_));
       assert(GetAvailableSpace() > 0);
     }
-    new (buffer_ + size_) Item(item);
+    new (head_ + size_) Item(item);
     size_++;
   }
 
