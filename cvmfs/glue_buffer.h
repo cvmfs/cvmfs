@@ -629,7 +629,7 @@ class InodeTracker {
  * Tracks fuse negative cache replies for active cache eviction
  */
 class NentryTracker {
- FRIEND_TEST(T_GlueBuffer, NentryTracker);
+  FRIEND_TEST(T_GlueBuffer, NentryTracker);
 
  private:
   struct Entry {
@@ -661,6 +661,8 @@ class NentryTracker {
   };
   Statistics GetStatistics() { return statistics_; }
 
+  static void *MainCleaner(void *data);
+
   NentryTracker();
   explicit NentryTracker(const NentryTracker &other);
   NentryTracker &operator= (const NentryTracker &other);
@@ -688,7 +690,10 @@ class NentryTracker {
    * The nentry tracker is only needed for active cache eviction and can
    * otherwise ignore new entries.
    */
-  void Disable();
+  void Disable() { is_active_ = false; }
+  bool is_active() const { return is_active_; }
+
+  void SpawnCleaner(unsigned interval_s);
 
   Cursor BeginEnumerate();
   bool NextEntry(Cursor *cursor, uint64_t *inode_parent, NameString *name);
@@ -725,6 +730,10 @@ class NentryTracker {
   Statistics statistics_;
   bool is_active_;
   BigQueue<Entry> entries_;
+
+  int pipe_terminate_[2];
+  int cleaning_interval_ms_;
+  pthread_t thread_cleaner_;
 };  // class NentryTracker
 
 

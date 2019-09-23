@@ -1944,6 +1944,10 @@ static void Spawn() {
   }
 
   cvmfs::fuse_remounter_->Spawn();
+  if (cvmfs::mount_point_->nentry_tracker()->is_active()) {
+    cvmfs::mount_point_->nentry_tracker()->SpawnCleaner(
+      cvmfs::mount_point_->kcache_timeout_sec() * 5);  // Usually every 5s
+  }
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();

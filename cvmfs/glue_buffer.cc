@@ -7,6 +7,9 @@
 #include "cvmfs_config.h"
 #include "glue_buffer.h"
 
+#include <poll.h>
+#include <unistd.h>
+
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -17,6 +20,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -103,16 +107,26 @@ InodeTracker::~InodeTracker() {
 //------------------------------------------------------------------------------
 
 NentryTracker::NentryTracker() : version_(kVersion), is_active_(true) {
+  pipe_terminate_[0] = pipe_terminate_[1] = -1;
+  cleaning_interval_ms_ = -1;
   InitLock();
 }
 
 
 NentryTracker::~NentryTracker() {
+  if (pipe_terminate_[1] >= 0) {
+    char t = 'T';
+    WritePipe(pipe_terminate_[1], &t, 1);
+    pthread_join(thread_cleaner_, NULL);
+    ClosePipe(pipe_terminate_);
+  }
 }
 
 
 NentryTracker::NentryTracker(const NentryTracker &other) {
   CopyFrom(other);
+  pipe_terminate_[0] = pipe_terminate_[1] = -1;
+  cleaning_interval_ms_ = -1;
   InitLock();
 }
 
@@ -121,7 +135,9 @@ NentryTracker &NentryTracker::operator= (const NentryTracker &other) {
   if (&other == this)
     return *this;
 
+  Lock();
   CopyFrom(other);
+  Unlock();
   return *this;
 }
 
@@ -146,18 +162,64 @@ NentryTracker *NentryTracker::Move() {
 }
 
 
+void NentryTracker::SpawnCleaner(unsigned interval_s) {
+  assert(pipe_terminate_[0] == -1);
+  cleaning_interval_ms_ = interval_s * 1000;
+  if (cleaning_interval_ms_ == 0) cleaning_interval_ms_ = -1;
+  MakePipe(pipe_terminate_);
+  int retval = pthread_create(&thread_cleaner_, NULL, MainCleaner, this);
+  assert(retval == 0);
+}
+
+
+void *NentryTracker::MainCleaner(void *data) {
+  NentryTracker *tracker = reinterpret_cast<NentryTracker *>(data);
+  LogCvmfs(kLogCvmfs, kLogDebug, "starting negative entry cache cleaner");
+
+  struct pollfd watch_term;
+  watch_term.fd = tracker->pipe_terminate_[0];
+  watch_term.events = POLLIN | POLLPRI;
+  int timeout_ms = tracker->cleaning_interval_ms_;;
+  uint64_t deadline = platform_monotonic_time() + timeout_ms / 1000;
+  while (true) {
+    watch_term.revents = 0;
+    int retval = poll(&watch_term, 1, timeout_ms);
+    if (retval < 0) {
+      if (errno == EINTR) {
+        if (timeout_ms >= 0) {
+          uint64_t now = platform_monotonic_time();
+          timeout_ms = (now > deadline) ? 0 : (deadline - now) * 1000;
+        }
+        continue;
+      }
+      abort();
+    }
+    timeout_ms = tracker->cleaning_interval_ms_;
+    deadline = platform_monotonic_time() + timeout_ms / 1000;
+
+    if (retval == 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "negative entry cleaner: pruning");
+      tracker->Prune();
+      continue;
+    }
+
+    assert(watch_term.revents != 0);
+
+    char c = 0;
+    ReadPipe(tracker->pipe_terminate_[0], &c, 1);
+    assert(c == 'T');
+    break;
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug, "stopping negative entry cache cleaner");
+  return NULL;
+}
+
+
 void NentryTracker::InitLock() {
   lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
-}
-
-
-void NentryTracker::Disable() {
-  Lock();
-  is_active_ = false;
-  Unlock();
 }
 
 

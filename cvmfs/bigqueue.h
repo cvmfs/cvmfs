@@ -48,7 +48,7 @@ class BigQueue {
 
   void PushBack(const Item &item) {
     if (GetAvailableSpace() == 0) {
-      Migrate(1.9 * float(capacity_));
+      Migrate(1.9 * static_cast<float>(capacity_));
       assert(GetAvailableSpace() > 0);
     }
     new (buffer_ + size_) Item(item);
@@ -60,7 +60,7 @@ class BigQueue {
     head_++;
     size_--;
     if ((size_ > kCompactThreshold) && (size_ < (capacity_ / 2)))
-      Migrate(int(float(capacity_ * 0.6)));
+      Migrate(static_cast<int>(static_cast<float>(capacity_ * 0.6)));
   }
 
   bool Peek(Item **item) {

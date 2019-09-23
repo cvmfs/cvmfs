@@ -9,6 +9,7 @@
 #include "glue_buffer.h"
 #include "platform.h"
 #include "shortstring.h"
+#include "util/posix.h"
 
 namespace glue {
 
@@ -117,6 +118,49 @@ TEST_F(T_GlueBuffer, NentryTracker) {
   EXPECT_EQ(2U, tracker.GetStatistics().num_insert);
   EXPECT_EQ(2U, tracker.GetStatistics().num_remove);
   EXPECT_EQ(3U, tracker.GetStatistics().num_prune);
+}
+
+
+TEST_F(T_GlueBuffer, NentryMove) {
+  NentryTracker tracker;
+  const unsigned kTimeoutNever = 100000;
+
+  tracker.Add(1, "one", kTimeoutNever);
+
+  NentryTracker *dst = tracker.Move();
+
+  uint64_t parent_inode = 0;
+  NameString name;
+  NentryTracker::Cursor cursor = tracker.BeginEnumerate();
+  EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
+  tracker.EndEnumerate(&cursor);
+
+  cursor = dst->BeginEnumerate();
+  EXPECT_TRUE(dst->NextEntry(&cursor, &parent_inode, &name));
+  EXPECT_EQ(1U, parent_inode);
+  EXPECT_EQ(std::string("one"), name.ToString());
+  EXPECT_FALSE(dst->NextEntry(&cursor, &parent_inode, &name));
+  dst->EndEnumerate(&cursor);
+}
+
+
+TEST_F(T_GlueBuffer, NentryCleanerSlow) {
+  NentryTracker tracker;
+  tracker.Prune();  // Don't crash when tracker is empty
+
+  tracker.Add(0, "one", 1);
+  tracker.SpawnCleaner(1);
+  SafeSleepMs(4000);
+
+  EXPECT_GT(tracker.GetStatistics().num_prune, 0U);
+  EXPECT_EQ(1U, tracker.GetStatistics().num_remove);
+  EXPECT_EQ(1U, tracker.GetStatistics().num_insert);
+
+  uint64_t parent_inode = 0;
+  NameString name;
+  NentryTracker::Cursor cursor = tracker.BeginEnumerate();
+  EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
+  tracker.EndEnumerate(&cursor);
 }
 
 }  // namespace glue
