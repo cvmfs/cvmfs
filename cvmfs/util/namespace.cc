@@ -26,6 +26,15 @@
 #define MS_REC 0x4000
 #endif
 
+#ifndef __APPLE__
+#define CVMFS_HAS_UNSHARE 1
+#ifdef __GLIBC_MINOR__
+#if __GLIBC_MINOR__ < 4
+#undef CVMFS_HAS_UNSHARE
+#endif
+#endif
+#endif
+
 
 int CheckNamespaceFeatures() {
 #ifdef __APPLE__
@@ -46,9 +55,7 @@ int CheckNamespaceFeatures() {
 
 
 bool CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
-#ifdef __APPLE__
-  return false;
-#else
+#ifdef CVMFS_HAS_UNSHARE
   std::string uid_str = StringifyInt(geteuid());
   std::string gid_str = StringifyInt(geteuid());
 
@@ -65,6 +72,8 @@ bool CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
   if (!rvb) return false;
 
   return true;
+#else
+  return false;
 #endif
 }
 
@@ -80,9 +89,7 @@ bool BindMount(const std::string &from, const std::string &to) {
 
 
 bool CreateMountNamespace() {
-#ifdef __APPLE__
-  return false;
-#else
+#ifdef CVMFS_HAS_UNSHARE
   std::string cwd = GetCurrentWorkingDirectory();
 
   int rvi = unshare(CLONE_NEWNS);
@@ -90,6 +97,8 @@ bool CreateMountNamespace() {
 
   rvi = chdir(cwd.c_str());
   return rvi == 0;
+#else
+  return false;
 #endif
 }
 
@@ -100,9 +109,7 @@ bool CreateMountNamespace() {
  * init process a means to detect when the parent process is terminated.
  */
 bool CreatePidNamespace(int *fd_parent) {
-#ifdef __APPLE__
-  return false;
-#else
+#ifdef CVMFS_HAS_UNSHARE
   int rvi = unshare(CLONE_NEWPID);
   if (rvi != 0) return false;
 
@@ -147,5 +154,7 @@ bool CreatePidNamespace(int *fd_parent) {
 
   rvi = mount("", "/proc", "proc", 0, NULL);
   return rvi == 0;
+#else
+  return false;
 #endif
 }
