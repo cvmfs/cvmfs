@@ -80,7 +80,8 @@ TEST_F(T_GlueBuffer, InodeTracker) {
 
 
 TEST_F(T_GlueBuffer, NentryTracker) {
-  NentryTracker tracker(100000);  // Don't auto-prune
+  NentryTracker tracker;
+  const unsigned kTimeoutNever = 100000;
 
   uint64_t parent_inode = 0;
   NameString name;
@@ -88,8 +89,9 @@ TEST_F(T_GlueBuffer, NentryTracker) {
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
 
-  tracker.Add(1, "one");
-  tracker.Add(2, "two");
+  tracker.Add(1, "one", kTimeoutNever);
+  tracker.Add(2, "two", kTimeoutNever);
+  tracker.Add(3, "ignore_me", 0);
   cursor = tracker.BeginEnumerate();
   EXPECT_TRUE(tracker.NextEntry(&cursor, &parent_inode, &name));
   EXPECT_EQ(1U, parent_inode);
@@ -102,12 +104,12 @@ TEST_F(T_GlueBuffer, NentryTracker) {
 
   tracker.Disable();
 
-  tracker.DoPrune(platform_monotonic_time() + 100000 + 1);
+  tracker.DoPrune(platform_monotonic_time() + kTimeoutNever + 1);
   cursor = tracker.BeginEnumerate();
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
 
-  tracker.Add(3, "ignore_me");
+  tracker.Add(4, "ignore_me", kTimeoutNever);
   cursor = tracker.BeginEnumerate();
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);

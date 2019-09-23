@@ -1436,7 +1436,7 @@ void MountPoint::CreateTables() {
                                          statistics_);
 
   inode_tracker_ = new glue::InodeTracker();
-  nentry_tracker_ = new glue::NentryTracker(kcache_timeout_sec_);
+  nentry_tracker_ = new glue::NentryTracker();
 }
 
 /**
@@ -1717,7 +1717,6 @@ void MountPoint::SetupBehavior() {
     // Can be negative and should then be interpreted as 0.0
     kcache_timeout_sec_ =
       std::max(0.0, static_cast<double>(String2Int64(optarg)));
-    nentry_tracker_->SetTimeout(kcache_timeout_sec_);
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));

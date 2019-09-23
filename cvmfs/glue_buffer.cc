@@ -102,12 +102,7 @@ InodeTracker::~InodeTracker() {
 
 //------------------------------------------------------------------------------
 
-
-NentryTracker::NentryTracker(unsigned timeout_s)
-  : version_(kVersion)
-  , timeout_s_(timeout_s)
-  , is_active_(true)
-{
+NentryTracker::NentryTracker() : version_(kVersion), is_active_(true) {
   InitLock();
 }
 
@@ -135,7 +130,6 @@ void NentryTracker::CopyFrom(const NentryTracker &other) {
   assert(other.version_ == kVersion);
 
   version_ = kVersion;
-  timeout_s_ = other.timeout_s_;
   statistics_ = other.statistics_;
   is_active_ = other.is_active_;
   entries_ = other.entries_;
@@ -157,13 +151,6 @@ void NentryTracker::InitLock() {
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
-}
-
-
-void NentryTracker::SetTimeout(unsigned seconds) {
-  Lock();
-  timeout_s_ = seconds;
-  Unlock();
 }
 
 

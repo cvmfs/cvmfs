@@ -661,7 +661,7 @@ class NentryTracker {
   };
   Statistics GetStatistics() { return statistics_; }
 
-  explicit NentryTracker(unsigned timeout_s);
+  NentryTracker();
   explicit NentryTracker(const NentryTracker &other);
   NentryTracker &operator= (const NentryTracker &other);
   ~NentryTracker();
@@ -671,19 +671,19 @@ class NentryTracker {
    */
   NentryTracker *Move();
 
-  void Add(const uint64_t inode_parent, const char *name) {
+  void Add(const uint64_t inode_parent, const char *name, uint64_t timeout_s) {
     if (!is_active_) return;
+    if (timeout_s == 0) return;
 
     uint64_t now = platform_monotonic_time();
     Lock();
-    entries_.PushBack(Entry(now + timeout_s_, inode_parent, name));
+    entries_.PushBack(Entry(now + timeout_s, inode_parent, name));
     statistics_.num_insert++;
     DoPrune(now);
     Unlock();
   }
 
   void Prune();
-  void SetTimeout(unsigned seconds);
   /**
    * The nentry tracker is only needed for active cache eviction and can
    * otherwise ignore new entries.
@@ -722,7 +722,6 @@ class NentryTracker {
 
   pthread_mutex_t *lock_;
   unsigned version_;
-  unsigned timeout_s_;
   Statistics statistics_;
   bool is_active_;
   BigQueue<Entry> entries_;
