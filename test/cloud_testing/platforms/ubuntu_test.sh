@@ -41,13 +41,6 @@ if [ x"$(lsb_release -cs)" = x"trusty" ]; then
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi
-if [ x"$(lsb_release -cs)" = x"precise" ]; then
-  # Ubuntu 12.04
-  # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
-
-  echo "Ubuntu 12.04... using aufs instead of overlayfs"
-fi
 
 
 cd ${SOURCE_DIRECTORY}/test
