@@ -36,6 +36,7 @@ type Image struct {
 	Digest     string
 	IsThin     bool
 	Manifest   *da.Manifest
+	Config     *image.Image
 }
 
 func (i Image) GetSimpleName() string {
@@ -142,8 +143,10 @@ func (img Image) GetManifest() (da.Manifest, error) {
 	img.Manifest = &manifest
 	return manifest, nil
 }
-
-func (img Image) GetChanges() (changes []string, err error) {
+func (img Image) GetConfig() (config image.Image, err error) {
+	if img.Config != nil {
+		return *img.Config, nil
+	}
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -152,7 +155,6 @@ func (img Image) GetChanges() (changes []string, err error) {
 		pass = ""
 	}
 
-	changes = []string{"ENV CVMFS_IMAGE true"}
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
@@ -168,7 +170,7 @@ func (img Image) GetChanges() (changes []string, err error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", configUrl, nil)
 	if err != nil {
-		LogE(err).Warning("Impossible to create a request for getting the changes no chnages set.")
+		LogE(err).Warning("Impossible to create a request for getting the changes no changes set.")
 		return
 	}
 	req.Header.Set("Authorization", token)
@@ -182,12 +184,22 @@ func (img Image) GetChanges() (changes []string, err error) {
 		return
 	}
 
-	var config image.Image
 	err = json.Unmarshal(body, &config)
 	if err != nil {
 		LogE(err).Warning("Error in unmarshaling the configuration of the image")
 		return
 	}
+	img.Config = &config
+	return
+}
+
+func (img Image) GetChanges() (changes []string, err error) {
+	changes = []string{"ENV CVMFS_IMAGE true"}
+	config, err := img.GetConfig()
+	if err != nil {
+		return
+	}
+
 	env := config.Config.Env
 
 	if len(env) > 0 {
@@ -209,6 +221,18 @@ func (img Image) GetChanges() (changes []string, err error) {
 		}
 	}
 
+	return
+}
+
+func (img Image) GetDiffIDs() (diffIDs []string, err error) {
+	diffIDs = []string{}
+	config, err := img.GetConfig()
+	if err != nil {
+		return
+	}
+	for _, diffID := range config.RootFS.DiffIDs {
+		diffIDs = append(diffIDs, string(diffID))
+	}
 	return
 }
 
