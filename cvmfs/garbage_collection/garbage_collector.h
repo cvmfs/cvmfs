@@ -36,7 +36,8 @@
 
 #include <vector>
 
-#include "catalog_traversal.h"
+// #include "catalog_traversal.h"
+#include "catalog_traversal_parallel.h"
 #include "garbage_collection/hash_filter.h"
 #include "statistics.h"
 #include "upload_facility.h"

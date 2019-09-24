@@ -23,7 +23,7 @@
 namespace swissknife {
 
 typedef HttpObjectFetcher<> ObjectFetcher;
-typedef CatalogTraversal<ObjectFetcher> ReadonlyCatalogTraversal;
+typedef CatalogTraversalParallel<ObjectFetcher> ReadonlyCatalogTraversal;
 typedef SmallhashFilter HashFilter;
 typedef GarbageCollector<ReadonlyCatalogTraversal, HashFilter> GC;
 typedef GarbageCollectorAux<ReadonlyCatalogTraversal, HashFilter> GCAux;
