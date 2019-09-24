@@ -7,6 +7,7 @@
 #include "cvmfs_config.h"
 #include "glue_buffer.h"
 
+#include <errno.h>
 #include <poll.h>
 #include <unistd.h>
 
