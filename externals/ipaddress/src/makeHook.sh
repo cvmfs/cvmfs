@@ -2,7 +2,13 @@
 
 set -e
 rm -rf build
-python setup.py build
+
+PYTHON=python
+if ! $PYTHON -V >/dev/null 2>&1; then
+  PYTHON=python2
+fi
+
+$PYTHON setup.py build
 if [ -d build/lib ]; then
   cd build/lib
 else
