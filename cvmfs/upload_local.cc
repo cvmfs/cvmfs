@@ -78,7 +78,6 @@ void LocalUploader::FileUpload(const std::string &local_path,
     return;
   }
 
-  CountUploadedBytes(GetFileSize(remote_path));
   Respond(callback, UploaderResults(retcode, local_path));
 }
 
@@ -152,7 +151,11 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     }
     if (!content_hash.HasSuffix()
         || content_hash.suffix == shash::kSuffixPartial) {
+      CountUploadedChunks();
       CountUploadedBytes(GetFileSize(upstream_path_ + "/" + final_path));
+    } else if (content_hash.suffix == shash::kSuffixCatalog) {
+      CountUploadedCatalogs();
+      CountUploadedCatalogBytes(GetFileSize(upstream_path_ + "/" + final_path));
     }
   } else {
     const int retval = unlink(local_handle->temporary_path.c_str());
@@ -161,6 +164,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
                "failed to remove temporary file '%s' (errno: %d)",
                local_handle->temporary_path.c_str(), errno);
     }
+    CountDuplicates();
   }
 
   const CallbackTN *callback = handle->commit_callback;
@@ -182,9 +186,6 @@ void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
 
 bool LocalUploader::Peek(const std::string &path) {
   bool retval = FileExists(upstream_path_ + "/" + path);
-  if (retval) {
-    CountDuplicates();
-  }
   return retval;
 }
 

@@ -152,7 +152,6 @@ void GatewayUploader::FileUpload(const std::string& local_path,
     return;
   }
 
-  CountUploadedBytes(handle->bucket->size);
   Respond(callback, UploaderResults(0, local_path));
 }
 
@@ -199,8 +198,14 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
             UploaderResults(UploaderResults::kChunkCommit, 4));
     return;
   }
-
-  CountUploadedBytes(hd->bucket->size);
+  if (!content_hash.HasSuffix()
+      || content_hash.suffix == shash::kSuffixPartial) {
+    CountUploadedChunks();
+    CountUploadedBytes(hd->bucket->size);
+  } else if (content_hash.suffix == shash::kSuffixCatalog) {
+    CountUploadedCatalogs();
+    CountUploadedCatalogBytes(hd->bucket->size);
+  }
   Respond(handle->commit_callback,
           UploaderResults(UploaderResults::kChunkCommit, 0));
 }

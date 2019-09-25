@@ -101,6 +101,7 @@ set(CVMFS_UNITTEST_FILES
   t_sqlite_database.cc
   t_sqlitemem.cc
   t_statistics.cc
+  t_statistics_sql.cc
   t_suid_util.cc
   t_supervisor.cc
   t_swissknife_lease.cc
@@ -223,6 +224,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/statistics_database.cc
   ${CVMFS_SOURCE_DIR}/supervisor.cc
   ${CVMFS_SOURCE_DIR}/swissknife.cc
   ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc

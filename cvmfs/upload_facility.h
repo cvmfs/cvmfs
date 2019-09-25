@@ -22,14 +22,23 @@
 namespace upload {
 
 struct UploadCounters {
-  perf::Counter *n_duplicated_files;
+  perf::Counter *n_chunks_added;
+  perf::Counter *n_chunks_duplicated;
+  perf::Counter *n_catalogs_added;
   perf::Counter *sz_uploaded_bytes;
+  perf::Counter *sz_uploaded_catalog_bytes;
 
   explicit UploadCounters(perf::StatisticsTemplate statistics) {
-    n_duplicated_files = statistics.RegisterTemplated("n_duplicated_files",
-        "Number of duplicated files added");
-    sz_uploaded_bytes = statistics.RegisterTemplated("sz_uploaded_bytes",
-        "Number of uploaded bytes");
+    n_chunks_added = statistics.RegisterOrLookupTemplated(
+      "n_chunks_added", "Number of new chunks added");
+    n_chunks_duplicated = statistics.RegisterOrLookupTemplated(
+      "n_chunks_duplicated", "Number of duplicated chunks added");
+    n_catalogs_added = statistics.RegisterOrLookupTemplated(
+      "n_catalogs_added", "Number of new catalogs added");
+    sz_uploaded_bytes = statistics.RegisterOrLookupTemplated(
+      "sz_uploaded_bytes", "Number of uploaded bytes");
+    sz_uploaded_catalog_bytes = statistics.RegisterOrLookupTemplated(
+      "sz_uploaded_catalog_bytes", "Number of uploaded bytes for catalogs");
   }
 };  // UploadCounters
 
@@ -374,8 +383,12 @@ class AbstractUploader
     return spooler_definition_;
   }
 
+  void CountUploadedChunks() const;
+  void DecUploadedChunks() const;
   void CountUploadedBytes(int64_t bytes_written) const;
   void CountDuplicates() const;
+  void CountUploadedCatalogs() const;
+  void CountUploadedCatalogBytes(int64_t bytes_written) const;
 
  protected:
   /**

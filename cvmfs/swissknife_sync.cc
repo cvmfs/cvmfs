@@ -726,7 +726,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                               &publish_statistics);
   if (NULL == params.spooler) return 3;
   UniquePtr<upload::Spooler> spooler_catalogs(
-      upload::Spooler::Construct(spooler_definition_catalogs));
+      upload::Spooler::Construct(spooler_definition_catalogs,
+                                 &publish_statistics));
   if (!spooler_catalogs.IsValid()) return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
@@ -853,6 +854,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     PrintError("something went wrong during sync");
     return 5;
   }
+
+  perf::Counter *revision_counter = statistics()->Register("Publish.revision",
+                                                  "Published revision number");
+  revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");

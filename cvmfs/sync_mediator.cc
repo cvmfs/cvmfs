@@ -34,6 +34,9 @@ struct Counters {
   perf::Counter *n_directories_added;
   perf::Counter *n_directories_removed;
   perf::Counter *n_directories_changed;
+  perf::Counter *n_symlinks_added;
+  perf::Counter *n_symlinks_removed;
+  perf::Counter *n_symlinks_changed;
   perf::Counter *sz_added_bytes;
   perf::Counter *sz_removed_bytes;
 
@@ -52,6 +55,12 @@ struct Counters {
     n_directories_changed =
                   statistics.RegisterTemplated("n_directories_changed",
                                             "Number of directories changed");
+    n_symlinks_added = statistics.RegisterTemplated("n_symlinks_added",
+        "Number of symlinks added");
+    n_symlinks_removed = statistics.RegisterTemplated("n_symlinks_removed",
+        "Number of symlinks removed");
+    n_symlinks_changed = statistics.RegisterTemplated("n_symlinks_changed",
+        "Number of symlinks changed");
     sz_added_bytes = statistics.RegisterTemplated("sz_added_bytes",
                                             "Number of bytes added");
     sz_removed_bytes = statistics.RegisterTemplated("sz_removed_bytes",
@@ -173,12 +182,38 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
   if (entry->IsRegularFile() || entry->IsSymlink() || entry->IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
     // Replace calls Remove; cancel Remove's actions:
-    perf::Dec(counters_->n_files_removed);
     perf::Xadd(counters_->sz_removed_bytes, -entry->GetRdOnlySize());
 
-    perf::Inc(counters_->n_files_changed);
     // Count only the diference between the old and new file
-    int64_t dif = entry->GetScratchSize() - entry->GetRdOnlySize();
+    // Symlinks do not count into added or removed bytes
+    int64_t dif = 0;
+
+    // Need to handle 4 cases (symlink->symlink, symlink->regular,
+    // regular->symlink, regular->regular)
+    if (entry->WasSymlink()) {
+      // Replace calls Remove; cancel Remove's actions:
+      perf::Dec(counters_->n_symlinks_removed);
+
+      if (entry->IsSymlink()) {
+        perf::Inc(counters_->n_symlinks_changed);
+      } else {
+        perf::Inc(counters_->n_symlinks_removed);
+        perf::Inc(counters_->n_files_added);
+        dif += entry->GetScratchSize();
+      }
+    } else {
+      // Replace calls Remove; cancel Remove's actions:
+      perf::Dec(counters_->n_files_removed);
+      dif -= entry->GetRdOnlySize();
+      if (entry->IsSymlink()) {
+        perf::Inc(counters_->n_files_removed);
+        perf::Inc(counters_->n_symlinks_added);
+      } else {
+        perf::Inc(counters_->n_files_changed);
+        dif += entry->GetScratchSize();
+      }
+    }
+
     if (dif > 0) {                            // added bytes
       perf::Xadd(counters_->sz_added_bytes, dif);
     } else {                                  // removed bytes
@@ -359,6 +394,12 @@ void SyncMediator::InsertHardlink(SharedPtr<SyncItem> entry) {
   } else {
     // Append the file to the appropriate hardlink group
     hardlink_group->second.AddHardlink(entry);
+  }
+
+  // publish statistics counting for new file
+  if (entry->IsNew()) {
+    perf::Inc(counters_->n_files_added);
+    perf::Xadd(counters_->sz_added_bytes, entry->GetScratchSize());
   }
 }
 
@@ -865,8 +906,12 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
 
   // publish statistics counting for new file
   if (entry->IsNew()) {
-    perf::Inc(counters_->n_files_added);
-    perf::Xadd(counters_->sz_added_bytes, entry->GetScratchSize());
+    if (entry->IsSymlink()) {
+      perf::Inc(counters_->n_symlinks_added);
+    } else {
+      perf::Inc(counters_->n_files_added);
+      perf::Xadd(counters_->sz_added_bytes, entry->GetScratchSize());
+    }
   }
 }
 
@@ -883,7 +928,11 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
   }
 
   // Counting nr of removed files and removed bytes
-  perf::Inc(counters_->n_files_removed);
+  if (entry->WasSymlink()) {
+    perf::Inc(counters_->n_symlinks_removed);
+  } else {
+    perf::Inc(counters_->n_files_removed);
+  }
   perf::Xadd(counters_->sz_removed_bytes, entry->GetRdOnlySize());
 }
 

@@ -16,15 +16,6 @@
 
 struct Stats;
 
-struct RevisionFlags {
-  enum T {
-    kInitialRevision   = 1,
-    kUpdatableRevision = 2,
-    kUpdatedRevision   = 3,
-    kFailingRevision   = 4,
-  };
-};
-
 class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
  protected:
   friend class sqlite::Database<StatisticsDatabase>;
@@ -57,7 +48,7 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   */
   int StoreStatistics(const perf::Statistics *statistics,
                       const std::string &start_time,
-                      const std::string &finished_time,
+                      const std::string &finish_time,
                       const std::string &command_name,
                       const std::string &repo_name);
 
