@@ -14,7 +14,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/docker/image"
+	manifestlist "github.com/docker/distribution/manifest/manifestlist"
+	image "github.com/docker/docker/image"
+
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
 
@@ -27,16 +29,17 @@ type ManifestRequest struct {
 }
 
 type Image struct {
-	Id         int
-	User       string
-	Scheme     string
-	Registry   string
-	Repository string
-	Tag        string
-	Digest     string
-	IsThin     bool
-	Manifest   *da.Manifest
-	Config     *image.Image
+	Id           int
+	User         string
+	Scheme       string
+	Registry     string
+	Repository   string
+	Tag          string
+	Digest       string
+	IsThin       bool
+	Manifest     *da.Manifest
+	ManifestList *manifestlist.ManifestList
+	Config       *image.Image
 }
 
 func (i Image) GetSimpleName() string {
@@ -124,26 +127,94 @@ func (img Image) PrintImage(machineFriendly, csv_header bool) {
 	}
 }
 
-func (img Image) GetManifest() (da.Manifest, error) {
+func (img *Image) GetManifest() (da.Manifest, error) {
 	if img.Manifest != nil {
+		Log().Info("Serve manifest from cache")
 		return *img.Manifest, nil
 	}
+	Log().Info("Getting remote manifest")
 	bytes, err := img.getByteManifest()
 	if err != nil {
+		LogE(err).Error("Error in getting the bytes of the manifest")
 		return da.Manifest{}, err
 	}
 	var manifest da.Manifest
 	err = json.Unmarshal(bytes, &manifest)
 	if err != nil {
+		LogE(err).Error("Error in unmarshaling the manifest")
 		return manifest, err
 	}
 	if reflect.DeepEqual(da.Manifest{}, manifest) {
+		Log().Warn("Got empty manifest")
 		return manifest, fmt.Errorf("Got empty manifest")
 	}
 	img.Manifest = &manifest
 	return manifest, nil
 }
-func (img Image) GetConfig() (config image.Image, err error) {
+
+func (img *Image) GetManifestList() (manifestlist.ManifestList, error) {
+	if img.ManifestList != nil {
+		return *img.ManifestList, nil
+	}
+	var manifestList manifestlist.ManifestList
+	bytes, err := img.getByteManifestList()
+	if err != nil {
+		LogE(err).Error("Error in getting the bytes from the manifest list")
+		return manifestList, err
+	}
+	err = json.Unmarshal(bytes, &manifestList)
+	if err != nil {
+		LogE(err).Error("Error in unmarshaling the bytes for the manifest list")
+		return manifestList, err
+	}
+	if reflect.DeepEqual(manifestlist.ManifestList{}, manifestList) {
+		err := fmt.Errorf("Got empty manifest list")
+		LogE(err).Warn("Unmarshaled manifest list is equal to zero value manifest list")
+		return manifestList, err
+	}
+	img.ManifestList = &manifestList
+	return manifestList, nil
+}
+
+func (img Image) getByteManifestList() ([]byte, error) {
+	url := img.GetManifestUrl()
+
+	reqAuth, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		LogE(err).Error("Error in creating the HTTP Request for the authentication for the manifest list")
+		return nil, err
+	}
+	token, err := firstRequestForAuthV2(reqAuth)
+	if err != nil {
+		LogE(err).Error("Error in obtain the token for the manifest list")
+		return nil, err
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		LogE(err).Error("Error in creating the HTTP Request for the manifest list")
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", token)
+	req.Header.Set("Accept", manifestlist.MediaTypeManifestList)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		LogE(err).Error("Error in making the HTTP request for the manifest list")
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		LogE(err).Error("Error in reading the bytes from the request for the manifest list")
+		return nil, err
+	}
+	return body, nil
+}
+
+func (img *Image) GetConfig() (config image.Image, err error) {
 	if img.Config != nil {
 		return *img.Config, nil
 	}
@@ -155,6 +226,7 @@ func (img Image) GetConfig() (config image.Image, err error) {
 		pass = ""
 	}
 
+	Log().Info("Get Manifest form GetConfig")
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
@@ -378,8 +450,49 @@ func getManifestWithUsernameAndPassword(img Image, user, pass string) ([]byte, e
 	return body, nil
 }
 
+func firstRequestForAuthV2(request *http.Request) (token string, err error) {
+	client := &http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		LogE(err).Error("Error in making the first request for authentication")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 401 {
+		log.WithFields(log.Fields{
+			"status code": resp.StatusCode,
+			"url":         request.URL,
+		}).Info("Expected status code 401, print body anyway.")
+		if err != nil {
+			LogE(err).Error("Error in reading the first http response")
+		}
+	}
+	_, authPresent := resp.Header["Www-Authenticate"]
+	if !authPresent {
+		err = fmt.Errorf("No authentication in the Header")
+		LogE(err).Error("The header does not contains authorization informations")
+		return "", err
+	}
+
+	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
+	user, pass, _ := request.BasicAuth()
+	token, err = requestAuthToken(WwwAuthenticate, user, pass)
+	if err != nil {
+		LogE(err).Error("Error in getting the authentication token")
+		return "", err
+	}
+	return token, nil
+}
+
 func firstRequestForAuth(url, user, pass string) (token string, err error) {
-	resp, err := http.Get(url)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		LogE(err).Error("Impossible to create a HTTP request")
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		LogE(err).Error("Error in making the first request for auth")
 		return "", err
@@ -388,14 +501,19 @@ func firstRequestForAuth(url, user, pass string) (token string, err error) {
 	if resp.StatusCode != 401 {
 		log.WithFields(log.Fields{
 			"status code": resp.StatusCode,
+			"url":         url,
 		}).Info("Expected status code 401, print body anyway.")
-		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			LogE(err).Error("Error in reading the first http response")
 		}
-		fmt.Println(string(body))
+	}
+	_, authPresent := resp.Header["Www-Authenticate"]
+	if !authPresent {
+		err = fmt.Errorf("No authentication in the Header")
+		LogE(err).Error("The header does not contains authorization informations")
 		return "", err
 	}
+
 	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
 	token, err = requestAuthToken(WwwAuthenticate, user, pass)
 	if err != nil {
@@ -403,12 +521,11 @@ func firstRequestForAuth(url, user, pass string) (token string, err error) {
 		return "", err
 	}
 	return token, nil
-
 }
 
-func getLayerUrl(img Image, layer da.Layer) string {
+func getBlobUrl(img Image, blobDigest string) string {
 	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, layer.Digest)
+		img.Scheme, img.Registry, img.Repository, blobDigest)
 }
 
 type downloadedLayer struct {
@@ -437,7 +554,7 @@ func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<
 
 	// A first request is used to get the authentication
 	firstLayer := manifest.Layers[0]
-	layerUrl := getLayerUrl(img, firstLayer)
+	layerUrl := getBlobUrl(img, firstLayer.Digest)
 	token, err := firstRequestForAuth(layerUrl, user, pass)
 	if err != nil {
 		return err
@@ -518,7 +635,7 @@ func (img Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend d
 		user = ""
 		pass = ""
 	}
-	layerUrl := getLayerUrl(img, layer)
+	layerUrl := getBlobUrl(img, layer.Digest)
 	if token == "" {
 		token, err = firstRequestForAuth(layerUrl, user, pass)
 		if err != nil {
