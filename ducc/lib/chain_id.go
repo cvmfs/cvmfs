@@ -6,22 +6,24 @@ import (
 )
 
 type ChainID struct {
-	BaseLayers []string
+	BaseLayers []digest.Digest
 	Chain      []digest.Digest
 	ID         digest.Digest
 }
 
-func NewChainID(base string) ChainID {
-	ID := digest.FromBytes([]byte(base))
+func NewChainID(id digest.Digest) ChainID {
 	return ChainID{
-		[]string{base},
-		[]digest.Digest{ID},
-		ID,
+		[]digest.Digest{id},
+		[]digest.Digest{id},
+		id,
 	}
 }
 
-func (chain ChainID) AddLayer(layer string) ChainID {
-	ID := digest.FromBytes([]byte(chain.ID.String() + " " + layer))
+func (chain ChainID) AddLayer(layer digest.Digest) ChainID {
+	if chain.ID == "" {
+		return NewChainID(layer)
+	}
+	ID := digest.FromString(chain.ID.String() + " " + layer.String())
 	baseLayers := append(chain.BaseLayers, layer)
 	chainD := append(chain.Chain, ID)
 	return ChainID{
@@ -29,4 +31,24 @@ func (chain ChainID) AddLayer(layer string) ChainID {
 		chainD,
 		ID,
 	}
+}
+
+func ChainIDFromLayers(layers []digest.Digest) ChainID {
+	chain := ChainID{}
+	for _, l := range layers {
+		chain = chain.AddLayer(l)
+	}
+	return chain
+}
+
+func MapStringToDigest(layers []string) ([]digest.Digest, error) {
+	var digests []digest.Digest
+	for _, layer := range layers {
+		digest, err := digest.Parse(layer)
+		if err != nil {
+			return nil, err
+		}
+		digests = append(digests, digest)
+	}
+	return digests, nil
 }

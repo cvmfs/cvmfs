@@ -16,6 +16,7 @@ import (
 
 	manifestlist "github.com/docker/distribution/manifest/manifestlist"
 	image "github.com/docker/docker/image"
+	digest "github.com/opencontainers/go-digest"
 
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
@@ -296,14 +297,18 @@ func (img Image) GetChanges() (changes []string, err error) {
 	return
 }
 
-func (img Image) GetDiffIDs() (diffIDs []string, err error) {
-	diffIDs = []string{}
+func (img Image) GetDiffIDs() (diffIDs []digest.Digest, err error) {
+	diffIDs = []digest.Digest{}
 	config, err := img.GetConfig()
 	if err != nil {
 		return
 	}
 	for _, diffID := range config.RootFS.DiffIDs {
-		diffIDs = append(diffIDs, string(diffID))
+		digest, err := digest.Parse(string(diffID))
+		if err != nil {
+			return diffIDs, err
+		}
+		diffIDs = append(diffIDs, digest)
 	}
 	return
 }
