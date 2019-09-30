@@ -48,6 +48,10 @@ func TestApplyDirectory(t *testing.T) {
 	os.Create(filepath.Join(bottom, "a", "001.txt"))
 	os.Create(filepath.Join(bottom, "a", "002.txt"))
 	os.Create(filepath.Join(bottom, "a", "003.txt"))
+	os.Mkdir(filepath.Join(bottom, "a", "zzz"), 0766)
+	os.Mkdir(filepath.Join(bottom, "a", "xxx"), 0766)
+	os.Create(filepath.Join(bottom, "a", "xxx", "100.txt"))
+	os.Mkdir(filepath.Join(bottom, "a", "xxx", "yyy"), 0766)
 
 	os.Mkdir(filepath.Join(bottom, "a", "b"), 0766)
 	os.Create(filepath.Join(bottom, "a", "b", "010.txt"))
@@ -60,6 +64,11 @@ func TestApplyDirectory(t *testing.T) {
 	os.Create(filepath.Join(top, "a", "b", ".wh..wh..opq"))
 	// this should delete the file $bottom/a/001.txt
 	os.Create(filepath.Join(top, "a", ".wh.001.txt"))
+	// this should delete the directory $bottom/a/zzz
+	os.Create(filepath.Join(top, "a", ".wh.zzz"))
+	// this should delete the directory $bottom/a/xxx and all the content
+	os.Create(filepath.Join(top, "a", ".wh.xxx"))
+
 	if err != nil {
 		// maybe in some filesystem this call can fail, better make sure it actually worked.
 		t.Errorf("Error in creating opaque file in directory, %s", err)
@@ -98,7 +107,27 @@ func TestApplyDirectory(t *testing.T) {
 	}
 
 	cancelledByWhiteout := filepath.Join(bottom, "a", "001.txt")
-	if _, err := os.Stat(notCancelledByOpaqueWhiteout); !os.IsNotExist(err) {
+	if _, err := os.Stat(cancelledByWhiteout); !os.IsNotExist(err) {
 		t.Errorf("File %s was not cancelled by the whiteout file in the top directory.", cancelledByWhiteout)
+	}
+
+	cancelledByWhiteout = filepath.Join(bottom, "a", "zzz")
+	if _, err := os.Stat(cancelledByWhiteout); !os.IsNotExist(err) {
+		t.Errorf("Directory %s was not cancelled by the whiteout file in the top directory.", cancelledByWhiteout)
+	}
+
+	cancelledByWhiteout = filepath.Join(bottom, "a", "xxx", "100.txt")
+	if _, err := os.Stat(cancelledByWhiteout); !os.IsNotExist(err) {
+		t.Errorf("Directory %s was not cancelled by the whiteout file in the top directory.", cancelledByWhiteout)
+	}
+
+	cancelledByWhiteout = filepath.Join(bottom, "a", "xxx", "yyy")
+	if _, err := os.Stat(cancelledByWhiteout); !os.IsNotExist(err) {
+		t.Errorf("Directory %s was not cancelled by the whiteout file in the top directory.", cancelledByWhiteout)
+	}
+
+	cancelledByWhiteout = filepath.Join(bottom, "a", "xxx")
+	if _, err := os.Stat(cancelledByWhiteout); !os.IsNotExist(err) {
+		t.Errorf("Directory %s was not cancelled by the whiteout file in the top directory.", cancelledByWhiteout)
 	}
 }

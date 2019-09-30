@@ -66,6 +66,13 @@ func ApplyDirectory(bottom, top string) error {
 	for _, whiteOut := range whiteOuts {
 		fmt.Println(whiteOut)
 		// delete the file that should be whiteout
+		whiteOutBaseFilename := filepath.Base(whiteOut.Path)
+		toRemoveBaseFilename := getPathToWhiteout(whiteOutBaseFilename)
+		whiteOutPath := filepath.Join(bottom, filepath.Dir(whiteOut.Path), toRemoveBaseFilename)
+		err = os.RemoveAll(whiteOutPath)
+		if err != nil {
+			return err
+		}
 	}
 	for _, file := range standards {
 		fmt.Println(file)
