@@ -2,10 +2,14 @@ package lib
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 func ApplyDirectory(bottom, top string) error {
@@ -64,7 +68,6 @@ func ApplyDirectory(bottom, top string) error {
 		}
 	}
 	for _, whiteOut := range whiteOuts {
-		fmt.Println(whiteOut)
 		// delete the file that should be whiteout
 		whiteOutBaseFilename := filepath.Base(whiteOut.Path)
 		toRemoveBaseFilename := getPathToWhiteout(whiteOutBaseFilename)
@@ -75,8 +78,91 @@ func ApplyDirectory(bottom, top string) error {
 		}
 	}
 	for _, file := range standards {
-		fmt.Println(file)
 		// add the file or directory
+		// remember to set permision and owner
+		// if it is a directory, just create the directory with all the permision and the correct owner
+		// if is is a file, just create the file and then copy all the content
+
+		// start by getting the UID and GID of the file
+		var UID int
+		var GID int
+		var rdev int
+		if stat, ok := file.Info.Sys().(*syscall.Stat_t); ok {
+			UID = int(stat.Uid)
+			GID = int(stat.Gid)
+			rdev = int(stat.Rdev)
+		} else {
+			UID = os.Getuid()
+			GID = os.Getgid()
+			rdev = 0
+		}
+		// then we get the permission
+		filemode := file.Info.Mode()
+		// and finally we compose the path of the file
+		path := filepath.Join(bottom, file.Path)
+
+		switch {
+		case filemode.IsDir():
+			// we create a very open directory to avoid permission problem
+			// we fix all the permission in the defer statements.
+			// the defer are stacked, hence the last directory created will
+			// be the first one to have its permission changed.
+			err = os.MkdirAll(path, 0700)
+			if err != nil {
+				return err
+			}
+			defer func(path string, filemode os.FileMode, UID, GID int) {
+				os.Chmod(path, filemode)
+				os.Chown(path, UID, GID)
+			}(path, filemode, UID, GID)
+
+		case filemode.IsRegular():
+			// we remove the file, it may not exists and this call will return PathError.
+			// we just ignore this kind of error
+			os.Remove(path)
+			newFile, err := os.Create(path)
+			if err != nil {
+				return err
+			}
+			srcFile, err := os.Open(filepath.Join(top, file.Path))
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(newFile, srcFile)
+			if err != nil {
+				return err
+			}
+			newFile.Chown(UID, GID)
+			newFile.Chmod(filemode)
+
+		case filemode&os.ModeSymlink != 0:
+			link, err := os.Readlink(filepath.Join(top, file.Path))
+			if err != nil {
+				return err
+			}
+
+			err = os.Symlink(link, path)
+			if err != nil {
+				return err
+			}
+			os.Lchown(path, UID, GID)
+
+		case filemode&os.ModeNamedPipe != 0:
+			fallthrough
+		case filemode&os.ModeSocket != 0:
+			err = unix.Mkfifo(path, uint32(filemode))
+			if err != nil {
+				return err
+			}
+			os.Chown(path, UID, GID)
+		case filemode&os.ModeDevice != 0:
+			err = unix.Mknod(path, uint32(filemode), rdev)
+			if err != nil {
+				return err
+			}
+			os.Chown(path, UID, GID)
+		}
+
 	}
 	return nil
 }
