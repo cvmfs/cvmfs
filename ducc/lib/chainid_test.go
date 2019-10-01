@@ -5,6 +5,9 @@ import (
 )
 
 func TestGetDiffIDs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Short test that speak with the network, skipping.")
+	}
 	imageName := "https://registry.hub.docker.com/library/redis:@sha256:b33e5a3c00e5794324fad2fab650eadba0f65e625cc915e4e57995590502c269"
 	img, err := ParseImage(imageName)
 	if err != nil {
@@ -35,6 +38,9 @@ func TestGetDiffIDs(t *testing.T) {
 }
 
 func TestGetChainIDs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Short test that speak with the network, skipping.")
+	}
 	imageName := "https://registry.hub.docker.com/library/redis:@sha256:b33e5a3c00e5794324fad2fab650eadba0f65e625cc915e4e57995590502c269"
 	img, err := ParseImage(imageName)
 	if err != nil {
