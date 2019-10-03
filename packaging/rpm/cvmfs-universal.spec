@@ -165,7 +165,6 @@ Group: Applications/System
 Requires: cvmfs = %{version}
 Requires: fuse3
 Requires: fuse3-libs
-Requires: fuse3
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 %endif
