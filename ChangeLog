@@ -1,4 +1,5 @@
 2.7.0:
+  * Add support for EL8 platform (CVM-1731)
   * Fix publish statistics for several corner cases (CVM-1716 .. CVM-1720)
   * Add 'list_reflog' command to cvmfs_swissknife (CVM-1760)
   * Add 'filestats' command to cvmfs_swissknife (CVM-1756)
