@@ -1,0 +1,9 @@
+--- src/Makefile.orig	2019-09-25 23:22:21.619964247 +0200
++++ src/Makefile	2019-09-25 23:27:07.783290561 +0200
+@@ -135,5 +135,5 @@
+ 
+ clean:
+ 	rm -f $(LIBRARY_LINK) $(LIBRARY) libjs.a pacparser.o pactester pymod/pacparser_o_buildstamp jsapi_buildstamp
+-	cd pymod && python setup.py clean --all
++	cd pymod && $(PYTHON) setup.py clean --all
+ 	cd spidermonkey && $(MAKE) clean

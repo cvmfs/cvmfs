@@ -4,14 +4,14 @@
 %define sle12 1
 %define dist .sle12
 %endif
-%if 0%{?el6} || 0%{?el7} || 0%{?fedora}
+%if 0%{?rhel} >= 6 || 0%{?fedora}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
-%if 0%{?el7} || 0%{?fedora}
+%if 0%{?rhel} >= 7 || 0%{?fedora}
 %define selinux_cvmfs_server 1
 %endif
-%if 0%{?el7} || 0%{?fedora} >= 29
+%if 0%{?rhel} >= 7 || 0%{?fedora} >= 29
   %if "%{?_arch}" != "aarch64"
     %define build_ducc 1
   %endif
@@ -26,13 +26,18 @@
 %endif
 
 # List of platforms that require systemd/autofs fix as described in CVM-1200
-%if 0%{?el7} || 0%{?fedora} || 0%{?sle12}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12}
 %define systemd_autofs_patch 1
 %endif
 
 # fuse3 is in epel starting with epel6
 %if 0%{?fedora} >= 29 || 0%{?rhel} >= 6
 %define build_fuse3 1
+%endif
+
+%define cvmfs_python python
+%if 0%{?el8}
+%define cvmfs_python python2
 %endif
 
 %define __strip /bin/true
@@ -80,7 +85,7 @@ BuildRequires: libattr-devel
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig
-BuildRequires: python-devel
+BuildRequires: %{cvmfs_python}-devel
 BuildRequires: unzip
 
 Requires: bash
@@ -117,7 +122,7 @@ Requires: shadow-utils
 Requires: SysVinit
 Requires: e2fsprogs
   %else
-    %if 0%{?fedora}
+    %if 0%{?fedora} || 0%{?rhel} >= 8
 Requires: procps-ng
     %else
 Requires: sysvinit-tools
@@ -158,6 +163,7 @@ Copyright (c) CERN
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
 Requires: cvmfs = %{version}
+Requires: fuse3
 Requires: fuse3-libs
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
@@ -173,10 +179,10 @@ CernVM-FS static client library for pure user-space use
 %package server
 Summary: CernVM-FS server tools
 Group: Application/System
-BuildRequires: python-devel
+BuildRequires: %{cvmfs_python}-devel
 BuildRequires: libcap-devel
 BuildRequires: unzip
-BuildRequires: python-setuptools
+BuildRequires: %{cvmfs_python}-setuptools
 %if 0%{?suse_version}
 Requires: insserv
 %else
@@ -197,7 +203,7 @@ Requires: lsof
 Requires: rsync
 Requires: usbutils
 Requires: sqlite
-%if 0%{?el6} || 0%{?el7} || 0%{?fedora} || 0%{?suse_version} >= 1300
+%if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
 %endif
 %if 0%{?selinux_cvmfs_server}
@@ -384,7 +390,7 @@ mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/do
 %endif
 
 # Fix docdir on Fedora
-%if 0%{?fedora}
+%if 0%{?fedora} || 0%{?rhel} >= 8
 rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
 %endif
 
@@ -579,6 +585,8 @@ fi
 %endif
 
 %changelog
+* Thu Oct 03 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
+- Add EL8 support
 * Wed Jun 12 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
 - Remove cvmfs_stratum_agent
 * Wed Apr 03 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
