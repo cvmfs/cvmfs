@@ -707,7 +707,11 @@ cvmfs_chksetup() {
       done
 
       # Check for network
-      local uuid=$(uuidgen)
+      local uuid=$(uuidgen 2>/dev/null)
+      if [ $? -ne 0 ]; then
+        # fallback: use following on Debian based systems
+        uuid=$(uuid -v4)
+      fi
       if [ ! -z "$CVMFS_HTTP_PROXY" -a ! -z "$CVMFS_SERVER_URL"  ]; then
         server_list=`echo "$CVMFS_SERVER_URL" | sed -e 's/,/ /g' -e 's/;/ /g'`
         for server in $server_list
