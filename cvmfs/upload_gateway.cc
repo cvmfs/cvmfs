@@ -148,8 +148,8 @@ void GatewayUploader::DoUpload(const std::string& remote_path,
   do {
     read_bytes = source->Read(&buf[0], buf.size());
     assert(read_bytes >= 0);
-    ObjectPack::AddToBucket(&buf[0], buf.size(), handle->bucket);
-    shash::Update(reinterpret_cast<unsigned char *>(&buf[0]), buf.size(),
+    ObjectPack::AddToBucket(&buf[0], read_bytes, handle->bucket);
+    shash::Update(reinterpret_cast<unsigned char *>(&buf[0]), read_bytes,
                   hash_ctx_ptr);
   } while (static_cast<size_t>(read_bytes) == buf.size());
   source->Close();

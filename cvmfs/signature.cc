@@ -325,11 +325,9 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
 
 
 void SignatureManager::UnloadPublicRsaKeys() {
-  if (!public_keys_.empty()) {
-    for (unsigned i = 0; i < public_keys_.size(); ++i)
-      RSA_free(public_keys_[i]);
-    public_keys_.clear();
-  }
+  for (unsigned i = 0; i < public_keys_.size(); ++i)
+    RSA_free(public_keys_[i]);
+  public_keys_.clear();
 }
 
 
