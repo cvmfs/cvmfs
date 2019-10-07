@@ -6,6 +6,7 @@
 #define CVMFS_UTIL_EXCEPTION_H_
 
 #include <stdexcept>
+#include <string>
 
 #include "logging.h"
 
@@ -15,8 +16,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 class ECvmfsException : std::runtime_error {
  public:
-  ECvmfsException(const std::string& what_arg) : 
-    std::runtime_error(what_arg){};
+  ECvmfsException ECvmfsException(const std::string& what_arg)
+      : std::runtime_error(what_arg) {}
 };
 
 #define PANIC(...) Panic("PANIC: __FILE__ : __LINE__", __VA_ARGS__);
