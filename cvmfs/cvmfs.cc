@@ -1331,6 +1331,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
   } else if (attr == "user.pubkeys") {
     attribute_value = mount_point_->signature_mgr()->GetActivePubkeys();
+  } else if (attr == "user.repo_counters") {
+    attribute_value = mount_point_->catalog_mgr()->GetRootCatalog()->
+                                    GetCounters().GetCsvMap();
   } else if (attr == "user.hash") {
     if (!d.checksum().IsNull()) {
       attribute_value = d.checksum().ToString();
@@ -1585,7 +1588,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
     "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
     "user.external_host\0user.external_timeout\0user.pubkeys\0"
-    "user.ncleanup24\0";
+    "user.ncleanup24\0user.repo_counters\0";
   string attribute_list;
   if (mount_point_->hide_magic_xattrs()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
