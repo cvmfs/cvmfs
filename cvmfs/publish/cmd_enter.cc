@@ -143,10 +143,9 @@ int CmdEnter::Main(const Options &options) {
   EnterRootContainer();
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-  // TODO(jblomer): remove hard-coded paths
-  cvmfs_binary_ = "/home/jakob/Documents/CERN/git/src/build-arch/cvmfs/cvmfs2";
-  overlayfs_binary_ =
-    "/home/jakob/Documents/CERN/git/fuse-overlayfs/fuse-overlayfs";
+  // TODO(jblomer): set correct paths
+  cvmfs_binary_ = "cvmfs2";
+  overlayfs_binary_ = "fuse-overlayfs";
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Mounting CernVM-FS read-only branch... ");
