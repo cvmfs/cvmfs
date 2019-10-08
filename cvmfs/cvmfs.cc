@@ -1270,6 +1270,33 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   fuse_reply_statfs(req, &info);
 }
 
+const uint64_t kMaxMetainfoLength = 64*1024;
+
+string GetRepoMetainfo(uint64_t size) {
+  if (!mount_point_->catalog_mgr()->manifest()) {
+    return "Manifest not available";
+  }
+
+  shash::Any hash = mount_point_->catalog_mgr()->manifest()->meta_info();
+  // Follow max size suggested by fuse, otherwise 64KiB
+  uint64_t max_size = (size) ? size : kMaxMetainfoLength;
+  int fd = mount_point_->fetcher()->
+            Fetch(hash, CacheManager::kSizeUnknown,
+                  "metainfo (" + hash.ToString() + ")",
+                  zlib::kZlibDefault, CacheManager::kTypeRegular, "");
+  if (fd < 0) {
+    return "Failed to open metadata file";
+  }
+  uint64_t actual_size = file_system_->cache_mgr()->GetSize(fd);
+  if (actual_size > max_size) {
+    return "Failed to open: metadata file is too big";
+  }
+  char buffer[actual_size];
+  file_system_->cache_mgr()->Pread(fd, buffer, actual_size, 0);
+  close(fd);
+  return string(buffer, buffer + actual_size);
+}
+
 
 #ifdef __APPLE__
 static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
@@ -1334,6 +1361,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.repo_counters") {
     attribute_value = mount_point_->catalog_mgr()->GetRootCatalog()->
                                     GetCounters().GetCsvMap();
+  } else if (attr == "user.repo_metainfo") {
+    attribute_value = GetRepoMetainfo(size);
   } else if (attr == "user.hash") {
     if (!d.checksum().IsNull()) {
       attribute_value = d.checksum().ToString();
@@ -1588,7 +1617,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
     "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
     "user.external_host\0user.external_timeout\0user.pubkeys\0"
-    "user.ncleanup24\0user.repo_counters\0";
+    "user.ncleanup24\0user.repo_counters\0user.repo_metainfo\0";
   string attribute_list;
   if (mount_point_->hide_magic_xattrs()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");

@@ -64,6 +64,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   uint64_t all_inodes() const { return all_inodes_; }
   uint64_t loaded_inodes() const { return loaded_inodes_; }
   std::string repo_name() const { return repo_name_; }
+  manifest::Manifest *manifest() const { return manifest_.weak_ref(); }
 
  protected:
   LoadError LoadCatalog(const PathString  &mountpoint,
@@ -87,6 +88,8 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
    */
   std::map<PathString, shash::Any> loaded_catalogs_;
   std::map<PathString, shash::Any> mounted_catalogs_;
+
+  UniquePtr<manifest::Manifest> manifest_;
 
   std::string repo_name_;
   cvmfs::Fetcher *fetcher_;
