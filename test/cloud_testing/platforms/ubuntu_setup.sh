@@ -93,13 +93,7 @@ install_from_repo libssl-dev   || die "fail (installing libssl-dev)"
 # Install the test S3 provider
 install_test_s3 || die "fail (installing test S3)"
 
-# install 'jq' (on 12.04 this needs the precise-backports repo)
-if [ x"$ubuntu_release" = x"precise" ]; then
-  echo -n "enabling precise-backports... "
-  sudo sed -i -e 's/^# \(.*precise-backports.*\)$/\1/g' /etc/apt/sources.list || die "fail (updating sources.list)"
-  sudo apt-get update > /dev/null                                             || die "fail (apt-get update)"
-  echo "done"
-fi
+# install 'jq'
 install_from_repo jq || die "fail (installing jq)"
 
 # On Ubuntu 16.04 install backported autofs

@@ -41,13 +41,6 @@ if [ x"$(lsb_release -cs)" = x"trusty" ]; then
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi
-if [ x"$(lsb_release -cs)" = x"precise" ]; then
-  # Ubuntu 12.04
-  # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
-
-  echo "Ubuntu 12.04... using aufs instead of overlayfs"
-fi
 
 
 cd ${SOURCE_DIRECTORY}/test
@@ -85,10 +78,20 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
 fi
 
 
-echo "running CernVM-FS migration test cases..."
-CVMFS_TEST_CLASS_NAME=MigrationTests \
-./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/*                              \
-                                || retval=1
+echo "running CernVM-FS client migration test cases..."
+CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
+./run.sh $MIGRATIONTEST_CLIENT_LOGFILE                            \
+         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/0*                                    \
+          || retval=1
+
+if [ x"$(uname -m)" = x"x86_64" ]; then
+  echo "running CernVM-FS server migration test cases..."
+  CVMFS_TEST_CLASS_NAME=ServerMigrationTests                       \
+  ./run.sh $MIGRATIONTEST_SERVER_LOGFILE                           \
+          -o ${MIGRATIONTEST_SERVER_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+              migration_tests/5*                                   \
+          || retval=1
+fi
 
 exit $retval
