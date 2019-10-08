@@ -26,6 +26,7 @@ std::string StringifyTime(const time_t seconds, const bool utc);
 std::string StringifyTimeval(const timeval value);
 std::string RfcTimestamp();
 std::string IsoTimestamp();
+std::string WhitelistTimestamp(time_t when);
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);

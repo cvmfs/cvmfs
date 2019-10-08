@@ -11,6 +11,7 @@
 #include <string>
 
 #include "atomic.h"
+#include "ingestion/ingestion_source.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "repository_tag.h"
@@ -142,6 +143,12 @@ class AbstractUploader
   virtual std::string name() const = 0;
 
   /**
+   * Initializes a new repository storage area, e.g. create directory layout
+   * for local backend or create bucket for S3 backend.
+   */
+  virtual bool Create() = 0;
+
+  /**
    * Concrete uploaders might want to use a customized setting for multi-stream
    * writing, for instance one per disk.  Note that the S3 backend uses one task
    * but this one task uses internally mutliple HTTP streams through curl async
@@ -184,13 +191,23 @@ class AbstractUploader
    * @param remote_path  desired path for the file in the backend storage
    * @param callback     (optional) gets notified when the upload was finished
    */
-  void Upload(
+  void UploadFile(
     const std::string &local_path,
     const std::string &remote_path,
     const CallbackTN *callback = NULL)
   {
     ++jobs_in_flight_;
-    FileUpload(local_path, remote_path, callback);
+    FileIngestionSource source(local_path);
+    DoUpload(remote_path, &source, callback);
+  }
+
+  void UploadIngestionSource(
+    const std::string &remote_path,
+    IngestionSource *source,
+    const CallbackTN *callback = NULL)
+  {
+    ++jobs_in_flight_;
+    DoUpload(remote_path, source, callback);
   }
 
   /**
@@ -318,9 +335,9 @@ class AbstractUploader
    * @param remote_path  destination to be written in the backend
    * @param callback     callback to be called on completion
    */
-  virtual void FileUpload(const std::string &local_path,
-                          const std::string &remote_path,
-                          const CallbackTN *callback = NULL) = 0;
+  virtual void DoUpload(const std::string &remote_path,
+                        IngestionSource *source,
+                        const CallbackTN *callback = NULL) = 0;
 
   /**
    * Implementation of a streamed upload step. See public interface for details.

@@ -758,13 +758,15 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
       b->MakeDataCopy(block_buffer, block_size);
       tube_in.Enqueue(b);
     }
+
+    *chunk_item->hash_ptr() = hash_zeros;
+
     BlockItem *b_stop = new BlockItem(i, &allocator_);
     b_stop->SetFileItem(&file_large);
     b_stop->SetChunkItem(chunk_item);
     b_stop->MakeStop();
     tube_in.Enqueue(b_stop);
 
-    *chunk_item->hash_ptr() = hash_zeros;
     if (i == (nchunks - 1)) {
       file_large.set_is_fully_chunked();
     }

@@ -31,6 +31,8 @@ const size_t kMaxPathLength = 256;
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+const int kPrivateFileMode = S_IWUSR | S_IRUSR;
+const int kPrivateDirMode = S_IXUSR | S_IWUSR | S_IRUSR;
 
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
@@ -88,10 +90,13 @@ std::vector<std::string> FindFilesByPrefix(const std::string &dir,
                                            const std::string &prefix);
 std::vector<std::string> FindDirectories(const std::string &parent_dir);
 
+std::string GetUserName();
+std::string GetShell();
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid);
 bool GetGidOf(const std::string &groupname, gid_t *gid);
 mode_t GetUmask();
 bool AddGroup2Persona(const gid_t gid);
+std::string GetHomeDirectory();
 
 int SetLimitNoFile(unsigned limit_nofile);
 void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit);
@@ -105,7 +110,7 @@ bool ExecuteBinary(int *fd_stdin,
                    int *fd_stdout,
                    int *fd_stderr,
                    const std::string &binary_path,
-                   const std::vector<std::string>  &argv,
+                   const std::vector<std::string> &argv,
                    const bool double_fork = true,
                    pid_t *child_pid = NULL);
 bool ManagedExec(const std::vector<std::string> &command_line,

@@ -94,7 +94,7 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
           file_watcher::Event event = file_watcher::kInvalid;
           if (inotify_event->mask & IN_DELETE_SELF) {
             event = file_watcher::kDeleted;
-          } else if (inotify_event->mask & IN_MODIFY) {
+          } else if (inotify_event->mask & IN_CLOSE_WRITE) {
             // Modified
             event = file_watcher::kModified;
           } else if (inotify_event->mask & IN_MOVE_SELF) {
@@ -148,7 +148,7 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
 int FileWatcherInotify::TryRegisterFilter(const std::string& file_path) {
   return inotify_add_watch(
       inotify_fd_, file_path.c_str(),
-      IN_ATTRIB | IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF);
+      IN_ATTRIB | IN_CLOSE_WRITE | IN_DELETE_SELF | IN_MOVE_SELF);
 }
 
 }  // namespace file_watcher

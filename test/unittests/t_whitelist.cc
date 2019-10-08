@@ -6,6 +6,7 @@
 
 #include <ctime>
 
+#include "signature.h"
 #include "util/string.h"
 #include "whitelist.h"
 
@@ -60,6 +61,27 @@ TEST_F(T_Whitelist, ParseWhitelist) {
   text += "\nNabc";
   EXPECT_EQ(kFailOk, wl_->ParseWhitelist(
     reinterpret_cast<const unsigned char *>(text.data()), text.size()));
+}
+
+TEST_F(T_Whitelist, Create) {
+  signature::SignatureManager smgr;
+  smgr.Init();
+  smgr.GenerateMasterKeyPair();
+  smgr.GenerateCertificate("test.cvmfs.io");
+  std::string whitelist_valid =
+    Whitelist::CreateString("test.cvmfs.io", 1, shash::kShake128, &smgr);
+  std::string whitelist_err_fqrn =
+    Whitelist::CreateString("other.cvmfs.io", 1, shash::kShake128, &smgr);
+  std::string whitelist_err_expired =
+    Whitelist::CreateString("test.cvmfs.io", -1, shash::kShake128, &smgr);
+
+  wl_ = new Whitelist("test.cvmfs.io", NULL, &smgr);
+  EXPECT_EQ(whitelist::kFailOk, wl_->LoadMem(whitelist_valid));
+  EXPECT_EQ(whitelist::kFailOk, wl_->LoadMem(wl_->ExportString()));
+  EXPECT_EQ(whitelist::kFailNameMismatch, wl_->LoadMem(whitelist_err_fqrn));
+  EXPECT_EQ(whitelist::kFailExpired, wl_->LoadMem(whitelist_err_expired));
+
+  smgr.Fini();
 }
 
 }  // namespace whitelist

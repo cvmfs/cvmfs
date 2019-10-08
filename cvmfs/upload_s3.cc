@@ -24,6 +24,14 @@
 
 namespace upload {
 
+void S3Uploader::RequestCtrl::WaitFor() {
+  char c;
+  ReadPipe(pipe_wait[0], &c, 1);
+  assert(c == 'c');
+  ClosePipe(pipe_wait);
+}
+
+
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   : AbstractUploader(spooler_definition)
   , dns_buckets_(true)
@@ -163,6 +171,38 @@ bool S3Uploader::WillHandle(const SpoolerDefinition &spooler_definition) {
 }
 
 
+bool S3Uploader::Create() {
+  if (!dns_buckets_)
+    return false;
+
+  s3fanout::JobInfo *info = CreateJobInfo("");
+  info->request = s3fanout::JobInfo::kReqPutBucket;
+  std::string request_content;
+  if (!region_.empty()) {
+    request_content =
+      std::string("<CreateBucketConfiguration xmlns="
+        "\"http://s3.amazonaws.com/doc/2006-03-01/\">"
+        "<LocationConstraint>") + region_ + "</LocationConstraint>"
+        "</CreateBucketConfiguration>";
+    info->origin = s3fanout::kOriginMem;
+    info->origin_mem.size = request_content.length();
+    info->origin_mem.data =
+      reinterpret_cast<const unsigned char *>(request_content.data());
+  }
+
+  RequestCtrl req_ctrl;
+  MakePipe(req_ctrl.pipe_wait);
+  info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
+    &S3Uploader::OnReqComplete, this, &req_ctrl)));
+
+  IncJobsInFlight();
+  UploadJobInfo(info);
+  req_ctrl.WaitFor();
+
+  return req_ctrl.return_code == 0;
+}
+
+
 unsigned int S3Uploader::GetNumberOfErrors() const {
   return atomic_read32(&io_errors_);
 }
@@ -237,11 +277,48 @@ void *S3Uploader::MainCollectResults(void *data) {
 }
 
 
-void S3Uploader::FileUpload(
-  const std::string &local_path,
+void S3Uploader::DoUpload(
   const std::string &remote_path,
-  const CallbackTN  *callback
+  IngestionSource *source,
+  const CallbackTN *callback
 ) {
+  bool rvb = source->Open();
+  if (!rvb) {
+    Respond(callback, UploaderResults(100, source->GetPath()));
+    return;
+  }
+  uint64_t size;
+  rvb = source->GetSize(&size);
+  assert(rvb);
+
+  std::string local_path;
+  if (source->IsRealFile()) {
+    local_path = source->GetPath();
+  } else {
+    // TODO(jblomer): keep small files in memory
+    int tmp_fd = CreateAndOpenTemporaryChunkFile(&local_path);
+    if (tmp_fd < 0) {
+      source->Close();
+      Respond(callback, UploaderResults(100, source->GetPath()));
+      return;
+    }
+    unsigned char buffer[kPageSize];
+    ssize_t nbytes;
+    do {
+      nbytes = source->Read(buffer, kPageSize);
+      rvb = true;
+      if (nbytes > 0) rvb = SafeWrite(tmp_fd, buffer, nbytes);
+      if (nbytes < 0 || !rvb) {
+        source->Close();
+        close(tmp_fd);
+        unlink(local_path.c_str());
+        Respond(callback, UploaderResults(100, source->GetPath()));
+        return;
+      }
+    } while (nbytes == kPageSize);
+    close(tmp_fd);
+  }
+  source->Close();
   s3fanout::JobInfo *info =
     new s3fanout::JobInfo(repository_alias_ + "/" + remote_path,
                           const_cast<void*>(
@@ -255,9 +332,19 @@ void S3Uploader::FileUpload(
       info->request = s3fanout::JobInfo::kReqHeadPut;
   }
 
+  RequestCtrl req_ctrl;
+  MakePipe(req_ctrl.pipe_wait);
+  req_ctrl.callback_forward = callback;
+  req_ctrl.original_path = source->GetPath();
+  info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
+    &S3Uploader::OnReqComplete, this, &req_ctrl)));
+
   UploadJobInfo(info);
-  LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from file finished: %s",
-           local_path.c_str());
+  req_ctrl.WaitFor();
+  LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from source finished: %s",
+           source->GetPath().c_str());
+
+  if (!source->IsRealFile()) unlink(local_path.c_str());
 }
 
 
@@ -411,11 +498,18 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
 }
 
 
-void S3Uploader::OnPeekComplete(
+void S3Uploader::OnReqComplete(
   const upload::UploaderResults &results,
-  PeekCtrl *ctrl)
+  RequestCtrl *ctrl)
 {
-  ctrl->exists = (results.return_code == 0);
+  ctrl->return_code = results.return_code;
+  if (ctrl->callback_forward != NULL) {
+    // We are already in Respond() so we must not call it again
+    upload::UploaderResults fix_path(results.return_code, ctrl->original_path);
+    (*(ctrl->callback_forward))(fix_path);
+    delete ctrl->callback_forward;
+    ctrl->callback_forward = NULL;
+  }
   char c = 'c';
   WritePipe(ctrl->pipe_wait[1], &c, 1);
 }
@@ -425,20 +519,17 @@ bool S3Uploader::Peek(const std::string& path) {
   const std::string mangled_path = repository_alias_ + "/" + path;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
 
-  PeekCtrl peek_ctrl;
-  MakePipe(peek_ctrl.pipe_wait);
+  RequestCtrl req_ctrl;
+  MakePipe(req_ctrl.pipe_wait);
   info->request = s3fanout::JobInfo::kReqHeadOnly;
   info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
-    &S3Uploader::OnPeekComplete, this, &peek_ctrl)));
+    &S3Uploader::OnReqComplete, this, &req_ctrl)));
 
   IncJobsInFlight();
   UploadJobInfo(info);
-  char c;
-  ReadPipe(peek_ctrl.pipe_wait[0], &c, 1);
-  assert(c == 'c');
-  ClosePipe(peek_ctrl.pipe_wait);
+  req_ctrl.WaitFor();
 
-  return peek_ctrl.exists;
+  return req_ctrl.return_code == 0;
 }
 
 

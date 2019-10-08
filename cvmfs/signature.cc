@@ -14,6 +14,7 @@
 #include "cvmfs_config.h"
 #include "signature.h"
 
+#include <openssl/bn.h>
 #include <openssl/evp.h>
 #include <openssl/pkcs7.h>
 #include <openssl/x509v3.h>
@@ -31,6 +32,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "platform.h"
+#include "prng.h"
 #include "smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -66,6 +68,7 @@ static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {
 
 SignatureManager::SignatureManager() {
   private_key_ = NULL;
+  private_master_key_ = NULL;
   certificate_ = NULL;
   x509_store_ = NULL;
   x509_lookup_ = NULL;
@@ -110,21 +113,17 @@ void SignatureManager::Init() {
 
 
 void SignatureManager::Fini() {
-  if (certificate_) X509_free(certificate_);
-  certificate_ = NULL;
-  if (private_key_) EVP_PKEY_free(private_key_);
-  private_key_ = NULL;
-  if (!public_keys_.empty()) {
-    for (unsigned i = 0; i < public_keys_.size(); ++i)
-      RSA_free(public_keys_[i]);
-    public_keys_.clear();
-  }
+  UnloadCertificate();
+  UnloadPrivateKey();
+  UnloadPrivateMasterKey();
+  UnloadPublicRsaKeys();
   // Lookup is freed automatically
   if (x509_store_) X509_STORE_free(x509_store_);
 
   EVP_cleanup();
 
   private_key_ = NULL;
+  private_master_key_ = NULL;
   certificate_ = NULL;
   x509_store_ = NULL;
   x509_lookup_ = NULL;
@@ -151,9 +150,28 @@ string SignatureManager::GetCryptoError() {
  *     Password is not saved internally, but the private key is.
  * \return True on success, false otherwise
  */
+bool SignatureManager::LoadPrivateMasterKeyPath(const string &file_pem)
+{
+  UnloadPrivateMasterKey();
+  FILE *fp;
+  if ((fp = fopen(file_pem.c_str(), "r")) == NULL)
+    return false;
+  private_master_key_ = PEM_read_RSAPrivateKey(fp, NULL, NULL, NULL);
+  fclose(fp);
+  return (private_master_key_ != NULL);
+}
+
+
+/**
+ * @param[in] file_pem File name of the PEM key file
+ * @param[in] password Password for the private key.
+ *     Password is not saved internally, but the private key is.
+ * \return True on success, false otherwise
+ */
 bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
                                           const string &password)
 {
+  UnloadPrivateKey();
   bool result;
   FILE *fp = NULL;
   char *tmp = strdupa(password.c_str());
@@ -172,6 +190,21 @@ bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
 void SignatureManager::UnloadPrivateKey() {
   if (private_key_) EVP_PKEY_free(private_key_);
   private_key_ = NULL;
+}
+
+
+void SignatureManager::UnloadCertificate() {
+  if (certificate_) X509_free(certificate_);
+  certificate_ = NULL;
+}
+
+
+/**
+ * Clears the memory storing the private RSA master key (whitelist signing).
+ */
+void SignatureManager::UnloadPrivateMasterKey() {
+  if (private_master_key_) RSA_free(private_master_key_);
+  private_master_key_ = NULL;
 }
 
 
@@ -242,11 +275,7 @@ bool SignatureManager::LoadCertificateMem(const unsigned char *buffer,
  * Loads a list of public RSA keys separated by ":".
  */
 bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
-  if (!public_keys_.empty()) {
-    for (unsigned i = 0; i < public_keys_.size(); ++i)
-      RSA_free(public_keys_[i]);
-    public_keys_.clear();
-  }
+  UnloadPublicRsaKeys();
 
   if (path_list == "")
     return true;
@@ -295,6 +324,13 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
 }
 
 
+void SignatureManager::UnloadPublicRsaKeys() {
+  for (unsigned i = 0; i < public_keys_.size(); ++i)
+    RSA_free(public_keys_[i]);
+  public_keys_.clear();
+}
+
+
 std::string SignatureManager::GenerateKeyText(RSA *pubkey) {
   if (!pubkey) {return "";}
 
@@ -328,6 +364,142 @@ std::string SignatureManager::GetActivePubkeys() {
   // NOTE: we do not add the pubkey of the certificate here, as it is
   // not used for the whitelist verification.
   return pubkeys;
+}
+
+
+std::string SignatureManager::GetCertificate() {
+  if (!certificate_) return "";
+
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  bool rvb = PEM_write_bio_X509(bp, certificate_);
+  assert(rvb);
+  char *bio_crt_text;
+  long bytes = BIO_get_mem_data(bp, &bio_crt_text);  // NOLINT
+  assert(bytes > 0);
+  std::string bio_crt_str(bio_crt_text, bytes);
+  BIO_free(bp);
+  return bio_crt_str;
+}
+
+
+std::string SignatureManager::GetPrivateKey() {
+  if (!private_key_) return "";
+
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  bool rvb = PEM_write_bio_PrivateKey(bp, private_key_, NULL, NULL, 0, 0, NULL);
+  assert(rvb);
+  char *bio_privkey_text;
+  long bytes = BIO_get_mem_data(bp, &bio_privkey_text);  // NOLINT
+  assert(bytes > 0);
+  std::string bio_privkey_str(bio_privkey_text, bytes);
+  BIO_free(bp);
+  return bio_privkey_str;
+}
+
+
+std::string SignatureManager::GetPrivateMasterKey() {
+  if (!private_master_key_) return "";
+
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  bool rvb = PEM_write_bio_RSAPrivateKey(bp, private_master_key_,
+                                         NULL, NULL, 0, 0, NULL);
+  assert(rvb);
+  char *bio_master_privkey_text;
+  long bytes = BIO_get_mem_data(bp, &bio_master_privkey_text);  // NOLINT
+  assert(bytes > 0);
+  std::string bio_master_privkey_str(bio_master_privkey_text, bytes);
+  BIO_free(bp);
+  return bio_master_privkey_str;
+}
+
+RSA *SignatureManager::GenerateRsaKeyPair() {
+  RSA *rsa = NULL;
+  BIGNUM *bn = BN_new();
+  int retval = BN_set_word(bn, RSA_F4);
+  assert(retval == 1);
+#ifdef OPENSSL_API_INTERFACE_V09
+  rsa = RSA_generate_key(2048, RSA_F4, NULL, NULL);
+  assert(rsa != NULL);
+#else
+  rsa = RSA_new();
+  retval = RSA_generate_key_ex(rsa, 2048, bn, NULL);
+  assert(retval == 1);
+#endif
+  BN_free(bn);
+  return rsa;
+}
+
+
+/**
+ * Creates the RSA master key pair for whitelist signing
+ */
+void SignatureManager::GenerateMasterKeyPair() {
+  UnloadPrivateMasterKey();
+  UnloadPublicRsaKeys();
+
+  RSA *rsa = GenerateRsaKeyPair();
+  private_master_key_ = RSAPrivateKey_dup(rsa);
+  public_keys_.push_back(RSAPublicKey_dup(rsa));
+  RSA_free(rsa);
+}
+
+/**
+ * Creates a new RSA key pair (private key) and a self-signed certificate
+ */
+void SignatureManager::GenerateCertificate(const std::string &cn) {
+  UnloadPrivateKey();
+  UnloadCertificate();
+  int retval;
+
+  RSA *rsa = GenerateRsaKeyPair();
+  private_key_ = EVP_PKEY_new();
+  retval = EVP_PKEY_set1_RSA(private_key_, RSAPrivateKey_dup(rsa));
+  assert(retval == 1);
+  EVP_PKEY *pkey = EVP_PKEY_new();
+  retval = EVP_PKEY_set1_RSA(pkey, rsa);
+  assert(retval == 1);
+
+  certificate_ = X509_new();
+  X509_set_version(certificate_, 2L);
+  X509_set_pubkey(certificate_, pkey);
+
+  Prng prng;
+  prng.InitLocaltime();
+  unsigned long rnd_serial_no = prng.Next(uint64_t(1) + uint32_t(-1));  //NOLINT
+  rnd_serial_no = rnd_serial_no |
+    uint64_t(prng.Next(uint64_t(1) + uint32_t(-1))) << 32;
+  ASN1_INTEGER_set(X509_get_serialNumber(certificate_), rnd_serial_no);
+
+  // valid as of now
+  X509_gmtime_adj(reinterpret_cast<ASN1_TIME *>(
+    X509_get_notBefore(certificate_)), 0);
+  // valid for 1 year (validity range is unused)
+  X509_gmtime_adj(reinterpret_cast<ASN1_TIME *>(
+    X509_get_notAfter(certificate_)), 3600 * 24 * 365);
+
+  X509_NAME *name = X509_get_subject_name(certificate_);
+#ifdef OPENSSL_API_INTERFACE_V09
+  X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
+    const_cast<unsigned char *>(
+      reinterpret_cast<const unsigned char *>(cn.c_str())),
+    -1, -1, 0);
+#else
+  X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
+    reinterpret_cast<const unsigned char *>(cn.c_str()), -1, -1, 0);
+#endif
+  retval = X509_set_issuer_name(certificate_, name);
+  assert(retval == 1);
+
+#ifdef OPENSSL_API_INTERFACE_V09
+  retval = X509_sign(certificate_, pkey, EVP_sha1());
+#else
+  retval = X509_sign(certificate_, pkey, EVP_sha256());
+#endif
+  EVP_PKEY_free(pkey);
+  assert(retval > 0);
 }
 
 /**
@@ -595,6 +767,40 @@ bool SignatureManager::Sign(const unsigned char *buffer,
   }
 
   return result;
+}
+
+
+/**
+ * Signs a data block using the loaded private master key.
+ *
+ * \return True on sucess, false otherwise
+ */
+bool SignatureManager::SignRsa(const unsigned char *buffer,
+                               const unsigned buffer_size,
+                               unsigned char **signature,
+                               unsigned *signature_size)
+{
+  if (!private_master_key_) {
+    *signature_size = 0;
+    *signature = NULL;
+    return false;
+  }
+
+  unsigned char *to = (unsigned char *)smalloc(RSA_size(private_master_key_));
+  unsigned char *from = (unsigned char *)smalloc(buffer_size);
+  memcpy(from, buffer, buffer_size);
+
+  int size = RSA_private_encrypt(buffer_size, from, to,
+                                 private_master_key_, RSA_PKCS1_PADDING);
+  free(from);
+  if (size < 0) {
+    *signature_size = 0;
+    *signature = NULL;
+    return false;
+  }
+  *signature = to;
+  *signature_size = size;
+  return true;
 }
 
 
