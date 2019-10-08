@@ -133,3 +133,15 @@ BENCHMARK_DEFINE_F(BM_InodeTracker, FindInode)(benchmark::State &st) {
   st.SetItemsProcessed(st.iterations());
 }
 BENCHMARK_REGISTER_F(BM_InodeTracker, FindInode)->Repetitions(3)->Arg(10000);
+
+
+BENCHMARK_DEFINE_F(BM_InodeTracker, Nadd)(benchmark::State &st) {
+  unsigned size = st.range(0);
+  while (st.KeepRunning()) {
+    glue::NentryTracker tracker;
+    for (unsigned i = 0; i < size; ++i)
+      tracker.Add(0, "libCore.so", 1000);
+  }
+  st.SetItemsProcessed(st.iterations() * size);
+}
+BENCHMARK_REGISTER_F(BM_InodeTracker, Nadd)->Repetitions(3)->Arg(100000);

@@ -17,10 +17,17 @@
     struct fuse_lowlevel_ops { int dummy; };  // for loader.h
     // Defined in t_fuse_evict.cc
     extern unsigned fuse_lowlevel_notify_inval_inode_cnt;
+    extern unsigned fuse_lowlevel_notify_inval_entry_cnt;
     static int __attribute__((used)) fuse_lowlevel_notify_inval_inode(
       void *, unsigned /*fuse_ino_t*/, off_t, off_t)  // NOLINT (ulong from fuse)
     {
       fuse_lowlevel_notify_inval_inode_cnt++;
+      return -1;
+    }
+    static int __attribute__((used)) fuse_lowlevel_notify_inval_entry(
+      void *, unsigned /*fuse_ino_t*/, const char *, size_t)  // NOLINT
+    {
+      fuse_lowlevel_notify_inval_entry_cnt++;
       return -1;
     }
   }

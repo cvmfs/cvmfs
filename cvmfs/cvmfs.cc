@@ -378,6 +378,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
 
+  fuse_ino_t parent_fuse = parent;
   parent = catalog_mgr->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %" PRIu64 " for name: %s",
@@ -444,6 +445,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   return;
 
  lookup_reply_negative:
+  // Will be a no-op if there is no fuse cache eviction
+  mount_point_->nentry_tracker()->Add(parent_fuse, name, timeout);
   fuse_remounter_->fence()->Leave();
   perf::Inc(file_system_->n_fs_lookup_negative());
   result.ino = 0;
@@ -498,7 +501,9 @@ static void cvmfs_forget(
 
 /**
  * Looks into dirent to decide if this is an EIO negative reply or an
- * ENOENT negative reply
+ * ENOENT negative reply.  We do not need to store the reply in the negative
+ * cache tracker because ReplyNegative is called on inode queries.  Inodes,
+ * however, change anyway when a new catalog is applied.
  */
 static void ReplyNegative(const catalog::DirectoryEntry &dirent,
                           fuse_req_t req)
@@ -1876,6 +1881,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                     &buf)) {
     if (!cvmfs::options_mgr_->IsOn(buf)) {
       fuse_notify_invalidation = false;
+      cvmfs::mount_point_->nentry_tracker()->Disable();
     }
   }
   cvmfs::fuse_remounter_ =
@@ -1938,6 +1944,10 @@ static void Spawn() {
   }
 
   cvmfs::fuse_remounter_->Spawn();
+  if (cvmfs::mount_point_->nentry_tracker()->is_active()) {
+    cvmfs::mount_point_->nentry_tracker()->SpawnCleaner(
+      cvmfs::mount_point_->kcache_timeout_sec());  // Usually every minute
+  }
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();
@@ -2078,6 +2088,15 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     saved_states->push_back(state_glue_buffer);
   }
 
+  msg_progress = "Saving negative entry cache\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  glue::NentryTracker *saved_nentry_cache =
+    new glue::NentryTracker(*cvmfs::mount_point_->nentry_tracker());
+  loader::SavedState *state_nentry_tracker = new loader::SavedState();
+  state_nentry_tracker->state_id = loader::kStateNentryTracker;
+  state_nentry_tracker->state = saved_nentry_cache;
+  saved_states->push_back(state_nentry_tracker);
+
   msg_progress = "Saving chunk tables\n";
   SendMsg2Socket(fd_progress, msg_progress);
   ChunkTables *saved_chunk_tables = new ChunkTables(
@@ -2175,6 +2194,16 @@ static bool RestoreState(const int fd_progress,
         (glue::InodeTracker *)saved_states[i]->state;
       new (cvmfs::mount_point_->inode_tracker())
         glue::InodeTracker(*saved_inode_tracker);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateNentryTracker) {
+      SendMsg2Socket(fd_progress, "Restoring negative entry cache... ");
+      cvmfs::mount_point_->nentry_tracker()->~NentryTracker();
+      glue::NentryTracker *saved_nentry_tracker =
+        (glue::NentryTracker *)saved_states[i]->state;
+      new (cvmfs::mount_point_->nentry_tracker())
+        glue::NentryTracker(*saved_nentry_tracker);
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2285,6 +2314,10 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateGlueBufferV4:
         SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
+        break;
+      case loader::kStateNentryTracker:
+        SendMsg2Socket(fd_progress, "Releasing saved negative entry cache\n");
+        delete static_cast<glue::NentryTracker *>(saved_states[i]->state);
         break;
       case loader::kStateOpenChunks:
         SendMsg2Socket(fd_progress, "Releasing chunk tables (version 1)\n");

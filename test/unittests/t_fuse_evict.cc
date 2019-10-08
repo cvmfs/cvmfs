@@ -11,7 +11,8 @@
 class T_FuseInvalidator : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    invalidator_ = new FuseInvalidator(&inode_tracker_, NULL, true);
+    invalidator_ =
+      new FuseInvalidator(&inode_tracker_, &nentry_tracker_, NULL, true);
     invalidator_->Spawn();
   }
 
@@ -21,18 +22,19 @@ class T_FuseInvalidator : public ::testing::Test {
 
  protected:
   glue::InodeTracker inode_tracker_;
+  glue::NentryTracker nentry_tracker_;
   FuseInvalidator *invalidator_;
 };
 
 
 TEST_F(T_FuseInvalidator, StartStop) {
   FuseInvalidator *idle_invalidator =
-    new FuseInvalidator(&inode_tracker_, NULL, true);
+    new FuseInvalidator(&inode_tracker_, &nentry_tracker_, NULL, true);
   EXPECT_FALSE(idle_invalidator->spawned_);
   delete idle_invalidator;
 
   FuseInvalidator *noop_invalidator =
-    new FuseInvalidator(&inode_tracker_, NULL, true);
+    new FuseInvalidator(&inode_tracker_, &nentry_tracker_, NULL, true);
   noop_invalidator->Spawn();
   EXPECT_TRUE(noop_invalidator->spawned_);
   EXPECT_GE(noop_invalidator->pipe_ctrl_[0], 0);
@@ -63,6 +65,9 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
   for (unsigned i = 2; i <= 1024; ++i) {
     inode_tracker_.VfsGet(i, PathString("/" + StringifyInt(i)));
   }
+  for (unsigned i = 0; i < 1024; ++i) {
+    nentry_tracker_.Add(i, "404", 100000);
+  }
 
   FuseInvalidator::Handle handle(0);
   EXPECT_FALSE(handle.IsDone());
@@ -71,6 +76,7 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
   EXPECT_TRUE(handle.IsDone());
   EXPECT_EQ(FuseInvalidator::kCheckTimeoutFreqOps,
             fuse_lowlevel_notify_inval_inode_cnt);
+  EXPECT_EQ(1024U, fuse_lowlevel_notify_inval_entry_cnt);
 
   FuseInvalidator::Handle handle2(1000000);
   EXPECT_FALSE(handle2.IsDone());
@@ -79,7 +85,11 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
   EXPECT_TRUE(handle2.IsDone());
   EXPECT_EQ(FuseInvalidator::kCheckTimeoutFreqOps + 1024,
             fuse_lowlevel_notify_inval_inode_cnt);
+  EXPECT_EQ(1024U, fuse_lowlevel_notify_inval_entry_cnt);
 
+  for (unsigned i = 0; i < 1024; ++i) {
+    nentry_tracker_.Add(i, "404", 100000);
+  }
   invalidator_->terminated_ = 1;
   handle2.Reset();
   EXPECT_FALSE(handle2.IsDone());
@@ -88,4 +98,6 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
   EXPECT_TRUE(handle2.IsDone());
   EXPECT_EQ((2 * FuseInvalidator::kCheckTimeoutFreqOps) + 1024,
             fuse_lowlevel_notify_inval_inode_cnt);
+  EXPECT_EQ(FuseInvalidator::kCheckTimeoutFreqOps + 1024,
+            fuse_lowlevel_notify_inval_entry_cnt);
 }
