@@ -1,12 +1,14 @@
-#!/bin/bash
+cvmfs_test_name="DUCC container ingestion"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="ducc"
 
 registry=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
-recipe="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
+recipe="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
 repository="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
-ducc_log="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).log"
-ducc_err="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+ducc_log="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).log"
+ducc_err="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
 
-clean_up() {
+ducc_test_400_clean_up() {
     printf "Cleaning up..."
 
     mv /etc/cvmfs/default.local.bk /etc/cvmfs/default.local
@@ -41,12 +43,11 @@ clean_up() {
     printf "done\n"
 }
 
-
-main() {
-    trap clean_up EXIT
+cvmfs_run_test() {
+    trap ducc_test_400_clean_up EXIT
 
     # change the docker configuration to run thin images
-    printf "Changing the docker configuration to run thin images..."
+    printf "*** Changing the docker configuration to run thin images..."
 
     # saving old docker configuration
     mkdir -p /etc/docker
@@ -73,12 +74,12 @@ EOL
     printf "done\n"
 
     # start by running the docker registry on localhost
-    printf "Starting docker registry for tests..."
+    printf "*** Starting docker registry for tests..."
     docker run -d -p 5000:5000 --name $registry registry:2 >> /dev/null || return 3
     printf "done\n"
 
     # create a simple recipe file for the repository manager in the local dir
-    printf "Creating recipe file..."
+    printf "*** Creating recipe file..."
     cat > $recipe  << EOL
 version: 1
 user: mock_user
@@ -94,11 +95,11 @@ EOL
     export DUCC_DOCKER_REGISTRY_PASS=mock_pass
 
     # crete the repository where to store the content
-    printf "Creating CVMFS repo..."
-    cvmfs_server mkfs -o $USER $repository >> /dev/null
+    printf "*** Creating CVMFS repo..."
+    create_empty_repo $repository $USER || return $?
     printf "done\n"
 
-    printf "Changing configuration to read the new repo..."
+    printf "*** Changing configuration to read the new repo..."
     # setting the configuration for the repo
     mv /etc/cvmfs/default.local /etc/cvmfs/default.local.bk
 
@@ -113,23 +114,23 @@ CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$repository.pub
 EOL
     printf "done\n"
 
-    printf "Starting test.\n"
+    printf "*** Starting test.\n"
 
-    printf "Converting recipe..."
+    printf "*** Converting recipe..."
     cvmfs_ducc convert $recipe 1> $ducc_log 2> $ducc_err || return 101
     grep -q "level=error" $ducc_err
     while [ $? -ne 1 ]
     do
-        printf "Some error during conversion, let's do it again.\nConverting recipe..."
+        printf "*** Some error during conversion, let's do it again.\nConverting recipe..."
         rm $ducc_log $ducc_err
         cvmfs_ducc convert $recipe 1> $ducc_log 2> $ducc_err || return 101
         grep -q "level=error" $ducc_err
     done
-    printf "\nConvert recipe successfully\n"
+    printf "\n*** Convert recipe successfully\n"
 
-    printf "Check integrity of the repository...\n"
-    cvmfs_server check $repository || return 102
-    printf "Repository checked successfully\n"
+    printf "*** Check integrity of the repository...\n"
+    check_repository $repository -i || return 102
+    printf "*** Repository checked successfully\n"
 
     singularity exec /cvmfs/$repository/registry.hub.docker.com/library/ubuntu\:latest/ echo token-abc | grep "token-abc" || return 103
     singularity exec /cvmfs/$repository/registry.hub.docker.com/library/centos\:centos6/ echo token-xyz | grep "token-xyz" || return 104
@@ -141,10 +142,9 @@ EOL
 
     # add other possible tests
 
-    printf "\n\nTest successful\n\n"
+    printf "*** Test successful\n"
 
     return
-}
 
-main
+}
 
