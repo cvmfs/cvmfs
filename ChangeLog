@@ -1,4 +1,5 @@
 2.7.0:
+  * Fix stale negative entries in active cache eviction (CVM-1759)
   * Add support for EL8 platform (CVM-1731)
   * Fix publish statistics for several corner cases (CVM-1716 .. CVM-1720)
   * Add 'list_reflog' command to cvmfs_swissknife (CVM-1760)
