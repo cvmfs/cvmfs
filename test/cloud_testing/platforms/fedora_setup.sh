@@ -61,6 +61,8 @@ install_from_repo python-devel
 install_from_repo unzip
 install_from_repo redhat-rpm-config
 
+install_from_repo acl
+
 disable_systemd_rate_limit
 
 # increase open file descriptor limits

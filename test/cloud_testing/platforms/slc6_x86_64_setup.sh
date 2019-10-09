@@ -95,6 +95,8 @@ install_from_repo cmake         || die "fail (installing cmake)"
 install_from_repo libattr-devel || die "fail (installing libattr-devel)"
 install_from_repo python-devel  || die "fail (installing python-devel)"
 
+install_from_repo acl
+
 # install test dependency for 600
 install_from_repo compat-expat1          || die "fail (installing compat-expat1)"
 install_from_repo openssl098e            || die "fail (installing openssl098e)"
