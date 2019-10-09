@@ -672,7 +672,7 @@ CacheManager *FileSystem::SetupRamCacheMgr(const string &instance) {
       return NULL;
     }
   }
-  sz_cache_bytes = RoundUp8(std::max(static_cast<uint64_t>(200 * 1024 * 1024),
+  sz_cache_bytes = RoundUp8(std::max(static_cast<uint64_t>(40 * 1024 * 1024),
                                      sz_cache_bytes));
   RamCacheManager *cache_mgr = new RamCacheManager(
         sz_cache_bytes,
