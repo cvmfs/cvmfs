@@ -9,6 +9,7 @@ cvmfs_run_test() {
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
   sudo sh -c "echo CVMFS_INCLUDE_XATTRS=true >> /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+  sudo sh -c "echo CVMFS_ENFORCE_ACLS=true >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
 
   echo "*** create file system structure"
   start_transaction $CVMFS_TEST_REPO || return $?

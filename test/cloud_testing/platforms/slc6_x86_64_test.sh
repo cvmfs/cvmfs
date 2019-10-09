@@ -70,6 +70,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
                                  src/585-xattrs                               \
+                                 src/673-acl                                  \
                                  src/700-overlayfs_validation                 \
                                  --                                           \
                                  src/5*                                       \
