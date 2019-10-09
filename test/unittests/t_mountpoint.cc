@@ -198,6 +198,7 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
   }
   options_mgr_.SetValue("CVMFS_CACHE_tiered_UPPER", "ram_upper");
   options_mgr_.SetValue("CVMFS_CACHE_ram_upper_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_upper_SIZE", "75");
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
@@ -221,6 +222,7 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
 
   options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "ram_lower");
   options_mgr_.SetValue("CVMFS_CACHE_ram_lower_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_lower_SIZE", "75");
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
