@@ -39,6 +39,9 @@ if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # aufs, expected failure, disable gateway, disable notification system
   CVMFS_EXCLUDE="src/081-shrinkwrap src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
 
+  # CVMFS config repository not enabled on Ubuntu 14.04
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany"
+
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi
 
@@ -51,7 +54,6 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/005-asetup                               \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
-                                 src/050-configrepo                           \
                                  src/084-premounted                           \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
