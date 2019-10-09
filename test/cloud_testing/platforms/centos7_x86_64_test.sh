@@ -40,7 +40,6 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/585-xattrs                               \
                                  src/600-securecvmfs                          \
-                                 src/602-libcvmfs                             \
                                  src/628-pythonwrappedcvmfsserver             \
                                  --                                           \
                                  src/5*                                       \
