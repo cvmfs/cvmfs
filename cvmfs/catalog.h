@@ -252,6 +252,8 @@ class Catalog : SingleCopy {
 
   void ResetNestedCatalogCacheUnprotected();
 
+  bool LookupMd5Path(const shash::Md5 &md5path, DirectoryEntry *dirent) const;
+
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
 
@@ -274,7 +276,6 @@ class Catalog : SingleCopy {
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
-  bool LookupMd5Path(const shash::Md5 &md5path, DirectoryEntry *dirent) const;
   bool LookupXattrsMd5Path(const shash::Md5 &md5path, XattrList *xattrs) const;
   bool ListMd5PathChunks(const shash::Md5 &md5path,
                          const shash::Algorithms interpret_hashes_as,

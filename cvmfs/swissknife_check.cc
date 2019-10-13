@@ -104,6 +104,12 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
              a.name().c_str(), b.name().c_str());
     retval = false;
   }
+  if (diffs & Difference::kHasXattrsFlag) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "extended attributes differ: %d / %d "
+             "(%s / %s)", a.HasXattrs(), b.HasXattrs(),
+             a.name().c_str(), b.name().c_str());
+    retval = false;
+  }
 
   return retval;
 }
@@ -787,6 +793,8 @@ bool CommandCheck::InspectTree(const string                  &path,
   }
 
   // Check number of entries
+  if (root_entry.HasXattrs())
+    computed_counters->self.xattrs++;
   const uint64_t num_found_entries =
     1 +
     computed_counters->self.regular_files +

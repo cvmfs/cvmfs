@@ -327,6 +327,8 @@ void WritableCatalogManager::Clone(const std::string destination,
   destination_dirent.name_.Assign(
       NameString(destination_filename.c_str(), destination_filename.length()));
 
+  // TODO(jblomer): clone is used by tarball engine and should eventually
+  // support extended attributes
   this->AddFile(destination_dirent, empty_xattrs, destination_dirname);
 }
 
@@ -338,6 +340,7 @@ void WritableCatalogManager::Clone(const std::string destination,
  * @return true on success, false otherwise
  */
 void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
+                                          const XattrList &xattrs,
                                           const std::string &parent_directory)
 {
   const string parent_path = MakeRelativePath(parent_directory);
@@ -357,7 +360,7 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
   DirectoryEntry fixed_hardlink_count(entry);
   fixed_hardlink_count.set_linkcount(2);
   // No support for extended attributes on directories yet
-  catalog->AddEntry(fixed_hardlink_count, empty_xattrs,
+  catalog->AddEntry(fixed_hardlink_count, xattrs,
                     directory_path, parent_path);
 
   parent_entry.set_linkcount(parent_entry.linkcount() + 1);
@@ -562,6 +565,7 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
  * @param path       the path of the directory entry to be touched
  */
 void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
+                                            const XattrList &xattrs,
                                             const std::string &directory_path)
 {
   assert(entry.IsDirectory());
@@ -578,7 +582,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
     assert(false);
   }
 
-  catalog->TouchEntry(entry, entry_path);
+  catalog->TouchEntry(entry, xattrs, entry_path);
 
   // since we deal with a directory here, we might just touch a
   // nested catalog transition point. If this is the case we would need to
@@ -607,7 +611,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
 
     // update nested catalog root in the child catalog
     reinterpret_cast<WritableCatalog *>(nested_catalog)->
-      TouchEntry(entry, entry_path);
+      TouchEntry(entry, xattrs, entry_path);
   }
 
   SyncUnlock();
@@ -666,6 +670,12 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
   assert(new_catalog->IsWritable());
   WritableCatalog *wr_new_catalog = static_cast<WritableCatalog *>(new_catalog);
+
+  if (new_root_entry.HasXattrs()) {
+    XattrList xattrs;
+    retval = old_catalog->LookupXattrsPath(ps_nested_root_path, &xattrs);
+    wr_new_catalog->TouchEntry(new_root_entry, xattrs, nested_root_path);
+  }
 
   // From now on, there are two catalogs, spanning the same directory structure
   // we have to split the overlapping directory entries from the old catalog

@@ -18,6 +18,7 @@ cvmfs_run_test() {
   echo foo > /cvmfs/$CVMFS_TEST_REPO/public-data/foo
 
   chmod 0660 /cvmfs/$CVMFS_TEST_REPO/for-nobody
+  chmod 0660 /cvmfs/$CVMFS_TEST_REPO/public-data/foo
   chmod 0770 /cvmfs/$CVMFS_TEST_REPO/public-data
 
   echo "*** create CVMFS snapshot"
@@ -32,22 +33,27 @@ cvmfs_run_test() {
   echo "*** set ACLs"
   start_transaction $CVMFS_TEST_REPO || return $?
   setfacl -m u:nobody:r /cvmfs/$CVMFS_TEST_REPO/for-nobody || return 30
-  setfacl -m o::rx /cvmfs/$CVMFS_TEST_REPO/public-data || return 31
-  setfacl -d --set o::r /cvmfs/$CVMFS_TEST_REPO/public-data || return 32
+  setfacl -m u:nobody:rx /cvmfs/$CVMFS_TEST_REPO/public-data || return 31
+  setfacl -d --set u:nobody:r /cvmfs/$CVMFS_TEST_REPO/public-data || return 32
+  echo new > /cvmfs/$CVMFS_TEST_REPO/public-data/new
+  chmod 0660 /cvmfs/$CVMFS_TEST_REPO/public-data/new
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "*** check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "*** check ACLs"
-  getfacl -t /cvmfs/$CVMFS_TEST_REPO/for-nobody || return 40
-  getfacl -t /cvmfs/$CVMFS_TEST_REPO/public-data || return 41
-  getfacl -t /cvmfs/$CVMFS_TEST_REPO/public-data/foo || return 42
+  getfacl -t /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/for-nobody || return 40
+  getfacl -t /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data || return 41
+  getfacl -t /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/foo || return 42
+  getfacl -t /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/new || return 43
 
   cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/for-nobody || return 50
   cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/foo || return 51
   sudo -u nobody /bin/sh -c "cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/for-nobody" || return 52
-  sudo -u nobody /bin/sh -c "cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/foo" || return 53
+  sudo -u nobody /bin/sh -c "ls -lah /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data" || return 53
+  sudo -u nobody /bin/sh -c "cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/foo" && return 54
+  sudo -u nobody /bin/sh -c "cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/new" || return 55
 
   return 0
 }

@@ -743,7 +743,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   item.SetContentHash(result.content_hash);
   item.SetCompressionAlgorithm(result.compression_alg);
 
-  XattrList *xattrs = &default_xattrs;
+  XattrList *xattrs = &default_xattrs_;
   if (params_->include_xattrs) {
     xattrs = XattrList::CreateFromFile(result.local_path);
     assert(xattrs != NULL);
@@ -762,7 +762,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
       item.relative_parent_path());
   }
 
-  if (xattrs != &default_xattrs)
+  if (xattrs != &default_xattrs_)
     free(xattrs);
 }
 
@@ -862,20 +862,27 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
   if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) {
     assert(!entry->HasGraftMarker());
     // Symlinks and special files are completely stored in the catalog
-    catalog_manager_->AddFile(entry->CreateBasicCatalogDirent(), default_xattrs,
+    XattrList *xattrs = &default_xattrs_;
+    if (params_->include_xattrs) {
+      xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
+      assert(xattrs);
+    }
+    catalog_manager_->AddFile(entry->CreateBasicCatalogDirent(), *xattrs,
                               entry->relative_parent_path());
+    if (xattrs != &default_xattrs_)
+      free(xattrs);
   } else if (entry->HasGraftMarker() && !params_->dry_run) {
     if (entry->IsValidGraft()) {
       // Graft files are added to catalog immediately.
       if (entry->IsChunkedGraft()) {
         catalog_manager_->AddChunkedFile(
-            entry->CreateBasicCatalogDirent(), default_xattrs,
+            entry->CreateBasicCatalogDirent(), default_xattrs_,
             entry->relative_parent_path(), *(entry->GetGraftChunks()));
       } else {
         catalog_manager_->AddFile(
             entry->CreateBasicCatalogDirent(),
-            default_xattrs,  // TODO(bbockelm): For now, use default xattrs
-                             // on grafted files.
+            default_xattrs_,  // TODO(bbockelm): For now, use default xattrs
+                              // on grafted files.
             entry->relative_parent_path());
       }
     } else {
@@ -946,8 +953,15 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
   perf::Inc(counters_->n_directories_added);
   assert(!entry->HasGraftMarker());
   if (!params_->dry_run) {
-    catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(),
+    XattrList *xattrs = &default_xattrs_;
+    if (params_->include_xattrs) {
+      xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
+      assert(xattrs);
+    }
+    catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
                                    entry->relative_parent_path());
+    if (xattrs != &default_xattrs_)
+      free(xattrs);
   }
 
   if (entry->HasCatalogMarker() &&
@@ -983,8 +997,15 @@ void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
   const std::string directory_path = entry->GetRelativePath();
 
   if (!params_->dry_run) {
-    catalog_manager_->TouchDirectory(entry->CreateBasicCatalogDirent(),
+    XattrList *xattrs = &default_xattrs_;
+    if (params_->include_xattrs) {
+      xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
+      assert(xattrs);
+    }
+    catalog_manager_->TouchDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
                                      directory_path);
+    if (xattrs != &default_xattrs_)
+      free(xattrs);
   }
 
   if (entry->HasCatalogMarker() &&
@@ -1048,7 +1069,7 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   {
     hardlinks.push_back(i->second->CreateBasicCatalogDirent());
   }
-  XattrList *xattrs = &default_xattrs;
+  XattrList *xattrs = &default_xattrs_;
   if (params_->include_xattrs) {
     xattrs = XattrList::CreateFromFile(group.master->GetUnionPath());
     assert(xattrs);
@@ -1058,7 +1079,7 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
     *xattrs,
     group.master->relative_parent_path(),
     group.file_chunks);
-  if (xattrs != &default_xattrs)
+  if (xattrs != &default_xattrs_)
     free(xattrs);
 }
 
