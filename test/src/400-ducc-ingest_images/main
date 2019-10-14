@@ -27,11 +27,10 @@ ducc_test_400_clean_up() {
     docker rm $CVMFS_TEST400_REGISTRY >> /dev/null
     echo "done"
 
-    if [ CVMFS_TEST400_REMOVE_PLUGIN -eq 1 ]
+    if [ $CVMFS_TEST400_REMOVE_PLUGIN -eq 1 ]
     then
         echo -n "Reseting initial docker configuration..."
         rm -f /etc/docker/daemon.json
-        mv /etc/docker/daemon.json.bk /etc/docker/daemon.json
         systemctl restart docker
     fi
 
@@ -100,11 +99,10 @@ EOL
     echo -n "*** Creating CVMFS repo..."
     create_empty_repo $CVMFS_TEST400_REPOSITORY $USER || return $?
     echo "done"
-
-    echo -n "*** Changing configuration to read the new repo..."
-    # setting the configuration for the repo
-    mv /etc/cvmfs/default.local /etc/cvmfs/default.local.bk
     
+    echo "*** Restarting docker"
+    systemctl restart docker.service || return 153
+
     echo "*** Starting test."
 
     echo -n "*** Converting recipe..."
@@ -129,10 +127,10 @@ EOL
     
     echo "*** Singularity conversion worked fine"
 
-    systemctl restart docker.service || return 153
-
-    docker run "localhost:5000/mock/library/ubuntu:latest" echo "token-123" | grep "token-123" || return 105
-    docker run "localhost:5000/mock/library/centos:centos6" echo "token-321" | grep "token-321" || return 106
+    docker run "localhost:5000/mock/library/ubuntu:latest" /bin/echo "token-123" | grep "token-123" || return 105
+    docker run "localhost:5000/mock/library/centos:centos6" /bin/echo "token-321" | grep "token-321" || return 106
+    
+    echo "*** Docker conversion worked fine"
 
     # add other possible tests
 
