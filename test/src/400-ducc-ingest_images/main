@@ -1,5 +1,5 @@
 cvmfs_test_name="DUCC container ingestion"
-cvmfs_test_autofs_on_startup=false
+cvmfs_test_autofs_on_startup=true
 cvmfs_test_suites="ducc"
 
 registry=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
