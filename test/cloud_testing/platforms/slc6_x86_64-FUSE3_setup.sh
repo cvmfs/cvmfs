@@ -14,9 +14,6 @@ fi
 create_partition $disk_to_partition $cache_partition_size || die "fail (creating partition)"
 echo "done"
 
-echo "enabling epel yum repository..."
-install_from_repo epel-release
-
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
