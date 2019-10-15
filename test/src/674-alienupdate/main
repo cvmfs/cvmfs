@@ -1,0 +1,136 @@
+cvmfs_test_name="Apply updates on shared alien cache"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+CVMFS_TEST_674_MOUNTPOINT_A=""
+CVMFS_TEST_674_MOUNTPOINT_B=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_674_MOUNTPOINT_A ]; then
+    sudo fusermount -u $CVMFS_TEST_674_MOUNTPOINT_A
+    sudo umount        $CVMFS_TEST_674_MOUNTPOINT_A
+  fi
+  if [ ! -z $CVMFS_TEST_674_MOUNTPOINT_B ]; then
+    sudo fusermount -u $CVMFS_TEST_674_MOUNTPOINT_B
+    sudo umount        $CVMFS_TEST_674_MOUNTPOINT_B
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_url=$(get_repo_url $CVMFS_TEST_REPO)
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir /cvmfs/$CVMFS_TEST_REPO/dir
+  touch /cvmfs/$CVMFS_TEST_REPO/dir/first
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local preload_dir=$scratch_dir/preload_dir
+  echo "preloading $preload_dir"
+  mkdir -p $preload_dir || return 10
+  cvmfs2 __MK_ALIEN_CACHE__ $preload_dir $(id -u $CVMFS_TEST_USER) $(id -g $CVMFS_TEST_USER) || return 11
+  mkdir $preload_dir/sync_temp || return 12
+  cvmfs_swissknife pull -c \
+    -u $repo_url \
+    -r $preload_dir \
+    -k /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub \
+    -m $CVMFS_TEST_REPO \
+    -x $preload_dir/sync_temp || return 13
+
+  echo "*** cached root hash is $(cat $preload_dir/cvmfschecksum.${CVMFS_TEST_REPO})"
+
+  echo "compare the results of cvmfs to our reference copy"
+  mkdir ws_a ws_b
+  mkdir mnt_a mnt_b
+# create a local configuration file
+  cat > local_a.conf << EOF
+CVMFS_WORKSPACE=$(pwd)/ws_a
+CVMFS_QUOTA_LIMIT=-1
+CVMFS_RELOAD_SOCKETS=$(pwd)/ws_a
+CVMFS_ALIEN_CACHE=$preload_dir
+CVMFS_SERVER_URL=$(get_repo_url $CVMFS_TEST_REPO)
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
+CVMFS_DEBUGLOG=$(pwd)/cvmfs_debug_a.log
+EOF
+  cat > local_b.conf << EOF
+CVMFS_WORKSPACE=$(pwd)/ws_b
+CVMFS_QUOTA_LIMIT=-1
+CVMFS_RELOAD_SOCKETS=$(pwd)/ws_b
+CVMFS_ALIEN_CACHE=$preload_dir
+CVMFS_SERVER_URL=$(get_repo_url $CVMFS_TEST_REPO)
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
+CVMFS_DEBUGLOG=$(pwd)/cvmfs_debug_b.log
+EOF
+
+  trap cleanup EXIT HUP INT TERM || return 15
+
+  CVMFS_TEST_674_MOUNTPOINT_A="$(pwd)/mnt_a"
+  cvmfs2 -o debug,config=$(pwd)/local_a.conf $CVMFS_TEST_REPO $CVMFS_TEST_674_MOUNTPOINT_A || return 20
+  ls $CVMFS_TEST_674_MOUNTPOINT_A/dir/first || return 21
+  ls $CVMFS_TEST_674_MOUNTPOINT_A/dir/second && return 22
+
+  CVMFS_TEST_674_MOUNTPOINT_B="$(pwd)/mnt_b"
+  cvmfs2 -o debug,config=$(pwd)/local_b.conf $CVMFS_TEST_REPO $CVMFS_TEST_674_MOUNTPOINT_B || return 25
+  ls $CVMFS_TEST_674_MOUNTPOINT_B/dir/first || return 26
+  ls $CVMFS_TEST_674_MOUNTPOINT_B/dir/second && return 27
+
+  echo "*** Updating the repository {1}"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/dir/second
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** Update repository A from network {1}"
+  cvmfs_talk -p $(pwd)/ws_a/cvmfs_io.${CVMFS_TEST_REPO} remount sync || return 31
+  ls $CVMFS_TEST_674_MOUNTPOINT_A/dir | grep first || return 32
+  ls $CVMFS_TEST_674_MOUNTPOINT_A/dir | grep second || return 33
+
+  echo "*** Verify that repository B updates as well {1}"
+  cvmfs_talk -p $(pwd)/ws_b/cvmfs_io.${CVMFS_TEST_REPO} remount sync || return 41
+  ls $CVMFS_TEST_674_MOUNTPOINT_B/dir | grep first || return 42
+  ls $CVMFS_TEST_674_MOUNTPOINT_B/dir | grep second || return 43
+
+  echo "*** Cutting network access"
+  cvmfs_talk -p $(pwd)/ws_a/cvmfs_io.${CVMFS_TEST_REPO} host set NOTAVAIL || return 50
+  cvmfs_talk -p $(pwd)/ws_b/cvmfs_io.${CVMFS_TEST_REPO} host set NOTAVAIL || return 51
+
+  echo "*** Updating the repository {2}"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/dir/third
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** Enforce offline mode {2}"
+  cvmfs_talk -p $(pwd)/ws_a/cvmfs_io.${CVMFS_TEST_REPO} remount sync || return 61
+  cvmfs_talk -p $(pwd)/ws_b/cvmfs_io.${CVMFS_TEST_REPO} remount sync || return 62
+  ls $CVMFS_TEST_674_MOUNTPOINT_A/dir | grep second || return 63
+  ls $CVMFS_TEST_674_MOUNTPOINT_B/dir | grep second || return 64
+  ls $CVMFS_TEST_674_MOUNTPOINT_A/dir | grep third && return 65
+  ls $CVMFS_TEST_674_MOUNTPOINT_B/dir | grep third && return 66
+
+  echo "*** Preloading alien cache {3}"
+
+  cvmfs_swissknife pull -c \
+    -u $repo_url \
+    -r $preload_dir \
+    -k /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub \
+    -m $CVMFS_TEST_REPO \
+    -x $preload_dir/sync_temp || return 70
+
+  echo "*** cached root hash is $(cat $preload_dir/cvmfschecksum.${CVMFS_TEST_REPO})"
+  cvmfs_talk -p $(pwd)/ws_a/cvmfs_io.${CVMFS_TEST_REPO} remount sync || return 81
+  cvmfs_talk -p $(pwd)/ws_b/cvmfs_io.${CVMFS_TEST_REPO} remount sync || return 82
+  ls $CVMFS_TEST_674_MOUNTPOINT_A/dir | grep second || return 83
+  ls $CVMFS_TEST_674_MOUNTPOINT_B/dir | grep second || return 84
+  ls $CVMFS_TEST_674_MOUNTPOINT_A/dir | grep third || return 85
+  ls $CVMFS_TEST_674_MOUNTPOINT_B/dir | grep third || return 86
+
+  return 0
+}
+
