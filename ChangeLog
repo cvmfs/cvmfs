@@ -1,4 +1,6 @@
 2.6.4:
+  * Fix client updates on shared writable alien cache (CVM-1803)
+  * Fix spurious error message when spawning external cache
 
 2.6.3:
   * Fix parsing of /etc/hosts (CVM-1796, CVM-1797)
