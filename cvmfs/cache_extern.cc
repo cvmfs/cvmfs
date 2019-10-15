@@ -172,7 +172,9 @@ int ExternalCacheManager::CommitTxn(void *txn) {
 }
 
 
-int ExternalCacheManager::ConnectLocator(const std::string &locator) {
+int ExternalCacheManager::ConnectLocator(
+  const std::string &locator, bool print_error)
+{
   vector<string> tokens = SplitString(locator, '=');
   int result = -1;
   if (tokens[0] == "unix") {
@@ -186,12 +188,14 @@ int ExternalCacheManager::ConnectLocator(const std::string &locator) {
     return -EINVAL;
   }
   if (result < 0) {
-    if (errno) {
-      LogCvmfs(kLogCache, kLogDebug | kLogStderr,
-               "Failed to connect to socket: %s", strerror(errno));
-    } else {
-      LogCvmfs(kLogCache, kLogDebug | kLogStderr,
-               "Failed to connect to socket (unknown error)");
+    if (print_error) {
+      if (errno) {
+        LogCvmfs(kLogCache, kLogDebug | kLogStderr,
+                 "Failed to connect to socket: %s", strerror(errno));
+      } else {
+        LogCvmfs(kLogCache, kLogDebug | kLogStderr,
+                 "Failed to connect to socket (unknown error)");
+      }
     }
     return -EIO;
   }
@@ -266,7 +270,7 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
       // Prevent violate busy loops
       SafeSleepMs(1000);
     }
-    plugin_handle->fd_connection_ = ConnectLocator(locator);
+    plugin_handle->fd_connection_ = ConnectLocator(locator, num_attempts > 1);
     if (plugin_handle->IsValid()) {
       break;
     } else if (plugin_handle->fd_connection_ == -EINVAL) {
