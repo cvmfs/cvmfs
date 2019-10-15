@@ -11,7 +11,7 @@ cvmfs_run_test() {
   autofs_switch off || return 1
 
   # Make sure CVMFS_HTTP_PROXY is present before manual mount
-  echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local
+  sudo sh -c "echo \"CVMFS_HTTP_PROXY=DIRECT\" >> /etc/cvmfs/default.local"
 
   cvmfs_mount_direct sft.cern.ch || return 2
   mount | grep cvmfs-config.cern.ch || return 3
