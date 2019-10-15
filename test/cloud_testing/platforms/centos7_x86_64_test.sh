@@ -41,6 +41,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/585-xattrs                               \
                                  src/600-securecvmfs                          \
                                  src/628-pythonwrappedcvmfsserver             \
+                                 src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
                                  --                                           \
                                  src/5*                                       \

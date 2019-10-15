@@ -19,6 +19,9 @@ if [ x"$(lsb_release -cs)" = x"xenial" ]; then
   # Expected failure, see test case
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
+  # Hardlinks do not work with overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+
   echo "Ubuntu 16.04... using overlayfs"
   export CVMFS_TEST_UNIONFS=overlayfs
 fi
@@ -80,6 +83,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/647-bearercvmfs                          \
                                src/628-pythonwrappedcvmfsserver             \
                                src/670-listreflog                           \
+                               src/672-publish_stats_hardlinks              \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \
