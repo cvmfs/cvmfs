@@ -5,6 +5,7 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_path
 
   echo "*** create a repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return 1
@@ -24,7 +25,13 @@ cvmfs_run_test() {
   echo "test file" > $repo_dir/testfile4  # size 10
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  cvmfs_swissknife filestats -r /srv/cvmfs/$CVMFS_TEST_REPO -o filestats.db
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    repo_path=$(get_s3_repo_url "$CVMFS_TEST_REPO")
+  else
+    repo_path=/srv/cvmfs/$CVMFS_TEST_REPO
+  fi
+
+  cvmfs_swissknife filestats -r $repo_path -o filestats.db
 
   num_catalogs=$(sqlite3 filestats.db "select count(*) from catalogs;")
   [ $num_catalogs -eq 1 ] || return 1
