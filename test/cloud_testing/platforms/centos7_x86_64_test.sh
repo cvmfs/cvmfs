@@ -57,4 +57,10 @@ CVMFS_TEST_CLASS_NAME=MigrationTests                                            
                                    migration_tests/*                              \
                                 || retval=1
 
+echo "running DUCC test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests                                    \
+./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   src/4*                               \
+                                || retval=1
+
 exit $retval
