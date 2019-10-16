@@ -28,6 +28,7 @@ install_rpm $SERVER_PACKAGE
 install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 install_rpm $SHRINKWRAP_PACKAGE
+install_rpm $DUCC_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."
