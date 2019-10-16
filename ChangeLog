@@ -1,4 +1,5 @@
 2.7.0:
+  * Fix missing package dependency on Debian 9 and Ubuntu 18.04 (CVM-1789)
   * Enable default config repository for debian stretch and newer (CVM-1794)
   * Fix potential parsing of incomplete /etc/hosts
   * Fix stale negative entries in active cache eviction (CVM-1759)
