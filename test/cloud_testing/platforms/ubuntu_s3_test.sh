@@ -16,8 +16,6 @@ if [ x"$(lsb_release -cs)" = x"xenial" ]; then
   # Ubuntu 16.04
   # Kernel sources too old for gcc, TODO
   CVMFS_EXCLUDE="src/006-buildkernel"
-  # Should work once packages are built on destination platform, TODO
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/602-libcvmfs"
   # Expected failure, see test case
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
