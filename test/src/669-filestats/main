@@ -31,7 +31,7 @@ cvmfs_run_test() {
     repo_path=/srv/cvmfs/$CVMFS_TEST_REPO
   fi
 
-  cvmfs_swissknife filestats -r $repo_path -o filestats.db
+  cvmfs_swissknife filestats -r $repo_path -n $CVMFS_TEST_REPO -k /etc/cvmfs/keys -o filestats.db
 
   num_catalogs=$(sqlite3 filestats.db "select count(*) from catalogs;")
   [ $num_catalogs -eq 1 ] || return 1
