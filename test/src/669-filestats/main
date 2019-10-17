@@ -43,7 +43,8 @@ cvmfs_run_test() {
   [ $num_objects -eq 3 ] || return 4
 
   object_sizes=$(sqlite3 filestats.db "select size from objects;" | sort)
-  [ "x$object_sizes" == x"10 11 11" ] || return 5
+  object_sizes_formatted=$(echo $object_sizes)
+  [ "x$object_sizes_formatted" == x"10 11 11" ] || return 5
 
   return 0
 }
