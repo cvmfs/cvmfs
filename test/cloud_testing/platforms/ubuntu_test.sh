@@ -41,7 +41,7 @@ fi
 if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # Ubuntu 14.04
   # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/585-xattrs src/673-acl src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
+  CVMFS_EXCLUDE="src/585-xattrs src/673-acl src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
 
   # CVMFS config repository not enabled on Ubuntu 14.04
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany src/086-reloadmanualmount"
