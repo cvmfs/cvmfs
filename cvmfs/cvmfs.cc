@@ -1274,12 +1274,17 @@ const uint64_t kMaxMetainfoLength = 64*1024;
 
 string GetRepoMetainfo(uint64_t size) {
   if (!mount_point_->catalog_mgr()->manifest()) {
+    // message truncating not needed, handled at the end of cvmfs_getxattr
     return "Manifest not available";
   }
 
   shash::Any hash = mount_point_->catalog_mgr()->manifest()->meta_info();
+  if (hash.IsNull()) {
+    return "Metainfo not available";
+  }
   // Follow max size suggested by fuse, otherwise 64KiB
-  uint64_t max_size = (size) ? size : kMaxMetainfoLength;
+  uint64_t max_size = (size && size < kMaxMetainfoLength)
+                      ? size : kMaxMetainfoLength;
   int fd = mount_point_->fetcher()->
             Fetch(hash, CacheManager::kSizeUnknown,
                   "metainfo (" + hash.ToString() + ")",
@@ -1289,12 +1294,17 @@ string GetRepoMetainfo(uint64_t size) {
   }
   uint64_t actual_size = file_system_->cache_mgr()->GetSize(fd);
   if (actual_size > max_size) {
+    file_system_->cache_mgr()->Close(fd);
     return "Failed to open: metadata file is too big";
   }
   char buffer[actual_size];
-  file_system_->cache_mgr()->Pread(fd, buffer, actual_size, 0);
-  close(fd);
-  return string(buffer, buffer + actual_size);
+  int bytes_read =
+    file_system_->cache_mgr()->Pread(fd, buffer, actual_size, 0);
+  file_system_->cache_mgr()->Close(fd);
+  if (bytes_read < 0) {
+    return "Failed to read metadata file";
+  }
+  return string(buffer, buffer + bytes_read);
 }
 
 

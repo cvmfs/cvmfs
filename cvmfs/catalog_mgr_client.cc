@@ -187,7 +187,6 @@ LoadError ClientCatalogManager::LoadCatalog(
     return success_code;
   }
 
-  if (manifest_.IsValid()) delete manifest_;
   manifest_ = new manifest::Manifest(*ensemble.manifest);
 
   offline_mode_ = false;
