@@ -44,7 +44,7 @@ if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   CVMFS_EXCLUDE="src/081-shrinkwrap src/585-xattrs src/673-acl src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
 
   # CVMFS config repository not enabled on Ubuntu 14.04
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany"
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany src/086-reloadmanualmount"
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi
