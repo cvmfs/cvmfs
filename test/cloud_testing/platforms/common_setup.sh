@@ -38,6 +38,26 @@ SOURCE_DIRECTORY=""
 LOG_DIRECTORY=""
 GATEWAY_BUILD_URL=""
 
+usage() {
+  local msg=$1
+
+  echo "$msg"
+  echo
+  echo "Mandatory options:"
+  echo " -t <cvmfs source tree>      CernVM-FS source tree location"
+  echo " -s <cvmfs server package>   CernVM-FS server package to be tested"
+  echo " -c <cvmfs client package>   CernVM-FS client package to be tested"
+  echo " -f <cvmfs fuse3 package>    CernVM-FS fuse3 package to be tested"
+  echo " -l <test log directory>     destination for log file generation"
+  echo " -d <cvmfs devel package>    CernVM-FS devel package to be tested"
+  echo " -k <cvmfs config packages>  CernVM-FS config packages to be tested"
+  echo " -g <cvmfs unittest package> CernVM-FS unittest package to be tested"
+  echo " -p <shrinkwrap package>     CernVM-FS shrinkwrap package to be tested"
+  echo " -w <gateway build url>      URL of gateway build to be tested"
+
+  exit 1
+}
+
 # parse script parameters (same for all platforms)
 while getopts "s:c:d:k:t:g:l:w:n:p:f:" option; do
   case $option in
