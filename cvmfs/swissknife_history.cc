@@ -569,7 +569,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     }
 
     if (!ManipulateTag(env, tag_template, user_provided_hash)) {
-      return 1;
+      return 102;
     }
   }
 

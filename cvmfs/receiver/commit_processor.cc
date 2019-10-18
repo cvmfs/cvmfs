@@ -4,6 +4,9 @@
 
 #include "commit_processor.h"
 
+#include <sys/time.h>
+#include <unistd.h>
+
 #include <vector>
 
 #include "catalog_diff_tool.h"
@@ -40,10 +43,16 @@ PathString RemoveRepoName(const PathString& lease_path) {
   }
 }
 
-bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
-                  const receiver::Params& params, const std::string& temp_dir,
-                  const std::string& manifest_path,
-                  const std::string& public_key_path) {
+/**
+ * @return 0   for success
+ * @return !0  for error
+ * @return 102 error, trying to create a generic tag with a name that already
+ *         exists
+ **/
+int CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
+                 const receiver::Params& params, const std::string& temp_dir,
+                 const std::string& manifest_path,
+                 const std::string& public_key_path) {
   swissknife::ArgumentList args;
   args['r'].Reset(new std::string(params.spooler_configuration));
   args['w'].Reset(new std::string(params.stratum0));
@@ -64,10 +73,9 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
   if (ret) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret,
              repo_tag.name_.c_str());
-    return false;
   }
 
-  return true;
+  return ret;
 }
 
 }  // namespace
@@ -101,12 +109,14 @@ CommitProcessor::Result CommitProcessor::Process(
   // If tag_name is a generic tag, update the time stamp
   if (HasPrefix(final_tag.name_, "generic-", false)) {
     // timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+    // the timestamp is 20char, the `generic-` part is 8
+    // the total is 28, we get some margin
     char buf[32];
     time_t now = time(NULL);
     struct tm timestamp;
     gmtime_r(&now, &timestamp);
-    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timestamp);
-    final_tag.name_ = std::string("generic-") + buf;
+    strftime(buf, sizeof(buf), "generic-%Y-%m-%dT%H:%M:%SZ", &timestamp);
+    final_tag.name_ = std::string(buf);
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,
@@ -200,11 +210,37 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
-  if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
-                    public_key)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
-             final_tag.name_.c_str());
-    return kError;
+  bool tag_creation_loop = true;
+  while (tag_creation_loop) {
+    switch (CreateNewTag(final_tag, repo_name, params, temp_dir,
+                         new_manifest_path, public_key)) {
+      case 0: {
+        // no error, everything went fine, the new tag was created
+        tag_creation_loop = false;
+        break;
+      }
+      case 102: {
+        // catalog name already exists and it is a generic catalog.
+        // we wait one second, update the name of the catalog and we try again.
+        tag_creation_loop = true;
+        sleep(1);
+        char buf[32];
+        time_t now = time(NULL);
+        struct tm timestamp;
+        gmtime_r(&now, &timestamp);
+        strftime(buf, sizeof(buf), "generic-%Y-%m-%dT%H:%M:%SZ", &timestamp);
+        final_tag.name_ = std::string(buf);
+        break;
+      }
+      case 1:
+      default: {
+        // some unknown error, we just log it
+        tag_creation_loop = false;
+        LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
+                 final_tag.name_.c_str());
+        return kError;
+      }
+    }
   }
 
   // We need to re-initialize the ServerTool component for signing
