@@ -4,6 +4,8 @@
 
 #include "commit_processor.h"
 
+#include <time.h>
+
 #include <vector>
 
 #include "catalog_diff_tool.h"
@@ -100,13 +102,24 @@ CommitProcessor::Result CommitProcessor::Process(
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
   if (HasPrefix(final_tag.name_, "generic-", false)) {
-    // timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
-    char buf[32];
-    time_t now = time(NULL);
+    // format time following the ISO 8601 YYYY-MM-DDThh:mm:ss.sssZ
+    // note the millisecond accurracy
+    struct timespec now;
     struct tm timestamp;
-    gmtime_r(&now, &timestamp);
-    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timestamp);
-    final_tag.name_ = std::string("generic-") + buf;
+    clock_gettime(CLOCK_REALTIME, &now);
+
+    gmtime_r(&now.tv_sec, &timestamp);
+    int milliseconds = now.tv_nsec / 1000000;
+
+    char seconds_buffer[32];
+    strftime(seconds_buffer, sizeof(seconds_buffer),
+             "generic-%Y-%m-%dT%H:%M:%S", &timestamp);
+
+    char millis_buffer[48];
+    snprintf(millis_buffer, sizeof(millis_buffer), "%s.%03dZ", seconds_buffer,
+             milliseconds);
+
+    final_tag.name_ = std::string(millis_buffer);
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,
