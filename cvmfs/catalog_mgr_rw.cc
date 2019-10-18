@@ -674,6 +674,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   if (new_root_entry.HasXattrs()) {
     XattrList xattrs;
     retval = old_catalog->LookupXattrsPath(ps_nested_root_path, &xattrs);
+    assert(retval);
     wr_new_catalog->TouchEntry(new_root_entry, xattrs, nested_root_path);
   }
 
