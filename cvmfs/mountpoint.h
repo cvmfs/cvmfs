@@ -418,6 +418,7 @@ class MountPoint : SingleCopy, public BootFactory {
   FileSystem *file_system() { return file_system_; }
   bool has_membership_req() { return has_membership_req_; }
   bool hide_magic_xattrs() { return hide_magic_xattrs_; }
+  bool enforce_acls() { return enforce_acls_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
@@ -545,6 +546,7 @@ class MountPoint : SingleCopy, public BootFactory {
   double kcache_timeout_sec_;
   bool fixed_catalog_;
   bool hide_magic_xattrs_;
+  bool enforce_acls_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
 

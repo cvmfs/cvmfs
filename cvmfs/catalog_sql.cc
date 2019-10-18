@@ -804,10 +804,10 @@ SqlDirentTouch::SqlDirentTouch(const CatalogDatabase &database) {
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
 //            1             2             3               4
-    "name = :name, symlink = :symlink, uid = :uid, gid = :gid "
-//        5                6               7           8
+    "name = :name, symlink = :symlink, uid = :uid, gid = :gid, xattr = :xattr "
+//        5                6               7           8             9
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
-//                    9                       10
+//                    10                       11
 }
 
 
@@ -825,7 +825,22 @@ bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
 
 
 bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
-  return BindMd5(9, 10, hash);
+  return BindMd5(10, 11, hash);
+}
+
+
+bool SqlDirentTouch::BindXattr(const XattrList &xattrs) {
+  unsigned char *packed_xattrs;
+  unsigned size;
+  xattrs.Serialize(&packed_xattrs, &size);
+  if (packed_xattrs == NULL)
+    return BindNull(9);
+  return BindBlobTransient(9, packed_xattrs, size);
+}
+
+
+bool SqlDirentTouch::BindXattrEmpty() {
+  return BindNull(9);
 }
 
 

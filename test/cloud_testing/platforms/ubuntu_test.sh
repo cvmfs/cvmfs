@@ -35,7 +35,7 @@ fi
 if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # Ubuntu 14.04
   # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
+  CVMFS_EXCLUDE="src/081-shrinkwrap src/585-xattrs src/673-acl src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
 
   # CVMFS config repository not enabled on Ubuntu 14.04
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany"
@@ -64,7 +64,6 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
   CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
   ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                                 -x src/518-hardlinkstresstest                   \
-                                   src/585-xattrs                               \
                                    src/600-securecvmfs                          \
                                    src/647-bearercvmfs                          \
                                    $CVMFS_EXCLUDE                               \

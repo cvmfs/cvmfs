@@ -1711,12 +1711,30 @@ bool Pin(const string &path) {
  * Do after-daemon() initialization
  */
 static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_init");
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_init, capable: %d", conn->capable);
 
   // NFS support
 #ifdef CVMFS_NFS_SUPPORT
   conn->want |= FUSE_CAP_EXPORT_SUPPORT;
 #endif
+
+  if (mount_point_->enforce_acls()) {
+#ifdef FUSE_CAP_POSIX_ACL
+    if ((conn->capable & FUSE_CAP_POSIX_ACL) == 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "ACL support requested but missing fuse kernel support, "
+               "aborting");
+      abort();
+    }
+    conn->want |= FUSE_CAP_POSIX_ACL;
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "enforcing ACLs");
+#else
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "ACL support requested but not available in this version of "
+             "libfuse, aborting");
+    abort();
+#endif
+  }
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {

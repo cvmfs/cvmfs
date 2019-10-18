@@ -906,6 +906,17 @@ int FuseMain(int argc, char *argv[]) {
              "CernVM-FS: running in debug mode");
   }
 
+#ifndef FUSE_CAP_POSIX_ACL
+  if (options_manager->GetValue("CVMFS_ENFORCE_ACLS", &parameter) &&
+      options_manager->IsOn(parameter))
+  {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "CernVM-FS: ACL support requested but not available in this "
+             "version of libfuse");
+    return kFailPermission;
+  }
+#endif
+
   // Initialize the loader socket, connections are not accepted until Spawn()
   socket_path_ = new string("/var/run/cvmfs");
   if (options_manager->GetValue("CVMFS_RELOAD_SOCKETS", &parameter))

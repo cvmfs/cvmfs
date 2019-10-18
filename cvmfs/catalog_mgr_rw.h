@@ -107,8 +107,10 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void RemoveFile(const std::string &file_path);
 
   void AddDirectory(const DirectoryEntryBase &entry,
+                    const XattrList &xattrs,
                     const std::string &parent_directory);
   void TouchDirectory(const DirectoryEntryBase &entry,
+                      const XattrList &xattrs,
                       const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
   void Clone(const std::string from, const std::string to);

@@ -221,13 +221,28 @@ void WritableCatalog::IncLinkcount(const string &path_within_group,
 
 
 void WritableCatalog::TouchEntry(const DirectoryEntryBase &entry,
+                                 const XattrList &xattrs,
                                  const shash::Md5 &path_hash) {
   SetDirty();
 
-  bool retval =
-    sql_touch_->BindPathHash(path_hash) &&
-    sql_touch_->BindDirentBase(entry)   &&
-    sql_touch_->Execute();
+  catalog::DirectoryEntry prev_entry;
+  bool retval = LookupMd5Path(path_hash, &prev_entry);
+  assert(retval);
+
+  retval = sql_touch_->BindPathHash(path_hash) &&
+           sql_touch_->BindDirentBase(entry);
+  assert(retval);
+  if (xattrs.IsEmpty()) {
+    retval = sql_touch_->BindXattrEmpty();
+    if (prev_entry.HasXattrs())
+      delta_counters_.self.xattrs--;
+  } else {
+    retval = sql_touch_->BindXattr(xattrs);
+    if (!prev_entry.HasXattrs())
+      delta_counters_.self.xattrs++;
+  }
+  assert(retval);
+  retval = sql_touch_->Execute();
   assert(retval);
   sql_touch_->Reset();
 }

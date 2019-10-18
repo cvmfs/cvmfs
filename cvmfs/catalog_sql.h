@@ -379,6 +379,8 @@ class SqlDirentTouch : public SqlCatalog {
 
   bool BindDirentBase(const DirectoryEntryBase &entry);
   bool BindPathHash(const shash::Md5 &hash);
+  bool BindXattr(const XattrList &xattrs);
+  bool BindXattrEmpty();
 };
 
 

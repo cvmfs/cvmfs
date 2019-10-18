@@ -90,6 +90,8 @@ install_from_repo python-dev   || die "fail (installing python-dev)"
 install_from_repo libz-dev     || die "fail (installing libz-dev)"
 install_from_repo libssl-dev   || die "fail (installing libssl-dev)"
 
+install_from_repo acl || die "fail (installing acl)"
+
 # Install the test S3 provider
 install_test_s3 || die "fail (installing test S3)"
 
