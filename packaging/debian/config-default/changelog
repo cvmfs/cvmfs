@@ -1,3 +1,9 @@
+cvmfs-config-default (1.8-1) lucid; urgency=low
+
+  * Enable CERN config repository on newer platforms
+
+ -- Jan Priessnitz <jan.priessnitz@cern.ch>  Thu, 17 Oct 2019 09:00:00 +0000
+
 cvmfs-config-default (1.7-1) lucid; urgency=low
 
   * Replace BNL and FNAL stratum 1s with their OSG aliases
