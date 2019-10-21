@@ -104,19 +104,21 @@ CommitProcessor::Result CommitProcessor::Process(
   if (HasPrefix(final_tag.name_, "generic-", false)) {
     // format time following the ISO 8601 YYYY-MM-DDThh:mm:ss.sssZ
     // note the millisecond accurracy
-    struct timespec now;
+    uint64_t nanoseconds_timestamp = GetTime();
+
+    time_t seconds = nanoseconds_timestamp / 1000000000;  // 1E9
     struct tm timestamp;
-    clock_gettime(CLOCK_REALTIME, &now);
-
-    gmtime_r(&now.tv_sec, &timestamp);
-    int milliseconds = now.tv_nsec / 1000000;
-
+    gmtime_r(&seconds, &timestamp);
     char seconds_buffer[32];
     strftime(seconds_buffer, sizeof(seconds_buffer),
              "generic-%Y-%m-%dT%H:%M:%S", &timestamp);
 
+    // first we get the raw nanoseconds from the timestamp using the module
+    // and then we divide to extract the millisecond.
+    // the division truncate the number brutally, it should be enough.
+    time_t milliseconds = (nanoseconds_timestamp % 1000000000) / 1000000;
     char millis_buffer[48];
-    snprintf(millis_buffer, sizeof(millis_buffer), "%s.%03dZ", seconds_buffer,
+    snprintf(millis_buffer, sizeof(millis_buffer), "%s.%03ldZ", seconds_buffer,
              milliseconds);
 
     final_tag.name_ = std::string(millis_buffer);
