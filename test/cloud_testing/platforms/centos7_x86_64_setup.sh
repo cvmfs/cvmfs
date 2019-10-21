@@ -76,6 +76,11 @@ install_from_repo python-devel
 install_from_repo unzip
 install_from_repo bzip2
 
+# install docker for testing DUCC
+yum install -y yum-utils
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+yum install docker-ce docker-ce-cli containerd.io
+
 # Migration test needs lsb_release
 echo "install lsb_release..."
 install_from_repo redhat-lsb-core
