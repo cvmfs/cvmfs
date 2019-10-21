@@ -339,7 +339,7 @@ inline uint64_t platform_monotonic_time_ns() {
   return static_cast<uint64_t>(tp.tv_sec * 1e9 + tp.tv_nsec);
 }
 
-inline uint64_t platform_time() {
+inline uint64_t platform_realtime_ns() {
   struct timespec tp = _time_with_clock(CLOCK_REALTIME);
   return static_cast<uint64_t>(tp.tv_sec * 1e9 + tp.tv_nsec);
 }

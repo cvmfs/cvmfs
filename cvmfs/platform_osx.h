@@ -265,7 +265,13 @@ inline uint64_t platform_monotonic_time_ns() {
   return val_ns;
 }
 
-inline uint64_t platform_time() { return platform_monotonic_time_ns(); }
+inline uint64_t platform_realtime_ns() {
+  struct timeval tv;
+  int ret = gettimeofday(&tv, NULL);
+  assert(ret == 0);
+  uint64_t time = tv.tv_sec * 1e6 + tv.tv_usec * 1e3;
+  return time;
+}
 
 /**
  * strdupa does not exist on OSX

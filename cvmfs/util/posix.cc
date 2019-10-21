@@ -1630,13 +1630,6 @@ bool SafeWriteToFile(const std::string &content,
   return retval;
 }
 
-/**
- * Returns current time in nanoseconds
- * It is not guarantee to be monotomic increasing
- */
-uint64_t GetTime() {
-  return platform_time();
-}
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

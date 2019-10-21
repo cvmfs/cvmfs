@@ -104,7 +104,7 @@ CommitProcessor::Result CommitProcessor::Process(
   if (HasPrefix(final_tag.name_, "generic-", false)) {
     // format time following the ISO 8601 YYYY-MM-DDThh:mm:ss.sssZ
     // note the millisecond accurracy
-    uint64_t nanoseconds_timestamp = GetTime();
+    uint64_t nanoseconds_timestamp = platform_realtime_ns();
 
     time_t seconds = nanoseconds_timestamp / 1000000000;  // 1E9
     struct tm timestamp;
