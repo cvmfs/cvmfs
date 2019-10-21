@@ -336,6 +336,13 @@ inline uint64_t platform_monotonic_time_ns() {
   return static_cast<uint64_t>(tp.tv_sec*1e9 + tp.tv_nsec);
 }
 
+inline uint64_t platform_time() {
+  struct timespec tp;
+  int retval = clock_gettime(CLOCK_REALTIME, &tp);
+  assert(retval == 0);
+  return static_cast<uint64_t>(tp.tv_sec*1e9 + tp.tv_nsec);
+}
+
 inline uint64_t platform_memsize() {
   return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
          static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
