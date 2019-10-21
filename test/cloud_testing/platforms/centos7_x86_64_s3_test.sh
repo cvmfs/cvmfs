@@ -68,6 +68,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/622-gracefulrmfs                         \
                                src/647-bearercvmfs                          \
                                src/670-listreflog                           \
+                               src/672-publish_stats_hardlinks              \
                                src/673-acl                                  \
                                --                                           \
                                src/5*                                       \

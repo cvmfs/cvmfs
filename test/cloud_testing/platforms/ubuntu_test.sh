@@ -19,6 +19,9 @@ if [ x"$(lsb_release -cs)" = x"bionic" ]; then
   # Expected failure, see test case
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
+  # Hardlinks do not work with overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+
   echo "Ubuntu 18.04... using overlayfs"
   export CVMFS_TEST_UNIONFS=overlayfs
 fi
@@ -29,16 +32,19 @@ if [ x"$(lsb_release -cs)" = x"xenial" ]; then
   # Expected failure, see test case
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
+  # Hardlinks do not work with overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+
   echo "Ubuntu 16.04... using overlayfs"
   export CVMFS_TEST_UNIONFS=overlayfs
 fi
 if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # Ubuntu 14.04
   # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/585-xattrs src/673-acl src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
+  CVMFS_EXCLUDE="src/585-xattrs src/673-acl src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
 
   # CVMFS config repository not enabled on Ubuntu 14.04
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany"
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany src/086-reloadmanualmount"
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
 fi

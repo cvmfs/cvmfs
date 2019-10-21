@@ -7,13 +7,20 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount_direct sft.cern.ch || return 1
-  mount | grep cvmfs-config.cern.ch || return 2
+  # Disable autofs before manual mount
+  autofs_switch off || return 1
 
-  cvmfs_umount cvmfs-config.cern.ch || return 10
-  mount | grep cvmfs-config.cern.ch && return 11
+  # Make sure necessary default.local content is present before manual mount
+  sudo sh -c "echo \"CVMFS_HTTP_PROXY=DIRECT\" >> /etc/cvmfs/default.local" || return 2
+  sudo sh -c "echo \"CVMFS_REPOSITORIES=sft.cern.ch\" >> /etc/cvmfs/default.local" || return 3
 
-  sudo cvmfs_config reload || return 20
+  cvmfs_mount_direct sft.cern.ch || return 4
+  mount | grep cvmfs-config.cern.ch || return 5
+
+  cvmfs_umount cvmfs-config.cern.ch || return 6
+  mount | grep cvmfs-config.cern.ch && return 7
+
+  sudo cvmfs_config reload || return 8
 
   return 0
 }

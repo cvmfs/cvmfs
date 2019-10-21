@@ -22,10 +22,10 @@ cvmfs_run_test() {
 
   echo "*** creating fuse-premount"
   cc -o fuse_premount "$workdir/fuse_premount.c" || return 1
-  sudo chown root:root fuse_premount || return 2
-  sudo chmod 4755 fuse_premount || return 3
   CVMFS_TEST084_FUSEPREMOUNT=/fuse_premount
-  sudo cp fuse_premount $CVMFS_TEST084_FUSEPREMOUNT || return 4
+  sudo cp fuse_premount $CVMFS_TEST084_FUSEPREMOUNT || return 2
+  sudo chown root:root $CVMFS_TEST084_FUSEPREMOUNT || return 3
+  sudo chmod 4755 $CVMFS_TEST084_FUSEPREMOUNT || return 4
   ls -lah $CVMFS_TEST084_FUSEPREMOUNT
   trap cleanup HUP EXIT TERM INT || return 5
 
