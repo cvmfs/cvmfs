@@ -132,6 +132,8 @@ bool SafeReadToString(int fd, std::string *final_result);
 bool SafeWriteToFile(const std::string &content,
                      const std::string &path, int mode);
 
+// Return the current time in nanoseconds
+uint64_t GetTime();
 
 struct Pipe : public SingleCopy {
   Pipe() {
