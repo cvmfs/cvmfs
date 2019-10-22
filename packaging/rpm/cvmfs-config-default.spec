@@ -74,9 +74,6 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
-#For next release:
-#- Changed NIKHEF alias from klei.nikhef.nl to cvmfs01.nikhef.nl
-
 * Fri May 25 2018 Dave Dykstra <dwd@fnal.gov> - 1.7-1
 - Skipped versions 1.5 and 1.6 because debian packages with those 
   versions already exist
