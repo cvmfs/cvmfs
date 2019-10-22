@@ -132,7 +132,6 @@ bool SafeReadToString(int fd, std::string *final_result);
 bool SafeWriteToFile(const std::string &content,
                      const std::string &path, int mode);
 
-
 struct Pipe : public SingleCopy {
   Pipe() {
     int pipe_fd[2];

@@ -1630,6 +1630,7 @@ bool SafeWriteToFile(const std::string &content,
   return retval;
 }
 
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

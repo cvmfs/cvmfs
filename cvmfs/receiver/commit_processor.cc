@@ -4,6 +4,8 @@
 
 #include "commit_processor.h"
 
+#include <time.h>
+
 #include <vector>
 
 #include "catalog_diff_tool.h"
@@ -100,13 +102,26 @@ CommitProcessor::Result CommitProcessor::Process(
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
   if (HasPrefix(final_tag.name_, "generic-", false)) {
-    // timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
-    char buf[32];
-    time_t now = time(NULL);
+    // format time following the ISO 8601 YYYY-MM-DDThh:mm:ss.sssZ
+    // note the millisecond accurracy
+    uint64_t nanoseconds_timestamp = platform_realtime_ns();
+
+    time_t seconds = nanoseconds_timestamp / 1000000000;  // 1E9
     struct tm timestamp;
-    gmtime_r(&now, &timestamp);
-    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timestamp);
-    final_tag.name_ = std::string("generic-") + buf;
+    gmtime_r(&seconds, &timestamp);
+    char seconds_buffer[32];
+    strftime(seconds_buffer, sizeof(seconds_buffer),
+             "generic-%Y-%m-%dT%H:%M:%S", &timestamp);
+
+    // first we get the raw nanoseconds from the timestamp using the module
+    // and then we divide to extract the millisecond.
+    // the division truncate the number brutally, it should be enough.
+    time_t milliseconds = (nanoseconds_timestamp % 1000000000) / 1000000;
+    char millis_buffer[48];
+    snprintf(millis_buffer, sizeof(millis_buffer), "%s.%03ldZ", seconds_buffer,
+             milliseconds);
+
+    final_tag.name_ = std::string(millis_buffer);
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,
