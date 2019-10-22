@@ -1,0 +1,21 @@
+cvmfs_test_name="Test magic extended attributes"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount grid.cern.ch || return 1
+  local attributes_err = $(list_xattrs /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
+  local attributes=$(list_xattrs /cvmfs/grid.cern.ch)
+  if [ "x$attributes" = "x" ] || [ "x$attributes_err" != "x" ]; then
+    return 2
+  fi
+
+  local repo_counters_err=$(get_xattr repo_counters /cvmfs/grid.cern.ch 2>&1 1>/dev/null)  
+  local repo_counters=$(get_xattr repo_counters /cvmfs/grid.cern.ch)
+  if [ "x$repo_counters" = "x" ] || [ "x$repo_counters_err" != "x" ]; then
+    return 3
+  fi
+
+  return 0
+}

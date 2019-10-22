@@ -187,6 +187,8 @@ LoadError ClientCatalogManager::LoadCatalog(
     return success_code;
   }
 
+  manifest_ = new manifest::Manifest(*ensemble.manifest);
+
   offline_mode_ = false;
   cvmfs_path += " (" + ensemble.manifest->catalog_hash().ToString() + ")";
   LogCvmfs(kLogCache, kLogDebug, "remote checksum is %s",

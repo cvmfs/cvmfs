@@ -492,4 +492,27 @@ TEST_F(T_CatalogCounters, FieldsMap) {
   EXPECT_EQ(DeltaCounters_t(0), *map["self_special"]);
 }
 
+TEST_F(T_CatalogCounters, CsvMap) {
+  Counters c = GetFilledCounters();
+  std::string output_actual = c.GetCsvMap();
+  std::string output_expected =
+    "chunked," + StringifyInt(c.self.chunked_files + c.subtree.chunked_files) +
+    "\nchunked_size," +
+    StringifyInt(c.self.chunked_file_size + c.subtree.chunked_file_size) +
+    "\nchunks," + StringifyInt(c.self.file_chunks + c.subtree.file_chunks) +
+    "\ndir," + StringifyInt(c.self.directories + c.subtree.directories) +
+    "\nexternal," + StringifyInt(c.self.externals + c.subtree.externals) +
+    "\nexternal_file_size," +
+    StringifyInt(c.self.external_file_size + c.subtree.external_file_size) +
+    "\nfile_size," + StringifyInt(c.self.file_size + c.subtree.file_size) +
+    "\nnested," +
+    StringifyInt(c.self.nested_catalogs + c.subtree.nested_catalogs) +
+    "\nregular," +
+    StringifyInt(c.self.regular_files + c.subtree.regular_files) +
+    "\nspecial," + StringifyInt(c.self.specials + c.subtree.specials) +
+    "\nsymlink," + StringifyInt(c.self.symlinks + c.subtree.symlinks) +
+    "\nxattr," + StringifyInt(c.self.xattrs + c.subtree.xattrs) + "\n";
+  EXPECT_EQ(output_expected, output_actual);
+}
+
 }  // namespace catalog

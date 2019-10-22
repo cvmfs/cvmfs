@@ -5,9 +5,11 @@
 #ifndef CVMFS_CATALOG_COUNTERS_IMPL_H_
 #define CVMFS_CATALOG_COUNTERS_IMPL_H_
 
+#include <map>
 #include <string>
 
 #include "catalog_sql.h"
+#include "util/string.h"
 
 namespace catalog {
 
@@ -28,6 +30,32 @@ typename TreeCountersBase<FieldT>::FieldsMap
   self.FillFieldsMap("self_", &map);
   subtree.FillFieldsMap("subtree_", &map);
   return map;
+}
+
+template<typename FieldT>
+std::string TreeCountersBase<FieldT>::GetCsvMap() const {
+  FieldsMap map_self;
+  FieldsMap map_subtree;
+  self.FillFieldsMap("", &map_self);
+  subtree.FillFieldsMap("", &map_subtree);
+
+  std::map<std::string, FieldT> map_summed;
+
+  typename FieldsMap::const_iterator i    = map_self.begin();
+  typename FieldsMap::const_iterator iend = map_self.end();
+  for (; i != iend; ++i) {
+    map_summed[i->first] = *(map_self[i->first]) + *(map_subtree[i->first]);
+  }
+
+  std::string result;
+  typename std::map<std::string, FieldT>::const_iterator j    =
+    map_summed.begin();
+  typename std::map<std::string, FieldT>::const_iterator jend =
+    map_summed.end();
+  for (; j != jend; ++j) {
+    result += j->first + "," + StringifyInt(j->second) + "\n";
+  }
+  return result;
 }
 
 
