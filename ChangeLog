@@ -1,4 +1,5 @@
 2.7.0:
+  * Add "repo_counters" and "repo_metainfo" xattrs (CVM-1499, 1733)
   * Add support for extended attributes on directories
   * Add support for CVMFS_ENFORCE_ACLS client parameter
   * Fix missing package dependency on Debian 9 and Ubuntu 18.04 (CVM-1789)
