@@ -1,4 +1,5 @@
 2.7.0:
+  * Fix clashing generic tags for short transactions with gateway (CVM-1735)
   * Add "repo_counters" and "repo_metainfo" xattrs (CVM-1499, 1733)
   * Add support for extended attributes on directories
   * Add support for CVMFS_ENFORCE_ACLS client parameter
