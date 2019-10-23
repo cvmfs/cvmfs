@@ -1753,7 +1753,7 @@ bool Pin(const string &path) {
  * Do after-daemon() initialization
  */
 static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_init, capable: %d", conn->capable);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_init");
 
   // NFS support
 #ifdef CVMFS_NFS_SUPPORT
