@@ -5,6 +5,7 @@
 #ifndef CVMFS_MONITOR_H_
 #define CVMFS_MONITOR_H_
 
+#include <pthread.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -28,6 +29,8 @@ class Watchdog {
   ~Watchdog();
   void Spawn();
   void RegisterOnCrash(void (*CleanupOnCrash)(void));
+
+  static void *MainWatchdogListener(void *data);
 
  private:
   typedef std::map<int, struct sigaction> SigactionMap;
@@ -75,6 +78,11 @@ class Watchdog {
   std::string exe_path_;
   pid_t watchdog_pid_;
   Pipe *pipe_watchdog_;
+  /// The supervisee makes sure its watchdog does not die
+  Pipe *pipe_listener_;
+  /// Send the terminate signal to the listener
+  Pipe *pipe_terminate_;
+  pthread_t thread_listener_;
   void (*on_crash_)(void);
   platform_spinlock lock_handler_;
   stack_t sighandler_stack_;
