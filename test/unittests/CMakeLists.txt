@@ -261,6 +261,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc
 
   cache.pb.cc cache.pb.h
+  c_http_server.cc
 )
 
 # Lower optimization level for this file. Xcode 9.3+ gives different results in Os and above
