@@ -218,8 +218,10 @@ string ResolveProxyDescription(
       continue;
 
     lb_groups[i] = AutoProxy(download_manager);
-    if (lb_groups[i].empty())
+    if (lb_groups[i].empty()) {
       use_cache = true;
+      lb_groups.erase(lb_groups.begin()+i);
+    }
   }
 
   string discovered_proxies = JoinStrings(lb_groups, ";");
