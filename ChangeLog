@@ -1,4 +1,5 @@
 2.7.0:
+  * Set default mount point to /Users/shared/cvmfs on macOS >= 10.15 (CVM-1813)
   * Use relative symbolic links in DUCC (CVM-1817)
   * Terminate fuse daemon if watchdog disappears (CVM-1753)
   * Fix clashing generic tags for short transactions with gateway (CVM-1735)
