@@ -1829,15 +1829,21 @@ EOF
     ;;
 
    Darwin )
-     #sudo sed -i -e "/^$(echo $CVMFS_MOUNT_DIR | sed -e "s,/,\\\\/,g")/d" /etc/auto_master
-     #local cvmfs_map="$CVMFS_MOUNT_DIR\t\t\t/etc/auto_cvmfs"
-     #sudo bash -c "echo -e '$cvmfs_map' >> /etc/auto_master"
-     #reload configurations
-     #sudo automount -vc &> /dev/null
-     echo "Fuse4x and autofs bug" > /dev/null
-     sudo mkdir -p /cvmfs
-     sudo chown cvmfs:cvmfs /cvmfs
-     sudo chmod 777 /cvmfs
+     # Since MacOS 10.15 Catalina it is not possible anymore (without disabling
+     # SIP) create directory in root `/`.
+     # We decide to move the standard installation directory on
+     # `/Users/shared/cvmfs` instead of `/cvmfs`
+     if sw_vers | grep 10.15; then
+        sudo mkdir -p /Users/shared/cvmfs
+        sudo chown cvmfs:cvmfs /Users/shared/cvmfs
+        sudo chmod 777 /Users/shared/cvmfs
+     else
+        echo "Fuse4x and autofs bug" > /dev/null
+        sudo mkdir -p /cvmfs
+        sudo chown cvmfs:cvmfs /cvmfs
+        sudo chmod 777 /cvmfs
+     fi
+
      ;;
 
    * )
