@@ -6,6 +6,12 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
+CVMFS_EXCLUDE=
+if cat /etc/fedora-release | grep 28; then
+   #fuse3 package is not new enough on this platform
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/084-traversesft src/673-acl"
+fi
+
 # running unit test suite
 run_unittests --gtest_shuffle \
               --gtest_death_test_use_fork || retval=1
@@ -20,6 +26,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/006-buildkernel                          \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
+                                 $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
@@ -36,6 +43,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/647-bearercvmfs                          \
                                  src/672-publish_stats_hardlinks              \
+                                 $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
