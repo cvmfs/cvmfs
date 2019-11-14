@@ -84,6 +84,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/628-pythonwrappedcvmfsserver             \
                                src/670-listreflog                           \
                                src/672-publish_stats_hardlinks              \
+                               src/673-acl                                  \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

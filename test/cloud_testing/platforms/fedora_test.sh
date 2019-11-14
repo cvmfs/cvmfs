@@ -9,7 +9,7 @@ retval=0
 CVMFS_EXCLUDE=
 if cat /etc/fedora-release | grep 28; then
    #fuse3 package is not new enough on this platform
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/084-traversesft src/673-acl"
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/084-premounted src/673-acl"
 fi
 
 # running unit test suite
