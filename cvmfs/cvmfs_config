@@ -1830,7 +1830,7 @@ EOF
 
    Darwin )
      # Since MacOS 10.15 Catalina it is not possible anymore (without disabling
-     # SIP) create directory in root `/`.
+     # SIP) to create directory in root `/`.
      # We decide to move the standard installation directory on
      # `/Users/shared/cvmfs` instead of `/cvmfs`
      if sw_vers | grep 10.15; then
