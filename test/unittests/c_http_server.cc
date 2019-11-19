@@ -2,6 +2,18 @@
  * This file is part of the CernVM File System.
  */
 
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <cstring>
+
+#include "duplex_curl.h"
+#include "util/posix.h"
+
 #include "c_http_server.h"
 
 HTTPRequestParser::HTTPRequestParser() {
@@ -152,6 +164,8 @@ MockHTTPServer::MockHTTPServer(int port) {
   atomic_init32(&running_);
   atomic_init32(&server_thread_ready_);
   server_port_ = port;
+  callback_func_ = NULL;
+  callback_data_ = NULL;
 }
 
 MockHTTPServer::~MockHTTPServer() {
@@ -245,4 +259,132 @@ void *MockHTTPServer::Main(void *data) {
   }
   close(listen_sockfd);
   return NULL;
+}
+
+MockFileServer::MockFileServer(int port, std::string root_dir) {
+  port_ = port;
+  root_dir_ = root_dir;
+  num_processed_requests_ = 0;
+  server_ = new MockHTTPServer(port);
+  server_->SetResponseCallback(FileServerHandler, this);
+  assert(server_->Start());
+}
+
+MockFileServer::~MockFileServer() {
+  delete server_;
+}
+
+HTTPResponse MockFileServer::FileServerHandler(const HTTPRequest &req,
+                                               void *data) {
+  MockFileServer *file_server = static_cast<MockFileServer *>(data);
+  HTTPResponse response;
+  if (req.method == "GET") {
+    bool host_header = false;
+    HTTPHeaderList::const_iterator it = req.headers.begin();
+    HTTPHeaderList::const_iterator itend = req.headers.end();
+    for (; it != itend; ++it) {
+      if (it->first == "Host") {
+        host_header = true;
+        break;
+      }
+    }
+    std::string local_path = file_server->root_dir_;
+    if (host_header) {
+      local_path += "/" + req.path;
+    } else {
+      local_path += "/" + req.path.substr(req.path.find("/") + 1);
+    }
+    if (FileExists(local_path)) {
+      int fd = open(local_path.c_str(), O_RDONLY);
+      assert(fd >= 0);
+      SafeReadToString(fd, &response.body);
+      close(fd);
+    } else {
+      response.code = 404;
+      response.reason = "Not Found";
+    }
+  }
+  ++file_server->num_processed_requests_;
+  return response;
+}
+
+MockProxyServer::MockProxyServer(int port) {
+  port_ = port;
+  num_processed_requests_ = 0;
+  server_ = new MockHTTPServer(port);
+  server_->SetResponseCallback(ProxyServerHandler, this);
+  assert(server_->Start());
+}
+
+MockProxyServer::~MockProxyServer() {
+  delete server_;
+}
+
+size_t MockProxyServer::ProxyServerWriteCallback(char *ptr, size_t size,
+                                                 size_t nmemb, void* userdata) {
+  std::string *response = static_cast<std::string *>(userdata);
+  (*response) += std::string(ptr, size*nmemb);
+  return size*nmemb;
+}
+
+HTTPResponse MockProxyServer::ProxyServerHandler(const HTTPRequest &req,
+                                                 void *data) {
+  MockProxyServer *proxy_server = static_cast<MockProxyServer *>(data);
+  HTTPResponse response;
+  CURL* handle = curl_easy_init();
+  curl_easy_setopt(handle, CURLOPT_HEADER, 1);
+  curl_easy_setopt(handle, CURLOPT_URL, req.path.c_str());
+  curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, req.method.c_str());
+
+  std::string destination_response;
+  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, ProxyServerWriteCallback);
+  curl_easy_setopt(handle, CURLOPT_WRITEDATA, &destination_response);
+
+  struct curl_slist *header_list = NULL;
+  HTTPHeaderList::const_iterator it = req.headers.begin();
+  HTTPHeaderList::const_iterator itend = req.headers.end();
+  for (; it != itend; ++it) {
+    std::string header = it->first + ": " + it->second;
+    header_list = curl_slist_append(header_list, header.c_str());
+  }
+  curl_easy_setopt(handle, CURLOPT_HTTPHEADER, header_list);
+
+  if (req.body.length()) {
+    curl_easy_setopt(handle, CURLOPT_POSTFIELDS, req.body.c_str());
+    curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, req.body.length());
+  }
+  curl_easy_perform(handle);
+  curl_easy_cleanup(handle);
+  curl_slist_free_all(header_list);
+  response.raw = true;
+  response.body = destination_response;
+  ++proxy_server->num_processed_requests_;
+  return response;
+}
+
+MockRedirectServer::MockRedirectServer(int port,
+                                       std::string redirect_destination) {
+  port_ = port;
+  server_ = new MockHTTPServer(port);
+  redirect_destination_ = redirect_destination;
+  num_processed_requests_ = 0;
+  server_->SetResponseCallback(RedirectServerHandler, this);
+  assert(server_->Start());
+}
+
+MockRedirectServer::~MockRedirectServer() {
+  delete server_;
+}
+
+HTTPResponse MockRedirectServer::RedirectServerHandler(const HTTPRequest &req,
+                                            void *data) {
+  MockRedirectServer *redirect_server =
+    static_cast<MockRedirectServer *>(data);
+  HTTPResponse response;
+  response.code = 301;
+  response.reason = "Moved Permanently";
+  response.AddHeader("Location",
+                      redirect_server->redirect_destination_ + req.path);
+  ++redirect_server->num_processed_requests_;
+  return response;
 }
