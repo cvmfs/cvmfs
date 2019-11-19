@@ -6,6 +6,7 @@
 #define TEST_UNITTESTS_C_FILE_SANDBOX_H_
 
 #include <errno.h>
+#include <fcntl.h>
 
 #include <cstring>
 #include <string>
@@ -58,6 +59,14 @@ class FileSandbox : public ::testing::Test {
     LazilyCreateDummyFile(sandbox_path_, 100*1024, &huge_zero_file_,
                           uint64_t(-1));
     return huge_zero_file_;
+  }
+
+  std::string GetFileContents(std::string path) {
+    int fd = open(path.c_str(), O_RDONLY);
+    std::string content;
+    SafeReadToString(fd, &content);
+    close(fd);
+    return content;
   }
 
   template <class VectorT>
