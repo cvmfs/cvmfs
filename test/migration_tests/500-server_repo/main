@@ -44,8 +44,8 @@ cvmfs_run_test() {
 
   # make CernVM-FS ready to go
   echo "setting up CernVM-FS (cvmfs_config setup)"
-  cvmfs_config setup    || return 5
-  cvmfs_config chksetup || return 5
+  sudo cvmfs_config setup    || return 5
+  sudo cvmfs_config chksetup || return 5
 
   # make sure that autofs is not running
   echo "switching off autofs"
@@ -78,8 +78,8 @@ cvmfs_run_test() {
   install_packages "$CVMFS_SERVER_PACKAGE" || return 16
 
   # migrate repositories created under old version
-  cvmfs_server migrate $MIGRATIONTEST_500_REPO || return 17
-  cvmfs_server migrate $MIGRATIONTEST_500_REPLICA || return 18
+  sudo cvmfs_server migrate $MIGRATIONTEST_500_REPO || return 17
+  sudo cvmfs_server migrate $MIGRATIONTEST_500_REPLICA || return 18
 
   # do some ordinary stuff with the repository
   start_transaction $MIGRATIONTEST_500_REPO || return 19
