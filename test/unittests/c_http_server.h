@@ -168,12 +168,16 @@ class MockFileServer {
   explicit MockFileServer(int port, std::string root_dir) {
     port_ = port;
     root_dir_ = root_dir;
+    num_processed_requests_ = 0;
     server_ = new MockHTTPServer(port);
     server_->SetResponseCallback(FileServerHandler, this);
     assert(server_->Start());
   }
   ~MockFileServer() {
     delete server_;
+  }
+  int num_processed_requests() {
+    return num_processed_requests_;
   }
 
  protected:
@@ -206,17 +210,20 @@ class MockFileServer {
         response.reason = "Not Found";
       }
     }
+    ++file_server->num_processed_requests_;
     return response;
   }
   std::string root_dir_;
   int port_;
   MockHTTPServer *server_;
+  int num_processed_requests_;
 };
 
 class MockProxyServer {
  public:
   explicit MockProxyServer(int port) {
     port_ = port;
+    num_processed_requests_ = 0;
     server_ = new MockHTTPServer(port);
     server_->SetResponseCallback(ProxyServerHandler, this);
     assert(server_->Start());
@@ -224,7 +231,10 @@ class MockProxyServer {
   ~MockProxyServer() {
     delete server_;
   }
- 
+  int num_processed_requests() {
+    return num_processed_requests_;
+  }
+
  protected:
   static size_t ProxyServerWriteCallback(char *ptr, size_t size, size_t nmemb,
                                          void* userdata) {
@@ -234,7 +244,7 @@ class MockProxyServer {
   }
 
   static HTTPResponse ProxyServerHandler(const HTTPRequest &req, void *data) {
-    // MockProxyServer *proxy_server = static_cast<MockProxyServer *>(data);    
+    MockProxyServer *proxy_server = static_cast<MockProxyServer *>(data);
     HTTPResponse response;
     CURL* handle = curl_easy_init();
     curl_easy_setopt(handle, CURLOPT_HEADER, 1);
@@ -263,11 +273,13 @@ class MockProxyServer {
     curl_slist_free_all(header_list);
     response.raw = true;
     response.body = destination_response;
+    ++proxy_server->num_processed_requests_;
     return response;
   }
 
   int port_;
   MockHTTPServer *server_;
+  int num_processed_requests_;
 };
 
 class MockRedirectServer {
@@ -276,28 +288,35 @@ class MockRedirectServer {
     port_ = port;
     server_ = new MockHTTPServer(port);
     redirect_destination_ = redirect_destination;
+    num_processed_requests_ = 0;
     server_->SetResponseCallback(RedirectServerHandler, this);
     assert(server_->Start());
   }
   ~MockRedirectServer() {
     delete server_;
   }
+  int num_processed_requests() {
+    return num_processed_requests_;
+  }
 
  protected:
   static HTTPResponse RedirectServerHandler(const HTTPRequest &req,
                                             void *data) {
-    MockRedirectServer *redirect_server = static_cast<MockRedirectServer *>(data);    
+    MockRedirectServer *redirect_server =
+      static_cast<MockRedirectServer *>(data);
     HTTPResponse response;
     response.code = 301;
     response.reason = "Moved Permanently";
     response.AddHeader("Location",
                        redirect_server->redirect_destination_ + req.path);
+    ++redirect_server->num_processed_requests_;
     return response;
   }
 
   int port_;
   std::string redirect_destination_;
   MockHTTPServer *server_;
+  int num_processed_requests_;
 };
 
 #endif  // TEST_UNITTESTS_C_HTTP_SERVER_H_
