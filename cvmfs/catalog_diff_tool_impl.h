@@ -9,6 +9,7 @@
 #include <string>
 
 #include "catalog.h"
+#include "catalog_diff_tool.h"
 #include "download.h"
 #include "hash.h"
 #include "logging.h"
@@ -93,24 +94,48 @@ RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
 
 template <typename RoCatalogMgr>
 void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
+  LogCvmfs(kLogCvmfs, kLogSyslog,
+                "CatalogDiffTool - DiffRec on %s",
+                path.ToString().c_str());
+  // This function is recursive at the very end, let's keep this in mind.
+
+  // A directory entry is some layer of abstraction above a C struct dirent.
+  // Nothing more than the type of file in the directory (can be another directory),
+  // the name itself and the inode
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
+  // We start allocating the DirectoryEntryList and we AppendFirstEntry to it.
+  // It is nothing more than a vector where the first and the last entries are marker.
   old_catalog_mgr_->Listing(path, &old_listing);
+  // here we list the content of path into the old_listing DirectoryEntry.
+  // I believe that this listing is not recursive, but I could be wrong here.
+  // Non recursive listing may explain the recursiveness of this function.
   sort(old_listing.begin(), old_listing.end(), IsSmaller);
+  // obvious, the IsSmaller just compares the names of the DirectoryEntriy-ies being
+  // careful with the inode.
   AppendLastEntry(&old_listing);
+  // We mark the old_listing as over.
 
   catalog::DirectoryEntryList new_listing;
   AppendFirstEntry(&new_listing);
   new_catalog_mgr_->Listing(path, &new_listing);
   sort(new_listing.begin(), new_listing.end(), IsSmaller);
   AppendLastEntry(&new_listing);
+  // Here we repeat what we did above, excatly the same, but this time we use the new_catalog_manager
 
+  // At this point we have two DirectoryEntryList (vectors), that are sorted.
+  // Both of them contains the files that are under the directory `path` (the arguments)
+  // but at different points in times, before and after the transaction.
+
+  // Now we are starting the loop inside of which we call this same function recursively
   unsigned i_from = 0, size_from = old_listing.size();
   unsigned i_to = 0, size_to = new_listing.size();
   while ((i_from < size_from) || (i_to < size_to)) {
+    // the loops goes on as long as we don't have visited all the entries in both lists
     catalog::DirectoryEntry old_entry = old_listing[i_from];
     catalog::DirectoryEntry new_entry = new_listing[i_to];
 
+    // some sanity check
     if (old_entry.linkcount() == 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                 "CatalogDiffTool - Entry %s in old catalog has linkcount 0. "
@@ -130,6 +155,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     while (old_entry.IsHidden()) old_entry = old_listing[++i_from];
     while (new_entry.IsHidden()) new_entry = new_listing[++i_to];
 
+    // From now on we work in `PathString`s not anymore simple strings.
     PathString old_path(path);
     old_path.Append("/", 1);
     old_path.Append(old_entry.name().GetChars(), old_entry.name().GetLength());
@@ -142,7 +168,10 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
     }
 
+    // note the `continue` statement, we apply the differences and then we skip
+    // to the next iteraction
     if (IsSmaller(new_entry, old_entry)) {
+      // we found a difference, there is something new in the new listing.
       i_to++;
       FileChunkList chunks;
       if (new_entry.IsChunkedFile()) {
@@ -151,22 +180,30 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       }
       ReportAddition(new_path, new_entry, xattrs, chunks);
       if (new_entry.IsDirectory()) {
+        // Recursion!
         DiffRec(new_path);
       }
       continue;
     } else if (IsSmaller(old_entry, new_entry)) {
+      // another difference, there is something less in the new listing.
       i_from++;
       if (old_entry.IsDirectory() && !old_entry.IsNestedCatalogMountpoint()) {
+        // Recursion! Again!
         DiffRec(old_path);
       }
       ReportRemoval(old_path, old_entry);
       continue;
     }
 
+    // if we arrived here the dirent are the same, but the content could have change
     assert(old_path == new_path);
+    // let's not forget to upgrade our counters, later it will be more difficult.
     i_from++;
     i_to++;
 
+    // we are computing the differences between two entries
+    // a diff of kIdentical (which is equal to zero), means that there are no differences
+    // between the two entries.
     catalog::DirectoryEntryBase::Differences diff =
         old_entry.CompareTo(new_entry);
     if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
@@ -179,6 +216,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       if (id_nested_from == id_nested_to) continue;
     }
 
+    // something is different
     if (old_entry.CompareTo(new_entry) > 0) {
       FileChunkList chunks;
       if (new_entry.IsChunkedFile()) {
@@ -187,10 +225,14 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       }
       ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
     }
+    // At least one of them is a directory
+    // hence we need to recurse to the direcotries, one or both.
     if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
       if (old_entry.IsDirectory()) {
+        // Recursion!
         DiffRec(old_path);
       } else if (new_entry.IsDirectory()) {
+        // Recursion!
         DiffRec(new_path);
       }
       continue;
