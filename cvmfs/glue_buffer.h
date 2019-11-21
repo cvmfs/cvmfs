@@ -8,6 +8,7 @@
  * functions.
  */
 
+#include <gtest/gtest_prod.h>
 #include <pthread.h>
 #include <sched.h>
 #include <stdint.h>
@@ -19,8 +20,10 @@
 #include <vector>
 
 #include "atomic.h"
+#include "bigqueue.h"
 #include "bigvector.h"
 #include "hash.h"
+#include "platform.h"
 #include "shortstring.h"
 #include "smallhash.h"
 #include "smalloc.h"
@@ -620,6 +623,118 @@ class InodeTracker {
   InodeReferences inode_references_;
   Statistics statistics_;
 };  // class InodeTracker
+
+
+/**
+ * Tracks fuse negative cache replies for active cache eviction
+ */
+class NentryTracker {
+  FRIEND_TEST(T_GlueBuffer, NentryTracker);
+
+ private:
+  struct Entry {
+    Entry() : expiry(0), inode_parent(0) {}
+    Entry(uint64_t e, uint64_t p, const char *n)
+      : expiry(e)
+      , inode_parent(p)
+      , name(n, strlen(n))
+    {}
+    uint64_t expiry;
+    uint64_t inode_parent;
+    NameString name;
+  };
+
+ public:
+  struct Cursor {
+    explicit Cursor(Entry *h) : head(h), pos(0) {}
+    Entry *head;
+    size_t pos;
+  };
+
+  // Cannot be moved to the statistics manager because it has to survive
+  // reloads.  Added manually in the fuse module initialization and in talk.cc.
+  struct Statistics {
+    Statistics() : num_insert(0), num_remove(0), num_prune(0) {}
+    uint64_t num_insert;
+    uint64_t num_remove;
+    uint64_t num_prune;
+  };
+  Statistics GetStatistics() { return statistics_; }
+
+  static void *MainCleaner(void *data);
+
+  NentryTracker();
+  explicit NentryTracker(const NentryTracker &other);
+  NentryTracker &operator= (const NentryTracker &other);
+  ~NentryTracker();
+
+  /**
+   * Lock object during copy
+   */
+  NentryTracker *Move();
+
+  void Add(const uint64_t inode_parent, const char *name, uint64_t timeout_s) {
+    if (!is_active_) return;
+    if (timeout_s == 0) return;
+
+    uint64_t now = platform_monotonic_time();
+    Lock();
+    entries_.PushBack(Entry(now + timeout_s, inode_parent, name));
+    statistics_.num_insert++;
+    DoPrune(now);
+    Unlock();
+  }
+
+  void Prune();
+  /**
+   * The nentry tracker is only needed for active cache eviction and can
+   * otherwise ignore new entries.
+   */
+  void Disable() { is_active_ = false; }
+  bool is_active() const { return is_active_; }
+
+  void SpawnCleaner(unsigned interval_s);
+
+  Cursor BeginEnumerate();
+  bool NextEntry(Cursor *cursor, uint64_t *inode_parent, NameString *name);
+  void EndEnumerate(Cursor *cursor);
+
+ private:
+  static const unsigned kVersion = 0;
+
+  void CopyFrom(const NentryTracker &other);
+
+  void InitLock();
+  inline void Lock() const {
+    int retval = pthread_mutex_lock(lock_);
+    assert(retval == 0);
+  }
+  inline void Unlock() const {
+    int retval = pthread_mutex_unlock(lock_);
+    assert(retval == 0);
+  }
+
+  void DoPrune(uint64_t now) {
+    Entry *entry;
+    while (entries_.Peek(&entry)) {
+      if (entry->expiry >= now)
+        break;
+      entries_.PopFront();
+      statistics_.num_remove++;
+    }
+    statistics_.num_prune++;
+  }
+
+  pthread_mutex_t *lock_;
+  unsigned version_;
+  Statistics statistics_;
+  bool is_active_;
+  BigQueue<Entry> entries_;
+
+  int pipe_terminate_[2];
+  int cleaning_interval_ms_;
+  pthread_t thread_cleaner_;
+};  // class NentryTracker
 
 
 }  // namespace glue

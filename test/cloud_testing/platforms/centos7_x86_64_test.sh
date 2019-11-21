@@ -40,8 +40,9 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/585-xattrs                               \
                                  src/600-securecvmfs                          \
-                                 src/602-libcvmfs                             \
                                  src/628-pythonwrappedcvmfsserver             \
+                                 src/672-publish_stats_hardlinks              \
+                                 src/673-acl                                  \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
@@ -51,11 +52,20 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                               || retval=1
 
 
-echo "running CernVM-FS migration test cases..."
-CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
-./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/*                              \
-                                || retval=1
+echo "running CernVM-FS client migration test cases..."
+CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
+./run.sh $MIGRATIONTEST_CLIENT_LOGFILE                            \
+         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/0*                                    \
+         || retval=1
+
+
+echo "running CernVM-FS server migration test cases..."
+CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
+./run.sh $MIGRATIONTEST_SERVER_LOGFILE                            \
+         -o ${MIGRATIONTEST_SERVER_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/5*                                    \
+         || retval=1
 
 echo "running DUCC test cases..."
 CVMFS_TEST_CLASS_NAME=DUCCTests                                         \

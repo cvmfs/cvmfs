@@ -269,7 +269,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   /**
    * By default, files have no extended attributes.
    */
-  XattrList default_xattrs;
+  XattrList default_xattrs_;
   UniquePtr<Counters> counters_;
 };  // class SyncMediator
 

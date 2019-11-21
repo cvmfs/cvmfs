@@ -119,6 +119,8 @@ class TreeCountersBase {
 
   void SetZero();
 
+  std::string GetCsvMap() const;
+
  protected:
   FieldsMap GetFieldsMap() const;
 

@@ -19,6 +19,9 @@ if [ x"$(lsb_release -cs)" = x"bionic" ]; then
   # Expected failure, see test case
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
+  # Hardlinks do not work with overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+
   echo "Ubuntu 18.04... using overlayfs"
   export CVMFS_TEST_UNIONFS=overlayfs
 fi
@@ -26,10 +29,11 @@ if [ x"$(lsb_release -cs)" = x"xenial" ]; then
   # Ubuntu 16.04
   # Kernel sources too old for gcc, TODO
   CVMFS_EXCLUDE="src/006-buildkernel"
-  # Should work once packages are built on destination platform, TODO
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/602-libcvmfs"
   # Expected failure, see test case
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
+
+  # Hardlinks do not work with overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
 
   echo "Ubuntu 16.04... using overlayfs"
   export CVMFS_TEST_UNIONFS=overlayfs
@@ -37,16 +41,12 @@ fi
 if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   # Ubuntu 14.04
   # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
+  CVMFS_EXCLUDE="src/585-xattrs src/673-acl src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
+
+  # CVMFS config repository not enabled on Ubuntu 14.04
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany src/086-reloadmanualmount"
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
-fi
-if [ x"$(lsb_release -cs)" = x"precise" ]; then
-  # Ubuntu 12.04
-  # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/081-shrinkwrap src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway* src/9*"
-
-  echo "Ubuntu 12.04... using aufs instead of overlayfs"
 fi
 
 
@@ -58,7 +58,6 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/005-asetup                               \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
-                                 src/050-configrepo                           \
                                  src/084-premounted                           \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
@@ -71,9 +70,9 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
   CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
   ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                                 -x src/518-hardlinkstresstest                   \
-                                   src/585-xattrs                               \
                                    src/600-securecvmfs                          \
                                    src/647-bearercvmfs                          \
+                                   src/673-acl                                  \
                                    $CVMFS_EXCLUDE                               \
                                    --                                           \
                                    src/5*                                       \
@@ -85,10 +84,20 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
 fi
 
 
-echo "running CernVM-FS migration test cases..."
-CVMFS_TEST_CLASS_NAME=MigrationTests \
-./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/*                              \
-                                || retval=1
+echo "running CernVM-FS client migration test cases..."
+CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
+./run.sh $MIGRATIONTEST_CLIENT_LOGFILE                            \
+         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/0*                                    \
+          || retval=1
+
+if [ x"$(uname -m)" = x"x86_64" ]; then
+  echo "running CernVM-FS server migration test cases..."
+  CVMFS_TEST_CLASS_NAME=ServerMigrationTests                       \
+  ./run.sh $MIGRATIONTEST_SERVER_LOGFILE                           \
+          -o ${MIGRATIONTEST_SERVER_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+              migration_tests/5*                                   \
+          || retval=1
+fi
 
 exit $retval

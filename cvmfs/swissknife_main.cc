@@ -23,6 +23,7 @@
 #include "swissknife_ingest.h"
 #include "swissknife_lease.h"
 #include "swissknife_letter.h"
+#include "swissknife_list_reflog.h"
 #include "swissknife_lsrepo.h"
 #include "swissknife_migrate.h"
 #include "swissknife_notify.h"
@@ -104,6 +105,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandMigrate());
   command_list.push_back(new swissknife::CommandScrub());
   command_list.push_back(new swissknife::CommandGc());
+  command_list.push_back(new swissknife::CommandListReflog());
   command_list.push_back(new swissknife::CommandReconstructReflog());
   command_list.push_back(new swissknife::CommandLease());
   command_list.push_back(new swissknife::Ingest());
@@ -195,7 +197,7 @@ int main(int argc, char **argv) {
   // run the command
   string start_time = GetGMTimestamp();
   const int retval = command->Main(args);
-  string finished_time = GetGMTimestamp();
+  string finish_time = GetGMTimestamp();
 
   if (display_statistics) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");
@@ -234,7 +236,7 @@ int main(int argc, char **argv) {
         LogCvmfs(kLogCvmfs, kLogSyslogErr,
                 "Couldn't create StatisticsDatabase object!");
       } else if (db->StoreStatistics(command->statistics(), start_time,
-                                     finished_time, command->GetName(),
+                                     finish_time, command->GetName(),
                                                              repo_name) != 0) {
         LogCvmfs(kLogCvmfs, kLogSyslogErr,
               "Couldn't store statistics in %s!",

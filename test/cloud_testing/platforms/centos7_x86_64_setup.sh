@@ -75,6 +75,7 @@ install_from_repo libuuid-devel
 install_from_repo python-devel
 install_from_repo unzip
 install_from_repo bzip2
+install_from_repo acl
 
 # install docker for testing DUCC
 sudo yum install -y yum-utils

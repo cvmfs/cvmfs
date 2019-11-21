@@ -42,6 +42,7 @@ class DownloadManager;
 }
 namespace glue {
 class InodeTracker;
+class NentryTracker;
 }
 namespace lru {
 class InodeCache;
@@ -417,6 +418,7 @@ class MountPoint : SingleCopy, public BootFactory {
   FileSystem *file_system() { return file_system_; }
   bool has_membership_req() { return has_membership_req_; }
   bool hide_magic_xattrs() { return hide_magic_xattrs_; }
+  bool enforce_acls() { return enforce_acls_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
@@ -425,6 +427,7 @@ class MountPoint : SingleCopy, public BootFactory {
   double kcache_timeout_sec() { return kcache_timeout_sec_; }
   lru::Md5PathCache *md5path_cache() { return md5path_cache_; }
   std::string membership_req() { return membership_req_; }
+  glue::NentryTracker *nentry_tracker() { return nentry_tracker_; }
   lru::PathCache *path_cache() { return path_cache_; }
   std::string repository_tag() { return repository_tag_; }
   SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
@@ -534,6 +537,7 @@ class MountPoint : SingleCopy, public BootFactory {
   lru::Md5PathCache *md5path_cache_;
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
+  glue::NentryTracker *nentry_tracker_;
 
   file_watcher::FileWatcher* resolv_conf_watcher_;
 
@@ -542,6 +546,7 @@ class MountPoint : SingleCopy, public BootFactory {
   double kcache_timeout_sec_;
   bool fixed_catalog_;
   bool hide_magic_xattrs_;
+  bool enforce_acls_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
 

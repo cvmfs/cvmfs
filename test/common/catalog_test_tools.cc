@@ -302,7 +302,8 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
     if (item.entry_.IsRegular() || item.entry_.IsLink()) {
       catalog_mgr->AddFile(item.entry_base(), item.xattrs(), item.parent());
     } else if (item.entry_.IsDirectory()) {
-      catalog_mgr->AddDirectory(item.entry_base(), item.parent());
+      catalog_mgr->AddDirectory(
+        item.entry_base(), item.xattrs(), item.parent());
     }
   }
 
@@ -334,7 +335,8 @@ bool CatalogTestTool::ApplyAtRootHash(
     if (item.entry_.IsRegular() || item.entry_.IsLink()) {
       catalog_mgr->AddFile(item.entry_base(), item.xattrs(), item.parent());
     } else if (item.entry_.IsDirectory()) {
-      catalog_mgr->AddDirectory(item.entry_base(), item.parent());
+      catalog_mgr->AddDirectory(
+        item.entry_base(), item.xattrs(), item.parent());
     }
   }
 

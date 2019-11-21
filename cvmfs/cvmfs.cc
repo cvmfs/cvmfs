@@ -378,6 +378,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
 
+  fuse_ino_t parent_fuse = parent;
   parent = catalog_mgr->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %" PRIu64 " for name: %s",
@@ -444,6 +445,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   return;
 
  lookup_reply_negative:
+  // Will be a no-op if there is no fuse cache eviction
+  mount_point_->nentry_tracker()->Add(parent_fuse, name, timeout);
   fuse_remounter_->fence()->Leave();
   perf::Inc(file_system_->n_fs_lookup_negative());
   result.ino = 0;
@@ -498,7 +501,9 @@ static void cvmfs_forget(
 
 /**
  * Looks into dirent to decide if this is an EIO negative reply or an
- * ENOENT negative reply
+ * ENOENT negative reply.  We do not need to store the reply in the negative
+ * cache tracker because ReplyNegative is called on inode queries.  Inodes,
+ * however, change anyway when a new catalog is applied.
  */
 static void ReplyNegative(const catalog::DirectoryEntry &dirent,
                           fuse_req_t req)
@@ -1265,6 +1270,43 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   fuse_reply_statfs(req, &info);
 }
 
+const uint64_t kMaxMetainfoLength = 64*1024;
+
+string GetRepoMetainfo(uint64_t size) {
+  if (!mount_point_->catalog_mgr()->manifest()) {
+    // message truncating not needed, handled at the end of cvmfs_getxattr
+    return "Manifest not available";
+  }
+
+  shash::Any hash = mount_point_->catalog_mgr()->manifest()->meta_info();
+  if (hash.IsNull()) {
+    return "Metainfo not available";
+  }
+  // Follow max size suggested by fuse, otherwise 64KiB
+  uint64_t max_size = (size && size < kMaxMetainfoLength)
+                      ? size : kMaxMetainfoLength;
+  int fd = mount_point_->fetcher()->
+            Fetch(hash, CacheManager::kSizeUnknown,
+                  "metainfo (" + hash.ToString() + ")",
+                  zlib::kZlibDefault, CacheManager::kTypeRegular, "");
+  if (fd < 0) {
+    return "Failed to open metadata file";
+  }
+  uint64_t actual_size = file_system_->cache_mgr()->GetSize(fd);
+  if (actual_size > max_size) {
+    file_system_->cache_mgr()->Close(fd);
+    return "Failed to open: metadata file is too big";
+  }
+  char buffer[actual_size];
+  int bytes_read =
+    file_system_->cache_mgr()->Pread(fd, buffer, actual_size, 0);
+  file_system_->cache_mgr()->Close(fd);
+  if (bytes_read < 0) {
+    return "Failed to read metadata file";
+  }
+  return string(buffer, buffer + bytes_read);
+}
+
 
 #ifdef __APPLE__
 static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
@@ -1326,6 +1368,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
   } else if (attr == "user.pubkeys") {
     attribute_value = mount_point_->signature_mgr()->GetActivePubkeys();
+  } else if (attr == "user.repo_counters") {
+    attribute_value = mount_point_->catalog_mgr()->GetRootCatalog()->
+                                    GetCounters().GetCsvMap();
+  } else if (attr == "user.repo_metainfo") {
+    attribute_value = GetRepoMetainfo(size);
   } else if (attr == "user.hash") {
     if (!d.checksum().IsNull()) {
       attribute_value = d.checksum().ToString();
@@ -1580,7 +1627,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
     "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
     "user.external_host\0user.external_timeout\0user.pubkeys\0"
-    "user.ncleanup24\0";
+    "user.ncleanup24\0user.repo_counters\0user.repo_metainfo\0";
   string attribute_list;
   if (mount_point_->hide_magic_xattrs()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
@@ -1712,6 +1759,24 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 #ifdef CVMFS_NFS_SUPPORT
   conn->want |= FUSE_CAP_EXPORT_SUPPORT;
 #endif
+
+  if (mount_point_->enforce_acls()) {
+#ifdef FUSE_CAP_POSIX_ACL
+    if ((conn->capable & FUSE_CAP_POSIX_ACL) == 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "ACL support requested but missing fuse kernel support, "
+               "aborting");
+      abort();
+    }
+    conn->want |= FUSE_CAP_POSIX_ACL;
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "enforcing ACLs");
+#else
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "ACL support requested but not available in this version of "
+             "libfuse, aborting");
+    abort();
+#endif
+  }
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
@@ -1876,6 +1941,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                     &buf)) {
     if (!cvmfs::options_mgr_->IsOn(buf)) {
       fuse_notify_invalidation = false;
+      cvmfs::mount_point_->nentry_tracker()->Disable();
     }
   }
   cvmfs::fuse_remounter_ =
@@ -1938,6 +2004,10 @@ static void Spawn() {
   }
 
   cvmfs::fuse_remounter_->Spawn();
+  if (cvmfs::mount_point_->nentry_tracker()->is_active()) {
+    cvmfs::mount_point_->nentry_tracker()->SpawnCleaner(
+      cvmfs::mount_point_->kcache_timeout_sec());  // Usually every minute
+  }
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();
@@ -2078,6 +2148,15 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     saved_states->push_back(state_glue_buffer);
   }
 
+  msg_progress = "Saving negative entry cache\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  glue::NentryTracker *saved_nentry_cache =
+    new glue::NentryTracker(*cvmfs::mount_point_->nentry_tracker());
+  loader::SavedState *state_nentry_tracker = new loader::SavedState();
+  state_nentry_tracker->state_id = loader::kStateNentryTracker;
+  state_nentry_tracker->state = saved_nentry_cache;
+  saved_states->push_back(state_nentry_tracker);
+
   msg_progress = "Saving chunk tables\n";
   SendMsg2Socket(fd_progress, msg_progress);
   ChunkTables *saved_chunk_tables = new ChunkTables(
@@ -2175,6 +2254,16 @@ static bool RestoreState(const int fd_progress,
         (glue::InodeTracker *)saved_states[i]->state;
       new (cvmfs::mount_point_->inode_tracker())
         glue::InodeTracker(*saved_inode_tracker);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateNentryTracker) {
+      SendMsg2Socket(fd_progress, "Restoring negative entry cache... ");
+      cvmfs::mount_point_->nentry_tracker()->~NentryTracker();
+      glue::NentryTracker *saved_nentry_tracker =
+        (glue::NentryTracker *)saved_states[i]->state;
+      new (cvmfs::mount_point_->nentry_tracker())
+        glue::NentryTracker(*saved_nentry_tracker);
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2285,6 +2374,10 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateGlueBufferV4:
         SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
+        break;
+      case loader::kStateNentryTracker:
+        SendMsg2Socket(fd_progress, "Releasing saved negative entry cache\n");
+        delete static_cast<glue::NentryTracker *>(saved_states[i]->state);
         break;
       case loader::kStateOpenChunks:
         SendMsg2Socket(fd_progress, "Releasing chunk tables (version 1)\n");

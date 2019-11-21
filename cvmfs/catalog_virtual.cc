@@ -40,7 +40,7 @@ void VirtualCatalog::CreateBaseDirectory() {
   entry_dir.gid_ = 0;
   entry_dir.size_ = 97;
   entry_dir.mtime_ = time(NULL);
-  catalog_mgr_->AddDirectory(entry_dir, "");
+  catalog_mgr_->AddDirectory(entry_dir, XattrList(), "");
   WritableCatalog *parent_catalog =
     catalog_mgr_->GetHostingCatalog(kVirtualPath);
   catalog_mgr_->CreateNestedCatalog(kVirtualPath);
@@ -100,7 +100,7 @@ void VirtualCatalog::CreateSnapshotDirectory() {
   entry_dir.gid_ = 0;
   entry_dir.size_ = 97;
   entry_dir.mtime_ = time(NULL);
-  catalog_mgr_->AddDirectory(entry_dir, kVirtualPath);
+  catalog_mgr_->AddDirectory(entry_dir, XattrList(), kVirtualPath);
 }
 
 
@@ -257,8 +257,8 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
   // Add directory entry
   DirectoryEntryBase entry_dir = entry_root;
   entry_dir.name_ = NameString(tag.name);
-  catalog_mgr_->AddDirectory(
-    entry_dir, string(kVirtualPath) + "/" + string(kSnapshotDirectory));
+  catalog_mgr_->AddDirectory(entry_dir, XattrList(),
+    string(kVirtualPath) + "/" + string(kSnapshotDirectory));
 
   // Set "bind mount" flag
   WritableCatalog *virtual_catalog =

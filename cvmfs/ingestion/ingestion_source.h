@@ -39,6 +39,7 @@ class IngestionSource : SingleCopy {
  public:
   virtual ~IngestionSource() {}
   virtual std::string GetPath() const = 0;
+  virtual bool IsRealFile() const = 0;
   virtual bool Open() = 0;
   virtual ssize_t Read(void* buffer, size_t nbyte) = 0;
   virtual bool Close() = 0;
@@ -52,6 +53,7 @@ class FileIngestionSource : public IngestionSource {
   ~FileIngestionSource() {}
 
   std::string GetPath() const { return path_; }
+  virtual bool IsRealFile() const { return true; }
 
   bool Open() {
     fd_ = open(path_.c_str(), O_RDONLY);
@@ -113,10 +115,12 @@ class FileIngestionSource : public IngestionSource {
  */
 class MemoryIngestionSource : public IngestionSource {
  public:
-  MemoryIngestionSource(const std::string &p, unsigned char *d, unsigned s)
+  MemoryIngestionSource(
+    const std::string &p, const unsigned char *d, unsigned s)
     : path_(p), data_(d), size_(s), pos_(0) {}
   virtual ~MemoryIngestionSource() {}
   virtual std::string GetPath() const { return path_; }
+  virtual bool IsRealFile() const { return false; }
   virtual bool Open() { return true; }
   virtual ssize_t Read(void* buffer, size_t nbyte) {
     size_t remaining = size_ - pos_;
@@ -130,9 +134,36 @@ class MemoryIngestionSource : public IngestionSource {
 
  private:
   std::string path_;
-  unsigned char *data_;
+  const unsigned char *data_;
   unsigned size_;
   unsigned pos_;
+};
+
+
+/**
+ * Uses an std::string as data buffer
+ */
+class StringIngestionSource : public IngestionSource {
+ public:
+  explicit StringIngestionSource(const std::string &data)
+    : data_(data)
+    , source_("MEM",
+              reinterpret_cast<const unsigned char *>(data_.data()),
+              data_.length())
+  {}
+  virtual ~StringIngestionSource() {}
+  virtual std::string GetPath() const { return source_.GetPath(); }
+  virtual bool IsRealFile() const { return false; }
+  virtual bool Open() { return source_.Open(); }
+  virtual ssize_t Read(void* buffer, size_t nbyte) {
+    return source_.Read(buffer, nbyte);
+  }
+  virtual bool Close() { return source_.Close(); }
+  virtual bool GetSize(uint64_t* size) { return source_.GetSize(size); }
+
+ private:
+  std::string data_;
+  MemoryIngestionSource source_;
 };
 
 
@@ -149,6 +180,7 @@ class TarIngestionSource : public IngestionSource {
   }
 
   std::string GetPath() const { return path_; }
+  virtual bool IsRealFile() const { return false; }
 
   bool Open() {
     assert(size_ >= 0);

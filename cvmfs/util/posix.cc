@@ -1011,6 +1011,43 @@ std::vector<std::string> FindDirectories(const std::string &parent_dir) {
   return result;
 }
 
+
+std::string GetUserName() {
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(geteuid(), &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return "";
+  }
+  std::string user_name = pwd.pw_name;
+  free(buf);
+  return user_name;
+}
+
+std::string GetShell() {
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(geteuid(), &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return "";
+  }
+  std::string shell = pwd.pw_shell;
+  free(buf);
+  return shell;
+}
+
 /**
  * Name -> UID from passwd database
  */
@@ -1091,6 +1128,26 @@ bool AddGroup2Persona(const gid_t gid) {
   retval = setgroups(ngroups+1, groups);
   free(groups);
   return retval == 0;
+}
+
+
+std::string GetHomeDirectory() {
+  uid_t uid = getuid();
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(uid, &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return "";
+  }
+  std::string home_dir = result->pw_dir;
+  free(buf);
+  return home_dir;
 }
 
 
@@ -1566,12 +1623,13 @@ bool SafeReadToString(int fd, std::string *final_result) {
 bool SafeWriteToFile(const std::string &content,
                      const std::string &path,
                      int mode) {
-  int fd = open(path.c_str(), O_WRONLY | O_CREAT, mode);
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
   if (fd < 0) return false;
   bool retval = SafeWrite(fd, content.data(), content.size());
   close(fd);
   return retval;
 }
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

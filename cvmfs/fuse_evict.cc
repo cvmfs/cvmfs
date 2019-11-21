@@ -67,9 +67,11 @@ bool FuseInvalidator::HasFuseNotifyInval() {
 
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
+  glue::NentryTracker *nentry_tracker,
   void **fuse_channel_or_session,
   bool fuse_notify_invalidation)
   : inode_tracker_(inode_tracker)
+  , nentry_tracker_(nentry_tracker)
   , fuse_channel_or_session_(fuse_channel_or_session)
   , spawned_(false)
 {
@@ -135,14 +137,14 @@ void *FuseInvalidator::MainInvalidator(void *data) {
 
     // We must not hold a lock when calling fuse_lowlevel_notify_inval_entry.
     // Therefore, we first copy all the inodes into a temporary data structure.
-    glue::InodeTracker::Cursor cursor(
+    glue::InodeTracker::Cursor inode_cursor(
       invalidator->inode_tracker_->BeginEnumerate());
     uint64_t inode;
-    while (invalidator->inode_tracker_->NextInode(&cursor, &inode))
+    while (invalidator->inode_tracker_->NextInode(&inode_cursor, &inode))
     {
       invalidator->evict_list_.PushBack(inode);
     }
-    invalidator->inode_tracker_->EndEnumerate(&cursor);
+    invalidator->inode_tracker_->EndEnumerate(&inode_cursor);
 
     unsigned i = 0;
     unsigned N = invalidator->evict_list_.size();
@@ -173,6 +175,38 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         }
       }
     }
+
+    // Do the nentry tracker last to increase the effectiveness of pruning
+    invalidator->nentry_tracker_->Prune();
+    // Copy and empty the nentry tracker in a single atomic operation
+    glue::NentryTracker *nentries_copy = invalidator->nentry_tracker_->Move();
+    glue::NentryTracker::Cursor nentry_cursor = nentries_copy->BeginEnumerate();
+    uint64_t entry_parent;
+    NameString entry_name;
+    i = 0;
+    while (nentries_copy->NextEntry(&nentry_cursor, &entry_parent, &entry_name))
+    {
+      // Can fail, e.g. the entry might be already evicted
+#if CVMFS_USE_LIBFUSE == 2
+      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_chan**>(
+        invalidator->fuse_channel_or_session_),
+        entry_parent, entry_name.GetChars(), entry_name.GetLength());
+#else
+      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_session**>(
+        invalidator->fuse_channel_or_session_),
+        entry_parent, entry_name.GetChars(), entry_name.GetLength());
+#endif
+      if ((++i % kCheckTimeoutFreqOps) == 0) {
+        if (atomic_read32(&invalidator->terminated_) == 1) {
+          LogCvmfs(kLogCvmfs, kLogDebug,
+                   "cancel cache eviction due to termination");
+          break;
+        }
+      }
+    }
+    nentries_copy->EndEnumerate(&nentry_cursor);
+    delete nentries_copy;
+
     handle->SetDone();
     invalidator->evict_list_.Clear();
   }

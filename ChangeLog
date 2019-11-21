@@ -1,4 +1,18 @@
 2.7.0:
+  * Set default mount point to /Users/shared/cvmfs on macOS >= 10.15 (CVM-1813)
+  * Use relative symbolic links in DUCC (CVM-1817)
+  * Terminate fuse daemon if watchdog disappears (CVM-1753)
+  * Fix clashing generic tags for short transactions with gateway (CVM-1735)
+  * Add "repo_counters" and "repo_metainfo" xattrs (CVM-1499, 1733)
+  * Add support for extended attributes on directories
+  * Add support for CVMFS_ENFORCE_ACLS client parameter
+  * Fix missing package dependency on Debian 9 and Ubuntu 18.04 (CVM-1789)
+  * Enable default config repository for debian stretch and newer (CVM-1794)
+  * Fix potential parsing of incomplete /etc/hosts
+  * Fix stale negative entries in active cache eviction (CVM-1759)
+  * Add support for EL8 platform (CVM-1731)
+  * Fix publish statistics for several corner cases (CVM-1716 .. CVM-1720)
+  * Add 'list_reflog' command to cvmfs_swissknife (CVM-1760)
   * Add 'filestats' command to cvmfs_swissknife (CVM-1756)
   * Add fuse callback performance instrumentation through new switch 
     CVMFS_INSTRUMENT_FUSE (CVM-1770)
@@ -11,6 +25,10 @@
   * Add support for pre-mounted mount point with libfuse3
   * Add support for libfuse3, including new mount option libfuse=[2|3]
     (CVM-1710, CVM-1744)
+
+2.6.4:
+  * Fix client updates on shared writable alien cache (CVM-1803)
+  * Fix spurious error message when spawning external cache
 
 2.6.3:
   * Fix parsing of /etc/hosts (CVM-1796, CVM-1797)

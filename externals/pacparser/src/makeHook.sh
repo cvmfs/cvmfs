@@ -9,10 +9,15 @@ if [ x"$(uname)" = x"Darwin" ]; then
   FIX_COMP="CC=/usr/bin/clang CXX=/usr/bin/clang++"
 fi
 
+FIX_PYTHON=""
+if ! python -V >/dev/null 2>&1; then
+  FIX_PYTHON="PYTHON=python2"
+fi
+
 echo "make clean && make for libpacparser (omitting test execution)..."
 [ -d $static_result_dir ] && rm -fR $static_result_dir
-make -C src clean
-make $FIX_COMP CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS" -j1 -C src pacparser.o libjs.a # default target runs tests!
+make $FIX_PYTHON -C src clean
+make $FIX_PYTHON $FIX_COMP CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS" -j1 -C src pacparser.o libjs.a # default target runs tests!
 echo "finished internal build of libpacparser"
 
 echo "creating static link library for libpacparser..."

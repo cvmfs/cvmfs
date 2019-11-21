@@ -48,6 +48,9 @@ class GatewayUploader : public AbstractUploader {
 
   virtual bool Initialize();
 
+  // Can't "create" a repository storage area with the gateway backend
+  virtual bool Create();
+
   virtual bool FinalizeSession(bool commit, const std::string& old_root_hash,
                                const std::string& new_root_hash,
                                const RepositoryTag& tag);
@@ -63,9 +66,9 @@ class GatewayUploader : public AbstractUploader {
   virtual unsigned int GetNumberOfErrors() const;
 
  protected:
-  virtual void FileUpload(const std::string& local_path,
-                          const std::string& remote_path,
-                          const CallbackTN* callback = NULL);
+  virtual void DoUpload(const std::string& remote_path,
+                        IngestionSource *source,
+                        const CallbackTN* callback = NULL);
 
   virtual UploadStreamHandle* InitStreamedUpload(
       const CallbackTN* callback = NULL);

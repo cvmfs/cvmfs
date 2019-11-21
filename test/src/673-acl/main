@@ -1,0 +1,60 @@
+cvmfs_test_name="POSIX ACLs"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  sudo sh -c "echo CVMFS_INCLUDE_XATTRS=true >> /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+  sudo sh -c "echo CVMFS_ENFORCE_ACLS=true >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
+
+  echo "*** create file system structure"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo nothing > /cvmfs/$CVMFS_TEST_REPO/for-nobody
+  mkdir /cvmfs/$CVMFS_TEST_REPO/public-data
+  echo foo > /cvmfs/$CVMFS_TEST_REPO/public-data/foo
+
+  chmod 0660 /cvmfs/$CVMFS_TEST_REPO/for-nobody
+  chmod 0660 /cvmfs/$CVMFS_TEST_REPO/public-data/foo
+  chmod 0770 /cvmfs/$CVMFS_TEST_REPO/public-data
+
+  echo "*** create CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check permissions without ACLs"
+  cat /cvmfs/$CVMFS_TEST_REPO/for-nobody || return 10
+  cat /cvmfs/$CVMFS_TEST_REPO/public-data/foo || return 11
+  sudo -u nobody /bin/sh -c "cat /cvmfs/$CVMFS_TEST_REPO/for-nobody" && return 20
+  sudo -u nobody /bin/sh -c "/cvmfs/$CVMFS_TEST_REPO/public-data/foo" && return 21
+
+  echo "*** set ACLs"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  setfacl -m u:nobody:r /cvmfs/$CVMFS_TEST_REPO/for-nobody || return 30
+  setfacl -m u:nobody:rx /cvmfs/$CVMFS_TEST_REPO/public-data || return 31
+  setfacl -d --set u:nobody:r /cvmfs/$CVMFS_TEST_REPO/public-data || return 32
+  echo new > /cvmfs/$CVMFS_TEST_REPO/public-data/new
+  chmod 0660 /cvmfs/$CVMFS_TEST_REPO/public-data/new
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** check ACLs"
+  getfacl -t /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/for-nobody || return 40
+  getfacl -t /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data || return 41
+  getfacl -t /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/foo || return 42
+  getfacl -t /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/new || return 43
+
+  cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/for-nobody || return 50
+  cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/foo || return 51
+  sudo -u nobody /bin/sh -c "cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/for-nobody" || return 52
+  sudo -u nobody /bin/sh -c "ls -lah /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data" || return 53
+  sudo -u nobody /bin/sh -c "cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/foo" && return 54
+  sudo -u nobody /bin/sh -c "cat /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/public-data/new" || return 55
+
+  return 0
+}
+

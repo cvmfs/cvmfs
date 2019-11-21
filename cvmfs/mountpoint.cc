@@ -672,7 +672,7 @@ CacheManager *FileSystem::SetupRamCacheMgr(const string &instance) {
       return NULL;
     }
   }
-  sz_cache_bytes = RoundUp8(std::max(static_cast<uint64_t>(200 * 1024 * 1024),
+  sz_cache_bytes = RoundUp8(std::max(static_cast<uint64_t>(40 * 1024 * 1024),
                                      sz_cache_bytes));
   RamCacheManager *cache_mgr = new RamCacheManager(
         sz_cache_bytes,
@@ -1398,6 +1398,13 @@ void MountPoint::CreateStatistics() {
                         "overall number of successful path lookups");
   statistics_->Register("inode_tracker.n_miss_path",
                         "overall number of unsuccessful path lookups");
+
+  statistics_->Register("nentry_tracker.n_insert",
+                        "overall number of added negative cache entries");
+  statistics_->Register("nentry_tracker.n_remove",
+                        "overall number of evicted negative cache entries");
+  statistics_->Register("nentry_tracker.n_prune",
+                        "overall number of prune calls");
 }
 
 
@@ -1429,6 +1436,7 @@ void MountPoint::CreateTables() {
                                          statistics_);
 
   inode_tracker_ = new glue::InodeTracker();
+  nentry_tracker_ = new glue::NentryTracker();
 }
 
 /**
@@ -1627,11 +1635,13 @@ MountPoint::MountPoint(
   , md5path_cache_(NULL)
   , tracer_(NULL)
   , inode_tracker_(NULL)
+  , nentry_tracker_(NULL)
   , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
   , hide_magic_xattrs_(false)
+  , enforce_acls_(false)
   , has_membership_req_(false)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
@@ -1642,6 +1652,7 @@ MountPoint::MountPoint(
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
+  delete nentry_tracker_;
   delete inode_tracker_;
   delete tracer_;
   delete md5path_cache_;
@@ -1715,6 +1726,12 @@ void MountPoint::SetupBehavior() {
       && options_mgr_->IsOn(optarg))
   {
     hide_magic_xattrs_ = true;
+  }
+
+  if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    enforce_acls_ = true;
   }
 }
 

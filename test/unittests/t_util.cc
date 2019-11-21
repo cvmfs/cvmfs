@@ -128,6 +128,21 @@ class T_Util : public ::testing::Test {
 };
 
 
+TEST_F(T_Util, GetUserName) {
+  EXPECT_FALSE(GetUserName().empty());
+  if (getenv("USER") != NULL) {
+    EXPECT_STREQ(getenv("USER"), GetUserName().c_str());
+  }
+}
+
+
+TEST_F(T_Util, GetShell) {
+  if (getenv("SHELL") != NULL) {
+    EXPECT_STREQ(getenv("SHELL"), GetShell().c_str());
+  }
+}
+
+
 TEST_F(T_Util, GetUidOf) {
   uid_t uid;
   gid_t gid;
@@ -135,6 +150,12 @@ TEST_F(T_Util, GetUidOf) {
   EXPECT_EQ(0U, uid);
   EXPECT_EQ(0U, gid);
   EXPECT_FALSE(GetUidOf("no-such-user", &uid, &gid));
+}
+
+
+TEST_F(T_Util, GetHomeDirectory) {
+  EXPECT_FALSE(GetHomeDirectory().empty());
+  EXPECT_TRUE(DirectoryExists(GetHomeDirectory()));
 }
 
 
@@ -1076,6 +1097,11 @@ TEST_F(T_Util, IsoTimestamp) {
   EXPECT_GT(converted, 0);
   EXPECT_GE(converted, now - 5);
   EXPECT_LE(converted, now + 5);
+}
+
+TEST_F(T_Util, WhitelistTimestamp) {
+  string timestamp = WhitelistTimestamp(0);
+  EXPECT_STREQ("19700101000000", timestamp.c_str());
 }
 
 TEST_F(T_Util, StringifyTimeval) {

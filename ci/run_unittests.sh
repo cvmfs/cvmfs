@@ -13,6 +13,7 @@ usage() {
   echo "Usage: $0 [-q only quick tests] [-s shrinkwrap test binary]\\"
   echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
   echo "          [-d run the ducc unittests] \\"
+  echo "          [-p run the publish unit tests] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
   exit 1
@@ -23,6 +24,7 @@ CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
 CVMFS_TEST_DUCC=0
+CVMFS_TEST_PUBLISH=0
 
 while getopts "qc:g:s:l:d" option; do
   case $option in
@@ -44,6 +46,9 @@ while getopts "qc:g:s:l:d" option; do
     ;;
     d)
       CVMFS_TEST_DUCC=1
+    ;;
+    p)
+      CVMFS_TEST_PUBLISH=1
     ;;
     ?)
       usage
@@ -116,10 +121,16 @@ if [ $CVMFS_TEST_DUCC = 1 ] && [ $(can_build_ducc) -ge 1 ]; then
   popd > /dev/null
 fi
 
+if [ $CVMFS_TEST_PUBLISH = 1 ]; then
+  echo "running publish unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  CVMFS_PUBLISH_UNITTESTS="$(dirname $CVMFS_UNITTESTS_BINARY)/cvmfs_test_publish"
+  $CVMFS_PUBLISH_UNITTESTS --gtest_shuffle                                     \
+                           --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
+                           --gtest_filter=$test_filter
+fi
+
 # run the unit tests
 echo "running unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
 $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
-
-

@@ -820,6 +820,7 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
       return "HEAD";
     case JobInfo::kReqPutCas:
     case JobInfo::kReqPutDotCvmfs:
+    case JobInfo::kReqPutBucket:
       return "PUT";
     case JobInfo::kReqDelete:
       return "DELETE";
@@ -839,6 +840,8 @@ string S3FanoutManager::GetContentType(const JobInfo &info) const {
       return "application/octet-stream";
     case JobInfo::kReqPutDotCvmfs:
       return "application/x-cvmfs";
+    case JobInfo::kReqPutBucket:
+      return "text/xml";
     default:
       abort();
   }
@@ -910,7 +913,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     if (info->request == JobInfo::kReqPutDotCvmfs) {
       info->http_headers =
           curl_slist_append(info->http_headers, kCacheControlDotCvmfs);
-    } else {
+    } else if (info->request == JobInfo::kReqPutCas) {
       info->http_headers =
           curl_slist_append(info->http_headers, kCacheControlCas);
     }

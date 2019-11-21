@@ -1,0 +1,102 @@
+
+cvmfs_test_name="Migrate repository to newer version"
+MIGRATIONTEST_500_REPO="migrationtest.cern.ch"
+MIGRATIONTEST_500_REPLICA="migrationtest-stratum1.cern.ch"
+
+
+cleanup() {
+  echo "running cleanup()"
+  destroy_repo $MIGRATIONTEST_500_REPO
+  destroy_repo $MIGRATIONTEST_500_REPLICA
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../../common/migration_tests/common.sh
+
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  # download upstream client package
+  current_version=$(package_version $CVMFS_SERVER_PACKAGE)
+  echo "Version of testee:        $current_version"
+  # FIX ME: We want to test upgrading from more than just one base version
+  # previous_version=$(decrement_version $current_version)
+  previous_version="2.5.2"
+  echo "Version to be downloaded: $previous_version"
+  upstream_package_url=$(guess_package_url "cvmfs-server" ${previous_version}-1)
+  echo "Download URL:             $upstream_package_url"
+  wget --no-check-certificate --quiet $upstream_package_url || return 2
+  upstream_package=$(basename $upstream_package_url)
+  echo "Upstream Package:         $upstream_package"
+
+  # make sure that there is no version of CernVM-FS server installed
+  if is_installed "cvmfs-server"; then
+    installed_version=$(installed_package_version "cvmfs-server")
+    echo "uninstalling CernVM-FS $installed_version"
+    uninstall_package "cvmfs-server" || return 3
+  fi
+
+  # install the upstream CernVM-FS package
+  echo "installing CernVM-FS server $previous_version"
+  install_packages $upstream_package || return 4
+
+  # make CernVM-FS ready to go
+  echo "setting up CernVM-FS (cvmfs_config setup)"
+  sudo cvmfs_config setup    || return 5
+  sudo cvmfs_config chksetup || return 5
+
+  # make sure that autofs is not running
+  echo "switching off autofs"
+  autofs_switch off || return 6
+
+  # create a testing repository
+  create_empty_repo $MIGRATIONTEST_500_REPO $CVMFS_TEST_USER || return 7
+
+  start_transaction $MIGRATIONTEST_500_REPO || return 8
+  echo "testfile" > /cvmfs/$MIGRATIONTEST_500_REPO/testfile || return 9
+  publish_repo $MIGRATIONTEST_500_REPO || return 10
+
+
+  # create a stratum1
+  load_repo_config $MIGRATIONTEST_500_REPO
+  create_stratum1 $MIGRATIONTEST_500_REPLICA \
+                  $CVMFS_TEST_USER           \
+                  $CVMFS_STRATUM0            \
+                  /etc/cvmfs/keys/${MIGRATIONTEST_500_REPO}.pub || return 11
+
+  # synchronize stratum1 with stratum0
+  cvmfs_server snapshot $MIGRATIONTEST_500_REPLICA || return 12
+
+  start_transaction $MIGRATIONTEST_500_REPO || return 13
+  echo "testfile2" > /cvmfs/$MIGRATIONTEST_500_REPO/testfile2 || return 14
+  publish_repo $MIGRATIONTEST_500_REPO || return 15
+
+  # do the CernVM-FS package update
+  echo "updating CernVM-FS server package to version $current_version"
+  install_packages "$CVMFS_SERVER_PACKAGE" || return 16
+
+  # migrate repositories created under old version
+  sudo cvmfs_server migrate $MIGRATIONTEST_500_REPO || return 17
+  sudo cvmfs_server migrate $MIGRATIONTEST_500_REPLICA || return 18
+
+  # do some ordinary stuff with the repository
+  start_transaction $MIGRATIONTEST_500_REPO || return 19
+  echo "testfile3" > /cvmfs/$MIGRATIONTEST_500_REPO/testfile3
+  rm /cvmfs/$MIGRATIONTEST_500_REPO/testfile
+  publish_repo $MIGRATIONTEST_500_REPO || return 20
+
+  # synchronize stratum1 with stratum0
+  cvmfs_server snapshot $MIGRATIONTEST_500_REPLICA || return 21
+
+  # check that test files were successfully replicated
+  testfile2_object="c8e126bfcef0d8b8dce3daf99cf0219c8ba3011a"
+  testfile3_object="903122d5ce97886bb5331af7d0a615a0720dafd0"
+  peek_backend $MIGRATIONTEST_500_REPLICA $testfile2_object || return 22
+  peek_backend $MIGRATIONTEST_500_REPLICA $testfile3_object || return 23 
+
+  # check repositories integrity
+  check_repository $MIGRATIONTEST_500_REPO || return 24
+  check_repository $MIGRATIONTEST_500_REPLICA || return 25
+}

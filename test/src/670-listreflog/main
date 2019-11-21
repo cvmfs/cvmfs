@@ -1,0 +1,71 @@
+cvmfs_test_name="Swissknife list_reflog feature"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+inflate_file() {
+  local destination_file=$1
+  local source_file=$2
+  local desired_file_size=$3
+
+  touch $destination_file
+  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
+    cat $source_file >> $destination_file
+  done
+}
+
+check_reflog_list() {
+  list_objects=$(cvmfs_swissknife list_reflog -r /srv/cvmfs/$CVMFS_TEST_REPO -n $CVMFS_TEST_REPO -R /var/spool/cvmfs/$CVMFS_TEST_REPO/reflog.chksum)
+  for f in $list_objects; do
+    prefix=${f:0:2}
+    hash=${f:2}
+    file_path="/srv/cvmfs/$CVMFS_TEST_REPO/data/$prefix/$hash"
+    # Check if the referenced file is actually in the storage (with possible C, H, M or X suffix)
+    [ -f $file_path ] || [ -f "${file_path}C" ] || [ -f "${file_path}T" ] ||
+    [ -f "${file_path}H" ] || [ -f "${file_path}M" ] ||
+    [ -f "${file_path}X" ] || [ -f "${file_path}P" ] || return 1
+  done
+  num_objects_reflog=$(echo $list_objects | wc -w)
+  num_objects_actual=$(find /srv/cvmfs/$CVMFS_TEST_REPO/data -type f | wc -l)
+  [ $num_objects_reflog -eq $num_objects_actual ] || return 1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a gc-enabled repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -z -g || return 1
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return 1
+  check_repository $CVMFS_TEST_REPO -i  || return 1
+
+  # - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  check_reflog_list || return 1
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  check_reflog_list || return 1
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "test file" > $repo_dir/testfile
+  echo "test file" > $repo_dir/testfile2
+  echo "test file3" > $repo_dir/testfile3
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  check_reflog_list || return 1
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "test file2" > $repo_dir/testfile
+  echo "test file" > $repo_dir/testfile4
+  # create big file which is going to be chunked (50 MB)
+  echo "This is a very big file.\n" > $repo_dir/bigfile1
+  touch $repo_dir/bigfile2
+  inflate_file $repo_dir/bigfile2 $repo_dir/bigfile1 10000
+  touch $repo_dir/bigfile3
+  inflate_file $repo_dir/bigfile3 $repo_dir/bigfile2 50000000
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  check_reflog_list || return 1
+
+  return 0
+}
