@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Query Geo-API for server and fallback proxy order"
+cvmfs_test_suites="quick"
 
 get_first_proxyname() {
     sudo cvmfs_talk -i grid.cern.ch proxy info|sed -n 's/^\[0\] //p'|sed 's/.*(//;s/,.*//'
@@ -35,11 +36,11 @@ cvmfs_run_test() {
     *.fnal.gov|*.unl.edu) country=us;;
   esac
 
-  if [ "$country" = "ch" ]; then
+  if [ "x$country" = "xch" ]; then
     if [ "$geo_probe" != "http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.ihep.ac.cn:8000/cvmfs/grid.cern.ch" ]; then
       return 20;
     fi
-  elif [ "$country" = "us" ]; then
+  elif [ "x$country" = "xus" ]; then
     if [ "$geo_probe" != "http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.ihep.ac.cn:8000/cvmfs/grid.cern.ch" ]; then
       return 21;
     fi

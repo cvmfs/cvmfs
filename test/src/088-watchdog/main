@@ -10,7 +10,7 @@ cvmfs_run_test() {
   local pid_watchdog=$(sudo cvmfs_talk -i lhcb.cern.ch pid watchdog)
   echo "*** PID of watchdog is $pid_watchdog"
   sudo kill -9 $pid_watchdog
-  sleep 1
+  sleep 5
 
   ls /cvmfs/lhcb.cern.ch && return 10
   sudo umount /cvmfs/lhcb.cern.ch
