@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Query Geo-API for server and fallback proxy order"
+cvmfs_test_suites="quick"
 
 get_first_proxyname() {
     sudo cvmfs_talk -i grid.cern.ch proxy info|sed -n 's/^\[0\] //p'|sed 's/.*(//;s/,.*//'
