@@ -109,13 +109,14 @@ install_from_repo globus-gsi-credential  || die "fail (installing globus-gsi-cre
 install_from_repo globus-gsi-sysconfig   || die "fail (installing globus-gsi-sysconfig)"
 # TODO(jblomer): when we get support on more platforms, we might want to get the
 # helper package in a more general way than hard-coding it into the setup script
-x509_helper="https://ecsft.cern.ch/dist/cvmfs/cvmfs-x509-helper/cvmfs-x509-helper-0.9-1.el6.x86_64.rpm"
-echo -n "download X509 helper $x509_helper... "
-wget --no-check-certificate --quiet "$x509_helper" || die "download failed"
+contrib_release="http://ecsft.cern.ch/dist/cvmfs/cvmfs-contrib-release/cvmfs-contrib-release-latest.noarch.rpm"
+echo -n "download contrib release $contrib_release... "
+wget --no-check-certificate --quiet "$contrib_release" || die "download failed"
 echo "OK"
-echo -n "install x509 helper... "
-sudo rpm -ivh $(basename $x509_helper) > /dev/null || die "install failed"
+echo -n "install contrib release... "
+sudo rpm -ivh $(basename $contrib_release) > /dev/null || die "install failed"
 echo "OK"
+install_from_repo cvmfs-x509-helper || die "fail (install cvmfs-x509-helper)"
 
 # Install test dependency for 647
 install_from_repo python-flask          || die "fail (installing python-flask)"
