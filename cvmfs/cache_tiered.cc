@@ -35,7 +35,7 @@ int TieredCacheManager::DoRestoreState(void *data) {
   int new_root_fd = upper_->RestoreState(-1, state->state_upper);
   // The lower cache layer does not keep the root catalog open
   int retval = lower_->RestoreState(-1, state->state_lower);
-  assert(retval = -1);
+  assert(retval == -1);
   return new_root_fd;
 }
 
