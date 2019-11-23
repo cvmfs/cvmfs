@@ -2045,7 +2045,12 @@ static string GetErrorMsg() {
 }
 
 
-static void Fini() {
+/**
+ * Called alone at the end of SaveState; it performs a Fini() half way through,
+ * enough to delete the catalog manager, so that no more open file handles
+ * from file catalogs are active.
+ */
+static void ShutdownMountpoint() {
   delete cvmfs::talk_mgr_;
   cvmfs::talk_mgr_ = NULL;
 
@@ -2069,10 +2074,16 @@ static void Fini() {
 
   delete cvmfs::directory_handles_;
   delete cvmfs::mount_point_;
-  delete cvmfs::file_system_;
-  delete cvmfs::options_mgr_;
   cvmfs::directory_handles_ = NULL;
   cvmfs::mount_point_ = NULL;
+}
+
+
+static void Fini() {
+  ShutdownMountpoint();
+
+  delete cvmfs::file_system_;
+  delete cvmfs::options_mgr_;
   cvmfs::file_system_ = NULL;
   cvmfs::options_mgr_ = NULL;
 
@@ -2177,7 +2188,9 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_inode_generation->state = saved_inode_generation;
   saved_states->push_back(state_inode_generation);
 
-  SendMsg2Socket(fd_progress, msg_progress);
+  // Close open file catalogs
+  ShutdownMountpoint();
+
   loader::SavedState *state_cache_mgr = new loader::SavedState();
   state_cache_mgr->state_id = loader::kStateOpenFiles;
   state_cache_mgr->state =
@@ -2185,7 +2198,6 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   saved_states->push_back(state_cache_mgr);
 
   msg_progress = "Saving open files counter\n";
-  SendMsg2Socket(fd_progress, msg_progress);
   uint32_t *saved_num_fd =
     new uint32_t(cvmfs::file_system_->no_open_files()->Get());
   loader::SavedState *state_num_fd = new loader::SavedState();
@@ -2331,8 +2343,13 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFiles) {
-      cvmfs::file_system_->cache_mgr()->RestoreState(
+      int new_root_fd = cvmfs::file_system_->cache_mgr()->RestoreState(
         fd_progress, saved_states[i]->state);
+      LogCvmfs(kLogCvmfs, kLogDebug, "new root file catalog descriptor @%d",
+               new_root_fd);
+      if (new_root_fd >= 0) {
+        cvmfs::file_system_->RemapCatalogFd(0, new_root_fd);
+      }
     }
   }
   if (cvmfs::mount_point_->inode_annotation()) {

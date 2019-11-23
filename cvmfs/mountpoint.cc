@@ -1045,6 +1045,11 @@ void FileSystem::TearDown2ReadOnly() {
 }
 
 
+void FileSystem::RemapCatalogFd(int from, int to) {
+  sqlite::RegisterFdMapping(from, to);
+}
+
+
 bool FileSystem::TriageCacheMgr() {
   cache_mgr_instance_ = kDefaultCacheMgrInstance;
   string instance;

@@ -341,7 +341,14 @@ int ExternalCacheManager::DoOpen(const shash::Any &id) {
 }
 
 
-bool ExternalCacheManager::DoRestoreState(void *data) {
+int ExternalCacheManager::DoRestoreState(void *data) {
+  // When DoRestoreState is called, we have fd 0 assigned to the root file
+  // catalog unless this is a lower layer cache in a tiered setup
+  for (unsigned i = 1; i < fd_table_.GetMaxFds(); ++i) {
+    assert(fd_table_.GetHandle(i) == ReadOnlyHandle());
+  }
+  ReadOnlyHandle handle_root = fd_table_.GetHandle(0);
+
   FdTable<ReadOnlyHandle> *other =
     reinterpret_cast<FdTable<ReadOnlyHandle> *>(data);
   fd_table_.AssignFrom(*other);
@@ -350,7 +357,15 @@ bool ExternalCacheManager::DoRestoreState(void *data) {
   msg_ioctl.set_conncnt_change_by(-1);
   CacheTransport::Frame frame(&msg_ioctl);
   transport_.SendFrame(&frame);
-  return true;
+
+  int new_root_fd = -1;
+  if (handle_root != ReadOnlyHandle()) {
+    new_root_fd = fd_table_.OpenFd(handle_root);
+    // There must be a free file descriptor because the root file catalog gets
+    // closed before a reload
+    assert(new_root_fd >= 0);
+  }
+  return new_root_fd;
 }
 
 

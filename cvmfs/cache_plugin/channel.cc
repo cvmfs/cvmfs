@@ -463,7 +463,7 @@ void CachePlugin::HandleRefcount(
     msg_reply.set_status(status);
     if ((status != cvmfs::STATUS_OK) && (status != cvmfs::STATUS_NOENTRY)) {
       LogSessionError(msg_req->session_id(), status,
-                      "failed to open/close object");
+                      "failed to open/close object " + object_id.ToString());
     }
   }
   transport->SendFrame(&frame_send);
