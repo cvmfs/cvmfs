@@ -102,7 +102,7 @@ class ExternalCacheManager : public CacheManager {
 
  protected:
   virtual void *DoSaveState();
-  virtual bool DoRestoreState(void *data);
+  virtual int DoRestoreState(void *data);
   virtual bool DoFreeState(void *data);
 
  private:

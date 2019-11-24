@@ -122,6 +122,8 @@ class FdTable : SingleCopy {
     return 0;
   }
 
+  unsigned GetMaxFds() const { return fd_index_.size(); }
+
  private:
   struct FdWrapper {
     FdWrapper(HandleT h, unsigned i) : handle(h), index(i) { }

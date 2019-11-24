@@ -168,6 +168,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool IsHaNfsSource() { return nfs_mode_ & kNfsMapsHa; }
   void ResetErrorCounters();
   void TearDown2ReadOnly();
+  void RemapCatalogFd(int from, int to);
 
   CacheManager *cache_mgr() { return cache_mgr_; }
   std::string cache_mgr_instance() { return cache_mgr_instance_; }

@@ -308,11 +308,11 @@ void *PosixCacheManager::DoSaveState() {
 }
 
 
-bool PosixCacheManager::DoRestoreState(void *data) {
+int PosixCacheManager::DoRestoreState(void *data) {
   assert(data);
   char *c = reinterpret_cast<char *>(data);
   assert(*c == '\0');
-  return true;
+  return -1;
 }
 
 

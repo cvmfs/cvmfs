@@ -30,11 +30,13 @@ bool TieredCacheManager::DoFreeState(void *data) {
 }
 
 
-bool TieredCacheManager::DoRestoreState(void *data) {
+int TieredCacheManager::DoRestoreState(void *data) {
   SavedState *state = reinterpret_cast<SavedState *>(data);
-  upper_->RestoreState(-1, state->state_upper);
-  lower_->RestoreState(-1, state->state_lower);
-  return true;
+  int new_root_fd = upper_->RestoreState(-1, state->state_upper);
+  // The lower cache layer does not keep the root catalog open
+  int retval = lower_->RestoreState(-1, state->state_lower);
+  assert(retval == -1);
+  return new_root_fd;
 }
 
 
