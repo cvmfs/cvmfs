@@ -270,7 +270,10 @@ class TestCacheManager : public CacheManager {
   virtual void Spawn() { }
 
   virtual void *DoSaveState() { return state; }
-  virtual bool DoRestoreState(void *data) { return data == this; }
+  virtual int DoRestoreState(void *data) {
+    if (data == this) return -1;
+    return -2;
+  }
   virtual bool DoFreeState(void *data) { return data == this; }
 
   void *state;
