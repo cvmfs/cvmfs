@@ -1,4 +1,5 @@
 2.7.0:
+  * Fix potential file descriptor mix-up of external cache manager after reload
   * Fix spurious error with 'auto;DIRECT' when WPAD returns no proxy (CVM-1818)
   * Add firmlink /cvmfs --> /Users/Shared/cvmfs on macOS >= 10.15
   * Set default mount point to /Users/Shared/cvmfs on macOS >= 10.15 (CVM-1813)
