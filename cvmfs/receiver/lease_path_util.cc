@@ -18,6 +18,12 @@ bool IsPathInLease(const PathString& lease, const PathString& path) {
     return true;
   }
 
+  // The lease is a prefix of the path and the last char of the lease is a "/"
+  if (path.StartsWith(lease) &&
+      lease.GetChars()[lease.GetLength() - 1] == '/') {
+    return true;
+  }
+
   // If the path string is exactly the lease path return true (allow the
   // creation of the leased directory during the lease itself)
   if (lease == path) {
