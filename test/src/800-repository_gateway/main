@@ -170,7 +170,7 @@ run_transactions() {
     num_tags_after=$(cvmfs_server tag -l test.repo.org | grep -a generic | wc -l)
     num_generic_tags_created=$((num_tags_after - num_tags_before))
 
-    ## Transaction 8 (Check creation of named tag)
+    ## Transaction 9 (Check creation of named tag)
 
     echo "  Starting transaction 9"
     cvmfs_server transaction test.repo.org
@@ -183,6 +183,20 @@ run_transactions() {
 
     echo "  Check that the named tag has been created"
     specialtag_line=$(cvmfs_server tag -l test.repo.org | grep specialtag)
+
+    ## Transaction 10 (Lease on a subpath with trailing slash)
+    ## Very similar to transaction 6, but note the trailing slash after the
+    ## directory
+    echo "  Starting transaction 10"
+    cvmfs_server transaction test.repo.org/new/c/
+    echo "New file" > /cvmfs/test.repo.org/new/c/another_file_trailing.txt
+
+    echo "  Publishing changes 10"
+    cvmfs_server publish test.repo.org
+    cvmfs_server check test.repo.org
+
+    echo "  Copy the contents of the repository"
+    save_repo_contents /tmp/cvmfs_out_10
 
     ## Check results
 
@@ -206,6 +220,8 @@ run_transactions() {
     compare_file_checksum /tmp/cvmfs_out_5/new/c/d/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 105
 
     compare_file_checksum /tmp/cvmfs_out_6/new/c/another_file.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 106
+
+    compare_file_checksum /tmp/cvmfs_out_10/new/c/another_file_trailing.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 107
 
     if [ -f /tmp/cvmfs_out_7/new/invalid_file.txt ]; then
         echo "/cvmfs/test.repo.org/new/invalid_file.txt should not have been create in transaction 7"
