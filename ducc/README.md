@@ -101,7 +101,7 @@ input:
 **version**: indicate what version of recipe we are using, at the moment only
 `1` is supported.
 **user**: the user that will push the thin docker images into the registry,
-the password must be stored in the `DOCKER2CVMFS_DOCKER_REGISTRY_PASS`
+the password must be stored in the `DUCC_DOCKER_REGISTRY_PASS`
 environment variable.
 **cvmfs_repo**: in which CVMFS repository store the layers and the singularity
 images.
@@ -184,6 +184,35 @@ the singularity one, finally we upload the output image to the registry.
 
 It does not support dowloading images that are not public.
 
-In order to publish images to a repository is necessary to sign up in the
+In order to publish images to a registry is necessary to sign up in the
 docker hub. It will use the user from the recipe, while it will read the
-password from the `DOCKER2CVMFS_DOCKER_REGISTRY_PASS` environment variable.
+password from the `DUCC_DOCKER_REGISTRY_PASS` environment variable.
+
+## Run as daemon
+
+DUCC provides an unit file suitable to be used by systemd. While used as a
+daemon DUCC will run the `loop` command.
+
+Environmental variables are used in order to provide input for DUCC. Two
+variables need to be set:
+1. `$DUCC_RECIPE_FILE`
+2. `$DUCC_DOCKER_REGISTRY_PASS`
+
+The `$RECIPE_FILE` variable need to point to the recipe.yaml file that you want
+to convert.
+
+The `$DUCC_DOCKER_REGISTRY_PASS` is the variable described
+above. It needs to be set to the password of the docker registry that DUCC will
+use to publish the docker images.
+
+In order to set those variable, create an override file.
+
+`systemctl edit cvmfs_ducc.service`
+
+And then edit like the following:
+
+```unit
+[Service]
+Environment="DUCC_RECIPE_FILE=UPDATE-ME.yaml"
+Environment="DUCC_DOCKER_REGISTRY_PASS=UPDATE-ME"
+```

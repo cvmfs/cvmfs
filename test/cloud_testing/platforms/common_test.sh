@@ -114,6 +114,7 @@ TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3_instance.log"
 UNITTEST_LOGFILE="${LOG_DIRECTORY}/unittest.log"
 MIGRATIONTEST_CLIENT_LOGFILE="${LOG_DIRECTORY}/migrationtest_client.log"
 MIGRATIONTEST_SERVER_LOGFILE="${LOG_DIRECTORY}/migrationtest_server.log"
+DUCCTEST_LOGFILE="${LOG_DIRECTORY}/test_ducc.log"
 
 XUNIT_OUTPUT_SUFFIX=".xunit.xml"
 

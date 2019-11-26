@@ -589,6 +589,7 @@ fi
 %if 0%{?build_ducc}
 %files ducc
 %{_bindir}/cvmfs_ducc
+%{_unitdir}/cvmfs_ducc.service
 %endif
 
 %changelog
