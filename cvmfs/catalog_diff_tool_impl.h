@@ -94,25 +94,25 @@ RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
 
 template <typename RoCatalogMgr>
 void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
-  LogCvmfs(kLogCvmfs, kLogSyslog,
-                "CatalogDiffTool - DiffRec on %s",
-                path.ToString().c_str());
+  LogCvmfs(kLogCvmfs, kLogSyslog, "CatalogDiffTool - DiffRec on %s",
+           path.ToString().c_str());
   // This function is recursive at the very end, let's keep this in mind.
 
   // A directory entry is some layer of abstraction above a C struct dirent.
-  // Nothing more than the type of file in the directory (can be another directory),
-  // the name itself and the inode
+  // Nothing more than the type of file in the directory (can be another
+  // directory), the name itself and the inode
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
   // We start allocating the DirectoryEntryList and we AppendFirstEntry to it.
-  // It is nothing more than a vector where the first and the last entries are marker.
+  // It is nothing more than a vector where the first and the last entries are
+  // marker.
   old_catalog_mgr_->Listing(path, &old_listing);
   // here we list the content of path into the old_listing DirectoryEntry.
   // I believe that this listing is not recursive, but I could be wrong here.
   // Non recursive listing may explain the recursiveness of this function.
   sort(old_listing.begin(), old_listing.end(), IsSmaller);
-  // obvious, the IsSmaller just compares the names of the DirectoryEntriy-ies being
-  // careful with the inode.
+  // obvious, the IsSmaller just compares the names of the DirectoryEntriy-ies
+  // being careful with the inode.
   AppendLastEntry(&old_listing);
   // We mark the old_listing as over.
 
@@ -121,33 +121,37 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   new_catalog_mgr_->Listing(path, &new_listing);
   sort(new_listing.begin(), new_listing.end(), IsSmaller);
   AppendLastEntry(&new_listing);
-  // Here we repeat what we did above, excatly the same, but this time we use the new_catalog_manager
+  // Here we repeat what we did above, excatly the same, but this time we use
+  // the new_catalog_manager
 
   // At this point we have two DirectoryEntryList (vectors), that are sorted.
-  // Both of them contains the files that are under the directory `path` (the arguments)
-  // but at different points in times, before and after the transaction.
+  // Both of them contains the files that are under the directory `path` (the
+  // arguments) but at different points in times, before and after the
+  // transaction.
 
-  // Now we are starting the loop inside of which we call this same function recursively
+  // Now we are starting the loop inside of which we call this same function
+  // recursively
   unsigned i_from = 0, size_from = old_listing.size();
   unsigned i_to = 0, size_to = new_listing.size();
   while ((i_from < size_from) || (i_to < size_to)) {
-    // the loops goes on as long as we don't have visited all the entries in both lists
+    // the loops goes on as long as we don't have visited all the entries in
+    // both lists
     catalog::DirectoryEntry old_entry = old_listing[i_from];
     catalog::DirectoryEntry new_entry = new_listing[i_to];
 
     // some sanity check
     if (old_entry.linkcount() == 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-                "CatalogDiffTool - Entry %s in old catalog has linkcount 0. "
-                "Aborting.",
-                old_entry.name().c_str());
+               "CatalogDiffTool - Entry %s in old catalog has linkcount 0. "
+               "Aborting.",
+               old_entry.name().c_str());
       abort();
     }
     if (new_entry.linkcount() == 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-                "CatalogDiffTool - Entry %s in new catalog has linkcount 0. "
-                "Aborting.",
-                new_entry.name().c_str());
+               "CatalogDiffTool - Entry %s in new catalog has linkcount 0. "
+               "Aborting.",
+               new_entry.name().c_str());
       abort();
     }
 
@@ -195,15 +199,17 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       continue;
     }
 
-    // if we arrived here the dirent are the same, but the content could have change
+    // if we arrived here the dirent are the same, but the content could have
+    // change
     assert(old_path == new_path);
-    // let's not forget to upgrade our counters, later it will be more difficult.
+    // let's not forget to upgrade our counters, later it will be more
+    // difficult.
     i_from++;
     i_to++;
 
     // we are computing the differences between two entries
-    // a diff of kIdentical (which is equal to zero), means that there are no differences
-    // between the two entries.
+    // a diff of kIdentical (which is equal to zero), means that there are no
+    // differences between the two entries.
     catalog::DirectoryEntryBase::Differences diff =
         old_entry.CompareTo(new_entry);
     if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
