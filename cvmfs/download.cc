@@ -952,8 +952,10 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   if (!opt_dns_server_.empty())
     curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_.c_str());
 
-  if (info->probe_hosts && opt_host_chain_)
+  if (info->probe_hosts && opt_host_chain_) {
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
+    info->current_host_chain_index = opt_host_chain_current_;
+  }
 
   string url = url_prefix + *(info->url);
 
@@ -2030,16 +2032,12 @@ void DownloadManager::SwitchHost(JobInfo *info) {
   }
 
   if (info) {
-    char *effective_url;
-    curl_easy_getinfo(info->curl_handle, CURLINFO_EFFECTIVE_URL,
-                      &effective_url);
-    if (!HasPrefix(string(effective_url) + "/",
-                   (*opt_host_chain_)[opt_host_chain_current_] + "/", true)) {
+    if (info->current_host_chain_index != opt_host_chain_current_) {
       do_switch = false;
       LogCvmfs(kLogDownload, kLogDebug,
                "don't switch host, "
-               "effective url: %s, current host: %s",
-               effective_url,
+               "last used host: %s, current host: %s",
+               (*opt_host_chain_)[info->current_host_chain_index].c_str(),
                (*opt_host_chain_)[opt_host_chain_current_].c_str());
     }
   }
