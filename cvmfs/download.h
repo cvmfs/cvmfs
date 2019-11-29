@@ -203,6 +203,7 @@ struct JobInfo {
     error_code = kFailOther;
     num_used_proxies = num_used_hosts = num_retries = 0;
     backoff_ms = 0;
+    current_host_chain_index = 0;
 
     range_offset = -1;
     range_size = -1;
@@ -283,6 +284,7 @@ struct JobInfo {
   unsigned char num_used_hosts;
   unsigned char num_retries;
   unsigned backoff_ms;
+  unsigned int current_host_chain_index;
 };  // JobInfo
 
 
