@@ -1,4 +1,6 @@
 2.8.0:
+  * Add POSIX external cache plugin (CVM-1823)
+  * Manage DUCC daemon with systemd units
 
 2.7.0:
   * Fix potential file descriptor mix-up of external cache manager after reload
