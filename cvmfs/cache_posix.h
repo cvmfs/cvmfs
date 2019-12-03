@@ -97,6 +97,7 @@ class PosixCacheManager : public CacheManager {
 
   virtual manifest::Breadcrumb LoadBreadcrumb(const std::string &fqrn);
   virtual bool StoreBreadcrumb(const manifest::Manifest &manifest);
+  bool StoreBreadcrumb(std::string fqrn, manifest::Breadcrumb breadcrumb);
 
   void TearDown2ReadOnly();
   CacheModes cache_mode() { return cache_mode_; }

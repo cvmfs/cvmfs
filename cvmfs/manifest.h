@@ -24,6 +24,8 @@ struct Breadcrumb {
   Breadcrumb(const shash::Any &h, uint64_t t) : catalog_hash(h), timestamp(t) {}
   explicit Breadcrumb(const std::string &from_string);
 
+  bool Export(const std::string &fqrn,
+              const std::string &directory, const int mode) const;
   std::string ToString() const;
   bool IsValid() const { return !catalog_hash.IsNull() && (timestamp > 0); }
 

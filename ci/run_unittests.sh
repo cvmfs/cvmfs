@@ -84,6 +84,7 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
   CVMFS_CACHE_CONFIG=$(mktemp /tmp/cvmfs-unittests-XXXXX)
   echo "CVMFS_CACHE_PLUGIN_SIZE=1000" > $CVMFS_CACHE_CONFIG
   echo "CVMFS_CACHE_PLUGIN_TEST=yes" >> $CVMFS_CACHE_CONFIG
+  echo "CVMFS_CACHE_PLUGIN_PATH=/tmp/cvmfs_cache_test_dir/" >> $CVMFS_CACHE_CONFIG
   i=0
   for plugin in $(echo $CVMFS_CACHE_PLUGIN | tr : " "); do
     if [ -x $plugin ]; then
@@ -99,6 +100,7 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
       $CVMFS_CACHE_UNITTESTS $CVMFS_CACHE_LOCATOR \
         --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin)
       /bin/kill $plugin_pid
+      rm -rf "/tmp/cvmfs_cache_test_dir/"
     else
       echo "Warning: plugin $plugin not found, skipping"
     fi
