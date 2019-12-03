@@ -1050,6 +1050,11 @@ if (BUILD_LIBCVMFS_CACHE)
     RUNTIME
     DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
   )
+  install (
+    TARGETS     cvmfs_cache_posix
+    RUNTIME
+    DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
+  )
 endif (BUILD_LIBCVMFS_CACHE)
 
 if (BUILD_RECEIVER)

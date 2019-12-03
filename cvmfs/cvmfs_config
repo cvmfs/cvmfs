@@ -1350,6 +1350,7 @@ cvmfs_bugreport() {
                  'ls -lR /var/run/cvmfs' 'grep cvmfs /var/log/messages' 'grep cvmfs /var/log/syslog' \
                  'journalctl -alm /usr/bin/cvmfs2' \
                  'journalctl -alm /usr/libexec/cvmfs/cache/cvmfs_cache_ram' \
+                 'journalctl -alm /usr/libexec/cvmfs/cache/cvmfs_cache_posix' \
                  "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
                  'cvmfs_config probe' 'mount' 'df -h' 'ps -ef' \
                  'cvmfs_config status' 'cvmfs_config showconfig' \
