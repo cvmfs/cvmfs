@@ -513,6 +513,7 @@ fi
 /usr/libexec/cvmfs/authz/cvmfs_allow_helper
 /usr/libexec/cvmfs/authz/cvmfs_deny_helper
 /usr/libexec/cvmfs/cache/cvmfs_cache_ram
+/usr/libexec/cvmfs/cache/cvmfs_cache_posix
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}

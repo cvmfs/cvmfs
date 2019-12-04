@@ -4,10 +4,10 @@
 **/
 
 #include <signal.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include <climits>
 #include <cstring>
 #include <string>
 
