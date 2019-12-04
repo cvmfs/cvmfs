@@ -4,7 +4,6 @@
 **/
 
 #include <signal.h>
-#include <stdint.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -406,8 +405,8 @@ int main(int argc, char **argv) {
   g_transactions = new SmallHashDynamic<uint64_t, Txn>;
   g_listings = new SmallHashDynamic<uint64_t, Listing>;
   g_opened_objects->Init(32, empty_hash, cvmcache_hash_hasher);
-  g_transactions->Init(32, INT64_MAX, uint64_hasher);
-  g_listings->Init(32, INT64_MAX, uint64_hasher);
+  g_transactions->Init(32, (uint64_t(-1)), uint64_hasher);
+  g_listings->Init(32, (uint64_t(-1)), uint64_hasher);
   g_pinned_size = 0;
   g_used_size = 0;
   g_capacity = CVMCACHE_SIZE_UNKNOWN;
