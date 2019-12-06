@@ -176,6 +176,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool found_previous_crash() { return found_previous_crash_; }
   Log2Histogram *hist_fs_lookup() { return hist_fs_lookup_; }
   Log2Histogram *hist_fs_forget() { return hist_fs_forget_; }
+  Log2Histogram *hist_fs_forget_multi() { return hist_fs_forget_multi_; }
   Log2Histogram *hist_fs_getattr() { return hist_fs_getattr_; }
   Log2Histogram *hist_fs_readlink() { return hist_fs_readlink_; }
   Log2Histogram *hist_fs_opendir() { return hist_fs_opendir_; }
@@ -296,6 +297,7 @@ class FileSystem : SingleCopy, public BootFactory {
 
   Log2Histogram *hist_fs_lookup_;
   Log2Histogram *hist_fs_forget_;
+  Log2Histogram *hist_fs_forget_multi_;
   Log2Histogram *hist_fs_getattr_;
   Log2Histogram *hist_fs_readlink_;
   Log2Histogram *hist_fs_opendir_;
