@@ -427,6 +427,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_spooler_definition.cc
   url.cc
   util/algorithm.cc
+  util/exception.cc
   util/mmap_file.cc
   util/posix.cc
   util/string.cc
@@ -496,6 +497,7 @@ set (CVMFS_PRELOADER_SOURCES
   upload_s3.cc
   upload_spooler_definition.cc
   util/algorithm.cc
+  util/exception.cc
   util/mmap_file.cc
   util/posix.cc
   util/string.cc

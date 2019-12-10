@@ -82,6 +82,7 @@ set(CVMFS_UNITTEST_FILES
   t_object_fetcher.cc
   t_options.cc
   t_pack.cc
+  t_panic.cc
   t_pathspec.cc
   t_payload_processor.cc
   t_pipe.cc
@@ -249,6 +250,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/url.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/namespace.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
