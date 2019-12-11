@@ -763,11 +763,13 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   perf::Inc(file_system_->n_fs_dir_open());
   perf::Inc(file_system_->no_open_dirs());
 
-#if (FUSE_VERSION >= 32)
+#if (FUSE_VERSION >= 30)
+#ifdef CVMFS_ENABLE_FUSE3_CACHE_READDIR
   // This affects only reads on the same open directory handle (e.g. multiple
   // reads with rewinddir() between them).  A new opendir on the same directory
   // will trigger readdir calls independently of this setting.
   fi->cache_readdir = 1;
+#endif
 #endif
   fuse_reply_open(req, fi);
 }

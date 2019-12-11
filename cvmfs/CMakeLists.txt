@@ -95,6 +95,10 @@ else(APPLE)
   endif(CVMFS_ENABLE_INOTIFY)
 endif (APPLE)
 
+if (CVMFS_ENABLE_FUSE3_CACHE_READDIR)
+  add_definitions(-DCVMFS_ENABLE_FUSE3_CACHE_READDIR)
+endif()
+
 # First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc
                             PROPERTIES GENERATED true)
