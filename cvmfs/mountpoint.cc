@@ -225,6 +225,7 @@ void FileSystem::CreateStatistics() {
 
   hist_fs_lookup_ = new Log2Histogram(30);
   hist_fs_forget_ = new Log2Histogram(30);
+  hist_fs_forget_multi_ = new Log2Histogram(30);
   hist_fs_getattr_ = new Log2Histogram(30);
   hist_fs_readlink_ = new Log2Histogram(30);
   hist_fs_opendir_ = new Log2Histogram(30);
@@ -408,6 +409,7 @@ FileSystem::~FileSystem() {
   SqliteMemoryManager::CleanupInstance();
 
   delete hist_fs_lookup_;
+  delete hist_fs_forget_multi_;
   delete hist_fs_forget_;
   delete hist_fs_getattr_;
   delete hist_fs_readlink_;

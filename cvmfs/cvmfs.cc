@@ -499,6 +499,39 @@ static void cvmfs_forget(
 }
 
 
+#if (FUSE_VERSION >= 29)
+static void cvmfs_forget_multi(
+  fuse_req_t req,
+  size_t count,
+  struct fuse_forget_data *forgets
+) {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_forget_multi());
+
+  perf::Xadd(file_system_->n_fs_forget(), count);
+  if (file_system_->IsNfsSource()) {
+    fuse_reply_none(req);
+    return;
+  }
+
+  fuse_remounter_->fence()->Enter();
+  for (size_t i = 0; i < count; ++i) {
+    if (forgets[i].ino == FUSE_ROOT_ID) {
+      continue;
+    }
+
+    uint64_t ino = mount_point_->catalog_mgr()->MangleInode(forgets[i].ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
+             ino, forgets[i].nlookup);
+
+    mount_point_->inode_tracker()->VfsPut(ino, forgets[i].nlookup);
+  }
+  fuse_remounter_->fence()->Leave();
+
+  fuse_reply_none(req);
+}
+#endif  // FUSE_VERSION >= 29
+
+
 /**
  * Looks into dirent to decide if this is an EIO negative reply or an
  * ENOENT negative reply.  We do not need to store the reply in the negative
@@ -730,6 +763,12 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   perf::Inc(file_system_->n_fs_dir_open());
   perf::Inc(file_system_->no_open_dirs());
 
+#if (FUSE_VERSION >= 32)
+  // This affects only reads on the same open directory handle (e.g. multiple
+  // reads with rewinddir() between them).  A new opendir on the same directory
+  // will trigger readdir calls independently of this setting.
+  fi->cache_readdir = 1;
+#endif
   fuse_reply_open(req, fi);
 }
 
@@ -1791,22 +1830,25 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   memset(cvmfs_operations, 0, sizeof(*cvmfs_operations));
 
   // Init/Fini
-  cvmfs_operations->init     = cvmfs_init;
-  cvmfs_operations->destroy  = cvmfs_destroy;
+  cvmfs_operations->init         = cvmfs_init;
+  cvmfs_operations->destroy      = cvmfs_destroy;
 
-  cvmfs_operations->lookup      = cvmfs_lookup;
-  cvmfs_operations->getattr     = cvmfs_getattr;
-  cvmfs_operations->readlink    = cvmfs_readlink;
-  cvmfs_operations->open        = cvmfs_open;
-  cvmfs_operations->read        = cvmfs_read;
-  cvmfs_operations->release     = cvmfs_release;
-  cvmfs_operations->opendir     = cvmfs_opendir;
-  cvmfs_operations->readdir     = cvmfs_readdir;
-  cvmfs_operations->releasedir  = cvmfs_releasedir;
-  cvmfs_operations->statfs      = cvmfs_statfs;
-  cvmfs_operations->getxattr    = cvmfs_getxattr;
-  cvmfs_operations->listxattr   = cvmfs_listxattr;
-  cvmfs_operations->forget      = cvmfs_forget;
+  cvmfs_operations->lookup       = cvmfs_lookup;
+  cvmfs_operations->getattr      = cvmfs_getattr;
+  cvmfs_operations->readlink     = cvmfs_readlink;
+  cvmfs_operations->open         = cvmfs_open;
+  cvmfs_operations->read         = cvmfs_read;
+  cvmfs_operations->release      = cvmfs_release;
+  cvmfs_operations->opendir      = cvmfs_opendir;
+  cvmfs_operations->readdir      = cvmfs_readdir;
+  cvmfs_operations->releasedir   = cvmfs_releasedir;
+  cvmfs_operations->statfs       = cvmfs_statfs;
+  cvmfs_operations->getxattr     = cvmfs_getxattr;
+  cvmfs_operations->listxattr    = cvmfs_listxattr;
+  cvmfs_operations->forget       = cvmfs_forget;
+#if (FUSE_VERSION >= 29)
+  cvmfs_operations->forget_multi = cvmfs_forget_multi;
+#endif
 }
 
 // Called by cvmfs_talk when switching into read-only cache mode

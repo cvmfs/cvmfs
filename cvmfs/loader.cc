@@ -324,6 +324,18 @@ static void stub_forget(
 }
 
 
+#if (FUSE_VERSION >= 29)
+static void stub_forget_multi(
+  fuse_req_t req,
+  size_t count,
+  struct fuse_forget_data *forgets
+) {
+  FenceGuard fence_guard(fence_reload_);
+  cvmfs_exports_->cvmfs_operations.forget_multi(req, count, forgets);
+}
+#endif
+
+
 /**
  * The callback used when fuse is parsing all the options
  * We separate CVMFS options from FUSE options here.
@@ -983,6 +995,10 @@ int FuseMain(int argc, char *argv[]) {
 
   struct fuse_lowlevel_ops loader_operations;
   SetFuseOperations(&loader_operations);
+#if (FUSE_VERSION >= 29)
+  if (cvmfs_exports_->cvmfs_operations.forget_multi)
+    loader_operations.forget_multi = stub_forget_multi;
+#endif
 
 #if CVMFS_USE_LIBFUSE == 2
   channel = fuse_mount(mount_point_->c_str(), mount_options);
