@@ -12,7 +12,7 @@
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "upload_facility.h"
-
+#include "util/exception.h"
 
 namespace swissknife {
 
@@ -286,10 +286,9 @@ DatabaseT* RootChainWalker::ReturnOrAbort(
     case ObjectFetcherFailures::kFailNotFound:
       return NULL;
     default:
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to load object '%s' (%d - %s)",
-                                      content_hash.ToStringWithSuffix().c_str(),
-                                      failure, Code2Ascii(failure));
-      abort();
+      PANIC(kLogStderr, "Failed to load object '%s' (%d - %s)",
+            content_hash.ToStringWithSuffix().c_str(), failure,
+            Code2Ascii(failure));
   }
 }
 
