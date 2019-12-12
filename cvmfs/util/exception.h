@@ -22,7 +22,8 @@ class ECvmfsException : std::runtime_error {
 
 #define PANIC(...) Panic("PANIC: __FILE__ : __LINE__", __VA_ARGS__);
 
-void Panic(const char *coordinates, const int mask, const char *format, ...);
+void Panic(const char *coordinates, const LogSource source, const int mask,
+           const char *format, ...);
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

@@ -78,6 +78,7 @@ set (CVMFS_CLIENT_SOURCES
   tracer.cc
   uuid.cc
   util/algorithm.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
   util_concurrency.cc

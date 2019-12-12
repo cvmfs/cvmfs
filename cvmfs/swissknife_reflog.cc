@@ -286,7 +286,7 @@ DatabaseT* RootChainWalker::ReturnOrAbort(
     case ObjectFetcherFailures::kFailNotFound:
       return NULL;
     default:
-      PANIC(kLogStderr, "Failed to load object '%s' (%d - %s)",
+      PANIC(kLogCvmfs, kLogStderr, "Failed to load object '%s' (%d - %s)",
             content_hash.ToStringWithSuffix().c_str(), failure,
             Code2Ascii(failure));
   }

@@ -113,16 +113,16 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     catalog::DirectoryEntry new_entry = new_listing[i_to];
 
     if (old_entry.linkcount() == 0) {
-      PANIC(kLogStderr,
-          "CatalogDiffTool - Entry %s in old catalog has linkcount 0. "
-          "Aborting.",
-          old_entry.name().c_str());
+      PANIC(kLogCvmfs, kLogStderr,
+            "CatalogDiffTool - Entry %s in old catalog has linkcount 0. "
+            "Aborting.",
+            old_entry.name().c_str());
     }
     if (new_entry.linkcount() == 0) {
-      PANIC(kLogStderr,
-          "CatalogDiffTool - Entry %s in new catalog has linkcount 0. "
-          "Aborting.",
-          new_entry.name().c_str());
+      PANIC(kLogCvmfs, kLogStderr,
+            "CatalogDiffTool - Entry %s in new catalog has linkcount 0. "
+            "Aborting.",
+            new_entry.name().c_str());
     }
 
     // Skip .cvmfs hidden directory
