@@ -852,6 +852,28 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 }
 
 
+#if (FUSE_VERSION >= 30)
+/**
+ * Read the directory listing and perform a lookup (increase inode reference
+ * counter) on the returned entries except . and ..
+ * Fuse expects a buffer filled with struct fuse_entry_param instead of
+ * struct stat. We create the readdirplus buffer on the fly from the readdir
+ * buffer that was created by opendir. With adaptive readdirplus, there is a
+ * good chance that only the first batch uses readdirplus.
+ */
+//static void cvmfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size,
+//                              off_t off, struct fuse_file_info *fi)
+//{
+//  HighPrecisionTimer guard_timer(file_system_->hist_fs_readdirplus());
+//
+//  LogCvmfs(kLogCvmfs, kLogDebug,
+//           "cvmfs_readdirplus on %" PRIu64 " reading %d bytes from offset %d",
+//           uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)), size, off);
+//  fuse_reply_err(req, EINVAL);
+//}
+#endif
+
+
 /**
  * Open a file from cache.  If necessary, file is downloaded first.
  *
@@ -1850,6 +1872,9 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->forget       = cvmfs_forget;
 #if (FUSE_VERSION >= 29)
   cvmfs_operations->forget_multi = cvmfs_forget_multi;
+#endif
+#if (FUSE_VERSION >= 30)
+  //cvmfs_operations->readdirplus  = cvmfs_readdirplus;
 #endif
 }
 

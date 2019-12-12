@@ -231,6 +231,7 @@ void FileSystem::CreateStatistics() {
   hist_fs_opendir_ = new Log2Histogram(30);
   hist_fs_releasedir_ = new Log2Histogram(30);
   hist_fs_readdir_ = new Log2Histogram(30);
+  hist_fs_readdirplus_ = new Log2Histogram(30);
   hist_fs_open_ = new Log2Histogram(30);
   hist_fs_read_ = new Log2Histogram(30);
   hist_fs_release_ = new Log2Histogram(30);
@@ -415,6 +416,7 @@ FileSystem::~FileSystem() {
   delete hist_fs_readlink_;
   delete hist_fs_opendir_;
   delete hist_fs_releasedir_;
+  delete hist_fs_readdirplus_;
   delete hist_fs_readdir_;
   delete hist_fs_open_;
   delete hist_fs_read_;

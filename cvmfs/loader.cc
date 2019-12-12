@@ -256,6 +256,15 @@ static void stub_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   cvmfs_exports_->cvmfs_operations.readdir(req, ino, size, off, fi);
 }
 
+#if (FUSE_VERSION >= 30)
+static void stub_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size,
+                             off_t off, struct fuse_file_info *fi)
+{
+  FenceGuard fence_guard(fence_reload_);
+  cvmfs_exports_->cvmfs_operations.readdirplus(req, ino, size, off, fi);
+}
+#endif
+
 
 static void stub_open(fuse_req_t req, fuse_ino_t ino,
                       struct fuse_file_info *fi)
@@ -998,6 +1007,10 @@ int FuseMain(int argc, char *argv[]) {
 #if (FUSE_VERSION >= 29)
   if (cvmfs_exports_->cvmfs_operations.forget_multi)
     loader_operations.forget_multi = stub_forget_multi;
+#endif
+#if (FUSE_VERSION >= 30)
+  if (cvmfs_exports_->cvmfs_operations.readdirplus)
+    loader_operations.readdirplus = stub_readdirplus;
 #endif
 
 #if CVMFS_USE_LIBFUSE == 2

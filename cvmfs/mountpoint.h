@@ -182,6 +182,7 @@ class FileSystem : SingleCopy, public BootFactory {
   Log2Histogram *hist_fs_opendir() { return hist_fs_opendir_; }
   Log2Histogram *hist_fs_releasedir() { return hist_fs_releasedir_; }
   Log2Histogram *hist_fs_readdir() { return hist_fs_readdir_; }
+  Log2Histogram *hist_fs_readdirplus() { return hist_fs_readdirplus_; }
   Log2Histogram *hist_fs_open() { return hist_fs_open_; }
   Log2Histogram *hist_fs_read() { return hist_fs_read_; }
   Log2Histogram *hist_fs_release() { return hist_fs_release_; }
@@ -303,6 +304,7 @@ class FileSystem : SingleCopy, public BootFactory {
   Log2Histogram *hist_fs_opendir_;
   Log2Histogram *hist_fs_releasedir_;
   Log2Histogram *hist_fs_readdir_;
+  Log2Histogram *hist_fs_readdirplus_;
   Log2Histogram *hist_fs_open_;
   Log2Histogram *hist_fs_read_;
   Log2Histogram *hist_fs_release_;

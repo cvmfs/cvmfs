@@ -572,13 +572,15 @@ void *TalkManager::MainResponder(void *data) {
 
       result += "Lookup\n" + file_system->hist_fs_lookup()->ToString();
       result += "Forget\n" + file_system->hist_fs_forget()->ToString();
-      result += "Multi-Forget\n"
-                + file_system->hist_fs_forget_multi()->ToString();
+      result += "Multi-Forget\n" +
+                file_system->hist_fs_forget_multi()->ToString();
       result += "Getattr\n" + file_system->hist_fs_getattr()->ToString();
       result += "Readlink\n" + file_system->hist_fs_readlink()->ToString();
       result += "Opendir\n" + file_system->hist_fs_opendir()->ToString();
       result += "Releasedir\n" + file_system->hist_fs_releasedir()->ToString();
       result += "Readdir\n" + file_system->hist_fs_readdir()->ToString();
+      result += "Readdirplus\n" +
+                file_system->hist_fs_readdirplus()->ToString();
       result += "Open\n" + file_system->hist_fs_open()->ToString();
       result += "Read\n" + file_system->hist_fs_read()->ToString();
       result += "Release\n" + file_system->hist_fs_release()->ToString();

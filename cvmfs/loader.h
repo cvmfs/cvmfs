@@ -199,8 +199,8 @@ struct LoaderExports {
  * Whenever something changes, change the version number.
  * A global CvmfsExports struct is looked up by the loader via dlsym.
  *
- * Note: as of cvmfs version 2.8, we set cvmfs_operations.forget_multi on new
- * enough fuse
+ * Note: as of cvmfs version 2.8, we set cvmfs_operations.forget_multi and
+ * cvmfs_operations.readdirplus on new enough fuse
  */
 struct CvmfsExports {
   CvmfsExports() {
