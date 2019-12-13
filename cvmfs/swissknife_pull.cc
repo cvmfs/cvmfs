@@ -89,9 +89,8 @@ class ChunkJob {
 static void SpoolerOnUpload(const upload::SpoolerResult &result) {
   unlink(result.local_path.c_str());
   if (result.return_code != 0) {
-    PANIC(kLogCvmfs, kLogStderr, "spooler failure %d (%s, hash: %s)",
-          result.return_code, result.local_path.c_str(),
-          result.content_hash.ToString().c_str());
+    PANIC(kLogStderr, "spooler failure %d (%s, hash: %s)", result.return_code,
+          result.local_path.c_str(), result.content_hash.ToString().c_str());
   }
 }
 
@@ -184,21 +183,21 @@ static void Store(
     if (!compressed_src) {
       int retval = rename(local_path.c_str(), remote_path.c_str());
       if (retval != 0) {
-        PANIC(kLogCvmfs, kLogStderr, "Failed to move '%s' to '%s'",
-              local_path.c_str(), remote_path.c_str());
+        PANIC(kLogStderr, "Failed to move '%s' to '%s'", local_path.c_str(),
+              remote_path.c_str());
       }
     } else {
       // compressed input
       string tmp_dest;
       FILE *fdest = CreateTempFile(remote_path, 0660, "w", &tmp_dest);
       if (fdest == NULL) {
-        PANIC(kLogCvmfs, kLogStderr, "Failed to create temporary file '%s'",
+        PANIC(kLogStderr, "Failed to create temporary file '%s'",
               remote_path.c_str());
       }
       int retval = zlib::DecompressPath2File(local_path, fdest);
       if (!retval) {
-        PANIC(kLogCvmfs, kLogStderr, "Failed to preload %s to %s",
-              local_path.c_str(), remote_path.c_str());
+        PANIC(kLogStderr, "Failed to preload %s to %s", local_path.c_str(),
+              remote_path.c_str());
       }
       fclose(fdest);
       retval = rename(tmp_dest.c_str(), remote_path.c_str());
@@ -282,7 +281,7 @@ static void *MainWorker(void *data) {
                                        download_manager->Fetch(&download_chunk);
       if (download_result != download::kFailOk) {
         ReportDownloadError(download_chunk);
-        PANIC(kLogCvmfs, kLogStderr, "Download error");
+        PANIC(kLogStderr, "Download error");
       }
       fclose(fchunk);
       Store(tmp_file, chunk_hash,
@@ -345,7 +344,7 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
     // Preload: dirtab changed
     if (inspect_existing_catalogs) {
       if (!preload_cache) {
-        PANIC(kLogCvmfs, kLogStderr, "to be implemented: -t without -c");
+        PANIC(kLogStderr, "to be implemented: -t without -c");
       }
       catalog::Catalog *catalog = catalog::Catalog::AttachFreely(
         path, MakePath(catalog_hash), catalog_hash);

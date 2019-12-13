@@ -18,7 +18,7 @@ static void LogPanic(const LogSource source, const int mask, const char *msg)
 TEST(T_Panic, Call) {
   EXPECT_FALSE(FileExists("cvmfs_test_panic"));
   SetAltLogFunc(LogPanic);
-  EXPECT_DEATH(PANIC(kLogCvmfs, kLogStderr, "unit test"), ".*");
+  EXPECT_DEATH(PANIC(kLogStderr, "unit test"), ".*");
   SetAltLogFunc(NULL);
   EXPECT_TRUE(FileExists("cvmfs_test_panic"));
   unlink("cvmfs_test_panic");

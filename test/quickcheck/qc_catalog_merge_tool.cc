@@ -105,7 +105,7 @@ DirSpec ModifySpec(const DirSpec& in) {
         // TODO(radu): Implement file content modifications
         break;
       default:
-        PANIC(kLogCvmfs, kLogStderr, "Unknown change type. Aborting.");
+        PANIC(kLogStderr, "Unknown change type. Aborting.");
         break;
     }
   }

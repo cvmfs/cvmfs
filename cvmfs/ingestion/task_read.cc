@@ -31,13 +31,11 @@ void TaskRead::Process(FileItem *item) {
   }
 
   if (item->Open() == false) {
-    PANIC(kLogCvmfs, kLogStderr, "failed to open %s (%d)", item->path().c_str(),
-          errno);
+    PANIC(kLogStderr, "failed to open %s (%d)", item->path().c_str(), errno);
   }
   uint64_t size;
   if (item->GetSize(&size) == false) {
-    PANIC(kLogCvmfs, kLogStderr, "failed to fstat %s (%d)",
-          item->path().c_str(), errno);
+    PANIC(kLogStderr, "failed to fstat %s (%d)", item->path().c_str(), errno);
   }
   item->set_size(size);
 
@@ -53,8 +51,7 @@ void TaskRead::Process(FileItem *item) {
   do {
     nbytes = item->Read(buffer, kBlockSize);
     if (nbytes < 0) {
-      PANIC(kLogCvmfs, kLogStderr, "failed to read %s (%d)",
-            item->path().c_str(), errno);
+      PANIC(kLogStderr, "failed to read %s (%d)", item->path().c_str(), errno);
     }
 
     BlockItem *block_item = new BlockItem(tag, allocator_);
