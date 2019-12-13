@@ -25,8 +25,6 @@ class PublisherHTTP : public Publisher {
 
  private:
   std::string server_url_;
-
-  bool initialized_;
 };
 
 }  // namespace notify

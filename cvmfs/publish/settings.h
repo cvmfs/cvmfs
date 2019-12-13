@@ -263,7 +263,6 @@ class SettingsPublisher {
   Setting<gid_t> owner_gid_;
   Setting<unsigned> whitelist_validity_days_;
 
-  SettingsGc gc_;
   SettingsStorage storage_;
   SettingsTransaction transaction_;
   SettingsKeychain keychain_;

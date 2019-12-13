@@ -25,8 +25,6 @@ const LogFacilities& kLogError = DefaultLogging::error;
 
 const int kMaxPoolHandles = 1;
 const bool kUseSystemProxy = true;
-const unsigned kDownloadTimeout = 60;  // 1 minute
-const unsigned kDownloadRetries = 1;   // 2 attempts in total
 
 class SwissknifeSubscriber : public notify::SubscriberSSE {
  public:
