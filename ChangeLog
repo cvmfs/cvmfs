@@ -1,4 +1,5 @@
 2.7.1:
+  * Fix host fail-over after redirection (CVM-1675)
   * Add reboot info to Catalina installation screen
 
 2.7.0:
