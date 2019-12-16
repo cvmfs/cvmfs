@@ -285,23 +285,23 @@ TEST_F(T_Download, RemoteFileSwitchHosts) {
   EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
 }
 
-// TEST_F(T_Download, RemoteFileSwitchHostsAfterRedirect) {
-//   string src_path = GetSmallFile();
-//   string src_content = GetFileContents(src_path);
+TEST_F(T_Download, RemoteFileSwitchHostsAfterRedirect) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
 
-//   MockRedirectServer redirect_server(8083, "http://127.0.0.1:8084");
-//   MockFileServer file_server(8082, sandbox_path_);
+  MockRedirectServer redirect_server(8083, "http://127.0.0.1:8084");
+  MockFileServer file_server(8082, sandbox_path_);
 
-//   download_mgr.EnableRedirects();
-//   download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
-//   string url = "/" + GetFileName(src_path);
-//   JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL);
-//   download_mgr.Fetch(&info);
-  // ASSERT_EQ(info.num_used_hosts, 2);
-//   ASSERT_EQ(info.error_code, kFailOk);
-//   ASSERT_EQ(info.destination_mem.pos, src_content.length());
-//   EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
-// }
+  download_mgr.EnableRedirects();
+  download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
+  string url = "/" + GetFileName(src_path);
+  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(info.num_used_hosts, 2);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
 
 TEST_F(T_Download, RemoteFileSwitchProxies) {
   string src_path = GetSmallFile();
