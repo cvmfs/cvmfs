@@ -12,9 +12,7 @@ cvmfs_run_test() {
   echo "*** converting image to singularity ***"
   cvmfs_ducc convert-singularity-image -r $CVMFS_TEST_REPO $DOCKER_TEST_IMAGE || return 2
 
-  cvmfs_mount $CVMFS_TEST_REPO || return 3
-
-  [ -d "/cvmfs/$TESTS_REPO/registry.hub.docker.com/library/centos:centos7" ] || return 4
+  [ -d "/cvmfs/$CVMFS_TEST_REPO/registry.hub.docker.com/library/centos:centos7" ] || return 3
 
   return 0
 }
