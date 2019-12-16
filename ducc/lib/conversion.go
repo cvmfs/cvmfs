@@ -32,7 +32,30 @@ const (
 
 var subDirInsideRepo = ".layers"
 
-func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingularity bool) (err error) {
+func ConvertWishSingularity(wish WishFriendly) (err error) {
+	tmpDir, err := ioutil.TempDir("", "conversion")
+	if err != nil {
+		LogE(err).Error("Error when creating tmp singularity directory")
+		return
+	}
+	inputImage, err := ParseImage(wish.InputName)
+	var singularity Singularity
+	singularity, err = inputImage.DownloadSingularityDirectory(tmpDir)
+	if err != nil {
+		LogE(err).Error("Error in dowloading the singularity image")
+		return
+	}
+	defer os.RemoveAll(singularity.TempDirectory)
+
+	err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
+	if err != nil {
+		LogE(err).Error("Error in ingesting the singularity image into the CVMFS repository")
+		return
+	}
+	return nil
+}
+
+func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err error) {
 
 	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
 	if err != nil {
@@ -199,15 +222,6 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 		return err
 	}
 
-	var singularity Singularity
-	if convertSingularity {
-		singularity, err = inputImage.DownloadSingularityDirectory(tmpDir)
-		if err != nil {
-			LogE(err).Error("Error in dowloading the singularity image")
-			return
-		}
-		defer os.RemoveAll(singularity.TempDirectory)
-	}
 	changes, _ := inputImage.GetChanges()
 
 	var wg sync.WaitGroup
@@ -301,15 +315,6 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 	// we wait for the goroutines to finish
 	// and if there was no error we add everything to the converted table
 	noErrorInConversionValue := <-noErrorInConversion
-
-	// here we can launch the ingestion for the singularity image
-	if convertSingularity {
-		err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
-		if err != nil {
-			LogE(err).Error("Error in ingesting the singularity image into the CVMFS repository")
-			noErrorInConversionValue = false
-		}
-	}
 
 	err = SaveLayersBacklink(wish.CvmfsRepo, inputImage, layerDigests)
 	if err != nil {

@@ -65,9 +65,15 @@ var loopCmd = &cobra.Command{
 					"repository":   wish.CvmfsRepo,
 					"output image": wish.OutputName}
 				lib.Log().WithFields(fields).Info("Start conversion of wish")
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer, convertSingularity)
+				err = lib.ConvertWishDocker(wish, convertAgain, overwriteLayer)
 				if err != nil {
-					lib.LogE(err).WithFields(fields).Error("Error in converting wish, going on")
+					lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+				}
+				if convertSingularity {
+					err = lib.ConvertWishSingularity(wish)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
+					}
 				}
 				checkQuitSignal()
 			}
