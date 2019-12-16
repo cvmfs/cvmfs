@@ -10,6 +10,7 @@
 #include "receiver/catalog_merge_tool.h"
 #include "receiver/params.h"
 #include "testutil.h"
+#include "util/exception.h"
 #include "xattr.h"
 
 namespace {
@@ -104,8 +105,7 @@ DirSpec ModifySpec(const DirSpec& in) {
         // TODO(radu): Implement file content modifications
         break;
       default:
-        LogCvmfs(kLogCvmfs, kLogStderr, "Unknown change type. Aborting.");
-        abort();
+        PANIC(kLogStderr, "Unknown change type. Aborting.");
         break;
     }
   }

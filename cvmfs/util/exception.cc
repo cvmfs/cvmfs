@@ -16,7 +16,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-void Panic(const char *coordinates, const char *format, ...) {
+void Panic(const char* coordinates, const LogSource source, const int mask,
+           const char* format, ...) {
   char* msg = NULL;
   va_list variadic_list;
 
@@ -41,7 +42,7 @@ void Panic(const char *coordinates, const char *format, ...) {
 #ifdef LIBCVMFS_SERVER
   throw ECvmfsException(msg);
 #else
-  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, msg);
+  LogCvmfs(source, mask, msg);
   abort();
 #endif
 }

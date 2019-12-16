@@ -78,6 +78,7 @@ set (CVMFS_CLIENT_SOURCES
   tracer.cc
   uuid.cc
   util/algorithm.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
   util_concurrency.cc
@@ -251,6 +252,7 @@ set (CVMFS_PUBLISH_SOURCES
   sanitizer.cc
   signature.cc
   upload_spooler_definition.cc
+  util/exception.cc
   util/namespace.cc
   util/posix.cc
   util/string.cc
@@ -318,6 +320,7 @@ set (LIBCVMFS_SERVER_SOURCES
   upload_spooler_definition.cc
   util_concurrency.cc
   util/algorithm.cc
+  util/exception.cc
   util/mmap_file.cc
   util/posix.cc
   util/string.cc
@@ -578,6 +581,7 @@ if(BUILD_RECEIVER)
     upload_s3.cc
     upload_spooler_definition.cc
     util/algorithm.cc
+    util/exception.cc
     util/mmap_file.cc
     util/posix.cc
     util/string.cc

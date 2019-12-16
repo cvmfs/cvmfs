@@ -352,7 +352,6 @@ int ConnectSocket(const std::string &path) {
     RemoveShortSocketLink(short_path);
 
   if (retval < 0) {
-    // LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
     close(socket_fd);
     return -1;
   }
