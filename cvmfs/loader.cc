@@ -47,6 +47,7 @@
 #include "options.h"
 #include "platform.h"
 #include "sanitizer.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -397,8 +398,8 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       parse_options_only_ = true;
       return 0;
     default:
-      LogCvmfs(kLogCvmfs, kLogStderr, "internal option parsing error");
-      abort();
+      PANIC(kLogStderr, "internal option parsing error");
+      return 0;
   }
 }
 
@@ -782,9 +783,8 @@ int FuseMain(int argc, char *argv[]) {
   }
   if (suid_mode_) {
     if (getuid() != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "must be root to mount with suid option");
-      abort();
+      PANIC(kLogStderr | kLogSyslogErr,
+            "must be root to mount with suid option");
     }
     fuse_opt_add_arg(mount_options, "-osuid");
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
@@ -1137,4 +1137,3 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_stub_exports;
   g_cvmfs_stub_exports = NULL;
 }
-
