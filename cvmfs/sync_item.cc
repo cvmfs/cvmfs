@@ -16,6 +16,7 @@
 #include "ingestion/ingestion_source.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
+#include "util/exception.h"
 
 using namespace std;  // NOLINT
 
@@ -67,10 +68,11 @@ SyncItemType SyncItem::GetGenericFiletype(const SyncItem::EntryStat &stat) const
 {
   const SyncItemType type = stat.GetSyncItemType();
   if (type == kItemUnknown) {
-    PrintWarning("'" + GetRelativePath() + "' has an unsupported file type "
-                 "(st_mode: " + StringifyInt(stat.stat.st_mode) +
-                 " errno: " + StringifyInt(stat.error_code) + ")");
-    abort();
+    PANIC(kLogStderr, ("[WARNING] '" + GetRelativePath() +
+                       "' has an unsupported file type (st_mode: " +
+                       StringifyInt(stat.stat.st_mode) +
+                       " errno: " + StringifyInt(stat.error_code) + ")")
+                          .c_str());
   }
   return type;
 }
@@ -94,9 +96,10 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 SyncItemType SyncItemNative::GetScratchFiletype() const {
   StatScratch();
   if (scratch_stat_.error_code != 0) {
-    PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
-                 "(errno: " + StringifyInt(scratch_stat_.error_code) + ")");
-    abort();
+    PANIC(kLogStderr, ("[WARNING] Failed to stat() '" + GetRelativePath() +
+                       "' in scratch. (errno: " +
+                       StringifyInt(scratch_stat_.error_code) + ")")
+                          .c_str());
   }
 
   return GetGenericFiletype(scratch_stat_);
