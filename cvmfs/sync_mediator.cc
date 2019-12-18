@@ -21,6 +21,7 @@
 #include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -115,8 +116,8 @@ void SyncMediator::EnsureAllowed(SharedPtr<SyncItem> entry) {
                   string(catalog::VirtualCatalog::kVirtualPath) + "/",
                   ignore_case_setting)) )
   {
-    PrintError("invalid attempt to modify '" + relative_path + "'");
-    abort();
+    PANIC(kLogStderr, "[ERROR] invalid attempt to modify '",
+          relative_path.c_str(), "'");
   }
 }
 
