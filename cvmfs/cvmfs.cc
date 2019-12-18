@@ -106,6 +106,7 @@
 #include "statistics.h"
 #include "talk.h"
 #include "tracer.h"
+#include "util/exception.h"
 #include "util_concurrency.h"
 #include "uuid.h"
 #include "wpad.h"
@@ -1804,18 +1805,16 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   if (mount_point_->enforce_acls()) {
 #ifdef FUSE_CAP_POSIX_ACL
     if ((conn->capable & FUSE_CAP_POSIX_ACL) == 0) {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-               "ACL support requested but missing fuse kernel support, "
-               "aborting");
-      abort();
+      PANIC(kLogDebug | kLogSyslogErr,
+            "ACL support requested but missing fuse kernel support, "
+            "aborting");
     }
     conn->want |= FUSE_CAP_POSIX_ACL;
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "enforcing ACLs");
 #else
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "ACL support requested but not available in this version of "
-             "libfuse, aborting");
-    abort();
+    PANIC(kLogDebug | kLogSyslogErr,
+          "ACL support requested but not available in this version of "
+          "libfuse, aborting");
 #endif
   }
 }
