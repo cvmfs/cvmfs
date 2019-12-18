@@ -29,6 +29,7 @@
 #include "reflog.h"
 #include "sanitizer.h"
 #include "shortstring.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 
@@ -170,14 +171,12 @@ string CommandCheck::FetchPath(const string &path) {
     download::JobInfo download_job(&url, false, false, f, NULL);
     download::Failures retval = download_manager()->Fetch(&download_job);
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s", url.c_str());
-      abort();
+      PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   } else {
     bool retval = CopyPath2File(url, f);
     if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s", url.c_str());
-      abort();
+      PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   }
 
