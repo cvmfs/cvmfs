@@ -41,9 +41,8 @@ FuseRemounter::Status FuseRemounter::Check() {
   if (mountpoint_->ReloadBlacklists() &&
       mountpoint_->catalog_mgr()->IsRevisionBlacklisted())
   {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
-            "repository revision blacklisted, aborting");
-    abort();
+    PANIC(kLogDebug | kLogSyslogErr,
+          "repository revision blacklisted, aborting");
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
