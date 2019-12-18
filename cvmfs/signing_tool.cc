@@ -12,6 +12,7 @@
 #include "server_tool.h"
 #include "upload.h"
 #include "util/pointer.h"
+#include "util/exception.h"
 
 namespace {
 
@@ -230,8 +231,7 @@ SigningTool::Result SigningTool::Run(
       reinterpret_cast<const unsigned char *>(published_hash.ToString().data()),
       published_hash.GetHexSize(), &sig, &sig_size);
   if (!manifest_was_signed) {
-    abort();
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
+    PANIC(kLogStderr, "Failed to sign manifest");
     return kError;
   }
 
