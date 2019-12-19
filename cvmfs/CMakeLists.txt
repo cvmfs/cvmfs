@@ -455,7 +455,10 @@ set (CVMFS_SWISSKNIFE_SOURCES
 set (CVMFS_SUID_HELPER_SOURCES
   cvmfs_suid_helper.cc
   cvmfs_suid_util.cc
+  logging.cc
   sanitizer.cc
+  util/exception.cc
+  util/posix.cc
 )
 
 set (CVMFS_PRELOADER_SOURCES
@@ -932,6 +935,7 @@ if (BUILD_SERVER)
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
                          pthread dl)
+  target_link_libraries (cvmfs_suid_helper pthread)
   target_link_libraries (cvmfs_server ${LIBCVMFS_SERVER_LIBS} ${LIBCVMFS_SERVER_LINK_LIBRARIES})
   target_link_libraries (cvmfs_publish cvmfs_server)
   if (BUILD_SERVER_DEBUG)

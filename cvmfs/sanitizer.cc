@@ -5,6 +5,7 @@
  */
 
 #include "cvmfs_config.h"
+#include "util/exception.h"
 #include "sanitizer.h"
 
 #include <cassert>
@@ -63,7 +64,7 @@ void InputSanitizer::InitValidRanges(const std::string &whitelist) {
           valid_ranges_.push_back(CharRange(range[0], range[1]));
           break;
         default:
-          assert(false);
+          PANIC(NULL);
       }
       ++i;
       pickup_pos = i+1;
