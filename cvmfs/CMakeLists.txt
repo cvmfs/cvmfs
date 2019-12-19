@@ -6,6 +6,7 @@
 set (CVMFS2_BINARY_SOURCES
   fuse_main.cc
   logging.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
 )
@@ -20,6 +21,7 @@ set (CVMFS_STUB_SOURCES
   options.cc
   sanitizer.cc
   statistics.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
 )
@@ -162,6 +164,7 @@ set (LIBCVMFS_CACHE_SOURCES
   monitor.cc
   options.cc
   sanitizer.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
   util_concurrency.cc
@@ -177,6 +180,7 @@ set (CVMFS_CACHE_RAM_SOURCES
   malloc_heap.cc
   statistics.cc
   util_concurrency.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
 )
@@ -190,6 +194,7 @@ set (CVMFS_CACHE_POSIX_SOURCES
   logging.cc
   manifest.cc
   quota.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
 )
@@ -200,6 +205,7 @@ set (CVMFS_FSCK_SOURCES
   hash.cc
   logging.cc
   statistics.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
 )
@@ -209,6 +215,7 @@ set (CVMFS_TALK_SOURCES
   logging.cc
   options.cc
   sanitizer.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
 )
@@ -227,6 +234,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
   shrinkwrap/spec_tree.cc
   shrinkwrap/util.cc
   statistics.cc
+  util/exception.cc
   util/posix.cc
   util/string.cc
   util_concurrency.cc

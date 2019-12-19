@@ -48,6 +48,7 @@
 #include "logging.h"
 #include "platform.h"
 
+#include "util/exception.h"
 #include "util_concurrency.h"
 
 //using namespace std;  // NOLINT
@@ -180,7 +181,7 @@ bool IsHttpUrl(const std::string &path) {
 
 
 /**
- * By default abort() on failure
+ * By default PANIC(NULL) on failure
  */
 void CreateFile(
   const std::string &path,
@@ -194,7 +195,7 @@ void CreateFile(
   }
   if (ignore_failure)
     return;
-  assert(false);
+  PANIC(NULL);
 }
 
 
