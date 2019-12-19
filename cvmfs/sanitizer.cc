@@ -4,11 +4,12 @@
  * Provides input data sanitizer in the form of whitelist of character ranges.
  */
 
-#include "cvmfs_config.h"
-#include "util/exception.h"
 #include "sanitizer.h"
 
 #include <cassert>
+
+#include "cvmfs_config.h"
+#include "util/exception.h"
 
 using namespace std;  // NOLINT
 

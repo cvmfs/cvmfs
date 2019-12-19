@@ -11,8 +11,8 @@
 #include "reflog.h"
 #include "server_tool.h"
 #include "upload.h"
-#include "util/pointer.h"
 #include "util/exception.h"
+#include "util/pointer.h"
 
 namespace {
 
