@@ -47,6 +47,16 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
 #endif
 }
 
+void Panic(const char* coordinates, const LogSource _source, const int _mask) {
+  assert(_mask == 0);
+#ifdef LIBCVMFS_SERVER
+  throw ECvmfsException(coordinates);
+#else
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogStdout | kLogStderr, coordinates);
+  abort();
+#endif
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
