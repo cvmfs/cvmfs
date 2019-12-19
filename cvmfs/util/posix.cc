@@ -1234,7 +1234,7 @@ int WaitForChild(pid_t pid) {
     if (retval == -1) {
       if (errno == EINTR)
         continue;
-      assert(false);
+      PANIC(NULL);
     }
     assert(retval == pid);
     break;
