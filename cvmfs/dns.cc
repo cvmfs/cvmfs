@@ -1233,7 +1233,7 @@ bool HostfileResolver::SetSearchDomains(const vector<string> &domains) {
 
 void HostfileResolver::SetSystemSearchDomains() {
   // TODO(jblomer)
-  assert(false);
+  PANIC(NULL);
 }
 
 
