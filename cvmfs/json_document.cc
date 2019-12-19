@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "logging.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/string.h"
 
@@ -200,7 +201,7 @@ std::string JsonDocument::PrintValue(JSON *value, PrintOptions print_options) {
       result += value->int_value ? "true" : "false";
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
   return result;
 }

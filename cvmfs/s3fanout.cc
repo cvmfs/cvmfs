@@ -14,6 +14,7 @@
 #include "platform.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -231,7 +232,7 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
       }
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
 
   return 0;
@@ -734,7 +735,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
           "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         break;
       default:
-        abort();
+        PANIC(NULL);
     }
     return true;
   }
@@ -758,7 +759,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
             shash::Sha256Mem(info.origin_mem.data, info.origin_mem.size);
           return true;
         default:
-          abort();
+          PANIC(NULL);
       }
     case kOriginPath:
       switch (config_.authz_method) {
@@ -784,10 +785,10 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
           }
           return true;
         default:
-          abort();
+          PANIC(NULL);
       }
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 
@@ -808,7 +809,7 @@ bool S3FanoutManager::MkPayloadSize(const JobInfo &info, uint64_t *size) const {
       *size = file_size;
       return true;
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 
@@ -825,7 +826,7 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
     case JobInfo::kReqDelete:
       return "DELETE";
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 
@@ -843,7 +844,7 @@ string S3FanoutManager::GetContentType(const JobInfo &info) const {
     case JobInfo::kReqPutBucket:
       return "text/xml";
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 
@@ -929,7 +930,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       retval_b = MkV4Authz(*info, &authz_headers);
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
   if (!retval_b)
     return kFailLocalIO;

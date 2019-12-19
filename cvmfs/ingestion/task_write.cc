@@ -8,6 +8,7 @@
 #include <cstdlib>
 
 #include "logging.h"
+#include "util/exception.h"
 #include "upload_facility.h"
 
 
@@ -80,6 +81,6 @@ void TaskWrite::Process(BlockItem *input_block) {
       delete input_block;
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
 }
