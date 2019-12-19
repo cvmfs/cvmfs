@@ -21,6 +21,7 @@
 #include "platform.h"
 #include "sanitizer.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -170,9 +171,8 @@ void AuthzExternalFetcher::ExecHelper() {
       close(fd);
 
     execve(argv0, argv, &envp[0]);
-    syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)",
-           argv0, errno);
-    abort();
+    PANIC(kLogStdout | kLogStderr, "failed to start authz helper %s (%d)",
+          argv0, errno);
   }
   assert(pid > 0);
   close(pipe_send[0]);

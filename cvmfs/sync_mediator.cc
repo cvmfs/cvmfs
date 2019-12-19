@@ -727,9 +727,8 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
            result.file_chunks.size(),
            result.return_code);
   if (result.return_code != 0) {
-    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
-             result.local_path.c_str(), result.return_code);
-    abort();
+    PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
+          result.return_code);
   }
 
   SyncItemList::iterator itr;
@@ -777,9 +776,8 @@ void SyncMediator::PublishHardlinksCallback(
            result.content_hash.ToString().c_str(),
            result.return_code);
   if (result.return_code != 0) {
-    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
-             result.local_path.c_str(), result.return_code);
-    abort();
+    PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
+          result.return_code);
   }
 
   bool found = false;
@@ -890,18 +888,15 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
       // the graft file is missing information.  It's not clear that continuing
       // forward with the publish is the correct thing to do; abort for now.
-      LogCvmfs(kLogPublish, kLogStderr,
-               "Encountered a grafted file (%s) with "
-               "invalid grafting information; check contents of .cvmfsgraft-*"
-               " file.  Aborting publish.",
-               entry->GetRelativePath().c_str());
-      abort();
+      PANIC(kLogStderr,
+            "Encountered a grafted file (%s) with "
+            "invalid grafting information; check contents of .cvmfsgraft-*"
+            " file.  Aborting publish.",
+            entry->GetRelativePath().c_str());
     }
   } else if (entry->relative_parent_path().empty() &&
              entry->IsCatalogMarker()) {
-    LogCvmfs(kLogPublish, kLogStderr,
-             "Error: nested catalog marker in root directory");
-    abort();
+    PANIC(kLogStderr, "Error: nested catalog marker in root directory");
   } else {
     {
       // Push the file to the spooler, remember the entry for the path
@@ -1035,7 +1030,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
       LogCvmfs(kLogPublish, kLogStdout, "Hardlinks across directories (%s)",
                i->second.master->GetUnionPath().c_str());
       if (!params_->ignore_xdir_hardlinks)
-        abort();
+        PANIC(NULL);
     }
 
     if (params_->print_changeset) {

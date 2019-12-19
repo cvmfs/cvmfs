@@ -156,9 +156,9 @@ unsigned GetContextSize(const Algorithms algorithm) {
     case kShake128:
       return sizeof(Keccak_HashInstance);
     default:
-      LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
-               "context for unspecified hash. Aborting...");
-      abort();  // Undefined hash
+      PANIC(kLogDebug | kLogSyslogErr,
+            "tried to generate hash context for unspecified hash. Aborting...");
+      return 0;
   }
 }
 

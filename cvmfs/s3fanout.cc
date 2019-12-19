@@ -285,16 +285,14 @@ void *S3FanoutManager::MainUpload(void *data) {
       ReadPipe(s3fanout_mgr->pipe_jobs_[0], &info, sizeof(info));
       CURL *handle = s3fanout_mgr->AcquireCurlHandle();
       if (handle == NULL) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
-        assert(handle != NULL);
+        PANIC(kLogStderr, "Failed to acquire CURL handle handle == NULL.");
       }
       s3fanout::Failures init_failure =
         s3fanout_mgr->InitializeRequest(info, handle);
       if (init_failure != s3fanout::kFailOk) {
-        LogCvmfs(kLogS3Fanout, kLogStderr,
-                "Failed to initialize CURL handle (error: %d - %s | errno: %d)",
-                 init_failure, Code2Ascii(init_failure), errno);
-        abort();
+        PANIC(kLogStderr,
+              "Failed to initialize CURL handle (error: %d - %s | errno: %d)",
+              init_failure, Code2Ascii(init_failure), errno);
       }
       s3fanout_mgr->SetUrlOptions(info);
 
@@ -1129,10 +1127,10 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                                                         info->curl_handle);
 
     if (init_failure != s3fanout::kFailOk) {
-      LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to initialize CURL handle "
-                                         "(error: %d - %s | errno: %d)",
-               init_failure, Code2Ascii(init_failure), errno);
-      abort();
+      PANIC(kLogStderr,
+            "Failed to initialize CURL handle "
+            "(error: %d - %s | errno: %d)",
+            init_failure, Code2Ascii(init_failure), errno);
     }
     SetUrlOptions(info);
     // Reset origin

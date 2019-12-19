@@ -21,6 +21,7 @@
 #include "smalloc.h"
 #include "statistics.h"
 #include "upload.h"
+#include "util/exception.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -242,9 +243,8 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
-             file_path.c_str());
-    assert(false);
+    PANIC(kLogStderr, "catalog for file '%s' cannot be found",
+          file_path.c_str());
   }
 
   catalog->RemoveEntry(file_path);
@@ -265,10 +265,8 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
   WritableCatalog *catalog;
   DirectoryEntry parent_entry;
   if (!FindCatalog(parent_path, &catalog, &parent_entry)) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "catalog for directory '%s' cannot be found",
-             directory_path.c_str());
-    assert(false);
+    PANIC(kLogStderr, "catalog for directory '%s' cannot be found",
+          directory_path.c_str());
   }
 
   parent_entry.set_linkcount(parent_entry.linkcount() - 1);
@@ -301,14 +299,12 @@ void WritableCatalogManager::Clone(const std::string destination,
 
   DirectoryEntry source_dirent;
   if (!LookupPath(relative_source, kLookupSole, &source_dirent)) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "catalog for file '%s' cannot be found aborting", source.c_str());
-    assert(false);
+    PANIC(kLogStderr, "catalog for file '%s' cannot be found aborting",
+          source.c_str());
   }
   if (source_dirent.IsDirectory()) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "Trying to clone a directory: '%s' aborting", source.c_str());
-    assert(false);
+    PANIC(kLogStderr, "Trying to clone a directory: '%s' aborting",
+          source.c_str());
   }
 
   // if the file is already there we remove it and we add it back
@@ -351,10 +347,8 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
   WritableCatalog *catalog;
   DirectoryEntry parent_entry;
   if (!FindCatalog(parent_path, &catalog, &parent_entry)) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "catalog for directory '%s' cannot be found",
-             directory_path.c_str());
-    assert(false);
+    PANIC(kLogStderr, "catalog for directory '%s' cannot be found",
+          directory_path.c_str());
   }
 
   DirectoryEntry fixed_hardlink_count(entry);
@@ -395,9 +389,8 @@ void WritableCatalogManager::AddFile(
   SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
-             file_path.c_str());
-    assert(false);
+    PANIC(kLogStderr, "catalog for file '%s' cannot be found",
+          file_path.c_str());
   }
 
   assert(!entry.IsRegular() || entry.IsChunkedFile() ||
@@ -415,7 +408,7 @@ void WritableCatalogManager::AddFile(
              file_path.c_str(),
              file_mbyte_limit_,
              mbytes);
-    assert(!enforce_limits_);
+    if (enforce_limits_) PANIC(NULL);
   }
 
   catalog->AddEntry(entry, xattrs, file_path, parent_path);
@@ -442,9 +435,8 @@ void WritableCatalogManager::AddChunkedFile(
   SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "catalog for file '%s' cannot be found",
-             file_path.c_str());
-    assert(false);
+    PANIC(kLogStderr, "catalog for file '%s' cannot be found",
+          file_path.c_str());
   }
 
   for (unsigned i = 0; i < file_chunks.size(); ++i) {
@@ -495,16 +487,15 @@ void WritableCatalogManager::AddHardlinkGroup(
              (parent_path + entries[0].name().ToString()).c_str(),
              file_mbyte_limit_,
              mbytes);
-    assert(!enforce_limits_);
+    if (enforce_limits_) PANIC(NULL);
   }
 
   SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "catalog for hardlink group containing '%s' cannot be found",
-             parent_path.c_str());
-    assert(false);
+    PANIC(kLogStderr,
+          "catalog for hardlink group containing '%s' cannot be found",
+          parent_path.c_str());
   }
 
   // Get a valid hardlink group id for the catalog the group will end up in
@@ -545,10 +536,9 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
   SyncLock();
   WritableCatalog *catalog;
   if (!FindCatalog(relative_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "catalog for hardlink group containing '%s' cannot be found",
-             remove_path.c_str());
-    assert(false);
+    PANIC(kLogStderr,
+          "catalog for hardlink group containing '%s' cannot be found",
+          remove_path.c_str());
   }
 
   catalog->IncLinkcount(relative_path, -1);
@@ -577,9 +567,8 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
   // find the catalog to be updated
   WritableCatalog *catalog;
   if (!FindCatalog(parent_path, &catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "catalog for entry '%s' cannot be found",
-             entry_path.c_str());
-    assert(false);
+    PANIC(kLogStderr, "catalog for entry '%s' cannot be found",
+          entry_path.c_str());
   }
 
   catalog->TouchEntry(entry, xattrs, entry_path);
@@ -636,10 +625,10 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   WritableCatalog *old_catalog = NULL;
   DirectoryEntry new_root_entry;
   if (!FindCatalog(nested_root_path, &old_catalog, &new_root_entry)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to create nested catalog '%s': "
-             "mountpoint was not found in current catalog structure",
-             nested_root_path.c_str());
-    assert(false);
+    PANIC(kLogStderr,
+          "failed to create nested catalog '%s': "
+          "mountpoint was not found in current catalog structure",
+          nested_root_path.c_str());
   }
 
   // Create the database schema and the inital root entry
@@ -731,10 +720,10 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
   // Find the catalog which should be removed
   WritableCatalog *nested_catalog = NULL;
   if (!FindCatalog(nested_root_path, &nested_catalog)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to remove nested catalog '%s': "
-             "mountpoint was not found in current catalog structure",
-             nested_root_path.c_str());
-    assert(false);
+    PANIC(kLogStderr,
+          "failed to remove nested catalog '%s': "
+          "mountpoint was not found in current catalog structure",
+          nested_root_path.c_str());
   }
 
   // Check if the found catalog is really the nested catalog to be deleted
@@ -750,10 +739,9 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
 
   // Delete the catalog database file from the working copy
   if (unlink(nested_catalog->database_path().c_str()) != 0) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "unable to delete the removed nested catalog database file '%s'",
-             nested_catalog->database_path().c_str());
-    assert(false);
+    PANIC(kLogStderr,
+          "unable to delete the removed nested catalog database file '%s'",
+          nested_catalog->database_path().c_str());
   }
 
   // Remove the catalog from internal data structures
@@ -772,9 +760,8 @@ bool WritableCatalogManager::IsTransitionPoint(const string &mountpoint) {
   WritableCatalog *catalog;
   DirectoryEntry entry;
   if (!FindCatalog(path, &catalog, &entry)) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "catalog for directory '%s' cannot be found", path.c_str());
-    assert(false);
+    PANIC(kLogStderr, "catalog for directory '%s' cannot be found",
+          path.c_str());
   }
   const bool result = entry.IsNestedCatalogRoot();
   SyncUnlock();
@@ -959,7 +946,7 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
              (catalog->IsRoot() ? "/" : catalog->mountpoint().c_str()),
              catalog_limit,
              catalog->GetCounters().GetSelfEntries());
-    assert(!enforce_limits_);
+    if (enforce_limits_) PANIC(NULL);
   }
 
   // allow for manual adjustments in the catalog
@@ -991,9 +978,8 @@ void WritableCatalogManager::CatalogUploadCallback(
                           const upload::SpoolerResult &result,
                           const CatalogUploadContext   catalog_upload_context) {
   if (result.return_code != 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to upload '%s' (retval: %d)",
-             result.local_path.c_str(), result.return_code);
-    assert(false);
+    PANIC(kLogStderr, "failed to upload '%s' (retval: %d)",
+          result.local_path.c_str(), result.return_code);
   }
 
   // retrieve the catalog object based on the callback information
@@ -1046,7 +1032,7 @@ void WritableCatalogManager::CatalogUploadCallback(
     catalog_upload_context.root_catalog_info->Set(root_catalog_info);
     SyncUnlock();
   } else {
-    assert(false && "inconsistent state detected");
+    PANIC(kLogStderr | kLogStdout, "inconsistent state detected");
   }
 }
 
@@ -1159,9 +1145,8 @@ void WritableCatalogManager::CatalogUploadSerializedCallback(
   const CatalogUploadContext unused)
 {
   if (result.return_code != 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to upload '%s' (retval: %d)",
-             result.local_path.c_str(), result.return_code);
-    assert(false);
+    PANIC(kLogStderr, "failed to upload '%s' (retval: %d)",
+          result.local_path.c_str(), result.return_code);
   }
   unlink(result.local_path.c_str());
 }
@@ -1193,8 +1178,8 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
     if (!zlib::CompressPath2Null((*i)->database_path(),
                                  &hash_catalog))
     {
-      PrintError("could not compress catalog " + (*i)->mountpoint().ToString());
-      assert(false);
+      PANIC(kLogStderr | kLogStdout, "could not compress catalog ",
+            (*i)->mountpoint().ToString().c_str());
     }
 
     int64_t catalog_size = GetFileSize((*i)->database_path());
@@ -1212,7 +1197,7 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
       root_catalog_info.content_hash = hash_catalog;
       root_catalog_info.revision = (*i)->GetRevision();
     } else {
-      assert(false && "inconsistent state detected");
+      PANIC(kLogStderr | kLogStdout, "inconsistent state detected");
     }
 
     spooler_->ProcessCatalog((*i)->database_path());

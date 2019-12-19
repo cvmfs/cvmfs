@@ -13,6 +13,7 @@
 
 #include "fs_traversal.h"
 #include "sync_mediator.h"
+#include "util/exception.h"
 #include "util/shared_ptr.h"
 
 namespace publish {
@@ -124,17 +125,16 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(
     SharedPtr<SyncItem> entry) const {
   if (!entry->IsNew() && !entry->WasDirectory() &&
       entry->GetRdOnlyLinkcount() > 1) {
-    LogCvmfs(kLogPublish, kLogStderr,
-             "OverlayFS has copied-up a file (%s) "
-             "with existing hardlinks in lowerdir "
-             "(linkcount %d). OverlayFS cannot handle "
-             "hardlinks and would produce "
-             "inconsistencies. \n\n"
-             "Consider running this command: \n"
-             "  cvmfs_server eliminate-hardlinks\n\n"
-             "Aborting...",
-             entry->GetUnionPath().c_str(), entry->GetRdOnlyLinkcount());
-    abort();
+    PANIC(kLogStderr,
+          "OverlayFS has copied-up a file (%s) "
+          "with existing hardlinks in lowerdir "
+          "(linkcount %d). OverlayFS cannot handle "
+          "hardlinks and would produce "
+          "inconsistencies. \n\n"
+          "Consider running this command: \n"
+          "  cvmfs_server eliminate-hardlinks\n\n"
+          "Aborting...",
+          entry->GetUnionPath().c_str(), entry->GetRdOnlyLinkcount());
   }
 }
 

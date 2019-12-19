@@ -24,6 +24,7 @@
 #include "sync_item_tar.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
 
@@ -131,10 +132,8 @@ void SyncUnionTarball::Traverse() {
 
     switch (result) {
       case ARCHIVE_FATAL: {
-        LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Fatal error in reading the archive.\n%s\n",
-                 archive_error_string(src));
-        abort();
+        PANIC(kLogStderr, "Fatal error in reading the archive.\n%s\n",
+              archive_error_string(src));
         break;  // Only exit point with error
       }
 
@@ -192,11 +191,8 @@ void SyncUnionTarball::Traverse() {
       default: {
         // We should never enter in this branch, but just for safeness we prefer
         // to abort in case we hit a case we don't how to manage.
-        LogCvmfs(kLogUnionFs, kLogStderr,
-                 "Enter in unknow state. Aborting.\nError: %s\n", result,
-                 archive_error_string(src));
-
-        abort();
+        PANIC(kLogStderr, "Enter in unknow state. Aborting.\nError: %s\n",
+              result, archive_error_string(src));
       }
     }
   }
@@ -259,11 +255,10 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
     if (filename != ".cvmfscatalog") {
       ProcessFile(sync_entry);
     } else {
-      LogCvmfs(kLogUnionFs, kLogStderr,
-               "Found entity called as a catalog marker '%s' that however is "
-               "not a regular file, abort",
-               complete_path.c_str());
-      abort();
+      PANIC(kLogStderr,
+            "Found entity called as a catalog marker '%s' that however is "
+            "not a regular file, abort",
+            complete_path.c_str());
     }
 
     // here we don't need to read data from the tar file so we can wake up
@@ -271,13 +266,12 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
     read_archive_signal_->Wakeup();
 
   } else {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Fatal error found unexpected file: \n%s\n", filename.c_str());
+    PANIC(kLogStderr, "Fatal error found unexpected file: \n%s\n",
+          filename.c_str());
     // if for any reason this code path change and we don't abort anymore,
     // remember to wakeup the signal, otherwise we will be stuck in a deadlock
     //
     // read_archive_signal_->Wakeup();
-    abort();
   }
 }
 
