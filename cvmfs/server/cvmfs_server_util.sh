@@ -904,21 +904,32 @@ _to_syslog_for_geoip() {
 _update_geodb_install() {
   local retcode=0
   local datname="$2"
-  local dburl="${CVMFS_UPDATEGEO_URLBASE}/${CVMFS_UPDATEGEO_DB%.*}.tar.gz"
+  local dburl="${CVMFS_UPDATEGEO_URLBASE}?edition_id=${CVMFS_UPDATEGEO_DB%.*}&suffix=tar.gz&license_key=$CVMFS_GEO_LICENSE_KEY"
   local dbfile="${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_DB}"
   local download_target=${dbfile}.tgz
   local untar_dir=${dbfile}.untar
 
+  if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
+      echo "CVMFS_GEO_LICENSE_KEY not set" >&2
+      _to_syslog_for_geoip "CVMFS_GEO_LICENSE_KEY not set"
+      return 1
+  fi
+
   _to_syslog_for_geoip "started update from $dburl"
 
   # downloading the GeoIP database file
-  if ! curl -sS                  \
-            --fail               \
-            --connect-timeout 10 \
+  curl -sS  --connect-timeout 10 \
             --max-time 60        \
-            "$dburl" > $download_target 2>/dev/null; then
-    echo "failed to download $dburl" >&2
-    _to_syslog_for_geoip "failed to download from $dburl"
+            "$dburl" > $download_target || true
+  if ! tar tzf $download_target >/dev/null 2>&1; then
+    local msg
+    if file $download_target|grep -q "ASCII text$"; then
+      msg="`cat -v $download_target|head -1`"
+    else
+      msg="file not valid tarball"
+    fi
+    echo "failed to download geodb (see url in syslog): $msg" >&2
+    _to_syslog_for_geoip "failed to download from $dburl: $msg"
     rm -f $download_target
     return 1
   fi
