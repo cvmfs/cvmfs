@@ -31,10 +31,8 @@ int CmdInfo::Main(const Options &options) {
   }
   Repository repository(settings_repository);
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Connected to %s", fqrn.c_str());
-
   if (options.Has("meta-info")) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s", repository.GetMetainfo().c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s", repository.meta_info().c_str());
   }
 
   return 0;

@@ -57,7 +57,7 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   // Inheritance of History and SqliteHisty unknown in the header
   history::History *history();
 
-  std::string GetMetainfo();
+  std::string meta_info() { return meta_info_; }
 
  protected:
   Repository();

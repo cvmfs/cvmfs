@@ -113,9 +113,11 @@ void Repository::DownloadRootObjects(
 {
   delete whitelist_;
   whitelist_ = new whitelist::Whitelist(fqrn, download_mgr_, signature_mgr_);
-  whitelist_->LoadUrl(url);
-  if (whitelist_->status() != whitelist::Whitelist::kStAvailable)
-    throw EPublish("cannot load whitelist");
+  whitelist::Failures rv_whitelist = whitelist_->LoadUrl(url);
+  if (whitelist_->status() != whitelist::Whitelist::kStAvailable) {
+    throw EPublish(std::string("cannot load whitelist [") +
+                   whitelist::Code2Ascii(rv_whitelist) + "]");
+  }
 
   manifest::ManifestEnsemble ensemble;
   const uint64_t minimum_timestamp = 0;
@@ -141,11 +143,18 @@ void Repository::DownloadRootObjects(
        NULL);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
   fclose(reflog_fd);
-  if (rv_dl != download::kFailOk) throw EPublish("cannot load reflog");
-  delete reflog_;
-  reflog_ = manifest::Reflog::Open(reflog_path);
-  if (reflog_ == NULL) throw EPublish("cannot open reflog");
-  reflog_->TakeDatabaseFileOwnership();
+  if (rv_dl == download::kFailOk) {
+    delete reflog_;
+    reflog_ = manifest::Reflog::Open(reflog_path);
+    if (reflog_ == NULL) throw EPublish("cannot open reflog");
+    reflog_->TakeDatabaseFileOwnership();
+  } else {
+    if (download_reflog.http_code != 404) {
+      throw EPublish(std::string("cannot load reflog [") +
+                     download::Code2Ascii(rv_dl) + "]");
+    }
+    assert(reflog_ == NULL);
+  }
 
   std::string tags_path;
   FILE *tags_fd =
@@ -155,7 +164,7 @@ void Repository::DownloadRootObjects(
   download::JobInfo download_tags(
        &tags_url,
        true /* compressed */,
-       false /* probe hosts */,
+       true /* probe hosts */,
        tags_fd,
        &tags_hash);
   rv_dl = download_mgr_->Fetch(&download_tags);
@@ -165,17 +174,30 @@ void Repository::DownloadRootObjects(
   history_ = history::SqliteHistory::OpenWritable(tags_path);
   if (history_ == NULL) throw EPublish("cannot open tag database");
   history_->TakeDatabaseFileOwnership();
+
+  if (!manifest_->meta_info().IsNull()) {
+    shash::Any info_hash(manifest_->meta_info());
+    std::string info_url = url + "/data/" + info_hash.MakePath();
+    download::JobInfo download_info(
+      &info_url,
+      true /* compressed */,
+      true /* probe_hosts */,
+      &info_hash);
+    download::Failures rv_info = download_mgr_->Fetch(&download_info);
+    if (rv_info != download::kFailOk) {
+      throw EPublish(std::string("cannot load meta info [") +
+                     download::Code2Ascii(rv_info) + "]");
+    }
+    meta_info_ = std::string(download_info.destination_mem.data,
+                             download_info.destination_mem.pos);
+  } else {
+    meta_info_ = "n/a";
+  }
 }
 
 
 std::string Repository::GetFqrnFromUrl(const std::string &url) {
   return GetFileName(MakeCanonicalPath(url));
-}
-
-std::string Repository::GetMetainfo() {
-  if (manifest_->meta_info().IsNull()) return "n/a";
-
-  return "TODO";
 }
 
 
