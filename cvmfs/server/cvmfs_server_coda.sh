@@ -22,7 +22,11 @@ DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 LATEST_JSON_INFO_SCHEMA=1
 
 if [ -f /etc/cvmfs/server.local ]; then
-  . /etc/cvmfs/server.local
+  if [ -r /etc/cvmfs/server.local ]; then
+    . /etc/cvmfs/server.local
+  else
+    echo "WARNING: cannot read /etc/cvmfs/server.local" >&2
+  fi
 fi
 
 # setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
