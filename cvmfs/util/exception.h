@@ -22,6 +22,7 @@ class ECvmfsException : std::runtime_error {
 
 #define PANIC(...) Panic("PANIC: __FILE__ : __LINE__", kLogCvmfs, __VA_ARGS__);
 
+__attribute__((noreturn))
 void Panic(const char *coordinates, const LogSource source, const int mask,
            const char *format, ...);
 
