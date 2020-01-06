@@ -13,13 +13,17 @@ CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
 CVMFS_UPDATEGEO_MINDAYS=25 # Minimum days between update attempts
 CVMFS_UPDATEGEO_MAXDAYS=100 # Maximum days old before considering it an error
 
-CVMFS_UPDATEGEO_URLBASE="http://geolite.maxmind.com/download/geoip/database"
+CVMFS_UPDATEGEO_URLBASE="https://download.maxmind.com/app/geoip_download"
 CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
 CVMFS_UPDATEGEO_DB="GeoLite2-City.mmdb"
 
 DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 
 LATEST_JSON_INFO_SCHEMA=1
+
+if [ -f /etc/cvmfs/server.local ]; then
+  . /etc/cvmfs/server.local
+fi
 
 # setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
