@@ -36,7 +36,6 @@
 
 #include <vector>
 
-// #include "catalog_traversal.h"
 #include "catalog_traversal_parallel.h"
 #include "garbage_collection/hash_filter.h"
 #include "statistics.h"
@@ -70,7 +69,8 @@ class GarbageCollector {
       , verbose(false)
       , deleted_objects_logfile(NULL)
       , statistics(NULL)
-      , extended_stats(false) {}
+      , extended_stats(false)
+      , num_threads(8) {}
 
     bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
@@ -84,6 +84,7 @@ class GarbageCollector {
     FILE                      *deleted_objects_logfile;
     perf::Statistics          *statistics;
     bool                       extended_stats;
+    unsigned int               num_threads;
   };
 
  public:
