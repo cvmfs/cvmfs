@@ -240,6 +240,7 @@ set (CVMFS_PUBLISH_SOURCES
   logging.cc
   manifest.cc
   options.cc
+  publish/cmd_diff.cc
   publish/cmd_enter.cc
   publish/cmd_help.cc
   publish/cmd_info.cc
