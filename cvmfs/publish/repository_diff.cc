@@ -8,6 +8,7 @@
 #include <cassert>
 #include <string>
 
+#include "catalog_counters.h"
 #include "catalog_diff_tool.h"
 #include "catalog_mgr_ro.h"
 #include "file_chunk.h"
@@ -88,31 +89,36 @@ void Repository::Diff(const std::string &from, const std::string &to,
 {
   history::History::Tag from_tag = GetTag(from, *history_);
   history::History::Tag to_tag = GetTag(to, *history_);
+  diff_listener->OnInit(from_tag, to_tag);
 
-  perf::Statistics stats_old;
-  catalog::SimpleCatalogManager *mgr_old = new catalog::SimpleCatalogManager(
+  perf::Statistics stats_from;
+  catalog::SimpleCatalogManager *mgr_from = new catalog::SimpleCatalogManager(
     from_tag.root_hash,
     settings_.url(),
     settings_.tmp_dir(),
     download_mgr_,
-    &stats_old,
+    &stats_from,
     true /* manage_catalog_files */
   );
-  mgr_old->Init();
+  mgr_from->Init();
 
-  perf::Statistics stats_new;
-  catalog::SimpleCatalogManager *mgr_new = new catalog::SimpleCatalogManager(
+  perf::Statistics stats_to;
+  catalog::SimpleCatalogManager *mgr_to = new catalog::SimpleCatalogManager(
     to_tag.root_hash,
     settings_.url(),
     settings_.tmp_dir(),
     download_mgr_,
-    &stats_new,
+    &stats_to,
     true /* manage_catalog_files */
   );
-  mgr_new->Init();
+  mgr_to->Init();
+
+  catalog::Counters counters_from = mgr_from->GetRootCatalog()->GetCounters();
+  catalog::Counters counters_to = mgr_to->GetRootCatalog()->GetCounters();
+  diff_listener->OnStats(catalog::Counters::Diff(counters_from, counters_to));
 
   // DiffTool takes ownership of the catalog managers
-  DiffForwarder diff_forwarder(mgr_old, mgr_new, diff_listener);
+  DiffForwarder diff_forwarder(mgr_from, mgr_to, diff_listener);
   if (!diff_forwarder.Init())
     throw EPublish("cannot initialize difference engine");
   diff_forwarder.Run(PathString());

@@ -38,7 +38,7 @@ class CmdDiff : public Command {
     p.push_back(Parameter::Optional("to", 'd', "repository tag",
       "The destination tag name [default='trunk']"));
     p.push_back(Parameter::Switch("header", 'h', "Show the header line"));
-    p.push_back(Parameter::Switch("ignore-timestamp", 'i',
+    p.push_back(Parameter::Switch("ignore-timediff", 'i',
       "Ignore changes that only differ in their timestamps"));
     return p;
   }

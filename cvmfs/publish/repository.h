@@ -7,11 +7,13 @@
 
 #include <string>
 
+#include "history.h"  // for History::Tag
 #include "publish/settings.h"
 #include "upload_spooler_result.h"
 #include "util/single_copy.h"
 
 namespace catalog {
+class DeltaCounters;
 class DirectoryEntry;
 class SimpleCatalogManager;
 }
@@ -19,7 +21,6 @@ namespace download {
 class DownloadManager;
 }
 namespace history {
-class History;
 class SqliteHistory;
 }
 namespace manifest {
@@ -47,6 +48,9 @@ namespace publish {
 class __attribute__((visibility("default"))) DiffListener {
  public:
   virtual ~DiffListener() {}
+  virtual void OnInit(const history::History::Tag &from_tag,
+                      const history::History::Tag &to_tag) = 0;
+  virtual void OnStats(const catalog::DeltaCounters &delta) = 0;
   virtual void OnAdd(const std::string &path,
                      const catalog::DirectoryEntry &entry) = 0;
   virtual void OnRemove(const std::string &path,
