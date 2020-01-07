@@ -269,6 +269,7 @@ set (LIBCVMFS_SERVER_SOURCES
   catalog_mgr_rw.cc
   catalog_virtual.cc
   compression.cc
+  directory_entry.cc
   dns.cc
   download.cc
   gateway_util.cc
@@ -294,6 +295,7 @@ set (LIBCVMFS_SERVER_SOURCES
   options.cc
   pack.cc
   publish/repository.cc
+  publish/repository_diff.cc
   publish/settings.cc
   reflog.cc
   reflog_sql.cc
@@ -324,6 +326,7 @@ set (LIBCVMFS_SERVER_SOURCES
   util/exception.cc
   util/mmap_file.cc
   util/posix.cc
+  util/raii_temp_dir.cc
   util/string.cc
   whitelist.cc
   xattr.cc

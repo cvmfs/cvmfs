@@ -121,6 +121,13 @@ class Command {
     std::string GetString(const std::string &key) const {
       return map_.find(Parameter(key))->second.value_str;
     }
+    std::string GetStringDefault(const std::string &key,
+                                 const std::string &default_value) const
+    {
+      if (Has(key))
+        return map_.find(Parameter(key))->second.value_str;
+      return default_value;
+    }
     int GetInt(const std::string &key) const {
       return map_.find(Parameter(key))->second.value_int;
     }

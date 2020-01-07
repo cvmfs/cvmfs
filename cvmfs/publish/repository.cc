@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdlib>
 
+#include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "download.h"
 #include "hash.h"
@@ -42,9 +43,11 @@ const std::string CommandTag::kPreviousHeadTag = "trunk-previous";
 namespace publish {
 
 Repository::Repository()
-  : statistics_(new perf::Statistics())
+  : settings_("")
+  , statistics_(new perf::Statistics())
   , signature_mgr_(new signature::SignatureManager())
   , download_mgr_(NULL)
+  , simple_catalog_mgr_(NULL)
   , spooler_(NULL)
   , whitelist_(NULL)
   , reflog_(NULL)
@@ -55,9 +58,11 @@ Repository::Repository()
 }
 
 Repository::Repository(const SettingsRepository &settings)
-  : statistics_(new perf::Statistics())
+  : settings_(settings)
+  , statistics_(new perf::Statistics())
   , signature_mgr_(new signature::SignatureManager())
   , download_mgr_(NULL)
+  , simple_catalog_mgr_(NULL)
   , spooler_(NULL)
   , whitelist_(NULL)
   , reflog_(NULL)
@@ -103,10 +108,25 @@ Repository::~Repository() {
   delete spooler_;
   delete signature_mgr_;
   delete download_mgr_;
+  delete simple_catalog_mgr_;
   delete statistics_;
 }
 
 history::History *Repository::history() { return history_; }
+
+catalog::SimpleCatalogManager *Repository::GetSimpleCatalogManager() {
+  if (simple_catalog_mgr_ != NULL) return simple_catalog_mgr_;
+
+  simple_catalog_mgr_ = new catalog::SimpleCatalogManager(
+    manifest_->catalog_hash(),
+    settings_.url(),
+    settings_.tmp_dir(),
+    download_mgr_,
+    statistics_,
+    true /* manage_catalog_files */
+  );
+  return simple_catalog_mgr_;
+}
 
 void Repository::DownloadRootObjects(
   const std::string &url, const std::string &fqrn, const std::string &tmp_dir)
