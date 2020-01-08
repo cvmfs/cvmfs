@@ -285,7 +285,7 @@ void *S3FanoutManager::MainUpload(void *data) {
       ReadPipe(s3fanout_mgr->pipe_jobs_[0], &info, sizeof(info));
       CURL *handle = s3fanout_mgr->AcquireCurlHandle();
       if (handle == NULL) {
-        PANIC(kLogStderr, "Failed to acquire CURL handle handle == NULL.");
+        PANIC(kLogStderr, "Failed to acquire CURL handle.");
       }
       s3fanout::Failures init_failure =
         s3fanout_mgr->InitializeRequest(info, handle);

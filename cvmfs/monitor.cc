@@ -493,8 +493,7 @@ void *Watchdog::MainWatchdogListener(void *data) {
           (watch_fds[0].revents & POLLHUP) ||
           (watch_fds[0].revents & POLLNVAL))
       {
-        PANIC(kLogDebug | kLogSyslogErr,
-                 "watchdog disappeared, aborting");
+        PANIC(kLogDebug | kLogSyslogErr, "watchdog disappeared, aborting");
       }
       PANIC(NULL);
     }

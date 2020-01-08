@@ -48,7 +48,8 @@ void NfsMapsLeveldb::ForkAwareEnv::StartThread(void (*f)(void*), void* a) {
     leveldb::Env::Default()->StartThread(f, a);
     return;
   }
-  PANIC(kLogDebug, "single threaded leveldb::StartThread called");
+  PANIC(kLogDebug | kLogSyslogErr,
+        "single threaded leveldb::StartThread called");
   // Unclear how to handle this because caller assumes that thread is started
 }
 
