@@ -50,7 +50,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   atomic_init32(&terminate_);
 
   if (!ParseSpoolerDefinition(spooler_definition)) {
-    PANIC(NULL);
+    PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
   s3fanout::S3FanoutManager::S3Config s3config;

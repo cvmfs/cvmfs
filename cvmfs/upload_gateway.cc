@@ -61,7 +61,7 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
          spooler_definition.driver_type == SpoolerDefinition::Gateway);
 
   if (!ParseSpoolerDefinition(spooler_definition, &config_)) {
-    PANIC(NULL);
+    PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
   atomic_init32(&num_errors_);

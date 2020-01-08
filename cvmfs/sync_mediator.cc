@@ -116,8 +116,8 @@ void SyncMediator::EnsureAllowed(SharedPtr<SyncItem> entry) {
                   string(catalog::VirtualCatalog::kVirtualPath) + "/",
                   ignore_case_setting)) )
   {
-    PANIC(kLogStderr, "[ERROR] invalid attempt to modify '",
-          relative_path.c_str(), "'");
+    PANIC(kLogStderr, "[ERROR] invalid attempt to modify %s",
+          relative_path.c_str());
   }
 }
 

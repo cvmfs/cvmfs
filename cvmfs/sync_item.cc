@@ -68,11 +68,9 @@ SyncItemType SyncItem::GetGenericFiletype(const SyncItem::EntryStat &stat) const
 {
   const SyncItemType type = stat.GetSyncItemType();
   if (type == kItemUnknown) {
-    PANIC(kLogStderr, ("[WARNING] '" + GetRelativePath() +
-                       "' has an unsupported file type (st_mode: " +
-                       StringifyInt(stat.stat.st_mode) +
-                       " errno: " + StringifyInt(stat.error_code) + ")")
-                          .c_str());
+   PANIC(kLogStderr,
+          "[WARNING] '%s' has an unsupported file type (st_mode: %d errno: %d)",
+          GetRelativePath().c_str(), stat.stat.st_mode, stat.error_code);
   }
   return type;
 }
@@ -96,10 +94,8 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 SyncItemType SyncItemNative::GetScratchFiletype() const {
   StatScratch();
   if (scratch_stat_.error_code != 0) {
-    PANIC(kLogStderr, ("[WARNING] Failed to stat() '" + GetRelativePath() +
-                       "' in scratch. (errno: " +
-                       StringifyInt(scratch_stat_.error_code) + ")")
-                          .c_str());
+    PANIC(kLogStderr, "[WARNING] Failed to stat() '%s' in scratch. (errno: %s)",
+          GetRelativePath().c_str(), scratch_stat_.error_code);
   }
 
   return GetGenericFiletype(scratch_stat_);
