@@ -49,12 +49,7 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
 
 void Panic(const char* coordinates, const LogSource _source, const int _mask) {
   assert(_mask == 0);
-#ifdef LIBCVMFS_SERVER
-  throw ECvmfsException(coordinates);
-#else
-  LogCvmfs(kLogCvmfs, kLogDebug | kLogStdout | kLogStderr, coordinates);
-  abort();
-#endif
+  Panic(coordinates, _source, _mask, "");
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
