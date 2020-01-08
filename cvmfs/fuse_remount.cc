@@ -85,7 +85,6 @@ FuseRemounter::Status FuseRemounter::Check() {
     }
     default:
       PANIC(NULL);
-      return kStatusUp2Date;  // only to suppress compilation warning
   }
 }
 

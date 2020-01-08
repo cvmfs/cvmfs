@@ -158,7 +158,6 @@ unsigned GetContextSize(const Algorithms algorithm) {
     default:
       PANIC(kLogDebug | kLogSyslogErr,
             "tried to generate hash context for unspecified hash. Aborting...");
-      return 0;
   }
 }
 

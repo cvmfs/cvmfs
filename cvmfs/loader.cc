@@ -399,7 +399,6 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       return 0;
     default:
       PANIC(kLogStderr, "internal option parsing error");
-      return 0;
   }
 }
 
