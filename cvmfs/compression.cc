@@ -152,7 +152,6 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
     return kNoCompression;
   PANIC(kLogStderr, "unknown compression algorithms: %s",
         algorithm_option.c_str());
-  return kNoCompression;  // avoid compilation warning
 }
 
 
