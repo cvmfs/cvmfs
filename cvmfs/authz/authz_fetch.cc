@@ -171,8 +171,9 @@ void AuthzExternalFetcher::ExecHelper() {
       close(fd);
 
     execve(argv0, argv, &envp[0]);
-    PANIC(kLogStdout | kLogStderr, "failed to start authz helper %s (%d)",
-          argv0, errno);
+    syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)",
+           argv0, errno);
+    abort();
   }
   assert(pid > 0);
   close(pipe_send[0]);
