@@ -76,10 +76,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
       SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
       if (retval != kFailOk) {
-        PANIC(kLogSyslogErr,
-              "reloading Fuse module failed "
-              "(%d - %s)",
-              retval, Code2Ascii(static_cast<Failures>(retval)));
+        PANIC(kLogSyslogErr, "reloading Fuse module failed (%d - %s)", retval,
+              Code2Ascii(static_cast<Failures>(retval)));
       }
       SetLogMicroSyslog("");
     }
