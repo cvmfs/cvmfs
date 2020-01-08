@@ -404,11 +404,11 @@ void WritableCatalogManager::AddFile(
              "%s: file at %s is larger than %u megabytes (%u). "
              "CernVM-FS works best with small files. "
              "Please remove the file or increase the limit.",
-             enforce_limits_ ? "FATAL" : "WARNING",
-             file_path.c_str(),
-             file_mbyte_limit_,
-             mbytes);
-    if (enforce_limits_) PANIC(NULL);
+             enforce_limits_ ? "FATAL" : "WARNING", file_path.c_str(),
+             file_mbyte_limit_, mbytes);
+    if (enforce_limits_)
+      PANIC(kLogStderr, "file at %s is larger than %u megabytes (%u).",
+            file_path.c_str(), file_mbyte_limit_, mbytes);
   }
 
   catalog->AddEntry(entry, xattrs, file_path, parent_path);
@@ -487,7 +487,10 @@ void WritableCatalogManager::AddHardlinkGroup(
              (parent_path + entries[0].name().ToString()).c_str(),
              file_mbyte_limit_,
              mbytes);
-    if (enforce_limits_) PANIC(NULL);
+    if (enforce_limits_)
+      PANIC(kLogStderr, "hard link at %s is larger than %u megabytes (%u)",
+            (parent_path + entries[0].name().ToString()).c_str(),
+            file_mbyte_limit_, mbytes);
   }
 
   SyncLock();
@@ -944,9 +947,11 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
              "Please split it into nested catalogs or increase the limit.",
              enforce_limits_ ? "FATAL" : "WARNING",
              (catalog->IsRoot() ? "/" : catalog->mountpoint().c_str()),
-             catalog_limit,
-             catalog->GetCounters().GetSelfEntries());
-    if (enforce_limits_) PANIC(NULL);
+             catalog_limit, catalog->GetCounters().GetSelfEntries());
+    if (enforce_limits_)
+      PANIC(kLogStderr, "catalog at %s has more than %u entries (%u). ",
+            (catalog->IsRoot() ? "/" : catalog->mountpoint().c_str()),
+            catalog_limit, catalog->GetCounters().GetSelfEntries());
   }
 
   // allow for manual adjustments in the catalog
@@ -1032,7 +1037,7 @@ void WritableCatalogManager::CatalogUploadCallback(
     catalog_upload_context.root_catalog_info->Set(root_catalog_info);
     SyncUnlock();
   } else {
-    PANIC(kLogStderr | kLogStdout, "inconsistent state detected");
+    PANIC(kLogStderr, "inconsistent state detected");
   }
 }
 
@@ -1178,7 +1183,7 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
     if (!zlib::CompressPath2Null((*i)->database_path(),
                                  &hash_catalog))
     {
-      PANIC(kLogStderr | kLogStdout, "could not compress catalog ",
+      PANIC(kLogStderr, "could not compress catalog %s",
             (*i)->mountpoint().ToString().c_str());
     }
 
@@ -1197,7 +1202,7 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
       root_catalog_info.content_hash = hash_catalog;
       root_catalog_info.revision = (*i)->GetRevision();
     } else {
-      PANIC(kLogStderr | kLogStdout, "inconsistent state detected");
+      PANIC(kLogStderr, "inconsistent state detected");
     }
 
     spooler_->ProcessCatalog((*i)->database_path());
