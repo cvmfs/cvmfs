@@ -18,6 +18,8 @@
 namespace publish {
 
 class Command {
+  friend class CmdHelp;  //to set the progname_
+
  public:
   /**
    * A parameter is information that can be passed by -$short_key or --$key to
@@ -157,6 +159,7 @@ class Command {
    */
   virtual ParameterList GetParams() const = 0;
   virtual std::string GetUsage() const { return "[options]"; }
+  std::string GetExamples() const;
   /**
    * The command needs at least so many non-parameter arguments (e.g. fqrn)
    */
@@ -176,6 +179,14 @@ class Command {
   virtual int Main(const Options &options) = 0;
 
   std::string progname() const { return progname_; }
+
+ protected:
+  /**
+   * Example one-liners which get prepended by the command invocation
+   */
+  virtual std::vector<std::string> DoGetExamples() const {
+    return std::vector<std::string>();
+  }
 
  private:
   std::string progname_;

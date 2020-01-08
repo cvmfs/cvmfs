@@ -25,7 +25,19 @@ class CmdDiff : public Command {
      "start with a '@' symbol to distinguish it from a name.";
   }
   virtual std::string GetUsage() const {
-    return "[options] <repository URL>";
+    return "[options] <repository name / url>";
+  }
+  virtual std::vector<std::string> DoGetExamples() const {
+    std::vector<std::string> e;
+    e.push_back("-k /etc/cvmfs/keys/cern.ch "
+      "http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch "
+      " # use with any repository for which public keys are available");
+    e.push_back("myrepo.cvmfs.io "
+      "# use with a local stratum 0 or stratum 1 copy");
+    e.push_back("--from version1 --to version2 "
+      "# compare tags for the one and only stratum 0 or stratum 1 copy "
+      "available on this node");
+    return e;
   }
   virtual ParameterList GetParams() const {
     ParameterList p;
@@ -42,7 +54,6 @@ class CmdDiff : public Command {
       "Ignore changes that only differ in their timestamps"));
     return p;
   }
-  virtual unsigned GetMinPlainArgs() const { return 1; }
 
   virtual int Main(const Options &options);
 };  // class CmdDiff

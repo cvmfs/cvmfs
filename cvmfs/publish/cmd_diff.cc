@@ -136,7 +136,8 @@ class DiffReporter : public publish::DiffListener {
     if (diff & catalog::DirectoryEntryBase::Difference::kHardlinkGroup)
       result_list.push_back(machine_readable_ ? "G" : "hardlink-group");
     if (diff &
-        catalog::DirectoryEntryBase::Difference::kNestedCatalogTransitionFlags) {
+        catalog::DirectoryEntryBase::Difference::kNestedCatalogTransitionFlags)
+    {
       result_list.push_back(machine_readable_ ? "N" : "nested-catalog");
     }
     if (diff & catalog::DirectoryEntryBase::Difference::kChunkedFileFlag)
@@ -171,23 +172,17 @@ class DiffReporter : public publish::DiffListener {
 namespace publish {
 
 int CmdDiff::Main(const Options &options) {
-  std::string url = options.plain_args()[0].value_str;
-  std::string fqrn = Repository::GetFqrnFromUrl(url);
-  sanitizer::RepositorySanitizer sanitizer;
-  if (!sanitizer.IsValid(fqrn)) {
-    throw EPublish("malformed repository name: " + fqrn);
-  }
+  SettingsBuilder builder;
+  SettingsRepository settings = builder.CreateSettingsRepository(
+    options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
 
   std::string from = options.GetStringDefault("from", "trunk-previous");
   std::string to = options.GetStringDefault("to", "trunk");
 
-  SettingsRepository settings_repository(fqrn);
-  settings_repository.SetUrl(url);
   if (options.Has("keychain")) {
-    settings_repository.GetKeychain()->SetKeychainDir(
-      options.GetString("keychain"));
+    settings.GetKeychain()->SetKeychainDir(options.GetString("keychain"));
   }
-  Repository repository(settings_repository);
+  Repository repository(settings);
 
   DiffReporter diff_reporter(options.Has("machine-readable"),
                              options.Has("ignore-timediff"));

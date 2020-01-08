@@ -56,7 +56,7 @@ class Setting {
  private:
   T value_;
   bool is_default_;
-};
+};  // Setting
 
 
 // Settings from the point of construction always represent a valid
@@ -86,7 +86,7 @@ class SettingsSpoolArea {
  private:
   Setting<std::string> workspace_;
   Setting<std::string> tmp_dir_;
-};
+};  // SettingsSpoolArea
 
 
 class SettingsTransaction {
@@ -128,11 +128,11 @@ class SettingsTransaction {
   Setting<UnionFsType> union_fs_;
 
   SettingsSpoolArea spool_area_;
-};
+};  // class SettingsTransaction
 
 
 class SettingsGc {
-};
+};  // class SettingsGc
 
 
 class SettingsStorage {
@@ -155,7 +155,8 @@ class SettingsStorage {
   Setting<upload::SpoolerDefinition::DriverType> type_;
   Setting<std::string> tmp_dir_;
   Setting<std::string> endpoint_;
-};
+};  // class SettingsStorage
+
 
 class SettingsKeychain {
  public:
@@ -190,7 +191,7 @@ class SettingsKeychain {
   Setting<std::string> master_public_key_path_;
   Setting<std::string> private_key_path_;
   Setting<std::string> certificate_path_;
-};
+};  // class SettingsKeychain
 
 
 /**
@@ -206,6 +207,7 @@ class SettingsRepository {
   {}
 
   void SetUrl(const std::string &url);
+  void SetTmpDir(const std::string &tmp_dir);
 
   std::string fqrn() const { return fqrn_; }
   std::string url() const { return url_; }
@@ -220,7 +222,7 @@ class SettingsRepository {
   Setting<std::string> tmp_dir_;
 
   SettingsKeychain keychain_;
-};
+};  // class SettingsRepository
 
 
 /**
@@ -266,7 +268,8 @@ class SettingsPublisher {
   SettingsStorage storage_;
   SettingsTransaction transaction_;
   SettingsKeychain keychain_;
-};
+};  // SettingsPublisher
+
 
 /**
  * Description of a stratum 1
@@ -283,7 +286,42 @@ class SettingsReplica {
   Setting<std::string> fqrn_;
   Setting<std::string> alias_;
   Setting<std::string> url_;
-};
+};  // class SettingsReplica
+
+
+/**
+ * Create Settings objects from the system configuration in
+ * /etc/cvmfs/repositories.d
+ */
+class SettingsBuilder {
+ public:
+  SettingsBuilder() : config_path_("/etc/cvmfs/repositories.d") {}
+  /**
+   * Used in unit tests.
+   */
+  explicit SettingsBuilder(const std::string c) : config_path_(c) {}
+
+  /**
+   * If ident is a url, creates a generic settings object inferring the fqrn
+   * from the url.
+   * Otherweise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
+   * If alias is an empty string, the command still succeds iff there is a
+   * single repository under /etc/cvmfs/repositories.d
+   */
+  SettingsRepository CreateSettingsRepository(const std::string &ident);
+
+ private:
+  std::string config_path_;
+
+  /**
+   * Returns the name of the one and only repository under kConfigPath
+   * Throws an exception if there are none or multiple repositories.
+   * The alias is usually the fqrn except for a replica with an explicit
+   * alias set different from the fqrn (e.g. if Stratum 0 and 1 are hosted)
+   * on the same node.
+   */
+  std::string GetSingleAlias();
+};  // class SettingsBuilder
 
 }  // namespace publish
 

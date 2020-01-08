@@ -9,7 +9,10 @@
 #include <string>
 #include <vector>
 
+#include "options.h"
 #include "publish/except.h"
+#include "publish/repository.h"
+#include "sanitizer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -148,6 +151,11 @@ void SettingsRepository::SetUrl(const std::string &url) {
 }
 
 
+void SettingsRepository::SetTmpDir(const std::string &tmp_dir) {
+  tmp_dir_ = tmp_dir;
+}
+
+
 //------------------------------------------------------------------------------
 
 
@@ -167,6 +175,62 @@ void SettingsPublisher::SetOwner(const std::string &user_name) {
 void SettingsPublisher::SetOwner(uid_t uid, gid_t gid) {
   owner_uid_ = uid;
   owner_gid_ = gid;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+std::string SettingsBuilder::GetSingleAlias() {
+  std::vector<std::string> repositories = FindDirectories(config_path_);
+  if (repositories.empty())
+    throw EPublish("no repositories available in " + config_path_);
+  if (repositories.size() > 1)
+    throw EPublish("multiple repositories available in " + config_path_);
+  return repositories[0];
+}
+
+
+SettingsRepository SettingsBuilder::CreateSettingsRepository(
+  const std::string &ident)
+{
+  if (HasPrefix(ident, "http://", true /* ignore case */) ||
+      HasPrefix(ident, "https://", true /* ignore case */) ||
+      HasPrefix(ident, "file://", true /* ignore case */))
+  {
+    std::string fqrn = Repository::GetFqrnFromUrl(ident);
+    sanitizer::RepositorySanitizer sanitizer;
+    if (!sanitizer.IsValid(fqrn)) {
+      throw EPublish("malformed repository name: " + fqrn);
+    }
+    SettingsRepository settings(fqrn);
+    settings.SetUrl(ident);
+    return settings;
+  }
+
+  std::string alias = ident.empty() ? GetSingleAlias() : ident;
+  std::string repo_path = config_path_ + "/" + alias;
+  std::string server_path = repo_path + "/server.conf";
+  std::string replica_path = repo_path + "/replica.conf";
+  std::string fqrn = alias;
+
+  BashOptionsManager options;
+  std::string arg;
+  options.set_taint_environment(false);
+  options.ParsePath(server_path, false /* external */);
+  options.ParsePath(replica_path, false /* external */);
+  if (options.GetValue("CVMFS_REPOSITORY_NAME", &arg))
+    fqrn = arg;
+  SettingsRepository settings(fqrn);
+
+  if (options.GetValue("CVMFS_PUBLIC_KEY", &arg))
+    settings.GetKeychain()->SetKeychainDir(arg);
+  if (options.GetValue("CVMFS_STRATUM0", &arg))
+    settings.SetUrl(arg);
+  if (options.GetValue("CVMFS_SPOOL_DIR", &arg))
+    settings.SetTmpDir(arg + "/tmp");
+
+  return settings;
 }
 
 }  // namespace publish

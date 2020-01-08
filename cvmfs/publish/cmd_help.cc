@@ -10,6 +10,7 @@
 
 #include "logging.h"
 #include "publish/except.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -23,6 +24,7 @@ int CmdHelp::Main(const Options &options) {
     return 1;
   }
 
+  cmd->progname_ = progname();
   LogCvmfs(kLogCvmfs, kLogStdout, "\nHelp for '%s'", cmd->GetName().c_str());
   for (unsigned i = 0; i < cmd->GetName().length() + 11; ++i)
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "=");
@@ -33,6 +35,17 @@ int CmdHelp::Main(const Options &options) {
   LogCvmfs(kLogCvmfs, kLogStdout, "------");
   LogCvmfs(kLogCvmfs, kLogStdout, "  %s %s %s\n",
            progname().c_str(), cmd->GetName().c_str(), cmd->GetUsage().c_str());
+
+  std::string examples = cmd->GetExamples();
+  if (!examples.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Examples:");
+    LogCvmfs(kLogCvmfs, kLogStdout, "---------");
+    std::vector<std::string> ex_lines = SplitString(examples, '\n');
+    for (unsigned i = 0; i < ex_lines.size() - 1; ++i) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "  [%d] %s", i + 1, ex_lines[i].c_str());
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout, "");
+  }
 
   ParameterList params = cmd->GetParams();
   if (params.empty()) return 0;
