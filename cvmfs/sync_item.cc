@@ -68,7 +68,7 @@ SyncItemType SyncItem::GetGenericFiletype(const SyncItem::EntryStat &stat) const
 {
   const SyncItemType type = stat.GetSyncItemType();
   if (type == kItemUnknown) {
-   PANIC(kLogStderr,
+    PANIC(kLogStderr,
           "[WARNING] '%s' has an unsupported file type (st_mode: %d errno: %d)",
           GetRelativePath().c_str(), stat.stat.st_mode, stat.error_code);
   }
