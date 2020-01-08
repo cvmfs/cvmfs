@@ -299,11 +299,11 @@ void WritableCatalogManager::Clone(const std::string destination,
 
   DirectoryEntry source_dirent;
   if (!LookupPath(relative_source, kLookupSole, &source_dirent)) {
-    PANIC(kLogStderr, "catalog for file '%s' cannot be found aborting",
+    PANIC(kLogStderr, "catalog for file '%s' cannot be found, aborting",
           source.c_str());
   }
   if (source_dirent.IsDirectory()) {
-    PANIC(kLogStderr, "Trying to clone a directory: '%s' aborting",
+    PANIC(kLogStderr, "Trying to clone a directory: '%s', aborting",
           source.c_str());
   }
 

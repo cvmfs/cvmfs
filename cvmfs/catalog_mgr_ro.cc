@@ -33,8 +33,8 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
   FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
                                   catalog_path);
   if (!fcatalog) {
-    PANIC(kLogStderr,
-             "failed to create temp file when loading %s", url.c_str());
+    PANIC(kLogStderr, "failed to create temp file when loading %s",
+          url.c_str());
   }
 
   download::JobInfo download_catalog(&url, true, false, fcatalog,
@@ -44,9 +44,8 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   if (retval != download::kFailOk) {
     unlink(catalog_path->c_str());
-    PANIC(kLogStderr,
-             "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
-             retval, download::Code2Ascii(retval));
+    PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
+          retval, download::Code2Ascii(retval));
   }
 
   *catalog_hash = effective_hash;
