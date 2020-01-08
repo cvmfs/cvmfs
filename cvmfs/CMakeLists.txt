@@ -455,10 +455,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
 set (CVMFS_SUID_HELPER_SOURCES
   cvmfs_suid_helper.cc
   cvmfs_suid_util.cc
-  logging.cc
   sanitizer.cc
-  util/exception.cc
-  util/posix.cc
 )
 
 set (CVMFS_PRELOADER_SOURCES
