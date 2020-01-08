@@ -23,3 +23,12 @@ TEST(T_Panic, Call) {
   EXPECT_TRUE(FileExists("cvmfs_test_panic"));
   unlink("cvmfs_test_panic");
 }
+
+TEST(T_Panic, CallNullPANIC) {
+  EXPECT_FALSE(FileExists("cvmfs_test_panic"));
+  SetAltLogFunc(LogPanic);
+  EXPECT_DEATH(PANIC(NULL), ".*");
+  SetAltLogFunc(NULL);
+  EXPECT_TRUE(FileExists("cvmfs_test_panic"));
+  unlink("cvmfs_test_panic");
+}
