@@ -232,7 +232,6 @@ SigningTool::Result SigningTool::Run(
       published_hash.GetHexSize(), &sig, &sig_size);
   if (!manifest_was_signed) {
     PANIC(kLogStderr, "Failed to sign manifest");
-    return kError;
   }
 
   // Write new manifest
