@@ -65,7 +65,7 @@ void InputSanitizer::InitValidRanges(const std::string &whitelist) {
           valid_ranges_.push_back(CharRange(range[0], range[1]));
           break;
         default:
-          PANIC(NULL);
+          assert(false);
       }
       ++i;
       pickup_pos = i+1;
