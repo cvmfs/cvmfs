@@ -20,7 +20,8 @@
  * A thread-safe, doubly linked list of links containing pointers to ItemT.  The
  * ItemT elements are not owned by the Tube.  FIFO semantics; items are pushed
  * to the back and poped from the front.  Using Slice(), items at arbitrary
- * locations in the tube can be removed, too.
+ * locations in the tube can be removed, too. Using functions EnqueueFront and
+ * PopBack, Tube can be used as deque.
  *
  * The tube links the steps in the file processing pipeline.  It connects
  * multiple producers to multiple consumers and can throttle the producers if a
@@ -65,17 +66,34 @@ class Tube : SingleCopy {
    * Push an item to the back of the queue.  Block if queue is currently full.
    */
   Link *Enqueue(ItemT *item) {
-    assert(item != NULL);
     MutexLockGuard lock_guard(&lock_);
     while (size_ == limit_)
       pthread_cond_wait(&cond_capacious_, &lock_);
 
     Link *link = new Link(item);
-    link->next_ = tail_;
-    link->prev_ = tail_->prev_;
-    tail_->prev_->next_ = link;
-    tail_->prev_ = link;
-    tail_ = link;
+    link->next_ = head_->next_;
+    link->prev_ = head_;
+    head_->next_->prev_ = link;
+    head_->next_ = link;
+    size_++;
+    int retval = pthread_cond_signal(&cond_populated_);
+    assert(retval == 0);
+    return link;
+  }
+
+  /**
+   * Push an item to the front of the queue. Block if queue currently full.
+   */
+  Link *EnqueueFront(ItemT *item) {
+    MutexLockGuard lock_guard(&lock_);
+    while (size_ == limit_)
+      pthread_cond_wait(&cond_capacious_, &lock_);
+
+    Link *link = new Link(item);
+    link->next_ = head_;
+    link->prev_ = head_->prev_;
+    head_->prev_->next_ = link;
+    head_->prev_ = link;
     size_++;
     int retval = pthread_cond_signal(&cond_populated_);
     assert(retval == 0);
@@ -103,6 +121,17 @@ class Tube : SingleCopy {
   }
 
   /**
+   * Remove and return the last element from the queue.  Block if tube is
+   * empty.
+   */
+  ItemT *PopBack() {
+    MutexLockGuard lock_guard(&lock_);
+    while (size_ == 0)
+      pthread_cond_wait(&cond_populated_, &lock_);
+    return SliceUnlocked(head_->next_);
+  }
+
+  /**
    * Blocks until the tube is empty
    */
   void Wait() {
@@ -124,9 +153,8 @@ class Tube : SingleCopy {
  private:
   void Init() {
     Link *sentinel = new Link(NULL);
-    head_ = tail_ = sentinel;
+    head_ = sentinel;
     head_->next_ = head_->prev_ = sentinel;
-    tail_->next_ = tail_->prev_ = sentinel;
 
     int retval = pthread_mutex_init(&lock_, NULL);
     assert(retval == 0);
@@ -139,10 +167,10 @@ class Tube : SingleCopy {
   }
 
   ItemT *SliceUnlocked(Link *link) {
+    // Cannot delete the sentinel link
+    assert(link != head_);
     link->prev_->next_ = link->next_;
     link->next_->prev_ = link->prev_;
-    if (link == tail_)
-      tail_ = head_;
     ItemT *item = link->item_;
     delete link;
     size_--;
@@ -168,10 +196,6 @@ class Tube : SingleCopy {
    * In front of the first element (next in line for Pop())
    */
   Link *head_;
-  /**
-   * Points to the last inserted element
-   */
-  Link *tail_;
   /**
    * Protects all internal state
    */
