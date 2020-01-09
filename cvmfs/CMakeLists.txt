@@ -297,6 +297,7 @@ set (LIBCVMFS_SERVER_SOURCES
   pack.cc
   publish/repository.cc
   publish/repository_diff.cc
+  publish/repository_tags.cc
   publish/settings.cc
   reflog.cc
   reflog_sql.cc

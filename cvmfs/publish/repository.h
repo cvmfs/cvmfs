@@ -68,10 +68,10 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
    */
   static const char kRawHashSymbol = '@';
 
+  static std::string GetFqrnFromUrl(const std::string &url);
+
   explicit Repository(const SettingsRepository &settings);
   virtual ~Repository();
-
-  static std::string GetFqrnFromUrl(const std::string &url);
 
   void Check();
   void GarbageCollect();
@@ -84,13 +84,15 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   void Diff(const std::string &from, const std::string &to,
             DiffListener *diff_listener);
 
-  upload::Spooler *spooler() { return spooler_; }
-  download::DownloadManager *download_mgr() { return download_mgr_; }
-  whitelist::Whitelist *whitelist() { return whitelist_; }
-  manifest::Manifest *manifest() { return manifest_; }
+  const signature::SignatureManager *signature_mgr() const {
+    return signature_mgr_;
+  }
+  const upload::Spooler *spooler() const { return spooler_; }
+  const whitelist::Whitelist *whitelist() const { return whitelist_; }
+  const manifest::Manifest *manifest() const { return manifest_; }
   // Inheritance of History and SqliteHistory unknown in the header
-  history::History *history();
-  std::string meta_info() { return meta_info_; }
+  const history::History *history() const;
+  std::string meta_info() const { return meta_info_; }
 
  protected:
   Repository();
@@ -130,19 +132,27 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Abort();
   void Publish();
   void Ingest();
-  void EditTags();
+  void Sync();
+
+  /**
+   * Must not edit magic tags 'trunk' and 'trunk-previous'.
+   * Removal of non-existing tags is silently ignored. The caller needs to
+   * ensure that the data provided in new tags makes sense.
+   */
+  void EditTags(const std::vector<history::History::Tag> &add_tags,
+                const std::vector<std::string> &rm_tags);
   void Rollback();
   void Resign();
   void Migrate();
 
-  signature::SignatureManager *signature_mgr() { return signature_mgr_; }
+  const SettingsPublisher &settings() const { return settings_; }
 
  private:
-  // Used by Create
-  Publisher();
+  Publisher();  ///< Used by Create
 
   void CreateKeychain();
   void CreateStorage();
+  void CreateSpoolArea();
   void CreateRootObjects();
 
   void ExportKeychain();
@@ -163,7 +173,14 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void OnUploadReflog(const upload::SpoolerResult &result);
   void OnUploadWhitelist(const upload::SpoolerResult &result);
 
+  void CheckTagName(const std::string &name);
+
   SettingsPublisher settings_;
+  /**
+   * The log level, set to kLogNone if settings_.is_silent() == true
+   */
+  int llvl_;
+  bool in_transaction_;
 };
 
 class __attribute__((visibility("default"))) Replica : public Repository {

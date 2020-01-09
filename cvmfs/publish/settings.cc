@@ -84,6 +84,12 @@ void SettingsStorage::MakeS3(
   endpoint_ = "cvmfs/" + fqrn_() + "@" + s3_config;
 }
 
+void SettingsStorage::MakeLocal(const std::string &path) {
+  type_ = upload::SpoolerDefinition::Local;
+  endpoint_ = path;
+  tmp_dir_ = path + "/data/txn";
+}
+
 void SettingsStorage::SetLocator(const std::string &locator) {
   std::vector<std::string> tokens = SplitString(locator, ',');
   if (tokens.size() != 3) {
@@ -175,6 +181,10 @@ void SettingsPublisher::SetOwner(const std::string &user_name) {
 void SettingsPublisher::SetOwner(uid_t uid, gid_t gid) {
   owner_uid_ = uid;
   owner_gid_ = gid;
+}
+
+void SettingsPublisher::SetIsSilent(bool value) {
+  is_silent_ = value;
 }
 
 

@@ -92,7 +92,7 @@ class SettingsSpoolArea {
 class SettingsTransaction {
  public:
   explicit SettingsTransaction(const std::string &fqrn)
-    : hash_algorithm_(shash::kSha1)
+    : hash_algorithm_(shash::kShake128)
     , compression_algorithm_(zlib::kZlibDefault)
     , ttl_second_(240)
     , is_garbage_collectable_(true)
@@ -146,6 +146,7 @@ class SettingsStorage {
 
   std::string GetLocator() const;
   void SetLocator(const std::string &locator);
+  void MakeLocal(const std::string &path);
   void MakeS3(const std::string &s3_config, const std::string &tmp_dir);
 
   upload::SpoolerDefinition::DriverType type() const { return type_; }
@@ -236,6 +237,7 @@ class SettingsPublisher {
     , owner_uid_(0)
     , owner_gid_(0)
     , whitelist_validity_days_(30)
+    , is_silent_(false)
     , storage_(fqrn_)
     , transaction_(fqrn_)
     , keychain_(fqrn_)
@@ -244,12 +246,14 @@ class SettingsPublisher {
   void SetUrl(const std::string &url);
   void SetOwner(const std::string &user_name);
   void SetOwner(uid_t uid, gid_t gid);
+  void SetIsSilent(bool value);
 
   std::string fqrn() const { return fqrn_; }
   std::string url() const { return url_; }
   unsigned whitelist_validity_days() const { return whitelist_validity_days_; }
   uid_t owner_uid() const { return owner_uid_; }
   uid_t owner_gid() const { return owner_gid_; }
+  bool is_silent() const { return is_silent_; }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
@@ -264,6 +268,7 @@ class SettingsPublisher {
   Setting<uid_t> owner_uid_;
   Setting<gid_t> owner_gid_;
   Setting<unsigned> whitelist_validity_days_;
+  Setting<bool> is_silent_;
 
   SettingsStorage storage_;
   SettingsTransaction transaction_;

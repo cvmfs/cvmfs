@@ -112,7 +112,7 @@ Repository::~Repository() {
   delete statistics_;
 }
 
-history::History *Repository::history() { return history_; }
+const history::History *Repository::history() const { return history_; }
 
 catalog::SimpleCatalogManager *Repository::GetSimpleCatalogManager() {
   if (simple_catalog_mgr_ != NULL) return simple_catalog_mgr_;
@@ -415,22 +415,26 @@ void Publisher::PushWhitelist() {
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
   UniquePtr<Publisher> publisher(new Publisher());
   publisher->settings_ = settings;
+  if (settings.is_silent())
+    publisher->llvl_ = kLogNone;
   publisher->signature_mgr_ = new signature::SignatureManager();
   publisher->signature_mgr_->Init();
 
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Creating Key Chain... ");
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
+           "Creating Key Chain... ");
   publisher->CreateKeychain();
   publisher->ExportKeychain();
-  LogCvmfs(kLogCvmfs, kLogStdout, "done");
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Backend Storage... ");
   publisher->CreateStorage();
   publisher->PushWhitelist();
-  LogCvmfs(kLogCvmfs, kLogStdout, "done");
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Initial Repository... ");
+  publisher->InitSpoolArea();
   publisher->CreateRootObjects();
   publisher->PushHistory();
   publisher->PushCertificate();
@@ -438,12 +442,14 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   publisher->PushReflog();
   publisher->PushManifest();
   // TODO(jblomer): meta-info
-  LogCvmfs(kLogCvmfs, kLogStdout, "done");
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
   return publisher.Release();
 }
 
 void Publisher::ExportKeychain() {
+  CreateDirectoryAsOwner(settings_.keychain().keychain_dir(), kDefaultDirMode);
+
   bool rvb;
   rvb = SafeWriteToFile(signature_mgr_->GetActivePubkeys(),
                         settings_.keychain().master_public_key_path(), 0644);
@@ -544,16 +550,25 @@ void Publisher::InitSpoolArea() {
 
 Publisher::Publisher()
   : settings_("invalid.cvmfs.io")
+  , llvl_(kLogNormal)
+  , in_transaction_(false)
 {
 }
 
 Publisher::Publisher(const SettingsPublisher &settings)
   : settings_(settings)
+  , llvl_(settings.is_silent() ? kLogNone : kLogNormal)
+  , in_transaction_(false)
 {
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
+  upload::SpoolerDefinition sd(
+    settings_.storage().GetLocator(),
+    settings_.transaction().hash_algorithm(),
+    settings_.transaction().compression_algorithm());
+  spooler_ = upload::Spooler::Construct(sd);
+  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
 
-  // TODO(jblomer): use key directory if applicable
   int rvb;
   rvb = signature_mgr_->LoadPublicRsaKeys(
     settings.keychain().master_public_key_path());
@@ -583,22 +598,21 @@ Publisher::~Publisher() {
 }
 
 void Publisher::Transaction() {
+  if (in_transaction_) throw EPublish("another transaction is already open");
+
   InitSpoolArea();
-  // TODO(jblomer): set transaction lock
+  // TODO(jblomer): acquire gateway lease, create in_transaction lock file
+  LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
+           "(%s) opened transaction", settings_.fqrn().c_str());
+  in_transaction_ = true;
 }
+
+
 void Publisher::Abort() {
   // TODO(jblomer): remove transaction lock
 }
-void Publisher::Publish() {
-  LogCvmfs(kLogCvmfs, kLogStdout, "Staet at revision: %d",
-           manifest_->revision());
-  upload::SpoolerDefinition sd(
-    settings_.storage().GetLocator(),
-    settings_.transaction().hash_algorithm(),
-    settings_.transaction().compression_algorithm());
-  spooler_ = upload::Spooler::Construct(sd);
-  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
 
+void Publisher::Sync() {
   catalog::WritableCatalogManager catalog_mgr(
     manifest_->catalog_hash(),
     settings_.url(),
@@ -644,11 +658,16 @@ void Publisher::Publish() {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %d", manifest_->revision());
   reflog_->AddCatalog(manifest_->catalog_hash());
-  PushManifest();
-  PushReflog();
-  // TODO(jblomer): check transaction lock and remove if successful
 }
-void Publisher::EditTags() {}
+
+void Publisher::Publish() {
+  if (!in_transaction_) throw EPublish("cannot publish outside transaction");
+
+  PushReflog();
+  PushManifest();
+  in_transaction_ = false;
+}
+
 void Publisher::Ingest() {}
 void Publisher::Migrate() {}
 void Publisher::Resign() {}

@@ -76,11 +76,11 @@ class SignatureManager {
                         unsigned *pos_after_mark);
 
   // Returns the PEM-encoded text of all loaded RSA pubkeys
-  std::string GetActivePubkeys();
+  std::string GetActivePubkeys() const;
   // The PEM-encoded private key matching the public master key
   std::string GetPrivateMasterKey();
   // The PEM-encoded certificate without private key
-  std::string GetCertificate();
+  std::string GetCertificate() const;
   // The PEM-encoded private key matching the certificate
   std::string GetPrivateKey();
 
@@ -89,7 +89,7 @@ class SignatureManager {
 
  private:
   RSA *GenerateRsaKeyPair();
-  std::string GenerateKeyText(RSA *pubkey);
+  std::string GenerateKeyText(RSA *pubkey) const;
 
   void InitX509Store();
 

@@ -421,8 +421,10 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
 )
 
 set (CVMFS_TEST_PUBLISH_SOURCES
+  publish/c_repository.cc
   publish/main.cc
   publish/t_command.cc
+  publish/t_diff.cc
   publish/t_settings.cc
 
   ../common/env.cc
@@ -434,6 +436,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
   ${CVMFS_SOURCE_DIR}/backoff.cc
