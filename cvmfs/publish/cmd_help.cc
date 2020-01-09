@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 #include "logging.h"
 #include "publish/except.h"

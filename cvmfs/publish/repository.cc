@@ -123,8 +123,7 @@ catalog::SimpleCatalogManager *Repository::GetSimpleCatalogManager() {
     settings_.tmp_dir(),
     download_mgr_,
     statistics_,
-    true /* manage_catalog_files */
-  );
+    true /* manage_catalog_files */);
   return simple_catalog_mgr_;
 }
 

@@ -4,6 +4,8 @@
 
 #include "c_repository.h"
 
+#include <string>
+
 #include "publish/settings.h"
 #include "util/posix.h"
 

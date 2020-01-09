@@ -159,7 +159,8 @@ class DiffReporter : public publish::DiffListener {
     if (entry.IsRegular()) return machine_readable_ ? "F" : "file";
     else if (entry.IsLink()) return machine_readable_ ? "S" : "symlink";
     else if (entry.IsDirectory()) return machine_readable_ ? "D" : "directory";
-    else return machine_readable_ ? "U" : "unknown";
+    else
+      return machine_readable_ ? "U" : "unknown";
   }
 
   bool machine_readable_;

@@ -6,6 +6,7 @@
 #define CVMFS_PUBLISH_REPOSITORY_H_
 
 #include <string>
+#include <vector>
 
 #include "history.h"  // for History::Tag
 #include "publish/settings.h"

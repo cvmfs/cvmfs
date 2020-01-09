@@ -44,7 +44,7 @@ static history::History::Tag GetTag(const std::string &tag_name,
 
 class DiffForwarder : public CatalogDiffTool<catalog::SimpleCatalogManager> {
  private:
-   publish::DiffListener *listener_;
+  publish::DiffListener *listener_;
 
  public:
   DiffForwarder(catalog::SimpleCatalogManager *old_mgr,
@@ -80,7 +80,7 @@ class DiffForwarder : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   }
 };  // class DiffForwarder
 
-} // anonymous namespace
+}  // anonymous namespace
 
 namespace publish {
 
@@ -98,8 +98,7 @@ void Repository::Diff(const std::string &from, const std::string &to,
     settings_.tmp_dir(),
     download_mgr_,
     &stats_from,
-    true /* manage_catalog_files */
-  );
+    true /* manage_catalog_files */);
   mgr_from->Init();
 
   perf::Statistics stats_to;
@@ -109,8 +108,7 @@ void Repository::Diff(const std::string &from, const std::string &to,
     settings_.tmp_dir(),
     download_mgr_,
     &stats_to,
-    true /* manage_catalog_files */
-  );
+    true /* manage_catalog_files */);
   mgr_to->Init();
 
   catalog::Counters counters_from = mgr_from->GetRootCatalog()->GetCounters();

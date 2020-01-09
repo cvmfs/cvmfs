@@ -6,6 +6,7 @@
 #define CVMFS_PUBLISH_CMD_DIFF_H_
 
 #include <string>
+#include <vector>
 
 #include "publish/command.h"
 

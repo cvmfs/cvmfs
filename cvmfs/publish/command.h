@@ -18,7 +18,7 @@
 namespace publish {
 
 class Command {
-  friend class CmdHelp;  //to set the progname_
+  friend class CmdHelp;  // to set the progname_
 
  public:
   /**
@@ -135,6 +135,7 @@ class Command {
     }
     unsigned GetSize() const { return map_.size(); }
     const std::vector<Argument>& plain_args() const { return plain_args_; }
+
    private:
     std::map<Parameter, Argument> map_;
     std::vector<Argument> plain_args_;
