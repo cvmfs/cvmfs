@@ -987,10 +987,27 @@ _update_geodb() {
 
   # sanity checks
   [ -w "$dbdir"  ]   || { echo "Directory '$dbdir' doesn't exist or is not writable by $(whoami)" >&2; return 1; }
-  [ ! -f "$dbfile" ] || [ -w "$dbfile" ] || { echo "GeoIP database '$dbfile' is not writable by $(whoami)" >&2; return 2; }
 
   # check if an update/installation needs to be done
-  if [ ! -f "$dbfile" ]; then
+  if [ -z "$CVMFS_GEO_DB_FILE" ] && [ -z "$CVMFS_GEO_LICENSE_KEY" ] && \
+      [ -r /usr/share/GeoIP/$CVMFS_UPDATEGEO_DB ]; then
+    # Use the default location of geoipupdate
+    CVMFS_GEO_DB_FILE=/usr/share/GeoIP/$CVMFS_UPDATEGEO_DB
+  fi
+  if [ -n "$CVMFS_GEO_DB_FILE" ]; then
+    # This overrides the update/install; link to the given file instead.
+    if [ ! -L "$dbfile" ] || [ "`readlink $dbfile`" != "$CVMFS_GEO_DB_FILE" ]; then
+      if [ "$CVMFS_GEO_DB_FILE" != "NONE" ] && [ ! -r "$CVMFS_GEO_DB_FILE" ]; then
+        echo "$CVMFS_GEO_DB_FILE doesn't exist or is not readable" >&2
+        return 1
+      fi
+      rm -f $dbfile
+      echo "Linking GeoIP Database"
+      _to_syslog_for_geoip "linking db from $CVMFS_GEO_DB_FILE"
+      ln -s $CVMFS_GEO_DB_FILE $dbfile
+    fi
+    return 0
+  elif [ ! -f "$dbfile" ] || [ -L "$dbfile" ]; then
     echo -n "Installing GeoIP Database... "
   elif ! $lazy; then
     echo -n "Updating GeoIP Database... "
