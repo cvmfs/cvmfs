@@ -29,14 +29,20 @@ namespace {
 
 class DiffReporter : public publish::DiffListener {
  public:
-  DiffReporter(bool machine_readable, bool ignore_timediff)
-    : machine_readable_(machine_readable)
+  DiffReporter(bool show_header, bool machine_readable, bool ignore_timediff)
+    : show_header_(show_header)
+    , machine_readable_(machine_readable)
     , ignore_timediff_(ignore_timediff)
   {}
   virtual ~DiffReporter() {}
+
+
   virtual void OnInit(const history::History::Tag &from_tag,
                       const history::History::Tag &to_tag)
   {
+    if (!show_header_)
+      return;
+
     if (machine_readable_) {
       LogCvmfs(kLogCvmfs, kLogStdout,
              "# line descriptor: A - add, R - remove, M - modify, "
@@ -51,6 +57,7 @@ class DiffReporter : public publish::DiffListener {
                StringifyTime(to_tag.timestamp, true).c_str());
     }
   }
+
 
   virtual void OnStats(const catalog::DeltaCounters &delta) {
     std::string operation = machine_readable_ ? "S " : "d(";
@@ -75,17 +82,36 @@ class DiffReporter : public publish::DiffListener {
              type_catalog.c_str(), diff_catalog);
   }
 
+
   virtual void OnAdd(const std::string &path,
                      const catalog::DirectoryEntry &entry)
   {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Add: %s", path.c_str());
+    std::string operation = machine_readable_ ? "A" : "add";
+    if (machine_readable_) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64, operation.c_str(),
+               PrintEntryType(entry).c_str(), path.c_str(), entry.size());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes",
+               path.c_str(), operation.c_str(),
+               PrintEntryType(entry).c_str(), entry.size());
+    }
   }
+
 
   virtual void OnRemove(const std::string &path,
                         const catalog::DirectoryEntry &entry)
   {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Remove: %s", path.c_str());
+    std::string operation = machine_readable_ ? "R" : "remove";
+    if (machine_readable_) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64, operation.c_str(),
+               PrintEntryType(entry).c_str(), path.c_str(), entry.size());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes",
+               path.c_str(), operation.c_str(),
+               PrintEntryType(entry).c_str(), entry.size());
+    }
   }
+
 
   virtual void OnModify(const std::string &path,
                         const catalog::DirectoryEntry &entry_from,
@@ -163,6 +189,7 @@ class DiffReporter : public publish::DiffListener {
       return machine_readable_ ? "U" : "unknown";
   }
 
+  bool show_header_;
   bool machine_readable_;
   bool ignore_timediff_;
 };
@@ -185,7 +212,8 @@ int CmdDiff::Main(const Options &options) {
   }
   Repository repository(settings);
 
-  DiffReporter diff_reporter(options.Has("machine-readable"),
+  DiffReporter diff_reporter(options.Has("header"),
+                             options.Has("machine-readable"),
                              options.Has("ignore-timediff"));
   repository.Diff(from, to, &diff_reporter);
 
