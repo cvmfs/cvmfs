@@ -934,15 +934,25 @@ if (BUILD_SERVER)
   target_link_libraries (cvmfs_publish cvmfs_server)
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_SOURCES})
-
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "-DDEBUGMSG -g -O0" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
-
     target_link_libraries (cvmfs_swissknife_debug
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
                            ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
                            ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                            ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
                            pthread dl)
+
+    add_library (cvmfs_server_debug SHARED ${LIBCVMFS_SERVER_SOURCES})
+    set_target_properties (cvmfs_server_debug PROPERTIES
+      VERSION ${CernVM-FS_VERSION_STRING}
+      COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS} -DDEBUGMSG -g -O0")
+    target_link_libraries (cvmfs_server_debug ${LIBCVMFS_SERVER_LIBS} ${LIBCVMFS_SERVER_LINK_LIBRARIES})
+
+    add_executable (cvmfs_publish_debug ${CVMFS_PUBLISH_SOURCES})
+    set_target_properties (cvmfs_publish_debug
+      PROPERTIES COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -DDEBUGMSG -g -O0"
+      LINK_FLAGS "${CVMFS_PUBLISH_LD_FLAGS}")
+    target_link_libraries (cvmfs_publish_debug cvmfs_server_debug)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
@@ -1106,6 +1116,18 @@ if (BUILD_SERVER)
       TARGETS     cvmfs_swissknife_debug
       RUNTIME
       DESTINATION   bin
+    )
+
+    install (
+      TARGETS     cvmfs_publish_debug
+      RUNTIME
+      DESTINATION   bin
+    )
+
+    install (
+      TARGETS     cvmfs_server_debug
+      LIBRARY
+      DESTINATION    ${CMAKE_INSTALL_LIBDIR}
     )
   endif (BUILD_SERVER_DEBUG)
 

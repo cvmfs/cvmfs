@@ -30,7 +30,9 @@ static void Usage(const std::string &progname,
                   const publish::CommandList &clist)
 {
   LogCvmfs(kLogCvmfs, kLogStdout,
-    "CernVM-FS Server Tool %s\n\n"
+    "CernVM-FS Server Tool %s\n"
+    "NOTE: This utility is for CernVM-FS internal use only for the time being!"
+    "\n\n"
     "Usage:\n"
     "------\n"
     "  %s COMMAND [options] <parameters>\n\n"
