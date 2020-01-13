@@ -1,4 +1,5 @@
 2.7.1:
+  * Add support for CVMFS_GEO_DB_FILE replica parameter
   * Change geodb update to use license key (CVM-1833)
   * Fix host fail-over after redirection (CVM-1675)
   * Add reboot info to Catalina installation screen
