@@ -9,6 +9,7 @@
 
 #include "logging.h"
 #include "upload_facility.h"
+#include "util/exception.h"
 
 
 void TaskWrite::OnBlockComplete(
@@ -16,9 +17,7 @@ void TaskWrite::OnBlockComplete(
   BlockItem *block_item)
 {
   if (results.return_code != 0) {
-    LogCvmfs(kLogSpooler, kLogStderr, "block upload failed (code: %d)",
-      results.return_code);
-    abort();
+    PANIC(kLogStderr, "block upload failed (code: %d)", results.return_code);
   }
 
   delete block_item;
@@ -30,9 +29,7 @@ void TaskWrite::OnChunkComplete(
   ChunkItem *chunk_item)
 {
   if (results.return_code != 0) {
-    LogCvmfs(kLogSpooler, kLogStderr, "chunk upload failed (code: %d)",
-             results.return_code);
-    abort();
+    PANIC(kLogStderr, "chunk upload failed (code: %d)", results.return_code);
   }
 
   FileItem *file_item = chunk_item->file_item();
@@ -80,6 +77,6 @@ void TaskWrite::Process(BlockItem *input_block) {
       delete input_block;
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
 }

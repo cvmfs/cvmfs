@@ -14,6 +14,7 @@
 
 #include "malloc_arena.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
@@ -285,7 +286,7 @@ void SqliteMemoryManager::PutLookasideBuffer(void *buffer) {
       return;
     }
   }
-  assert(false);
+  PANIC(NULL);
 }
 
 
@@ -305,7 +306,7 @@ void SqliteMemoryManager::PutMemory(void *ptr) {
         return;
       }
     }
-    assert(false);
+    PANIC(NULL);
   }
 }
 

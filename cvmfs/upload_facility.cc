@@ -9,6 +9,7 @@
 #include "upload_gateway.h"
 #include "upload_local.h"
 #include "upload_s3.h"
+#include "util/exception.h"
 
 namespace upload {
 
@@ -155,7 +156,7 @@ void TaskUpload::Process(AbstractUploader::UploadJob *upload_job) {
       break;
 
     default:
-      abort();
+      PANIC(NULL);
   }
 
   delete upload_job;

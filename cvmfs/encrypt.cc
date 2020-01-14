@@ -19,6 +19,7 @@
 #include "hash.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -161,7 +162,7 @@ Cipher *Cipher::Create(const Algorithms a) {
     case kNone:
       return new CipherNone();
     default:
-      abort();
+      PANIC(NULL);
   }
   // Never here
 }

@@ -29,6 +29,7 @@
 #ifdef __APPLE__
 #include "smalloc.h"
 #endif
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -536,9 +537,8 @@ void *ExternalCacheManager::MainRead(void *data) {
       cache_mgr->quota_mgr_->BroadcastBackchannels("R");
       continue;
     } else {
-      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "unexpected message %s",
-               msg->GetTypeName().c_str());
-      abort();
+      PANIC(kLogSyslogErr | kLogDebug, "unexpected message %s",
+            msg->GetTypeName().c_str());
     }
 
     RpcInFlight rpc_inflight;
@@ -564,9 +564,8 @@ void *ExternalCacheManager::MainRead(void *data) {
   }
 
   if (!cache_mgr->terminated_) {
-    LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "connection to external cache manager broken (%d)", errno);
-    abort();
+    PANIC(kLogSyslogErr | kLogDebug,
+          "connection to external cache manager broken (%d)", errno);
   }
   LogCvmfs(kLogCache, kLogDebug, "stopping external cache reader thread");
   return NULL;

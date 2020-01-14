@@ -37,6 +37,7 @@
 #include "logging.h"
 #include "sanitizer.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -562,7 +563,7 @@ static void CallbackCares(
           break;
         default:
           // Never here.
-          abort();
+          PANIC(NULL);
       }
       info->status = retval;
       break;
@@ -790,7 +791,7 @@ CaresResolver *CaresResolver::Create(
       }
       default:
         // Never here.
-        abort();
+        PANIC(NULL);
     }
     iter = iter->next;
   }
@@ -995,7 +996,7 @@ void CaresResolver::WaitOnCares() {
       if (nfds == -1) {
         // poll must not fail for other reasons
         if ((errno != EAGAIN) && (errno != EINTR))
-          abort();
+          PANIC(NULL);
       }
     } while (nfds == -1);
   }
@@ -1232,7 +1233,7 @@ bool HostfileResolver::SetSearchDomains(const vector<string> &domains) {
 
 void HostfileResolver::SetSystemSearchDomains() {
   // TODO(jblomer)
-  assert(false);
+  PANIC(NULL);
 }
 
 

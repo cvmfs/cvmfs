@@ -25,6 +25,7 @@ class ECvmfsException : std::runtime_error {
 __attribute__((noreturn))
 void Panic(const char *coordinates, const LogSource source, const int mask,
            const char *format, ...);
+void Panic(const char *coordinates, const LogSource source, const int mast);
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

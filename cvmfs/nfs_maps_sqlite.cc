@@ -26,6 +26,7 @@
 #include "prng.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -154,10 +155,8 @@ NfsMapsSqlite *NfsMapsSqlite::Create(
     sqlite3_bind_int64(stmt, 1, root_inode);
     assert(retval == SQLITE_OK);
     if (sqlite3_step(stmt) != SQLITE_DONE) {
-      LogCvmfs(kLogNfsMaps, kLogDebug | kLogSyslogErr,
-               "Failed to execute CreateRoot: %s",
-               sqlite3_errmsg(maps->db_));
-      abort();
+      PANIC(kLogDebug | kLogSyslogErr, "Failed to execute CreateRoot: %s",
+            sqlite3_errmsg(maps->db_));
     }
     sqlite3_finalize(stmt);
   }
@@ -282,10 +281,8 @@ bool NfsMapsSqlite::GetPath(const uint64_t inode, PathString *path) {
     return false;
   }
   if (sqlite_state != SQLITE_ROW) {
-    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
-             "Failed to execute SQL for GetPath (%" PRIu64 "): %s", inode,
-             sqlite3_errmsg(db_));
-    abort();
+    PANIC(kLogSyslogErr, "Failed to execute SQL for GetPath (%" PRIu64 "): %s",
+          inode, sqlite3_errmsg(db_));
   }
   const char *raw_path = (const char *)sqlite3_column_text(stmt_get_path_, 0);
   path->Assign(raw_path, strlen(raw_path));

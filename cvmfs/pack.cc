@@ -11,6 +11,7 @@
 
 #include "platform.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 
@@ -45,9 +46,7 @@ void AppendItemToHeader(ObjectPack::BucketContentType object_type,
       line_prefix = "C ";
       break;
     default:
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Unknown object pack type to be added to header.");
-      abort();
+      PANIC(kLogStderr, "Unknown object pack type to be added to header.");
   }
   if (header) {
     *header += line_prefix + hash_str + " " + StringifyInt(object_size) +

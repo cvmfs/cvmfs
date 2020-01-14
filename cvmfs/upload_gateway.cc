@@ -9,6 +9,7 @@
 
 #include "gateway_util.h"
 #include "logging.h"
+#include "util/exception.h"
 #include "util/string.h"
 
 namespace upload {
@@ -60,7 +61,7 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
          spooler_definition.driver_type == SpoolerDefinition::Gateway);
 
   if (!ParseSpoolerDefinition(spooler_definition, &config_)) {
-    abort();
+    PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
   atomic_init32(&num_errors_);

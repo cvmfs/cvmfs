@@ -20,6 +20,7 @@
 
 #include "logging.h"
 #include "sanitizer.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -153,7 +154,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
     MakePipe(pipe_quit);
     switch (pid_child = fork()) {
       case -1:
-        abort();
+        PANIC(NULL);
       case 0: {  // Child
         close(pipe_open[0]);
         close(pipe_quit[1]);

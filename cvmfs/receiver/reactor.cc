@@ -17,6 +17,7 @@
 #include "payload_processor.h"
 #include "repository_tag.h"
 #include "session_token.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -131,9 +132,7 @@ bool Reactor::Run() {
 
 bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleGenerateToken: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleGenerateToken: Invalid reply pointer.");
   }
 
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
@@ -180,9 +179,7 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
 
 bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleGetTokenId: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleGetTokenId: Invalid reply pointer.");
   }
 
   std::string token_id;
@@ -201,9 +198,7 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
 
 bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleCheckToken: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleCheckToken: Invalid reply pointer.");
   }
 
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
@@ -246,9 +241,8 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
       break;
     default:
       // Should not be reached
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "HandleCheckToken: Unknown value received. Exiting.");
-      abort();
+      PANIC(kLogSyslogErr,
+            "HandleCheckToken: Unknown value received. Exiting.");
   }
 
   ToJsonString(input, reply);
@@ -260,9 +254,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
 bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
                                   std::string* reply) {
   if (!reply) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleSubmitPayload: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleSubmitPayload: Invalid reply pointer.");
   }
 
   // Extract the Path (used for verification), Digest and DigestSize from the
@@ -310,10 +302,9 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
       reply_input.push_back(std::make_pair("status", "ok"));
       break;
     default:
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "HandleSubmitPayload: Unknown value of PayloadProcessor::Result "
-               "encountered.");
-      abort();
+      PANIC(kLogSyslogErr,
+            "HandleSubmitPayload: Unknown value of PayloadProcessor::Result "
+            "encountered.");
       break;
   }
 
@@ -324,9 +315,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
 bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   if (!reply) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleCommit: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
   }
 
   // Extract the Path from the request JSON.
@@ -388,9 +377,8 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       reply_input.push_back(std::make_pair("reason", "missing_reflog"));
       break;
     default:
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Unknown value of CommitProcessor::Result encountered.");
-      abort();
+      PANIC(kLogSyslogErr,
+            "Unknown value of CommitProcessor::Result encountered.");
       break;
   }
 

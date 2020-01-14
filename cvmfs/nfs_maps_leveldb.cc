@@ -27,6 +27,7 @@
 #include "logging.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
@@ -47,10 +48,9 @@ void NfsMapsLeveldb::ForkAwareEnv::StartThread(void (*f)(void*), void* a) {
     leveldb::Env::Default()->StartThread(f, a);
     return;
   }
-  LogCvmfs(kLogNfsMaps, kLogDebug,
-           "single threaded leveldb::StartThread called");
+  PANIC(kLogDebug | kLogSyslogErr,
+        "single threaded leveldb::StartThread called");
   // Unclear how to handle this because caller assumes that thread is started
-  abort();
 }
 
 
@@ -200,10 +200,8 @@ uint64_t NfsMapsLeveldb::FindInode(const shash::Md5 &path) {
 
   status = db_path2inode_->Get(leveldb::ReadOptions(), key, &result);
   if (!status.ok() && !status.IsNotFound()) {
-    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
-             "failed to read from path2inode db (path %s): %s",
-             path.ToString().c_str(), status.ToString().c_str());
-    abort();
+    PANIC(kLogSyslogErr, "failed to read from path2inode db (path %s): %s",
+          path.ToString().c_str(), status.ToString().c_str());
   }
 
   if (status.IsNotFound()) {
@@ -261,10 +259,9 @@ bool NfsMapsLeveldb::GetPath(const uint64_t inode, PathString *path) {
     return false;
   }
   if (!status.ok()) {
-    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
-             "failed to read from inode2path db inode %" PRIu64 ": %s",
-             inode, status.ToString().c_str());
-    abort();
+    PANIC(kLogSyslogErr,
+          "failed to read from inode2path db inode %" PRIu64 ": %s", inode,
+          status.ToString().c_str());
   }
 
   path->Assign(result.data(), result.length());
@@ -336,10 +333,9 @@ void NfsMapsLeveldb::PutInode2Path(
 
   status = db_inode2path_->Put(leveldb::WriteOptions(), key, value);
   if (!status.ok()) {
-    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
-             "failed to write inode2path entry (%" PRIu64 " --> %s): %s",
-             inode, path.c_str(), status.ToString().c_str());
-    abort();
+    PANIC(kLogSyslogErr,
+          "failed to write inode2path entry (%" PRIu64 " --> %s): %s", inode,
+          path.c_str(), status.ToString().c_str());
   }
   LogCvmfs(kLogNfsMaps, kLogDebug, "stored inode %" PRIu64 " --> path %s",
            inode, path.c_str());
@@ -357,10 +353,9 @@ void NfsMapsLeveldb::PutPath2Inode(
 
   status = db_path2inode_->Put(leveldb::WriteOptions(), key, value);
   if (!status.ok()) {
-    LogCvmfs(kLogNfsMaps, kLogSyslogErr,
-             "failed to write path2inode entry (%s --> %" PRIu64 "): %s",
-             path.ToString().c_str(), inode, status.ToString().c_str());
-    abort();
+    PANIC(kLogSyslogErr,
+          "failed to write path2inode entry (%s --> %" PRIu64 "): %s",
+          path.ToString().c_str(), inode, status.ToString().c_str());
   }
   LogCvmfs(kLogNfsMaps, kLogDebug, "stored path %s --> inode %" PRIu64,
            path.ToString().c_str(), inode);

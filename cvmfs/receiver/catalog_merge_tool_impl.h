@@ -14,6 +14,7 @@
 #include "manifest.h"
 #include "options.h"
 #include "upload.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 
@@ -40,10 +41,10 @@ inline void SplitHardlink(catalog::DirectoryEntry* entry) {
 
 inline void AbortIfHardlinked(const catalog::DirectoryEntry& entry) {
   if (entry.linkcount() > 1) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-              "CatalogMergeTool - Removal of file %s with linkcount > 1 is "
-              "not supported. Aborting", entry.name().c_str());
-    abort();
+    PANIC(kLogSyslogErr,
+          "CatalogMergeTool - Removal of file %s with linkcount > 1 is "
+          "not supported. Aborting",
+          entry.name().c_str());
   }
 }
 

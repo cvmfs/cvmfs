@@ -18,7 +18,9 @@
 #include <cstring>
 
 #include "duplex_ssl.h"
+#include "util/exception.h"
 #include "KeccakHash.h"
+
 
 using namespace std;  // NOLINT
 
@@ -154,9 +156,8 @@ unsigned GetContextSize(const Algorithms algorithm) {
     case kShake128:
       return sizeof(Keccak_HashInstance);
     default:
-      LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
-               "context for unspecified hash. Aborting...");
-      abort();  // Undefined hash
+      PANIC(kLogDebug | kLogSyslogErr,
+            "tried to generate hash context for unspecified hash. Aborting...");
   }
 }
 
@@ -182,7 +183,7 @@ void Init(ContextPtr context) {
       assert(keccak_result == SUCCESS);
       break;
     default:
-      abort();  // Undefined hash
+      PANIC(NULL);  // Undefined hash
   }
 }
 
@@ -213,7 +214,7 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
       assert(keccak_result == SUCCESS);
       break;
     default:
-      abort();  // Undefined hash
+      PANIC(NULL);  // Undefined hash
   }
 }
 
@@ -245,7 +246,7 @@ void Final(ContextPtr context, Any *any_digest) {
           context.buffer), any_digest->digest, kDigestSizes[kShake128] * 8);
       break;
     default:
-      abort();  // Undefined hash
+      PANIC(NULL);  // Undefined hash
   }
   any_digest->algorithm = context.algorithm;
 }
@@ -410,7 +411,7 @@ static string HexFromSha256(unsigned char digest[SHA256_DIGEST_LENGTH]) {
 
 string Sha256File(const string &filename) {
 #ifdef OPENSSL_API_INTERFACE_V09
-  abort();
+  PANIC(NULL);
 #else
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd < 0)
@@ -440,7 +441,7 @@ string Sha256File(const string &filename) {
 
 string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size) {
 #ifdef OPENSSL_API_INTERFACE_V09
-  abort();
+  PANIC(NULL);
 #else
   unsigned char digest[SHA256_DIGEST_LENGTH];
   SHA256(buffer, buffer_size, digest);
@@ -460,7 +461,7 @@ std::string Hmac256(
   bool raw_output)
 {
 #ifdef OPENSSL_API_INTERFACE_V09
-  abort();
+  PANIC(NULL);
 #else
   unsigned char digest[SHA256_DIGEST_LENGTH];
   const unsigned block_size = 64;

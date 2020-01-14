@@ -56,6 +56,7 @@
 #include "sanitizer.h"
 #include "smalloc.h"
 #include "util/algorithm.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -832,7 +833,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
                  "%" PRId64 "-%" PRId64,
                  range_lower, range_upper) == 100)
     {
-      abort();  // Should be impossible given limits on offset size.
+      PANIC(NULL);  // Should be impossible given limits on offset size.
     }
     curl_easy_setopt(handle, CURLOPT_RANGE, byte_range_array);
   } else {
@@ -1438,7 +1439,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
             switch_host = true;
         } else {
           // No other errors expected when retrying
-          abort();
+          PANIC(NULL);
         }
     }
     if (switch_proxy) {

@@ -47,6 +47,11 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
 #endif
 }
 
+void Panic(const char* coordinates, const LogSource _source, const int _mask) {
+  assert(_mask == 0);
+  Panic(coordinates, _source, _mask, "");
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif

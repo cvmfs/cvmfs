@@ -19,6 +19,7 @@
 #include "logging.h"
 #include "options.h"
 #include "s3fanout.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -49,7 +50,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   atomic_init32(&terminate_);
 
   if (!ParseSpoolerDefinition(spooler_definition)) {
-    abort();
+    PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
   s3fanout::S3FanoutManager::S3Config s3config;
