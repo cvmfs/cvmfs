@@ -228,6 +228,10 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -+stats"
   fi
 
+  if [ "x$CVMFS_UPLOAD_STATS_DB" = "xtrue" ]; then
+    ingest_command="$ingest_command -I"
+  fi
+
   local upstream_storage=$CVMFS_UPSTREAM_STORAGE
   local upstream_type=$(get_upstream_type $upstream_storage)
   gw_key_file=/etc/cvmfs/keys/${name}.gw

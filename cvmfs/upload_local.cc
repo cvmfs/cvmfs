@@ -37,7 +37,8 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 }
 
 bool LocalUploader::Create() {
-  return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_);
+  return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_) &&
+         MkdirDeep(upstream_path_ + "/stats", backend_dir_mode_, false);
 }
 
 void LocalUploader::DoUpload(const std::string &remote_path,
