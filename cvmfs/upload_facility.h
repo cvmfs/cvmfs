@@ -300,6 +300,14 @@ class AbstractUploader
   virtual bool Peek(const std::string &path) = 0;
 
   /**
+   * Make directory in upstream storage. Noop if directory already present.
+   * 
+   * @param path relative directory path in the upstream storage
+   * @return true if the directory was successfully created or already present
+   */
+  virtual bool Mkdir(const std::string &path) = 0;
+
+  /**
    * Creates a top-level shortcut to the given data object. This is particularly
    * useful for bootstrapping repositories whose data-directory is secured by
    * a VOMS certificate.

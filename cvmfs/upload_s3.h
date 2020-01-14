@@ -69,6 +69,7 @@ class S3Uploader : public AbstractUploader {
 
   virtual void DoRemoveAsync(const std::string &file_to_delete);
   virtual bool Peek(const std::string &path);
+  virtual bool Mkdir(const std::string &path);
   virtual bool PlaceBootstrappingShortcut(const shash::Any &object);
 
   virtual unsigned int GetNumberOfErrors() const;

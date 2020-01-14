@@ -213,6 +213,10 @@ bool LocalUploader::Peek(const std::string &path) {
   return retval;
 }
 
+bool LocalUploader::Mkdir(const std::string &path) {
+  return MkdirDeep(upstream_path_ + "/" + path, backend_dir_mode_, false);
+}
+
 bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) {
   const std::string src = "data/" + object.MakePath();
   const std::string dest = upstream_path_ + "/" + object.MakeAlternativePath();

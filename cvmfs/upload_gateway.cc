@@ -118,6 +118,11 @@ void GatewayUploader::DoRemoveAsync(const std::string& /*file_to_delete*/) {
 
 bool GatewayUploader::Peek(const std::string& /*path*/) { return false; }
 
+// TODO(jpriessn): implement Mkdir on gateway server-side
+bool GatewayUploader::Mkdir(const std::string &path) {
+  return true;
+}
+
 bool GatewayUploader::PlaceBootstrappingShortcut(const shash::Any& /*object*/) {
   return false;
 }

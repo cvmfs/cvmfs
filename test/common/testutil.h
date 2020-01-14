@@ -179,6 +179,10 @@ class AbstractMockUploader : public upload::AbstractUploader {
     assert(AbstractMockUploader::not_implemented);
   }
 
+  virtual bool Mkdir(const std::string &path) {
+    assert(AbstractMockUploader::not_implemented);
+  }
+
   virtual bool PlaceBootstrappingShortcut(const shash::Any &object) {
     assert(AbstractMockUploader::not_implemented);
   }
