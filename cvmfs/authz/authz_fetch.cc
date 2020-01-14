@@ -21,7 +21,6 @@
 #include "platform.h"
 #include "sanitizer.h"
 #include "smalloc.h"
-#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
