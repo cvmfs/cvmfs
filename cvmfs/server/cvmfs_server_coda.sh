@@ -129,7 +129,7 @@ if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
       ;;
     esac
   else
-    echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode [cvmfs_swissknfe]...."
+    echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode [cvmfs_swissknife]...."
   fi
 
   if cvmfs_sys_file_is_regular /usr/bin/cvmfs_publish_debug ; then

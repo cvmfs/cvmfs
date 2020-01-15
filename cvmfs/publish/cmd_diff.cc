@@ -192,7 +192,7 @@ class DiffReporter : public publish::DiffListener {
   bool show_header_;
   bool machine_readable_;
   bool ignore_timediff_;
-};
+};  // class DiffReporter
 
 }  // anonymous namespace
 
