@@ -264,7 +264,7 @@ for l in $existing_libs; do
 done
 
 if [ x"$missing_libs" != x ]; then
-  echo "Bulding libraries: $missing_libs"
+  echo "Building libraries: $missing_libs"
 fi
 
 for l in $missing_libs; do
