@@ -146,6 +146,21 @@ __swissknife() {
 }
 
 
+__publish_cmd() {
+  local might_be_debugging="$1"
+  if [ ! -z $might_be_debugging ]; then
+    echo "$CVMFS_SERVER_PUBLISH_DEBUG"
+  else
+    echo "$CVMFS_SERVER_PUBLISH"
+  fi
+}
+
+
+__publish() {
+  $(__publish_cmd) $@
+}
+
+
 # checks if a given list of strings contains a specific item
 #
 # @param haystack   the list to be searched

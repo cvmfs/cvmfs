@@ -6,16 +6,22 @@
 #define CVMFS_PUBLISH_REPOSITORY_H_
 
 #include <string>
+#include <vector>
 
+#include "history.h"  // for History::Tag
 #include "publish/settings.h"
 #include "upload_spooler_result.h"
 #include "util/single_copy.h"
 
+namespace catalog {
+class DeltaCounters;
+class DirectoryEntry;
+class SimpleCatalogManager;
+}
 namespace download {
 class DownloadManager;
 }
 namespace history {
-class History;
 class SqliteHistory;
 }
 namespace manifest {
@@ -37,27 +43,57 @@ class Whitelist;
 
 namespace publish {
 
+/**
+ * Users create derived instances to react on repository diffs
+ */
+class __attribute__((visibility("default"))) DiffListener {
+ public:
+  virtual ~DiffListener() {}
+  virtual void OnInit(const history::History::Tag &from_tag,
+                      const history::History::Tag &to_tag) = 0;
+  virtual void OnStats(const catalog::DeltaCounters &delta) = 0;
+  virtual void OnAdd(const std::string &path,
+                     const catalog::DirectoryEntry &entry) = 0;
+  virtual void OnRemove(const std::string &path,
+                        const catalog::DirectoryEntry &entry) = 0;
+  virtual void OnModify(const std::string &path,
+                        const catalog::DirectoryEntry &entry_from,
+                        const catalog::DirectoryEntry &entry_to) = 0;
+};
+
+
 class __attribute__((visibility("default"))) Repository : SingleCopy {
  public:
-  explicit Repository(const SettingsRepository &settings);
-  virtual ~Repository();
+  /**
+   * Tag names beginning with @ are interpreted as raw hashes
+   */
+  static const char kRawHashSymbol = '@';
 
   static std::string GetFqrnFromUrl(const std::string &url);
+
+  explicit Repository(const SettingsRepository &settings);
+  virtual ~Repository();
 
   void Check();
   void GarbageCollect();
   void List();
-  void Diff();
 
-  upload::Spooler *spooler() { return spooler_; }
-  download::DownloadManager *download_mgr() { return download_mgr_; }
-  whitelist::Whitelist *whitelist() { return whitelist_; }
+  /**
+   * From and to are either tag names or catalog root hashes preceeded by
+   * a '@'.
+   */
+  void Diff(const std::string &from, const std::string &to,
+            DiffListener *diff_listener);
 
-  manifest::Manifest *manifest() { return manifest_; }
-  // Inheritance of History and SqliteHisty unknown in the header
-  history::History *history();
-
-  std::string GetMetainfo();
+  const signature::SignatureManager *signature_mgr() const {
+    return signature_mgr_;
+  }
+  const upload::Spooler *spooler() const { return spooler_; }
+  const whitelist::Whitelist *whitelist() const { return whitelist_; }
+  const manifest::Manifest *manifest() const { return manifest_; }
+  // Inheritance of History and SqliteHistory unknown in the header
+  const history::History *history() const;
+  std::string meta_info() const { return meta_info_; }
 
  protected:
   Repository();
@@ -65,10 +101,17 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
     const std::string &url,
     const std::string &fqrn,
     const std::string &tmp_dir);
+  catalog::SimpleCatalogManager *GetSimpleCatalogManager();
+
+  const SettingsRepository settings_;
 
   perf::Statistics *statistics_;
   signature::SignatureManager *signature_mgr_;
   download::DownloadManager *download_mgr_;
+  /**
+   * The read-only catalog manager, loaded on demand
+   */
+  catalog::SimpleCatalogManager *simple_catalog_mgr_;
   upload::Spooler *spooler_;
   whitelist::Whitelist *whitelist_;
   manifest::Reflog *reflog_;
@@ -90,19 +133,27 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Abort();
   void Publish();
   void Ingest();
-  void EditTags();
+  void Sync();
+
+  /**
+   * Must not edit magic tags 'trunk' and 'trunk-previous'.
+   * Removal of non-existing tags is silently ignored. The caller needs to
+   * ensure that the data provided in new tags makes sense.
+   */
+  void EditTags(const std::vector<history::History::Tag> &add_tags,
+                const std::vector<std::string> &rm_tags);
   void Rollback();
   void Resign();
   void Migrate();
 
-  signature::SignatureManager *signature_mgr() { return signature_mgr_; }
+  const SettingsPublisher &settings() const { return settings_; }
 
  private:
-  // Used by Create
-  Publisher();
+  Publisher();  ///< Used by Create
 
   void CreateKeychain();
   void CreateStorage();
+  void CreateSpoolArea();
   void CreateRootObjects();
 
   void ExportKeychain();
@@ -123,7 +174,14 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void OnUploadReflog(const upload::SpoolerResult &result);
   void OnUploadWhitelist(const upload::SpoolerResult &result);
 
+  void CheckTagName(const std::string &name);
+
   SettingsPublisher settings_;
+  /**
+   * The log level, set to kLogNone if settings_.is_silent() == true
+   */
+  int llvl_;
+  bool in_transaction_;
 };
 
 class __attribute__((visibility("default"))) Replica : public Repository {

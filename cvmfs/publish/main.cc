@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "logging.h"
+#include "publish/cmd_diff.h"
 #include "publish/cmd_enter.h"
 #include "publish/cmd_help.h"
 #include "publish/cmd_info.h"
@@ -29,7 +30,9 @@ static void Usage(const std::string &progname,
                   const publish::CommandList &clist)
 {
   LogCvmfs(kLogCvmfs, kLogStdout,
-    "CernVM-FS Server Tool %s\n\n"
+    "CernVM-FS Server Tool %s\n"
+    "NOTE: This utility is for CernVM-FS internal use only for the time being!"
+    "\n\n"
     "Usage:\n"
     "------\n"
     "  %s COMMAND [options] <parameters>\n\n"
@@ -62,6 +65,7 @@ int main(int argc, char **argv) {
   commands.TakeCommand(new publish::CmdMkfs());
   commands.TakeCommand(new publish::CmdEnter());
   commands.TakeCommand(new publish::CmdInfo());
+  commands.TakeCommand(new publish::CmdDiff());
   commands.TakeCommand(new publish::CmdHelp(&commands));
   commands.TakeCommand(new publish::CmdZpipe());
 

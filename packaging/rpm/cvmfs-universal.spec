@@ -557,6 +557,8 @@ fi
 
 %files server
 %defattr(-,root,root)
+%{_bindir}/cvmfs_publish
+%{_bindir}/cvmfs_publish_debug
 %{_bindir}/cvmfs_receiver
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
@@ -565,6 +567,8 @@ fi
 %{_bindir}/cvmfs_rsync
 %{_libdir}/libcvmfs_server.so
 %{_libdir}/libcvmfs_server.so.%{version}
+%{_libdir}/libcvmfs_server_debug.so
+%{_libdir}/libcvmfs_server_debug.so.%{version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi

@@ -423,8 +423,10 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
 )
 
 set (CVMFS_TEST_PUBLISH_SOURCES
+  publish/c_repository.cc
   publish/main.cc
   publish/t_command.cc
+  publish/t_diff.cc
   publish/t_settings.cc
 
   ../common/env.cc
@@ -435,6 +437,8 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/command.cc
   ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
   ${CVMFS_SOURCE_DIR}/backoff.cc
@@ -446,6 +450,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
@@ -499,6 +504,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc

@@ -18,6 +18,8 @@
 namespace publish {
 
 class Command {
+  friend class CmdHelp;  // to set the progname_
+
  public:
   /**
    * A parameter is information that can be passed by -$short_key or --$key to
@@ -121,11 +123,19 @@ class Command {
     std::string GetString(const std::string &key) const {
       return map_.find(Parameter(key))->second.value_str;
     }
+    std::string GetStringDefault(const std::string &key,
+                                 const std::string &default_value) const
+    {
+      if (Has(key))
+        return map_.find(Parameter(key))->second.value_str;
+      return default_value;
+    }
     int GetInt(const std::string &key) const {
       return map_.find(Parameter(key))->second.value_int;
     }
     unsigned GetSize() const { return map_.size(); }
     const std::vector<Argument>& plain_args() const { return plain_args_; }
+
    private:
     std::map<Parameter, Argument> map_;
     std::vector<Argument> plain_args_;
@@ -150,6 +160,7 @@ class Command {
    */
   virtual ParameterList GetParams() const = 0;
   virtual std::string GetUsage() const { return "[options]"; }
+  std::string GetExamples() const;
   /**
    * The command needs at least so many non-parameter arguments (e.g. fqrn)
    */
@@ -169,6 +180,14 @@ class Command {
   virtual int Main(const Options &options) = 0;
 
   std::string progname() const { return progname_; }
+
+ protected:
+  /**
+   * Example one-liners which get prepended by the command invocation
+   */
+  virtual std::vector<std::string> DoGetExamples() const {
+    return std::vector<std::string>();
+  }
 
  private:
   std::string progname_;

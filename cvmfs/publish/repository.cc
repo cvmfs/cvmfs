@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdlib>
 
+#include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "download.h"
 #include "hash.h"
@@ -42,9 +43,11 @@ const std::string CommandTag::kPreviousHeadTag = "trunk-previous";
 namespace publish {
 
 Repository::Repository()
-  : statistics_(new perf::Statistics())
+  : settings_("")
+  , statistics_(new perf::Statistics())
   , signature_mgr_(new signature::SignatureManager())
   , download_mgr_(NULL)
+  , simple_catalog_mgr_(NULL)
   , spooler_(NULL)
   , whitelist_(NULL)
   , reflog_(NULL)
@@ -55,9 +58,11 @@ Repository::Repository()
 }
 
 Repository::Repository(const SettingsRepository &settings)
-  : statistics_(new perf::Statistics())
+  : settings_(settings)
+  , statistics_(new perf::Statistics())
   , signature_mgr_(new signature::SignatureManager())
   , download_mgr_(NULL)
+  , simple_catalog_mgr_(NULL)
   , spooler_(NULL)
   , whitelist_(NULL)
   , reflog_(NULL)
@@ -103,19 +108,35 @@ Repository::~Repository() {
   delete spooler_;
   delete signature_mgr_;
   delete download_mgr_;
+  delete simple_catalog_mgr_;
   delete statistics_;
 }
 
-history::History *Repository::history() { return history_; }
+const history::History *Repository::history() const { return history_; }
+
+catalog::SimpleCatalogManager *Repository::GetSimpleCatalogManager() {
+  if (simple_catalog_mgr_ != NULL) return simple_catalog_mgr_;
+
+  simple_catalog_mgr_ = new catalog::SimpleCatalogManager(
+    manifest_->catalog_hash(),
+    settings_.url(),
+    settings_.tmp_dir(),
+    download_mgr_,
+    statistics_,
+    true /* manage_catalog_files */);
+  return simple_catalog_mgr_;
+}
 
 void Repository::DownloadRootObjects(
   const std::string &url, const std::string &fqrn, const std::string &tmp_dir)
 {
   delete whitelist_;
   whitelist_ = new whitelist::Whitelist(fqrn, download_mgr_, signature_mgr_);
-  whitelist_->LoadUrl(url);
-  if (whitelist_->status() != whitelist::Whitelist::kStAvailable)
-    throw EPublish("cannot load whitelist");
+  whitelist::Failures rv_whitelist = whitelist_->LoadUrl(url);
+  if (whitelist_->status() != whitelist::Whitelist::kStAvailable) {
+    throw EPublish(std::string("cannot load whitelist [") +
+                   whitelist::Code2Ascii(rv_whitelist) + "]");
+  }
 
   manifest::ManifestEnsemble ensemble;
   const uint64_t minimum_timestamp = 0;
@@ -141,11 +162,18 @@ void Repository::DownloadRootObjects(
        NULL);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
   fclose(reflog_fd);
-  if (rv_dl != download::kFailOk) throw EPublish("cannot load reflog");
-  delete reflog_;
-  reflog_ = manifest::Reflog::Open(reflog_path);
-  if (reflog_ == NULL) throw EPublish("cannot open reflog");
-  reflog_->TakeDatabaseFileOwnership();
+  if (rv_dl == download::kFailOk) {
+    delete reflog_;
+    reflog_ = manifest::Reflog::Open(reflog_path);
+    if (reflog_ == NULL) throw EPublish("cannot open reflog");
+    reflog_->TakeDatabaseFileOwnership();
+  } else {
+    if (download_reflog.http_code != 404) {
+      throw EPublish(std::string("cannot load reflog [") +
+                     download::Code2Ascii(rv_dl) + "]");
+    }
+    assert(reflog_ == NULL);
+  }
 
   std::string tags_path;
   FILE *tags_fd =
@@ -155,7 +183,7 @@ void Repository::DownloadRootObjects(
   download::JobInfo download_tags(
        &tags_url,
        true /* compressed */,
-       false /* probe hosts */,
+       true /* probe hosts */,
        tags_fd,
        &tags_hash);
   rv_dl = download_mgr_->Fetch(&download_tags);
@@ -165,17 +193,30 @@ void Repository::DownloadRootObjects(
   history_ = history::SqliteHistory::OpenWritable(tags_path);
   if (history_ == NULL) throw EPublish("cannot open tag database");
   history_->TakeDatabaseFileOwnership();
+
+  if (!manifest_->meta_info().IsNull()) {
+    shash::Any info_hash(manifest_->meta_info());
+    std::string info_url = url + "/data/" + info_hash.MakePath();
+    download::JobInfo download_info(
+      &info_url,
+      true /* compressed */,
+      true /* probe_hosts */,
+      &info_hash);
+    download::Failures rv_info = download_mgr_->Fetch(&download_info);
+    if (rv_info != download::kFailOk) {
+      throw EPublish(std::string("cannot load meta info [") +
+                     download::Code2Ascii(rv_info) + "]");
+    }
+    meta_info_ = std::string(download_info.destination_mem.data,
+                             download_info.destination_mem.pos);
+  } else {
+    meta_info_ = "n/a";
+  }
 }
 
 
 std::string Repository::GetFqrnFromUrl(const std::string &url) {
   return GetFileName(MakeCanonicalPath(url));
-}
-
-std::string Repository::GetMetainfo() {
-  if (manifest_->meta_info().IsNull()) return "n/a";
-
-  return "TODO";
 }
 
 
@@ -373,22 +414,26 @@ void Publisher::PushWhitelist() {
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
   UniquePtr<Publisher> publisher(new Publisher());
   publisher->settings_ = settings;
+  if (settings.is_silent())
+    publisher->llvl_ = kLogNone;
   publisher->signature_mgr_ = new signature::SignatureManager();
   publisher->signature_mgr_->Init();
 
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Creating Key Chain... ");
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
+           "Creating Key Chain... ");
   publisher->CreateKeychain();
   publisher->ExportKeychain();
-  LogCvmfs(kLogCvmfs, kLogStdout, "done");
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Backend Storage... ");
   publisher->CreateStorage();
   publisher->PushWhitelist();
-  LogCvmfs(kLogCvmfs, kLogStdout, "done");
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Initial Repository... ");
+  publisher->InitSpoolArea();
   publisher->CreateRootObjects();
   publisher->PushHistory();
   publisher->PushCertificate();
@@ -396,12 +441,14 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   publisher->PushReflog();
   publisher->PushManifest();
   // TODO(jblomer): meta-info
-  LogCvmfs(kLogCvmfs, kLogStdout, "done");
+  LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
   return publisher.Release();
 }
 
 void Publisher::ExportKeychain() {
+  CreateDirectoryAsOwner(settings_.keychain().keychain_dir(), kDefaultDirMode);
+
   bool rvb;
   rvb = SafeWriteToFile(signature_mgr_->GetActivePubkeys(),
                         settings_.keychain().master_public_key_path(), 0644);
@@ -502,16 +549,25 @@ void Publisher::InitSpoolArea() {
 
 Publisher::Publisher()
   : settings_("invalid.cvmfs.io")
+  , llvl_(kLogNormal)
+  , in_transaction_(false)
 {
 }
 
 Publisher::Publisher(const SettingsPublisher &settings)
   : settings_(settings)
+  , llvl_(settings.is_silent() ? kLogNone : kLogNormal)
+  , in_transaction_(false)
 {
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
+  upload::SpoolerDefinition sd(
+    settings_.storage().GetLocator(),
+    settings_.transaction().hash_algorithm(),
+    settings_.transaction().compression_algorithm());
+  spooler_ = upload::Spooler::Construct(sd);
+  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
 
-  // TODO(jblomer): use key directory if applicable
   int rvb;
   rvb = signature_mgr_->LoadPublicRsaKeys(
     settings.keychain().master_public_key_path());
@@ -541,22 +597,21 @@ Publisher::~Publisher() {
 }
 
 void Publisher::Transaction() {
+  if (in_transaction_) throw EPublish("another transaction is already open");
+
   InitSpoolArea();
-  // TODO(jblomer): set transaction lock
+  // TODO(jblomer): acquire gateway lease, create in_transaction lock file
+  LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
+           "(%s) opened transaction", settings_.fqrn().c_str());
+  in_transaction_ = true;
 }
+
+
 void Publisher::Abort() {
   // TODO(jblomer): remove transaction lock
 }
-void Publisher::Publish() {
-  LogCvmfs(kLogCvmfs, kLogStdout, "Staet at revision: %d",
-           manifest_->revision());
-  upload::SpoolerDefinition sd(
-    settings_.storage().GetLocator(),
-    settings_.transaction().hash_algorithm(),
-    settings_.transaction().compression_algorithm());
-  spooler_ = upload::Spooler::Construct(sd);
-  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
 
+void Publisher::Sync() {
   catalog::WritableCatalogManager catalog_mgr(
     manifest_->catalog_hash(),
     settings_.url(),
@@ -602,11 +657,16 @@ void Publisher::Publish() {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %d", manifest_->revision());
   reflog_->AddCatalog(manifest_->catalog_hash());
-  PushManifest();
-  PushReflog();
-  // TODO(jblomer): check transaction lock and remove if successful
 }
-void Publisher::EditTags() {}
+
+void Publisher::Publish() {
+  if (!in_transaction_) throw EPublish("cannot publish outside transaction");
+
+  PushReflog();
+  PushManifest();
+  in_transaction_ = false;
+}
+
 void Publisher::Ingest() {}
 void Publisher::Migrate() {}
 void Publisher::Resign() {}

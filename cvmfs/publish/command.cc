@@ -20,6 +20,16 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
+std::string Command::GetExamples() const {
+  std::vector<std::string> examples = DoGetExamples();
+  std::string result;
+  for (unsigned i = 0; i < examples.size(); ++i) {
+    result += progname() + " " + GetName() + " " + examples[i] + "\n";
+  }
+  return result;
+}
+
+
 Command::Options Command::ParseOptions(int argc, char **argv) {
   Options result;
   progname_ = argv[0];
@@ -99,6 +109,10 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
 
   return result;
 }
+
+
+//------------------------------------------------------------------------------
+
 
 CommandList::~CommandList() {
   for (unsigned i = 0; i < commands_.size(); ++i)
