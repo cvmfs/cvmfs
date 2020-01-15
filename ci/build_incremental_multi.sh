@@ -58,7 +58,7 @@ fi
 # it check a new enough version of the compiler >= 1.11.4
 # and that go-junit-report is installed
 build_ducc="OFF"
-if [ $(can_build_ducc) -ge 1]; then
+if [ $(can_build_ducc) -ge 1 ]; then
   build_ducc="ON"
 fi
 
