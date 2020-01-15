@@ -249,9 +249,12 @@ if [ -f $externals_install_dir/.bootstrapDone ]; then
   existing_libs=$(cat $externals_install_dir/.bootstrapDone)
   for l in $existing_libs; do
     if [ x"$l" != x ]; then
+      echo "Bootstrap - found $l"
       missing_libs=$(echo $missing_libs | sed -e "s/$l//")
     fi
   done
+else
+  echo "Bootstrap - clean build"
 fi
 
 mkdir -p $externals_build_dir
