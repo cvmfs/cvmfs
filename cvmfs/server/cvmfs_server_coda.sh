@@ -5,7 +5,8 @@
 ################################################################################
 
 # Configuration variables for update-geodb -l.  May be overridden in
-#   /etc/cvmfs/cvmfs_server_hooks.sh or per-repo replica.conf.
+#   /etc/cvmfs/cvmfs_server_hooks.sh, /etc/cvmfs/server.local, or
+#   per-repo in replica.conf.
 # Default settings will attempt to update from cvmfs_server snapshot
 #   once every 4 weeks in the 10 o'clock hour of Tuesday.
 CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
