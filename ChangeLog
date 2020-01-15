@@ -1,4 +1,5 @@
 2.8.0:
+  * Add the cvmfs_publish transitional utility
   * Add convert-singularity-image command to DUCC
   * Enable readdir caching on fuse3 and kernel >= 4.20
   * Add fuse forget_multi calback for fuse >= 2.9
