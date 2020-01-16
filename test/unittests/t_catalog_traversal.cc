@@ -14,6 +14,7 @@
 #include "manifest.h"
 #include "prng.h"
 #include "testutil.h"
+#include "util/string.h"
 
 using swissknife::CatalogTraversal;
 using swissknife::CatalogTraversalParallel;
@@ -72,6 +73,24 @@ class T_CatalogTraversal : public ::testing::Test {
     max_revision(6),
     initial_catalog_instances(42) /* depends on max_revision */ {}
 
+
+  CatalogIdentifiers SetupHugeRevisions() {
+    CatalogIdentifiers huge_catalogs;
+    revisions_[7] = CatalogPathMap();
+
+    root_catalogs_[7] =
+      RootCatalogInfo(h("5200e05489fda665361bb055bf5dbd3be632756a", 'C'),
+                      t(2, 3, 2017));
+    MockCatalog *root_catalog_7 =
+      CreateAndRegisterCatalog("", 7, GetRootTimestamp(7), NULL,
+                               GetRootHash(7));
+    huge_catalogs.push_back(CatalogIdentifier(7, ""));
+    CatalogIdentifiers cat_list = MakeSubtree("", 7, GetRootTimestamp(7),
+                                  root_catalog_7, 183285);
+    huge_catalogs.insert(huge_catalogs.end(), cat_list.begin(), cat_list.end());
+    return huge_catalogs;
+  }
+
  protected:
   void SetUp() {
     MockCatalog::ResetGlobalState();
@@ -99,24 +118,22 @@ class T_CatalogTraversal : public ::testing::Test {
     if (check_counts) {
       EXPECT_EQ(expected.size(), observed.size());
     }
+
     typedef CatalogIdentifiers::const_iterator itr;
+    std::set<CatalogIdentifier> observed_set;
 
-    itr i    = expected.begin();
-    itr iend = expected.end();
+    itr i    = observed.begin();
+    itr iend = observed.end();
     for (; i != iend; ++i) {
-      bool found = false;
+      observed_set.insert(*i);
+    }
 
-      itr j    = observed.begin();
-      itr jend = observed.end();
-      for (; j != jend; ++j) {
-        if (*i == *j) {
-          found = true;
-          break;
-        }
-      }
-
-      EXPECT_TRUE(found) << "didn't find catalog: " << i->second << " "
-                          << "(revision: " << i->first << ")";
+    itr j    = expected.begin();
+    itr jend = expected.end();
+    for (; j != jend; ++j) {
+      bool found = (observed_set.find(*j) != observed_set.end());
+      EXPECT_TRUE(found) << "didn't find catalog: " << j->second << " "
+                         << "(revision: " << j->first << ")";
     }
   }
 
@@ -131,6 +148,27 @@ class T_CatalogTraversal : public ::testing::Test {
         << observed[_i].first << " " << observed[_i].second << std::endl
         << "expected: "
         << expected[_i].first << " " << expected[_i].second << std::endl;
+    }
+  }
+
+  // Checks the post-order property of the catalog list:
+  // parent of a node must come after the node itself in the list
+  void CheckCatalogPostOrder(const CatalogIdentifiers &observed) {
+    std::set<CatalogIdentifier> seen;
+
+    typedef CatalogIdentifiers::const_iterator itr;
+    itr i = observed.begin();
+    itr iend = observed.end();
+    for (; i != iend; ++i) {
+      if (i->second == "") continue;
+      std::string parent_path =
+        i->second.substr(0, i->second.find_last_of("/"));
+      CatalogIdentifier parent(i->first, parent_path);
+      bool found = (seen.find(parent) != seen.end());
+      EXPECT_FALSE(found) << "found parent catalog " << parent_path << " before"
+                          << " child catalog " << i->second << " (revision: "
+                          << i->first << ")";
+      seen.insert(*i);
     }
   }
 
@@ -283,7 +321,7 @@ class T_CatalogTraversal : public ::testing::Test {
     // create the root catalog
     MockCatalog *root_catalog =
       CreateAndRegisterCatalog("", revision, GetRootTimestamp(revision), NULL,
-                               this->GetRootHash(revision));
+                               GetRootHash(revision));
 
     // create the catalog hierarchy depending on the revision
     switch (revision) {
@@ -366,6 +404,29 @@ class T_CatalogTraversal : public ::testing::Test {
     } else {
       FAIL();
     }
+  }
+
+  CatalogIdentifiers MakeSubtree(
+    const std::string &path, unsigned revision, time_t timestamp,
+    MockCatalog *parent, unsigned num_catalogs)
+  {
+    CatalogIdentifiers result;
+    result.reserve(num_catalogs);
+    for (unsigned i = 0; num_catalogs > 0; ++i) {
+      // generate deterministic "random" branch size between 1 and num_catalogs
+      unsigned branch_size =
+        ((num_catalogs/((num_catalogs % 10) + 1)) % num_catalogs) + 1;
+      std::string branch_path = path + "/" + StringifyUint(i);
+      MockCatalog *branch_root =
+        CreateAndRegisterCatalog(branch_path, revision, timestamp, parent);
+      result.push_back(CatalogIdentifier(revision, branch_path));
+      CatalogIdentifiers subtree = MakeSubtree(branch_path, revision, timestamp,
+                                               branch_root, branch_size - 1);
+      result.insert(result.end(), subtree.begin(), subtree.end());
+      num_catalogs -= branch_size;
+    }
+
+    return result;
   }
 
   MockCatalog* CreateAndRegisterCatalog(
@@ -2960,4 +3021,33 @@ TYPED_TEST(T_CatalogTraversal, TraverseNamedSnapshotsWithoutHistory) {
     catalogs, TraverseNamedSnapshotsWithoutHistory_visited_catalogs);
   this->CheckCatalogSequence(
     catalogs, TraverseNamedSnapshotsWithoutHistory_visited_catalogs);
+}
+
+CatalogIdentifiers TraverseDepthFirstParallelStressSlow_visited_catalogs;
+void TraverseDepthFirstParallelStressSlowCallback(
+  const MockedCatalogTraversal::CallbackDataTN &data)
+{
+  TraverseDepthFirstParallelStressSlow_visited_catalogs.push_back(
+    std::make_pair(data.catalog->GetRevision(),
+                   data.catalog->mountpoint().ToString()));
+}
+
+TYPED_TEST(T_CatalogTraversal, TraverseDepthFirstParallelStressSlow) {
+  if (!TraversalIsParallel<TypeParam>()) {
+    return;
+  }
+  CatalogIdentifiers present_catalogs = this->SetupHugeRevisions();
+  TraversalParams params = this->GetBasicTraversalParams();
+  params.num_threads = 8;
+  params.no_close = true;
+  TypeParam traverse(params);
+  traverse.RegisterListener(&TraverseDepthFirstParallelStressSlowCallback);
+  const bool t1 = traverse.TraverseRevision(this->GetRootHash(7),
+                                            TypeParam::kDepthFirst);
+  EXPECT_TRUE(t1);
+
+  this->CheckVisitedCatalogs(present_catalogs,
+    TraverseDepthFirstParallelStressSlow_visited_catalogs);
+  this->CheckCatalogPostOrder(
+    TraverseDepthFirstParallelStressSlow_visited_catalogs);
 }
