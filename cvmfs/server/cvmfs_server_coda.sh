@@ -5,13 +5,14 @@
 ################################################################################
 
 # Configuration variables for update-geodb -l.  May be overridden in
-#   /etc/cvmfs/cvmfs_server_hooks.sh or per-repo replica.conf.
+#   /etc/cvmfs/cvmfs_server_hooks.sh, /etc/cvmfs/server.local, or
+#   per-repo in replica.conf.
 # Default settings will attempt to update from cvmfs_server snapshot
 #   once every 4 weeks in the 10 o'clock hour of Tuesday.
 CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
 CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
-CVMFS_UPDATEGEO_MINDAYS=25 # Minimum days between update attempts
-CVMFS_UPDATEGEO_MAXDAYS=100 # Maximum days old before considering it an error
+CVMFS_UPDATEGEO_MINDAYS=14 # Minimum days between update attempts
+CVMFS_UPDATEGEO_MAXDAYS=28 # Maximum days before considering it urgent
 
 CVMFS_UPDATEGEO_URLBASE="https://download.maxmind.com/app/geoip_download"
 CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
