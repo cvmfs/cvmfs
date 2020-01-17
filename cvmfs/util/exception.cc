@@ -47,9 +47,9 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
 #endif
 }
 
-void Panic(const char* coordinates, const LogSource _source, const int _mask) {
-  assert(_mask == 0);
-  Panic(coordinates, _source, _mask, "");
+void Panic(const char* coordinates, const LogSource _source, const char *nul) {
+  assert(nul == NULL);
+  Panic(coordinates, _source, kLogDebug | kLogStderr | kLogSyslogErr, "");
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
