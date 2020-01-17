@@ -1,4 +1,4 @@
-cvmfs_test_name="Repository gateway nested catalogs"
+cvmfs_test_name="Repository gateway lease on not existsing directory"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
@@ -41,6 +41,17 @@ save_repo_contents() {
 run_transactions() {
     set_up_repository_gateway
 
+    ## Pre-checks: starting and aborting transactions should leave no trace
+    cvmfs_server transaction test.repo.org
+    cvmfs_server abort -f test.repo.org
+    cvmfs_server check test.repo.org
+
+    cvmfs_server transaction test.repo.org
+    cp -r /usr/bin /cvmfs/test.repo.org
+    cvmfs_server abort -f test.repo.org
+    cvmfs_server check test.repo.org
+
+
     echo "Checking transaction + publish"
 
     ## Transaction 1
@@ -48,54 +59,46 @@ run_transactions() {
     cvmfs_server transaction test.repo.org
 
     echo "  Create a deep directory hierarchy"
-    mkdir -p /cvmfs/test.repo.org/a
-    echo "New file" > /cvmfs/test.repo.org/a/b
+    mkdir -p /cvmfs/test.repo.org/a/b
+    echo "New file" > /cvmfs/test.repo.org/a/b/new_file.txt
     touch /cvmfs/test.repo.org/a/.cvmfscatalog
 
     echo "  Publishing changes 1"
     cvmfs_server publish -v test.repo.org
     cvmfs_server check test.repo.org
 
-    echo "  Checking results 1"
-    compare_file_checksum /tmp/cvmfs_out_1/a/b f1885b1a57c71cacbd923fc5e9aefef3
-    if [ x"$(cvmfs_server check test.repo.org | grep /a)" = x"" ]; then
-        echo "Nested catalog not created at /a"
-        return 1
-    else
-        echo "Nested catalog was successfully created at /a"
-    fi
-
     echo "  Copy the contents of the repository"
     save_repo_contents /tmp/cvmfs_out_1
 
     echo "  Checking results 1"
-    compare_file_checksum /tmp/cvmfs_out_1/a/b f1885b1a57c71cacbd923fc5e9aefef3
+    compare_file_checksum /tmp/cvmfs_out_1/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 101
     if [ x"$(cvmfs_server check test.repo.org | grep /a)" = x"" ]; then
         echo "Nested catalog not created at /a"
-        return 1
+        return 102
     else
         echo "Nested catalog was successfully created at /a"
     fi
 
 
-    echo "  Getting lease on subdirectory that does not exists yet"
+    echo "  Getting lease on subdirectory that does not exists yet should not work"
     cvmfs_server transaction test.repo.org/foo/bar/
 
-    mkdir -p /cvmfs/test.repo.org/foo/bar/baz/
-    touch /cvmfs/test.repo.org/foo/bar/baz/.cvmfscatalog
-    touch /cvmfs/test.repo.org/foo/bar/nested_file
-    echo "Nested file" > /cvmfs/test.repo.org/foo/bar/nested_file
-    
-    echo "  Publishing changes"
-    cvmfs_server publish -v test.repo.org
-    cvmfs_server check test.repo.org
-
-    tree /cvmfs/test.repo.org
-
-    if [ x"$(tree /cvmfs/test.repo.org | grep nested_file)" = x"" ]; then
-        echo "File nested_file not found"
-        return 2
+    if [ $? -ne 2 ]; then
+        echo "  Error should not be possible to open a transaction on a directory that does not exists"
+        return 103
     fi
+
+    cvmfs_server check test.repo.org || return 104
+
+    echo "  Getting lease on a directory we are going to create should work"
+    cvmfs_server transaction test.repo.org/foo/
+    mkdir /cvmfs/test.repo.org/foo
+    echo "New file" > /cvmfs/test.repo.org/foo/bar.txt
+    save_repo_contents /tmp/cvmfs_out_2
+
+    cvmfs_server check test.repo.org || return 105
+
+    compare_file_checksum /tmp/cvmfs_out_2/foo/bar.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 105
 
     clean_up
 }
