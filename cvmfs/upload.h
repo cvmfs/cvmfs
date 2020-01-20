@@ -265,6 +265,15 @@ class Spooler : public Observable<SpoolerResult> {
   bool Peek(const std::string &path) const;
 
   /**
+   * Make directory in upstream storage. Noop if directory already present.
+   * NOTE: currently only used to create the 'stats/' subdirectory
+   * 
+   * @param path relative directory path in the upstream storage
+   * @return true if the directory was successfully created or already present
+   */
+  bool Mkdir(const std::string &path);
+
+  /**
    * Creates a top-level shortcut to the given data object. This is particularly
    * useful for bootstrapping repositories whose data-directory is secured by
    * a VOMS certificate.

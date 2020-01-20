@@ -273,6 +273,9 @@ cvmfs_server_publish() {
     if [ "x$CVMFS_IGNORE_SPECIAL_FILES" = "xtrue" ]; then
       sync_command="$sync_command -g"
     fi
+    if [ "x$CVMFS_UPLOAD_STATS_DB" = "xtrue" ]; then
+      sync_command="$sync_command -I"
+    fi
     local sync_command_virtual_dir=
     if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
       sync_command_virtual_dir="$sync_command -S snapshots"

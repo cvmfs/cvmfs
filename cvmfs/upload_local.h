@@ -69,6 +69,8 @@ class LocalUploader : public AbstractUploader {
 
   bool Peek(const std::string &path);
 
+  bool Mkdir(const std::string &path);
+
   bool PlaceBootstrappingShortcut(const shash::Any &object);
 
   /**

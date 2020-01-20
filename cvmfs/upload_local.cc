@@ -37,7 +37,8 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 }
 
 bool LocalUploader::Create() {
-  return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_);
+  return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_) &&
+         MkdirDeep(upstream_path_ + "/stats", backend_dir_mode_, false);
 }
 
 void LocalUploader::DoUpload(const std::string &remote_path,
@@ -211,6 +212,10 @@ void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
 bool LocalUploader::Peek(const std::string &path) {
   bool retval = FileExists(upstream_path_ + "/" + path);
   return retval;
+}
+
+bool LocalUploader::Mkdir(const std::string &path) {
+  return MkdirDeep(upstream_path_ + "/" + path, backend_dir_mode_, false);
 }
 
 bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) {

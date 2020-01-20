@@ -534,6 +534,12 @@ bool S3Uploader::Peek(const std::string& path) {
 }
 
 
+// noop: no mkdir needed in S3 storage
+bool S3Uploader::Mkdir(const std::string &path) {
+  return true;
+}
+
+
 bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) {
   return false;  // TODO(rmeusel): implement
 }

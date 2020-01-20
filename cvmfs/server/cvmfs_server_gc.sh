@@ -323,6 +323,10 @@ __run_gc() {
     additional_switches="$additional_switches -L $CVMFS_GC_DELETION_LOG"
   fi
 
+  if [ x"$CVMFS_UPLOAD_STATS_DB" = x"true" ]; then
+    additional_switches="$additional_switches -I"
+  fi
+
   # do it!
   local user_shell="$(get_user_shell $name)"
 

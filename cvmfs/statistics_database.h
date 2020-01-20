@@ -11,6 +11,7 @@
 #include "options.h"
 #include "sql.h"
 #include "statistics.h"
+#include "upload.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -20,7 +21,11 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
  protected:
   friend class sqlite::Database<StatisticsDatabase>;
   StatisticsDatabase(const std::string  &filename,
-                const OpenMode      open_mode);
+                     const OpenMode      open_mode);
+
+  std::string repo_name_;
+
+  bool StoreEntry(const std::string &insert_statement);
 
  public:
   // not const - needs to be adaptable!
@@ -42,15 +47,50 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   ~StatisticsDatabase();
 
 /**
-  * Entry point function for writing data into database
-  *
-  * @return 0 if no error occured or a negative integer if errors occurred
-  */
-  int StoreStatistics(const perf::Statistics *statistics,
-                      const std::string &start_time,
-                      const std::string &finish_time,
-                      const std::string &command_name,
-                      const std::string &repo_name);
+ * Opens or creates a statistics DB in standard path
+ * for repo_name repository 
+ * 
+ * @return StatisticsDatabase pointer on success, NULL otherwise
+ */
+  static StatisticsDatabase *OpenStandardDB(const std::string repo_name);
+
+/**
+ * Store a publish entry into the database
+ * 
+ * @return true on success, false otherwise
+ */
+  bool StorePublishStatistics(const perf::Statistics *statistics,
+                              const std::string &start_time,
+                              const bool success);
+
+/**
+ * Store a publish entry into the database
+ * 
+ * @return true on success, false otherwise
+ */
+  bool StoreGCStatistics(const perf::Statistics *statistics,
+                         const std::string &start_time,
+                         const bool success);
+
+/**
+ * Upload the statistics database into the storage backend
+ * configured in spooler. This is a convenience method
+ * useful when only the spooler (and not the underlying)
+ * uploader) is available to the developer.
+ * 
+ * @return true on success, false otherwise
+ */
+  bool UploadStatistics(upload::Spooler *spooler,
+                        std::string local_path = "");
+
+/**
+ * Upload the statistics database into the storage backend
+ * configured in uploader.
+ * 
+ * @return true on success, false otherwise
+ */
+  bool UploadStatistics(upload::AbstractUploader *uploader,
+                        std::string local_path = "");
 
 /**
   * Get the path for the database file

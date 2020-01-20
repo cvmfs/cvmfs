@@ -43,11 +43,14 @@ ParameterList CommandGc::GetParams() const {
   r.push_back(Parameter::Optional('L', "path to deletion log file"));
   r.push_back(Parameter::Switch('d', "dry run"));
   r.push_back(Parameter::Switch('l', "list objects to be removed"));
+  r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
   return r;
 }
 
 
 int CommandGc::Main(const ArgumentList &args) {
+  std::string start_time = GetGMTimestamp();
+
   const std::string &repo_url = *args.find('r')->second;
   const std::string &spooler = *args.find('u')->second;
   const std::string &repo_name = *args.find('n')->second;
@@ -73,6 +76,7 @@ int CommandGc::Main(const ArgumentList &args) {
     *args.find('t')->second : "/tmp";
   const std::string deletion_log_path = (args.count('L') > 0) ?
     *args.find('L')->second : "";
+  const bool upload_statsdb = (args.count('I') > 0);
 
   if (revisions < 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -169,6 +173,8 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
+  StatisticsDatabase *stats_db = StatisticsDatabase::OpenStandardDB(repo_name);
+
   // File catalogs
   GC collector(config);
   collector.UseReflogTimestamps();
@@ -176,6 +182,12 @@ int CommandGc::Main(const ArgumentList &args) {
 
   if (!success) {
     LogCvmfs(kLogCvmfs, kLogStderr, "garbage collection failed");
+    if (!dry_run) {
+      stats_db->StoreGCStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(uploader);
+      }
+    }
     uploader->TearDown();
     return 1;
   }
@@ -191,6 +203,12 @@ int CommandGc::Main(const ArgumentList &args) {
   if (!success) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "garbage collection of auxiliary files failed");
+    if (!dry_run) {
+      stats_db->StoreGCStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(uploader);
+      }
+    }
     uploader->TearDown();
     return 1;
   }
@@ -224,10 +242,22 @@ int CommandGc::Main(const ArgumentList &args) {
 
   if (uploader->GetNumberOfErrors() > 0 && !dry_run) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload updated Reflog");
+
+    stats_db->StoreGCStatistics(this->statistics(), start_time, false);
+    if (upload_statsdb) {
+      stats_db->UploadStatistics(uploader);
+    }
+
     uploader->TearDown();
     return 1;
   }
 
+  if (!dry_run) {
+    stats_db->StoreGCStatistics(this->statistics(), start_time, true);
+    if (upload_statsdb) {
+      stats_db->UploadStatistics(uploader);
+    }
+  }
   uploader->TearDown();
   return 0;
 }

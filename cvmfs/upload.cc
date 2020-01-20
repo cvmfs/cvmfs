@@ -124,6 +124,10 @@ bool Spooler::Peek(const std::string &path) const {
   return uploader_->Peek(path);
 }
 
+bool Spooler::Mkdir(const std::string &path) {
+  return uploader_->Mkdir(path);
+}
+
 bool Spooler::PlaceBootstrappingShortcut(const shash::Any &object) const {
   assert(!object.IsNull());
   return uploader_->PlaceBootstrappingShortcut(object);
