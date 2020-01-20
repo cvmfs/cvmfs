@@ -1,4 +1,6 @@
 2.8.0:
+  * [Server] add new parameter CVMFS_UPLOAD_STATS_DB=[true/false] in order to
+    push publish and GC statistics into the /stats location on the Stratum 0
   * [GW] fix lease acquisiton on non-existing paths (CVM-1696) 
   * Add the cvmfs_publish transitional utility
   * Add convert-singularity-image command to DUCC
