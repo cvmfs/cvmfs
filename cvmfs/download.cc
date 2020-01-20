@@ -360,6 +360,17 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 //------------------------------------------------------------------------------
 
 
+bool JobInfo::IsFileNotFound() {
+  if (HasPrefix(*url, "file://", true /* ignore_case */))
+    return error_code == kFailHostConnection;
+
+  return http_code == 404;
+}
+
+
+//------------------------------------------------------------------------------
+
+
 const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;

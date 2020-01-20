@@ -15,10 +15,15 @@ class CmdInfo : public Command {
  public:
   virtual std::string GetName() const { return "info"; }
   virtual std::string GetBrief() const {
-    return "Retrieves global repository information";
+    return "Shows summary information about a repository";
+  }
+  virtual std::string GetDescription() const {
+    return "Shows high-level data about a repository, such as its name, "
+      "whitelist expiry, etc. For stratum 0/1 repositories managed on the "
+      "machine, additionally shows the main configuration settings.";
   }
   virtual std::string GetUsage() const {
-    return "[options] <repository URL>";
+    return "[options] <repository name / URL>";
   }
   virtual ParameterList GetParams() const {
     ParameterList p;
@@ -30,7 +35,6 @@ class CmdInfo : public Command {
       "Path to sqlite statistics output file"));
     return p;
   }
-  virtual unsigned GetMinPlainArgs() const { return 1; }
 
   virtual int Main(const Options &options);
 };  // class CmdInfo

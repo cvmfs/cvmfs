@@ -245,6 +245,8 @@ set (CVMFS_SHRINKWRAP_SOURCES
 set (CVMFS_PUBLISH_SOURCES
   compression.cc
   directory_entry.cc
+  dns.cc
+  download.cc
   hash.cc
   logging.cc
   manifest.cc
@@ -261,11 +263,14 @@ set (CVMFS_PUBLISH_SOURCES
   publish/settings.cc
   sanitizer.cc
   signature.cc
+  statistics.cc
   upload_spooler_definition.cc
+  util/algorithm.cc
   util/exception.cc
   util/namespace.cc
   util/posix.cc
   util/string.cc
+  whitelist.cc
 )
 
 set (LIBCVMFS_SERVER_SOURCES
