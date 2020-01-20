@@ -1,4 +1,5 @@
 2.8.0:
+  * [GW] fix lease acquisiton on non-existing paths (CVM-1696) 
   * Add the cvmfs_publish transitional utility
   * Add convert-singularity-image command to DUCC
   * Enable readdir caching on fuse3 and kernel >= 4.20
