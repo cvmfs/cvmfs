@@ -75,14 +75,14 @@ static void RevertToRevision2(StatisticsDatabase *db) {
 }
 
 
-TEST_F(T_StatisticsSql, SchemaMigration1To2) {
+TEST_F(T_StatisticsSql, SchemaMigration1To3) {
   string path;
   FILE *ftmp = CreateTempFile("./cvmfs_stats.db", 0600, "w+", &path);
   ASSERT_TRUE(ftmp != NULL);
   fclose(ftmp);
   UnlinkGuard unlink_guard(path);
 
-  // Revision 1 --> 2
+  // Revision 3 --> 1
   {
     UniquePtr<StatisticsDatabase>
       db(StatisticsDatabase::Create(path));
@@ -97,7 +97,7 @@ TEST_F(T_StatisticsSql, SchemaMigration1To2) {
 
     sqlite::Sql sql1(db->sqlite_db(), "SELECT revision, finish_time, "
       "chunks_added, chunks_duplicated, symlinks_added, symlinks_removed, "
-      "symlinks_changed, catalogs_added, sz_catalog_bytes_uploaded "
+      "symlinks_changed, catalogs_added, sz_catalog_bytes_uploaded, success "
       "FROM publish_statistics;");
     ASSERT_TRUE(sql1.Execute());
 
