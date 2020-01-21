@@ -15,6 +15,8 @@
 #include "sync_union.h"
 #include "upload_spooler_definition.h"
 
+class OptionsManager;
+
 namespace publish {
 
 /**
@@ -164,10 +166,10 @@ class SettingsKeychain {
   explicit SettingsKeychain(const std::string &fqrn)
     : fqrn_(fqrn)
     , keychain_dir_("/etc/cvmfs/keys")
-    , master_private_key_path_(keychain_dir_() + fqrn + ".masterkey")
-    , master_public_key_path_(keychain_dir_() + fqrn + ".pub")
-    , private_key_path_(keychain_dir_() + fqrn + ".key")
-    , certificate_path_(keychain_dir_() + fqrn + ".crt")
+    , master_private_key_path_(keychain_dir_() + "/" + fqrn + ".masterkey")
+    , master_public_key_path_(keychain_dir_() + "/" + fqrn + ".pub")
+    , private_key_path_(keychain_dir_() + "/" + fqrn + ".key")
+    , certificate_path_(keychain_dir_() + "/" + fqrn + ".crt")
   {}
 
   void SetKeychainDir(const std::string &keychain_dir);
@@ -195,6 +197,8 @@ class SettingsKeychain {
 };  // class SettingsKeychain
 
 
+class SettingsPublisher;
+
 /**
  * Description of a read-only repository
  */
@@ -206,6 +210,7 @@ class SettingsRepository {
     , tmp_dir_("/tmp")
     , keychain_(fqrn)
   {}
+  explicit SettingsRepository(const SettingsPublisher &settings_publisher);
 
   void SetUrl(const std::string &url);
   void SetTmpDir(const std::string &tmp_dir);
@@ -298,9 +303,13 @@ class SettingsReplica {
  * Create Settings objects from the system configuration in
  * /etc/cvmfs/repositories.d
  */
-class SettingsBuilder {
+class SettingsBuilder : SingleCopy {
  public:
-  SettingsBuilder() : config_path_("/etc/cvmfs/repositories.d") {}
+  SettingsBuilder()
+    : config_path_("/etc/cvmfs/repositories.d")
+    , options_mgr_(NULL)
+  {}
+  ~SettingsBuilder();
   /**
    * Used in unit tests.
    */
@@ -315,8 +324,16 @@ class SettingsBuilder {
    */
   SettingsRepository CreateSettingsRepository(const std::string &ident);
 
+  OptionsManager *options_mgr() const { return options_mgr_; }
+  bool IsManagedRepository() const { return options_mgr_ != NULL; }
+
  private:
   std::string config_path_;
+  /**
+   * For locally managed repositories, the options manager is non NULL and
+   * contains the configuration after a call to CreateSettingsRepository()
+   */
+  OptionsManager *options_mgr_;
 
   /**
    * Returns the name of the one and only repository under kConfigPath

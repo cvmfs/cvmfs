@@ -94,7 +94,7 @@ class Whitelist {
 
   void CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
                    unsigned *pkcs7_size, unsigned char **pkcs7_buf) const;
-  time_t expires();
+  time_t expires() const;
   bool IsExpired() const;
   Failures VerifyLoadedCertificate() const;
 

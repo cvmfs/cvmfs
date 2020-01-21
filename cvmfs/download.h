@@ -269,6 +269,12 @@ struct JobInfo {
     }
   }
 
+  /**
+   * Tells whether the error is because of a non-existing file. Should only
+   * be called if error_code is not kFailOk
+   */
+  bool IsFileNotFound();
+
   // Internal state, don't touch
   CURL *curl_handle;
   curl_slist *headers;

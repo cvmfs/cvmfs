@@ -168,7 +168,7 @@ void Repository::DownloadRootObjects(
     if (reflog_ == NULL) throw EPublish("cannot open reflog");
     reflog_->TakeDatabaseFileOwnership();
   } else {
-    if (download_reflog.http_code != 404) {
+    if (!download_reflog.IsFileNotFound()) {
       throw EPublish(std::string("cannot load reflog [") +
                      download::Code2Ascii(rv_dl) + "]");
     }
@@ -217,6 +217,18 @@ void Repository::DownloadRootObjects(
 
 std::string Repository::GetFqrnFromUrl(const std::string &url) {
   return GetFileName(MakeCanonicalPath(url));
+}
+
+
+bool Repository::IsMasterReplica() {
+  std::string url = settings_.url() + "/.cvmfs_master_replica";
+  download::JobInfo head(&url, false /* probe_hosts */);
+  download::Failures retval = download_mgr_->Fetch(&head);
+  if (retval == download::kFailOk) return true;
+  if (head.IsFileNotFound()) return false;
+
+  throw EPublish(std::string("error looking for .cvmfs_master_replica [") +
+                 download::Code2Ascii(retval) + "]");
 }
 
 
@@ -441,6 +453,11 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   publisher->PushReflog();
   publisher->PushManifest();
   // TODO(jblomer): meta-info
+
+  // Re-create from empty repository in order to properly initialize
+  // parent Repository object
+  publisher = new Publisher(settings);
+
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
   return publisher.Release();
@@ -555,7 +572,8 @@ Publisher::Publisher()
 }
 
 Publisher::Publisher(const SettingsPublisher &settings)
-  : settings_(settings)
+  : Repository(SettingsRepository(settings))
+  , settings_(settings)
   , llvl_(settings.is_silent() ? kLogNone : kLogNormal)
   , in_transaction_(false)
 {
@@ -569,9 +587,6 @@ Publisher::Publisher(const SettingsPublisher &settings)
   if (spooler_ == NULL) throw EPublish("could not initialize spooler");
 
   int rvb;
-  rvb = signature_mgr_->LoadPublicRsaKeys(
-    settings.keychain().master_public_key_path());
-  if (!rvb) throw EPublish("cannot load public rsa key");
   rvb =
     signature_mgr_->LoadCertificatePath(settings.keychain().certificate_path());
   if (!rvb) throw EPublish("cannot load certificate");
@@ -583,12 +598,6 @@ Publisher::Publisher(const SettingsPublisher &settings)
     settings.keychain().master_private_key_path());
   if (!rvb) throw EPublish("cannot load private master key");
   if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
-
-  download_mgr_ = new download::DownloadManager();
-  download_mgr_->Init(16, false,
-                      perf::StatisticsTemplate("download", statistics_));
-  DownloadRootObjects(settings.url(), settings.fqrn(),
-                      settings.transaction().spool_area().tmp_dir());
 
   // TODO(jblomer): check transaction lock
 }
@@ -666,6 +675,19 @@ void Publisher::Publish() {
   PushManifest();
   in_transaction_ = false;
 }
+
+
+void Publisher::MarkReplicatible(bool value) {
+  if (value) {
+    spooler_->Upload("/dev/null", "/.cvmfs_master_replica");
+  } else {
+    spooler_->RemoveAsync("/.cvmfs_master_replica");
+  }
+  spooler_->WaitForUpload();
+  if (spooler_->GetNumberOfErrors() > 0)
+    throw EPublish("cannot set replication mode");
+}
+
 
 void Publisher::Ingest() {}
 void Publisher::Migrate() {}

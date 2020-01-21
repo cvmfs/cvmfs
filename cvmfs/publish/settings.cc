@@ -151,6 +151,17 @@ bool SettingsKeychain::HasRepositoryKeys() const {
 //------------------------------------------------------------------------------
 
 
+SettingsRepository::SettingsRepository(
+  const SettingsPublisher &settings_publisher)
+  : fqrn_(settings_publisher.fqrn())
+  , url_(settings_publisher.url())
+  , tmp_dir_(settings_publisher.transaction().spool_area().tmp_dir())
+  , keychain_(settings_publisher.fqrn())
+{
+  keychain_.SetKeychainDir(settings_publisher.keychain().keychain_dir());
+}
+
+
 void SettingsRepository::SetUrl(const std::string &url) {
   // TODO(jblomer): sanitiation, check availability
   url_ = url;
@@ -191,6 +202,11 @@ void SettingsPublisher::SetIsSilent(bool value) {
 //------------------------------------------------------------------------------
 
 
+SettingsBuilder::~SettingsBuilder() {
+  delete options_mgr_;
+}
+
+
 std::string SettingsBuilder::GetSingleAlias() {
   std::vector<std::string> repositories = FindDirectories(config_path_);
   if (repositories.empty())
@@ -224,20 +240,25 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   std::string replica_path = repo_path + "/replica.conf";
   std::string fqrn = alias;
 
-  BashOptionsManager options;
+  delete options_mgr_;
+  options_mgr_ = new BashOptionsManager();
   std::string arg;
-  options.set_taint_environment(false);
-  options.ParsePath(server_path, false /* external */);
-  options.ParsePath(replica_path, false /* external */);
-  if (options.GetValue("CVMFS_REPOSITORY_NAME", &arg))
+  options_mgr_->set_taint_environment(false);
+  options_mgr_->ParsePath(server_path, false /* external */);
+  options_mgr_->ParsePath(replica_path, false /* external */);
+  if (options_mgr_->GetValue("CVMFS_REPOSITORY_NAME", &arg))
     fqrn = arg;
   SettingsRepository settings(fqrn);
 
-  if (options.GetValue("CVMFS_PUBLIC_KEY", &arg))
+  if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &arg))
     settings.GetKeychain()->SetKeychainDir(arg);
-  if (options.GetValue("CVMFS_STRATUM0", &arg))
+  if (options_mgr_->GetValue("CVMFS_STRATUM0", &arg))
     settings.SetUrl(arg);
-  if (options.GetValue("CVMFS_SPOOL_DIR", &arg))
+  // For a replica, the stratum 1 url is the "local" location, hence it takes
+  // precedence over the stratum 0 url
+  if (options_mgr_->GetValue("CVMFS_STRATUM1", &arg))
+    settings.SetUrl(arg);
+  if (options_mgr_->GetValue("CVMFS_SPOOL_DIR", &arg))
     settings.SetTmpDir(arg + "/tmp");
 
   return settings;

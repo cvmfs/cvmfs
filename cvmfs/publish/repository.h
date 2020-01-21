@@ -85,6 +85,11 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   void Diff(const std::string &from, const std::string &to,
             DiffListener *diff_listener);
 
+  /**
+   * Checks whether the $url/.cvmfs_master_replica is available
+   */
+  bool IsMasterReplica();
+
   const signature::SignatureManager *signature_mgr() const {
     return signature_mgr_;
   }
@@ -142,6 +147,11 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    */
   void EditTags(const std::vector<history::History::Tag> &add_tags,
                 const std::vector<std::string> &rm_tags);
+  /**
+   * Create empty $url/.cvmfs_master_replica
+   */
+  void MarkReplicatible(bool value);
+
   void Rollback();
   void Resign();
   void Migrate();

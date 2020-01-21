@@ -427,6 +427,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   publish/main.cc
   publish/t_command.cc
   publish/t_diff.cc
+  publish/t_repository.cc
   publish/t_settings.cc
 
   ../common/env.cc
