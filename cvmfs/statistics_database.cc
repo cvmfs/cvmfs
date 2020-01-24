@@ -287,7 +287,7 @@ bool StatisticsDatabase::LiveSchemaUpgradeIfNecessary() {
     sqlite::Sql publish_upgrade2_2(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD revision INTEGER;");
     sqlite::Sql publish_upgrade2_3(this->sqlite_db(), "ALTER TABLE "
-    "publish_statistics RENAME COLUMN duplicated_files TO chunks_duplicated");
+    "publish_statistics RENAME COLUMN duplicated_files TO chunks_duplicated;");
     sqlite::Sql publish_upgrade2_4(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD chunks_added INTEGER;");
     sqlite::Sql publish_upgrade2_5(this->sqlite_db(), "ALTER TABLE "
@@ -361,7 +361,6 @@ bool StatisticsDatabase::LiveSchemaUpgradeIfNecessary() {
       return false;
     }
   }
-
   return true;
 }
 
