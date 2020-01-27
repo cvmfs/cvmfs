@@ -16,6 +16,7 @@ func init() {
 	loopCmd.Flags().BoolVarP(&overwriteLayer, "overwrite-layers", "f", false, "overwrite the layer if they are already inside the CVMFS repository")
 	loopCmd.Flags().BoolVarP(&convertAgain, "convert-again", "g", false, "convert again images that are already successfull converted")
 	loopCmd.Flags().BoolVarP(&convertSingularity, "convert-singularity", "s", true, "also create a singularity images")
+	loopCmd.Flags().BoolVarP(&convertDocker, "convert-docker", "d", true, "unpacking the layers into the repository")
 	rootCmd.AddCommand(loopCmd)
 }
 
@@ -65,9 +66,11 @@ var loopCmd = &cobra.Command{
 					"repository":   wish.CvmfsRepo,
 					"output image": wish.OutputName}
 				lib.Log().WithFields(fields).Info("Start conversion of wish")
-				err = lib.ConvertWishDocker(wish, convertAgain, overwriteLayer)
-				if err != nil {
-					lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+				if convertDocker {
+					err = lib.ConvertWishDocker(wish, convertAgain, overwriteLayer)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+					}
 				}
 				if convertSingularity {
 					err = lib.ConvertWishSingularity(wish)
