@@ -218,12 +218,15 @@ std::string SettingsBuilder::GetSingleAlias() {
 
 
 SettingsRepository SettingsBuilder::CreateSettingsRepository(
-  const std::string &ident)
+  const std::string &ident, bool needs_managed)
 {
   if (HasPrefix(ident, "http://", true /* ignore case */) ||
       HasPrefix(ident, "https://", true /* ignore case */) ||
       HasPrefix(ident, "file://", true /* ignore case */))
   {
+    if (needs_managed)
+      throw EPublish("remote repositories are not supported in this context");
+
     std::string fqrn = Repository::GetFqrnFromUrl(ident);
     sanitizer::RepositorySanitizer sanitizer;
     if (!sanitizer.IsValid(fqrn)) {

@@ -321,8 +321,10 @@ class SettingsBuilder : SingleCopy {
    * Otherweise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
    * If alias is an empty string, the command still succeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
+   * If is_managed is true, the repository has to be a local, managed one.
    */
-  SettingsRepository CreateSettingsRepository(const std::string &ident);
+  SettingsRepository CreateSettingsRepository(const std::string &ident,
+                                              bool is_managed = false);
 
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }

@@ -361,6 +361,17 @@ TEST_F(T_Util, GetFileName) {
 }
 
 
+TEST_F(T_Util, GetFileSystemType) {
+  if (!DirectoryExists("/proc")) {
+    printf("Skipping\n");
+    return;
+  }
+
+  EXPECT_EQ(kFsTypeProc, GetFileSystemType("/proc"));
+  EXPECT_EQ(kFsTypeUnknown, GetFileSystemType("/"));
+}
+
+
 TEST_F(T_Util, SplitPath) {
   string dirname;
   string filename;

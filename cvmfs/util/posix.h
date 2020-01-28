@@ -34,11 +34,24 @@ const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
 const int kPrivateFileMode = S_IWUSR | S_IRUSR;
 const int kPrivateDirMode = S_IXUSR | S_IWUSR | S_IRUSR;
 
+/**
+ * The magic numbers that identify a file system in statfs()
+ * Adjust GetFileSystemType() when new file systems are added
+ */
+enum EFileSystemTypes {
+  kFsTypeUnknown = 0,
+  kFsTypeAutofs = 0x0187,
+  kFsTypeNFS = 0x6969,
+  kFsTypeProc = 0x9fa0,
+  kFsTypeBeeGFS = 0x19830326
+};
+
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 NameString GetFileName(const PathString &path);
+EFileSystemTypes GetFileSystemType(const std::string &path);
 void SplitPath(const std::string &path,
                std::string *dirname,
                std::string *filename);

@@ -64,13 +64,6 @@
 #include "statistics.h"
 #include "util/posix.h"
 
-#ifndef NFS_SUPER_MAGIC
-#define NFS_SUPER_MAGIC 0x6969
-#endif
-#ifndef BEEGFS_SUPER_MAGIC
-#define BEEGFS_SUPER_MAGIC 0x19830326
-#endif
-
 using namespace std;  // NOLINT
 
 namespace {
@@ -250,21 +243,20 @@ PosixCacheManager *PosixCacheManager::Create(
     }
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
-    struct statfs cache_buf;
-    int retval = statfs(cache_path.c_str(), &cache_buf);
-    if (retval == 0) {
-      switch (cache_buf.f_type) {
-        case NFS_SUPER_MAGIC:
-          cache_manager->rename_workaround_ = kRenameLink;
-          LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-               "Alien cache is on NFS.");
-          break;
-        case BEEGFS_SUPER_MAGIC:
-          cache_manager->rename_workaround_ = kRenameSamedir;
-          LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-               "Alien cache is on BeeGFS.");
-          break;
-      }
+    EFileSystemTypes fs_type = GetFileSystemType(cache_path);
+    switch (fs_type) {
+      case kFsTypeNFS:
+        cache_manager->rename_workaround_ = kRenameLink;
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "Alien cache is on NFS.");
+        break;
+      case kFsTypeBeeGFS:
+        cache_manager->rename_workaround_ = kRenameSamedir;
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "Alien cache is on BeeGFS.");
+        break;
+      default:
+        break;
     }
   } else {
     if (!MakeCacheDirectories(cache_path, 0700))

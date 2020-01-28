@@ -24,6 +24,9 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#ifndef __APPLE__
+#include <sys/statfs.h>
+#endif
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -152,6 +155,27 @@ NameString GetFileName(const PathString &path) {
   }
 
   return name;
+}
+
+
+EFileSystemTypes GetFileSystemType(const std::string &path) {
+  struct statfs info;
+  int retval = statfs(path.c_str(), &info);
+  if (retval != 0)
+    return kFsTypeUnknown;
+
+  switch (info.f_type) {
+    case kFsTypeAutofs:
+      return kFsTypeAutofs;
+    case kFsTypeNFS:
+      return kFsTypeNFS;
+    case kFsTypeProc:
+      return kFsTypeProc;
+    case kFsTypeBeeGFS:
+      return kFsTypeBeeGFS;
+    default:
+      return kFsTypeUnknown;
+  }
 }
 
 
