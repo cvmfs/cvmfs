@@ -256,6 +256,7 @@ set (CVMFS_PUBLISH_SOURCES
   publish/cmd_help.cc
   publish/cmd_info.cc
   publish/cmd_mkfs.cc
+  publish/cmd_transaction.cc
   publish/cmd_zpipe.cc
   publish/command.cc
   publish/except.cc
