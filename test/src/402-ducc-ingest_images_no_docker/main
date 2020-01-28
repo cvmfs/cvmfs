@@ -1,0 +1,86 @@
+cvmfs_test_name="DUCC container ingestion"
+cvmfs_test_autofs_on_startup=true
+cvmfs_test_suites="ducc"
+
+CVMFS_TEST400_RECIPE="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
+CVMFS_TEST400_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
+CVMFS_TEST400_DUCC_LOG="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).log"
+CVMFS_TEST400_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+
+ducc_test_402_clean_up() {
+    echo "Cleaning up..."
+
+    echo "Removing log file..."
+    rm CVMFS_TEST400_RECIPE
+    rm CVMFS_TEST400_REPOSITORY
+    rm CVMFS_TEST400_DUCC_LOG
+    rm CVMFS_TEST400_DUCC_ERR
+    echo "... done"
+
+    echo  "Removing the repository..."
+    cvmfs_server rmfs $CVMFS_TEST400_REPOSITORY
+    echo "... done"
+    
+    echo "Cleaning up: done"
+}
+
+cvmfs_run_test() {
+    trap ducc_test_400_clean_up EXIT HUP INT TERM
+
+    # create a simple recipe file for the repository manager in the local dir
+    echo -n "*** Creating recipe file..."
+    cat > $CVMFS_TEST400_RECIPE  << EOL
+version: 1
+user: mock_user
+cvmfs_repo: '$CVMFS_TEST400_REPOSITORY'
+output_format: '\$(scheme)://localhost:5000/mock/\$(image)'
+input:
+    - 'https://registry.hub.docker.com/library/ubuntu:latest'
+    - 'https://registry.hub.docker.com/library/centos:centos6'
+EOL
+    echo "done"
+
+    # set the password to access the docker hub
+    export DUCC_DOCKER_REGISTRY_PASS=mock_pass
+
+    # crete the repository where to store the content
+    echo -n "*** Creating CVMFS repo..."
+    create_empty_repo $CVMFS_TEST400_REPOSITORY $USER || return $?
+    echo "done"
+  
+    echo "*** Starting test."
+
+    echo -n "*** Converting recipe..."
+    cvmfs_ducc convert --convert-docker=false $CVMFS_TEST400_RECIPE 1> $CVMFS_TEST400_DUCC_LOG 2> $CVMFS_TEST400_DUCC_ERR || return 101
+    grep -q "level=error" $CVMFS_TEST400_DUCC_ERR
+    while [ $? -ne 1 ]
+    do
+        echo -n "*** Some error during conversion, let's do it again. Converting recipe..."
+        rm $CVMFS_TEST400_DUCC_LOG $CVMFS_TEST400_DUCC_ERR
+        cvmfs_ducc convert $CVMFS_TEST400_RECIPE 1> $CVMFS_TEST400_DUCC_LOG 2> $CVMFS_TEST400_DUCC_ERR || return 101
+        grep -q "level=error" $CVMFS_TEST400_DUCC_ERR
+    done
+    echo "*** Convert recipe successfully"
+
+    echo "*** Check integrity of the repository..."
+    check_repository $CVMFS_TEST400_REPOSITORY -i || return 102
+    
+    echo "*** Repository checked successfully"
+
+    ls /cvmfs/$CVMFS_TEST400_REPOSITORY/registry.hub.docker.com/library/ubuntu\:latest/ || return 103
+    ls /cvmfs/$CVMFS_TEST400_REPOSITORY/registry.hub.docker.com/library/centos\:centos6/ || return 104
+    
+    echo "*** Singularity conversion worked fine"
+
+    echo "*** Checking that we did NOT create the .layers directory for docker"
+
+    # note the `&&` and not the usual `||`, we want the first part of the expression to be true >0 (hence failed)
+    ls /cvmfs/$CVMFS_TEST400_REPOSITORY/.layers/ && return 105
+
+    echo "*** .layers directory was not created"
+
+    echo "*** Test successful"
+
+    return 0
+}
+
