@@ -442,6 +442,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_health.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 

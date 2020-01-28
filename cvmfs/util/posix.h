@@ -51,13 +51,16 @@ std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 NameString GetFileName(const PathString &path);
-EFileSystemTypes GetFileSystemType(const std::string &path);
 void SplitPath(const std::string &path,
                std::string *dirname,
                std::string *filename);
 bool IsAbsolutePath(const std::string &path);
 std::string GetAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
+
+std::string ResolvePath(const std::string &path);
+bool IsMountPoint(const std::string &path);
+EFileSystemTypes GetFileSystemType(const std::string &path);
 
 void CreateFile(const std::string &path, const int mode,
                 const bool ignore_failure = false);

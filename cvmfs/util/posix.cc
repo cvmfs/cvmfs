@@ -158,27 +158,6 @@ NameString GetFileName(const PathString &path) {
 }
 
 
-EFileSystemTypes GetFileSystemType(const std::string &path) {
-  struct statfs info;
-  int retval = statfs(path.c_str(), &info);
-  if (retval != 0)
-    return kFsTypeUnknown;
-
-  switch (info.f_type) {
-    case kFsTypeAutofs:
-      return kFsTypeAutofs;
-    case kFsTypeNFS:
-      return kFsTypeNFS;
-    case kFsTypeProc:
-      return kFsTypeProc;
-    case kFsTypeBeeGFS:
-      return kFsTypeBeeGFS;
-    default:
-      return kFsTypeUnknown;
-  }
-}
-
-
 bool IsAbsolutePath(const std::string &path) {
   return (!path.empty() && path[0] == '/');
 }
@@ -201,6 +180,69 @@ bool IsHttpUrl(const std::string &path) {
   std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
 
   return prefix == "http://";
+}
+
+
+EFileSystemTypes GetFileSystemType(const std::string &path) {
+  struct statfs info;
+  int retval = statfs(path.c_str(), &info);
+  if (retval != 0)
+    return kFsTypeUnknown;
+
+  switch (info.f_type) {
+    case kFsTypeAutofs:
+      return kFsTypeAutofs;
+    case kFsTypeNFS:
+      return kFsTypeNFS;
+    case kFsTypeProc:
+      return kFsTypeProc;
+    case kFsTypeBeeGFS:
+      return kFsTypeBeeGFS;
+    default:
+      return kFsTypeUnknown;
+  }
+}
+
+
+/**
+ * Follow all symlinks if possible. Equivalent to
+ * `readlink --canonicalize-missing`
+ */
+std::string ResolvePath(const std::string &path) {
+  if (path.empty() || (path == "/"))
+    return "/";
+  std::string name = GetFileName(path);
+  std::string result = name;
+  if (name != path) {
+    // There is a parent path of 'path'
+    std::string parent = ResolvePath(GetParentPath(path));
+    result = parent + (parent == "/" ? "" : "/") + name;
+  }
+  char *real_result = realpath(result.c_str(), NULL);
+  if (real_result) {
+    result = real_result;
+    free(real_result);
+  }
+  if (SymlinkExists(result)) {
+    char buf[PATH_MAX + 1];
+    ssize_t nchars = readlink(result.c_str(), buf, PATH_MAX);
+    if (nchars >= 0) {
+      buf[nchars] = '\0';
+      result = buf;
+    }
+  }
+  return result;
+}
+
+
+bool IsMountPoint(const std::string &path) {
+  std::vector<std::string> mount_list = platform_mountlist();
+  std::string resolved_path = ResolvePath(path);
+  for (unsigned i = 0; i < mount_list.size(); ++i) {
+    if (mount_list[i] == resolved_path)
+      return true;
+  }
+  return false;
 }
 
 

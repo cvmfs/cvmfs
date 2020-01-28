@@ -1,0 +1,52 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef CVMFS_PUBLISH_CMD_TRANSACTION_H_
+#define CVMFS_PUBLISH_CMD_TRANSACTION_H_
+
+#include <string>
+
+#include "publish/command.h"
+
+namespace publish {
+
+class CmdTransaction : public Command {
+ public:
+  virtual std::string GetName() const { return "transaction"; }
+  virtual std::string GetBrief() const {
+    return "Opens a managed repository for writing";
+  }
+  virtual std::string GetDescription() const {
+    return "A transaction gets a lease for a repository in order to write "
+      "new content. The content is not visible to clients until publication. "
+      "Transactions can be aborted in order to revert to the original state. "
+      "Repositories that are configured to use a CernVM-FS gateway can lock "
+      "certain sub paths, such that other publisher nodes can publish "
+      "concurrently to other sub trees.";
+  }
+  virtual std::string GetUsage() const {
+    return "[options] <repository name>[path]";
+  }
+  virtual std::vector<std::string> DoGetExamples() const {
+    std::vector<std::string> e;
+    e.push_back("example.cvmfs.io "
+      "# normal use with a locally managed repository");
+    e.push_back("example.cvmfs.io/64bit/v42 "
+      "# locks only the given sub tree, use with gateway "
+      "(no space between the repository name and the path)");
+    return e;
+  }
+  virtual ParameterList GetParams() const {
+    ParameterList p;
+    p.push_back(Parameter::Switch("force", 'f',
+      "Continue even if another transaction is already open"));
+    return p;
+  }
+
+  virtual int Main(const Options &options);
+};  // class CmdTransaction
+
+}  // namespace publish
+
+#endif  // CVMFS_PUBLISH_CMD_TRANSACTION_H_

@@ -70,6 +70,7 @@ class SettingsSpoolArea {
   explicit SettingsSpoolArea(const std::string &fqrn)
     : workspace_(std::string("/var/spool/cvmfs/") + fqrn)
     , tmp_dir_(workspace_() + "/tmp")
+    , union_mnt_(std::string("/cvmfs/") + fqrn)
   { }
 
   void UseSystemTempDir();
@@ -78,7 +79,7 @@ class SettingsSpoolArea {
   std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
   std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
-  std::string union_mnt() const { return workspace_() + "/union"; }
+  std::string union_mnt() const { return union_mnt_; }
   std::string scratch_dir() const { return workspace_() + "/scratch/current"; }
   std::string client_config() const { return workspace_() + "/client.config"; }
   std::string client_log() const { return workspace_() + "/usyslog.log"; }
@@ -88,6 +89,7 @@ class SettingsSpoolArea {
  private:
   Setting<std::string> workspace_;
   Setting<std::string> tmp_dir_;
+  Setting<std::string> union_mnt_;
 };  // SettingsSpoolArea
 
 
@@ -236,17 +238,20 @@ class SettingsRepository {
  */
 class SettingsPublisher {
  public:
+  static const unsigned kDefaultWhitelistValidity;  // 30 days
+
   explicit SettingsPublisher(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn)
     , owner_uid_(0)
     , owner_gid_(0)
-    , whitelist_validity_days_(30)
+    , whitelist_validity_days_(kDefaultWhitelistValidity)
     , is_silent_(false)
     , storage_(fqrn_)
     , transaction_(fqrn_)
     , keychain_(fqrn_)
   { }
+  explicit SettingsPublisher(const SettingsRepository &settings_repository);
 
   void SetUrl(const std::string &url);
   void SetOwner(const std::string &user_name);
@@ -318,13 +323,22 @@ class SettingsBuilder : SingleCopy {
   /**
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
+   * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
+   * If alias is an empty string, the command still succeds iff there is a
+   * single repository under /etc/cvmfs/repositories.d
+   */
+  SettingsRepository CreateSettingsRepository(const std::string &ident);
+
+  /**
+   * If ident is a url, creates a generic settings object inferring the fqrn
+   * from the url.
    * Otherweise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
    * If alias is an empty string, the command still succeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
-   * If is_managed is true, the repository has to be a local, managed one.
+   * If needs_managed is true, remote repositories are rejected
    */
-  SettingsRepository CreateSettingsRepository(const std::string &ident,
-                                              bool is_managed = false);
+  SettingsPublisher CreateSettingsPublisher(const std::string &ident,
+                                            bool needs_managed = false);
 
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }

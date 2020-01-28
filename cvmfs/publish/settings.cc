@@ -176,6 +176,25 @@ void SettingsRepository::SetTmpDir(const std::string &tmp_dir) {
 //------------------------------------------------------------------------------
 
 
+const unsigned SettingsPublisher::kDefaultWhitelistValidity = 30;
+
+
+SettingsPublisher::SettingsPublisher(
+  const SettingsRepository &settings_repository)
+  : fqrn_(settings_repository.fqrn())
+  , url_(settings_repository.url())
+  , owner_uid_(0)
+  , owner_gid_(0)
+  , whitelist_validity_days_(kDefaultWhitelistValidity)
+  , is_silent_(false)
+  , storage_(fqrn_)
+  , transaction_(fqrn_)
+  , keychain_(fqrn_)
+{
+  keychain_.SetKeychainDir(settings_repository.keychain().keychain_dir());
+}
+
+
 void SettingsPublisher::SetUrl(const std::string &url) {
   // TODO(jblomer): sanitiation, check availability
   url_ = url;
@@ -218,15 +237,12 @@ std::string SettingsBuilder::GetSingleAlias() {
 
 
 SettingsRepository SettingsBuilder::CreateSettingsRepository(
-  const std::string &ident, bool needs_managed)
+  const std::string &ident)
 {
   if (HasPrefix(ident, "http://", true /* ignore case */) ||
       HasPrefix(ident, "https://", true /* ignore case */) ||
       HasPrefix(ident, "file://", true /* ignore case */))
   {
-    if (needs_managed)
-      throw EPublish("remote repositories are not supported in this context");
-
     std::string fqrn = Repository::GetFqrnFromUrl(ident);
     sanitizer::RepositorySanitizer sanitizer;
     if (!sanitizer.IsValid(fqrn)) {
@@ -265,6 +281,26 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
     settings.SetTmpDir(arg + "/tmp");
 
   return settings;
+}
+
+
+SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
+  const std::string &ident, bool needs_managed)
+{
+  SettingsRepository settings_repository = CreateSettingsRepository(ident);
+  if (needs_managed && !IsManagedRepository())
+    throw EPublish("remote repositories are not supported in this context");
+
+  // TODO(jblomer): fix for remote repositories
+  if (options_mgr_->GetValueOrDie("CVMFS_REPOSITORY_TYPE") != "stratum0")
+    throw EPublish("Not a stratum 0 repository");
+
+  SettingsPublisher settings_publisher(settings_repository);
+  settings_publisher.SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
+
+  // TODO(jblomer): process other parameters
+
+  return settings_publisher;
 }
 
 }  // namespace publish

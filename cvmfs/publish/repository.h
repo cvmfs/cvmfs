@@ -128,6 +128,23 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
 
 class __attribute__((visibility("default"))) Publisher : public Repository {
  public:
+  /**
+   * Steers the aggressiveness of CheckHealth()
+   */
+  enum ERepairMode {
+    kRepairNever = 0,
+    kRepairSafe,
+    kRepairTransaction,
+    kRepairAlways
+  };
+
+  /**
+   * Collection of publisher failure states
+   */
+  enum EFailures {
+    kFailOk = 0
+  };
+
   static Publisher *Create(const SettingsPublisher &settings);
 
   explicit Publisher(const SettingsPublisher &settings);
@@ -139,6 +156,11 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Publish();
   void Ingest();
   void Sync();
+
+  /**
+   * Verifies the mountpoints and the transaction status.
+   */
+  EFailures CheckHealth(ERepairMode mode, bool is_quiet = false);
 
   /**
    * Must not edit magic tags 'trunk' and 'trunk-previous'.

@@ -372,6 +372,28 @@ TEST_F(T_Util, GetFileSystemType) {
 }
 
 
+TEST_F(T_Util, ResolvePath) {
+  EXPECT_EQ("/", ResolvePath("/"));
+  EXPECT_EQ("/", ResolvePath(""));
+  EXPECT_EQ("/no/such/path", ResolvePath("/no/such/path"));
+  EXPECT_EQ("/", ResolvePath("/.//././."));
+  EXPECT_EQ("/", ResolvePath("/tmp/.."));
+
+  EXPECT_EQ(0, symlink(".", "cvmfs_test_link"));
+  EXPECT_EQ(GetCurrentWorkingDirectory(), ResolvePath("cvmfs_test_link"));
+
+  EXPECT_EQ(0, symlink("/no/such/path", "cvmfs_test_link_dangling"));
+  EXPECT_EQ("/no/such/path", ResolvePath("cvmfs_test_link_dangling"));
+}
+
+
+TEST_F(T_Util, IsMountPoint) {
+  EXPECT_TRUE(IsMountPoint(""));
+  EXPECT_TRUE(IsMountPoint("/"));
+  EXPECT_FALSE(IsMountPoint("/no/such/file"));
+}
+
+
 TEST_F(T_Util, SplitPath) {
   string dirname;
   string filename;
