@@ -384,7 +384,6 @@ rm -f $RPM_BUILD_ROOT%{_libdir}/libcvmfs_fuse3*
 %endif
 
 # Remove experimental server binaries
-rm -f "$RPM_BUILD_ROOT%{_bindir}/cvmfs_publish"
 rm -f "$RPM_BUILD_ROOT%{_libdir}/libcvmfs_server*"
 
 # Fix docdir on SuSE
