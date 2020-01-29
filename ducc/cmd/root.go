@@ -8,6 +8,10 @@ import (
 	"github.com/cvmfs/ducc/lib"
 )
 
+func init() {
+	rootCmd.PersistentFlags().StringVarP(&lib.TemporaryBaseDir, "temporary-dir", "t", "", "Temporary directory to store files necessary during the conversion of images, it can grow large ~1G. If not set we use the standard of the system $TMP, usually /tmp")
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "repository-manager",
 	Short: "Show the several commands available.",
