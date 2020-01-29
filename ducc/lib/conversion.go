@@ -40,13 +40,12 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	}
 	defer os.RemoveAll(tmpDir)
 	inputImage, err := ParseImage(wish.InputName)
-	var singularity Singularity
-	singularity, err = inputImage.DownloadSingularityDirectory(tmpDir)
+	singularity, err := inputImage.DownloadSingularityDirectory(tmpDir)
+	defer os.RemoveAll(singularity.TempDirectory)
 	if err != nil {
 		LogE(err).Error("Error in dowloading the singularity image")
 		return
 	}
-	defer os.RemoveAll(singularity.TempDirectory)
 
 	err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
 	if err != nil {

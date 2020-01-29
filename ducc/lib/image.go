@@ -241,10 +241,8 @@ func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity
 	if err != nil {
 		LogE(err).Error("Error in creating temporary directory for singularity")
 		return
-
 	}
-	defer os.RemoveAll(dir)
-	singularityTempCache, err := UserDefinedTempDir("", "tempDirSingularityCache")
+	singularityTempCache, err := UserDefinedTempDir(rootPath, "tempDirSingularityCache")
 	if err != nil {
 		LogE(err).Error("Error in creating temporary directory for singularity cache")
 		return
