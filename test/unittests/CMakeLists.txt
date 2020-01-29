@@ -432,6 +432,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   publish/t_diff.cc
   publish/t_repository.cc
   publish/t_settings.cc
+  publish/t_util.cc
 
   ../common/env.cc
 
@@ -444,6 +445,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_health.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_util.cc
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
   ${CVMFS_SOURCE_DIR}/backoff.cc

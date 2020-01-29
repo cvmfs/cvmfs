@@ -75,6 +75,7 @@ class SettingsSpoolArea {
 
   void UseSystemTempDir();
   void SetSpoolArea(const std::string &path);
+  void SetUnionMount(const std::string &path);
 
   std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
@@ -85,6 +86,7 @@ class SettingsSpoolArea {
   std::string client_log() const { return workspace_() + "/usyslog.log"; }
   std::string cache_dir() const { return workspace_() + "/cache"; }
   std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }
+  std::string checkout_marker() const { return workspace_() + "/checkout"; }
 
  private:
   Setting<std::string> workspace_;

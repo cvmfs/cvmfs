@@ -31,6 +31,11 @@ void SettingsSpoolArea::SetSpoolArea(const std::string &path) {
 }
 
 
+void SettingsSpoolArea::SetUnionMount(const std::string &path) {
+  union_mnt_ = path;
+}
+
+
 //------------------------------------------------------------------------------
 
 

@@ -139,10 +139,16 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   };
 
   /**
-   * Collection of publisher failure states
+   * Collection of publisher failure states (see CheckHealth)
    */
   enum EFailures {
-    kFailOk = 0
+    kFailOk                   = 0,
+    kFailRdOnlyBroken         = 0x01,
+    kFailRdOnlyOutdated       = 0x02,
+    kFailRdOnlyWrongRevision  = 0x04,
+    kFailUnionBroken          = 0x08,
+    kFailUnionWritable        = 0x10,
+    kFailUnionLocked          = 0x20,
   };
 
   static Publisher *Create(const SettingsPublisher &settings);
@@ -158,9 +164,10 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Sync();
 
   /**
-   * Verifies the mountpoints and the transaction status.
+   * Verifies the mountpoints and the transaction status. Returns a bit map
+   * of EFailures codes.
    */
-  EFailures CheckHealth(ERepairMode mode, bool is_quiet = false);
+  int CheckHealth(ERepairMode mode, bool is_quiet = false);
 
   /**
    * Must not edit magic tags 'trunk' and 'trunk-previous'.

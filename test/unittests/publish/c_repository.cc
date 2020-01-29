@@ -20,6 +20,8 @@ publish::Publisher *GetTestPublisher() {
   settings.SetOwner(GetUserName());
   settings.GetStorage()->MakeLocal(srv_dir);
   settings.GetTransaction()->GetSpoolArea()->SetSpoolArea(spool_dir);
+  settings.GetTransaction()->GetSpoolArea()->SetUnionMount(
+    spool_dir + "/union");
   settings.GetKeychain()->SetKeychainDir(keys_dir);
   settings.SetUrl("file://" + srv_dir);
 
