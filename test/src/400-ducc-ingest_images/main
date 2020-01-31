@@ -140,13 +140,11 @@ EOL
 CVMFS_REPOSITORIES=$CVMFS_TEST400_REPOSITORY
 CVMFS_HTTP_PROXY="DIRECT"
 EOL'
-    #sudo chown $USER /etc/cvmfs/default.local
 
     sudo -E CVMFS_TEST400_REPOSITORY="$CVMFS_TEST400_REPOSITORY" bash -c 'cat > /etc/cvmfs/config.d/$CVMFS_TEST400_REPOSITORY.local << EOL
 CVMFS_SERVER_URL=http://localhost/cvmfs/$CVMFS_TEST400_REPOSITORY/
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST400_REPOSITORY.pub
 EOL'
-    #sudo chown $USER /etc/cvmfs/config.d/$CVMFS_TEST400_REPOSITORY.local
     echo "done"
 
     # start by running the docker registry on localhost
