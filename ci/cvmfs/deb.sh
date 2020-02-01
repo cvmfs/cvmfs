@@ -50,10 +50,19 @@ echo "copy packaging meta information and get in place..."
 cp -r ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs ${copied_source}/debian
 cd $copied_source
 
+# Configure control file
+mv debian/control.in debian/control
 # On Ubuntu 18.04 Bionic, the insserv and initscripts packages are no longer
 # available. They should be removed from the list of dependencies
 if [ x"$(lsb_release -sc)" = x"bionic" ]; then
   sed -i -e "s/insserv, initscripts, //g" debian/control
+fi
+# Fuse3 is only available as of Debian 10 "buster"
+if [ x"$(lsb_release -sc)" = x"buster" ]; then
+  sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev/g" debian/control
+else
+  cat debian/control | awk '/#FUSE3-BEGIN/{flag=1;next}/#FUSE3-END/{flag=0;next}!flag' > debian/control.tmp
+  mv debian/control.tmp debian/control
 fi
 
 cpu_cores=$(get_number_of_cpu_cores)
@@ -72,7 +81,6 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
                        "$(basename $(find . -name 'cvmfs-unittests*.deb'))" \
                        "$CVMFS_CONFIG_PACKAGE"                              \
                        "$(basename $(find . -name 'cvmfs-shrinkwrap*.deb'))"\
-                       "$(basename $(find . -name 'cvmfs-ducc*.deb'))"      \
                        "$(basename $(find . -name 'cvmfs-fuse3*.deb'))"
 fi
 
