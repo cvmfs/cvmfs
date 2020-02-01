@@ -52,6 +52,7 @@ cd $copied_source
 
 # Configure control file
 mv debian/control.in debian/control
+echo "Debian release: $(lsb_release -sc)"
 # On Ubuntu 18.04 Bionic, the insserv and initscripts packages are no longer
 # available. They should be removed from the list of dependencies
 if [ x"$(lsb_release -sc)" = x"bionic" ]; then
