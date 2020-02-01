@@ -61,6 +61,7 @@ fi
 # Fuse3 is only available as of Debian 10 "buster"
 if [ x"$(lsb_release -sc)" = x"buster" ]; then
   sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control
+  sed -i -e "s/^Recommends:/Recommends: cvmfs-fuse3,/g" debian/control
 else
   cat debian/control | awk '/#FUSE3-BEGIN/{flag=1;next}/#FUSE3-END/{flag=0;next}!flag' > debian/control.tmp
   mv debian/control.tmp debian/control
