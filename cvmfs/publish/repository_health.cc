@@ -11,37 +11,48 @@
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 
 namespace publish {
 
 int Publisher::CheckHealth(Publisher::ERepairMode mode, bool is_quiet) {
+  const std::string rdonly_mnt =
+    settings_.transaction().spool_area().readonly_mnt();
+  const std::string union_mnt =
+    settings_.transaction().spool_area().union_mnt();
+
   int result = kFailOk;
-  if (!IsMountPoint(settings_.transaction().spool_area().readonly_mnt())) {
+
+  if (!IsMountPoint(rdonly_mnt)) {
     result |= kFailRdOnlyBroken;
   } else {
     const std::string root_hash_xattr = "user.root_hash";
     std::string root_hash_str;
-    bool retval = platform_getxattr(
-      settings_.transaction().spool_area().readonly_mnt(), root_hash_xattr,
-      &root_hash_str);
+    bool retval = platform_getxattr(rdonly_mnt, root_hash_xattr,
+                                    &root_hash_str);
     if (!retval)
       throw EPublish("cannot retrieve root hash from read-only mount point");
     shash::Any root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_str),
                                                shash::kSuffixCatalog);
-    if (root_hash != manifest()->catalog_hash()) {
-      CheckoutMarker *marker = CheckoutMarker::CreateFrom(
-        settings_.transaction().spool_area().checkout_marker());
-      if (marker != NULL) {
-        if (marker->hash() != root_hash)
-          result |= kFailRdOnlyWrongRevision;
-        delete marker;
-      } else {
-        result |= kFailRdOnlyOutdated;
-      }
+
+    UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
+      settings_.transaction().spool_area().checkout_marker()));
+    if (marker.IsValid()) {
+      if (marker->hash() != root_hash)
+        result |= kFailRdOnlyWrongRevision;
+    }
+
+    if ((root_hash != manifest()->catalog_hash()) && !marker.IsValid()) {
+      result |= kFailRdOnlyOutdated;
     }
   }
 
+  if (!IsMountPoint(union_mnt)) {
+    result |= kFailUnionBroken;
+  } else {
+
+  }
 
   return result;
 
@@ -52,26 +63,7 @@ int Publisher::CheckHealth(Publisher::ERepairMode mode, bool is_quiet) {
 }
 
 
-# parses the checkout file
-#
-# @param name  the repository name to be checked
-# @return      0 if checked out
-get_checked_out_hash() {
-  local name=$1
-  load_repo_config $name
-  cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f2
-}
 
-
-# parses the checkout file
-#
-# @param name  the repository name to be checked
-# @return      0 if checked out
-get_checked_out_branch() {
-  local name=$1
-  load_repo_config $name
-  cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f3
-}
 */
 
 
