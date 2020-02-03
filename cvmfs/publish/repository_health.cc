@@ -21,6 +21,8 @@ int Publisher::CheckHealth(Publisher::ERepairMode mode, bool is_quiet) {
     settings_.transaction().spool_area().readonly_mnt();
   const std::string union_mnt =
     settings_.transaction().spool_area().union_mnt();
+  const std::string transaction_lock =
+    settings_.transaction().spool_area().transaction_lock();
 
   int result = kFailOk;
 
@@ -48,10 +50,26 @@ int Publisher::CheckHealth(Publisher::ERepairMode mode, bool is_quiet) {
     }
   }
 
+  bool union_should_be_rw = false;
+  bool union_should_be_ro = false;
+  bool is_in_transaction =
+    ServerLockFile::IsLocked(transaction_lock, false /* ignore_stale */);
   if (!IsMountPoint(union_mnt)) {
     result |= kFailUnionBroken;
+    if (is_in_transaction) {
+      union_should_be_rw = true;
+    } else {
+      union_should_be_ro = true;
+    }
   } else {
-
+    FileSystemInfo fs_info = GetFileSystemInfo(union_mnt);
+    if (is_in_transaction) {
+      if (fs_info.is_rdonly)
+        union_should_be_rw = true;
+    } else {
+      if (!fs_info.is_rdonly)
+        union_should_be_ro = true;
+    }
   }
 
   return result;

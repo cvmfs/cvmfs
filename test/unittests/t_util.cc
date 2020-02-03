@@ -361,14 +361,17 @@ TEST_F(T_Util, GetFileName) {
 }
 
 
-TEST_F(T_Util, GetFileSystemType) {
+TEST_F(T_Util, GetFileSystemInfo) {
   if (!DirectoryExists("/proc")) {
     printf("Skipping\n");
     return;
   }
 
-  EXPECT_EQ(kFsTypeProc, GetFileSystemType("/proc"));
-  EXPECT_EQ(kFsTypeUnknown, GetFileSystemType("/"));
+  FileSystemInfo fs_info;
+  fs_info = GetFileSystemInfo("/proc");
+  EXPECT_EQ(kFsTypeProc, fs_info.type);
+  fs_info = GetFileSystemInfo("/");
+  EXPECT_EQ(kFsTypeUnknown, fs_info.type);
 }
 
 
@@ -1428,6 +1431,13 @@ TEST_F(T_Util, ReplaceAll) {
   EXPECT_EQ("it's for REPLACED or for @not-replace@",
       ReplaceAll("it's for @replace@ or for @not-replace@", "@replace@",
           "REPLACED"));
+}
+
+TEST_F(T_Util, ProcessExists) {
+  EXPECT_TRUE(ProcessExists(getpid()));
+  EXPECT_TRUE(ProcessExists(1));
+  EXPECT_FALSE(ProcessExists(999999999));
+  EXPECT_DEATH(ProcessExists(0), ".*");
 }
 
 TEST_F(T_Util, BlockSignal) {

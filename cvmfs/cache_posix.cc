@@ -243,8 +243,8 @@ PosixCacheManager *PosixCacheManager::Create(
     }
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
-    EFileSystemTypes fs_type = GetFileSystemType(cache_path);
-    switch (fs_type) {
+    FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
+    switch (fs_info.type) {
       case kFsTypeNFS:
         cache_manager->rename_workaround_ = kRenameLink;
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,

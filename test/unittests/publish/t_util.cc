@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "publish/repository_util.h"
+#include "util/posix.h"
 
 using namespace std;  // NOLINT
 
@@ -33,6 +34,31 @@ TEST_F(T_Util, CheckoutMarker) {
   EXPECT_EQ(m.branch(), l->branch());
   EXPECT_EQ(m.hash(), l->hash());
   delete l;
+}
+
+
+TEST_F(T_Util, ServerLockFile) {
+  EXPECT_FALSE(ServerLockFile::IsLocked("foo", true));
+  EXPECT_TRUE(ServerLockFile::Acquire("foo", true));
+  EXPECT_FALSE(ServerLockFile::Acquire("foo", true));
+  EXPECT_TRUE(ServerLockFile::IsLocked("foo", true));
+  ServerLockFile::Release("foo");
+  EXPECT_FALSE(ServerLockFile::IsLocked("foo", true));
+
+  pid_t pid_child = fork();
+  ASSERT_TRUE(pid_child >= 0);
+  if (pid_child == 0) {
+    EXPECT_TRUE(ServerLockFile::Acquire("foo", true));
+    exit(0);
+  }
+  EXPECT_EQ(0, WaitForChild(pid_child));
+
+  EXPECT_TRUE(ServerLockFile::IsLocked("foo", true));
+  EXPECT_FALSE(ServerLockFile::IsLocked("foo", false));
+  EXPECT_FALSE(ServerLockFile::Acquire("foo", true));
+  EXPECT_TRUE(ServerLockFile::Acquire("foo", false));
+  EXPECT_TRUE(ServerLockFile::IsLocked("foo", false));
+  ServerLockFile::Release("foo");
 }
 
 }  // namespace publish

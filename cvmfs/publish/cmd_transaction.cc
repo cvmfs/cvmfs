@@ -41,7 +41,8 @@ int CmdTransaction::Main(const Options &options) {
   {
     throw EPublish("No write permission to repository");
   }
-  if (GetFileSystemType("/cvmfs") == kFsTypeAutofs)
+  FileSystemInfo fs_info = GetFileSystemInfo("/cvmfs");
+  if (fs_info.type == kFsTypeAutofs)
     throw EPublish("Autofs on /cvmfs has to be disabled");
 
 

@@ -32,6 +32,20 @@ class CheckoutMarker {
   shash::Any hash_;
 };
 
+
+/**
+ * The server lock file is a file containing the pid of the creator, so that
+ * with high probability one can determine stale locks.  This comes from the
+ * cvmfs_server bash times and should at some point become a regular POSIX
+ * lock file.
+ */
+class ServerLockFile {
+ public:
+  static bool Acquire(const std::string &path, bool ignore_stale);
+  static void Release(const std::string &path);
+  static bool IsLocked(const std::string &path, bool ignore_stale);
+};
+
 }  // namespace publish
 
 #endif  // CVMFS_PUBLISH_REPOSITORY_UTIL_H_

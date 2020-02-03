@@ -313,6 +313,7 @@ set (LIBCVMFS_SERVER_SOURCES
   publish/repository_diff.cc
   publish/repository_health.cc
   publish/repository_tags.cc
+  publish/repository_transaction.cc
   publish/repository_util.cc
   publish/settings.cc
   reflog.cc

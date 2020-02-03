@@ -36,7 +36,7 @@ const int kPrivateDirMode = S_IXUSR | S_IWUSR | S_IRUSR;
 
 /**
  * The magic numbers that identify a file system in statfs()
- * Adjust GetFileSystemType() when new file systems are added
+ * Adjust GetFileSystemInfo() when new file systems are added
  */
 enum EFileSystemTypes {
   kFsTypeUnknown = 0,
@@ -44,6 +44,12 @@ enum EFileSystemTypes {
   kFsTypeNFS = 0x6969,
   kFsTypeProc = 0x9fa0,
   kFsTypeBeeGFS = 0x19830326
+};
+
+struct FileSystemInfo {
+  FileSystemInfo() : type(kFsTypeUnknown), is_rdonly(false) {}
+  EFileSystemTypes type;
+  bool is_rdonly;
 };
 
 std::string MakeCanonicalPath(const std::string &path);
@@ -60,7 +66,7 @@ bool IsHttpUrl(const std::string &path);
 
 std::string ResolvePath(const std::string &path);
 bool IsMountPoint(const std::string &path);
-EFileSystemTypes GetFileSystemType(const std::string &path);
+FileSystemInfo GetFileSystemInfo(const std::string &path);
 
 void CreateFile(const std::string &path, const int mode,
                 const bool ignore_failure = false);
@@ -117,6 +123,7 @@ std::string GetHomeDirectory();
 int SetLimitNoFile(unsigned limit_nofile);
 void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit);
 
+bool ProcessExists(pid_t pid);
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
 int WaitForChild(pid_t pid);

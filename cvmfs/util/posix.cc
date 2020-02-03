@@ -24,7 +24,9 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#ifndef __APPLE__
+#ifdef __APPLE__
+#include <sys/mount.h>  //  for statfs()
+#else
 #include <sys/statfs.h>
 #endif
 #include <sys/time.h>
@@ -55,6 +57,12 @@
 #include "util_concurrency.h"
 
 //using namespace std;  // NOLINT
+
+#ifndef ST_RDONLY
+// On Linux, this is in sys/statvfs.h
+// On macOS, this flag is called MNT_RDONLY /usr/include/sys/mount.h
+#define ST_RDONLY 1
+#endif
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -183,24 +191,35 @@ bool IsHttpUrl(const std::string &path) {
 }
 
 
-EFileSystemTypes GetFileSystemType(const std::string &path) {
+FileSystemInfo GetFileSystemInfo(const std::string &path) {
+  FileSystemInfo result;
+
   struct statfs info;
   int retval = statfs(path.c_str(), &info);
   if (retval != 0)
-    return kFsTypeUnknown;
+    return result;
 
   switch (info.f_type) {
     case kFsTypeAutofs:
-      return kFsTypeAutofs;
+      result.type = kFsTypeAutofs;
+      break;
     case kFsTypeNFS:
-      return kFsTypeNFS;
+      result.type = kFsTypeNFS;
+      break;
     case kFsTypeProc:
-      return kFsTypeProc;
+      result.type = kFsTypeProc;
+      break;
     case kFsTypeBeeGFS:
-      return kFsTypeBeeGFS;
+      result.type = kFsTypeBeeGFS;
+      break;
     default:
-      return kFsTypeUnknown;
+      result.type = kFsTypeUnknown;
   }
+
+  if (info.f_flags & ST_RDONLY)
+    result.is_rdonly = true;
+
+  return result;
 }
 
 
@@ -1259,6 +1278,15 @@ void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit) {
 #else
   *hard_limit = rpl.rlim_max;
 #endif
+}
+
+
+bool ProcessExists(pid_t pid) {
+  assert(pid > 0);
+  int retval = kill(pid, 0);
+  if (retval == 0)
+    return true;
+  return (errno != ESRCH);
 }
 
 

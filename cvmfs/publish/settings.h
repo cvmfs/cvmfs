@@ -87,6 +87,12 @@ class SettingsSpoolArea {
   std::string cache_dir() const { return workspace_() + "/cache"; }
   std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }
   std::string checkout_marker() const { return workspace_() + "/checkout"; }
+  std::string transaction_lock() const {
+    return workspace_() + "/in_transaction.lock";
+  }
+  std::string publishing_lock() const {
+    return workspace_() + "/is_publishing.lock";
+  }
 
  private:
   Setting<std::string> workspace_;
