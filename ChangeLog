@@ -10,6 +10,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.1:
+  * Build cvmfs-fuse3 on Debian 10 "buster" (CVM-1825)
   * Add support for CVMFS_GEO_DB_FILE replica parameter
   * Change geodb update to use license key (CVM-1833)
   * Fix host fail-over after redirection (CVM-1675)

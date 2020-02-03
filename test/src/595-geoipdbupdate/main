@@ -3,8 +3,11 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 # NOTE:
-#  Requires valid CVMFS_GEO_LICENSE_KEY in /etc/cvmfs/server.local, and
-#    for the file to be readable by $CVMFS_TEST_USER
+#  A full test requires a valid CVMFS_GEO_LICENSE_KEY in a
+#    /etc/cvmfs/server.local that is readable by $CVMFS_TEST_USER. 
+#  Test will be skipped with a warning if either CVMFS_GEO_DB_FILE is
+#    set or there's no CVMFS_GEO_LICENSE_KEY but there is a system
+#    geo DB in /usr/share/GeoIP.
 
 #
 # Location of the system-wide GeoIP databases
@@ -73,12 +76,29 @@ cvmfs_run_test() {
 
   if [ ! -d `dirname $CVMFS_TEST_595_GEODB` ]; then
     echo "No geo database directory, disabled on this platform"
+    CVMFS_GENERAL_WARNING_FLAG=1
     return 0
+  fi
+
+  if [ -n "$CVMFS_GEO_DB_FILE" ]; then
+    echo "Geo database update disabled, skipping tests"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
+  if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
+    if [ -f /usr/share/GeoIP/`basename $CVMFS_TEST_595_GEODB` ]; then
+      echo "System geo database installed, skipping tests"
+      CVMFS_GENERAL_WARNING_FLAG=1
+      return 0
+    fi
+    echo "No geo license key or db file found"
+    return 1
   fi
 
   # can't start out as root, it causes some of the tests below to fail
   echo "check if running as root"
-  [ $(id -u) != 0 ] || return 1
+  [ $(id -u) != 0 ] || return 2
 
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
