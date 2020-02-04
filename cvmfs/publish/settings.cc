@@ -302,6 +302,8 @@ SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
 
   SettingsPublisher settings_publisher(settings_repository);
   settings_publisher.SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
+  settings_publisher.GetStorage()->SetLocator(
+    options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
 
   // TODO(jblomer): process other parameters
 

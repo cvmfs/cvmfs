@@ -134,7 +134,6 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   enum ERepairMode {
     kRepairNever = 0,
     kRepairSafe,
-    kRepairTransaction,
     kRepairAlways
   };
 
@@ -167,7 +166,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    * Verifies the mountpoints and the transaction status. Returns a bit map
    * of EFailures codes.
    */
-  int CheckHealth(ERepairMode mode, bool is_quiet = false);
+  int CheckHealth(ERepairMode repair_mode, bool is_quiet = false);
 
   /**
    * Must not edit magic tags 'trunk' and 'trunk-previous'.

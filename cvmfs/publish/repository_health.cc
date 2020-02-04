@@ -11,18 +11,24 @@
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
+#include "upload.h"
+#include "upload_spooler_definition.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 
+
 namespace publish {
 
-int Publisher::CheckHealth(Publisher::ERepairMode mode, bool is_quiet) {
+int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
   const std::string rdonly_mnt =
     settings_.transaction().spool_area().readonly_mnt();
   const std::string union_mnt =
     settings_.transaction().spool_area().union_mnt();
   const std::string transaction_lock =
     settings_.transaction().spool_area().transaction_lock();
+  const std::string publishing_lock =
+    settings_.transaction().spool_area().publishing_lock();
+  const std::string fqrn = settings_.fqrn();
 
   int result = kFailOk;
 
@@ -46,14 +52,19 @@ int Publisher::CheckHealth(Publisher::ERepairMode mode, bool is_quiet) {
     }
 
     if ((root_hash != manifest()->catalog_hash()) && !marker.IsValid()) {
-      result |= kFailRdOnlyOutdated;
+      // In a gateway setup, it is expected that other publishers changed
+      // the repository in the meantime
+      if (spooler()->GetDriverType() != upload::SpoolerDefinition::Gateway)
+        result |= kFailRdOnlyOutdated;
     }
   }
 
   bool union_should_be_rw = false;
   bool union_should_be_ro = false;
+  // The process that opens the transaction does not stay alive for the life
+  // time of the transaction
   bool is_in_transaction =
-    ServerLockFile::IsLocked(transaction_lock, false /* ignore_stale */);
+    ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
   if (!IsMountPoint(union_mnt)) {
     result |= kFailUnionBroken;
     if (is_in_transaction) {
@@ -64,46 +75,93 @@ int Publisher::CheckHealth(Publisher::ERepairMode mode, bool is_quiet) {
   } else {
     FileSystemInfo fs_info = GetFileSystemInfo(union_mnt);
     if (is_in_transaction) {
-      if (fs_info.is_rdonly)
+      if (fs_info.is_rdonly) {
         union_should_be_rw = true;
+        result |= kFailUnionLocked;
+      }
     } else {
-      if (!fs_info.is_rdonly)
+      if (!fs_info.is_rdonly) {
         union_should_be_ro = true;
+        result |= kFailUnionWritable;
+      }
     }
   }
 
+  if (result == kFailOk)
+    return result;
+
+  // Report & Repair
+
+  int logFlags = kLogStderr;
+  if (is_quiet)
+    logFlags |= kLogNone;
+  if (result & kFailRdOnlyBroken) {
+    LogCvmfs(kLogCvmfs, logFlags, "%s is not mounted properly",
+             rdonly_mnt.c_str());
+  }
+  if (result & kFailRdOnlyOutdated) {
+    LogCvmfs(kLogCvmfs, logFlags,
+             "%s is not based on the newest published revision", fqrn.c_str());
+  }
+  if (result & kFailRdOnlyWrongRevision) {
+    LogCvmfs(kLogCvmfs, logFlags,
+             "%s is not based on the checked out revision", fqrn.c_str());
+  }
+  if (result & kFailUnionBroken) {
+    LogCvmfs(kLogCvmfs, logFlags, "%s is not mounted properly",
+             union_mnt.c_str());
+  }
+  if (union_should_be_ro) {
+    LogCvmfs(kLogCvmfs, logFlags,
+             "%s is not in a transaction but %s is mounted read/write",
+             fqrn.c_str(), union_mnt.c_str());
+  }
+  if (union_should_be_rw) {
+    LogCvmfs(kLogCvmfs, logFlags,
+             "%s is in a transaction but %s is not mounted read/write",
+             fqrn.c_str(), union_mnt.c_str());
+  }
+
+  // Check whether we can repair
+
+  bool is_publishing =
+    ServerLockFile::IsLocked(publishing_lock, false /* ignore_stale */);
+  switch (repair_mode) {
+    case kRepairNever:
+      return result;
+    case kRepairAlways:
+      break;
+    case kRepairSafe:
+      if (is_publishing) {
+        LogCvmfs(kLogCvmfs, logFlags,
+          "WARNING: The repository %s is currently publishing and should not\n"
+          "be touched. If you are absolutely sure, that this is _not_ the "
+          "case,\nplease run the following command and retry:\n\n"
+          "    rm -fR %s\n",
+          fqrn.c_str(), publishing_lock.c_str());
+        return result;
+      }
+
+      if (is_in_transaction) {
+        LogCvmfs(kLogCvmfs, logFlags,
+          "Repository %s is in a transaction and cannot be repaired.\n"
+          "--> Run `cvmfs_server abort $name` to revert and repair.",
+          fqrn.c_str());
+        return result;
+      }
+
+      break;
+    default:
+      abort();
+  }
+
+  LogCvmfs(kLogCvmfs, kLogSyslog, "(%s) attempting mountpoint repair (%d)",
+           fqrn.c_str());
   return result;
 
-  /* get_checked_out_tag() {
-  local name=$1
-  load_repo_config $name
-  cat /var/spool/cvmfs/${name}/checkout | cut -d" " -f1
-}
+  // Repair
 
 
-
-*/
-
-
-  // [ -f /var/spool/cvmfs/${name}/checkout ]
-
-  /*assert(!mount_point.empty());
-    const std::string root_hash_xattr = "user.root_hash";
-    std::string root_hash;
-    const bool success =
-        platform_getxattr(mount_point, root_hash_xattr, &root_hash);
-    if (!success) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "failed to retrieve extended attribute "
-               " '%s' from '%s' (errno: %d)",
-               root_hash_xattr.c_str(), mount_point.c_str(), errno);
-      return 1;
-    }
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
-             (human_readable) ? "Mounted Root Hash:               " : "",
-             root_hash.c_str());*/
-
-  return kFailOk;
 }
 
 }  // namespace publish

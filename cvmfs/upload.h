@@ -267,7 +267,7 @@ class Spooler : public Observable<SpoolerResult> {
   /**
    * Make directory in upstream storage. Noop if directory already present.
    * NOTE: currently only used to create the 'stats/' subdirectory
-   * 
+   *
    * @param path relative directory path in the upstream storage
    * @return true if the directory was successfully created or already present
    */
@@ -305,6 +305,10 @@ class Spooler : public Observable<SpoolerResult> {
 
   shash::Algorithms GetHashAlgorithm() const {
     return spooler_definition_.hash_algorithm;
+  }
+
+  SpoolerDefinition::DriverType GetDriverType() const {
+    return spooler_definition_.driver_type;
   }
 
  protected:
