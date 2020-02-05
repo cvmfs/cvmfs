@@ -448,7 +448,9 @@ void WritableCatalogManager::CloneTreeImpl(
 
     if (ls[i].IsChunkedFile()) {
       FileChunkList chunks;
-      retval = ListFileChunks(sub_path, ls[i].hash_algorithm(), &chunks);
+      std::string relative_sub_path = MakeRelativePath(sub_path.ToString());
+      retval = ListFileChunks(
+        PathString(relative_sub_path), ls[i].hash_algorithm(), &chunks);
       assert(retval);
       AddChunkedFile(ls[i], xattrs, dest_dir, chunks);
     } else {
