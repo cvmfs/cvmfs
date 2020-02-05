@@ -458,7 +458,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   bool LookupPath(const PathString &path,
                   catalog::DirectoryEntry *dirent) const;
   bool ListingPath(const PathString &path,
-                   catalog::DirectoryEntryList *listing) const;
+                   catalog::DirectoryEntryList *listing,
+                   const bool expand_symlink) const;
 
   bool GetVOMSAuthz(std::string *authz) { return false; }
 

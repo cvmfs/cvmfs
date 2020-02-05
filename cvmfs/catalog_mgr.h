@@ -146,7 +146,11 @@ class AbstractCatalogManager : public SingleCopy {
   bool ListCatalogSkein(const PathString &path,
                         std::vector<PathString> *result_list);
 
-  bool Listing(const PathString &path, DirectoryEntryList *listing);
+  bool Listing(const PathString &path, DirectoryEntryList *listing,
+               const bool expand_symlink);
+  bool Listing(const PathString &path, DirectoryEntryList *listing) {
+    return Listing(path, listing, true);
+  }
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
     PathString p;
     p.Assign(&path[0], path.length());

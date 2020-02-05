@@ -5,6 +5,7 @@
 #ifndef TEST_COMMON_CATALOG_TEST_TOOLS_H_
 #define TEST_COMMON_CATALOG_TEST_TOOLS_H_
 
+#include <cassert>
 #include <map>
 #include <set>
 #include <string>
@@ -154,6 +155,14 @@ class CatalogTestTool : public ServerTool {
 
   std::string repo_name() { return stratum0_; }
   std::string public_key() { return public_key_; }
+  catalog::WritableCatalogManager *catalog_mgr() {
+    assert(catalog_mgr_.IsValid());
+    return catalog_mgr_.weak_ref();
+  }
+
+  // Necessary for libcvmfs unit tests in order to avoid clash of sqlite
+  // configurations
+  void DestroyCatalogManager() { catalog_mgr_.Destroy(); }
 
  private:
   static upload::Spooler* CreateSpooler(const std::string& config);
@@ -179,9 +188,10 @@ class CatalogTestTool : public ServerTool {
   std::string public_key_;
   std::string temp_dir_;
 
+  perf::Statistics statistics_;
   UniquePtr<manifest::Manifest> manifest_;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr_;
   UniquePtr<upload::Spooler> spooler_;
+  UniquePtr<catalog::WritableCatalogManager> catalog_mgr_;
   History history_;
 };
 

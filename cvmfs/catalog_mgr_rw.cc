@@ -345,6 +345,9 @@ void WritableCatalogManager::CloneTree(const std::string &from_dir,
   const std::string relative_source = MakeRelativePath(from_dir);
   const std::string relative_dest = MakeRelativePath(to_dir);
 
+  if (relative_source == relative_dest) {
+    PANIC(kLogStderr, "cannot clone tree into itself ('%s')", to_dir.c_str());
+  }
   if (HasPrefix(relative_dest, relative_source + "/", false /*ignore_case*/)) {
     PANIC(kLogStderr,
           "cannot clone tree into sub directory of source '%s' --> '%s'",
@@ -372,9 +375,9 @@ void WritableCatalogManager::CloneTree(const std::string &from_dir,
           to_dir.c_str());
   }
 
-  CloneTreeImpl(PathString(relative_source),
-                dest_parent,
-                NameString(GetFileName(relative_source)));
+  CloneTreeImpl(PathString(from_dir),
+                GetParentPath(to_dir),
+                NameString(GetFileName(to_dir)));
 }
 
 
@@ -387,30 +390,44 @@ void WritableCatalogManager::CloneTreeImpl(
   const std::string &dest_parent_dir,
   const NameString &dest_name)
 {
+  LogCvmfs(kLogCatalog, kLogDebug, "cloning %s --> %s/%s", source_dir.c_str(),
+           dest_parent_dir.c_str(), dest_name.ToString().c_str());
+  PathString relative_source(MakeRelativePath(source_dir.ToString()));
+
   DirectoryEntry source_dirent;
-  bool retval = LookupPath(source_dir, kLookupSole, &source_dirent);
+  bool retval = LookupPath(relative_source, kLookupSole, &source_dirent);
   assert(retval);
+  assert(!source_dirent.IsBindMountpoint());
 
   DirectoryEntry dest_dirent(source_dirent);
   dest_dirent.name_.Assign(dest_name);
+  // Just in case, reset the nested catalog markers
+  dest_dirent.set_is_nested_catalog_mountpoint(false);
+  dest_dirent.set_is_nested_catalog_root(false);
 
   XattrList xattrs;
   if (source_dirent.HasXattrs()) {
-    retval = LookupXattrs(source_dir, &xattrs);
+    retval = LookupXattrs(relative_source, &xattrs);
     assert(retval);
   }
   AddDirectory(dest_dirent, xattrs, dest_parent_dir);
 
-  std::string dest_dir = dest_parent_dir + "/" + dest_name.ToString();
-  if (source_dirent.IsNestedCatalogRoot()) {
+  std::string dest_dir = dest_parent_dir;
+  if (!dest_dir.empty())
+    dest_dir.push_back('/');
+  dest_dir += dest_name.ToString();
+  if (source_dirent.IsNestedCatalogRoot() ||
+      source_dirent.IsNestedCatalogMountpoint())
+  {
     CreateNestedCatalog(dest_dir);
   }
 
   DirectoryEntryList ls;
-  retval = Listing(source_dir, &ls);
+  retval = Listing(relative_source, &ls, false /* expand_symlink */);
   assert(retval);
   for (unsigned i = 0; i < ls.size(); ++i) {
     PathString sub_path(source_dir);
+    assert(!sub_path.IsEmpty());
     sub_path.Append("/", 1);
     sub_path.Append(ls[i].name().GetChars(), ls[i].name().GetLength());
 
