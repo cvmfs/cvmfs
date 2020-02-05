@@ -328,6 +328,119 @@ void WritableCatalogManager::Clone(const std::string destination,
   this->AddFile(destination_dirent, empty_xattrs, destination_dirname);
 }
 
+
+/**
+ * Copies an entire directory tree from the exisitng from_dir to the
+ * non-existing to_dir. The destination's parent directory must exist. On the
+ * catalog level, the new entries will be identical to the old ones except
+ * for their path hash fields.
+ */
+void WritableCatalogManager::CloneTree(const std::string &from_dir,
+                                       const std::string &to_dir)
+{
+  // Sanitize input paths
+  if (from_dir.empty() || to_dir.empty())
+    PANIC(kLogStderr, "clone tree from or to root impossible");
+
+  const std::string relative_source = MakeRelativePath(from_dir);
+  const std::string relative_dest = MakeRelativePath(to_dir);
+
+  if (HasPrefix(relative_dest, relative_source + "/", false /*ignore_case*/)) {
+    PANIC(kLogStderr,
+          "cannot clone tree into sub directory of source '%s' --> '%s'",
+          from_dir.c_str(), to_dir.c_str());
+  }
+
+  DirectoryEntry source_dirent;
+  if (!LookupPath(relative_source, kLookupSole, &source_dirent)) {
+    PANIC(kLogStderr, "path '%s' cannot be found, aborting", from_dir.c_str());
+  }
+  if (!source_dirent.IsDirectory()) {
+    PANIC(kLogStderr, "CloneTree: source '%s' not a directory, aborting",
+          from_dir.c_str());
+  }
+
+  DirectoryEntry dest_dirent;
+  if (LookupPath(relative_dest, kLookupSole, &dest_dirent)) {
+    PANIC(kLogStderr, "destination '%s' exists, aborting", to_dir.c_str());
+  }
+
+  const std::string dest_parent = GetParentPath(relative_dest);
+  DirectoryEntry dest_parent_dirent;
+  if (!LookupPath(dest_parent, kLookupSole, &dest_parent_dirent)) {
+    PANIC(kLogStderr, "destination '%s' not on a known path, aborting",
+          to_dir.c_str());
+  }
+
+  CloneTreeImpl(PathString(relative_source),
+                dest_parent,
+                NameString(GetFileName(relative_source)));
+}
+
+
+/**
+ * Called from CloneTree(), assumes that from_dir and to_dir are sufficiently
+ * sanitized
+ */
+void WritableCatalogManager::CloneTreeImpl(
+  const PathString &source_dir,
+  const std::string &dest_parent_dir,
+  const NameString &dest_name)
+{
+  DirectoryEntry source_dirent;
+  bool retval = LookupPath(source_dir, kLookupSole, &source_dirent);
+  assert(retval);
+
+  DirectoryEntry dest_dirent(source_dirent);
+  dest_dirent.name_.Assign(dest_name);
+
+  XattrList xattrs;
+  if (source_dirent.HasXattrs()) {
+    retval = LookupXattrs(source_dir, &xattrs);
+    assert(retval);
+  }
+  AddDirectory(dest_dirent, xattrs, dest_parent_dir);
+
+  std::string dest_dir = dest_parent_dir + "/" + dest_name.ToString();
+  if (source_dirent.IsNestedCatalogRoot()) {
+    CreateNestedCatalog(dest_dir);
+  }
+
+  DirectoryEntryList ls;
+  retval = Listing(source_dir, &ls);
+  assert(retval);
+  for (unsigned i = 0; i < ls.size(); ++i) {
+    PathString sub_path(source_dir);
+    sub_path.Append("/", 1);
+    sub_path.Append(ls[i].name().GetChars(), ls[i].name().GetLength());
+
+    if (ls[i].IsDirectory()) {
+      CloneTreeImpl(sub_path, dest_dir, ls[i].name());
+      continue;
+    }
+
+    // We break hard-links during cloning
+    ls[i].set_hardlink_group(0);
+    ls[i].set_linkcount(1);
+
+    xattrs.Clear();
+    if (ls[i].HasXattrs()) {
+      retval = LookupXattrs(sub_path, &xattrs);
+      assert(retval);
+    }
+
+    if (ls[i].IsChunkedFile()) {
+      FileChunkList chunks;
+      retval = ListFileChunks(sub_path, ls[i].hash_algorithm(), &chunks);
+      assert(retval);
+      AddChunkedFile(ls[i], xattrs, dest_dir, chunks);
+    } else {
+      AddFile(ls[i], xattrs, dest_dir);
+    }
+  }
+}
+
+
 /**
  * Add a new directory to the catalogs.
  * @param entry a DirectoryEntry structure describing the new directory
@@ -353,7 +466,6 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
 
   DirectoryEntry fixed_hardlink_count(entry);
   fixed_hardlink_count.set_linkcount(2);
-  // No support for extended attributes on directories yet
   catalog->AddEntry(fixed_hardlink_count, xattrs,
                     directory_path, parent_path);
 
