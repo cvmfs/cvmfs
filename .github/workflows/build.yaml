@@ -10,42 +10,42 @@ jobs:
       - uses: actions/checkout@v1
       - name: Install dependencies
         run: |
-          sudo apt-get install
-            autotools-dev
-            build-essential
-            cmake
-            cpio
-            debhelper
-            devscripts
-            gdb
-            gcc
-            git
-            libattr1-dev
-            libcap-dev
-            libffi-dev
-            libfuse-dev
-            libssl-dev
-            pkg-config
-            python-dev
-            python-setuptools
-            ruby
-            ruby-dev
-            rubygems
-            unzip
-            uuid-dev
-            valgrind
-            autoconf
-            bison
-            doxygen
-            graphviz
-            gsfonts
-            dh-systemd
-            flex
-            libhesiod-dev
-            libkrb5-dev
-            libldap2-dev
-            libsasl2-dev
-            libxml2-dev
+          sudo apt-get install \
+            autotools-dev \
+            build-essential \
+            cmake \
+            cpio \
+            debhelper \
+            devscripts \
+            gdb \
+            gcc \
+            git \
+            libattr1-dev \
+            libcap-dev \
+            libffi-dev \
+            libfuse-dev \
+            libssl-dev \
+            pkg-config \
+            python-dev \
+            python-setuptools \
+            ruby \
+            ruby-dev \
+            rubygems \
+            unzip \
+            uuid-dev \
+            valgrind \
+            autoconf \
+            bison \
+            doxygen \
+            graphviz \
+            gsfonts \
+            dh-systemd \
+            flex \
+            libhesiod-dev \
+            libkrb5-dev \
+            libldap2-dev \
+            libsasl2-dev \
+            libxml2-dev \
             sssd-common
       - name: "Create build directory"
         run: mkdir build
