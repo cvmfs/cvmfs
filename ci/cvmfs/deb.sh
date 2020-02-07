@@ -59,10 +59,14 @@ if [ x"$(lsb_release -sc)" = x"bionic" ]; then
   sed -i -e "s/insserv, initscripts, //g" debian/control
 fi
 # Fuse3 is only available as of Debian 10 "buster"
+echo "DEBUG: ...lsb_release -sc... => $(lsb_release -sc)"
 if [ x"$(lsb_release -sc)" = x"buster" ]; then
-  sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control
-  sed -i -e "s/^Recommends:/Recommends: cvmfs-fuse3,/g" debian/control
+echo "DEBUG: inside if for debian10"
+  sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control || return 101
+  sed -i -e "s/^Recommends:/Recommends: cvmfs-fuse3,/g" debian/control || return 102
+echo "DEBUG: done if for debian10"
 else
+echo "DEBUG: inside else for debian10"
   cat debian/control | awk '/#FUSE3-BEGIN/{flag=1;next}/#FUSE3-END/{flag=0;next}!flag' > debian/control.tmp
   mv debian/control.tmp debian/control
 fi
