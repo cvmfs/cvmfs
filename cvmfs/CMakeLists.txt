@@ -1167,6 +1167,18 @@ if (BUILD_SERVER)
   )
 
   install(
+    FILES      server/generate_stats_plots.C
+    DESTINATION    "/usr/share/cvmfs-server"
+    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
+
+  install(
+    FILES      server/stats_index.html.tpl
+    DESTINATION    "/usr/share/cvmfs-server"
+    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
+
+  install(
     CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server)"
   )
 
