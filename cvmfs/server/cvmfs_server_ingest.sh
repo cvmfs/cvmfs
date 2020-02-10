@@ -270,6 +270,9 @@ cvmfs_server_ingest() {
 
   if [ x"$upstream_type" = xgw ]; then
       close_transaction  $name $use_fd_fallback
+      if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
+        upload_statistics_plots $name $upstream
+      fi
       publish_after_hook $name
       publish_succeeded $name
       echo "Changes submitted to repository gateway"
@@ -360,6 +363,9 @@ cvmfs_server_ingest() {
 
   # remount the repository
   close_transaction $name $use_fd_fallback
+  if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
+    upload_statistics_plots $name $upstream
+  fi
   publish_after_hook $name
   publish_succeeded  $name
 

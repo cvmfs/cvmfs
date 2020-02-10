@@ -940,6 +940,7 @@ CVMFS_AUTOCATALOGS=false
 CVMFS_ASYNC_SCRATCH_CLEANUP=true
 CVMFS_PRINT_STATISTICS=false
 CVMFS_UPLOAD_STATS_DB=false
+CVMFS_UPLOAD_STATS_PLOTS=false
 EOF
 
   if [ x"$voms_authz" != x"" ]; then
@@ -1306,4 +1307,34 @@ _run_catalog_migration() {
   set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
 }
 
+upload_statistics_plots_bg() {
+  local db_path_copied="$1"
+  local REPO_NAME="$2"
+  local upstream="$3"
+  root_file=$(mktemp -t stats.root.XXXXXX)
+  root -l -b -q /usr/share/cvmfs-server/generate_stats_plots.C+\("\"${db_path_copied}\", \"${root_file}\""\)
+  $(__swissknife_cmd dbg) upload -i ${root_file} \
+                                 -o stats/stats.root \
+                                 -r $upstream
+  
+  index_file=$(mktemp -t stats_index.html.XXXXXX)
+  sed "s/\$REPO_NAME/$REPO_NAME/g" /usr/share/cvmfs-server/stats_index.html.tpl > $index_file 
 
+  $(__swissknife_cmd dbg) upload -i $index_file \
+                                 -o stats/index.html \
+                                 -r $upstream
+  rm $db_path_copied
+  rm $root_file
+  rm $index_file
+}
+
+upload_statistics_plots() {
+  local name="$1"
+  local upstream="$2"
+
+  db_path="/var/spool/cvmfs/${name}/stats.db"
+  
+  db_path_copied=$(mktemp -t stats.root.XXXXXX)
+  cp $db_path $db_path_copied
+  upload_statistics_plots_bg $db_path_copied $name $upstream 1>/dev/null &
+}
