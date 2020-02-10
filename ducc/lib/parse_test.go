@@ -22,6 +22,32 @@ func TestParseImageSimple(t *testing.T) {
 	if image.Tag != "5" {
 		t.Errorf("Error in parse wrong tag: %s", image.Tag)
 	}
+	if image.StarWildcard {
+		t.Errorf("Error in parse detect StarWildcard")
+	}
+}
+
+func TestParseImageWithStartWildcard(t *testing.T) {
+	imageString := "https://hub.docker.com/library/redis:*"
+	image, err := ParseImage(imageString)
+	if err != nil {
+		t.Errorf("Error in parsing %s", imageString)
+	}
+	if image.Scheme != "https" {
+		t.Errorf("Error in parse wrong scheme: %s", image.Scheme)
+	}
+	if image.Registry != "hub.docker.com" {
+		t.Errorf("Error in parse wrong registry: %s", image.Registry)
+	}
+	if image.Repository != "library/redis" {
+		t.Errorf("Error in parse wrong repository: %s", image.Repository)
+	}
+	if image.Tag != "*" {
+		t.Errorf("Error in parse wrong tag: %s", image.Tag)
+	}
+	if !image.StarWildcard {
+		t.Errorf("Error no StarWildcard detected")
+	}
 }
 
 func TestParseImageNoTag(t *testing.T) {

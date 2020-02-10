@@ -27,15 +27,16 @@ type ManifestRequest struct {
 }
 
 type Image struct {
-	Id         int
-	User       string
-	Scheme     string
-	Registry   string
-	Repository string
-	Tag        string
-	Digest     string
-	IsThin     bool
-	Manifest   *da.Manifest
+	Id           int
+	User         string
+	Scheme       string
+	Registry     string
+	Repository   string
+	Tag          string
+	Digest       string
+	IsThin       bool
+	StarWildcard bool
+	Manifest     *da.Manifest
 }
 
 func (i Image) GetSimpleName() string {

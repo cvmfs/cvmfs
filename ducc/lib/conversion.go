@@ -73,7 +73,7 @@ func assureValidSingularity() error {
 }
 
 func ConvertWishSingularity(wish WishFriendly) (err error) {
-	err := assureValidSingularity()
+	err = assureValidSingularity()
 	if err != nil {
 		return err
 	}
@@ -119,12 +119,17 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 	if err != nil {
 		return
 	}
-	password, err := GetPassword()
+	inputImage, err := ParseImage(wish.InputName)
+	inputImage.User = wish.UserInput
 	if err != nil {
 		return
 	}
-	inputImage, err := ParseImage(wish.InputName)
-	inputImage.User = wish.UserInput
+
+	return convertInputOutput(inputImage, outputImage, wish.CvmfsRepo, convertAgain, forceDownload)
+}
+
+func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain, forceDownload bool) (err error) {
+	password, err := GetPassword()
 	if err != nil {
 		return
 	}
@@ -133,7 +138,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 		return
 	}
 
-	alreadyConverted := AlreadyConverted(wish.CvmfsRepo, inputImage, manifest.Config.Digest)
+	alreadyConverted := AlreadyConverted(repo, inputImage, manifest.Config.Digest)
 	Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
 		"Already converted the image, skipping.")
 
@@ -148,7 +153,6 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 
 		}
 	}
-
 	layersChanell := make(chan downloadedLayer, 3)
 	manifestChanell := make(chan string, 1)
 	stopGettingLayers := make(chan bool, 1)
@@ -176,12 +180,12 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 		cleanup := func(location string) {
 			Log().Info("Running clean up function deleting the last layer.")
 
-			err := ExecCommand("cvmfs_server", "abort", "-f", wish.CvmfsRepo).Start()
+			err := ExecCommand("cvmfs_server", "abort", "-f", repo).Start()
 			if err != nil {
 				LogE(err).Warning("Error in the abort command inside the cleanup function, this warning is usually normal")
 			}
 
-			err = ExecCommand("cvmfs_server", "ingest", "--delete", location, wish.CvmfsRepo).Start()
+			err = ExecCommand("cvmfs_server", "ingest", "--delete", location, repo).Start()
 			if err != nil {
 				LogE(err).Error("Error in the cleanup command")
 			}
@@ -190,7 +194,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 
 			Log().WithFields(log.Fields{"layer": layer.Name}).Info("Start Ingesting the file into CVMFS")
 			layerDigest := strings.Split(layer.Name, ":")[1]
-			layerPath := LayerRootfsPath(wish.CvmfsRepo, layerDigest)
+			layerPath := LayerRootfsPath(repo, layerDigest)
 
 			var pathExists bool
 			if _, err := os.Stat(layerPath); os.IsNotExist(err) {
@@ -225,7 +229,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 				} {
 
 					Log().WithFields(log.Fields{"catalogdirectory": dir}).Info("Working on CATALOGDIRECTORY")
-					err = CreateCatalogIntoDir(wish.CvmfsRepo, dir)
+					err = CreateCatalogIntoDir(repo, dir)
 					if err != nil {
 						LogE(err).WithFields(log.Fields{
 							"directory": dir}).Error(
@@ -236,7 +240,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 							"Created subcatalog in directory")
 					}
 				}
-				err = ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", TrimCVMFSRepoPrefix(layerPath), wish.CvmfsRepo).StdIn(layer.Path).Start()
+				err = ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", TrimCVMFSRepoPrefix(layerPath), repo).StdIn(layer.Path).Start()
 
 				if err != nil {
 					LogE(err).WithFields(log.Fields{"layer": layer.Name}).Error("Some error in ingest the layer")
@@ -360,7 +364,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 	// and if there was no error we add everything to the converted table
 	noErrorInConversionValue := <-noErrorInConversion
 
-	err = SaveLayersBacklink(wish.CvmfsRepo, inputImage, layerDigests)
+	err = SaveLayersBacklink(repo, inputImage, layerDigests)
 	if err != nil {
 		LogE(err).Error("Error in saving the backlinks")
 		noErrorInConversionValue = false
@@ -388,14 +392,14 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 		Log().Info("Finish pushing the image to the registry")
 
 		manifestPath := filepath.Join(".metadata", inputImage.GetSimpleName(), "manifest.json")
-		errIng := IngestIntoCVMFS(wish.CvmfsRepo, manifestPath, <-manifestChanell)
+		errIng := IngestIntoCVMFS(repo, manifestPath, <-manifestChanell)
 		if errIng != nil {
 			LogE(errIng).Error("Error in storing the manifest in the repository")
 		}
 		var errRemoveSchedule error
 		if alreadyConverted == ConversionNotMatch {
 			Log().Info("Image already converted, but it does not match the manifest, adding it to the remove scheduler")
-			errRemoveSchedule = AddManifestToRemoveScheduler(wish.CvmfsRepo, manifest)
+			errRemoveSchedule = AddManifestToRemoveScheduler(repo, manifest)
 			if errRemoveSchedule != nil {
 				Log().Warning("Error in adding the image to the remove schedule")
 				return errRemoveSchedule
