@@ -84,19 +84,31 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	}
 	defer os.RemoveAll(tmpDir)
 	inputImage, err := ParseImage(wish.InputName)
-	singularity, err := inputImage.DownloadSingularityDirectory(tmpDir)
-	defer os.RemoveAll(singularity.TempDirectory)
+	expandedImgTag, err := inputImage.ExpandWildcard()
 	if err != nil {
-		LogE(err).Error("Error in dowloading the singularity image")
+		LogE(err).WithFields(log.Fields{
+			"input image": fmt.Sprintf("%s/%s", inputImage.Registry, inputImage.Repository)}).
+			Error("Error in retrieving all the tags from the image")
 		return
+	}
+	var firstError error
+	for _, inputImage := range expandedImgTag {
+		singularity, err := inputImage.DownloadSingularityDirectory(tmpDir)
+		if err != nil {
+			LogE(err).Error("Error in dowloading the singularity image")
+			firstError = err
+		}
+
+		err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
+		if err != nil {
+			LogE(err).Error("Error in ingesting the singularity image into the CVMFS repository")
+			firstError = err
+		}
+
+		os.RemoveAll(singularity.TempDirectory)
 	}
 
-	err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
-	if err != nil {
-		LogE(err).Error("Error in ingesting the singularity image into the CVMFS repository")
-		return
-	}
-	return nil
+	return firstError
 }
 
 func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err error) {
