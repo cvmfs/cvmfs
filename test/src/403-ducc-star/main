@@ -1,0 +1,112 @@
+cvmfs_test_name="DUCC container ingestion"
+cvmfs_test_autofs_on_startup=true
+cvmfs_test_suites="ducc"
+
+CVMFS_TEST403_REGISTRY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+CVMFS_TEST403_RECIPE="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
+CVMFS_TEST403_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
+CVMFS_TEST403_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+
+
+ducc_test_403_clean_up() {
+    echo -n "Cleaning up..."
+
+    export DUCC_DOCKER_REGISTRY_PASS=""
+
+    # delete the recipe file
+    rm $CVMFS_TEST403_RECIPE
+    # delete the logs and error from ducc
+    rm $CVMFS_TEST403_DUCC_ERR
+
+    # stop and delete the registry container
+    echo -n "Stopping and deleting docker registry..."
+    docker stop $CVMFS_TEST403_REGISTRY >> /dev/null
+    docker rm $CVMFS_TEST403_REGISTRY >> /dev/null
+    echo "done"
+
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_USER
+
+    echo "done"
+}
+
+cvmfs_run_test() {
+    trap ducc_test_403_clean_up EXIT HUP INT TERM
+
+    # overall exists the following containers with the following hash
+    # siscia/ducc_test:base                        ab3fe83c0696
+    # siscia/ducc_test:base_another_tag            ab3fe83c0696
+    # siscia/ducc_test:one_more_file               69e11b6e987c
+    # siscia/ducc_test:one_more_file_another_tag   69e11b6e987c
+    # siscia/ducc_test_1:base                      ab3fe83c0696
+    # siscia/ducc_test_1:one_more_file             69e11b6e987c
+
+    # create a simple recipe file for the repository manager in the local dir
+    echo -n "*** Creating recipe file..."
+    cat > $CVMFS_TEST403_RECIPE  << EOL
+version: 1
+user: mock_user
+cvmfs_repo: '$CVMFS_TEST403_REPOSITORY'
+output_format: '\$(scheme)://localhost:5000/mock/\$(image)'
+input:
+    - 'https://registry.hub.docker.com/siscia/ducc_test:*'
+    - 'https://registry.hub.docker.com/siscia/ducc_test_1:*'
+EOL
+    echo "done"
+
+    # set the password to access the docker hub
+    export DUCC_DOCKER_REGISTRY_PASS=mock_pass
+
+    # crete the repository where to store the content
+    echo -n "*** Creating CVMFS repo..."
+    create_empty_repo $CVMFS_TEST403_REPOSITORY $USER || return $?
+    echo "done"
+
+    # start by running the docker registry on localhost
+    echo -n "*** Starting docker registry for tests..."
+    docker run -d -p 5000:5000 --name $CVMFS_TEST403_REGISTRY registry:2 >> /dev/null || return 3
+    echo "done"
+
+    echo "*** Starting test."
+
+    echo "*** Converting recipe..."
+    echo "cvmfs_ducc convert $CVMFS_TEST403_RECIPE 2> $CVMFS_TEST403_DUCC_ERR"
+          cvmfs_ducc convert $CVMFS_TEST403_RECIPE 2> $CVMFS_TEST403_DUCC_ERR || return 101
+    grep -q "level=error" $CVMFS_TEST403_DUCC_ERR
+    while [ $? -ne 1 ]
+    do
+        echo -n "*** Some error during conversion, let's do it again. Converting recipe..."
+        rm $CVMFS_TEST403_DUCC_ERR
+        cvmfs_ducc convert $CVMFS_TEST403_RECIPE 2> $CVMFS_TEST403_DUCC_ERR || return 101
+        grep -q "level=error" $CVMFS_TEST403_DUCC_ERR
+    done
+    echo "*** Convert recipe successfully"
+
+    echo "*** Check integrity of the repository..."
+    check_repository $CVMFS_TEST403_REPOSITORY -i || return 102
+
+    echo "*** Repository checked successfully"
+
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/registry.hub.docker.com/siscia/ducc_test\:base/ >> /dev/null || return 111
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/registry.hub.docker.com/siscia/ducc_test\:base_another_tag/ >> /dev/null || return 112
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/registry.hub.docker.com/siscia/ducc_test\:one_more_file/ >> /dev/null || return 113
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/registry.hub.docker.com/siscia/ducc_test\:one_more_file_another_tag/ >> /dev/null || return 114
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/registry.hub.docker.com/siscia/ducc_test_1\:base/ >> /dev/null || return 115
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/registry.hub.docker.com/siscia/ducc_test_1\:one_more_file/ >> /dev/null || return 116
+     
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.metadata/registry.hub.docker.com/siscia/ducc_test\:base/ >> /dev/null || return 117
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.metadata/registry.hub.docker.com/siscia/ducc_test\:base_another_tag/ >> /dev/null || return 118
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.metadata/registry.hub.docker.com/siscia/ducc_test\:one_more_file/ >> /dev/null || return 119
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.metadata/registry.hub.docker.com/siscia/ducc_test\:one_more_file_another_tag/ >> /dev/null || return 120
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.metadata/registry.hub.docker.com/siscia/ducc_test_1\:base/ >> /dev/null || return 121
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.metadata/registry.hub.docker.com/siscia/ducc_test_1\:one_more_file/ >> /dev/null || return 122
+    
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.layers >> /dev/null || return 123
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.metadata >> /dev/null || return 124
+    ls /cvmfs/$CVMFS_TEST403_REPOSITORY/.flat >> /dev/null || return 125
+
+    # add other possible tests
+
+    echo "*** Test successful"
+
+    return 0
+}
