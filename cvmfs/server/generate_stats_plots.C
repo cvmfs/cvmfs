@@ -58,13 +58,6 @@ const std::string stmt_gc_weekly =
   " GROUP BY datetime(start_time, \"weekday 0\", \"start of day\")"
   " ORDER BY datetime(start_time, \"weekday 0\", \"start of day\") ASC;";
 
-const std::string stmt_gc_monthly =
-  "SELECT substr(start_time, 0, 8) AS month,"
-  "count(gc_id) AS n_ops,"
-  "sum((julianday(finish_time) - julianday(start_time))) AS duration,"
-  + getSumsSubStmt(gc_cols) +
-  " FROM gc_statistics GROUP BY substr(start_time, 0, 8);";
-
 const std::string stmt_publish =
   "SELECT * FROM "
     "(SELECT * FROM publish_statistics ORDER BY start_time DESC LIMIT 2000) "
@@ -87,37 +80,11 @@ const std::string stmt_publish_weekly =
   " GROUP BY datetime(start_time, \"weekday 0\", \"start of day\")"
   " ORDER BY datetime(start_time, \"weekday 0\", \"start of day\") ASC;";
 
-const std::string stmt_publish_monthly =
-  "SELECT substr(start_time, 0, 8) AS month,"
-  "count(publish_id) AS n_ops,"
-  "sum((julianday(finish_time) - julianday(start_time))) AS duration,"
-  + getSumsSubStmt(publish_cols) +
-  " FROM publish_statistics GROUP BY substr(start_time, 0, 8);";
-
 unsigned offset = TDatime(1995, 1, 1, 0, 0, 0).Convert();
 
-// unsigned getMonthCoord(const std::string &date) {
-//   return TDatime(stoi(date.substr(0, 4)),
-//                  stoi(date.substr(5, 2)),
-//                  0, 0, 0, 0).Convert() - offset;
-// }
-
-unsigned getDayCoord(const std::string &date) {
-  return TDatime(stoi(date.substr(0, 4)),
-                 stoi(date.substr(5, 2)),
-                 stoi(date.substr(8, 2)),
-                 0, 0, 0).Convert() - offset;
-}
-
-unsigned getWeekCoord(const std::string &date) {
-  return TDatime(date.c_str()).Convert() - offset - 24*3600*6;  // to Monday
-}
-
-
-typedef std::unordered_map<std::string, ROOT::RDF::RNode*> RDFMap;
-typedef std::unordered_map<std::string, ROOT::RDF::RResultPtr<TGraph> >
-        TGraphMap;
-typedef std::vector<ROOT::RDF::RResultPtr<TGraph> > TGraphList;
+using RDFMap = std::unordered_map<std::string, ROOT::RDF::RNode*>;
+using TGraphMap = std::unordered_map<std::string, ROOT::RDF::RResultPtr<TGraph> >;
+using TGraphList = std::vector<ROOT::RDF::RResultPtr<TGraph> >;
 
 struct PlotInstrs {
   TGraphList gr;
@@ -154,14 +121,14 @@ void WriteHistogram(PlotInstrs pi) {
   TCanvas *c = new TCanvas(pi.name.c_str());
   c->SetRightMargin(.02);
 
-  auto hists = new TList();
+  std::vector<std::unique_ptr<TH1D>> hists;
 
   int nvals = pi.gr[0]->GetN();
   double xmin = pi.gr[0]->GetX()[0];
   // shift xmax to the RIGHT side of the bin
   double xmax = pi.gr[0]->GetX()[nvals-1] + pi.period;
   int nbins = (xmax - xmin) / pi.period;
-  auto helper = new TH1D("helper", "", nbins, xmin, xmax);
+  std::unique_ptr<TH1D> helper(new TH1D("helper", "", nbins, xmin, xmax));
   helper->SetBinContent(0, 0);
   int n_visible_vals = std::min(nbins, max_visible_values);
 
@@ -169,7 +136,8 @@ void WriteHistogram(PlotInstrs pi) {
 
   for (unsigned i = 0; i < pi.gr.size(); ++i) {
     auto gr = *pi.gr[i];
-    auto h = GetHistogram(&gr, pi.period);
+    hists.emplace_back(GetHistogram(&gr, pi.period));
+    auto &h = hists.back();
     int nbins = h->GetNbinsX();
     for (int i = 0; i < nbins; ++i) {
       if (helper->GetBinContent(i+1) < h->GetBinContent(i+1)) {
@@ -183,8 +151,8 @@ void WriteHistogram(PlotInstrs pi) {
     h->SetLineWidth(2);
     h->SetLineColor(pi.colors[i]);
     h->SetTitle(pi.gr_titles[i].c_str());
-    hists->Add(h);
-    legend->AddEntry(h, pi.gr_titles[i].c_str());
+    // hists.push_back(h);
+    legend->AddEntry(h.get(), pi.gr_titles[i].c_str());
   }
 
   if (pi.time_axis) {
@@ -210,8 +178,7 @@ void WriteHistogram(PlotInstrs pi) {
   helper->SetTitle(pi.title.c_str());
   helper->Draw("L");
 
-  for (int i = 0; i < hists->GetEntries(); ++i) {
-    auto h = hists->At(i);
+  for (auto const& h : hists) {
     h->Draw("L P0 SAME");
   }
 
@@ -228,10 +195,6 @@ void WriteHistogram(PlotInstrs pi) {
     legend->Draw();
   }
   c->Write();
-  for (int i = 0; i < hists->GetEntries(); ++i) {
-    delete hists->At(i);
-  }
-  delete helper;
 }
 
 void WriteTHStack(PlotInstrs pi)
@@ -245,12 +208,14 @@ void WriteTHStack(PlotInstrs pi)
   int n_visible_vals = std::min(nbins, max_visible_values);
   THStack *hs = new THStack("hs", pi.title.c_str());
 
-  auto hists = new TList();
+  std::vector<std::unique_ptr<TH1D>> hists;
 
   for (unsigned i = 0; i < pi.gr.size(); ++i) {
     auto gr = *pi.gr[i];
     auto name = std::string(gr.GetName()) + std::to_string(i);  // unique name
-    auto h = new TH1D(name.c_str(), pi.gr_titles[i].c_str(), nbins, xmin, xmax);
+    hists.emplace_back(new TH1D(name.c_str(), pi.gr_titles[i].c_str(),
+                                nbins, xmin, xmax));
+    auto &h = hists.back();
     for (int i = 0; i < gr.GetN(); ++i) {
       double x, y;
       gr.GetPoint(i, x, y);
@@ -260,8 +225,7 @@ void WriteTHStack(PlotInstrs pi)
     }
 
     h->SetFillColor(pi.colors[i]);
-    hs->Add(h);
-    hists->Add(h);
+    hs->Add(h.get());
   }
   hs->Draw();
   hs->GetHistogram()->SetBarWidth();
@@ -278,29 +242,36 @@ void WriteTHStack(PlotInstrs pi)
   hs->GetYaxis()->SetTitle(pi.y_axis_title.c_str());
   c->BuildLegend();
   c->Write();
-
-  for (int i = 0; i < hists->GetEntries(); ++i) {
-    delete hists->At(i);
-  }
 }
 
 
-// rdfs["gc"|"publish"]["period"]
-std::unordered_map<std::string, RDFMap> rdfs;
-// graphs["gc"|"publish"]["period"]["col"]
+// g_rdfs["gc"|"publish"]["period"]
+std::unordered_map<std::string, RDFMap> g_rdfs;
+// g_graphs["gc"|"publish"]["period"]["col"]
 std::unordered_map<std::string,
-                   std::unordered_map<std::string, TGraphMap> > graphs;
+                   std::unordered_map<std::string, TGraphMap> > g_graphs;
 
 // Do not generate graphs of these column values
 std::set<std::string> excluded_cols =
-  {"x", "date", "day", "month", "gc_id",
-  "publish_id", "start_time", "finish_time"};
+  {"x", "date", "day", "revision", "gc_id",
+  "publish_id", "start_time", "finish_time", "success"};
 
 std::set<std::string> speed_cols =
   {"sz_bytes_added", "sz_bytes_uploaded"};
 
-double getSpeed(int64_t count, double duration) {
-  return count/duration/86400;
+double getSpeed(Long64_t count, double duration_days) {
+  return count/duration_days/86400;
+}
+
+unsigned getDayCoord(const std::string &date) {
+  return TDatime(stoi(date.substr(0, 4)),
+                 stoi(date.substr(5, 2)),
+                 stoi(date.substr(8, 2)),
+                 0, 0, 0).Convert() - offset;
+}
+
+unsigned getWeekCoord(const std::string &date) {
+  return TDatime(date.c_str()).Convert() - offset - 24*3600*6;  // to Monday
 }
 
 ROOT::RDF::RNode define_custom_cols(ROOT::RDF::RNode *rdf) {
@@ -344,22 +315,22 @@ TGraphMap precompute_graphs(ROOT::RDF::RNode* rdf)
 }
 
 void generate_stats_plots(std::string stats_db_path, std::string out_path) {
-  TFile f(out_path.c_str(), "RECREATE");
+  std::unique_ptr<TFile> f(TFile::Open(out_path.c_str(), "RECREATE"));
+  assert(f && ! f->IsZombie());
   // TODO(jpriessn) change "x" to revision
-  rdfs["publish"]["revision"] = new ROOT::RDF::RNode(
+  unsigned row_id = 0;
+  g_rdfs["publish"]["revision"] = new ROOT::RDF::RNode(
     ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish)
-              .Alias("x", "publish_id"));
-  rdfs["publish"]["daily"] = new ROOT::RDF::RNode(
+              .Define("x", [&row_id] (Long64_t rev) {++row_id; return (rev > row_id) ? rev : row_id; }, {"revision"}));
+  g_rdfs["publish"]["daily"] = new ROOT::RDF::RNode(
     ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish_daily)
               .Define("x", getDayCoord, {"day"}));
-  rdfs["publish"]["weekly"] = new ROOT::RDF::RNode(
+  g_rdfs["publish"]["weekly"] = new ROOT::RDF::RNode(
     ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish_weekly)
               .Define("x", getWeekCoord, {"date"}));
-  // rdfs["publish"]["monthly"] = new ROOT::RDF::RNode(
-  //   ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish_monthly)
-  //             .Define("x", getMonthCoord, {"month"}));
 
   // TODO(jpriessn) change "x" to revision
+  row_id = 0;
   auto rdf_gc_rev =
     new ROOT::RDF::RNode(
     ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_gc)
@@ -367,21 +338,18 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
   bool garbage_collectible;
   garbage_collectible = *rdf_gc_rev->Count();
   if (garbage_collectible) {
-    rdfs["gc"]["revision"] = rdf_gc_rev;
-    rdfs["gc"]["daily"] = new ROOT::RDF::RNode(
+    g_rdfs["gc"]["revision"] = rdf_gc_rev;
+    g_rdfs["gc"]["daily"] = new ROOT::RDF::RNode(
       ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_gc_daily)
                 .Define("x", getDayCoord, {"day"}));
-    rdfs["gc"]["weekly"] = new ROOT::RDF::RNode(
+    g_rdfs["gc"]["weekly"] = new ROOT::RDF::RNode(
       ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_gc_weekly)
                 .Define("x", getWeekCoord, {"date"}));
-    // rdfs["gc"]["monthly"] = new ROOT::RDF::RNode(
-    //   ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_gc_monthly)
-    //             .Define("x", getMonthCoord, {"month"}));
   }
 
-  for (auto const& op : rdfs) {
-    for (auto const& period : op.second) {
-      graphs[op.first][period.first] = precompute_graphs(period.second);
+  for (auto const& op : g_rdfs) {
+    for (auto &period : op.second) {
+      g_graphs[op.first][period.first] = precompute_graphs(period.second);
     }
   }
 
@@ -406,8 +374,8 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
     }
     pi.marker_styles = {20, 21, 22};
 
-    auto p_grs = graphs["publish"][period];
-    auto gc_grs = graphs["gc"][period];
+    auto p_grs = g_graphs["publish"][period];
+    auto gc_grs = g_graphs["gc"][period];
 
     pi.gr = {p_grs["files_added"], p_grs["files_removed"],
              p_grs["files_changed"]};
