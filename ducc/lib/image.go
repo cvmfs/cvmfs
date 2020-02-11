@@ -217,6 +217,64 @@ func (img Image) GetSingularityLocation() string {
 	return fmt.Sprintf("docker://%s/%s%s", img.Registry, img.Repository, img.GetReference())
 }
 
+func (img Image) GetTagListUrl() string {
+	return fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository)
+}
+
+func (img Image) ExpandWildcard() ([]Image, error) {
+	maxTags := 20
+	var result []Image
+	if !img.StarWildcard {
+		result = append(result, img)
+		return result, nil
+	}
+	var tagsList struct {
+		Tags []string
+	}
+	pass, err := GetPassword()
+	if err != nil {
+		LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
+		pass = ""
+	}
+	user := img.User
+	url := img.GetTagListUrl()
+	token, err := firstRequestForAuth(url, user, pass)
+	if err != nil {
+		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
+		LogE(err).Error(errF)
+		return result, errF
+	}
+
+	client := http.Client{}
+	url = fmt.Sprintf("%s?n=%d", url, maxTags)
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		errF := fmt.Errorf("Error in making the request for retrieving the tags: %s", err)
+		LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
+		return result, errF
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		errF := fmt.Errorf("Got error status code (%d) trying to retrieve the tags", resp.StatusCode)
+		LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
+		return result, errF
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
+		errF := fmt.Errorf("Error in decoding the tags from the server: %s", err)
+		LogE(err).Error(errF)
+		return result, errF
+	}
+	for _, tag := range tagsList.Tags {
+		taggedImg := img
+		taggedImg.Tag = tag
+		result = append(result, taggedImg)
+	}
+	return result, nil
+}
+
 func GetSingularityPathFromManifest(manifest da.Manifest) string {
 	digest := strings.Split(manifest.Config.Digest, ":")[1]
 	return filepath.Join(".flat", digest[0:2], digest)

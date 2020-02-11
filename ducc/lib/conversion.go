@@ -124,8 +124,21 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 	if err != nil {
 		return
 	}
-
-	return convertInputOutput(inputImage, outputImage, wish.CvmfsRepo, convertAgain, forceDownload)
+	var firstError error
+	expandedImgTags, err := inputImage.ExpandWildcard()
+	if err != nil {
+		LogE(err).WithFields(log.Fields{
+			"input image": fmt.Sprintf("%s/%s", inputImage.Registry, inputImage.Repository)}).
+			Error("Error in retrieving all the tags from the image")
+		return err
+	}
+	for _, expandedImgTag := range expandedImgTags {
+		err = convertInputOutput(expandedImgTag, outputImage, wish.CvmfsRepo, convertAgain, forceDownload)
+		if err != nil && firstError == nil {
+			firstError = err
+		}
+	}
+	return firstError
 }
 
 func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain, forceDownload bool) (err error) {
