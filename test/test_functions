@@ -55,7 +55,7 @@ if [ -z "$CVMFS_TEST_HTTP_BASE" ] && [ ! -z "$CVMFS_TEST_STRATUM0" ]; then
 fi
 
 if [ ! -z "$CVMFS_TEST_GEO_LICENSE_KEY" ]; then
-  echo "CVMFS_GEO_LICENSE_KEY=$CVMFS_TEST_GEO_LICENSE_KEY" | sudo tee /etc/cvmfs/server.local
+  echo "CVMFS_GEO_LICENSE_KEY=$CVMFS_TEST_GEO_LICENSE_KEY" | sudo tee /etc/cvmfs/server.local > /dev/null
 fi
 
 
