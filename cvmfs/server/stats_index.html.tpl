@@ -3,28 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>CVMFS repository statistics - $REPO_NAME</title>
+  <title>CernVM-FS repository statistics - $REPO_NAME</title>
   <script src="https://root.cern/js/latest/scripts/JSRootCore.min.js" type="text/javascript"></script>
   <script type='text/javascript'>
     var filename = "stats.root";
-    var publish_cols = [  "files_added", "files_removed", "files_changed",
-  "directories_added", "directories_removed", "directories_changed",
-  "symlinks_added", "symlinks_removed", "symlinks_changed",
-  "chunks_duplicated", "chunks_added",
-  "sz_bytes_added", "sz_bytes_removed", "sz_bytes_uploaded",
-  "catalogs_added", "sz_catalog_bytes_uploaded" ]
-    var gc_cols = ["n_condemned_objects", "sz_condemned_bytes",
-                   "n_preserved_catalogs", "n_condemned_catalogs"];
-    var cols = publish_cols.concat(gc_cols);
-    
-   //  JSROOT.OpenFile(filename, function(file) {
-   //    cols.forEach(function(col) {
-   //      file.ReadObject(col+"_daily", function(obj) {
-   //        JSROOT.draw(col, obj);
-   //      })
-   //    })
-   //  });
-   var plots = ["utilization_daily", "utilization_weekly",
+
+    var plots = ["utilization_daily", "utilization_weekly",
                 "condemned_objects", "condemned_objects_daily", "condemned_objects_weekly",
                 "condemned_bytes", "condemned_bytes_daily", "condemned_bytes_weekly",
                 "condemned_catalogs", "condemned_catalogs_daily", "condemned_catalogs_weekly",
@@ -38,7 +22,8 @@
                 "publish_ops_daily", "publish_ops_weekly",
                 "uploaded_speed_daily", "uploaded_speed_weekly",
                 "volume_speed_daily", "volume_speed_weekly"];
-   JSROOT.OpenFile(filename, function(file) {
+
+    JSROOT.OpenFile(filename, function(file) {
       plots.forEach(function(plot) {
         file.ReadObject(plot, function(obj) {
          JSROOT.draw(plot, obj);
@@ -48,15 +33,15 @@
   </script>
 </head>
 <body>
-  <h1>CVMFS repository statistics - $REPO_NAME</h1>
+  <h1>CernVM-FS repository statistics - $REPO_NAME</h1>
   [ <a href="stats.db">Raw data (SQLite database)</a> ]
   [ <a href="stats.root">ROOT file with plots</a> ]
   <div>
     <h2>Intro</h2>
-    This is a statistics monitor of CVMFS Stratum0 repository.<br>
+    This is a statistics monitor of CernVM-FS Stratum0 repository.<br>
     <ul>
       <li>It contains useful plots related to publication and garbage collection on this machine.</li>
-      <li>Data used to compose these plots come from CVMFS internal statistics database available <a href="stats.db">here</a>.</li>
+      <li>Data used to compose these plots come from CernVM-FS internal statistics database available <a href="stats.db">here</a>.</li>
       <li>Plots are redrawn every time the underlying database changes (i. e. after publication or garbage collection) with a few second delay.</li>
       <li>Plots are loaded from a <a href="stats.root">ROOT file</a> using JsROOT. <a href="https://root.cern.ch/js/">JsROOT official page</a> can provide more information on usage.</li>
     </ul>
