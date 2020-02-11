@@ -269,10 +269,8 @@ cvmfs_server_ingest() {
   fi
 
   if [ x"$upstream_type" = xgw ]; then
+      # TODO(jpriessn): implement publication counters upload to gateway
       close_transaction  $name $use_fd_fallback
-      if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
-        upload_statistics_plots $name $upstream
-      fi
       publish_after_hook $name
       publish_succeeded $name
       echo "Changes submitted to repository gateway"
@@ -362,10 +360,10 @@ cvmfs_server_ingest() {
   fi
 
   # remount the repository
-  close_transaction $name $use_fd_fallback
   if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
     upload_statistics_plots $name $upstream
   fi
+  close_transaction $name $use_fd_fallback
   publish_after_hook $name
   publish_succeeded  $name
 
