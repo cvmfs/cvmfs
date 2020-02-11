@@ -34,7 +34,7 @@ const (
 var subDirInsideRepo = ".layers"
 
 func assureValidSingularity() error {
-	err, stdout, _ := ExecCommand("singularity", "--version").StartWithOutput()
+	err, stdout, _ := ExecCommand("singularity", "version").StartWithOutput()
 	if err != nil {
 		err := fmt.Errorf("No working version of Singularity: %s", err)
 		LogE(err).Error("No working version of Singularity")
@@ -94,16 +94,71 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	var firstError error
 	for _, inputImage := range expandedImgTag {
 
-		singularityPath, err := inputImage.GetSingularityPath()
+		// we want to check if we have already ingested the Singularity image
+		// Several cases are possible
+		// Image not ingested, neither pubSymPath nor privatePath are present
+		// Image ingested and up to date, pubSymPath and privatePath point to the same thing
+		// Image update but stale (old), pubSymPath and privatePath point to different things
+		publicSymlinkPath := inputImage.GetPublicSymlinkPath()
+		completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
+		_, errPub := os.Stat(completePubSymPath)
+
+		singularityPrivatePath, err := inputImage.GetSingularityPath()
 		if err != nil {
 			errF := fmt.Errorf("Error in getting the path where to save Singularity filesystem: %s", err)
 			LogE(err).Warning(errF)
 			firstError = errF
 			continue
 		}
+		completeSingularityPriPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, singularityPrivatePath)
+		_, errPri := os.Stat(completeSingularityPriPath)
 
-		fileInfo, err := os.Stat(singularityPath)
-		if err == nil && fileInfo.IsDir() {
+		// no error in stating both directories
+		// either the image is up to date or the image became stale
+		if errPub == nil && errPri == nil {
+			pubLinkPointsTo, err := os.Readlink(completePubSymPath)
+			if err != nil {
+				// this should never happen
+				Log().Warning("Error in reading the public link")
+			} else {
+				if pubLinkPointsTo == singularityPrivatePath {
+					// the link is up to date
+					Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Singularity Image up to date")
+					continue
+				} else {
+					// delete the old pubLink
+					// make a new Link to the privatePaht
+					// after that skip and continue
+					Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
+					err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+					if err != nil {
+						errF := fmt.Errorf("Error in updating symlink for singularity image: %s")
+						LogE(errF).WithFields(
+							log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
+							Error("Error in creating symlink")
+						if firstError == nil {
+							firstError = errF
+						}
+					}
+					continue
+				}
+			}
+		}
+
+		// no error in stating the private directory, but the public one does not exists
+		// we simply create the public directory
+		if errPri == nil && os.IsNotExist(errPub) {
+			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Creating link for Singularity Image")
+			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			if err != nil {
+				errF := fmt.Errorf("Error in creating symlink for singularity image: %s")
+				LogE(errF).WithFields(
+					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
+					Error("Error in creating symlink")
+				if firstError == nil {
+					firstError = errF
+				}
+			}
 			continue
 		}
 
@@ -162,8 +217,10 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 		return err
 	}
 	for _, expandedImgTag := range expandedImgTags {
-
-		err = convertInputOutput(expandedImgTag, outputImage, wish.CvmfsRepo, convertAgain, forceDownload)
+		tag := expandedImgTag.Tag
+		outputWithTag := outputImage
+		outputWithTag.Tag = tag
+		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload)
 		if err != nil && firstError == nil {
 			firstError = err
 		}

@@ -323,8 +323,14 @@ func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity
 	return Singularity{Image: &img, TempDirectory: dir}, nil
 }
 
+// the one that the user see, without the /cvmfs/$repo.cern.ch prefix
+// used mostly by Singularity
+func (i Image) GetPublicSymlinkPath() string {
+	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
+}
+
 func (s Singularity) IngestIntoCVMFS(CVMFSRepo string) error {
-	symlinkPath := filepath.Join(s.Image.Registry, s.Image.Repository+":"+s.Image.GetSimpleReference())
+	symlinkPath := s.Image.GetPublicSymlinkPath()
 	singularityPath, err := s.Image.GetSingularityPath()
 	if err != nil {
 		LogE(err).Error(
