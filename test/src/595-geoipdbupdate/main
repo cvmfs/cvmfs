@@ -4,7 +4,7 @@ cvmfs_test_suites="quick"
 
 # NOTE:
 #  A full test requires a valid CVMFS_GEO_LICENSE_KEY in a
-#    /etc/cvmfs/server.local that is readable by $CVMFS_TEST_USER. 
+#    /etc/cvmfs/server.local that is readable by $CVMFS_TEST_USER.
 #  Test will be skipped with a warning if either CVMFS_GEO_DB_FILE is
 #    set or there's no CVMFS_GEO_LICENSE_KEY but there is a system
 #    geo DB in /usr/share/GeoIP.
@@ -86,6 +86,9 @@ cvmfs_run_test() {
     return 0
   fi
 
+  if [ -f /etc/cvmfs/server.local ]; then
+    . /etc/cvmfs/server.local
+  fi
   if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
     if [ -f /usr/share/GeoIP/`basename $CVMFS_TEST_595_GEODB` ]; then
       echo "System geo database installed, skipping tests"

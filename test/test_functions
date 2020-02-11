@@ -23,6 +23,7 @@ CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
 CVMFS_TEST_REPO_MORE=${CVMFS_TEST_REPO_MORE:=test-more.cern.ch}
 CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
 CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing
+CVMFS_TEST_GEO_LICENSE_KEY=${CVMFS_TEST_GEO_LICENSE_KEY:=}
 
 CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
@@ -51,6 +52,10 @@ if [ -z "$CVMFS_TEST_HTTP_BASE" ] && [ ! -z "$CVMFS_TEST_STRATUM0" ]; then
   echo "Warning: You are using the deprecated CVMFS_TEST_STRATUM0 variable."
   echo "         Please consider switching to CVMFS_TEST_HTTP_BASE"
   CVMFS_TEST_HTTP_BASE="$CVMFS_TEST_STRATUM0"
+fi
+
+if [ ! -z "$CVMFS_TEST_GEO_LICENSE_KEY" ]; then
+  echo "CVMFS_GEO_LICENSE_KEY=$CVMFS_TEST_GEO_LICENSE_KEY" | sudo tee /etc/cvmfs/server.local > /dev/null
 fi
 
 
