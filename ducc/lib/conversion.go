@@ -93,18 +93,35 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	}
 	var firstError error
 	for _, inputImage := range expandedImgTag {
+
+		singularityPath, err := inputImage.GetSingularityPath()
+		if err != nil {
+			errF := fmt.Errorf("Error in getting the path where to save Singularity filesystem: %s", err)
+			LogE(err).Warning(errF)
+			firstError = errF
+			continue
+		}
+
+		fileInfo, err := os.Stat(singularityPath)
+		if err == nil && fileInfo.IsDir() {
+			continue
+		}
+
 		singularity, err := inputImage.DownloadSingularityDirectory(tmpDir)
 		if err != nil {
 			LogE(err).Error("Error in dowloading the singularity image")
 			firstError = err
+			os.RemoveAll(singularity.TempDirectory)
+			continue
 		}
 
 		err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
 		if err != nil {
 			LogE(err).Error("Error in ingesting the singularity image into the CVMFS repository")
 			firstError = err
+			os.RemoveAll(singularity.TempDirectory)
+			continue
 		}
-
 		os.RemoveAll(singularity.TempDirectory)
 	}
 
@@ -145,6 +162,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 		return err
 	}
 	for _, expandedImgTag := range expandedImgTags {
+
 		err = convertInputOutput(expandedImgTag, outputImage, wish.CvmfsRepo, convertAgain, forceDownload)
 		if err != nil && firstError == nil {
 			firstError = err
@@ -167,17 +185,12 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 	Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
 		"Already converted the image, skipping.")
 
-	switch alreadyConverted {
-
-	case ConversionMatch:
-		{
-			Log().Info("Already converted the image.")
-			if convertAgain == false {
-				return nil
-			}
-
+	if alreadyConverted == ConversionMatch {
+		if convertAgain == false {
+			return nil
 		}
 	}
+
 	layersChanell := make(chan downloadedLayer, 3)
 	manifestChanell := make(chan string, 1)
 	stopGettingLayers := make(chan bool, 1)
