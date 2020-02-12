@@ -234,6 +234,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 Summary: ducc: Daemon Unpacking Containers in CVMFS
 Group: Application/System
 BuildRequires: golang >= 1.11.4
+Requires: singularity >= 3.5
 %description ducc
 Daemon to automatically unpack and expose containers images into CernVM-FS
 %endif
