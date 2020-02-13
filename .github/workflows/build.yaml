@@ -5,7 +5,9 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-18.04
-
+    env:
+      CCACHE_COMPRESS: true
+      CCACHE_MAXSIZE: 1G
     steps:
       - uses: actions/checkout@v1
       - name: Install dependencies
@@ -47,7 +49,20 @@ jobs:
             libldap2-dev \
             libsasl2-dev \
             libxml2-dev \
-            sssd-common
+            sssd-common \
+            ccache
+      - name: "Setup ccache"
+        run: |
+          CCACHE_PATH=$(which ccache)
+          ln -s $CCACHE_PATH $(which cc)
+          ln -s $CCACHE_PATH $(which c++)
+          ln -s $CCACHE_PATH $(which gcc)
+          ln -s $CCACHE_PATH $(which g++)
+      - name: "Set up github cache for ccache"
+        uses: actions/cache@v1
+        with:
+          path: .ccache
+          key: ${{ runner.os }}-ccache
       - name: "Create build directory"
         run: mkdir build
       - name: "Run CMAKE"
@@ -56,3 +71,5 @@ jobs:
       - name: "Compile it"
         working-directory: build
         run: make
+      - name: "Print out ccache stats"
+        run: ccache -s
