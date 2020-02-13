@@ -54,7 +54,7 @@ jobs:
       - name: "Set up github cache for ccache"
         uses: actions/cache@v1.1.2
         with:
-          path: "/home/runner/.ccache"
+          path: "~/.ccache"
           key: ${{ runner.os }}-ccache
       - name: "Setup ccache path"
         run: echo "::add-path::/usr/lib/ccache/"
