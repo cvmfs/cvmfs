@@ -55,4 +55,4 @@ jobs:
         run: cmake BUILD_ALL=ON ..
       - name: "Compile it"
         working-directory: build
-        run: make -j
+        run: make
