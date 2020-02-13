@@ -23,10 +23,10 @@ ducc_test_400_clean_up() {
     rm $CVMFS_TEST400_DUCC_LOG
     rm $CVMFS_TEST400_DUCC_ERR
 
-    rm /etc/cvmfs/default.local
+    sudo rm /etc/cvmfs/default.local
     if [ -f /etc/cvmfs/default.local.bk ]
     then
-        mv /etc/cvmfs/default.local.bk /etc/cvmfs/default.local
+        sudo mv /etc/cvmfs/default.local.bk /etc/cvmfs/default.local
     fi
 
     # stop and delete the registry container
@@ -47,15 +47,17 @@ ducc_test_400_clean_up() {
 
     if [ $CVMFS_TEST400_DISABLE_STORAGE -eq 1 ]
     then
-	mv -f /etc/docker/daemon.json.bk /etc/docker/daemon.json
-    fi
-    
-    if [ $CVMFS_TEST400_REMOVE_JSON -eq 1 ]
-    then
-	rm /etc/docker/daemon.json
+	sudo mv -f /etc/docker/daemon.json.bk /etc/docker/daemon.json
     fi
 
-    systemctl restart docker.service
+    if [ $CVMFS_TEST400_REMOVE_JSON -eq 1 ]
+    then
+	sudo rm /etc/docker/daemon.json
+    fi
+
+    sudo systemctl restart docker.service
+
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_USER
 
     echo "done"
 }
@@ -89,14 +91,14 @@ cvmfs_run_test() {
 	if [ ! -f /etc/docker/daemon.json ]
 	then
 	    CVMFS_TEST400_REMOVE_JSON=1
-            mkdir -p /etc/docker
-	    touch /etc/docker/daemon.json
+            sudo mkdir -p /etc/docker
+	    sudo touch /etc/docker/daemon.json
 	fi
 
-	mv /etc/docker/daemon.json /etc/docker/daemon.json.bk
+	sudo mv /etc/docker/daemon.json /etc/docker/daemon.json.bk
 
 	# change configuration file
-        cat > /etc/docker/daemon.json << EOL
+        sudo bash -c 'cat > /etc/docker/daemon.json << EOL
 {
   "experimental": true,
   "storage-driver": "cvmfs/graphdriver",
@@ -104,11 +106,11 @@ cvmfs_run_test() {
     "overlay2.override_kernel_check=true"
   ]
 }
-EOL
+EOL'
     fi
 
-    systemctl restart docker.service || return 151
-        
+    sudo systemctl restart docker.service || return 151
+
     # create a simple recipe file for the repository manager in the local dir
     echo -n "*** Creating recipe file..."
     cat > $CVMFS_TEST400_RECIPE  << EOL
@@ -129,20 +131,20 @@ EOL
     echo -n "*** Creating CVMFS repo..."
     create_empty_repo $CVMFS_TEST400_REPOSITORY $USER || return $?
     echo "done"
-   
+
     echo -n "*** Changing configuration to read the new repo..."
     # setting the configuration for the repo
-    mv /etc/cvmfs/default.local /etc/cvmfs/default.local.bk
- 
-    cat > /etc/cvmfs/default.local << EOL
+    sudo mv /etc/cvmfs/default.local /etc/cvmfs/default.local.bk
+
+    sudo -E CVMFS_TEST400_REPOSITORY="$CVMFS_TEST400_REPOSITORY" bash -c 'cat > /etc/cvmfs/default.local << EOL
 CVMFS_REPOSITORIES=$CVMFS_TEST400_REPOSITORY
 CVMFS_HTTP_PROXY="DIRECT"
-EOL
+EOL'
 
-    cat > /etc/cvmfs/config.d/$CVMFS_TEST400_REPOSITORY.local << EOL
+    sudo -E CVMFS_TEST400_REPOSITORY="$CVMFS_TEST400_REPOSITORY" bash -c 'cat > /etc/cvmfs/config.d/$CVMFS_TEST400_REPOSITORY.local << EOL
 CVMFS_SERVER_URL=http://localhost/cvmfs/$CVMFS_TEST400_REPOSITORY/
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST400_REPOSITORY.pub
-EOL
+EOL'
     echo "done"
 
     # start by running the docker registry on localhost
@@ -166,19 +168,19 @@ EOL
 
     echo "*** Check integrity of the repository..."
     check_repository $CVMFS_TEST400_REPOSITORY -i || return 102
-    
+
     echo "*** Repository checked successfully"
 
     singularity exec /cvmfs/$CVMFS_TEST400_REPOSITORY/registry.hub.docker.com/library/ubuntu\:latest/ echo token-abc | grep "token-abc" || return 103
     singularity exec /cvmfs/$CVMFS_TEST400_REPOSITORY/registry.hub.docker.com/library/centos\:centos6/ echo token-xyz | grep "token-xyz" || return 104
-    
+
     echo "*** Singularity conversion worked fine"
 
-    systemctl restart docker.service || return 111
+    sudo systemctl restart docker.service || return 111
 
     docker run "localhost:5000/mock/library/ubuntu:latest" /bin/echo "token-123" | grep "token-123" || return 105
     docker run "localhost:5000/mock/library/centos:centos6" /bin/echo "token-321" | grep "token-321" || return 106
-    
+
     echo "*** Docker conversion worked fine"
 
     # add other possible tests

@@ -237,19 +237,18 @@ type Singularity struct {
 }
 
 func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity, err error) {
-	dir, err := ioutil.TempDir(rootPath, "singularity_buffer")
+	dir, err := UserDefinedTempDir(rootPath, "singularity_buffer")
 	if err != nil {
 		LogE(err).Error("Error in creating temporary directory for singularity")
 		return
-
 	}
-	singularityTempCache, err := ioutil.TempDir("", "tempDirSingularityCache")
+	singularityTempCache, err := UserDefinedTempDir(rootPath, "tempDirSingularityCache")
 	if err != nil {
 		LogE(err).Error("Error in creating temporary directory for singularity cache")
 		return
 	}
 	defer os.RemoveAll(singularityTempCache)
-	err = ExecCommand("singularity", "build", "--force", "--sandbox", dir, img.GetSingularityLocation()).Env(
+	err = ExecCommand("singularity", "build", "--force", "--fix-perms", "--sandbox", dir, img.GetSingularityLocation()).Env(
 		"SINGULARITY_CACHEDIR", singularityTempCache).Env("PATH", os.Getenv("PATH")).Start()
 	if err != nil {
 		LogE(err).Error("Error in downloading the singularity image")

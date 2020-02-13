@@ -4,10 +4,15 @@ cvmfs_test_suites="ducc"
 
 DOCKER_TEST_IMAGE="https://registry.hub.docker.com/library/centos:centos7"
 
+ducc_test_401_clean_up() {
+  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
+}
 
 cvmfs_run_test() {
+  trap ducc_test_401_clean_up EXIT HUP INT TERM
+
   echo "*** creating empty repo ***"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+  create_empty_repo $CVMFS_TEST_REPO $USER || return 1
 
   echo "*** converting image to singularity ***"
   cvmfs_ducc convert-singularity-image -r $CVMFS_TEST_REPO $DOCKER_TEST_IMAGE || return 2

@@ -33,19 +33,19 @@ const (
 var subDirInsideRepo = ".layers"
 
 func ConvertWishSingularity(wish WishFriendly) (err error) {
-	tmpDir, err := ioutil.TempDir("", "conversion")
+	tmpDir, err := UserDefinedTempDir("", "conversion")
 	if err != nil {
 		LogE(err).Error("Error when creating tmp singularity directory")
 		return
 	}
+	defer os.RemoveAll(tmpDir)
 	inputImage, err := ParseImage(wish.InputName)
-	var singularity Singularity
-	singularity, err = inputImage.DownloadSingularityDirectory(tmpDir)
+	singularity, err := inputImage.DownloadSingularityDirectory(tmpDir)
+	defer os.RemoveAll(singularity.TempDirectory)
 	if err != nil {
 		LogE(err).Error("Error in dowloading the singularity image")
 		return
 	}
-	defer os.RemoveAll(singularity.TempDirectory)
 
 	err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
 	if err != nil {
@@ -209,7 +209,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 		Log().Info("Finished pushing the layers into CVMFS")
 	}()
 	// we create a temp directory for all the files needed, when this function finish we can remove the temp directory cleaning up
-	tmpDir, err := ioutil.TempDir("", "conversion")
+	tmpDir, err := UserDefinedTempDir("", "conversion")
 	if err != nil {
 		LogE(err).Error("Error in creating a temporary direcotry for all the files")
 		return
