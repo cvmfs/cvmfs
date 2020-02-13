@@ -8,6 +8,7 @@ jobs:
     env:
       CCACHE_COMPRESS: true
       CCACHE_MAXSIZE: 1G
+      PATH: "/usr/lib/ccache/:$PATH"
     steps:
       - uses: actions/checkout@v1
       - name: Install dependencies
@@ -51,13 +52,6 @@ jobs:
             libxml2-dev \
             sssd-common \
             ccache
-      - name: "Setup ccache"
-        run: |
-          CCACHE_PATH=$(which ccache)
-          ln -s $CCACHE_PATH $(which cc)
-          ln -s $CCACHE_PATH $(which c++)
-          ln -s $CCACHE_PATH $(which gcc)
-          ln -s $CCACHE_PATH $(which g++)
       - name: "Set up github cache for ccache"
         uses: actions/cache@v1
         with:
