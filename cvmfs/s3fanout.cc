@@ -20,7 +20,7 @@
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
-
+  
 namespace s3fanout {
 
 const char *S3FanoutManager::kCacheControlCas = "Cache-Control: max-age=259200";
@@ -29,7 +29,7 @@ const char *S3FanoutManager::kCacheControlDotCvmfs =
 const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
 const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
-const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
+ const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
 
 
 /**
@@ -39,7 +39,8 @@ void S3FanoutManager::DetectThrottleIndicator(
   const std::string &header,
   JobInfo *info)
 {
-  std::string value_str;
+ 
+ std::string value_str;
   if (HasPrefix(header, "retry-after:", true))
     value_str = header.substr(12);
   if (HasPrefix(header, "x-retry-in:", true))
