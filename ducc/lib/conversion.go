@@ -93,7 +93,6 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	}
 	var firstError error
 	for _, inputImage := range expandedImgTag {
-
 		// we want to check if we have already ingested the Singularity image
 		// Several cases are possible
 		// Image not ingested, neither pubSymPath nor privatePath are present

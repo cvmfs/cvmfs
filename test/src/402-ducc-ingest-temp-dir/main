@@ -1,0 +1,98 @@
+cvmfs_test_name="DUCC container ingestion"
+cvmfs_test_autofs_on_startup=true
+cvmfs_test_suites="ducc"
+
+CVMFS_TEST402_REGISTRY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+CVMFS_TEST402_RECIPE="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
+CVMFS_TEST402_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
+CVMFS_TEST402_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+
+CVMFS_TEST402_TMP_DIR="$(mktemp -d $(pwd)/temp402.XXXXX)"
+
+
+ducc_test_400_clean_up() {
+    echo -n "Cleaning up..."
+
+    export DUCC_DOCKER_REGISTRY_PASS=""
+
+    # delete the recipe file
+    rm $CVMFS_TEST402_RECIPE
+    # delete the logs and error from ducc
+    rm $CVMFS_TEST402_DUCC_ERR
+    rm -r $CVMFS_TEST402_TMP_DIR
+
+    # stop and delete the registry container
+    echo -n "Stopping and deleting docker registry..."
+    docker stop $CVMFS_TEST402_REGISTRY >> /dev/null
+    docker rm $CVMFS_TEST402_REGISTRY >> /dev/null
+    echo "done"
+
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_USER
+
+    echo "done"
+}
+
+cvmfs_run_test() {
+    trap ducc_test_400_clean_up EXIT HUP INT TERM
+
+    # create a simple recipe file for the repository manager in the local dir
+    echo -n "*** Creating recipe file..."
+    cat > $CVMFS_TEST402_RECIPE  << EOL
+version: 1
+user: mock_user
+cvmfs_repo: '$CVMFS_TEST402_REPOSITORY'
+output_format: '\$(scheme)://localhost:5000/mock/\$(image)'
+input:
+    - 'https://registry.hub.docker.com/library/ubuntu:latest'
+    - 'https://registry.hub.docker.com/library/centos:centos6'
+EOL
+    echo "done"
+
+    # set the password to access the docker hub
+    export DUCC_DOCKER_REGISTRY_PASS=mock_pass
+
+    # crete the repository where to store the content
+    echo -n "*** Creating CVMFS repo..."
+    create_empty_repo $CVMFS_TEST402_REPOSITORY $USER || return $?
+    echo "done"
+    
+    # start by running the docker registry on localhost
+    echo -n "*** Starting docker registry for tests..."
+    docker run -d -p 5000:5000 --name $CVMFS_TEST402_REGISTRY registry:2 >> /dev/null || return 3
+    echo "done"
+
+    echo "*** Starting test."
+
+    echo "*** Converting recipe..."
+    echo "cvmfs_ducc --temporary-dir $CVMFS_TEST402_TMP_DIR convert $CVMFS_TEST402_RECIPE 2> $CVMFS_TEST402_DUCC_ERR"
+    cvmfs_ducc --temporary-dir $CVMFS_TEST402_TMP_DIR convert $CVMFS_TEST402_RECIPE 2> $CVMFS_TEST402_DUCC_ERR || return 101
+    grep -q "level=error" $CVMFS_TEST402_DUCC_ERR
+    while [ $? -ne 1 ]
+    do
+        echo -n "*** Some error during conversion, let's do it again. Converting recipe..."
+        rm $CVMFS_TEST402_DUCC_ERR
+        cvmfs_ducc convert $CVMFS_TEST402_RECIPE 2> $CVMFS_TEST402_DUCC_ERR || return 101
+        grep -q "level=error" $CVMFS_TEST402_DUCC_ERR
+    done
+    echo "*** Convert recipe successfully"
+
+    echo "*** Check integrity of the repository..."
+    check_repository $CVMFS_TEST402_REPOSITORY -i || return 102
+
+    echo "*** Repository checked successfully"
+
+    ls /cvmfs/$CVMFS_TEST402_REPOSITORY/registry.hub.docker.com/library/ubuntu\:latest/ || return 111
+    ls /cvmfs/$CVMFS_TEST402_REPOSITORY/registry.hub.docker.com/library/centos\:centos6/ || return 112
+    ls /cvmfs/$CVMFS_TEST402_REPOSITORY/.layers || return 113
+    ls /cvmfs/$CVMFS_TEST402_REPOSITORY/.metadata || return 114
+    ls /cvmfs/$CVMFS_TEST402_REPOSITORY/.flat || return 115
+    ls /cvmfs/$CVMFS_TEST402_REPOSITORY/.metadata/registry.hub.docker.com/library/ubuntu:latest || return 116
+    ls /cvmfs/$CVMFS_TEST402_REPOSITORY/.metadata/registry.hub.docker.com/library/centos:centos6 || return 117
+
+    # add other possible tests
+
+    echo "*** Test successful"
+
+    return 0
+}
+
