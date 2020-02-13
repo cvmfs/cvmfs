@@ -27,7 +27,7 @@ func TestParseImageSimple(t *testing.T) {
 	}
 }
 
-func TestParseImageWithStartWildcard(t *testing.T) {
+func TestParseImageWithTagWildcard(t *testing.T) {
 	imageString := "https://hub.docker.com/library/redis:*"
 	image, err := ParseImage(imageString)
 	if err != nil {
@@ -45,8 +45,8 @@ func TestParseImageWithStartWildcard(t *testing.T) {
 	if image.Tag != "*" {
 		t.Errorf("Error in parse wrong tag: %s", image.Tag)
 	}
-	if !image.StarWildcard {
-		t.Errorf("Error no StarWildcard detected")
+	if !image.TagWildcard {
+		t.Errorf("Error no TagWildcard detected")
 	}
 }
 

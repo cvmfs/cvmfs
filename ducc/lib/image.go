@@ -27,16 +27,16 @@ type ManifestRequest struct {
 }
 
 type Image struct {
-	Id           int
-	User         string
-	Scheme       string
-	Registry     string
-	Repository   string
-	Tag          string
-	Digest       string
-	IsThin       bool
-	StarWildcard bool
-	Manifest     *da.Manifest
+	Id          int
+	User        string
+	Scheme      string
+	Registry    string
+	Repository  string
+	Tag         string
+	Digest      string
+	IsThin      bool
+	TagWildcard bool
+	Manifest    *da.Manifest
 }
 
 func (i Image) GetSimpleName() string {
@@ -222,14 +222,8 @@ func (img Image) GetTagListUrl() string {
 }
 
 func (img Image) ExpandWildcard() ([]Image, error) {
-	// the pagination seems to don't be respected by the docker hub
-	// I don't believe it to be a huge issue at the moment
-	// I simply comment out the code to avoid mistakes
-
-	// maxTags := 20 // pagination
-
 	var result []Image
-	if !img.StarWildcard {
+	if !img.TagWildcard {
 		result = append(result, img)
 		return result, nil
 	}
@@ -251,7 +245,6 @@ func (img Image) ExpandWildcard() ([]Image, error) {
 	}
 
 	client := http.Client{}
-	// url = fmt.Sprintf("%s?n=%d", url, maxTags) // pagination
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", token)
 

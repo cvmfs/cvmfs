@@ -89,12 +89,12 @@ func ParseImage(image string) (img Image, err error) {
 		}
 		tag := colonRepoTagSplitted[1]
 		return Image{
-			Scheme:       url.Scheme,
-			Registry:     url.Host,
-			Repository:   repository,
-			Tag:          tag,
-			Digest:       digest,
-			StarWildcard: tag == "*",
+			Scheme:      url.Scheme,
+			Registry:    url.Host,
+			Repository:  repository,
+			Tag:         tag,
+			Digest:      digest,
+			TagWildcard: tag == "*",
 		}, nil
 	}
 	return Image{}, fmt.Errorf("Impossible to parse the image: %s", image)
