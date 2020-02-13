@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache@v1.1.2
         with:
           path: "~/.ccache"
-          key: ${{ runner.os }}-ccache
+          key: ${{ runner.os }}-ccache-1
       - name: "Setup ccache path"
         run: echo "::add-path::/usr/lib/ccache/"
       - name: "Create build directory"
