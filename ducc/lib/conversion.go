@@ -119,28 +119,27 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 			if err != nil {
 				// this should never happen
 				Log().Warning("Error in reading the public link")
-			} else {
-				if pubLinkPointsTo == singularityPrivatePath {
-					// the link is up to date
-					Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Singularity Image up to date")
-					continue
-				}
-				// delete the old pubLink
-				// make a new Link to the privatePaht
-				// after that skip and continue
-				Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
-				err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
-				if err != nil {
-					errF := fmt.Errorf("Error in updating symlink for singularity image: %s")
-					LogE(errF).WithFields(
-						log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
-						Error("Error in creating symlink")
-					if firstError == nil {
-						firstError = errF
-					}
-				}
+			}
+			if pubLinkPointsTo == singularityPrivatePath {
+				// the link is up to date
+				Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Singularity Image up to date")
 				continue
 			}
+			// delete the old pubLink
+			// make a new Link to the privatePaht
+			// after that skip and continue
+			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
+			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			if err != nil {
+				errF := fmt.Errorf("Error in updating symlink for singularity image: %s")
+				LogE(errF).WithFields(
+					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
+					Error("Error in creating symlink")
+				if firstError == nil {
+					firstError = errF
+				}
+			}
+			continue
 		}
 
 		// no error in stating the private directory, but the public one does not exists
