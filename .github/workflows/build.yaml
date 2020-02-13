@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-18.04
     env:
       CCACHE_COMPRESS: true
-      CCACHE_MAXSIZE: 1G
+      CCACHE_MAXSIZE: 200M
     steps:
       - uses: actions/checkout@v1
       - name: Install dependencies
@@ -52,9 +52,9 @@ jobs:
             sssd-common \
             ccache
       - name: "Set up github cache for ccache"
-        uses: actions/cache@v1
+        uses: actions/cache@v1.1.2
         with:
-          path: .ccache
+          path: "$HOME/.ccache"
           key: ${{ runner.os }}-ccache
       - name: "Setup ccache path"
         run: echo "::add-path::/usr/lib/ccache/"
