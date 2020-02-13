@@ -94,7 +94,7 @@ func ParseImage(image string) (img Image, err error) {
 			Repository:  repository,
 			Tag:         tag,
 			Digest:      digest,
-			TagWildcard: tag == "*",
+			TagWildcard: strings.Contains(tag, `*`),
 		}, nil
 	}
 	return Image{}, fmt.Errorf("Impossible to parse the image: %s", image)

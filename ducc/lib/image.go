@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -269,6 +270,26 @@ func (img Image) ExpandWildcard() ([]Image, error) {
 		taggedImg := img
 		taggedImg.Tag = tag
 		result = append(result, taggedImg)
+	}
+	return result, nil
+}
+
+func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
+	result := make([]string, 0)
+	regexPattern := strings.ReplaceAll(pattern, "*", ".*")
+	regex, err := regexp.Compile(regexPattern)
+	if err != nil {
+		return result, err
+	}
+	regex.Longest()
+	for _, toCheck := range toFilter {
+		s := regex.FindString(toCheck)
+		if s == "" {
+			continue
+		}
+		if s == toCheck {
+			result = append(result, s)
+		}
 	}
 	return result, nil
 }

@@ -131,7 +131,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
 			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
 			if err != nil {
-				errF := fmt.Errorf("Error in updating symlink for singularity image: %s")
+				errF := fmt.Errorf("Error in updating symlink for singularity image: %s", inputImage.GetSimpleName())
 				LogE(errF).WithFields(
 					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
 					Error("Error in creating symlink")
@@ -148,7 +148,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Creating link for Singularity Image")
 			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
 			if err != nil {
-				errF := fmt.Errorf("Error in creating symlink for singularity image: %s")
+				errF := fmt.Errorf("Error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
 				LogE(errF).WithFields(
 					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
 					Error("Error in creating symlink")

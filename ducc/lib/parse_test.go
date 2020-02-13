@@ -22,7 +22,7 @@ func TestParseImageSimple(t *testing.T) {
 	if image.Tag != "5" {
 		t.Errorf("Error in parse wrong tag: %s", image.Tag)
 	}
-	if image.StarWildcard {
+	if image.TagWildcard {
 		t.Errorf("Error in parse detect StarWildcard")
 	}
 }
