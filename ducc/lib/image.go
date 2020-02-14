@@ -266,7 +266,12 @@ func (img Image) ExpandWildcard() ([]Image, error) {
 		LogE(err).Error(errF)
 		return result, errF
 	}
-	for _, tag := range tagsList.Tags {
+	pattern := img.Tag
+	filteredTags, err := filterUsingGlob(pattern, tagsList.Tags)
+	if err != nil {
+		return result, nil
+	}
+	for _, tag := range filteredTags {
 		taggedImg := img
 		taggedImg.Tag = tag
 		result = append(result, taggedImg)
