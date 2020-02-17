@@ -100,7 +100,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 		// Image update but stale (old), pubSymPath and privatePath point to different things
 		publicSymlinkPath := inputImage.GetPublicSymlinkPath()
 		completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
-		_, errPub := os.Stat(completePubSymPath)
+		pubDirInfo, errPub := os.Stat(completePubSymPath)
 
 		singularityPrivatePath, err := inputImage.GetSingularityPath()
 		if err != nil {
@@ -110,17 +110,12 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 			continue
 		}
 		completeSingularityPriPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, singularityPrivatePath)
-		_, errPri := os.Stat(completeSingularityPriPath)
+		priDirInfo, errPri := os.Stat(completeSingularityPriPath)
 
 		// no error in stating both directories
 		// either the image is up to date or the image became stale
 		if errPub == nil && errPri == nil {
-			pubLinkPointsTo, err := os.Readlink(completePubSymPath)
-			if err != nil {
-				// this should never happen
-				Log().Warning("Error in reading the public link")
-			}
-			if pubLinkPointsTo == singularityPrivatePath {
+			if os.SameFile(pubDirInfo, priDirInfo) {
 				// the link is up to date
 				Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Singularity Image up to date")
 				continue
