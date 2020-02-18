@@ -22,7 +22,7 @@
 #include "util_concurrency.h"
 
 namespace s3fanout {
-
+   
 /**
  * From where to read the data.
  */
