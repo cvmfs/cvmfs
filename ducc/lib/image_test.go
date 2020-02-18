@@ -49,68 +49,102 @@ func TestGetTagsWithGlob(t *testing.T) {
 }
 
 func TestFilterUsingGlobStarMatchEverything(t *testing.T) {
-	garbage := []string{"vnje", "nc.cnrje", "5230.25.83"}
-	result, err := filterUsingGlob("*", garbage)
+	input := []string{"vnje", "nc.cnrje", "5230.25.83"}
+	result, err := filterUsingGlob("*", input)
 	if err != nil {
 		t.Errorf("Error in filtering: %s", err)
 	}
-	if len(result) != len(garbage) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(garbage))
+	if len(result) != len(input) {
+		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
 	for i, _ := range result {
-		if result[i] != garbage[i] {
-			t.Errorf("The match is missing something: %s != %s", result[i], garbage[i])
+		if result[i] != input[i] {
+			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
 	}
 }
 
 func TestFilterUsingGlobStar(t *testing.T) {
-	garbage := []string{"aaaa", "aab.12-8", "2.3"}
-	result, err := filterUsingGlob("a*", garbage)
+	input := []string{"aaaa", "aab.12-8", "2.3"}
+	result, err := filterUsingGlob("a*", input)
 	if err != nil {
 		t.Errorf("Error in filtering: %s", err)
 	}
 	expected := []string{"aaaa", "aab.12-8"}
 	if len(result) != len(expected) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(garbage))
+		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
 	for i, _ := range result {
 		if result[i] != expected[i] {
-			t.Errorf("The match is missing something: %s != %s", result[i], garbage[i])
+			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
 	}
 }
 
 func TestFilterUsingGlobAtBeginning(t *testing.T) {
-	garbage := []string{"bar-foo", "ubuntu-foo", "foo-bar"}
-	result, err := filterUsingGlob("*-foo", garbage)
+	input := []string{"bar-foo", "ubuntu-foo", "foo-bar"}
+	result, err := filterUsingGlob("*-foo", input)
 	if err != nil {
 		t.Errorf("Error in filtering: %s", err)
 	}
 	expected := []string{"bar-foo", "ubuntu-foo"}
 	if len(result) != len(expected) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(garbage))
+		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
 	for i, _ := range result {
 		if result[i] != expected[i] {
-			t.Errorf("The match is missing something: %s != %s", result[i], garbage[i])
+			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
 	}
 }
 
 func TestFilterUsingGlobTwice(t *testing.T) {
-	garbage := []string{"foo", "ubuntu-foo", "foo-bar", "version-foo-2", "nope"}
-	result, err := filterUsingGlob("*foo*", garbage)
+	input := []string{"foo", "ubuntu-foo", "foo-bar", "version-foo-2", "nope"}
+	result, err := filterUsingGlob("*foo*", input)
 	if err != nil {
 		t.Errorf("Error in filtering: %s", err)
 	}
 	expected := []string{"foo", "ubuntu-foo", "foo-bar", "version-foo-2"}
 	if len(result) != len(expected) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(garbage))
+		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
 	for i, _ := range result {
 		if result[i] != expected[i] {
-			t.Errorf("The match is missing something: %s != %s", result[i], garbage[i])
+			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
+		}
+	}
+}
+
+func TestFilterUsingGlobRealLifeImages01(t *testing.T) {
+	input := []string{"rhel6-m201911", "rhel6-m202001", "rhel6-m202002", "rhel6", "rhel7-m201911", "rhel7-m202001", "rhel7-m202002", "rhel7", "tmp-rhel6-m202002-20200213", "tmp-rhel7-m202002-20200213"}
+	result, err := filterUsingGlob("rhel7-m*", input)
+	if err != nil {
+		t.Errorf("Error in filtering: %s", err)
+	}
+	expected := []string{"rhel7-m201911", "rhel7-m202001", "rhel7-m202002"}
+	if len(result) != len(expected) {
+		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
+	}
+	for i, _ := range result {
+		if result[i] != expected[i] {
+			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
+		}
+	}
+}
+
+func TestFilterUsingGlobRealLifeImages02(t *testing.T) {
+	input := []string{"rhel6-m201911", "rhel6-m202001", "rhel6-m202002", "rhel6", "rhel7-m201911", "rhel7-m202001", "rhel7-m202002", "rhel7", "tmp-rhel6-m202002-20200213", "tmp-rhel7-m202002-20200213"}
+	result, err := filterUsingGlob("rhel7", input)
+	if err != nil {
+		t.Errorf("Error in filtering: %s", err)
+	}
+	expected := []string{"rhel7"}
+	if len(result) != len(expected) {
+		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
+	}
+	for i, _ := range result {
+		if result[i] != expected[i] {
+			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
 	}
 }
