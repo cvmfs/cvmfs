@@ -36,7 +36,7 @@ enum AuthzMethods {
   kAuthzAwsV2 = 0,
   kAuthzAwsV4
 };
-
+   
 /**
  * Possible return values.
  */
