@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
-
+   
 #ifndef CVMFS_S3FANOUT_H_
 #define CVMFS_S3FANOUT_H_
 
