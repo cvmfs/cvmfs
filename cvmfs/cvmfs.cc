@@ -30,7 +30,7 @@
 
 // sys/xattr.h conflicts with linux/xattr.h and needs to be loaded very early
 #include <sys/xattr.h>  // NOLINT
-
+   
 #include "cvmfs_config.h"
 #include "cvmfs.h"
 
