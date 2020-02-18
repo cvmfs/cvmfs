@@ -20,7 +20,7 @@
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
-
+    
 namespace s3fanout {
 
 const char *S3FanoutManager::kCacheControlCas = "Cache-Control: max-age=259200";
