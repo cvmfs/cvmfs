@@ -22,6 +22,24 @@ var garbageCollectionCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 
+		// tried already to make them in parallel, we don't gain much
+		// from ~1min to ~30 sec
+		imagesUsed, _ := lib.FindAllUsedFlatImages("unpacked.cern.ch")
+		imagesAll, _ := lib.FindAllFlatImages("unpacked.cern.ch")
+		layersUsed, _ := lib.FindAllUsedLayers("unpacked.cern.ch")
+		layersAll, _ := lib.FindAllLayers("unpacked.cern.ch")
+		/*
+			toPrintUsed, _ := json.MarshalIndent(imagesUsed, "", "  ")
+			fmt.Print(string(toPrintUsed))
+			imagesAll, _ := lib.FindAllUsedLayers("unpacked.cern.ch")
+			toPrintAll, _ := json.MarshalIndent(imagesAll, "", "  ")
+			fmt.Print(string(toPrintAll))
+
+			//fmt.Printf("imagesUsed: %d\nimagesAll: %d", len(imagesUsed), len(imagesAll))
+		*/
+		fmt.Printf("\nimagesUsed: %d\nimagesAll: %d\nlayersUsed: %d\nlayersAll: %d\n", len(imagesUsed), len(imagesAll), len(layersUsed), len(layersAll))
+		os.Exit(1)
+
 		fmt.Println("Start")
 		repo := args[0]
 		llog := func(l *log.Entry) *log.Entry {
