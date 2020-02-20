@@ -26,7 +26,7 @@ CVMFS_GEOAPI_SOURCES=
 CVMFS_TEST_DUCC=0
 CVMFS_TEST_PUBLISH=0
 
-while getopts "qc:g:s:l:d" option; do
+while getopts "qc:g:s:l:dp" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
