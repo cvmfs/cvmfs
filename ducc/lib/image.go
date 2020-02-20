@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -27,15 +28,16 @@ type ManifestRequest struct {
 }
 
 type Image struct {
-	Id         int
-	User       string
-	Scheme     string
-	Registry   string
-	Repository string
-	Tag        string
-	Digest     string
-	IsThin     bool
-	Manifest   *da.Manifest
+	Id          int
+	User        string
+	Scheme      string
+	Registry    string
+	Repository  string
+	Tag         string
+	Digest      string
+	IsThin      bool
+	TagWildcard bool
+	Manifest    *da.Manifest
 }
 
 func (i Image) GetSimpleName() string {
@@ -216,6 +218,87 @@ func (img Image) GetSingularityLocation() string {
 	return fmt.Sprintf("docker://%s/%s%s", img.Registry, img.Repository, img.GetReference())
 }
 
+func (img Image) GetTagListUrl() string {
+	return fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository)
+}
+
+func (img Image) ExpandWildcard() ([]Image, error) {
+	var result []Image
+	if !img.TagWildcard {
+		result = append(result, img)
+		return result, nil
+	}
+	var tagsList struct {
+		Tags []string
+	}
+	pass, err := GetPassword()
+	if err != nil {
+		LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
+		pass = ""
+	}
+	user := img.User
+	url := img.GetTagListUrl()
+	token, err := firstRequestForAuth(url, user, pass)
+	if err != nil {
+		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
+		LogE(err).Error(errF)
+		return result, errF
+	}
+
+	client := http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		errF := fmt.Errorf("Error in making the request for retrieving the tags: %s", err)
+		LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
+		return result, errF
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		errF := fmt.Errorf("Got error status code (%d) trying to retrieve the tags", resp.StatusCode)
+		LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
+		return result, errF
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
+		errF := fmt.Errorf("Error in decoding the tags from the server: %s", err)
+		LogE(err).Error(errF)
+		return result, errF
+	}
+	pattern := img.Tag
+	filteredTags, err := filterUsingGlob(pattern, tagsList.Tags)
+	if err != nil {
+		return result, nil
+	}
+	for _, tag := range filteredTags {
+		taggedImg := img
+		taggedImg.Tag = tag
+		result = append(result, taggedImg)
+	}
+	return result, nil
+}
+
+func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
+	result := make([]string, 0)
+	regexPattern := strings.ReplaceAll(pattern, "*", ".*")
+	regex, err := regexp.Compile(regexPattern)
+	if err != nil {
+		return result, err
+	}
+	regex.Longest()
+	for _, toCheck := range toFilter {
+		s := regex.FindString(toCheck)
+		if s == "" {
+			continue
+		}
+		if s == toCheck {
+			result = append(result, s)
+		}
+	}
+	return result, nil
+}
+
 func GetSingularityPathFromManifest(manifest da.Manifest) string {
 	digest := strings.Split(manifest.Config.Digest, ":")[1]
 	return filepath.Join(".flat", digest[0:2], digest)
@@ -259,8 +342,14 @@ func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity
 	return Singularity{Image: &img, TempDirectory: dir}, nil
 }
 
+// the one that the user see, without the /cvmfs/$repo.cern.ch prefix
+// used mostly by Singularity
+func (i Image) GetPublicSymlinkPath() string {
+	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
+}
+
 func (s Singularity) IngestIntoCVMFS(CVMFSRepo string) error {
-	symlinkPath := filepath.Join(s.Image.Registry, s.Image.Repository+":"+s.Image.GetSimpleReference())
+	symlinkPath := s.Image.GetPublicSymlinkPath()
 	singularityPath, err := s.Image.GetSingularityPath()
 	if err != nil {
 		LogE(err).Error(

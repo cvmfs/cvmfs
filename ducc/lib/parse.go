@@ -87,12 +87,14 @@ func ParseImage(image string) (img Image, err error) {
 		if repository == "" {
 			return Image{}, fmt.Errorf("Impossible to find the repository for: %s", image)
 		}
+		tag := colonRepoTagSplitted[1]
 		return Image{
-			Scheme:     url.Scheme,
-			Registry:   url.Host,
-			Repository: repository,
-			Tag:        colonRepoTagSplitted[1],
-			Digest:     digest,
+			Scheme:      url.Scheme,
+			Registry:    url.Host,
+			Repository:  repository,
+			Tag:         tag,
+			Digest:      digest,
+			TagWildcard: strings.Contains(tag, `*`),
 		}, nil
 	}
 	return Image{}, fmt.Errorf("Impossible to parse the image: %s", image)
