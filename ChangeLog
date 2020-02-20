@@ -1,4 +1,5 @@
 2.8.0:
+  * [ducc] Improve robustness against intermittent registry failures (CVM-1829)
   * [ducc] Add support for wildcards in tag names (CVM-1715)
   * [ducc] Make temporary directory configurable (CVM-1826) 
   * [ducc] Require Singularity >= 3.5 (CVM-1840)
