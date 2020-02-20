@@ -29,7 +29,6 @@ cvmfs_run_test() {
 
   echo "*** publish second transaction"
   start_transaction $CVMFS_TEST_REPO || return $?
-  mkdir /cvmfs/$CVMFS_TEST_REPO/dir
   echo "first 2" > /cvmfs/$CVMFS_TEST_REPO/dir/first
   echo "second 2" > /cvmfs/$CVMFS_TEST_REPO/dir/second
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -39,7 +38,7 @@ cvmfs_run_test() {
   diff stats1.db "/var/spool/cvmfs/${CVMFS_TEST_REPO}/stats.db" || return 4
   count_gc=$(sqlite3 stats1.db "select count(*) from gc_statistics;")
   count_publish=$(sqlite3 stats1.db "select count(*) from publish_statistics;")
-  [ $count_gc -eq 2 ] || return 5
+  [ $count_gc -eq 1 ] || return 5
   [ $count_publish -eq 4 ] || return 6
 
   echo "*** perform basic garbage collection"
@@ -50,7 +49,7 @@ cvmfs_run_test() {
   diff stats2.db "/var/spool/cvmfs/${CVMFS_TEST_REPO}/stats.db" || return 9
   count_gc=$(sqlite3 stats2.db "select count(*) from gc_statistics;")
   count_publish=$(sqlite3 stats2.db "select count(*) from publish_statistics;")
-  [ $count_gc -eq 3 ] || return 10
+  [ $count_gc -eq 2 ] || return 10
   [ $count_publish -eq 4 ] || return 11
 
   return 0
