@@ -17,6 +17,11 @@ func FindAllUsedFlatImages(CVMFSRepo string) ([]string, error) {
 	root_components := strings.Split(root, string(os.PathSeparator))
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
+		// some kind of error, we don't really care and we just move on.
+		if err != nil {
+			LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			return nil
+		}
 		components := strings.Split(path, string(os.PathSeparator))
 		// first root directory, not sure if this ever happen
 		if len(components) == len(root_components) {
@@ -52,6 +57,10 @@ func FindAllFlatImages(CVMFSRepo string) ([]string, error) {
 	root_components := strings.Split(root, string(os.PathSeparator))
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			return nil
+		}
 		components := strings.Split(path, string(os.PathSeparator))
 		if len(components) == len(root_components)+2 && info.IsDir() {
 			result = append(result, path)
@@ -75,6 +84,10 @@ func FindAllLayers(CVMFSRepo string) ([]string, error) {
 	root_components := strings.Split(root, string(os.PathSeparator))
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			return nil
+		}
 		components := strings.Split(path, string(os.PathSeparator))
 		if len(components) == len(root_components)+2 && info.IsDir() {
 			result = append(result, path)
@@ -97,6 +110,10 @@ func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
 	root := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			return nil
+		}
 		if info.Name() == "manifest.json" {
 			bytes, err := ioutil.ReadFile(path)
 			if err != nil {
