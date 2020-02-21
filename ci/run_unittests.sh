@@ -74,7 +74,9 @@ fi
 # run the Python unittests for the GeoAPI
 if [ "x$CVMFS_GEOAPI_SOURCES" != "x" ]; then
   pushd $CVMFS_GEOAPI_SOURCES
-  python2 test_cvmfs_geo.py
+  # python2 is not available on MacOS
+  command -v python2 >/dev/null 2>&1 && PYTHON_COMMAND=python2 || PYTHON_COMMAND=python
+  $PYTHON_COMMAND test_cvmfs_geo.py
   popd
 fi
 
