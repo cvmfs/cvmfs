@@ -12,6 +12,114 @@ import (
 	da "github.com/cvmfs/ducc/docker-api"
 )
 
+func FindAllUsedFlatImages(CVMFSRepo string) ([]string, error) {
+	root := filepath.Join("/", "cvmfs", CVMFSRepo)
+	root_components := strings.Split(root, string(os.PathSeparator))
+	result := make([]string, 0)
+	walker := func(path string, info os.FileInfo, err error) error {
+		components := strings.Split(path, string(os.PathSeparator))
+		// first root directory, not sure if this ever happen
+		if len(components) == len(root_components) {
+			return nil
+		}
+		// checking if we are in a hidden directory
+		// if we are, we skip it all
+		first_dir := components[len(root_components)]
+		if strings.HasPrefix(first_dir, ".") {
+			return filepath.SkipDir
+		}
+		// let's check if we have reach a symlink
+		// if we are in a symlink, we should capture
+		// the image digest
+		// we don't need to break the walk since Walk
+		// does not follow symlinks
+		if info.Mode()&os.ModeSymlink != 0 {
+			realName, _ := filepath.EvalSymlinks(path)
+			if err != nil {
+				return nil
+			}
+			result = append(result, realName)
+		}
+		// general case we keep iterating
+		return nil
+	}
+	filepath.Walk(root, walker)
+	return result, nil
+}
+
+func FindAllFlatImages(CVMFSRepo string) ([]string, error) {
+	root := filepath.Join("/", "cvmfs", CVMFSRepo, ".flat")
+	root_components := strings.Split(root, string(os.PathSeparator))
+	result := make([]string, 0)
+	walker := func(path string, info os.FileInfo, err error) error {
+		components := strings.Split(path, string(os.PathSeparator))
+		if len(components) == len(root_components)+2 && info.IsDir() {
+			result = append(result, path)
+			return filepath.SkipDir
+		}
+		if len(components) > len(root_components)+2 {
+			return filepath.SkipDir
+		}
+		if len(components) < len(root_components)+2 {
+			return nil
+		}
+		// general case we keep iterating
+		return nil
+	}
+	filepath.Walk(root, walker)
+	return result, nil
+}
+
+func FindAllLayers(CVMFSRepo string) ([]string, error) {
+	root := filepath.Join("/", "cvmfs", CVMFSRepo, ".layers")
+	root_components := strings.Split(root, string(os.PathSeparator))
+	result := make([]string, 0)
+	walker := func(path string, info os.FileInfo, err error) error {
+		components := strings.Split(path, string(os.PathSeparator))
+		if len(components) == len(root_components)+2 && info.IsDir() {
+			result = append(result, path)
+			return filepath.SkipDir
+		}
+		if len(components) > len(root_components)+2 {
+			return filepath.SkipDir
+		}
+		if len(components) < len(root_components)+2 {
+			return nil
+		}
+		// general case we keep iterating
+		return nil
+	}
+	filepath.Walk(root, walker)
+	return result, nil
+}
+
+func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
+	root := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
+	result := make([]string, 0)
+	walker := func(path string, info os.FileInfo, err error) error {
+		if info.Name() == "manifest.json" {
+			bytes, err := ioutil.ReadFile(path)
+			if err != nil {
+				return filepath.SkipDir
+			}
+			var manifest da.Manifest
+			err = json.Unmarshal(bytes, &manifest)
+			if err != nil {
+				return filepath.SkipDir
+			}
+			for _, layerStruct := range manifest.Layers {
+				layer := strings.Split(layerStruct.Digest, ":")[1]
+				layerPath := filepath.Join("/", "cvmfs", CVMFSRepo, ".layers", layer[0:2], layer)
+				result = append(result, layerPath)
+			}
+			return filepath.SkipDir
+		}
+		return nil
+	}
+	filepath.Walk(root, walker)
+	return result, nil
+}
+
 func FindImageToGarbageCollect(CVMFSRepo string) ([]da.Manifest, error) {
 	removeSchedulePath := RemoveScheduleLocation(CVMFSRepo)
 	llog := func(l *log.Entry) *log.Entry {
