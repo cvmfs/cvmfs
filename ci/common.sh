@@ -225,14 +225,22 @@ can_build_ducc() {
     go_minor=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\2/p')
     go_patch=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\3/p')
 
-    if [ $go_minor -ge 11 ]; then
-      if [ $go_patch -ge 4 ]; then
-        echo "1"
-      else
-        echo "0"
-      fi
-    else
+    if [ $go_major -gt 1 ]; then
+      echo "1"
+    elif [ $go_major -lt 1 ]; then
       echo "0"
+    else
+      if [ $go_minor -gt 11 ]; then
+        echo "1"
+      elif [ $go_minor -lt 11 ]; then
+        echo "0"
+      else
+        if [ $go_patch -ge 4 ]; then
+          echo "1"
+        else
+          echo "0"
+        fi
+      fi
     fi
   else
     echo "0"
