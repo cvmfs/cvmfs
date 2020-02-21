@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-const int max_visible_values = 50;
+const int kMaxVisibleValues = 50;
 
 const std::vector<std::string> gc_cols = {
   "n_preserved_catalogs", "n_condemned_catalogs",
@@ -80,7 +80,7 @@ const std::string stmt_publish_weekly =
   " GROUP BY datetime(start_time, \"weekday 0\", \"start of day\")"
   " ORDER BY datetime(start_time, \"weekday 0\", \"start of day\") ASC;";
 
-unsigned offset = TDatime(1995, 1, 1, 0, 0, 0).Convert();
+unsigned kROOTEpoch = TDatime(1995, 1, 1, 0, 0, 0).Convert();
 
 using RDFMap = std::unordered_map<std::string, ROOT::RDF::RNode*>;
 using TGraphMap = std::unordered_map<std::string, ROOT::RDF::RResultPtr<TGraph> >;
@@ -95,12 +95,13 @@ struct PlotInstrs {
   std::string title;
   std::string y_axis_title;
   bool time_axis = false;
+  bool garbage_collection = false;
   int period;
 };
 
 TH1D *GetHistogram(TGraph *gr, int period) {
   int nvals = gr->GetN();
-  int n_visible_vals = std::min(nvals, max_visible_values);
+  int n_visible_vals = std::min(nvals, kMaxVisibleValues);
   double xmin = gr->GetX()[0];
   // shift xmax to the RIGHT side of the bin
   double xmax = gr->GetX()[nvals-1] + period;
@@ -130,7 +131,7 @@ void WriteHistogram(PlotInstrs pi) {
   int nbins = (xmax - xmin) / pi.period;
   std::unique_ptr<TH1D> helper(new TH1D("helper", "", nbins, xmin, xmax));
   helper->SetBinContent(0, 0);
-  int n_visible_vals = std::min(nbins, max_visible_values);
+  int n_visible_vals = std::min(nbins, kMaxVisibleValues);
 
   auto legend = new TLegend();
 
@@ -159,7 +160,11 @@ void WriteHistogram(PlotInstrs pi) {
     helper->GetXaxis()->SetTimeDisplay(1);
     helper->GetXaxis()->SetTitle("date");
   } else {
-    helper->GetXaxis()->SetTitle("revision");
+    if (pi.garbage_collection) {
+      helper->GetXaxis()->SetTitle("gc id");
+    } else {
+      helper->GetXaxis()->SetTitle("revision");
+    }
     helper->GetXaxis()->SetNoExponent();
   }
   helper->GetXaxis()->CenterTitle();
@@ -205,7 +210,7 @@ void WriteTHStack(PlotInstrs pi)
   double xmin = pi.gr[0]->GetX()[0];
   double xmax = pi.gr[0]->GetX()[pi.gr[0]->GetN()-1] + pi.period;
   int nbins = (xmax - xmin) / pi.period;
-  int n_visible_vals = std::min(nbins, max_visible_values);
+  int n_visible_vals = std::min(nbins, kMaxVisibleValues);
   THStack *hs = new THStack("hs", pi.title.c_str());
 
   std::vector<std::unique_ptr<TH1D>> hists;
@@ -259,6 +264,7 @@ std::set<std::string> excluded_cols =
 std::set<std::string> speed_cols =
   {"sz_bytes_added", "sz_bytes_uploaded"};
 
+// returns number of operations/bytes per second
 double getSpeed(Long64_t count, double duration_days) {
   return count/duration_days/86400;
 }
@@ -267,11 +273,11 @@ unsigned getDayCoord(const std::string &date) {
   return TDatime(stoi(date.substr(0, 4)),
                  stoi(date.substr(5, 2)),
                  stoi(date.substr(8, 2)),
-                 0, 0, 0).Convert() - offset;
+                 0, 0, 0).Convert() - kROOTEpoch;
 }
 
 unsigned getWeekCoord(const std::string &date) {
-  return TDatime(date.c_str()).Convert() - offset - 24*3600*6;  // to Monday
+  return TDatime(date.c_str()).Convert() - kROOTEpoch - 24*3600*6;  // to Monday
 }
 
 ROOT::RDF::RNode define_custom_cols(ROOT::RDF::RNode *rdf) {
@@ -317,7 +323,6 @@ TGraphMap precompute_graphs(ROOT::RDF::RNode* rdf)
 void generate_stats_plots(std::string stats_db_path, std::string out_path) {
   std::unique_ptr<TFile> f(TFile::Open(out_path.c_str(), "RECREATE"));
   assert(f && ! f->IsZombie());
-  // TODO(jpriessn) change "x" to revision
   unsigned row_id = 0;
   g_rdfs["publish"]["revision"] = new ROOT::RDF::RNode(
     ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish)
@@ -329,7 +334,6 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
     ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish_weekly)
               .Define("x", getWeekCoord, {"date"}));
 
-  // TODO(jpriessn) change "x" to revision
   row_id = 0;
   auto rdf_gc_rev =
     new ROOT::RDF::RNode(
@@ -414,6 +418,7 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
     WriteHistogram(pi);
 
     if (garbage_collectible) {
+      pi.garbage_collection = true;
       pi.gr = {gc_grs["n_condemned_objects"]};
       pi.gr_titles = {""};
       pi.colors = {2};
@@ -445,6 +450,8 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
       pi.title = "Preserved catalogs" + title_suffix;
       pi.y_axis_title = "";
       WriteHistogram(pi);
+
+      pi.garbage_collection = false;
     }
 
     // Aggregate graphs only (exclude graph by revision) follow
@@ -485,6 +492,7 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
     WriteHistogram(pi);
 
     if (garbage_collectible) {
+      pi.garbage_collection = true;
       pi.gr = {gc_grs["n_ops"]};
       pi.gr_titles = {""};
       pi.colors = {4};
@@ -517,6 +525,8 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
       pi.title = "Uploaded/purged bytes" + title_suffix;
       pi.y_axis_title = "bytes";
       WriteHistogram(pi);
+
+      pi.garbage_collection = false;
     } else {
       pi.gr = {p_grs["chunks_added"], p_grs["chunks_uploaded"]};
       pi.gr_titles = {"added", "uploaded"};

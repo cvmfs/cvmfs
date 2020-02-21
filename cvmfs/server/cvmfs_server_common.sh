@@ -1334,7 +1334,7 @@ upload_statistics_plots() {
 
   db_path="/var/spool/cvmfs/${name}/stats.db"
   
-  db_path_copied=$(mktemp -t stats.root.XXXXXX)
+  db_path_copied=$(mktemp -t stats.db.XXXXXX)
   cp $db_path $db_path_copied
   upload_statistics_plots_bg $db_path_copied $name $upstream 1>/dev/null &
 }
