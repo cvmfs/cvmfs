@@ -50,7 +50,7 @@ class DiffForwarder : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   DiffForwarder(catalog::SimpleCatalogManager *old_mgr,
                 catalog::SimpleCatalogManager *new_mgr,
                 publish::DiffListener *listener)
-    : CatalogDiffTool(old_mgr, new_mgr)
+    : CatalogDiffTool<catalog::SimpleCatalogManager>(old_mgr, new_mgr)
     , listener_(listener)
   {
   }
