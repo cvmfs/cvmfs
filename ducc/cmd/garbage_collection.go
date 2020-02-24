@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -80,19 +81,36 @@ var garbageCollectionCmd = &cobra.Command{
 		// we remove the prefix to the paths and we accumulate them in a single array
 		// we remove the prefix to pass them to `cvmfs_server ingest --delete $path_with_no_prefix CVMFSRepo`
 		prefix := filepath.Join("/", "cvmfs", CVMFSRepo) + "/"
+		today := time.Now()
+
+		pathShouldBeDeleted := func(path string) bool {
+			if !strings.HasPrefix(path, prefix) {
+				llog(lib.Log()).WithFields(log.Fields{"path": path, "prefix": prefix}).Warning("Path does not have the expected prefix")
+				return false
+			}
+			stat, err := os.Stat(path)
+			if err != nil {
+				llog(lib.Log()).WithFields(log.Fields{"path": path, "err": err}).Warning("Error in stating the path")
+				return false
+			}
+			modTime := stat.ModTime()
+			thirtyDays := 30 * 24 * time.Hour
+			if modTime.Add(thirtyDays).After(today) {
+				llog(lib.Log()).WithFields(log.Fields{"path": path, "grace period": "30 days", "path mod time": modTime}).Warning("Path still in it's grace period")
+				return false
+			}
+			return true
+		}
+
 		pathsToDelete := make([]string, 0)
 		for _, path := range imagesToDelete {
-			if strings.HasPrefix(path, prefix) {
+			if pathShouldBeDeleted(path) {
 				pathsToDelete = append(pathsToDelete, strings.TrimPrefix(path, prefix))
-			} else {
-				llog(lib.Log()).WithFields(log.Fields{"path": path, "prefix": prefix}).Warning("Path does not have the expected prefix")
 			}
 		}
 		for _, path := range layersToDelete {
-			if strings.HasPrefix(path, prefix) {
+			if pathShouldBeDeleted(path) {
 				pathsToDelete = append(pathsToDelete, strings.TrimPrefix(path, prefix))
-			} else {
-				llog(lib.Log()).WithFields(log.Fields{"path": path, "prefix": prefix}).Warning("Path does not have the expected prefix")
 			}
 		}
 
