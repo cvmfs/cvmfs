@@ -96,7 +96,7 @@ var garbageCollectionCmd = &cobra.Command{
 			modTime := stat.ModTime()
 			thirtyDays := 30 * 24 * time.Hour
 			if modTime.Add(thirtyDays).After(today) {
-				llog(lib.Log()).WithFields(log.Fields{"path": path, "grace period": "30 days", "path mod time": modTime}).Warning("Path still in it's grace period")
+				llog(lib.Log()).WithFields(log.Fields{"path": path, "grace period": "30 days", "path mod time": modTime}).Warning("Path still in its grace period")
 				return false
 			}
 			return true
