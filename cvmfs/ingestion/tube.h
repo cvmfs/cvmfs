@@ -66,6 +66,7 @@ class Tube : SingleCopy {
    * Push an item to the back of the queue.  Block if queue is currently full.
    */
   Link *Enqueue(ItemT *item) {
+    assert(item != NULL);
     MutexLockGuard lock_guard(&lock_);
     while (size_ == limit_)
       pthread_cond_wait(&cond_capacious_, &lock_);
@@ -85,6 +86,7 @@ class Tube : SingleCopy {
    * Push an item to the front of the queue. Block if queue currently full.
    */
   Link *EnqueueFront(ItemT *item) {
+    assert(item != NULL);
     MutexLockGuard lock_guard(&lock_);
     while (size_ == limit_)
       pthread_cond_wait(&cond_capacious_, &lock_);
