@@ -375,16 +375,15 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 	}()
 	wg.Wait()
 
-	// maing the thin image
-
 	if createThinImage {
 		err = CreateThinImage(manifest, layerLocations, inputImage, outputImage)
 		if err != nil {
 			return
 		}
 	}
+
 	// we wait for the goroutines to finish
-	// and if there was no error we add everything to the converted table
+	// and if there was no error we conclude everything writing the manifest into the repository
 	noErrorInConversionValue := <-noErrorInConversion
 
 	err = SaveLayersBacklink(repo, inputImage, layerDigests)
@@ -471,7 +470,6 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	if err != nil {
 		return
 	}
-	fmt.Println(string(thinJson))
 	var imageTar bytes.Buffer
 	tarFile := tar.NewWriter(&imageTar)
 	header := &tar.Header{Name: "thin.json", Mode: 0644, Size: int64(len(thinJson))}
@@ -516,8 +514,6 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	Log().Info("Created the image in the local docker daemon")
 
 	return nil
-	// here we are ready to push the image to the docker registry
-
 }
 
 func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionResult {
