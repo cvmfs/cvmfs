@@ -111,11 +111,13 @@ TEST_F(T_CatalogMergeTool, CRUD) {
 
   CatalogTestTool::History history = tester.history();
 
+  perf::Statistics *statistics = new perf::Statistics();
+
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
-                 server_tool->download_manager(), &first_manifest);
+                 server_tool->download_manager(), &first_manifest, statistics);
   EXPECT_TRUE(merge_tool.Init());
 
   std::string output_manifest_path;

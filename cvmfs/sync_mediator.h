@@ -36,6 +36,7 @@
 #include "compression.h"
 #include "file_chunk.h"
 #include "platform.h"
+#include "statistics.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
 #include "util/shared_ptr.h"
@@ -270,7 +271,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * By default, files have no extended attributes.
    */
   XattrList default_xattrs_;
-  UniquePtr<Counters> counters_;
+  UniquePtr<perf::FsCounters> counters_;
 };  // class SyncMediator
 
 }  // namespace publish

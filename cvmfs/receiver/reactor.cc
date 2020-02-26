@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "commit_processor.h"
-#include "json_document.h"
 #include "logging.h"
 #include "payload_processor.h"
 #include "repository_tag.h"
@@ -109,6 +108,58 @@ bool Reactor::WriteReply(int fd, const std::string& data) {
 
   return SafeWrite(fd, &buffer[0], total_size);
 }
+
+bool Reactor::ExtractStatsFromReq(JsonDocument *req,
+                                  perf::Statistics *stats,
+                                  std::string *start_time)
+{
+  perf::StatisticsTemplate stats_tmpl("Publish", stats);
+  perf::UploadCounters counters(stats_tmpl);
+
+  LogCvmfs(kLogReceiver, kLogSyslog, "req: %s", req->PrintPretty().c_str());
+
+  const JSON* statistics = JsonDocument::SearchInObject(
+    req->root(), "statistics", JSON_OBJECT);
+  if (statistics == NULL) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Could not find 'statistics' field in request");
+    return false;
+  }
+
+  const JSON *n_chunks_added = JsonDocument::SearchInObject(
+    statistics, "Publish.n_chunks_added", JSON_STRING);
+  const JSON *n_chunks_duplicated = JsonDocument::SearchInObject(
+    statistics, "Publish.n_chunks_duplicated", JSON_STRING);
+  const JSON *n_catalogs_added = JsonDocument::SearchInObject(
+    statistics, "Publish.n_catalogs_added", JSON_STRING);
+  const JSON *sz_uploaded_bytes = JsonDocument::SearchInObject(
+    statistics, "Publish.sz_uploaded_bytes", JSON_STRING);
+  const JSON *sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
+    statistics, "Publish.sz_uploaded_catalog_bytes", JSON_STRING);
+  const JSON *start_time_json = JsonDocument::SearchInObject(
+    statistics, "start_time", JSON_STRING);
+  if (n_chunks_added == NULL || n_chunks_duplicated == NULL ||
+      n_catalogs_added == NULL || sz_uploaded_bytes == NULL ||
+      sz_uploaded_catalog_bytes == NULL || start_time_json == NULL) {
+    return false;
+  }
+
+  perf::Xadd(counters.n_chunks_added,
+             String2Int64(n_chunks_added->string_value));
+  perf::Xadd(counters.n_chunks_duplicated,
+             String2Int64(n_chunks_duplicated->string_value));
+  perf::Xadd(counters.n_catalogs_added,
+             String2Int64(n_catalogs_added->string_value));
+  perf::Xadd(counters.sz_uploaded_bytes,
+             String2Int64(sz_uploaded_bytes->string_value));
+  perf::Xadd(counters.sz_uploaded_catalog_bytes,
+             String2Int64(sz_uploaded_catalog_bytes->string_value));
+
+  *start_time = start_time_json->string_value;
+
+  return true;
+}
+
 
 Reactor::Reactor(int fdin, int fdout) : fdin_(fdin), fdout_(fdout) {}
 
@@ -279,7 +330,10 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
     return false;
   }
 
+  perf::Statistics statistics;
+
   UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
+  proc->SetStatistics(&statistics);
   JsonStringInput reply_input;
   PayloadProcessor::Result res =
       proc->Process(fdin, digest_json->string_value, path_json->string_value,
@@ -294,7 +348,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
       reply_input.PushBack("status", "error");
       reply_input.PushBack("reason", "other_error");
       break;
-    case PayloadProcessor::kSpoolerError:
+    case PayloadProcessor::kUploaderError:
       reply_input.PushBack("status", "error");
       reply_input.PushBack("reason", "uploader_error");
       break;
@@ -307,6 +361,10 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
             "encountered.");
       break;
   }
+
+  // HandleSubmitPayload sends partial statistics back to the gateway
+  std::string stats_json = statistics.PrintJSON();
+  reply_input.PushBack("statistics", stats_json, false);
 
   ToJsonString(reply_input, reply);
 
@@ -346,8 +404,16 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     return false;
   }
 
+  perf::Statistics statistics;
+  std::string start_time;
+  if (!Reactor::ExtractStatsFromReq(req_json, &statistics, &start_time)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+      "HandleCommit: Could not extract statistics counters from request");
+  }
+
   // Here we use the path to commit the changes!
   UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
+  proc->SetStatistics(&statistics, start_time);
   shash::Any old_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(old_root_hash_json->string_value));
   shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(

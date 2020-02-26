@@ -181,11 +181,13 @@ RC_GTEST_FIXTURE_PROP(T_CatalogMergeTool, InOut, ()) {
 
   CatalogTestTool::History history = tester.history();
 
+  perf::Statistics *statistics = new perf::Statistics();
+
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
-                 server_tool->download_manager(), &first_manifest);
+                 server_tool->download_manager(), &first_manifest, statistics);
   RC_ASSERT(merge_tool.Init());
 
   std::string output_manifest_path;

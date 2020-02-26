@@ -361,7 +361,7 @@ cvmfs_server_ingest() {
 
   # remount the repository
   if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
-    upload_statistics_plots $name $upstream
+    /usr/share/cvmfs-server/upload_stats_plots.sh $name
   fi
   close_transaction $name $use_fd_fallback
   publish_after_hook $name

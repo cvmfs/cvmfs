@@ -28,47 +28,6 @@
 
 using namespace std;  // NOLINT
 
-struct Counters {
-  perf::Counter *n_files_added;
-  perf::Counter *n_files_removed;
-  perf::Counter *n_files_changed;
-  perf::Counter *n_directories_added;
-  perf::Counter *n_directories_removed;
-  perf::Counter *n_directories_changed;
-  perf::Counter *n_symlinks_added;
-  perf::Counter *n_symlinks_removed;
-  perf::Counter *n_symlinks_changed;
-  perf::Counter *sz_added_bytes;
-  perf::Counter *sz_removed_bytes;
-
-  explicit Counters(perf::StatisticsTemplate statistics) {
-    n_files_added = statistics.RegisterTemplated("n_files_added",
-        "Number of files added");
-    n_files_removed = statistics.RegisterTemplated("n_files_removed",
-        "Number of files removed");
-    n_files_changed = statistics.RegisterTemplated("n_files_changed",
-        "Number of files changed");
-    n_directories_added = statistics.RegisterTemplated("n_directories_added",
-        "Number of directories added");
-    n_directories_removed =
-                  statistics.RegisterTemplated("n_directories_removed",
-                                            "Number of directories removed");
-    n_directories_changed =
-                  statistics.RegisterTemplated("n_directories_changed",
-                                            "Number of directories changed");
-    n_symlinks_added = statistics.RegisterTemplated("n_symlinks_added",
-        "Number of symlinks added");
-    n_symlinks_removed = statistics.RegisterTemplated("n_symlinks_removed",
-        "Number of symlinks removed");
-    n_symlinks_changed = statistics.RegisterTemplated("n_symlinks_changed",
-        "Number of symlinks changed");
-    sz_added_bytes = statistics.RegisterTemplated("sz_added_bytes",
-                                            "Number of bytes added");
-    sz_removed_bytes = statistics.RegisterTemplated("sz_removed_bytes",
-                                            "Number of bytes removed");
-  }
-};  // Counters
-
 namespace publish {
 
 AbstractSyncMediator::~AbstractSyncMediator() {}
@@ -88,7 +47,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
-  counters_ = new Counters(statistics);
+  counters_ = new perf::FsCounters(statistics);
 }
 
 

@@ -19,6 +19,10 @@ struct JsonStringInput {
     std::string key;
     std::string val;
     bool quoted;
+
+    JsonStringEntry() {
+      quoted = true;
+    }
   };
 
   void PushBack(std::string key, std::string val, bool quoted = true) {

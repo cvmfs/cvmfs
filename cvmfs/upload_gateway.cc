@@ -208,8 +208,9 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     return;
   }
 
+  // hd->remote_path is ignored when empty
   if (!session_context_->CommitBucket(ObjectPack::kCas, content_hash,
-                                      hd->bucket, "")) {
+                                      hd->bucket, hd->remote_path)) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - could not commit bucket");
     BumpErrors();

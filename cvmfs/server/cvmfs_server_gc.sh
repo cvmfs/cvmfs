@@ -280,7 +280,7 @@ __do_gc_cmd()
         # close the transaction
         trap - EXIT HUP INT TERM
         if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
-          upload_statistics_plots $name $CVMFS_UPSTREAM_STORAGE
+          /usr/share/cvmfs-server/upload_stats_plots.sh $name
         fi
         close_transaction $name 0
       else

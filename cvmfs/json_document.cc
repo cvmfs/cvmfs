@@ -33,7 +33,7 @@ bool ToJsonString(const JsonStringInput &input, std::string *output) {
       *output += ',';
     }
   }
-  *output += std::string("}");
+  *output += string("}");
 
   return true;
 }

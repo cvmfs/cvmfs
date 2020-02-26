@@ -10,6 +10,7 @@
 #include "catalog_diff_tool.h"
 #include "file_chunk.h"
 #include "params.h"
+#include "statistics.h"
 #include "util/pointer.h"
 
 namespace catalog {
@@ -37,7 +38,8 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                    RwCatalogMgr* output_catalog_mgr,
                    const PathString& lease_path,
                    const std::string& temp_dir_prefix,
-                   manifest::Manifest* manifest)
+                   manifest::Manifest* manifest,
+                   perf::Statistics* statistics)
       : CatalogDiffTool<RoCatalogMgr>(old_catalog_mgr, new_catalog_mgr),
         repo_path_(""),
         lease_path_(lease_path),
@@ -45,21 +47,24 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         download_manager_(NULL),
         manifest_(manifest),
         output_catalog_mgr_(output_catalog_mgr),
-        needs_setup_(false) {}
+        needs_setup_(false),
+        statistics_(statistics) {}
 
   CatalogMergeTool(RoCatalogMgr* old_catalog_mgr, RoCatalogMgr* new_catalog_mgr,
                    const std::string& repo_path,
                    const PathString& lease_path,
                    const std::string& temp_dir_prefix,
                    download::DownloadManager* download_manager,
-                   manifest::Manifest* manifest)
+                   manifest::Manifest* manifest,
+                   perf::Statistics* statistics)
       : CatalogDiffTool<RoCatalogMgr>(old_catalog_mgr, new_catalog_mgr),
         repo_path_(repo_path),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
         manifest_(manifest),
-        needs_setup_(true) {}
+        needs_setup_(true),
+        statistics_(statistics) {}
 
   CatalogMergeTool(const std::string& repo_path,
                    const shash::Any& old_root_hash,
@@ -67,7 +72,8 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                    const PathString& lease_path,
                    const std::string& temp_dir_prefix,
                    download::DownloadManager* download_manager,
-                   manifest::Manifest* manifest)
+                   manifest::Manifest* manifest,
+                   perf::Statistics* statistics)
       : CatalogDiffTool<RoCatalogMgr>(repo_path, old_root_hash, new_root_hash,
                                       temp_dir_prefix, download_manager),
         repo_path_(repo_path),
@@ -75,7 +81,8 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
         manifest_(manifest),
-        needs_setup_(true) {}
+        needs_setup_(true),
+        statistics_(statistics) {}
 
   virtual ~CatalogMergeTool() {}
 
@@ -109,6 +116,9 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   UniquePtr<RwCatalogMgr> output_catalog_mgr_;
 
   const bool needs_setup_;
+
+  perf::Statistics *statistics_;
+  perf::FsCounters *counters_;
 };
 
 }  // namespace receiver

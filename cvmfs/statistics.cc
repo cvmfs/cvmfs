@@ -90,7 +90,20 @@ string Statistics::PrintList(const PrintOptions print_options) {
   }
   return result;
 }
+string Statistics::PrintJSON() {
+  string result = "{";
+  MutexLockGuard lock_guard(lock_);
+  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
+       iEnd = counters_.end(); i != iEnd; ++i)
+  {
+    result +=
+      std::string("\"") + i->first + "\":\"" +
+      i->second->counter.ToString() + "\",";
+  }
+  result[result.length() - 1] = '}';  // replace last ',' with '}'
 
+  return result;
+}
 
 Counter *Statistics::Register(const string &name, const string &desc) {
   MutexLockGuard lock_guard(lock_);
