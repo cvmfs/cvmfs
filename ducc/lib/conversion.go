@@ -211,7 +211,11 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	for _, expandedImgTag := range expandedImgTags {
 		tag := expandedImgTag.Tag
 		outputWithTag := outputImage
-		outputWithTag.Tag = tag
+		if inputImage.TagWildcard {
+			outputWithTag.Tag = tag
+		} else {
+			outputWithTag.Tag = outputImage.Tag
+		}
 		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, createThinImage)
 		if err != nil && firstError == nil {
 			firstError = err
