@@ -3,14 +3,18 @@ cvmfs_test_autofs_on_startup=true
 cvmfs_test_suites="ducc"
 
 DOCKER_TEST_IMAGE1="https://registry.hub.docker.com/library/centos:centos7"
-DOCKER_TEST_IMAGE2="https://registry.hub.docker.com/library/ubuntu:18.04"
+DOCKER_TEST_IMAGE2="https://registry.hub.docker.com/library/fedora:30"
 
 ducc_test_401_clean_up() {
   sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
 }
 
+# the convert can fail if the network fails, a solution is to put them in a loop.
+# We didn't do it here to avoid complexity, moreover we choose images "simples" to ingest
+# (images with few layers).
+
 cvmfs_run_test() {
-  # trap ducc_test_401_clean_up EXIT HUP INT TERM
+  trap ducc_test_401_clean_up EXIT HUP INT TERM
 
   echo "*** creating empty repo ***"
   create_empty_repo $CVMFS_TEST_REPO $USER || return 1
@@ -20,15 +24,15 @@ cvmfs_run_test() {
 
   [ -d "/cvmfs/$CVMFS_TEST_REPO/registry.hub.docker.com/library/centos:centos7" ] || return 3
   # we check that there is nothing in `.layers`
-  [ ! -d "/cvmfs/$CVMFS_TEST_REPO/.layers/*" ] || return 4
+  [ ! "$( ls /cvmfs/$CVMFS_TEST_REPO/.layers/* 2> /dev/null )" ] || return 4
 
   echo "*** converting image to layers ***"
-  cvmfs_ducc convert-single-image --skip-flat $DOCKER_TEST_IMAGE2 $CVMFS_TEST_REPO || return 5
+  cvmfs_ducc convert-single-image --skip-thin-image --skip-flat $DOCKER_TEST_IMAGE2 $CVMFS_TEST_REPO || return 5
 
   # the image should not be in the flat part
-  [ ! -d "/cvmfs/$CVMFS_TEST_REPO/registry.hub.docker.com/library/ubuntu:18.04" ] || return 6
+  [ ! -d "/cvmfs/$CVMFS_TEST_REPO/registry.hub.docker.com/library/fedora:30" ] || return 6
   # now there should be some layer
-  [ -d "/cvmfs/$CVMFS_TEST_REPO/.layers/*" ] || return 7
-  
-return 0
+  [ "$( ls /cvmfs/$CVMFS_TEST_REPO/.layers/*  2> /dev/null )" ] || return 7
+
+  return 0
 }
