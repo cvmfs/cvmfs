@@ -1,4 +1,6 @@
 2.8.0:
+  * [server] Add CVMFS_UPLOAD_STATS_PLOTS parameter to automatically generate
+    and upload publish statistics plots; requires ROOT (CVM-1836)
   * [ducc] Improve robustness against intermittent registry failures (CVM-1829)
   * [ducc] Add support for wildcards in tag names (CVM-1715)
   * [ducc] Make temporary directory configurable (CVM-1826) 
