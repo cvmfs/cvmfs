@@ -279,6 +279,9 @@ __do_gc_cmd()
       if is_stratum0 $name; then
         # close the transaction
         trap - EXIT HUP INT TERM
+        if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
+          upload_statistics_plots $name $CVMFS_UPSTREAM_STORAGE
+        fi
         close_transaction $name 0
       else
         # release the update lock
