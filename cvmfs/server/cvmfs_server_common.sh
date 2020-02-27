@@ -1332,6 +1332,11 @@ upload_statistics_plots() {
   local name="$1"
   local upstream="$2"
 
+  if ! command -v root 1>/dev/null ; then
+    echo "CVMFS_UPLOAD_STATS_PLOTS enabled but no ROOT installed. No plots will be uploaded."
+    return
+  fi
+
   db_path="/var/spool/cvmfs/${name}/stats.db"
   
   db_path_copied=$(mktemp -t stats.db.XXXXXX)
