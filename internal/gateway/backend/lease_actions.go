@@ -48,6 +48,11 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 		return "", err
 	}
 
+	if err := s.StatsMgr.AddLeaseEmpty(leasePath); err != nil {
+		outcome = err.Error()
+		return "", err
+	}
+
 	outcome = fmt.Sprintf("success: %v", token.TokenStr)
 	return token.TokenStr, err
 }
@@ -121,7 +126,7 @@ func (s *Services) CancelLease(ctx context.Context, tokenStr string) error {
 	outcome := "success"
 	defer logAction(ctx, "cancel_lease", &outcome, t0)
 
-	_, lease, err := s.Leases.GetLease(ctx, tokenStr)
+	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
 		outcome = err.Error()
 		return err
@@ -136,6 +141,11 @@ func (s *Services) CancelLease(ctx context.Context, tokenStr string) error {
 	}
 
 	if err := s.Leases.CancelLease(ctx, tokenStr); err != nil {
+		outcome = err.Error()
+		return err
+	}
+
+	if _, err := s.StatsMgr.PopLease(leasePath); err != nil {
 		outcome = err.Error()
 		return err
 	}
@@ -171,6 +181,11 @@ func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRo
 	}); err != nil {
 		outcome = err.Error()
 		return err
+	}
+
+	plotsErr := s.StatsMgr.UploadStatsPlots(repository)
+	if plotsErr != nil {
+		gw.LogC(ctx, "actions", gw.LogError).Msgf(plotsErr.Error())
 	}
 
 	if err := s.Leases.CancelLease(ctx, tokenStr); err != nil {
