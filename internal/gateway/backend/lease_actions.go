@@ -154,7 +154,7 @@ func (s *Services) CancelLease(ctx context.Context, tokenStr string) error {
 }
 
 // CommitLease associated with the token (transaction commit)
-func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -163,24 +163,27 @@ func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRo
 	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
 	if err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
 	repository, _, err := gw.SplitLeasePath(leasePath)
 	if err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
+	var finalRev uint64
 	if err := s.Leases.WithLock(ctx, repository, func() error {
-		return s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+		var err error
+		finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+		return err
 	}); err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
 	plotsErr := s.StatsMgr.UploadStatsPlots(repository)
@@ -190,8 +193,8 @@ func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRo
 
 	if err := s.Leases.CancelLease(ctx, tokenStr); err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
-	return nil
+	return finalRev, nil
 }
