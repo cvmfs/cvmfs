@@ -1,0 +1,6 @@
+usr/lib/libcvmfs_fuse3_stub.so.@CVMFS_VERSION@
+usr/lib/libcvmfs_fuse3_stub.so
+usr/lib/libcvmfs_fuse3.so.@CVMFS_VERSION@
+usr/lib/libcvmfs_fuse3.so
+usr/lib/libcvmfs_fuse3_debug.so.@CVMFS_VERSION@
+usr/lib/libcvmfs_fuse3_debug.so

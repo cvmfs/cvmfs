@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -15,6 +16,7 @@ func init() {
 	loopCmd.Flags().BoolVarP(&overwriteLayer, "overwrite-layers", "f", false, "overwrite the layer if they are already inside the CVMFS repository")
 	loopCmd.Flags().BoolVarP(&convertAgain, "convert-again", "g", false, "convert again images that are already successfull converted")
 	loopCmd.Flags().BoolVarP(&convertSingularity, "convert-singularity", "s", true, "also create a singularity images")
+	loopCmd.Flags().BoolVarP(&convertDocker, "convert-docker", "d", true, "unpacking the layers into the repository")
 	rootCmd.AddCommand(loopCmd)
 }
 
@@ -55,18 +57,30 @@ var loopCmd = &cobra.Command{
 				lib.LogE(err).Fatal("Impossible to parse the recipe file")
 				os.Exit(1)
 			}
+			if len(recipe.Wishes) == 0 {
+				lib.Log().Warn("No wishes to convert.")
+				time.Sleep(30 * time.Second)
+			}
 			for _, wish := range recipe.Wishes {
 				fields := log.Fields{"input image": wish.InputName,
 					"repository":   wish.CvmfsRepo,
 					"output image": wish.OutputName}
 				lib.Log().WithFields(fields).Info("Start conversion of wish")
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer, convertSingularity)
-				if err != nil {
-					lib.LogE(err).WithFields(fields).Error("Error in converting wish, going on")
+				if convertDocker {
+					err = lib.ConvertWishDocker(wish, convertAgain, overwriteLayer)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+					}
+				}
+				if convertSingularity {
+					err = lib.ConvertWishSingularity(wish)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
+					}
 				}
 				checkQuitSignal()
 			}
-
+			checkQuitSignal()
 		}
 	},
 }

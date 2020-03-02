@@ -1,0 +1,57 @@
+cvmfs_test_name="Upload stats.db into upstream storage"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_url=$(get_repo_url $CVMFS_TEST_REPO)
+  local server_cfg_file=/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+
+  echo "*** create a garbage-collectible repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -g -z || return $?
+
+  echo "*** disable automatic garbage collection"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
+  echo "*** publish first transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir /cvmfs/$CVMFS_TEST_REPO/dir
+  echo "first 1" > /cvmfs/$CVMFS_TEST_REPO/dir/first
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check that stats.db was not uploaded"
+  curl -s --fail --output /dev/null "${repo_url}/stats/stats.db" && return 2
+
+  echo "*** enable statistics DB upload"
+  echo "CVMFS_UPLOAD_STATS_DB=true" >> $server_cfg_file
+
+  echo "*** publish second transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "first 2" > /cvmfs/$CVMFS_TEST_REPO/dir/first
+  echo "second 2" > /cvmfs/$CVMFS_TEST_REPO/dir/second
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** check that stats.db was uploaded"
+  curl -s --fail -o stats1.db "${repo_url}/stats/stats.db" || return 3
+  diff stats1.db "/var/spool/cvmfs/${CVMFS_TEST_REPO}/stats.db" || return 4
+  count_gc=$(sqlite3 stats1.db "select count(*) from gc_statistics;")
+  count_publish=$(sqlite3 stats1.db "select count(*) from publish_statistics;")
+  [ $count_gc -eq 1 ] || return 5
+  [ $count_publish -eq 4 ] || return 6
+
+  echo "*** perform basic garbage collection"
+  cvmfs_server gc -r1 -f $CVMFS_TEST_REPO || return 7
+
+  echo "*** check that stats.db was uploaded"
+  curl -s --fail -o stats2.db "${repo_url}/stats/stats.db" || return 8
+  diff stats2.db "/var/spool/cvmfs/${CVMFS_TEST_REPO}/stats.db" || return 9
+  count_gc=$(sqlite3 stats2.db "select count(*) from gc_statistics;")
+  count_publish=$(sqlite3 stats2.db "select count(*) from publish_statistics;")
+  [ $count_gc -eq 2 ] || return 10
+  [ $count_publish -eq 4 ] || return 11
+
+  return 0
+}
+

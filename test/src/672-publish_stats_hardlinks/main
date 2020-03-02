@@ -1,0 +1,70 @@
+cvmfs_test_name="Store publish statistics in a SQLite database - hardlinks"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+REPO_NAME=test.cern.ch
+STATS_DB_PATH=/var/spool/cvmfs/$REPO_NAME/stats.db
+
+
+cleanup() {
+  destroy_repo $REPO_NAME
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$REPO_NAME
+
+  echo "*** Create a fresh repository named $REPO_NAME with user $CVMFS_TEST_USER"
+  create_empty_repo $REPO_NAME $CVMFS_TEST_USER || return $?
+  trap cleanup EXIT HUP INT TERM
+
+
+  echo "*** starting transaction to edit repository"
+  start_transaction $REPO_NAME || return $?
+
+  echo "*** Test - create a file and additional hardlinks in new repository"
+
+  echo "a file" > $repo_dir/file1
+  ln $repo_dir/file1 $repo_dir/hardlink1
+
+  echo "*** creating CVMFS snapshot"
+  publish_repo $REPO_NAME || return $?
+  # get the last inserted data
+  actual_values=$(sqlite3 $STATS_DB_PATH 'select * from publish_statistics' | tail -1)
+
+  echo "*** check catalog and data integrity"
+  check_repository $REPO_NAME -i || return $?
+
+  column_names=([3]=revision \
+                n_files_added \
+                n_files_removed \
+                n_files_changed \
+                n_chunks_added \
+                n_chunks_duplicated \
+                n_catalogs_added \
+                n_directories_added \
+                n_directories_removed \
+                n_directories_changed \
+                n_symlinks_added \
+                n_symlinks_removed \
+                n_symlinks_changed \
+                sz_bytes_added \
+                sz_bytes_removed \
+                sz_bytes_uploaded)
+
+  expected_values=([3]=3 2 0 0 1 0 1 0 0 0 0 0 0 14 0 15)
+
+
+  IFS="|" read -r -a actual_values_array <<< $actual_values
+
+  # comparing columns 3 to 18 (numbered from 0)
+  for i in `seq 3 18`;
+  do
+    if [ "x${expected_values[$i]}" != "x${actual_values_array[$i]}" ]; then
+      echo "*** Test for ${column_names[$i]} - \
+            (${actual_values_array[$i]} vs ref:${expected_values[$i]}) FAILED!"
+    return 100
+    fi
+  done
+
+}

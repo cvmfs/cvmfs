@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "gateway_util.h"
+#include "logging.h"
+#include "util/exception.h"
 #include "util/string.h"
 
 namespace upload {
@@ -59,7 +61,7 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
          spooler_definition.driver_type == SpoolerDefinition::Gateway);
 
   if (!ParseSpoolerDefinition(spooler_definition, &config_)) {
-    abort();
+    PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
   atomic_init32(&num_errors_);
@@ -69,6 +71,12 @@ GatewayUploader::~GatewayUploader() {
   if (session_context_) {
     delete session_context_;
   }
+}
+
+bool GatewayUploader::Create() {
+  LogCvmfs(kLogUploadGateway, kLogStderr,
+           "cannot create repository storage area when using the gateway");
+  return false;
 }
 
 bool GatewayUploader::Initialize() {
@@ -110,6 +118,11 @@ void GatewayUploader::DoRemoveAsync(const std::string& /*file_to_delete*/) {
 
 bool GatewayUploader::Peek(const std::string& /*path*/) { return false; }
 
+// TODO(jpriessn): implement Mkdir on gateway server-side
+bool GatewayUploader::Mkdir(const std::string &path) {
+  return true;
+}
+
 bool GatewayUploader::PlaceBootstrappingShortcut(const shash::Any& /*object*/) {
   return false;
 }
@@ -118,42 +131,47 @@ unsigned int GatewayUploader::GetNumberOfErrors() const {
   return atomic_read32(&num_errors_);
 }
 
-void GatewayUploader::FileUpload(const std::string& local_path,
-                                 const std::string& remote_path,
-                                 const CallbackTN* callback) {
+void GatewayUploader::DoUpload(const std::string& remote_path,
+                               IngestionSource *source,
+                               const CallbackTN* callback) {
   UniquePtr<GatewayStreamHandle> handle(
       new GatewayStreamHandle(callback, session_context_->NewBucket()));
 
-  FILE* local_file = fopen(local_path.c_str(), "rb");
-  if (!local_file) {
+  bool rvb = source->Open();
+  if (!rvb) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "File upload - could not open local file.");
     BumpErrors();
-    Respond(callback, UploaderResults(1, local_path));
+    Respond(callback, UploaderResults(1, source->GetPath()));
     return;
   }
 
+  unsigned char hash_ctx[shash::kMaxContextSize];
+  shash::ContextPtr hash_ctx_ptr(spooler_definition().hash_algorithm, hash_ctx);
+  shash::Init(hash_ctx_ptr);
   std::vector<char> buf(1024);
-  size_t read_bytes = 0;
+  ssize_t read_bytes = 0;
   do {
-    read_bytes = fread(&buf[0], buf.size(), 1, local_file);
-    ObjectPack::AddToBucket(&buf[0], buf.size(), handle->bucket);
-  } while (read_bytes == buf.size());
-  fclose(local_file);
-
+    read_bytes = source->Read(&buf[0], buf.size());
+    assert(read_bytes >= 0);
+    ObjectPack::AddToBucket(&buf[0], read_bytes, handle->bucket);
+    shash::Update(reinterpret_cast<unsigned char *>(&buf[0]), read_bytes,
+                  hash_ctx_ptr);
+  } while (static_cast<size_t>(read_bytes) == buf.size());
+  source->Close();
   shash::Any content_hash(spooler_definition().hash_algorithm);
-  shash::HashFile(local_path, &content_hash);
+  shash::Final(hash_ctx_ptr, &content_hash);
+
   if (!session_context_->CommitBucket(ObjectPack::kNamed, content_hash,
                                       handle->bucket, remote_path)) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "File upload - could not commit bucket");
     BumpErrors();
-    Respond(handle->commit_callback, UploaderResults(2, local_path));
+    Respond(handle->commit_callback, UploaderResults(2, source->GetPath()));
     return;
   }
 
-  CountUploadedBytes(handle->bucket->size);
-  Respond(callback, UploaderResults(0, local_path));
+  Respond(callback, UploaderResults(0, source->GetPath()));
 }
 
 UploadStreamHandle* GatewayUploader::InitStreamedUpload(
@@ -199,8 +217,14 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
             UploaderResults(UploaderResults::kChunkCommit, 4));
     return;
   }
-
-  CountUploadedBytes(hd->bucket->size);
+  if (!content_hash.HasSuffix()
+      || content_hash.suffix == shash::kSuffixPartial) {
+    CountUploadedChunks();
+    CountUploadedBytes(hd->bucket->size);
+  } else if (content_hash.suffix == shash::kSuffixCatalog) {
+    CountUploadedCatalogs();
+    CountUploadedCatalogBytes(hd->bucket->size);
+  }
   Respond(handle->commit_callback,
           UploaderResults(UploaderResults::kChunkCommit, 0));
 }

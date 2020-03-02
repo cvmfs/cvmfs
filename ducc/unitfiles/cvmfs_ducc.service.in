@@ -1,0 +1,13 @@
+[Unit]
+Description=DUCC Daemon Unpacking Containers in CVMFS
+After=network.target dockerd.service
+Requires=dockerd.service
+
+[Service]
+Environment="DUCC_RECIPE_FILE=UPDATE-ME.yaml"
+Environment="DUCC_DOCKER_REGISTRY_PASS=UPDATE-ME"
+
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/cvmfs_ducc loop $RECIPE_FILE
+
+[Install]
+WantedBy=multi-user.target

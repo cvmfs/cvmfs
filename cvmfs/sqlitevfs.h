@@ -24,6 +24,12 @@ bool RegisterVfsRdOnly(CacheManager *cache_mgr,
                        const VfsOptions options);
 bool UnregisterVfsRdOnly();
 
+/**
+ * After a reload, existing file catalog file dscriptors might need a remap
+ * to the fd in the context of the restored cache manager.
+ */
+void RegisterFdMapping(int from, int to);
+
 }  // namespace sqlite
 
 #endif  // CVMFS_SQLITEVFS_H_

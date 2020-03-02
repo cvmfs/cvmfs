@@ -90,6 +90,12 @@ class BranchSanitizer : public InputSanitizer {
 };
 
 
+class TagSanitizer : public InputSanitizer {
+ public:
+  TagSanitizer() : InputSanitizer("az AZ 09 - _ . / :") { }
+};
+
+
 class IntegerSanitizer : public InputSanitizer {
  public:
   IntegerSanitizer() : InputSanitizer("09") { }

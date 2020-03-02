@@ -21,6 +21,7 @@
 #include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -34,6 +35,9 @@ struct Counters {
   perf::Counter *n_directories_added;
   perf::Counter *n_directories_removed;
   perf::Counter *n_directories_changed;
+  perf::Counter *n_symlinks_added;
+  perf::Counter *n_symlinks_removed;
+  perf::Counter *n_symlinks_changed;
   perf::Counter *sz_added_bytes;
   perf::Counter *sz_removed_bytes;
 
@@ -52,6 +56,12 @@ struct Counters {
     n_directories_changed =
                   statistics.RegisterTemplated("n_directories_changed",
                                             "Number of directories changed");
+    n_symlinks_added = statistics.RegisterTemplated("n_symlinks_added",
+        "Number of symlinks added");
+    n_symlinks_removed = statistics.RegisterTemplated("n_symlinks_removed",
+        "Number of symlinks removed");
+    n_symlinks_changed = statistics.RegisterTemplated("n_symlinks_changed",
+        "Number of symlinks changed");
     sz_added_bytes = statistics.RegisterTemplated("sz_added_bytes",
                                             "Number of bytes added");
     sz_removed_bytes = statistics.RegisterTemplated("sz_removed_bytes",
@@ -106,8 +116,8 @@ void SyncMediator::EnsureAllowed(SharedPtr<SyncItem> entry) {
                   string(catalog::VirtualCatalog::kVirtualPath) + "/",
                   ignore_case_setting)) )
   {
-    PrintError("invalid attempt to modify '" + relative_path + "'");
-    abort();
+    PANIC(kLogStderr, "[ERROR] invalid attempt to modify %s",
+          relative_path.c_str());
   }
 }
 
@@ -173,12 +183,38 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
   if (entry->IsRegularFile() || entry->IsSymlink() || entry->IsSpecialFile()) {
     Replace(entry);  // This way, hardlink processing is correct
     // Replace calls Remove; cancel Remove's actions:
-    perf::Dec(counters_->n_files_removed);
     perf::Xadd(counters_->sz_removed_bytes, -entry->GetRdOnlySize());
 
-    perf::Inc(counters_->n_files_changed);
     // Count only the diference between the old and new file
-    int64_t dif = entry->GetScratchSize() - entry->GetRdOnlySize();
+    // Symlinks do not count into added or removed bytes
+    int64_t dif = 0;
+
+    // Need to handle 4 cases (symlink->symlink, symlink->regular,
+    // regular->symlink, regular->regular)
+    if (entry->WasSymlink()) {
+      // Replace calls Remove; cancel Remove's actions:
+      perf::Dec(counters_->n_symlinks_removed);
+
+      if (entry->IsSymlink()) {
+        perf::Inc(counters_->n_symlinks_changed);
+      } else {
+        perf::Inc(counters_->n_symlinks_removed);
+        perf::Inc(counters_->n_files_added);
+        dif += entry->GetScratchSize();
+      }
+    } else {
+      // Replace calls Remove; cancel Remove's actions:
+      perf::Dec(counters_->n_files_removed);
+      dif -= entry->GetRdOnlySize();
+      if (entry->IsSymlink()) {
+        perf::Inc(counters_->n_files_removed);
+        perf::Inc(counters_->n_symlinks_added);
+      } else {
+        perf::Inc(counters_->n_files_changed);
+        dif += entry->GetScratchSize();
+      }
+    }
+
     if (dif > 0) {                            // added bytes
       perf::Xadd(counters_->sz_added_bytes, dif);
     } else {                                  // removed bytes
@@ -359,6 +395,12 @@ void SyncMediator::InsertHardlink(SharedPtr<SyncItem> entry) {
   } else {
     // Append the file to the appropriate hardlink group
     hardlink_group->second.AddHardlink(entry);
+  }
+
+  // publish statistics counting for new file
+  if (entry->IsNew()) {
+    perf::Inc(counters_->n_files_added);
+    perf::Xadd(counters_->sz_added_bytes, entry->GetScratchSize());
   }
 }
 
@@ -685,9 +727,8 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
            result.file_chunks.size(),
            result.return_code);
   if (result.return_code != 0) {
-    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
-             result.local_path.c_str(), result.return_code);
-    abort();
+    PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
+          result.return_code);
   }
 
   SyncItemList::iterator itr;
@@ -702,7 +743,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   item.SetContentHash(result.content_hash);
   item.SetCompressionAlgorithm(result.compression_alg);
 
-  XattrList *xattrs = &default_xattrs;
+  XattrList *xattrs = &default_xattrs_;
   if (params_->include_xattrs) {
     xattrs = XattrList::CreateFromFile(result.local_path);
     assert(xattrs != NULL);
@@ -721,7 +762,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
       item.relative_parent_path());
   }
 
-  if (xattrs != &default_xattrs)
+  if (xattrs != &default_xattrs_)
     free(xattrs);
 }
 
@@ -735,9 +776,8 @@ void SyncMediator::PublishHardlinksCallback(
            result.content_hash.ToString().c_str(),
            result.return_code);
   if (result.return_code != 0) {
-    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
-             result.local_path.c_str(), result.return_code);
-    abort();
+    PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
+          result.return_code);
   }
 
   bool found = false;
@@ -821,38 +861,42 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
   if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) {
     assert(!entry->HasGraftMarker());
     // Symlinks and special files are completely stored in the catalog
-    catalog_manager_->AddFile(entry->CreateBasicCatalogDirent(), default_xattrs,
+    XattrList *xattrs = &default_xattrs_;
+    if (params_->include_xattrs) {
+      xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
+      assert(xattrs);
+    }
+    catalog_manager_->AddFile(entry->CreateBasicCatalogDirent(), *xattrs,
                               entry->relative_parent_path());
+    if (xattrs != &default_xattrs_)
+      free(xattrs);
   } else if (entry->HasGraftMarker() && !params_->dry_run) {
     if (entry->IsValidGraft()) {
       // Graft files are added to catalog immediately.
       if (entry->IsChunkedGraft()) {
         catalog_manager_->AddChunkedFile(
-            entry->CreateBasicCatalogDirent(), default_xattrs,
+            entry->CreateBasicCatalogDirent(), default_xattrs_,
             entry->relative_parent_path(), *(entry->GetGraftChunks()));
       } else {
         catalog_manager_->AddFile(
             entry->CreateBasicCatalogDirent(),
-            default_xattrs,  // TODO(bbockelm): For now, use default xattrs
-                             // on grafted files.
+            default_xattrs_,  // TODO(bbockelm): For now, use default xattrs
+                              // on grafted files.
             entry->relative_parent_path());
       }
     } else {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
       // the graft file is missing information.  It's not clear that continuing
       // forward with the publish is the correct thing to do; abort for now.
-      LogCvmfs(kLogPublish, kLogStderr,
-               "Encountered a grafted file (%s) with "
-               "invalid grafting information; check contents of .cvmfsgraft-*"
-               " file.  Aborting publish.",
-               entry->GetRelativePath().c_str());
-      abort();
+      PANIC(kLogStderr,
+            "Encountered a grafted file (%s) with "
+            "invalid grafting information; check contents of .cvmfsgraft-*"
+            " file.  Aborting publish.",
+            entry->GetRelativePath().c_str());
     }
   } else if (entry->relative_parent_path().empty() &&
              entry->IsCatalogMarker()) {
-    LogCvmfs(kLogPublish, kLogStderr,
-             "Error: nested catalog marker in root directory");
-    abort();
+    PANIC(kLogStderr, "Error: nested catalog marker in root directory");
   } else {
     {
       // Push the file to the spooler, remember the entry for the path
@@ -865,8 +909,12 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
 
   // publish statistics counting for new file
   if (entry->IsNew()) {
-    perf::Inc(counters_->n_files_added);
-    perf::Xadd(counters_->sz_added_bytes, entry->GetScratchSize());
+    if (entry->IsSymlink()) {
+      perf::Inc(counters_->n_symlinks_added);
+    } else {
+      perf::Inc(counters_->n_files_added);
+      perf::Xadd(counters_->sz_added_bytes, entry->GetScratchSize());
+    }
   }
 }
 
@@ -883,7 +931,11 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
   }
 
   // Counting nr of removed files and removed bytes
-  perf::Inc(counters_->n_files_removed);
+  if (entry->WasSymlink()) {
+    perf::Inc(counters_->n_symlinks_removed);
+  } else {
+    perf::Inc(counters_->n_files_removed);
+  }
   perf::Xadd(counters_->sz_removed_bytes, entry->GetRdOnlySize());
 }
 
@@ -897,8 +949,15 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
   perf::Inc(counters_->n_directories_added);
   assert(!entry->HasGraftMarker());
   if (!params_->dry_run) {
-    catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(),
+    XattrList *xattrs = &default_xattrs_;
+    if (params_->include_xattrs) {
+      xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
+      assert(xattrs);
+    }
+    catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
                                    entry->relative_parent_path());
+    if (xattrs != &default_xattrs_)
+      free(xattrs);
   }
 
   if (entry->HasCatalogMarker() &&
@@ -934,8 +993,15 @@ void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
   const std::string directory_path = entry->GetRelativePath();
 
   if (!params_->dry_run) {
-    catalog_manager_->TouchDirectory(entry->CreateBasicCatalogDirent(),
+    XattrList *xattrs = &default_xattrs_;
+    if (params_->include_xattrs) {
+      xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
+      assert(xattrs);
+    }
+    catalog_manager_->TouchDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
                                      directory_path);
+    if (xattrs != &default_xattrs_)
+      free(xattrs);
   }
 
   if (entry->HasCatalogMarker() &&
@@ -964,7 +1030,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
       LogCvmfs(kLogPublish, kLogStdout, "Hardlinks across directories (%s)",
                i->second.master->GetUnionPath().c_str());
       if (!params_->ignore_xdir_hardlinks)
-        abort();
+        PANIC(NULL);
     }
 
     if (params_->print_changeset) {
@@ -999,7 +1065,7 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   {
     hardlinks.push_back(i->second->CreateBasicCatalogDirent());
   }
-  XattrList *xattrs = &default_xattrs;
+  XattrList *xattrs = &default_xattrs_;
   if (params_->include_xattrs) {
     xattrs = XattrList::CreateFromFile(group.master->GetUnionPath());
     assert(xattrs);
@@ -1009,7 +1075,7 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
     *xattrs,
     group.master->relative_parent_path(),
     group.file_chunks);
-  if (xattrs != &default_xattrs)
+  if (xattrs != &default_xattrs_)
     free(xattrs);
 }
 

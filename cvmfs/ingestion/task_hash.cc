@@ -8,6 +8,7 @@
 #include <cstdlib>
 
 #include "hash.h"
+#include "util/exception.h"
 
 
 void TaskHash::Process(BlockItem *input_block) {
@@ -23,7 +24,7 @@ void TaskHash::Process(BlockItem *input_block) {
       shash::Final(chunk->hash_ctx(), chunk->hash_ptr());
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
 
   tubes_out_->Dispatch(input_block);

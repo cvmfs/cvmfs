@@ -203,6 +203,7 @@ struct JobInfo {
     error_code = kFailOther;
     num_used_proxies = num_used_hosts = num_retries = 0;
     backoff_ms = 0;
+    current_host_chain_index = 0;
 
     range_offset = -1;
     range_size = -1;
@@ -268,6 +269,12 @@ struct JobInfo {
     }
   }
 
+  /**
+   * Tells whether the error is because of a non-existing file. Should only
+   * be called if error_code is not kFailOk
+   */
+  bool IsFileNotFound();
+
   // Internal state, don't touch
   CURL *curl_handle;
   curl_slist *headers;
@@ -283,6 +290,7 @@ struct JobInfo {
   unsigned char num_used_hosts;
   unsigned char num_retries;
   unsigned backoff_ms;
+  unsigned int current_host_chain_index;
 };  // JobInfo
 
 

@@ -1,0 +1,33 @@
+cvmfs_test_name="Upgrade statistics database schema"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+check_stats_db_schema() {
+  publish_query="SELECT revision, finish_time, chunks_duplicated, chunks_added, "
+  publish_query+="symlinks_added, symlinks_removed, symlinks_changed FROM publish_statistics;"
+  sqlite3 /var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db "$publish_query" > /dev/null || return 1
+
+  sqlite3 /var/spool/cvmfs/$CVMFS_TEST_REPO/stats.db "SELECT finish_time FROM gc_statistics;" > /dev/null || return 1
+  return 0
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+
+  echo "*** replace stats.db with an old one"
+  cp $script_location/stats-rev01.db /var/spool/cvmfs/$CVMFS_TEST_REPO/
+  echo "*** run publish to upgrade the stats.db schema"
+  start_transaction $CVMFS_TEST_REPO
+  publish_repo $CVMFS_TEST_REPO || return 1
+
+  echo "*** check schema of the upgraded stats.db"
+  check_stats_db_schema || return 1
+
+  return 0
+}

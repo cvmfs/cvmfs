@@ -28,6 +28,7 @@ install_rpm $SERVER_PACKAGE
 install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 install_rpm $SHRINKWRAP_PACKAGE
+install_rpm $DUCC_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."
@@ -74,6 +75,12 @@ install_from_repo libuuid-devel
 install_from_repo python-devel
 install_from_repo unzip
 install_from_repo bzip2
+install_from_repo acl
+
+# install docker for testing DUCC
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+sudo yum install docker-ce docker-ce-cli containerd.io
 
 # Migration test needs lsb_release
 echo "install lsb_release..."

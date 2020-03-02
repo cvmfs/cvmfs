@@ -77,19 +77,30 @@ class Whitelist {
     kStAvailable,
   };
 
+  static std::string CreateString(
+    const std::string &fqrn,
+    int validity_days,
+    shash::Algorithms hash_algorithm,
+    signature::SignatureManager *signature_manager);
+
   Whitelist(const std::string &fqrn,
             download::DownloadManager *download_manager,
             signature::SignatureManager *signature_manager);
   ~Whitelist();
   explicit Whitelist(const Whitelist &other);
   Whitelist &operator= (const Whitelist &other);
-  Failures Load(const std::string &base_url);
+  Failures LoadUrl(const std::string &base_url);
+  Failures LoadMem(const std::string &whitelist);
 
   void CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
                    unsigned *pkcs7_size, unsigned char **pkcs7_buf) const;
-  time_t expires();
+  time_t expires() const;
   bool IsExpired() const;
   Failures VerifyLoadedCertificate() const;
+
+  std::string ExportString() const;
+
+  Status status() const { return status_; }
 
  private:
   Whitelist();
@@ -99,6 +110,7 @@ class Whitelist {
   static const int kFlagVerifyCaChain;
 
   bool IsBefore(time_t now, const struct tm &t_whitelist);
+  Failures VerifyWhitelist();
   Failures ParseWhitelist(const unsigned char *whitelist,
                           const unsigned whitelist_size);
   void Reset();

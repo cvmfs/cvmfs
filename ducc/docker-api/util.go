@@ -49,9 +49,6 @@ func MakeThinImage(m Manifest, layersMapping map[string]string, origin string) (
 
 	url_base := "cvmfs://"
 
-	fmt.Println(layersMapping)
-	fmt.Println(m.Layers)
-
 	for i, layer := range m.Layers {
 		digest := strings.Split(layer.Digest, ":")[1]
 		location, ok := layersMapping[layer.Digest]

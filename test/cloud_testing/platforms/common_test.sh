@@ -59,7 +59,7 @@ usage() {
 
 
 # parse script parameters (same for all platforms)
-while getopts "t:s:c:d:l:S:" option; do
+while getopts "t:s:c:d:l:S:G:" option; do
   case $option in
     t)
       SOURCE_DIRECTORY=$OPTARG
@@ -78,6 +78,9 @@ while getopts "t:s:c:d:l:S:" option; do
       ;;
     S)
       CVMFS_TEST_SUITES="$OPTARG"
+      ;;
+    G)
+      export CVMFS_TEST_GEO_LICENSE_KEY="$OPTARG"
       ;;
     ?)
       shift $(($OPTIND-2))
@@ -101,18 +104,14 @@ if [ "x$(uname -s)" != "xDarwin" ]; then
     fi
 fi
 
-sudo tee /etc/cvmfs/cvmfs_server_hooks.sh << EOF
-# download GeoIP database from a copy at CERN instead of directly from MaxMind
-CVMFS_UPDATEGEO_URLBASE="https://ecsft.cern.ch/dist/cvmfs/geodb"
-CVMFS_UPDATEGEO_URLBASE6="https://ecsft.cern.ch/dist/cvmfs/geodb/GeoLiteCityv6-beta"
-EOF
-
 CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client.log"
 SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server.log"
 S3_TEST_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
 TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3_instance.log"
 UNITTEST_LOGFILE="${LOG_DIRECTORY}/unittest.log"
-MIGRATIONTEST_LOGFILE="${LOG_DIRECTORY}/migrationtest.log"
+MIGRATIONTEST_CLIENT_LOGFILE="${LOG_DIRECTORY}/migrationtest_client.log"
+MIGRATIONTEST_SERVER_LOGFILE="${LOG_DIRECTORY}/migrationtest_server.log"
+DUCCTEST_LOGFILE="${LOG_DIRECTORY}/test_ducc.log"
 
 XUNIT_OUTPUT_SUFFIX=".xunit.xml"
 

@@ -62,12 +62,15 @@ class WritableCatalog : public Catalog {
                 const XattrList &xattr,
                 const std::string &entry_path,
                 const std::string &parent_path);
-  void TouchEntry(const DirectoryEntryBase &entry, const shash::Md5 &path_hash);
+  void TouchEntry(const DirectoryEntryBase &entry,
+                  const XattrList &xattrs,
+                  const shash::Md5 &path_hash);
   inline void TouchEntry(
     const DirectoryEntryBase &entry,
+    const XattrList &xattrs,
     const std::string &path)
   {
-    TouchEntry(entry, shash::Md5(shash::AsciiPtr(path)));
+    TouchEntry(entry, xattrs, shash::Md5(shash::AsciiPtr(path)));
   }
   void RemoveEntry(const std::string &entry_path);
   void IncLinkcount(const std::string &path_within_group, const int delta);

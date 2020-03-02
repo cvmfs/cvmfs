@@ -6,6 +6,7 @@
 #define CVMFS_UPLOAD_LOCAL_H_
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <string>
 
@@ -35,13 +36,17 @@ struct LocalStreamHandle : public UploadStreamHandle {
 class LocalUploader : public AbstractUploader {
  private:
   static const mode_t default_backend_file_mode_ = 0666;
+  static const mode_t default_backend_dir_mode_ = 0777;
   const mode_t backend_file_mode_;
+  const mode_t backend_dir_mode_;
 
  public:
   explicit LocalUploader(const SpoolerDefinition &spooler_definition);
   static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
   virtual std::string name() const { return "Local"; }
+
+  virtual bool Create();
 
   /**
    * Upload() is not done concurrently in the current implementation of the
@@ -50,8 +55,9 @@ class LocalUploader : public AbstractUploader {
    * This method calls NotifyListeners and invokes a callback for all
    * registered listeners (see the Observable template for details).
    */
-  void FileUpload(const std::string &local_path, const std::string &remote_path,
-                  const CallbackTN *callback = NULL);
+  void DoUpload(const std::string &remote_path,
+                IngestionSource *source,
+                const CallbackTN *callback = NULL);
 
   UploadStreamHandle *InitStreamedUpload(const CallbackTN *callback = NULL);
   void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,
@@ -62,6 +68,8 @@ class LocalUploader : public AbstractUploader {
   void DoRemoveAsync(const std::string &file_to_delete);
 
   bool Peek(const std::string &path);
+
+  bool Mkdir(const std::string &path);
 
   bool PlaceBootstrappingShortcut(const shash::Any &object);
 

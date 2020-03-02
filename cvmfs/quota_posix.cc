@@ -52,6 +52,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -1372,7 +1373,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
           break;
         }
         default:
-          abort();  // other types are handled by the bunch processor
+          PANIC(NULL);  // other types are handled by the bunch processor
       }
       quota_mgr->UnbindReturnPipe(return_pipe);
       num_commands = 0;
@@ -1437,7 +1438,7 @@ void PosixQuotaManager::ParseDirectories(
       *workspace_dir = dir_tokens[1];
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 
@@ -1604,10 +1605,8 @@ void PosixQuotaManager::ProcessCommandBunch(
         LogCvmfs(kLogQuota, kLogDebug, "touching %s (%ld): %d",
                  hash_str.c_str(), seq_-1, retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
-          LogCvmfs(kLogQuota, kLogSyslogErr,
-                   "failed to update %s in cachedb, error %d",
-                   hash_str.c_str(), retval);
-          abort();
+          PANIC(kLogSyslogErr, "failed to update %s in cachedb, error %d",
+                hash_str.c_str(), retval);
         }
         sqlite3_reset(stmt_touch_);
         break;
@@ -1618,10 +1617,8 @@ void PosixQuotaManager::ProcessCommandBunch(
         LogCvmfs(kLogQuota, kLogDebug, "unpinning %s: %d",
                  hash_str.c_str(), retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
-          LogCvmfs(kLogQuota, kLogSyslogErr,
-                   "failed to unpin %s in cachedb, error %d",
-                   hash_str.c_str(), retval);
-          abort();
+          PANIC(kLogSyslogErr, "failed to unpin %s in cachedb, error %d",
+                hash_str.c_str(), retval);
         }
         sqlite3_reset(stmt_unpin_);
         break;
@@ -1660,25 +1657,22 @@ void PosixQuotaManager::ProcessCommandBunch(
         LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, method %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
-          LogCvmfs(kLogQuota, kLogSyslogErr,
-                   "failed to insert %s in cachedb, error %d",
-                   hash_str.c_str(), retval);
-          abort();
+          PANIC(kLogSyslogErr, "failed to insert %s in cachedb, error %d",
+                hash_str.c_str(), retval);
         }
         sqlite3_reset(stmt_new_);
 
         if (!exists) gauge_ += size;
         break;
       default:
-        abort();  // other types should have been taken care of by event loop
+        // other types should have been taken care of by event loop
+        PANIC(NULL);
     }
   }
 
   retval = sqlite3_exec(database_, "COMMIT", NULL, NULL, NULL);
   if (retval != SQLITE_OK) {
-    LogCvmfs(kLogQuota, kLogSyslogErr,
-             "failed to commit to cachedb, error %d", retval);
-    abort();
+    PANIC(kLogSyslogErr, "failed to commit to cachedb, error %d", retval);
   }
 }
 
@@ -1831,9 +1825,8 @@ void PosixQuotaManager::RegisterBackChannel(
     ReadHalfPipe(back_channel[0], &success, sizeof(success));
     // At this point, the named FIFO is unlinked, so don't use CloseReturnPipe
     if (success != 'S') {
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
-               "failed to register quota back channel (%c)", success);
-      abort();
+      PANIC(kLogDebug | kLogSyslogErr,
+            "failed to register quota back channel (%c)", success);
     }
   } else {
     // Dummy pipe to return valid file descriptors
@@ -1872,8 +1865,7 @@ void PosixQuotaManager::Spawn() {
   if (pthread_create(&thread_lru_, NULL, MainCommandServer,
       static_cast<void *>(this)) != 0)
   {
-    LogCvmfs(kLogQuota, kLogDebug, "could not create lru thread");
-    abort();
+    PANIC(kLogDebug, "could not create lru thread");
   }
 
   spawned_ = true;

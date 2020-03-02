@@ -17,6 +17,7 @@
 #include "platform.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
+#include "util/exception.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 
@@ -178,7 +179,7 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
       break;
 
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 

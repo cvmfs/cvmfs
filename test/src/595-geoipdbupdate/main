@@ -2,6 +2,13 @@ cvmfs_test_name="Update GeoIP Database"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
+# NOTE:
+#  A full test requires a valid CVMFS_GEO_LICENSE_KEY in a
+#    /etc/cvmfs/server.local that is readable by $CVMFS_TEST_USER.
+#  Test will be skipped with a warning if either CVMFS_GEO_DB_FILE is
+#    set or there's no CVMFS_GEO_LICENSE_KEY but there is a system
+#    geo DB in /usr/share/GeoIP.
+
 #
 # Location of the system-wide GeoIP databases
 # configurable: to be changed if $CVMFS_UPDATEGEO_DIR or CVMFS_UPDATEGEO_DB
@@ -69,12 +76,32 @@ cvmfs_run_test() {
 
   if [ ! -d `dirname $CVMFS_TEST_595_GEODB` ]; then
     echo "No geo database directory, disabled on this platform"
+    CVMFS_GENERAL_WARNING_FLAG=1
     return 0
+  fi
+
+  if [ -n "$CVMFS_GEO_DB_FILE" ]; then
+    echo "Geo database update disabled, skipping tests"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
+  if [ -f /etc/cvmfs/server.local ]; then
+    . /etc/cvmfs/server.local
+  fi
+  if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
+    if [ -f /usr/share/GeoIP/`basename $CVMFS_TEST_595_GEODB` ]; then
+      echo "System geo database installed, skipping tests"
+      CVMFS_GENERAL_WARNING_FLAG=1
+      return 0
+    fi
+    echo "No geo license key or db file found"
+    return 1
   fi
 
   # can't start out as root, it causes some of the tests below to fail
   echo "check if running as root"
-  [ $(id -u) != 0 ] || return 1
+  [ $(id -u) != 0 ] || return 2
 
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
@@ -278,24 +305,34 @@ cvmfs_run_test() {
   local snapshot_1_log="snapshot_1.log"
   cvmfs_server snapshot $replica_name > $snapshot_1_log 2>&1 || return 44
 
-  echo "change ownership of $CVMFS_TEST_595_GEODB to 'root'"
-  sudo chown root:root $CVMFS_TEST_595_GEODB || return 45
+  echo "move $CVMFS_TEST_595_GEODB to pwd"
+  mv -f $CVMFS_TEST_595_GEODB . || return 45
 
-  echo "create a stratum1 snapshot (should 'fail' due to permissions)"
+  echo "try snapshot with a dbfile of NONE"
   local snapshot_2_log="snapshot_2.log"
-  cvmfs_server snapshot $replica_name > $snapshot_2_log 2>&1 || return 46
+  CVMFS_GEO_DB_FILE=NONE cvmfs_server snapshot $replica_name > $snapshot_2_log 2>&1 || return 46
+
+  echo "try again with a dbfile of NONE (database should be up to date)"
+  local snapshot_3_log="snapshot_3.log"
+  CVMFS_GEO_DB_FILE=NONE cvmfs_server snapshot $replica_name > $snapshot_3_log 2>&1 || return 47
+
+  echo "try snapshot with a dbfile pointing to pwd"
+  local snapshot_4_log="snapshot_4.log"
+  CVMFS_GEO_DB_FILE=$(pwd)/$(basename $CVMFS_TEST_595_GEODB) cvmfs_server snapshot $replica_name > $snapshot_4_log 2>&1 || return 48
 
   echo "change ownership of $(dirname $CVMFS_TEST_595_GEODB) to 'root'"
-  sudo chown root:root $(dirname $CVMFS_TEST_595_GEODB) || return 47
+  sudo chown root:root $(dirname $CVMFS_TEST_595_GEODB) || return 49
 
   echo "create a stratum1 snapshot (should 'fail' due to permissions)"
-  local snapshot_3_log="snapshot_3.log"
-  cvmfs_server snapshot $replica_name > $snapshot_3_log 2>&1 || return 48
+  local snapshot_5_log="snapshot_5.log"
+  cvmfs_server snapshot $replica_name > $snapshot_5_log 2>&1 || return 50
 
   echo "check output logs for the expected status messages"
-  test -z "`cat $snapshot_1_log | grep GeoIP`"                                   || return 49
-  cat $snapshot_2_log | grep -e "GeoIP database.*not writable.*$CVMFS_TEST_USER" || return 50
-  cat $snapshot_3_log | grep -e "Directory.*not writable.*$CVMFS_TEST_USER"      || return 51
+  test -z "`cat $snapshot_1_log | grep GeoIP`"                                   || return 51
+  cat $snapshot_2_log | grep "Linking GeoIP Database"                            || return 52
+  test -z "`cat $snapshot_3_log | grep GeoIP`"                                   || return 53
+  cat $snapshot_4_log | grep "Linking GeoIP Database"                            || return 54
+  cat $snapshot_5_log | grep -e "Directory.*not writable.*$CVMFS_TEST_USER"      || return 55
 
   return 0
 }

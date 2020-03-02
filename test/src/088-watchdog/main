@@ -1,0 +1,20 @@
+
+cvmfs_test_name="Die on watchdog abort"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount lhcb.cern.ch || return 1
+  ls /cvmfs/lhcb.cern.ch || return 2
+  local pid_watchdog=$(sudo cvmfs_talk -i lhcb.cern.ch pid watchdog)
+  echo "*** PID of watchdog is $pid_watchdog"
+  sudo kill -9 $pid_watchdog
+  sleep 5
+
+  ls /cvmfs/lhcb.cern.ch && return 10
+  sudo umount /cvmfs/lhcb.cern.ch
+
+  return 0
+}
+

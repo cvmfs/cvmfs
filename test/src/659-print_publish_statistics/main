@@ -7,10 +7,10 @@ CVMFS_TEST_659_NR_OF_TESTS=4
 CVMFS_TEST_659_ERROR_FILES_ADDED=101
 CVMFS_TEST_659_ERROR_FILES_REMOVED=102
 CVMFS_TEST_659_ERROR_FILES_CHANGED=103
-CVMFS_TEST_659_ERROR_DUPLICATED_FILES=104
-CVMFS_TEST_659_ERROR_DIR_ADDED=105
-CVMFS_TEST_659_ERROR_DIR_REMOVED=106
-CVMFS_TEST_659_ERROR_DIR_CHANGED=107
+CVMFS_TEST_659_ERROR_FILES_DUPLICATED=104
+CVMFS_TEST_659_ERROR_DIRS_ADDED=105
+CVMFS_TEST_659_ERROR_DIRS_REMOVED=106
+CVMFS_TEST_659_ERROR_DIRS_CHANGED=107
 CVMFS_TEST_659_ERROR_BYTES_ADDED=108
 CVMFS_TEST_659_ERROR_BYTES_REMOVED=109
 CVMFS_TEST_659_ERROR_BYTES_UPLOADED=110
@@ -126,46 +126,66 @@ cvmfs_run_test() {
   test_results[1,1]=5     # n_files_added
   test_results[1,2]=0     # n_files_removed
   test_results[1,3]=0     # n_files_changed
-  test_results[1,4]=0     # n_duplicated_files
-  test_results[1,5]=2     # n_directories_added
-  test_results[1,6]=0     # n_directories_removed
-  test_results[1,7]=0     # n_directories_changed
-  test_results[1,8]=65    # sz_added_bytes
-  test_results[1,9]=0     # sz_removed_bytes
-  test_results[1,10]=103  # sz_uploaded_bytes
+  test_results[1,4]=5     # n_chunks_added
+  test_results[1,5]=0     # n_chunks_duplicated
+  test_results[1,6]=1     # n_catalogs_added
+  test_results[1,7]=2     # n_directories_added
+  test_results[1,8]=0     # n_directories_removed
+  test_results[1,9]=0     # n_directories_changed
+  test_results[1,10]=0     # n_symlinks_added
+  test_results[1,11]=0     # n_symlinks_removed
+  test_results[1,12]=0     # n_symlinks_changed
+  test_results[1,13]=65    # sz_added_bytes
+  test_results[1,14]=0     # sz_removed_bytes
+  test_results[1,15]=103  # sz_uploaded_bytes
   # test 2
   test_results[2,1]=0
   test_results[2,2]=2
   test_results[2,3]=2
-  test_results[2,4]=0
+  test_results[2,4]=2
   test_results[2,5]=0
   test_results[2,6]=1
-  test_results[2,7]=1
-  test_results[2,8]=31
-  test_results[2,9]=22
-  test_results[2,10]=74
+  test_results[2,7]=0
+  test_results[2,8]=1
+  test_results[2,9]=1
+  test_results[2,10]=0
+  test_results[2,11]=0
+  test_results[2,12]=0
+  test_results[2,13]=31
+  test_results[2,14]=22
+  test_results[2,15]=74
   # test 3
   test_results[3,1]=5
   test_results[3,2]=0
   test_results[3,3]=0
-  test_results[3,4]=5
-  test_results[3,5]=3
-  test_results[3,6]=0
-  test_results[3,7]=0
-  test_results[3,8]=65
+  test_results[3,4]=0
+  test_results[3,5]=5
+  test_results[3,6]=1
+  test_results[3,7]=3
+  test_results[3,8]=0
   test_results[3,9]=0
   test_results[3,10]=0
+  test_results[3,11]=0
+  test_results[3,12]=0
+  test_results[3,13]=65
+  test_results[3,14]=0
+  test_results[3,15]=0
   # test 4
   test_results[4,1]=0
   test_results[4,2]=0
   test_results[4,3]=5
-  test_results[4,4]=5
-  test_results[4,5]=0
-  test_results[4,6]=0
+  test_results[4,4]=0
+  test_results[4,5]=5
+  test_results[4,6]=1
   test_results[4,7]=0
   test_results[4,8]=0
   test_results[4,9]=0
   test_results[4,10]=0
+  test_results[4,11]=0
+  test_results[4,12]=0
+  test_results[4,13]=0
+  test_results[4,14]=0
+  test_results[4,15]=0
 
   # check publish statistics
   for i in `seq 1 $CVMFS_TEST_659_NR_OF_TESTS`;
@@ -173,10 +193,15 @@ cvmfs_run_test() {
     local files_added=$(cat test_659_$i | grep n_files_added |cut -d '|' -f 2)
     local files_removed=$(cat test_659_$i |  grep n_files_removed |cut -d '|' -f 2)
     local files_changed=$(cat test_659_$i |  grep n_files_changed |cut -d '|' -f 2)
-    local duplicated_files=$(cat test_659_$i |  grep n_duplicated_files |cut -d '|' -f 2)
+    local chunks_added=$(cat test_659_$i |  grep n_chunks_added |cut -d '|' -f 2)
+    local chunks_duplicated=$(cat test_659_$i |  grep n_chunks_duplicated |cut -d '|' -f 2)
+    local catalogs_added=$(cat test_659_$i |  grep n_catalogs_added |cut -d '|' -f 2)
     local directories_added=$(cat test_659_$i | grep n_directories_added |cut -d '|' -f 2)
     local directories_removed=$(cat test_659_$i |  grep n_directories_removed |cut -d '|' -f 2)
     local directories_changed=$(cat test_659_$i |  grep n_directories_changed |cut -d '|' -f 2)
+    local symlinks_added=$(cat test_659_$i |  grep n_symlinks_added |cut -d '|' -f 2)
+    local symlinks_removed=$(cat test_659_$i |  grep n_symlinks_removed |cut -d '|' -f 2)
+    local symlinks_changed=$(cat test_659_$i |  grep n_symlinks_changed |cut -d '|' -f 2)
     local bytes_added=$(cat test_659_$i |  grep sz_added_bytes |cut -d '|' -f 2)
     local bytes_removed=$(cat test_659_$i |  grep sz_removed_bytes |cut -d '|' -f 2)
     local bytes_uploaded=$(cat test_659_$i |  grep sz_uploaded_bytes |cut -d '|' -f 2)
@@ -196,39 +221,64 @@ cvmfs_run_test() {
             ($files_changed vs ref:${test_results[$i,3]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_FILES_CHANGED
     fi
-    if [ "x$duplicated_files" != "x${test_results[$i,4]}" ]; then
-      echo "*** Test $i.4 - number of duplicated files - \
-            ($duplicated_files vs ref:${test_results[$i,4]}) FAILED!"
-      return $CVMFS_TEST_659_ERROR_DUPLICATED_FILES
+    if [ "x$chunks_added" != "x${test_results[$i,4]}" ]; then
+      echo "*** Test $i.4 - number of added chunks - \
+            ($chunks_added vs ref:${test_results[$i,4]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_CHUNKS_ADDED
     fi
-    if [ "x$directories_added" != "x${test_results[$i,5]}" ]; then
-      echo "*** Test $i.5 - number of added directories - \
-            ($directories_added vs ref:${test_results[$i,5]}) FAILED!"
-      return $CVMFS_TEST_659_ERROR_DIR_ADDED
+    if [ "x$chunks_duplicated" != "x${test_results[$i,5]}" ]; then
+      echo "*** Test $i.5 - number of duplicated chunks - \
+            ($chunks_duplicated vs ref:${test_results[$i,5]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_CHUNKS_DUPLICATED
     fi
-    if [ "x$directories_removed" != "x${test_results[$i,6]}" ]; then
-      echo "*** Test $i.6 - number of removed directories \
-            - ($directories_removed vs ref:${test_results[$i,6]}) FAILED!"
-      return $CVMFS_TEST_659_ERROR_DIR_REMOVED
+    if [ "x$catalogs_added" != "x${test_results[$i,6]}" ]; then
+      echo "*** Test $i.6 - number of added catalogs - \
+            ($catalogs_added vs ref:${test_results[$i,6]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_CATALOGS_ADDED
     fi
-    if [ "x$directories_changed" != "x${test_results[$i,7]}" ]; then
-      echo "*** Test $i.7 - number of changed directories - \
-            ($directories_changed vs ref:${test_results[$i,7]}) FAILED!"
-      return $CVMFS_TEST_659_ERROR_DIR_CHANGED
+    if [ "x$directories_added" != "x${test_results[$i,7]}" ]; then
+      echo "*** Test $i.7 - number of added directories - \
+            ($directories_added vs ref:${test_results[$i,7]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_DIRS_ADDED
     fi
-    if [ "x$bytes_added" != "x${test_results[$i,8]}" ]; then
-      echo "*** Test $i.8 - number of added bytes - \
-            ($bytes_added vs ref:${test_results[$i,8]}) FAILED!"
+    if [ "x$directories_removed" != "x${test_results[$i,8]}" ]; then
+      echo "*** Test $i.8 - number of removed directories \
+            - ($directories_removed vs ref:${test_results[$i,8]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_DIRS_REMOVED
+    fi
+    if [ "x$directories_changed" != "x${test_results[$i,9]}" ]; then
+      echo "*** Test $i.9 - number of changed directories - \
+            ($directories_changed vs ref:${test_results[$i,9]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_DIRS_CHANGED
+    fi
+    if [ "x$symlinks_added" != "x${test_results[$i,10]}" ]; then
+      echo "*** Test $i.10 - number of added symlinks - \
+            ($symlinks_added vs ref:${test_results[$i,10]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_SYMLINKS_ADDED
+    fi
+    if [ "x$symlinks_removed" != "x${test_results[$i,11]}" ]; then
+      echo "*** Test $i.11 - number of removed symlinks \
+            - ($symlinks_removed vs ref:${test_results[$i,11]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_SYMLINKS_REMOVED
+    fi
+    if [ "x$symlinks_changed" != "x${test_results[$i,12]}" ]; then
+      echo "*** Test $i.12 - number of changed symlinks - \
+            ($symlinks_changed vs ref:${test_results[$i,12]}) FAILED!"
+      return $CVMFS_TEST_659_ERROR_SYMLINKS_CHANGED
+    fi
+    if [ "x$bytes_added" != "x${test_results[$i,13]}" ]; then
+      echo "*** Test $i.13 - number of added bytes - \
+            ($bytes_added vs ref:${test_results[$i,13]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_BYTES_ADDED
     fi
-    if [ "x$bytes_removed" != "x${test_results[$i,9]}" ]; then
-      echo "*** Test $i.9 - number of removed bytes - \
-            ($bytes_removed vs ref:${test_results[$i,9]}) FAILED!"
+    if [ "x$bytes_removed" != "x${test_results[$i,14]}" ]; then
+      echo "*** Test $i.14 - number of removed bytes - \
+            ($bytes_removed vs ref:${test_results[$i,14]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_BYTES_REMOVED
     fi
-    if [ "x$bytes_uploaded" != "x${test_results[$i,10]}" ]; then
-      echo "*** Test $i.10 - number of uploaded bytes - \
-            ($bytes_uploaded vs ref:${test_results[$i,10]}) FAILED!"
+    if [ "x$bytes_uploaded" != "x${test_results[$i,15]}" ]; then
+      echo "*** Test $i.15 - number of uploaded bytes - \
+            ($bytes_uploaded vs ref:${test_results[$i,15]}) FAILED!"
       return $CVMFS_TEST_659_ERROR_BYTES_UPLOADED
     fi
 

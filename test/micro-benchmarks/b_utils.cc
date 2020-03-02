@@ -17,9 +17,24 @@ class BM_Utils : public benchmark::Fixture {
   }
 };
 
-BENCHMARK_DEFINE_F(BM_Utils, GetPreciseTime)(benchmark::State &st) {
+
+BENCHMARK_DEFINE_F(BM_Utils, GetMonotonicTime)(benchmark::State &st) {
+  uint64_t now;
   while (st.KeepRunning()) {
-    platform_monotonic_time_ns();
+    now = platform_monotonic_time();
+    Escape(&now);
+  }
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Utils, GetMonotonicTime)->Repetitions(3)->
+  UseRealTime();
+
+
+BENCHMARK_DEFINE_F(BM_Utils, GetPreciseTime)(benchmark::State &st) {
+  uint64_t now;
+  while (st.KeepRunning()) {
+    now = platform_monotonic_time_ns();
+    Escape(&now);
   }
   st.SetItemsProcessed(st.iterations());
 }

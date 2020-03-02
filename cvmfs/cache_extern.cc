@@ -29,6 +29,7 @@
 #ifdef __APPLE__
 #include "smalloc.h"
 #endif
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -172,7 +173,9 @@ int ExternalCacheManager::CommitTxn(void *txn) {
 }
 
 
-int ExternalCacheManager::ConnectLocator(const std::string &locator) {
+int ExternalCacheManager::ConnectLocator(
+  const std::string &locator, bool print_error)
+{
   vector<string> tokens = SplitString(locator, '=');
   int result = -1;
   if (tokens[0] == "unix") {
@@ -186,12 +189,14 @@ int ExternalCacheManager::ConnectLocator(const std::string &locator) {
     return -EINVAL;
   }
   if (result < 0) {
-    if (errno) {
-      LogCvmfs(kLogCache, kLogDebug | kLogStderr,
-               "Failed to connect to socket: %s", strerror(errno));
-    } else {
-      LogCvmfs(kLogCache, kLogDebug | kLogStderr,
-               "Failed to connect to socket (unknown error)");
+    if (print_error) {
+      if (errno) {
+        LogCvmfs(kLogCache, kLogDebug | kLogStderr,
+                 "Failed to connect to socket: %s", strerror(errno));
+      } else {
+        LogCvmfs(kLogCache, kLogDebug | kLogStderr,
+                 "Failed to connect to socket (unknown error)");
+      }
     }
     return -EIO;
   }
@@ -266,7 +271,7 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
       // Prevent violate busy loops
       SafeSleepMs(1000);
     }
-    plugin_handle->fd_connection_ = ConnectLocator(locator);
+    plugin_handle->fd_connection_ = ConnectLocator(locator, num_attempts > 1);
     if (plugin_handle->IsValid()) {
       break;
     } else if (plugin_handle->fd_connection_ == -EINVAL) {
@@ -337,7 +342,14 @@ int ExternalCacheManager::DoOpen(const shash::Any &id) {
 }
 
 
-bool ExternalCacheManager::DoRestoreState(void *data) {
+int ExternalCacheManager::DoRestoreState(void *data) {
+  // When DoRestoreState is called, we have fd 0 assigned to the root file
+  // catalog unless this is a lower layer cache in a tiered setup
+  for (unsigned i = 1; i < fd_table_.GetMaxFds(); ++i) {
+    assert(fd_table_.GetHandle(i) == ReadOnlyHandle());
+  }
+  ReadOnlyHandle handle_root = fd_table_.GetHandle(0);
+
   FdTable<ReadOnlyHandle> *other =
     reinterpret_cast<FdTable<ReadOnlyHandle> *>(data);
   fd_table_.AssignFrom(*other);
@@ -346,7 +358,15 @@ bool ExternalCacheManager::DoRestoreState(void *data) {
   msg_ioctl.set_conncnt_change_by(-1);
   CacheTransport::Frame frame(&msg_ioctl);
   transport_.SendFrame(&frame);
-  return true;
+
+  int new_root_fd = -1;
+  if (handle_root != ReadOnlyHandle()) {
+    new_root_fd = fd_table_.OpenFd(handle_root);
+    // There must be a free file descriptor because the root file catalog gets
+    // closed before a reload
+    assert(new_root_fd >= 0);
+  }
+  return new_root_fd;
 }
 
 
@@ -517,9 +537,8 @@ void *ExternalCacheManager::MainRead(void *data) {
       cache_mgr->quota_mgr_->BroadcastBackchannels("R");
       continue;
     } else {
-      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "unexpected message %s",
-               msg->GetTypeName().c_str());
-      abort();
+      PANIC(kLogSyslogErr | kLogDebug, "unexpected message %s",
+            msg->GetTypeName().c_str());
     }
 
     RpcInFlight rpc_inflight;
@@ -545,9 +564,8 @@ void *ExternalCacheManager::MainRead(void *data) {
   }
 
   if (!cache_mgr->terminated_) {
-    LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "connection to external cache manager broken (%d)", errno);
-    abort();
+    PANIC(kLogSyslogErr | kLogDebug,
+          "connection to external cache manager broken (%d)", errno);
   }
   LogCvmfs(kLogCache, kLogDebug, "stopping external cache reader thread");
   return NULL;

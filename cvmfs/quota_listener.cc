@@ -14,6 +14,7 @@
 #include "logging.h"
 #include "quota.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -101,9 +102,7 @@ static void *MainWatchdogListener(void *data) {
           (watch_fds[1].revents & POLLHUP) ||
           (watch_fds[1].revents & POLLNVAL))
       {
-        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
-                 "cache manager disappeared, aborting");
-        abort();
+        PANIC(kLogDebug | kLogSyslogErr, "cache manager disappeared, aborting");
       }
       // Clean the pipe
       watch_fds[1].revents = 0;

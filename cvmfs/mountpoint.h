@@ -42,6 +42,7 @@ class DownloadManager;
 }
 namespace glue {
 class InodeTracker;
+class NentryTracker;
 }
 namespace lru {
 class InodeCache;
@@ -167,6 +168,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool IsHaNfsSource() { return nfs_mode_ & kNfsMapsHa; }
   void ResetErrorCounters();
   void TearDown2ReadOnly();
+  void RemapCatalogFd(int from, int to);
 
   CacheManager *cache_mgr() { return cache_mgr_; }
   std::string cache_mgr_instance() { return cache_mgr_instance_; }
@@ -174,6 +176,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool found_previous_crash() { return found_previous_crash_; }
   Log2Histogram *hist_fs_lookup() { return hist_fs_lookup_; }
   Log2Histogram *hist_fs_forget() { return hist_fs_forget_; }
+  Log2Histogram *hist_fs_forget_multi() { return hist_fs_forget_multi_; }
   Log2Histogram *hist_fs_getattr() { return hist_fs_getattr_; }
   Log2Histogram *hist_fs_readlink() { return hist_fs_readlink_; }
   Log2Histogram *hist_fs_opendir() { return hist_fs_opendir_; }
@@ -294,6 +297,7 @@ class FileSystem : SingleCopy, public BootFactory {
 
   Log2Histogram *hist_fs_lookup_;
   Log2Histogram *hist_fs_forget_;
+  Log2Histogram *hist_fs_forget_multi_;
   Log2Histogram *hist_fs_getattr_;
   Log2Histogram *hist_fs_readlink_;
   Log2Histogram *hist_fs_opendir_;
@@ -417,6 +421,7 @@ class MountPoint : SingleCopy, public BootFactory {
   FileSystem *file_system() { return file_system_; }
   bool has_membership_req() { return has_membership_req_; }
   bool hide_magic_xattrs() { return hide_magic_xattrs_; }
+  bool enforce_acls() { return enforce_acls_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
@@ -425,6 +430,7 @@ class MountPoint : SingleCopy, public BootFactory {
   double kcache_timeout_sec() { return kcache_timeout_sec_; }
   lru::Md5PathCache *md5path_cache() { return md5path_cache_; }
   std::string membership_req() { return membership_req_; }
+  glue::NentryTracker *nentry_tracker() { return nentry_tracker_; }
   lru::PathCache *path_cache() { return path_cache_; }
   std::string repository_tag() { return repository_tag_; }
   SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
@@ -534,6 +540,7 @@ class MountPoint : SingleCopy, public BootFactory {
   lru::Md5PathCache *md5path_cache_;
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
+  glue::NentryTracker *nentry_tracker_;
 
   file_watcher::FileWatcher* resolv_conf_watcher_;
 
@@ -542,6 +549,7 @@ class MountPoint : SingleCopy, public BootFactory {
   double kcache_timeout_sec_;
   bool fixed_catalog_;
   bool hide_magic_xattrs_;
+  bool enforce_acls_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
 

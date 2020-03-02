@@ -27,14 +27,16 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/081-shrinkwrap                           \
                                  src/082-shrinkwrap-cms                       \
                                  src/084-premounted                           \
+                                 src/089-external_cache_plugin                \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
 
-echo "running CernVM-FS migration test cases..."
-CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
-./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/*                              \
-                                || retval=1
+echo "running CernVM-FS client migration test cases..."
+CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
+./run.sh $MIGRATIONTEST_CLIENT_LOGFILE                            \
+         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/0*                                    \
+         || retval=1
 
 exit $retval

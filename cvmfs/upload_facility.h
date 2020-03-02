@@ -11,6 +11,7 @@
 #include <string>
 
 #include "atomic.h"
+#include "ingestion/ingestion_source.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "repository_tag.h"
@@ -22,14 +23,23 @@
 namespace upload {
 
 struct UploadCounters {
-  perf::Counter *n_duplicated_files;
+  perf::Counter *n_chunks_added;
+  perf::Counter *n_chunks_duplicated;
+  perf::Counter *n_catalogs_added;
   perf::Counter *sz_uploaded_bytes;
+  perf::Counter *sz_uploaded_catalog_bytes;
 
   explicit UploadCounters(perf::StatisticsTemplate statistics) {
-    n_duplicated_files = statistics.RegisterTemplated("n_duplicated_files",
-        "Number of duplicated files added");
-    sz_uploaded_bytes = statistics.RegisterTemplated("sz_uploaded_bytes",
-        "Number of uploaded bytes");
+    n_chunks_added = statistics.RegisterOrLookupTemplated(
+      "n_chunks_added", "Number of new chunks added");
+    n_chunks_duplicated = statistics.RegisterOrLookupTemplated(
+      "n_chunks_duplicated", "Number of duplicated chunks added");
+    n_catalogs_added = statistics.RegisterOrLookupTemplated(
+      "n_catalogs_added", "Number of new catalogs added");
+    sz_uploaded_bytes = statistics.RegisterOrLookupTemplated(
+      "sz_uploaded_bytes", "Number of uploaded bytes");
+    sz_uploaded_catalog_bytes = statistics.RegisterOrLookupTemplated(
+      "sz_uploaded_catalog_bytes", "Number of uploaded bytes for catalogs");
   }
 };  // UploadCounters
 
@@ -133,6 +143,12 @@ class AbstractUploader
   virtual std::string name() const = 0;
 
   /**
+   * Initializes a new repository storage area, e.g. create directory layout
+   * for local backend or create bucket for S3 backend.
+   */
+  virtual bool Create() = 0;
+
+  /**
    * Concrete uploaders might want to use a customized setting for multi-stream
    * writing, for instance one per disk.  Note that the S3 backend uses one task
    * but this one task uses internally mutliple HTTP streams through curl async
@@ -175,13 +191,23 @@ class AbstractUploader
    * @param remote_path  desired path for the file in the backend storage
    * @param callback     (optional) gets notified when the upload was finished
    */
-  void Upload(
+  void UploadFile(
     const std::string &local_path,
     const std::string &remote_path,
     const CallbackTN *callback = NULL)
   {
     ++jobs_in_flight_;
-    FileUpload(local_path, remote_path, callback);
+    FileIngestionSource source(local_path);
+    DoUpload(remote_path, &source, callback);
+  }
+
+  void UploadIngestionSource(
+    const std::string &remote_path,
+    IngestionSource *source,
+    const CallbackTN *callback = NULL)
+  {
+    ++jobs_in_flight_;
+    DoUpload(remote_path, source, callback);
   }
 
   /**
@@ -274,6 +300,14 @@ class AbstractUploader
   virtual bool Peek(const std::string &path) = 0;
 
   /**
+   * Make directory in upstream storage. Noop if directory already present.
+   * 
+   * @param path relative directory path in the upstream storage
+   * @return true if the directory was successfully created or already present
+   */
+  virtual bool Mkdir(const std::string &path) = 0;
+
+  /**
    * Creates a top-level shortcut to the given data object. This is particularly
    * useful for bootstrapping repositories whose data-directory is secured by
    * a VOMS certificate.
@@ -309,9 +343,9 @@ class AbstractUploader
    * @param remote_path  destination to be written in the backend
    * @param callback     callback to be called on completion
    */
-  virtual void FileUpload(const std::string &local_path,
-                          const std::string &remote_path,
-                          const CallbackTN *callback = NULL) = 0;
+  virtual void DoUpload(const std::string &remote_path,
+                        IngestionSource *source,
+                        const CallbackTN *callback = NULL) = 0;
 
   /**
    * Implementation of a streamed upload step. See public interface for details.
@@ -374,8 +408,12 @@ class AbstractUploader
     return spooler_definition_;
   }
 
+  void CountUploadedChunks() const;
+  void DecUploadedChunks() const;
   void CountUploadedBytes(int64_t bytes_written) const;
   void CountDuplicates() const;
+  void CountUploadedCatalogs() const;
+  void CountUploadedCatalogBytes(int64_t bytes_written) const;
 
  protected:
   /**

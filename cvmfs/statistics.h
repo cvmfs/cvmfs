@@ -111,6 +111,16 @@ class StatisticsTemplate {
     return statistics_->Register(name_major_ + "." + name_minor, desc);
   }
 
+  Counter *RegisterOrLookupTemplated(const std::string &name_minor,
+                                     const std::string &desc)
+  {
+    Counter *result = statistics_->Lookup(name_major_ + "." + name_minor);
+    if (result == NULL) {
+      return RegisterTemplated(name_minor, desc);
+    }
+    return result;
+  }
+
   Statistics *statistics() { return statistics_; }
 
  private:

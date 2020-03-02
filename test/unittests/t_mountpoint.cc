@@ -170,6 +170,7 @@ TEST_F(T_MountPoint, TriageCacheMgr) {
 TEST_F(T_MountPoint, RamCacheMgr) {
   options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "ram");
   options_mgr_.SetValue("CVMFS_CACHE_ram_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_SIZE", "75");
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
@@ -198,6 +199,7 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
   }
   options_mgr_.SetValue("CVMFS_CACHE_tiered_UPPER", "ram_upper");
   options_mgr_.SetValue("CVMFS_CACHE_ram_upper_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_upper_SIZE", "75");
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
@@ -221,6 +223,7 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
 
   options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "ram_lower");
   options_mgr_.SetValue("CVMFS_CACHE_ram_lower_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ram_lower_SIZE", "75");
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
@@ -245,7 +248,9 @@ TEST_F(T_MountPoint, TieredComplex) {
   options_mgr_.SetValue("CVMFS_CACHE_tiered_upper_UPPER", "uu_ram");
   options_mgr_.SetValue("CVMFS_CACHE_tiered_upper_LOWER", "ul_ram");
   options_mgr_.SetValue("CVMFS_CACHE_uu_ram_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_uu_ram_SIZE", "75");
   options_mgr_.SetValue("CVMFS_CACHE_ul_ram_TYPE", "ram");
+  options_mgr_.SetValue("CVMFS_CACHE_ul_ram_SIZE", "75");
   options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "tiered_lower");
   options_mgr_.SetValue("CVMFS_CACHE_tiered_lower_TYPE", "tiered");
   options_mgr_.SetValue("CVMFS_CACHE_tiered_lower_UPPER", "lu_posix");

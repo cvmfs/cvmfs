@@ -44,7 +44,43 @@ void Whitelist::CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
 }
 
 
-time_t Whitelist::expires() {
+std::string Whitelist::CreateString(
+  const std::string &fqrn,
+  int validity_days,
+  shash::Algorithms hash_algorithm,
+  signature::SignatureManager *signature_manager)
+{
+  std::string to_sign =
+    WhitelistTimestamp(time(NULL)) + "\n" +
+    "E" + WhitelistTimestamp(time(NULL) + validity_days * 24 * 3600) + "\n" +
+    "N" + fqrn + "\n" +
+    signature_manager->FingerprintCertificate(hash_algorithm) + "\n";
+  shash::Any hash(hash_algorithm);
+  shash::HashString(to_sign, &hash);
+  std::string hash_str = hash.ToString();
+
+  std::string whitelist(to_sign);
+  whitelist += "--\n" + hash_str + "\n";
+  unsigned char *signature;
+  unsigned signature_size;
+  bool retval = signature_manager->SignRsa(
+    reinterpret_cast<const unsigned char *>(hash_str.data()), hash_str.length(),
+    &signature, &signature_size);
+  assert(retval);
+  whitelist += std::string(reinterpret_cast<char *>(signature), signature_size);
+  free(signature);
+
+  return whitelist;
+}
+
+
+std::string Whitelist::ExportString() const {
+  if (plain_buf_ == NULL) return "";
+  return std::string(reinterpret_cast<char *>(plain_buf_), plain_size_);
+}
+
+
+time_t Whitelist::expires() const {
   assert(status_ == kStAvailable);
   return expires_;
 }
@@ -86,29 +122,15 @@ Failures Whitelist::VerifyLoadedCertificate() const {
 }
 
 
-Failures Whitelist::Load(const std::string &base_url) {
-  const bool probe_hosts = base_url == "";
+/**
+ * Expects whitelist to be loaded into plain_buf_ / plain_size_ and already
+ * parsed so that verification_flags_ is set
+ */
+Failures Whitelist::VerifyWhitelist() {
   bool retval_b;
-  download::Failures retval_dl;
   whitelist::Failures retval_wl;
 
-  Reset();
-
-  const string whitelist_url = base_url + string("/.cvmfswhitelist");
-  download::JobInfo download_whitelist(&whitelist_url,
-                                       false, probe_hosts, NULL);
-  retval_dl = download_manager_->Fetch(&download_whitelist);
-  if (retval_dl != download::kFailOk)
-    return kFailLoad;
-  plain_size_ = download_whitelist.destination_mem.pos;
-  if (plain_size_ == 0)
-    return kFailEmpty;
-  plain_buf_ =
-    reinterpret_cast<unsigned char *>(download_whitelist.destination_mem.data);
-
-  retval_wl = ParseWhitelist(plain_buf_, plain_size_);
-  if (retval_wl != kFailOk)
-    return retval_wl;
+  assert(verification_flags_ != 0);
 
   if (verification_flags_ & kFlagVerifyRsa) {
     retval_b = signature_manager_->VerifyLetter(plain_buf_, plain_size_, true);
@@ -119,20 +141,6 @@ Failures Whitelist::Load(const std::string &base_url) {
   }
 
   if (verification_flags_ & kFlagVerifyPkcs7) {
-    // Load the separate whitelist pkcs7 structure
-    const string whitelist_pkcs7_url =
-      base_url + string("cvmfswhitelist.pkcs7");
-    download::JobInfo download_whitelist_pkcs7(&whitelist_pkcs7_url, false,
-                                               probe_hosts, NULL);
-    retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
-    if (retval_dl != download::kFailOk)
-      return kFailLoadPkcs7;
-    pkcs7_size_ = download_whitelist_pkcs7.destination_mem.pos;
-    if (pkcs7_size_ == 0)
-      return kFailEmptyPkcs7;
-    pkcs7_buf_ = reinterpret_cast<unsigned char *>
-      (download_whitelist_pkcs7.destination_mem.data);
-
     unsigned char *extracted_whitelist;
     unsigned extracted_whitelist_size;
     vector<string> alt_uris;
@@ -182,6 +190,69 @@ Failures Whitelist::Load(const std::string &base_url) {
 
   status_ = kStAvailable;
   return kFailOk;
+}
+
+
+Failures Whitelist::LoadMem(const std::string &whitelist) {
+  Failures retval_wl;
+
+  Reset();
+
+  plain_size_ = whitelist.length();
+  plain_buf_ = reinterpret_cast<unsigned char *>(smalloc(plain_size_));
+  memcpy(plain_buf_, whitelist.data(), plain_size_);
+
+  retval_wl = ParseWhitelist(plain_buf_, plain_size_);
+  if (retval_wl != kFailOk)
+    return retval_wl;
+  // TODO(jblomer): PKCS7 verification unsupported when loading from memory
+  if (verification_flags_ & kFlagVerifyPkcs7)
+    return kFailLoadPkcs7;
+
+  return VerifyWhitelist();
+}
+
+
+Failures Whitelist::LoadUrl(const std::string &base_url) {
+  const bool probe_hosts = base_url == "";
+  download::Failures retval_dl;
+  Failures retval_wl;
+
+  Reset();
+
+  const string whitelist_url = base_url + string("/.cvmfswhitelist");
+  download::JobInfo download_whitelist(&whitelist_url,
+                                       false, probe_hosts, NULL);
+  retval_dl = download_manager_->Fetch(&download_whitelist);
+  if (retval_dl != download::kFailOk)
+    return kFailLoad;
+  plain_size_ = download_whitelist.destination_mem.pos;
+  if (plain_size_ == 0)
+    return kFailEmpty;
+  plain_buf_ =
+    reinterpret_cast<unsigned char *>(download_whitelist.destination_mem.data);
+
+  retval_wl = ParseWhitelist(plain_buf_, plain_size_);
+  if (retval_wl != kFailOk)
+    return retval_wl;
+
+  if (verification_flags_ & kFlagVerifyPkcs7) {
+    // Load the separate whitelist pkcs7 structure
+    const string whitelist_pkcs7_url =
+      base_url + string("cvmfswhitelist.pkcs7");
+    download::JobInfo download_whitelist_pkcs7(&whitelist_pkcs7_url, false,
+                                               probe_hosts, NULL);
+    retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
+    if (retval_dl != download::kFailOk)
+      return kFailLoadPkcs7;
+    pkcs7_size_ = download_whitelist_pkcs7.destination_mem.pos;
+    if (pkcs7_size_ == 0)
+      return kFailEmptyPkcs7;
+    pkcs7_buf_ = reinterpret_cast<unsigned char *>
+      (download_whitelist_pkcs7.destination_mem.data);
+  }
+
+  return VerifyWhitelist();
 }
 
 

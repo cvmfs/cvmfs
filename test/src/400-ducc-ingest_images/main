@@ -1,0 +1,192 @@
+cvmfs_test_name="DUCC container ingestion"
+cvmfs_test_autofs_on_startup=true
+cvmfs_test_suites="ducc"
+
+CVMFS_TEST400_REGISTRY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+CVMFS_TEST400_RECIPE="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
+CVMFS_TEST400_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
+CVMFS_TEST400_DUCC_LOG="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).log"
+CVMFS_TEST400_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+CVMFS_TEST400_REMOVE_PLUGIN=0
+CVMFS_TEST400_DISABLE_PLUGIN=0
+CVMFS_TEST400_DISABLE_STORAGE=0
+CVMFS_TEST400_REMOVE_JSON=0
+
+ducc_test_400_clean_up() {
+    echo -n "Cleaning up..."
+
+    export DUCC_DOCKER_REGISTRY_PASS=""
+
+    # delete the recipe file
+    rm $CVMFS_TEST400_RECIPE
+    # delete the logs and error from ducc
+    rm $CVMFS_TEST400_DUCC_LOG
+    rm $CVMFS_TEST400_DUCC_ERR
+
+    sudo rm /etc/cvmfs/default.local
+    if [ -f /etc/cvmfs/default.local.bk ]
+    then
+        sudo mv /etc/cvmfs/default.local.bk /etc/cvmfs/default.local
+    fi
+
+    # stop and delete the registry container
+    echo -n "Stopping and deleting docker registry..."
+    docker stop $CVMFS_TEST400_REGISTRY >> /dev/null
+    docker rm $CVMFS_TEST400_REGISTRY >> /dev/null
+    echo "done"
+
+    if [ $CVMFS_TEST400_DISABLE_PLUGIN -eq 1 ]
+    then
+	docker plugin disable cvmfs/graphdriver
+    fi
+
+    if [ $CVMFS_TEST400_REMOVE_PLUGIN -eq 1 ]
+    then
+	docker plugin rm cvmfs/graphdriver
+    fi
+
+    if [ $CVMFS_TEST400_DISABLE_STORAGE -eq 1 ]
+    then
+	sudo mv -f /etc/docker/daemon.json.bk /etc/docker/daemon.json
+    fi
+
+    if [ $CVMFS_TEST400_REMOVE_JSON -eq 1 ]
+    then
+	sudo rm /etc/docker/daemon.json
+    fi
+
+    sudo systemctl restart docker.service
+
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_USER
+
+    echo "done"
+}
+
+cvmfs_run_test() {
+    trap ducc_test_400_clean_up EXIT HUP INT TERM
+
+    docker plugin ls --format '{{.Name}} {{.Enabled}}' | grep cvmfs/graphdriver
+    if [ $? -ne 0 ]
+    then
+	CVMFS_TEST400_REMOVE_PLUGIN=1
+        # installing thin image plugin
+        docker plugin install --grant-all-permissions cvmfs/graphdriver || return 150
+
+    fi
+
+    docker plugin ls --format '{{.Name}} {{.Enabled}}' | grep cvmfs/graphdriver | grep true
+    if [ $? -ne 0 ]
+    then
+	CVMFS_TEST400_DISABLE_PLUGIN=1
+        # enabling the thin image plugin
+        docker plugin enable cvmfs/graphdriver || return 151
+    fi
+
+    docker info --format '{{.Driver}}' | grep cvmfs/graphdriver
+    if [ $? -ne 0 ]
+    then
+	CVMFS_TEST400_DISABLE_STORAGE=1
+        # enabling the storage driver
+
+	if [ ! -f /etc/docker/daemon.json ]
+	then
+	    CVMFS_TEST400_REMOVE_JSON=1
+            sudo mkdir -p /etc/docker
+	    sudo touch /etc/docker/daemon.json
+	fi
+
+	sudo mv /etc/docker/daemon.json /etc/docker/daemon.json.bk
+
+	# change configuration file
+        sudo bash -c 'cat > /etc/docker/daemon.json << EOL
+{
+  "experimental": true,
+  "storage-driver": "cvmfs/graphdriver",
+  "storage-opts": [
+    "overlay2.override_kernel_check=true"
+  ]
+}
+EOL'
+    fi
+
+    sudo systemctl restart docker.service || return 151
+
+    # create a simple recipe file for the repository manager in the local dir
+    echo -n "*** Creating recipe file..."
+    cat > $CVMFS_TEST400_RECIPE  << EOL
+version: 1
+user: mock_user
+cvmfs_repo: '$CVMFS_TEST400_REPOSITORY'
+output_format: '\$(scheme)://localhost:5000/mock/\$(image)'
+input:
+    - 'https://registry.hub.docker.com/library/ubuntu:latest'
+    - 'https://registry.hub.docker.com/library/centos:centos6'
+EOL
+    echo "done"
+
+    # set the password to access the docker hub
+    export DUCC_DOCKER_REGISTRY_PASS=mock_pass
+
+    # crete the repository where to store the content
+    echo -n "*** Creating CVMFS repo..."
+    create_empty_repo $CVMFS_TEST400_REPOSITORY $USER || return $?
+    echo "done"
+
+    echo -n "*** Changing configuration to read the new repo..."
+    # setting the configuration for the repo
+    sudo mv /etc/cvmfs/default.local /etc/cvmfs/default.local.bk
+
+    sudo -E CVMFS_TEST400_REPOSITORY="$CVMFS_TEST400_REPOSITORY" bash -c 'cat > /etc/cvmfs/default.local << EOL
+CVMFS_REPOSITORIES=$CVMFS_TEST400_REPOSITORY
+CVMFS_HTTP_PROXY="DIRECT"
+EOL'
+
+    sudo -E CVMFS_TEST400_REPOSITORY="$CVMFS_TEST400_REPOSITORY" bash -c 'cat > /etc/cvmfs/config.d/$CVMFS_TEST400_REPOSITORY.local << EOL
+CVMFS_SERVER_URL=http://localhost/cvmfs/$CVMFS_TEST400_REPOSITORY/
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST400_REPOSITORY.pub
+EOL'
+    echo "done"
+
+    # start by running the docker registry on localhost
+    echo -n "*** Starting docker registry for tests..."
+    docker run -d -p 5000:5000 --name $CVMFS_TEST400_REGISTRY registry:2 >> /dev/null || return 3
+    echo "done"
+
+    echo "*** Starting test."
+
+    echo -n "*** Converting recipe..."
+    cvmfs_ducc convert $CVMFS_TEST400_RECIPE 1> $CVMFS_TEST400_DUCC_LOG 2> $CVMFS_TEST400_DUCC_ERR || return 101
+    grep -q "level=error" $CVMFS_TEST400_DUCC_ERR
+    while [ $? -ne 1 ]
+    do
+        echo -n "*** Some error during conversion, let's do it again. Converting recipe..."
+        rm $CVMFS_TEST400_DUCC_LOG $CVMFS_TEST400_DUCC_ERR
+        cvmfs_ducc convert $CVMFS_TEST400_RECIPE 1> $CVMFS_TEST400_DUCC_LOG 2> $CVMFS_TEST400_DUCC_ERR || return 101
+        grep -q "level=error" $CVMFS_TEST400_DUCC_ERR
+    done
+    echo "*** Convert recipe successfully"
+
+    echo "*** Check integrity of the repository..."
+    check_repository $CVMFS_TEST400_REPOSITORY -i || return 102
+
+    echo "*** Repository checked successfully"
+
+    singularity exec /cvmfs/$CVMFS_TEST400_REPOSITORY/registry.hub.docker.com/library/ubuntu\:latest/ echo token-abc | grep "token-abc" || return 103
+    singularity exec /cvmfs/$CVMFS_TEST400_REPOSITORY/registry.hub.docker.com/library/centos\:centos6/ echo token-xyz | grep "token-xyz" || return 104
+
+    echo "*** Singularity conversion worked fine"
+
+    sudo systemctl restart docker.service || return 111
+
+    docker run "localhost:5000/mock/library/ubuntu:latest" /bin/echo "token-123" | grep "token-123" || return 105
+    docker run "localhost:5000/mock/library/centos:centos6" /bin/echo "token-321" | grep "token-321" || return 106
+
+    echo "*** Docker conversion worked fine"
+
+    # add other possible tests
+
+    echo "*** Test successful"
+
+    return 0
+}
+

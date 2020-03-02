@@ -6,6 +6,12 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
+CVMFS_EXCLUDE=
+if cat /etc/fedora-release | grep 28; then
+   #fuse3 package is not new enough on this platform
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/084-premounted src/673-acl"
+fi
+
 # running unit test suite
 run_unittests --gtest_shuffle \
               --gtest_death_test_use_fork || retval=1
@@ -20,6 +26,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/006-buildkernel                          \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
+                                 $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
@@ -35,6 +42,8 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/600-securecvmfs                          \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/647-bearercvmfs                          \
+                                 src/672-publish_stats_hardlinks              \
+                                 $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
@@ -42,11 +51,19 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               || retval=1
 
 
-# To do: remove me once previous package is available
-echo "NOT running CernVM-FS migration test cases (disabled)..."
-CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
-./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/*                              \
-                                || retval=1
+echo "running CernVM-FS client migration test cases..."
+CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
+./run.sh $MIGRATIONTEST_CLIENT_LOGFILE                            \
+         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/0*                                    \
+         || retval=1
+
+
+echo "running CernVM-FS server migration test cases..."
+CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
+./run.sh $MIGRATIONTEST_SERVER_LOGFILE                            \
+         -o ${MIGRATIONTEST_SERVER_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/5*                                    \
+         || retval=1
 
 exit $retval

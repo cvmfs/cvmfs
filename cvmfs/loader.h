@@ -101,7 +101,8 @@ enum StateId {
   kStateOpenChunksV2,       // >= 2.1.20
   kStateOpenChunksV3,       // >= 2.2.0
   kStateOpenChunksV4,       // >= 2.2.3
-  kStateOpenFiles           // >= 2.4
+  kStateOpenFiles,          // >= 2.4
+  kStateNentryTracker       // >= 2.7
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };
@@ -197,6 +198,9 @@ struct LoaderExports {
  * This contains the public interface of the cvmfs fuse module.
  * Whenever something changes, change the version number.
  * A global CvmfsExports struct is looked up by the loader via dlsym.
+ *
+ * Note: as of cvmfs version 2.8, we set cvmfs_operations.forget_multi on new
+ * enough fuse
  */
 struct CvmfsExports {
   CvmfsExports() {

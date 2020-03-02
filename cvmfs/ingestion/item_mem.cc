@@ -7,8 +7,8 @@
 #include <cassert>
 #include <cstdlib>
 
+#include "util/exception.h"
 #include "util_concurrency.h"
-
 
 atomic_int64 ItemAllocator::total_allocated_ = 0;
 
@@ -29,7 +29,7 @@ void ItemAllocator::Free(void *ptr) {
         return;
       }
     }
-    assert(false);
+    PANIC(NULL);
   }
 }
 

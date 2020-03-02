@@ -29,6 +29,7 @@
 #include "reflog.h"
 #include "sanitizer.h"
 #include "shortstring.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 
@@ -104,6 +105,12 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
              a.name().c_str(), b.name().c_str());
     retval = false;
   }
+  if (diffs & Difference::kHasXattrsFlag) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "extended attributes differ: %d / %d "
+             "(%s / %s)", a.HasXattrs(), b.HasXattrs(),
+             a.name().c_str(), b.name().c_str());
+    retval = false;
+  }
 
   return retval;
 }
@@ -164,14 +171,12 @@ string CommandCheck::FetchPath(const string &path) {
     download::JobInfo download_job(&url, false, false, f, NULL);
     download::Failures retval = download_manager()->Fetch(&download_job);
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s", url.c_str());
-      abort();
+      PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   } else {
     bool retval = CopyPath2File(url, f);
     if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s", url.c_str());
-      abort();
+      PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   }
 
@@ -787,6 +792,8 @@ bool CommandCheck::InspectTree(const string                  &path,
   }
 
   // Check number of entries
+  if (root_entry.HasXattrs())
+    computed_counters->self.xattrs++;
   const uint64_t num_found_entries =
     1 +
     computed_counters->self.regular_files +

@@ -23,6 +23,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -149,9 +150,8 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
     return kZlibDefault;
   if (algorithm_option == "none")
     return kNoCompression;
-  LogCvmfs(kLogCompress, kLogStderr, "unknown compression algorithms: %s",
-           algorithm_option.c_str());
-  assert(false);
+  PANIC(kLogStderr, "unknown compression algorithms: %s",
+        algorithm_option.c_str());
 }
 
 

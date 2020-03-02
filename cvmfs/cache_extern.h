@@ -102,7 +102,7 @@ class ExternalCacheManager : public CacheManager {
 
  protected:
   virtual void *DoSaveState();
-  virtual bool DoRestoreState(void *data);
+  virtual int DoRestoreState(void *data);
   virtual bool DoFreeState(void *data);
 
  private:
@@ -274,7 +274,7 @@ class ExternalCacheManager : public CacheManager {
   };
 
   static void *MainRead(void *data);
-  static int ConnectLocator(const std::string &locator);
+  static int ConnectLocator(const std::string &locator, bool print_error);
   static bool SpawnPlugin(const std::vector<std::string> &cmd_line);
 
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);

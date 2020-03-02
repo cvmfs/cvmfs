@@ -13,6 +13,7 @@
 
 #include <errno.h>
 #include <execinfo.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <sys/resource.h>
@@ -41,6 +42,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -355,7 +357,7 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
   for (; i != iend; ++i) {
     struct sigaction old_signal_handler;
     if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
-      abort();
+      PANIC(NULL);
     }
     old_signal_handlers[i->first] = old_signal_handler;
   }
@@ -370,13 +372,14 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 void Watchdog::Spawn() {
   Pipe pipe_pid;
   pipe_watchdog_ = new Pipe();
+  pipe_listener_ = new Pipe();
 
   pid_t pid;
   int statloc;
   int max_fd = sysconf(_SC_OPEN_MAX);
   assert(max_fd >= 0);
   switch (pid = fork()) {
-    case -1: abort();
+    case -1: PANIC(NULL);
     case 0:
       // Double fork to avoid zombie
       switch (fork()) {
@@ -395,8 +398,11 @@ void Watchdog::Spawn() {
           // SetLogMicroSyslog("");
           SetLogDebugFile("");
           for (int fd = 0; fd < max_fd; fd++) {
-            if (fd != pipe_watchdog_->read_end)
-              close(fd);
+            if (fd == pipe_watchdog_->read_end)
+              continue;
+            if (fd == pipe_listener_->write_end)
+              continue;
+            close(fd);
           }
           // SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
@@ -408,8 +414,9 @@ void Watchdog::Spawn() {
       }
     default:
       close(pipe_watchdog_->read_end);
-      if (waitpid(pid, &statloc, 0) != pid) abort();
-      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
+      close(pipe_listener_->write_end);
+      if (waitpid(pid, &statloc, 0) != pid) PANIC(NULL);
+      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) PANIC(NULL);
   }
 
   // retrieve the watchdog PID from the pipe
@@ -431,7 +438,7 @@ void Watchdog::Spawn() {
   sighandler_stack_.ss_size = stack_size;
   sighandler_stack_.ss_flags = 0;
   if (sigaltstack(&sighandler_stack_, NULL) != 0)
-    abort();
+    PANIC(NULL);
 
   // define our crash signal handler
   struct sigaction sa;
@@ -451,7 +458,50 @@ void Watchdog::Spawn() {
   signal_handlers[SIGXFSZ] = sa;
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
+  pipe_terminate_ = new Pipe();
+  int retval =
+    pthread_create(&thread_listener_, NULL, MainWatchdogListener, this);
+  assert(retval == 0);
+
   spawned_ = true;
+}
+
+
+void *Watchdog::MainWatchdogListener(void *data) {
+  Watchdog *watchdog = static_cast<Watchdog *>(data);
+  LogCvmfs(kLogMonitor, kLogDebug, "starting watchdog listener");
+
+  struct pollfd watch_fds[2];
+  watch_fds[0].fd = watchdog->pipe_listener_->read_end;
+  watch_fds[0].events = POLLIN | POLLPRI;
+  watch_fds[0].revents = 0;
+  watch_fds[1].fd = watchdog->pipe_terminate_->read_end;
+  watch_fds[1].events = POLLIN | POLLPRI;
+  watch_fds[1].revents = 0;
+  while (true) {
+    int retval = poll(watch_fds, 2, -1);
+    if (retval < 0) {
+      continue;
+    }
+
+    // Terminate I/O thread
+    if (watch_fds[1].revents)
+      break;
+
+    if (watch_fds[0].revents) {
+      if ((watch_fds[0].revents & POLLERR) ||
+          (watch_fds[0].revents & POLLHUP) ||
+          (watch_fds[0].revents & POLLNVAL))
+      {
+        PANIC(kLogDebug | kLogSyslogErr, "watchdog disappeared, aborting");
+      }
+      PANIC(NULL);
+    }
+  }
+  close(watchdog->pipe_listener_->read_end);
+
+  LogCvmfs(kLogMonitor, kLogDebug, "stopping watchdog listener");
+  return NULL;
 }
 
 
@@ -483,6 +533,7 @@ void Watchdog::Supervise() {
   }
 
   close(pipe_watchdog_->read_end);
+  close(pipe_listener_->write_end);
 }
 
 
@@ -492,6 +543,8 @@ Watchdog::Watchdog(const string &crash_dump_path)
   , exe_path_(string(platform_getexepath()))
   , watchdog_pid_(0)
   , pipe_watchdog_(NULL)
+  , pipe_listener_(NULL)
+  , pipe_terminate_(NULL)
   , on_crash_(NULL)
 {
   int retval = platform_spinlock_init(&lock_handler_, 0);
@@ -514,9 +567,17 @@ Watchdog::~Watchdog() {
     free(sighandler_stack_.ss_sp);
     sighandler_stack_.ss_size = 0;
 
+    pipe_terminate_->Write(ControlFlow::kQuit);
+    pthread_join(thread_listener_, NULL);
+    pipe_terminate_->Close();
+
     pipe_watchdog_->Write(ControlFlow::kQuit);
     close(pipe_watchdog_->write_end);
   }
+
+  delete pipe_watchdog_;
+  delete pipe_listener_;
+  delete pipe_terminate_;
 
   platform_spinlock_destroy(&lock_handler_);
   LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");

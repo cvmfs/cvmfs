@@ -9,6 +9,7 @@
 #include "upload_gateway.h"
 #include "upload_local.h"
 #include "upload_s3.h"
+#include "util/exception.h"
 
 namespace upload {
 
@@ -73,8 +74,9 @@ int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
       CreateTempPath(spooler_definition_.temporary_path + "/" + "chunk", 0644);
   if (tmp_path.empty()) {
     LogCvmfs(kLogSpooler, kLogStderr,
-             "Failed to create temp file for upload of file chunk (errno: %d).",
-             errno);
+             "Failed to create temp file in %s for upload of file chunk"
+             " (errno: %d).",
+             spooler_definition_.temporary_path.c_str(), errno);
     return -1;
   }
 
@@ -102,6 +104,18 @@ void AbstractUploader::InitCounters(perf::StatisticsTemplate *statistics) {
   counters_ = new UploadCounters(*statistics);
 }
 
+void AbstractUploader::CountUploadedChunks() const {
+  if (counters_.IsValid()) {
+    perf::Inc(counters_->n_chunks_added);
+  }
+}
+
+void AbstractUploader::DecUploadedChunks() const {
+  if (counters_.IsValid()) {
+    perf::Dec(counters_->n_chunks_added);
+  }
+}
+
 void AbstractUploader::CountUploadedBytes(int64_t bytes_written) const {
   if (counters_.IsValid()) {
     perf::Xadd(counters_->sz_uploaded_bytes, bytes_written);
@@ -110,7 +124,19 @@ void AbstractUploader::CountUploadedBytes(int64_t bytes_written) const {
 
 void AbstractUploader::CountDuplicates() const {
   if (counters_.IsValid()) {
-    perf::Inc(counters_->n_duplicated_files);
+    perf::Inc(counters_->n_chunks_duplicated);
+  }
+}
+
+void AbstractUploader::CountUploadedCatalogs() const {
+  if (counters_.IsValid()) {
+    perf::Inc(counters_->n_catalogs_added);
+  }
+}
+
+void AbstractUploader::CountUploadedCatalogBytes(int64_t bytes_written) const {
+  if (counters_.IsValid()) {
+    perf::Xadd(counters_->sz_uploaded_catalog_bytes, bytes_written);
   }
 }
 
@@ -130,7 +156,7 @@ void TaskUpload::Process(AbstractUploader::UploadJob *upload_job) {
       break;
 
     default:
-      abort();
+      PANIC(NULL);
   }
 
   delete upload_job;

@@ -47,6 +47,7 @@
 #include "options.h"
 #include "platform.h"
 #include "sanitizer.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -324,6 +325,18 @@ static void stub_forget(
 }
 
 
+#if (FUSE_VERSION >= 29)
+static void stub_forget_multi(
+  fuse_req_t req,
+  size_t count,
+  struct fuse_forget_data *forgets
+) {
+  FenceGuard fence_guard(fence_reload_);
+  cvmfs_exports_->cvmfs_operations.forget_multi(req, count, forgets);
+}
+#endif
+
+
 /**
  * The callback used when fuse is parsing all the options
  * We separate CVMFS options from FUSE options here.
@@ -385,8 +398,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       parse_options_only_ = true;
       return 0;
     default:
-      LogCvmfs(kLogCvmfs, kLogStderr, "internal option parsing error");
-      abort();
+      PANIC(kLogStderr, "internal option parsing error");
   }
 }
 
@@ -770,9 +782,8 @@ int FuseMain(int argc, char *argv[]) {
   }
   if (suid_mode_) {
     if (getuid() != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "must be root to mount with suid option");
-      abort();
+      PANIC(kLogStderr | kLogSyslogErr,
+            "must be root to mount with suid option");
     }
     fuse_opt_add_arg(mount_options, "-osuid");
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
@@ -906,6 +917,17 @@ int FuseMain(int argc, char *argv[]) {
              "CernVM-FS: running in debug mode");
   }
 
+#ifndef FUSE_CAP_POSIX_ACL
+  if (options_manager->GetValue("CVMFS_ENFORCE_ACLS", &parameter) &&
+      options_manager->IsOn(parameter))
+  {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "CernVM-FS: ACL support requested but not available in this "
+             "version of libfuse");
+    return kFailPermission;
+  }
+#endif
+
   // Initialize the loader socket, connections are not accepted until Spawn()
   socket_path_ = new string("/var/run/cvmfs");
   if (options_manager->GetValue("CVMFS_RELOAD_SOCKETS", &parameter))
@@ -972,6 +994,10 @@ int FuseMain(int argc, char *argv[]) {
 
   struct fuse_lowlevel_ops loader_operations;
   SetFuseOperations(&loader_operations);
+#if (FUSE_VERSION >= 29)
+  if (cvmfs_exports_->cvmfs_operations.forget_multi)
+    loader_operations.forget_multi = stub_forget_multi;
+#endif
 
 #if CVMFS_USE_LIBFUSE == 2
   channel = fuse_mount(mount_point_->c_str(), mount_options);
@@ -1110,4 +1136,3 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_stub_exports;
   g_cvmfs_stub_exports = NULL;
 }
-

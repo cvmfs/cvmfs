@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -32,7 +33,149 @@ const (
 
 var subDirInsideRepo = ".layers"
 
-func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingularity bool) (err error) {
+func assureValidSingularity() error {
+	err, stdout, _ := ExecCommand("singularity", "version").StartWithOutput()
+	if err != nil {
+		err := fmt.Errorf("No working version of Singularity: %s", err)
+		LogE(err).Error("No working version of Singularity")
+		return err
+	}
+	version := stdout.String()
+	sems := strings.Split(version, ".")
+	if len(sems) < 2 {
+		err := fmt.Errorf("Singularity version returned an unexpected format, unable to find Major and Minor number")
+		LogE(err).WithFields(log.Fields{"version": version}).Error("Not valid singularity")
+		return err
+	}
+	majorS := sems[0]
+	majorI, err := strconv.Atoi(majorS)
+	if err != nil {
+		errF := fmt.Errorf("Singularity version returned an unexpected format, unable to parse Major number: %s", err)
+		LogE(errF).WithFields(log.Fields{"version": version, "major number": majorS}).Error("Not valid singularity")
+		return errF
+	}
+	if majorI >= 4 {
+		return nil
+	}
+	minorS := sems[1]
+	minorI, err := strconv.Atoi(minorS)
+	if err != nil {
+		errF := fmt.Errorf("Singularity version returned an unexpected format, unable to parse Minor number: %s", err)
+		LogE(errF).WithFields(log.Fields{"version": version, "minor number": minorS}).Error("Not valid singularity")
+		return errF
+	}
+	if majorI >= 3 && minorI >= 5 {
+		return nil
+	}
+	errF := fmt.Errorf("Installed singularity is too old, we need at least 3.5: Installed version: %s", version)
+	LogE(errF).WithFields(log.Fields{"version": version}).Error("Too old singularity")
+	return errF
+}
+
+func ConvertWishSingularity(wish WishFriendly) (err error) {
+	err = assureValidSingularity()
+	if err != nil {
+		return err
+	}
+	tmpDir, err := UserDefinedTempDir("", "conversion")
+	if err != nil {
+		LogE(err).Error("Error when creating tmp singularity directory")
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+	inputImage, err := ParseImage(wish.InputName)
+	expandedImgTag, err := inputImage.ExpandWildcard()
+	if err != nil {
+		LogE(err).WithFields(log.Fields{
+			"input image": fmt.Sprintf("%s/%s", inputImage.Registry, inputImage.Repository)}).
+			Error("Error in retrieving all the tags from the image")
+		return
+	}
+	var firstError error
+	for _, inputImage := range expandedImgTag {
+		// we want to check if we have already ingested the Singularity image
+		// Several cases are possible
+		// Image not ingested, neither pubSymPath nor privatePath are present
+		// Image ingested and up to date, pubSymPath and privatePath point to the same thing
+		// Image update but stale (old), pubSymPath and privatePath point to different things
+		publicSymlinkPath := inputImage.GetPublicSymlinkPath()
+		completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
+		pubDirInfo, errPub := os.Stat(completePubSymPath)
+
+		singularityPrivatePath, err := inputImage.GetSingularityPath()
+		if err != nil {
+			errF := fmt.Errorf("Error in getting the path where to save Singularity filesystem: %s", err)
+			LogE(err).Warning(errF)
+			firstError = errF
+			continue
+		}
+		completeSingularityPriPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, singularityPrivatePath)
+		priDirInfo, errPri := os.Stat(completeSingularityPriPath)
+
+		// no error in stating both directories
+		// either the image is up to date or the image became stale
+		if errPub == nil && errPri == nil {
+			if os.SameFile(pubDirInfo, priDirInfo) {
+				// the link is up to date
+				Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Singularity Image up to date")
+				continue
+			}
+			// delete the old pubLink
+			// make a new Link to the privatePaht
+			// after that skip and continue
+			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
+			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			if err != nil {
+				errF := fmt.Errorf("Error in updating symlink for singularity image: %s", inputImage.GetSimpleName())
+				LogE(errF).WithFields(
+					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
+					Error("Error in creating symlink")
+				if firstError == nil {
+					firstError = errF
+				}
+			}
+			continue
+		}
+
+		// no error in stating the private directory, but the public one does not exists
+		// we simply create the public directory
+		if errPri == nil && os.IsNotExist(errPub) {
+			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Creating link for Singularity Image")
+			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			if err != nil {
+				errF := fmt.Errorf("Error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
+				LogE(errF).WithFields(
+					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
+					Error("Error in creating symlink")
+				if firstError == nil {
+					firstError = errF
+				}
+			}
+			continue
+		}
+
+		singularity, err := inputImage.DownloadSingularityDirectory(tmpDir)
+		if err != nil {
+			LogE(err).Error("Error in dowloading the singularity image")
+			firstError = err
+			os.RemoveAll(singularity.TempDirectory)
+			continue
+		}
+
+		err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
+		if err != nil {
+			LogE(err).Error("Error in ingesting the singularity image into the CVMFS repository")
+			firstError = err
+			os.RemoveAll(singularity.TempDirectory)
+			continue
+		}
+		os.RemoveAll(singularity.TempDirectory)
+	}
+
+	return firstError
+}
+
+func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err error) {
 
 	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
 	if err != nil {
@@ -52,12 +195,33 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 	if err != nil {
 		return
 	}
-	password, err := GetPassword()
+	inputImage, err := ParseImage(wish.InputName)
+	inputImage.User = wish.UserInput
 	if err != nil {
 		return
 	}
-	inputImage, err := ParseImage(wish.InputName)
-	inputImage.User = wish.UserInput
+	var firstError error
+	expandedImgTags, err := inputImage.ExpandWildcard()
+	if err != nil {
+		LogE(err).WithFields(log.Fields{
+			"input image": fmt.Sprintf("%s/%s", inputImage.Registry, inputImage.Repository)}).
+			Error("Error in retrieving all the tags from the image")
+		return err
+	}
+	for _, expandedImgTag := range expandedImgTags {
+		tag := expandedImgTag.Tag
+		outputWithTag := outputImage
+		outputWithTag.Tag = tag
+		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload)
+		if err != nil && firstError == nil {
+			firstError = err
+		}
+	}
+	return firstError
+}
+
+func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain, forceDownload bool) (err error) {
+	password, err := GetPassword()
 	if err != nil {
 		return
 	}
@@ -66,19 +230,13 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 		return
 	}
 
-	alreadyConverted := AlreadyConverted(wish.CvmfsRepo, inputImage, manifest.Config.Digest)
+	alreadyConverted := AlreadyConverted(repo, inputImage, manifest.Config.Digest)
 	Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
 		"Already converted the image, skipping.")
 
-	switch alreadyConverted {
-
-	case ConversionMatch:
-		{
-			Log().Info("Already converted the image.")
-			if convertAgain == false {
-				return nil
-			}
-
+	if alreadyConverted == ConversionMatch {
+		if convertAgain == false {
+			return nil
 		}
 	}
 
@@ -109,12 +267,12 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 		cleanup := func(location string) {
 			Log().Info("Running clean up function deleting the last layer.")
 
-			err := ExecCommand("cvmfs_server", "abort", "-f", wish.CvmfsRepo).Start()
+			err := ExecCommand("cvmfs_server", "abort", "-f", repo).Start()
 			if err != nil {
 				LogE(err).Warning("Error in the abort command inside the cleanup function, this warning is usually normal")
 			}
 
-			err = ExecCommand("cvmfs_server", "ingest", "--delete", location, wish.CvmfsRepo).Start()
+			err = ExecCommand("cvmfs_server", "ingest", "--delete", location, repo).Start()
 			if err != nil {
 				LogE(err).Error("Error in the cleanup command")
 			}
@@ -123,7 +281,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 
 			Log().WithFields(log.Fields{"layer": layer.Name}).Info("Start Ingesting the file into CVMFS")
 			layerDigest := strings.Split(layer.Name, ":")[1]
-			layerPath := LayerRootfsPath(wish.CvmfsRepo, layerDigest)
+			layerPath := LayerRootfsPath(repo, layerDigest)
 
 			var pathExists bool
 			if _, err := os.Stat(layerPath); os.IsNotExist(err) {
@@ -158,7 +316,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 				} {
 
 					Log().WithFields(log.Fields{"catalogdirectory": dir}).Info("Working on CATALOGDIRECTORY")
-					err = CreateCatalogIntoDir(wish.CvmfsRepo, dir)
+					err = CreateCatalogIntoDir(repo, dir)
 					if err != nil {
 						LogE(err).WithFields(log.Fields{
 							"directory": dir}).Error(
@@ -169,7 +327,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 							"Created subcatalog in directory")
 					}
 				}
-				err = ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", TrimCVMFSRepoPrefix(layerPath), wish.CvmfsRepo).StdIn(layer.Path).Start()
+				err = ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", TrimCVMFSRepoPrefix(layerPath), repo).StdIn(layer.Path).Start()
 
 				if err != nil {
 					LogE(err).WithFields(log.Fields{"layer": layer.Name}).Error("Some error in ingest the layer")
@@ -186,7 +344,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 		Log().Info("Finished pushing the layers into CVMFS")
 	}()
 	// we create a temp directory for all the files needed, when this function finish we can remove the temp directory cleaning up
-	tmpDir, err := ioutil.TempDir("", "conversion")
+	tmpDir, err := UserDefinedTempDir("", "conversion")
 	if err != nil {
 		LogE(err).Error("Error in creating a temporary direcotry for all the files")
 		return
@@ -199,15 +357,6 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 		return err
 	}
 
-	var singularity Singularity
-	if convertSingularity {
-		singularity, err = inputImage.DownloadSingularityDirectory(tmpDir)
-		if err != nil {
-			LogE(err).Error("Error in dowloading the singularity image")
-			return
-		}
-		defer os.RemoveAll(singularity.TempDirectory)
-	}
 	changes, _ := inputImage.GetChanges()
 
 	var wg sync.WaitGroup
@@ -302,16 +451,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 	// and if there was no error we add everything to the converted table
 	noErrorInConversionValue := <-noErrorInConversion
 
-	// here we can launch the ingestion for the singularity image
-	if convertSingularity {
-		err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
-		if err != nil {
-			LogE(err).Error("Error in ingesting the singularity image into the CVMFS repository")
-			noErrorInConversionValue = false
-		}
-	}
-
-	err = SaveLayersBacklink(wish.CvmfsRepo, inputImage, layerDigests)
+	err = SaveLayersBacklink(repo, inputImage, layerDigests)
 	if err != nil {
 		LogE(err).Error("Error in saving the backlinks")
 		noErrorInConversionValue = false
@@ -339,14 +479,14 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, convertSingular
 		Log().Info("Finish pushing the image to the registry")
 
 		manifestPath := filepath.Join(".metadata", inputImage.GetSimpleName(), "manifest.json")
-		errIng := IngestIntoCVMFS(wish.CvmfsRepo, manifestPath, <-manifestChanell)
+		errIng := IngestIntoCVMFS(repo, manifestPath, <-manifestChanell)
 		if errIng != nil {
 			LogE(errIng).Error("Error in storing the manifest in the repository")
 		}
 		var errRemoveSchedule error
 		if alreadyConverted == ConversionNotMatch {
 			Log().Info("Image already converted, but it does not match the manifest, adding it to the remove scheduler")
-			errRemoveSchedule = AddManifestToRemoveScheduler(wish.CvmfsRepo, manifest)
+			errRemoveSchedule = AddManifestToRemoveScheduler(repo, manifest)
 			if errRemoveSchedule != nil {
 				Log().Warning("Error in adding the image to the remove schedule")
 				return errRemoveSchedule
@@ -400,7 +540,7 @@ func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionR
 }
 
 func GetPassword() (string, error) {
-	envVar := "DOCKER2CVMFS_DOCKER_REGISTRY_PASS"
+	envVar := "DUCC_DOCKER_REGISTRY_PASS"
 	pass := os.Getenv(envVar)
 	if pass == "" {
 		err := fmt.Errorf(

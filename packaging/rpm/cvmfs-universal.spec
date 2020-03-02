@@ -4,14 +4,14 @@
 %define sle12 1
 %define dist .sle12
 %endif
-%if 0%{?el6} || 0%{?el7} || 0%{?fedora}
+%if 0%{?rhel} >= 6 || 0%{?fedora}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
-%if 0%{?el7} || 0%{?fedora}
+%if 0%{?rhel} >= 7 || 0%{?fedora}
 %define selinux_cvmfs_server 1
 %endif
-%if 0%{?el7} || 0%{?fedora} >= 29
+%if 0%{?rhel} >= 7 || 0%{?fedora} >= 29
   %if "%{?_arch}" != "aarch64"
     %define build_ducc 1
   %endif
@@ -26,13 +26,18 @@
 %endif
 
 # List of platforms that require systemd/autofs fix as described in CVM-1200
-%if 0%{?el7} || 0%{?fedora} || 0%{?sle12}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12}
 %define systemd_autofs_patch 1
 %endif
 
 # fuse3 is in epel starting with epel6
 %if 0%{?fedora} >= 29 || 0%{?rhel} >= 6
 %define build_fuse3 1
+%endif
+
+%define cvmfs_python python
+%if 0%{?el8}
+%define cvmfs_python python2
 %endif
 
 %define __strip /bin/true
@@ -43,7 +48,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.7.0
+Version: 2.8.0
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -80,7 +85,7 @@ BuildRequires: libattr-devel
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig
-BuildRequires: python-devel
+BuildRequires: %{cvmfs_python}-devel
 BuildRequires: unzip
 
 Requires: bash
@@ -117,7 +122,7 @@ Requires: shadow-utils
 Requires: SysVinit
 Requires: e2fsprogs
   %else
-    %if 0%{?fedora}
+    %if 0%{?fedora} || 0%{?rhel} >= 8
 Requires: procps-ng
     %else
 Requires: sysvinit-tools
@@ -158,6 +163,7 @@ Copyright (c) CERN
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
 Requires: cvmfs = %{version}
+Requires: fuse3
 Requires: fuse3-libs
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
@@ -173,10 +179,10 @@ CernVM-FS static client library for pure user-space use
 %package server
 Summary: CernVM-FS server tools
 Group: Application/System
-BuildRequires: python-devel
+BuildRequires: %{cvmfs_python}-devel
 BuildRequires: libcap-devel
 BuildRequires: unzip
-BuildRequires: python-setuptools
+BuildRequires: %{cvmfs_python}-setuptools
 %if 0%{?suse_version}
 Requires: insserv
 %else
@@ -197,7 +203,7 @@ Requires: lsof
 Requires: rsync
 Requires: usbutils
 Requires: sqlite
-%if 0%{?el6} || 0%{?el7} || 0%{?fedora} || 0%{?suse_version} >= 1300
+%if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
 %endif
 %if 0%{?selinux_cvmfs_server}
@@ -228,6 +234,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 Summary: ducc: Daemon Unpacking Containers in CVMFS
 Group: Application/System
 BuildRequires: golang >= 1.11.4
+Requires: singularity >= 3.5
 %description ducc
 Daemon to automatically unpack and expose containers images into CernVM-FS
 %endif
@@ -384,7 +391,7 @@ mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/do
 %endif
 
 # Fix docdir on Fedora
-%if 0%{?fedora}
+%if 0%{?fedora} || 0%{?rhel} >= 8
 rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
 %endif
 
@@ -503,6 +510,7 @@ fi
 /usr/libexec/cvmfs/authz/cvmfs_allow_helper
 /usr/libexec/cvmfs/authz/cvmfs_deny_helper
 /usr/libexec/cvmfs/cache/cvmfs_cache_ram
+/usr/libexec/cvmfs/cache/cvmfs_cache_posix
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}
@@ -546,16 +554,23 @@ fi
 
 %files server
 %defattr(-,root,root)
+%{_bindir}/cvmfs_publish
+%{_bindir}/cvmfs_publish_debug
 %{_bindir}/cvmfs_receiver
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
+%{_libdir}/libcvmfs_server.so
+%{_libdir}/libcvmfs_server.so.%{version}
+%{_libdir}/libcvmfs_server_debug.so
+%{_libdir}/libcvmfs_server_debug.so.%{version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
+/usr/share/cvmfs-server/generate_stats_plots.C
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
@@ -571,14 +586,18 @@ fi
 %{_bindir}/cvmfs_unittests
 %{_bindir}/cvmfs_test_cache
 %{_bindir}/cvmfs_test_shrinkwrap
+%{_bindir}/cvmfs_test_publish
 %doc COPYING AUTHORS README.md ChangeLog
 
 %if 0%{?build_ducc}
 %files ducc
 %{_bindir}/cvmfs_ducc
+%{_unitdir}/cvmfs_ducc.service
 %endif
 
 %changelog
+* Thu Oct 03 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
+- Add EL8 support
 * Wed Jun 12 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
 - Remove cvmfs_stratum_agent
 * Wed Apr 03 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0

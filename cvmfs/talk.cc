@@ -481,6 +481,8 @@ void *TalkManager::MainResponder(void *data) {
       // Manually setting the inode tracker numbers
       glue::InodeTracker::Statistics inode_stats =
         mount_point->inode_tracker()->GetStatistics();
+      glue::NentryTracker::Statistics nentry_stats =
+        mount_point->nentry_tracker()->GetStatistics();
       mount_point->statistics()->Lookup("inode_tracker.n_insert")->Set(
         atomic_read64(&inode_stats.num_inserts));
       mount_point->statistics()->Lookup("inode_tracker.n_remove")->Set(
@@ -493,6 +495,12 @@ void *TalkManager::MainResponder(void *data) {
         atomic_read64(&inode_stats.num_hits_path));
       mount_point->statistics()->Lookup("inode_tracker.n_miss_path")->Set(
         atomic_read64(&inode_stats.num_misses_path));
+      mount_point->statistics()->Lookup("nentry_tracker.n_insert")->Set(
+        nentry_stats.num_insert);
+      mount_point->statistics()->Lookup("nentry_tracker.n_remove")->Set(
+        nentry_stats.num_remove);
+      mount_point->statistics()->Lookup("nentry_tracker.n_prune")->Set(
+        nentry_stats.num_prune);
 
       if (file_system->cache_mgr()->id() == kPosixCacheManager) {
         PosixCacheManager *cache_mgr =
@@ -564,6 +572,8 @@ void *TalkManager::MainResponder(void *data) {
 
       result += "Lookup\n" + file_system->hist_fs_lookup()->ToString();
       result += "Forget\n" + file_system->hist_fs_forget()->ToString();
+      result += "Multi-Forget\n"
+                + file_system->hist_fs_forget_multi()->ToString();
       result += "Getattr\n" + file_system->hist_fs_getattr()->ToString();
       result += "Readlink\n" + file_system->hist_fs_readlink()->ToString();
       result += "Opendir\n" + file_system->hist_fs_opendir()->ToString();

@@ -191,7 +191,7 @@ int CacheManager::OpenPinned(
 }
 
 
-void CacheManager::RestoreState(const int fd_progress, void *data) {
+int CacheManager::RestoreState(const int fd_progress, void *data) {
   State *state = reinterpret_cast<State *>(data);
   if (fd_progress >= 0)
     SendMsg2Socket(fd_progress, "Restoring open files table... ");
@@ -205,12 +205,13 @@ void CacheManager::RestoreState(const int fd_progress, void *data) {
       SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
     abort();
   }
-  bool result = DoRestoreState(state->concrete_state);
-  if (!result) {
+  int new_root_fd = DoRestoreState(state->concrete_state);
+  if (new_root_fd < -1) {
     if (fd_progress >= 0) SendMsg2Socket(fd_progress, "FAILED!\n");
     abort();
   }
   if (fd_progress >= 0) SendMsg2Socket(fd_progress, "done\n");
+  return new_root_fd;
 }
 
 

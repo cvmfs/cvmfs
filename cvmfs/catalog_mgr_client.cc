@@ -169,7 +169,7 @@ LoadError ClientCatalogManager::LoadCatalog(
     std::map<PathString, shash::Any>::const_iterator iter =
       mounted_catalogs_.find(mountpoint);
     if (iter != mounted_catalogs_.end()) {
-      if (iter->second != cache_hash) {
+      if (breadcrumb.IsValid() && (iter->second != cache_hash)) {
         success_code = catalog::kLoadNew;
       }
     }
@@ -187,6 +187,8 @@ LoadError ClientCatalogManager::LoadCatalog(
     return success_code;
   }
 
+  manifest_ = new manifest::Manifest(*ensemble.manifest);
+
   offline_mode_ = false;
   cvmfs_path += " (" + ensemble.manifest->catalog_hash().ToString() + ")";
   LogCvmfs(kLogCache, kLogDebug, "remote checksum is %s",
@@ -194,20 +196,32 @@ LoadError ClientCatalogManager::LoadCatalog(
 
   // Short way out, use cached copy
   if (ensemble.manifest->catalog_hash() == cache_hash) {
+    LoadError success_code = catalog::kLoadUp2Date;
+
+    // Has the breadcrumb been updated externally?
+    std::map<PathString, shash::Any>::const_iterator iter =
+      mounted_catalogs_.find(mountpoint);
+    if (iter != mounted_catalogs_.end()) {
+      if (iter->second != cache_hash) {
+        LogCvmfs(kLogCache, kLogDebug, "updating from %s to alien cache copy",
+                 iter->second.ToString().c_str());
+        success_code = catalog::kLoadNew;
+      }
+    }
+
     if (catalog_path) {
       LoadError error =
         LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
       if (error == catalog::kLoadNew) {
         loaded_catalogs_[mountpoint] = cache_hash;
         *catalog_hash = cache_hash;
-        return catalog::kLoadUp2Date;
+        return success_code;
       }
       LogCvmfs(kLogCache, kLogDebug,
                "unable to open catalog from local checksum, downloading");
     } else {
-      loaded_catalogs_[mountpoint] = cache_hash;
       *catalog_hash = cache_hash;
-      return catalog::kLoadUp2Date;
+      return success_code;
     }
   }
   if (!catalog_path)

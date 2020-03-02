@@ -12,6 +12,7 @@
 #include "gateway_util.h"
 #include "json_document.h"
 #include "swissknife_lease_curl.h"
+#include "util/exception.h"
 #include "util/string.h"
 
 namespace {
@@ -396,9 +397,8 @@ void* SessionContext::UploadLoop(void* data) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
       UploadJob* job = ctx->upload_jobs_->Dequeue();
       if (!ctx->DoUpload(job)) {
-        LogCvmfs(kLogUploadGateway, kLogStderr,
-                 "SessionContext: could not submit payload. Aborting.");
-        abort();
+        PANIC(kLogStderr,
+              "SessionContext: could not submit payload. Aborting.");
       }
       job->result->Set(true);
       delete job->pack;

@@ -31,10 +31,14 @@ class SignatureManager {
   void Fini();
   std::string GetCryptoError();
 
+  void UnloadPrivateKey();
+  void UnloadPublicRsaKeys();
+  void UnloadPrivateMasterKey();
+  void UnloadCertificate();
+
+  bool LoadPrivateMasterKeyPath(const std::string &file_pem);
   bool LoadPrivateKeyPath(const std::string &file_pem,
                           const std::string &password);
-  void UnloadPrivateKey();
-
   bool LoadCertificatePath(const std::string &file_pem);
   bool LoadCertificateMem(const unsigned char *buffer,
                           const unsigned buffer_size);
@@ -54,6 +58,8 @@ class SignatureManager {
 
   bool Sign(const unsigned char *buffer, const unsigned buffer_size,
             unsigned char **signature, unsigned *signature_size);
+  bool SignRsa(const unsigned char *buffer, const unsigned buffer_size,
+                unsigned char **signature, unsigned *signature_size);
   bool Verify(const unsigned char *buffer, const unsigned buffer_size,
               const unsigned char *signature, unsigned signature_size);
   bool VerifyRsa(const unsigned char *buffer, const unsigned buffer_size,
@@ -69,16 +75,26 @@ class SignatureManager {
                         unsigned *letter_length,
                         unsigned *pos_after_mark);
 
-  // Returns the PEM-encoded text of all loaded pubkeys (both raw RSA keys
-  // and that from the current certificate).
-  std::string GetActivePubkeys();
+  // Returns the PEM-encoded text of all loaded RSA pubkeys
+  std::string GetActivePubkeys() const;
+  // The PEM-encoded private key matching the public master key
+  std::string GetPrivateMasterKey();
+  // The PEM-encoded certificate without private key
+  std::string GetCertificate() const;
+  // The PEM-encoded private key matching the certificate
+  std::string GetPrivateKey();
+
+  void GenerateMasterKeyPair();
+  void GenerateCertificate(const std::string &cn);
 
  private:
-  std::string GenerateKeyText(RSA *pubkey);
+  RSA *GenerateRsaKeyPair();
+  std::string GenerateKeyText(RSA *pubkey) const;
 
   void InitX509Store();
 
   EVP_PKEY *private_key_;
+  RSA *private_master_key_;
   X509 *certificate_;
   std::vector<RSA *> public_keys_;  /**< Contains cvmfs public master keys */
   pthread_mutex_t lock_blacklist_;

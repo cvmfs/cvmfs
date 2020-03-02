@@ -13,6 +13,7 @@ usage() {
   echo "Usage: $0 [-q only quick tests] [-s shrinkwrap test binary]\\"
   echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
   echo "          [-d run the ducc unittests] \\"
+  echo "          [-p run the publish unit tests] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
   exit 1
@@ -23,8 +24,9 @@ CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
 CVMFS_TEST_DUCC=0
+CVMFS_TEST_PUBLISH=0
 
-while getopts "qc:g:s:l:d" option; do
+while getopts "qc:g:s:l:dp" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
@@ -44,6 +46,9 @@ while getopts "qc:g:s:l:d" option; do
     ;;
     d)
       CVMFS_TEST_DUCC=1
+    ;;
+    p)
+      CVMFS_TEST_PUBLISH=1
     ;;
     ?)
       usage
@@ -68,8 +73,11 @@ fi
 
 # run the Python unittests for the GeoAPI
 if [ "x$CVMFS_GEOAPI_SOURCES" != "x" ]; then
-  # TODO(jblomer): XML output
-  (cd $CVMFS_GEOAPI_SOURCES && python test_cvmfs_geo.py)
+  pushd $CVMFS_GEOAPI_SOURCES
+  # python2 is not available on MacOS
+  command -v python2 >/dev/null 2>&1 && PYTHON_COMMAND=python2 || PYTHON_COMMAND=python
+  $PYTHON_COMMAND test_cvmfs_geo.py
+  popd
 fi
 
 # run the cache plugin unittests
@@ -79,6 +87,7 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
   CVMFS_CACHE_CONFIG=$(mktemp /tmp/cvmfs-unittests-XXXXX)
   echo "CVMFS_CACHE_PLUGIN_SIZE=1000" > $CVMFS_CACHE_CONFIG
   echo "CVMFS_CACHE_PLUGIN_TEST=yes" >> $CVMFS_CACHE_CONFIG
+  echo "CVMFS_CACHE_DIR=/tmp/cvmfs_cache_test_dir/" >> $CVMFS_CACHE_CONFIG
   i=0
   for plugin in $(echo $CVMFS_CACHE_PLUGIN | tr : " "); do
     if [ -x $plugin ]; then
@@ -94,6 +103,7 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
       $CVMFS_CACHE_UNITTESTS $CVMFS_CACHE_LOCATOR \
         --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin)
       /bin/kill $plugin_pid
+      rm -rf "/tmp/cvmfs_cache_test_dir/"
     else
       echo "Warning: plugin $plugin not found, skipping"
     fi
@@ -116,10 +126,16 @@ if [ $CVMFS_TEST_DUCC = 1 ] && [ $(can_build_ducc) -ge 1 ]; then
   popd > /dev/null
 fi
 
+if [ $CVMFS_TEST_PUBLISH = 1 ]; then
+  echo "running publish unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  CVMFS_PUBLISH_UNITTESTS="$(dirname $CVMFS_UNITTESTS_BINARY)/cvmfs_test_publish"
+  $CVMFS_PUBLISH_UNITTESTS --gtest_shuffle                                     \
+                           --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
+                           --gtest_filter=$test_filter
+fi
+
 # run the unit tests
 echo "running unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
 $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
-
-

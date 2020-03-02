@@ -57,6 +57,10 @@ bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   return true;
 }
 
+bool Spooler::Create() {
+  return uploader_->Create();
+}
+
 void Spooler::Process(IngestionSource *source, const bool allow_chunking) {
   ingestion_pipeline_->Process(source, allow_chunking);
 }
@@ -76,17 +80,33 @@ void Spooler::ProcessCertificate(const std::string &local_path) {
                                shash::kSuffixCertificate);
 }
 
+void Spooler::ProcessCertificate(IngestionSource *source) {
+  ingestion_pipeline_->Process(source, false, shash::kSuffixCertificate);
+}
+
 void Spooler::ProcessMetainfo(const std::string &local_path) {
   ingestion_pipeline_->Process(new FileIngestionSource(local_path), false,
                                shash::kSuffixMetainfo);
 }
 
+void Spooler::ProcessMetainfo(IngestionSource *source) {
+  ingestion_pipeline_->Process(source, false, shash::kSuffixMetainfo);
+}
+
 void Spooler::Upload(const std::string &local_path,
                      const std::string &remote_path) {
-  uploader_->Upload(
+  uploader_->UploadFile(
       local_path, remote_path,
       AbstractUploader::MakeCallback(&Spooler::UploadingCallback, this));
 }
+
+void Spooler::Upload(const std::string &remote_path, IngestionSource *source) {
+  uploader_->UploadIngestionSource(
+      remote_path, source,
+      AbstractUploader::MakeCallback(&Spooler::UploadingCallback, this));
+  delete source;
+}
+
 
 void Spooler::UploadManifest(const std::string &local_path) {
   Upload(local_path, ".cvmfspublished");
@@ -102,6 +122,10 @@ void Spooler::RemoveAsync(const std::string &file_to_delete) {
 
 bool Spooler::Peek(const std::string &path) const {
   return uploader_->Peek(path);
+}
+
+bool Spooler::Mkdir(const std::string &path) {
+  return uploader_->Mkdir(path);
 }
 
 bool Spooler::PlaceBootstrappingShortcut(const shash::Any &object) const {

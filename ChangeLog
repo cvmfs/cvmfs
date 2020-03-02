@@ -1,4 +1,44 @@
+2.8.0:
+  * [server] Add CVMFS_UPLOAD_STATS_PLOTS parameter to automatically generate
+    and upload publish statistics plots; requires ROOT (CVM-1836)
+  * [ducc] Improve robustness against intermittent registry failures (CVM-1829)
+  * [ducc] Add support for wildcards in tag names (CVM-1715)
+  * [ducc] Make temporary directory configurable (CVM-1826) 
+  * [ducc] Require Singularity >= 3.5 (CVM-1840)
+  * [server] Add new parameter CVMFS_UPLOAD_STATS_DB=[true/false] in order to
+    push publish and GC statistics into the /stats location on the Stratum 0
+  * [gw] Fix lease acquisiton on non-existing paths (CVM-1696) 
+  * Add the cvmfs_publish transitional utility
+  * Add convert-singularity-image command to DUCC
+  * Enable readdir caching on fuse3 and kernel >= 4.20
+  * Add fuse forget_multi calback for fuse >= 2.9
+  * Add POSIX external cache plugin (CVM-1823)
+  * Manage DUCC daemon with systemd units
+
+2.7.1:
+  * Build cvmfs-fuse3 on Debian 10 "buster" (CVM-1825)
+  * Add support for CVMFS_GEO_DB_FILE replica parameter
+  * Change geodb update to use license key (CVM-1833)
+  * Fix host fail-over after redirection (CVM-1675)
+  * Add reboot info to Catalina installation screen
+
 2.7.0:
+  * Fix potential file descriptor mix-up of external cache manager after reload
+  * Fix spurious error with 'auto;DIRECT' when WPAD returns no proxy (CVM-1818)
+  * Add firmlink /cvmfs --> /Users/Shared/cvmfs on macOS >= 10.15
+  * Set default mount point to /Users/Shared/cvmfs on macOS >= 10.15 (CVM-1813)
+  * Use relative symbolic links in DUCC (CVM-1817)
+  * Terminate fuse daemon if watchdog disappears (CVM-1753)
+  * Fix clashing generic tags for short transactions with gateway (CVM-1735)
+  * Add "repo_counters" and "repo_metainfo" xattrs (CVM-1499, 1733)
+  * Add support for extended attributes on directories
+  * Add support for CVMFS_ENFORCE_ACLS client parameter
+  * Fix missing package dependency on Debian 9 and Ubuntu 18.04 (CVM-1789)
+  * Enable default config repository for debian stretch and newer (CVM-1794)
+  * Fix potential parsing of incomplete /etc/hosts
+  * Fix stale negative entries in active cache eviction (CVM-1759)
+  * Add support for EL8 platform (CVM-1731)
+  * Fix publish statistics for several corner cases (CVM-1716 .. CVM-1720)
   * Add 'list_reflog' command to cvmfs_swissknife (CVM-1760)
   * Add 'filestats' command to cvmfs_swissknife (CVM-1756)
   * Add fuse callback performance instrumentation through new switch 
@@ -14,6 +54,8 @@
     (CVM-1710, CVM-1744)
 
 2.6.4:
+  * Fix client updates on shared writable alien cache (CVM-1803)
+  * Fix spurious error message when spawning external cache
 
 2.6.3:
   * Fix parsing of /etc/hosts (CVM-1796, CVM-1797)

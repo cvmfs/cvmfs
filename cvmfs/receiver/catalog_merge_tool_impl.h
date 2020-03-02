@@ -14,6 +14,7 @@
 #include "manifest.h"
 #include "options.h"
 #include "upload.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 
@@ -40,10 +41,10 @@ inline void SplitHardlink(catalog::DirectoryEntry* entry) {
 
 inline void AbortIfHardlinked(const catalog::DirectoryEntry& entry) {
   if (entry.linkcount() > 1) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-              "CatalogMergeTool - Removal of file %s with linkcount > 1 is "
-              "not supported. Aborting", entry.name().c_str());
-    abort();
+    PANIC(kLogSyslogErr,
+          "CatalogMergeTool - Removal of file %s with linkcount > 1 is "
+          "not supported. Aborting",
+          entry.name().c_str());
   }
 }
 
@@ -100,7 +101,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
 
   if (entry.IsDirectory()) {
-    output_catalog_mgr_->AddDirectory(entry, parent_path);
+    output_catalog_mgr_->AddDirectory(entry, xattrs, parent_path);
     if (entry.IsNestedCatalogMountpoint()) {
       output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
     }
@@ -170,7 +171,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     // From directory to directory
     const catalog::DirectoryEntryBase* base_entry =
         static_cast<const catalog::DirectoryEntryBase*>(&entry2);
-    output_catalog_mgr_->TouchDirectory(*base_entry, rel_path.c_str());
+    output_catalog_mgr_->TouchDirectory(*base_entry, xattrs, rel_path.c_str());
     if (!entry1.IsNestedCatalogMountpoint() &&
         entry2.IsNestedCatalogMountpoint()) {
       output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
@@ -182,7 +183,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     // From file to directory
     AbortIfHardlinked(entry1);
     output_catalog_mgr_->RemoveFile(rel_path.c_str());
-    output_catalog_mgr_->AddDirectory(entry2, parent_path);
+    output_catalog_mgr_->AddDirectory(entry2, xattrs, parent_path);
     if (entry2.IsNestedCatalogMountpoint()) {
       output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
     }

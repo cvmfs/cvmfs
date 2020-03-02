@@ -308,11 +308,11 @@ void *PosixCacheManager::DoSaveState() {
 }
 
 
-bool PosixCacheManager::DoRestoreState(void *data) {
+int PosixCacheManager::DoRestoreState(void *data) {
   assert(data);
   char *c = reinterpret_cast<char *>(data);
   assert(*c == '\0');
-  return true;
+  return -1;
 }
 
 
@@ -535,6 +535,12 @@ manifest::Breadcrumb PosixCacheManager::LoadBreadcrumb(const std::string &fqrn)
 
 bool PosixCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
   return manifest.ExportBreadcrumb(cache_path_, 0600);
+}
+
+
+bool PosixCacheManager::StoreBreadcrumb(std::string fqrn,
+                                        manifest::Breadcrumb breadcrumb) {
+  return breadcrumb.Export(fqrn, cache_path_, 0600);
 }
 
 

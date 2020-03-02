@@ -211,7 +211,7 @@ string ResolveProxyDescription(
   if ((cvmfs_proxies == "") || (cvmfs_proxies.find("auto") == string::npos))
     return cvmfs_proxies;
 
-  bool use_cache = false;
+  int empty_auto = -1;
   vector<string> lb_groups = SplitString(cvmfs_proxies, ';');
   for (unsigned i = 0; i < lb_groups.size(); ++i) {
     if (lb_groups[i] != "auto")
@@ -219,13 +219,15 @@ string ResolveProxyDescription(
 
     lb_groups[i] = AutoProxy(download_manager);
     if (lb_groups[i].empty())
-      use_cache = true;
+      empty_auto = static_cast<int>(i);
   }
 
+  if (empty_auto != -1)
+    lb_groups.erase(lb_groups.begin()+static_cast<unsigned>(empty_auto));
   string discovered_proxies = JoinStrings(lb_groups, ";");
 
   if (!path_fallback_cache.empty()) {
-    if (use_cache) {
+    if (empty_auto != -1) {
       string cached_proxies;
       int fd = open(path_fallback_cache.c_str(), O_RDONLY);
       if (fd >= 0) {

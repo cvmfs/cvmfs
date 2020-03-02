@@ -18,6 +18,7 @@ namespace upload {
 LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition)
     : AbstractUploader(spooler_definition),
       backend_file_mode_(default_backend_file_mode_ ^ GetUmask()),
+      backend_dir_mode_(default_backend_dir_mode_ ^ GetUmask()),
       upstream_path_(spooler_definition.spooler_configuration),
       temporary_path_(spooler_definition.temporary_path)
 {
@@ -35,51 +36,74 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
   return atomic_read32(&copy_errors_);
 }
 
-void LocalUploader::FileUpload(const std::string &local_path,
-                               const std::string &remote_path,
-                               const CallbackTN *callback) {
+bool LocalUploader::Create() {
+  return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_) &&
+         MkdirDeep(upstream_path_ + "/stats", backend_dir_mode_, false);
+}
+
+void LocalUploader::DoUpload(const std::string &remote_path,
+                             IngestionSource *source,
+                             const CallbackTN *callback) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "FileUpload call started.");
 
   // create destination in backend storage temporary directory
-  std::string tmp_path = CreateTempPath(temporary_path_ + "/upload", 0666);
-  if (tmp_path.empty()) {
+  std::string tmp_path;
+  FILE *ftmp = CreateTempFile(temporary_path_ + "/upload", 0666, "w",
+                              &tmp_path);
+  if (ftmp == NULL) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "failed to create temp path for "
              "upload of file '%s' (errno: %d)",
-             local_path.c_str(), errno);
+             source->GetPath().c_str(), errno);
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(1, local_path));
+    Respond(callback, UploaderResults(1, source->GetPath()));
     return;
   }
 
   // copy file into controlled temporary directory location
-  int retval = CopyPath2Path(local_path, tmp_path);
-  int retcode = retval ? 0 : 100;
-  if (retcode != 0) {
-    LogCvmfs(kLogSpooler, kLogVerboseMsg,
-             "failed to copy file '%s' to staging "
-             "area: '%s'",
-             local_path.c_str(), tmp_path.c_str());
+  bool rvb = source->Open();
+  if (!rvb) {
+    fclose(ftmp);
+    unlink(tmp_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(retcode, local_path));
+    Respond(callback, UploaderResults(100, source->GetPath()));
     return;
   }
+  unsigned char buffer[kPageSize];
+  ssize_t rbytes;
+  do {
+    rbytes = source->Read(buffer, kPageSize);
+    size_t wbytes = 0;
+    if (rbytes > 0) {
+      wbytes = fwrite(buffer, 1, rbytes, ftmp);
+    }
+    if ((rbytes < 0) || (static_cast<size_t>(rbytes) != wbytes)) {
+      source->Close();
+      fclose(ftmp);
+      unlink(tmp_path.c_str());
+      atomic_inc32(&copy_errors_);
+      Respond(callback, UploaderResults(100, source->GetPath()));
+      return;
+    }
+  } while (rbytes == kPageSize);
+  source->Close();
+  fclose(ftmp);
 
   // move the file in place (atomic operation)
-  retcode = Move(tmp_path, remote_path);
-  if (retcode != 0) {
+  int rvi = Move(tmp_path, remote_path);
+  if (rvi != 0) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "failed to move file '%s' from the "
              "staging area to the final location: "
              "'%s'",
              tmp_path.c_str(), remote_path.c_str());
+    unlink(tmp_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(retcode, local_path));
+    Respond(callback, UploaderResults(rvi, source->GetPath()));
     return;
   }
 
-  CountUploadedBytes(GetFileSize(remote_path));
-  Respond(callback, UploaderResults(retcode, local_path));
+  Respond(callback, UploaderResults(rvi, source->GetPath()));
 }
 
 UploadStreamHandle *LocalUploader::InitStreamedUpload(
@@ -152,7 +176,11 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     }
     if (!content_hash.HasSuffix()
         || content_hash.suffix == shash::kSuffixPartial) {
+      CountUploadedChunks();
       CountUploadedBytes(GetFileSize(upstream_path_ + "/" + final_path));
+    } else if (content_hash.suffix == shash::kSuffixCatalog) {
+      CountUploadedCatalogs();
+      CountUploadedCatalogBytes(GetFileSize(upstream_path_ + "/" + final_path));
     }
   } else {
     const int retval = unlink(local_handle->temporary_path.c_str());
@@ -161,6 +189,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
                "failed to remove temporary file '%s' (errno: %d)",
                local_handle->temporary_path.c_str(), errno);
     }
+    CountDuplicates();
   }
 
   const CallbackTN *callback = handle->commit_callback;
@@ -182,10 +211,11 @@ void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
 
 bool LocalUploader::Peek(const std::string &path) {
   bool retval = FileExists(upstream_path_ + "/" + path);
-  if (retval) {
-    CountDuplicates();
-  }
   return retval;
+}
+
+bool LocalUploader::Mkdir(const std::string &path) {
+  return MkdirDeep(upstream_path_ + "/" + path, backend_dir_mode_, false);
 }
 
 bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) {

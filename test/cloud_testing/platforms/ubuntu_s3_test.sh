@@ -16,10 +16,11 @@ if [ x"$(lsb_release -cs)" = x"xenial" ]; then
   # Ubuntu 16.04
   # Kernel sources too old for gcc, TODO
   CVMFS_EXCLUDE="src/006-buildkernel"
-  # Should work once packages are built on destination platform, TODO
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/602-libcvmfs"
   # Expected failure, see test case
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
+
+  # Hardlinks do not work with overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
 
   echo "Ubuntu 16.04... using overlayfs"
   export CVMFS_TEST_UNIONFS=overlayfs
@@ -30,13 +31,6 @@ if [ x"$(lsb_release -cs)" = x"trusty" ]; then
   CVMFS_EXCLUDE="src/700-overlayfs_validation src/80*-repository_gateway*"
 
   echo "Ubuntu 14.04... using aufs instead of overlayfs"
-fi
-if [ x"$(lsb_release -cs)" = x"precise" ]; then
-  # Ubuntu 12.04
-  # aufs, expected failure
-  CVMFS_EXCLUDE="src/614-geoservice src/700-overlayfs_validation src/80*-repository_gateway*"
-
-  echo "Ubuntu 12.04... using aufs instead of overlayfs"
 fi
 
 
@@ -89,6 +83,8 @@ if [ $s3_retval -eq 0 ]; then
                                src/647-bearercvmfs                          \
                                src/628-pythonwrappedcvmfsserver             \
                                src/670-listreflog                           \
+                               src/672-publish_stats_hardlinks              \
+                               src/673-acl                                  \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

@@ -201,7 +201,13 @@ class CacheManager : SingleCopy {
   // POSIX cache, nothing needs to be done because the table is keep in the
   // kernel for the process.  Other cache managers need to do it manually.
   void *SaveState(const int fd_progress);
-  void RestoreState(const int fd_progress, void *state);
+  /**
+   * When RestoreState is called, the cache has already exactly one file
+   * descriptor open: the root file catalog. This file descriptor might be
+   * remapped to another number. A return value of -1 means no action needs
+   * to take place. A smaller value inidicates an error.
+   */
+  int RestoreState(const int fd_progress, void *state);
   void FreeState(const int fd_progress, void *state);
 
   /**
@@ -222,7 +228,7 @@ class CacheManager : SingleCopy {
 
   // Unless overwritten, Saving/Restoring states will crash the Fuse module
   virtual void *DoSaveState() { return NULL; }
-  virtual bool DoRestoreState(void *data) { return false; }
+  virtual int DoRestoreState(void *data) { return false; }
   virtual bool DoFreeState(void *data) { return false; }
 
   /**

@@ -5,6 +5,7 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_path
 
   echo "*** create a repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return 1
@@ -24,20 +25,26 @@ cvmfs_run_test() {
   echo "test file" > $repo_dir/testfile4  # size 10
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  cvmfs_swissknife filestats -r /srv/cvmfs/$CVMFS_TEST_REPO -o filestats.db
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    repo_path=$(get_s3_repo_url "$CVMFS_TEST_REPO")
+  else
+    repo_path=/srv/cvmfs/$CVMFS_TEST_REPO
+  fi
+
+  cvmfs_swissknife filestats -r $repo_path -n $CVMFS_TEST_REPO -k /etc/cvmfs/keys -o filestats.db
 
   num_catalogs=$(sqlite3 filestats.db "select count(*) from catalogs;")
-  [ $num_catalogs -eq 1 ] || return 1
+  [ $num_catalogs -eq 1 ] || return 2
 
   num_files=$(sqlite3 filestats.db "select count(*) from files;")
-  [ $num_files -eq 4 ] || return 1
+  [ $num_files -eq 4 ] || return 3
 
   num_objects=$(sqlite3 filestats.db "select count(*) from objects;")
-  [ $num_objects -eq 3 ] || return 1
+  [ $num_objects -eq 3 ] || return 4
 
-  object_sizes=$(sqlite3 filestats.db "select size from objects;")
-  object_sizes=$(echo $object_sizes | sort)
-  [ "x$object_sizes" == x"10 11 11" ] || return 1
+  object_sizes=$(sqlite3 filestats.db "select size from objects;" | sort)
+  object_sizes_formatted=$(echo $object_sizes)
+  [ "x$object_sizes_formatted" == x"10 11 11" ] || return 5
 
   return 0
 }

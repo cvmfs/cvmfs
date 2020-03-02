@@ -2,4 +2,5 @@ cvmfs: file-in-unusual-dir usr/libexec/cvmfs/authz/cvmfs_allow_helper
 cvmfs: file-in-unusual-dir usr/libexec/cvmfs/authz/cvmfs_deny_helper
 cvmfs: file-in-unusual-dir usr/libexec/cvmfs/auto.cvmfs
 cvmfs: file-in-unusual-dir usr/libexec/cvmfs/cache/cvmfs_cache_ram
+cvmfs: file-in-unusual-dir usr/libexec/cvmfs/cache/cvmfs_cache_posix
 cvmfs: non-standard-dir-in-usr usr/libexec/

@@ -115,6 +115,7 @@
 
 #include "file_chunk.h"
 #include "hash.h"
+#include "ingestion/ingestion_source.h"
 #include "ingestion/pipeline.h"
 #include "repository_tag.h"
 #include "upload_facility.h"
@@ -151,6 +152,11 @@ class Spooler : public Observable<SpoolerResult> {
   std::string backend_name() const;
 
   /**
+   * Calls the concrete uploder to create a new repository area
+   */
+  bool Create();
+
+  /**
    * Schedules a copy job that transfers a file found at local_path to the
    * location pointed to by remote_path. Copy Jobs do not hash or compress the
    * given file. They simply upload it.
@@ -162,6 +168,11 @@ class Spooler : public Observable<SpoolerResult> {
    *                      backend storage
    */
   void Upload(const std::string &local_path, const std::string &remote_path);
+
+  /**
+   * Ownership of source is transferred to the spooler
+   */
+  void Upload(const std::string &remote_path, IngestionSource *source);
 
   /**
    * Convenience wrapper to upload the Manifest file into the backend storage
@@ -219,6 +230,10 @@ class Spooler : public Observable<SpoolerResult> {
    * @param local_path  the location of the source of the certificate file
    */
   void ProcessCertificate(const std::string &local_path);
+  /**
+   * Ownership of source is transferred to the ingestion pipeline
+   */
+  void ProcessCertificate(IngestionSource *source);
 
   /**
    * Convenience wrapper to process a meta info file.
@@ -226,6 +241,10 @@ class Spooler : public Observable<SpoolerResult> {
    * @param local_path  the location of the meta info file
    */
   void ProcessMetainfo(const std::string &local_path);
+  /**
+   * Ownership of source is transferred to the ingestion pipeline
+   */
+  void ProcessMetainfo(IngestionSource *source);
 
   /**
    * Deletes the given file from the repository backend storage.  This requires
@@ -244,6 +263,15 @@ class Spooler : public Observable<SpoolerResult> {
    * @return      true if the file was found in the backend storage
    */
   bool Peek(const std::string &path) const;
+
+  /**
+   * Make directory in upstream storage. Noop if directory already present.
+   * NOTE: currently only used to create the 'stats/' subdirectory
+   * 
+   * @param path relative directory path in the upstream storage
+   * @return true if the directory was successfully created or already present
+   */
+  bool Mkdir(const std::string &path);
 
   /**
    * Creates a top-level shortcut to the given data object. This is particularly

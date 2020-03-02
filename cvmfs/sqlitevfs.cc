@@ -29,6 +29,7 @@
 #include <climits>
 #include <cstring>
 #include <ctime>
+#include <vector>
 
 #include "cache.h"
 #include "duplex_sqlite3.h"
@@ -84,11 +85,32 @@ struct VfsRdOnlyFile {
   uint64_t size;
 };
 
+/**
+ * File descriptor mappings
+ */
+std::vector<int> *fd_from_ = NULL;
+std::vector<int> *fd_to_ = NULL;
+
 }  // anonymous namespace
+
+static void ApplyFdMap(VfsRdOnlyFile *pFile) {
+  unsigned N = fd_from_->size();
+  for (unsigned i = 0; i < N; ++i) {
+    if (pFile->fd == (*fd_from_)[i]) {
+      LogCvmfs(kLogSql, kLogDebug, "map fd %d --> %d",
+               (*fd_from_)[i], (*fd_to_)[i]);
+      pFile->fd = (*fd_to_)[i];
+      fd_from_->erase(fd_from_->begin() + i);
+      fd_to_->erase(fd_to_->begin() + i);
+      return;
+    }
+  }
+}
 
 
 static int VfsRdOnlyClose(sqlite3_file *pFile) {
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
+  ApplyFdMap(p);
   int retval = p->vfs_rdonly->cache_mgr->Close(p->fd);
   if (retval == 0) {
     perf::Dec(p->vfs_rdonly->no_open);
@@ -109,6 +131,7 @@ static int VfsRdOnlyRead(
   sqlite_int64 iOfst
 ) {
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
+  ApplyFdMap(p);
   ssize_t got = p->vfs_rdonly->cache_mgr->Pread(p->fd, zBuf, iAmt, iOfst);
   perf::Inc(p->vfs_rdonly->n_read);
   if (got == iAmt) {
@@ -306,18 +329,6 @@ static int VfsRdOnlyAccess(
     return SQLITE_OK;
   }
 
-  /*int amode = 0;
-  switch (flags) {
-    case SQLITE_ACCESS_EXISTS:
-      amode = F_OK;
-      break;
-    case SQLITE_ACCESS_READ:
-      amode = R_OK;
-      break;
-    default:
-      assert(false);
-  }
-  *pResOut = (access(zPath, amode) == 0);*/
   // This VFS deals with file descriptors, we know the files are there
   *pResOut = 0;
   perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_access);
@@ -444,6 +455,9 @@ bool RegisterVfsRdOnly(
   perf::Statistics *statistics,
   const VfsOptions options)
 {
+  fd_from_ = new std::vector<int>();
+  fd_to_ = new std::vector<int>();
+
   sqlite3_vfs *vfs = reinterpret_cast<sqlite3_vfs *>(
     smalloc(sizeof(sqlite3_vfs)));
   memset(vfs, 0, sizeof(sqlite3_vfs));
@@ -515,7 +529,18 @@ bool UnregisterVfsRdOnly() {
 
   delete reinterpret_cast<VfsRdOnly *>(vfs->pAppData);
   free(vfs);
+
+  delete fd_from_;
+  delete fd_to_;
+  fd_from_ = NULL;
+  fd_to_ = NULL;
+
   return true;
+}
+
+void RegisterFdMapping(int from, int to) {
+  fd_from_->push_back(from);
+  fd_to_->push_back(to);
 }
 
 }  // namespace sqlite

@@ -15,6 +15,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/posix.h"
 
 // TODO(jblomer): Check for possible starvation of plugin by dying clients
@@ -218,7 +219,7 @@ void CacheTransport::Frame::WrapMsg() {
     is_msg_out_of_band_ = true;
   } else {
     // Unexpected message type, should never happen
-    abort();
+    PANIC(NULL);
   }
   is_wrapped_ = true;
 }
@@ -274,7 +275,7 @@ void CacheTransport::Frame::UnwrapMsg() {
     is_msg_out_of_band_ = true;
   } else {
     // Unexpected message type, should never happen
-    abort();
+  PANIC(NULL);
   }
 }
 
@@ -313,7 +314,7 @@ void CacheTransport::FillMsgHash(
       msg_hash->set_algorithm(cvmfs::HASH_SHAKE128);
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
   msg_hash->set_digest(hash.digest, shash::kDigestSizes[hash.algorithm]);
 }
@@ -336,7 +337,7 @@ void CacheTransport::FillObjectType(
       *wire_type = cvmfs::OBJECT_VOLATILE;
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 
@@ -507,10 +508,8 @@ void CacheTransport::SendData(
   bool retval = SafeWriteV(fd_connection_, iov, (att_size == 0) ? 2 : 4);
 
   if (!retval && !(flags_ & kFlagSendIgnoreFailure)) {
-    LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "failed to write to external cache transport (%d), aborting",
-             errno);
-    abort();
+    PANIC(kLogSyslogErr | kLogDebug,
+          "failed to write to external cache transport (%d), aborting", errno);
   }
 }
 
@@ -531,10 +530,9 @@ void CacheTransport::SendNonBlocking(struct iovec *iov, unsigned iovcnt) {
   if (retval < 0) {
     assert(errno != EMSGSIZE);
     if (!(flags_ & kFlagSendIgnoreFailure)) {
-      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-             "failed to write to external cache transport (%d), aborting",
-             errno);
-      abort();
+      PANIC(kLogSyslogErr | kLogDebug,
+            "failed to write to external cache transport (%d), aborting",
+            errno);
     }
   }
 }

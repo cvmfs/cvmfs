@@ -5,21 +5,30 @@
 ################################################################################
 
 # Configuration variables for update-geodb -l.  May be overridden in
-#   /etc/cvmfs/cvmfs_server_hooks.sh or per-repo replica.conf.
+#   /etc/cvmfs/cvmfs_server_hooks.sh, /etc/cvmfs/server.local, or
+#   per-repo in replica.conf.
 # Default settings will attempt to update from cvmfs_server snapshot
 #   once every 4 weeks in the 10 o'clock hour of Tuesday.
 CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
 CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
-CVMFS_UPDATEGEO_MINDAYS=25 # Minimum days between update attempts
-CVMFS_UPDATEGEO_MAXDAYS=100 # Maximum days old before considering it an error
+CVMFS_UPDATEGEO_MINDAYS=14 # Minimum days between update attempts
+CVMFS_UPDATEGEO_MAXDAYS=28 # Maximum days before considering it urgent
 
-CVMFS_UPDATEGEO_URLBASE="http://geolite.maxmind.com/download/geoip/database"
+CVMFS_UPDATEGEO_URLBASE="https://download.maxmind.com/app/geoip_download"
 CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
 CVMFS_UPDATEGEO_DB="GeoLite2-City.mmdb"
 
 DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 
 LATEST_JSON_INFO_SCHEMA=1
+
+if [ -f /etc/cvmfs/server.local ]; then
+  if [ -r /etc/cvmfs/server.local ]; then
+    . /etc/cvmfs/server.local
+  else
+    echo "WARNING: cannot read /etc/cvmfs/server.local" >&2
+  fi
+fi
 
 # setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
@@ -97,6 +106,9 @@ CVMFS_DEFAULT_AUTO_GC_LAPSE='1 day ago'
 CVMFS_SERVER_DEBUG=${CVMFS_SERVER_DEBUG:=0}
 CVMFS_SERVER_SWISSKNIFE="cvmfs_swissknife"
 CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
+# cvmfs_publish will eventually become cvmfs_server, removing the shell wrapper
+CVMFS_SERVER_PUBLISH="cvmfs_publish"
+CVMFS_SERVER_PUBLISH_DEBUG=$CVMFS_SERVER_PUBLISH
 
 # On newer Apache version, reloading is asynchonrous and not guaranteed to succeed.
 # The integration test cases set this parameter to true.
@@ -126,7 +138,26 @@ if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
       ;;
     esac
   else
-    echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
+    echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode [cvmfs_swissknife]...."
+  fi
+
+  if cvmfs_sys_file_is_regular /usr/bin/cvmfs_publish_debug ; then
+    case $CVMFS_SERVER_DEBUG in
+      1)
+        # in case something breaks we are provided with a GDB prompt.
+        CVMFS_SERVER_PUBLISH_DEBUG="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_publish_debug"
+      ;;
+      2)
+        # attach gdb and provide a prompt WITHOUT actual running the program
+        CVMFS_SERVER_PUBLISH_DEBUG="gdb --quiet --args cvmfs_publish_debug"
+      ;;
+      3)
+        # do not attach gdb just run debug version
+        CVMFS_SERVER_PUBLISH_DEBUG="cvmfs_publish_debug"
+      ;;
+    esac
+  else
+    echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode [cvmfs_publish]...."
   fi
 fi
 
