@@ -35,7 +35,7 @@ func TestSessionValid(t *testing.T) {
 		ctx, token, payload, digest, headerSize); err != nil {
 		t.Fatalf("could not submit payload: %v", err)
 	}
-	if err := backend.CommitLease(ctx, token, "old_hash", "new_hash",
+	if _, err := backend.CommitLease(ctx, token, "old_hash", "new_hash",
 		gw.RepositoryTag{
 			Name:        "mytag",
 			Channel:     "mychannel",
@@ -137,7 +137,7 @@ func TestSessionCommitWithInvalidToken(t *testing.T) {
 		t.Fatalf("could not generate second lease token")
 	}
 
-	if err := backend.CommitLease(ctx, token2.TokenStr, "old_hash", "new_hash",
+	if _, err := backend.CommitLease(ctx, token2.TokenStr, "old_hash", "new_hash",
 		gw.RepositoryTag{
 			Name:        "mytag",
 			Channel:     "mychannel",
@@ -175,7 +175,7 @@ func TestSessionCommitWithExpiredToken(t *testing.T) {
 
 	time.Sleep(2 * backend.Config.MaxLeaseTime)
 
-	if err := backend.CommitLease(ctx, token, "old_hash", "new_hash",
+	if _, err := backend.CommitLease(ctx, token, "old_hash", "new_hash",
 		gw.RepositoryTag{
 			Name:        "mytag",
 			Channel:     "mychannel",
@@ -228,7 +228,7 @@ func TestSessionTwoConcurrentValid(t *testing.T) {
 		t.Fatalf("could not submit payload: %v", err)
 	}
 
-	if err := backend.CommitLease(ctx, token1, "old_hash", "new_hash1",
+	if _, err := backend.CommitLease(ctx, token1, "old_hash", "new_hash1",
 		gw.RepositoryTag{
 			Name:        "mytag",
 			Channel:     "mychannel",
@@ -237,7 +237,7 @@ func TestSessionTwoConcurrentValid(t *testing.T) {
 		t.Fatalf("could not commit existing lease: %v", err)
 	}
 
-	if err := backend.CommitLease(ctx, token2, "old_hash", "new_hash2",
+	if _, err := backend.CommitLease(ctx, token2, "old_hash", "new_hash2",
 		gw.RepositoryTag{
 			Name:        "mytag",
 			Channel:     "mychannel",

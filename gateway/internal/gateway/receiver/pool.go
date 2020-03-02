@@ -39,12 +39,13 @@ func (p payloadTask) Context() context.Context {
 
 // commitTask is the input data for a commit task
 type commitTask struct {
-	ctx         context.Context
-	leasePath   string
-	oldRootHash string
-	newRootHash string
-	tag         gw.RepositoryTag
-	replyChan   chan<- error
+	ctx          context.Context
+	leasePath    string
+	oldRootHash  string
+	newRootHash  string
+	tag          gw.RepositoryTag
+	replyChan    chan<- error
+	finalRevChan chan<- uint64
 }
 
 // Reply returns the reply channel
@@ -74,7 +75,6 @@ type Pool struct {
 func StartPool(workerExec string, numWorkers int, mock bool, smgr *stats.StatisticsMgr) (*Pool, error) {
 	// Start payload submission workers
 	tasks := make(chan task)
-
 	pool := &Pool{tasks, sync.WaitGroup{}, workerExec, mock, smgr}
 
 	for i := 0; i < numWorkers; i++ {
@@ -106,11 +106,16 @@ func (p *Pool) SubmitPayload(ctx context.Context, leasePath string, payload io.R
 
 // CommitLease associated with the token (transaction commit)
 // TODO: implement timeout or context?
-func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	reply := make(chan error)
-	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, reply}
+	finalRevChan := make(chan uint64, 1)
+	var finalRev uint64
+	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, reply, finalRevChan}
 	result := <-reply
-	return result
+	if reply == nil {
+		finalRev = <-finalRevChan
+	}
+	return finalRev, result
 }
 
 func worker(tasks <-chan task, pool *Pool, workerIdx int) {
@@ -143,13 +148,16 @@ M:
 
 			var taskType string
 			var result error
+			var finalRev uint64
 			switch t := task.(type) {
 			case payloadTask:
 				result = receiver.SubmitPayload(t.leasePath, t.payload, t.digest, t.headerSize)
 				taskType = "payload"
 			case commitTask:
-				result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
+				finalRev, result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
 				taskType = "commit"
+				commitTask := commitTask(t)
+				commitTask.finalRevChan <- finalRev
 			default:
 				task.Reply() <- fmt.Errorf("unknown task type")
 				return
