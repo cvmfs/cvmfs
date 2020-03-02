@@ -17,7 +17,7 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "repository-manager",
+	Use:   "cvmfs_ducc",
 	Short: "Show the several commands available.",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

@@ -1,0 +1,46 @@
+cvmfs_test_name="DUCC singularity image conversion thin image"
+cvmfs_test_autofs_on_startup=true
+cvmfs_test_suites="ducc"
+
+DOCKER_TEST_IMAGE="https://registry.hub.docker.com/library/centos:centos7"
+
+CVMFS_TEST404_REGISTRY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+
+ducc_test_401_clean_up() {
+  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
+    
+  export DUCC_DOCKER_REGISTRY_PASS=""
+
+  echo -n "Stopping and deleting docker registry..."
+  docker stop $CVMFS_TEST404_REGISTRY >> /dev/null
+  docker rm $CVMFS_TEST404_REGISTRY >> /dev/null
+  echo "done"
+}
+
+cvmfs_run_test() {
+  trap ducc_test_401_clean_up EXIT HUP INT TERM
+
+  echo "*** creating empty repo ***"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return 1
+    
+  echo -n "*** Starting docker registry for tests..."
+  docker run -d -p 5000:5000 --name $CVMFS_TEST404_REGISTRY registry:2 >> /dev/null || return 3
+  echo "done"
+
+  echo "*** converting image to flat ***"
+  export DUCC_DOCKER_REGISTRY_PASS=mock_pass
+  cvmfs_ducc convert-single-image \
+        --skip-flat \
+        --thin-image-name http://localhost:5000/mock/thin_404/centos:7 \
+        --username mock_user \
+        $DOCKER_TEST_IMAGE $CVMFS_TEST_REPO || return 2
+
+   docker images | grep mock/thin_404/centos || return 3
+   docker rmi localhost:5000/mock/thin_404/centos:7 || return 4
+   docker pull localhost:5000/mock/thin_404/centos:7 || return 5
+ 
+   # make sure we actually saved some layer
+   ls /cvmfs/$CVMFS_TEST_REPO/.layers/* >> /dev/null || return 6  
+
+  return 0
+}
