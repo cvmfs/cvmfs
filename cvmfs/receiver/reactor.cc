@@ -168,9 +168,9 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   }
 
   JsonStringInput input;
-  input.push_back(std::make_pair("token", session_token.c_str()));
-  input.push_back(std::make_pair("id", public_token_id.c_str()));
-  input.push_back(std::make_pair("secret", token_secret.c_str()));
+  input.PushBack("token", session_token.c_str());
+  input.PushBack("id", public_token_id.c_str());
+  input.PushBack("secret", token_secret.c_str());
 
   ToJsonString(input, reply);
 
@@ -185,11 +185,11 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   std::string token_id;
   JsonStringInput input;
   if (!GetTokenPublicId(req, &token_id)) {
-    input.push_back(std::make_pair("status", "error"));
-    input.push_back(std::make_pair("reason", "invalid_token"));
+    input.PushBack("status", "error");
+    input.PushBack("reason", "invalid_token");
   } else {
-    input.push_back(std::make_pair("status", "ok"));
-    input.push_back(std::make_pair("id", token_id.c_str()));
+    input.PushBack("status", "ok");
+    input.PushBack("id", token_id);
   }
 
   ToJsonString(input, reply);
@@ -226,18 +226,18 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   switch (ret) {
     case kExpired:
       // Expired token
-      input.push_back(std::make_pair("status", "error"));
-      input.push_back(std::make_pair("reason", "expired_token"));
+      input.PushBack("status", "error");
+      input.PushBack("reason", "expired_token");
       break;
     case kInvalid:
       // Invalid token
-      input.push_back(std::make_pair("status", "error"));
-      input.push_back(std::make_pair("reason", "invalid_token"));
+      input.PushBack("status", "error");
+      input.PushBack("reason", "invalid_token");
       break;
     case kValid:
       // All ok
-      input.push_back(std::make_pair("status", "ok"));
-      input.push_back(std::make_pair("path", path.c_str()));
+      input.PushBack("status", "ok");
+      input.PushBack("path", path);
       break;
     default:
       // Should not be reached
@@ -287,19 +287,19 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   switch (res) {
     case PayloadProcessor::kPathViolation:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "path_violation"));
+      reply_input.PushBack("status", "error");
+      reply_input.PushBack("reason", "path_violation");
       break;
     case PayloadProcessor::kOtherError:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "other_error"));
+      reply_input.PushBack("status", "error");
+      reply_input.PushBack("reason", "other_error");
       break;
     case PayloadProcessor::kSpoolerError:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "spooler_error"));
+      reply_input.PushBack("status", "error");
+      reply_input.PushBack("reason", "uploader_error");
       break;
     case PayloadProcessor::kSuccess:
-      reply_input.push_back(std::make_pair("status", "ok"));
+      reply_input.PushBack("status", "ok");
       break;
     default:
       PANIC(kLogSyslogErr,
@@ -362,19 +362,19 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   JsonStringInput reply_input;
   switch (res) {
     case CommitProcessor::kSuccess:
-      reply_input.push_back(std::make_pair("status", "ok"));
+      reply_input.PushBack("status", "ok");
       break;
     case CommitProcessor::kError:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "miscellaneous"));
+      reply_input.PushBack("status", "error");
+      reply_input.PushBack("reason", "miscellaneous");
       break;
     case CommitProcessor::kMergeFailure:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "merge_error"));
+      reply_input.PushBack("status", "error");
+      reply_input.PushBack("reason", "merge_error");
       break;
     case CommitProcessor::kMissingReflog:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "missing_reflog"));
+      reply_input.PushBack("status", "error");
+      reply_input.PushBack("reason", "missing_reflog");
       break;
     default:
       PANIC(kLogSyslogErr,
