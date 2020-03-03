@@ -175,7 +175,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	return firstError
 }
 
-func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err error) {
+func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThinImage bool) (err error) {
 
 	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
 	if err != nil {
@@ -211,8 +211,12 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 	for _, expandedImgTag := range expandedImgTags {
 		tag := expandedImgTag.Tag
 		outputWithTag := outputImage
-		outputWithTag.Tag = tag
-		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload)
+		if inputImage.TagWildcard {
+			outputWithTag.Tag = tag
+		} else {
+			outputWithTag.Tag = outputImage.Tag
+		}
+		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, createThinImage)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
@@ -220,11 +224,8 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload bool) (err
 	return firstError
 }
 
-func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain, forceDownload bool) (err error) {
-	password, err := GetPassword()
-	if err != nil {
-		return
-	}
+func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain, forceDownload, createThinImage bool) (err error) {
+
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
@@ -357,8 +358,6 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 		return err
 	}
 
-	changes, _ := inputImage.GetChanges()
-
 	var wg sync.WaitGroup
 
 	layerLocations := make(map[string]string)
@@ -380,75 +379,15 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 	}()
 	wg.Wait()
 
-	thin, err := da.MakeThinImage(manifest, layerLocations, inputImage.WholeName())
-	if err != nil {
-		return
-	}
-
-	thinJson, err := json.MarshalIndent(thin, "", "  ")
-	if err != nil {
-		return
-	}
-	fmt.Println(string(thinJson))
-	var imageTar bytes.Buffer
-	tarFile := tar.NewWriter(&imageTar)
-	header := &tar.Header{Name: "thin.json", Mode: 0644, Size: int64(len(thinJson))}
-	err = tarFile.WriteHeader(header)
-	if err != nil {
-		return
-	}
-	_, err = tarFile.Write(thinJson)
-	if err != nil {
-		return
-	}
-	err = tarFile.Close()
-	if err != nil {
-		return
-	}
-
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
-	if err != nil {
-		return
-	}
-
-	image := types.ImageImportSource{
-		Source:     bytes.NewBuffer(imageTar.Bytes()),
-		SourceName: "-",
-	}
-	importOptions := types.ImageImportOptions{
-		Tag:     outputImage.Tag,
-		Message: "",
-		Changes: changes,
-	}
-	importResult, err := dockerClient.ImageImport(
-		context.Background(),
-		image,
-		outputImage.GetSimpleName(),
-		importOptions)
-	if err != nil {
-		LogE(err).Error("Error in image import")
-		return
-	}
-	defer importResult.Close()
-	Log().Info("Created the image in the local docker daemon")
-
-	// is necessary this mechanism to pass the authentication to the
-	// dockers even if the documentation says otherwise
-	authStruct := struct {
-		Username string
-		Password string
-	}{
-		Username: outputImage.User,
-		Password: password,
-	}
-	authBytes, _ := json.Marshal(authStruct)
-	authCredential := base64.StdEncoding.EncodeToString(authBytes)
-	pushOptions := types.ImagePushOptions{
-		RegistryAuth: authCredential,
+	if createThinImage {
+		err = CreateThinImage(manifest, layerLocations, inputImage, outputImage)
+		if err != nil {
+			return
+		}
 	}
 
 	// we wait for the goroutines to finish
-	// and if there was no error we add everything to the converted table
+	// and if there was no error we conclude everything writing the manifest into the repository
 	noErrorInConversionValue := <-noErrorInConversion
 
 	err = SaveLayersBacklink(repo, inputImage, layerDigests)
@@ -458,26 +397,48 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 	}
 
 	if noErrorInConversionValue {
-
-		res, errImgPush := dockerClient.ImagePush(
-			context.Background(),
-			outputImage.GetSimpleName(),
-			pushOptions)
-		if errImgPush != nil {
-			err = fmt.Errorf("Error in pushing the image: %s", errImgPush)
-			return err
+		if createThinImage {
+			// is necessary this mechanism to pass the authentication to the
+			// dockers even if the documentation says otherwise
+			password, err := GetPassword()
+			if err != nil {
+				return err
+			}
+			authStruct := struct {
+				Username string
+				Password string
+			}{
+				Username: outputImage.User,
+				Password: password,
+			}
+			authBytes, _ := json.Marshal(authStruct)
+			authCredential := base64.StdEncoding.EncodeToString(authBytes)
+			pushOptions := types.ImagePushOptions{
+				RegistryAuth: authCredential,
+			}
+			dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+			if err != nil {
+				return err
+			}
+			res, errImgPush := dockerClient.ImagePush(
+				context.Background(),
+				outputImage.GetSimpleName(),
+				pushOptions)
+			if errImgPush != nil {
+				err = fmt.Errorf("Error in pushing the image: %s", errImgPush)
+				return err
+			}
+			b, _ := ioutil.ReadAll(res)
+			Log().WithFields(log.Fields{"action": "prepared thin-image manifest"}).Info(string(b))
+			defer res.Close()
+			// here is possible to use the result of the above ReadAll to have
+			// informantion about the status of the upload.
+			_, errReadDocker := ioutil.ReadAll(res)
+			if err != nil {
+				LogE(errReadDocker).Warning("Error in reading the status from docker")
+			}
+			Log().Info("Finish pushing the image to the registry")
 		}
-		b, _ := ioutil.ReadAll(res)
-		fmt.Println(string(b))
-		defer res.Close()
-		// here is possible to use the result of the above ReadAll to have
-		// informantion about the status of the upload.
-		_, errReadDocker := ioutil.ReadAll(res)
-		if err != nil {
-			LogE(errReadDocker).Warning("Error in reading the status from docker")
-		}
-		Log().Info("Finish pushing the image to the registry")
-
 		manifestPath := filepath.Join(".metadata", inputImage.GetSimpleName(), "manifest.json")
 		errIng := IngestIntoCVMFS(repo, manifestPath, <-manifestChanell)
 		if errIng != nil {
@@ -501,6 +462,62 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 		Log().Warn("Some error during the conversion, we are not storing it into the database")
 		return
 	}
+}
+
+func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inputImage, outputImage Image) (err error) {
+	thin, err := da.MakeThinImage(manifest, layerLocations, inputImage.WholeName())
+	if err != nil {
+		return
+	}
+
+	thinJson, err := json.MarshalIndent(thin, "", "  ")
+	if err != nil {
+		return
+	}
+	var imageTar bytes.Buffer
+	tarFile := tar.NewWriter(&imageTar)
+	header := &tar.Header{Name: "thin.json", Mode: 0644, Size: int64(len(thinJson))}
+	err = tarFile.WriteHeader(header)
+	if err != nil {
+		return
+	}
+	_, err = tarFile.Write(thinJson)
+	if err != nil {
+		return
+	}
+	err = tarFile.Close()
+	if err != nil {
+		return
+	}
+
+	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	if err != nil {
+		return
+	}
+
+	changes, _ := inputImage.GetChanges()
+	image := types.ImageImportSource{
+		Source:     bytes.NewBuffer(imageTar.Bytes()),
+		SourceName: "-",
+	}
+	importOptions := types.ImageImportOptions{
+		Tag:     outputImage.Tag,
+		Message: "",
+		Changes: changes,
+	}
+	importResult, err := dockerClient.ImageImport(
+		context.Background(),
+		image,
+		outputImage.GetSimpleName(),
+		importOptions)
+	if err != nil {
+		LogE(err).Error("Error in image import")
+		return
+	}
+	defer importResult.Close()
+	Log().Info("Created the image in the local docker daemon")
+
+	return nil
 }
 
 func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionResult {
