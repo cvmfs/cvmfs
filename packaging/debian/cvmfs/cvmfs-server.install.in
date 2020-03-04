@@ -16,5 +16,6 @@ usr/share/cvmfs-server/webapi/*
 usr/share/cvmfs-server/webapi/*/*
 usr/share/cvmfs-server/webapi/*/*/*
 usr/share/cvmfs-server/generate_stats_plots.C
+usr/share/cvmfs-server/stats_index.html.tpl
 var/lib/cvmfs-server/geo/
 var/spool/cvmfs/README
