@@ -224,7 +224,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	return firstError
 }
 
-func getLayersOfImage(image Image, repo string, forceDownload bool, layersChan chan<- downloadedLayer) (err error) {
+func getLayersOfImage(image *Image, repo string, forceDownload bool, layersChan chan<- downloadedLayer) (err error) {
 	defer close(layersChan)
 
 	manifest, err := image.GetManifest()
@@ -252,7 +252,7 @@ func getLayersOfImage(image Image, repo string, forceDownload bool, layersChan c
 		user = ""
 		pass = ""
 	}
-	layerUrl := getBlobUrl(image, layersToDownload[0].Digest)
+	layerUrl := getBlobUrl(*image, layersToDownload[0].Digest)
 	token, err := firstRequestForAuth(layerUrl, user, pass)
 	if err != nil {
 		LogE(err).WithFields(log.Fields{"error": err}).Error("Error in obtain the authentication token to download the layers.")

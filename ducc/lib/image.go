@@ -153,7 +153,7 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 		return manifest, fmt.Errorf("Got empty manifest")
 	}
 	img.Manifest = &manifest
-	return manifest, nil
+	return *img.Manifest, nil
 }
 
 func (img *Image) GetManifestList() (manifestlist.ManifestList, error) {
@@ -269,7 +269,7 @@ func (img *Image) GetConfig() (config image.Image, err error) {
 	return
 }
 
-func (img Image) GetChanges() (changes []string, err error) {
+func (img *Image) GetChanges() (changes []string, err error) {
 	changes = []string{"ENV CVMFS_IMAGE true"}
 	config, err := img.GetConfig()
 	if err != nil {
@@ -300,7 +300,7 @@ func (img Image) GetChanges() (changes []string, err error) {
 	return
 }
 
-func (img Image) GetDiffIDs() (diffIDs []digest.Digest, err error) {
+func (img *Image) GetDiffIDs() (diffIDs []digest.Digest, err error) {
 	diffIDs = []digest.Digest{}
 	config, err := img.GetConfig()
 	if err != nil {
@@ -407,7 +407,7 @@ func GetSingularityPathFromManifest(manifest da.Manifest) string {
 }
 
 // here is where in the FS we are going to store the singularity image
-func (img Image) GetSingularityPath() (string, error) {
+func (img *Image) GetSingularityPath() (string, error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Error("Error in getting the manifest to figureout the singularity path")
@@ -444,7 +444,7 @@ func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity
 	return Singularity{Image: &img, TempDirectory: dir}, nil
 }
 
-func (img Image) AreAllLayersPresent(repo string) bool {
+func (img *Image) AreAllLayersPresent(repo string) bool {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Error("Error in obtaining the manifest")
@@ -460,7 +460,7 @@ func (img Image) AreAllLayersPresent(repo string) bool {
 	return true
 }
 
-func (img Image) UnpackFlatFilesystemInDir(repo string) error {
+func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	// we first obtain all the layers
 	for i := 0; i <= 5; i++ {
 
