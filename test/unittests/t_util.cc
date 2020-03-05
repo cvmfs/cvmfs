@@ -1595,8 +1595,10 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   map<int, int> fd_map;
   fd_map[fd_stdout[1]] = 1;
 
-  success = ManagedExec(command_line, preserve_filedes, fd_map, true, true,
-      &pid);
+  success = ManagedExec(command_line, preserve_filedes, fd_map,
+                        true /* drop_credentials */, false /* clear_env */,
+                        true /* double_fork */,
+                        &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
   ssize_t bytes_read = read(fd_stdout[0], buffer, message.length());
@@ -1605,6 +1607,37 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   ASSERT_EQ(message, result);
   close(fd_stdout[0]);
 }
+
+
+TEST_F(T_Util, ManagedExecClearEnv) {
+  bool success;
+  pid_t pid;
+  int fd_stdout[2];
+  int fd_stdin[2];
+  UniquePtr<unsigned char> buffer(static_cast<unsigned char*>(
+    scalloc(100, 1)));
+  MakePipe(fd_stdout);
+  MakePipe(fd_stdin);
+  vector<string> command_line;
+  command_line.push_back("/usr/bin/env");
+
+  set<int> preserve_filedes;
+  preserve_filedes.insert(1);
+
+  map<int, int> fd_map;
+  fd_map[fd_stdout[1]] = 1;
+
+  success = ManagedExec(command_line, preserve_filedes, fd_map,
+                        true /* drop_credentials */, true /* clear_env */,
+                        true /* double_fork */,
+                        &pid);
+  close(fd_stdout[1]);
+  ASSERT_TRUE(success);
+  ssize_t bytes_read = read(fd_stdout[0], buffer, 64);
+  EXPECT_EQ(bytes_read, 0);
+  close(fd_stdout[0]);
+}
+
 
 TEST_F(T_Util, ManagedExecRunShell) {
   int fd_stdin;

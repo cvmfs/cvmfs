@@ -1404,7 +1404,8 @@ bool ExecuteBinary(
   if (!ManagedExec(cmd_line,
                    preserve_fildes,
                    map_fildes,
-                   true,
+                   true /* drop_credentials */,
+                   false /* clear_env */,
                    double_fork,
                    child_pid))
   {
@@ -1487,6 +1488,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
                  const std::set<int>        &preserve_fildes,
                  const std::map<int, int>   &map_fildes,
                  const bool             drop_credentials,
+                 const bool             clear_env,
                  const bool             double_fork,
                        pid_t           *child_pid)
 {
@@ -1500,6 +1502,11 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     int max_fd;
     int fd_flags;
     ForkFailures::Names failed = ForkFailures::kUnknown;
+
+    if (clear_env) {
+      int retval = clearenv();
+      assert(retval == 0);
+    }
 
     const char *argv[command_line.size() + 1];
     for (unsigned i = 0; i < command_line.size(); ++i)
