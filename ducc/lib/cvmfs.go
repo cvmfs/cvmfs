@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	copy "github.com/otiai10/copy"
 	log "github.com/sirupsen/logrus"
@@ -17,6 +18,53 @@ import (
 
 var dirPermision = os.FileMode(0755)
 var filePermision = os.FileMode(0644)
+
+var cvmfsMutex sync.Mutex
+
+func InTransaction(CVMFSRepo string) bool {
+	_, errTransaction := os.Stat(filepath.Join("/", "var", "spool", "cvmfs", CVMFSRepo, "in_transaction.lock"))
+	if !os.IsNotExist(errTransaction) {
+		return true
+	}
+	return false
+}
+
+func OpenTransaction(CVMFSRepo string) error {
+	cvmfsMutex.Lock()
+
+	if InTransaction(CVMFSRepo) {
+		defer cvmfsMutex.Unlock()
+		err := fmt.Errorf("Repository seems already in a transaction")
+		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Error("The repository seems already in a transaction")
+	}
+
+	err := ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("Error in opening the transaction.")
+		return err
+	}
+	return nil
+}
+
+func PublishTransaction(CVMFSRepo string) error {
+	defer cvmfsMutex.Unlock()
+	err := ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("Error in committing the transaction.")
+		return err
+	}
+	return nil
+}
+
+func AbortTransaction(CVMFSRepo string) error {
+	defer cvmfsMutex.Unlock()
+	err := ExecCommand("cvmfs_server", "abort", "-f", CVMFSRepo).Start()
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("Error in aborting the transaction.")
+		return err
+	}
+	return nil
+}
 
 // ingest into the repository, inside the subpath, the target (directory or file) object
 // CVMFSRepo: just the name of the repository (ex: unpacked.cern.ch)
@@ -406,6 +454,18 @@ func RemoveSingularityImageFromManifest(CVMFSRepo string, manifest da.Manifest) 
 		return err
 	}
 	return nil
+}
+
+func ChainPath(CVMFSRepo, chainID string) string {
+	return filepath.Join("/", "cvmfs", CVMFSRepo, ".chain", chainID[0:2], chainID)
+}
+
+func ChainRootfsPath(CVMFSRepo, chainID string) string {
+	return filepath.Join(ChainPath(CVMFSRepo, chainID), "layerfs")
+}
+
+func ChainMetadataPath(CVMFSRepo, chainID string) string {
+	return filepath.Join(ChainPath(CVMFSRepo, chainID), ".metadata")
 }
 
 func LayerPath(CVMFSRepo, layerDigest string) string {

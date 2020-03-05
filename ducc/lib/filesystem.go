@@ -126,16 +126,21 @@ func ApplyDirectory(bottom, top string) error {
 			}
 			srcFile, err := os.Open(filepath.Join(top, file.Path))
 			if err != nil {
+				newFile.Close()
 				return err
 			}
 			_, err = io.Copy(newFile, srcFile)
+			srcFile.Close()
 			if err != nil {
+				newFile.Close()
 				return err
 			}
 			newFile.Chown(UID, GID)
 			newFile.Chmod(filemode)
+			newFile.Close()
 
 		case filemode&os.ModeSymlink != 0:
+			os.Remove(path)
 			link, err := os.Readlink(filepath.Join(top, file.Path))
 			if err != nil {
 				return err
