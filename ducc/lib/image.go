@@ -17,7 +17,10 @@ import (
 
 	manifestlist "github.com/docker/distribution/manifest/manifestlist"
 	image "github.com/docker/docker/image"
+	//dockerArchive "github.com/docker/docker/pkg/archive"
+	dockerArchive "github.com/docker/docker/pkg/archive"
 	digest "github.com/opencontainers/go-digest"
+	copy "github.com/otiai10/copy"
 
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
@@ -443,6 +446,109 @@ func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity
 	return Singularity{Image: &img, TempDirectory: dir}, nil
 }
 
+func (img Image) UnpackFlatFilesystemInDir(dir string) error {
+	// we first obtain all the layers
+	rootPath, err := UserDefinedTempDir("", "unpackImage")
+	if err != nil {
+		LogE(err).Error("Impossible to create a temporary directory")
+	}
+	layersChan := make(chan downloadedLayer)
+
+	go getLayersOfImage(img, "", true, layersChan)
+
+	layerToLocation := make(map[string]string)
+	for downloadedLayer := range layersChan {
+		defer downloadedLayer.Path.Close()
+		path := filepath.Join(rootPath, downloadedLayer.Name+".tar")
+		f, err := os.Create(path)
+		if err != nil {
+			errC := fmt.Errorf("Error in creating the file where to save the layer: %s", err)
+			LogE(errC).WithFields(log.Fields{"digest": downloadedLayer.Name, "file path": path}).Error("Error in saving the layer to path")
+			return errC
+		}
+		_, err = io.Copy(f, downloadedLayer.Path)
+		if err != nil {
+			errF := fmt.Errorf("Error in writing the layer in the filesystem: %s", err)
+			LogE(errF).WithFields(log.Fields{"digest": downloadedLayer.Name, "path": path}).Error("Error in saving the layer to path")
+			return errF
+		}
+		layerToLocation[downloadedLayer.Name] = path
+	}
+
+	// now we make sure that all the necessary layers are where we can reach them.
+	manifest, err := img.GetManifest()
+	if err != nil {
+		LogE(err).Error("Error in obtaining the manifest")
+		return err
+	}
+	for _, layer := range manifest.Layers {
+		_, foundLayer := layerToLocation[layer.Digest]
+		if !foundLayer {
+			err = fmt.Errorf("Error, layer: %s not found in local storage", layer.Digest)
+			LogE(err).Error("Not found layer")
+			return err
+		}
+	}
+
+	chainsPath := filepath.Join(rootPath, "chainIDs")
+	err = os.MkdirAll(chainsPath, 0744)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"dir": chainsPath}).Error("Error in creating the directory for the chainIDs")
+		return err
+	}
+	diffIDs, err := img.GetDiffIDs()
+	if err != nil {
+		LogE(err).Error("Error in generating the diffID")
+		return err
+	}
+	chainId := ChainIDFromLayers(diffIDs)
+	// diffIDs and layers hash must be on the same number.
+	// just for references, diffID are generated as hash of the **uncompressed** content of the layer
+	// while the hash of the layer is from the **compressed** content.
+
+	if len(chainId.Chain) != len(layerToLocation) {
+		err := fmt.Errorf("Different number of layers (%s) and diffIDs (%s), they should be the same.",
+			len(layerToLocation), len(chainId.Chain))
+		LogE(err).Error("Impossible to continue")
+		return err
+	}
+
+	previousDirectory := ""
+	for i := 0; i < len(layerToLocation); i++ {
+		// create directory where to store the chain
+		layer := manifest.Layers[i]
+		tarPath := layerToLocation[layer.Digest]
+		chainPath := filepath.Join(chainsPath, chainId.Chain[i].String())
+		Log().WithFields(log.Fields{"layer": layer}).Info("Working on layer")
+		err := os.MkdirAll(chainPath, 0744)
+		if err != nil {
+			LogE(err).WithFields(log.Fields{"dir": chainPath}).Error("Error in creating the directory for the chainIDs")
+			return err
+		}
+		if previousDirectory != "" {
+			copy.Copy(previousDirectory, chainPath)
+		}
+		/*
+			tarFile, err := os.Open(tarPath)
+			if err != nil {
+				LogE(err).WithFields(log.Fields{"file": tarPath}).Error("Error in opening tar file")
+				return err
+			}
+			_, err = dockerArchive.ApplyLayer(chainPath, tarFile)
+		*/
+		archiver := dockerArchive.NewDefaultArchiver()
+		err = archiver.UntarPath(tarPath, chainPath)
+		if err != nil {
+			LogE(err).WithFields(log.Fields{"file": tarPath, "directory": chainPath}).Error("Error in applying the tar file to the directory")
+			return err
+		}
+	}
+
+	fmt.Println(layerToLocation)
+	// let's make sure also the manifest is been ingested
+	return nil
+}
+
 // the one that the user see, without the /cvmfs/$repo.cern.ch prefix
 // used mostly by Singularity
 func (i Image) GetPublicSymlinkPath() string {
@@ -622,10 +728,11 @@ func getBlobUrl(img Image, blobDigest string) string {
 }
 
 type downloadedLayer struct {
-	Name string
-	Path io.ReadCloser
+	Name string        // the digest of the layer
+	Path io.ReadCloser // a reader for the content of the layer
 }
 
+// manifestChan will hold the path where we saved the manifest file
 func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
 	defer close(layersChan)
 	defer close(manifestChan)
@@ -681,7 +788,7 @@ func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<
 		go func(ctx context.Context, layer da.Layer) {
 			defer wg.Done()
 			Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Start working on layer")
-			toSend, err := img.downloadLayer(layer, token, rootPath)
+			toSend, err := img.downloadLayer(layer, token)
 			if err != nil {
 				LogE(err).Error("Error in downloading a layer")
 				return
@@ -720,7 +827,7 @@ func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<
 	}
 }
 
-func (img Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend downloadedLayer, err error) {
+func (img Image) downloadLayer(layer da.Layer, token string) (toSend downloadedLayer, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -765,7 +872,6 @@ func (img Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend d
 		}
 	}
 	return
-
 }
 
 func parseBearerToken(token string) (realm string, options map[string]string, err error) {

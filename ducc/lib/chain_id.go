@@ -1,7 +1,8 @@
 package lib
 
 import (
-	_ "crypto/sha256"
+
+	//_ "crypto/sha256"
 	"github.com/opencontainers/go-digest"
 )
 
