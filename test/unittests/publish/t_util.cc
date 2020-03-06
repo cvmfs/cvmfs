@@ -4,6 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <fcntl.h>
+
+#include "publish/except.h"
 #include "publish/repository_util.h"
 #include "util/posix.h"
 
@@ -59,6 +62,35 @@ TEST_F(T_Util, ServerLockFile) {
   EXPECT_TRUE(ServerLockFile::Acquire("foo", false));
   EXPECT_TRUE(ServerLockFile::IsLocked("foo", false));
   ServerLockFile::Release("foo");
+}
+
+
+TEST_F(T_Util, SetInConfig) {
+  EXPECT_THROW(SetInConfig("/no/such/file", "x", "y"), EPublish);
+  EXPECT_FALSE(FileExists("test_publish_config"));
+  SetInConfig("test_publish_config", "X", "y");
+  EXPECT_TRUE(FileExists("test_publish_config"));
+
+  int fd = open("test_publish_config", O_RDONLY);
+  EXPECT_GE(fd, 0);
+  std::string content;
+  EXPECT_TRUE(SafeReadToString(fd, &content));
+  close(fd);
+  EXPECT_EQ("X=y\n", content);
+
+  SetInConfig("test_publish_config", "X", "z");
+  fd = open("test_publish_config", O_RDONLY);
+  EXPECT_GE(fd, 0);
+  EXPECT_TRUE(SafeReadToString(fd, &content));
+  close(fd);
+  EXPECT_EQ("X=z\n", content);
+
+  SetInConfig("test_publish_config", "A", "b");
+  fd = open("test_publish_config", O_RDONLY);
+  EXPECT_GE(fd, 0);
+  EXPECT_TRUE(SafeReadToString(fd, &content));
+  close(fd);
+  EXPECT_EQ("X=z\nA=b\n", content);
 }
 
 }  // namespace publish

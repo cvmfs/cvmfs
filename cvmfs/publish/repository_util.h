@@ -46,6 +46,20 @@ class ServerLockFile {
   static bool IsLocked(const std::string &path, bool ignore_stale);
 };
 
+
+/**
+ * Callout to cvmfs_suid_helper $verb $fqrn
+ */
+void RunSuidHelper(const std::string &verb, const std::string &fqrn);
+
+
+/**
+ * Replaces or creates $key=$value in the config file $path. Creates $path
+ * if necessary.
+ */
+void SetInConfig(const std::string &path,
+                 const std::string &key, const std::string &value);
+
 }  // namespace publish
 
 #endif  // CVMFS_PUBLISH_REPOSITORY_UTIL_H_

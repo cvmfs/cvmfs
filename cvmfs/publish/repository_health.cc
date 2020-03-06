@@ -156,11 +156,40 @@ int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
   }
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "(%s) attempting mountpoint repair (%d)",
-           fqrn.c_str());
+           fqrn.c_str(), result);
+
+  // consecutively bring the mountpoints into a sane state by working bottom up:
+  //   1. solve problems with the rdonly mountpoint
+  //      Note: this might require to 'break' the union mount
+  //            (kFailUnionBroken -> 1)
+  //      1.1. solve outdated rdonly mountpoint (kFailRdOnlyOutdated -> 0)
+  //      1.2. remount rdonly mountpoint        (kFailRdOnlyBroken   -> 0)
+  //   2. solve problems with the union mountpoint
+  //      2.1. mount the union mountpoint read-only    (kFailUnionBroken   -> 0)
+  //      2.2. remount the union mountpoint read-only  (kFailUnionWritable -> 0)
+  //      2.2. remount the union mountpoint read-write (kFailUnionLocked   -> 0)
+
+  logFlags = kLogSyslog;
+  if (!is_quiet)
+    logFlags |= kLogStderr;
+
+  if ((result & kFailRdOnlyOutdated) || (result & kFailRdOnlyWrongRevision)) {
+    if ((result & kFailUnionBroken) == 0) {
+      AlterMountpoint(kAlterUnionUnmount, logFlags);
+      result |= kFailUnionBroken;
+    }
+
+    if ((result & kFailRdOnlyBroken) == 0) {
+      AlterMountpoint(kAlterRdOnlyUnmount, logFlags);
+      result |= kFailRdOnlyBroken;
+    }
+
+    // set ro hash
+    result &= ~kFailRdOnlyOutdated;
+    result &= ~kFailRdOnlyWrongRevision;
+  }
+
   return result;
-
-  // Repair
-
 
 }
 

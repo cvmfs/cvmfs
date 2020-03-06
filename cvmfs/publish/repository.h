@@ -187,6 +187,19 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   const SettingsPublisher &settings() const { return settings_; }
 
  private:
+  /**
+   * Possible state transitions for the cvmfs read-only mountpoint and the
+   * union file system on /cvmfs/$fqrn
+   */
+  enum EMountpointAlterations {
+    kAlterUnionUnmount,
+    kAlterRdOnlyUnmount,
+    kAlterUnionMount,
+    kAlterRdOnlyMount,
+    kAlterUnionOpen,
+    kAlterUnionLock,
+  };
+
   Publisher();  ///< Used by Create
 
   void CreateKeychain();
@@ -213,6 +226,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void OnUploadWhitelist(const upload::SpoolerResult &result);
 
   void CheckTagName(const std::string &name);
+  void AlterMountpoint(EMountpointAlterations how, int log_level);
 
   SettingsPublisher settings_;
   /**

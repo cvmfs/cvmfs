@@ -10,6 +10,8 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -76,7 +78,7 @@ bool ServerLockFile::Acquire(const std::string &path, bool ignore_stale) {
   unlink(tmp_path.c_str());
   if (errno == EEXIST)
     return false;
-  EPublish("cannot commit lock file " + path);
+  throw EPublish("cannot commit lock file " + path);
 }
 
 
@@ -113,6 +115,67 @@ bool ServerLockFile::IsLocked(const std::string &path, bool ignore_stale) {
 
 void ServerLockFile::Release(const std::string &path) {
   unlink(path.c_str());
+}
+
+
+void RunSuidHelper(const std::string &verb, const std::string &fqrn) {
+  std::vector<std::string> cmd_line;
+  cmd_line.push_back("/usr/bin/cvmfs_suid_helper");
+  cmd_line.push_back(verb);
+  cmd_line.push_back(fqrn);
+  std::set<int> preserved_fds;
+  preserved_fds.insert(1);
+  preserved_fds.insert(2);
+  pid_t child_pid;
+  bool retval = ManagedExec(cmd_line, preserved_fds, std::map<int, int>(),
+                            false /* drop_credentials */,
+                            true /* clear_env */,
+                            false /* double_fork */,
+                            &child_pid);
+  if (!retval)
+    throw EPublish("cannot spawn suid helper");
+  int exit_code = WaitForChild(child_pid);
+  if (exit_code != 0)
+    throw EPublish("error calling suid helper: " + StringifyInt(exit_code));
+}
+
+
+void SetInConfig(const std::string &path,
+                 const std::string &key, const std::string &value)
+{
+  int fd = open(path.c_str(), O_RDWR | O_CREAT, kDefaultFileMode);
+  if (fd < 0)
+    throw EPublish("cannot modify configuration file " + path);
+
+  std::string new_content;
+  std::string line;
+  bool key_exists = false;
+  while (GetLineFd(fd, &line)) {
+    std::string trimmed = Trim(line);
+    if (HasPrefix(trimmed, key + "=", false /* ignore_case */)) {
+      new_content += key + "=" + value + "\n";
+      key_exists = true;
+    } else {
+      new_content += line + "\n";
+    }
+  }
+  if (!key_exists)
+    new_content += key + "=" + value + "\n";
+
+  off_t off_zero = lseek(fd, 0, SEEK_SET);
+  if (off_zero != 0) {
+    close(fd);
+    throw EPublish("cannot rewind configuration file " + path);
+  }
+  int rvi = ftruncate(fd, 0);
+  if (rvi != 0) {
+    close(fd);
+    throw EPublish("cannot truncate configuration file " + path);
+  }
+  bool rvb = SafeWrite(fd, new_content.data(), new_content.length());
+  close(fd);
+  if (!rvb)
+    throw EPublish("cannot rewrite configuration file " + path);
 }
 
 }  // namespace publish
