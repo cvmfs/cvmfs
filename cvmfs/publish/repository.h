@@ -227,6 +227,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   void CheckTagName(const std::string &name);
   void AlterMountpoint(EMountpointAlterations how, int log_level);
+  void SetRootHash(const shash::Any &hash);
 
   SettingsPublisher settings_;
   /**

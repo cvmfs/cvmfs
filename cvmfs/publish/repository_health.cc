@@ -32,6 +32,12 @@ int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
 
   int result = kFailOk;
 
+  shash::Any expected_hash = manifest()->catalog_hash();
+  UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
+    settings_.transaction().spool_area().checkout_marker()));
+  if (marker.IsValid())
+    expected_hash = marker->hash();
+
   if (!IsMountPoint(rdonly_mnt)) {
     result |= kFailRdOnlyBroken;
   } else {
@@ -44,47 +50,30 @@ int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
     shash::Any root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_str),
                                                shash::kSuffixCatalog);
 
-    UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
-      settings_.transaction().spool_area().checkout_marker()));
-    if (marker.IsValid()) {
-      if (marker->hash() != root_hash)
+    if (expected_hash != root_hash) {
+      if (marker.IsValid()) {
         result |= kFailRdOnlyWrongRevision;
-    }
-
-    if ((root_hash != manifest()->catalog_hash()) && !marker.IsValid()) {
-      // In a gateway setup, it is expected that other publishers changed
-      // the repository in the meantime
-      if (spooler()->GetDriverType() != upload::SpoolerDefinition::Gateway)
-        result |= kFailRdOnlyOutdated;
+      } else {
+        // In a gateway setup, it is expected that other publishers changed
+        // the repository in the meantime
+        if (spooler()->GetDriverType() != upload::SpoolerDefinition::Gateway)
+          result |= kFailRdOnlyOutdated;
+      }
     }
   }
 
-  bool union_should_be_rw = false;
-  bool union_should_be_ro = false;
   // The process that opens the transaction does not stay alive for the life
   // time of the transaction
   bool is_in_transaction =
     ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
   if (!IsMountPoint(union_mnt)) {
     result |= kFailUnionBroken;
-    if (is_in_transaction) {
-      union_should_be_rw = true;
-    } else {
-      union_should_be_ro = true;
-    }
   } else {
     FileSystemInfo fs_info = GetFileSystemInfo(union_mnt);
-    if (is_in_transaction) {
-      if (fs_info.is_rdonly) {
-        union_should_be_rw = true;
-        result |= kFailUnionLocked;
-      }
-    } else {
-      if (!fs_info.is_rdonly) {
-        union_should_be_ro = true;
-        result |= kFailUnionWritable;
-      }
-    }
+    if (is_in_transaction && fs_info.is_rdonly)
+      result |= kFailUnionLocked;
+    if (!is_in_transaction && !fs_info.is_rdonly)
+      result |= kFailUnionWritable;
   }
 
   if (result == kFailOk)
@@ -111,12 +100,12 @@ int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
     LogCvmfs(kLogCvmfs, logFlags, "%s is not mounted properly",
              union_mnt.c_str());
   }
-  if (union_should_be_ro) {
+  if (result & kFailUnionWritable) {
     LogCvmfs(kLogCvmfs, logFlags,
              "%s is not in a transaction but %s is mounted read/write",
              fqrn.c_str(), union_mnt.c_str());
   }
-  if (union_should_be_rw) {
+  if (result & kFailUnionLocked) {
     LogCvmfs(kLogCvmfs, logFlags,
              "%s is in a transaction but %s is not mounted read/write",
              fqrn.c_str(), union_mnt.c_str());
@@ -169,28 +158,58 @@ int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
   //      2.2. remount the union mountpoint read-only  (kFailUnionWritable -> 0)
   //      2.2. remount the union mountpoint read-write (kFailUnionLocked   -> 0)
 
-  logFlags = kLogSyslog;
+  int log_flags = kLogSyslog;
   if (!is_quiet)
-    logFlags |= kLogStderr;
+    log_flags |= kLogStderr;
 
   if ((result & kFailRdOnlyOutdated) || (result & kFailRdOnlyWrongRevision)) {
     if ((result & kFailUnionBroken) == 0) {
-      AlterMountpoint(kAlterUnionUnmount, logFlags);
+      AlterMountpoint(kAlterUnionUnmount, log_flags);
       result |= kFailUnionBroken;
     }
 
     if ((result & kFailRdOnlyBroken) == 0) {
-      AlterMountpoint(kAlterRdOnlyUnmount, logFlags);
+      AlterMountpoint(kAlterRdOnlyUnmount, log_flags);
       result |= kFailRdOnlyBroken;
     }
 
-    // set ro hash
+    SetRootHash(expected_hash);
     result &= ~kFailRdOnlyOutdated;
     result &= ~kFailRdOnlyWrongRevision;
   }
 
-  return result;
+  if (result & kFailRdOnlyBroken) {
+    if ((result & kFailUnionBroken) == 0) {
+      AlterMountpoint(kAlterUnionUnmount, log_flags);
+      result |= kFailUnionBroken;
+    }
+    AlterMountpoint(kAlterRdOnlyMount, log_flags);
+    result &= ~kFailRdOnlyBroken;
+  }
 
+  if (result & kFailUnionBroken) {
+    AlterMountpoint(kAlterUnionMount, log_flags);
+    // read-only mount by default
+    if (is_in_transaction)
+      result |= kFailUnionLocked;
+
+    result &= ~kFailUnionBroken;
+    result &= ~kFailUnionWritable;
+  }
+
+  if (result & kFailUnionLocked) {
+    AlterMountpoint(kAlterUnionOpen, log_flags);
+    result &= ~kFailUnionLocked;
+  }
+
+  if (result & kFailUnionWritable) {
+    AlterMountpoint(kAlterUnionLock, log_flags);
+    result &= ~kFailUnionWritable;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogSyslog, "finished mountpoint repair (%d)", result);
+
+  return result;
 }
 
 }  // namespace publish

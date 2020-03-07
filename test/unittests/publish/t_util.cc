@@ -91,6 +91,13 @@ TEST_F(T_Util, SetInConfig) {
   EXPECT_TRUE(SafeReadToString(fd, &content));
   close(fd);
   EXPECT_EQ("X=z\nA=b\n", content);
+
+  SetInConfig("test_publish_config", "X", "");
+  fd = open("test_publish_config", O_RDONLY);
+  EXPECT_GE(fd, 0);
+  EXPECT_TRUE(SafeReadToString(fd, &content));
+  close(fd);
+  EXPECT_EQ("A=b\n", content);
 }
 
 }  // namespace publish

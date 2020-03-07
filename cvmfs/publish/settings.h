@@ -83,6 +83,7 @@ class SettingsSpoolArea {
   std::string union_mnt() const { return union_mnt_; }
   std::string scratch_dir() const { return workspace_() + "/scratch/current"; }
   std::string client_config() const { return workspace_() + "/client.config"; }
+  std::string client_lconfig() const { return workspace_() + "/client.local"; }
   std::string client_log() const { return workspace_() + "/usyslog.log"; }
   std::string cache_dir() const { return workspace_() + "/cache"; }
   std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }

@@ -55,7 +55,7 @@ void RunSuidHelper(const std::string &verb, const std::string &fqrn);
 
 /**
  * Replaces or creates $key=$value in the config file $path. Creates $path
- * if necessary.
+ * if necessary. If value is empty, the key is removed.
  */
 void SetInConfig(const std::string &path,
                  const std::string &key, const std::string &value);

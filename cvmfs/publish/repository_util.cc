@@ -153,13 +153,14 @@ void SetInConfig(const std::string &path,
   while (GetLineFd(fd, &line)) {
     std::string trimmed = Trim(line);
     if (HasPrefix(trimmed, key + "=", false /* ignore_case */)) {
-      new_content += key + "=" + value + "\n";
       key_exists = true;
+      if (!value.empty())
+        new_content += key + "=" + value + "\n";
     } else {
       new_content += line + "\n";
     }
   }
-  if (!key_exists)
+  if (!key_exists && !value.empty())
     new_content += key + "=" + value + "\n";
 
   off_t off_zero = lseek(fd, 0, SEEK_SET);

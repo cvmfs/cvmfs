@@ -746,6 +746,13 @@ void Publisher::AlterMountpoint(EMountpointAlterations how, int log_level) {
 }
 
 
+void Publisher::SetRootHash(const shash::Any &hash) {
+  const std::string config_path =
+    settings_.transaction().spool_area().client_lconfig();
+  SetInConfig(config_path, "CVMFS_ROOT_HASH", hash.ToString());
+}
+
+
 void Publisher::Ingest() {}
 void Publisher::Migrate() {}
 void Publisher::Resign() {}
