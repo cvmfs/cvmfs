@@ -613,19 +613,9 @@ Publisher::Publisher(const SettingsPublisher &settings)
 Publisher::~Publisher() {
 }
 
-void Publisher::Transaction() {
-  if (in_transaction_) throw EPublish("another transaction is already open");
-
-  InitSpoolArea();
-
-  // TODO(jblomer): acquire gateway lease, create in_transaction lock file
-  LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
-           "(%s) opened transaction", settings_.fqrn().c_str());
-  in_transaction_ = true;
-}
-
 
 void Publisher::Abort() {
+
   // TODO(jblomer): remove transaction lock
 }
 

@@ -197,7 +197,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   virtual ~Publisher();
 
   void UpdateMetaInfo();
-  void Transaction();
+  void Transaction(const std::string &path = "");
   void Abort();
   void Publish();
   void Ingest();
