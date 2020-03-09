@@ -39,6 +39,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/082-shrinkwrap-cms                       \
                                    src/083-suid                                 \
                                    src/084-premounted                           \
+                                   src/089-external_cache_plugin                \
                                    --                                           \
                                    src/0*
 
