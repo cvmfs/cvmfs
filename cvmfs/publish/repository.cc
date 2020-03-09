@@ -600,7 +600,12 @@ Publisher::Publisher(const SettingsPublisher &settings)
   if (!rvb) throw EPublish("cannot load private master key");
   if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
 
-  // TODO(jblomer): check transaction lock
+  // The process that opens the transaction does not stay alive for the life
+  // time of the transaction
+  const std::string transaction_lock =
+    settings_.transaction().spool_area().transaction_lock();
+  in_transaction_ =
+    ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
 }
 
 Publisher::~Publisher() {
@@ -610,6 +615,7 @@ void Publisher::Transaction() {
   if (in_transaction_) throw EPublish("another transaction is already open");
 
   InitSpoolArea();
+
   // TODO(jblomer): acquire gateway lease, create in_transaction lock file
   LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
            "(%s) opened transaction", settings_.fqrn().c_str());

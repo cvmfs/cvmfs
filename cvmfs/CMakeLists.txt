@@ -257,6 +257,7 @@ set (CVMFS_PUBLISH_SOURCES
   publish/cmd_info.cc
   publish/cmd_mkfs.cc
   publish/cmd_transaction.cc
+  publish/cmd_util.cc
   publish/cmd_zpipe.cc
   publish/command.cc
   publish/except.cc
@@ -311,7 +312,7 @@ set (LIBCVMFS_SERVER_SOURCES
   pack.cc
   publish/repository.cc
   publish/repository_diff.cc
-  publish/repository_health.cc
+  publish/repository_managed.cc
   publish/repository_tags.cc
   publish/repository_transaction.cc
   publish/repository_util.cc

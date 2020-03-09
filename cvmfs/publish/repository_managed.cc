@@ -19,13 +19,14 @@
 
 namespace publish {
 
-int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
+int Publisher::CheckManagedNode(
+  Publisher::ERepairMode repair_mode,
+  bool is_quiet)
+{
   const std::string rdonly_mnt =
     settings_.transaction().spool_area().readonly_mnt();
   const std::string union_mnt =
     settings_.transaction().spool_area().union_mnt();
-  const std::string transaction_lock =
-    settings_.transaction().spool_area().transaction_lock();
   const std::string publishing_lock =
     settings_.transaction().spool_area().publishing_lock();
   const std::string fqrn = settings_.fqrn();
@@ -64,15 +65,13 @@ int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
 
   // The process that opens the transaction does not stay alive for the life
   // time of the transaction
-  bool is_in_transaction =
-    ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
   if (!IsMountPoint(union_mnt)) {
     result |= kFailUnionBroken;
   } else {
     FileSystemInfo fs_info = GetFileSystemInfo(union_mnt);
-    if (is_in_transaction && fs_info.is_rdonly)
+    if (in_transaction_ && fs_info.is_rdonly)
       result |= kFailUnionLocked;
-    if (!is_in_transaction && !fs_info.is_rdonly)
+    if (!in_transaction_ && !fs_info.is_rdonly)
       result |= kFailUnionWritable;
   }
 
@@ -131,7 +130,7 @@ int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
         return result;
       }
 
-      if (is_in_transaction) {
+      if (in_transaction_) {
         LogCvmfs(kLogCvmfs, logFlags,
           "Repository %s is in a transaction and cannot be repaired.\n"
           "--> Run `cvmfs_server abort $name` to revert and repair.",
@@ -190,7 +189,7 @@ int Publisher::CheckHealth(Publisher::ERepairMode repair_mode, bool is_quiet) {
   if (result & kFailUnionBroken) {
     AlterMountpoint(kAlterUnionMount, log_flags);
     // read-only mount by default
-    if (is_in_transaction)
+    if (in_transaction_)
       result |= kFailUnionLocked;
 
     result &= ~kFailUnionBroken;

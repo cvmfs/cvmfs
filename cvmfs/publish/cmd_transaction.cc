@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "logging.h"
+#include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
@@ -57,10 +58,27 @@ int CmdTransaction::Main(const Options &options) {
       "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
+  int rvi =
+    publisher.CheckManagedNode(Publisher::kRepairSafe, false /* is_quiet */);
+  if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
 
-  // Transaction before hook
-  // publisher --> transaction
-  // Transaction after hook
+  rvi = CallServerHook("transaction_before_hook", fqrn);
+  if (rvi != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "transaction hook failed, not opening a transaction");
+    return rvi;
+  }
+
+  if (options.HasNot("force") || !publisher.in_transaction())
+    publisher.Transaction();
+  // Mount tree
+
+  rvi = CallServerHook("transaction_after_hook", fqrn);
+  if (rvi != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "final transaction hook failed");
+    return rvi;
+  }
 
   return 0;
 }

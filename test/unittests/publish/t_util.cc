@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 
+#include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "util/posix.h"
@@ -98,6 +99,21 @@ TEST_F(T_Util, SetInConfig) {
   EXPECT_TRUE(SafeReadToString(fd, &content));
   close(fd);
   EXPECT_EQ("A=b\n", content);
+}
+
+TEST_F(T_Util, CallServerHook) {
+  EXPECT_EQ(0, CallServerHook("hookX", "t.cvmfs.io", "no/such/file"));
+
+  EXPECT_TRUE(SafeWriteToFile(
+    "hookY() { if [ $1 = \"t.cvmfs.io\" ]; then return 0; fi; return 42; }\n",
+    "cvmfs_test_hooks.sh", 0644));
+
+  EXPECT_EQ(0, CallServerHook("hookX", "t.cvmfs.io",
+                              "./cvmfs_test_hooks.sh"));
+  EXPECT_EQ(0, CallServerHook("hookY", "t.cvmfs.io",
+                              "./cvmfs_test_hooks.sh"));
+  EXPECT_EQ(42, CallServerHook("hookY", "x.cvmfs.io",
+                               "./cvmfs_test_hooks.sh"));
 }
 
 }  // namespace publish

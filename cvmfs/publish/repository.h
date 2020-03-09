@@ -166,7 +166,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    * Verifies the mountpoints and the transaction status. Returns a bit map
    * of EFailures codes.
    */
-  int CheckHealth(ERepairMode repair_mode, bool is_quiet = false);
+  int CheckManagedNode(ERepairMode repair_mode, bool is_quiet = false);
 
   /**
    * Must not edit magic tags 'trunk' and 'trunk-previous'.
@@ -185,6 +185,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Migrate();
 
   const SettingsPublisher &settings() const { return settings_; }
+  bool in_transaction() const { return in_transaction_; }
 
  private:
   /**

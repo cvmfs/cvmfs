@@ -438,12 +438,13 @@ set (CVMFS_TEST_PUBLISH_SOURCES
 
   ${CVMFS_SOURCE_DIR}/publish/cmd_help.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_mkfs.cc
+  ${CVMFS_SOURCE_DIR}/publish/cmd_util.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_zpipe.cc
   ${CVMFS_SOURCE_DIR}/publish/command.cc
   ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
-  ${CVMFS_SOURCE_DIR}/publish/repository_health.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_managed.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_transaction.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_util.cc
