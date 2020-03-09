@@ -256,6 +256,7 @@ class SettingsPublisher {
     , owner_gid_(0)
     , whitelist_validity_days_(kDefaultWhitelistValidity)
     , is_silent_(false)
+    , is_managed_(false)
     , storage_(fqrn_)
     , transaction_(fqrn_)
     , keychain_(fqrn_)
@@ -266,6 +267,7 @@ class SettingsPublisher {
   void SetOwner(const std::string &user_name);
   void SetOwner(uid_t uid, gid_t gid);
   void SetIsSilent(bool value);
+  void SetIsManaged(bool value);
 
   std::string fqrn() const { return fqrn_; }
   std::string url() const { return url_; }
@@ -273,6 +275,7 @@ class SettingsPublisher {
   uid_t owner_uid() const { return owner_uid_; }
   uid_t owner_gid() const { return owner_gid_; }
   bool is_silent() const { return is_silent_; }
+  bool is_managed() const { return is_managed_; }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
@@ -288,6 +291,7 @@ class SettingsPublisher {
   Setting<gid_t> owner_gid_;
   Setting<unsigned> whitelist_validity_days_;
   Setting<bool> is_silent_;
+  Setting<bool> is_managed_;
 
   SettingsStorage storage_;
   SettingsTransaction transaction_;

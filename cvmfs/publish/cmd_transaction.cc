@@ -58,8 +58,8 @@ int CmdTransaction::Main(const Options &options) {
       "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
-  int rvi =
-    publisher.CheckManagedNode(Publisher::kRepairSafe, false /* is_quiet */);
+  int rvi = publisher.managed_node()->Check(Publisher::ManagedNode::kRepairSafe,
+                                            false /* is_quiet */);
   if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
 
   rvi = CallServerHook("transaction_before_hook", fqrn);
@@ -71,7 +71,7 @@ int CmdTransaction::Main(const Options &options) {
 
   if (options.HasNot("force") || !publisher.in_transaction())
     publisher.Transaction();
-  // Mount tree
+  publisher.managed_node()->Open();
 
   rvi = CallServerHook("transaction_after_hook", fqrn);
   if (rvi != 0) {

@@ -606,6 +606,8 @@ Publisher::Publisher(const SettingsPublisher &settings)
     settings_.transaction().spool_area().transaction_lock();
   in_transaction_ =
     ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
+  if (settings.is_managed())
+    managed_node_ = new ManagedNode(this);
 }
 
 Publisher::~Publisher() {
@@ -694,70 +696,6 @@ void Publisher::MarkReplicatible(bool value) {
   if (spooler_->GetNumberOfErrors() > 0)
     throw EPublish("cannot set replication mode");
 }
-
-void Publisher::AlterMountpoint(EMountpointAlterations how, int log_level) {
-  std::string mountpoint;
-  std::string info_msg;
-  std::string suid_helper_verb;
-  switch (how) {
-    case kAlterUnionUnmount:
-      mountpoint = settings_.transaction().spool_area().union_mnt();
-      info_msg = "Trying to unmount " + mountpoint;
-      suid_helper_verb = "rw_umount";
-      break;
-    case kAlterRdOnlyUnmount:
-      mountpoint = settings_.transaction().spool_area().readonly_mnt();
-      info_msg = "Trying to unmount " + mountpoint;
-      suid_helper_verb = "rdonly_umount";
-      break;
-    case kAlterUnionMount:
-      mountpoint = settings_.transaction().spool_area().union_mnt();
-      info_msg = "Trying to mount " + mountpoint;
-      suid_helper_verb = "rw_mount";
-      break;
-    case kAlterRdOnlyMount:
-      mountpoint = settings_.transaction().spool_area().readonly_mnt();
-      info_msg = "Trying to mount " + mountpoint;
-      suid_helper_verb = "rdonly_mount";
-      break;
-    case kAlterUnionOpen:
-      mountpoint = settings_.transaction().spool_area().union_mnt();
-      info_msg = "Trying to remount " + mountpoint + " read/write";
-      suid_helper_verb = "open";
-      break;
-    case kAlterUnionLock:
-      mountpoint = settings_.transaction().spool_area().union_mnt();
-      info_msg = "Trying to remount " + mountpoint + " read-only";
-      suid_helper_verb = "lock";
-      break;
-    default:
-      throw EPublish("internal error: unknown mountpoint alteration");
-  }
-
-  if (log_level & kLogStdout) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogNoLinebreak, "Note: %s... ",
-             info_msg.c_str());
-  }
-
-  try {
-    RunSuidHelper(suid_helper_verb, settings_.fqrn());
-    LogCvmfs(kLogCvmfs, (log_level & ~kLogStdout), "%s... success",
-             info_msg.c_str());
-    if (log_level & kLogStdout)
-      LogCvmfs(kLogCvmfs, kLogStdout, "success");
-  } catch (const EPublish&) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s... fail");
-    throw EPublish(info_msg + "... fail");
-  }
-}
-
-
-void Publisher::SetRootHash(const shash::Any &hash) {
-  const std::string config_path =
-    settings_.transaction().spool_area().client_lconfig();
-  SetInConfig(config_path, "CVMFS_ROOT_HASH", hash.ToString());
-}
-
 
 void Publisher::Ingest() {}
 void Publisher::Migrate() {}

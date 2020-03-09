@@ -11,6 +11,7 @@
 #include "history.h"  // for History::Tag
 #include "publish/settings.h"
 #include "upload_spooler_result.h"
+#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace catalog {
@@ -129,25 +130,65 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
 class __attribute__((visibility("default"))) Publisher : public Repository {
  public:
   /**
-   * Steers the aggressiveness of CheckHealth()
+   * Encapsulates operations on a dedicated publisher
    */
-  enum ERepairMode {
-    kRepairNever = 0,
-    kRepairSafe,
-    kRepairAlways
-  };
+  class ManagedNode {
+   public:
+    /**
+     * Steers the aggressiveness of CheckHealth()
+     */
+    enum ERepairMode {
+      kRepairNever = 0,
+      kRepairSafe,
+      kRepairAlways
+    };
 
-  /**
-   * Collection of publisher failure states (see CheckHealth)
-   */
-  enum EFailures {
-    kFailOk                   = 0,
-    kFailRdOnlyBroken         = 0x01,
-    kFailRdOnlyOutdated       = 0x02,
-    kFailRdOnlyWrongRevision  = 0x04,
-    kFailUnionBroken          = 0x08,
-    kFailUnionWritable        = 0x10,
-    kFailUnionLocked          = 0x20,
+    /**
+     * Collection of publisher failure states (see CheckHealth)
+     */
+    enum EFailures {
+      kFailOk                   = 0,
+      kFailRdOnlyBroken         = 0x01,
+      kFailRdOnlyOutdated       = 0x02,
+      kFailRdOnlyWrongRevision  = 0x04,
+      kFailUnionBroken          = 0x08,
+      kFailUnionWritable        = 0x10,
+      kFailUnionLocked          = 0x20,
+    };
+
+    ManagedNode(Publisher *p) : publisher_(p) {}
+    /**
+     * Verifies the mountpoints and the transaction status. Returns a bit map
+     * of EFailures codes.
+     */
+    int Check(ERepairMode repair_mode, bool is_quiet = false);
+    /**
+     * Re-mount /cvmfs/$fqrn read-writable
+     */
+    void Open();
+    /**
+     * Re-mount /cvmfs/$fqrn read-only
+     */
+    void Lock();
+
+   private:
+    /**
+     * Possible state transitions for the cvmfs read-only mountpoint and the
+     * union file system on /cvmfs/$fqrn
+     */
+    enum EMountpointAlterations {
+      kAlterUnionUnmount,
+      kAlterRdOnlyUnmount,
+      kAlterUnionMount,
+      kAlterRdOnlyMount,
+      kAlterUnionOpen,
+      kAlterUnionLock,
+    };
+
+    void AlterMountpoint(EMountpointAlterations how, int log_level);
+    void SetRootHash(const shash::Any &hash);
+
+    Publisher *publisher_;
   };
 
   static Publisher *Create(const SettingsPublisher &settings);
@@ -161,12 +202,6 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Publish();
   void Ingest();
   void Sync();
-
-  /**
-   * Verifies the mountpoints and the transaction status. Returns a bit map
-   * of EFailures codes.
-   */
-  int CheckManagedNode(ERepairMode repair_mode, bool is_quiet = false);
 
   /**
    * Must not edit magic tags 'trunk' and 'trunk-previous'.
@@ -186,21 +221,9 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   const SettingsPublisher &settings() const { return settings_; }
   bool in_transaction() const { return in_transaction_; }
+  ManagedNode *managed_node() const { return managed_node_.weak_ref(); }
 
  private:
-  /**
-   * Possible state transitions for the cvmfs read-only mountpoint and the
-   * union file system on /cvmfs/$fqrn
-   */
-  enum EMountpointAlterations {
-    kAlterUnionUnmount,
-    kAlterRdOnlyUnmount,
-    kAlterUnionMount,
-    kAlterRdOnlyMount,
-    kAlterUnionOpen,
-    kAlterUnionLock,
-  };
-
   Publisher();  ///< Used by Create
 
   void CreateKeychain();
@@ -227,8 +250,6 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void OnUploadWhitelist(const upload::SpoolerResult &result);
 
   void CheckTagName(const std::string &name);
-  void AlterMountpoint(EMountpointAlterations how, int log_level);
-  void SetRootHash(const shash::Any &hash);
 
   SettingsPublisher settings_;
   /**
@@ -236,6 +257,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    */
   int llvl_;
   bool in_transaction_;
+  UniquePtr<ManagedNode> managed_node_;
 };
 
 class __attribute__((visibility("default"))) Replica : public Repository {

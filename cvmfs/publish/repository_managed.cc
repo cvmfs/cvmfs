@@ -19,23 +19,31 @@
 
 namespace publish {
 
-int Publisher::CheckManagedNode(
-  Publisher::ERepairMode repair_mode,
+void Publisher::ManagedNode::Open() {
+  AlterMountpoint(kAlterUnionOpen, kLogSyslog);
+}
+
+void Publisher::ManagedNode::Lock() {
+  AlterMountpoint(kAlterUnionLock, kLogSyslog);
+}
+
+int Publisher::ManagedNode::Check(
+  ERepairMode repair_mode,
   bool is_quiet)
 {
   const std::string rdonly_mnt =
-    settings_.transaction().spool_area().readonly_mnt();
+    publisher_->settings_.transaction().spool_area().readonly_mnt();
   const std::string union_mnt =
-    settings_.transaction().spool_area().union_mnt();
+    publisher_->settings_.transaction().spool_area().union_mnt();
   const std::string publishing_lock =
-    settings_.transaction().spool_area().publishing_lock();
-  const std::string fqrn = settings_.fqrn();
+    publisher_->settings_.transaction().spool_area().publishing_lock();
+  const std::string fqrn = publisher_->settings_.fqrn();
 
   int result = kFailOk;
 
-  shash::Any expected_hash = manifest()->catalog_hash();
+  shash::Any expected_hash = publisher_->manifest()->catalog_hash();
   UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
-    settings_.transaction().spool_area().checkout_marker()));
+    publisher_->settings_.transaction().spool_area().checkout_marker()));
   if (marker.IsValid())
     expected_hash = marker->hash();
 
@@ -57,8 +65,11 @@ int Publisher::CheckManagedNode(
       } else {
         // In a gateway setup, it is expected that other publishers changed
         // the repository in the meantime
-        if (spooler()->GetDriverType() != upload::SpoolerDefinition::Gateway)
+        if (publisher_->spooler()->GetDriverType() !=
+            upload::SpoolerDefinition::Gateway)
+        {
           result |= kFailRdOnlyOutdated;
+        }
       }
     }
   }
@@ -69,9 +80,9 @@ int Publisher::CheckManagedNode(
     result |= kFailUnionBroken;
   } else {
     FileSystemInfo fs_info = GetFileSystemInfo(union_mnt);
-    if (in_transaction_ && fs_info.is_rdonly)
+    if (publisher_->in_transaction_ && fs_info.is_rdonly)
       result |= kFailUnionLocked;
-    if (!in_transaction_ && !fs_info.is_rdonly)
+    if (!publisher_->in_transaction_ && !fs_info.is_rdonly)
       result |= kFailUnionWritable;
   }
 
@@ -130,7 +141,7 @@ int Publisher::CheckManagedNode(
         return result;
       }
 
-      if (in_transaction_) {
+      if (publisher_->in_transaction_) {
         LogCvmfs(kLogCvmfs, logFlags,
           "Repository %s is in a transaction and cannot be repaired.\n"
           "--> Run `cvmfs_server abort $name` to revert and repair.",
@@ -189,7 +200,7 @@ int Publisher::CheckManagedNode(
   if (result & kFailUnionBroken) {
     AlterMountpoint(kAlterUnionMount, log_flags);
     // read-only mount by default
-    if (in_transaction_)
+    if (publisher_->in_transaction_)
       result |= kFailUnionLocked;
 
     result &= ~kFailUnionBroken;
@@ -209,6 +220,74 @@ int Publisher::CheckManagedNode(
   LogCvmfs(kLogCvmfs, kLogSyslog, "finished mountpoint repair (%d)", result);
 
   return result;
+}
+
+void Publisher::ManagedNode::AlterMountpoint(
+  EMountpointAlterations how, int log_level)
+{
+  std::string mountpoint;
+  std::string info_msg;
+  std::string suid_helper_verb;
+  switch (how) {
+    case kAlterUnionUnmount:
+      mountpoint = publisher_->settings_.transaction().spool_area().union_mnt();
+      info_msg = "Trying to unmount " + mountpoint;
+      suid_helper_verb = "rw_umount";
+      break;
+    case kAlterRdOnlyUnmount:
+      mountpoint =
+        publisher_->settings_.transaction().spool_area().readonly_mnt();
+      info_msg = "Trying to unmount " + mountpoint;
+      suid_helper_verb = "rdonly_umount";
+      break;
+    case kAlterUnionMount:
+      mountpoint = publisher_->settings_.transaction().spool_area().union_mnt();
+      info_msg = "Trying to mount " + mountpoint;
+      suid_helper_verb = "rw_mount";
+      break;
+    case kAlterRdOnlyMount:
+      mountpoint =
+        publisher_->settings_.transaction().spool_area().readonly_mnt();
+      info_msg = "Trying to mount " + mountpoint;
+      suid_helper_verb = "rdonly_mount";
+      break;
+    case kAlterUnionOpen:
+      mountpoint = publisher_->settings_.transaction().spool_area().union_mnt();
+      info_msg = "Trying to remount " + mountpoint + " read/write";
+      suid_helper_verb = "open";
+      break;
+    case kAlterUnionLock:
+      mountpoint =
+        publisher_->settings_.transaction().spool_area().union_mnt();
+      info_msg = "Trying to remount " + mountpoint + " read-only";
+      suid_helper_verb = "lock";
+      break;
+    default:
+      throw EPublish("internal error: unknown mountpoint alteration");
+  }
+
+  if (log_level & kLogStdout) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogNoLinebreak, "Note: %s... ",
+             info_msg.c_str());
+  }
+
+  try {
+    RunSuidHelper(suid_helper_verb, publisher_->settings_.fqrn());
+    LogCvmfs(kLogCvmfs, (log_level & ~kLogStdout), "%s... success",
+             info_msg.c_str());
+    if (log_level & kLogStdout)
+      LogCvmfs(kLogCvmfs, kLogStdout, "success");
+  } catch (const EPublish&) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s... fail");
+    throw EPublish(info_msg + "... fail");
+  }
+}
+
+
+void Publisher::ManagedNode::SetRootHash(const shash::Any &hash) {
+  const std::string config_path =
+    publisher_->settings_.transaction().spool_area().client_lconfig();
+  SetInConfig(config_path, "CVMFS_ROOT_HASH", hash.ToString());
 }
 
 }  // namespace publish

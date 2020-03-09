@@ -192,6 +192,7 @@ SettingsPublisher::SettingsPublisher(
   , owner_gid_(0)
   , whitelist_validity_days_(kDefaultWhitelistValidity)
   , is_silent_(false)
+  , is_managed_(false)
   , storage_(fqrn_)
   , transaction_(fqrn_)
   , keychain_(fqrn_)
@@ -220,6 +221,10 @@ void SettingsPublisher::SetOwner(uid_t uid, gid_t gid) {
 
 void SettingsPublisher::SetIsSilent(bool value) {
   is_silent_ = value;
+}
+
+void SettingsPublisher::SetIsManaged(bool value) {
+  is_managed_ = value;
 }
 
 
@@ -301,6 +306,7 @@ SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
     throw EPublish("Not a stratum 0 repository");
 
   SettingsPublisher settings_publisher(settings_repository);
+  settings_publisher.SetIsManaged(IsManagedRepository());
   settings_publisher.SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
   settings_publisher.GetStorage()->SetLocator(
     options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
