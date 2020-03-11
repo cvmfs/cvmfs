@@ -37,18 +37,8 @@ if [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1804 ] || [ x"${CVMFS_BUILD_PLATFORM}" 
 elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
     BUILDER_SCRIPT=${SCRIPT_LOCATION}/make_rpm.sh
 else
-  echo "Platform ${CVMFS_BUILD_PLATFORM} not recognized."
+  echo "Platform ${CVMFS_BUILD_PLATFORM} not recognized. Expect some error."
 fi
-
-echo "start debug..."
-echo "builder script: $BUILDER_SCRIPT"
-echo "$BUILDER_SCRIPT \
-  $(cd ${CVMFS_GATEWAY_SOURCES}; pwd) \
-  ${CVMFS_BUILD_PLATFORM} \
-  ${REPO_GATEWAY_VERSION} \
-  ${PACKAGE_VERSION}
-"
-echo "... end debug"
 
 $BUILDER_SCRIPT \
   $(cd ${CVMFS_GATEWAY_SOURCES}; pwd) \
