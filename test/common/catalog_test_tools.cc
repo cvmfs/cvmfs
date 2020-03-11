@@ -284,9 +284,11 @@ bool CatalogTestTool::Init() {
 // original,
 //       empty repository.
 bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
+  statistics_ = new perf::Statistics();
   catalog_mgr_ =
     CreateCatalogMgr(history_.front().second, "file://" + stratum0_,
-                     temp_dir_, spooler_, download_manager(), &statistics_);
+                     temp_dir_, spooler_, download_manager(),
+                     statistics_.weak_ref());
   if (!catalog_mgr_.IsValid()) {
     return false;
   }
@@ -315,9 +317,10 @@ bool CatalogTestTool::ApplyAtRootHash(
   const shash::Any& root_hash,
   const DirSpec& spec
 ) {
+  statistics_ = new perf::Statistics();
   catalog_mgr_ =
     CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
-                     download_manager(), &statistics_);
+                     download_manager(), statistics_.weak_ref());
   if (!catalog_mgr_.IsValid()) {
     return false;
   }
