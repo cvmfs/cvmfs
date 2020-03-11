@@ -32,10 +32,12 @@ if [ ! -z "$NIGHTLY_NUMBER" ]; then
 fi
 
 # Create an RPM or DEB package from the tarball
-if [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1804 ]; then
+if [ x"${CVMFS_BUILD_PLATFORM}" = xubuntu1804 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xdebian9 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xdebian10 ]; then
     BUILDER_SCRIPT=${SCRIPT_LOCATION}/make_deb.sh
 elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
     BUILDER_SCRIPT=${SCRIPT_LOCATION}/make_rpm.sh
+else
+  echo "Platform ${CVMFS_BUILD_PLATFORM} not recognized. Expect some error."
 fi
 
 $BUILDER_SCRIPT \
