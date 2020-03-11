@@ -639,7 +639,7 @@ TEST_F(T_Dns, CaresResolverMany) {
   names.push_back("l.root-servers.net");
   names.push_back("m.root-servers.net");
   names.push_back("127.0.0.1");
-  names.push_back("nemo.root-servers.net");
+  names.push_back("nemo.example.com");
   vector<Host> hosts;
   default_resolver->ResolveMany(names, &hosts);
   ASSERT_EQ(hosts.size(), names.size());
