@@ -29,6 +29,7 @@ CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
+CVMFS_TEST_S3_STORAGE=${CVMFS_TEST_S3_STORAGE:=}
 CVMFS_TEST_HTTP_BASE=${CVMFS_TEST_HTTP_BASE:=}
 CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}   # backward compatibility! use CVMFS_TEST_HTTP_BASE instead
 
@@ -652,6 +653,11 @@ destroy_repo() {
   local repo=$1
   shift 1
   local additional_flags="$@"
+
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ] && [ x"$CVMFS_TEST_S3_STORAGE" != x"" ]; then
+    echo "Wiping repository S3 storage ${CVMFS_TEST_S3_STORAGE}/${repo}"
+    sudo rm -rf "${CVMFS_TEST_S3_STORAGE}/${repo}"
+  fi
 
   sudo cvmfs_server rmfs -f $additional_flags $repo || return 100
 }
