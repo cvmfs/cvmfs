@@ -38,6 +38,16 @@ elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xc
     BUILDER_SCRIPT=${SCRIPT_LOCATION}/make_rpm.sh
 fi
 
+echo "start debug..."
+echo "builder script: $BUILDER_SCRIPT"
+echo "$BUILDER_SCRIPT \
+  $(cd ${CVMFS_GATEWAY_SOURCES}; pwd) \
+  ${CVMFS_BUILD_PLATFORM} \
+  ${REPO_GATEWAY_VERSION} \
+  ${PACKAGE_VERSION}
+"
+echo "... end debug"
+
 $BUILDER_SCRIPT \
   $(cd ${CVMFS_GATEWAY_SOURCES}; pwd) \
   ${CVMFS_BUILD_PLATFORM} \
