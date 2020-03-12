@@ -3,8 +3,14 @@ cvmfs_test_name="Test CVMFS with external cache plugins"
 cvmfs_test_suites="quick"
 
 CVMFS_TEST_CACHE_PLUGIN_PORT=8081
-CVMFS_CACHE_PLUGIN_POSIX_PATH=/usr/libexec/cvmfs/cache/cvmfs_cache_posix
-CVMFS_CACHE_PLUGIN_RAM_PATH=/usr/libexec/cvmfs/cache/cvmfs_cache_ram
+
+if running_on_osx; then
+  CVMFS_CACHE_PLUGIN_POSIX_PATH=/usr/local/libexec/cvmfs/cache/cvmfs_cache_posix
+  CVMFS_CACHE_PLUGIN_RAM_PATH=/usr/local/libexec/cvmfs/cache/cvmfs_cache_ram
+else
+  CVMFS_CACHE_PLUGIN_POSIX_PATH=/usr/libexec/cvmfs/cache/cvmfs_cache_posix
+  CVMFS_CACHE_PLUGIN_RAM_PATH=/usr/libexec/cvmfs/cache/cvmfs_cache_ram
+fi
 
 CVMFS_CACHE_PLUGIN_POSIX_PID=""
 CVMFS_CACHE_PLUGIN_RAM_PID=""
