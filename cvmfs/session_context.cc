@@ -375,7 +375,11 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
              ret);
   }
 
-  const bool ok = (reply == "{\"status\":\"ok\"}");
+  JsonDocument *reply_json = JsonDocument::Create(reply);
+  const JSON *reply_status =
+    JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
+  const bool ok = (reply_status != NULL &&
+                   std::string(reply_status->string_value) == "ok");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "SessionContext::DoUpload - error reply: %s",
