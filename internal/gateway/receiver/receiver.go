@@ -66,6 +66,11 @@ type CvmfsReceiver struct {
 	ctx          context.Context
 }
 
+type ReceiverReply struct {
+	Status string `json:"status"`
+	Reason string `json:"reason"`
+}
+
 // NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
 func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, error) {
 	if _, err := os.Stat(execPath); os.IsNotExist(err) {
@@ -254,21 +259,17 @@ func (r *CvmfsReceiver) reply() ([]byte, error) {
 }
 
 func toReceiverError(reply []byte) error {
-	res := make(map[string]string)
+	res := ReceiverReply{}
 	if err := json.Unmarshal(reply, &res); err != nil {
 		return errors.Wrap(err, "could not decode reply")
 	}
 
-	if status, ok := res["status"]; ok {
-		if status == "ok" {
-			return nil
-		}
+	if res.Status == "ok" {
+		return nil
+	}
 
-		if reason, ok := res["reason"]; ok {
-			return Error(reason)
-		}
-
-		return fmt.Errorf("invalid reply")
+	if res.Reason != "" {
+		return Error(res.Reason)
 	}
 
 	return fmt.Errorf("invalid reply")
