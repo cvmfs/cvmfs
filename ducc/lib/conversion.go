@@ -224,6 +224,57 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	return firstError
 }
 
+func getLayersOfImage(image *Image, repo string, forceDownload bool, layersChan chan<- downloadedLayer) (err error) {
+	defer close(layersChan)
+
+	manifest, err := image.GetManifest()
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"image": image.WholeName(), "error": err}).Error("Error in getting the manifest for the image")
+		return err
+	}
+
+	// check if layer is needed
+	layersToDownload := make([]da.Layer, 0)
+	for _, layer := range manifest.Layers {
+		layerDigest := strings.Split(layer.Digest, ":")[1]
+		layerPath := LayerRootfsPath(repo, layerDigest)
+		if _, err := os.Stat(layerPath); os.IsNotExist(err) || forceDownload {
+			layersToDownload = append(layersToDownload, layer)
+		}
+	}
+	if len(layersToDownload) == 0 {
+		return nil
+	}
+
+	user := image.User
+	pass, err := GetPassword()
+	if err != nil {
+		user = ""
+		pass = ""
+	}
+	layerUrl := getBlobUrl(*image, layersToDownload[0].Digest)
+	token, err := firstRequestForAuth(layerUrl, user, pass)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"error": err}).Error("Error in obtain the authentication token to download the layers.")
+		return err
+	}
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	for _, layer := range layersToDownload {
+		wg.Add(1)
+		go func(layer da.Layer) {
+			defer wg.Done()
+			toSend, err := image.downloadLayer(layer, token)
+			if err != nil {
+				return
+			}
+			layersChan <- toSend
+		}(layer)
+	}
+
+	return nil
+}
+
 func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain, forceDownload, createThinImage bool) (err error) {
 
 	manifest, err := inputImage.GetManifest()

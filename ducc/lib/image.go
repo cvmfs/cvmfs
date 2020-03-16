@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,7 +16,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/docker/image"
+	manifestlist "github.com/docker/distribution/manifest/manifestlist"
+	image "github.com/docker/docker/image"
+	digest "github.com/opencontainers/go-digest"
+	copy "github.com/otiai10/copy"
+	capability "github.com/syndtr/gocapability/capability"
+
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
 
@@ -28,16 +34,18 @@ type ManifestRequest struct {
 }
 
 type Image struct {
-	Id          int
-	User        string
-	Scheme      string
-	Registry    string
-	Repository  string
-	Tag         string
-	Digest      string
-	IsThin      bool
-	TagWildcard bool
-	Manifest    *da.Manifest
+	Id           int
+	User         string
+	Scheme       string
+	Registry     string
+	Repository   string
+	Tag          string
+	Digest       string
+	IsThin       bool
+	Manifest     *da.Manifest
+	ManifestList *manifestlist.ManifestList
+	Config       *image.Image
+	TagWildcard  bool
 }
 
 func (i Image) GetSimpleName() string {
@@ -125,27 +133,97 @@ func (img Image) PrintImage(machineFriendly, csv_header bool) {
 	}
 }
 
-func (img Image) GetManifest() (da.Manifest, error) {
+func (img *Image) GetManifest() (da.Manifest, error) {
 	if img.Manifest != nil {
+		Log().Info("Serve manifest from cache")
 		return *img.Manifest, nil
 	}
+	Log().Info("Getting remote manifest")
 	bytes, err := img.getByteManifest()
 	if err != nil {
+		LogE(err).Error("Error in getting the bytes of the manifest")
 		return da.Manifest{}, err
 	}
 	var manifest da.Manifest
 	err = json.Unmarshal(bytes, &manifest)
 	if err != nil {
+		LogE(err).Error("Error in unmarshaling the manifest")
 		return manifest, err
 	}
 	if reflect.DeepEqual(da.Manifest{}, manifest) {
+		Log().Warn("Got empty manifest")
 		return manifest, fmt.Errorf("Got empty manifest")
 	}
 	img.Manifest = &manifest
-	return manifest, nil
+	return *img.Manifest, nil
 }
 
-func (img Image) GetChanges() (changes []string, err error) {
+func (img *Image) GetManifestList() (manifestlist.ManifestList, error) {
+	if img.ManifestList != nil {
+		return *img.ManifestList, nil
+	}
+	var manifestList manifestlist.ManifestList
+	bytes, err := img.getByteManifestList()
+	if err != nil {
+		LogE(err).Error("Error in getting the bytes from the manifest list")
+		return manifestList, err
+	}
+	err = json.Unmarshal(bytes, &manifestList)
+	if err != nil {
+		LogE(err).Error("Error in unmarshaling the bytes for the manifest list")
+		return manifestList, err
+	}
+	if reflect.DeepEqual(manifestlist.ManifestList{}, manifestList) {
+		err := fmt.Errorf("Got empty manifest list")
+		LogE(err).Warn("Unmarshaled manifest list is equal to zero value manifest list")
+		return manifestList, err
+	}
+	img.ManifestList = &manifestList
+	return manifestList, nil
+}
+
+func (img Image) getByteManifestList() ([]byte, error) {
+	url := img.GetManifestUrl()
+
+	reqAuth, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		LogE(err).Error("Error in creating the HTTP Request for the authentication for the manifest list")
+		return nil, err
+	}
+	token, err := firstRequestForAuthV2(reqAuth)
+	if err != nil {
+		LogE(err).Error("Error in obtain the token for the manifest list")
+		return nil, err
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		LogE(err).Error("Error in creating the HTTP Request for the manifest list")
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", token)
+	req.Header.Set("Accept", manifestlist.MediaTypeManifestList)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		LogE(err).Error("Error in making the HTTP request for the manifest list")
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		LogE(err).Error("Error in reading the bytes from the request for the manifest list")
+		return nil, err
+	}
+	return body, nil
+}
+
+func (img *Image) GetConfig() (config image.Image, err error) {
+	if img.Config != nil {
+		return *img.Config, nil
+	}
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -154,7 +232,7 @@ func (img Image) GetChanges() (changes []string, err error) {
 		pass = ""
 	}
 
-	changes = []string{"ENV CVMFS_IMAGE true"}
+	Log().Info("Get Manifest form GetConfig")
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
@@ -170,7 +248,7 @@ func (img Image) GetChanges() (changes []string, err error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", configUrl, nil)
 	if err != nil {
-		LogE(err).Warning("Impossible to create a request for getting the changes no chnages set.")
+		LogE(err).Warning("Impossible to create a request for getting the changes no changes set.")
 		return
 	}
 	req.Header.Set("Authorization", token)
@@ -184,12 +262,22 @@ func (img Image) GetChanges() (changes []string, err error) {
 		return
 	}
 
-	var config image.Image
 	err = json.Unmarshal(body, &config)
 	if err != nil {
 		LogE(err).Warning("Error in unmarshaling the configuration of the image")
 		return
 	}
+	img.Config = &config
+	return
+}
+
+func (img *Image) GetChanges() (changes []string, err error) {
+	changes = []string{"ENV CVMFS_IMAGE true"}
+	config, err := img.GetConfig()
+	if err != nil {
+		return
+	}
+
 	env := config.Config.Env
 
 	if len(env) > 0 {
@@ -211,6 +299,22 @@ func (img Image) GetChanges() (changes []string, err error) {
 		}
 	}
 
+	return
+}
+
+func (img *Image) GetDiffIDs() (diffIDs []digest.Digest, err error) {
+	diffIDs = []digest.Digest{}
+	config, err := img.GetConfig()
+	if err != nil {
+		return
+	}
+	for _, diffID := range config.RootFS.DiffIDs {
+		digest, err := digest.Parse(string(diffID))
+		if err != nil {
+			return diffIDs, err
+		}
+		diffIDs = append(diffIDs, digest)
+	}
 	return
 }
 
@@ -305,7 +409,7 @@ func GetSingularityPathFromManifest(manifest da.Manifest) string {
 }
 
 // here is where in the FS we are going to store the singularity image
-func (img Image) GetSingularityPath() (string, error) {
+func (img *Image) GetSingularityPath() (string, error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Error("Error in getting the manifest to figureout the singularity path")
@@ -340,6 +444,203 @@ func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity
 
 	Log().Info("Successfully download the singularity image")
 	return Singularity{Image: &img, TempDirectory: dir}, nil
+}
+
+func (img *Image) AreAllLayersPresent(repo string) bool {
+	manifest, err := img.GetManifest()
+	if err != nil {
+		LogE(err).Error("Error in obtaining the manifest")
+		return false
+	}
+	for _, layer := range manifest.Layers {
+		layerDigest := strings.Split(layer.Digest, ":")[1]
+		layerPath := LayerRootfsPath(repo, layerDigest)
+		if _, err := os.Stat(layerPath); os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
+}
+
+func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
+	// we first obtain all the layers
+	for i := 0; i <= 5; i++ {
+
+		if img.AreAllLayersPresent(repo) {
+			break
+		}
+
+		layersChan := make(chan downloadedLayer)
+
+		go getLayersOfImage(img, repo, false, layersChan)
+
+		for downloadedLayer := range layersChan {
+			defer downloadedLayer.Path.Close()
+			layerDigest := strings.Split(downloadedLayer.Name, ":")[1]
+			path := LayerRootfsPath(repo, layerDigest)
+			err := ExecCommand("cvmfs_server", "ingest", "--catalog",
+				"-t", "-", "-b", TrimCVMFSRepoPrefix(path), repo).StdIn(downloadedLayer.Path).Start()
+			if err != nil {
+				// some error occurs, we abort and clean up whatever we were doing
+				ExecCommand("cvmfs_server", "abort", "-f", repo).Start()
+				ExecCommand("cvmfs_server", "ingest", "--delete", TrimCVMFSRepoPrefix(path), repo).Start()
+			}
+		}
+	}
+
+	if img.AreAllLayersPresent(repo) == false {
+		err := fmt.Errorf("Impossible to download all the layers")
+		LogE(err).Error("Interrupting ingestion of flat filesystem")
+		return err
+	}
+
+	diffIDs, err := img.GetDiffIDs()
+	if err != nil {
+		LogE(err).Error("Error in generating the diffID")
+		return err
+	}
+	chainIDs := ChainIDFromLayers(diffIDs)
+	manifest, _ := img.GetManifest()
+
+	// here we need both:
+	// CAP_DAC_OVERRIDE to read root files and
+	// CAP_DAC_READ_SEARCH to read root directories
+	// without these permissions we may fail in opening files or walking some directory
+	// the failure should be reported, but it should not stop the whole ingestion process
+	// we should try to acquire this permision now, if we succeed we should drop them when not necessary anymore
+	var capErr error
+	p_cap, err := capability.NewPid2(0)
+	if err != nil {
+		capErr = err
+		LogE(err).Warning("Impossible to obtain capabilities (Pid handler), we may fail.")
+	}
+	err = p_cap.Load()
+	if err != nil {
+		capErr = err
+		LogE(err).Warning("Impossible to load capabilities (handler load), we may fail.")
+	}
+	necessary_cap := capability.CAP_DAC_OVERRIDE | capability.CAP_DAC_READ_SEARCH
+	if !p_cap.Get(capability.CAPS, necessary_cap) {
+		Log().Info("No CAP_DAC_READ_SEARCH which is usually needed, trying to load it")
+		p_cap.Set(capability.EFFECTIVE|capability.PERMITTED, necessary_cap)
+		err = p_cap.Apply(capability.CAPS)
+		if err != nil {
+			capErr = err
+			LogE(err).Warning("Impossible to load capabilities (handler apply), we may fail.")
+		} else {
+			Log().Info("Set CAP_DAC_OVERRIDE | CAP_DAC_READ_SEARCH")
+		}
+		err = p_cap.Load()
+		if err != nil {
+			capErr = err
+			LogE(err).Warning("Impossible to load capabilities")
+		}
+		fmt.Printf("Permitted: %s\nEffective: %s\n", p_cap.StringCap(capability.PERMITTED), p_cap.StringCap(capability.EFFECTIVE))
+	}
+	if capErr != nil {
+		defer func() {
+			// drop capabilities
+		}()
+	}
+	previousDir := ""
+	for i := 0; i < len(chainIDs.Chain); i++ {
+		chainID := chainIDs.Chain[i]
+		chainDigest := strings.Split(chainID.String(), ":")[1]
+		mainPath := ChainPath(repo, chainDigest)
+		rootPath := ChainRootfsPath(repo, chainDigest)
+		metaPath := ChainMetadataPath(repo, chainDigest)
+		_, errMain := os.Stat(mainPath)
+		_, errRoot := os.Stat(rootPath)
+		_, errMeta := os.Stat(metaPath)
+		if os.IsNotExist(errMain) || os.IsNotExist(errRoot) || os.IsNotExist(errMeta) {
+			Log().WithFields(log.Fields{"chain": chainID}).Info("Working on a new chain")
+			err = OpenTransaction(repo)
+			if err != nil {
+				return err
+			}
+			if os.IsNotExist(errMain) {
+				err = os.MkdirAll(mainPath, dirPermision)
+				if err != nil {
+					LogE(err).WithFields(log.Fields{"directory": mainPath}).
+						Error("Error in creating the directory")
+					AbortTransaction(repo)
+					return err
+				}
+			}
+			if os.IsNotExist(errRoot) {
+				err = os.MkdirAll(rootPath, dirPermision)
+				if err != nil {
+					LogE(err).WithFields(log.Fields{"directory": rootPath}).
+						Error("Error in creating the directory")
+					AbortTransaction(repo)
+					return err
+				}
+			}
+
+			if os.IsNotExist(errMeta) {
+				err = os.MkdirAll(metaPath, dirPermision)
+				if err != nil {
+					LogE(err).WithFields(log.Fields{"directory": metaPath}).
+						Error("Error in creating the directory")
+					AbortTransaction(repo)
+					return err
+				}
+			}
+
+			layerToApply := manifest.Layers[i]
+			layerDigest := strings.Split(layerToApply.Digest, ":")[1]
+			layerPath := LayerRootfsPath(repo, layerDigest)
+
+			if previousDir == "" {
+				// first chain, we just copy the layer
+				err = copy.Copy(layerPath, rootPath)
+				if errors.Is(err, os.ErrPermission) {
+					fmt.Println("Permission error detected...............................")
+				}
+				if err != nil {
+					LogE(err).WithFields(log.Fields{
+						"directory":   rootPath,
+						"lower layer": layerPath}).
+						Error("Error in creating ChainDirectory during copying of the lower layer")
+					AbortTransaction(repo)
+					return err
+				}
+				previousDir = rootPath
+			} else {
+				err = copy.Copy(previousDir, rootPath)
+				if err != nil {
+					LogE(err).WithFields(log.Fields{
+						"directory":   rootPath,
+						"lower layer": previousDir}).
+						Error("Error in creating ChainDirectory during copying of the lower layer")
+					AbortTransaction(repo)
+					return err
+				}
+				// now we apply the upper layer
+				err = ApplyDirectory(rootPath, layerPath)
+				if err != nil {
+					LogE(err).WithFields(log.Fields{
+						"directory": rootPath,
+						"layer":     layerPath}).
+						Error("Error in applying the layer to the directory")
+					AbortTransaction(repo)
+					return err
+				}
+				previousDir = rootPath
+			}
+
+			err = PublishTransaction(repo)
+			if err != nil {
+				return err
+			}
+		} else {
+			Log().WithFields(log.Fields{"chain": chainID}).Info("Skipping already created chain")
+			previousDir = rootPath
+			continue // if everything exists, I assume the chain is already ingested
+		}
+	}
+
+	return nil
 }
 
 // the one that the user see, without the /cvmfs/$repo.cern.ch prefix
@@ -442,8 +743,49 @@ func getManifestWithUsernameAndPassword(img Image, user, pass string) ([]byte, e
 	return body, nil
 }
 
+func firstRequestForAuthV2(request *http.Request) (token string, err error) {
+	client := &http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		LogE(err).Error("Error in making the first request for authentication")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 401 {
+		log.WithFields(log.Fields{
+			"status code": resp.StatusCode,
+			"url":         request.URL,
+		}).Info("Expected status code 401, print body anyway.")
+		if err != nil {
+			LogE(err).Error("Error in reading the first http response")
+		}
+	}
+	_, authPresent := resp.Header["Www-Authenticate"]
+	if !authPresent {
+		err = fmt.Errorf("No authentication in the Header")
+		LogE(err).Error("The header does not contains authorization informations")
+		return "", err
+	}
+
+	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
+	user, pass, _ := request.BasicAuth()
+	token, err = requestAuthToken(WwwAuthenticate, user, pass)
+	if err != nil {
+		LogE(err).Error("Error in getting the authentication token")
+		return "", err
+	}
+	return token, nil
+}
+
 func firstRequestForAuth(url, user, pass string) (token string, err error) {
-	resp, err := http.Get(url)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		LogE(err).Error("Impossible to create a HTTP request")
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		LogE(err).Error("Error in making the first request for auth")
 		return "", err
@@ -452,14 +794,19 @@ func firstRequestForAuth(url, user, pass string) (token string, err error) {
 	if resp.StatusCode != 401 {
 		log.WithFields(log.Fields{
 			"status code": resp.StatusCode,
+			"url":         url,
 		}).Info("Expected status code 401, print body anyway.")
-		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			LogE(err).Error("Error in reading the first http response")
 		}
-		fmt.Println(string(body))
+	}
+	_, authPresent := resp.Header["Www-Authenticate"]
+	if !authPresent {
+		err = fmt.Errorf("No authentication in the Header")
+		LogE(err).Error("The header does not contains authorization informations")
 		return "", err
 	}
+
 	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
 	token, err = requestAuthToken(WwwAuthenticate, user, pass)
 	if err != nil {
@@ -467,19 +814,19 @@ func firstRequestForAuth(url, user, pass string) (token string, err error) {
 		return "", err
 	}
 	return token, nil
-
 }
 
-func getLayerUrl(img Image, layer da.Layer) string {
+func getBlobUrl(img Image, blobDigest string) string {
 	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, layer.Digest)
+		img.Scheme, img.Registry, img.Repository, blobDigest)
 }
 
 type downloadedLayer struct {
-	Name string
-	Path io.ReadCloser
+	Name string        // the digest of the layer
+	Path io.ReadCloser // a reader for the content of the layer
 }
 
+// manifestChan will hold the path where we saved the manifest file
 func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
 	defer close(layersChan)
 	defer close(manifestChan)
@@ -501,7 +848,7 @@ func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<
 
 	// A first request is used to get the authentication
 	firstLayer := manifest.Layers[0]
-	layerUrl := getLayerUrl(img, firstLayer)
+	layerUrl := getBlobUrl(img, firstLayer.Digest)
 	token, err := firstRequestForAuth(layerUrl, user, pass)
 	if err != nil {
 		return err
@@ -535,7 +882,7 @@ func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<
 		go func(ctx context.Context, layer da.Layer) {
 			defer wg.Done()
 			Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Start working on layer")
-			toSend, err := img.downloadLayer(layer, token, rootPath)
+			toSend, err := img.downloadLayer(layer, token)
 			if err != nil {
 				LogE(err).Error("Error in downloading a layer")
 				return
@@ -574,7 +921,7 @@ func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<
 	}
 }
 
-func (img Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend downloadedLayer, err error) {
+func (img Image) downloadLayer(layer da.Layer, token string) (toSend downloadedLayer, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -582,7 +929,7 @@ func (img Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend d
 		user = ""
 		pass = ""
 	}
-	layerUrl := getLayerUrl(img, layer)
+	layerUrl := getBlobUrl(img, layer.Digest)
 	if token == "" {
 		token, err = firstRequestForAuth(layerUrl, user, pass)
 		if err != nil {
@@ -619,7 +966,6 @@ func (img Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend d
 		}
 	}
 	return
-
 }
 
 func parseBearerToken(token string) (realm string, options map[string]string, err error) {
