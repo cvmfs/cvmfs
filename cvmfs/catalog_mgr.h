@@ -195,6 +195,9 @@ class AbstractCatalogManager : public SingleCopy {
     return (inode <= kInodeOffset) ? GetRootInode() : inode;
   }
 
+  catalog::Counters LookupCounters(const PathString &path,
+                                   std::string *subcatalog_path);
+
  protected:
   /**
    * Load the catalog and return a file name and the catalog hash. Derived

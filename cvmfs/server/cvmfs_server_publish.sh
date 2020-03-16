@@ -357,6 +357,7 @@ cvmfs_server_publish() {
     fi
 
     if [ x"$upstream_type" = xgw ]; then
+        # TODO(jpriessn): implement publication counters upload to gateway        
         close_transaction  $name $use_fd_fallback
         publish_after_hook $name
         publish_succeeded $name
@@ -446,6 +447,9 @@ cvmfs_server_publish() {
     fi
 
     # remount the repository
+    if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
+      upload_statistics_plots $name $upstream
+    fi
     close_transaction  $name $use_fd_fallback
     publish_after_hook $name
     publish_succeeded  $name

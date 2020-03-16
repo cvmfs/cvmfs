@@ -19,28 +19,31 @@ var (
 )
 
 var (
-	convertAgain, overwriteLayer, convertDocker, convertSingularity bool
+	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage bool
 )
 
 func init() {
 	convertCmd.Flags().BoolVarP(&overwriteLayer, "overwrite-layers", "f", false, "overwrite the layer if they are already inside the CVMFS repository")
 	convertCmd.Flags().BoolVarP(&convertAgain, "convert-again", "g", false, "convert again images that are already successfull converted")
-	convertCmd.Flags().BoolVarP(&convertSingularity, "convert-singularity", "s", true, "also create a singularity images")
-	convertCmd.Flags().BoolVarP(&convertDocker, "convert-docker", "d", true, "unpacking the layers into the repository")
+	convertCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat image (compatible with singularity)")
+	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image")
+	convertCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	rootCmd.AddCommand(convertCmd)
 }
 
 var convertCmd = &cobra.Command{
-	Use:   "convert",
+	Use:   "convert wish-list.yaml",
 	Short: "Convert the wishes",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		AliveMessage()
 
-		_, err := lib.GetPassword()
-		if err != nil {
-			lib.LogE(err).Error("No password provide to upload the docker images")
-			os.Exit(NoPasswordError)
+		if (skipLayers == false) && (skipThinImage == false) {
+			_, err := lib.GetPassword()
+			if err != nil {
+				lib.LogE(err).Error("No password provide to upload the docker images")
+				os.Exit(NoPasswordError)
+			}
 		}
 
 		defer lib.ExecCommand("docker", "system", "prune", "--force", "--all")
@@ -68,13 +71,13 @@ var convertCmd = &cobra.Command{
 				"repository":   wish.CvmfsRepo,
 				"output image": wish.OutputName}
 			lib.Log().WithFields(fields).Info("Start conversion of wish")
-			if convertDocker {
-				err = lib.ConvertWishDocker(wish, convertAgain, overwriteLayer)
+			if !skipLayers {
+				err = lib.ConvertWishDocker(wish, convertAgain, overwriteLayer, !skipThinImage)
 				if err != nil {
 					lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
 				}
 			}
-			if convertSingularity {
+			if !skipFlat {
 				err = lib.ConvertWishSingularity(wish)
 				if err != nil {
 					lib.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")

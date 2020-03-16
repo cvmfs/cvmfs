@@ -570,6 +570,8 @@ fi
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
+/usr/share/cvmfs-server/generate_stats_plots.C
+/usr/share/cvmfs-server/stats_index.html.tpl
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
