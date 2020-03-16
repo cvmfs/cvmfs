@@ -485,6 +485,8 @@ bool StatisticsDatabase::UploadStatistics(
   uploader->WaitForUpload();
   unsigned errors_before = uploader->GetNumberOfErrors();
 
+  uploader->RemoveAsync("stats/stats.db");
+  uploader->WaitForUpload();
   uploader->UploadFile(local_path, "stats/stats.db");
   uploader->WaitForUpload();
   unsigned errors_after = uploader->GetNumberOfErrors();
