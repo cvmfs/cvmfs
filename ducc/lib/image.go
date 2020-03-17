@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,7 +19,6 @@ import (
 	image "github.com/docker/docker/image"
 	digest "github.com/opencontainers/go-digest"
 	copy "github.com/otiai10/copy"
-	// capability "github.com/syndtr/gocapability/capability"
 
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
@@ -502,45 +500,6 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	chainIDs := ChainIDFromLayers(diffIDs)
 	manifest, _ := img.GetManifest()
 
-	// here we need both:
-	// CAP_DAC_OVERRIDE to read root files and
-	// CAP_DAC_READ_SEARCH to read root directories
-	// without these permissions we may fail in opening files or walking some directory
-	// the failure should be reported, but it should not stop the whole ingestion process
-	// we should try to acquire this permision now, if we succeed we should drop them when not necessary anymore
-	/*
-	var capErr error
-	p_cap, capErr := capability.NewPid2(0)
-	if capErr != nil {
-		LogE(err).Warning("Impossible to obtain capabilities (Pid handler), we may fail.")
-	}
-	capErr = p_cap.Load()
-	if capErr != nil {
-		LogE(err).Warning("Impossible to load capabilities (handler load), we may fail.")
-	}
-	necessary_cap := capability.CAP_DAC_OVERRIDE | capability.CAP_DAC_READ_SEARCH
-	fmt.Printf("Before \n Permitted: %s\nEffective: %s\n", p_cap.StringCap(capability.PERMITTED), p_cap.StringCap(capability.EFFECTIVE))
-	if !p_cap.Get(capability.EFFECTIVE, necessary_cap) {
-		Log().Info("No CAP_DAC_READ_SEARCH | CAP_DAC_OVERRIDE which is usually needed, trying to load it")
-		p_cap.Set(capability.EFFECTIVE|capability.PERMITTED, necessary_cap)
-		capErr = p_cap.Apply(capability.EFFECTIVE)
-		if capErr != nil {
-			LogE(err).Warning("Impossible to load capabilities (handler apply), we may fail.")
-		} else {
-			Log().Info("Successfully set CAP_DAC_OVERRIDE | CAP_DAC_READ_SEARCH")
-		}
-		capErr = p_cap.Load()
-		if capErr != nil {
-			LogE(err).Warning("Impossible to load capabilities")
-		}
-		fmt.Printf("After \n Permitted: %s\nEffective: %s\n", p_cap.StringCap(capability.PERMITTED), p_cap.StringCap(capability.EFFECTIVE))
-	}
-	if capErr != nil {
-		defer func() {
-			// drop capabilities
-		}()
-	}
-	*/
 	previousDir := ""
 	for i := 0; i < len(chainIDs.Chain); i++ {
 		chainID := chainIDs.Chain[i]
@@ -590,12 +549,27 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 			layerDigest := strings.Split(layerToApply.Digest, ":")[1]
 			layerPath := LayerRootfsPath(repo, layerDigest)
 
+			copyOptions := copy.DefaultOptions
+			copyOptions.Skip = func(path string) bool {
+				// we don't copy devices
+				// they required anyway root permission or CAP_MKNOD
+				// and they should not be included in an image filesystem anyway
+				// unfortunately sometimes they are
+				info, err := os.Lstat(path)
+				if err != nil {
+					// not sure what to do here, it will fail above.
+					// failing above is not that bad
+					return false
+				}
+				if info.Mode()&os.ModeDevice != 0 {
+					Log().WithFields(log.Fields{"file": path}).Info("Skipping device file, it should not be here anyway.")
+					return true
+				}
+				return false
+			}
 			if previousDir == "" {
 				// first chain, we just copy the layer
-				err = copy.Copy(layerPath, rootPath)
-				if errors.Is(err, os.ErrPermission) {
-					fmt.Println("Permission error detected...............................")
-				}
+				err = copy.Copy(layerPath, rootPath, copyOptions)
 				if err != nil {
 					LogE(err).WithFields(log.Fields{
 						"directory":   rootPath,
@@ -606,7 +580,7 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 				}
 				previousDir = rootPath
 			} else {
-				err = copy.Copy(previousDir, rootPath)
+				err = copy.Copy(previousDir, rootPath, copyOptions)
 				if err != nil {
 					LogE(err).WithFields(log.Fields{
 						"directory":   rootPath,
