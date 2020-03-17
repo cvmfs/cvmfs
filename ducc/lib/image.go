@@ -639,6 +639,110 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 
 	err = img.CreateChainIDDirectories(repo)
 
+	// now we need to create the .flat image
+	// the process will be similar to the one to create the chain id
+	// we copy the last chain directory in .flat/image_digest
+	// we add the .singularity files
+	// we finish
+	publicSymlinkPath := img.GetPublicSymlinkPath()
+	completeFlatPubSymPath := filepath.Join("/", "cvmfs", repo, publicSymlinkPath)
+	pubDirInfo, errPub := os.Stat(completeFlatPubSymPath)
+	flatPrivatePath, err := img.GetSingularityPath()
+	if err != nil {
+		errF := fmt.Errorf("Error in getting the path where to save flat filesystem: %s", err)
+		LogE(err).Warning(errF)
+		return err
+	}
+	completeFlatPriPath := filepath.Join("/", "cvmfs", repo, flatPrivatePath)
+	priDirInfo, errPri := os.Stat(completeFlatPriPath)
+
+	// no error in stating both directories
+	// either the image is up to date or the image became stale
+	if errPub == nil && errPri == nil {
+		if os.SameFile(pubDirInfo, priDirInfo) {
+			// the link is up to date
+			// everything is good
+			Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("Singularity Image up to date")
+			return nil
+		}
+		// delete the old pubLink
+		// make a new Link to the privatePaht
+		// after that skip and continue
+		Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("Updating Singularity Image")
+		err = CreateSymlinkIntoCVMFS(repo, publicSymlinkPath, flatPrivatePath)
+		if err != nil {
+			errF := fmt.Errorf("Error in updating symlink for singularity image: %s", img.GetSimpleName())
+			LogE(errF).WithFields(
+				log.Fields{"to": publicSymlinkPath, "from": flatPrivatePath}).
+				Error("Error in creating symlink")
+			return errF
+		}
+		return nil
+	}
+
+	// no error in stating the private directory, but the public one does not exists
+	// we simply create the public directory
+	if errPri == nil && os.IsNotExist(errPub) {
+		Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("Creating link for Singularity Image")
+		err = CreateSymlinkIntoCVMFS(repo, publicSymlinkPath, flatPrivatePath)
+		if err != nil {
+			errF := fmt.Errorf("Error in creating symlink for singularity image: %s", img.GetSimpleName())
+			LogE(errF).WithFields(
+				log.Fields{"to": publicSymlinkPath, "from": flatPrivatePath}).
+				Error("Error in creating symlink")
+			return errF
+		}
+		return nil
+	}
+
+	// error in both the private and the public path
+	// new image to ingest
+
+	// first step is to understand what is the chainID we should copy
+	chainIDs, err := img.GetChainIDs()
+	if err != nil {
+		LogE(err).Error("Error in getting ChainIDs, it should never happen.")
+		return err
+	}
+	lastChain := chainIDs.Chain[len(chainIDs.Chain)-1]
+	lastChainPath := ChainRootfsPath(repo, lastChain.String())
+	_, err = os.Stat(lastChainPath)
+	if err != nil {
+		LogE(err).Error("Error chain path not found, it should never happen.")
+		return err
+	}
+
+	err = OpenTransaction(repo)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"repository": repo, "image": img.GetSimpleName(), "error": err}).Error("Error in opening transaction when creating flat image")
+		return err
+	}
+
+	// now we should copy the rootPath to the private path
+	// XXX finish this part here, missing the .singularity files and the public link creation
+	// we start by making the privatePath
+	err = os.MkdirAll(completeFlatPriPath, dirPermision)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"repository": repo, "path": completeFlatPriPath, "image": img.GetSimpleName()}).Error("Error in creating private path for flat image")
+		AbortTransaction(repo)
+		return err
+	}
+	// we copy the rootPath into it
+	err = copy.Copy(lastChainPath, completeFlatPriPath)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"repository": repo, "chain directory": lastChainPath, "private flat path": completeFlatPriPath}).Error("Error in copying the last chain directory into the private flat path")
+		AbortTransaction(repo)
+		return err
+	}
+	// we add the .singularity files
+	// we create the public link
+
+	err = PublishTransaction(repo)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"repository": repo, "image": img.GetSimpleName(), "error": err}).Error("Error in publishing the transaction when creating flat image")
+		return err
+	}
+
 	return nil
 }
 
