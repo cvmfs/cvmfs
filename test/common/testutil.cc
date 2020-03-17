@@ -363,7 +363,8 @@ bool MockCatalog::LookupPath(const PathString &path,
 }
 
 bool MockCatalog::ListingPath(const PathString &path,
-                 catalog::DirectoryEntryList *listing) const {
+                 catalog::DirectoryEntryList *listing,
+                 const bool /* expand_symlink */) const {
   unsigned initial_size = listing->size();
   shash::Md5 path_hash(path.GetChars(), path.GetLength());
   for (unsigned i = 0; i < files_.size(); ++i) {

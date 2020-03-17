@@ -278,12 +278,12 @@ TEST_F(T_Libcvmfs, TemplatingSlow) {
 
 namespace {
 // Create some default hashes for DirSpec
-const char* g_hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
-                         "26ab0db90d72e28ad0ba1e22ee510510000000",
-                         "6d7fce9fee471194aa8b5b6e47267f03000000",
-                         "48a24b70a0b376535542b996af517398000000",
-                         "1dcca23355272056f04fe8bf20edfce0000000",
-                         "11111111111111111111111111111111111111"};
+const char* g_hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d100000000",
+                          "26ab0db90d72e28ad0ba1e22ee51051000000000",
+                          "6d7fce9fee471194aa8b5b6e47267f0300000000",
+                          "48a24b70a0b376535542b996af51739800000000",
+                          "1dcca23355272056f04fe8bf20edfce000000000",
+                          "1111111111111111111111111111111111111111"};
 
 const size_t g_file_size = 4096;
 }  // anonymous namespace
@@ -336,6 +336,7 @@ TEST_F(T_Libcvmfs, Stat) {
   // Create file structure
   DirSpec spec1 = MakeBaseSpec();
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+  tester.DestroyCatalogManager();
 
   // Find directory entry for use later
   catalog::DirectoryEntry entry;
@@ -395,6 +396,7 @@ TEST_F(T_Libcvmfs, Attr) {
   DirSpec spec = MakeBaseSpec();
   EXPECT_TRUE(spec.LinkFile("link", "dir", "file1", g_file_size));
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+  tester.DestroyCatalogManager();
 
   // Find directory entry for use later
   catalog::DirectoryEntry entry;
@@ -485,6 +487,7 @@ TEST_F(T_Libcvmfs, Listdir) {
 
   // Apply the created DirSpec
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+  tester.DestroyCatalogManager();
 
   // Set CVMFS options to reflect created repository
   cvmfs_options_set(opts,
@@ -544,6 +547,7 @@ TEST_F(T_Libcvmfs, StatNestedCatalog) {
 
   // Apply the created DirSpec
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+  tester.DestroyCatalogManager();
   char *d0_hash = strdup(tester.manifest()->catalog_hash().ToString().c_str());
 
   // Find the hash of the newly added Nested Catalog for comparison
@@ -629,6 +633,7 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   // Apply created DirSpec
   EXPECT_TRUE(
     tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+  tester.DestroyCatalogManager();
 
   // Set CVMFS options to reflect created repository
   cvmfs_options_set(opts,
