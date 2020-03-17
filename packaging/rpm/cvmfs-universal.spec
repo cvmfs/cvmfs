@@ -36,7 +36,7 @@
 %endif
 
 %define cvmfs_python python
-%if 0%{?el8}
+%if 0%{?el8} || 0%{?fedora} >= 31
 %define cvmfs_python python2
 %endif
 
