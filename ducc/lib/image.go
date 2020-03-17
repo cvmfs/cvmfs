@@ -44,6 +44,7 @@ type Image struct {
 	ManifestList *manifestlist.ManifestList
 	Config       *image.Image
 	TagWildcard  bool
+	chainID      *ChainID
 }
 
 func (i Image) GetSimpleName() string {
@@ -460,12 +461,11 @@ func (img *Image) AreAllLayersPresent(repo string) bool {
 	return true
 }
 
-func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
-	// we first obtain all the layers
+func (img *Image) ObtainAllLayers(repo string) error {
 	for i := 0; i <= 5; i++ {
 
 		if img.AreAllLayersPresent(repo) {
-			break
+			return nil
 		}
 
 		layersChan := make(chan downloadedLayer)
@@ -485,19 +485,29 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 			}
 		}
 	}
+	return fmt.Errorf("Unable to obtain all the layers")
+}
 
-	if img.AreAllLayersPresent(repo) == false {
-		err := fmt.Errorf("Impossible to download all the layers")
-		LogE(err).Error("Interrupting ingestion of flat filesystem")
-		return err
+func (img *Image) GetChainIDs() (ChainID, error) {
+	if img.chainID != nil {
+		return *img.chainID, nil
 	}
-
 	diffIDs, err := img.GetDiffIDs()
+	if err != nil {
+		LogE(err).Error("Error in generating the diffID")
+		return ChainID{}, err
+	}
+	chainIDs := ChainIDFromLayers(diffIDs)
+	img.chainID = &chainIDs
+	return chainIDs, nil
+}
+
+func (img *Image) CreateChainIDDirectories(repo string) error {
+	chainIDs, err := img.GetChainIDs()
 	if err != nil {
 		LogE(err).Error("Error in generating the diffID")
 		return err
 	}
-	chainIDs := ChainIDFromLayers(diffIDs)
 	manifest, _ := img.GetManifest()
 
 	previousDir := ""
@@ -612,6 +622,22 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 			continue // if everything exists, I assume the chain is already ingested
 		}
 	}
+	return nil
+}
+
+func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
+	// we first obtain all the layers
+	err := img.ObtainAllLayers(repo)
+	if err != nil {
+		return err
+	}
+	if img.AreAllLayersPresent(repo) == false {
+		err := fmt.Errorf("Impossible to download all the layers")
+		LogE(err).Error("Interrupting ingestion of flat filesystem")
+		return err
+	}
+
+	err = img.CreateChainIDDirectories(repo)
 
 	return nil
 }
