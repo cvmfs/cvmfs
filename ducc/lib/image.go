@@ -714,7 +714,7 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	}
 
 	// find the link between the private path and the public path
-	relativePath, err := filepath.Rel(completeFlatPubSymPath, completeFlatPriPath)
+	relativePath, err := filepath.Rel(completeFlatPriPath, completeFlatPubSymPath)
 	if err != nil {
 		// should never happen
 		LogE(err).WithFields(log.Fields{"private flat path": completeFlatPriPath, "public flat path": completeFlatPubSymPath}).Error("Error in finding the relative link name between the private flat path and the public flat path")
