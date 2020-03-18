@@ -732,7 +732,6 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	}
 
 	// now we should copy the rootPath to the private path
-	// XXX finish this part here, missing the .singularity files and the public link creation
 	// we start by making the privatePath
 	err = os.MkdirAll(completeFlatPriPath, dirPermision)
 	if err != nil {
@@ -748,7 +747,18 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 		return err
 	}
 	// we add the .singularity files
+	// XXX finish this part here, missing the .singularity files and the public link creation
 	// we create the public link
+	// need to make sure that the directory where we want to create the link exists
+	dir := filepath.Dir(completeFlatPubSymPath)
+	if _, err := os.Stat(dir); err != nil {
+		err = os.MkdirAll(dir, dirPermision)
+		if err != nil {
+			LogE(err).WithFields(log.Fields{"repository": repo, "directory": dir, "image link": completeFlatPubSymPath}).Error("Error in creating the directory for the image link");
+			AbortTransaction(repo)
+			return err
+		}
+	}
 	err = os.Symlink(link, completeFlatPubSymPath)
 	if err != nil {
 		// again it should not happen
