@@ -24,6 +24,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	da "github.com/cvmfs/ducc/docker-api"
+	"github.com/cvmfs/ducc/singularity"
 )
 
 type ManifestRequest struct {
@@ -747,6 +748,7 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 		return err
 	}
 	// we add the .singularity files
+	err = singularity.MakeBaseEnv(completeFlatPriPath)
 	// XXX finish this part here, missing the .singularity files and the public link creation
 	// we create the public link
 	// need to make sure that the directory where we want to create the link exists
