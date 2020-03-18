@@ -480,13 +480,11 @@ func (img *Image) ObtainAllLayers(repo string) error {
 		for downloadedLayer := range layersChan {
 			layerDigest := strings.Split(downloadedLayer.Name, ":")[1]
 			path := LayerRootfsPath(repo, layerDigest)
-			err := ExecCommand("cvmfs_server", "ingest", "--catalog",
-				"-t", "-", "-b", TrimCVMFSRepoPrefix(path), repo).StdIn(downloadedLayer.Path).Start()
+			err := Ingest(repo, TrimCVMFSRepoPrefix(path), true, downloadedLayer.Path)
 			downloadedLayer.Path.Close()
 			if err != nil {
-				// some error occurs, we abort and clean up whatever we were doing
-				ExecCommand("cvmfs_server", "abort", "-f", repo).Start()
-				ExecCommand("cvmfs_server", "ingest", "--delete", TrimCVMFSRepoPrefix(path), repo).Start()
+				// some error occurs, we clean up whatever we were doing
+				IngestDelete(repo, TrimCVMFSRepoPrefix(path))
 			}
 		}
 	}

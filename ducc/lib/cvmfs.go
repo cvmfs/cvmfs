@@ -30,9 +30,9 @@ func OpenTransaction(CVMFSRepo string) error {
 	cvmfsMutex.Lock()
 
 	if InTransaction(CVMFSRepo) {
-		defer cvmfsMutex.Unlock()
 		err := fmt.Errorf("repository seems already in a transaction")
-		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Error("The repository seems already in a transaction")
+		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("The repository seems already in a transaction")
+		// this will fail later
 	}
 
 	err := ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
@@ -61,6 +61,23 @@ func AbortTransaction(CVMFSRepo string) error {
 		return err
 	}
 	return nil
+}
+
+func Ingest(CVMFSRepo, path string, withCatalog bool, content io.ReadCloser) error {
+	cmdLine := []string{"cvmfs_server", "ingest"}
+	if withCatalog {
+		cmdLine = append(cmdLine, "--catalog")
+	}
+	cmdLine = append(cmdLine, "-t", "-", "-b", path, CVMFSRepo)
+	cvmfsMutex.Lock()
+	defer cvmfsMutex.Unlock()
+	return ExecCommand(cmdLine...).StdIn(content).Start()
+}
+
+func IngestDelete(CVMFSRepo, path string) error {
+	cvmfsMutex.Lock()
+	defer cvmfsMutex.Unlock()
+	return ExecCommand("cvmfs_server", "ingest", "--delete", path, CVMFSRepo).Start()
 }
 
 // ingest into the repository, inside the subpath, the target (directory or file) object
