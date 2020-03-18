@@ -12,7 +12,7 @@ type ChainID struct {
 	ID         digest.Digest
 }
 
-func NewChainID(id digest.Digest) ChainID {
+func newChainID(id digest.Digest) ChainID {
 	return ChainID{
 		[]digest.Digest{id},
 		[]digest.Digest{id},
@@ -20,9 +20,9 @@ func NewChainID(id digest.Digest) ChainID {
 	}
 }
 
-func (chain ChainID) AddLayer(layer digest.Digest) ChainID {
+func (chain ChainID) addLayer(layer digest.Digest) ChainID {
 	if chain.ID == "" {
-		return NewChainID(layer)
+		return newChainID(layer)
 	}
 	ID := digest.FromString(chain.ID.String() + " " + layer.String())
 	baseLayers := append(chain.BaseLayers, layer)
@@ -37,19 +37,7 @@ func (chain ChainID) AddLayer(layer digest.Digest) ChainID {
 func ChainIDFromLayers(layers []digest.Digest) ChainID {
 	chain := ChainID{}
 	for _, l := range layers {
-		chain = chain.AddLayer(l)
+		chain = chain.addLayer(l)
 	}
 	return chain
-}
-
-func MapStringToDigest(layers []string) ([]digest.Digest, error) {
-	var digests []digest.Digest
-	for _, layer := range layers {
-		digest, err := digest.Parse(layer)
-		if err != nil {
-			return nil, err
-		}
-		digests = append(digests, digest)
-	}
-	return digests, nil
 }

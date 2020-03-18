@@ -150,7 +150,7 @@ func TestApplyDirectory(t *testing.T) {
 		t.Errorf("File %s does not exists but it should.", updated)
 	}
 	miaomiao, _ := ioutil.ReadFile(updated)
-	if "MiaoMiao" != string(miaomiao) {
+	if string(miaomiao) != "MiaoMiao" {
 		t.Errorf("Content of %s is not expected '%s' vs '%s'", updated, string(miaomiao), "MiaoMiao")
 	}
 
@@ -164,7 +164,7 @@ func TestApplyDirectory(t *testing.T) {
 		t.Errorf("File %s does not exists but it should.", created)
 	}
 	simo_ema, _ := ioutil.ReadFile(created)
-	if "Simo❤Ema" != string(simo_ema) {
+	if string(simo_ema) != "Simo❤Ema" {
 		t.Errorf("Content of %s is not expected '%s' vs '%s'", created, string(simo_ema), "Simo❤Ema")
 	}
 }

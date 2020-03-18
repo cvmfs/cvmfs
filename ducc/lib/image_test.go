@@ -57,7 +57,7 @@ func TestFilterUsingGlobStarMatchEverything(t *testing.T) {
 	if len(result) != len(input) {
 		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
-	for i, _ := range result {
+	for i := range result {
 		if result[i] != input[i] {
 			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
@@ -74,7 +74,7 @@ func TestFilterUsingGlobStar(t *testing.T) {
 	if len(result) != len(expected) {
 		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
-	for i, _ := range result {
+	for i := range result {
 		if result[i] != expected[i] {
 			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
@@ -91,7 +91,7 @@ func TestFilterUsingGlobAtBeginning(t *testing.T) {
 	if len(result) != len(expected) {
 		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
-	for i, _ := range result {
+	for i := range result {
 		if result[i] != expected[i] {
 			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
@@ -108,7 +108,7 @@ func TestFilterUsingGlobTwice(t *testing.T) {
 	if len(result) != len(expected) {
 		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
-	for i, _ := range result {
+	for i := range result {
 		if result[i] != expected[i] {
 			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
@@ -125,7 +125,7 @@ func TestFilterUsingGlobRealLifeImages01(t *testing.T) {
 	if len(result) != len(expected) {
 		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
-	for i, _ := range result {
+	for i := range result {
 		if result[i] != expected[i] {
 			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}
@@ -142,7 +142,7 @@ func TestFilterUsingGlobRealLifeImages02(t *testing.T) {
 	if len(result) != len(expected) {
 		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
 	}
-	for i, _ := range result {
+	for i := range result {
 		if result[i] != expected[i] {
 			t.Errorf("The match is missing something: %s != %s", result[i], input[i])
 		}

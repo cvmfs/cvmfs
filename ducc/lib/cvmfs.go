@@ -23,10 +23,7 @@ var cvmfsMutex sync.Mutex
 
 func InTransaction(CVMFSRepo string) bool {
 	_, errTransaction := os.Stat(filepath.Join("/", "var", "spool", "cvmfs", CVMFSRepo, "in_transaction.lock"))
-	if !os.IsNotExist(errTransaction) {
-		return true
-	}
-	return false
+	return !os.IsNotExist(errTransaction)
 }
 
 func OpenTransaction(CVMFSRepo string) error {
@@ -34,7 +31,7 @@ func OpenTransaction(CVMFSRepo string) error {
 
 	if InTransaction(CVMFSRepo) {
 		defer cvmfsMutex.Unlock()
-		err := fmt.Errorf("Repository seems already in a transaction")
+		err := fmt.Errorf("repository seems already in a transaction")
 		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Error("The repository seems already in a transaction")
 	}
 
@@ -127,7 +124,7 @@ func IngestIntoCVMFS(CVMFSRepo string, path string, target string) (err error) {
 			return err
 		}()
 	} else {
-		err = fmt.Errorf("Trying to ingest neither a file nor a directory")
+		err = fmt.Errorf("trying to ingest neither a file nor a directory")
 	}
 
 	if err != nil {
@@ -198,14 +195,14 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 			// the file exists and it is a symlink, we overwrite it
 			err = os.Remove(newLinkName)
 			if err != nil {
-				err = fmt.Errorf("Error in removing existsing symlink: %s", err)
+				err = fmt.Errorf("error in removing existsing symlink: %s", err)
 				llog(LogE(err)).Error("Error in removing previous symlink")
 				return err
 			}
 		} else {
 			// the file exists but is not a symlink
 			err = fmt.Errorf(
-				"Error, trying to overwrite with a symlink something that is not a symlink")
+				"error, trying to overwrite with a symlink something that is not a symlink")
 			llog(LogE(err)).Error("Error in creating a symlink")
 			return err
 		}
@@ -514,14 +511,14 @@ func RemoveDirectory(directory string) error {
 		return err
 	}
 	if !stat.Mode().IsDir() {
-		err = fmt.Errorf("Trying to remove something different from a directory")
+		err = fmt.Errorf("trying to remove something different from a directory")
 		llog(LogE(err)).Error("Error, input is not a directory")
 		return err
 	}
 
 	dirsSplitted := strings.Split(directory, string(os.PathSeparator))
 	if len(dirsSplitted) <= 3 || dirsSplitted[1] != "cvmfs" {
-		err := fmt.Errorf("Directory not in the CVMFS repo")
+		err := fmt.Errorf("directory not in the CVMFS repo")
 		llog(LogE(err)).Error("Error in opening the transaction")
 		return err
 	}
@@ -567,12 +564,12 @@ func CreateCatalogIntoDir(CVMFSRepo, dir string) (err error) {
 
 func RepositoryExists(CVMFSRepo string) bool {
 	cmd := ExecCommand("cvmfs_server", "list")
-	err, stdout, _ := cmd.StartWithOutput()
+	stdout, _, err := cmd.StartWithOutput()
 	if err != nil {
-		LogE(fmt.Errorf("Error in listing the repository")).Error("Repo not present")
+		LogE(fmt.Errorf("error in listing the repository")).Error("Repo not present")
 		return false
 	}
-	stdoutString := string(stdout.Bytes())
+	stdoutString := stdout.String()
 
 	if strings.Contains(stdoutString, CVMFSRepo) {
 		return true

@@ -2,6 +2,8 @@ package lib
 
 import (
 	"testing"
+
+	"github.com/opencontainers/go-digest"
 )
 
 func TestGetDiffIDs(t *testing.T) {
@@ -56,14 +58,22 @@ func TestGetChainIDs(t *testing.T) {
 			t.Errorf("Wrong base layer in position %d. %s vs %s", i, baseID, diffIDs[i])
 		}
 	}
-	expectedChainID, _ := MapStringToDigest([]string{
+	layers := []string{
 		"sha256:6744ca1b11903f4db4d5e26145f6dd20f9a6d321a7f725f1a0a7a45a4174c579",
 		"sha256:b3bcf5ea8345bc3bff9cc11fe0b0ffaf89edf2dc085ce8fb8e020075d192004a",
 		"sha256:9c6b6e118e74cba1ab3978e46bdfbcca56d0738a24ebab4b3e75d4a06b931386",
 		"sha256:640d7d5e90b3829c5393959bf1d7320fffbd4cab213298424410a206a190a6a8",
 		"sha256:52c069fff757e5af1e9e7f09ed0bfa69ba880ffa5a0abeb44a9d9f49599dbd65",
 		"sha256:f5c82cd22e3348bb4a4fcc5bfedbd9f3bc0ae2834a6a2361aff608aa2310dfa1",
-	})
+	}
+	var expectedChainID []digest.Digest
+	for _, layer := range layers {
+		digest, err := digest.Parse(layer)
+		if err != nil {
+			continue
+		}
+		expectedChainID = append(expectedChainID, digest)
+	}
 	for i, chainID := range chain.Chain {
 		if chainID != expectedChainID[i] {
 			t.Errorf("Wrong ChainID in position %d. %s vs %s", i, chainID.String(), expectedChainID[i])

@@ -12,14 +12,14 @@ func ParseImage(image string) (img Image, err error) {
 		return Image{}, err
 	}
 	if url.Host == "" {
-		return Image{}, fmt.Errorf("Impossible to identify the registry of the image: %s", image)
+		return Image{}, fmt.Errorf("impossible to identify the registry of the image: %s", image)
 	}
 	if url.Path == "" {
-		return Image{}, fmt.Errorf("Impossible to identify the repository of the image: %s", image)
+		return Image{}, fmt.Errorf("impossible to identify the repository of the image: %s", image)
 	}
 	colonPathSplitted := strings.Split(url.Path, ":")
 	if len(colonPathSplitted) == 0 {
-		return Image{}, fmt.Errorf("Impossible to identify the path of the image: %s", image)
+		return Image{}, fmt.Errorf("impossible to identify the path of the image: %s", image)
 	}
 	// no split happened, hence we don't have neither a tag nor a digest, but only a path
 	if len(colonPathSplitted) == 1 {
@@ -28,7 +28,7 @@ func ParseImage(image string) (img Image, err error) {
 		repository := strings.TrimLeft(colonPathSplitted[0], "/")
 		repository = strings.TrimRight(repository, "/")
 		if repository == "" {
-			return Image{}, fmt.Errorf("Impossible to find the repository for: %s", image)
+			return Image{}, fmt.Errorf("impossible to find the repository for: %s", image)
 		}
 		return Image{
 			Scheme:     url.Scheme,
@@ -39,7 +39,7 @@ func ParseImage(image string) (img Image, err error) {
 	}
 	if len(colonPathSplitted) > 3 {
 		fmt.Println(colonPathSplitted)
-		return Image{}, fmt.Errorf("Impossible to parse the string into an image, too many `:` in : %s", image)
+		return Image{}, fmt.Errorf("impossible to parse the string into an image, too many `:` in : %s", image)
 	}
 	// the colon `:` is used also as separator in the digest between sha256
 	// and the actuall digest, a len(pathSplitted) == 2 could either means
@@ -51,7 +51,7 @@ func ParseImage(image string) (img Image, err error) {
 	// digest, if it produce more than two we have an error.
 	atPathSplitted := strings.Split(url.Path, "@")
 	if len(atPathSplitted) > 2 {
-		return Image{}, fmt.Errorf("To many `@` in the image name: %s", image)
+		return Image{}, fmt.Errorf("to many `@` in the image name: %s", image)
 	}
 	var repoTag, digest string
 	if len(atPathSplitted) == 2 {
@@ -70,7 +70,7 @@ func ParseImage(image string) (img Image, err error) {
 		repository := strings.TrimLeft(colonRepoTagSplitted[0], "/")
 		repository = strings.TrimRight(repository, "/")
 		if repository == "" {
-			return Image{}, fmt.Errorf("Impossible to find the repository for: %s", image)
+			return Image{}, fmt.Errorf("impossible to find the repository for: %s", image)
 		}
 		return Image{
 			Scheme:     url.Scheme,
@@ -85,7 +85,7 @@ func ParseImage(image string) (img Image, err error) {
 		repository := strings.TrimLeft(colonRepoTagSplitted[0], "/")
 		repository = strings.TrimRight(repository, "/")
 		if repository == "" {
-			return Image{}, fmt.Errorf("Impossible to find the repository for: %s", image)
+			return Image{}, fmt.Errorf("impossible to find the repository for: %s", image)
 		}
 		tag := colonRepoTagSplitted[1]
 		return Image{
@@ -97,5 +97,5 @@ func ParseImage(image string) (img Image, err error) {
 			TagWildcard: strings.Contains(tag, `*`),
 		}, nil
 	}
-	return Image{}, fmt.Errorf("Impossible to parse the image: %s", image)
+	return Image{}, fmt.Errorf("impossible to parse the image: %s", image)
 }

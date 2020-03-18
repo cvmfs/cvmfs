@@ -18,16 +18,16 @@ func ApplyDirectory(bottom, top string) error {
 	if err != nil {
 		return err
 	}
-	if bottomDir.IsDir() == false {
-		return fmt.Errorf("Bottom directory '%s' is not a directory", bottom)
+	if !bottomDir.IsDir() {
+		return fmt.Errorf("bottom directory '%s' is not a directory", bottom)
 	}
 
 	topDir, err := os.Stat(top)
 	if err != nil {
 		return err
 	}
-	if topDir.IsDir() == false {
-		return fmt.Errorf("Top directory '%s' is not a directory", top)
+	if !topDir.IsDir() {
+		return fmt.Errorf("top directory '%s' is not a directory", top)
 	}
 
 	var opaqueWhiteouts []FilePathAndInfo
