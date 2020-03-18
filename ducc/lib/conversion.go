@@ -319,12 +319,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 		cleanup := func(location string) {
 			Log().Info("Running clean up function deleting the last layer.")
 
-			err := ExecCommand("cvmfs_server", "abort", "-f", repo).Start()
-			if err != nil {
-				LogE(err).Warning("Error in the abort command inside the cleanup function, this warning is usually normal")
-			}
-
-			err = ExecCommand("cvmfs_server", "ingest", "--delete", location, repo).Start()
+			err = IngestDelete(repo, location)
 			if err != nil {
 				LogE(err).Error("Error in the cleanup command")
 			}
@@ -379,7 +374,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 							"Created subcatalog in directory")
 					}
 				}
-				err = ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", TrimCVMFSRepoPrefix(layerPath), repo).StdIn(layer.Path).Start()
+				err = Ingest(repo, TrimCVMFSRepoPrefix(layerPath), true, layer.Path)
 
 				if err != nil {
 					LogE(err).WithFields(log.Fields{"layer": layer.Name}).Error("Some error in ingest the layer")

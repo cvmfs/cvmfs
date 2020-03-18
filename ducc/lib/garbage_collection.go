@@ -213,9 +213,10 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 
 		backlinkPath := getBacklinkPath(CVMFSRepo, layer)
 
-		err = ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
+		err = OpenTransaction(CVMFSRepo)
 		if err != nil {
 			llog(LogE(err)).Error("Error in opening the transaction")
+			AbortTransaction(CVMFSRepo)
 			return err
 		}
 
@@ -225,6 +226,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 			if err != nil {
 				llog(LogE(err)).WithFields(log.Fields{"directory": dir}).Error(
 					"Error in creating the directory for the backlinks file, skipping...")
+				AbortTransaction(CVMFSRepo)
 				return err
 			}
 		}
@@ -233,12 +235,14 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 		if err != nil {
 			llog(LogE(err)).WithFields(log.Fields{"file": backlinkPath}).Error(
 				"Error in writing the backlink file, skipping...")
+			AbortTransaction(CVMFSRepo)
 			return err
 		}
 
-		err = ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
+		err = PublishTransaction(CVMFSRepo)
 		if err != nil {
 			llog(LogE(err)).Error("Error in publishing after adding the backlinks")
+			AbortTransaction(CVMFSRepo)
 			return err
 		}
 		// write it to file
