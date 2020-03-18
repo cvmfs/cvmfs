@@ -282,7 +282,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 		return
 	}
 
-	alreadyConverted := AlreadyConverted(repo, inputImage, manifest.Config.Digest)
+	alreadyConverted := alreadyConverted(repo, inputImage, manifest.Config.Digest)
 	Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
 		"Already converted the image, skipping.")
 
@@ -431,7 +431,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 	wg.Wait()
 
 	if createThinImage {
-		err = CreateThinImage(manifest, layerLocations, inputImage, outputImage)
+		err = createDockerThinImage(manifest, layerLocations, inputImage, outputImage)
 		if err != nil {
 			return
 		}
@@ -515,7 +515,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 	}
 }
 
-func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inputImage, outputImage Image) (err error) {
+func createDockerThinImage(manifest da.Manifest, layerLocations map[string]string, inputImage, outputImage Image) (err error) {
 	thin, err := da.MakeThinImage(manifest, layerLocations, inputImage.WholeName())
 	if err != nil {
 		return
@@ -571,7 +571,7 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	return nil
 }
 
-func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionResult {
+func alreadyConverted(CVMFSRepo string, img Image, reference string) ConversionResult {
 	path := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata", img.GetSimpleName(), "manifest.json")
 
 	fmt.Println(path)
@@ -607,13 +607,20 @@ func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionR
 	return ConversionNotMatch
 }
 
+var alreadyGotPass = false
+var passwordFromEnv = ""
+
 func GetPassword() (string, error) {
 	envVar := "DUCC_DOCKER_REGISTRY_PASS"
-	pass := os.Getenv(envVar)
-	if pass == "" {
-		err := fmt.Errorf(
-			"Env variable (%s) storing the password to access the docker registry is not set", envVar)
-		return "", err
+	if alreadyGotPass {
+		return passwordFromEnv, nil
 	}
-	return pass, nil
+	pass := os.Getenv(envVar)
+	var err error
+	if pass == "" {
+		err = fmt.Errorf("Env variable (%s) storing the password to access the docker registry is not set", envVar)
+	}
+	alreadyGotPass = true
+	passwordFromEnv = pass
+	return pass, err
 }
