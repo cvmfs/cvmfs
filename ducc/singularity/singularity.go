@@ -489,5 +489,3 @@ func MakeBaseEnv(rootPath string) (err error) {
 
 	return err
 }
-
-

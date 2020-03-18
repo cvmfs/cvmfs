@@ -152,7 +152,7 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 	}
 	if reflect.DeepEqual(da.Manifest{}, manifest) {
 		Log().Warn("Got empty manifest")
-		return manifest, fmt.Errorf("Got empty manifest")
+		return manifest, fmt.Errorf("got empty manifest")
 	}
 	img.Manifest = &manifest
 	return *img.Manifest, nil
@@ -174,7 +174,7 @@ func (img *Image) GetManifestList() (manifestlist.ManifestList, error) {
 		return manifestList, err
 	}
 	if reflect.DeepEqual(manifestlist.ManifestList{}, manifestList) {
-		err := fmt.Errorf("Got empty manifest list")
+		err := fmt.Errorf("got empty manifest list")
 		LogE(err).Warn("Unmarshaled manifest list is equal to zero value manifest list")
 		return manifestList, err
 	}
@@ -255,6 +255,10 @@ func (img *Image) GetConfig() (config image.Image, err error) {
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 
 	resp, err := client.Do(req)
+	if err != nil {
+		LogE(err).Warning("Error in making the network request for the configuration")
+		return
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -344,29 +348,29 @@ func (img Image) ExpandWildcard() ([]Image, error) {
 	url := img.GetTagListUrl()
 	token, err := firstRequestForAuth(url, user, pass)
 	if err != nil {
-		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
+		errF := fmt.Errorf("error in authenticating for retrieving the tags: %s", err)
 		LogE(err).Error(errF)
 		return result, errF
 	}
 
 	client := http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", token)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		errF := fmt.Errorf("Error in making the request for retrieving the tags: %s", err)
+		errF := fmt.Errorf("error in making the request for retrieving the tags: %s", err)
 		LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
 		return result, errF
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		errF := fmt.Errorf("Got error status code (%d) trying to retrieve the tags", resp.StatusCode)
+		errF := fmt.Errorf("got error status code (%d) trying to retrieve the tags", resp.StatusCode)
 		LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
 		return result, errF
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
-		errF := fmt.Errorf("Error in decoding the tags from the server: %s", err)
+		errF := fmt.Errorf("error in decoding the tags from the server: %s", err)
 		LogE(err).Error(errF)
 		return result, errF
 	}
@@ -474,11 +478,11 @@ func (img *Image) ObtainAllLayers(repo string) error {
 		go getLayersOfImage(img, repo, false, layersChan)
 
 		for downloadedLayer := range layersChan {
-			defer downloadedLayer.Path.Close()
 			layerDigest := strings.Split(downloadedLayer.Name, ":")[1]
 			path := LayerRootfsPath(repo, layerDigest)
 			err := ExecCommand("cvmfs_server", "ingest", "--catalog",
 				"-t", "-", "-b", TrimCVMFSRepoPrefix(path), repo).StdIn(downloadedLayer.Path).Start()
+			downloadedLayer.Path.Close()
 			if err != nil {
 				// some error occurs, we abort and clean up whatever we were doing
 				ExecCommand("cvmfs_server", "abort", "-f", repo).Start()
@@ -486,7 +490,7 @@ func (img *Image) ObtainAllLayers(repo string) error {
 			}
 		}
 	}
-	return fmt.Errorf("Unable to obtain all the layers")
+	return fmt.Errorf("unable to obtain all the layers")
 }
 
 func (img *Image) GetChainIDs() (ChainID, error) {
@@ -632,14 +636,17 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	if err != nil {
 		return err
 	}
-	if img.AreAllLayersPresent(repo) == false {
-		err := fmt.Errorf("Impossible to download all the layers")
+	if !img.AreAllLayersPresent(repo) {
+		err := fmt.Errorf("impossible to download all the layers")
 		LogE(err).Error("Interrupting ingestion of flat filesystem")
 		return err
 	}
 
 	err = img.CreateChainIDDirectories(repo)
-
+	if err != nil {
+		LogE(err).Error("Error in creating the chains directories")
+		return err
+	}
 	// now we need to create the .flat image
 	// the process will be similar to the one to create the chain id
 	// we copy the last chain directory in .flat/image_digest
@@ -650,7 +657,7 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	pubDirInfo, errPub := os.Stat(completeFlatPubSymPath)
 	flatPrivatePath, err := img.GetSingularityPath()
 	if err != nil {
-		errF := fmt.Errorf("Error in getting the path where to save flat filesystem: %s", err)
+		errF := fmt.Errorf("error in getting the path where to save flat filesystem: %s", err)
 		LogE(err).Warning(errF)
 		return err
 	}
@@ -672,7 +679,7 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 		Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("Updating Singularity Image")
 		err = CreateSymlinkIntoCVMFS(repo, publicSymlinkPath, flatPrivatePath)
 		if err != nil {
-			errF := fmt.Errorf("Error in updating symlink for singularity image: %s", img.GetSimpleName())
+			errF := fmt.Errorf("error in updating symlink for singularity image: %s", img.GetSimpleName())
 			LogE(errF).WithFields(
 				log.Fields{"to": publicSymlinkPath, "from": flatPrivatePath}).
 				Error("Error in creating symlink")
@@ -687,7 +694,7 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 		Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("Creating link for Singularity Image")
 		err = CreateSymlinkIntoCVMFS(repo, publicSymlinkPath, flatPrivatePath)
 		if err != nil {
-			errF := fmt.Errorf("Error in creating symlink for singularity image: %s", img.GetSimpleName())
+			errF := fmt.Errorf("error in creating symlink for singularity image: %s", img.GetSimpleName())
 			LogE(errF).WithFields(
 				log.Fields{"to": publicSymlinkPath, "from": flatPrivatePath}).
 				Error("Error in creating symlink")
@@ -749,18 +756,22 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	}
 	// we add the .singularity files
 	err = singularity.MakeBaseEnv(completeFlatPriPath)
-	// XXX finish this part here, missing the .singularity files and the public link creation
-	// we create the public link
+	if err != nil {
+		// here we just log the error
+		// it won't be as fancy as it could be, but the image it would be usable
+		LogE(err).WithFields(log.Fields{"directory": completeFlatPriPath}).Warning("Error in generating the singularity files inside the directory")
+	}
 	// need to make sure that the directory where we want to create the link exists
 	dir := filepath.Dir(completeFlatPubSymPath)
 	if _, err := os.Stat(dir); err != nil {
 		err = os.MkdirAll(dir, dirPermision)
 		if err != nil {
-			LogE(err).WithFields(log.Fields{"repository": repo, "directory": dir, "image link": completeFlatPubSymPath}).Error("Error in creating the directory for the image link");
+			LogE(err).WithFields(log.Fields{"repository": repo, "directory": dir, "image link": completeFlatPubSymPath}).Error("Error in creating the directory for the image link")
 			AbortTransaction(repo)
 			return err
 		}
 	}
+	// we create the public link
 	err = os.Symlink(link, completeFlatPubSymPath)
 	if err != nil {
 		// again it should not happen
@@ -896,7 +907,7 @@ func firstRequestForAuthV2(request *http.Request) (token string, err error) {
 	}
 	_, authPresent := resp.Header["Www-Authenticate"]
 	if !authPresent {
-		err = fmt.Errorf("No authentication in the Header")
+		err = fmt.Errorf("no authentication in the Header")
 		LogE(err).Error("The header does not contains authorization informations")
 		return "", err
 	}
@@ -937,7 +948,7 @@ func firstRequestForAuth(url, user, pass string) (token string, err error) {
 	}
 	_, authPresent := resp.Header["Www-Authenticate"]
 	if !authPresent {
-		err = fmt.Errorf("No authentication in the Header")
+		err = fmt.Errorf("no authentication in the Header")
 		LogE(err).Error("The header does not contains authorization informations")
 		return "", err
 	}
@@ -1000,7 +1011,7 @@ func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<
 		case <-killKiller:
 			return
 		case <-stopGettingLayers:
-			err := fmt.Errorf("Detect errors, stop getting layer")
+			err := fmt.Errorf("detect errors, stop getting layer")
 			errorChannel <- err
 			LogE(err).Error("Detect error, stop getting layers")
 			cancel()
@@ -1095,9 +1106,11 @@ func (img Image) downloadLayer(layer da.Layer, token string) (toSend downloadedL
 			toSend = downloadedLayer{Name: layer.Digest, Path: gread}
 			return toSend, nil
 
-		} else {
-			Log().Warning("Received status code ", resp.StatusCode)
-			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
+		}
+		Log().Warning("Received status code ", resp.StatusCode)
+		if i == 5 {
+			err = fmt.Errorf("layer not received, status code: %d", resp.StatusCode)
+			return toSend, err
 		}
 	}
 	return
@@ -1110,7 +1123,7 @@ func parseBearerToken(token string) (realm string, options map[string]string, er
 	for _, kv := range keyValue {
 		splitted := strings.Split(kv, "=")
 		if len(splitted) != 2 {
-			err = fmt.Errorf("Wrong formatting of the token")
+			err = fmt.Errorf("wrong formatting of the token")
 			return
 		}
 		splitted[1] = strings.Trim(splitted[1], `"`)
@@ -1145,10 +1158,14 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	if err != nil {
+		LogE(err).Error("Error in making the network request")
+		return
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		err = fmt.Errorf("Authorization error %s", resp.Status)
+		err = fmt.Errorf("authorization error %s", resp.Status)
 		return
 	}
 
@@ -1161,7 +1178,7 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	if ok {
 		authToken = "Bearer " + authTokenInterface.(string)
 	} else {
-		err = fmt.Errorf("Didn't get the token key from the server")
+		err = fmt.Errorf("didn't get the token key from the server")
 		return
 	}
 	return

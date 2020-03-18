@@ -34,9 +34,9 @@ const (
 var subDirInsideRepo = ".layers"
 
 func assureValidSingularity() error {
-	err, stdout, _ := ExecCommand("singularity", "version").StartWithOutput()
+	stdout, _, err := ExecCommand("singularity", "version").StartWithOutput()
 	if err != nil {
-		err := fmt.Errorf("No working version of Singularity: %s", err)
+		err := fmt.Errorf("no working version of Singularity: %s", err)
 		LogE(err).Error("No working version of Singularity")
 		return err
 	}
@@ -67,7 +67,7 @@ func assureValidSingularity() error {
 	if majorI >= 3 && minorI >= 5 {
 		return nil
 	}
-	errF := fmt.Errorf("Installed singularity is too old, we need at least 3.5: Installed version: %s", version)
+	errF := fmt.Errorf("installed singularity is too old, we need at least 3.5: Installed version: %s", version)
 	LogE(errF).WithFields(log.Fields{"version": version}).Error("Too old singularity")
 	return errF
 }
@@ -104,7 +104,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 
 		singularityPrivatePath, err := inputImage.GetSingularityPath()
 		if err != nil {
-			errF := fmt.Errorf("Error in getting the path where to save Singularity filesystem: %s", err)
+			errF := fmt.Errorf("error in getting the path where to save Singularity filesystem: %s", err)
 			LogE(err).Warning(errF)
 			firstError = errF
 			continue
@@ -126,7 +126,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
 			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
 			if err != nil {
-				errF := fmt.Errorf("Error in updating symlink for singularity image: %s", inputImage.GetSimpleName())
+				errF := fmt.Errorf("error in updating symlink for singularity image: %s", inputImage.GetSimpleName())
 				LogE(errF).WithFields(
 					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
 					Error("Error in creating symlink")
@@ -143,7 +143,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Creating link for Singularity Image")
 			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
 			if err != nil {
-				errF := fmt.Errorf("Error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
+				errF := fmt.Errorf("error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
 				LogE(errF).WithFields(
 					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
 					Error("Error in creating symlink")
@@ -287,7 +287,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 		"Already converted the image, skipping.")
 
 	if alreadyConverted == ConversionMatch {
-		if convertAgain == false {
+		if !convertAgain {
 			return nil
 		}
 	}
@@ -352,7 +352,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 				wg.Done()
 			}(layer.Name, layerPath, layerDigest)
 
-			if pathExists == false || forceDownload {
+			if !pathExists || forceDownload {
 
 				// need to create the "super-directory", those
 				// directory starting with 2 char prefix of the
@@ -476,7 +476,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 				outputImage.GetSimpleName(),
 				pushOptions)
 			if errImgPush != nil {
-				err = fmt.Errorf("Error in pushing the image: %s", errImgPush)
+				err = fmt.Errorf("error in pushing the image: %s", errImgPush)
 				return err
 			}
 			b, _ := ioutil.ReadAll(res)

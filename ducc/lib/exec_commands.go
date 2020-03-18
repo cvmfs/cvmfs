@@ -41,7 +41,7 @@ func ExecCommand(input ...string) *execCmd {
 
 func (e *execCmd) StdIn(input io.ReadCloser) *execCmd {
 	if e == nil {
-		err := fmt.Errorf("Use of nil execCmd")
+		err := fmt.Errorf("use of nil execCmd")
 		LogE(err).Error("Call StdIn with nil cmd, maybe error in the constructor")
 		return nil
 	}
@@ -53,27 +53,27 @@ func (e *execCmd) StdIn(input io.ReadCloser) *execCmd {
 
 func (e *execCmd) StdOut() io.ReadCloser {
 	if e == nil {
-		LogE(fmt.Errorf("No cmd structure passed as input.")).Error("Impossible to get the stdout.")
+		LogE(fmt.Errorf("no cmd structure passed as input")).Error("Impossible to get the stdout")
 		return nil
 	}
 	return e.out
 }
 
-func (e *execCmd) StartWithOutput() (error, bytes.Buffer, bytes.Buffer) {
+func (e *execCmd) StartWithOutput() (bytes.Buffer, bytes.Buffer, error) {
 	var outb, errb bytes.Buffer
 	e.cmd.Stdout = &outb
 	e.cmd.Stderr = &errb
 
 	if e == nil {
-		err := fmt.Errorf("Use of nil execCmd")
+		err := fmt.Errorf("use of nil execCmd")
 		LogE(err).Error("Call start with nil cmd, maybe error in the constructor")
-		return err, outb, errb
+		return outb, errb, err
 	}
 
 	err := e.cmd.Start()
 	if err != nil {
 		LogE(err).Error("Error in starting the command")
-		return err, outb, errb
+		return outb, errb, err
 	}
 
 	if e.stdin != nil {
@@ -97,84 +97,26 @@ func (e *execCmd) StartWithOutput() (error, bytes.Buffer, bytes.Buffer) {
 		}()
 	}
 	err = e.cmd.Wait()
-	return err, outb, errb
+	return outb, errb, err
 }
 
 func (e *execCmd) Start() error {
 
-	err, stdout, stderr := e.StartWithOutput()
+	stdout, stderr, err := e.StartWithOutput()
 	if err == nil {
 		return nil
 	} else {
 		LogE(err).Error("Error in executing the command")
-		Log().WithFields(log.Fields{"pipe": "STDOUT"}).Info(string(stdout.Bytes()))
-		Log().WithFields(log.Fields{"pipe": "STDERR"}).Info(string(stderr.Bytes()))
+		Log().WithFields(log.Fields{"pipe": "STDOUT"}).Info(stdout.String())
+		Log().WithFields(log.Fields{"pipe": "STDERR"}).Info(stderr.String())
 		return err
 	}
 	return nil
 }
-
-/*
-func (e *execCmd) Start() error {
-	if e == nil {
-		err := fmt.Errorf("Use of nil execCmd")
-		LogE(err).Error("Call start with nil cmd, maybe error in the constructor")
-		return err
-	}
-
-	err := e.cmd.Start()
-	if err != nil {
-		LogE(err).Error("Error in starting the command")
-		return err
-	}
-
-	if e.stdin != nil {
-		go func() {
-			defer (*e.stdin).Close()
-			defer e.in.Close()
-			n, err := io.Copy(e.in, *e.stdin)
-			Log().WithFields(log.Fields{"n": n}).Info("Copied n bytes to STDIN")
-			if err != nil {
-				LogE(err).Error("Error in copying the input into STDIN.")
-				return
-			}
-			for n > 0 {
-				n, err = io.Copy(e.in, *e.stdin)
-				if err != nil {
-					LogE(err).Error("Error in copying the input into STDIN")
-					return
-				}
-				Log().WithFields(log.Fields{"n": n}).Info("Copied additionally n bytes to STDIN")
-			}
-		}()
-	}
-
-	slurpOut, errOUT := ioutil.ReadAll(e.out)
-	if errOUT != nil {
-		LogE(errOUT).Warning("Impossible to read the STDOUT")
-		return err
-	}
-	slurpErr, errERR := ioutil.ReadAll(e.err)
-	if errERR != nil {
-		LogE(errERR).Warning("Impossible to read the STDERR")
-		return err
-	}
-
-	err = e.cmd.Wait()
-	if err != nil {
-
-		LogE(err).Error("Error in executing the command")
-		Log().WithFields(log.Fields{"pipe": "STDOUT"}).Info(string(slurpOut))
-		Log().WithFields(log.Fields{"pipe": "STDERR"}).Info(string(slurpErr))
-		return err
-	}
-	return nil
-}
-*/
 
 func (e *execCmd) Env(key, value string) *execCmd {
 	if e == nil {
-		err := fmt.Errorf("Use of nil execCmd")
+		err := fmt.Errorf("use of nil execCmd")
 		LogE(err).Error("Set ENV to nil cmd, maybe error in the constructor")
 		return nil
 	}
