@@ -705,7 +705,8 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 		return err
 	}
 	lastChain := chainIDs.Chain[len(chainIDs.Chain)-1]
-	lastChainPath := ChainRootfsPath(repo, lastChain.String())
+	chainDigest := strings.Split(lastChain.String(), ":")[1]
+	lastChainPath := ChainRootfsPath(repo, chainDigest)
 	_, err = os.Stat(lastChainPath)
 	if err != nil {
 		LogE(err).Error("Error chain path not found, it should never happen.")
