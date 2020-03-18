@@ -714,7 +714,7 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	}
 
 	// find the link between the private path and the public path
-	relativePath, err := filepath.Rel(completeFlatPriPath, completeFlatPubSymPath)
+	relativePath, err := filepath.Rel(completeFlatPubSymPath, completeFlatPriPath)
 	if err != nil {
 		// should never happen
 		LogE(err).WithFields(log.Fields{"private flat path": completeFlatPriPath, "public flat path": completeFlatPubSymPath}).Error("Error in finding the relative link name between the private flat path and the public flat path")
@@ -749,7 +749,7 @@ func (img *Image) UnpackFlatFilesystemInDir(repo string) error {
 	}
 	// we add the .singularity files
 	// we create the public link
-	err = os.Symlink(link, completeFlatPriPath)
+	err = os.Symlink(link, completeFlatPubSymPath)
 	if err != nil {
 		// again it should not happen
 		LogE(err).WithFields(log.Fields{"source": link, "destination": completeFlatPriPath}).Error("Impossible to create symlink")
