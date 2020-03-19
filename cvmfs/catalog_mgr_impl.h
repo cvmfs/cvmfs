@@ -477,7 +477,8 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
  */
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
-                                     DirectoryEntryList *listing)
+                                     DirectoryEntryList *listing,
+                                     const bool expand_symlink)
 {
   EnforceSqliteMemLimit();
   bool result;
@@ -499,7 +500,7 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
   }
 
   perf::Inc(statistics_.n_listing);
-  result = catalog->ListingPath(path, listing);
+  result = catalog->ListingPath(path, listing, expand_symlink);
 
   Unlock();
   return result;

@@ -67,6 +67,7 @@ if [ $s3_retval -eq 0 ]; then
   echo "running CernVM-FS server test cases against the test S3 provider..."
   CVMFS_TEST_S3_CONFIG=$TEST_S3_CONFIG                                      \
   CVMFS_TEST_HTTP_BASE=$TEST_S3_URL                                         \
+  CVMFS_TEST_S3_STORAGE=$TEST_S3_STORAGE/data/$TEST_S3_BUCKET               \
   CVMFS_TEST_CLASS_NAME=S3ServerIntegrationTests                            \
   ./run.sh $S3_TEST_LOGFILE -o ${S3_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}     \
                             -x src/518-hardlinkstresstest                   \

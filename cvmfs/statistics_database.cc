@@ -459,6 +459,8 @@ bool StatisticsDatabase::UploadStatistics(upload::Spooler *spooler,
   spooler->WaitForUpload();
   unsigned errors_before = spooler->GetNumberOfErrors();
   spooler->Mkdir("stats");
+  spooler->RemoveAsync("stats/stats.db");
+  spooler->WaitForUpload();
   spooler->Upload(local_path, "stats/stats.db");
   spooler->WaitForUpload();
   unsigned errors_after = spooler->GetNumberOfErrors();
@@ -483,6 +485,8 @@ bool StatisticsDatabase::UploadStatistics(
   uploader->WaitForUpload();
   unsigned errors_before = uploader->GetNumberOfErrors();
 
+  uploader->RemoveAsync("stats/stats.db");
+  uploader->WaitForUpload();
   uploader->UploadFile(local_path, "stats/stats.db");
   uploader->WaitForUpload();
   unsigned errors_after = uploader->GetNumberOfErrors();

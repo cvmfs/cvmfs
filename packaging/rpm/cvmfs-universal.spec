@@ -36,8 +36,13 @@
 %endif
 
 %define cvmfs_python python
-%if 0%{?el8}
+%if 0%{?el8} || 0%{?fedora} >= 31
 %define cvmfs_python python2
+%endif
+
+%define hardlink /usr/sbin/hardlink
+%if 0%{?fedora} >= 31
+%define hardlink /usr/bin/hardlink
 %endif
 
 %define __strip /bin/true
@@ -405,7 +410,7 @@ do
 done
 popd
 # Hardlink identical policy module packages together
-/usr/sbin/hardlink -cv $RPM_BUILD_ROOT%{_datadir}/selinux
+%{hardlink} -cv $RPM_BUILD_ROOT%{_datadir}/selinux
 %endif
 
 %if 0%{?systemd_autofs_patch}
@@ -597,6 +602,9 @@ fi
 %endif
 
 %changelog
+* Tue Mar 17 2020 Jan Priessnitz <jan.priessnitz@cern.ch> - 2.8.0
+- Fix python2-devel dependency for Fedora >=31
+- Change to /usr/bin/hardlink for Fedora >=31
 * Thu Oct 03 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
 - Add EL8 support
 * Wed Jun 12 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0

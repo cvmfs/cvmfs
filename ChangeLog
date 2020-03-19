@@ -1,4 +1,5 @@
 2.8.0:
+  * Fix packaging for Fedora 31
   * [client] Add catalog_counters extended attribute (CVM-1824)
   * [server] Add CVMFS_UPLOAD_STATS_PLOTS parameter to automatically generate
     and upload publish statistics plots; requires ROOT (CVM-1836)
