@@ -400,6 +400,17 @@ break_hardlink() {
   mv    $tmp_file $path
 }
 
+wait_for_umount() {
+  local timeout=60
+  while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
+    if [ $timeout -eq 0 ]; then
+      return 1
+    fi
+    timeout=$(($timeout-1))
+    sleep 1
+  done
+  return 0
+}
 
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null                   || return 100
@@ -408,14 +419,7 @@ cvmfs_clean() {
   sudo sh -c "rm -f /etc/cvmfs/config.d/*"               || return 103
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 104
 
-  local timeout=60
-  while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
-    if [ $timeout -eq 0 ]; then
-      return 99
-    fi
-    timeout=$(($timeout-1))
-    sleep 1
-  done
+  wait_for_umount || return 99
 
   return 0
 }
