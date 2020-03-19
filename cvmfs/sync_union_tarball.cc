@@ -147,6 +147,11 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_EOF: {
+	if (create_catalog_on_root_) {
+	  SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(new SyncItemDummyCatalog(base_directory_, this));
+	  ProcessFile(catalog);
+	  to_create_catalog_dirs_.insert(base_directory_);
+	}
         for (set<string>::iterator dir = to_create_catalog_dirs_.begin();
              dir != to_create_catalog_dirs_.end(); ++dir) {
           assert(dirs_.find(*dir) != dirs_.end());
@@ -168,23 +173,6 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_OK: {
-        if (first_iteration && create_catalog_on_root_) {
-          struct archive_entry *catalog = archive_entry_new();
-          std::string catalog_path = ".cvmfscatalog";
-          archive_entry_set_pathname(catalog, catalog_path.c_str());
-          archive_entry_set_size(catalog, 0);
-          archive_entry_set_filetype(catalog, AE_IFREG);
-          archive_entry_set_perm(catalog, kDefaultFileMode);
-          archive_entry_set_gid(catalog, getgid());
-          archive_entry_set_uid(catalog, getuid());
-          ProcessArchiveEntry(catalog);
-          archive_entry_free(catalog);
-          // The ProcessArchiveEntry does call Wakeup on the signal, in this
-          // particular corner case we need to re-wait for it.
-          read_archive_signal_->Wait();
-        }
-        first_iteration = false;
-
         ProcessArchiveEntry(entry);
         break;
       }
