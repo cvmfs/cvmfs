@@ -1,0 +1,35 @@
+cvmfs_test_name="Optimized loading of deeply nested catalogs"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/foo/bar
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/.cvmfscatalog
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog
+  publish_repo $CVMFS_TEST_REPO || return 2
+
+  echo "load repository configuration"
+  load_repo_config $CVMFS_TEST_REPO
+  local spool_dir="$CVMFS_SPOOL_DIR"
+  local pipe_path="${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
+  local open_catalogs_cmd="sudo cvmfs_talk -p $pipe_path open catalogs"
+  $open_catalogs_cmd
+  [ $($open_catalogs_cmd | wc -l) -eq 1 ] || return 10
+
+  ls -dal "${CVMFS_SPOOL_DIR}/rdonly/foo/bar"  || return 20
+  local open_catalogs=`$open_catalogs_cmd`
+  echo "OPEN CATALOGS ($open_catalogs_cmd)"
+  echo "$open_catalogs"                        || return 21
+  echo "-------------"
+  [ $($open_catalogs_cmd | wc -l) -eq 2 ]      || return 22
+  $open_catalogs_cmd | grep '/foo'             || return 23
+  $open_catalogs_cmd | grep '/foo/bar'         && return 24
+
+  return 0
+}
