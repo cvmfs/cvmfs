@@ -276,6 +276,23 @@ void LibContext::AppendStringToList(char const   *str,
 }
 
 
+void LibContext::AppendStatToList(const cvmfs_stat_t   st,
+                                  cvmfs_stat_t       **buf,
+                                  size_t              *listlen,
+                                  size_t              *buflen)
+{
+  if (*listlen + 1 >= *buflen) {
+       size_t newbuflen = (*listlen)*2 + 5;
+       *buf = reinterpret_cast<cvmfs_stat_t *>(
+         realloc(*buf, sizeof(cvmfs_stat_t) * newbuflen));
+       assert(*buf);
+       *buflen = newbuflen;
+       assert(*listlen < *buflen);
+  }
+  (*buf)[(*listlen)].info = st.info;
+  (*buf)[(*listlen)++].name = strdup(st.name);
+}
+
 int LibContext::GetAttr(const char *c_path, struct stat *info) {
   perf::Inc(file_system()->n_fs_stat());
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
@@ -443,6 +460,48 @@ int LibContext::ListDirectory(
   for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
     AppendStringToList(listing_from_catalog.AtPtr(i)->name.c_str(),
                           buf, listlen, buflen);
+  }
+
+  return 0;
+}
+
+int LibContext::ListDirectoryStat(
+  const char *c_path,
+  cvmfs_stat_t **buf,
+  size_t *listlen,
+  size_t *buflen) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir_stat on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+
+  if (c_path[0] == '/' && c_path[1] == '\0') {
+    // root path is expected to be "", not "/"
+    c_path = "";
+  }
+
+  PathString path;
+  path.Assign(c_path, strlen(c_path));
+
+  catalog::DirectoryEntry d;
+  const bool found = GetDirentForPath(path, &d);
+
+  if (!found) {
+    return -ENOENT;
+  }
+
+  if (!d.IsDirectory()) {
+    return -ENOTDIR;
+  }
+
+  // Build listing
+  catalog::StatEntryList listing_from_catalog;
+  if (!mount_point_->catalog_mgr()->ListingStat(path, &listing_from_catalog)) {
+    return -EIO;
+  }
+  for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
+    cvmfs_stat_t st;
+    st.info = listing_from_catalog.AtPtr(i)->info;
+    st.name = listing_from_catalog.AtPtr(i)->name.c_str();
+    AppendStatToList(st, buf, listlen, buflen);
   }
 
   return 0;

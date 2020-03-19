@@ -152,6 +152,11 @@ struct cvmfs_attr {
   void * cvm_xattrs;
 };
 
+struct cvmfs_stat_t {
+  const char * name;
+  struct stat info;
+};
+
 /**
  * Create the cvmfs_attr struct which contains the same information
  * as a stat, but also has pointers to the hash, symlink, and name.
@@ -230,6 +235,11 @@ void cvmfs_options_set(cvmfs_option_map *opts,
  * and -1 otherwise.
  */
 int cvmfs_options_parse(cvmfs_option_map *opts, const char *path);
+/**
+ * Sets default options from repository defaults in /etc/cvmfs.
+ * Returns 0 on success and -1 otherwise.
+ */
+void cvmfs_options_parse_default(cvmfs_option_map *opts, const char *fqrn);
 /**
  * Removes a key-value pair from a cvmfs_options_map.  The key may or may not
  * exist before the call.
@@ -426,6 +436,13 @@ int cvmfs_listdir_contents(
   cvmfs_context *ctx,
   const char *path,
   char ***buf,
+  size_t *listlen,
+  size_t *buflen);
+
+int cvmfs_listdir_stat(
+  cvmfs_context *ctx,
+  const char *path,
+  cvmfs_stat_t **buf,
   size_t *listlen,
   size_t *buflen);
 
