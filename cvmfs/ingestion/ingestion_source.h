@@ -139,6 +139,7 @@ class MemoryIngestionSource : public IngestionSource {
   unsigned pos_;
 };
 
+
 /**
  * Uses an std::string as data buffer
  */
@@ -166,6 +167,7 @@ class StringIngestionSource : public IngestionSource {
   std::string data_;
   MemoryIngestionSource source_;
 };
+
 
 class TarIngestionSource : public IngestionSource {
  public:
