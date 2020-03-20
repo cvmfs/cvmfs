@@ -50,7 +50,7 @@ class SyncItemDummyCatalog : public SyncItem {
   }
 
   IngestionSource *CreateIngestionSource() const {
-    return new StringIngestionSource("");
+    return new StringIngestionSource("", GetUnionPath());
   }
 
   void StatScratch(const bool refresh) const { return; }
