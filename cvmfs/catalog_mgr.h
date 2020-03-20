@@ -224,7 +224,9 @@ class AbstractCatalogManager : public SingleCopy {
 
   CatalogT *MountCatalog(const PathString &mountpoint, const shash::Any &hash,
                          CatalogT *parent_catalog);
-  bool MountSubtree(const PathString &path, const CatalogT *entry_point,
+  bool MountSubtree(const PathString &path,
+                    const CatalogT *entry_point,
+                    bool can_listing,
                     CatalogT **leaf_catalog);
 
   bool AttachCatalog(const std::string &db_path, CatalogT *new_catalog);
