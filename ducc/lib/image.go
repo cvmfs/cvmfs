@@ -607,8 +607,9 @@ func (img *Image) CreateChainIDDirectories(repo string) error {
 				if err != nil {
 					LogE(err).WithFields(log.Fields{
 						"directory": rootPath,
-						"layer":     layerPath}).
-						Error("Error in applying the layer to the directory")
+						"layer":     layerPath,
+						"previous":  previousDir}).
+						Error("Error in applying the layer to the directory, the directory is a copy of the previous directory.")
 					AbortTransaction(repo)
 					return err
 				}

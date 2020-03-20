@@ -58,7 +58,8 @@ func ApplyDirectory(bottom, top string) error {
 		opaqueDirPath := filepath.Join(bottom, filepath.Dir(opaqueWhiteout.Path))
 		inOpaqueDirectory, err := ioutil.ReadDir(opaqueDirPath)
 		if err != nil {
-			return err
+			// it may happen a directory that does not exists in the lower layer is an opaqueWhiteout in the top layer
+			continue
 		}
 		for _, toDelete := range inOpaqueDirectory {
 			toDeletePath := filepath.Join(opaqueDirPath, toDelete.Name())
