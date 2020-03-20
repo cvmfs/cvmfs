@@ -121,7 +121,6 @@ void SyncUnionTarball::Traverse() {
   // we are simplying deleting entity from  the repo
   if (NULL == src) return;
 
-  bool first_iteration = true;
   struct archive_entry *entry = archive_entry_new();
   while (true) {
     // Get the lock, wait if lock is not available yet
@@ -147,11 +146,12 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_EOF: {
-	if (create_catalog_on_root_) {
-	  SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(new SyncItemDummyCatalog(base_directory_, this));
-	  ProcessFile(catalog);
-	  to_create_catalog_dirs_.insert(base_directory_);
-	}
+        if (create_catalog_on_root_) {
+          SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
+              new SyncItemDummyCatalog(base_directory_, this));
+          ProcessFile(catalog);
+          to_create_catalog_dirs_.insert(base_directory_);
+        }
         for (set<string>::iterator dir = to_create_catalog_dirs_.begin();
              dir != to_create_catalog_dirs_.end(); ++dir) {
           assert(dirs_.find(*dir) != dirs_.end());

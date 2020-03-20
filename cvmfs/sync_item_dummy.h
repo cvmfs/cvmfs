@@ -22,7 +22,7 @@ class SyncItemDummyCatalog : public SyncItem {
   SyncItemDummyCatalog(const std::string &relative_parent_path,
                        const SyncUnion *union_engine)
       : SyncItem(relative_parent_path, ".cvmfscatalog", union_engine,
-                 kItemFile){};
+                 kItemFile) {}
 
  public:
   bool IsType(const SyncItemType expected_type) const {
