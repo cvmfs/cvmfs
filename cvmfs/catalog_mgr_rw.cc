@@ -204,7 +204,8 @@ bool WritableCatalogManager::FindCatalog(const string     &path,
     AbstractCatalogManager<Catalog>::FindCatalog(ps_path);
   assert(best_fit != NULL);
   Catalog *catalog = NULL;
-  bool retval = MountSubtree(ps_path, best_fit, &catalog);
+  bool retval =
+    MountSubtree(ps_path, best_fit, true /* is_listable */, &catalog);
   if (!retval)
     return false;
 

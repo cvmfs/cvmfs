@@ -118,6 +118,7 @@ class T_CatalogManager : public ::testing::Test {
     // we haven't mounted the third catalog yet!
     ASSERT_EQ(1, catalog_mgr_.GetNumCatalogs());
 
+    root_catalog->AddFile(empty_content, file_size, "", "nested");
     MockCatalog *new_catalog_3 = new MockCatalog("/nested", shash::Any(),
                                                  4096, 1, 0, false,
                                                  root_catalog, NULL);
@@ -212,6 +213,8 @@ TEST_F(T_CatalogManager, Lookup) {
                                        kLookupSole, &dirent));
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
   EXPECT_TRUE(catalog_mgr_.LookupPath("/nested", kLookupSole, &dirent));
+  EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/nested/file6", kLookupSole, &dirent));
   EXPECT_EQ(4, catalog_mgr_.GetNumCatalogs());
 }
 

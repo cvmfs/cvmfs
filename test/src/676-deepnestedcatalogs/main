@@ -31,5 +31,12 @@ cvmfs_run_test() {
   $open_catalogs_cmd | grep '/foo'             || return 23
   $open_catalogs_cmd | grep '/foo/bar'         && return 24
 
+  # For listing, the deeply nested catalog still needs to get loaded
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return 30
+  # Start with a freshly mounted r/o branch
+  [ $($open_catalogs_cmd | wc -l) -eq 1 ] || return 31
+  ls -al "${CVMFS_SPOOL_DIR}/rdonly/foo/bar" | grep .cvmfscatalog || return 32
+
   return 0
 }
