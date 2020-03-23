@@ -380,7 +380,9 @@ StatisticsDatabase *StatisticsDatabase::OpenStandardDB(
   const std::string repo_name)
 {
   StatisticsDatabase *db;
-  std::string db_file_path = GetDBPath(repo_name);
+  std::string db_file_path;
+  uint32_t days_to_keep;
+  GetDBParams(repo_name, &db_file_path, &days_to_keep);
   if (FileExists(db_file_path)) {
     db = StatisticsDatabase::Open(db_file_path, kOpenReadWrite);
     if (db == NULL) {
@@ -388,6 +390,9 @@ StatisticsDatabase *StatisticsDatabase::OpenStandardDB(
     } else if (db->GetProperty<std::string>("repo_name") != repo_name) {
       PANIC(kLogSyslogErr, "'repo_name' property of the statistics database %s "
             "is incorrect. Please fix the database.", db_file_path.c_str());
+    }
+    if (!db->Prune(days_to_keep)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Failed to prune statistics database");
     }
   } else {
     db = StatisticsDatabase::Create(db_file_path);
@@ -432,20 +437,48 @@ bool StatisticsDatabase::StoreGCStatistics(
 bool StatisticsDatabase::StoreEntry(const std::string &insert_statement) {
   sqlite::Sql insert(this->sqlite_db(), insert_statement);
 
-  std::string error_message = "";
   if (!insert.Execute()) {
-    error_message = "insert.Execute failed!";
-  } else if (!insert.Reset()) {
-    error_message = "insert.Reset() failed!";
-  } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at: %s",
-             this->filename().c_str());
-    return true;
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+      "Couldn't store statistics in %s: insert.Execute failed!",
+      this->filename().c_str());
+    return false;
   }
 
-  LogCvmfs(kLogCvmfs, kLogSyslogErr, "Couldn't store statistics in %s: %s",
-          this->filename().c_str(), error_message.c_str());
-  return false;
+  LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at: %s",
+            this->filename().c_str());
+  return true;
+}
+
+
+bool StatisticsDatabase::Prune(uint32_t days) {
+  if (days == 0) return true;
+
+  std::string publish_stmt =
+    "DELETE FROM publish_statistics WHERE "
+    "julianday('now','start of day')-julianday(start_time) > " +
+    StringifyUint(days) + ";";
+
+  std::string gc_stmt =
+    "DELETE FROM gc_statistics WHERE "
+    "julianday('now','start of day')-julianday(start_time) > " +
+    StringifyUint(days) + ";";
+
+  sqlite::Sql publish_sql(this->sqlite_db(), publish_stmt);
+  sqlite::Sql gc_sql(this->sqlite_db(), gc_stmt);
+  if (!publish_sql.Execute() || !gc_sql.Execute()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+      "Couldn't prune statistics DB %s: SQL Execute() failed!",
+      this->filename().c_str());
+    return false;
+  }
+  if (!this->Vacuum()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+      "Couldn't prune statistics DB %s: Vacuum() failed!",
+      this->filename().c_str());
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -494,7 +527,10 @@ bool StatisticsDatabase::UploadStatistics(
 }
 
 
-std::string StatisticsDatabase::GetDBPath(const std::string &repo_name) {
+void StatisticsDatabase::GetDBParams(const std::string &repo_name,
+                                     std::string *path,
+                                     uint32_t *days_to_keep)
+{
   // default location
   const std::string db_default_path =
       "/var/spool/cvmfs/" + repo_name + "/stats.db";
@@ -506,7 +542,9 @@ std::string StatisticsDatabase::GetDBPath(const std::string &repo_name) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "Could not parse repository configuration: %s.",
              repo_config_file.c_str());
-    return db_default_path;
+    *path = db_default_path;
+    *days_to_keep = kDefaultDaysToKeep;
+    return;
   }
 
   std::string statistics_db = "";
@@ -515,20 +553,32 @@ std::string StatisticsDatabase::GetDBPath(const std::string &repo_name) {
              "Parameter %s was not set in the repository configuration file. "
              "Using default value: %s",
              "CVMFS_STATISTICS_DB", db_default_path.c_str());
-    return db_default_path;
+    *path = db_default_path;
+  } else {
+    std::string dirname = GetParentPath(statistics_db);
+    int mode = S_IRUSR | S_IWUSR | S_IXUSR |
+               S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;  // 755
+    if (!MkdirDeep(dirname, mode, true)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+        "Couldn't write statistics at the specified path %s.",
+        statistics_db.c_str());
+      *path = db_default_path;
+    } else {
+      *path = statistics_db;
+    }
   }
 
-  std::string dirname = GetParentPath(statistics_db);
-  int mode = S_IRUSR | S_IWUSR | S_IXUSR |
-             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;  // 755
-  if (!MkdirDeep(dirname, mode, true)) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr,
-      "Couldn't write statistics at the specified path %s.",
-      statistics_db.c_str());
-    return db_default_path;
+  std::string days_to_keep_str = "";
+  if (!parser.GetValue("CVMFS_STATS_DB_DAYS_TO_KEEP", &statistics_db)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "Parameter %s was not set in the repository configuration file. "
+             "Using default value: %s",
+             "CVMFS_STATS_DB_DAYS_TO_KEEP",
+             StringifyUint(kDefaultDaysToKeep).c_str());
+    *days_to_keep = kDefaultDaysToKeep;
+  } else {
+    *days_to_keep = static_cast<uint32_t> (String2Uint64(days_to_keep_str));
   }
-
-  return statistics_db;
 }
 
 
@@ -570,3 +620,5 @@ StatisticsDatabase::StatisticsDatabase(const std::string  &filename,
 {
   ++StatisticsDatabase::instances;
 }
+
+const uint32_t StatisticsDatabase::kDefaultDaysToKeep = 365;

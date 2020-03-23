@@ -27,6 +27,13 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
 
   bool StoreEntry(const std::string &insert_statement);
 
+/**
+ * Prune the statistics DB (delete records older than certain threshhold)
+ * @param days number of days of records to keep, 0 means no pruning
+ * @return true on success, false otherwise
+ */
+  bool Prune(uint32_t days);
+
  public:
   // not const - needs to be adaptable!
   static float        kLatestSchema;
@@ -93,14 +100,23 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
                         std::string local_path = "");
 
 /**
-  * Get the path for the database file
-  * user can specify it in the server.conf
-  * by default: /var/spool/cvmfs/$repo_name/stats.db
+  * Get the parameters for the database file
+  * user can specify them in the server.conf
+  * DB file path:
+  *   key: CVMFS_STATISTICS_DB
+  *   default: /var/spool/cvmfs/$repo_name/stats.db
+  * maximum age (in days) of records to keep when pruning
+  * (zero means keep forever)
+  *   key: CVMFS_STATS_DB_DAYS_TO_KEEP
+  *   deafult: 365
   *
   * @param repo_name Fully qualified name of the repository
-  * @return path to store database file
+  * @param path pointer to save the db path in
+  * @param days_to_keep pointer to save the number of days
   */
-  static std::string GetDBPath(const std::string &repo_name);
+  static void GetDBParams(const std::string &repo_name,
+                          std::string *path,
+                          uint32_t *days_to_keep);
 
   /**
   * Check if the CVMFS_EXTENDED_GC_STATS is ON or not
@@ -109,6 +125,9 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * @return true if CVMFS_EXTENDED_GC_STATS is ON, false otherwise
   */
   static bool GcExtendedStats(const std::string &repo_name);
+
+ private:
+  static const uint32_t kDefaultDaysToKeep;
 };
 
 
