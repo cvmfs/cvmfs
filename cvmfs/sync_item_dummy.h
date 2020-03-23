@@ -35,13 +35,13 @@ class SyncItemDummyCatalog : public SyncItem {
     dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
     dirent.linkcount_ = 1;
     dirent.mode_ =
-        S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+        S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
     dirent.uid_ = getuid();
     dirent.gid_ = getgid();
     dirent.size_ = 0;
     dirent.mtime_ = time(NULL);
     dirent.checksum_ = this->GetContentHash();
-    dirent.is_external_file_ = this->IsExternalData();
+    dirent.is_external_file_ = false;
     dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
 
     dirent.name_.Assign(name.data(), name.length());
