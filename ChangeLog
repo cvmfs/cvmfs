@@ -17,6 +17,9 @@
   * Add POSIX external cache plugin (CVM-1823)
   * Manage DUCC daemon with systemd units
 
+2.7.2:
+  * [gw] fix/relax JSON parsing of success status message
+
 2.7.1:
   * Build cvmfs-fuse3 on Debian 10 "buster" (CVM-1825)
   * Add support for CVMFS_GEO_DB_FILE replica parameter
