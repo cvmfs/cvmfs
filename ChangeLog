@@ -1,3 +1,6 @@
+1.1.1:
+  * Allow additional unknown fields in receiver JSON reply
+
 1.1.0:
   * This package now obsoletes `cvmfs-notify`
   * Added notification system functionality
