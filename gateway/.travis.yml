@@ -13,7 +13,9 @@ services:
 notifications:
   email:
     recipients:
-      - mail@radupopescu.net
+      - jan.priessnitz@cern.ch
+      - simone.mosciatti@cern.ch
+      - jakob.blomer@cern.ch
     on_success: change
     on_failure: always
 
