@@ -310,6 +310,7 @@ set (LIBCVMFS_SERVER_SOURCES
   malloc_arena.cc
   options.cc
   pack.cc
+  publish/except.cc
   publish/repository.cc
   publish/repository_diff.cc
   publish/repository_managed.cc

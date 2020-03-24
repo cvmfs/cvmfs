@@ -12,7 +12,16 @@ namespace publish {
 
 class EPublish : public std::runtime_error {
  public:
-  explicit EPublish(const std::string& what) : std::runtime_error(what) { }
+  explicit EPublish(const std::string& what)
+    : std::runtime_error(what + "\n\nStacktrace:\n" + GetStacktrace())
+  {}
+
+ private:
+  /**
+   * Maximum number of frames in the stack trace
+   */
+  static const unsigned kMaxBacktrace = 64;
+  static std::string GetStacktrace();
 };
 
 }  // namespace publish
