@@ -24,7 +24,7 @@ bool ToJsonString(const JsonStringInput &input, std::string *output) {
   *output = "{";
   for (size_t i = 0u; i < input.entries.size(); ++i) {
     *output += string("\"") + input.entries[i].key + "\":";
-    if (input.entries[i].quoted) {  // check for nested object
+    if (input.entries[i].quoted) {
       *output += string("\"") + input.entries[i].val + "\"";
     } else {
       *output += input.entries[i].val;
