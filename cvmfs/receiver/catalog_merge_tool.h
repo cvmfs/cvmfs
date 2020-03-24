@@ -48,7 +48,8 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         manifest_(manifest),
         output_catalog_mgr_(output_catalog_mgr),
         needs_setup_(false),
-        statistics_(statistics) {}
+        statistics_(statistics),
+        counters_(NULL) {}
 
   CatalogMergeTool(RoCatalogMgr* old_catalog_mgr, RoCatalogMgr* new_catalog_mgr,
                    const std::string& repo_path,
@@ -64,7 +65,8 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         download_manager_(download_manager),
         manifest_(manifest),
         needs_setup_(true),
-        statistics_(statistics) {}
+        statistics_(statistics),
+        counters_(NULL) {}
 
   CatalogMergeTool(const std::string& repo_path,
                    const shash::Any& old_root_hash,
@@ -82,7 +84,8 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         download_manager_(download_manager),
         manifest_(manifest),
         needs_setup_(true),
-        statistics_(statistics) {}
+        statistics_(statistics),
+        counters_(NULL) {}
 
   virtual ~CatalogMergeTool() {}
 
