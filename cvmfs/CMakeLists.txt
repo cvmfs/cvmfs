@@ -314,6 +314,7 @@ set (LIBCVMFS_SERVER_SOURCES
   publish/repository.cc
   publish/repository_diff.cc
   publish/repository_managed.cc
+  publish/repository_lease.cc
   publish/repository_tags.cc
   publish/repository_transaction.cc
   publish/repository_util.cc

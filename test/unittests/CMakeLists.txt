@@ -444,6 +444,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_lease.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_managed.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_transaction.cc

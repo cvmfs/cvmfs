@@ -249,6 +249,9 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void OnUploadReflog(const upload::SpoolerResult &result);
   void OnUploadWhitelist(const upload::SpoolerResult &result);
 
+  void AcquireLease(const std::string &path);
+  void DropLease();
+
   void CheckTagName(const std::string &name);
 
   SettingsPublisher settings_;
