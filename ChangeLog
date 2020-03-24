@@ -20,6 +20,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.2:
+  * Fix creation of nested catalogs by ingestion command (CVM-1862)
   * [gw] fix/relax JSON parsing of success status message
 
 2.7.1:
