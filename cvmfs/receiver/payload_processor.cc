@@ -155,6 +155,7 @@ void PayloadProcessor::ConsumerEventCallback(
       info.skip = true;
     } else {
       // New file to unpack
+      // info.handle is later deleted by FinalizeStreamedUpload
       info.handle = uploader_->InitStreamedUpload(NULL);
     }
 

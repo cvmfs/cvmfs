@@ -68,7 +68,7 @@ class PayloadProcessor {
   UniquePtr<upload::AbstractUploader> uploader_;
   UniquePtr<RaiiTempDir> temp_dir_;
   int num_errors_;
-  perf::StatisticsTemplate *statistics_;
+  UniquePtr<perf::StatisticsTemplate> statistics_;
 };
 
 }  // namespace receiver

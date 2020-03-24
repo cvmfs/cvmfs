@@ -22,6 +22,27 @@
 
 namespace upload {
 
+struct UploadCounters {
+  perf::Counter *n_chunks_added;
+  perf::Counter *n_chunks_duplicated;
+  perf::Counter *n_catalogs_added;
+  perf::Counter *sz_uploaded_bytes;
+  perf::Counter *sz_uploaded_catalog_bytes;
+
+  explicit UploadCounters(perf::StatisticsTemplate statistics) {
+    n_chunks_added = statistics.RegisterOrLookupTemplated(
+      "n_chunks_added", "Number of new chunks added");
+    n_chunks_duplicated = statistics.RegisterOrLookupTemplated(
+      "n_chunks_duplicated", "Number of duplicated chunks added");
+    n_catalogs_added = statistics.RegisterOrLookupTemplated(
+      "n_catalogs_added", "Number of new catalogs added");
+    sz_uploaded_bytes = statistics.RegisterOrLookupTemplated(
+      "sz_uploaded_bytes", "Number of uploaded bytes");
+    sz_uploaded_catalog_bytes = statistics.RegisterOrLookupTemplated(
+      "sz_uploaded_catalog_bytes", "Number of uploaded bytes for catalogs");
+  }
+};  // UploadCounters
+
 struct UploaderResults {
   enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove, kLookup };
 
@@ -414,7 +435,7 @@ class AbstractUploader
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
   TubeGroup<UploadJob> tubes_upload_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
-  mutable UniquePtr<perf::UploadCounters> counters_;
+  mutable UniquePtr<UploadCounters> counters_;
 };  // class AbstractUploader
 
 

@@ -14,6 +14,10 @@
 
 typedef struct json_value JSON;
 
+// This class is used for marshalling JSON objects to strings.
+// When adding an object, use quoted = true for strings and
+// quoted = false for numbers, nested objects, etc.
+
 struct JsonStringInput {
   struct JsonStringEntry {
     std::string key;

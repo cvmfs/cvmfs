@@ -4,9 +4,7 @@
 load_repo_config() {
   local name=$1
   . /etc/cvmfs/repositories.d/${name}/server.conf
-  if [ x"$CVMFS_REPOSITORY_TYPE" = x"stratum0" ]; then
-    . /etc/cvmfs/repositories.d/${name}/client.conf
-  else
+  if ! [ x"$CVMFS_REPOSITORY_TYPE" = x"stratum0" ]; then
     . /etc/cvmfs/repositories.d/${name}/replica.conf
   fi
 }

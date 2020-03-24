@@ -16,6 +16,7 @@
 #include "payload_processor.h"
 #include "repository_tag.h"
 #include "session_token.h"
+#include "upload_facility.h"
 #include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -114,9 +115,7 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
                                   std::string *start_time)
 {
   perf::StatisticsTemplate stats_tmpl("Publish", stats);
-  perf::UploadCounters counters(stats_tmpl);
-
-  LogCvmfs(kLogReceiver, kLogSyslog, "req: %s", req->PrintPretty().c_str());
+  upload::UploadCounters counters(stats_tmpl);
 
   const JSON* statistics = JsonDocument::SearchInObject(
     req->root(), "statistics", JSON_OBJECT);

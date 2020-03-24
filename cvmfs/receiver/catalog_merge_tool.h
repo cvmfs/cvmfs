@@ -118,7 +118,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   const bool needs_setup_;
 
   perf::Statistics *statistics_;
-  perf::FsCounters *counters_;
+  UniquePtr<perf::FsCounters> counters_;
 };
 
 }  // namespace receiver
