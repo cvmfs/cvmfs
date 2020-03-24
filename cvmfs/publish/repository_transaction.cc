@@ -18,7 +18,10 @@
 namespace publish {
 
 void Publisher::Transaction(const std::string &path) {
-  if (in_transaction_) throw EPublish("another transaction is already open");
+  if (in_transaction_) {
+    throw EPublish("another transaction is already open",
+                   EPublish::kIdTransactionLocked);
+  }
 
   InitSpoolArea();
 

@@ -69,14 +69,24 @@ int CmdTransaction::Main(const Options &options) {
     return rvi;
   }
 
-  if (options.HasNot("force") || !publisher.in_transaction())
-    publisher.Transaction();
+  if (!publisher.in_transaction() || options.HasNot("force")) {
+    try {
+      publisher.Transaction();
+    } catch (const EPublish &e) {
+      if (e.id() == EPublish::kIdTransactionLocked) {
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+        return 1;
+      }
+      throw;
+    }
+  }
+
   publisher.managed_node()->Open();
 
   rvi = CallServerHook("transaction_after_hook", fqrn);
   if (rvi != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "final transaction hook failed");
+             "post transaction hook failed");
     return rvi;
   }
 

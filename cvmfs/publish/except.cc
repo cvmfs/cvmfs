@@ -8,6 +8,8 @@
 
 #include <string>
 
+publish::EPublish::~EPublish() throw() { }
+
 std::string publish::EPublish::GetStacktrace() {
   std::string result;
   void *addr[kMaxBacktrace];

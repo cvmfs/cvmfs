@@ -12,11 +12,29 @@ namespace publish {
 
 class EPublish : public std::runtime_error {
  public:
-  explicit EPublish(const std::string& what)
+  /**
+   * Well-known exceptions that are usually caught and handled
+   */
+  enum EId {
+    kIdUnspecified = 0,
+    kIdTransactionLocked = 1,
+  };
+
+  explicit EPublish(const std::string& what, EId id = kIdUnspecified)
     : std::runtime_error(what + "\n\nStacktrace:\n" + GetStacktrace())
+    , id_(id)
+    , msg_(what)
   {}
 
+  virtual ~EPublish() throw();
+
+  EId id() const { return id_; }
+  std::string msg() const { return msg_; }
+
  private:
+  EId id_;
+  std::string msg_;
+
   /**
    * Maximum number of frames in the stack trace
    */
