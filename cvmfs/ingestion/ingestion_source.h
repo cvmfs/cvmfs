@@ -145,12 +145,14 @@ class MemoryIngestionSource : public IngestionSource {
  */
 class StringIngestionSource : public IngestionSource {
  public:
-  explicit StringIngestionSource(const std::string &data)
-    : data_(data)
-    , source_("MEM",
-              reinterpret_cast<const unsigned char *>(data_.data()),
-              data_.length())
-  {}
+  explicit StringIngestionSource(const std::string& data)
+      : data_(data),
+        source_("MEM", reinterpret_cast<const unsigned char*>(data_.data()),
+                data_.length()) {}
+  StringIngestionSource(const std::string& data, const std::string& filename)
+      : data_(data),
+        source_(filename, reinterpret_cast<const unsigned char*>(data_.data()),
+                data_.length()) {}
   virtual ~StringIngestionSource() {}
   virtual std::string GetPath() const { return source_.GetPath(); }
   virtual bool IsRealFile() const { return false; }

@@ -26,6 +26,7 @@ class SyncItem;
 class SyncItemNative;
 class SyncItemTar;
 class SyncItemDummyDir;
+class SyncItemDummyCatalog;
 }
 namespace swissknife {
 class CommandMigrate;
@@ -65,6 +66,7 @@ class DirectoryEntryBase {
   friend class publish::SyncItemNative;
   friend class publish::SyncItemTar;
   friend class publish::SyncItemDummyDir;
+  friend class publish::SyncItemDummyCatalog;
   // Simplify file system like _touch_ of DirectoryEntry objects
   friend class SqlDirentTouch;
   // Allow creation of virtual directories and files

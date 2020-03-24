@@ -10,9 +10,56 @@
 #include <ctime>
 #include <string>
 
+#include "ingestion/ingestion_source.h"
 #include "sync_union_tarball.h"
 
 namespace publish {
+
+class SyncItemDummyCatalog : public SyncItem {
+  friend class SyncUnionTarball;
+
+ protected:
+  SyncItemDummyCatalog(const std::string &relative_parent_path,
+                       const SyncUnion *union_engine)
+      : SyncItem(relative_parent_path, ".cvmfscatalog", union_engine,
+                 kItemFile) {}
+
+ public:
+  bool IsType(const SyncItemType expected_type) const {
+    return expected_type == kItemFile;
+  }
+
+  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const {
+    catalog::DirectoryEntryBase dirent;
+    std::string name(".cvmfscatalog");
+    dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
+    dirent.linkcount_ = 1;
+    dirent.mode_ =
+        S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
+    dirent.uid_ = getuid();
+    dirent.gid_ = getgid();
+    dirent.size_ = 0;
+    dirent.mtime_ = time(NULL);
+    dirent.checksum_ = this->GetContentHash();
+    dirent.is_external_file_ = false;
+    dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
+
+    dirent.name_.Assign(name.data(), name.length());
+
+    return dirent;
+  }
+
+  IngestionSource *CreateIngestionSource() const {
+    return new StringIngestionSource("", GetUnionPath());
+  }
+
+  void StatScratch(const bool refresh) const { return; }
+
+  SyncItemType GetScratchFiletype() const { return kItemFile; }
+
+  void MakePlaceholderDirectory() const {}
+};
+
 /*
  * This class represents dummy directories that we know are going to be there
  * but we still haven't found yet. This is possible in the extraction of
