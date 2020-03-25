@@ -24,69 +24,63 @@ export GOCACHE=${CVMFS_GATEWAY_SOURCES}/../gocache
 go env
 go build -mod=vendor
 
-for TARGET_PLATFORM in ubuntu1604 ubuntu1804; do
-    if [ x"$TARGET_PLATFORM" = xubuntu1604 ]; then
-        PACKAGE_NAME_SUFFIX="+ubuntu16.04_amd64"
-    elif [ x"$TARGET_PLATFORM" = xubuntu1804 ]; then
-        PACKAGE_NAME_SUFFIX="+ubuntu18.04_amd64"
-    fi
-    PACKAGE_NAME=cvmfs-gateway_$VERSION~$RELEASE$PACKAGE_NAME_SUFFIX.deb
+PACKAGE_NAME_SUFFIX="+$(lsb_release -si | tr [:upper:] [:lower:])$(lsb_release -sr)_amd64"
+PACKAGE_NAME=cvmfs-gateway_$VERSION~$RELEASE$PACKAGE_NAME_SUFFIX.deb
 
-    mkdir -p ${CVMFS_GATEWAY_SOURCES}/DEBS
+mkdir -p ${CVMFS_GATEWAY_SOURCES}/DEBS
 
-    if [ -e /etc/profile.d/rvm.sh ]; then
-        . /etc/profile.d/rvm.sh
-    fi
+if [ -e /etc/profile.d/rvm.sh ]; then
+    . /etc/profile.d/rvm.sh
+fi
 
-    WORKSPACE=${CVMFS_GATEWAY_SOURCES}/pkg_ws_${TARGET_PLATFORM}
-    mkdir -p $WORKSPACE
+WORKSPACE=${CVMFS_GATEWAY_SOURCES}/pkg_ws_${BUILD_PLATFORM}
+mkdir -p $WORKSPACE
 
-    mkdir -p $WORKSPACE/etc/systemd/system
-    mkdir -p $WORKSPACE/etc/cvmfs/gateway
-    mkdir -p $WORKSPACE/usr/bin
-    mkdir -p $WORKSPACE/usr/libexec/cvmfs-gateway/scripts
-    mkdir -p $WORKSPACE/var/lib/cvmfs-gateway
+mkdir -p $WORKSPACE/etc/systemd/system
+mkdir -p $WORKSPACE/etc/cvmfs/gateway
+mkdir -p $WORKSPACE/usr/bin
+mkdir -p $WORKSPACE/usr/libexec/cvmfs-gateway/scripts
+mkdir -p $WORKSPACE/var/lib/cvmfs-gateway
 
-    cp -v ${CVMFS_GATEWAY_SOURCES}/gateway $WORKSPACE/usr/bin/cvmfs_gateway
+cp -v ${CVMFS_GATEWAY_SOURCES}/gateway $WORKSPACE/usr/bin/cvmfs_gateway
 
-    # Install the run_cvmfs_gateway.sh script for compatibility with cvmfs-gateway-1.0.0
-    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/run_cvmfs_gateway.sh ${WORKSPACE}/usr/libexec/cvmfs-gateway/scripts/
+# Install the run_cvmfs_gateway.sh script for compatibility with cvmfs-gateway-1.0.0
+cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/run_cvmfs_gateway.sh ${WORKSPACE}/usr/libexec/cvmfs-gateway/scripts/
 
-    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.service \
-        $WORKSPACE/etc/systemd/system/
-    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway@.service \
-        $WORKSPACE/etc/systemd/system/
-    cp -v ${CVMFS_GATEWAY_SOURCES}/config/repo.json $WORKSPACE/etc/cvmfs/gateway/
-    cp -v ${CVMFS_GATEWAY_SOURCES}/config/user.json $WORKSPACE/etc/cvmfs/gateway/
+cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.service \
+    $WORKSPACE/etc/systemd/system/
+cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway@.service \
+    $WORKSPACE/etc/systemd/system/
+cp -v ${CVMFS_GATEWAY_SOURCES}/config/repo.json $WORKSPACE/etc/cvmfs/gateway/
+cp -v ${CVMFS_GATEWAY_SOURCES}/config/user.json $WORKSPACE/etc/cvmfs/gateway/
 
-    pushd $WORKSPACE
-    fpm -s dir -t deb \
-        --verbose \
-        --package ../DEBS/$PACKAGE_NAME \
-        --version $VERSION \
-        --name cvmfs-gateway \
-        --maintainer "Radu Popescu <radu.popescu@cern.ch>" \
-        --description "CernVM-FS Repository Gateway" \
-        --url "http://cernvm.cern.ch" \
-        --license "BSD-3-Clause" \
-        --depends "cvmfs-server > 2.5.2" \
-        --replaces "cvmfs-notify" \
-        --directories usr/libexec/cvmfs-gateway \
-        --config-files etc/cvmfs/gateway/repo.json \
-        --config-files etc/cvmfs/gateway/user.json \
-        --config-files etc/systemd/system/cvmfs-gateway.service \
-        --config-files etc/systemd/system/cvmfs-gateway@.service \
-        --exclude etc/systemd/system \
-        --no-deb-systemd-restart-after-upgrade \
-        --after-install ${CVMFS_GATEWAY_SOURCES}/pkg/setup_deb.sh \
-        --chdir $WORKSPACE \
-        ./
-    popd
+pushd $WORKSPACE
+fpm -s dir -t deb \
+    --verbose \
+    --package ../DEBS/$PACKAGE_NAME \
+    --version $VERSION \
+    --name cvmfs-gateway \
+    --maintainer "Radu Popescu <radu.popescu@cern.ch>" \
+    --description "CernVM-FS Repository Gateway" \
+    --url "http://cernvm.cern.ch" \
+    --license "BSD-3-Clause" \
+    --depends "cvmfs-server > 2.5.2" \
+    --replaces "cvmfs-notify" \
+    --directories usr/libexec/cvmfs-gateway \
+    --config-files etc/cvmfs/gateway/repo.json \
+    --config-files etc/cvmfs/gateway/user.json \
+    --config-files etc/systemd/system/cvmfs-gateway.service \
+    --config-files etc/systemd/system/cvmfs-gateway@.service \
+    --exclude etc/systemd/system \
+    --no-deb-systemd-restart-after-upgrade \
+    --after-install ${CVMFS_GATEWAY_SOURCES}/pkg/setup_deb.sh \
+    --chdir $WORKSPACE \
+    ./
+popd
 
-    mkdir -p ${CVMFS_GATEWAY_SOURCES}/pkgmap
-    PKGMAP_FILE=${CVMFS_GATEWAY_SOURCES}/pkgmap/pkgmap.${TARGET_PLATFORM}_x86_64
-    echo "[${TARGET_PLATFORM}_x86_64]" >> $PKGMAP_FILE
-    echo "gateway=$PACKAGE_NAME" >> $PKGMAP_FILE
+mkdir -p ${CVMFS_GATEWAY_SOURCES}/pkgmap
+PKGMAP_FILE=${CVMFS_GATEWAY_SOURCES}/pkgmap/pkgmap.${BUILD_PLATFORM}_x86_64
+echo "[${BUILD_PLATFORM}_x86_64]" >> $PKGMAP_FILE
+echo "gateway=$PACKAGE_NAME" >> $PKGMAP_FILE
 
-    rm -rf $WORKSPACE
-done
+rm -rf $WORKSPACE
