@@ -17,11 +17,6 @@ echo "Release: $RELEASE"
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 echo "Script location: $SCRIPT_LOCATION"
 
-if [ x"${BUILD_PLATFORM}" = xubuntu1604 ]; then
-echo "Building on Ubuntu1604 with old libc: setting CGO_ENABLED=0"
-export CGO_ENABLED=0
-fi
-
 echo "Building package"
 cd ${CVMFS_GATEWAY_SOURCES}
 export GOPATH=${GOPATH:=${CVMFS_GATEWAY_SOURCES}/../go}
