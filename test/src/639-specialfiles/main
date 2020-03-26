@@ -5,7 +5,7 @@ cvmfs_test_autofs_on_startup=false
 create_socket() {
   socket="$1"
 
-  python -c "import socket as s; sock = s.socket(s.AF_UNIX); sock.bind('$socket')" || return 1
+  $CVMFS_PYTHON2 -c "import socket as s; sock = s.socket(s.AF_UNIX); sock.bind('$socket')" || return 1
 }
 
 create_special_files() {
