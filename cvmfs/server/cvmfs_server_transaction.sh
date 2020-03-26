@@ -9,4 +9,3 @@
 cvmfs_server_transaction() {
   $(__publish_cmd dbg) transaction $@
 }
-

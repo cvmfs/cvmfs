@@ -71,6 +71,10 @@ bool SettingsTransaction::ValidateUnionFs() {
   return true;
 }
 
+void SettingsTransaction::SetLeaseWait(unsigned seconds) {
+  lease_wait_s_ = seconds;
+}
+
 //------------------------------------------------------------------------------
 
 
@@ -123,6 +127,7 @@ void SettingsKeychain::SetKeychainDir(const std::string &keychain_dir) {
   master_public_key_path_ = keychain_dir + "/" + fqrn_() + ".pub";
   private_key_path_ = keychain_dir + "/" + fqrn_() + ".key";
   certificate_path_ = keychain_dir + "/" + fqrn_() + ".crt";
+  gw_key_path_ = keychain_dir + "/" + fqrn_() + ".gw";
 }
 
 
@@ -151,6 +156,10 @@ bool SettingsKeychain::HasDanglingRepositoryKeys() const {
 bool SettingsKeychain::HasRepositoryKeys() const {
   return FileExists(private_key_path_) &&
          FileExists(certificate_path_);
+}
+
+bool SettingsKeychain::HasGatewayKey() const {
+  return FileExists(gw_key_path_);
 }
 
 //------------------------------------------------------------------------------

@@ -35,12 +35,16 @@ class CmdTransaction : public Command {
     e.push_back("example.cvmfs.io/64bit/v42 "
       "# locks only the given sub tree, use with gateway "
       "(no space between the repository name and the path)");
+    e.push_back("example.cvmfs.io/popular/path -t 500 "
+      "# retries for a maximum of 5 minutes to lock /popular/path");
     return e;
   }
   virtual ParameterList GetParams() const {
     ParameterList p;
     p.push_back(Parameter::Switch("force", 'f',
       "Continue even if another transaction is already open"));
+    p.push_back(Parameter::Optional("retry-timeout", 't', "seconds",
+      "Retry for a maximum number of given seconds if repository is busy"));
     return p;
   }
 

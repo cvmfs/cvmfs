@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "gateway_util.h"
 #include "history.h"  // for History::Tag
 #include "publish/settings.h"
 #include "upload_spooler_result.h"
@@ -260,6 +261,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    */
   int llvl_;
   bool in_transaction_;
+  gateway::GatewayKey gw_key_;
   UniquePtr<ManagedNode> managed_node_;
 };
 

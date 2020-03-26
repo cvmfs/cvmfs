@@ -88,6 +88,9 @@ class SettingsSpoolArea {
   std::string cache_dir() const { return workspace_() + "/cache"; }
   std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }
   std::string checkout_marker() const { return workspace_() + "/checkout"; }
+  std::string gw_session_token() const {
+    return workspace_() + "/session_token";
+  }
   std::string transaction_lock() const {
     return workspace_() + "/in_transaction.lock";
   }
@@ -111,10 +114,12 @@ class SettingsTransaction {
     , is_garbage_collectable_(true)
     , is_volatile_(false)
     , union_fs_(kUnionFsUnknown)
+    , lease_wait_s_(0)
     , spool_area_(fqrn)
   {}
 
   void SetUnionFsType(const std::string &union_fs);
+  void SetLeaseWait(unsigned seconds);
   void DetectUnionFsType();
 
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
@@ -125,6 +130,7 @@ class SettingsTransaction {
   bool is_garbage_collectable() const { return is_garbage_collectable_; }
   bool is_volatile() const { return is_volatile_; }
   std::string voms_authz() const { return voms_authz_; }
+  unsigned lease_wait_s() const { return lease_wait_s_; }
 
   const SettingsSpoolArea &spool_area() const { return spool_area_; }
   SettingsSpoolArea *GetSpoolArea() { return &spool_area_; }
@@ -139,6 +145,10 @@ class SettingsTransaction {
   Setting<bool> is_volatile_;
   Setting<std::string> voms_authz_;
   Setting<UnionFsType> union_fs_;
+  /**
+   * How long to retry taking a lease before giving up
+   */
+  Setting<unsigned> lease_wait_s_;
 
   SettingsSpoolArea spool_area_;
 };  // class SettingsTransaction
@@ -163,6 +173,7 @@ class SettingsStorage {
   void MakeS3(const std::string &s3_config, const std::string &tmp_dir);
 
   upload::SpoolerDefinition::DriverType type() const { return type_; }
+  std::string endpoint() const { return endpoint_; }
 
  private:
   Setting<std::string> fqrn_;
@@ -181,6 +192,7 @@ class SettingsKeychain {
     , master_public_key_path_(keychain_dir_() + "/" + fqrn + ".pub")
     , private_key_path_(keychain_dir_() + "/" + fqrn + ".key")
     , certificate_path_(keychain_dir_() + "/" + fqrn + ".crt")
+    , gw_key_path_(keychain_dir_() + "/" + fqrn + ".gw")
   {}
 
   void SetKeychainDir(const std::string &keychain_dir);
@@ -189,6 +201,7 @@ class SettingsKeychain {
   bool HasMasterKeys() const;
   bool HasDanglingRepositoryKeys() const;
   bool HasRepositoryKeys() const;
+  bool HasGatewayKey() const;
 
   std::string keychain_dir() const { return keychain_dir_; }
   std::string master_private_key_path() const {
@@ -197,6 +210,7 @@ class SettingsKeychain {
   std::string master_public_key_path() const { return master_public_key_path_; }
   std::string private_key_path() const { return private_key_path_; }
   std::string certificate_path() const { return certificate_path_; }
+  std::string gw_key_path() const { return gw_key_path_; }
 
  private:
   Setting<std::string> fqrn_;
@@ -205,6 +219,7 @@ class SettingsKeychain {
   Setting<std::string> master_public_key_path_;
   Setting<std::string> private_key_path_;
   Setting<std::string> certificate_path_;
+  Setting<std::string> gw_key_path_;
 };  // class SettingsKeychain
 
 

@@ -605,6 +605,18 @@ Publisher::Publisher(const SettingsPublisher &settings)
   if (!rvb) throw EPublish("cannot load private master key");
   if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
 
+  if (spooler()->GetDriverType() != upload::SpoolerDefinition::Gateway) {
+    if (!settings.keychain().HasGatewayKey()) {
+      throw EPublish("gateway key missing: " +
+                     settings.keychain().gw_key_path());
+    }
+    gw_key_ = gateway::ReadGatewayKey(settings.keychain().gw_key_path());
+    if (!gw_key_.IsValid()) {
+      throw EPublish("cannot read gateway key: " +
+                     settings.keychain().gw_key_path());
+    }
+  }
+
   // The process that opens the transaction does not stay alive for the life
   // time of the transaction
   const std::string transaction_lock =
