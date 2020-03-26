@@ -17,12 +17,19 @@ echo "Release: $RELEASE"
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 echo "Script location: $SCRIPT_LOCATION"
 
+go_build_args=
+
+if [ x"${BUILD_PLATFORM}" = xubuntu1604 ]; then
+go_build_args="-ldflags=--extldflags=-Wl,--compress-debug-sections=none"
+echo "Building on Ubuntu 16.04 with old ld: running go build with ${go_build_args}"
+fi
+
 echo "Building package"
 cd ${CVMFS_GATEWAY_SOURCES}
 export GOPATH=${GOPATH:=${CVMFS_GATEWAY_SOURCES}/../go}
 export GOCACHE=${CVMFS_GATEWAY_SOURCES}/../gocache
 go env
-go build -mod=vendor
+go build -mod=vendor $go_build_args
 
 PACKAGE_NAME_SUFFIX="+$(lsb_release -si | tr [:upper:] [:lower:])$(lsb_release -sr)_amd64"
 PACKAGE_NAME=cvmfs-gateway_$VERSION~$RELEASE$PACKAGE_NAME_SUFFIX.deb
