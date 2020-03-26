@@ -632,7 +632,6 @@ Publisher::~Publisher() {
 
 
 void Publisher::Abort() {
-
   // TODO(jblomer): remove transaction lock
 }
 

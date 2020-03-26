@@ -50,7 +50,7 @@ TEST_F(T_Util, ServerLockFile) {
   EXPECT_FALSE(ServerLockFile::IsLocked("foo", true));
 
   pid_t pid_child = fork();
-  ASSERT_TRUE(pid_child >= 0);
+  ASSERT_GE(pid_child, 0);
   if (pid_child == 0) {
     EXPECT_TRUE(ServerLockFile::Acquire("foo", true));
     exit(0);

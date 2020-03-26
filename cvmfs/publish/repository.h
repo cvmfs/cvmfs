@@ -157,7 +157,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
       kFailUnionLocked          = 0x20,
     };
 
-    ManagedNode(Publisher *p) : publisher_(p) {}
+    explicit ManagedNode(Publisher *p) : publisher_(p) {}
     /**
      * Verifies the mountpoints and the transaction status. Returns a bit map
      * of EFailures codes.

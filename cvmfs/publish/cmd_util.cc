@@ -7,7 +7,10 @@
 
 #include <unistd.h>
 
+#include <map>
+#include <set>
 #include <string>
+#include <vector>
 
 #include "publish/except.h"
 #include "util/posix.h"

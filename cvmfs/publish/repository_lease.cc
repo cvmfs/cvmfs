@@ -10,16 +10,16 @@
 
 #include "backoff.h"
 #include "catalog_mgr_ro.h"
-#include "duplex_curl.h"
 #include "directory_entry.h"
+#include "duplex_curl.h"
 #include "hash.h"
 #include "json_document.h"
 #include "logging.h"
 #include "publish/except.h"
 #include "upload.h"
-#include "util/string.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 namespace {
 
@@ -190,7 +190,7 @@ void Publisher::AcquireLease(const std::string &path) {
       }
       break;
     case kLeaseReplyBusy:
-      //return kLeaseBusy; TODO (retry)
+      // return kLeaseBusy; TODO(jblomer)
       throw EPublish("lease path busy, timeout");
       break;
     case kLeaseReplyFailure:
