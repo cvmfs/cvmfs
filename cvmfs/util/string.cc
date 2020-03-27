@@ -577,15 +577,18 @@ string Tail(const string &source, unsigned num_lines) {
 /**
   * Get UTC Time.
   *
-  * @return a timestamp in "YYYY-MM-DD HH:MM:SS" format
+  * @param format format if timestamp (YYYY-MM-DD HH:MM:SS by default)
+  * @return a timestamp string on success, empty string on failure
   */
-std::string GetGMTimestamp() {
+std::string GetGMTimestamp(std::string format) {
   struct tm time_ptr;
-  char date_and_time[50];
+  char date_and_time[100];
   time_t t = time(NULL);
   gmtime_r(&t, &time_ptr);      // take UTC
-  // timestamp format
-  strftime(date_and_time, 50, "%Y-%m-%d %H:%M:%S", &time_ptr);
+  // return empty string if formatting fails
+  if (!strftime(date_and_time, 100, format.c_str(), &time_ptr)) {
+    return "";
+  }
   std::string timestamp(date_and_time);
   return timestamp;
 }
