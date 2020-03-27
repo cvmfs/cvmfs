@@ -108,6 +108,20 @@ struct cvmfs_nc_attr {
   char *mountpoint;
   char *hash;
   uint64_t size;
+
+  // Catalog counters
+  uint64_t regular;
+  uint64_t symlink;
+  uint64_t special;
+  uint64_t dir;
+  uint64_t nested;
+  uint64_t chunked;
+  uint64_t chunks;
+  uint64_t file_size;
+  uint64_t chunked_size;
+  uint64_t xattr;
+  uint64_t external;
+  uint64_t external_file_size;
 };
 
 /**

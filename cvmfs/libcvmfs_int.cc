@@ -529,10 +529,28 @@ int LibContext::GetNestedCatalogAttr(
     return -ENOENT;
   }
 
+  std::string subcat_path;
+  std::map<std::string, uint64_t> counters =
+    mount_point_->catalog_mgr()->LookupCounters(p, &subcat_path).GetValues();
+
   // Set values of the passed structure
   nc_attr->mountpoint = strdup(mountpoint.ToString().c_str());
   nc_attr->hash = strdup(hash.ToString().c_str());
   nc_attr->size = size;
+
+
+  nc_attr->regular = counters["regular"];
+  nc_attr->symlink = counters["symlink"];
+  nc_attr->special = counters["special"];
+  nc_attr->dir = counters["dir"];
+  nc_attr->nested = counters["nested"];
+  nc_attr->chunked = counters["chunked"];
+  nc_attr->chunks = counters["chunks"];
+  nc_attr->file_size = counters["file_size"];
+  nc_attr->chunked_size = counters["chunked_size"];
+  nc_attr->xattr = counters["xattr"];
+  nc_attr->external = counters["external"];
+  nc_attr->external_file_size = counters["external_file_size"];
   return 0;
 }
 
