@@ -65,9 +65,9 @@ TEST(T_Json, SearchInObject) {
 
 TEST(T_Json, ToJsonString) {
   JsonStringInput input;
-  input.push_back(std::make_pair("f1", "v1"));
-  input.push_back(std::make_pair("f2", "v2"));
-  input.push_back(std::make_pair("f3", "v3"));
+  input.PushBack("f1", "v1");
+  input.PushBack("f2", "v2");
+  input.PushBack("f3", "v3");
 
   std::string output;
   ASSERT_TRUE(ToJsonString(input, &output));

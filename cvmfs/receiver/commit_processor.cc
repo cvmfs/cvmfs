@@ -20,6 +20,7 @@
 #include "params.h"
 #include "signing_tool.h"
 #include "statistics.h"
+#include "statistics_database.h"
 #include "swissknife.h"
 #include "swissknife_history.h"
 #include "util/algorithm.h"
@@ -76,7 +77,7 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
 
 namespace receiver {
 
-CommitProcessor::CommitProcessor() : num_errors_(0) {}
+CommitProcessor::CommitProcessor() : num_errors_(0), statistics_(NULL) {}
 
 CommitProcessor::~CommitProcessor() {}
 
@@ -196,7 +197,8 @@ CommitProcessor::Result CommitProcessor::Process(
                    catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, old_root_hash, new_root_hash,
                  relative_lease_path, temp_dir_root,
-                 server_tool->download_manager(), manifest.weak_ref());
+                 server_tool->download_manager(), manifest.weak_ref(),
+                 statistics_);
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error: Could not initialize the catalog merge tool");
@@ -296,7 +298,36 @@ CommitProcessor::Result CommitProcessor::Process(
     return kError;
   }
 
+  StatisticsDatabase *stats_db = StatisticsDatabase::OpenStandardDB(repo_name);
+  if (stats_db != NULL) {
+    if (!stats_db->StorePublishStatistics(statistics_, start_time_, true)) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+        "Could not store publish statistics");
+    }
+    if (params.upload_stats_db) {
+      upload::SpoolerDefinition sd(params.spooler_configuration, shash::kAny);
+      upload::Spooler *spooler = upload::Spooler::Construct(sd);
+      if (!stats_db->UploadStatistics(spooler)) {
+        LogCvmfs(kLogReceiver, kLogSyslogErr,
+          "Could not upload statistics DB to upstream storage");
+      }
+      delete spooler;
+    }
+    delete stats_db;
+
+  } else {
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Could not open statistics DB");
+  }
+
   return kSuccess;
+}
+
+void CommitProcessor::SetStatistics(perf::Statistics *st,
+                                    std::string start_time)
+{
+  statistics_ = st;
+  statistics_->Register("Publish.revision", "");
+  start_time_ = start_time;
 }
 
 }  // namespace receiver

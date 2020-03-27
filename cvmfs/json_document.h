@@ -13,7 +13,33 @@
 #include "util/single_copy.h"
 
 typedef struct json_value JSON;
-typedef std::vector<std::pair<const char *, const char *> > JsonStringInput;
+
+// This class is used for marshalling JSON objects to strings.
+// When adding an object, use quoted = true for strings and
+// quoted = false for numbers, nested objects, etc.
+
+struct JsonStringInput {
+  struct JsonStringEntry {
+    std::string key;
+    std::string val;
+    bool quoted;
+
+    JsonStringEntry() {
+      quoted = true;
+    }
+  };
+
+  void PushBack(std::string key, std::string val, bool quoted = true) {
+    JsonStringEntry entry;
+    entry.key = key;
+    entry.val = val;
+    entry.quoted = quoted;
+    entries.push_back(entry);
+  }
+
+
+  std::vector<JsonStringEntry> entries;
+};
 
 bool ToJsonString(const JsonStringInput &input, std::string *output);
 

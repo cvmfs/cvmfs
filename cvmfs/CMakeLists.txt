@@ -585,6 +585,7 @@ if(BUILD_RECEIVER)
     signature.cc
     signing_tool.cc
     statistics.cc
+    statistics_database.cc
     swissknife.cc
     swissknife_history.cc
     swissknife_lease_curl.cc
@@ -1170,6 +1171,12 @@ if (BUILD_SERVER)
     FILES      server/generate_stats_plots.C
     DESTINATION    "/usr/share/cvmfs-server"
     PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
+
+  install(
+    FILES      server/upload_stats_plots.sh
+    DESTINATION    "/usr/share/cvmfs-server"
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
   install(

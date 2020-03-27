@@ -22,14 +22,18 @@ bool ToJsonString(const JsonStringInput &input, std::string *output) {
 
   output->clear();
   *output = "{";
-  for (size_t i = 0u; i < input.size(); ++i) {
-    *output +=
-        std::string("\"") + input[i].first + "\":\"" + input[i].second + "\"";
-    if (i < input.size() - 1) {
+  for (size_t i = 0u; i < input.entries.size(); ++i) {
+    *output += string("\"") + input.entries[i].key + "\":";
+    if (input.entries[i].quoted) {
+      *output += string("\"") + input.entries[i].val + "\"";
+    } else {
+      *output += input.entries[i].val;
+    }
+    if (i < input.entries.size() - 1) {
       *output += ',';
     }
   }
-  *output += std::string("}");
+  *output += string("}");
 
   return true;
 }

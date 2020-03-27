@@ -6,7 +6,11 @@
 #define CVMFS_RECEIVER_REACTOR_H_
 
 #include <cstdlib>
+#include <map>
 #include <string>
+
+#include "json_document.h"
+#include "statistics.h"
 
 namespace receiver {
 
@@ -40,6 +44,10 @@ class Reactor {
   static bool ReadReply(int fd, std::string* data);
   static bool WriteReply(int fd, const std::string& data);
 
+  static bool ExtractStatsFromReq(JsonDocument *req,
+                                  perf::Statistics *stats,
+                                  std::string *start_time);
+
   Reactor(int fdin, int fdout);
   virtual ~Reactor();
 
@@ -63,6 +71,8 @@ class Reactor {
 
   int fdin_;
   int fdout_;
+
+  std::map<std::string, perf::Statistics*> statistics_map_;
 };
 
 }  // namespace receiver

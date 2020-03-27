@@ -439,9 +439,13 @@ void S3Uploader::FinalizeStreamedUpload(
     return;
   }
 
-  // New file name based on content hash
-  std::string final_path(
-    repository_alias_ + "/data/" + content_hash.MakePath());
+  // New file name based on content hash or remote_path override
+  std::string final_path;
+  if (local_handle->remote_path != "") {
+    final_path = repository_alias_ + "/" + local_handle->remote_path;
+  } else {
+    final_path = repository_alias_ + "/data/" + content_hash.MakePath();
+  }
 
   s3fanout::JobInfo *info =
       new s3fanout::JobInfo(final_path,

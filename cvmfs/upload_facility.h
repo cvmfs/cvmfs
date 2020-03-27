@@ -92,9 +92,9 @@ class AbstractUploader
    */
   struct UploadBuffer {
     UploadBuffer() : size(0), data(NULL) { }
-    UploadBuffer(uint64_t s, void *d) : size(s), data(d) { }
+    UploadBuffer(uint64_t s, const void *d) : size(s), data(d) { }
     uint64_t size;
-    void *data;
+    const void *data;
   };
 
   struct JobStatus {
@@ -478,6 +478,8 @@ struct UploadStreamHandle {
   const CallbackTN *commit_callback;
 
   int64_t tag;
+
+  std::string remote_path;  // override remote location of the object
 };
 
 }  // namespace upload

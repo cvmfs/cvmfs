@@ -173,6 +173,13 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     params->file_mbyte_limit = String2Uint64(file_mbyte_limit_str);
   }
 
+  std::string upload_stats_db_str;
+  if (parser.GetValue("CVMFS_UPLOAD_STATS_DB", &upload_stats_db_str)) {
+    params->upload_stats_db = parser.IsOn(upload_stats_db_str);
+  } else {
+    params->upload_stats_db = false;
+  }
+
   return true;
 }
 
