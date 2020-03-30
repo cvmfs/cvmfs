@@ -573,6 +573,7 @@ if(BUILD_RECEIVER)
     malloc_arena.cc
     manifest.cc
     manifest_fetch.cc
+    monitor.cc
     options.cc
     pack.cc
     reflog.cc
@@ -616,8 +617,19 @@ if(BUILD_RECEIVER)
                         ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
                         ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
 
-  set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
+  set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions")
   set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
+
+  if(BUILD_RECEIVER_DEBUG)
+    add_executable(cvmfs_receiver_debug ${CVMFS_RECEIVER_SOURCES})
+    target_link_libraries(cvmfs_receiver_debug ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+    ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
+    ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
+    ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
+
+    set (CVMFS_RECEIVER_DEBUG_CFLAGS "${CVMFS_RECEIVER_CFLAGS} -DDEBUGMSG -g -O0")
+    set_target_properties (cvmfs_receiver_debug PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_DEBUG_CFLAGS}")
+  endif(BUILD_RECEIVER_DEBUG)
 endif(BUILD_RECEIVER)
 
 #
