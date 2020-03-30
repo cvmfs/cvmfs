@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	stats "github.com/cvmfs/gateway/internal/gateway/statistics"
 )
 
 // task is the common interface of all receiver tasks
@@ -65,15 +66,16 @@ type Pool struct {
 	wg         sync.WaitGroup
 	workerExec string
 	mock       bool
+	smgr       *stats.StatisticsMgr
 }
 
 // StartPool the receiver pool using the specified executable and number of payload
 // submission workers
-func StartPool(workerExec string, numWorkers int, mock bool) (*Pool, error) {
+func StartPool(workerExec string, numWorkers int, mock bool, smgr *stats.StatisticsMgr) (*Pool, error) {
 	// Start payload submission workers
 	tasks := make(chan task)
 
-	pool := &Pool{tasks, sync.WaitGroup{}, workerExec, mock}
+	pool := &Pool{tasks, sync.WaitGroup{}, workerExec, mock, smgr}
 
 	for i := 0; i < numWorkers; i++ {
 		pool.wg.Add(1)
@@ -127,7 +129,7 @@ M:
 
 		func() {
 			t0 := time.Now()
-			receiver, err := NewReceiver(task.Context(), pool.workerExec, pool.mock)
+			receiver, err := NewReceiver(task.Context(), pool.workerExec, pool.mock, pool.smgr)
 			if err != nil {
 				task.Reply() <- err
 				return
