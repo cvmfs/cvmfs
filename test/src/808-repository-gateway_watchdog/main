@@ -1,0 +1,37 @@
+cvmfs_test_name="Repository gateway - receiver watchdog"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+    receiver_logdir=$(pwd)/receiver_logs
+
+    # Receiver tries to read, fails, and exits gracefully
+    cvmfs_receiver -i 420 -o 421 -w $receiver_logdir
+    n_stacktraces_1=$(ls $receiver_logdir | wc -l)
+    # No stacktraces are produced
+    [ $n_stacktraces_1 -eq 0 ] || return 2
+
+    # Create a pipe as stdin for receiver process.
+    # This way, the process responds to SIGQUIT signal
+    # during a blocking SafeRead from stdin.
+    mkfifo receiver_stdin
+    tail -f receiver_stdin | cvmfs_receiver -w $receiver_logdir &
+    receiver_pid=$!
+    # Give watchdog a little time to set up the signal handlers
+    sleep 10
+    # Gets a SIGQUIT signal while being blocked by SafeRead
+    kill -3 $receiver_pid
+    # Watchdog takes some time generating the stack traces
+    num_retries=20
+    while [ $num_retries -ne 0 ]; do
+        ps cax | grep cvmfs_receiver >/dev/null || break
+        num_retries=$(( $num_retries - 1 ))
+        sleep 1
+    done
+    n_stacktraces_2=$(ls $receiver_logdir | wc -l)
+    # A stacktrace is produced
+    [ $n_stacktraces_2 -eq 1 ] || return 3
+
+    return 0
+}
