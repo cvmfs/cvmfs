@@ -1,4 +1,5 @@
 2.8.0:
+  * [ducc] Add support for converting from private registries
   * Use multi-threaded upload facility on gateway (CVM-1739)
   * Maintain publish statistics on gateway (CVM-1806)
   * Add CVMFS_STATS_DB_DAYS_TO_KEEP parameter to prune publish statistics
