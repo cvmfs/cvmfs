@@ -306,6 +306,9 @@ __run_gc() {
 
   load_repo_config $name
 
+  upstream=$CVMFS_UPSTREAM_STORAGE
+  upstream_type=$(get_upstream_type $upstream)
+
   # sanity checks
   is_garbage_collectable $name  || return 1
   [ x"$repository_url" != x"" ] || return 2
@@ -328,6 +331,24 @@ __run_gc() {
 
   if [ x"$CVMFS_UPLOAD_STATS_DB" = x"true" ]; then
     additional_switches="$additional_switches -I"
+  fi
+
+  echo $CVMFS_UPSTREAM_STORAGE
+  if [ x"$upstream_type" = xgw ]; then
+    # nahhh, different approach, we need no C
+    # lets first get the lease using curl
+    url=$(echo -n $CVMFS_UPSTREAM_STORAGE | awk -F,  '{print $3}')
+    keyid=$(cat /etc/cvmfs/keys/${name}.gw | awk '{ print $2}')
+    secret=$(cat /etc/cvmfs/keys/${name}.gw | awk '{ print $3}')
+    lease_body='"{\"path\": \"/\", \"api_version\": \"2\"}"'
+    hmac=$(echo -n $lease_body | openssl dgst -r -sha1 -hmac $secret | awk '{print $1}' | base64)
+    header="\"Authorization: ${keyid} ${hmac}\""
+    echo "curl -H $header --data $lease_body -X POST ${url}/leases"
+    curl -H ${header} --data ${lease_body} -X POST ${url}/lease
+    return $?
+    # send the gc command
+    # poll
+    # call it done
   fi
 
   # do it!

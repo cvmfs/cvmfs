@@ -41,6 +41,8 @@ ParameterList CommandGc::GetParams() const {
   r.push_back(Parameter::Optional('k', "repository master key(s) / dir"));
   r.push_back(Parameter::Optional('t', "temporary directory"));
   r.push_back(Parameter::Optional('L', "path to deletion log file"));
+  r.push_back(Parameter::Optional('P', "session_token_file"));
+  r.push_back(Parameter::Optional('H', "key file for HTTP API"));
   r.push_back(Parameter::Switch('d', "dry run"));
   r.push_back(Parameter::Switch('l', "list objects to be removed"));
   r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
