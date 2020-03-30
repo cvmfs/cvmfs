@@ -20,7 +20,10 @@ class ECvmfsException : std::runtime_error {
       : std::runtime_error(what_arg) {}
 };
 
-#define PANIC(...) Panic("PANIC: __FILE__ : __LINE__", kLogCvmfs, __VA_ARGS__);
+#define S1(x) #x
+#define S2(x) S1(x)
+#define __LOCATION__ "PANIC: " __FILE__ " : " S2(__LINE__)
+#define PANIC(...) Panic(__LOCATION__, kLogCvmfs, __VA_ARGS__);
 
 __attribute__((noreturn))
 void Panic(const char *coordinates, const LogSource source, const int mask,
