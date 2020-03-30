@@ -12,13 +12,14 @@ clean_up() {
 
 
 run_transactions() {
-
+    echo "Running transactions"
 }
 
 cvmfs_run_test() {
     trap clean_up EXIT HUP INT TERM || return $?
 
     set_up_repository_gateway
+    toggle_gc test.repo.org
 
     echo "  Starting transaction 1"
     cvmfs_server transaction test.repo.org
@@ -38,7 +39,7 @@ cvmfs_run_test() {
     cvmfs_server publish test.repo.org
 
     # the gc can run a dry run
-    cvmfs_server gc -n -f test.repo.org || return 101
+    cvmfs_server gc -d -f test.repo.org || return 101
 
     # a normal, empty GC can run
     # it is empty because we ask to preserver 10 revision
@@ -59,7 +60,7 @@ cvmfs_run_test() {
     cvmfs_server publish test.repo.org
 
     # the gc can run a dry run
-    cvmfs_server gc -n -f test.repo.org || return 104
+    cvmfs_server gc -d -f test.repo.org || return 104
 
     # a normal, empty GC can run
     # it is empty because we ask to preserver 10 revision
