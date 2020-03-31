@@ -272,6 +272,8 @@ __do_gc_cmd()
              "$dry_run"                 \
              "$deletion_log"            \
              "$reconstruct_this_reflog" \
+             "$preserve_revisions"      \
+             "$preserve_timestamp"      \
              $additional_switches || die "Fail ($?)!"
 
     if [ $dry_run -eq 0 ]; then
@@ -301,7 +303,9 @@ __run_gc() {
   local dry_run="$3"
   local deletion_log="$4"
   local reconstruct_reflog="$5"
-  shift 5
+  local preserve_revisions="$6"
+  local preserve_timestamp="$7"
+  shift 7
   local additional_switches="$*"
 
   load_repo_config $name
@@ -340,11 +344,44 @@ __run_gc() {
     url=$(echo -n $CVMFS_UPSTREAM_STORAGE | awk -F,  '{print $3}')
     keyid=$(cat /etc/cvmfs/keys/${name}.gw | awk '{ print $2}')
     secret=$(cat /etc/cvmfs/keys/${name}.gw | awk '{ print $3}')
-    lease_body='"{\"path\": \"/\", \"api_version\": \"2\"}"'
-    hmac=$(echo -n $lease_body | openssl dgst -r -sha1 -hmac $secret | awk '{print $1}' | base64)
-    header="\"Authorization: ${keyid} ${hmac}\""
-    echo "curl -H $header --data $lease_body -X POST ${url}/leases"
-    curl -H ${header} --data ${lease_body} -X POST ${url}/lease
+    lease_body="{\"path\": \"${name}/\", \"api_version\": \"2\"}"
+    hmac=$(echo -n $lease_body | openssl dgst -r -sha1 -hmac $secret | awk '{printf $1}' | base64 -w0)
+    header="Authorization: ${keyid} ${hmac}"
+    echo "curl -H '${header}' --data '$lease_body' -X POST $url/leases"
+    http_result=$(curl -H "$header" --data "$lease_body" -X POST $url/leases 2> /dev/null)
+    lease_request=$(echo $http_result | jq -r '.status')
+    echo $lease_request
+    if [ x"$lease_request" = xok ]; then
+      # happy path
+      # send the GC command and wait
+      if [ $dry_run -eq 0 ]; then
+        dry_run_fmt="false"
+      else
+        dry_run_fmt="true"
+      fi
+      json_command="{\"repo\": \"${name}\", \"num_revisions\": $(($preserve_revision + 0)), \"dry_run\": $dry_run_fmt, \"verbose\": true, \"timestamp\": \"$(date -d@$preserve_timestamp --iso-8601=seconds)\"}"
+      token=$(echo $http_result | jq -r '.session_token')
+      hmac=$(echo -n $token | openssl dgst -r -sha1 -hmac $secret | awk '{printf $1}' | base64 -w0)
+      header="Authorization: ${keyid} ${hmac}"
+      echo "curl -H '$header' --data '$json_command' -X POST $url/gc/$token"
+      http_result=$(curl -H "$header" --data "$json_command" -X POST $url/gc/$token 2> /dev/null)
+      echo $http_result
+      echo "happy path"
+    elif [ x"$lease_request" = xpath_busy ]; then
+      echo "Impossible to take the lease on the whole repository"
+      echo "Another lease is in progress with a timeout of $(echo $http_result | jq '.time_remaining')"
+      return 1
+    elif [ x"$lease_request" = xerror ]; then
+      # internal error, we don't know better than just loggin
+      echo "Error on the gateway"
+      echo "$http_result"
+      return 1
+    else
+      # no idea, just log and exit
+      echo "Unkwon error"
+      echo "$http_result"
+      return 1
+    fi
     return $?
     # send the gc command
     # poll
