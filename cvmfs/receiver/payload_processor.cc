@@ -249,7 +249,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
     return kUploaderError;
   }
 
-  if (statistics_ != NULL) {
+  if (statistics_.IsValid()) {
     uploader_->InitCounters(statistics_);
   }
 
