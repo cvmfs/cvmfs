@@ -27,7 +27,6 @@ struct FileInfo {
   size_t current_size;
   shash::ContextPtr hash_context;
   std::vector<unsigned char> hash_buffer;
-  bool skip;
 };
 
 /**
