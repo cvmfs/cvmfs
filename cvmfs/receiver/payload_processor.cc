@@ -165,8 +165,12 @@ void PayloadProcessor::ConsumerEventCallback(
   FileInfo& info = pending_files_[event.id];
 
   if (!info.skip) {
-    upload::AbstractUploader::UploadBuffer buf(event.buf_size, event.buf);
-    uploader_->ScheduleUpload(info.handle, buf);
+    void *buf_copied = smalloc(event.buf_size);
+    memcpy(buf_copied, event.buf, event.buf_size);
+    upload::AbstractUploader::UploadBuffer buf(event.buf_size, buf_copied);
+    uploader_->ScheduleUpload(info.handle, buf,
+      upload::AbstractUploader::MakeClosure(
+        &PayloadProcessor::OnUploadJobComplete, this, buf_copied));
 
     shash::Update(static_cast<const unsigned char*>(event.buf),
                   event.buf_size,
@@ -199,6 +203,13 @@ void PayloadProcessor::ConsumerEventCallback(
 
     pending_files_.erase(event.id);
   }
+}
+
+void PayloadProcessor::OnUploadJobComplete(
+  const upload::UploaderResults &results,
+  void *buffer)
+{
+  free(buffer);
 }
 
 void PayloadProcessor::SetStatistics(perf::Statistics *st) {
