@@ -142,7 +142,7 @@ __do_snapshot() {
         -a $retries $with_history $with_reflog         \
            $initial_snapshot_flag $timestamp_threshold $log_level"
 
-    update_repo_status $alias_name last_snapshot "`date --utc`"
+    update_repo_status $alias_name last_snapshot "`date --utc`" $CVMFS_UPSTREAM_STORAGE
 
     # this part is deprecated but keep for now for backward compatibility
     local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"

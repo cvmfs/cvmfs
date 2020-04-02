@@ -201,6 +201,7 @@ update_repo_status() {
   local name="$1"
   local variable="$2"
   local value="$3"
+  local upstream="$4"
 
   local old_status="$(read_repo_item $name .cvmfs_status.json)"
   if [ -z "$old_status" ]; then
@@ -212,7 +213,7 @@ update_repo_status() {
 
   local jq_tmp="${CVMFS_SPOOL_DIR}/tmp/status.json"
   echo "$old_status" | jq ".$variable=\"$value\"" | $user_shell "cat > $jq_tmp"
-  $user_shell "$(__swissknife_cmd) upload -r ${CVMFS_UPSTREAM_STORAGE} \
+  $user_shell "$(__swissknife_cmd) upload -r $upstream \
     -i $jq_tmp                                                     \
     -o .cvmfs_status.json"
   $user_shell "rm -f $jq_tmp"

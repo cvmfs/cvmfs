@@ -21,10 +21,11 @@ cvmfs_server_gc() {
   local all_collectable=0
   local deletion_log=""
   local reconstruct_reflog="0"
+  local hidden_gateway_switch="0"
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:faL:" option
+  while getopts "ldr:t:faL:@" option
   do
     case $option in
       l)
@@ -48,6 +49,9 @@ cvmfs_server_gc() {
       L)
         deletion_log="$OPTARG"
       ;;
+      @)
+        hidden_gateway_switch=1
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command gc: Unrecognized option: $1"
@@ -55,6 +59,7 @@ cvmfs_server_gc() {
     esac
   done
   shift $(($OPTIND-1))
+
 
   # get repository names
   if [ $all_collectable -ne 0 ] && [ -z "$@" ]; then
@@ -96,31 +101,6 @@ cvmfs_server_gc() {
     fi
   done
 
-  # TODO: Once the gateway administration endpoint is in place (CVM-1685), it should be forbidded
-  #       to run GC directly on the gateway
-  # Check if the command is called on a repository gateway, and if so,
-  # abort if there are any active leases
-  if [ -x "/usr/libexec/cvmfs-gateway/scripts/get_leases.sh" ]; then
-    for name in $names; do
-      if [ x"$( /usr/libexec/cvmfs-gateway/scripts/get_leases.sh | grep $name )" != x"" ]; then
-        echo "Active lease found for repository: $name. Aborting"
-        return 1
-      fi
-    done
-    # If cvmfs-gateway is running, turn it off for the duration of the GC
-    if [ "x$(sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status)" = "xpong" ]; then
-      echo "Turning off cvmfs-gateway"
-      if is_systemd; then
-        sudo systemctl stop cvmfs-gateway
-      else
-        sudo service cvmfs-gateway stop
-      fi
-      trap __restore_cvmfs_gateway EXIT HUP INT TERM
-    fi
-  fi
-
-
-
   # sanity checks
   if [ $dry_run -ne 0 ] && [ $reconstruct_reflog -ne 0 ]; then
     die "Reflog reconstruction needed. Cannot do a dry-run."
@@ -136,7 +116,9 @@ cvmfs_server_gc() {
     if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
 
     local reflog_reconstruct_msg="no"
-    if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
+    if [ $reconstruct_reflog -eq 1 ]; then
+      reflog_reconstruct_msg="yes"
+    fi
 
     echo "Affected Repositories:         $names"
     echo "Dry Run (no actual deletion):  $dry_run_msg"
@@ -168,7 +150,8 @@ cvmfs_server_gc() {
                   "$list_deleted_objects"       \
                   "$preserve_revisions"         \
                   "$preserve_timestamp"         \
-                  "$deletion_log"
+                  "$deletion_log"               \
+                  "$hidden_gateway_switch"
     else
       local log=/var/log/cvmfs/gc.log
 
@@ -185,7 +168,8 @@ cvmfs_server_gc() {
                   "$list_deleted_objects"       \
                   "$preserve_revisions"         \
                   "$preserve_timestamp"         \
-                  "$deletion_log"
+                  "$deletion_log"               \
+                  "$hidden_gateway_switch"
       )
       if [ $? != 0 ]; then
         echo "ERROR from cvmfs_server gc!" >&2
@@ -218,10 +202,19 @@ __do_gc_cmd()
   local preserve_revisions="$4"
   local preserve_timestamp="$5"
   local deletion_log="$6"
+  local hidden_gateway_switch="$7"
 
   # leave extra layer of indent for now to better show diff with previous
 
     load_repo_config $name
+
+    upstream=$CVMFS_UPSTREAM_STORAGE
+    upstream_type=$(get_upstream_type $upstream)
+    if [ x"$upstream_type" = xgw ] && [ $hidden_gateway_switch -eq 0 ]; then
+      is_publisher=1
+    else
+      is_publisher=0
+    fi
 
     # sanity checks
     check_repository_compatibility $name
@@ -249,7 +242,7 @@ __do_gc_cmd()
     [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
 
     if [ $dry_run -eq 0 ]; then
-      if is_stratum0 $name; then
+      if is_stratum0 $name && [ $is_publisher -ne 1 ]; then
         trap "close_transaction $name 0" EXIT HUP INT TERM
         open_transaction $name || die "Failed to open transaction for garbage collection"
       else
@@ -274,6 +267,7 @@ __do_gc_cmd()
              "$reconstruct_this_reflog" \
              "$preserve_revisions"      \
              "$preserve_timestamp"      \
+             "$hidden_gateway_switch"   \
              $additional_switches || die "Fail ($?)!"
 
     if [ $dry_run -eq 0 ]; then
@@ -282,7 +276,12 @@ __do_gc_cmd()
         # close the transaction
         trap - EXIT HUP INT TERM
         if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
-          upload_statistics_plots $name $CVMFS_UPSTREAM_STORAGE
+	  upstream=$CVMFS_UPSTREAM_STORAGE
+	  if [ $hidden_gateway_switch -eq 1 ]; then
+	    export $(cat "/etc/cvmfs/repositories.d/$name/server.conf" | grep CVMFS_UPSTREAM_STORAGE | grep 'local,\|s3,')
+	    upstream=$CVMFS_UPSTREAM_STORAGE
+	  fi
+	  upload_statistics_plots $name $upstream
         fi
         close_transaction $name 0
       else
@@ -305,19 +304,28 @@ __run_gc() {
   local reconstruct_reflog="$5"
   local preserve_revisions="$6"
   local preserve_timestamp="$7"
-  shift 7
+  local hidden_gateway_switch="$8"
+  shift 8
   local additional_switches="$*"
+
+
+  upstream=$CVMFS_UPSTREAM_STORAGE
+  if [ $hidden_gateway_switch -eq 1 ]; then
+    export $(cat "/etc/cvmfs/repositories.d/$name/server.conf" | grep CVMFS_UPSTREAM_STORAGE | grep 'local,\|s3,')
+    upstream=$CVMFS_UPSTREAM_STORAGE
+  fi
 
   load_repo_config $name
 
-  upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)
 
   # sanity checks
   is_garbage_collectable $name  || return 1
   [ x"$repository_url" != x"" ] || return 2
   if [ $dry_run -eq 0 ]; then
-    is_in_transaction $name || is_stratum1 $name || return 3
+    # TODO fix back this part over here
+    echo "missing check"
+    # is_in_transaction $name || is_stratum1 $name || return 3
   else
     [ $reconstruct_reflog -eq 0 ] || return 8
   fi
@@ -337,8 +345,7 @@ __run_gc() {
     additional_switches="$additional_switches -I"
   fi
 
-  echo $CVMFS_UPSTREAM_STORAGE
-  if [ x"$upstream_type" = xgw ]; then
+  if [ x"$upstream_type" = xgw ] && [ $hidden_gateway_switch -ne 1 ]; then
     # nahhh, different approach, we need no C
     # lets first get the lease using curl
     url=$(echo -n $CVMFS_UPSTREAM_STORAGE | awk -F,  '{print $3}')
@@ -347,10 +354,8 @@ __run_gc() {
     lease_body="{\"path\": \"${name}/\", \"api_version\": \"2\"}"
     hmac=$(echo -n $lease_body | openssl dgst -r -sha1 -hmac $secret | awk '{printf $1}' | base64 -w0)
     header="Authorization: ${keyid} ${hmac}"
-    echo "curl -H '${header}' --data '$lease_body' -X POST $url/leases"
     http_result=$(curl -H "$header" --data "$lease_body" -X POST $url/leases 2> /dev/null)
     lease_request=$(echo $http_result | jq -r '.status')
-    echo $lease_request
     if [ x"$lease_request" = xok ]; then
       # happy path
       # send the GC command and wait
@@ -363,7 +368,6 @@ __run_gc() {
       token=$(echo $http_result | jq -r '.session_token')
       hmac=$(echo -n $token | openssl dgst -r -sha1 -hmac $secret | awk '{printf $1}' | base64 -w0)
       header="Authorization: ${keyid} ${hmac}"
-      echo "curl -H '$header' --data '$json_command' -X POST $url/gc/$token"
       http_result=$(curl -H "$header" --data "$json_command" -X POST $url/gc/$token 2> /dev/null)
       echo $http_result
       echo "happy path"
@@ -393,9 +397,9 @@ __run_gc() {
 
   if [ $reconstruct_reflog -ne 0 ]; then
     to_syslog_for_repo $name "reference log reconstruction started"
-    local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
+   local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog  \
                                                   -r $repository_url             \
-                                                  -u $CVMFS_UPSTREAM_STORAGE     \
+                                                  -u $upstream		         \
                                                   -n $CVMFS_REPOSITORY_NAME      \
                                                   -t ${CVMFS_SPOOL_DIR}/tmp/     \
                                                   -k $CVMFS_PUBLIC_KEY           \
@@ -408,9 +412,9 @@ __run_gc() {
   fi
 
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
-  local gc_command="$(__swissknife_cmd dbg) gc                              \
+   local gc_command="$(__swissknife_cmd dbg) gc                             \
                                             -r $repository_url              \
-                                            -u $CVMFS_UPSTREAM_STORAGE      \
+                                            -u $upstream                    \
                                             -n $CVMFS_REPOSITORY_NAME       \
                                             -k $CVMFS_PUBLIC_KEY            \
                                             -t ${CVMFS_SPOOL_DIR}/tmp/      \
@@ -422,7 +426,7 @@ __run_gc() {
     return 6
   fi
 
-  [ $dry_run -ne 0 ] || update_repo_status $name last_gc "`date --utc`"
+  [ $dry_run -ne 0 ] || update_repo_status $name last_gc "`date --utc`" $upstream
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0
