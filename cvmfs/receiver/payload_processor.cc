@@ -26,8 +26,7 @@ FileInfo::FileInfo()
     total_size(0),
     current_size(0),
     hash_context(),
-    hash_buffer(),
-    skip(false)
+    hash_buffer()
 {}
 
 FileInfo::FileInfo(const ObjectPackBuild::Event& event)
@@ -35,8 +34,7 @@ FileInfo::FileInfo(const ObjectPackBuild::Event& event)
     total_size(event.size),
     current_size(0),
     hash_context(shash::ContextPtr(event.id.algorithm)),
-    hash_buffer(hash_context.size, 0),
-    skip(false)
+    hash_buffer(hash_context.size, 0)
 {
   hash_context.buffer = &hash_buffer[0];
   shash::Init(hash_context);
@@ -47,8 +45,7 @@ FileInfo::FileInfo(const FileInfo& other)
     total_size(other.total_size),
     current_size(other.current_size),
     hash_context(other.hash_context),
-    hash_buffer(other.hash_buffer),
-    skip(other.skip)
+    hash_buffer(other.hash_buffer)
 {
   hash_context.buffer = &hash_buffer[0];
 }
@@ -60,7 +57,6 @@ FileInfo& FileInfo::operator=(const FileInfo& other) {
   hash_context = other.hash_context;
   hash_buffer = other.hash_buffer;
   hash_context.buffer = &hash_buffer[0];
-  skip = other.skip;
 
   return *this;
 }
@@ -141,65 +137,49 @@ void PayloadProcessor::ConsumerEventCallback(
 
   FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
+    // Schedule file upload if it's not being uploaded yet.
+    // Uploaders later check if the file is already present
+    // in the upstream storage and will not upload it twice.
     FileInfo info(event);
-
-    // If the file already exists in the repository, don't create a temp file,
-    // mark it to be skipped in the FileInfo, but keep track of the number of
-    // bytes currently written
-    if (uploader_->Peek("data/" + path)) {
-      LogCvmfs(
-          kLogReceiver, kLogDebug,
-          "PayloadProcessor - file %s already exists at destination. "
-          "Marking it to be skipped.",
-          path.c_str());
-      info.skip = true;
-    } else {
-      // New file to unpack
-      // info.handle is later deleted by FinalizeStreamedUpload
-      info.handle = uploader_->InitStreamedUpload(NULL);
-    }
-
+    // info.handle is later deleted by FinalizeStreamedUpload
+    info.handle = uploader_->InitStreamedUpload(NULL);
     pending_files_[event.id] = info;
   }
 
   FileInfo& info = pending_files_[event.id];
 
-  if (!info.skip) {
-    void *buf_copied = smalloc(event.buf_size);
-    memcpy(buf_copied, event.buf, event.buf_size);
-    upload::AbstractUploader::UploadBuffer buf(event.buf_size, buf_copied);
-    uploader_->ScheduleUpload(info.handle, buf,
-      upload::AbstractUploader::MakeClosure(
-        &PayloadProcessor::OnUploadJobComplete, this, buf_copied));
+  void *buf_copied = smalloc(event.buf_size);
+  memcpy(buf_copied, event.buf, event.buf_size);
+  upload::AbstractUploader::UploadBuffer buf(event.buf_size, buf_copied);
+  uploader_->ScheduleUpload(info.handle, buf,
+    upload::AbstractUploader::MakeClosure(
+      &PayloadProcessor::OnUploadJobComplete, this, buf_copied));
 
-    shash::Update(static_cast<const unsigned char*>(event.buf),
-                  event.buf_size,
-                  info.hash_context);
-  }
+  shash::Update(static_cast<const unsigned char*>(event.buf),
+                event.buf_size,
+                info.hash_context);
 
   info.current_size += event.buf_size;
 
   if (info.current_size == info.total_size) {
-    if (!info.skip) {
-      shash::Any file_hash(event.id.algorithm);
-      shash::Final(info.hash_context, &file_hash);
+    shash::Any file_hash(event.id.algorithm);
+    shash::Final(info.hash_context, &file_hash);
 
-      if (file_hash != event.id) {
-        LogCvmfs(
-            kLogReceiver, kLogSyslogErr,
-            "PayloadProcessor - error: Hash mismatch for unpacked file: event "
-            "size: %ld, file size: %ld, event hash: %s, file hash: %s",
-            event.size, info.current_size,
-            event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
-        num_errors_++;
-        return;
-      }
-      // override final remote path if not CAS object
-      if (event.object_type == ObjectPack::kNamed) {
-        info.handle->remote_path = path;
-      }
-      uploader_->ScheduleCommit(info.handle, event.id);
+    if (file_hash != event.id) {
+      LogCvmfs(
+          kLogReceiver, kLogSyslogErr,
+          "PayloadProcessor - error: Hash mismatch for unpacked file: event "
+          "size: %ld, file size: %ld, event hash: %s, file hash: %s",
+          event.size, info.current_size,
+          event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
+      num_errors_++;
+      return;
     }
+    // override final remote path if not CAS object
+    if (event.object_type == ObjectPack::kNamed) {
+      info.handle->remote_path = path;
+    }
+    uploader_->ScheduleCommit(info.handle, event.id);
 
     pending_files_.erase(event.id);
   }
@@ -249,7 +229,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
     return kUploaderError;
   }
 
-  if (statistics_ != NULL) {
+  if (statistics_.IsValid()) {
     uploader_->InitCounters(statistics_);
   }
 
