@@ -51,6 +51,9 @@ class PayloadProcessor {
 
   virtual void ConsumerEventCallback(const ObjectPackBuild::Event& event);
 
+  virtual void OnUploadJobComplete(const upload::UploaderResults &results,
+                                   void *buffer);
+
   int GetNumErrors() const { return num_errors_; }
 
   void SetStatistics(perf::Statistics *st);
