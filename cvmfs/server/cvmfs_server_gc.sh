@@ -319,13 +319,18 @@ __run_gc() {
 
   upstream_type=$(get_upstream_type $upstream)
 
+  if [ x"$upstream_type" = xgw ] && [ $hidden_gateway_switch -eq 0 ]; then
+    is_publisher=1
+  else
+    is_publisher=0
+  fi
+
   # sanity checks
   is_garbage_collectable $name  || return 1
   [ x"$repository_url" != x"" ] || return 2
   if [ $dry_run -eq 0 ]; then
-    # TODO fix back this part over here
-    echo "missing check"
-    # is_in_transaction $name || is_stratum1 $name || return 3
+    is_in_transaction $name || [ $is_publisher -eq 1 ] || return 3
+    is_stratum1 $name && return 4
   else
     [ $reconstruct_reflog -eq 0 ] || return 8
   fi
@@ -346,7 +351,6 @@ __run_gc() {
   fi
 
   if [ x"$upstream_type" = xgw ] && [ $hidden_gateway_switch -ne 1 ]; then
-    # nahhh, different approach, we need no C
     # lets first get the lease using curl
     url=$(echo -n $CVMFS_UPSTREAM_STORAGE | awk -F,  '{print $3}')
     keyid=$(cat /etc/cvmfs/keys/${name}.gw | awk '{ print $2}')
@@ -369,8 +373,33 @@ __run_gc() {
       hmac=$(echo -n $token | openssl dgst -r -sha1 -hmac $secret | awk '{printf $1}' | base64 -w0)
       header="Authorization: ${keyid} ${hmac}"
       http_result=$(curl -H "$header" --data "$json_command" -X POST $url/gc/$token 2> /dev/null)
-      echo $http_result
-      echo "happy path"
+      status=$(echo $http_result | jq -r '.status')
+      if [ x"$status" != xok ]; then
+        echo "Error in starting the GC"
+        echo $http_result
+        return 1
+      fi
+
+      # here we wait for the GC to finish
+
+      # if for some reason the GC is very fast, we prefer to wait one second at the very beginning
+      sleep 1
+      while true
+      do
+        http_result=$(curl -m 5 -H "$header" -X GET $url/gc/$token/check 2> /dev/null)
+        status=$(echo $http_result | jq -r '.status')
+        if [ x"$status" = x"done" ]; then
+          echo "GC finished $(date)"
+          break
+        elif [ x"$status" = x"in_progress" ]; then
+          echo "GC still in progress $(date)"
+          sleep 10
+        else
+          echo "Error in checking GC status, got unknow status: $status"
+          echo $http_result
+        fi
+      done
+
     elif [ x"$lease_request" = xpath_busy ]; then
       echo "Impossible to take the lease on the whole repository"
       echo "Another lease is in progress with a timeout of $(echo $http_result | jq '.time_remaining')"
