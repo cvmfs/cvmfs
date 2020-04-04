@@ -600,13 +600,13 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
+  if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
     result =
-      MountSubtree(catalog_path, best_fit, true /* is_listable */, &catalog);
+      MountSubtree(catalog_path, best_fit, false /* is_listable */, &catalog);
     // Result is false if an available catalog failed to load (error happened)
     if (!result) {
       Unlock();
