@@ -1396,8 +1396,10 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     assert(retval);
   }
   std::string subcatalog_path;
-  catalog::Counters counters =
-    catalog_mgr->LookupCounters(path, &subcatalog_path);
+  catalog::Counters counters;
+  // Query for the counters is potentially expensive, do it only if necessary
+  if (attr == "user.catalog_counters")
+    counters = catalog_mgr->LookupCounters(path, &subcatalog_path);
   fuse_remounter_->fence()->Leave();
 
   if (!found) {

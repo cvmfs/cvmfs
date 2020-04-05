@@ -229,7 +229,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
   bool found = best_fit->LookupPath(path, dirent);
 
   // Possibly in a nested catalog
-  if (!found && MountSubtree(path, best_fit, NULL)) {
+  if (!found && MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in a nested catalog",
              path.c_str());
     Unlock();
@@ -245,7 +245,8 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
                "entry not found, we may have to load nested catalogs");
 
       CatalogT *nested_catalog;
-      found = MountSubtree(path, best_fit, &nested_catalog);
+      found =
+        MountSubtree(path, best_fit, false /* is_listable */, &nested_catalog);
 
       if (!found) {
         LogCvmfs(kLogCatalog, kLogDebug,
@@ -331,12 +332,13 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(catalog_path, best_fit, NULL)) {
+  if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
-    result = MountSubtree(catalog_path, best_fit, &catalog);
+    result =
+      MountSubtree(catalog_path, best_fit, false /* is_listable */, &catalog);
     // Result is false if an available catalog failed to load (error happened)
     if (!result) {
       Unlock();
@@ -393,12 +395,12 @@ bool AbstractCatalogManager<CatalogT>::ListCatalogSkein(
   CatalogT *best_fit = FindCatalog(test);
   CatalogT *catalog = best_fit;
   // True if there is an available nested catalog
-  if (MountSubtree(test, best_fit, NULL)) {
+  if (MountSubtree(test, best_fit, false /* is_listable */, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(test);
-    result = MountSubtree(test, best_fit, &catalog);
+    result = MountSubtree(test, best_fit, false /* is_listable */, &catalog);
     // result is false if an available catalog failed to load
     if (!result) {
       Unlock();
@@ -449,12 +451,12 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
-    result = MountSubtree(path, best_fit, &catalog);
+    result = MountSubtree(path, best_fit, false /* is_listable */, &catalog);
     if (!result) {
       Unlock();
       return false;
@@ -487,12 +489,12 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
-    result = MountSubtree(path, best_fit, &catalog);
+    result = MountSubtree(path, best_fit, true /* is_listable */, &catalog);
     if (!result) {
       Unlock();
       return false;
@@ -524,12 +526,12 @@ bool AbstractCatalogManager<CatalogT>::ListingStat(const PathString &path,
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
-    result = MountSubtree(path, best_fit, &catalog);
+    result = MountSubtree(path, best_fit, true /* is_listable */, &catalog);
     if (!result) {
       Unlock();
       return false;
@@ -564,12 +566,12 @@ bool AbstractCatalogManager<CatalogT>::ListFileChunks(
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
-    result = MountSubtree(path, best_fit, &catalog);
+    result = MountSubtree(path, best_fit, false /* is_listable */, &catalog);
     if (!result) {
       Unlock();
       return false;
@@ -598,12 +600,13 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
-    result = MountSubtree(catalog_path, best_fit, &catalog);
+    result =
+      MountSubtree(catalog_path, best_fit, false /* is_listable */, &catalog);
     // Result is false if an available catalog failed to load (error happened)
     if (!result) {
       Unlock();
@@ -758,15 +761,20 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
  * If leaf_catalog is NULL, just indicate if it is necessary to load a
  * nested catalog for the given path.
  * The final leaf nested catalog is returned.
+ * The is_listable parameter is relevant if path is a nested catalog.  Only
+ * if is_listable is true, the nested catalog will be used; otherwise the parent
+ * with the transation point is sufficient.
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
-                                          const CatalogT *entry_point,
-                                          CatalogT **leaf_catalog)
+bool AbstractCatalogManager<CatalogT>::MountSubtree(
+  const PathString &path,
+  const CatalogT *entry_point,
+  bool is_listable,
+  CatalogT **leaf_catalog)
 {
   bool result = true;
   CatalogT *parent = (entry_point == NULL) ?
-                    GetRootCatalog() : const_cast<CatalogT *>(entry_point);
+                     GetRootCatalog() : const_cast<CatalogT *>(entry_point);
   assert(path.StartsWith(parent->mountpoint()));
 
   // Try to find path as a super string of nested catalog mount points
@@ -783,6 +791,10 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
     PathString nested_path_slash(i->mountpoint);
     nested_path_slash.Append("/", 1);
     if (path_slash.StartsWith(nested_path_slash)) {
+      // Found a nested catalog transition point
+      if (!is_listable && (path_slash == nested_path_slash))
+        break;
+
       if (leaf_catalog == NULL)
         return true;
       CatalogT *new_nested;
@@ -796,7 +808,7 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
       if (!new_nested)
         return false;
 
-      result = MountSubtree(path, new_nested, &parent);
+      result = MountSubtree(path, new_nested, is_listable, &parent);
       break;
     }
   }
