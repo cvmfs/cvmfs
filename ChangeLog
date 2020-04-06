@@ -14,7 +14,6 @@
   * [ducc] Require Singularity >= 3.5 (CVM-1840)
   * [server] Add new parameter CVMFS_UPLOAD_STATS_DB=[true/false] in order to
     push publish and GC statistics into the /stats location on the Stratum 0
-  * [gw] Fix lease acquisiton on non-existing paths (CVM-1696) 
   * Add the cvmfs_publish transitional utility
   * Add convert-singularity-image command to DUCC
   * Enable readdir caching on fuse3 and kernel >= 4.20
@@ -23,6 +22,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.2:
+  * [gw] Fix lease acquisiton on non-existing paths (CVM-1696)
   * Optimize loading of nested catalogs (CVM-1848)
   * Fix creation of nested catalogs by ingestion command (CVM-1862)
   * [gw] fix/relax JSON parsing of success status message
