@@ -6,6 +6,7 @@
 #define CVMFS_SIGNING_TOOL_H_
 
 #include <string>
+#include <vector>
 
 #include "hash.h"
 #include "server_tool.h"
@@ -39,7 +40,9 @@ class SigningTool {
              const std::string &reflog_chksum_path = "",
              const bool garbage_collectable = false,
              const bool bootstrap_shortcuts = false,
-             const bool return_early = false);
+             const bool return_early = false,
+             const std::vector<shash::Any> reflog_catalogs =
+              std::vector<shash::Any>());
 
  protected:
   void CertificateUploadCallback(const upload::SpoolerResult &result);

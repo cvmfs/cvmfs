@@ -232,12 +232,17 @@ CommitProcessor::Result CommitProcessor::Process(
            "CommitProcessor - lease_path: %s, signing manifest",
            lease_path.c_str());
 
+  // Add C_N root catalog hash to reflog through SigningTool,
+  // so garbage collector can later delete it.
+  std::vector<shash::Any> reflog_catalogs;
+  reflog_catalogs.push_back(new_root_hash);
+
   SigningTool signing_tool(server_tool.weak_ref());
   SigningTool::Result res = signing_tool.Run(
       new_manifest_path, params.stratum0, params.spooler_configuration,
       temp_dir, certificate, private_key, repo_name, "", "",
       "/var/spool/cvmfs/" + repo_name + "/reflog.chksum",
-      params.garbage_collection);
+      params.garbage_collection, false, false, reflog_catalogs);
   switch (res) {
     case SigningTool::kReflogChecksumMissing:
       LogCvmfs(kLogReceiver, kLogSyslogErr,
