@@ -96,6 +96,12 @@ cvmfs_server_transaction() {
     if [ x"$upstream_type" = xgw ]; then
         local repo_services_url=$(echo $upstream_storage | cut -d',' -f3)
 
+        if [ ! -d $(dirname "/cvmfs/$name/$subpath") ]; then
+          echo "Impossible to open a transaction on a directory that does not exists"
+          echo "Trying to open a transaction on /cvmfs/$name/$subpath"
+          return 2
+        fi
+
         set +e
 
         local res=1
