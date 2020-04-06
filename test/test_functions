@@ -669,6 +669,15 @@ destroy_repo() {
     sudo rm -rf "${CVMFS_TEST_S3_STORAGE}/${repo}"
   fi
 
+  load_repo_config $repo
+  if [ x"$TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE" != x"" ]; then
+    # It is possible to have publisher and gateway on the same machine for testing purposes.
+    # However, `cvmfs_server rmfs` then incorrectly does not delete the repository backend storage.
+    # Let's do it here instead.
+    echo "Wiping local repository storage in gateway setup /srv/cvmfs/${repo}"
+    sudo rm -rf /srv/cvmfs/${repo}
+  fi
+
   sudo cvmfs_server rmfs -f $additional_flags $repo || return 100
 }
 
