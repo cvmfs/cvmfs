@@ -67,6 +67,8 @@ run_transactions() {
         return 1
     fi
 
+    check_repo_integrity test.repo.org || return 1
+
     clean_up
 }
 

@@ -48,6 +48,8 @@ run_transactions() {
     if [ x"$num_tags" != x5 ] || [ x"$num_generic_tags" != x2 ]; then
         return 1
     fi
+
+    check_repo_integrity test.repo.org || return 1
 }
 
 cvmfs_run_test() {

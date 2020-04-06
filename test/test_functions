@@ -1140,6 +1140,18 @@ check_repository() {
   return 0
 }
 
+check_repo_integrity() {
+  local repo=$1
+  for f in `find /cvmfs/${repo} -type f`; do
+    cat $f >/dev/null
+    if [ $? -ne 0 ]; then
+      echo "Integrity check: corrupted file ${f}"
+      return 1
+    fi
+  done
+  return 0
+}
+
 # wrapper function to start a new repository update transaction
 # @param repo    the repository you want to start the transaction for
 start_transaction() {

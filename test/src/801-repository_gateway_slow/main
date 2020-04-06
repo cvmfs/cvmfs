@@ -38,7 +38,7 @@ save_repo_contents() {
 
 run_transactions() {
     set_up_repository_gateway
-
+q
     echo "Checking transaction + publish"
 
     ## Transaction 1
@@ -85,6 +85,8 @@ run_transactions() {
     if [ "$hash_in" != "$hash_out" ]; then
         return 1
     fi
+
+    check_repo_integrity test.repo.org || return 1
 
     clean_up
 }
