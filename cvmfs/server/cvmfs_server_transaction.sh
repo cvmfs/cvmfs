@@ -126,7 +126,8 @@ cvmfs_server_transaction() {
 
         if [ $res -ne 0 ]; then
           echo "Could not acquire a new lease for repository $name"
-          retcode=1
+          # Specific return code to indicate we could not acquire the lease
+          retcode=10
           continue
         fi
     fi
