@@ -605,7 +605,7 @@ Publisher::Publisher(const SettingsPublisher &settings)
   if (!rvb) throw EPublish("cannot load private master key");
   if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
 
-  if (spooler()->GetDriverType() != upload::SpoolerDefinition::Gateway) {
+  if (spooler()->GetDriverType() == upload::SpoolerDefinition::Gateway) {
     if (!settings.keychain().HasGatewayKey()) {
       throw EPublish("gateway key missing: " +
                      settings.keychain().gw_key_path());
