@@ -308,8 +308,7 @@ cvmfs_run_test() {
   echo "OPEN CATALOGS ($open_catalogs_cmd)"
   echo "$open_catalogs"                         || return 7
   echo "-------------"
-  # Broken on overlayfs; uncomment when CVM-1859 is fixed
-  # [ $($open_catalogs_cmd | wc -l) -eq 5 ]       || return 8
+  [ $($open_catalogs_cmd | wc -l) -eq 5 ]       || return 8
   $open_catalogs_cmd | grep '/People/French'    || return 9
   $open_catalogs_cmd | grep '/People/Germans'   || return 10
   $open_catalogs_cmd | grep '/People/Russians'  || return 11
