@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include "catalog_mgr_ro.h"
+#include "directory_entry.h"
 #include "logging.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
@@ -22,8 +24,19 @@ void Publisher::Transaction(const std::string &path) {
 
   InitSpoolArea();
 
-  // No-op for all but the gateway spooler
-  AcquireLease(path);
+  // We might have a valid lease for a non-existing path. Nevertheless, we run
+  // run into problems when merging catalogs later, so for the time being we
+  // disallow transactions on non-existing paths.
+  catalog::SimpleCatalogManager *catalog_mgr = GetSimpleCatalogManager();
+  catalog::DirectoryEntry dirent;
+  bool retval = catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent);
+  if (!retval) {
+    throw EPublish("cannot open transaction on non-existing path " + path);
+  }
+  if (!dirent.IsDirectory()) {
+    throw EPublish("cannot open transaction on " + path + ", which is not "
+                   "a directory");
+  }
 
   const std::string transaction_lock =
     settings_.transaction().spool_area().transaction_lock();

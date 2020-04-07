@@ -71,8 +71,12 @@ bool SettingsTransaction::ValidateUnionFs() {
   return true;
 }
 
-void SettingsTransaction::SetLeaseWait(unsigned seconds) {
-  lease_wait_s_ = seconds;
+void SettingsTransaction::SetTimeout(unsigned seconds) {
+  timeout_s_ = seconds;
+}
+
+void SettingsTransaction::SetLeasePath(const std::string &path) {
+  lease_path_ = path;
 }
 
 //------------------------------------------------------------------------------
@@ -97,6 +101,16 @@ void SettingsStorage::MakeLocal(const std::string &path) {
   type_ = upload::SpoolerDefinition::Local;
   endpoint_ = path;
   tmp_dir_ = path + "/data/txn";
+}
+
+void SettingsStorage::MakeGateway(
+  const std::string &host,
+  unsigned int port,
+  const std::string &tmp_dir)
+{
+  type_ = upload::SpoolerDefinition::Gateway;
+  endpoint_ = "http://" + host + ":" + StringifyInt(port) + "/api/v1";
+  tmp_dir_ = tmp_dir_;
 }
 
 void SettingsStorage::SetLocator(const std::string &locator) {

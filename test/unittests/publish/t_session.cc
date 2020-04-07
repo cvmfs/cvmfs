@@ -12,7 +12,7 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
-class T_Repository : public ::testing::Test {
+class T_Session : public ::testing::Test {
  protected:
   virtual void SetUp() {
   }
@@ -21,10 +21,8 @@ class T_Repository : public ::testing::Test {
 };
 
 
-TEST_F(T_Lease, Acquire) {
-  Publisher *publisher = GetTestPublisherGateway(1234);
+TEST_F(T_Session, Acquire) {
 
-  delete publisher;
 }
 
 }  // namespace publish

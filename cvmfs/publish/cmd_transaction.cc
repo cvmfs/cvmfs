@@ -37,7 +37,7 @@ int CmdTransaction::Main(const Options &options) {
   SettingsPublisher settings =
     builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
   if (options.Has("retry-timeout")) {
-    settings.GetTransaction()->SetLeaseWait(options.GetInt("retry-timeout"));
+    settings.GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
   }
 
   if (!SwitchCredentials(settings.owner_uid(), settings.owner_gid(),

@@ -114,12 +114,13 @@ class SettingsTransaction {
     , is_garbage_collectable_(true)
     , is_volatile_(false)
     , union_fs_(kUnionFsUnknown)
-    , lease_wait_s_(0)
+    , timeout_s_(0)
     , spool_area_(fqrn)
   {}
 
   void SetUnionFsType(const std::string &union_fs);
-  void SetLeaseWait(unsigned seconds);
+  void SetTimeout(unsigned seconds);
+  void SetLeasePath(const std::string &path);
   void DetectUnionFsType();
 
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
@@ -130,7 +131,8 @@ class SettingsTransaction {
   bool is_garbage_collectable() const { return is_garbage_collectable_; }
   bool is_volatile() const { return is_volatile_; }
   std::string voms_authz() const { return voms_authz_; }
-  unsigned lease_wait_s() const { return lease_wait_s_; }
+  unsigned timeout_s() const { return timeout_s_; }
+  std::string lease_path() const { return lease_path_; }
 
   const SettingsSpoolArea &spool_area() const { return spool_area_; }
   SettingsSpoolArea *GetSpoolArea() { return &spool_area_; }
@@ -148,7 +150,8 @@ class SettingsTransaction {
   /**
    * How long to retry taking a lease before giving up
    */
-  Setting<unsigned> lease_wait_s_;
+  Setting<unsigned> timeout_s_;
+  Setting<std::string> lease_path_;
 
   SettingsSpoolArea spool_area_;
 };  // class SettingsTransaction
@@ -171,6 +174,8 @@ class SettingsStorage {
   void SetLocator(const std::string &locator);
   void MakeLocal(const std::string &path);
   void MakeS3(const std::string &s3_config, const std::string &tmp_dir);
+  void MakeGateway(const std::string &host, unsigned port,
+                   const std::string &tmp_dir);
 
   upload::SpoolerDefinition::DriverType type() const { return type_; }
   std::string endpoint() const { return endpoint_; }

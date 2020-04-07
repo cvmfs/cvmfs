@@ -190,7 +190,33 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
     void SetRootHash(const shash::Any &hash);
 
     Publisher *publisher_;
-  };
+  };  // class ManagedNode
+
+
+  /**
+   * A session encapsulates an active storage (gateway) lease
+   */
+  class Session : ::SingleCopy {
+   public:
+    struct Settings {
+      Settings() : llvl(0) {}
+      std::string service_endpoint;
+      std::string lease_path;
+      std::string gw_key_path;
+      std::string token_path;
+      int llvl;
+    };
+
+    Session *Create(const Settings &settings_session);
+    Session *Create(const SettingsPublisher &settings_publisher,
+                    int llvl = 0);
+    ~Session();
+   private:
+    explicit Session(const Settings &settings_session);
+    void Acquire();
+    Settings settings_;
+  };  // class Session
+
 
   static Publisher *Create(const SettingsPublisher &settings);
 
@@ -249,9 +275,6 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void OnUploadManifest(const upload::SpoolerResult &result);
   void OnUploadReflog(const upload::SpoolerResult &result);
   void OnUploadWhitelist(const upload::SpoolerResult &result);
-
-  void AcquireLease(const std::string &path);
-  void DropLease();
 
   void CheckTagName(const std::string &name);
 
