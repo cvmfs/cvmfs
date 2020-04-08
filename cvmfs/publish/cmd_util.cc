@@ -48,7 +48,7 @@ int publish::CallServerHook(const std::string &func,
 
   const std::string callout =
     func + "() { :; }\n" +
-    "source " + path_hooks + "\n" +
+    ". " + path_hooks + "\n" +
     func + " " + fqrn + "\n";
   WritePipe(pipe_stdin[1], callout.data(), callout.length());
   close(pipe_stdin[1]);
