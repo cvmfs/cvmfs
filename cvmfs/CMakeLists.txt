@@ -263,6 +263,7 @@ set (CVMFS_PUBLISH_SOURCES
   publish/settings.cc
   sanitizer.cc
   signature.cc
+  sync_item.cc
   statistics.cc
   upload_spooler_definition.cc
   util/algorithm.cc

@@ -174,7 +174,21 @@ void SettingsRepository::SetTmpDir(const std::string &tmp_dir) {
 
 
 //------------------------------------------------------------------------------
-
+/**
+ * We check if the server.conf configuration file is there
+ * More sophistaced checks should be put in place
+ */
+bool SettingsPublisher::CanBe(const std::string &fqrn) {
+  try {
+    const std::string reponame = GetFQRN(fqrn);
+    const std::string server_conf =
+        kConfigPath + "/" + reponame + "/" + "server.conf";
+    printf("Checking if exists: %s", server_conf.c_str());
+    return FileExists(server_conf);
+  } catch (...) {
+    return false;
+  }
+}
 
 void SettingsPublisher::SetUrl(const std::string &url) {
   // TODO(jblomer): sanitiation, check availability
@@ -207,12 +221,12 @@ SettingsBuilder::~SettingsBuilder() {
 }
 
 
-std::string SettingsBuilder::GetSingleAlias() {
-  std::vector<std::string> repositories = FindDirectories(config_path_);
+const std::string GetSingleAlias() {
+  std::vector<std::string> repositories = FindDirectories(kConfigPath);
   if (repositories.empty())
-    throw EPublish("no repositories available in " + config_path_);
+    throw EPublish("no repositories available in " + kConfigPath);
   if (repositories.size() > 1)
-    throw EPublish("multiple repositories available in " + config_path_);
+    throw EPublish("multiple repositories available in " + kConfigPath);
   return repositories[0];
 }
 
@@ -262,6 +276,42 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
     settings.SetTmpDir(arg + "/tmp");
 
   return settings;
+}
+
+const std::string GetFQRN(const std::string &ident) {
+  std::string fqrn;
+  sanitizer::RepositorySanitizer sanitizer;
+
+  if (HasPrefix(ident, "http://", true /* ignore case */) ||
+      HasPrefix(ident, "https://", true /* ignore case */) ||
+      HasPrefix(ident, "file://", true /* ignore case */)) {
+    fqrn = Repository::GetFqrnFromUrl(ident);
+  } else if (ident.empty()) {
+    fqrn = GetSingleAlias();
+  } else {
+    fqrn = ident;
+  }
+
+  if (!sanitizer.IsValid(fqrn)) {
+    throw EPublish("malformed repository name: " + fqrn);
+  }
+  return fqrn;
+}
+
+bool SettingsBuilder::CreateSettingsReplicas(const std::string &ident,
+                                             SettingsReplica &out) const {
+  std::string fqrn = GetFQRN(ident);
+  std::string repo_path = config_path_ + "/" + fqrn;
+
+  // if the replica file does not exists we cannot have a Replica
+  std::string replica_path = repo_path + "/replica.conf";
+  platform_stat64 info;
+  if (!platform_stat(replica_path.c_str(), &info)) {
+    return false;
+  }
+
+  SettingsPublisher spub(fqrn);
+  return true;
 }
 
 }  // namespace publish

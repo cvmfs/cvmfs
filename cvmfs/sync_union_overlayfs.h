@@ -24,7 +24,7 @@ namespace publish {
  */
 class SyncUnionOverlayfs : public SyncUnion {
  public:
-  SyncUnionOverlayfs(SyncMediator *mediator, const std::string &rdonly_path,
+  SyncUnionOverlayfs(AbstractSyncMediator *mediator, const std::string &rdonly_path,
                      const std::string &union_path,
                      const std::string &scratch_path);
 

@@ -200,9 +200,24 @@ class DiffReporter : public publish::DiffListener {
 namespace publish {
 
 int CmdDiff::Main(const Options &options) {
+  const std::string repo =
+      options.plain_args().empty() ? "" : options.plain_args()[0].value_str;
+
+  DiffReporter diff_reporter(options.Has("header"),
+                             options.Has("machine-readable"),
+                             options.Has("ignore-timediff"));
+
+  if (SettingsPublisher::CanBe(repo)) {
+    // if it is not in transaction fall back to the old behaviour
+    const SettingsPublisher spub = SettingsPublisher(repo);
+    Publisher pub(spub);
+    pub.Diff(diff_reporter);
+    return 0;
+  } else {
+  }
+
   SettingsBuilder builder;
-  SettingsRepository settings = builder.CreateSettingsRepository(
-    options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
+  SettingsRepository settings = builder.CreateSettingsRepository(repo);
 
   std::string from = options.GetStringDefault("from", "trunk-previous");
   std::string to = options.GetStringDefault("to", "trunk");
@@ -212,9 +227,6 @@ int CmdDiff::Main(const Options &options) {
   }
   Repository repository(settings);
 
-  DiffReporter diff_reporter(options.Has("header"),
-                             options.Has("machine-readable"),
-                             options.Has("ignore-timediff"));
   repository.Diff(from, to, &diff_reporter);
 
   return 0;

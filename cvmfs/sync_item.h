@@ -129,6 +129,11 @@ class SyncItem {
    * @return  a DirectoryEntry structure to be written into a catalog
    */
   virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const = 0;
+  /**
+   * This does not need to be virtual nor we want it to be.
+   * It just work on the RdOnly filesystem
+   */
+  catalog::DirectoryEntryBase CreatePreviousBasicCatalogDirent() const;
 
   inline std::string GetRelativePath() const {
     return (relative_parent_path_.empty()) ?
@@ -194,6 +199,11 @@ class SyncItem {
   inline platform_stat64 GetUnionStat() const {
     StatUnion();
     return union_stat_.stat;
+  }
+
+  inline platform_stat64 GetRdOnlyStat() const {
+    StatRdOnly();
+    return rdonly_stat_.stat;
   }
 
   SyncItemType GetRdOnlyFiletype() const;

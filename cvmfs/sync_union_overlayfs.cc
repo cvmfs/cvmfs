@@ -18,7 +18,7 @@
 
 namespace publish {
 
-SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
+SyncUnionOverlayfs::SyncUnionOverlayfs(AbstractSyncMediator *mediator,
                                        const string &rdonly_path,
                                        const string &union_path,
                                        const string &scratch_path)

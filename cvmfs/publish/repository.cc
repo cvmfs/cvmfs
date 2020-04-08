@@ -610,11 +610,17 @@ void Publisher::Transaction() {
 
   InitSpoolArea();
   // TODO(jblomer): acquire gateway lease, create in_transaction lock file
+  const std::string lock_file = settings_.transaction().lockfile();
+  CreateFile(lock_file, 0644, true);
   LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
            "(%s) opened transaction", settings_.fqrn().c_str());
   in_transaction_ = true;
 }
 
+const bool Publisher::InTransaction() const {
+  const std::string lock_file = settings_.transaction().lockfile();
+  return FileExists(lock_file);
+}
 
 void Publisher::Abort() {
   // TODO(jblomer): remove transaction lock
@@ -694,7 +700,6 @@ void Publisher::Migrate() {}
 void Publisher::Resign() {}
 void Publisher::Rollback() {}
 void Publisher::UpdateMetaInfo() {}
-
 
 //------------------------------------------------------------------------------
 

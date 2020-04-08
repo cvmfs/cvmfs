@@ -118,6 +118,8 @@ class SettingsTransaction {
   const SettingsSpoolArea &spool_area() const { return spool_area_; }
   SettingsSpoolArea *GetSpoolArea() { return &spool_area_; }
 
+  const std::string lockfile() const { return spool_area_.workspace() + "/in_transaction.lock"; }
+
  private:
   bool ValidateUnionFs();
 
@@ -248,6 +250,7 @@ class SettingsPublisher {
     , keychain_(fqrn_)
   { }
 
+  static bool CanBe(const std::string &fqrn);
   void SetUrl(const std::string &url);
   void SetOwner(const std::string &user_name);
   void SetOwner(uid_t uid, gid_t gid);
@@ -299,6 +302,8 @@ class SettingsReplica {
 };  // class SettingsReplica
 
 
+static const std::string kConfigPath = "/etc/cvmfs/repositories.d";
+
 /**
  * Create Settings objects from the system configuration in
  * /etc/cvmfs/repositories.d
@@ -306,7 +311,7 @@ class SettingsReplica {
 class SettingsBuilder : SingleCopy {
  public:
   SettingsBuilder()
-    : config_path_("/etc/cvmfs/repositories.d")
+    : config_path_(kConfigPath)
     , options_mgr_(NULL)
   {}
   ~SettingsBuilder();
@@ -324,10 +329,14 @@ class SettingsBuilder : SingleCopy {
    */
   SettingsRepository CreateSettingsRepository(const std::string &ident);
 
+  bool CreateSettingsReplicas(const std::string &ident,
+                              SettingsReplica &out) const;
+
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }
 
  private:
+
   std::string config_path_;
   /**
    * For locally managed repositories, the options manager is non NULL and
@@ -335,15 +344,19 @@ class SettingsBuilder : SingleCopy {
    */
   OptionsManager *options_mgr_;
 
-  /**
-   * Returns the name of the one and only repository under kConfigPath
-   * Throws an exception if there are none or multiple repositories.
-   * The alias is usually the fqrn except for a replica with an explicit
-   * alias set different from the fqrn (e.g. if Stratum 0 and 1 are hosted)
-   * on the same node.
-   */
-  std::string GetSingleAlias();
 };  // class SettingsBuilder
+
+
+/**
+ * Returns the name of the one and only repository under kConfigPath
+ * Throws an exception if there are none or multiple repositories.
+ * The alias is usually the fqrn except for a replica with an explicit
+ * alias set different from the fqrn (e.g. if Stratum 0 and 1 are hosted)
+ * on the same node.
+ */
+const std::string GetSingleAlias();
+
+const std::string GetFQRN(const std::string &ident);
 
 }  // namespace publish
 

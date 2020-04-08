@@ -43,6 +43,27 @@ class Whitelist;
 
 namespace publish {
 
+enum RepositoryType {
+  kClient,
+  kPublisher,
+  kReplica
+};
+
+/*
+Repository* GetRepository(const std::string fqrn) {
+  // here we only distinguish between a client and a publisher
+  // we do not take care of replicas for now
+  // should we call them Stratum0 and Straum1 instead of Publisher and Replica?
+  //
+  // In order to distinguish client and publisher we check if the spool directories exists
+  // maybe there is a better way, but it will be good enouh for now
+  //
+
+  SettingsPublisher spub(fqrn);
+  SettingsStorage stor = spub.storage();
+}
+*/
+
 /**
  * Users create derived instances to react on repository diffs
  */
@@ -61,7 +82,6 @@ class __attribute__((visibility("default"))) DiffListener {
                         const catalog::DirectoryEntry &entry_to) = 0;
 };
 
-
 class __attribute__((visibility("default"))) Repository : SingleCopy {
  public:
   /**
@@ -77,6 +97,8 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   void Check();
   void GarbageCollect();
   void List();
+  virtual const bool InTransaction() const { return false; };
+  virtual const RepositoryType GetRepositoryType() const { return kClient; };
 
   /**
    * From and to are either tag names or catalog root hashes preceeded by
@@ -139,6 +161,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Publish();
   void Ingest();
   void Sync();
+  void Diff(DiffListener&);
 
   /**
    * Must not edit magic tags 'trunk' and 'trunk-previous'.
@@ -156,7 +179,11 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Resign();
   void Migrate();
 
+  virtual const bool InTransaction() const override;
+
   const SettingsPublisher &settings() const { return settings_; }
+
+  virtual const RepositoryType GetRepositoryType() const { return kPublisher; };
 
  private:
   Publisher();  ///< Used by Create
@@ -199,6 +226,8 @@ class __attribute__((visibility("default"))) Replica : public Repository {
   static Replica *Create();
   explicit Replica(const SettingsReplica &settings);
   virtual ~Replica();
+
+  virtual const RepositoryType GetRepositoryType() const { return kReplica; };
 
   void Snapshot();
 };

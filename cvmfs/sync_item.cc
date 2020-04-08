@@ -200,19 +200,21 @@ void SyncItem::StatGeneric(const string  &path,
 catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   catalog::DirectoryEntryBase dirent;
 
+  platform_stat64 stat = this->GetUnionStat();
+
   // inode and parent inode is determined at runtime of client
   dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
 
   // this might mask the actual link count in case hardlinks are not supported
   // (i.e. on setups using OverlayFS)
-  dirent.linkcount_      = HasHardlinks() ? this->GetUnionStat().st_nlink : 1;
+  dirent.linkcount_      = HasHardlinks() ? stat.st_nlink : 1;
 
-  dirent.mode_           = this->GetUnionStat().st_mode;
-  dirent.uid_            = this->GetUnionStat().st_uid;
-  dirent.gid_            = this->GetUnionStat().st_gid;
+  dirent.mode_           = stat.st_mode;
+  dirent.uid_            = stat.st_uid;
+  dirent.gid_            = stat.st_gid;
   dirent.size_           = graft_size_ > -1 ? graft_size_ :
-                           this->GetUnionStat().st_size;
-  dirent.mtime_          = this->GetUnionStat().st_mtime;
+                           stat.st_size;
+  dirent.mtime_          = stat.st_mtime;
   dirent.checksum_       = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
@@ -234,6 +236,44 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   return dirent;
 }
 
+catalog::DirectoryEntryBase SyncItem::CreatePreviousBasicCatalogDirent() const {
+  catalog::DirectoryEntryBase dirent;
+
+  platform_stat64 stat = this->GetRdOnlyStat();
+
+  // inode and parent inode is determined at runtime of client
+  dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
+
+  // this might mask the actual link count in case hardlinks are not supported
+  // (i.e. on setups using OverlayFS)
+  dirent.linkcount_      = HasHardlinks() ? stat.st_nlink : 1;
+
+  dirent.mode_           = stat.st_mode;
+  dirent.uid_            = stat.st_uid;
+  dirent.gid_            = stat.st_gid;
+  dirent.size_           = graft_size_ > -1 ? graft_size_ :
+                           stat.st_size;
+  dirent.mtime_          = stat.st_mtime;
+  dirent.checksum_       = this->GetContentHash();
+  dirent.is_external_file_ = this->IsExternalData();
+  dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
+
+  dirent.name_.Assign(filename().data(), filename().length());
+
+  if (this->IsSymlink()) {
+    char slnk[PATH_MAX+1];
+    const ssize_t length =
+      readlink((this->GetRdOnlyPath()).c_str(), slnk, PATH_MAX);
+    assert(length >= 0);
+    dirent.symlink_.Assign(slnk, length);
+  }
+
+  if (this->IsCharacterDevice() || this->IsBlockDevice()) {
+    dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
+  }
+
+  return dirent;
+}
 
 std::string SyncItem::GetRdOnlyPath() const {
   const string relative_path = GetRelativePath().empty() ?

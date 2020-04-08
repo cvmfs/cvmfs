@@ -11,12 +11,18 @@
 #include "catalog_counters.h"
 #include "catalog_diff_tool.h"
 #include "catalog_mgr_ro.h"
+#include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
 #include "history_sqlite.h"
 #include "publish/except.h"
 #include "shortstring.h"
 #include "statistics.h"
+#include "sync_item.h"
+#include "sync_mediator.h"
+#include "sync_union.h"
+#include "sync_union_overlayfs.h"
+#include "util/shared_ptr.h"
 #include "xattr.h"
 
 namespace {
@@ -80,6 +86,45 @@ class DiffForwarder : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   }
 };  // class DiffForwarder
 
+class DiffMediator : public publish::AbstractSyncMediator {
+  private:
+    publish::DiffListener &listener_;
+
+  public:
+    DiffMediator(publish::DiffListener &listener)
+      : listener_(listener)
+    {
+    }
+    virtual void Add(SharedPtr<publish::SyncItem> entry) override {
+      // if it is a new directory we need to recurse into it and call Add to every element!
+      catalog::DirectoryEntry dir = catalog::DirectoryEntry(entry->CreateBasicCatalogDirent());
+      listener_.OnAdd(entry->GetUnionPath(), dir);
+    }
+    virtual void Touch(SharedPtr<publish::SyncItem> entry) override {
+      catalog::DirectoryEntry new_dir = catalog::DirectoryEntry(entry->CreateBasicCatalogDirent());
+      catalog::DirectoryEntry old_dir = catalog::DirectoryEntry(entry->CreatePreviousBasicCatalogDirent());
+      listener_.OnModify(entry->GetUnionPath(), old_dir, new_dir);
+    }
+    virtual void Remove(SharedPtr<publish::SyncItem> entry) override {
+      catalog::DirectoryEntry dir = catalog::DirectoryEntry(entry->CreateBasicCatalogDirent());
+      listener_.OnRemove(entry->GetUnionPath(), dir);
+    }
+    virtual void Replace(SharedPtr<publish::SyncItem> entry) override {
+      catalog::DirectoryEntry new_dir = catalog::DirectoryEntry(entry->CreateBasicCatalogDirent());
+      catalog::DirectoryEntry old_dir = catalog::DirectoryEntry(entry->CreatePreviousBasicCatalogDirent());
+      listener_.OnModify(entry->GetUnionPath(), old_dir, new_dir);
+    }
+    virtual void AddUnmaterializedDirectory(
+        SharedPtr<publish::SyncItem> entry) override {}
+    virtual void RegisterUnionEngine(publish::SyncUnion *engine) override { }
+    virtual void Clone(const std::string from, const std::string to) override {}
+    virtual void EnterDirectory(SharedPtr<publish::SyncItem> entry) override {}
+    virtual void LeaveDirectory(SharedPtr<publish::SyncItem> entry) override {}
+    virtual bool Commit(manifest::Manifest *manifest) override { return true; }
+    virtual bool IsExternalData() const override { return false; }
+    virtual zlib::Algorithms GetCompressionAlgorithm() const override { return zlib::Algorithms::kZlibDefault; }
+}; // class DiffMediator
+
 }  // anonymous namespace
 
 namespace publish {
@@ -120,6 +165,20 @@ void Repository::Diff(const std::string &from, const std::string &to,
   if (!diff_forwarder.Init())
     throw EPublish("cannot initialize difference engine");
   diff_forwarder.Run(PathString());
+}
+
+void Publisher::Diff(DiffListener &diff_listener) {
+  DiffMediator mediator(diff_listener);
+  SyncUnion *sync;
+  sync = new SyncUnionOverlayfs(&mediator,
+    settings_.transaction().spool_area().readonly_mnt(),
+    std::string("/cvmfs/") + settings_.fqrn(),
+    settings_.transaction().spool_area().scratch_dir());
+  if (!sync->Initialize()) throw EPublish("cannot initialize union file system engine");
+  sync->Traverse();
+
+  delete sync;
+  return;
 }
 
 }  // namespace publish
