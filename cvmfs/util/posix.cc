@@ -1504,8 +1504,12 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     ForkFailures::Names failed = ForkFailures::kUnknown;
 
     if (clear_env) {
+#ifdef __APPLE__
+      environ = NULL;
+#else
       int retval = clearenv();
       assert(retval == 0);
+#endif
     }
 
     const char *argv[command_line.size() + 1];
