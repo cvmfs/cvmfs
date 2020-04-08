@@ -64,6 +64,16 @@
 #define ST_RDONLY 1
 #endif
 
+// Older Linux glibc versions do not provide the f_flags member in struct statfs
+#define CVMFS_HAS_STATFS_F_FLAGS
+#ifndef __APPLE__
+#ifdef __GLIBC_MINOR__
+#if __GLIBC_MINOR__ < 12
+#undef CVMFS_HAS_STATFS_F_FLAGS
+#endif
+#endif
+#endif
+
 // Work around missing clearenv()
 #ifdef __APPLE__
 extern "C" {
@@ -223,8 +233,16 @@ FileSystemInfo GetFileSystemInfo(const std::string &path) {
       result.type = kFsTypeUnknown;
   }
 
+#ifdef CVMFS_HAS_STATFS_F_FLAGS
   if (info.f_flags & ST_RDONLY)
     result.is_rdonly = true;
+#else
+  // On old Linux systems, fall back to access()
+  retval = access(path.c_str(), W_OK);
+  result.is_rdonly = (retval != 0);
+#endif
+
+
 
   return result;
 }
