@@ -64,6 +64,13 @@
 #define ST_RDONLY 1
 #endif
 
+// Work around missing clearenv()
+#ifdef __APPLE__
+extern "C" {
+extern char **environ;
+}
+#endif
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
