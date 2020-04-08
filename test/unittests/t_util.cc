@@ -380,7 +380,7 @@ TEST_F(T_Util, ResolvePath) {
   EXPECT_EQ("/", ResolvePath(""));
   EXPECT_EQ("/no/such/path", ResolvePath("/no/such/path"));
   EXPECT_EQ("/", ResolvePath("/.//././."));
-  EXPECT_EQ("/", ResolvePath("/tmp/.."));
+  EXPECT_EQ("/", ResolvePath("/usr/.."));
 
   EXPECT_EQ(0, symlink(".", "cvmfs_test_link"));
   EXPECT_EQ(GetCurrentWorkingDirectory(), ResolvePath("cvmfs_test_link"));
