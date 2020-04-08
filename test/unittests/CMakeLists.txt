@@ -426,6 +426,7 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
 )
 
 set (CVMFS_TEST_PUBLISH_SOURCES
+  c_http_server.cc
   publish/c_repository.cc
   publish/main.cc
   publish/t_command.cc

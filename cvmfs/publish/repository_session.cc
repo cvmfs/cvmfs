@@ -64,6 +64,7 @@ static void MakeAcquireRequest(
   const gateway::GatewayKey &key,
   const std::string& repo_path,
   const std::string& repo_service_url,
+  int llvl,
   CurlBuffer* buffer)
 {
   CURLcode ret = static_cast<CURLcode>(0);
@@ -95,10 +96,11 @@ static void MakeAcquireRequest(
   ret = curl_easy_perform(h_curl);
   curl_easy_cleanup(h_curl);
   if (ret != CURLE_OK) {
-    LogCvmfs(kLogUploadGateway, kLogStderr,
+    LogCvmfs(kLogUploadGateway, llvl | kLogStderr,
              "Make lease acquire request failed: %d. Reply: %s", ret,
              buffer->data.c_str());
-    throw publish::EPublish("cannot acquire lease");
+    throw publish::EPublish("cannot acquire lease",
+                            publish::EPublish::kFailLeaseHttp);
   }
 }
 
@@ -196,11 +198,12 @@ Publisher::Session *Publisher::Session::Create(
 void Publisher::Session::Acquire() {
   gateway::GatewayKey gw_key = gateway::ReadGatewayKey(settings_.gw_key_path);
   if (!gw_key.IsValid()) {
-    throw EPublish("cannot read gateway key: " + settings_.gw_key_path);
+    throw EPublish("cannot read gateway key: " + settings_.gw_key_path,
+                   EPublish::kFailGatewayKey);
   }
   CurlBuffer buffer;
   MakeAcquireRequest(gw_key, settings_.lease_path, settings_.service_endpoint,
-                     &buffer);
+                     settings_.llvl, &buffer);
 
   std::string session_token;
   LeaseReply rep = ParseAcquireReply(buffer, &session_token, settings_.llvl);
@@ -217,16 +220,16 @@ void Publisher::Session::Acquire() {
       }
       break;
     case kLeaseReplyBusy:
-      // return kLeaseBusy; TODO(jblomer)
-      throw EPublish("lease path busy, timeout");
+      throw EPublish("lease path busy", EPublish::kFailLeaseBusy);
       break;
     case kLeaseReplyFailure:
     default:
-      throw EPublish("cannot parse session token");
+      throw EPublish("cannot parse session token", EPublish::kFailLeaseBody);
   }
 }
 
 Publisher::Session::~Session() {
+  // TODO(jblomer): drop lease
 }
 
 }  // namespace publish

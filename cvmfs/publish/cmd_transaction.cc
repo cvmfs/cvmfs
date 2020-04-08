@@ -76,7 +76,7 @@ int CmdTransaction::Main(const Options &options) {
     try {
       publisher.Transaction();
     } catch (const EPublish &e) {
-      if (e.id() == EPublish::kIdTransactionLocked) {
+      if (e.failure() == EPublish::kFailTransactionLocked) {
         LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
         return 1;
       }
@@ -84,6 +84,11 @@ int CmdTransaction::Main(const Options &options) {
     }
   }
 
+  // TODO(jblomer): clarify lifetime of the session object
+  UniquePtr<Publisher::Session> session;
+  if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
+    session = Publisher::Session::Create(settings);
+  }
   publisher.managed_node()->Open();
 
   rvi = CallServerHook("transaction_after_hook", fqrn);

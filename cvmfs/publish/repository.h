@@ -207,9 +207,9 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
       int llvl;
     };
 
-    Session *Create(const Settings &settings_session);
-    Session *Create(const SettingsPublisher &settings_publisher,
-                    int llvl = 0);
+    static Session *Create(const Settings &settings_session);
+    static Session *Create(const SettingsPublisher &settings_publisher,
+                           int llvl = 0);
     ~Session();
    private:
     explicit Session(const Settings &settings_session);

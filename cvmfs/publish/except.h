@@ -15,24 +15,28 @@ class EPublish : public std::runtime_error {
   /**
    * Well-known exceptions that are usually caught and handled
    */
-  enum EId {
-    kIdUnspecified = 0,
-    kIdTransactionLocked = 1,
+  enum EFailures {
+    kFailUnspecified = 0,
+    kFailTransactionLocked,  // another publisher process has an open txn
+    kFailGatewayKey,  // cannot access the gateway secret key
+    kFailLeaseHttp,  // cannot connect to the gateway HTTP endpoint
+    kFailLeaseBody,  // corrupted session token
+    kFailLeaseBusy,  // another active lease blocks the path
   };
 
-  explicit EPublish(const std::string& what, EId id = kIdUnspecified)
+  explicit EPublish(const std::string& what, EFailures f = kFailUnspecified)
     : std::runtime_error(what + "\n\nStacktrace:\n" + GetStacktrace())
-    , id_(id)
+    , failure_(f)
     , msg_(what)
   {}
 
   virtual ~EPublish() throw();
 
-  EId id() const { return id_; }
+  EFailures failure() const { return failure_; }
   std::string msg() const { return msg_; }
 
  private:
-  EId id_;
+  EFailures failure_;
   std::string msg_;
 
   /**

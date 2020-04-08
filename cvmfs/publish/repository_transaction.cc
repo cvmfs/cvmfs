@@ -19,7 +19,7 @@ namespace publish {
 void Publisher::Transaction(const std::string &path) {
   if (in_transaction_) {
     throw EPublish("another transaction is already open",
-                   EPublish::kIdTransactionLocked);
+                   EPublish::kFailTransactionLocked);
   }
 
   InitSpoolArea();
@@ -27,15 +27,17 @@ void Publisher::Transaction(const std::string &path) {
   // We might have a valid lease for a non-existing path. Nevertheless, we run
   // run into problems when merging catalogs later, so for the time being we
   // disallow transactions on non-existing paths.
-  catalog::SimpleCatalogManager *catalog_mgr = GetSimpleCatalogManager();
-  catalog::DirectoryEntry dirent;
-  bool retval = catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent);
-  if (!retval) {
-    throw EPublish("cannot open transaction on non-existing path " + path);
-  }
-  if (!dirent.IsDirectory()) {
-    throw EPublish("cannot open transaction on " + path + ", which is not "
-                   "a directory");
+  if (!path.empty()) {
+    catalog::SimpleCatalogManager *catalog_mgr = GetSimpleCatalogManager();
+    catalog::DirectoryEntry dirent;
+    bool retval = catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent);
+    if (!retval) {
+      throw EPublish("cannot open transaction on non-existing path " + path);
+    }
+    if (!dirent.IsDirectory()) {
+      throw EPublish("cannot open transaction on " + path + ", which is not "
+                     "a directory");
+    }
   }
 
   const std::string transaction_lock =
