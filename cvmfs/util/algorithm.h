@@ -141,6 +141,9 @@ friend class UTLog2Histogram;
     atomic_inc32(&(this->bins_[0]));  // add to overflow bin.
   }
 
+  //compute the quantile of order n
+  unsigned int q(float n);
+
   std::string ToString();
 
   void PrintLog2Histogram();
