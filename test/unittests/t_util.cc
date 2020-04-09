@@ -1850,7 +1850,7 @@ TEST(Log2Histogram, 3Bins) {
 
 TEST(Log2Histogram, Quantiles) {
   int N = 16;
-  long unsigned max = 1 << N;
+  int64_t max = 1 << N;
   // this start to fail with tollerance ~0.001
   // we add a safe factor of 50
   float tollerance = 0.05;
@@ -1860,11 +1860,12 @@ TEST(Log2Histogram, Quantiles) {
   rng.InitLocaltime();
 
   // we are oversampling to test the quantiles
-  long int i = 1 << (N + 4);
+  int64_t i = 1 << (N + 4);
   for (; i >= 0; i--) {
     log2hist.Add(rng.Next(max));
   }
-  float qs[12] = {0.15, 0.20, 0.3, 0.5, 0.75, 0.9, 0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999};
+  float qs[12] = {0.15, 0.20, 0.3,   0.5,   0.75,   0.9,
+                  0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999};
   for (int i = 0; i < 12; i++) {
     double expected = max * qs[i];
     double max_difference = expected * tollerance;

@@ -107,19 +107,19 @@ std::vector<atomic_int32> UTLog2Histogram::GetBins(const Log2Histogram &h) {
 
 unsigned int Log2Histogram::q(float n) {
   // we start by counting all the elements of the array, we include the overflow
-  unsigned long int total = 0;
+  uint64_t total = 0;
   unsigned int i = 0;
-  for (i = 0; i<= this->bins_.size() - 1; i++) {
+  for (i = 0; i <= this->bins_.size() - 1; i++) {
     total += (unsigned int)atomic_read32(&(this->bins_[i]));
   }
   // now we found the index of the element we want
-  unsigned long int index = total * n;
+  uint64_t index = total * n;
   float normalized_index = 0.0;
   // now we iterate through all the bins (excluding the overflow)
-  for (i = 1; 1 <= this->bins_.size() - 1; i++ ) {
+  for (i = 1; 1 <= this->bins_.size() - 1; i++) {
     unsigned int bin_value = (unsigned int)atomic_read32(&(this->bins_[i]));
     if (index <= bin_value) {
-      normalized_index = (float)index / bin_value;
+      normalized_index = static_cast<float>(index) / bin_value;
       break;
     }
     index -= bin_value;
@@ -247,7 +247,8 @@ std::string Log2Histogram::ToString() {
   result_string += buffer;
   memset(buffer, 0, sizeof(buffer));
 
-  float qs[15] = {.1, .2, .25, .3, .4, .5, .6, .7, .75, .8, .9, .95, .99, .995, .999};
+  float qs[15] = {.1,  .2, .25, .3,  .4,  .5,   .6,  .7,
+                  .75, .8, .9,  .95, .99, .995, .999};
   snprintf(buffer, kBufSize,
            "\n\nQuantiles\n"
            "q,%0.2f,%d\n"
