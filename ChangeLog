@@ -1,5 +1,7 @@
 2.7.2:
-  * [gw] Fix lease acquisiton on non-existing paths (CVM-1696)
+  * [gw] use watchdog in cvmfs_receiver (CVM-1864)
+  * [gw] build debug version of cvmfs_receiver (CVM-1863)
+  * [gw] fix lease acquisiton on non-existing paths (CVM-1696)
   * Optimize loading of nested catalogs (CVM-1848)
   * Fix creation of nested catalogs by ingestion command (CVM-1862)
   * [gw] fix/relax JSON parsing of success status message
