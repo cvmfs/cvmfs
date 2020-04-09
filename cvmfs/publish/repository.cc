@@ -180,20 +180,27 @@ void Repository::DownloadRootObjects(
   std::string tags_path;
   FILE *tags_fd =
     CreateTempFile(tmp_dir + "/tags", kPrivateFileMode, "w", &tags_path);
-  std::string tags_url = url + "/data/" + manifest_->history().MakePath();
-  shash::Any tags_hash(manifest_->history());
-  download::JobInfo download_tags(
-       &tags_url,
-       true /* compressed */,
-       true /* probe hosts */,
-       tags_fd,
-       &tags_hash);
-  rv_dl = download_mgr_->Fetch(&download_tags);
-  fclose(tags_fd);
-  if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");
-  delete history_;
-  history_ = history::SqliteHistory::OpenWritable(tags_path);
-  if (history_ == NULL) throw EPublish("cannot open tag database");
+  if (!manifest_->history().IsNull()) {
+    std::string tags_url = url + "/data/" + manifest_->history().MakePath();
+    shash::Any tags_hash(manifest_->history());
+    download::JobInfo download_tags(
+         &tags_url,
+         true /* compressed */,
+         true /* probe hosts */,
+         tags_fd,
+         &tags_hash);
+    rv_dl = download_mgr_->Fetch(&download_tags);
+    fclose(tags_fd);
+    if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");
+    delete history_;
+    history_ = history::SqliteHistory::OpenWritable(tags_path);
+    if (history_ == NULL) throw EPublish("cannot open tag database");
+  } else {
+    fclose(tags_fd);
+    delete history_;
+    history_ = history::SqliteHistory::Create(tags_path, fqrn);
+    if (history_ == NULL) throw EPublish("cannot create tag database");
+  }
   history_->TakeDatabaseFileOwnership();
 
   if (!manifest_->meta_info().IsNull()) {
