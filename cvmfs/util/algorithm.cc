@@ -105,6 +105,33 @@ std::vector<atomic_int32> UTLog2Histogram::GetBins(const Log2Histogram &h) {
   return h.bins_;
 }
 
+unsigned int Log2Histogram::q(float n) {
+  // we start by counting all the elements of the array, we include the overflow
+  unsigned long int total = 0;
+  unsigned int i = 0;
+  for (i = 0; i<= this->bins_.size() - 1; i++) {
+    total += (unsigned int)atomic_read32(&(this->bins_[i]));
+  }
+  // now we found the index of the element we want
+  unsigned long int index = total * n;
+  float normalized_index = 0.0;
+  // now we iterate through all the bins (excluding the overflow)
+  for (i = 1; 1 <= this->bins_.size() - 1; i++ ) {
+    unsigned int bin_value = (unsigned int)atomic_read32(&(this->bins_[i]));
+    if (index <= bin_value) {
+      normalized_index = (float)index / bin_value;
+      break;
+    }
+    index -= bin_value;
+  }
+  // now i store the index of the bin we want
+  // and normal_index is the element we want inside the bin
+  unsigned int min_value = this->boundary_values_[i - 1];
+  unsigned int max_value = this->boundary_values_[i];
+  // and we return the linear interpolation
+  return min_value + ((max_value - min_value) * normalized_index);
+}
+
 std::string Log2Histogram::ToString() {
   unsigned int i = 0;
 
@@ -166,7 +193,7 @@ std::string Log2Histogram::ToString() {
 
   std::string result_string = "";
 
-  const unsigned int kBufSize = 200;
+  const unsigned int kBufSize = 300;
   char buffer[kBufSize];
   memset(buffer, 0, sizeof(buffer));
 
@@ -217,6 +244,30 @@ std::string Log2Histogram::ToString() {
           total_format.c_str(),
           "total",
           total_sum_of_bins);
+  result_string += buffer;
+  memset(buffer, 0, sizeof(buffer));
+
+  float qs[15] = {.1, .2, .25, .3, .4, .5, .6, .7, .75, .8, .9, .95, .99, .995, .999};
+  snprintf(buffer, kBufSize,
+           "\n\nQuantiles\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "q,%0.2f,%d\n"
+           "End Quantiles"
+           "\n-----------------------\n",
+           qs[0], q(qs[0]), qs[1], q(qs[1]), qs[2], q(qs[2]), qs[3], q(qs[3]),
+           qs[4], q(qs[4]), qs[5], q(qs[5]), qs[6], q(qs[6]), qs[7], q(qs[7]),
+           qs[8], q(qs[8]), qs[9], q(qs[9]), qs[10], q(qs[10]), qs[11],
+           q(qs[11]));
   result_string += buffer;
   memset(buffer, 0, sizeof(buffer));
 

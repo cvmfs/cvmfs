@@ -1847,3 +1847,28 @@ TEST(Log2Histogram, 3Bins) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
   }
 }
+
+TEST(Log2Histogram, Quantiles) {
+  int N = 16;
+  long unsigned max = 1 << N;
+  // this start to fail with tollerance ~0.001
+  // we add a safe factor of 50
+  float tollerance = 0.05;
+  Log2Histogram log2hist(N + 1);
+  // so we can store values up to 2^N
+  Prng rng = Prng();
+  rng.InitLocaltime();
+
+  // we are oversampling to test the quantiles
+  long int i = 1 << (N + 4);
+  for (; i >= 0; i--) {
+    log2hist.Add(rng.Next(max));
+  }
+  float qs[12] = {0.15, 0.20, 0.3, 0.5, 0.75, 0.9, 0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999};
+  for (int i = 0; i < 12; i++) {
+    double expected = max * qs[i];
+    double max_difference = expected * tollerance;
+    unsigned int q = log2hist.q(qs[i]);
+    EXPECT_NEAR(q, expected, max_difference);
+  }
+}
