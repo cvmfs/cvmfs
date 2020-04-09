@@ -7,9 +7,14 @@
 #include "cvmfs_config.h"
 
 #include "../logging.h"
+#include "../monitor.h"
 #include "../swissknife.h"
+#include "../util/posix.h"
+#include "../util/string.h"
 
 #include "reactor.h"
+
+static const char *kDefaultReceiverLogDir = "/var/log/cvmfs_receiver/";
 
 swissknife::ParameterList MakeParameterList() {
   swissknife::ParameterList params;
@@ -17,6 +22,10 @@ swissknife::ParameterList MakeParameterList() {
       swissknife::Parameter::Optional('i', "File descriptor to use for input"));
   params.push_back(swissknife::Parameter::Optional(
       'o', "File descriptor to use for output"));
+  params.push_back(swissknife::Parameter::Optional(
+      'w', "Watchdog stacktrace output dir, "
+           "use without parameter to disable watchdog. "
+           "Default: " + std::string(kDefaultReceiverLogDir)));
   return params;
 }
 
@@ -81,11 +90,34 @@ int main(int argc, char** argv) {
 
   int fdin = 0;
   int fdout = 1;
+  std::string watchdog_out_dir = kDefaultReceiverLogDir;
   if (arguments.find('i') != arguments.end()) {
     fdin = std::atoi(arguments.find('i')->second->c_str());
   }
   if (arguments.find('o') != arguments.end()) {
     fdout = std::atoi(arguments.find('o')->second->c_str());
+  }
+  if (arguments.find('w') != arguments.end()) {
+    watchdog_out_dir = *arguments.find('w')->second;
+  }
+
+  // Spawn monitoring process (watchdog)
+  Watchdog *watchdog = NULL;
+  if (watchdog_out_dir != "") {
+    if (!MkdirDeep(watchdog_out_dir, 0755)) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
+               "Failed to create stacktrace directory: %s",
+               watchdog_out_dir.c_str());
+      return 1;
+    }
+    std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
+    watchdog = Watchdog::Create(watchdog_out_dir + "/stacktrace." + timestamp);
+    if (watchdog == NULL) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
+               "Failed to initialize watchdog");
+      return 1;
+    }
+    watchdog->Spawn();
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver started");
@@ -95,10 +127,12 @@ int main(int argc, char** argv) {
   if (!reactor.Run()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error running CVMFS Receiver event loop");
+    delete watchdog;
     return 1;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver finished");
 
+  delete watchdog;
   return 0;
 }
