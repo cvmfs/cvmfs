@@ -1,4 +1,5 @@
 2.7.2:
+  * Fix packaging for Fedora 31
   * [gw] use watchdog in cvmfs_receiver (CVM-1864)
   * [gw] build debug version of cvmfs_receiver (CVM-1863)
   * [gw] fix lease acquisiton on non-existing paths (CVM-1696)
