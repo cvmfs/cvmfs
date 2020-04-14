@@ -1851,11 +1851,12 @@ TEST(Log2Histogram, 3Bins) {
 TEST(Log2Histogram, Quantiles) {
   int N = 16;
   int64_t max = 1 << N;
-  // this start to fail with tollerance ~0.001
-  // we add a safe factor of 50
-  float tollerance = 0.05;
   Log2Histogram log2hist(N + 1);
-  // so we can store values up to 2^N
+
+  // the quantile computation to fail with tolerance ~0.001 (~0.1%) we add a
+  // safety factor of 50 (~5%)
+  float tolerance = 0.05;
+
   Prng rng = Prng();
   rng.InitLocaltime();
 
@@ -1868,8 +1869,8 @@ TEST(Log2Histogram, Quantiles) {
                   0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999};
   for (int i = 0; i < 12; i++) {
     double expected = max * qs[i];
-    double max_difference = expected * tollerance;
-    unsigned int q = log2hist.q(qs[i]);
+    double max_difference = expected * tolerance;
+    unsigned int q = log2hist.GetQuantile(qs[i]);
     EXPECT_NEAR(q, expected, max_difference);
   }
 }

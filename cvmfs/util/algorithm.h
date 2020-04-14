@@ -142,9 +142,21 @@ friend class UTLog2Histogram;
   }
 
   /**
+   * Returns the total number of elements in the histogram
+   */
+  inline uint64_t N() {
+    uint64_t n = 0;
+    unsigned int i;
+    for (i = 0; i <= this->bins_.size() - 1; i++) {
+      n += (unsigned int)atomic_read32(&(this->bins_[i]));
+    }
+    return n;
+  }
+
+  /**
    * compute the quantile of order n
    */
-  unsigned int q(float n);
+  unsigned int GetQuantile(float n);
 
   std::string ToString();
 
