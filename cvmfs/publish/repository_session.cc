@@ -186,7 +186,8 @@ Publisher::Session *Publisher::Session::Create(
 
   Settings settings_session;
   settings_session.service_endpoint = settings_publisher.storage().endpoint();
-  settings_session.lease_path = settings_publisher.transaction().lease_path();
+  settings_session.repo_path = settings_publisher.fqrn() + "/" +
+                               settings_publisher.transaction().lease_path();
   settings_session.gw_key_path = settings_publisher.keychain().gw_key_path();
   settings_session.token_path =
     settings_publisher.transaction().spool_area().gw_session_token();
@@ -202,7 +203,7 @@ void Publisher::Session::Acquire() {
                    EPublish::kFailGatewayKey);
   }
   CurlBuffer buffer;
-  MakeAcquireRequest(gw_key, settings_.lease_path, settings_.service_endpoint,
+  MakeAcquireRequest(gw_key, settings_.repo_path, settings_.service_endpoint,
                      settings_.llvl, &buffer);
 
   std::string session_token;

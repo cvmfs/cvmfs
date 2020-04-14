@@ -49,7 +49,12 @@ int CmdTransaction::Main(const Options &options) {
   if (fs_info.type == kFsTypeAutofs)
     throw EPublish("Autofs on /cvmfs has to be disabled");
 
-
+  settings.GetTransaction()->SetLeasePath(lease_path);
+  // TODO(jblomer): clarify lifetime of the session object
+  UniquePtr<Publisher::Session> session;
+  if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
+    session = Publisher::Session::Create(settings);
+  }
   Publisher publisher(settings);
   if (publisher.whitelist()->IsExpired()) {
     throw EPublish("Repository whitelist for $name is expired");
@@ -83,11 +88,6 @@ int CmdTransaction::Main(const Options &options) {
     }
   }
 
-  // TODO(jblomer): clarify lifetime of the session object
-  UniquePtr<Publisher::Session> session;
-  if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
-    session = Publisher::Session::Create(settings);
-  }
   publisher.managed_node()->Open();
 
   rvi = CallServerHook("transaction_after_hook", fqrn);

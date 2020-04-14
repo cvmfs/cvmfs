@@ -192,7 +192,10 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
     struct Settings {
       Settings() : llvl(0) {}
       std::string service_endpoint;
-      std::string lease_path;
+      /**
+       * $fqrn/$lease_path
+       */
+      std::string repo_path;
       std::string gw_key_path;
       std::string token_path;
       int llvl;

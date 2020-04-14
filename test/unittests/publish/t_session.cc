@@ -29,7 +29,7 @@ TEST_F(T_Session, Acquire) {
   ASSERT_TRUE(SafeWriteToFile("plain_text id secret", "gw_key", 0600));
   Publisher::Session::Settings settings;
   settings.service_endpoint = "http://localhost:4999/api/v1";
-  settings.lease_path = "/lease_path";
+  settings.repo_path = "test.cvmfs.io/lease_path";
   settings.gw_key_path = "gw_key_not_available";
   settings.token_path = "token";
   settings.llvl = kLogNone;

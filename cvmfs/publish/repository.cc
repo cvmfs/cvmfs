@@ -597,6 +597,9 @@ Publisher::Publisher(const SettingsPublisher &settings)
     settings_.storage().GetLocator(),
     settings_.transaction().hash_algorithm(),
     settings_.transaction().compression_algorithm());
+  sd.session_token_file =
+    settings_.transaction().spool_area().gw_session_token();
+  sd.key_file = settings_.keychain().gw_key_path();
   spooler_ = upload::Spooler::Construct(sd);
   if (spooler_ == NULL) throw EPublish("could not initialize spooler");
 
