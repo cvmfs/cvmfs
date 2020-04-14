@@ -748,9 +748,11 @@ create_empty_repo() {
 
   create_repo $repo $uid $debug_log "$@" || return 101
 
-  sudo cvmfs_server transaction $repo || return 102
-  rm -f /cvmfs/$repo/new_repository
-  sudo cvmfs_server publish $repo || return 103
+  if [ -f /cvmfs/$repo/new_repository ]; then
+    sudo cvmfs_server transaction $repo || return 102
+    rm -f /cvmfs/$repo/new_repository
+    sudo cvmfs_server publish $repo || return 103
+  fi
 }
 
 

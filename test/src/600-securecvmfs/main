@@ -239,6 +239,10 @@ cvmfs_run_test() {
   echo "Make sure we don't lock out ourselves when publishing"
   echo "CVMFS_AUTHZ_HELPER=/usr/libexec/cvmfs/authz/cvmfs_allow_helper" | \
     sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
+  cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO
+  cvmfs_suid_helper rw_mount $CVMFS_TEST_REPO
 
   echo "gather information about the just created repo"
   load_repo_config $CVMFS_TEST_REPO
