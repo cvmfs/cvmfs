@@ -27,10 +27,7 @@ void Publisher::ManagedNode::Lock() {
   AlterMountpoint(kAlterUnionLock, kLogSyslog);
 }
 
-int Publisher::ManagedNode::Check(
-  ERepairMode repair_mode,
-  bool is_quiet)
-{
+int Publisher::ManagedNode::Check(bool is_quiet) {
   const std::string rdonly_mnt =
     publisher_->settings_.transaction().spool_area().readonly_mnt();
   const std::string union_mnt =
@@ -38,6 +35,8 @@ int Publisher::ManagedNode::Check(
   const std::string publishing_lock =
     publisher_->settings_.transaction().spool_area().publishing_lock();
   const std::string fqrn = publisher_->settings_.fqrn();
+  EUnionMountRepairMode repair_mode =
+    publisher_->settings_.transaction().spool_area().repair_mode();
 
   int result = kFailOk;
 
@@ -126,11 +125,11 @@ int Publisher::ManagedNode::Check(
   bool is_publishing =
     ServerLockFile::IsLocked(publishing_lock, false /* ignore_stale */);
   switch (repair_mode) {
-    case kRepairNever:
+    case kUnionMountRepairNever:
       return result;
-    case kRepairAlways:
+    case kUnionMountRepairAlways:
       break;
-    case kRepairSafe:
+    case kUnionMountRepairSafe:
       if (is_publishing) {
         LogCvmfs(kLogCvmfs, logFlags,
           "WARNING: The repository %s is currently publishing and should not\n"

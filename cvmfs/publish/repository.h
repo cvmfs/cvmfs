@@ -136,16 +136,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   class ManagedNode {
    public:
     /**
-     * Steers the aggressiveness of CheckHealth()
-     */
-    enum ERepairMode {
-      kRepairNever = 0,
-      kRepairSafe,
-      kRepairAlways
-    };
-
-    /**
-     * Collection of publisher failure states (see CheckHealth)
+     * Collection of publisher failure states (see Check())
      */
     enum EFailures {
       kFailOk                   = 0,
@@ -162,7 +153,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      * Verifies the mountpoints and the transaction status. Returns a bit map
      * of EFailures codes.
      */
-    int Check(ERepairMode repair_mode, bool is_quiet = false);
+    int Check(bool is_quiet = false);
     /**
      * Re-mount /cvmfs/$fqrn read-writable
      */

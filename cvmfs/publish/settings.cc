@@ -30,9 +30,12 @@ void SettingsSpoolArea::SetSpoolArea(const std::string &path) {
   tmp_dir_ = workspace_() + "/tmp";
 }
 
-
 void SettingsSpoolArea::SetUnionMount(const std::string &path) {
   union_mnt_ = path;
+}
+
+void SettingsSpoolArea::SetRepairMode(const EUnionMountRepairMode val) {
+  repair_mode_ = val;
 }
 
 
@@ -333,6 +336,14 @@ SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
   settings_publisher.SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
   settings_publisher.GetStorage()->SetLocator(
     options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
+
+  std::string arg;
+  if (options_mgr_->GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
+    if (!options_mgr_->IsOn(arg)) {
+      settings_publisher.GetTransaction()->GetSpoolArea()->SetRepairMode(
+        kUnionMountRepairNever);
+    }
+  }
 
   // TODO(jblomer): process other parameters
 

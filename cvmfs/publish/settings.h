@@ -61,6 +61,16 @@ class Setting {
 };  // Setting
 
 
+/**
+ * Steers the aggressiveness of Publisher::ManagedNode::Check()
+ */
+enum EUnionMountRepairMode {
+  kUnionMountRepairNever = 0,
+  kUnionMountRepairSafe,
+  kUnionMountRepairAlways
+};
+
+
 // Settings from the point of construction always represent a valid
 // configuration. The constructor sets default values, which can be overwritten
 // by setters. The setters throw errors when invalid options are detected.
@@ -71,11 +81,13 @@ class SettingsSpoolArea {
     : workspace_(std::string("/var/spool/cvmfs/") + fqrn)
     , tmp_dir_(workspace_() + "/tmp")
     , union_mnt_(std::string("/cvmfs/") + fqrn)
+    , repair_mode_(kUnionMountRepairSafe)
   { }
 
   void UseSystemTempDir();
   void SetSpoolArea(const std::string &path);
   void SetUnionMount(const std::string &path);
+  void SetRepairMode(const EUnionMountRepairMode val);
 
   std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
@@ -97,11 +109,16 @@ class SettingsSpoolArea {
   std::string publishing_lock() const {
     return workspace_() + "/is_publishing.lock";
   }
+  EUnionMountRepairMode repair_mode() const { return repair_mode_; }
 
  private:
   Setting<std::string> workspace_;
   Setting<std::string> tmp_dir_;
   Setting<std::string> union_mnt_;
+  /**
+   * How aggresively should the mount point stack be repaired
+   */
+  Setting<EUnionMountRepairMode> repair_mode_;
 };  // SettingsSpoolArea
 
 
