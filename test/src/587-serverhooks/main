@@ -106,8 +106,8 @@ EOF
 
   echo "check the generic source sentinel"
   local user_string="$(id -u $CVMFS_TEST_USER) ($(id -un $CVMFS_TEST_USER))"
-  [ -f ${hook_dir}/sourced ]                                         || return 5
-  [ $(cat ${hook_dir}/sourced | grep "$user_string" | wc -l) -eq 3 ] || return 6
+  [ -f ${hook_dir}/sourced ]                      || return 5
+  cat ${hook_dir}/sourced | grep "$user_string"   || return 6
 
   echo "check the transaction hooks"
   [ -f ${hook_dir}/transaction_before_hook ] && \
@@ -171,8 +171,8 @@ EOF
   # ============================================================================
 
   echo "check the generic source sentinel"
-  [ -f ${hook_dir}/sourced ]                                         || return 20
-  [ $(cat ${hook_dir}/sourced | grep "$user_string" | wc -l) -eq 3 ] || return 21
+  [ -f ${hook_dir}/sourced ]                     || return 20
+  cat ${hook_dir}/sourced | grep "$user_string"  || return 21
 
   echo "check the transaction hooks"
   [ -f ${hook_dir}/transaction_before_hook ] && \
@@ -246,8 +246,8 @@ EOF
   # ============================================================================
 
   echo "check the generic source sentinel"
-  [ -f ${hook_dir}/sourced ]                                         || return 40
-  [ $(cat ${hook_dir}/sourced | grep "$user_string" | wc -l) -eq 3 ] || return 41
+  [ -f ${hook_dir}/sourced ]                      || return 40
+  cat ${hook_dir}/sourced | grep "$user_string"   || return 41
 
   echo "check the transaction hooks"
   [ -f ${hook_dir}/transaction_before_hook ] && \
