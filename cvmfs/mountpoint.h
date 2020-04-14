@@ -416,7 +416,7 @@ class MountPoint : SingleCopy, public BootFactory {
   }
   cvmfs::Fetcher *fetcher() { return fetcher_; }
   bool fixed_catalog() { return fixed_catalog_; }
-  std::string fqrn() { return fqrn_; }
+  std::string fqrn() const { return fqrn_; }
   cvmfs::Fetcher *external_fetcher() { return external_fetcher_; }
   FileSystem *file_system() { return file_system_; }
   bool has_membership_req() { return has_membership_req_; }

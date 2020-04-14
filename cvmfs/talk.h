@@ -15,6 +15,7 @@
 namespace download {
 class DownloadManager;
 }
+class FileSystem;
 class FuseRemounter;
 class MountPoint;
 class OptionsManager;
@@ -47,6 +48,8 @@ class TalkManager : SingleCopy {
   void AnswerStringList(int con_fd, const std::vector<std::string> &list);
   std::string FormatHostInfo(download::DownloadManager *download_mgr);
   std::string FormatProxyInfo(download::DownloadManager *download_mgr);
+  std::string FormatLatencies(const MountPoint &mount_point,
+                              FileSystem *file_system);
 
   std::string socket_path_;
   int socket_fd_;
