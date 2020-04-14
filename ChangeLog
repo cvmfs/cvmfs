@@ -4,7 +4,6 @@
   * Maintain publish statistics on gateway (CVM-1806)
   * Add CVMFS_STATS_DB_DAYS_TO_KEEP parameter to prune publish statistics
     database, defaults to 356 days (CVM-1841) 
-  * Fix packaging for Fedora 31
   * [client] Add catalog_counters extended attribute (CVM-1824)
   * [server] Add CVMFS_UPLOAD_STATS_PLOTS parameter to automatically generate
     and upload publish statistics plots; requires ROOT (CVM-1836)
@@ -22,6 +21,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.2:
+  * Fix packaging for Fedora 31
   * [gw] use watchdog in cvmfs_receiver (CVM-1864)
   * [gw] build debug version of cvmfs_receiver (CVM-1863)
   * [gw] fix lease acquisiton on non-existing paths (CVM-1696)

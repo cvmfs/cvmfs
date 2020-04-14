@@ -603,7 +603,7 @@ fi
 %endif
 
 %changelog
-* Tue Mar 17 2020 Jan Priessnitz <jan.priessnitz@cern.ch> - 2.8.0
+* Tue Apr 14 2020 Jan Priessnitz <jan.priessnitz@cern.ch> - 2.7.2
 - Fix python2-devel dependency for Fedora >=31
 - Change to /usr/bin/hardlink for Fedora >=31
 * Thu Oct 03 2019 Jakob Blomer <jblomer@cern.ch> - 2.7.0
