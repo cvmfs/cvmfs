@@ -672,8 +672,23 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
   const unsigned int bufSize = 300;
   char buffer[bufSize];
 
-  vector<float> qs{.1,  .2, .25, .3,  .4,  .5,   .6,   .7,
-                   .75, .8, .9,  .95, .99, .995, .999, 0.9999};
+  vector<float> qs;
+  qs.push_back(.1);
+  qs.push_back(.2);
+  qs.push_back(.25);
+  qs.push_back(.3);
+  qs.push_back(.4);
+  qs.push_back(.5);
+  qs.push_back(.6);
+  qs.push_back(.7);
+  qs.push_back(.75);
+  qs.push_back(.8);
+  qs.push_back(.9);
+  qs.push_back(.95);
+  qs.push_back(.99);
+  qs.push_back(.999);
+  qs.push_back(.9999);
+
   string repo(mount_point.fqrn());
 
   unsigned int format_index =
