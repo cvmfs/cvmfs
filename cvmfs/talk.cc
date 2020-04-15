@@ -709,8 +709,6 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
   names.push_back("lookup");
   hist.push_back(file_system->hist_fs_forget());
   names.push_back("forget");
-  hist.push_back(file_system->hist_fs_forget_multi());
-  names.push_back("forget_multi");
   hist.push_back(file_system->hist_fs_getattr());
   names.push_back("getattr");
   hist.push_back(file_system->hist_fs_readlink());
