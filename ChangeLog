@@ -21,6 +21,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.2:
+  * Minor improvements to geo db command line interface (CVM-1850, CVM-1851)
   * Reduce minimum and maximum days for geo db update
   * Fix packaging for Fedora 31
   * [gw] use watchdog in cvmfs_receiver (CVM-1864)

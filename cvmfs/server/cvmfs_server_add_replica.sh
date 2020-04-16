@@ -122,16 +122,21 @@ cvmfs_server_add_replica() {
   check_user $cvmfs_user || die "No user $cvmfs_user"
   check_upstream_validity $upstream
   if is_local_upstream $upstream; then
+    _update_geodb -l
     if [ $silence_httpd_warning -eq 0 ]; then
       check_apache || die "Apache must be installed and running"
       check_wsgi_module
       if [ x"$cvmfs_user" != x"root" ]; then
         echo "NOTE: If snapshot is not run regularly as root, the GeoIP database will not be updated."
-        echo "      You have three options:"
-        echo "      1. chown -R $CVMFS_UPDATEGEO_DIR accordingly OR"
-        echo "      2. run update-geodb monthly as root OR"
-        echo "      3. chown -R $CVMFS_UPDATEGEO_DIR to a dedicated"
-        echo "         user ID and run update-geodb monthly as that user"
+        echo "  You have some options:"
+        echo "    1. chown -R $CVMFS_UPDATEGEO_DIR accordingly"
+        echo "    2. Run update-geodb from cron as root"
+        echo "    3. chown -R $CVMFS_UPDATEGEO_DIR to a dedicated"
+        echo "       user ID and run update-geodb monthly as that user"
+        echo "    4. Use another update tool such as Maxmind's geoipupdate and"
+        echo "       set CVMFS_GEO_DB_FILE to point to the downloaded file"
+        echo "    5. Disable the geo api with CVMFS_GEO_DB_FILE=none"
+        echo "  See 'Geo API Setup' in the cvmfs documentation for more info."
       fi
     else
       check_apache || echo "Warning: Apache is needed to access this CVMFS replication"
@@ -170,7 +175,6 @@ EOF
   echo "done"
 
   if is_local_upstream $upstream; then
-    _update_geodb -l
     create_global_info_skeleton
 
     echo -n "Create CernVM-FS Storage... "
