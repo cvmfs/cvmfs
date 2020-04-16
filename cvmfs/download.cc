@@ -2025,40 +2025,41 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
  */
 void DownloadManager::SwitchHost(JobInfo *info) {
   MutexLockGuard m(lock_options_);
-  bool do_switch = true;
 
   if (!opt_host_chain_ || (opt_host_chain_->size() == 1)) {
     return;
   }
 
-  if (info) {
-    if (info->current_host_chain_index != opt_host_chain_current_) {
-      do_switch = false;
-      LogCvmfs(kLogDownload, kLogDebug,
-               "don't switch host, "
-               "last used host: %s, current host: %s",
-               (*opt_host_chain_)[info->current_host_chain_index].c_str(),
-               (*opt_host_chain_)[opt_host_chain_current_].c_str());
-    }
+  if (info && (info->current_host_chain_index != opt_host_chain_current_)) {
+    LogCvmfs(kLogDownload, kLogDebug,
+             "don't switch host, "
+             "last used host: %s, current host: %s",
+             (*opt_host_chain_)[info->current_host_chain_index].c_str(),
+             (*opt_host_chain_)[opt_host_chain_current_].c_str());
+    return;
   }
 
-  if (do_switch) {
-    string old_host = (*opt_host_chain_)[opt_host_chain_current_];
-    opt_host_chain_current_ =
-        (opt_host_chain_current_ + 1) % opt_host_chain_->size();
-    perf::Inc(counters_->n_host_failover);
-    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-             "switching host from %s to %s", old_host.c_str(),
-             (*opt_host_chain_)[opt_host_chain_current_].c_str());
+  string reason = "manually triggered";
+  if (info) {
+    reason = download::Code2Ascii(info->error_code);
+  }
 
-    // Remeber the timestamp of switching to backup host
-    if (opt_host_reset_after_ > 0) {
-      if (opt_host_chain_current_ != 0) {
-        if (opt_timestamp_backup_host_ == 0)
-          opt_timestamp_backup_host_ = time(NULL);
-      } else {
-        opt_timestamp_backup_host_ = 0;
-      }
+  string old_host = (*opt_host_chain_)[opt_host_chain_current_];
+  opt_host_chain_current_ =
+      (opt_host_chain_current_ + 1) % opt_host_chain_->size();
+  perf::Inc(counters_->n_host_failover);
+  LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+           "switching host from %s to %s (%s)", old_host.c_str(),
+           (*opt_host_chain_)[opt_host_chain_current_].c_str(),
+           reason.c_str());
+
+  // Remeber the timestamp of switching to backup host
+  if (opt_host_reset_after_ > 0) {
+    if (opt_host_chain_current_ != 0) {
+      if (opt_timestamp_backup_host_ == 0)
+        opt_timestamp_backup_host_ = time(NULL);
+    } else {
+      opt_timestamp_backup_host_ = 0;
     }
   }
 }
