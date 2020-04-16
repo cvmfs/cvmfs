@@ -122,6 +122,7 @@ cvmfs_server_add_replica() {
   check_user $cvmfs_user || die "No user $cvmfs_user"
   check_upstream_validity $upstream
   if is_local_upstream $upstream; then
+    _update_geodb -l
     if [ $silence_httpd_warning -eq 0 ]; then
       check_apache || die "Apache must be installed and running"
       check_wsgi_module
@@ -170,7 +171,6 @@ EOF
   echo "done"
 
   if is_local_upstream $upstream; then
-    _update_geodb -l
     create_global_info_skeleton
 
     echo -n "Create CernVM-FS Storage... "
