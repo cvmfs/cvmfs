@@ -45,7 +45,7 @@ run_transactions() {
 
     echo "Checking transaction + publish"
 
-    ## Transaction 1 (Modifying existing file and creating a new one)
+    ## Transaction 1 (Modifying existing file and creating files)
 
     echo "  Starting transaction 1"
     cvmfs_server transaction test.repo.org
@@ -237,6 +237,8 @@ run_transactions() {
       echo "Named tag was not created during transaction 9"
       return 1
     fi
+
+    check_repo_integrity test.repo.org || return 1
 
     clean_up
     return 0

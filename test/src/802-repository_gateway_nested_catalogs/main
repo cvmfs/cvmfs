@@ -152,6 +152,8 @@ run_transactions() {
         echo "Nested catalog at /dir2 was successfully created from .cvmfsdirtab"
     fi
 
+    check_repo_integrity test.repo.org
+
     ## Transaction 5
     echo "  Starting transaction 5 (Remove .cvmfsdirtab)"
     cvmfs_server transaction test.repo.org
@@ -180,6 +182,8 @@ run_transactions() {
     else
         echo "Nested catalog at /dir2 was successfully removed"
     fi
+
+    check_repo_integrity test.repo.org || return 1
 
     clean_up
 }
