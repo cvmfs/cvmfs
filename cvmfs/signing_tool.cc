@@ -31,7 +31,7 @@ SigningTool::Result SigningTool::Run(
     const std::string &repo_name, const std::string &pwd,
     const std::string &meta_info, const std::string &reflog_chksum_path,
     const bool garbage_collectable, const bool bootstrap_shortcuts,
-    const bool return_early) {
+    const bool return_early, const std::vector<shash::Any> reflog_catalogs) {
   shash::Any reflog_hash;
   if (reflog_chksum_path != "") {
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
@@ -156,6 +156,19 @@ SigningTool::Result SigningTool::Run(
     if (!metainfo_hash.IsNull()) {
       if (!reflog->AddMetainfo(metainfo_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add meta info to Reflog");
+        return kError;
+      }
+    }
+
+    // Callers of SigningTool may provide a list of additional catalogs that
+    // need to be added to reflog (e. g. for later garbage collection)
+    std::vector<shash::Any>::const_iterator i = reflog_catalogs.begin();
+    std::vector<shash::Any>::const_iterator iend = reflog_catalogs.end();
+    for (; i != iend; ++i) {
+      if (!reflog->AddCatalog(*i)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Failed to add additional catalog %s to Reflog",
+                 (*i).ToString().c_str());
         return kError;
       }
     }
