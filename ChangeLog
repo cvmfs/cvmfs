@@ -1,4 +1,5 @@
 2.7.2:
+  * Add `cvmfs_talk latency` command
   * Improve logging when switching hosts (CVM-1844)
   * Minor improvements to geo db command line interface (CVM-1850, CVM-1851)
   * Reduce minimum and maximum days for geo db update
