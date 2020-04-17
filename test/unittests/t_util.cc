@@ -1847,3 +1847,30 @@ TEST(Log2Histogram, 3Bins) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
   }
 }
+
+TEST(Log2Histogram, Quantiles) {
+  int N = 16;
+  int64_t max = 1 << N;
+  Log2Histogram log2hist(N + 1);
+
+  // the quantile computation to fail with tolerance ~0.001 (~0.1%) we add a
+  // safety factor of 50 (~5%)
+  float tolerance = 0.05;
+
+  Prng rng = Prng();
+  rng.InitLocaltime();
+
+  // we are oversampling to test the quantiles
+  int64_t i = 1 << (N + 4);
+  for (; i >= 0; i--) {
+    log2hist.Add(rng.Next(max));
+  }
+  float qs[12] = {0.15, 0.20, 0.3,   0.5,   0.75,   0.9,
+                  0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999};
+  for (int i = 0; i < 12; i++) {
+    double expected = max * qs[i];
+    double max_difference = expected * tolerance;
+    unsigned int q = log2hist.GetQuantile(qs[i]);
+    EXPECT_NEAR(q, expected, max_difference);
+  }
+}
