@@ -83,8 +83,14 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 		return
 	}
 	defer os.RemoveAll(tmpDir)
-	inputImage, err := ParseImage(wish.InputName)
-	inputImage.User = wish.UserInput
+	inputImage := wish.InputImage
+	if inputImage == nil {
+		err = fmt.Errorf("error in parsing the input image, got a null image")
+		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
+			Error("Null image, should not happen")
+		return
+	}
+
 	expandedImgTag, err := inputImage.ExpandWildcard()
 	if err != nil {
 		LogE(err).WithFields(log.Fields{
@@ -191,16 +197,21 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 			"Impossible to create subcatalog in super-directory.")
 	}
 
-	outputImage, err := ParseImage(wish.OutputName)
-	outputImage.User = wish.UserOutput
-	if err != nil {
+	outputImage := wish.OutputImage
+	if outputImage == nil {
+		err = fmt.Errorf("error in parsing the output image, got a null image")
+		LogE(err).WithFields(log.Fields{"output image": wish.OutputName}).
+			Error("Null image, should not happen")
 		return
 	}
-	inputImage, err := ParseImage(wish.InputName)
-	inputImage.User = wish.UserInput
-	if err != nil {
+	inputImage := wish.InputImage
+	if inputImage == nil {
+		err = fmt.Errorf("error in parsing the input image, got a null image")
+		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
+			Error("Null image, should not happen")
 		return
 	}
+
 	var firstError error
 	expandedImgTags, err := inputImage.ExpandWildcard()
 	if err != nil {
@@ -211,7 +222,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	}
 	for _, expandedImgTag := range expandedImgTags {
 		tag := expandedImgTag.Tag
-		outputWithTag := outputImage
+		outputWithTag := *outputImage
 		if inputImage.TagWildcard {
 			outputWithTag.Tag = tag
 		} else {

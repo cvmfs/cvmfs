@@ -39,24 +39,22 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 		return recipe, err
 	}
 	for _, inputImage := range recipeYamlV1.Input {
-		input, err := ParseImage(inputImage)
-		if err != nil {
-			LogE(err).WithFields(log.Fields{"image": inputImage}).Warning("Impossible to parse the image")
-			continue
-		}
-		output := formatOutputImage(recipeYamlV1.OutputFormat, input)
-		wish, err := CreateWish(inputImage, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
-		if err != nil {
-			LogE(err).Warning("Error in creating the wish")
-			continue
-		} else {
-			Log().Info("Pushed image")
-			wg.Add(1)
-			go func(wish WishFriendly) {
-				defer wg.Done()
+		wg.Add(1)
+		go func(inputImage string) {
+			defer wg.Done()
+			input, err := ParseImage(inputImage)
+			if err != nil {
+				LogE(err).WithFields(log.Fields{"image": inputImage}).Warning("Impossible to parse the image")
+			}
+			output := formatOutputImage(recipeYamlV1.OutputFormat, input)
+			wish, err := CreateWish(inputImage, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
+			if err != nil {
+				LogE(err).Warning("Error in creating the wish")
+			} else {
+				Log().Info("Pushed image")
 				recipe.Wishes <- wish
-			}(wish)
-		}
+			}
+		}(inputImage)
 	}
 	return recipe, nil
 }
