@@ -2,6 +2,7 @@ package lib
 
 import (
 	"strings"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 
@@ -18,17 +19,25 @@ type YamlRecipeV1 struct {
 
 type Recipe struct {
 	Repo   string
-	Wishes []WishFriendly
+	Wishes chan WishFriendly
 }
 
 func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 	recipeYamlV1 := YamlRecipeV1{}
 	err := yaml.Unmarshal(data, &recipeYamlV1)
-	if err != nil {
-		return Recipe{}, err
-	}
 	recipe := Recipe{}
 	recipe.Repo = recipeYamlV1.CVMFSRepo
+	recipe.Wishes = make(chan WishFriendly, 500)
+	var wg sync.WaitGroup
+	defer func() {
+		go func() {
+			wg.Wait()
+			close(recipe.Wishes)
+		}()
+	}()
+	if err != nil {
+		return recipe, err
+	}
 	for _, inputImage := range recipeYamlV1.Input {
 		input, err := ParseImage(inputImage)
 		if err != nil {
@@ -41,7 +50,12 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 			LogE(err).Warning("Error in creating the wish")
 			continue
 		} else {
-			recipe.Wishes = append(recipe.Wishes, wish)
+			Log().Info("Pushed image")
+			wg.Add(1)
+			go func(wish WishFriendly) {
+				defer wg.Done()
+				recipe.Wishes <- wish
+			}(wish)
 		}
 	}
 	return recipe, nil
