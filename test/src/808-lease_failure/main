@@ -48,8 +48,8 @@ run_transactions() {
 
     # Simulating another release manager taking the lease
     echo "  Simulating another node taking a lock on the path we want"
-    cat /var/spool/cvmfs/test.repo.org/session_token
-    cvmfs_swissknife  lease  -u http://localhost:4929/api/v1 -a drop -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/new/c
+    # session token saved in  /var/spool/cvmfs/test.repo.org/session_token
+    cvmfs_swissknife  lease  -u http://localhost:4929/api/v1 -a acquire -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/new/c
     if [ $? -ne 0 ]; then
         echo "Could not acquire lease on directory"
         return 23
@@ -58,8 +58,8 @@ run_transactions() {
     echo "  Checking that the lease is taken and that cvmfs_transaction fails"
     cvmfs_server transaction test.repo.org/new/c
     retcode=$?
-    if [ $retcode ]; then
-        echo "Return code should be 16 EBUSY"
+    if [ $retcode -ne 16 ]; then
+        echo "Return code should be 16 EBUSY instead of ${retcode}"
         return 24
     fi
     clean_up
