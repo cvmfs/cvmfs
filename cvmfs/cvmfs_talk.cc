@@ -202,6 +202,8 @@ static void Usage(const std::string &exe) {
     "  version patchlevel     gets cvmfs patchlevel                    \n"
     "  open catalogs          shows information about currently        \n"
     "                         loaded catalogs (_not_ all cached ones)  \n"
+    "  latency                show the latencies of different fuse     \n"
+    "                         calls (requires CVMFS_INSTRUMENT_FUSE)   \n"
     "\n",
     exe.c_str(), exe.c_str());
 }
