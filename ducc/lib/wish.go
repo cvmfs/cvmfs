@@ -2,6 +2,8 @@ package lib
 
 import (
 	"fmt"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Wish struct {
@@ -12,15 +14,16 @@ type Wish struct {
 }
 
 type WishFriendly struct {
-	Id          int
-	InputName   string
-	OutputName  string
-	CvmfsRepo   string
-	Converted   bool
-	UserInput   string
-	UserOutput  string
-	InputImage  *Image
-	OutputImage *Image
+	Id                int
+	InputName         string
+	OutputName        string
+	CvmfsRepo         string
+	Converted         bool
+	UserInput         string
+	UserOutput        string
+	InputImage        *Image
+	OutputImage       *Image
+	ExpandedTagImages <-chan *Image
 }
 
 func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string) (wish WishFriendly, err error) {
@@ -53,15 +56,25 @@ func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string
 	wish.InputImage.User = wish.UserInput
 	if errI != nil {
 		wish.InputImage = nil
+		err = errI
 		return
 	}
-	iImage.GetManifest()
+	expandedTagImages, errEx := iImage.ExpandWildcard()
+	if errEx != nil {
+		err = errEx
+		LogE(err).WithFields(log.Fields{
+			"input image": inputImage}).
+			Error("Error in retrieving all the tags from the image")
+		return
+	}
+	wish.ExpandedTagImages = expandedTagImages
 
 	oImage, errO := ParseImage(wish.OutputName)
 	wish.OutputImage = &oImage
 	wish.OutputImage.User = wish.UserOutput
 	if errO != nil {
 		wish.OutputImage = nil
+		err = errO
 		return
 	}
 

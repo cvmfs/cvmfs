@@ -222,11 +222,18 @@ func (img *Image) GetTagListUrl() string {
 	return fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository)
 }
 
-func (img *Image) ExpandWildcard() ([]*Image, error) {
-	var result []*Image
+func (img *Image) ExpandWildcard() (<-chan *Image, error) {
+	result := make(chan *Image, 500)
+	var wg sync.WaitGroup
+	defer func() {
+		go func() {
+			wg.Wait()
+			close(result)
+		}()
+	}()
 	if !img.TagWildcard {
 		img.GetManifest()
-		result = append(result, img)
+		result <- img
 		return result, nil
 	}
 	var tagsList struct {
@@ -273,19 +280,16 @@ func (img *Image) ExpandWildcard() ([]*Image, error) {
 		return result, nil
 	}
 	for _, tag := range filteredTags {
-		taggedImg := img
-		taggedImg.Tag = tag
-		result = append(result, taggedImg)
-	}
-	var wg sync.WaitGroup
-	for _, imgNoManifest := range result {
 		wg.Add(1)
-		go func(img *Image) {
-			img.GetManifest()
+		go func(tag string) {
 			defer wg.Done()
-		}(imgNoManifest)
+			taggedImg := *img
+			taggedImg.Tag = tag
+			taggedImg.GetManifest()
+			result <- &taggedImg
+		}(tag)
 	}
-	wg.Wait()
+
 	return result, nil
 }
 

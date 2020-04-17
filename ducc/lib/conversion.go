@@ -83,23 +83,9 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 		return
 	}
 	defer os.RemoveAll(tmpDir)
-	inputImage := wish.InputImage
-	if inputImage == nil {
-		err = fmt.Errorf("error in parsing the input image, got a null image")
-		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
-			Error("Null image, should not happen")
-		return
-	}
 
-	expandedImgTag, err := inputImage.ExpandWildcard()
-	if err != nil {
-		LogE(err).WithFields(log.Fields{
-			"input image": fmt.Sprintf("%s/%s", inputImage.Registry, inputImage.Repository)}).
-			Error("Error in retrieving all the tags from the image")
-		return
-	}
 	var firstError error
-	for _, inputImage := range expandedImgTag {
+	for inputImage := range wish.ExpandedTagImages {
 		// we want to check if we have already ingested the Singularity image
 		// Several cases are possible
 		// Image not ingested, neither pubSymPath nor privatePath are present
@@ -213,14 +199,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	}
 
 	var firstError error
-	expandedImgTags, err := inputImage.ExpandWildcard()
-	if err != nil {
-		LogE(err).WithFields(log.Fields{
-			"input image": fmt.Sprintf("%s/%s", inputImage.Registry, inputImage.Repository)}).
-			Error("Error in retrieving all the tags from the image")
-		return err
-	}
-	for _, expandedImgTag := range expandedImgTags {
+	for expandedImgTag := range wish.ExpandedTagImages {
 		tag := expandedImgTag.Tag
 		outputWithTag := *outputImage
 		if inputImage.TagWildcard {
