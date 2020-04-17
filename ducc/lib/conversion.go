@@ -84,6 +84,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	}
 	defer os.RemoveAll(tmpDir)
 	inputImage, err := ParseImage(wish.InputName)
+	inputImage.User = wish.UserInput
 	expandedImgTag, err := inputImage.ExpandWildcard()
 	if err != nil {
 		LogE(err).WithFields(log.Fields{

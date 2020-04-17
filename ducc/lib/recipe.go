@@ -34,7 +34,7 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 			continue
 		}
 		output := formatOutputImage(recipeYamlV1.OutputFormat, input)
-		wish, err := CreateWish(inputImage, output, recipeYamlV1.CVMFSRepo, "", recipeYamlV1.User)
+		wish, err := CreateWish(inputImage, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
 		if err != nil {
 			LogE(err).Warning("Error in creating the wish")
 			continue

@@ -331,18 +331,36 @@ func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity
 		return
 	}
 	defer os.RemoveAll(singularityTempCache)
-	err = ExecCommand("singularity", "build", "--force", "--fix-perms", "--sandbox", dir, img.GetSingularityLocation()).
+	// we first try to download the image with the credentials
+	// if we fail, we try again without the credentials
+	user := img.User
+	pass, _ := GetPassword()
+	err = ExecCommand("singularity", "build", "--force", "--fix-perms",
+		"--sandbox", dir, img.GetSingularityLocation()).
 		Env("SINGULARITY_CACHEDIR", singularityTempCache).
 		Env("PATH", os.Getenv("PATH")).
-		Env("SINGULARITY_DOCKER_USERNAME", img.User).
-		Env("SINGULARITY_DOCKER_PASSWORD", os.Getenv("DUCC_DOCKER_REGISTRY_PASS")).Start()
-	if err != nil {
-		LogE(err).Error("Error in downloading the singularity image")
-		return
+		Env("SINGULARITY_DOCKER_USERNAME", user).
+		Env("SINGULARITY_DOCKER_PASSWORD", pass).
+		Start()
+	if err == nil {
+		Log().Info("Successfully download the singularity image")
+		return Singularity{Image: &img, TempDirectory: dir}, nil
 	}
+	if user != "" || pass != "" {
+		Log().Info("Detected error in downloading image with credentials, trying without.")
+		err = ExecCommand("singularity", "build", "--force", "--fix-perms",
+			"--sandbox", dir, img.GetSingularityLocation()).
+			Env("SINGULARITY_CACHEDIR", singularityTempCache).
+			Env("PATH", os.Getenv("PATH")).
+			Start()
+		if err == nil {
+			Log().Info("Successfully download the singularity image")
+			return Singularity{Image: &img, TempDirectory: dir}, nil
+		}
+	}
+	LogE(err).Error("Error in downloading the singularity image")
+	return
 
-	Log().Info("Successfully download the singularity image")
-	return Singularity{Image: &img, TempDirectory: dir}, nil
 }
 
 // the one that the user see, without the /cvmfs/$repo.cern.ch prefix
@@ -464,13 +482,24 @@ func firstRequestForAuth(url, user, pass string) (token string, err error) {
 		return "", err
 	}
 	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
+	// we first try to get the token with the authentication
+	// if we fail, and we might since the docker hub might not have our user
+	// we try again without authentication
 	token, err = requestAuthToken(WwwAuthenticate, user, pass)
-	if err != nil {
-		LogE(err).Error("Error in getting the authentication token")
-		return "", err
+	if err == nil {
+		// happy path
+		return token, nil
 	}
-	return token, nil
-
+	// some error, we should retry without auth
+	if user != "" || pass != "" {
+		token, err = requestAuthToken(WwwAuthenticate, "", "")
+		if err == nil {
+			// happy path without auth
+			return token, nil
+		}
+	}
+	LogE(err).Error("Error in getting the authentication token")
+	return "", err
 }
 
 func getLayerUrl(img Image, layer da.Layer) string {
