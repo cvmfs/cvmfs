@@ -17,6 +17,7 @@ type YamlRecipeV1 struct {
 }
 
 type Recipe struct {
+	Repo   string
 	Wishes []WishFriendly
 }
 
@@ -27,6 +28,7 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 		return Recipe{}, err
 	}
 	recipe := Recipe{}
+	recipe.Repo = recipeYamlV1.CVMFSRepo
 	for _, inputImage := range recipeYamlV1.Input {
 		input, err := ParseImage(inputImage)
 		if err != nil {

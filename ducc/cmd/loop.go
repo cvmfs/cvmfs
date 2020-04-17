@@ -63,6 +63,10 @@ var loopCmd = &cobra.Command{
 				lib.Log().Warn("No wishes to convert.")
 				time.Sleep(30 * time.Second)
 			}
+			if !lib.RepositoryExists(recipe.Repo) {
+				lib.LogE(err).Error("The repository does not seems to exists.")
+				os.Exit(RepoNotExistsError)
+			}
 			for _, wish := range recipe.Wishes {
 				fields := log.Fields{"input image": wish.InputName,
 					"repository":   wish.CvmfsRepo,

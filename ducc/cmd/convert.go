@@ -62,7 +62,7 @@ var convertCmd = &cobra.Command{
 			lib.Log().Info("No recipe to convert")
 			os.Exit(0)
 		}
-		if !lib.RepositoryExists(recipe.Wishes[0].CvmfsRepo) {
+		if !lib.RepositoryExists(recipe.Repo) {
 			lib.LogE(err).Error("The repository does not seems to exists.")
 			os.Exit(RepoNotExistsError)
 		}
