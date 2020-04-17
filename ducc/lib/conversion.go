@@ -225,14 +225,15 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	return firstError
 }
 
-func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain, forceDownload, createThinImage bool) (err error) {
+func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, createThinImage bool) (err error) {
 
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
 	}
 
-	alreadyConverted := AlreadyConverted(repo, inputImage, manifest.Config.Digest)
+	manifestPath := filepath.Join("/", "cvmfs", repo, ".metadata", inputImage.GetSimpleName(), "manifest.json")
+	alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
 	Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
 		"Already converted the image, skipping.")
 
@@ -381,7 +382,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 	wg.Wait()
 
 	if createThinImage {
-		err = CreateThinImage(manifest, layerLocations, inputImage, outputImage)
+		err = CreateThinImage(manifest, layerLocations, *inputImage, outputImage)
 		if err != nil {
 			return
 		}
@@ -521,11 +522,10 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	return nil
 }
 
-func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionResult {
-	path := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata", img.GetSimpleName(), "manifest.json")
+func AlreadyConverted(manifestPath, reference string) ConversionResult {
 
-	fmt.Println(path)
-	manifestStat, err := os.Stat(path)
+	fmt.Println(manifestPath)
+	manifestStat, err := os.Stat(manifestPath)
 	if os.IsNotExist(err) {
 		Log().Info("Manifest not existing")
 		return ConversionNotFound
@@ -535,7 +535,7 @@ func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionR
 		return ConversionNotFound
 	}
 
-	manifestFile, err := os.Open(path)
+	manifestFile, err := os.Open(manifestPath)
 	if err != nil {
 		Log().Info("Error in opening the manifest")
 		return ConversionNotFound
