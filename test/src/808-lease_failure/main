@@ -25,7 +25,7 @@ run_transactions() {
     cvmfs_server transaction test.repo.org
     if [ $? -ne 0 ]; then
         echo "Did not manage to  start transaction"
-        return 1
+        return 20
     fi
 
     mkdir -p /cvmfs/test.repo.org/new/c/d
@@ -36,20 +36,23 @@ run_transactions() {
     retcode=$?
     if [ $retcode -ne 17 ]; then
         echo "cvmfs_server transaction should tell us that we have a transaction already"
-        return 1
+        return 21
     fi
 
+    echo "  Publishing the transaction 1"
     cvmfs_server publish test.repo.org
     if [ $? -ne 0 ]; then
         echo "Did not manage to publish the transaction 1"
-        return 1
+        return 22
     fi
 
     # Simulating another release manager taking the lease
+    echo "  Simulating another node taking a lock on the path we want"
+    cat /var/spool/cvmfs/test.repo.org/session_token
     cvmfs_swissknife  lease  -u http://localhost:4929/api/v1 -a drop -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/new/c
     if [ $? -ne 0 ]; then
         echo "Could not acquire lease on directory"
-        return 1
+        return 23
     fi
 
     echo "  Checking that the lease is taken and that cvmfs_transaction fails"
@@ -57,7 +60,7 @@ run_transactions() {
     retcode=$?
     if [ $retcode ]; then
         echo "Return code should be 16 EBUSY"
-        return 1
+        return 24
     fi
     clean_up
     return 0
