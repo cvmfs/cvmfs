@@ -2065,7 +2065,7 @@ void DownloadManager::SwitchHost(JobInfo *info) {
            (*opt_host_chain_)[opt_host_chain_current_].c_str(),
            reason.c_str());
 
-  // Remeber the timestamp of switching to backup host
+  // Remember the timestamp of switching to backup host
   if (opt_host_reset_after_ > 0) {
     if (opt_host_chain_current_ != 0) {
       if (opt_timestamp_backup_host_ == 0)
