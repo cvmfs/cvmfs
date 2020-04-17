@@ -436,7 +436,6 @@ func (img *Image) getAnonymousManifest() ([]byte, error) {
 }
 
 func (img *Image) getManifestWithPassword(password string) ([]byte, error) {
-	fmt.Println("user used:", img.User)
 	return getManifestWithUsernameAndPassword(img, img.User, password)
 }
 
