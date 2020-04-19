@@ -1,3 +1,12 @@
+cvmfs-config-default (1.9-1) lucid; urgency=low
+
+  * Only configure cvmfs-config.cern.ch, and require it, including setting
+    a default proxy of DIRECT for it and using openhtc.io when the proxy
+    is DIRECT or auto;DIRECT
+  * Drop support for Jessie & Wheezy
+
+ -- Dave Dykstra <dwd@fnal.gov>  Mon, 20 Apr 2020 16:00:00 +0000
+
 cvmfs-config-default (1.8-1) lucid; urgency=low
 
   * Enable CERN config repository on newer platforms

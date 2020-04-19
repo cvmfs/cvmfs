@@ -1,20 +1,13 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.7
+Version: 1.9
 Release: 1
 Source0: cern.ch.pub
 Source1: cern-it1.cern.ch.pub
 Source2: cern-it4.cern.ch.pub
 Source3: cern-it5.cern.ch.pub
-Source4: egi.eu.pub
-Source5: opensciencegrid.org.pub
-Source6: cern.ch.conf
-Source7: egi.eu.conf
-Source8: opensciencegrid.org.conf
-Source9: 50-cern.conf
-Source10: 60-egi.conf
-Source11: cms.cern.ch.conf
-Source12: grid.cern.ch.conf
+Source4: 50-cern.conf
+Source5: cvmfs-config.cern.ch.conf
 BuildArch: noarch
 Group: Applications/System
 License: BSD
@@ -43,37 +36,26 @@ done
 for key in %{SOURCE0} %{SOURCE1} %{SOURCE2} %{SOURCE3}; do
     install -D -m 444 "${key}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/keys/cern.ch
 done
-for key in %{SOURCE4}; do
-    install -D -m 444 "${key}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/keys/egi.eu
-done
-for key in %{SOURCE5}; do
-    install -D -m 444 "${key}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/keys/opensciencegrid.org
-done
-for domainconf in %{SOURCE6} %{SOURCE7} %{SOURCE8}; do
-    install -D -m 444 "${domainconf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/domain.d
-done
-for defaultconf in %{SOURCE9} %{SOURCE10}; do
+for defaultconf in %{SOURCE4}; do
     install -D -m 444 "${defaultconf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/default.d
 done
-for conf in %{SOURCE11} %{SOURCE12}; do
+for conf in %{SOURCE5}; do
     install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d
 done
 
 %files
 %dir %{_sysconfdir}/cvmfs/keys/cern.ch
-%dir %{_sysconfdir}/cvmfs/keys/egi.eu
-%dir %{_sysconfdir}/cvmfs/keys/opensciencegrid.org
 %{_sysconfdir}/cvmfs/keys/cern.ch/*
-%{_sysconfdir}/cvmfs/keys/egi.eu/*
-%{_sysconfdir}/cvmfs/keys/opensciencegrid.org/*
-%config %{_sysconfdir}/cvmfs/domain.d/egi.eu.conf
-%config %{_sysconfdir}/cvmfs/domain.d/opensciencegrid.org.conf
-%config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %config %{_sysconfdir}/cvmfs/default.d/50-cern.conf
-%config %{_sysconfdir}/cvmfs/default.d/60-egi.conf
-%config %{_sysconfdir}/cvmfs/config.d/*
+%config %{_sysconfdir}/cvmfs/config.d/cvmfs-config.cern.ch.conf
 
 %changelog
+* Mon Apr 20 2020 Dave Dykstra <dwd@fnal.gov> - 1.9-1
+- Skip version 1.8 because of prior debian release
+- Only configure cvmfs-config.cern.ch, and require it, including setting
+  a default proxy of DIRECT for it and using openhtc.io when the proxy
+  is DIRECT or auto;DIRECT
+
 * Fri May 25 2018 Dave Dykstra <dwd@fnal.gov> - 1.7-1
 - Skipped versions 1.5 and 1.6 because debian packages with those 
   versions already exist
