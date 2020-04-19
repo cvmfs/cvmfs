@@ -5,7 +5,7 @@
 # when another release manager has already taken the lock for 
 # the path we want.
 
-cvmfs_test_name="Repository gateway"
+cvmfs_test_name="Lease contention with repository gateway"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
@@ -62,7 +62,7 @@ run_transactions() {
         echo "Return code should be 16 EBUSY instead of ${retcode}"
         return 24
     fi
-    clean_up
+
     return 0
 }
 
