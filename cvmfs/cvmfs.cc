@@ -1523,6 +1523,33 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       fuse_reply_err(req, ENOATTR);
       return;
     }
+  } else if (attr == "user.chunks_access") {
+    if (d.IsRegular()) {
+      attribute_value = "hash,offset,size\n";
+      if (d.IsChunkedFile()) {
+        FileChunkList chunks;
+        if (!catalog_mgr->ListFileChunks(path, d.hash_algorithm(), &chunks) ||
+            chunks.IsEmpty())
+        {
+          LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+                   "'chunked', but no chunks found.", path.c_str());
+          fuse_reply_err(req, EIO);
+          return;
+        } else {
+          for (unsigned int i = 0; i < chunks.size(); ++i) {
+            attribute_value += chunks.At(i).content_hash().ToString() + "," +
+                               StringifyInt(chunks.At(i).offset()) + "," +
+                               StringifyUint(chunks.At(i).size()) + "\n";
+          }
+        }
+      } else {
+        attribute_value += d.checksum().ToString() + ",0," +
+                           StringifyUint(d.size()) + "\n";
+      }
+    } else {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
   } else if (attr == "user.external_file") {
     if (d.IsRegular()) {
       attribute_value = d.IsExternalFile() ? "1" : "0";
@@ -1694,7 +1721,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
       attribute_list += string(symlink_list, sizeof(symlink_list)-1);
     } else if (d.IsRegular()) {
       const char regular_file_list[] = "user.external_file\0user.compression\0"
-                                       "user.chunks\0";
+                                       "user.chunks\0user.chunks_access\0";
       attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
     }
 
