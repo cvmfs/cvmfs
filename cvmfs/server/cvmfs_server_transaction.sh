@@ -83,9 +83,11 @@ cvmfs_server_transaction() {
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility $name
     if [ $force -eq 0 ]; then
-        is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
+        # Return EEXIST (17) in this case
+        is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=17; continue; }
     fi
-    check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || { echo "Repository unavailable under $CVMFS_STRATUM0!"; retcode=1; continue; }
+    # Return ENOENT if the directory does not exist
+    check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || { echo "Repository unavailable under $CVMFS_STRATUM0!"; retcode=2; continue; }
     check_expiry $name $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     [ $(get_expiry $name $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
 
@@ -126,7 +128,8 @@ cvmfs_server_transaction() {
 
         if [ $res -ne 0 ]; then
           echo "Could not acquire a new lease for repository $name"
-          retcode=1
+          # Return EBUSY (16) to indicate we could not acquire the lease
+          retcode=16
           continue
         fi
     fi
