@@ -58,15 +58,11 @@ var convertCmd = &cobra.Command{
 			lib.LogE(err).Error("Impossible to parse the recipe file")
 			os.Exit(ParseRecipeFileError)
 		}
-		if len(recipe.Wishes) == 0 {
-			lib.Log().Info("No recipe to convert")
-			os.Exit(0)
-		}
-		if !lib.RepositoryExists(recipe.Wishes[0].CvmfsRepo) {
+		if !lib.RepositoryExists(recipe.Repo) {
 			lib.LogE(err).Error("The repository does not seems to exists.")
 			os.Exit(RepoNotExistsError)
 		}
-		for _, wish := range recipe.Wishes {
+		for wish := range recipe.Wishes {
 			fields := log.Fields{"input image": wish.InputName,
 				"repository":   wish.CvmfsRepo,
 				"output image": wish.OutputName}

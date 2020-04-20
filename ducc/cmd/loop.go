@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -59,11 +58,11 @@ var loopCmd = &cobra.Command{
 				lib.LogE(err).Fatal("Impossible to parse the recipe file")
 				os.Exit(1)
 			}
-			if len(recipe.Wishes) == 0 {
-				lib.Log().Warn("No wishes to convert.")
-				time.Sleep(30 * time.Second)
+			if !lib.RepositoryExists(recipe.Repo) {
+				lib.LogE(err).Error("The repository does not seems to exists.")
+				os.Exit(RepoNotExistsError)
 			}
-			for _, wish := range recipe.Wishes {
+			for wish := range recipe.Wishes {
 				fields := log.Fields{"input image": wish.InputName,
 					"repository":   wish.CvmfsRepo,
 					"output image": wish.OutputName}
