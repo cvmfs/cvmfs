@@ -59,7 +59,7 @@ var loopCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			if !lib.RepositoryExists(recipe.Repo) {
-				lib.LogE(err).Error("The repository does not seems to exists.")
+				lib.LogE(err).Error("The repository does not exists.")
 				os.Exit(RepoNotExistsError)
 			}
 			for wish := range recipe.Wishes {
