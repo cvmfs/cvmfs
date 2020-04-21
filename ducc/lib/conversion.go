@@ -83,17 +83,8 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 		return
 	}
 	defer os.RemoveAll(tmpDir)
-	inputImage, err := ParseImage(wish.InputName)
-	inputImage.User = wish.UserInput
-	expandedImgTag, err := inputImage.ExpandWildcard()
-	if err != nil {
-		LogE(err).WithFields(log.Fields{
-			"input image": fmt.Sprintf("%s/%s", inputImage.Registry, inputImage.Repository)}).
-			Error("Error in retrieving all the tags from the image")
-		return
-	}
 	var firstError error
-	for _, inputImage := range expandedImgTag {
+	for inputImage := range wish.ExpandedTagImages {
 		// we want to check if we have already ingested the Singularity image
 		// Several cases are possible
 		// Image not ingested, neither pubSymPath nor privatePath are present
@@ -191,27 +182,25 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 			"Impossible to create subcatalog in super-directory.")
 	}
 
-	outputImage, err := ParseImage(wish.OutputName)
-	outputImage.User = wish.UserOutput
-	if err != nil {
+	outputImage := wish.OutputImage
+	if outputImage == nil {
+		err = fmt.Errorf("error in parsing the output image, got a null image")
+		LogE(err).WithFields(log.Fields{"output image": wish.OutputName}).
+			Error("Null image, should not happen")
 		return
 	}
-	inputImage, err := ParseImage(wish.InputName)
-	inputImage.User = wish.UserInput
-	if err != nil {
+	inputImage := wish.InputImage
+	if inputImage == nil {
+		err = fmt.Errorf("error in parsing the input image, got a null image")
+		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
+			Error("Null image, should not happen")
 		return
 	}
+
 	var firstError error
-	expandedImgTags, err := inputImage.ExpandWildcard()
-	if err != nil {
-		LogE(err).WithFields(log.Fields{
-			"input image": fmt.Sprintf("%s/%s", inputImage.Registry, inputImage.Repository)}).
-			Error("Error in retrieving all the tags from the image")
-		return err
-	}
-	for _, expandedImgTag := range expandedImgTags {
+	for expandedImgTag := range wish.ExpandedTagImages {
 		tag := expandedImgTag.Tag
-		outputWithTag := outputImage
+		outputWithTag := *outputImage
 		if inputImage.TagWildcard {
 			outputWithTag.Tag = tag
 		} else {
@@ -225,14 +214,15 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	return firstError
 }
 
-func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain, forceDownload, createThinImage bool) (err error) {
+func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, createThinImage bool) (err error) {
 
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
 	}
 
-	alreadyConverted := AlreadyConverted(repo, inputImage, manifest.Config.Digest)
+	manifestPath := filepath.Join("/", "cvmfs", repo, ".metadata", inputImage.GetSimpleName(), "manifest.json")
+	alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
 	Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
 		"Already converted the image, skipping.")
 
@@ -381,7 +371,7 @@ func convertInputOutput(inputImage, outputImage Image, repo string, convertAgain
 	wg.Wait()
 
 	if createThinImage {
-		err = CreateThinImage(manifest, layerLocations, inputImage, outputImage)
+		err = CreateThinImage(manifest, layerLocations, *inputImage, outputImage)
 		if err != nil {
 			return
 		}
@@ -521,11 +511,10 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	return nil
 }
 
-func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionResult {
-	path := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata", img.GetSimpleName(), "manifest.json")
+func AlreadyConverted(manifestPath, reference string) ConversionResult {
 
-	fmt.Println(path)
-	manifestStat, err := os.Stat(path)
+	fmt.Println(manifestPath)
+	manifestStat, err := os.Stat(manifestPath)
 	if os.IsNotExist(err) {
 		Log().Info("Manifest not existing")
 		return ConversionNotFound
@@ -535,7 +524,7 @@ func AlreadyConverted(CVMFSRepo string, img Image, reference string) ConversionR
 		return ConversionNotFound
 	}
 
-	manifestFile, err := os.Open(path)
+	manifestFile, err := os.Open(manifestPath)
 	if err != nil {
 		Log().Info("Error in opening the manifest")
 		return ConversionNotFound
