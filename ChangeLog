@@ -1,4 +1,5 @@
 2.8.0:
+  * [ducc] Parallelize check if images are up to date
   * Indicate error type by return value in `cvmfs_server transaction`
   * [gw] add incoming publisher catalog to reflog to avoid dark garbage
   * [ducc] Add support for converting from private registries
