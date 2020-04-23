@@ -84,7 +84,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	}
 	defer os.RemoveAll(tmpDir)
 	var firstError error
-	for inputImage := range wish.ExpandedTagImages {
+	for inputImage := range wish.ExpandedTagImagesFlat {
 		// we want to check if we have already ingested the Singularity image
 		// Several cases are possible
 		// Image not ingested, neither pubSymPath nor privatePath are present
@@ -104,6 +104,13 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 		completeSingularityPriPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, singularityPrivatePath)
 		priDirInfo, errPri := os.Stat(completeSingularityPriPath)
 
+		Log().WithFields(log.Fields{
+			"image":                  inputImage.GetSimpleName(),
+			"public path":            completePubSymPath,
+			"err stats pubblic path": errPub,
+			"private path":           completeSingularityPriPath,
+			"err stats private path": errPri,
+		}).Info("Checking if images links are up to date.")
 		// no error in stating both directories
 		// either the image is up to date or the image became stale
 		if errPub == nil && errPri == nil {
@@ -198,7 +205,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	}
 
 	var firstError error
-	for expandedImgTag := range wish.ExpandedTagImages {
+	for expandedImgTag := range wish.ExpandedTagImagesLayer {
 		tag := expandedImgTag.Tag
 		outputWithTag := *outputImage
 		if inputImage.TagWildcard {

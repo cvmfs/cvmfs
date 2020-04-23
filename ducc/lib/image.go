@@ -222,19 +222,22 @@ func (img *Image) GetTagListUrl() string {
 	return fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository)
 }
 
-func (img *Image) ExpandWildcard() (<-chan *Image, error) {
-	result := make(chan *Image, 500)
+func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
+	r1 := make(chan *Image, 500)
+	r2 := make(chan *Image, 500)
 	var wg sync.WaitGroup
 	defer func() {
 		go func() {
 			wg.Wait()
-			close(result)
+			close(r1)
+			close(r2)
 		}()
 	}()
 	if !img.TagWildcard {
 		img.GetManifest()
-		result <- img
-		return result, nil
+		r1 <- img
+		r2 <- img
+		return r1, r2, nil
 	}
 	var tagsList struct {
 		Tags []string
@@ -250,7 +253,7 @@ func (img *Image) ExpandWildcard() (<-chan *Image, error) {
 	if err != nil {
 		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
 		LogE(err).Error(errF)
-		return result, errF
+		return r1, r2, errF
 	}
 
 	client := http.Client{}
@@ -261,23 +264,23 @@ func (img *Image) ExpandWildcard() (<-chan *Image, error) {
 	if err != nil {
 		errF := fmt.Errorf("Error in making the request for retrieving the tags: %s", err)
 		LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
-		return result, errF
+		return r1, r2, errF
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		errF := fmt.Errorf("Got error status code (%d) trying to retrieve the tags", resp.StatusCode)
 		LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
-		return result, errF
+		return r1, r2, errF
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
 		errF := fmt.Errorf("Error in decoding the tags from the server: %s", err)
 		LogE(err).Error(errF)
-		return result, errF
+		return r1, r2, errF
 	}
 	pattern := img.Tag
 	filteredTags, err := filterUsingGlob(pattern, tagsList.Tags)
 	if err != nil {
-		return result, nil
+		return r1, r2, nil
 	}
 	for _, tag := range filteredTags {
 		wg.Add(1)
@@ -286,11 +289,12 @@ func (img *Image) ExpandWildcard() (<-chan *Image, error) {
 			taggedImg := *img
 			taggedImg.Tag = tag
 			taggedImg.GetManifest()
-			result <- &taggedImg
+			r1 <- &taggedImg
+			r2 <- &taggedImg
 		}(tag)
 	}
 
-	return result, nil
+	return r1, r2, nil
 }
 
 func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {

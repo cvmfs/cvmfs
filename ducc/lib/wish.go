@@ -14,16 +14,17 @@ type Wish struct {
 }
 
 type WishFriendly struct {
-	Id                int
-	InputName         string
-	OutputName        string
-	CvmfsRepo         string
-	Converted         bool
-	UserInput         string
-	UserOutput        string
-	InputImage        *Image
-	OutputImage       *Image
-	ExpandedTagImages <-chan *Image
+	Id                     int
+	InputName              string
+	OutputName             string
+	CvmfsRepo              string
+	Converted              bool
+	UserInput              string
+	UserOutput             string
+	InputImage             *Image
+	OutputImage            *Image
+	ExpandedTagImagesLayer <-chan *Image
+	ExpandedTagImagesFlat  <-chan *Image
 }
 
 func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string) (wish WishFriendly, err error) {
@@ -59,7 +60,7 @@ func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string
 		err = errI
 		return
 	}
-	expandedTagImages, errEx := iImage.ExpandWildcard()
+	expandedTagImagesLayer, expandedTagImagesFlat, errEx := iImage.ExpandWildcard()
 	if errEx != nil {
 		err = errEx
 		LogE(err).WithFields(log.Fields{
@@ -67,7 +68,8 @@ func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string
 			Error("Error in retrieving all the tags from the image")
 		return
 	}
-	wish.ExpandedTagImages = expandedTagImages
+	wish.ExpandedTagImagesLayer = expandedTagImagesLayer
+	wish.ExpandedTagImagesFlat = expandedTagImagesFlat
 
 	oImage, errO := ParseImage(wish.OutputName)
 	wish.OutputImage = &oImage
