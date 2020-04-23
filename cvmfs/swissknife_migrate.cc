@@ -2022,10 +2022,9 @@ bool CommandMigrate::BulkhashRemovalMigrationWorker::RemoveRedundantBulkHashes(
   // hash since modern clients >= 2.1.7 won't require them
   const std::string stmt = "UPDATE OR ABORT catalog "
                            "SET hash = NULL "
-                           "WHERE flags & :file_chnked_flag;";
+                           "WHERE flags & :file_chunked_flag;";
   catalog::SqlCatalog bulkhash_removal_sql(db, stmt);
-  bulkhash_removal_sql.BindInt64(1,
-    catalog::SqlDirent::kFlagFile & catalog::SqlDirent::kFlagFileChunk);
+  bulkhash_removal_sql.BindInt64(1, catalog::SqlDirent::kFlagFileChunk);
   bulkhash_removal_sql.Execute();
 
   return db.CommitTransaction();
