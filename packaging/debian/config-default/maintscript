@@ -1,0 +1,9 @@
+rm_conffile /etc/cvmfs/config.d/grid.cern.ch.conf 1.9~
+rm_conffile /etc/cvmfs/config.d/cms.cern.ch.conf 1.9~
+rm_conffile /etc/cvmfs/default.d/60-egi.conf 1.9~
+rm_conffile /etc/cvmfs/default.d/50-cern-debian.conf 1.9~
+rm_conffile /etc/cvmfs/domain.d/egi.eu.conf 1.9~
+rm_conffile /etc/cvmfs/domain.d/cern.ch.conf 1.9~
+rm_conffile /etc/cvmfs/domain.d/opensciencegrid.org.conf 1.9~
+rm_conffile /etc/cvmfs/keys/opensciencegrid.org/opensciencegrid.org.pub 1.9~
+rm_conffile /etc/cvmfs/keys/egi.eu/egi.eu.pub 1.9~
