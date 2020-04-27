@@ -266,6 +266,9 @@ std::set<std::string> speed_cols =
 
 // returns number of operations/bytes per second
 double getSpeed(Long64_t count, double duration_days) {
+  if (duration_days == 0) {
+    duration_days += 1.f/2.f/86400.f; // add 0.5 sec if start_time == finish_time
+  }
   return count/duration_days/86400;
 }
 
