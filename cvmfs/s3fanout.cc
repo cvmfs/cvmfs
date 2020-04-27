@@ -135,27 +135,12 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   if (num_bytes == 0)
     return 0;
 
-  if (info->origin == kOriginMem) {
-    const size_t avail_bytes = info->origin_mem.size - info->origin_mem.pos;
-    const size_t send_size = avail_bytes < num_bytes ? avail_bytes : num_bytes;
-    memcpy(ptr, info->origin_mem.data + info->origin_mem.pos, send_size);
-    info->origin_mem.pos += send_size;
-    LogCvmfs(kLogS3Fanout, kLogDebug, "mem pushed out %d bytes", send_size);
-    return send_size;
-  } else if (info->origin == kOriginPath) {
-    size_t read_bytes = fread(ptr, 1, num_bytes, info->origin_file);
-    if (read_bytes != num_bytes) {
-      if (ferror(info->origin_file) != 0) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "local I/O error reading %s",
-                 info->origin_path.c_str());
-        return CURL_READFUNC_ABORT;
-      }
-    }
-    LogCvmfs(kLogS3Fanout, kLogDebug, "file pushed out %d bytes", read_bytes);
-    return read_bytes;
-  }
+  uint64_t read_bytes = info->origin->Read(ptr, num_bytes);
 
-  return CURL_READFUNC_ABORT;
+  LogCvmfs(kLogS3Fanout, kLogDebug,
+           "source buffer pushed out %d bytes", read_bytes);
+
+  return read_bytes;
 }
 
 
@@ -740,77 +725,27 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
 
   // PUT, there is actually payload
   shash::Any payload_hash(shash::kMd5);
-  bool retval;
 
-  switch (info.origin) {
-    case kOriginMem:
-      switch (config_.authz_method) {
-        case kAuthzAwsV2:
-          shash::HashMem(info.origin_mem.data, info.origin_mem.size,
-                         &payload_hash);
-          *hex_hash =
-            Base64(string(reinterpret_cast<char *>(payload_hash.digest),
-                          payload_hash.GetDigestSize()));
-          return true;
-        case kAuthzAwsV4:
-          *hex_hash =
-            shash::Sha256Mem(info.origin_mem.data, info.origin_mem.size);
-          return true;
-        default:
-          PANIC(NULL);
-      }
-    case kOriginPath:
-      switch (config_.authz_method) {
-        case kAuthzAwsV2:
-          retval = shash::HashFile(info.origin_path, &payload_hash);
-          if (!retval) {
-            LogCvmfs(kLogS3Fanout, kLogStderr,
-                     "failed to hash file %s (errno: %d)",
-                     info.origin_path.c_str(), errno);
-            return false;
-          }
-          *hex_hash =
-            Base64(string(reinterpret_cast<char *>(payload_hash.digest),
-                          payload_hash.GetDigestSize()));
-          return true;
-        case kAuthzAwsV4:
-          *hex_hash = shash::Sha256File(info.origin_path);
-          if (hex_hash->empty()) {
-            LogCvmfs(kLogS3Fanout, kLogStderr,
-                     "failed to hash file %s (errno: %d)",
-                     info.origin_path.c_str(), errno);
-            return false;
-          }
-          return true;
-        default:
-          PANIC(NULL);
-      }
-    default:
-      PANIC(NULL);
-  }
-}
+  unsigned char *data;
+  unsigned int nbytes =
+    info.origin->Data(reinterpret_cast<void **>(&data),
+                             info.origin->GetSize(), 0);
 
-
-bool S3FanoutManager::MkPayloadSize(const JobInfo &info, uint64_t *size) const {
-  int64_t file_size;
-  switch (info.origin) {
-    case kOriginMem:
-      *size = info.origin_mem.size;
+  switch (config_.authz_method) {
+    case kAuthzAwsV2:
+      shash::HashMem(data, nbytes, &payload_hash);
+      *hex_hash =
+        Base64(string(reinterpret_cast<char *>(payload_hash.digest),
+                      payload_hash.GetDigestSize()));
       return true;
-    case kOriginPath:
-      file_size = GetFileSize(info.origin_path);
-      if (file_size < 0) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to stat file %s (errno: %d)",
-                 info.origin_path.c_str(), errno);
-        return false;
-      }
-      *size = file_size;
+    case kAuthzAwsV4:
+      *hex_hash =
+        shash::Sha256Mem(data, nbytes);
       return true;
     default:
       PANIC(NULL);
   }
 }
-
 
 string S3FanoutManager::GetRequestString(const JobInfo &info) const {
   switch (info.request) {
@@ -861,13 +796,11 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   info->throttle_ms = 0;
   info->throttle_timestamp = 0;
   info->http_headers = NULL;
+  // info->payload_size is needed in S3Uploader::MainCollectResults,
+  // where info->origin is already destroyed.
+  info->payload_size = info->origin->GetSize();
 
   InitializeDnsSettings(handle, complete_hostname_);
-
-  bool retval_b;
-  retval_b = MkPayloadSize(*info, &info->payload_size);
-  if (!retval_b)
-    return kFailLocalIO;
 
   CURLcode retval;
   if ((info->request == JobInfo::kReqHeadOnly) ||
@@ -897,17 +830,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                              static_cast<curl_off_t>(info->payload_size));
+                              static_cast<curl_off_t>(info->origin->GetSize()));
     assert(retval == CURLE_OK);
-    if (info->origin == kOriginPath) {
-      assert(info->origin_file == NULL);
-      info->origin_file = fopen(info->origin_path.c_str(), "r");
-      if (info->origin_file == NULL) {
-        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to open file %s (errno: %d)",
-                 info->origin_path.c_str(), errno);
-        return kFailLocalIO;
-      }
-    }
 
     if (info->request == JobInfo::kReqPutDotCvmfs) {
       info->http_headers =
@@ -917,6 +841,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
           curl_slist_append(info->http_headers, kCacheControlCas);
     }
   }
+
+  bool retval_b;
 
   // Authorization
   vector<string> authz_headers;
@@ -1134,10 +1060,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     SetUrlOptions(info);
     // Reset origin
-    if (info->origin == kOriginMem)
-      info->origin_mem.pos = 0;
-    if (info->origin == kOriginPath)
-      rewind(info->origin_file);
+    info->origin->Rewind();
     return true;  // Again, Put
   }
 
@@ -1152,12 +1075,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       LogCvmfs(kLogS3Fanout, kLogDebug, "Trying again to upload %s",
                info->object_key.c_str());
       // Reset origin
-      if (info->origin == kOriginMem)
-        info->origin_mem.pos = 0;
-      if (info->origin == kOriginPath) {
-        assert(info->origin_file != NULL);
-        rewind(info->origin_file);
-      }
+      info->origin->Rewind();
     }
     Backoff(info);
     info->error_code = kFailOk;
@@ -1169,21 +1087,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   }
 
   // Cleanup opened resources
-  if (info->origin == kOriginPath) {
-    assert(info->mmf == NULL);
-    if (info->origin_file != NULL) {
-      if (fclose(info->origin_file) != 0)
-        info->error_code = kFailLocalIO;
-      info->origin_file = NULL;
-    }
-  } else if (info->origin == kOriginMem) {
-    assert(info->origin_file == NULL);
-    if (info->mmf != NULL) {
-      info->mmf->Unmap();
-      delete info->mmf;
-      info->mmf = NULL;
-    }
-  }
+  info->origin.Destroy();
 
   if ((info->error_code != kFailOk) &&
       (info->http_error != 0) && (info->http_error != 404))
