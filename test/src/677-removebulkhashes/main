@@ -1,0 +1,62 @@
+cvmfs_test_name="Remove Redundant Bulk Hashes"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** create small and large files"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "small" > /cvmfs/$CVMFS_TEST_REPO/small
+  cat /dev/urandom | base64 -w0 | head -c $((1024*1024*32)) \
+    > /cvmfs/$CVMFS_TEST_REPO/only_chunks
+  publish_repo $CVMFS_TEST_REPO || return 10
+
+  echo "CVMFS_GENERATE_LEGACY_BULK_CHUNKS=true" \
+    | sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cat /dev/urandom | base64 -w0 | head -c $((1024*1024*32)) \
+    > /cvmfs/$CVMFS_TEST_REPO/chunks_and_bulk
+  publish_repo $CVMFS_TEST_REPO || return 20
+
+  echo "CVMFS_USE_FILE_CHUNKING=false" \
+    | sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cat /dev/urandom | base64 -w0 | head -c $((1024*1024*32)) \
+    > /cvmfs/$CVMFS_TEST_REPO/only_bulk
+  publish_repo $CVMFS_TEST_REPO || return 30
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** verify chunks and bulk hashes"
+  local rdonly=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
+  cat $rdonly/small $rdonly/only_chunks $rdonly/chunks_and_bulk $rdonly/only_bulk > /dev/null || return 40
+  [ $(attr -qg chunks $rdonly/small) -eq 1 ] || return 41
+  [ $(attr -qg chunks $rdonly/only_chunks) -gt 1 ] || return 42
+  [ $(attr -qg chunks $rdonly/chunks_and_bulk) -gt 1 ] || return 43
+  [ $(attr -qg chunks $rdonly/only_bulk) -eq 1 ] || return 44
+  [ "x$(attr -qg hash $rdonly/chunks_and_bulk)" != "x" ] || return 45
+  [ "x$(attr -qg hash $rdonly/only_chunks)" = "x" ] || return 46
+
+  echo "*** eliminate bulk hashes"
+  sudo cvmfs_server eliminate-bulk-hashes -f $CVMFS_TEST_REPO || return 50
+
+  echo "*** re-check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** re-verify chunks and bulk hashes"
+  cat $rdonly/small $rdonly/only_chunks $rdonly/chunks_and_bulk $rdonly/only_bulk > /dev/null || return 60
+  [ $(attr -qg chunks $rdonly/small) -eq 1 ] || return 61
+  [ $(attr -qg chunks $rdonly/only_chunks) -gt 1 ] || return 62
+  [ $(attr -qg chunks $rdonly/chunks_and_bulk) -gt 1 ] || return 63
+  [ $(attr -qg chunks $rdonly/only_bulk) -eq 1 ] || return 64
+  [ "x$(attr -qg hash $rdonly/chunks_and_bulk)" = "x" ] || return 65
+  [ "x$(attr -qg hash $rdonly/only_chunks)" = "x" ] || return 66
+
+  return 0
+}

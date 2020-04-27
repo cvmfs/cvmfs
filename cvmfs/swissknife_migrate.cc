@@ -40,7 +40,7 @@ CommandMigrate::CommandMigrate() :
 ParameterList CommandMigrate::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v',
-    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink )"));
+    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink | bulkhash )"));
   r.push_back(Parameter::Mandatory('r',
     "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Mandatory('u', "upstream definition string"));
@@ -226,6 +226,12 @@ int CommandMigrate::Main(const ArgumentList &args) {
       context(temporary_directory_, collect_catalog_statistics);
     migration_succeeded =
       DoMigrationAndCommit<HardlinkRemovalMigrationWorker>(manifest_path,
+                                                           &context);
+  } else if (migration_base == "bulkhash") {
+    BulkhashRemovalMigrationWorker::worker_context
+      context(temporary_directory_, collect_catalog_statistics);
+    migration_succeeded =
+      DoMigrationAndCommit<BulkhashRemovalMigrationWorker>(manifest_path,
                                                            &context);
   } else {
     const std::string err_msg = "Unknown migration base: " + migration_base;
@@ -1975,6 +1981,51 @@ bool CommandMigrate::HardlinkRemovalMigrationWorker::BreakUpHardlinks(
   catalog::SqlCatalog hardlink_removal_sql(db, stmt);
   hardlink_removal_sql.BindInt64(1, catalog::SqlDirent::kFlagFile);
   hardlink_removal_sql.Execute();
+
+  return db.CommitTransaction();
+}
+
+//------------------------------------------------------------------------------
+
+
+bool CommandMigrate::BulkhashRemovalMigrationWorker::RunMigration(
+                                                   PendingCatalog *data) const {
+  return CheckDatabaseSchemaCompatibility(data) &&
+         RemoveRedundantBulkHashes(data);
+}
+
+
+bool
+CommandMigrate::BulkhashRemovalMigrationWorker::CheckDatabaseSchemaCompatibility
+                                                  (PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &clg = data->old_catalog->database();
+  return clg.schema_version() >= 2.4 - catalog::CatalogDatabase::kSchemaEpsilon;
+}
+
+
+bool CommandMigrate::BulkhashRemovalMigrationWorker::RemoveRedundantBulkHashes(
+                                                   PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &db =
+                                     GetWritable(data->old_catalog)->database();
+
+  if (!db.BeginTransaction()) {
+    return false;
+  }
+
+  // Regular files with both bulk hashes and chunked hashes can drop the bulk
+  // hash since modern clients >= 2.1.7 won't require them
+  const std::string stmt = "UPDATE OR ABORT catalog "
+                           "SET hash = NULL "
+                           "WHERE flags & :file_chunked_flag;";
+  catalog::SqlCatalog bulkhash_removal_sql(db, stmt);
+  bulkhash_removal_sql.BindInt64(1, catalog::SqlDirent::kFlagFileChunk);
+  bulkhash_removal_sql.Execute();
 
   return db.CommitTransaction();
 }

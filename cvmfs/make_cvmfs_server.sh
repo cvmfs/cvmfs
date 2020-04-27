@@ -57,6 +57,7 @@ COMPONENTS="\
     server/cvmfs_server_snapshot.sh
     server/cvmfs_server_migrate.sh
     server/cvmfs_server_chown.sh
+    server/cvmfs_server_eliminate_bulk_hashes.sh
     server/cvmfs_server_eliminate_hardlinks.sh
     server/cvmfs_server_update_info.sh
     server/cvmfs_server_update_repoinfo.sh

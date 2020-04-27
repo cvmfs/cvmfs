@@ -24,6 +24,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.3:
+  * Add hidden `cvmfs_server eliminate-bulk-hashes` command (CVM-1428)
 
 2.7.2:
   * Add `cvmfs_talk latency` command
