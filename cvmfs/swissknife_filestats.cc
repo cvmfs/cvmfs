@@ -162,7 +162,9 @@ void CommandFileStats::ProcessCatalog(string db_path) {
     int64_t size = catalog_list->RetrieveInt64(1);
     int flags = catalog_list->RetrieveInt(2);
     if ((flags & catalog::SqlDirent::kFlagFile) ==
-         catalog::SqlDirent::kFlagFile) {
+         catalog::SqlDirent::kFlagFile &&
+        (flags & catalog::SqlDirent::kFlagFileChunk) !=
+         catalog::SqlDirent::kFlagFileChunk) {
       int object_id = db_->StoreObject(hash, num_bytes, size);
       db_->StoreFile(cur_catalog_id, object_id);
     } else if ((flags & catalog::SqlDirent::kFlagLink) ==
