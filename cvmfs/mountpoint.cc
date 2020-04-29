@@ -1167,6 +1167,8 @@ MountPoint *MountPoint::Create(
   mountpoint->CreateTables();
   mountpoint->SetupBehavior();
 
+  mountpoint->magic_xattr_mgr_ = new MagicXattrManager(mountpoint.weak_ref());
+
   mountpoint->boot_status_ = loader::kFailOk;
   return mountpoint.Release();
 }

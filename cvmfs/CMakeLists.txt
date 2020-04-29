@@ -61,6 +61,7 @@ set (CVMFS_CLIENT_SOURCES
   json_document.cc
   kvstore.cc
   logging.cc
+  magic_xattr.cc
   malloc_arena.cc
   malloc_heap.cc
   manifest.cc
