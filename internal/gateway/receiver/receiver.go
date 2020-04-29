@@ -103,6 +103,12 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 		return nil, errors.Wrap(err, "could not start worker process")
 	}
 
+	// it is necessary to close this two files, otherwise, if the receiver crash,
+	// a read on the `workerOutRead` / `workerCmdOut` will hang forever.
+	// details: https://web.archive.org/web/20200429092830/https://redbeardlab.com/2020/04/29/on-linux-pipes-fork-and-passing-file-descriptors-to-other-process/
+	workerInRead.Close()
+	workerOutWrite.Close()
+
 	gw.LogC(ctx, "receiver", gw.LogDebug).
 		Str("command", "start").
 		Msg("worker process ready")
@@ -246,12 +252,18 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader)
 func (r *CvmfsReceiver) reply() ([]byte, error) {
 	buf := make([]byte, 4)
 	if _, err := io.ReadFull(r.workerCmdOut, buf); err != nil {
+		if (err == io.EOF) || (err == io.ErrUnexpectedEOF) {
+			return nil, errors.Wrap(err, "possible that the receiver crashed")
+		}
 		return nil, errors.Wrap(err, "could not read reply size")
 	}
 	repSize := int32(binary.LittleEndian.Uint32(buf))
 
 	reply := make([]byte, repSize)
 	if _, err := io.ReadFull(r.workerCmdOut, reply); err != nil {
+		if (err == io.EOF) || (err == io.ErrUnexpectedEOF) {
+			return nil, errors.Wrap(err, "possible that the receiver crashed")
+		}
 		return nil, errors.Wrap(err, "could not read reply body")
 	}
 
