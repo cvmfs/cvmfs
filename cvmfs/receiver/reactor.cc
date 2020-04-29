@@ -468,40 +468,55 @@ CommitProcessor* Reactor::MakeCommitProcessor() {
 bool Reactor::HandleRequest(Request req, const std::string& data) {
   bool ok = true;
   std::string reply;
-  switch (req) {
-    case kQuit:
-      ok = WriteReply(fdout_, "ok");
-      break;
-    case kEcho:
-      ok = WriteReply(fdout_, std::string("PID: ") + StringifyUint(getpid()));
-      break;
-    case kGenerateToken:
-      ok &= HandleGenerateToken(data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kGetTokenId:
-      ok &= HandleGetTokenId(data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kCheckToken:
-      ok &= HandleCheckToken(data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kSubmitPayload:
-      ok &= HandleSubmitPayload(fdin_, data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kCommit:
-      ok &= HandleCommit(data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kError:
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Reactor: unknown command received.");
-      ok = false;
-      break;
-    default:
-      break;
+  try {
+    switch (req) {
+      case kQuit:
+        ok = WriteReply(fdout_, "ok");
+        break;
+      case kEcho:
+        ok = WriteReply(fdout_, std::string("PID: ") + StringifyUint(getpid()));
+        break;
+      case kGenerateToken:
+        ok &= HandleGenerateToken(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kGetTokenId:
+        ok &= HandleGetTokenId(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kCheckToken:
+        ok &= HandleCheckToken(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kSubmitPayload:
+        ok &= HandleSubmitPayload(fdin_, data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kCommit:
+        ok &= HandleCommit(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kError:
+        LogCvmfs(kLogReceiver, kLogSyslogErr,
+                 "Reactor: unknown command received.");
+        ok = false;
+        break;
+      default:
+        break;
+    }
+  } catch (const ECvmfsException e) {
+    reply.clear();
+
+    std::string error("runtime error: ");
+    error + e.what();
+
+    JsonStringInput input;
+    input.PushBack("status", "error");
+    input.PushBack("reason", error);
+
+    ToJsonString(input, &reply);
+    WriteReply(fdout_, reply);
+    throw e;
   }
 
   return ok;
