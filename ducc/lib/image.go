@@ -710,6 +710,10 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	if err != nil {
+		err = fmt.Errorf("Error in getting the token, http request failed %s", err)
+		return
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
