@@ -14,7 +14,7 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-class ECvmfsException : std::runtime_error {
+class ECvmfsException : public std::runtime_error {
  public:
   explicit ECvmfsException(const std::string& what_arg)
       : std::runtime_error(what_arg) {}
