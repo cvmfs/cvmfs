@@ -9,6 +9,7 @@
 #include "../logging.h"
 #include "../monitor.h"
 #include "../swissknife.h"
+#include "../util/exception.h"
 #include "../util/posix.h"
 #include "../util/string.h"
 
@@ -124,11 +125,25 @@ int main(int argc, char** argv) {
 
   receiver::Reactor reactor(fdin, fdout);
 
-  if (!reactor.Run()) {
+  try {
+    if (!reactor.Run()) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "Error running CVMFS Receiver event loop");
+      delete watchdog;
+      return 1;
+    }
+  } catch (const ECvmfsException& e) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error running CVMFS Receiver event loop");
+             "Runtime error during CVMFS Receiver event loop.\n"
+             "%s",
+             e.what());
     delete watchdog;
-    return 1;
+    return 2;
+  } catch (...) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Unknow error during CVMFS Receiver event loop.\n");
+      delete watchdog;
+      return 3;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver finished");
