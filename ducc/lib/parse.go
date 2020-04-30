@@ -12,6 +12,16 @@ func ParseImage(image string) (img Image, err error) {
 		return Image{}, err
 	}
 	if url.Host == "" {
+
+		// likely the protocol `https://` is missing in the image string.
+		// worth to try to append it, and re-parse the image
+		image2 := "https://" + image
+		img2, err2 := ParseImage(image2)
+		if err2 == nil {
+			return img2, err2
+		}
+
+		// some other error, let's return the first error
 		return Image{}, fmt.Errorf("Impossible to identify the registry of the image: %s", image)
 	}
 	if url.Path == "" {

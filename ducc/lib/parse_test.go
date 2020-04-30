@@ -128,3 +128,13 @@ func TestParseImageWithTagAndDigest(t *testing.T) {
 		t.Errorf("Error in parse wrong digest: %s", image.Digest)
 	}
 }
+
+func TestParseImageWithoutProtocol(t *testing.T) {
+	imageString := "hub.docker.com/library/redis:5"
+	image, err := ParseImage(imageString)
+	if err != nil {
+		t.Errorf("We cannot manage images without protocol: %s", err)
+	}
+	// this call might panic if we are not able to manage the string
+	image.GetReference()
+}
