@@ -10,12 +10,16 @@ func TestGetTags(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error in parsing %s", imageString)
 	}
-	tagsExpanded, err := image.ExpandWildcard()
+	tagsExpanded, _, err := image.ExpandWildcard()
 	if err != nil {
 		t.Errorf("Error in expanding the tags %s", imageString)
 	}
-	if len(tagsExpanded) <= 1 {
-		t.Errorf("Tag expansions didn't work, only %d tags", len(tagsExpanded))
+	tagsList := make([]*Image, 0)
+	for tag := range tagsExpanded {
+		tagsList = append(tagsList, tag)
+	}
+	if len(tagsList) <= 1 {
+		t.Errorf("Tag expansions didn't work, only %d tags", len(tagsList))
 	}
 }
 
@@ -30,14 +34,14 @@ func TestGetTagsWithGlob(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error in parsing %s", imageString)
 	}
-	tagsExpanded, err := image.ExpandWildcard()
+	tagsExpanded, _, err := image.ExpandWildcard()
 	if err != nil {
 		t.Errorf("Error in expanding the tags %s", imageString)
 	}
 	// at the moment exists
 	existingTags := []string{"1.9.2-1", "1.9.2-1-alpine", "1.9.2", "1.9.2-alpine"}
 	tags := make(map[string]bool)
-	for _, tag := range tagsExpanded {
+	for tag := range tagsExpanded {
 		tags[tag.Tag] = true
 	}
 

@@ -206,9 +206,11 @@ func (img *Image) GetChanges() (changes []string, err error) {
 	cmd := config.Config.Cmd
 
 	if len(cmd) > 0 {
+		command := fmt.Sprintf("CMD")
 		for _, c := range cmd {
-			changes = append(changes, fmt.Sprintf("CMD %s", c))
+			command = fmt.Sprintf("%s %s", command, c)
 		}
+		changes = append(changes, command)
 	}
 
 	return

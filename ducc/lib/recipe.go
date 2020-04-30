@@ -45,6 +45,7 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 			input, err := ParseImage(inputImage)
 			if err != nil {
 				LogE(err).WithFields(log.Fields{"image": inputImage}).Warning("Impossible to parse the image")
+				return
 			}
 			output := formatOutputImage(recipeYamlV1.OutputFormat, input)
 			wish, err := CreateWish(inputImage, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
