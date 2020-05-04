@@ -1,0 +1,13 @@
+cvmfs_test_name="Bind mount /cvmfs into singularity container"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../container_common.sh
+
+  ls /cvmfs/unpacked.cern.ch || return 1
+
+  return 0
+}
