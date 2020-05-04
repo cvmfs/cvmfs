@@ -61,6 +61,13 @@ class CatalogCountersMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
+class ChunkListMagicXattr : public BaseMagicXattr {
+  std::string chunk_list_;
+
+  virtual bool PrepareValueFenced();
+  virtual std::string GetValue();
+};
+
 class ChunksMagicXattr : public BaseMagicXattr {
   uint64_t n_chunks_;
 

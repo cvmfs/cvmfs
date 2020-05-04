@@ -48,6 +48,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint)
   withhash_xattrs_["user.hash"] = new HashMagicXattr();
   withhash_xattrs_["user.lhash"] = new LHashMagicXattr();
 
+  regular_xattrs_["user.chunk_list"] = new ChunkListMagicXattr();
   regular_xattrs_["user.chunks"] = new ChunksMagicXattr();
   regular_xattrs_["user.compression"] = new CompressionMagicXattr();
   regular_xattrs_["user.external_file"] = new ExternalFileMagicXattr();
@@ -143,7 +144,8 @@ std::string CatalogCountersMagicXattr::GetValue() {
   return res;
 }
 
-bool ChunksMagicXattr::PrepareValueFenced() {
+bool ChunkListMagicXattr::PrepareValueFenced() {
+  chunk_list_ = "hash,offset,size\n";
   if (!dirent_->IsRegular()) {
     return false;
   }
@@ -157,11 +159,44 @@ bool ChunksMagicXattr::PrepareValueFenced() {
                 "'chunked', but no chunks found.", path_.c_str());
       return false;
     } else {
+      for (size_t i = 0; i < chunks.size(); ++i) {
+        chunk_list_ += chunks.At(i).content_hash().ToString() + ",";
+        chunk_list_ += StringifyInt(chunks.At(i).offset()) + ",";
+        chunk_list_ += StringifyUint(chunks.At(i).size()) + "\n";
+      }
+    }
+  } else {
+    chunk_list_ += dirent_->checksum().ToString() + ",";
+    chunk_list_ += "0,";
+    chunk_list_ += StringifyUint(dirent_->size()) + "\n";
+  }
+  return true;
+}
+
+std::string ChunkListMagicXattr::GetValue() {
+  return chunk_list_;
+}
+
+bool ChunksMagicXattr::PrepareValueFenced() {
+  if (!dirent_->IsRegular()) {
+    return false;
+  }
+  if (dirent_->IsChunkedFile()) {
+    FileChunkList chunks;
+    if (!mount_point_->catalog_mgr()
+                     ->ListFileChunks(path_, dirent_->hash_algorithm(), &chunks)
+        || chunks.IsEmpty())
+    {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "file %s is marked as "
+                 "'chunked', but no chunks found.", path_.c_str());
+       return false;
+    } else {
       n_chunks_ = chunks.size();
     }
   } else {
     n_chunks_ = 1;
   }
+
   return true;
 }
 
