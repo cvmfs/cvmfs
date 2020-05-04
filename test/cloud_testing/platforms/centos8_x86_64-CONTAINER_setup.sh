@@ -9,6 +9,15 @@ echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 
+# Singularity is in epel
+echo "enabling epel yum repository..."
+install_from_repo epel-release    || die "fail (install epel-release)"
+
+# Container runtimes and tools
+install_from_repo singularity     || die "fail (install singularity)"
+install_from_repo runc            || die "fail (install runc)"
+install_from_repo fuse-overlayfs  || die "fail (install fuse-overlayfs)"
+
 # setup environment
 echo -n "setting up CernVM-FS environment..."
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
