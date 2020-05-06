@@ -29,7 +29,7 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
   using namespace receiver;  // NOLINT
 
   // First, read the command identifier
-  int32_t req_id = 0;
+  int32_t req_id = Reactor::Request::kQuit;
   int nb = SafeRead(fd, &req_id, 4);
 
   if (nb != 4) {
@@ -54,10 +54,9 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
     }
 
     *data = std::string(&buffer[0], msg_size);
-    return static_cast<Request>(req_id);
   }
 
-  return kQuit;
+  return static_cast<Request>(req_id);
 }
 
 bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
@@ -496,6 +495,11 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
         ok &= HandleCommit(data, &reply);
         ok &= WriteReply(fdout_, reply);
         break;
+      case kTestCrash:
+        PANIC(kLogSyslogErr,
+              "Crash for test purposes. Should never happen in production "
+              "environment.");
+        break;
       case kError:
         LogCvmfs(kLogReceiver, kLogSyslogErr,
                  "Reactor: unknown command received.");
@@ -508,7 +512,7 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
     reply.clear();
 
     std::string error("runtime error: ");
-    error + e.what();
+    error += e.what();
 
     JsonStringInput input;
     input.PushBack("status", "error");
