@@ -29,7 +29,7 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
   using namespace receiver;  // NOLINT
 
   // First, read the command identifier
-  int32_t req_id = Reactor::Request::kQuit;
+  int32_t req_id = kQuit;
   int nb = SafeRead(fd, &req_id, 4);
 
   if (nb != 4) {
