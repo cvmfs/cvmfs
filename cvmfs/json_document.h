@@ -12,8 +12,6 @@
 #include "json.h"
 #include "util/single_copy.h"
 
-#include "json_document_write.h"
-
 typedef struct json_value JSON;
 
 class JsonDocument : SingleCopy {

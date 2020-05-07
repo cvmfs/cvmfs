@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "json_document.h"
+#include "json_document_write.h"
 #include "util/pointer.h"
 
 TEST(T_Json, Empty) {

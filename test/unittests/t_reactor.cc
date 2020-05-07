@@ -6,6 +6,7 @@
 
 #include <logging.h>
 #include "json_document.h"
+#include "json_document_write.h"
 #include "pack.h"
 #include "receiver/payload_processor.h"
 #include "receiver/reactor.h"
