@@ -11,6 +11,7 @@
 #include "cvmfs_config.h"
 #include "gateway_util.h"
 #include "json_document.h"
+#include "json_document_write.h"
 #include "swissknife_lease_curl.h"
 #include "util/exception.h"
 #include "util/string.h"
@@ -288,14 +289,13 @@ bool SessionContext::FinalizeDerived() {
 bool SessionContext::Commit(const std::string& old_root_hash,
                             const std::string& new_root_hash,
                             const RepositoryTag& tag) {
-  std::string request;
-  JsonStringInput request_input;
+  JsonStringGenerator request_input;
   request_input.PushBack("old_root_hash", old_root_hash);
   request_input.PushBack("new_root_hash", new_root_hash);
   request_input.PushBack("tag_name", tag.name_);
   request_input.PushBack("tag_channel", tag.channel_);
   request_input.PushBack("tag_description", tag.description_);
-  ToJsonString(request_input, &request);
+  std::string request = request_input.GenerateString();
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
                         request, &buffer);

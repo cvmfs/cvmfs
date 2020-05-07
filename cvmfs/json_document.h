@@ -12,36 +12,9 @@
 #include "json.h"
 #include "util/single_copy.h"
 
+#include "json_document_write.h"
+
 typedef struct json_value JSON;
-
-// This class is used for marshalling JSON objects to strings.
-// When adding an object, use quoted = true for strings and
-// quoted = false for numbers, nested objects, etc.
-
-struct JsonStringInput {
-  struct JsonStringEntry {
-    std::string key;
-    std::string val;
-    bool quoted;
-
-    JsonStringEntry() {
-      quoted = true;
-    }
-  };
-
-  void PushBack(std::string key, std::string val, bool quoted = true) {
-    JsonStringEntry entry;
-    entry.key = key;
-    entry.val = val;
-    entry.quoted = quoted;
-    entries.push_back(entry);
-  }
-
-
-  std::vector<JsonStringEntry> entries;
-};
-
-bool ToJsonString(const JsonStringInput &input, std::string *output);
 
 class JsonDocument : SingleCopy {
  public:

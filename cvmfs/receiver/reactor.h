@@ -56,12 +56,12 @@ class Reactor {
  protected:
   // NOTE: These methods are virtual such that they can be mocked for the
   // purpose of unit testing
-  virtual bool HandleGenerateToken(const std::string& req, std::string* reply);
-  virtual bool HandleGetTokenId(const std::string& req, std::string* reply);
-  virtual bool HandleCheckToken(const std::string& req, std::string* reply);
+  virtual bool HandleGenerateToken(const std::string& req, std::string& reply);
+  virtual bool HandleGetTokenId(const std::string& req, std::string& reply);
+  virtual bool HandleCheckToken(const std::string& req, std::string& reply);
   virtual bool HandleSubmitPayload(int fdin, const std::string& req,
-                                   std::string* reply);
-  virtual bool HandleCommit(const std::string& req, std::string* reply);
+                                   std::string& reply);
+  virtual bool HandleCommit(const std::string& req, std::string& reply);
 
   virtual PayloadProcessor* MakePayloadProcessor();
   virtual CommitProcessor* MakeCommitProcessor();

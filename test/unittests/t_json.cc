@@ -63,14 +63,13 @@ TEST(T_Json, SearchInObject) {
   EXPECT_EQ(NULL, result);
 }
 
-TEST(T_Json, ToJsonString) {
-  JsonStringInput input;
+TEST(T_Json, GenerateValidJsonString) {
+  JsonStringGenerator input;
   input.PushBack("f1", "v1");
   input.PushBack("f2", "v2");
   input.PushBack("f3", "v3");
 
-  std::string output;
-  ASSERT_TRUE(ToJsonString(input, &output));
+  std::string output = input.GenerateString();
 
   ASSERT_EQ("{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\"}", output);
 

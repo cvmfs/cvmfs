@@ -174,12 +174,11 @@ TEST_F(T_Reactor, FullCycle) {
   }
 
   // Check the token validity
-  JsonStringInput request_terms;
+  JsonStringGenerator request_terms;
   request_terms.PushBack("token", &token[0]);
   request_terms.PushBack("secret", &secret[0]);
 
-  std::string request;
-  ASSERT_TRUE(ToJsonString(request_terms, &request));
+  std::string request = request_terms.GenerateString();
   ASSERT_TRUE(
       Reactor::WriteRequest(to_reactor_[1], Reactor::kCheckToken, request));
 

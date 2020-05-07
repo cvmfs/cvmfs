@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "commit_processor.h"
+#include "json_document_write.h"
 #include "logging.h"
 #include "payload_processor.h"
 #include "repository_tag.h"
@@ -180,11 +181,7 @@ bool Reactor::Run() {
   return true;
 }
 
-bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
-  if (reply == NULL) {
-    PANIC(kLogSyslogErr, "HandleGenerateToken: Invalid reply pointer.");
-  }
-
+bool Reactor::HandleGenerateToken(const std::string& req, std::string& reply) {
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -217,23 +214,18 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
     return false;
   }
 
-  JsonStringInput input;
+  JsonStringGenerator input;
   input.PushBack("token", session_token.c_str());
   input.PushBack("id", public_token_id.c_str());
   input.PushBack("secret", token_secret.c_str());
 
-  ToJsonString(input, reply);
-
+  reply = input.GenerateString();
   return true;
 }
 
-bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
-  if (reply == NULL) {
-    PANIC(kLogSyslogErr, "HandleGetTokenId: Invalid reply pointer.");
-  }
-
+bool Reactor::HandleGetTokenId(const std::string& req, std::string& reply) {
   std::string token_id;
-  JsonStringInput input;
+  JsonStringGenerator input;
   if (!GetTokenPublicId(req, &token_id)) {
     input.PushBack("status", "error");
     input.PushBack("reason", "invalid_token");
@@ -242,15 +234,11 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
     input.PushBack("id", token_id);
   }
 
-  ToJsonString(input, reply);
+  reply = input.GenerateString();
   return true;
 }
 
-bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
-  if (reply == NULL) {
-    PANIC(kLogSyslogErr, "HandleCheckToken: Invalid reply pointer.");
-  }
-
+bool Reactor::HandleCheckToken(const std::string& req, std::string& reply) {
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -270,7 +258,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   }
 
   std::string path;
-  JsonStringInput input;
+  JsonStringGenerator input;
   TokenCheckResult ret =
       CheckToken(token->string_value, secret->string_value, &path);
   switch (ret) {
@@ -295,18 +283,14 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
             "HandleCheckToken: Unknown value received. Exiting.");
   }
 
-  ToJsonString(input, reply);
+  reply = input.GenerateString();
   return true;
 }
 
 // This is a special handler. We need to continue reading the payload from the
 // fdin_
 bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
-                                  std::string* reply) {
-  if (!reply) {
-    PANIC(kLogSyslogErr, "HandleSubmitPayload: Invalid reply pointer.");
-  }
-
+                                  std::string& reply) {
   // Extract the Path (used for verification), Digest and DigestSize from the
   // request JSON.
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
@@ -333,7 +317,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
   proc->SetStatistics(&statistics);
-  JsonStringInput reply_input;
+  JsonStringGenerator reply_input;
   PayloadProcessor::Result res =
       proc->Process(fdin, digest_json->string_value, path_json->string_value,
                     header_size_json->int_value);
@@ -365,16 +349,12 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   std::string stats_json = statistics.PrintJSON();
   reply_input.PushBack("statistics", stats_json, false);
 
-  ToJsonString(reply_input, reply);
+  reply = reply_input.GenerateString();
 
   return true;
 }
 
-bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
-  if (!reply) {
-    PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
-  }
-
+bool Reactor::HandleCommit(const std::string& req, std::string& reply) {
   // Extract the Path from the request JSON.
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
@@ -424,7 +404,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
                                               old_root_hash, new_root_hash,
                                               repo_tag);
 
-  JsonStringInput reply_input;
+  JsonStringGenerator reply_input;
   switch (res) {
     case CommitProcessor::kSuccess:
       reply_input.PushBack("status", "ok");
@@ -447,7 +427,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       break;
   }
 
-  ToJsonString(reply_input, reply);
+  reply = reply_input.GenerateString();
 
   return true;
 }
@@ -471,23 +451,23 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       ok = WriteReply(fdout_, std::string("PID: ") + StringifyUint(getpid()));
       break;
     case kGenerateToken:
-      ok &= HandleGenerateToken(data, &reply);
+      ok &= HandleGenerateToken(data, reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kGetTokenId:
-      ok &= HandleGetTokenId(data, &reply);
+      ok &= HandleGetTokenId(data, reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kCheckToken:
-      ok &= HandleCheckToken(data, &reply);
+      ok &= HandleCheckToken(data, reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kSubmitPayload:
-      ok &= HandleSubmitPayload(fdin_, data, &reply);
+      ok &= HandleSubmitPayload(fdin_, data, reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kCommit:
-      ok &= HandleCommit(data, &reply);
+      ok &= HandleCommit(data, reply);
       ok &= WriteReply(fdout_, reply);
       break;
     case kError:
