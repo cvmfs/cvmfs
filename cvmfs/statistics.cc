@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 
+#include "json_document_write.h"
 #include "platform.h"
 #include "smalloc.h"
 #include "util/string.h"
@@ -75,7 +76,6 @@ string Statistics::LookupDesc(const std::string &name) {
   return "";
 }
 
-
 string Statistics::PrintList(const PrintOptions print_options) {
   string result;
   if (print_options == kPrintHeader)
@@ -90,19 +90,18 @@ string Statistics::PrintList(const PrintOptions print_options) {
   }
   return result;
 }
-string Statistics::PrintJSON() {
-  string result = "{";
-  MutexLockGuard lock_guard(lock_);
-  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
-       iEnd = counters_.end(); i != iEnd; ++i)
-  {
-    result +=
-      std::string("\"") + i->first + "\":\"" +
-      i->second->counter.ToString() + "\",";
-  }
-  result[result.length() - 1] = '}';  // replace last ',' with '}'
 
-  return result;
+string Statistics::PrintJSON() {
+  MutexLockGuard lock_guard(lock_);
+
+  JsonStringGenerator json_generator;
+  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
+                                                  iEnd = counters_.end();
+       i != iEnd; ++i) {
+    json_generator.PushBack(i->first, i->second->counter.ToString());
+  }
+
+  return json_generator.GenerateString();
 }
 
 Counter *Statistics::Register(const string &name, const string &desc) {

@@ -4,8 +4,10 @@
 
 #include "gtest/gtest.h"
 
+#include "json_document.h"
 #include "platform.h"
 #include "statistics.h"
+#include "util/pointer.h"
 
 using namespace std;  // NOLINT
 
@@ -169,6 +171,14 @@ TEST(T_Statistics, MultiRecorder) {
   recorder.Tick();
   EXPECT_EQ(1U, recorder.GetNoTicks(1));
   EXPECT_EQ(1U, recorder.GetNoTicks(uint32_t(-1)));
+}
+
+TEST(T_Statistics, GenerateCorrectJsonEvenWithoutInput) {
+  Statistics stats;
+  std::string output = stats.PrintJSON();
+
+  UniquePtr<JsonDocument> json(JsonDocument::Create(output));
+  ASSERT_TRUE(json.IsValid());
 }
 
 }  // namespace perf
