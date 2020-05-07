@@ -5,6 +5,9 @@
 #ifndef CVMFS_JSON_DOCUMENT_WRITE_H_
 #define CVMFS_JSON_DOCUMENT_WRITE_H_
 
+#include <string>
+#include <vector>
+
 // This class is used for marshalling JSON objects to strings.
 // When adding an object, use quoted = true for strings and
 // quoted = false for numbers, nested objects, etc.
@@ -52,4 +55,4 @@ class JsonStringGenerator {
   std::vector<JsonStringEntry> entries;
 };
 
-#endif  // CVMFS_JSON_DOCUMENT_H_
+#endif  // CVMFS_JSON_DOCUMENT_WRITE_H_
