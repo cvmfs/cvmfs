@@ -25,6 +25,14 @@
 
 namespace receiver {
 
+// NOTE, during the handling of the messages between the gateway and the
+// receiver, we keep reading `4` bytes instead of the more common
+// `sizeof(req_id)` or `sizeof(int32_t)`.
+// This mirror well the behaviour of the gateway code.
+// It would be possible on both codebase to ask the size of the type, but then
+// we would need to make sure that the types are actually the same.
+// It is simpler to send `4` bytes.
+
 Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
   using namespace receiver;  // NOLINT
 
