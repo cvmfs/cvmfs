@@ -17,6 +17,16 @@ install_from_repo epel-release    || die "fail (install epel-release)"
 install_from_repo singularity     || die "fail (install singularity)"
 install_from_repo runc            || die "fail (install runc)"
 install_from_repo fuse-overlayfs  || die "fail (install fuse-overlayfs)"
+install_from_repo podman          || die "fail (install podman)"
+
+sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+sudo dnf install docker-ce --nobest -y || die "fail (install docker-ce)"
+sudo systemctl start docker            || die "fail (starting docker)"
+sudo usermod -aG docker sftnight
+newgrp docker
+docker ps                              || die "fail (accessing docker)"
+
+install_rpm https://ecsft.cern.ch/cvmfs/dist/builddeps/minikube-1.9.2-0.x86_64.rpm || die "fail (install minikube)"
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."
