@@ -684,3 +684,70 @@ TEST_F(T_Libcvmfs, ListNestedCatalogs) {
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }
+
+TEST_F(T_Libcvmfs, ListStat) {
+  // Initialize options
+  cvmfs_option_map *opts = cvmfs_options_init();
+
+  // Create and initialize repository named "stat"
+  CatalogTestTool tester("list_stat");
+  EXPECT_TRUE(tester.Init());
+
+  // Create file structure
+  DirSpec spec1 = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+  tester.DestroyCatalogManager();
+
+  // Set CVMFS options to reflect created repository
+  cvmfs_options_set(opts, "CVMFS_ROOT_HASH",
+                        tester.manifest()->catalog_hash().ToString().c_str());
+  cvmfs_options_set(opts, "CVMFS_SERVER_URL",
+                        ("file://" + tester.repo_name()).c_str());
+  cvmfs_options_set(opts, "CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts, "CVMFS_PUBLIC_KEY",
+                        tester.public_key().c_str());
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR",
+                        (tester.repo_name()+"/data/txn").c_str());
+  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR",
+                        ("/cvmfs" + tester.repo_name()).c_str());
+
+  // Initialize client repo based on options
+  ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+  // Attach to client repo
+  cvmfs_context *ctx;
+  EXPECT_EQ(LIBCVMFS_ERR_OK,
+    cvmfs_attach_repo_v2((tester.repo_name().c_str()), opts, &ctx));
+
+  struct cvmfs_stat_t *buf = 0;
+  size_t buflen = 0;
+  size_t listlen = 0;
+
+  int retval = cvmfs_listdir_stat(ctx, "dir", &buf, &listlen, &buflen);
+  EXPECT_EQ(0, retval);
+
+  EXPECT_EQ(4U, listlen);
+
+  for (size_t i = 0; i < listlen; ++i) {
+    if (!strcmp(buf[i].name, "dir")) {
+      EXPECT_TRUE(buf[i].info.st_mode & S_IFDIR);
+    } else if (!strcmp(buf[i].name, "dir2")) {
+      EXPECT_TRUE(buf[i].info.st_mode & S_IFDIR);
+
+    } else if (!strcmp(buf[i].name, "dir3")) {
+      EXPECT_TRUE(buf[i].info.st_mode & S_IFDIR);
+
+    } else if (!strcmp(buf[i].name, "file1")) {
+      EXPECT_TRUE(buf[i].info.st_mode & S_IFREG);
+      EXPECT_EQ(static_cast<int>(g_file_size), buf[i].info.st_size);
+
+    } else {
+      FAIL() << "unexpected object in list: " << buf[i].name;
+    }
+  }
+
+  // Finalize and close repo and options
+  cvmfs_detach_repo(ctx);
+  cvmfs_fini();
+  cvmfs_options_fini(opts);
+}
