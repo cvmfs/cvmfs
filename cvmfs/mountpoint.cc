@@ -1167,8 +1167,6 @@ MountPoint *MountPoint::Create(
   mountpoint->CreateTables();
   mountpoint->SetupBehavior();
 
-  mountpoint->magic_xattr_mgr_ = new MagicXattrManager(mountpoint.weak_ref());
-
   mountpoint->boot_status_ = loader::kFailOk;
   return mountpoint.Release();
 }
@@ -1649,7 +1647,6 @@ MountPoint::MountPoint(
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
-  , hide_magic_xattrs_(false)
   , enforce_acls_(false)
   , has_membership_req_(false)
 {
@@ -1731,11 +1728,14 @@ void MountPoint::SetupBehavior() {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
 
+  bool hide_magic_xattrs = false;
   if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
       && options_mgr_->IsOn(optarg))
   {
-    hide_magic_xattrs_ = true;
+    hide_magic_xattrs = true;
   }
+  magic_xattr_mgr_ = new MagicXattrManager(this, hide_magic_xattrs);
+
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)
       && options_mgr_->IsOn(optarg))

@@ -1359,10 +1359,10 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     assert(retval);
   }
 
-  BaseMagicXattr *magic_xattr;
+  MagicXattrRAIIWrapper magic_xattr;
   bool magic_xattr_success = true;
   magic_xattr = mount_point_->magic_xattr_mgr()->Get(attr, path, &d);
-  if (magic_xattr != NULL) {
+  if (!magic_xattr.IsNull()) {
     magic_xattr_success = magic_xattr->PrepareValueFenced();
   }
 
@@ -1380,7 +1380,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
   string attribute_value;
 
-  if (magic_xattr != NULL) {
+  if (!magic_xattr.IsNull()) {
     attribute_value = magic_xattr->GetValue();
   } else {
     if (!xattrs.Get(attr, &attribute_value)) {
@@ -1409,7 +1409,8 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   TraceInode(Tracer::kEventListAttr, ino, "listxattr()");
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_listxattr on inode: %" PRIu64 ", size %u [hide xattrs %d]",
-           uint64_t(ino), size, mount_point_->hide_magic_xattrs());
+           uint64_t(ino), size,
+           mount_point_->magic_xattr_mgr()->hide_magic_xattrs());
 
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
@@ -1429,13 +1430,8 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   }
 
   string attribute_list;
-  if (mount_point_->hide_magic_xattrs()) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
-    attribute_list = xattrs.ListKeysPosix("");
-  } else {
-    attribute_list = mount_point_->magic_xattr_mgr()->GetListString(&d);
-    attribute_list = xattrs.ListKeysPosix(attribute_list);
-  }
+  attribute_list = mount_point_->magic_xattr_mgr()->GetListString(&d);
+  attribute_list = xattrs.ListKeysPosix(attribute_list);
 
   if (size == 0) {
     fuse_reply_xattr(req, attribute_list.length());
@@ -1618,16 +1614,19 @@ loader::CvmfsExports *g_cvmfs_exports = NULL;
  */
 
 class ExpiresMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced() { return true; }
+  time_t catalogs_valid_until_;
+
+  virtual bool PrepareValueFenced() {
+    catalogs_valid_until_ = cvmfs::fuse_remounter_->catalogs_valid_until();
+    return true;
+  }
+
   virtual std::string GetValue() {
-    if (cvmfs::fuse_remounter_->catalogs_valid_until() ==
-        MountPoint::kIndefiniteDeadline)
-    {
+    if (catalogs_valid_until_ == MountPoint::kIndefiniteDeadline) {
       return "never (fixed root catalog)";
     } else {
       time_t now = time(NULL);
-      return StringifyInt(
-        (cvmfs::fuse_remounter_->catalogs_valid_until() - now) / 60);
+      return StringifyInt( (catalogs_valid_until_ - now) / 60);
     }
   }
 };

@@ -11,46 +11,93 @@
 #include "catalog_counters.h"
 #include "directory_entry.h"
 #include "shortstring.h"
+#include "util/exception.h"
 #include "util/string.h"
 
 class MountPoint;
+
+enum MagicXattrFlavor {
+  kXattrBase = 0,
+  kXattrWithHash,
+  kXattrRegular,
+  kXattrSymlink,
+  kXattrAuthz
+};
 
 class BaseMagicXattr {
   friend class MagicXattrManager;
 
  public:
-  virtual bool PrepareValueFenced() { return false; }
-  virtual std::string GetValue() { return ""; }
+  BaseMagicXattr() {
+    int retval = pthread_mutex_init(&access_mutex_, NULL);
+    assert(retval == 0);
+  }
+
+  virtual bool PrepareValueFenced() { return true; }
+  virtual std::string GetValue() = 0;
+  virtual MagicXattrFlavor GetXattrFlavor() { return kXattrBase; }
+
+  void Lock(PathString path, catalog::DirectoryEntry *dirent) {
+    int retval = pthread_mutex_lock(&access_mutex_);
+    assert(retval == 0);
+    path_ = path;
+    dirent_ = dirent;
+  }
+  void Release() {
+    int retval = pthread_mutex_unlock(&access_mutex_);
+    assert(retval == 0);
+  }
 
   virtual ~BaseMagicXattr() {}
  protected:
-  BaseMagicXattr() {}
 
   MountPoint *mount_point_;
   PathString path_;
   catalog::DirectoryEntry *dirent_;
+
+  pthread_mutex_t access_mutex_;
+};
+
+class MagicXattrRAIIWrapper {
+ public:
+  inline MagicXattrRAIIWrapper() : ref_(NULL) { }
+  inline explicit MagicXattrRAIIWrapper(BaseMagicXattr *ref) : ref_(ref) { }
+  inline ~MagicXattrRAIIWrapper() { if (ref_ != NULL) ref_->Release(); }
+  inline BaseMagicXattr* operator->() const { return ref_; }
+  inline bool IsNull() const { return ref_ == NULL; }
+ 
+ protected:
+  BaseMagicXattr *ref_;
+};
+
+class WithHashMagicXattr : public BaseMagicXattr {
+  virtual MagicXattrFlavor GetXattrFlavor() { return kXattrWithHash; }
+};
+
+class RegularMagicXattr : public BaseMagicXattr {
+  virtual MagicXattrFlavor GetXattrFlavor() { return kXattrRegular; }
 };
 
 class MagicXattrManager {
  public:
-  explicit MagicXattrManager(MountPoint *mountpoint);
-  BaseMagicXattr *Get(const std::string &name, PathString path,
-                      catalog::DirectoryEntry *d);
+  explicit MagicXattrManager(MountPoint *mountpoint, bool hide_magic_xattrs);
+  MagicXattrRAIIWrapper Get(const std::string &name, PathString path,
+                            catalog::DirectoryEntry *d);
   std::string GetListString(catalog::DirectoryEntry *dirent);
   void Register(const std::string &name, BaseMagicXattr *magic_xattr);
+  
+  bool hide_magic_xattrs() { return hide_magic_xattrs_; }
 
  protected:
-  std::map<std::string, BaseMagicXattr *> base_xattrs_;
-  std::map<std::string, BaseMagicXattr *> withhash_xattrs_;
-  std::map<std::string, BaseMagicXattr *> regular_xattrs_;
-  std::map<std::string, BaseMagicXattr *> symlink_xattrs_;
-  std::map<std::string, BaseMagicXattr *> authz_xattrs_;
+  std::map<std::string, BaseMagicXattr *> xattr_list_;
   MountPoint *mount_point_;
+  bool hide_magic_xattrs_;
 };
 
-class AuthZMagicXattr : public BaseMagicXattr {
+class AuthzMagicXattr : public BaseMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
+  virtual MagicXattrFlavor GetXattrFlavor();
 };
 
 class CatalogCountersMagicXattr : public BaseMagicXattr {
@@ -61,67 +108,61 @@ class CatalogCountersMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
-class ChunkListMagicXattr : public BaseMagicXattr {
+class ChunkListMagicXattr : public RegularMagicXattr {
   std::string chunk_list_;
 
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
-class ChunksMagicXattr : public BaseMagicXattr {
+class ChunksMagicXattr : public RegularMagicXattr {
   uint64_t n_chunks_;
 
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
-class CompressionMagicXattr : public BaseMagicXattr {
+class CompressionMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
-class ExternalFileMagicXattr : public BaseMagicXattr {
+class ExternalFileMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class ExternalHostMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class ExternalTimeoutMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class FqrnMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
-class HashMagicXattr : public BaseMagicXattr {
+class HashMagicXattr : public WithHashMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class HostMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class HostListMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
-class LHashMagicXattr : public BaseMagicXattr {
+class LHashMagicXattr : public WithHashMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class NCleanup24MagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
@@ -133,12 +174,10 @@ class NClgMagicXattr : public BaseMagicXattr {
 };
 
 class NDirOpenMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class NDownloadMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
@@ -150,12 +189,10 @@ class NIOErrMagicXattr : public BaseMagicXattr {
 };
 
 class NOpenMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class ProxyMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
@@ -169,6 +206,7 @@ class PubkeysMagicXattr : public BaseMagicXattr {
 class RawlinkMagicXattr : public BaseMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
+  virtual MagicXattrFlavor GetXattrFlavor();
 };
 
 class RepoCountersMagicXattr : public BaseMagicXattr {
@@ -203,12 +241,10 @@ class RootHashMagicXattr : public BaseMagicXattr {
 };
 
 class RxMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class SpeedMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
@@ -220,12 +256,10 @@ class TagMagicXattr : public BaseMagicXattr {
 };
 
 class TimeoutMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class TimeoutDirectMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
@@ -244,7 +278,6 @@ class UsedDirPMagicXattr : public BaseMagicXattr {
 };
 
 class VersionMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
