@@ -18,19 +18,12 @@
 #include "dns.h"
 #include "duplex_curl.h"
 #include "prng.h"
+#include "util/file_backed_buffer.h"
 #include "util/mmap_file.h"
+#include "util/pointer.h"
 #include "util_concurrency.h"
 
 namespace s3fanout {
-
-/**
- * From where to read the data.
- */
-enum Origin {
-  kOriginMem = 1,
-  kOriginPath,
-};  // Origin
-
 
 enum AuthzMethods {
   kAuthzAwsV2 = 0,
@@ -106,54 +99,25 @@ struct JobInfo {
     kReqDelete,
   };
 
-  Origin origin;
-  struct {
-    size_t size;
-    size_t pos;
-    const unsigned char *data;
-  } origin_mem;
-
   const std::string object_key;
-  const std::string origin_path;
   void *callback;  // Callback to be called when job is finished
-  MemoryMappedFile *mmf;
+  UniquePtr<FileBackedBuffer> origin;
 
   // One constructor per destination
   JobInfo(
     const std::string &object_key,
     void *callback,
-    const std::string &origin_path)
-    : object_key(object_key)
-    , origin_path(origin_path)
+    FileBackedBuffer *origin)
+    : object_key(object_key),
+      origin(origin)
   {
     JobInfoInit();
-    origin = kOriginPath;
     this->callback = callback;
-  }
-  JobInfo(
-    const std::string &object_key,
-    void *callback,
-    MemoryMappedFile *mmf,
-    const unsigned char *buffer, size_t size)
-    : object_key(object_key)
-  {
-    JobInfoInit();
-    origin = kOriginMem;
-    origin_mem.size = size;
-    origin_mem.data = buffer;
-    this->callback = callback;
-    this->mmf = mmf;
   }
   void JobInfoInit() {
     curl_handle = NULL;
     http_headers = NULL;
-    origin_mem.pos = 0;
-    origin_mem.size = 0;
-    origin_mem.data = NULL;
     callback = NULL;
-    mmf = NULL;
-    origin_file = NULL;
-    payload_size = 0;
     request = kReqPutCas;
     error_code = kFailOk;
     http_error = 0;
@@ -161,14 +125,12 @@ struct JobInfo {
     backoff_ms = 0;
     throttle_ms = 0;
     throttle_timestamp = 0;
-    origin = kOriginPath;
   }
   ~JobInfo() {}
 
   // Internal state, don't touch
   CURL *curl_handle;
   struct curl_slist *http_headers;
-  FILE *origin_file;
   uint64_t payload_size;
   RequestType request;
   Failures error_code;
@@ -277,7 +239,6 @@ class S3FanoutManager : SingleCopy {
   std::string GetUriEncode(const std::string &val, bool encode_slash) const;
   std::string GetAwsV4SigningKey(const std::string &date) const;
   bool MkPayloadHash(const JobInfo &info, std::string *hex_hash) const;
-  bool MkPayloadSize(const JobInfo &info, uint64_t *size) const;
   bool MkV2Authz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   bool MkV4Authz(const JobInfo &info,

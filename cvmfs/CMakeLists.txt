@@ -339,6 +339,7 @@ set (LIBCVMFS_SERVER_SOURCES
   util_concurrency.cc
   util/algorithm.cc
   util/exception.cc
+  util/file_backed_buffer.cc
   util/mmap_file.cc
   util/posix.cc
   util/raii_temp_dir.cc
@@ -452,6 +453,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   url.cc
   util/algorithm.cc
   util/exception.cc
+  util/file_backed_buffer.cc
   util/mmap_file.cc
   util/posix.cc
   util/string.cc
@@ -522,6 +524,7 @@ set (CVMFS_PRELOADER_SOURCES
   upload_spooler_definition.cc
   util/algorithm.cc
   util/exception.cc
+  util/file_backed_buffer.cc
   util/mmap_file.cc
   util/posix.cc
   util/string.cc
@@ -606,6 +609,7 @@ if(BUILD_RECEIVER)
     upload_spooler_definition.cc
     util/algorithm.cc
     util/exception.cc
+    util/file_backed_buffer.cc
     util/mmap_file.cc
     util/posix.cc
     util/string.cc
