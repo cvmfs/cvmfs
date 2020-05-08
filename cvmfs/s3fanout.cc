@@ -7,6 +7,7 @@
 #include <pthread.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cerrno>
 #include <utility>
 
@@ -730,6 +731,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
   unsigned int nbytes =
     info.origin->Data(reinterpret_cast<void **>(&data),
                              info.origin->GetSize(), 0);
+  assert(nbytes == info.origin->GetSize());
 
   switch (config_.authz_method) {
     case kAuthzAwsV2:

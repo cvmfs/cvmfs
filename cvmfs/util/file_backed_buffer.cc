@@ -36,22 +36,22 @@ FileBackedBuffer::FileBackedBuffer(uint64_t in_memory_threshold,
 
 FileBackedBuffer::~FileBackedBuffer() {
   free(buf_);
+  if (mode_ != kFileMode)
+    return;
 
-  if (mode_ == kFileMode) {
-    if (state_ == kWriteState) {
-      int retval = fclose(fp_);
-      if (retval != 0)
-        PANIC(kLogStderr, "could not close temporary file %s: error %d",
-              file_path_.c_str(), retval);
-    } else {
-      mmapped_->Unmap();
-      delete mmapped_;
-    }
-    int retval = unlink(file_path_.c_str());
+  if (state_ == kWriteState) {
+    int retval = fclose(fp_);
     if (retval != 0)
-      PANIC(kLogStderr, "could not delete temporary file %s: error %d",
+      PANIC(kLogStderr, "could not close temporary file %s: error %d",
             file_path_.c_str(), retval);
+  } else {
+    mmapped_->Unmap();
+    delete mmapped_;
   }
+  int retval = unlink(file_path_.c_str());
+  if (retval != 0)
+    PANIC(kLogStderr, "could not delete temporary file %s: error %d",
+          file_path_.c_str(), retval);
 }
 
 void FileBackedBuffer::Append(const void *source, uint64_t len) {
@@ -121,12 +121,9 @@ void FileBackedBuffer::Commit() {
 int64_t FileBackedBuffer::Data(void **ptr, int64_t len, uint64_t pos) {
   assert(state_ == kReadState);
 
-  int64_t actual_len = (pos + len <= size_) ? len : size_ - pos;
-  // return 0 if invalid
-  if (actual_len < 0) {
-    PANIC(kLogStderr, "reading from invalid position %lu (buffer size %lu)",
-          pos, size_);
-  }
+  int64_t actual_len = (pos + len <= size_) ?
+    len : static_cast<int64_t>(size_) - static_cast<int64_t>(pos);
+  assert(actual_len >= 0);
 
   if (mode_ == kMemoryMode) {
     *ptr = buf_ + pos;
@@ -150,9 +147,7 @@ int64_t FileBackedBuffer::ReadP(void *ptr, int64_t len, uint64_t pos) {
 }
 
 void FileBackedBuffer::Rewind() {
-  if (state_ == kWriteState) {
-    PANIC(kLogStderr, "cannot Rewind() before Commit()");
-  }
+  assert(state_ == kReadState);
   pos_ = 0;
 }
 

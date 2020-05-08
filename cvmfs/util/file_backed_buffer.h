@@ -15,16 +15,18 @@
 
 /**
  * FileBackedBuffer is a class for smart data writing and reading.
- * 
+ * It represents a buffer that is in a first step filled with data and,
+ * once all data has been written, it can be read back out.
+ *
  * It works in 2 modes: memory mode and file mode. It first starts
  * working in memory mode, but as soon as the buffer size reaches
  * a configurable threshold, it writes all data into a temporary file,
  * freeing up the occupied memory. From that point, all further data
  * are written directly into the file.
- * 
+ *
  * Reading is done straight from memory or using mmap, depending on the
  * current mode of operation.
- * 
+ *
  * Method call timeline:
  * 1. Create
  * 2. Append

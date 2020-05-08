@@ -9,9 +9,6 @@
 
 using namespace std;  // NOLINT
 
-// TEST(T_FileBackedBuffer, Init) {
-// }
-
 TEST(T_FileBackedBuffer, SimpleWriteAndRead) {
   FileBackedBuffer* buf = FileBackedBuffer::Create(39);
 

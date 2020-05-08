@@ -30,6 +30,7 @@ struct S3StreamHandle : public UploadStreamHandle {
     buffer = FileBackedBuffer::Create(in_memory_threshold, tmp_dir);
   }
 
+  // Ownership is later transferred to the S3 fanout
   UniquePtr<FileBackedBuffer> buffer;
 };
 
