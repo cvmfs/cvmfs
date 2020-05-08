@@ -8,6 +8,7 @@
 
 #include "duplex_ssl.h"
 #include "s3fanout.h"
+#include "util/file_backed_buffer.h"
 
 using namespace std;  // NOLINT
 
@@ -19,7 +20,8 @@ TEST(T_S3Fanout, Init) {
 }
 
 TEST(T_S3Fanout, DetectThrottleIndicator) {
-  s3fanout::JobInfo info("", NULL, "");
+  FileBackedBuffer *buf = FileBackedBuffer::Create(1024);
+  s3fanout::JobInfo info("", NULL, buf);
   info.throttle_ms = 1;
 
   s3fanout::S3FanoutManager::DetectThrottleIndicator("", &info);

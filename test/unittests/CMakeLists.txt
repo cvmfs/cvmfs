@@ -55,6 +55,7 @@ set(CVMFS_UNITTEST_FILES
   t_fd_table.cc
   t_fence.cc
   t_fetch.cc
+  t_file_backed_buffer.cc
   t_file_chunk.cc
   t_file_guard.cc
   t_file_sandbox.cc
@@ -252,6 +253,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/url.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/namespace.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
@@ -504,6 +506,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
