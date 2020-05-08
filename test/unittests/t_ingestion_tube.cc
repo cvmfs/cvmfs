@@ -12,11 +12,17 @@ using namespace std;  // NOLINT
 
 class T_Ingestion_Tube : public ::testing::Test {
  protected:
+  virtual void SetUp() {
+    s1 = "s1";
+    s2 = "s2";
+    s3 = "s3";
+    s4 = "s4";
+  }
   Tube<string> tube_;
-  string s1 = "s1";
-  string s2 = "s2";
-  string s3 = "s3";
-  string s4 = "s4";
+  string s1;
+  string s2;
+  string s3;
+  string s4;
 };
 
 TEST_F(T_Ingestion_Tube, Queue) {
