@@ -222,7 +222,7 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   input.PushBack("id", public_token_id.c_str());
   input.PushBack("secret", token_secret.c_str());
   std::string json = input.GenerateString();
-  reply->assign(json);
+  *reply = json;
 
   return true;
 }
@@ -242,7 +242,7 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
     input.PushBack("id", token_id);
   }
   std::string json = input.GenerateString();
-  reply->assign(json);
+  *reply = json;
 
   return true;
 }
@@ -297,7 +297,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   }
 
   std::string json = input.GenerateString();
-  reply->assign(json);
+  *reply = json;
 
   return true;
 }
@@ -369,7 +369,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   reply_input.PushBack("statistics", stats_json, false);
 
   std::string json = reply_input.GenerateString();
-  reply->assign(json);
+  *reply = json;
 
   return true;
 }
@@ -452,7 +452,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   }
 
   std::string json = reply_input.GenerateString();
-  reply->assign(json);
+  *reply = json;
 
   return true;
 }
