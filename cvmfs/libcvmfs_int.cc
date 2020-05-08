@@ -290,7 +290,7 @@ void LibContext::AppendStatToList(const cvmfs_stat_t   st,
        assert(*listlen < *buflen);
   }
   (*buf)[(*listlen)].info = st.info;
-  (*buf)[(*listlen)++].name = strdup(st.name);
+  (*buf)[(*listlen)++].name = st.name;
 }
 
 int LibContext::GetAttr(const char *c_path, struct stat *info) {
@@ -500,7 +500,7 @@ int LibContext::ListDirectoryStat(
   for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
     cvmfs_stat_t st;
     st.info = listing_from_catalog.AtPtr(i)->info;
-    st.name = listing_from_catalog.AtPtr(i)->name.c_str();
+    st.name = strdup(listing_from_catalog.AtPtr(i)->name.c_str());
     AppendStatToList(st, buf, listlen, buflen);
   }
 
@@ -538,19 +538,18 @@ int LibContext::GetNestedCatalogAttr(
   nc_attr->hash = strdup(hash.ToString().c_str());
   nc_attr->size = size;
 
-
-  nc_attr->regular = counters["regular"];
-  nc_attr->symlink = counters["symlink"];
-  nc_attr->special = counters["special"];
-  nc_attr->dir = counters["dir"];
-  nc_attr->nested = counters["nested"];
-  nc_attr->chunked = counters["chunked"];
-  nc_attr->chunks = counters["chunks"];
-  nc_attr->file_size = counters["file_size"];
-  nc_attr->chunked_size = counters["chunked_size"];
-  nc_attr->xattr = counters["xattr"];
-  nc_attr->external = counters["external"];
-  nc_attr->external_file_size = counters["external_file_size"];
+  nc_attr->ctr_regular = counters["regular"];
+  nc_attr->ctr_symlink = counters["symlink"];
+  nc_attr->ctr_special = counters["special"];
+  nc_attr->ctr_dir = counters["dir"];
+  nc_attr->ctr_nested = counters["nested"];
+  nc_attr->ctr_chunked = counters["chunked"];
+  nc_attr->ctr_chunks = counters["chunks"];
+  nc_attr->ctr_file_size = counters["file_size"];
+  nc_attr->ctr_chunked_size = counters["chunked_size"];
+  nc_attr->ctr_xattr = counters["xattr"];
+  nc_attr->ctr_external = counters["external"];
+  nc_attr->ctr_external_file_size = counters["external_file_size"];
   return 0;
 }
 

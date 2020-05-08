@@ -110,18 +110,18 @@ struct cvmfs_nc_attr {
   uint64_t size;
 
   // Catalog counters
-  uint64_t regular;
-  uint64_t symlink;
-  uint64_t special;
-  uint64_t dir;
-  uint64_t nested;
-  uint64_t chunked;
-  uint64_t chunks;
-  uint64_t file_size;
-  uint64_t chunked_size;
-  uint64_t xattr;
-  uint64_t external;
-  uint64_t external_file_size;
+  uint64_t ctr_regular;
+  uint64_t ctr_symlink;
+  uint64_t ctr_special;
+  uint64_t ctr_dir;
+  uint64_t ctr_nested;
+  uint64_t ctr_chunked;
+  uint64_t ctr_chunks;
+  uint64_t ctr_file_size;
+  uint64_t ctr_chunked_size;
+  uint64_t ctr_xattr;
+  uint64_t ctr_external;
+  uint64_t ctr_external_file_size;
 };
 
 /**
@@ -166,8 +166,13 @@ struct cvmfs_attr {
   void * cvm_xattrs;
 };
 
+
+/**
+ * Struct for storing stat info about an object.
+ */
 struct cvmfs_stat_t {
-  const char * name;
+  // name of the object, owned by the struct (needs to be freed)
+  char * name;
   struct stat info;
 };
 
@@ -453,10 +458,26 @@ int cvmfs_listdir_contents(
   size_t *listlen,
   size_t *buflen);
 
+/**
+ * Get list of directory contents' stat info.
+ * The list does not include "." or "..".
+ *
+ * On return, @param buf will contain list of cvmfs_stat_t objects.
+ * The caller must free the cvmfs_stat_t::name and the array containing
+ * cvmfs_stat_t objects (*buf).  
+ * The array (*buf) may be NULL when this function is called.
+ *
+ * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
+ * @param[out] buf, pointer to dynamically allocated array of cvmfs_stat_t
+ * @param[in] buflen, pointer to variable containing size of @param buf
+ * @param[in/out] listlen, pointer to number of entries in @param buf.
+ * Set @param listlen to 0 before to fill @param buf from index 0.
+ * \return 0 on success, -1 on failure (sets errno)
+ */
 int cvmfs_listdir_stat(
   cvmfs_context *ctx,
   const char *path,
-  cvmfs_stat_t **buf,
+  struct cvmfs_stat_t **buf,
   size_t *listlen,
   size_t *buflen);
 

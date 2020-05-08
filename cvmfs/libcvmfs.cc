@@ -399,7 +399,7 @@ int cvmfs_listdir_contents(
 int cvmfs_listdir_stat(
   LibContext *ctx,
   const char *path,
-  cvmfs_stat_t **buf,
+  struct cvmfs_stat_t **buf,
   size_t *listlen,
   size_t *buflen
 ) {
