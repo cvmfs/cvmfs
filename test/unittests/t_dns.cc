@@ -720,7 +720,7 @@ TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
               (host.status() == kFailInvalidResolvers));
 
   vector<string> new_domains;
-  new_domains.push_back("no.such.domain");
+  new_domains.push_back("example.com");
   new_domains.push_back("root-servers.net");
   bool retval = default_resolver->SetSearchDomains(new_domains);
   EXPECT_EQ(retval, true);
