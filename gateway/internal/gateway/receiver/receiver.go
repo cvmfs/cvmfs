@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
@@ -36,7 +35,8 @@ const (
 	receiverCheckToken    // Unused
 	receiverSubmitPayload
 	receiverCommit
-	receiverError // Unused
+	receiverError     // Unused
+	receiverTestCrash // Used only in testing
 )
 
 // Receiver contains the operations that "receiver" worker processes perform
@@ -45,15 +45,16 @@ type Receiver interface {
 	Echo() error
 	SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error
 	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
+	TestCrash() error
 }
 
 // NewReceiver is the factory method for Receiver types
-func NewReceiver(ctx context.Context, execPath string, mock bool) (Receiver, error) {
+func NewReceiver(ctx context.Context, execPath string, mock bool, args ...string) (Receiver, error) {
 	if mock {
-		return NewMockReceiver(ctx)
+		return NewMockReceiver(ctx, execPath, append(args, "-w ''")...)
 	}
 
-	return NewCvmfsReceiver(ctx, execPath)
+	return NewCvmfsReceiver(ctx, execPath, args...)
 }
 
 // CvmfsReceiver spawns an external cvmfs_receiver worker process
@@ -72,12 +73,14 @@ type ReceiverReply struct {
 }
 
 // NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
-func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, error) {
+func NewCvmfsReceiver(ctx context.Context, execPath string, args ...string) (*CvmfsReceiver, error) {
 	if _, err := os.Stat(execPath); os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "worker process executable not found")
 	}
 
-	cmd := exec.Command(execPath, "-i", strconv.Itoa(3), "-o", strconv.Itoa(4))
+	cmdLine := []string{"-i", "3", "-o", "4"}
+	cmdLine = append(cmdLine, args...)
+	cmd := exec.Command(execPath, cmdLine...)
 
 	workerInRead, workerInWrite, err := os.Pipe()
 	if err != nil {
@@ -225,10 +228,21 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 	return result
 }
 
+// Method used only in testing, we provide an empty implementation here
+func (r *CvmfsReceiver) TestCrash() error {
+	reply, err := r.call(receiverTestCrash, nil, nil)
+	if err != nil {
+		return err
+	}
+	result := toReceiverError(reply)
+	return result
+}
+
 func (r *CvmfsReceiver) call(reqID receiverOp, msg []byte, payload io.Reader) ([]byte, error) {
 	if err := r.request(reqID, msg, payload); err != nil {
 		return nil, err
 	}
+
 	return r.reply()
 }
 
