@@ -530,7 +530,7 @@ read_repo_item() {
   load_repo_config $name
 
   if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-    cat $(get_upstream_config $upstream)/"$item" 2>/dev/null
+    cat $(get_upstream_config $CVMFS_UPSTREAM_STORAGE)/"$item" 2>/dev/null
   elif is_stratum0 $name; then
     get_item $name $CVMFS_STRATUM0/"$item" noproxy
   else
