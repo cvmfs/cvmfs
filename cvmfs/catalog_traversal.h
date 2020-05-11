@@ -81,8 +81,8 @@ class CatalogTraversalInfoShim {
 
 /**
  * A base class for CatalogTraversal and CatalogTraversalParallel implementing
- * common functionality. Actual traversal classes inherit this class.
- * 
+ * common functionality. Actual traversal classes inherit from this class.
+ *
  */
 template <class ObjectFetcherT>
 class CatalogTraversalBase
@@ -94,7 +94,7 @@ class CatalogTraversalBase
   typedef typename ObjectFetcherT::HistoryTN  HistoryTN;
   typedef CatalogTraversalData<CatalogTN>     CallbackDataTN;
 
-   /**
+  /**
    * @param repo_url             the path to the repository to be traversed:
    *                             -> either absolute path to the local catalogs
    *                             -> or an URL to a remote repository
@@ -116,7 +116,7 @@ class CatalogTraversalBase
    * @param quiet                silence messages that would go to stderr
    * @param tmp_dir              path to the temporary directory to be used
    *                             (default: /tmp)
-   * 
+   *
    * ONLY FOR CatalogTraversalParallel
    * @param num_threads           number of threads concurrently traversing
    *                              the catalog trees; hint: set up based on
@@ -203,7 +203,7 @@ class CatalogTraversalBase
    * Traverse a list of revisions represented by root catalogs from first
    * to last. DO NOT traverse previous revisions based on history and
    * timestamp threshold settings.
-   * 
+   *
    * @param catalog_list  list of root catalog hashes
    * @param type          breadth- or depth- first traversal
    * @return              true on success

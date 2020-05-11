@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "atomic.h"
 #include "catalog_traversal.h"
 #include "ingestion/tube.h"
 #include "util/exception.h"
@@ -16,15 +17,14 @@
 namespace swissknife {
 
 /**
- * This class implements the same functionality as CatalogTraversal, but in parallel.
- * For common functionality, see the documentation of CatalogTraversal.
- * Differences:
- * - can choose number of threads
- *
+ * This class implements the same functionality as CatalogTraversal, but in
+ * parallel.  For common functionality, see the documentation of
+ * CatalogTraversal. Differences:
+ *  - can choose number of threads
  *  - traversal types change meaning:
- * - depth-first -> parallelized post-order traversal (parents are processed
- * after all children are finished)
- * - breadth-first -> same as original, but parallelized
+ *    - depth-first -> parallelized post-order traversal (parents are processed
+ *                     after all children are finished)
+ *    - breadth-first -> same as original, but parallelized
  */
 template<class ObjectFetcherT>
 class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
@@ -112,11 +112,11 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     return DoTraverse();
   }
 
-/**
- * Start the traversal process from a list of root catalogs. Same as
- * TraverseRevision function, TraverseList does not traverse into predecessor
- * catalog revisions and ignores TraversalParameter settings.
- */
+  /**
+   * Start the traversal process from a list of root catalogs. Same as
+   * TraverseRevision function, TraverseList does not traverse into predecessor
+   * catalog revisions and ignores TraversalParameter settings.
+   */
   bool TraverseList(const HashList &root_catalog_list,
                     const TraversalType type = Base::kBreadthFirst) {
     // Push in reverse order for CatalogTraversal-like behavior
@@ -186,7 +186,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     }
 
     for (unsigned int i = 0; i < num_threads_; ++i) {
-      assert(pthread_join(threads_process_[i], NULL) == 0);
+      int retval = pthread_join(threads_process_[i], NULL);
+      assert(retval == 0);
     }
     free(threads_process_);
 
@@ -251,10 +252,10 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       MutexLockGuard m(&catalogs_lock_);
       if (effective_traversal_type_ == Base::kBreadthFirst) {
         num_children = PushPreviousRevision(job) +
-                      PushNestedCatalogs(job, catalog_list);
+                       PushNestedCatalogs(job, catalog_list);
       } else {
         num_children = PushNestedCatalogs(job, catalog_list) +
-                      PushPreviousRevision(job);
+                       PushPreviousRevision(job);
         atomic_write32(&job->children_unprocessed, num_children);
       }
       if (!this->CloseCatalog(false, job)) {
