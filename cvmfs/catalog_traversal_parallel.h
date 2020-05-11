@@ -113,7 +113,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   }
 
 /**
- * Start the traversal process from a list of root catalogs. Same as 
+ * Start the traversal process from a list of root catalogs. Same as
  * TraverseRevision function, TraverseList does not traverse into predecessor
  * catalog revisions and ignores TraversalParameter settings.
  */
@@ -203,7 +203,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       reinterpret_cast<CatalogTraversalParallel<ObjectFetcherT> *>(data);
     CatalogJob *current_job;
     while (true) {
-      current_job = traversal->job_queue_.Pop();
+      current_job = traversal->job_queue_.PopFront();
       // NULL means the master thread tells us to finish
       if (current_job->hash.IsNull()) {
         delete current_job;

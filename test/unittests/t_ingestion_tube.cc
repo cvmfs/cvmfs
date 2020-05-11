@@ -26,20 +26,20 @@ class T_Ingestion_Tube : public ::testing::Test {
 };
 
 TEST_F(T_Ingestion_Tube, Queue) {
-  tube_.Enqueue(&s1);
-  tube_.Enqueue(&s2);
-  EXPECT_EQ(&s1, tube_.Pop());
-  tube_.Enqueue(&s3);
-  tube_.Enqueue(&s2);
+  tube_.EnqueueBack(&s1);
+  tube_.EnqueueBack(&s2);
+  EXPECT_EQ(&s1, tube_.PopFront());
+  tube_.EnqueueBack(&s3);
+  tube_.EnqueueBack(&s2);
   EXPECT_EQ(3U, tube_.size());
-  EXPECT_EQ(&s2, tube_.Pop());
-  EXPECT_EQ(&s3, tube_.Pop());
-  EXPECT_EQ(&s2, tube_.Pop());
+  EXPECT_EQ(&s2, tube_.PopFront());
+  EXPECT_EQ(&s3, tube_.PopFront());
+  EXPECT_EQ(&s2, tube_.PopFront());
   EXPECT_TRUE(tube_.IsEmpty());
-  tube_.Enqueue(&s4);
-  tube_.Enqueue(&s1);
-  EXPECT_EQ(&s4, tube_.Pop());
-  EXPECT_EQ(&s1, tube_.Pop());
+  tube_.EnqueueBack(&s4);
+  tube_.EnqueueBack(&s1);
+  EXPECT_EQ(&s4, tube_.PopFront());
+  EXPECT_EQ(&s1, tube_.PopFront());
   EXPECT_TRUE(tube_.IsEmpty());
 }
 
@@ -64,32 +64,32 @@ TEST_F(T_Ingestion_Tube, InvertedQueue) {
 TEST_F(T_Ingestion_Tube, Stack) {
   tube_.EnqueueFront(&s1);
   tube_.EnqueueFront(&s2);
-  EXPECT_EQ(&s2, tube_.Pop());
-  EXPECT_EQ(&s1, tube_.Pop());
+  EXPECT_EQ(&s2, tube_.PopFront());
+  EXPECT_EQ(&s1, tube_.PopFront());
   EXPECT_TRUE(tube_.IsEmpty());
   tube_.EnqueueFront(&s3);
   tube_.EnqueueFront(&s2);
   tube_.EnqueueFront(&s4);
-  EXPECT_EQ(&s4, tube_.Pop());
+  EXPECT_EQ(&s4, tube_.PopFront());
   tube_.EnqueueFront(&s1);
   EXPECT_EQ(3U, tube_.size());
-  EXPECT_EQ(&s1, tube_.Pop());
-  EXPECT_EQ(&s2, tube_.Pop());
-  EXPECT_EQ(&s3, tube_.Pop());
+  EXPECT_EQ(&s1, tube_.PopFront());
+  EXPECT_EQ(&s2, tube_.PopFront());
+  EXPECT_EQ(&s3, tube_.PopFront());
   EXPECT_TRUE(tube_.IsEmpty());
 }
 
 TEST_F(T_Ingestion_Tube, InvertedStack) {
-  tube_.Enqueue(&s1);
-  tube_.Enqueue(&s2);
+  tube_.EnqueueBack(&s1);
+  tube_.EnqueueBack(&s2);
   EXPECT_EQ(&s2, tube_.PopBack());
   EXPECT_EQ(&s1, tube_.PopBack());
   EXPECT_TRUE(tube_.IsEmpty());
-  tube_.Enqueue(&s3);
-  tube_.Enqueue(&s2);
-  tube_.Enqueue(&s4);
+  tube_.EnqueueBack(&s3);
+  tube_.EnqueueBack(&s2);
+  tube_.EnqueueBack(&s4);
   EXPECT_EQ(&s4, tube_.PopBack());
-  tube_.Enqueue(&s1);
+  tube_.EnqueueBack(&s1);
   EXPECT_EQ(3U, tube_.size());
   EXPECT_EQ(&s1, tube_.PopBack());
   EXPECT_EQ(&s2, tube_.PopBack());
@@ -98,30 +98,30 @@ TEST_F(T_Ingestion_Tube, InvertedStack) {
 }
 
 TEST_F(T_Ingestion_Tube, Deque) {
-  tube_.Enqueue(&s3);
-  tube_.Enqueue(&s2);
+  tube_.EnqueueBack(&s3);
+  tube_.EnqueueBack(&s2);
   tube_.EnqueueFront(&s2);
-  tube_.Enqueue(&s1);
+  tube_.EnqueueBack(&s1);
   tube_.EnqueueFront(&s1);
   EXPECT_EQ(5U, tube_.size());
-  EXPECT_EQ(&s1, tube_.Pop());
-  EXPECT_EQ(&s2, tube_.Pop());
+  EXPECT_EQ(&s1, tube_.PopFront());
+  EXPECT_EQ(&s2, tube_.PopFront());
   EXPECT_EQ(&s1, tube_.PopBack());
-  EXPECT_EQ(&s3, tube_.Pop());
-  EXPECT_EQ(&s2, tube_.Pop());
+  EXPECT_EQ(&s3, tube_.PopFront());
+  EXPECT_EQ(&s2, tube_.PopFront());
   EXPECT_TRUE(tube_.IsEmpty());
 }
 
 TEST_F(T_Ingestion_Tube, QueueDeferItem) {
-  tube_.Enqueue(&s1);
-  tube_.Enqueue(&s2);
-  Tube<string>::Link *to_defer = tube_.Enqueue(&s3);
-  tube_.Enqueue(&s4);
-  EXPECT_EQ(&s1, tube_.Pop());
+  tube_.EnqueueBack(&s1);
+  tube_.EnqueueBack(&s2);
+  Tube<string>::Link *to_defer = tube_.EnqueueBack(&s3);
+  tube_.EnqueueBack(&s4);
+  EXPECT_EQ(&s1, tube_.PopFront());
   EXPECT_EQ(&s3, tube_.Slice(to_defer));
-  tube_.Enqueue(&s3);
-  EXPECT_EQ(&s2, tube_.Pop());
-  EXPECT_EQ(&s4, tube_.Pop());
-  EXPECT_EQ(&s3, tube_.Pop());
+  tube_.EnqueueBack(&s3);
+  EXPECT_EQ(&s2, tube_.PopFront());
+  EXPECT_EQ(&s4, tube_.PopFront());
+  EXPECT_EQ(&s3, tube_.PopFront());
   EXPECT_TRUE(tube_.IsEmpty());
 }

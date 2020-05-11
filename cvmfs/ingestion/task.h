@@ -45,7 +45,7 @@ class TubeConsumer : SingleCopy {
       reinterpret_cast<TubeConsumer<ItemT> *>(data);
 
     while (true) {
-      ItemT *item = consumer->tube_->Pop();
+      ItemT *item = consumer->tube_->PopFront();
       if (item->IsQuitBeacon()) {
         delete item;
         break;
@@ -89,7 +89,7 @@ class TubeConsumerGroup : SingleCopy {
     assert(is_active_);
     unsigned N = consumers_.size();
     for (unsigned i = 0; i < N; ++i) {
-      consumers_[i]->tube_->Enqueue(ItemT::CreateQuitBeacon());
+      consumers_[i]->tube_->EnqueueBack(ItemT::CreateQuitBeacon());
     }
     for (unsigned i = 0; i < N; ++i) {
       int retval = pthread_join(threads_[i], NULL);

@@ -18,10 +18,15 @@
 
 /**
  * A thread-safe, doubly linked list of links containing pointers to ItemT.  The
- * ItemT elements are not owned by the Tube.  FIFO semantics; items are pushed
- * to the back and poped from the front.  Using Slice(), items at arbitrary
- * locations in the tube can be removed, too. Using functions EnqueueFront and
- * PopBack, Tube can be used as deque.
+ * ItemT elements are not owned by the Tube.  FIFO or LIFO semantics.  Using
+ * Slice(), items at arbitrary locations in the tube can be removed, too.
+ *
+ *
+ * The layout of the linked list is as follows:
+ *
+ * --------------------------------------------------------------
+ * |                                                            |
+ * --> I$n$ (back) <--> I2 <--> ... <--> I1 (front) <--> HEAD <--
  *
  * The tube links the steps in the file processing pipeline.  It connects
  * multiple producers to multiple consumers and can throttle the producers if a
@@ -65,7 +70,7 @@ class Tube : SingleCopy {
   /**
    * Push an item to the back of the queue.  Block if queue is currently full.
    */
-  Link *Enqueue(ItemT *item) {
+  Link *EnqueueBack(ItemT *item) {
     assert(item != NULL);
     MutexLockGuard lock_guard(&lock_);
     while (size_ == limit_)
@@ -115,7 +120,7 @@ class Tube : SingleCopy {
    * Remove and return the first element from the queue.  Block if tube is
    * empty.
    */
-  ItemT *Pop() {
+  ItemT *PopFront() {
     MutexLockGuard lock_guard(&lock_);
     while (size_ == 0)
       pthread_cond_wait(&cond_populated_, &lock_);
@@ -195,7 +200,7 @@ class Tube : SingleCopy {
    */
   uint64_t size_;
   /**
-   * In front of the first element (next in line for Pop())
+   * Sentinel element in front of the first (front) element
    */
   Link *head_;
   /**
@@ -246,23 +251,23 @@ class TubeGroup : SingleCopy {
   }
 
   /**
-   * Like Tube::Enqueue(), but pick a tube according to ItemT::tag()
+   * Like Tube::EnqueueBack(), but pick a tube according to ItemT::tag()
    */
   typename Tube<ItemT>::Link *Dispatch(ItemT *item) {
     assert(is_active_);
     unsigned tube_idx = (tubes_.size() == 1)
                         ? 0 : (item->tag() % tubes_.size());
-    return tubes_[tube_idx]->Enqueue(item);
+    return tubes_[tube_idx]->EnqueueBack(item);
   }
 
   /**
-   * Like Tube::Enqueue(), use tubes one after another
+   * Like Tube::EnqueueBack(), use tubes one after another
    */
   typename Tube<ItemT>::Link *DispatchAny(ItemT *item) {
     assert(is_active_);
     unsigned tube_idx = (tubes_.size() == 1)
                         ? 0 : (atomic_xadd32(&round_robin_, 1) % tubes_.size());
-    return tubes_[tube_idx]->Enqueue(item);
+    return tubes_[tube_idx]->EnqueueBack(item);
   }
 
  private:
