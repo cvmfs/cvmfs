@@ -522,11 +522,11 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
     std::string error("runtime error: ");
     error += e.what();
 
-    JsonStringInput input;
+    JsonStringGenerator input;
     input.PushBack("status", "error");
     input.PushBack("reason", error);
 
-    ToJsonString(input, &reply);
+    reply = input.GenerateString();
     WriteReply(fdout_, reply);
     throw e;
   }
