@@ -259,7 +259,8 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
       to_sweep.push_back(*i);
     }
   }
-  bool success = traversal_.TraverseList(to_sweep);
+  bool success = traversal_.TraverseList(to_sweep,
+                                         CatalogTraversalT::kDepthFirst);
   traversal_.UnregisterListener(callback);
 
   i = to_sweep.begin();
