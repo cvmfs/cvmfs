@@ -1,4 +1,5 @@
 2.7.3:
+  * Fix handling of .cvmfs_status.json after GC (CVM-1887)
   * Add hidden `cvmfs_server eliminate-bulk-hashes` command (CVM-1428)
 
 2.7.2:
