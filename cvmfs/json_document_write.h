@@ -8,27 +8,34 @@
 #include <string>
 #include <vector>
 
-// This class is used for marshalling JSON objects to strings.
-// When adding an object, use quoted = true for strings and
-// quoted = false for numbers, nested objects, etc.
-
+/**
+ * This class is used for marshalling JSON objects to strings.
+ * When adding an object, use the Quoted variant when adding a
+ * string and the Unquoted variant when adding anything else.
+ */
 class JsonStringGenerator {
   struct JsonStringEntry {
     std::string key;
     std::string val;
-    bool quoted;
+    bool is_quoted;
 
-    JsonStringEntry() {
-      quoted = true;
-    }
+    JsonStringEntry() : is_quoted(true) {}
   };
 
  public:
+  void PushBackQuoted(std::string key, std::string val) {
+    this->PushBack(key, val, true);
+  }
+
+  void PushBackUnquoted(std::string key, std::string val) {
+    this->PushBack(key, val, false);
+  }
+
   void PushBack(std::string key, std::string val, bool quoted = true) {
     JsonStringEntry entry;
     entry.key = key;
     entry.val = val;
-    entry.quoted = quoted;
+    entry.is_quoted = quoted;
     entries.push_back(entry);
   }
 
@@ -38,7 +45,7 @@ class JsonStringGenerator {
     output += "{";
     for (size_t i = 0u; i < this->entries.size(); ++i) {
       output += std::string("\"") + this->entries[i].key + "\":";
-      if (this->entries[i].quoted) {
+      if (this->entries[i].is_quoted) {
         output += std::string("\"") + this->entries[i].val + "\"";
       } else {
         output += this->entries[i].val;
