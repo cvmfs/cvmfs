@@ -195,7 +195,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       return false;
 
     assert(catalogs_processing_.size() == 0);
-    assert(job_queue_.IsEmpty());
+    assert(pre_job_queue_.IsEmpty());
+    assert(post_job_queue_.IsEmpty());
     return true;
   }
 
@@ -204,13 +205,18 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       reinterpret_cast<CatalogTraversalParallel<ObjectFetcherT> *>(data);
     CatalogJob *current_job;
     while (true) {
-      current_job = traversal->job_queue_.PopFront();
-      // NULL means the master thread tells us to finish
-      if (current_job->hash.IsNull()) {
-        delete current_job;
-        break;
+      if (!traversal->post_job_queue_.IsEmpty()) {
+        current_job = traversal->post_job_queue_.PopFront();
+        traversal->ProcessJobPost(current_job);
+      } else {
+        current_job = traversal->pre_job_queue_.PopFront();
+        // NULL means the master thread tells us to finish
+        if (current_job->hash.IsNull()) {
+          delete current_job;
+          break;
+        }
+        traversal->ProcessJobPre(current_job);
       }
-      traversal->ProcessJobPre(current_job);
     }
     return NULL;
   }
@@ -220,7 +226,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     null_hash.SetNull();
     for (unsigned i = 0; i < num_threads_; ++i) {
       CatalogJob *job = new CatalogJob("", null_hash, 0, 0);
-      job_queue_.EnqueueFront(job);
+      pre_job_queue_.EnqueueFront(job);
     }
   }
 
@@ -231,7 +237,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 
   void PushJobUnlocked(CatalogJob *job) {
     catalogs_processing_.Insert(job->hash, job);
-    job_queue_.EnqueueFront(job);
+    pre_job_queue_.EnqueueFront(job);
   }
 
   void ProcessJobPre(CatalogJob *job) {
@@ -376,7 +382,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       catalogs_processing_.Erase(job->hash);
       catalogs_done_.Insert(job->hash, true);
       // No more catalogs to process -> finish
-      if (catalogs_processing_.size() == 0 && job_queue_.IsEmpty()) {
+      if (catalogs_processing_.size() == 0 && pre_job_queue_.IsEmpty() &&
+          post_job_queue_.IsEmpty()) {
         NotifyFinished();
       }
     }
@@ -389,7 +396,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   void OnChildFinished(const int &a, CatalogJob *job) {
     // atomic_xadd32 returns value before subtraction -> needs to equal 1
     if (atomic_xadd32(&job->children_unprocessed, -1) == 1) {
-      ProcessJobPost(job);
+      post_job_queue_.EnqueueFront(job);
     }
   }
 
@@ -403,7 +410,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   pthread_t *threads_process_;
   atomic_int32 num_errors_;
 
-  Tube<CatalogJob> job_queue_;
+  Tube<CatalogJob> pre_job_queue_;
+  Tube<CatalogJob> post_job_queue_;
   SmallHashDynamic<shash::Any, CatalogJob *> catalogs_processing_;
   SmallHashDynamic<shash::Any, bool> catalogs_done_;
   pthread_mutex_t catalogs_lock_;
