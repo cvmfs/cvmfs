@@ -69,7 +69,7 @@ TEST(T_Json, GenerateValidJsonString) {
   input.AddQuoted("f1", "v1");
   input.AddQuoted("f2", "v2");
   input.AddQuoted("f3", "v3");
-  input.AddUnquoted("interger", "12");
+  input.AddUnquoted("integer", "12");
 
   std::string output = input.GenerateString();
 
