@@ -73,7 +73,8 @@ TEST(T_Json, GenerateValidJsonString) {
 
   std::string output = input.GenerateString();
 
-  ASSERT_EQ("{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\",\"integer\":12}", output);
+  ASSERT_EQ("{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\",\"integer\":12}",
+            output);
 
   UniquePtr<JsonDocument> json(JsonDocument::Create(output));
   ASSERT_TRUE(json.IsValid());
