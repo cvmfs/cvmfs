@@ -1,0 +1,27 @@
+cvmfs_test_name="Use k8s CSI driver"
+
+cleanup() {
+  echo "running cleanup()"
+
+  if [ ! -z "$CVMFS_TEST_004_MOUNTPOINT" ]; then
+    echo "unmounting $CVMFS_TEST_004_MOUNTPOINT"
+    sudo umount $CVMFS_TEST_004_MOUNTPOINT
+  fi
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../container_common.sh
+
+  if [ `get_number_of_cpu_cores` -lt 2 ]; then
+    echo "requires at least 2 CPUs (available: `get_number_of_cpu_cores`)"
+    return 1
+  fi
+
+  trap cleanup EXIT HUP INT TERM || return $?
+
+
+  return 0
+}

@@ -157,25 +157,6 @@ mount_partition() {
 }
 
 
-is_linux() {
-  [ x"$(uname)" = x"Linux" ]
-}
-
-
-is_macos() {
-  [ x"$(uname)" = x"Darwin" ]
-}
-
-
-get_number_of_cpu_cores() {
-  if is_linux; then
-    cat /proc/cpuinfo | grep -e '^processor' | wc -l
-  elif is_macos; then
-    sysctl -n hw.ncpu
-  else
-    echo "1"
-  fi
-}
 
 # Disable service start rate limiting for apache and autofs
 disable_systemd_rate_limit() {

@@ -395,6 +395,27 @@ uses_overlayfs() {
 }
 
 
+is_linux() {
+  [ x"$(uname)" = x"Linux" ]
+}
+
+
+is_macos() {
+  [ x"$(uname)" = x"Darwin" ]
+}
+
+
+get_number_of_cpu_cores() {
+  if is_linux; then
+    cat /proc/cpuinfo | grep -e '^processor' | wc -l
+  elif is_macos; then
+    sysctl -n hw.ncpu
+  else
+    echo "1"
+  fi
+}
+
+
 break_hardlink() {
   local path="$1"
   local tmp_file="$(mktemp)"
@@ -2448,7 +2469,7 @@ set_up_repository_gateway() {
 
     echo "  Stopping repository gateway"
     sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
-    
+
     echo "  Cleaning up the repository gateway db"
     sudo rm -rf /var/lib/cvmfs-gateway/*
 
