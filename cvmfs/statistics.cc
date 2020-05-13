@@ -98,7 +98,7 @@ string Statistics::PrintJSON() {
   for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
                                                   iEnd = counters_.end();
        i != iEnd; ++i) {
-    json_generator.PushBack(i->first, i->second->counter.ToString(), false);
+    json_generator.AddUnquoted(i->first, i->second->counter.ToString());
   }
 
   return json_generator.GenerateString();

@@ -218,9 +218,9 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   }
 
   JsonStringGenerator input;
-  input.PushBack("token", session_token.c_str());
-  input.PushBack("id", public_token_id.c_str());
-  input.PushBack("secret", token_secret.c_str());
+  input.AddQuoted("token", session_token.c_str());
+  input.AddQuoted("id", public_token_id.c_str());
+  input.AddQuoted("secret", token_secret.c_str());
   std::string json = input.GenerateString();
   *reply = json;
 
@@ -235,11 +235,11 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   std::string token_id;
   JsonStringGenerator input;
   if (!GetTokenPublicId(req, &token_id)) {
-    input.PushBack("status", "error");
-    input.PushBack("reason", "invalid_token");
+    input.AddQuoted("status", "error");
+    input.AddQuoted("reason", "invalid_token");
   } else {
-    input.PushBack("status", "ok");
-    input.PushBack("id", token_id);
+    input.AddQuoted("status", "ok");
+    input.AddQuoted("id", token_id);
   }
   std::string json = input.GenerateString();
   *reply = json;
@@ -277,18 +277,18 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   switch (ret) {
     case kExpired:
       // Expired token
-      input.PushBack("status", "error");
-      input.PushBack("reason", "expired_token");
+      input.AddQuoted("status", "error");
+      input.AddQuoted("reason", "expired_token");
       break;
     case kInvalid:
       // Invalid token
-      input.PushBack("status", "error");
-      input.PushBack("reason", "invalid_token");
+      input.AddQuoted("status", "error");
+      input.AddQuoted("reason", "invalid_token");
       break;
     case kValid:
       // All ok
-      input.PushBack("status", "ok");
-      input.PushBack("path", path);
+      input.AddQuoted("status", "ok");
+      input.AddQuoted("path", path);
       break;
     default:
       // Should not be reached
@@ -343,19 +343,19 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   switch (res) {
     case PayloadProcessor::kPathViolation:
-      reply_input.PushBack("status", "error");
-      reply_input.PushBack("reason", "path_violation");
+      reply_input.AddQuoted("status", "error");
+      reply_input.AddQuoted("reason", "path_violation");
       break;
     case PayloadProcessor::kOtherError:
-      reply_input.PushBack("status", "error");
-      reply_input.PushBack("reason", "other_error");
+      reply_input.AddQuoted("status", "error");
+      reply_input.AddQuoted("reason", "other_error");
       break;
     case PayloadProcessor::kUploaderError:
-      reply_input.PushBack("status", "error");
-      reply_input.PushBack("reason", "uploader_error");
+      reply_input.AddQuoted("status", "error");
+      reply_input.AddQuoted("reason", "uploader_error");
       break;
     case PayloadProcessor::kSuccess:
-      reply_input.PushBack("status", "ok");
+      reply_input.AddQuoted("status", "ok");
       break;
     default:
       PANIC(kLogSyslogErr,
@@ -366,7 +366,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   // HandleSubmitPayload sends partial statistics back to the gateway
   std::string stats_json = statistics.PrintJSON();
-  reply_input.PushBack("statistics", stats_json, false);
+  reply_input.AddUnquoted("statistics", stats_json);
 
   std::string json = reply_input.GenerateString();
   *reply = json;
@@ -431,19 +431,19 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   JsonStringGenerator reply_input;
   switch (res) {
     case CommitProcessor::kSuccess:
-      reply_input.PushBack("status", "ok");
+      reply_input.AddQuoted("status", "ok");
       break;
     case CommitProcessor::kError:
-      reply_input.PushBack("status", "error");
-      reply_input.PushBack("reason", "miscellaneous");
+      reply_input.AddQuoted("status", "error");
+      reply_input.AddQuoted("reason", "miscellaneous");
       break;
     case CommitProcessor::kMergeFailure:
-      reply_input.PushBack("status", "error");
-      reply_input.PushBack("reason", "merge_error");
+      reply_input.AddQuoted("status", "error");
+      reply_input.AddQuoted("reason", "merge_error");
       break;
     case CommitProcessor::kMissingReflog:
-      reply_input.PushBack("status", "error");
-      reply_input.PushBack("reason", "missing_reflog");
+      reply_input.AddQuoted("status", "error");
+      reply_input.AddQuoted("reason", "missing_reflog");
       break;
     default:
       PANIC(kLogSyslogErr,

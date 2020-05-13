@@ -23,20 +23,12 @@ class JsonStringGenerator {
   };
 
  public:
-  void PushBackQuoted(std::string key, std::string val) {
-    this->PushBack(key, val, true);
+  void AddQuoted(std::string key, std::string val) {
+    this->Add(key, val, true);
   }
 
-  void PushBackUnquoted(std::string key, std::string val) {
-    this->PushBack(key, val, false);
-  }
-
-  void PushBack(std::string key, std::string val, bool quoted = true) {
-    JsonStringEntry entry;
-    entry.key = key;
-    entry.val = val;
-    entry.is_quoted = quoted;
-    entries.push_back(entry);
+  void AddUnquoted(std::string key, std::string val) {
+    this->Add(key, val, false);
   }
 
   std::string GenerateString() const {
@@ -59,6 +51,14 @@ class JsonStringGenerator {
   }
 
  private:
+  void Add(std::string key, std::string val, bool quoted = true) {
+    JsonStringEntry entry;
+    entry.key = key;
+    entry.val = val;
+    entry.is_quoted = quoted;
+    entries.push_back(entry);
+  }
+
   std::vector<JsonStringEntry> entries;
 };
 
