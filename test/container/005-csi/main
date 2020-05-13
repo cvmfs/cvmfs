@@ -3,10 +3,7 @@ cvmfs_test_name="Use k8s CSI driver"
 cleanup() {
   echo "running cleanup()"
 
-  if [ ! -z "$CVMFS_TEST_004_MOUNTPOINT" ]; then
-    echo "unmounting $CVMFS_TEST_004_MOUNTPOINT"
-    sudo umount $CVMFS_TEST_004_MOUNTPOINT
-  fi
+  k8s_destroy
 }
 
 cvmfs_run_test() {
@@ -15,13 +12,42 @@ cvmfs_run_test() {
 
   . ${script_location}/../container_common.sh
 
+  #echo "client package: $CVMFS_CLIENT_PACKAGE"
+  #exit 0
+
   if [ `get_number_of_cpu_cores` -lt 2 ]; then
     echo "requires at least 2 CPUs (available: `get_number_of_cpu_cores`)"
     return 1
   fi
 
+  echo "*** start k8s cluster"
+  k8s_create v1.17.0 || return 10
   trap cleanup EXIT HUP INT TERM || return $?
+  k8s_kubectl get po -A || return 11
 
+  echo "*** build cvmfs CSI driver"
+  git clone https://github.com/cernops/cvmfs-csi || return 20
+  cd cvmfs-csi
+  make build || return 21
+  eval $(minikube docker-env)
+  docker build -t csi-cvmfsplugin:master -f ${script_location}/Dockerfile .
+
+  echo "*** deploy cvmfs CSI driver"
+  k8s_kubectl create -f deployments/kubernetes/namespace.yaml                   || return 30
+  k8s_kubectl create -f deployments/kubernetes/csi-attacher-rbac.yaml           || return 31
+  # TODO(jblomer): use upstream yaml once fixed
+  k8s_kubectl create -f $script_location/csi-provisioner-rbac.yaml              || return 32
+  k8s_kubectl create -f deployments/kubernetes/csi-nodeplugin-rbac.yaml         || return 33
+  k8s_kubectl create -f $script_location/csi-cvmfsplugin-attacher.yaml          || return 34
+  k8s_kubectl create -f deployments/kubernetes/csi-cvmfsplugin-provisioner.yaml || return 35
+  k8s_kubectl create -f $script_location/csi-cvmfsplugin.yaml                   || return 36
+  k8s_kubectl get all -A
+  # ${script_location}/logs.sh || return 37
+
+  echo "*** run demo POD"
+  k8s_kubectl create -f example/storageclass.yaml || return 40
+  k8s_kubectl create -f example/pvc.yaml          || return 41
+  k8s_kubectl create -f example/pod.yaml          || return 42
 
   return 0
 }

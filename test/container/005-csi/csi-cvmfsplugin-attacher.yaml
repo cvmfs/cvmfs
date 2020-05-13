@@ -1,0 +1,69 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-cvmfsplugin-attacher
+  namespace: cvmfs
+  labels:
+    app: csi-cvmfsplugin-attacher
+spec:
+  selector:
+    app: csi-cvmfsplugin-attacher
+  ports:
+    - name: dummy
+      port: 12345
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: null
+  labels:
+    app: csi-cvmfsplugin-attacher
+  name: csi-cvmfsplugin-attacher
+  namespace: cvmfs
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: csi-cvmfsplugin-attacher
+  serviceName: csi-cvmfsplugin-attacher
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: csi-cvmfsplugin-attacher
+    spec:
+      containers:
+      - args:
+        - --v=5
+        - --csi-address=$(ADDRESS)
+        env:
+        - name: ADDRESS
+          value: /var/lib/kubelet/plugins/csi-cvmfsplugin/csi.sock
+        image: quay.io/k8scsi/csi-attacher:v1.0.1
+        imagePullPolicy: IfNotPresent
+        name: csi-attacher
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/lib/kubelet/plugins/csi-cvmfsplugin
+          name: socket-dir
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: cvmfs-attacher
+      serviceAccountName: cvmfs-attacher
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /var/lib/kubelet/plugins/csi-cvmfsplugin
+          type: DirectoryOrCreate
+        name: socket-dir
+  updateStrategy:
+    type: OnDelete
+status:
+  replicas: 0

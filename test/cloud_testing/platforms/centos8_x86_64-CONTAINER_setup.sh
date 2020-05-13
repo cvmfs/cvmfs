@@ -21,12 +21,20 @@ install_from_repo podman          || die "fail (install podman)"
 
 sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
 sudo dnf install docker-ce --nobest -y || die "fail (install docker-ce)"
+sudo firewall-cmd --zone=public --add-masquerade --permanent
+sudo firewall-cmd --reload
 sudo systemctl start docker            || die "fail (starting docker)"
 sudo usermod -aG docker sftnight
 newgrp docker
 docker ps                              || die "fail (accessing docker)"
 
 install_rpm https://ecsft.cern.ch/cvmfs/dist/builddeps/minikube-1.9.2-0.x86_64.rpm || die "fail (install minikube)"
+
+
+# install packages to deploy CSI driver
+install_from_repo git     || die "fail (install git)"
+install_from_repo golang  || die "fail (install golang)"
+
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."
