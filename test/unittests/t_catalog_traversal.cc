@@ -96,13 +96,14 @@ class T_CatalogTraversal : public ::testing::Test {
     MockCatalog::ResetGlobalState();
     dice_.InitLocaltime();
     SetupDummyCatalogs();
-    EXPECT_EQ(initial_catalog_instances, MockCatalog::instances);
+    EXPECT_EQ(static_cast<int32_t>(initial_catalog_instances),
+              atomic_read32(&MockCatalog::instances));
   }
 
   void TearDown() {
     MockCatalog::Reset();
     MockHistory::Reset();
-    EXPECT_EQ(0u, MockCatalog::instances);
+    EXPECT_EQ(0, atomic_read32(&MockCatalog::instances));
   }
 
   TraversalParams GetBasicTraversalParams() {
@@ -569,7 +570,8 @@ TYPED_TEST(T_CatalogTraversal, SimpleTraversalNoClose) {
   bool t1 = traverse.Traverse();
   EXPECT_TRUE(t1);
 
-  EXPECT_EQ(21u + this->initial_catalog_instances, MockCatalog::instances);
+  EXPECT_EQ(static_cast<int32_t>(21 + this->initial_catalog_instances),
+            atomic_read32(&MockCatalog::instances));
 
   std::vector<MockCatalog*>::const_iterator i, iend;
   for (i    = SimpleTraversalNoCloseCallback_visited_catalogs.begin(),
@@ -739,7 +741,8 @@ TYPED_TEST(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
   const bool t1 = traverse.Traverse();
   EXPECT_TRUE(t1);
 
-  EXPECT_EQ(49u + this->initial_catalog_instances, MockCatalog::instances);
+  EXPECT_EQ(static_cast<int32_t>(49 + this->initial_catalog_instances),
+            atomic_read32(&MockCatalog::instances));
 
   std::vector<MockCatalog*>::const_iterator i, iend;
   for (i    = FirstLevelHistoryTraversalNoClose_visited_catalogs.begin(),
@@ -3050,4 +3053,30 @@ TYPED_TEST(T_CatalogTraversal, TraverseDepthFirstParallelStressSlow) {
     TraverseDepthFirstParallelStressSlow_visited_catalogs);
   this->CheckCatalogPostOrder(
     TraverseDepthFirstParallelStressSlow_visited_catalogs);
+}
+
+CatalogIdentifiers TraverseBreadthFirstParallelStressSlow_visited_catalogs;
+void TraverseBreadthFirstParallelStressSlowCallback(
+  const MockedCatalogTraversal::CallbackDataTN &data)
+{
+  TraverseBreadthFirstParallelStressSlow_visited_catalogs.push_back(
+    std::make_pair(data.catalog->GetRevision(),
+                   data.catalog->mountpoint().ToString()));
+}
+
+TYPED_TEST(T_CatalogTraversal, TraverseBreadthFirstParallelStressSlow) {
+  if (!TraversalIsParallel<TypeParam>()) {
+    return;
+  }
+  CatalogIdentifiers present_catalogs = this->SetupHugeRevisions();
+  TraversalParams params = this->GetBasicTraversalParams();
+  params.num_threads = 8;
+  params.no_close = true;
+  TypeParam traverse(params);
+  traverse.RegisterListener(&TraverseBreadthFirstParallelStressSlowCallback);
+  const bool t1 = traverse.TraverseRevision(this->GetRootHash(7));
+  EXPECT_TRUE(t1);
+
+  this->CheckVisitedCatalogs(present_catalogs,
+    TraverseBreadthFirstParallelStressSlow_visited_catalogs);
 }

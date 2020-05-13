@@ -315,7 +315,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
  public:
   static const std::string rhs;
   static const shash::Any  root_hash;
-  static unsigned int      instances;
+  static atomic_int32      instances;
 
  public:
   struct NestedCatalog {
@@ -399,7 +399,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     string name = root_path.substr(pos + 1, string::npos);
     File mountpoint_file(shash::Any(), 4096, parent_path, name);
     files_.push_back(mountpoint_file);
-    ++MockCatalog::instances;
+    atomic_inc32(&MockCatalog::instances);
   }
 
   MockCatalog(const MockCatalog &other) :
@@ -411,11 +411,11 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     children_(other.children_), files_(other.files_),
     chunks_(other.chunks_)
   {
-    ++MockCatalog::instances;
+    atomic_inc32(&MockCatalog::instances);
   }
 
   ~MockCatalog() {
-    --MockCatalog::instances;
+    atomic_dec32(&MockCatalog::instances);
   }
 
   /**
