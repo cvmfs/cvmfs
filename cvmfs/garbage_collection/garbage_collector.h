@@ -122,16 +122,22 @@ class GarbageCollector {
     public swissknife::CatalogTraversalInfoShim<CatalogTN>
   {
    public:
-    explicit ReflogBasedInfoShim(ReflogTN *reflog) : reflog_(reflog) { }
-    virtual ~ReflogBasedInfoShim() { }
+    explicit ReflogBasedInfoShim(ReflogTN *reflog) : reflog_(reflog) {
+      pthread_mutex_init(&reflog_mutex_, NULL);
+    }
+    virtual ~ReflogBasedInfoShim() {
+      pthread_mutex_destroy(&reflog_mutex_);
+    }
     virtual uint64_t GetLastModified(const CatalogTN *catalog) {
       uint64_t timestamp;
+      MutexLockGuard m(&reflog_mutex_);
       bool retval = reflog_->GetCatalogTimestamp(catalog->hash(), &timestamp);
       return retval ? timestamp : catalog->GetLastModified();
     }
 
    private:
     ReflogTN *reflog_;
+    pthread_mutex_t reflog_mutex_;
   };
 
   const Configuration  configuration_;
