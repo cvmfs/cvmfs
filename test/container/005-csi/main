@@ -3,7 +3,7 @@ cvmfs_test_name="Use k8s CSI driver"
 cleanup() {
   echo "running cleanup()"
 
-  k8s_destroy
+  #k8s_destroy
 }
 
 cvmfs_run_test() {
@@ -30,7 +30,7 @@ cvmfs_run_test() {
   cd cvmfs-csi
   make build || return 21
   eval $(minikube docker-env)
-  docker build -t csi-cvmfsplugin:master -f ${script_location}/Dockerfile .
+  docker build -t csi-cvmfsplugin:latest -f ${script_location}/Dockerfile .
 
   echo "*** deploy cvmfs CSI driver"
   k8s_kubectl create -f deployments/kubernetes/namespace.yaml                   || return 30
@@ -40,14 +40,19 @@ cvmfs_run_test() {
   k8s_kubectl create -f deployments/kubernetes/csi-nodeplugin-rbac.yaml         || return 33
   k8s_kubectl create -f $script_location/csi-cvmfsplugin-attacher.yaml          || return 34
   k8s_kubectl create -f deployments/kubernetes/csi-cvmfsplugin-provisioner.yaml || return 35
-  k8s_kubectl create -f $script_location/csi-cvmfsplugin.yaml                   || return 36
+
+  echo "CVMFS_HTTP_PROXY=DIRECT" > default.local
+  k8s_kubectl create --namespace=cvmfs configmap config \
+    --from-file=cvmfs-override=./default.local   || return 36
+  k8s_kubectl create -f $script_location/csi-cvmfsplugin.yaml   || return 37
   k8s_kubectl get all -A
-  # ${script_location}/logs.sh || return 37
+  k8s_kubectl get ev -A
+  #${script_location}/logs.sh                                    || return 38
 
   echo "*** run demo POD"
-  k8s_kubectl create -f example/storageclass.yaml || return 40
-  k8s_kubectl create -f example/pvc.yaml          || return 41
-  k8s_kubectl create -f example/pod.yaml          || return 42
+  #k8s_kubectl create -f example/storageclass.yaml || return 40
+  #k8s_kubectl create -f example/pvc.yaml          || return 41
+  #k8s_kubectl create -f example/pod.yaml          || return 42
 
   return 0
 }

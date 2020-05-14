@@ -48,13 +48,9 @@ spec:
           name: registration-dir
       - args:
         - --nodeid=$(NODE_ID)
-        - --type=cvmfs
-        - --nodeserver=true
         - --endpoint=$(CSI_ENDPOINT)
         - --v=5
         - --drivername=cvmfs.csi.cern.ch
-        - --metadatastorage=k8s_configmap
-        - --mountcachedir=/mount-cache-dir
         env:
         - name: NODE_ID
           valueFrom:
@@ -98,13 +94,8 @@ spec:
           readOnly: true
         - mountPath: /dev
           name: host-dev
-        - mountPath: /etc/cvmfs-csi-config/
-          name: cvmfs-csi-config
         - mountPath: /tmp/csi/keys
           name: keys-tmp-dir
-        - mountPath: /etc/cvmfs/default.local
-          name: cvmfs-config
-          subPath: cvmfs-override
       dnsPolicy: ClusterFirst
       hostNetwork: true
       restartPolicy: Always
@@ -144,17 +135,9 @@ spec:
           path: /dev
           type: ""
         name: host-dev
-      - configMap:
-          defaultMode: 420
-          name: cvmfs-csi-config
-        name: cvmfs-csi-config
       - emptyDir:
           medium: Memory
         name: keys-tmp-dir
-      - configMap:
-          defaultMode: 420
-          name: config
-        name: cvmfs-config
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 1

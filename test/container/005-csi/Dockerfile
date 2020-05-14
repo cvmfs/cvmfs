@@ -5,6 +5,7 @@ RUN yum install -y http://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-l
     yum install -y cvmfs && yum clean all && rm -rf /var/cache/yum
 
 COPY configs/default.local /etc/cvmfs
+RUN echo CVMFS_HTTP_PROXY=DIRECT >> /etc/cvmfs/default.local
 
 COPY bin/csi-cvmfsplugin /csi-cvmfsplugin
 RUN chmod +x /csi-cvmfsplugin
