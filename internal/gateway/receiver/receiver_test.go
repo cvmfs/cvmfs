@@ -8,7 +8,7 @@ import (
 )
 
 func TestReceiverCycle(t *testing.T) {
-	st, _ := stats.NewStatisticsMgr()
+	st := stats.NewStatisticsMgr()
 	receiver, err := NewReceiver(context.TODO(), "/usr/bin/cvmfs_receiver", true, st)
 	if err != nil {
 		t.Fatalf("could not start receiver: %v", err)

@@ -58,10 +58,7 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 		return nil, errors.Wrap(err, "could not create lease DB")
 	}
 
-	smgr, err := stats.NewStatisticsMgr()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not initialize statistics manager")
-	}
+	smgr := stats.NewStatisticsMgr()
 
 	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver, smgr)
 	if err != nil {

@@ -156,8 +156,8 @@ M:
 			case commitTask:
 				finalRev, result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
 				taskType = "commit"
-				commitTask := commitTask(t)
-				commitTask.finalRevChan <- finalRev
+				t.finalRevChan <- finalRev
+				close(t.finalRevChan)
 			default:
 				task.Reply() <- fmt.Errorf("unknown task type")
 				return
