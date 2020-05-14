@@ -141,10 +141,7 @@ func StartTestBackend(name string, maxLeaseTime time.Duration) (*Services, strin
 		os.Exit(3)
 	}
 
-	smgr, err := stats.NewStatisticsMgr()
-	if err != nil {
-		os.Exit(5)
-	}
+	smgr := stats.NewStatisticsMgr()
 
 	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver, smgr)
 	if err != nil {

@@ -48,7 +48,7 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 		return "", err
 	}
 
-	if err := s.StatsMgr.AddLeaseEmpty(leasePath); err != nil {
+	if err := s.StatsMgr.CreateLease(leasePath); err != nil {
 		outcome = err.Error()
 		return "", err
 	}
@@ -186,14 +186,16 @@ func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRo
 		return 0, err
 	}
 
-	plotsErr := s.StatsMgr.UploadStatsPlots(repository)
-	if plotsErr != nil {
-		gw.LogC(ctx, "actions", gw.LogError).Msgf(plotsErr.Error())
-	}
+	go func() {
+		plotsErr := s.StatsMgr.UploadStatsPlots(repository)
+		if plotsErr != nil {
+			gw.LogC(ctx, "actions", gw.LogError).Msgf(plotsErr.Error())
+		}
+	}()
 
 	if err := s.Leases.CancelLease(ctx, tokenStr); err != nil {
 		outcome = err.Error()
-		return 0, err
+		return finalRev, err
 	}
 
 	return finalRev, nil
