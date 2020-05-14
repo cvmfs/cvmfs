@@ -53,10 +53,48 @@ class JsonStringGenerator {
  private:
   void Add(std::string key, std::string val, bool quoted = true) {
     JsonStringEntry entry;
-    entry.key = key;
-    entry.val = val;
+    entry.key = escape(key);
+    entry.val = escape(val);
     entry.is_quoted = quoted;
     entries.push_back(entry);
+  }
+
+  // this escape procedure is not as complete as it should be.
+  // we should manage ALL control chars from '\x00' to '\x1f'
+  // however this are the one that we can expect to happen
+  // More info: https://stackoverflow.com/a/33799784/869271
+  std::string escape(const std::string input) const {
+    std::string result;
+    result.reserve(input.size());
+    for (size_t i = 0; i < input.size(); i++) {
+      switch (input[i]) {
+        case '"':
+          result.append("\\\"");
+          break;
+        case '\\':
+          result.append("\\\\");
+          break;
+        case '\b':
+          result.append("\\b");
+          break;
+        case '\f':
+          result.append("\\f");
+          break;
+        case '\n':
+          result.append("\\n");
+          break;
+        case '\r':
+          result.append("\\r");
+          break;
+        case '\t':
+          result.append("\\t");
+          break;
+        default:
+          result.push_back(input[i]);
+          break;
+      }
+    }
+    return result;
   }
 
   std::vector<JsonStringEntry> entries;
