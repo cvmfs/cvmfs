@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "cmd_transaction.h"
 
+#include <errno.h>
+
 #include <ctime>
 #include <string>
 #include <vector>
@@ -52,9 +54,16 @@ int CmdTransaction::Main(const Options &options) {
   settings.GetTransaction()->SetLeasePath(lease_path);
   // TODO(jblomer): clarify lifetime of the session object
   UniquePtr<Publisher::Session> session;
-  if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
+  try {
     session = Publisher::Session::Create(settings);
+  } catch (const EPublish &e) {
+    if (e.failure() == EPublish::kFailLeaseBusy) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      return EBUSY;
+    }
+    throw;
   }
+
   Publisher publisher(settings);
   if (publisher.whitelist()->IsExpired()) {
     throw EPublish("Repository whitelist for $name is expired");
@@ -82,7 +91,7 @@ int CmdTransaction::Main(const Options &options) {
     } catch (const EPublish &e) {
       if (e.failure() == EPublish::kFailTransactionLocked) {
         LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
-        return 1;
+        return EEXIST;
       }
       throw;
     }
