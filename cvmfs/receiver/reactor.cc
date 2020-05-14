@@ -523,8 +523,8 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
     error += e.what();
 
     JsonStringGenerator input;
-    input.PushBack("status", "error");
-    input.PushBack("reason", error);
+    input.AddQuoted("status", "error");
+    input.AddQuoted("reason", error);
 
     reply = input.GenerateString();
     WriteReply(fdout_, reply);
