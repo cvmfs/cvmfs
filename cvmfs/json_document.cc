@@ -15,29 +15,6 @@
 
 using namespace std;  // NOLINT
 
-bool ToJsonString(const JsonStringInput &input, std::string *output) {
-  if (!output) {
-    return false;
-  }
-
-  output->clear();
-  *output = "{";
-  for (size_t i = 0u; i < input.entries.size(); ++i) {
-    *output += string("\"") + input.entries[i].key + "\":";
-    if (input.entries[i].quoted) {
-      *output += string("\"") + input.entries[i].val + "\"";
-    } else {
-      *output += input.entries[i].val;
-    }
-    if (i < input.entries.size() - 1) {
-      *output += ',';
-    }
-  }
-  *output += string("}");
-
-  return true;
-}
-
 JsonDocument *JsonDocument::Create(const string &text) {
   UniquePtr<JsonDocument> json(new JsonDocument());
   bool retval = json->Parse(text);
