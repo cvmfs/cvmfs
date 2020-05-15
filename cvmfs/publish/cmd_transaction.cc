@@ -32,7 +32,7 @@ int CmdTransaction::Main(const Options &options) {
       SplitString(options.plain_args()[0].value_str, '/', 2);
     fqrn = tokens[0];
     if (tokens.size() == 2)
-      lease_path = std::string("/") + tokens[1];
+      lease_path = tokens[1];
   }
 
   SettingsBuilder builder;
