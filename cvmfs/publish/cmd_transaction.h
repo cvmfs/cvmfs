@@ -42,8 +42,6 @@ class CmdTransaction : public Command {
   }
   virtual ParameterList GetParams() const {
     ParameterList p;
-    p.push_back(Parameter::Switch("force", 'f',
-      "Continue even if another transaction is already open"));
     p.push_back(Parameter::Optional("retry-timeout", 't', "seconds",
       "Retry for a maximum number of given seconds if repository is busy"));
     return p;

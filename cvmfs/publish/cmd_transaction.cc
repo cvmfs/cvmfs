@@ -85,16 +85,14 @@ int CmdTransaction::Main(const Options &options) {
     return rvi;
   }
 
-  if (!publisher.in_transaction() || options.HasNot("force")) {
-    try {
-      publisher.Transaction();
-    } catch (const EPublish &e) {
-      if (e.failure() == EPublish::kFailTransactionLocked) {
-        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
-        return EEXIST;
-      }
-      throw;
+  try {
+    publisher.Transaction();
+  } catch (const EPublish &e) {
+    if (e.failure() == EPublish::kFailTransactionLocked) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      return EEXIST;
     }
+    throw;
   }
 
   publisher.managed_node()->Open();
