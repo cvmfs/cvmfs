@@ -130,9 +130,9 @@ TEST_F(T_Ingestion, TaskBasic) {
   EXPECT_EQ(0, atomic_read32(&TestTask::cnt_process));
   EXPECT_EQ(0, atomic_read32(&DummyItem::sum));
 
-  tube_.Enqueue(&i1);
-  tube_.Enqueue(&i2);
-  tube_.Enqueue(&i3);
+  tube_.EnqueueBack(&i1);
+  tube_.EnqueueBack(&i2);
+  tube_.EnqueueBack(&i3);
 
   tube_.Wait();
   task_group_.Terminate();
@@ -155,9 +155,9 @@ TEST_F(T_Ingestion, TaskStress) {
   EXPECT_EQ(0, atomic_read32(&DummyItem::sum));
 
   for (unsigned i = 0; i < 10000; ++i) {
-    tube_.Enqueue(&i1);
-    tube_.Enqueue(&i2);
-    tube_.Enqueue(&i3);
+    tube_.EnqueueBack(&i1);
+    tube_.EnqueueBack(&i2);
+    tube_.EnqueueBack(&i3);
   }
 
   tube_.Wait();
@@ -183,8 +183,8 @@ TEST_F(T_Ingestion, TaskRead) {
 
   FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
   EXPECT_TRUE(file_null.may_have_chunks());
-  tube_in.Enqueue(&file_null);
-  BlockItem *item_stop = tube_out->Pop();
+  tube_in.EnqueueBack(&file_null);
+  BlockItem *item_stop = tube_out->PopFront();
   EXPECT_EQ(0U, file_null.size());
   EXPECT_FALSE(file_null.may_have_chunks());
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
@@ -195,14 +195,14 @@ TEST_F(T_Ingestion, TaskRead) {
   EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
 
   FileItem file_abc(new FileIngestionSource(std::string("./abc")));
-  tube_in.Enqueue(&file_abc);
-  BlockItem *item_data = tube_out->Pop();
+  tube_in.EnqueueBack(&file_abc);
+  BlockItem *item_data = tube_out->PopFront();
   EXPECT_EQ(3U, file_abc.size());
   EXPECT_EQ(BlockItem::kBlockData, item_data->type());
   EXPECT_EQ(str_abc, string(reinterpret_cast<char *>(item_data->data()),
                             item_data->size()));
   delete item_data;
-  item_stop = tube_out->Pop();
+  item_stop = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
   unlink("./abc");
@@ -220,9 +220,9 @@ TEST_F(T_Ingestion, TaskRead) {
 
   FileItem file_large(new FileIngestionSource(std::string("./large")), size - 1,
                       size, size + 1);
-  tube_in.Enqueue(&file_large);
+  tube_in.EnqueueBack(&file_large);
   for (unsigned i = 0; i < nblocks; ++i) {
-    item_data = tube_out->Pop();
+    item_data = tube_out->PopFront();
     if (i == 0) {
       EXPECT_GT(BlockItem::managed_bytes(), 0U);
     }
@@ -234,7 +234,7 @@ TEST_F(T_Ingestion, TaskRead) {
   }
   EXPECT_EQ(size, file_large.size());
   EXPECT_TRUE(file_large.may_have_chunks());
-  item_stop = tube_out->Pop();
+  item_stop = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
   unlink("./large");
@@ -261,14 +261,14 @@ TEST_F(T_Ingestion, TaskReadThrottle) {
   EXPECT_TRUE(SafeWriteToFile(str_abc, "./abc", 0600));
 
   FileItem file_abc(new FileIngestionSource(std::string("./abc")));
-  tube_in.Enqueue(&file_abc);
+  tube_in.EnqueueBack(&file_abc);
 
   FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
-  tube_in.Enqueue(&file_null);
+  tube_in.EnqueueBack(&file_null);
 
-  BlockItem *item_data = tube_out->Pop();
+  BlockItem *item_data = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockData, item_data->type());
-  BlockItem *item_stop = tube_out->Pop();
+  BlockItem *item_stop = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
 
   if (task_read->n_block() == 0) {
@@ -280,7 +280,7 @@ TEST_F(T_Ingestion, TaskReadThrottle) {
   delete item_stop;
   unlink("./abc");
 
-  item_stop = tube_out->Pop();
+  item_stop = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   delete item_stop;
 
@@ -307,8 +307,8 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   BlockItem *b1 = new BlockItem(1, &allocator_);
   b1->SetFileItem(&file_null);
   b1->MakeStop();
-  tube_in.Enqueue(b1);
-  BlockItem *item_stop = tube_out->Pop();
+  tube_in.EnqueueBack(b1);
+  BlockItem *item_stop = tube_out->PopFront();
   EXPECT_EQ(0U, tube_out->size());
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   EXPECT_GE(item_stop->tag(), 2 << 28);
@@ -327,8 +327,8 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   BlockItem *b2 = new BlockItem(2, &allocator_);
   b2->SetFileItem(&file_null);
   b2->MakeStop();
-  tube_in.Enqueue(b2);
-  item_stop = tube_out->Pop();
+  tube_in.EnqueueBack(b2);
+  item_stop = tube_out->PopFront();
   EXPECT_EQ(0U, item_stop->chunk_item()->size());
   EXPECT_TRUE(item_stop->chunk_item()->is_bulk_chunk());
   EXPECT_FALSE(item_stop->chunk_item()->IsSolePiece());
@@ -343,13 +343,13 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   BlockItem *b3 = new BlockItem(3, &allocator_);
   b3->SetFileItem(&file_null_legacy);
   b3->MakeStop();
-  tube_in.Enqueue(b3);
-  BlockItem *item_stop_chunk = tube_out->Pop();
+  tube_in.EnqueueBack(b3);
+  BlockItem *item_stop_chunk = tube_out->PopFront();
   EXPECT_FALSE(item_stop_chunk->chunk_item()->is_bulk_chunk());
   EXPECT_TRUE(item_stop_chunk->chunk_item()->IsSolePiece());
   delete item_stop_chunk->chunk_item();
   delete item_stop_chunk;
-  BlockItem *item_stop_bulk = tube_out->Pop();
+  BlockItem *item_stop_bulk = tube_out->PopFront();
   EXPECT_TRUE(item_stop_bulk->chunk_item()->is_bulk_chunk());
   EXPECT_FALSE(item_stop_bulk->chunk_item()->IsSolePiece());
   EXPECT_TRUE(file_null_legacy.is_fully_chunked());
@@ -388,12 +388,12 @@ TEST_F(T_Ingestion, TaskChunk) {
     b->SetFileItem(&file_large);
     b->MakeDataCopy(reinterpret_cast<const unsigned char *>(str_content.data()),
                     TaskRead::kBlockSize);
-    tube_in.Enqueue(b);
+    tube_in.EnqueueBack(b);
   }
   BlockItem *b_stop = new BlockItem(1, &allocator_);
   b_stop->SetFileItem(&file_large);
   b_stop->MakeStop();
-  tube_in.Enqueue(b_stop);
+  tube_in.EnqueueBack(b_stop);
 
   unsigned consumed = 0;
   unsigned chunk_size = 0;
@@ -401,7 +401,7 @@ TEST_F(T_Ingestion, TaskChunk) {
   int64_t tag = -1;
   uint64_t last_offset = 0;
   while (consumed < size) {
-    BlockItem *b = tube_out->Pop();
+    BlockItem *b = tube_out->PopFront();
     EXPECT_FALSE(b->chunk_item()->is_bulk_chunk());
     EXPECT_FALSE(b->chunk_item()->IsSolePiece());
     if (tag == -1) {
@@ -429,7 +429,7 @@ TEST_F(T_Ingestion, TaskChunk) {
     consumed += b->size();
     delete b;
   }
-  b_stop = tube_out->Pop();
+  b_stop = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockStop, b_stop->type());
   delete b_stop->chunk_item();
   delete b_stop;
@@ -471,26 +471,26 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
     b->SetFileItem(&file_large);
     b->MakeDataCopy(buf, block_size);
     free(buf);
-    tube_in.Enqueue(b);
+    tube_in.EnqueueBack(b);
   }
   BlockItem *b_stop = new BlockItem(1, &allocator_);
   b_stop->SetFileItem(&file_large);
   b_stop->MakeStop();
-  tube_in.Enqueue(b_stop);
+  tube_in.EnqueueBack(b_stop);
 
   // Expect exactly two chunks of the same size
   ChunkItem *chunk_item;
   for (unsigned i = 0; i < 2; ++i) {
     chunk_item = NULL;
     for (unsigned j = 0; j < ((file_large.size() / 2) / block_size); ++j) {
-      BlockItem *b = tube_out->Pop();
+      BlockItem *b = tube_out->PopFront();
       EXPECT_FALSE(b->chunk_item()->is_bulk_chunk());
       if (chunk_item == NULL)
         chunk_item = b->chunk_item();
       EXPECT_EQ(chunk_item, b->chunk_item());
       delete b;
     }
-    b_stop = tube_out->Pop();
+    b_stop = tube_out->PopFront();
     EXPECT_EQ(BlockItem::kBlockStop, b_stop->type());
     EXPECT_EQ(file_large.size() / 2, chunk_item->size());
     delete b_stop;
@@ -522,13 +522,13 @@ TEST_F(T_Ingestion, TaskCompressNull) {
   b1->SetFileItem(&file_null);
   b1->SetChunkItem(&chunk_null);
   b1->MakeStop();
-  tube_in.Enqueue(b1);
+  tube_in.EnqueueBack(b1);
 
   void *ptr_zlib_null;
   uint64_t sz_zlib_null;
   EXPECT_TRUE(zlib::CompressMem2Mem(NULL, 0, &ptr_zlib_null, &sz_zlib_null));
 
-  BlockItem *item_data = tube_out->Pop();
+  BlockItem *item_data = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockData, item_data->type());
   EXPECT_EQ(sz_zlib_null, item_data->size());
   EXPECT_EQ(0, memcmp(item_data->data(), ptr_zlib_null, sz_zlib_null));
@@ -537,7 +537,7 @@ TEST_F(T_Ingestion, TaskCompressNull) {
   EXPECT_EQ(&file_null, item_data->file_item());
   EXPECT_EQ(&chunk_null, item_data->chunk_item());
   delete item_data;
-  BlockItem *item_stop = tube_out->Pop();
+  BlockItem *item_stop = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockStop, item_stop->type());
   EXPECT_EQ(1, item_stop->tag());
   EXPECT_EQ(&file_null, item_stop->file_item());
@@ -583,14 +583,14 @@ TEST_F(T_Ingestion, TaskCompress) {
     b->MakeDataCopy(reinterpret_cast<const unsigned char *>(str_content.data()),
                     block_size);
     EXPECT_EQ(block_size, block_raw.Write(b->data(), b->size()));
-    tube_in.Enqueue(b);
+    tube_in.EnqueueBack(b);
   }
   EXPECT_EQ(size, block_raw.size());
   BlockItem *b_stop = new BlockItem(1, &allocator_);
   b_stop->SetFileItem(&file_large);
   b_stop->SetChunkItem(&chunk_large);
   b_stop->MakeStop();
-  tube_in.Enqueue(b_stop);
+  tube_in.EnqueueBack(b_stop);
 
   void *ptr_zlib_large = NULL;
   uint64_t sz_zlib_large = 0;
@@ -606,7 +606,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   BlockItem *b = NULL;
   do {
     delete b;
-    b = tube_out->Pop();
+    b = tube_out->PopFront();
     EXPECT_EQ(1, b->tag());
     EXPECT_EQ(&file_large, b->file_item());
     EXPECT_EQ(&chunk_large, b->chunk_item());
@@ -646,9 +646,9 @@ TEST_F(T_Ingestion, TaskHash) {
   b1.SetFileItem(&file_null);
   b1.SetChunkItem(&chunk_null);
   b1.MakeStop();
-  tube_in.Enqueue(&b1);
+  tube_in.EnqueueBack(&b1);
 
-  BlockItem *item_stop = tube_out->Pop();
+  BlockItem *item_stop = tube_out->PopFront();
   EXPECT_EQ(&b1, item_stop);
   EXPECT_EQ("da39a3ee5e6b4b0d3255bfef95601890afd80709",
             chunk_null.hash_ptr()->ToString());
@@ -668,12 +668,12 @@ TEST_F(T_Ingestion, TaskHash) {
   b2_b.SetFileItem(&file_null);
   b2_b.SetChunkItem(&chunk_abc);
   b2_b.MakeStop();
-  tube_in.Enqueue(&b2_a);
-  tube_in.Enqueue(&b2_b);
+  tube_in.EnqueueBack(&b2_a);
+  tube_in.EnqueueBack(&b2_b);
 
-  BlockItem *item_data = tube_out->Pop();
+  BlockItem *item_data = tube_out->PopFront();
   EXPECT_EQ(&b2_a, item_data);
-  item_stop = tube_out->Pop();
+  item_stop = tube_out->PopFront();
   EXPECT_EQ(&b2_b, item_stop);
   EXPECT_EQ("a9993e364706816aba3e25717850c26c9cd0d89d",
             chunk_abc.hash_ptr()->ToString());
@@ -708,8 +708,8 @@ TEST_F(T_Ingestion, TaskWriteNull) {
   b1->SetFileItem(&file_null);
   b1->SetChunkItem(chunk_null);
   b1->MakeStop();
-  tube_in.Enqueue(b1);
-  FileItem *file_processed = tube_out->Pop();
+  tube_in.EnqueueBack(b1);
+  FileItem *file_processed = tube_out->PopFront();
   EXPECT_EQ(&file_null, file_processed);
   EXPECT_EQ(0U, file_processed->GetNumChunks());
   EXPECT_EQ(hash_empty, file_processed->bulk_hash());
@@ -756,7 +756,7 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
       b->SetFileItem(&file_large);
       b->SetChunkItem(chunk_item);
       b->MakeDataCopy(block_buffer, block_size);
-      tube_in.Enqueue(b);
+      tube_in.EnqueueBack(b);
     }
 
     *chunk_item->hash_ptr() = hash_zeros;
@@ -765,14 +765,14 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
     b_stop->SetFileItem(&file_large);
     b_stop->SetChunkItem(chunk_item);
     b_stop->MakeStop();
-    tube_in.Enqueue(b_stop);
+    tube_in.EnqueueBack(b_stop);
 
     if (i == (nchunks - 1)) {
       file_large.set_is_fully_chunked();
     }
   }
 
-  FileItem *file_processed = tube_out->Pop();
+  FileItem *file_processed = tube_out->PopFront();
   EXPECT_EQ(&file_large, file_processed);
   EXPECT_EQ(nchunks, file_processed->GetNumChunks());
   EXPECT_EQ(nchunks, uploader_->results.size());

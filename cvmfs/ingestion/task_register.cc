@@ -33,5 +33,5 @@ void TaskRegister::Process(FileItem *file_item) {
     file_item->compression_algorithm()));
 
   delete file_item;
-  tube_counter_->Pop();
+  tube_counter_->PopFront();
 }

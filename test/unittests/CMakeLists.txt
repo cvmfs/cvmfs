@@ -69,6 +69,7 @@ set(CVMFS_UNITTEST_FILES
   t_history.cc
   t_ingestion.cc
   t_ingestion_stress.cc
+  t_ingestion_tube.cc
   t_json.cc
   t_kvstore.cc
   t_lease_path_util.cc
