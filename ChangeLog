@@ -1,4 +1,5 @@
 2.8.0:
+  * Parallelize catalog traversal in garbage collection
   * Improve performance of uploading small objects to S3
   * Fix double counting in swissknife filestats command
   * [ducc] Parallelize check if images are up to date
