@@ -42,8 +42,8 @@ if (CMAKE_COMPILER_IS_GNUCC)
     OUTPUT_VARIABLE CVMFS_GCC_VERSION
     ERROR_VARIABLE  CVMFS_GCC_VERSION
   )
-  STRING(REGEX REPLACE "[A-Za-z]* \\(GCC\\) ([0-9]+)\\.[0-9]+\\.[0-9]+.*" "\\1" CVMFS_GCC_MAJOR "${CVMFS_GCC_VERSION}")
-  STRING(REGEX REPLACE "[A-Za-z]* \\(GCC\\) [0-9]+\\.([0-9]+)\\.[0-9]+.*" "\\1" CVMFS_GCC_MINOR "${CVMFS_GCC_VERSION}")
+  STRING(REGEX REPLACE "[A-Za-z]* \\(.+\\) ([0-9]+)\\.[0-9]+\\.[0-9]+.*" "\\1" CVMFS_GCC_MAJOR "${CVMFS_GCC_VERSION}")
+  STRING(REGEX REPLACE "[A-Za-z]* \\(.+\\) [0-9]+\\.([0-9]+)\\.[0-9]+.*" "\\1" CVMFS_GCC_MINOR "${CVMFS_GCC_VERSION}")
   if (${CVMFS_GCC_MAJOR} LESS 4)
     message (FATAL_ERROR "GCC < 4.1 unsupported")
   endif (${CVMFS_GCC_MAJOR} LESS 4)
