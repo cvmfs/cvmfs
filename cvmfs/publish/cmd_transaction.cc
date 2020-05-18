@@ -77,17 +77,22 @@ int CmdTransaction::Main(const Options &options) {
   try {
     publisher.Transaction();
   } catch (const EPublish &e) {
+    const char *msg_prefix = "CernVM-FS transaction error: ";
     if (e.failure() == EPublish::kFailTransactionLocked) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
+               msg_prefix, e.msg().c_str());
       return EEXIST;
     } else if (e.failure() == EPublish::kFailLeaseBusy) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
+               msg_prefix, e.msg().c_str());
       return EBUSY;
     } else if (e.failure() == EPublish::kFailLeaseNoEntry) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
+               msg_prefix, e.msg().c_str());
       return ENOENT;
     } else if (e.failure() == EPublish::kFailLeaseNoDir) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%%s",
+               msg_prefix, e.msg().c_str());
       return ENOTDIR;
     }
     throw;

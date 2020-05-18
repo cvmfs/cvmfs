@@ -134,12 +134,11 @@ static LeaseReply ParseAcquireReply(
       }
     } else if (status == "path_busy") {
       const JSON *time_remaining = JsonDocument::SearchInObject(
-          reply->root(), "time_remaining", JSON_INT);
-      if (time_remaining != NULL) {
-        LogCvmfs(kLogCvmfs, llvl | kLogStdout,
-                 "Path busy. Time remaining = %d s", time_remaining->int_value);
-        return kLeaseReplyBusy;
-      }
+          reply->root(), "time_remaining", JSON_STRING);
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout,
+               "Path busy. Time remaining = %s", (time_remaining != NULL) ?
+               time_remaining->string_value : "UNKNOWN");
+      return kLeaseReplyBusy;
     } else if (status == "error") {
       const JSON *reason =
           JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
