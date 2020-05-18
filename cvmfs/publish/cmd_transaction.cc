@@ -33,7 +33,6 @@ int CmdTransaction::Main(const Options &options) {
     fqrn = tokens[0];
     if (tokens.size() == 2)
       lease_path = MakeCanonicalPath(tokens[1]);
-
   }
 
   SettingsBuilder builder;
