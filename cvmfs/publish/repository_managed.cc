@@ -64,7 +64,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
       } else {
         // In a gateway setup, it is expected that other publishers changed
         // the repository in the meantime
-        if (publisher_->spooler()->GetDriverType() !=
+        if (publisher_->settings_.storage().type() !=
             upload::SpoolerDefinition::Gateway)
         {
           result |= kFailRdOnlyOutdated;
