@@ -218,7 +218,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   virtual ~Publisher();
 
   void UpdateMetaInfo();
-  void Transaction(const std::string &path = "");
+  void Transaction();
   void Abort();
   void Publish();
   void Ingest();
@@ -246,6 +246,11 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
  private:
   Publisher();  ///< Used by Create
+
+  /**
+   * Used just before a spooler is required, e.g. in Create()
+   */
+  void ConstructSpooler();
 
   void CreateKeychain();
   void CreateStorage();

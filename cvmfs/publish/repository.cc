@@ -126,8 +126,10 @@ catalog::SimpleCatalogManager *Repository::GetSimpleCatalogManager() {
     download_mgr_,
     statistics_,
     true /* manage_catalog_files */);
+  simple_catalog_mgr_->Init();
   return simple_catalog_mgr_;
 }
+
 
 void Repository::DownloadRootObjects(
   const std::string &url, const std::string &fqrn, const std::string &tmp_dir)
@@ -244,6 +246,22 @@ bool Repository::IsMasterReplica() {
 //------------------------------------------------------------------------------
 
 
+void Publisher::ConstructSpooler() {
+  if (spooler_ != NULL)
+    return;
+
+  upload::SpoolerDefinition sd(
+    settings_.storage().GetLocator(),
+    settings_.transaction().hash_algorithm(),
+    settings_.transaction().compression_algorithm());
+  sd.session_token_file =
+    settings_.transaction().spool_area().gw_session_token();
+  sd.key_file = settings_.keychain().gw_key_path();
+  spooler_ = upload::Spooler::Construct(sd);
+  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
+}
+
+
 void Publisher::CreateKeychain() {
   if (settings_.keychain().HasDanglingMasterKeys()) {
     throw EPublish("dangling master key pair");
@@ -314,12 +332,7 @@ void Publisher::CreateRootObjects() {
 
 
 void Publisher::CreateStorage() {
-  upload::SpoolerDefinition sd(
-    settings_.storage().GetLocator(),
-    settings_.transaction().hash_algorithm(),
-    settings_.transaction().compression_algorithm());
-  spooler_ = upload::Spooler::Construct(sd);
-  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
+  ConstructSpooler();
   if (!spooler_->Create())
     throw EPublish("could not initialize repository storage area");
 }
@@ -593,15 +606,6 @@ Publisher::Publisher(const SettingsPublisher &settings)
 {
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
-  upload::SpoolerDefinition sd(
-    settings_.storage().GetLocator(),
-    settings_.transaction().hash_algorithm(),
-    settings_.transaction().compression_algorithm());
-  sd.session_token_file =
-    settings_.transaction().spool_area().gw_session_token();
-  sd.key_file = settings_.keychain().gw_key_path();
-  spooler_ = upload::Spooler::Construct(sd);
-  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
 
   int rvb;
   rvb =
@@ -616,7 +620,7 @@ Publisher::Publisher(const SettingsPublisher &settings)
   if (!rvb) throw EPublish("cannot load private master key");
   if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
 
-  if (spooler()->GetDriverType() == upload::SpoolerDefinition::Gateway) {
+  if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
     if (!settings.keychain().HasGatewayKey()) {
       throw EPublish("gateway key missing: " +
                      settings.keychain().gw_key_path());
@@ -632,8 +636,10 @@ Publisher::Publisher(const SettingsPublisher &settings)
   // time of the transaction
   const std::string transaction_lock =
     settings_.transaction().spool_area().transaction_lock();
-  in_transaction_ =
-    ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
+  if (ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */)) {
+    in_transaction_ = true;
+    ConstructSpooler();
+  }
   if (settings.is_managed())
     managed_node_ = new ManagedNode(this);
 }
@@ -647,6 +653,8 @@ void Publisher::Abort() {
 }
 
 void Publisher::Sync() {
+  ConstructSpooler();
+
   catalog::WritableCatalogManager catalog_mgr(
     manifest_->catalog_hash(),
     settings_.url(),
@@ -704,6 +712,8 @@ void Publisher::Publish() {
 
 
 void Publisher::MarkReplicatible(bool value) {
+  ConstructSpooler();
+
   if (value) {
     spooler_->Upload("/dev/null", "/.cvmfs_master_replica");
   } else {

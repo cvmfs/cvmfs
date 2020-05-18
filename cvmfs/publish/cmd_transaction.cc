@@ -32,7 +32,8 @@ int CmdTransaction::Main(const Options &options) {
       SplitString(options.plain_args()[0].value_str, '/', 2);
     fqrn = tokens[0];
     if (tokens.size() == 2)
-      lease_path = tokens[1];
+      lease_path = MakeCanonicalPath(tokens[1]);
+
   }
 
   SettingsBuilder builder;
@@ -52,17 +53,6 @@ int CmdTransaction::Main(const Options &options) {
     throw EPublish("Autofs on /cvmfs has to be disabled");
 
   settings.GetTransaction()->SetLeasePath(lease_path);
-  // TODO(jblomer): clarify lifetime of the session object
-  UniquePtr<Publisher::Session> session;
-  try {
-    session = Publisher::Session::Create(settings);
-  } catch (const EPublish &e) {
-    if (e.failure() == EPublish::kFailLeaseBusy) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
-      return EBUSY;
-    }
-    throw;
-  }
 
   Publisher publisher(settings);
   if (publisher.whitelist()->IsExpired()) {
@@ -91,6 +81,15 @@ int CmdTransaction::Main(const Options &options) {
     if (e.failure() == EPublish::kFailTransactionLocked) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
       return EEXIST;
+    } else if (e.failure() == EPublish::kFailLeaseBusy) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      return EBUSY;
+    } else if (e.failure() == EPublish::kFailLeaseNoEntry) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      return ENOENT;
+    } else if (e.failure() == EPublish::kFailLeaseNoDir) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      return ENOTDIR;
     }
     throw;
   }
