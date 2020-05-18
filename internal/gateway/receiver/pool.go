@@ -98,7 +98,7 @@ func (p *Pool) Stop() error {
 // SubmitPayload to be unpacked into the repository
 // TODO: implement timeout or context?
 func (p *Pool) SubmitPayload(ctx context.Context, leasePath string, payload io.Reader, digest string, headerSize int) error {
-	reply := make(chan error)
+	reply := make(chan error, 1)
 	p.tasks <- payloadTask{ctx, leasePath, payload, digest, headerSize, reply}
 	result := <-reply
 	return result
@@ -107,7 +107,7 @@ func (p *Pool) SubmitPayload(ctx context.Context, leasePath string, payload io.R
 // CommitLease associated with the token (transaction commit)
 // TODO: implement timeout or context?
 func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
-	reply := make(chan error)
+	reply := make(chan error, 1)
 	finalRevChan := make(chan uint64, 1)
 	var finalRev uint64
 	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, reply, finalRevChan}
@@ -141,7 +141,9 @@ M:
 			}
 			defer func() {
 				if err := receiver.Quit(); err != nil {
-					task.Reply() <- err
+					gw.LogC(task.Context(), "worker_pool", gw.LogError).
+						Int("worker_id", workerIdx).
+						Msgf("error when quitting the receiver: %v", err.Error())
 					return
 				}
 			}()
@@ -164,6 +166,7 @@ M:
 			}
 
 			task.Reply() <- result
+			close(task.Reply())
 
 			gw.LogC(task.Context(), "worker_pool", gw.LogDebug).
 				Int("worker_id", workerIdx).
