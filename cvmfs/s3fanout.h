@@ -95,6 +95,7 @@ struct JobInfo {
     kReqHeadPut,  // conditional upload of content-addressed objects
     kReqPutCas,  // immutable data object
     kReqPutDotCvmfs,  // one of the /.cvmfs... top level files
+    kReqPutHtml,  // HTML file - display instead of downloading
     kReqPutBucket,  // bucket creation
     kReqDelete,
   };

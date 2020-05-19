@@ -756,6 +756,7 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
       return "HEAD";
     case JobInfo::kReqPutCas:
     case JobInfo::kReqPutDotCvmfs:
+    case JobInfo::kReqPutHtml:
     case JobInfo::kReqPutBucket:
       return "PUT";
     case JobInfo::kReqDelete:
@@ -776,6 +777,8 @@ string S3FanoutManager::GetContentType(const JobInfo &info) const {
       return "application/octet-stream";
     case JobInfo::kReqPutDotCvmfs:
       return "application/x-cvmfs";
+    case JobInfo::kReqPutHtml:
+      return "text/html";
     case JobInfo::kReqPutBucket:
       return "text/xml";
     default:
@@ -1073,7 +1076,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   }
   if (try_again) {
     if (info->request == JobInfo::kReqPutCas ||
-        info->request == JobInfo::kReqPutDotCvmfs) {
+        info->request == JobInfo::kReqPutDotCvmfs ||
+        info->request == JobInfo::kReqPutHtml) {
       LogCvmfs(kLogS3Fanout, kLogDebug, "Trying again to upload %s",
                info->object_key.c_str());
       // Reset origin
