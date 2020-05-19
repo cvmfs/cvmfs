@@ -614,10 +614,12 @@ Publisher::Publisher(const SettingsPublisher &settings)
   rvb = signature_mgr_->LoadPrivateKeyPath(
     settings.keychain().private_key_path(), "");
   if (!rvb) throw EPublish("cannot load private key");
-  // TODO(jblomer): make optional
-  rvb = signature_mgr_->LoadPrivateMasterKeyPath(
-    settings.keychain().master_private_key_path());
-  if (!rvb) throw EPublish("cannot load private master key");
+  // The private master key might be on a key card instead
+  if (FileExists(settings.keychain().master_private_key_path())) {
+    rvb = signature_mgr_->LoadPrivateMasterKeyPath(
+      settings.keychain().master_private_key_path());
+    if (!rvb) throw EPublish("cannot load private master key");
+  }
   if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
 
   if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
