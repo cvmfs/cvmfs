@@ -36,17 +36,24 @@ CheckoutMarker *CheckoutMarker::CreateFrom(const std::string &path) {
     throw publish::EPublish("empty checkout marker");
   line = Trim(line, true /* trim_newline */);
   std::vector<std::string> tokens = SplitString(line, ' ');
-  if (tokens.size() != 3)
+  std::string previous_branch;
+  if (tokens.size() == 4)
+    previous_branch = tokens[3];
+  if (tokens.size() < 3 || tokens.size() > 4)
     throw publish::EPublish("checkout marker not parsable: " + line);
 
   CheckoutMarker *marker = new CheckoutMarker(tokens[0], tokens[2],
-    shash::MkFromHexPtr(shash::HexPtr(tokens[1]), shash::kSuffixCatalog));
+    shash::MkFromHexPtr(shash::HexPtr(tokens[1]), shash::kSuffixCatalog),
+    previous_branch);
   return marker;
 }
 
 void CheckoutMarker::SaveAs(const std::string &path) const {
   std::string marker =
-    tag_ + " " + hash_.ToString(false /* with_suffix */) + " " + branch_ + "\n";
+    tag_ + " " + hash_.ToString(false /* with_suffix */) + " " + branch_;
+  if (!previous_branch_.empty())
+    marker += " " + previous_branch_;
+  marker += "\n";
   SafeWriteToFile(marker, path, kDefaultFileMode);
 }
 

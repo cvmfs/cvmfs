@@ -23,13 +23,13 @@ class T_Util : public ::testing::Test {
  protected:
 };
 
-TEST_F(T_Util, CheckoutMarker) {
+TEST_F(T_Util, CheckoutMarker3) {
   EXPECT_EQ(NULL, CheckoutMarker::CreateFrom("/no/such/path"));
 
   shash::Any hash = shash::MkFromHexPtr(
     shash::HexPtr("0123456789abcdef0123456789abcdef01234567"),
     shash::kSuffixCatalog);
-  CheckoutMarker m("tag", "branch", hash);
+  CheckoutMarker m("tag", "branch", hash, "");
   m.SaveAs("cvmfs_test_checkout_marker");
 
   CheckoutMarker *l = CheckoutMarker::CreateFrom("cvmfs_test_checkout_marker");
@@ -37,6 +37,26 @@ TEST_F(T_Util, CheckoutMarker) {
   EXPECT_EQ(m.tag(), l->tag());
   EXPECT_EQ(m.branch(), l->branch());
   EXPECT_EQ(m.hash(), l->hash());
+  EXPECT_EQ(m.previous_branch(), l->previous_branch());
+  delete l;
+}
+
+
+TEST_F(T_Util, CheckoutMarker4) {
+  EXPECT_EQ(NULL, CheckoutMarker::CreateFrom("/no/such/path"));
+
+  shash::Any hash = shash::MkFromHexPtr(
+    shash::HexPtr("0123456789abcdef0123456789abcdef01234567"),
+    shash::kSuffixCatalog);
+  CheckoutMarker m("tag", "branch", hash, "prev");
+  m.SaveAs("cvmfs_test_checkout_marker");
+
+  CheckoutMarker *l = CheckoutMarker::CreateFrom("cvmfs_test_checkout_marker");
+  ASSERT_TRUE(l != NULL);
+  EXPECT_EQ(m.tag(), l->tag());
+  EXPECT_EQ(m.branch(), l->branch());
+  EXPECT_EQ(m.hash(), l->hash());
+  EXPECT_EQ(m.previous_branch(), l->previous_branch());
   delete l;
 }
 
