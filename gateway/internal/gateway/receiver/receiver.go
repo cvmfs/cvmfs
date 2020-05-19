@@ -49,10 +49,10 @@ type Receiver interface {
 }
 
 type ReceiverReply struct {
-	Status        string         `json:"status"`
-	Reason        string         `json:"reason"`
-	FinalRevision uint64         `json:"final_revision"`
-	Statistics    stats.Counters `json:"statistics"`
+	Status        string           `json:"status"`
+	Reason        string           `json:"reason"`
+	FinalRevision uint64           `json:"final_revision"`
+	Statistics    stats.Statistics `json:"statistics"`
 }
 
 // NewReceiver is the factory method for Receiver types
@@ -192,7 +192,7 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 		Msgf("result: %v", result)
 
 	if result == nil {
-		r.statsMgr.MergeIntoLeaseCounters(leasePath, &parsedReply.Statistics)
+		r.statsMgr.MergeIntoLeaseStatistics(leasePath, &parsedReply.Statistics)
 	}
 
 	return result

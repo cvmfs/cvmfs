@@ -9,59 +9,62 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Counters struct {
-	ChunksAdded          int64  `json:"n_chunks_added,string"`
-	ChunksDuplicated     int64  `json:"n_chunks_duplicated,string"`
-	CatalogsAdded        int64  `json:"n_catalogs_added,string"`
-	UploadedBytes        int64  `json:"sz_uploaded_bytes,string"`
-	UploadedCatalogBytes int64  `json:"sz_uploaded_catalog_bytes,string"`
-	StartTime            string `json:"start_time"`
+type PublishCounters struct {
+	ChunksAdded          int64 `json:"n_chunks_added,string"`
+	ChunksDuplicated     int64 `json:"n_chunks_duplicated,string"`
+	CatalogsAdded        int64 `json:"n_catalogs_added,string"`
+	UploadedBytes        int64 `json:"sz_uploaded_bytes,string"`
+	UploadedCatalogBytes int64 `json:"sz_uploaded_catalog_bytes,string"`
 }
 
-// TODO: concurrent access
+type Statistics struct {
+	Publish   PublishCounters `json:"Publish"`
+	StartTime string          `json:"start_time"`
+}
+
 type StatisticsMgr struct {
-	leaseCounters map[string]Counters
-	readLock      sync.Mutex
+	leaseStatistics map[string]Statistics
+	readLock        sync.Mutex
 }
 
 func NewStatisticsMgr() *StatisticsMgr {
-	return &StatisticsMgr{leaseCounters: make(map[string]Counters)}
+	return &StatisticsMgr{leaseStatistics: make(map[string]Statistics)}
 }
 
 func (m *StatisticsMgr) CreateLease(leasePath string) error {
 	m.readLock.Lock()
 	defer m.readLock.Unlock()
-	if _, ex := m.leaseCounters[leasePath]; ex {
+	if _, ex := m.leaseStatistics[leasePath]; ex {
 		return fmt.Errorf("Could not create statistics entry for lease %s, entry already exsts", leasePath)
 	}
-	m.leaseCounters[leasePath] = Counters{StartTime: time.Now().Format("2006-01-02 15:04:05")}
+	m.leaseStatistics[leasePath] = Statistics{StartTime: time.Now().Format("2006-01-02 15:04:05")}
 	return nil
 }
 
-func (m *StatisticsMgr) PopLease(leasePath string) (Counters, error) {
+func (m *StatisticsMgr) PopLease(leasePath string) (Statistics, error) {
 	m.readLock.Lock()
 	defer m.readLock.Unlock()
-	res, prs := m.leaseCounters[leasePath]
+	res, prs := m.leaseStatistics[leasePath]
 	if !prs {
-		return Counters{}, fmt.Errorf("No statistics counters for lease %s", leasePath)
+		return Statistics{}, fmt.Errorf("No statistics counters for lease %s", leasePath)
 	}
-	delete(m.leaseCounters, leasePath)
+	delete(m.leaseStatistics, leasePath)
 	return res, nil
 }
 
-func (m *StatisticsMgr) MergeIntoLeaseCounters(leasePath string, other *Counters) error {
+func (m *StatisticsMgr) MergeIntoLeaseStatistics(leasePath string, other *Statistics) error {
 	m.readLock.Lock()
 	defer m.readLock.Unlock()
-	c, prs := m.leaseCounters[leasePath]
+	c, prs := m.leaseStatistics[leasePath]
 	if !prs {
 		return fmt.Errorf("Statistics counters not found for lease %s", leasePath)
 	}
-	c.ChunksAdded += other.ChunksAdded
-	c.ChunksDuplicated += other.ChunksDuplicated
-	c.CatalogsAdded += other.CatalogsAdded
-	c.UploadedBytes += other.UploadedBytes
-	c.UploadedCatalogBytes += other.UploadedCatalogBytes
-	m.leaseCounters[leasePath] = c
+	c.Publish.ChunksAdded += other.Publish.ChunksAdded
+	c.Publish.ChunksDuplicated += other.Publish.ChunksDuplicated
+	c.Publish.CatalogsAdded += other.Publish.CatalogsAdded
+	c.Publish.UploadedBytes += other.Publish.UploadedBytes
+	c.Publish.UploadedCatalogBytes += other.Publish.UploadedCatalogBytes
+	m.leaseStatistics[leasePath] = c
 	return nil
 }
 
