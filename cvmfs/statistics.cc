@@ -91,17 +91,52 @@ string Statistics::PrintList(const PrintOptions print_options) {
   return result;
 }
 
+/**
+ * Converts statistics counters into JSON string in following format
+ * {
+ *   "name_major1": {
+ *     "counter1": val1,
+ *     "counter2": val2
+ *   },
+ *   "name_major2": {
+ *     "counter3": val3
+ *   }
+ * }
+ */
 string Statistics::PrintJSON() {
   MutexLockGuard lock_guard(lock_);
 
-  JsonStringGenerator json_generator;
+  JsonStringGenerator json_statistics;
+
+  // Make use of std::map key ordering and add counters namespace by namespace
+  JsonStringGenerator json_statistics_namespace;
+  std::string last_namespace = "";
   for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
                                                   iEnd = counters_.end();
        i != iEnd; ++i) {
-    json_generator.AddUnquoted(i->first, i->second->counter.ToString());
+    size_t dot_pos = i->first.find_first_of(".");
+    std::string current_namespace = i->first.substr(0, dot_pos);
+    std::string current_counter = i->first.substr(dot_pos + 1);
+
+    if (current_namespace != last_namespace) {
+      if (last_namespace != "") {
+        json_statistics.AddUnquoted(last_namespace,
+                                    json_statistics_namespace.GenerateString());
+      }
+      json_statistics_namespace.Clear();
+    }
+
+    json_statistics_namespace.AddUnquoted(current_counter,
+                                          i->second->counter.ToString());
+
+    last_namespace = current_namespace;
+  }
+  if (last_namespace != "") {
+    json_statistics.AddUnquoted(last_namespace,
+                                json_statistics_namespace.GenerateString());
   }
 
-  return json_generator.GenerateString();
+  return json_statistics.GenerateString();
 }
 
 Counter *Statistics::Register(const string &name, const string &desc) {
