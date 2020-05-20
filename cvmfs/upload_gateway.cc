@@ -33,7 +33,7 @@ bool GatewayUploader::ParseSpoolerDefinition(
 
   if (spooler_definition.session_token_file.empty()) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Failed to configure HTTP uploader. "
+             "Failed to configure gateway uploader. "
              "Missing session token file.\n");
     return false;
   }
@@ -41,8 +41,8 @@ bool GatewayUploader::ParseSpoolerDefinition(
 
   if (spooler_definition.key_file.empty()) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Failed to configure HTTP uploader. "
-             "Missing HTTP API key file.\n");
+             "Failed to configure gateway uploader. "
+             "Missing API key file.\n");
     return false;
   }
   config->key_file = spooler_definition.key_file;

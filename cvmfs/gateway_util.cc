@@ -25,6 +25,15 @@ namespace gateway {
 
 int APIVersion() { return 2; }
 
+GatewayKey ReadGatewayKey(const std::string& key_file_name) {
+  std::string id;
+  std::string secret;
+  bool retval = ReadKeys(key_file_name, &id, &secret);
+  if (!retval)
+    return GatewayKey();
+  return GatewayKey(id, secret);
+}
+
 bool ReadKeys(const std::string& key_file_name, std::string* key_id,
               std::string* secret) {
   if (!(key_id && secret)) {

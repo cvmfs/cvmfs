@@ -766,6 +766,7 @@ bool ExternalCacheManager::SpawnPlugin(const vector<string> &cmd_line) {
                        preserve_filedes,
                        map_fildes,
                        false,  // drop_credentials
+                       false,  // clear_env
                        true,   // double fork
                        &child_pid);
   unsetenv(CacheTransport::kEnvReadyNotifyFd);

@@ -30,6 +30,14 @@ void SettingsSpoolArea::SetSpoolArea(const std::string &path) {
   tmp_dir_ = workspace_() + "/tmp";
 }
 
+void SettingsSpoolArea::SetUnionMount(const std::string &path) {
+  union_mnt_ = path;
+}
+
+void SettingsSpoolArea::SetRepairMode(const EUnionMountRepairMode val) {
+  repair_mode_ = val;
+}
+
 
 //------------------------------------------------------------------------------
 
@@ -66,6 +74,14 @@ bool SettingsTransaction::ValidateUnionFs() {
   return true;
 }
 
+void SettingsTransaction::SetTimeout(unsigned seconds) {
+  timeout_s_ = seconds;
+}
+
+void SettingsTransaction::SetLeasePath(const std::string &path) {
+  lease_path_ = path;
+}
+
 //------------------------------------------------------------------------------
 
 
@@ -88,6 +104,16 @@ void SettingsStorage::MakeLocal(const std::string &path) {
   type_ = upload::SpoolerDefinition::Local;
   endpoint_ = path;
   tmp_dir_ = path + "/data/txn";
+}
+
+void SettingsStorage::MakeGateway(
+  const std::string &host,
+  unsigned int port,
+  const std::string &tmp_dir)
+{
+  type_ = upload::SpoolerDefinition::Gateway;
+  endpoint_ = "http://" + host + ":" + StringifyInt(port) + "/api/v1";
+  tmp_dir_ = tmp_dir_;
 }
 
 void SettingsStorage::SetLocator(const std::string &locator) {
@@ -118,6 +144,7 @@ void SettingsKeychain::SetKeychainDir(const std::string &keychain_dir) {
   master_public_key_path_ = keychain_dir + "/" + fqrn_() + ".pub";
   private_key_path_ = keychain_dir + "/" + fqrn_() + ".key";
   certificate_path_ = keychain_dir + "/" + fqrn_() + ".crt";
+  gw_key_path_ = keychain_dir + "/" + fqrn_() + ".gw";
 }
 
 
@@ -148,6 +175,10 @@ bool SettingsKeychain::HasRepositoryKeys() const {
          FileExists(certificate_path_);
 }
 
+bool SettingsKeychain::HasGatewayKey() const {
+  return FileExists(gw_key_path_);
+}
+
 //------------------------------------------------------------------------------
 
 
@@ -176,6 +207,26 @@ void SettingsRepository::SetTmpDir(const std::string &tmp_dir) {
 //------------------------------------------------------------------------------
 
 
+const unsigned SettingsPublisher::kDefaultWhitelistValidity = 30;
+
+
+SettingsPublisher::SettingsPublisher(
+  const SettingsRepository &settings_repository)
+  : fqrn_(settings_repository.fqrn())
+  , url_(settings_repository.url())
+  , owner_uid_(0)
+  , owner_gid_(0)
+  , whitelist_validity_days_(kDefaultWhitelistValidity)
+  , is_silent_(false)
+  , is_managed_(false)
+  , storage_(fqrn_)
+  , transaction_(fqrn_)
+  , keychain_(fqrn_)
+{
+  keychain_.SetKeychainDir(settings_repository.keychain().keychain_dir());
+}
+
+
 void SettingsPublisher::SetUrl(const std::string &url) {
   // TODO(jblomer): sanitiation, check availability
   url_ = url;
@@ -196,6 +247,10 @@ void SettingsPublisher::SetOwner(uid_t uid, gid_t gid) {
 
 void SettingsPublisher::SetIsSilent(bool value) {
   is_silent_ = value;
+}
+
+void SettingsPublisher::SetIsManaged(bool value) {
+  is_managed_ = value;
 }
 
 
@@ -262,6 +317,37 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
     settings.SetTmpDir(arg + "/tmp");
 
   return settings;
+}
+
+
+SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
+  const std::string &ident, bool needs_managed)
+{
+  SettingsRepository settings_repository = CreateSettingsRepository(ident);
+  if (needs_managed && !IsManagedRepository())
+    throw EPublish("remote repositories are not supported in this context");
+
+  // TODO(jblomer): fix for remote repositories
+  if (options_mgr_->GetValueOrDie("CVMFS_REPOSITORY_TYPE") != "stratum0")
+    throw EPublish("Not a stratum 0 repository");
+
+  SettingsPublisher settings_publisher(settings_repository);
+  settings_publisher.SetIsManaged(IsManagedRepository());
+  settings_publisher.SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
+  settings_publisher.GetStorage()->SetLocator(
+    options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
+
+  std::string arg;
+  if (options_mgr_->GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
+    if (!options_mgr_->IsOn(arg)) {
+      settings_publisher.GetTransaction()->GetSpoolArea()->SetRepairMode(
+        kUnionMountRepairNever);
+    }
+  }
+
+  // TODO(jblomer): process other parameters
+
+  return settings_publisher;
 }
 
 }  // namespace publish

@@ -81,8 +81,7 @@ cvmfs_run_test() {
   sudo cvmfs_server resign $CVMFS_TEST_REPO || return $?
 
   echo "attempt publish with old repo keys (should fail)"
-  start_transaction $CVMFS_TEST_REPO || return 10
-  publish_repo $CVMFS_TEST_REPO && return 11
+  start_transaction $CVMFS_TEST_REPO && return 10
 
   echo "forcing the repo to look unhealthy"
   # resign -p should work even if the repository isn't completely healthy
@@ -94,9 +93,6 @@ cvmfs_run_test() {
 
   echo "and resign whitelist"
   sudo cvmfs_server resign $CVMFS_TEST_REPO || return 13
-
-  echo "restore the transaction to health by aborting transaction"
-  abort_transaction $CVMFS_TEST_REPO || return $?
 
   echo "and restart the transaction"
   start_transaction $CVMFS_TEST_REPO || return $?

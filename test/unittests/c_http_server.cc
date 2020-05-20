@@ -160,6 +160,10 @@ void HTTPRequestParser::FillContentLength() {
   request_.content_length = 0;
 }
 
+
+//------------------------------------------------------------------------------
+
+
 MockHTTPServer::MockHTTPServer(int port) {
   atomic_init32(&running_);
   atomic_init32(&server_thread_ready_);
@@ -261,6 +265,10 @@ void *MockHTTPServer::Main(void *data) {
   return NULL;
 }
 
+
+//------------------------------------------------------------------------------
+
+
 MockFileServer::MockFileServer(int port, std::string root_dir) {
   port_ = port;
   root_dir_ = root_dir;
@@ -307,6 +315,10 @@ HTTPResponse MockFileServer::FileServerHandler(const HTTPRequest &req,
   ++file_server->num_processed_requests_;
   return response;
 }
+
+
+//------------------------------------------------------------------------------
+
 
 MockProxyServer::MockProxyServer(int port) {
   port_ = port;
@@ -362,6 +374,10 @@ HTTPResponse MockProxyServer::ProxyServerHandler(const HTTPRequest &req,
   return response;
 }
 
+
+//------------------------------------------------------------------------------
+
+
 MockRedirectServer::MockRedirectServer(int port,
                                        std::string redirect_destination) {
   port_ = port;
@@ -387,4 +403,23 @@ HTTPResponse MockRedirectServer::RedirectServerHandler(const HTTPRequest &req,
                       redirect_server->redirect_destination_ + req.path);
   ++redirect_server->num_processed_requests_;
   return response;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+MockGateway::MockGateway(int port) {
+  server_ = new MockHTTPServer(port);
+  server_->SetResponseCallback(GatewayHandler, this);
+  assert(server_->Start());
+}
+
+MockGateway::~MockGateway() {
+  delete server_;
+}
+
+HTTPResponse MockGateway::GatewayHandler(const HTTPRequest &req, void *data) {
+  MockGateway *gateway = static_cast<MockGateway *>(data);
+  return gateway->next_response_;
 }

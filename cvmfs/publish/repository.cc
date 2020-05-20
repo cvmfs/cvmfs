@@ -12,6 +12,7 @@
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "download.h"
+#include "gateway_util.h"
 #include "hash.h"
 #include "history_sqlite.h"
 #include "ingestion/ingestion_source.h"
@@ -19,6 +20,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "publish/except.h"
+#include "publish/repository_util.h"
 #include "publish/settings.h"
 #include "reflog.h"
 #include "signature.h"
@@ -124,8 +126,10 @@ catalog::SimpleCatalogManager *Repository::GetSimpleCatalogManager() {
     download_mgr_,
     statistics_,
     true /* manage_catalog_files */);
+  simple_catalog_mgr_->Init();
   return simple_catalog_mgr_;
 }
+
 
 void Repository::DownloadRootObjects(
   const std::string &url, const std::string &fqrn, const std::string &tmp_dir)
@@ -178,20 +182,27 @@ void Repository::DownloadRootObjects(
   std::string tags_path;
   FILE *tags_fd =
     CreateTempFile(tmp_dir + "/tags", kPrivateFileMode, "w", &tags_path);
-  std::string tags_url = url + "/data/" + manifest_->history().MakePath();
-  shash::Any tags_hash(manifest_->history());
-  download::JobInfo download_tags(
-       &tags_url,
-       true /* compressed */,
-       true /* probe hosts */,
-       tags_fd,
-       &tags_hash);
-  rv_dl = download_mgr_->Fetch(&download_tags);
-  fclose(tags_fd);
-  if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");
-  delete history_;
-  history_ = history::SqliteHistory::OpenWritable(tags_path);
-  if (history_ == NULL) throw EPublish("cannot open tag database");
+  if (!manifest_->history().IsNull()) {
+    std::string tags_url = url + "/data/" + manifest_->history().MakePath();
+    shash::Any tags_hash(manifest_->history());
+    download::JobInfo download_tags(
+         &tags_url,
+         true /* compressed */,
+         true /* probe hosts */,
+         tags_fd,
+         &tags_hash);
+    rv_dl = download_mgr_->Fetch(&download_tags);
+    fclose(tags_fd);
+    if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");
+    delete history_;
+    history_ = history::SqliteHistory::OpenWritable(tags_path);
+    if (history_ == NULL) throw EPublish("cannot open tag database");
+  } else {
+    fclose(tags_fd);
+    delete history_;
+    history_ = history::SqliteHistory::Create(tags_path, fqrn);
+    if (history_ == NULL) throw EPublish("cannot create tag database");
+  }
   history_->TakeDatabaseFileOwnership();
 
   if (!manifest_->meta_info().IsNull()) {
@@ -233,6 +244,22 @@ bool Repository::IsMasterReplica() {
 
 
 //------------------------------------------------------------------------------
+
+
+void Publisher::ConstructSpooler() {
+  if (spooler_ != NULL)
+    return;
+
+  upload::SpoolerDefinition sd(
+    settings_.storage().GetLocator(),
+    settings_.transaction().hash_algorithm(),
+    settings_.transaction().compression_algorithm());
+  sd.session_token_file =
+    settings_.transaction().spool_area().gw_session_token();
+  sd.key_file = settings_.keychain().gw_key_path();
+  spooler_ = upload::Spooler::Construct(sd);
+  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
+}
 
 
 void Publisher::CreateKeychain() {
@@ -305,12 +332,7 @@ void Publisher::CreateRootObjects() {
 
 
 void Publisher::CreateStorage() {
-  upload::SpoolerDefinition sd(
-    settings_.storage().GetLocator(),
-    settings_.transaction().hash_algorithm(),
-    settings_.transaction().compression_algorithm());
-  spooler_ = upload::Spooler::Construct(sd);
-  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
+  ConstructSpooler();
   if (!spooler_->Create())
     throw EPublish("could not initialize repository storage area");
 }
@@ -557,11 +579,16 @@ void Publisher::InitSpoolArea() {
                          kPrivateDirMode);
   CreateDirectoryAsOwner(settings_.transaction().spool_area().ovl_work_dir(),
                          kPrivateDirMode);
-  CreateDirectoryAsOwner(settings_.transaction().spool_area().readonly_mnt(),
-                         kPrivateDirMode);
-  CreateDirectoryAsOwner(
-    settings_.transaction().spool_area().union_mnt() + "/" + settings_.fqrn(),
-    kPrivateDirMode);
+
+  // On a managed node, the mount points are already mounted
+  if (!DirectoryExists(settings_.transaction().spool_area().readonly_mnt())) {
+    CreateDirectoryAsOwner(settings_.transaction().spool_area().readonly_mnt(),
+                           kPrivateDirMode);
+  }
+  if (!DirectoryExists(settings_.transaction().spool_area().union_mnt())) {
+    CreateDirectoryAsOwner(
+      settings_.transaction().spool_area().union_mnt(), kPrivateDirMode);
+  }
 }
 
 Publisher::Publisher()
@@ -579,12 +606,6 @@ Publisher::Publisher(const SettingsPublisher &settings)
 {
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
-  upload::SpoolerDefinition sd(
-    settings_.storage().GetLocator(),
-    settings_.transaction().hash_algorithm(),
-    settings_.transaction().compression_algorithm());
-  spooler_ = upload::Spooler::Construct(sd);
-  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
 
   int rvb;
   rvb =
@@ -593,26 +614,39 @@ Publisher::Publisher(const SettingsPublisher &settings)
   rvb = signature_mgr_->LoadPrivateKeyPath(
     settings.keychain().private_key_path(), "");
   if (!rvb) throw EPublish("cannot load private key");
-  // TODO(jblomer): make optional
-  rvb = signature_mgr_->LoadPrivateMasterKeyPath(
-    settings.keychain().master_private_key_path());
-  if (!rvb) throw EPublish("cannot load private master key");
+  // The private master key might be on a key card instead
+  if (FileExists(settings.keychain().master_private_key_path())) {
+    rvb = signature_mgr_->LoadPrivateMasterKeyPath(
+      settings.keychain().master_private_key_path());
+    if (!rvb) throw EPublish("cannot load private master key");
+  }
   if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
 
-  // TODO(jblomer): check transaction lock
+  if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
+    if (!settings.keychain().HasGatewayKey()) {
+      throw EPublish("gateway key missing: " +
+                     settings.keychain().gw_key_path());
+    }
+    gw_key_ = gateway::ReadGatewayKey(settings.keychain().gw_key_path());
+    if (!gw_key_.IsValid()) {
+      throw EPublish("cannot read gateway key: " +
+                     settings.keychain().gw_key_path());
+    }
+  }
+
+  // The process that opens the transaction does not stay alive for the life
+  // time of the transaction
+  const std::string transaction_lock =
+    settings_.transaction().spool_area().transaction_lock();
+  if (ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */)) {
+    in_transaction_ = true;
+    ConstructSpooler();
+  }
+  if (settings.is_managed())
+    managed_node_ = new ManagedNode(this);
 }
 
 Publisher::~Publisher() {
-}
-
-void Publisher::Transaction() {
-  if (in_transaction_) throw EPublish("another transaction is already open");
-
-  InitSpoolArea();
-  // TODO(jblomer): acquire gateway lease, create in_transaction lock file
-  LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
-           "(%s) opened transaction", settings_.fqrn().c_str());
-  in_transaction_ = true;
 }
 
 
@@ -621,6 +655,8 @@ void Publisher::Abort() {
 }
 
 void Publisher::Sync() {
+  ConstructSpooler();
+
   catalog::WritableCatalogManager catalog_mgr(
     manifest_->catalog_hash(),
     settings_.url(),
@@ -678,6 +714,8 @@ void Publisher::Publish() {
 
 
 void Publisher::MarkReplicatible(bool value) {
+  ConstructSpooler();
+
   if (value) {
     spooler_->Upload("/dev/null", "/.cvmfs_master_replica");
   } else {
@@ -687,7 +725,6 @@ void Publisher::MarkReplicatible(bool value) {
   if (spooler_->GetNumberOfErrors() > 0)
     throw EPublish("cannot set replication mode");
 }
-
 
 void Publisher::Ingest() {}
 void Publisher::Migrate() {}

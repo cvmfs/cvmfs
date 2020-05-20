@@ -427,23 +427,31 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
 )
 
 set (CVMFS_TEST_PUBLISH_SOURCES
+  c_http_server.cc
   publish/c_repository.cc
   publish/main.cc
   publish/t_command.cc
   publish/t_diff.cc
+  publish/t_session.cc
   publish/t_repository.cc
   publish/t_settings.cc
+  publish/t_util.cc
 
   ../common/env.cc
 
   ${CVMFS_SOURCE_DIR}/publish/cmd_help.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_mkfs.cc
+  ${CVMFS_SOURCE_DIR}/publish/cmd_util.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_zpipe.cc
   ${CVMFS_SOURCE_DIR}/publish/command.cc
   ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_managed.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_session.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_transaction.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_util.cc
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
   ${CVMFS_SOURCE_DIR}/backoff.cc

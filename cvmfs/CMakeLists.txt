@@ -256,6 +256,8 @@ set (CVMFS_PUBLISH_SOURCES
   publish/cmd_help.cc
   publish/cmd_info.cc
   publish/cmd_mkfs.cc
+  publish/cmd_transaction.cc
+  publish/cmd_util.cc
   publish/cmd_zpipe.cc
   publish/command.cc
   publish/except.cc
@@ -308,9 +310,14 @@ set (LIBCVMFS_SERVER_SOURCES
   malloc_arena.cc
   options.cc
   pack.cc
+  publish/except.cc
   publish/repository.cc
   publish/repository_diff.cc
+  publish/repository_managed.cc
+  publish/repository_session.cc
   publish/repository_tags.cc
+  publish/repository_transaction.cc
+  publish/repository_util.cc
   publish/settings.cc
   reflog.cc
   reflog_sql.cc

@@ -384,6 +384,17 @@ bool OptionsManager::GetValue(const string &key, string *value) {
 }
 
 
+std::string OptionsManager::GetValueOrDie(const string &key) {
+  std::string value;
+  bool retval = GetValue(key, &value);
+  if (!retval) {
+    PANIC(kLogStderr | kLogDebug,
+          "%s configuration parameter missing", key.c_str());
+  }
+  return value;
+}
+
+
 bool OptionsManager::GetSource(const string &key, string *value) {
   map<string, ConfigValue>::const_iterator iter = config_.find(key);
   if (iter != config_.end()) {

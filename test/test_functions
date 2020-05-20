@@ -748,9 +748,11 @@ create_empty_repo() {
 
   create_repo $repo $uid $debug_log "$@" || return 101
 
-  sudo cvmfs_server transaction $repo || return 102
-  rm -f /cvmfs/$repo/new_repository
-  sudo cvmfs_server publish $repo || return 103
+  if [ -f /cvmfs/$repo/new_repository ]; then
+    sudo cvmfs_server transaction $repo || return 102
+    rm -f /cvmfs/$repo/new_repository
+    sudo cvmfs_server publish $repo || return 103
+  fi
 }
 
 
@@ -2448,7 +2450,7 @@ set_up_repository_gateway() {
 
     echo "  Stopping repository gateway"
     sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
-    
+
     echo "  Cleaning up the repository gateway db"
     sudo rm -rf /var/lib/cvmfs-gateway/*
 
@@ -2488,4 +2490,9 @@ EOF'
 
     echo "  Starting repository gateway"
     sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
+    # Let the service boot up
+    sleep 1
+    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
+    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
+    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
 }
