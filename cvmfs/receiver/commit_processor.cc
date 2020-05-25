@@ -331,7 +331,7 @@ void CommitProcessor::SetStatistics(perf::Statistics *st,
                                     std::string start_time)
 {
   statistics_ = st;
-  statistics_->Register("Publish.revision", "");
+  statistics_->Register("publish.revision", "");
   start_time_ = start_time;
 }
 

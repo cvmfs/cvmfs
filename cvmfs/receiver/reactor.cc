@@ -115,7 +115,7 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
                                   perf::Statistics *stats,
                                   std::string *start_time)
 {
-  perf::StatisticsTemplate stats_tmpl("Publish", stats);
+  perf::StatisticsTemplate stats_tmpl("publish", stats);
   upload::UploadCounters counters(stats_tmpl);
 
   const JSON* statistics = JsonDocument::SearchInObject(
@@ -127,11 +127,11 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
   }
 
   const JSON* publish_ctrs = JsonDocument::SearchInObject(
-    statistics, "Publish", JSON_OBJECT);
+    statistics, "publish", JSON_OBJECT);
 
   if (publish_ctrs == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Could not find 'statistics.Publish' field in request");
+             "Could not find 'statistics.publish' field in request");
     return false;
   }
 
