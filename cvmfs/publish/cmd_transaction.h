@@ -44,6 +44,9 @@ class CmdTransaction : public Command {
     ParameterList p;
     p.push_back(Parameter::Optional("retry-timeout", 't', "seconds",
       "Retry for a maximum number of given seconds if repository is busy"));
+    p.push_back(Parameter::Optional("template", 'T', "from-dir:to-dir",
+      "Clone directory 'from-dir' to 'to-dir' as part of opening the "
+      "transaction"));
     return p;
   }
 

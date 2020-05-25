@@ -50,6 +50,13 @@ int CmdTransaction::Main(const Options &options) {
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
   }
+  if (options.Has("template")) {
+    std::string templ = options.GetString("template");
+    std::vector<std::string> tokens = SplitString(templ, ':');
+    if (tokens.size() != 2)
+      throw EPublish("invalid syntax for --template parameter: " + templ);
+    settings.GetTransaction()->SetTemplate(tokens[0], tokens[1]);
+  }
 
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
                          false /* temporarily */))

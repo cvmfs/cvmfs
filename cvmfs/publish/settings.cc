@@ -83,6 +83,17 @@ void SettingsTransaction::SetLeasePath(const std::string &path) {
   lease_path_ = path;
 }
 
+void SettingsTransaction::SetTemplate(
+  const std::string &from, const std::string &to)
+{
+  if (from.empty())
+    throw EPublish("template transaction's 'from' path must not be empty");
+  if (to.empty())
+    throw EPublish("template transaction's 'to' path must not be empty");
+  template_from_ = from;
+  template_to_ = to;
+}
+
 //------------------------------------------------------------------------------
 
 

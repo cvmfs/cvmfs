@@ -138,6 +138,7 @@ class SettingsTransaction {
   void SetUnionFsType(const std::string &union_fs);
   void SetTimeout(unsigned seconds);
   void SetLeasePath(const std::string &path);
+  void SetTemplate(const std::string &from, const std::string &to);
   void DetectUnionFsType();
 
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
@@ -150,9 +151,13 @@ class SettingsTransaction {
   std::string voms_authz() const { return voms_authz_; }
   unsigned timeout_s() const { return timeout_s_; }
   std::string lease_path() const { return lease_path_; }
+  std::string template_from() const { return template_from_; }
+  std::string template_to() const { return template_to_; }
 
   const SettingsSpoolArea &spool_area() const { return spool_area_; }
   SettingsSpoolArea *GetSpoolArea() { return &spool_area_; }
+
+  bool HasTemplate() const { return !template_to().empty(); }
 
  private:
   bool ValidateUnionFs();
@@ -169,6 +174,12 @@ class SettingsTransaction {
    */
   Setting<unsigned> timeout_s_;
   Setting<std::string> lease_path_;
+  /**
+   * Used for template transactions where a directory tree gets cloned
+   * (from --> to) as part of opening the transaction
+   */
+  Setting<std::string> template_from_;
+  Setting<std::string> template_to_;
 
   SettingsSpoolArea spool_area_;
 };  // class SettingsTransaction
