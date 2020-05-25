@@ -83,8 +83,8 @@ func (b *mockBackend) CancelLease(ctx context.Context, tokenStr string) error {
 	return nil
 }
 
-func (b *mockBackend) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
-	return nil
+func (b *mockBackend) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return 1, nil
 }
 
 func (b *mockBackend) SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error {

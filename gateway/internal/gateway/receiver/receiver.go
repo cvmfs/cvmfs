@@ -45,13 +45,14 @@ type Receiver interface {
 	Quit() error
 	Echo() error
 	SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error
-	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
+	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 }
 
 type ReceiverReply struct {
-	Status     string         `json:"status"`
-	Reason     string         `json:"reason"`
-	Statistics stats.Counters `json:"statistics"`
+	Status        string           `json:"status"`
+	Reason        string           `json:"reason"`
+	FinalRevision uint64           `json:"final_revision"`
+	Statistics    stats.Statistics `json:"statistics"`
 }
 
 // NewReceiver is the factory method for Receiver types
@@ -191,17 +192,17 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 		Msgf("result: %v", result)
 
 	if result == nil {
-		r.statsMgr.MergeIntoLeaseCounters(leasePath, &parsedReply.Statistics)
+		r.statsMgr.MergeIntoLeaseStatistics(leasePath, &parsedReply.Statistics)
 	}
 
 	return result
 }
 
 // Commit command is sent to the worker
-func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	stats, err := r.statsMgr.PopLease(leasePath)
 	if err != nil {
-		return errors.Wrap(err, "could not obtain statistics counters")
+		return 0, errors.Wrap(err, "could not obtain statistics counters")
 	}
 	req := map[string]interface{}{
 		"lease_path":      leasePath,
@@ -214,21 +215,21 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 	}
 	buf, err := json.Marshal(&req)
 	if err != nil {
-		return errors.Wrap(err, "request encoding failed")
+		return 0, errors.Wrap(err, "request encoding failed")
 	}
 
 	reply, err := r.call(receiverCommit, buf, nil)
 	if err != nil {
-		return errors.Wrap(err, "worker 'commit' call failed")
+		return 0, errors.Wrap(err, "worker 'commit' call failed")
 	}
 
-	_, result := parseReceiverReply(reply)
+	parsedReply, result := parseReceiverReply(reply)
 
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "commit").
 		Msgf("result: %v", result)
 
-	return result
+	return parsedReply.FinalRevision, result
 }
 
 func (r *CvmfsReceiver) call(reqID receiverOp, msg []byte, payload io.Reader) ([]byte, error) {

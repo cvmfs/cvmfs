@@ -48,7 +48,7 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 		return "", err
 	}
 
-	if err := s.StatsMgr.AddLeaseEmpty(leasePath); err != nil {
+	if err := s.StatsMgr.CreateLease(leasePath); err != nil {
 		outcome = err.Error()
 		return "", err
 	}
@@ -154,7 +154,7 @@ func (s *Services) CancelLease(ctx context.Context, tokenStr string) error {
 }
 
 // CommitLease associated with the token (transaction commit)
-func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -163,35 +163,40 @@ func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRo
 	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
 	if err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
 	repository, _, err := gw.SplitLeasePath(leasePath)
 	if err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
+	var finalRev uint64
 	if err := s.Leases.WithLock(ctx, repository, func() error {
-		return s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+		var err error
+		finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+		return err
 	}); err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
-	plotsErr := s.StatsMgr.UploadStatsPlots(repository)
-	if plotsErr != nil {
-		gw.LogC(ctx, "actions", gw.LogError).Msgf(plotsErr.Error())
-	}
+	go func() {
+		plotsErr := s.StatsMgr.UploadStatsPlots(repository)
+		if plotsErr != nil {
+			gw.LogC(ctx, "actions", gw.LogError).Msgf(plotsErr.Error())
+		}
+	}()
 
 	if err := s.Leases.CancelLease(ctx, tokenStr); err != nil {
 		outcome = err.Error()
-		return err
+		return finalRev, err
 	}
 
-	return nil
+	return finalRev, nil
 }
