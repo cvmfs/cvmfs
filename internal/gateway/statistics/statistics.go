@@ -18,7 +18,7 @@ type PublishCounters struct {
 }
 
 type Statistics struct {
-	Publish   PublishCounters `json:"Publish"`
+	Publish   PublishCounters `json:"publish"`
 	StartTime string          `json:"start_time"`
 }
 
