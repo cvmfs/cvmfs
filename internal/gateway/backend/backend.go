@@ -32,7 +32,7 @@ type ActionController interface {
 	GetLease(ctx context.Context, tokenStr string) (*LeaseReturn, error)
 	CancelLeases(ctx context.Context, repoPath string) error
 	CancelLease(ctx context.Context, tokenStr string) error
-	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
+	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 	RunGC(ctx context.Context, options GCOptions) (string, error)
 	PublishManifest(ctx context.Context, repository string, message []byte) error
@@ -58,10 +58,7 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 		return nil, errors.Wrap(err, "could not create lease DB")
 	}
 
-	smgr, err := stats.NewStatisticsMgr()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not initialize statistics manager")
-	}
+	smgr := stats.NewStatisticsMgr()
 
 	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver, smgr)
 	if err != nil {

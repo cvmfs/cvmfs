@@ -239,7 +239,7 @@ func TestLeaseActionsCommitLease(t *testing.T) {
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
-		if err := backend.CommitLease(
+		if _, err := backend.CommitLease(
 			context.TODO(), token, "old_hash", "new_hash",
 			gw.RepositoryTag{
 				Name:        "mytag",
@@ -257,7 +257,7 @@ func TestLeaseActionsCommitLease(t *testing.T) {
 		if err != nil {
 			t.Fatalf("could not obtain new lease token: %v", err)
 		}
-		if err := backend.CommitLease(
+		if _, err := backend.CommitLease(
 			context.TODO(), token.TokenStr, "old_hash", "new_hash",
 			gw.RepositoryTag{
 				Name:        "mytag",
@@ -276,13 +276,13 @@ func TestLeaseActionsCommitLease(t *testing.T) {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
 		time.Sleep(2 * backend.Config.MaxLeaseTime)
-		if backend.CommitLease(
+		if _, err := backend.CommitLease(
 			context.TODO(), token, "old_hash", "new_hash",
 			gw.RepositoryTag{
 				Name:        "mytag",
 				Channel:     "mychannel",
 				Description: "this is a tag",
-			}) == nil {
+			}); err == nil {
 			t.Fatalf("expired lease should not have been accepted for commit")
 		}
 	})
