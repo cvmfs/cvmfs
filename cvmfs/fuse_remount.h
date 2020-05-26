@@ -13,6 +13,7 @@
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_evict.h"
+#include "hash.h"
 #include "util/single_copy.h"
 
 namespace cvmfs {
@@ -53,7 +54,8 @@ class FuseRemounter : SingleCopy {
 
   Status Check();
   Status CheckSynchronously();
-  void TryFinish();
+  Status ChangeRoot(const shash::Any &root_hash);
+  void TryFinish(const shash::Any &root_hash = shash::Any());
   void EnterMaintenanceMode();
   bool IsCaching() {
     return (atomic_read32(&maintenance_mode_) == 0) &&

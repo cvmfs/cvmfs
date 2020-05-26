@@ -308,6 +308,22 @@ void *TalkManager::MainResponder(void *data) {
         default:
           talk_mgr->Answer(con_fd, "internal error\n");
       }
+    } else if (line.substr(0, 6) == "chroot") {
+      if (line.length() < 8) {
+        talk_mgr->Answer(con_fd, "Usage: chroot <hash>\n");
+      } else {
+        std::string root_hash = line.substr(7);
+        FuseRemounter::Status status = remounter->ChangeRoot(
+          MkFromHexPtr(shash::HexPtr(root_hash), shash::kSuffixCatalog));
+        switch (status) {
+          case FuseRemounter::kStatusUp2Date:
+            talk_mgr->Answer(con_fd, "OK\n");
+            break;
+          default:
+            talk_mgr->Answer(con_fd, "Failed\n");
+            break;
+        }
+      }
     } else if (line == "detach nested catalogs") {
       mount_point->catalog_mgr()->DetachNested();
       talk_mgr->Answer(con_fd, "OK\n");

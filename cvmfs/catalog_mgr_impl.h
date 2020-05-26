@@ -149,6 +149,44 @@ LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
   return load_error;
 }
 
+/**
+ * Remounts to the given hash
+ */
+template <class CatalogT>
+LoadError AbstractCatalogManager<CatalogT>::ChangeRoot(
+  const shash::Any &root_hash)
+{
+  LogCvmfs(kLogCatalog, kLogDebug,
+           "switching to root hash %s", root_hash.ToString().c_str());
+
+  WriteLock();
+
+  string     catalog_path;
+  shash::Any catalog_hash;
+  const LoadError load_error = LoadCatalog(PathString("", 0),
+                                           root_hash,
+                                           &catalog_path,
+                                           &catalog_hash);
+  if (load_error == kLoadNew) {
+    inode_t old_inode_gauge = inode_gauge_;
+    DetachAll();
+    inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
+
+    CatalogT *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
+    assert(new_root);
+    bool retval = AttachCatalog(catalog_path, new_root);
+    assert(retval);
+
+    if (inode_annotation_) {
+      inode_annotation_->IncGeneration(old_inode_gauge);
+    }
+  }
+  CheckInodeWatermark();
+  Unlock();
+
+  return load_error;
+}
+
 
 /**
  * Detaches everything except the root catalog

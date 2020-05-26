@@ -126,6 +126,7 @@ class AbstractCatalogManager : public SingleCopy {
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
   LoadError Remount(const bool dry_run);
+  LoadError ChangeRoot(const shash::Any &root_hash);
   void DetachNested();
 
   bool LookupPath(const PathString &path, const LookupOptions options,
