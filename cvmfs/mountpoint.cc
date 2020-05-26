@@ -1649,6 +1649,8 @@ MountPoint::MountPoint(
   , fixed_catalog_(false)
   , enforce_acls_(false)
   , has_membership_req_(false)
+  , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
+  , talk_socket_owner_(0)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
@@ -1741,6 +1743,18 @@ void MountPoint::SetupBehavior() {
       && options_mgr_->IsOn(optarg))
   {
     enforce_acls_ = true;
+  }
+
+  if (options_mgr_->GetValue("CVMFS_TALK_SOCKET", &optarg)) {
+    talk_socket_path_ = optarg;
+  }
+  if (options_mgr_->GetValue("CVMFS_TALK_OWNER", &optarg)) {
+    uid_t uid;
+    gid_t main_gid;
+    bool retval = GetUidOf(optarg, &uid, &main_gid);
+    // TODO(jblomer): fail gracefully
+    assert(retval);
+    talk_socket_owner_ = uid;
   }
 }
 

@@ -1803,9 +1803,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   // Control & command interface
   cvmfs::talk_mgr_ = TalkManager::Create(
-    "./cvmfs_io." + cvmfs::mount_point_->fqrn(),
+    cvmfs::mount_point_->talk_socket_path(),
     cvmfs::mount_point_,
     cvmfs::fuse_remounter_);
+  if (cvmfs::mount_point_->talk_socket_owner() != 0) {
+    // TODO(jblomer): add helper function to set only the owner uid
+    chown(cvmfs::mount_point_->talk_socket_path().c_str(),
+          cvmfs::mount_point_->talk_socket_owner(), 0);
+  }
   if (cvmfs::talk_mgr_ == NULL) {
     *g_boot_error = "failed to initialize talk socket (" +
                     StringifyInt(errno) + ")";

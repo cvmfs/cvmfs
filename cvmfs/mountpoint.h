@@ -437,6 +437,8 @@ class MountPoint : SingleCopy, public BootFactory {
   SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
   perf::Statistics *statistics() { return statistics_; }
   signature::SignatureManager *signature_mgr() { return signature_mgr_; }
+  uid_t talk_socket_owner() { return talk_socket_owner_; }
+  std::string talk_socket_path() { return talk_socket_path_; }
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
 
@@ -557,6 +559,9 @@ class MountPoint : SingleCopy, public BootFactory {
   // TODO(jblomer): this should go in the catalog manager
   std::string membership_req_;
   bool has_membership_req_;
+
+  std::string talk_socket_path_;
+  uid_t talk_socket_owner_;
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_
