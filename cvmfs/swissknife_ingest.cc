@@ -155,6 +155,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
+  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 
   publish::SyncUnion *sync;
 

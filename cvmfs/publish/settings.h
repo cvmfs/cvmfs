@@ -130,17 +130,42 @@ class SettingsTransaction {
     , ttl_second_(240)
     , is_garbage_collectable_(true)
     , is_volatile_(false)
+    , enforce_limits_(false)
+    // SyncParameters::kDefaultNestedKcatalogLimit
+    , limit_nested_catalog_kentries_(500)
+    // SyncParameters::kDefaultRootKcatalogLimit
+    , limit_root_catalog_kentries_(500)
+    // SyncParameters::kDefaultFileMbyteLimit
+    , limit_file_size_mb_(1024)
+    , use_catalog_autobalance_(false)
+    // SyncParameters::kDefaultMaxWeight
+    , autobalance_max_weight_(100000)
+    // SyncParameters::kDefaultMinWeight
+    , autobalance_min_weight_(1000)
+    , print_changeset_(false)
     , union_fs_(kUnionFsUnknown)
     , timeout_s_(0)
     , spool_area_(fqrn)
   {}
 
+  void SetBaseHash(const shash::Any &hash);
   void SetUnionFsType(const std::string &union_fs);
+  void SetHashAlgorithm(const std::string &algorithm);
+  void SetCompressionAlgorithm(const std::string &algorithm);
+  void SetEnforceLimits(bool value);
+  void SetLimitNestedCatalogKentries(unsigned value);
+  void SetLimitRootCatalogKentries(unsigned value);
+  void SetLimitFileSizeMb(unsigned value);
+  void SetUseCatalogAutobalance(bool value);
+  void SetAutobalanceMaxWeight(unsigned value);
+  void SetAutobalanceMinWeight(unsigned value);
+  void SetPrintChangeset(bool value);
   void SetTimeout(unsigned seconds);
   void SetLeasePath(const std::string &path);
   void SetTemplate(const std::string &from, const std::string &to);
   void DetectUnionFsType();
 
+  shash::Any base_hash() const { return base_hash_; }
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
   zlib::Algorithms compression_algorithm() const {
     return compression_algorithm_;
@@ -148,7 +173,20 @@ class SettingsTransaction {
   uint32_t ttl_second() const { return ttl_second_; }
   bool is_garbage_collectable() const { return is_garbage_collectable_; }
   bool is_volatile() const { return is_volatile_; }
+  bool enforce_limits() const { return enforce_limits_; }
+  unsigned limit_nested_catalog_kentries() const {
+    return limit_nested_catalog_kentries_;
+  }
+  unsigned limit_root_catalog_kentries() const {
+    return limit_root_catalog_kentries_;
+  }
+  unsigned limit_file_size_mb() const { return limit_file_size_mb_; }
+  bool use_catalog_autobalance() const { return use_catalog_autobalance_; }
+  unsigned autobalance_max_weight() const { return autobalance_max_weight_; }
+  unsigned autobalance_min_weight() const { return autobalance_min_weight_; }
+  bool print_changeset() const { return print_changeset_; }
   std::string voms_authz() const { return voms_authz_; }
+  UnionFsType union_fs() const { return union_fs_; }
   unsigned timeout_s() const { return timeout_s_; }
   std::string lease_path() const { return lease_path_; }
   std::string template_from() const { return template_from_; }
@@ -162,11 +200,27 @@ class SettingsTransaction {
  private:
   bool ValidateUnionFs();
 
+  /**
+   * The root catalog hash based on which the transaction takes place.
+   * Usually the current root catalog from the manifest, which should be equal
+   * to the root hash of the mounted read-only volume.  In some cases, this
+   * can be different though, e.g. for checked out branches or after silent
+   * transactions such as template transactions.
+   */
+  Setting<shash::Any> base_hash_;
   Setting<shash::Algorithms> hash_algorithm_;
   Setting<zlib::Algorithms> compression_algorithm_;
   Setting<uint32_t> ttl_second_;
   Setting<bool> is_garbage_collectable_;
   Setting<bool> is_volatile_;
+  Setting<bool> enforce_limits_;
+  Setting<unsigned> limit_nested_catalog_kentries_;
+  Setting<unsigned> limit_root_catalog_kentries_;
+  Setting<unsigned> limit_file_size_mb_;
+  Setting<bool> use_catalog_autobalance_;
+  Setting<unsigned> autobalance_max_weight_;
+  Setting<unsigned> autobalance_min_weight_;
+  Setting<bool> print_changeset_;
   Setting<std::string> voms_authz_;
   Setting<UnionFsType> union_fs_;
   /**
