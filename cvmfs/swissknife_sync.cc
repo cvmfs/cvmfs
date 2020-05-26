@@ -41,6 +41,7 @@
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
+#include "monitor.h"
 #include "path_filters/dirtab.h"
 #include "platform.h"
 #include "reflog.h"
@@ -562,9 +563,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // Spawn monitoring process (watchdog)
   char watchdog_path[128];
   std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-  int path_size =
-      sprintf(watchdog_path, "/var/log/cvmfs-swissknife/stacktrace.%s.%d",
-              timestamp.c_str(), getpid());
+  int path_size = snprintf(watchdog_path, sizeof(watchdog_path),
+                           "/var/log/cvmfs-swissknife/stacktrace.%s.%d",
+                           timestamp.c_str(), getpid());
   assert(path_size > 0);
   assert(path_size < 128);
   Watchdog *watchdog = Watchdog::Create(std::string(watchdog_path));
