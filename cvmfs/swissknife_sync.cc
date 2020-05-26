@@ -559,6 +559,17 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   string start_time = GetGMTimestamp();
 
+  // Spawn monitoring process (watchdog)
+  char watchdog_path[128];
+  std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
+  int path_size =
+      sprintf(watchdog_path, "/var/log/cvmfs-swissknife/stacktrace.%s.%d",
+              timestamp.c_str(), getpid());
+  assert(path_size > 0);
+  assert(path_size < 128);
+  Watchdog *watchdog = Watchdog::Create(std::string(watchdog_path));
+  watchdog->Spawn();
+
   SyncParameters params;
 
   // Initialization

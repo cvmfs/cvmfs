@@ -36,7 +36,7 @@
 #include <string>
 #include <vector>
 
-#ifndef CVMFS_LIBCVMFS
+#if !(defined(CVMFS_LIBCVMFS) || defined(CVMFS_SWISSKNIFE))
 #include "cvmfs.h"
 #endif
 #include "logging.h"
@@ -47,7 +47,7 @@
 #include "util/string.h"
 
 // Used for address offset calculation
-#ifndef CVMFS_LIBCVMFS
+#if !(defined(CVMFS_LIBCVMFS) || defined(CVMFS_SWISSKNIFE))
 extern loader::CvmfsExports *g_cvmfs_exports;
 #endif
 
@@ -315,7 +315,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
     if (++counter == 300) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
       // Last attempt to log something useful
-#ifndef CVMFS_LIBCVMFS
+#if !(defined(CVMFS_LIBCVMFS) || defined(CVMFS_SWISSKNIFE))
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
                sig, send_errno);
       void *addr[kMaxBacktrace];

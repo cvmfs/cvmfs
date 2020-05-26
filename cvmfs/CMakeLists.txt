@@ -391,6 +391,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   malloc_arena.cc
   manifest.cc
   manifest_fetch.cc
+  monitor.cc
   notify/cmd_pub.cc
   notify/cmd_sub.cc
   notify/messages.cc
@@ -664,6 +665,7 @@ set (CVMFS_TALK_CFLAGS "-DCVMFS_CLIENT")
 set (LIBCVMFS_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (LIBCVMFS_CACHE_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (CVMFS_SHRINKWRAP_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
+set (CVMFS_SWISSKNIFE_CFLAGS "-DCVMFS_SWISSKNIFE")
 
 #
 # set some include and linking stuff
@@ -979,7 +981,7 @@ if (BUILD_SERVER)
   target_link_libraries (cvmfs_publish cvmfs_server)
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_SOURCES})
-    set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "-DDEBUGMSG -g -O0" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
+    set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS} -DDEBUGMSG -g -O0" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
     target_link_libraries (cvmfs_swissknife_debug
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
                            ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
