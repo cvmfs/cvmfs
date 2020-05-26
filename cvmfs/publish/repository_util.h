@@ -66,6 +66,8 @@ void RunSuidHelper(const std::string &verb, const std::string &fqrn);
 void SetInConfig(const std::string &path,
                  const std::string &key, const std::string &value);
 
+std::string SendTalkCommand(const std::string &socket, const std::string &cmd);
+
 }  // namespace publish
 
 #endif  // CVMFS_PUBLISH_REPOSITORY_UTIL_H_

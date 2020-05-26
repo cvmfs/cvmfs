@@ -312,7 +312,7 @@ void *TalkManager::MainResponder(void *data) {
       if (line.length() < 8) {
         talk_mgr->Answer(con_fd, "Usage: chroot <hash>\n");
       } else {
-        std::string root_hash = line.substr(7);
+        std::string root_hash = Trim(line.substr(7), true /* trim_newline */);
         FuseRemounter::Status status = remounter->ChangeRoot(
           MkFromHexPtr(shash::HexPtr(root_hash), shash::kSuffixCatalog));
         switch (status) {

@@ -23,6 +23,7 @@ cvmfs_run_test() {
   cat /cvmfs/$CVMFS_TEST_REPO/bar/hello || return 10
   cat /cvmfs/$CVMFS_TEST_REPO/bar/nested/x || return 11
   echo "new" > /cvmfs/$CVMFS_TEST_REPO/bar/new || return 12
+  echo "*** publish template transaction"
   publish_repo $CVMFS_TEST_REPO || return 13
 
   echo "*** verify structure"

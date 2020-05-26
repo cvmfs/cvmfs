@@ -92,6 +92,9 @@ class SettingsSpoolArea {
   std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
   std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
+  std::string readonly_talk_socket() const {
+     return workspace_() + "/cvmfs_io";
+  }
   std::string union_mnt() const { return union_mnt_; }
   std::string scratch_dir() const { return workspace_() + "/scratch/current"; }
   std::string client_config() const { return workspace_() + "/client.config"; }

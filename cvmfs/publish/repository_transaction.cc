@@ -72,6 +72,8 @@ void Publisher::Transaction() {
     catalog_mgr_->CloneTree(settings_.transaction().template_from(),
                             settings_.transaction().template_to());
     Sync();
+    SendTalkCommand(settings_.transaction().spool_area().readonly_talk_socket(),
+      "chroot " + settings_.transaction().base_hash().ToString() + "\n");
     LogCvmfs(kLogCvmfs, llvl_ | kLogStdout, "[done]");
     //PushReflog();
   }

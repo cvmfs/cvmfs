@@ -35,12 +35,9 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
-  BackoffThrottle throttle;
   if (atomic_cas32(&drainout_mode_, 0, 1)) {
     // As of this point, fuse callbacks return zero as cache timeout
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "new catalog revision available, "
-             "draining out meta-data caches");
+    LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
     invalidator_handle_.Reset();
     invalidator_->InvalidateInodes(&invalidator_handle_);
     atomic_inc32(&drainout_mode_);
@@ -51,6 +48,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   }
 
   int32_t drainout_code = 0;
+  BackoffThrottle throttle;
   do {
     TryFinish(root_hash);
     drainout_code = atomic_read32(&drainout_mode_);
