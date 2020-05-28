@@ -114,11 +114,9 @@ string Statistics::PrintJSON() {
   for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
                                                   iEnd = counters_.end();
        i != iEnd; ++i) {
-    size_t dot_pos = i->first.find_first_of(".");
-    std::string current_namespace = i->first.substr(0, dot_pos);
-    std::string current_counter = i->first.substr(dot_pos + 1);
+    std::vector<std::string> tokens = SplitString(i->first, '.');
 
-    if (current_namespace != last_namespace) {
+    if (tokens[0] != last_namespace) {
       if (last_namespace != "") {
         json_statistics.AddUnquoted(last_namespace,
                                     json_statistics_namespace.GenerateString());
@@ -126,10 +124,10 @@ string Statistics::PrintJSON() {
       json_statistics_namespace.Clear();
     }
 
-    json_statistics_namespace.AddUnquoted(current_counter,
+    json_statistics_namespace.AddUnquoted(tokens[1],
                                           i->second->counter.ToString());
 
-    last_namespace = current_namespace;
+    last_namespace = tokens[0];
   }
   if (last_namespace != "") {
     json_statistics.AddUnquoted(last_namespace,
