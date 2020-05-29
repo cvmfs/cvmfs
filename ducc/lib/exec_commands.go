@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"os/signal"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -70,6 +72,16 @@ func (e *execCmd) StartWithOutput() (error, bytes.Buffer, bytes.Buffer) {
 		return err, outb, errb
 	}
 
+	// we detect signals from the OS, if we receive a signal to exit we want to forward
+	// it to the cvmfs backend.
+
+	// subscribe to signal
+	// remove subscription with defer
+	quit := make(chan os.Signal, 1)
+	done := make(chan error, 1)
+	signal.Notify(quit, os.Interrupt)
+	defer signal.Reset()
+
 	err := e.cmd.Start()
 	if err != nil {
 		LogE(err).Error("Error in starting the command")
@@ -96,7 +108,34 @@ func (e *execCmd) StartWithOutput() (error, bytes.Buffer, bytes.Buffer) {
 			}
 		}()
 	}
-	err = e.cmd.Wait()
+
+	// we wait on a goroutine to set free the main thread
+	go func() {
+		done <- e.cmd.Wait()
+	}()
+
+	select {
+	// if we receive a signal we forward it
+	case sign := <-quit:
+		process := e.cmd.Process
+		if process != nil {
+			process.Signal(sign)
+		}
+		// we wait for the child process to exit
+		err = <-done
+		Log().WithFields(log.Fields{"err": err,
+			"signal": sign,
+			"STDOUT": string(outb.Bytes()),
+			"STDERR": string(errb.Bytes())}).
+			Warning("Process received exit signal")
+		// we exit ourselves
+		os.Exit(2) //SIGINT
+
+	// standard case, we didn't receive a signal and the process finish working
+	case err = <-done:
+		return err, outb, errb
+	}
+
 	return err, outb, errb
 }
 
