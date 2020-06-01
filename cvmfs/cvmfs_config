@@ -520,8 +520,8 @@ cvmfs_chksetup() {
             for i in {0..255}
               do
                 local chunk_dir; chunk_dir="${CVMFS_ALIEN_CACHE}/`printf   \"%.2x\n\" $i`"
-                  if [ ! -d $chunk_dir ]; then
-                    echo "Error: chunk directory $chunk_dir missing in alien   cache."
+                  if ! runascvmfsuser "test -d $chunk_dir "; then
+                    echo "Error: chunk directory $chunk_dir missing in alien cache."
                     num_errors=$(($num_errors+1))
                   fi
               done
