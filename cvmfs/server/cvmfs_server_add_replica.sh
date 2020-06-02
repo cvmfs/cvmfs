@@ -172,8 +172,10 @@ CVMFS_UPSTREAM_STORAGE=$upstream
 CVMFS_SNAPSHOT_GROUP=$snapshot_group
 EOF
   if [ $is_passthrough -eq 1 ]; then
-    echo "CVMFS_PASSTHROUGH=true" >> /etc/cvmfs/repositories.d/${alias_name}/server.conf
-    echo "# Pass-through" > /etc/cvmfs/repositories.d/${alias_name}/replica.conf
+    cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
+# Created by cvmfs_server.
+CVMFS_PASSTHROUGH=true
+EOF
   else
     cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
 # Created by cvmfs_server.
