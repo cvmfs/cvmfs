@@ -204,7 +204,12 @@ EOF
     if [ $configure_apache -eq 1 ]; then
       echo -n "Update Apache configuration... "
       ensure_enabled_apache_modules
-      create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
+      if [ $is_passthrough -eq 1 ]; then
+        check_proxy_module
+        create_apache_proxy_config_for_endpoint $alias_name $stratum0 "with wsgi"
+      else
+        create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
+      fi
       create_apache_config_for_global_info
       reload_apache > /dev/null
       if [ $is_passthrough -eq 0 ]; then
