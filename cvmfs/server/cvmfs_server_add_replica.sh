@@ -22,10 +22,11 @@ cvmfs_server_add_replica() {
   local enable_auto_gc=0
   local s3_config
   local snapshot_group
+  local is_passthrough=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:w:azs:pg:" option
+  while getopts "o:u:n:w:azs:pg:P" option
   do
     case $option in
       u)
@@ -55,6 +56,9 @@ cvmfs_server_add_replica() {
       g)
         snapshot_group=$OPTARG
       ;;
+      P)
+        is_passthrough=1
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command add-replica: Unrecognized option: $1"
@@ -64,10 +68,15 @@ cvmfs_server_add_replica() {
 
    # get stratum0 url and path of public key
   shift $(($OPTIND-1))
-  check_parameter_count 2 $#
 
-  stratum0=$1
-  public_key=$2
+  if [ $is_passthrough -eq 0 ]; then
+    check_parameter_count 2 $#
+    stratum0=$1
+    public_key=$2
+  else
+    check_parameter_count 1 $#
+    stratum0=$1
+  fi
 
   # get the name of the repository pointed to by $stratum0
   name=$(get_repo_info_from_url $stratum0 -L -n) || die "Failed to access Stratum0 repository at $stratum0"
@@ -87,6 +96,11 @@ cvmfs_server_add_replica() {
     else
       die "There is already a Stratum1 repository $alias_name"
     fi
+  fi
+
+  if [ $is_passthrough -eq 1 ]; then
+    [ -z "$upstream" ] || die "Pass-through repository and non-default upstream storage are mutually exclusive"
+    [ $enable_auto_gc -eq 0 ] || die "Pass-through repository and garbage collection are mutually exclusive"
   fi
 
   # upstream generation (defaults to local upstream)
@@ -157,13 +171,18 @@ CVMFS_STRATUM1=$stratum1
 CVMFS_UPSTREAM_STORAGE=$upstream
 CVMFS_SNAPSHOT_GROUP=$snapshot_group
 EOF
-  cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
+  if [ $is_passthrough -eq 1 ]; then
+    echo "CVMFS_PASSTHROUGH=true" >> /etc/cvmfs/repositories.d/${alias_name}/server.conf
+    echo "# Pass-through" > /etc/cvmfs/repositories.d/${alias_name}/replica.conf
+  else
+    cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
 # Created by cvmfs_server.
 CVMFS_NUM_WORKERS=16
 CVMFS_PUBLIC_KEY=$public_key
 CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
+  fi
 
   # append GC specific configuration
   if [ $enable_auto_gc != 0 ]; then
@@ -188,9 +207,11 @@ EOF
       create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
       create_apache_config_for_global_info
       reload_apache > /dev/null
-      touch $storage_dir/.cvmfsempty
-      wait_for_apache "${stratum1}/.cvmfsempty" || die "fail (Apache configuration)"
-      rm -f $storage_dir/.cvmfsempty
+      if [ $is_passthrough -eq 0 ]; then
+        touch $storage_dir/.cvmfsempty
+        wait_for_apache "${stratum1}/.cvmfsempty" || die "fail (Apache configuration)"
+        rm -f $storage_dir/.cvmfsempty
+      fi
       echo "done"
     fi
   fi
@@ -210,11 +231,13 @@ EOF
 
   syncfs
 
-  echo "\
+  if [ $is_passthrough -eq 0 ]; then
+    echo "\
 
 Use 'cvmfs_server snapshot' to replicate $alias_name.
 Make sure to install the repository public key in /etc/cvmfs/keys/
 You might have to add the key in /etc/cvmfs/repositories.d/${alias_name}/replica.conf"
+  fi
 }
 
 
