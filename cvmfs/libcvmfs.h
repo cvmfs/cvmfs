@@ -35,7 +35,11 @@
 // 26: CernVM-FS 2.5.0
 // 27: Add cvmfs_options_init_v2
 // 28: CernVM-FS 2.6.0
-#define LIBCVMFS_REVISION 28
+// 29: CernVM-FS 2.8
+//     * Add cvmfs_options_parse_default
+//     * Add cvmfs_listdir_stat
+//     * Add catalog counters to struct cvmfs_nc_attr
+#define LIBCVMFS_REVISION 29
 
 #include <stdint.h>
 #include <sys/stat.h>
@@ -464,7 +468,7 @@ int cvmfs_listdir_contents(
  *
  * On return, @param buf will contain list of cvmfs_stat_t objects.
  * The caller must free the cvmfs_stat_t::name and the array containing
- * cvmfs_stat_t objects (*buf).  
+ * cvmfs_stat_t objects (*buf).
  * The array (*buf) may be NULL when this function is called.
  *
  * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
