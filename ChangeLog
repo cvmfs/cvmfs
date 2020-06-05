@@ -1,4 +1,7 @@
 2.8.0:
+  * [libcvmfs] add cvmfs_options_parse_default() 
+  * [libcvmfs] add cvmfs_listdir_stat()
+  * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
   * Parallelize catalog traversal in garbage collection
   * Improve performance of uploading small objects to S3
   * Fix double counting in swissknife filestats command
