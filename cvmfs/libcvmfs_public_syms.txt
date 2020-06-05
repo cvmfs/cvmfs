@@ -20,6 +20,7 @@ cvmfs_options_clone_legacy
 cvmfs_options_fini
 cvmfs_options_set
 cvmfs_options_parse
+cvmfs_options_parse_default
 cvmfs_options_unset
 cvmfs_options_get
 cvmfs_options_dump
@@ -43,6 +44,7 @@ cvmfs_stat
 cvmfs_lstat
 cvmfs_listdir
 cvmfs_listdir_contents
+cvmfs_listdir_stat
 cvmfs_stat_attr
 cvmfs_stat_nc
 cvmfs_list_nc

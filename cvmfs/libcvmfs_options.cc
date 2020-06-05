@@ -82,6 +82,9 @@ int cvmfs_options_parse(SimpleOptionsParser *opts, const char *path) {
   return result ? 0 : -1;
 }
 
+void cvmfs_options_parse_default(SimpleOptionsParser *opts, const char *fqrn) {
+  opts->ParseDefault(fqrn);
+}
 
 void cvmfs_options_unset(SimpleOptionsParser *opts, const char *key) {
   opts->UnsetValue(key);
