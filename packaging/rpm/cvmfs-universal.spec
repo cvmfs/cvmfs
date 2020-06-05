@@ -430,6 +430,10 @@ EOF
 rm -rf $RPM_BUILD_ROOT
 
 %post
+if [ $1 -eq 1 ]; then
+   mkdir /cvmfs
+   chmod 755 /cvmfs
+fi
 %if 0%{?selinux_cvmfs}
 # Install SELinux policy modules
 for selinuxvariant in %{selinux_variants}
@@ -484,6 +488,8 @@ if [ $1 -eq 0 ]; then
    then
      rm -f /etc/auto.master.d/cvmfs.autofs
    fi
+   [ -f /var/lock/subsys/autofs ] && /sbin/service autofs reload >/dev/null
+   rmdir /cvmfs
 fi
 
 %if 0%{?selinux_cvmfs}
@@ -531,7 +537,6 @@ fi
 /sbin/mount.cvmfs
 %dir %{_sysconfdir}/cvmfs/config.d
 %dir %{_sysconfdir}/cvmfs/domain.d
-%dir /cvmfs
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf
