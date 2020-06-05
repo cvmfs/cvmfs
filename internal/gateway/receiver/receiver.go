@@ -45,6 +45,8 @@ type Receiver interface {
 	Echo() error
 	SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error
 	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
+	Interrupt() error // like Ctrl-C SIGTERM -2
+	// Kill() error // like Crtl-D SIGKILL -9
 }
 
 // NewReceiver is the factory method for Receiver types
@@ -103,6 +105,9 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 		return nil, errors.Wrap(err, "could not start worker process")
 	}
 
+	workerInRead.Close()
+	workerOutWrite.Close()
+
 	gw.LogC(ctx, "receiver", gw.LogDebug).
 		Str("command", "start").
 		Msg("worker process ready")
@@ -114,9 +119,13 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 
 // Quit command is sent to the worker
 func (r *CvmfsReceiver) Quit() error {
+	needToWait := true
 	defer func() {
 		r.workerCmdIn.Close()
 		r.workerCmdOut.Close()
+		if needToWait {
+			r.worker.Wait()
+		}
 	}()
 
 	if _, err := r.call(receiverQuit, []byte{}, nil); err != nil {
@@ -139,7 +148,9 @@ func (r *CvmfsReceiver) Quit() error {
 		Str("pipe", "stdout").
 		Msg(string(buf2))
 
-	if err := r.worker.Wait(); err != nil {
+	err := r.worker.Wait()
+	needToWait = false
+	if err != nil {
 		return errors.Wrap(err, "waiting for worker process failed")
 	}
 
@@ -219,6 +230,10 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 	return result
 }
 
+func (r *CvmfsReceiver) Interrupt() error {
+	return r.worker.Process.Signal(os.Interrupt)
+}
+
 func (r *CvmfsReceiver) call(reqID receiverOp, msg []byte, payload io.Reader) ([]byte, error) {
 	if err := r.request(reqID, msg, payload); err != nil {
 		return nil, err
@@ -237,6 +252,7 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader)
 	}
 	if payload != nil {
 		if _, err := io.Copy(r.workerCmdIn, payload); err != nil {
+			r.Interrupt()
 			return errors.Wrap(err, "could not write request payload")
 		}
 	}
