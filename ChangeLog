@@ -1,4 +1,5 @@
 2.7.3:
+  * Fix `cvmfs_config chksetup` for squashed NFS alien cache (CVM-1888)
   * Fix building with GCC >= 10 (CVM-1894)
   * Fix handling of .cvmfs_status.json after GC (CVM-1887)
   * Add hidden `cvmfs_server eliminate-bulk-hashes` command (CVM-1428)
