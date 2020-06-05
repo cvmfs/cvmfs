@@ -90,6 +90,16 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 		return nil, errors.Wrap(err, "could not create worker output pipe")
 	}
 
+	// it is necessary to close this two files, otherwise, if the receiver crash,
+	// a read on the `workerOutRead` / `workerCmdOut` will hang forever.
+	// details: https://web.archive.org/web/20200429092830/https://redbeardlab.com/2020/04/29/on-linux-pipes-fork-and-passing-file-descriptors-to-other-process/
+	// Note how we close them **after** the cmd.Start call finish, using defer.
+	// Indeed cmd.Start copies the file descriptor in the new process space,
+	// closing them before it would be an error, because the new process would
+	// get closed filed descriptor.
+	defer workerInRead.Close()
+	defer workerOutWrite.Close()
+
 	cmd.ExtraFiles = []*os.File{workerInRead, workerOutWrite}
 
 	stderr, err := cmd.StderrPipe()
@@ -104,9 +114,6 @@ func NewCvmfsReceiver(ctx context.Context, execPath string) (*CvmfsReceiver, err
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "could not start worker process")
 	}
-
-	workerInRead.Close()
-	workerOutWrite.Close()
 
 	gw.LogC(ctx, "receiver", gw.LogDebug).
 		Str("command", "start").
