@@ -30,13 +30,18 @@ cvmfs_run_test() {
 
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
 
-  CVMFS_TEST_621_REPLICA_NAMES="${replica_name}-1 ${replica_name}-2 ${replica_name}-3 ${replica_name}-4 ${replica_name}-5"
+  CVMFS_TEST_621_REPLICA_NAMES="${replica_name}-0 ${replica_name}-1 ${replica_name}-2 ${replica_name}-3 ${replica_name}-4 ${replica_name}-5"
   echo "*** install a cleanup function"
   trap cleanup EXIT HUP INT TERM || return $?
 
-  echo "*** create 5 Stratum1 replicas on the same machine"
+  echo "*** create 6 Stratum1 replicas on the same machine"
   load_repo_config $CVMFS_TEST_REPO
 
+  # First replica is pass-through
+  create_passthrough_stratum1 ${replica_name}-0    \
+                              $CVMFS_TEST_USER     \
+                              $CVMFS_STRATUM0      \
+                              || return 9
   for num in 1 2 3 4 5; do
     local groupopt
     groupopt=""
@@ -63,32 +68,34 @@ cvmfs_run_test() {
   rm -f /var/log/cvmfs/snapshots.log /var/log/cvmfs/gc.log
 
   echo "*** running cvmfs_server snapshot -a"
-  cvmfs_server snapshot -an || return 5
+  cvmfs_server snapshot -an || return 10
 
-  echo "*** download manifests of stratum 0 and replica 1 and 5"
-  curl -so mr1 "$(get_repo_url ${replica_name}-1)/.cvmfspublished" || return 6
-  curl -so mr5 "$(get_repo_url ${replica_name}-5)/.cvmfspublished" || return 7
-  curl -so ms0 "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"  || return 8
+  echo "*** download manifests of stratum 0 and replica 0, 1 and 5"
+  curl -so mr0 "$(get_repo_url ${replica_name}-0)/.cvmfspublished" || return 11
+  curl -so mr1 "$(get_repo_url ${replica_name}-1)/.cvmfspublished" || return 12
+  curl -so mr5 "$(get_repo_url ${replica_name}-5)/.cvmfspublished" || return 13
+  curl -so ms0 "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"  || return 14
 
-  echo "*** checking if snapshot worked on replicas 1 and 5"
-  cmp ms0 mr1 || return  9
-  cmp ms0 mr5 || return 10
+  echo "*** checking if snapshot worked on replicas 0, 1 and 5"
+  cmp ms0 mr0 || return 15
+  cmp ms0 mr1 || return 16
+  cmp ms0 mr5 || return 17
 
   echo "*** checking if replica 2 was skipped"
-  curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" && return 11
+  curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" && return 20
   echo "*** checking if replica 3 detected an error"
-  curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" && return 12
+  curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" && return 21
   echo "*** checking if replica 4 was skipped"
-  curl -f -sI "$(get_repo_url ${replica_name}-4)/.cvmfspublished" && return 13
+  curl -f -sI "$(get_repo_url ${replica_name}-4)/.cvmfspublished" && return 22
 
   echo "*** running cvmfs_server snapshot -a -g other"
-  cvmfs_server snapshot -an -g other || return 14
+  cvmfs_server snapshot -an -g other || return 30
 
   echo "*** download manifest of replica 4"
-  curl -so mr4 "$(get_repo_url ${replica_name}-5)/.cvmfspublished" || return 15
+  curl -so mr4 "$(get_repo_url ${replica_name}-5)/.cvmfspublished" || return 31
 
   echo "*** checking if snapshot worked on replica 4"
-  cmp ms0 mr4 || return  16
+  cmp ms0 mr4 || return  32
 
   echo "*** restoring replica 3's download URL"
   sudo $SHELL -c "sed -i 's,Bogus,,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
@@ -96,34 +103,40 @@ cvmfs_run_test() {
   echo '*** checking snapshot wildcard "*-?"'
   # make sure wildcard expansion does not happen in current working dir
   touch "afilewithadash-1"
-  cvmfs_server snapshot "*-?" || return 17
+  cvmfs_server snapshot "*-?" || return 40
 
   echo "*** checking that replicas 2 & 3 worked this time"
   # the wildcard does not look at CVMFS_REPLICA_ACTIVE
-  curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" || return 18
-  curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" || return 19
+  curl -f -sI "$(get_repo_url ${replica_name}-2)/.cvmfspublished" || return 41
+  curl -f -sI "$(get_repo_url ${replica_name}-3)/.cvmfs_last_snapshot" || return 42
 
   echo "*** corrupting third replica's download URL again"
   sudo $SHELL -c "sed -i 's,^\(CVMFS_STRATUM0=.*\),\1Bogus,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
 
   echo "*** remove evidence of initial repo gc"
-  ! has_jq || delete_from_backend $CVMFS_TEST_REPO .cvmfs_status.json || return 20
+  ! has_jq || delete_from_backend $CVMFS_TEST_REPO .cvmfs_status.json || return 43
 
   echo "*** running cvmfs_server gc -af"
-  cvmfs_server gc -af || return 21
+  cvmfs_server gc -af || return 44
 
   if ! has_jq; then
     return 0
   fi
 
   echo "*** checking if gc worked on test repo and replicas 1 and 4"
-  curl -f -s "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfs_status.json"|grep last_gc  || return 22
-  curl -f -s "$(get_repo_url ${replica_name}-1)/.cvmfs_status.json"|grep last_gc || return 23
-  curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json"|grep last_gc || return 24
+  curl -f -s "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfs_status.json"|grep last_gc  || return 50
+  curl -f -s "$(get_repo_url ${replica_name}-1)/.cvmfs_status.json"|grep last_gc || return 51
+  curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json"|grep last_gc || return 52
 
   echo "*** verifying gc did not work on replicas 2 and 3"
-  curl -f -s "$(get_repo_url ${replica_name}-2)/.cvmfs_status.json"|grep last_gc && return 25
-  curl -f -s "$(get_repo_url ${replica_name}-3)/.cvmfs_status.json"|grep last_gc && return 26
+  curl -f -s "$(get_repo_url ${replica_name}-2)/.cvmfs_status.json"|grep last_gc && return 53
+  curl -f -s "$(get_repo_url ${replica_name}-3)/.cvmfs_status.json"|grep last_gc && return 54
+
+  echo "*** checking if (only) replica 0 is marked as pass-through"
+  curl -f -s "$(get_local_repo_url info)/v1/repositories.json" | \
+    jq ".replicas[] | select(.alias == \"${replica_name}-0\")" | grep pass-through || return 55
+  curl -f -s "$(get_local_repo_url info)/v1/repositories.json" | \
+    jq ".replicas[] | select(.alias == \"${replica_name}-1\")" | grep pass-through && return 56
 
   return 0
 }

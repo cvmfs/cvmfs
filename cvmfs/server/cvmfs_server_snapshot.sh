@@ -56,6 +56,7 @@ __do_snapshot() {
     is_stratum1 $alias_name || { echo "Repository $alias_name is not a stratum 1 repository"; retcode=1; continue; }
 
     # get repository information
+    CVMFS_PASSTHROUGH=false
     load_repo_config $alias_name
     name=$CVMFS_REPOSITORY_NAME
     user=$CVMFS_USER
@@ -86,6 +87,11 @@ __do_snapshot() {
     if is_local_upstream $upstream; then
         # try to update the geodb, but continue if it doesn't work
         _update_geodb -l || true
+    fi
+
+    if [ x"$CVMFS_PASSTHROUGH" = x"true" ]; then
+      echo "Pass-through repository, skipping snapshot"
+      continue
     fi
 
     if ! acquire_update_lock $alias_name snapshot $abort_on_conflict; then

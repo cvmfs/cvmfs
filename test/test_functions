@@ -832,6 +832,33 @@ create_stratum1() {
                                    $stratum0_pub
 }
 
+# creates a repository replica as a pass-through to a stratum 0
+# @param replica_name  the name of the new replica
+# @param replica_owner the owner of the new replica
+# @param stratum0_url  the url for the source repository
+create_passthrough_stratum1() {
+  local replica_name=$1
+  local replica_owner=$2
+  local stratum0_url=$3
+  shift 3
+  local additional_parameters="$*"
+  local s3_config=""
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    local stratum1_url="$CVMFS_TEST_HTTP_BASE"
+    [ ! -z "$stratum1_url" ] || die "\$CVMFS_TEST_HTTP_BASE needs to be set for S3 tests to work!"
+    echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
+    echo "  Stratum1:  $stratum1_url"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
+  fi
+  sudo -E cvmfs_server add-replica -P \
+                                   -o $replica_owner      \
+                                   -n $replica_name       \
+                                   $s3_config             \
+                                   $additional_parameters \
+                                   $stratum0_url
+}
+
+
 # creates a big file at a given location with a given size
 # @param path  the location of the new file
 # @param size  the desired size in megabytes

@@ -1109,7 +1109,7 @@ Supported Commands:
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]
-                  [-g snapshot group]
+                  [-g snapshot group] [-P pass-through repository]
                   <stratum 0 url> <public key | keys directory>
                   Creates a Stratum 1 replica of a Stratum 0 repository
   import          [-w stratum0 url] [-o owner] [-u upstream storage]
