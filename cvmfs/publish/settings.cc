@@ -268,7 +268,8 @@ std::string SettingsBuilder::GetSingleAlias() {
     throw EPublish("no repositories available in " + config_path_);
   if (repositories.size() > 1)
     throw EPublish("multiple repositories available in " + config_path_);
-  return repositories[0];
+  // the + 1 remove the / separator
+  return repositories[0].substr(config_path_.size() + 1, std::string::npos);
 }
 
 
@@ -327,7 +328,6 @@ SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
   if (needs_managed && !IsManagedRepository())
     throw EPublish("remote repositories are not supported in this context");
 
-  // TODO(jblomer): fix for remote repositories
   if (options_mgr_->GetValueOrDie("CVMFS_REPOSITORY_TYPE") != "stratum0")
     throw EPublish("Not a stratum 0 repository");
 
