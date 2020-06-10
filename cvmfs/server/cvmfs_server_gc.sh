@@ -221,11 +221,16 @@ __do_gc_cmd()
 
   # leave extra layer of indent for now to better show diff with previous
 
+    CVMFS_PASSTHROUGH=false
     load_repo_config $name
 
     # sanity checks
     check_repository_compatibility $name
     check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || die "Repository unavailable under $CVMFS_STRATUM0"
+    if [ x"$CVMFS_PASSTHROUGH" = x"true" ]; then
+      echo "Repository $name is a pass-through repository, nothing to do"
+      return 0
+    fi
     if is_empty_repository $name; then
       echo "Repository $name is empty, nothing to do"
       return 0
