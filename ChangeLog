@@ -1,4 +1,5 @@
 2.7.3:
+  * Fix spurious SElinux error message on EL8 package upgrade (CVM-1878)
   * Add `add-replica -P` option to create pass-through replicas (CVM-1845)
   * Fix `cvmfs_config chksetup` for squashed NFS alien cache (CVM-1888)
   * Fix building with GCC >= 10 (CVM-1894)
