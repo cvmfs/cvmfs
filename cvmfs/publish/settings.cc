@@ -268,7 +268,6 @@ std::string SettingsBuilder::GetSingleAlias() {
     throw EPublish("no repositories available in " + config_path_);
   if (repositories.size() > 1)
     throw EPublish("multiple repositories available in " + config_path_);
-  // the + 1 remove the / separator
   return GetFileName(repositories[0]);
 }
 
