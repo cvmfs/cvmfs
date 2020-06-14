@@ -24,6 +24,18 @@ enum MagicXattrFlavor {
   kXattrAuthz
 };
 
+/**
+ * This is a base class for magic extended attribute. Concrete extended
+ * attributes inherit from this class. It should be generally used only
+ * in cooperation with MagicXattrManager.
+ * It contains an access mutex. Users should use Lock() and Release()
+ * before and after usage (Lock() is called implicitly in MagicXattrManager).
+ *
+ * To read out the attribute value, do:
+ * 0. Get an instance through MagicXattrManager::Get()
+ * 1. Call PrepareValueFenced() inside FuseRemounter::fence()
+ * 2. Call GetValue() to get the actual value (can be called outside the fence)
+ */
 class BaseMagicXattr {
   friend class MagicXattrManager;
 
@@ -32,8 +44,18 @@ class BaseMagicXattr {
     int retval = pthread_mutex_init(&access_mutex_, NULL);
     assert(retval == 0);
   }
-
+  /**
+  * This function is used to obtain the necessary information while
+  * inside FuseRemounter::fence(), which should prevent data races.
+  */
   virtual bool PrepareValueFenced() { return true; }
+  /**
+   * This function needs to be called after PrepareValueFenced(),
+   * which prepares the necessary data.
+   * It does the computationaly intensive part, which should not
+   * be done inside the FuseRemounter::fence(), and returns the
+   * value.
+   */
   virtual std::string GetValue() = 0;
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrBase; }
 
@@ -58,6 +80,10 @@ class BaseMagicXattr {
   pthread_mutex_t access_mutex_;
 };
 
+/**
+ * This wrapper ensures that the attribute instance "ref_" is
+ * released after the user finishes using it (on wrapper destruction).
+ */
 class MagicXattrRAIIWrapper {
  public:
   inline MagicXattrRAIIWrapper() : ref_(NULL) { }
@@ -78,6 +104,20 @@ class RegularMagicXattr : public BaseMagicXattr {
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrRegular; }
 };
 
+
+/**
+ * This class is acting as a user entry point for magic extended attributes.
+ * It instantiates all defined attributes in the constructor.
+ * Users can:
+ * 1. Register additional attributes
+ * 2. Get a string containing zero-byte delimited list of attribute names
+ *    (used in "cvmfs.cc")
+ * 3. Get an attribute by name. Specifically, get a RAII wrapper around
+ *    a singleton attribute instance. This means that the attribute instance
+ *    registered with the manager does not get cloned or copied inside Get().
+ *    Instead, member variables are set and the original instance is returned.
+ *    A mutex prevents from race conditions in case of concurrent access.
+ */
 class MagicXattrManager {
  public:
   explicit MagicXattrManager(MountPoint *mountpoint, bool hide_magic_xattrs);
