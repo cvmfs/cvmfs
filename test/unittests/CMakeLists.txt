@@ -76,6 +76,7 @@ set(CVMFS_UNITTEST_FILES
   t_libcvmfs.cc
   t_logging.cc
   t_lru.cc
+  t_magic_xattr.cc
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
