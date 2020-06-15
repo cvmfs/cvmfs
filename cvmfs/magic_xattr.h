@@ -71,8 +71,8 @@ class BaseMagicXattr {
   }
 
   virtual ~BaseMagicXattr() {}
- protected:
 
+ protected:
   MountPoint *mount_point_;
   PathString path_;
   catalog::DirectoryEntry *dirent_;
@@ -91,7 +91,7 @@ class MagicXattrRAIIWrapper {
   inline ~MagicXattrRAIIWrapper() { if (ref_ != NULL) ref_->Release(); }
   inline BaseMagicXattr* operator->() const { return ref_; }
   inline bool IsNull() const { return ref_ == NULL; }
- 
+
  protected:
   BaseMagicXattr *ref_;
 };
@@ -125,7 +125,7 @@ class MagicXattrManager {
                             catalog::DirectoryEntry *d);
   std::string GetListString(catalog::DirectoryEntry *dirent);
   void Register(const std::string &name, BaseMagicXattr *magic_xattr);
-  
+
   bool hide_magic_xattrs() { return hide_magic_xattrs_; }
 
  protected:
