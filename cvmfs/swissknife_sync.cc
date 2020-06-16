@@ -567,7 +567,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                            "/var/log/cvmfs-swissknife/stacktrace.%s.%d",
                            timestamp.c_str(), getpid());
   assert(path_size > 0);
-  assert(path_size < 128);
+  assert(path_size < PATH_MAX);
   Watchdog *watchdog = Watchdog::Create(std::string(watchdog_path));
   watchdog->Spawn();
 
