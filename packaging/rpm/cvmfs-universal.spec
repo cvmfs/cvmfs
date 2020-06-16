@@ -580,6 +580,7 @@ fi
 /usr/share/cvmfs-server/upload_stats_plots.sh
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
+/var/log/cvmfs-swissknife/
 %doc COPYING AUTHORS README.md ChangeLog
 
 %files shrinkwrap
