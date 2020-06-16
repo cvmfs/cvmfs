@@ -561,7 +561,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   string start_time = GetGMTimestamp();
 
   // Spawn monitoring process (watchdog)
-  char watchdog_path[128];
+  char watchdog_path[PATH_MAX];
   std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
   int path_size = snprintf(watchdog_path, sizeof(watchdog_path),
                            "/var/log/cvmfs-swissknife/stacktrace.%s.%d",
