@@ -1,4 +1,5 @@
 2.8.0:
+  * Remove perl as a package dependency
   * [libcvmfs] add cvmfs_options_parse_default() 
   * [libcvmfs] add cvmfs_listdir_stat()
   * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
