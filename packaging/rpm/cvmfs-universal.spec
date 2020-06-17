@@ -98,7 +98,6 @@ Requires: coreutils
 Requires: grep
 Requires: gawk
 Requires: sed
-Requires: perl
 Requires: psmisc
 Requires: autofs
 Requires: fuse
@@ -138,10 +137,6 @@ Requires: util-linux-ng
 Requires: util-linux
     %endif
   %endif
-%endif
-%if 0%{?fedora}
-# For cvmfs_talk, does not necessarily come with Fedora >= 25
-Requires: perl-Getopt-Long
 %endif
 Requires: cvmfs-config
 
