@@ -561,17 +561,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   string start_time = GetGMTimestamp();
 
   // Spawn monitoring process (watchdog)
-  std::string watchdog_dir = "/var/log/cvmfs-swissknife";
-  if (!MkdirDeep(watchdog_dir, 0755)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
-             "Failed to create stacktrace directory: %s", watchdog_dir.c_str());
-    return 1;
-  }
+  std::string watchdog_dir = "/tmp";
   char watchdog_path[PATH_MAX];
   std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-  int path_size =
-      snprintf(watchdog_path, sizeof(watchdog_path), "%s/stacktrace.%s.%d",
-               watchdog_dir.c_str(), timestamp.c_str(), getpid());
+  int path_size = snprintf(watchdog_path, sizeof(watchdog_path),
+                           "%s/cvmfs-swissknife-sync-stacktrace.%s.%d",
+                           watchdog_dir.c_str(), timestamp.c_str(), getpid());
   assert(path_size > 0);
   assert(path_size < PATH_MAX);
   Watchdog *watchdog = Watchdog::Create(std::string(watchdog_path));
