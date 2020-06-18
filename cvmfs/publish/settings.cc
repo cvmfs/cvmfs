@@ -323,7 +323,17 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
 SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
   const std::string &ident, bool needs_managed)
 {
-  SettingsRepository settings_repository = CreateSettingsRepository(ident);
+  // we are creating a publisher, it need to have the `server.conf` file
+  // present, otherwise something is wrong and we should exit early
+  const std::string alias(ident.empty() ? GetSingleAlias() : ident);
+  const std::string server_path = config_path_ + "/" + alias + "/server.conf";
+
+  if (FileExists(server_path) == false)
+    throw EPublish(
+        "Unable to find the configuration file `server.conf` for the cvmfs "
+        "publisher");
+
+  SettingsRepository settings_repository = CreateSettingsRepository(alias);
   if (needs_managed && !IsManagedRepository())
     throw EPublish("remote repositories are not supported in this context");
 
