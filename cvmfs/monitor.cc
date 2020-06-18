@@ -164,7 +164,6 @@ pid_t Watchdog::GetPid() {
   return getpid();
 }
 
-
 /**
  * Log a string to syslog and into the crash dump file.
  * We expect ideally nothing to be logged, so that file is created on demand.
@@ -177,9 +176,12 @@ void Watchdog::LogEmergency(string msg) {
     if (fp) {
       time_t now = time(NULL);
       msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
-      if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length())
-        msg += " (failed to report into crash dump file "
-               + crash_dump_path_ + ")";
+      if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length()) {
+        msg +=
+            " (failed to report into crash dump file " + crash_dump_path_ + ")";
+      } else {
+        msg += "\n Crash logged also on file: " + crash_dump_path_ + "\n";
+      }
       fclose(fp);
     } else {
       msg += " (failed to open crash dump file " + crash_dump_path_ + ")";
@@ -187,7 +189,6 @@ void Watchdog::LogEmergency(string msg) {
   }
   LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
 }
-
 
 /**
  * Reads from the file descriptor until the specific gdb prompt is reached or
