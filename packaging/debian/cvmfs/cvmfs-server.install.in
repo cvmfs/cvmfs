@@ -20,4 +20,3 @@ usr/share/cvmfs-server/stats_index.html.tpl
 usr/share/cvmfs-server/upload_stats_plots.sh
 var/lib/cvmfs-server/geo/
 var/spool/cvmfs/README
-var/log/cvmfs-swissknife
