@@ -9,9 +9,6 @@
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
 #include <sys/xattr.h>
-#ifdef HAVE_ATTR_XATTR_H
-#include <attr/xattr.h>  // NOLINT(build/include_alpha)
-#endif
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
