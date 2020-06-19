@@ -22,8 +22,8 @@ class EPublish : public std::runtime_error {
     kFailLeaseHttp,          // cannot connect to the gateway HTTP endpoint
     kFailLeaseBody,          // corrupted session token
     kFailLeaseBusy,          // another active lease blocks the path
-    kFailLeaseNoEntry,       // the leas path does not exist
-    kFailLeaseNoDir,         // the leas path is no a directory
+    kFailLeaseNoEntry,       // the lease path does not exist
+    kFailLeaseNoDir,         // the lease path is no a directory
   };
 
   explicit EPublish(const std::string& what, EFailures f = kFailUnspecified)
