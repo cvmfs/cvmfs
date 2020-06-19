@@ -331,7 +331,7 @@ SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
   if (FileExists(server_path) == false)
     throw EPublish(
         "Unable to find the configuration file `server.conf` for the cvmfs "
-        "publisher");
+        "publisher", EPublish::kFailRepositoryNotFound);
 
   SettingsRepository settings_repository = CreateSettingsRepository(alias);
   if (needs_managed && !IsManagedRepository())
