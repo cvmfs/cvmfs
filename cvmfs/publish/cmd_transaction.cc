@@ -36,18 +36,16 @@ int CmdTransaction::Main(const Options &options) {
   }
 
   SettingsBuilder builder;
-  const std::string repo = fqrn.empty() ? builder.GetSingleAlias() : fqrn;
   SettingsPublisher* settings;
   try {
-    SettingsPublisher s = builder.CreateSettingsPublisher(repo, true /* needs_managed */);
+    SettingsPublisher s =
+        builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
     settings = &s;
-  } catch (const EPublish &e) {
-    if (e.failure() == EPublish::kFailRepositoryNotFound) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "CernVM-FS error: repository %s not found.", repo.c_str());
-      return 1;
-    }
-    throw;
+  } catch (const EPublishRepositoryNotFound &e) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "CernVM-FS error: repository %s not found.",
+             e.repository().c_str());
+    return 1;
   }
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
