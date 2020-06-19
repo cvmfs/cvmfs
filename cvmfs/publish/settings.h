@@ -409,7 +409,6 @@ class SettingsBuilder : SingleCopy {
    * on the same node.
    */
   std::string GetSingleAlias();
-
 };  // class SettingsBuilder
 
 }  // namespace publish

@@ -17,14 +17,14 @@ class EPublish : public std::runtime_error {
    */
   enum EFailures {
     kFailUnspecified = 0,
-    kFailTransactionLocked,  // another publisher process has an open txn
-    kFailGatewayKey,         // cannot access the gateway secret key
-    kFailLeaseHttp,          // cannot connect to the gateway HTTP endpoint
-    kFailLeaseBody,          // corrupted session token
-    kFailLeaseBusy,          // another active lease blocks the path
-    kFailLeaseNoEntry,       // the lease path does not exist
-    kFailLeaseNoDir,         // the lease path is no a directory
-    kFailRepositoryNotFound, // the repository was not found on the machine
+    kFailTransactionLocked,   // another publisher process has an open txn
+    kFailGatewayKey,          // cannot access the gateway secret key
+    kFailLeaseHttp,           // cannot connect to the gateway HTTP endpoint
+    kFailLeaseBody,           // corrupted session token
+    kFailLeaseBusy,           // another active lease blocks the path
+    kFailLeaseNoEntry,        // the lease path does not exist
+    kFailLeaseNoDir,          // the lease path is no a directory
+    kFailRepositoryNotFound,  // the repository was not found on the machine
   };
 
   explicit EPublish(const std::string& what, EFailures f = kFailUnspecified)
@@ -58,7 +58,7 @@ class EPublishRepositoryNotFound : public EPublish {
             EPublish::kFailRepositoryNotFound),
         repo_(repo) {}
 
-  const std::string repository() const { return repo_; };
+  const std::string repository() const { return repo_; }
 
  private:
   const std::string repo_;
