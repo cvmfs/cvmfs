@@ -1,0 +1,8 @@
+project(SHA2)
+
+add_library(cvmfs_sha2 STATIC src/sha2.c)
+set_property(TARGET cvmfs_sha2 PROPERTY POSITION_INDEPENDENT_CODE TRUE)
+target_include_directories(cvmfs_sha2 INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+set(SHA2_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src PARENT_SCOPE)
+set(SHA2_LIBRARY $<TARGET_FILE:cvmfs_sha2> PARENT_SCOPE)
+set(SHA2_LIBRARIES cvmfs_sha2 PARENT_SCOPE)
