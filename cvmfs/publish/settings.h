@@ -393,14 +393,6 @@ class SettingsBuilder : SingleCopy {
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }
 
- private:
-  std::string config_path_;
-  /**
-   * For locally managed repositories, the options manager is non NULL and
-   * contains the configuration after a call to CreateSettingsRepository()
-   */
-  OptionsManager *options_mgr_;
-
   /**
    * Returns the name of the one and only repository under kConfigPath
    * Throws an exception if there are none or multiple repositories.
@@ -409,6 +401,15 @@ class SettingsBuilder : SingleCopy {
    * on the same node.
    */
   std::string GetSingleAlias();
+
+ private:
+  std::string config_path_;
+  /**
+   * For locally managed repositories, the options manager is non NULL and
+   * contains the configuration after a call to CreateSettingsRepository()
+   */
+  OptionsManager *options_mgr_;
+
 };  // class SettingsBuilder
 
 }  // namespace publish
