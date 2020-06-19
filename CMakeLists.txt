@@ -320,7 +320,7 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 find_package (GMock REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GMOCK_INCLUDE_DIRS})
 
-find_package (VJSON REQUIRED)
+add_subdirectory(externals/vjson)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
 
 find_package (LibArchive REQUIRED)
@@ -329,10 +329,10 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
 find_package (ZLIB REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 
-find_package (SHA2 REQUIRED)
+add_subdirectory(externals/sha2)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SHA2_INCLUDE_DIRS})
 
-find_package (SHA3 REQUIRED)
+add_subdirectory(externals/sha3)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SHA3_INCLUDE_DIRS})
 
 # Most build target require also curl/c-ares, sqlite, uuid, leveldb

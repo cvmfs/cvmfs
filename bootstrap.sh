@@ -207,19 +207,6 @@ build_lib() {
       do_copy "sqlite3"
       do_build "sqlite3"
       ;;
-    vjson)
-      do_copy "vjson"
-      patch_external "vjson"       "missing_include.patch"
-      do_build "vjson"
-      ;;
-    sha2)
-      do_copy "sha2"
-      do_build "sha2"
-      ;;
-    sha3)
-      do_copy "sha3"
-      do_build "sha3"
-      ;;
     rapidcheck)
       if [ x"$BUILD_QC_TESTS" != x"" ]; then
         do_extract "rapidcheck" "rapidcheck-${RAPIDCHECK_VERSION}.tar.gz"
@@ -240,7 +227,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive"
+missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 libarchive"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi

@@ -788,7 +788,7 @@ endif (BUILD_CVMFS)
 if (BUILD_LIBCVMFS_CACHE)
   add_library (cvmfs_cache_only STATIC ${LIBCVMFS_CACHE_SOURCES})
   add_dependencies (cvmfs_cache_only cache.pb.generated)
-  set (LIBCVMFS_CACHE_LIBS ${SHA3_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
+  set (LIBCVMFS_CACHE_LIBS ${PROTOBUF_LITE_LIBRARY}
     ${LIBCVMFS_CACHE_LIBS} ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a)
   if (MACOSX)
     list(APPEND LIBCVMFS_CACHE_LIBS ${OPENSSL_LIBRARIES})
@@ -805,7 +805,7 @@ if (BUILD_LIBCVMFS_CACHE)
   if (MACOSX)
     add_custom_command(
         OUTPUT libcvmfs_cache.a
-        COMMAND libtool -static -o libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+        COMMAND libtool -static -o libcvmfs_cache.a ${SHA3_LIBRARY} ${LIBCVMFS_CACHE_LIBS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         DEPENDS ${LIBCVMFS_CACHE_LIBS}
       )
@@ -813,9 +813,9 @@ if (BUILD_LIBCVMFS_CACHE)
     set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt")
     add_custom_command(
         OUTPUT libcvmfs_cache.a
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${SHA3_LIBRARY} ${LIBCVMFS_CACHE_LIBS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_CACHE_LIBS}
+        DEPENDS ${LIBCVMFS_CACHE_LIBS} ${SHA3_LIBRARIES}
       )
   endif (MACOSX)
 
@@ -858,7 +858,7 @@ if (BUILD_LIBCVMFS)
   set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CURL_LIBRARIES}
                      ${PACPARSER_LIBRARIES}
                      ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
-                     ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
+                     ${PROTOBUF_LITE_LIBRARY}
                      ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
@@ -871,17 +871,17 @@ if (BUILD_LIBCVMFS)
   if (MACOSX)
     add_custom_command(
         OUTPUT libcvmfs.a
-        COMMAND libtool -static -o libcvmfs.a ${LIBCVMFS_LIBS}
+        COMMAND libtool -static -o libcvmfs.a ${SHA3_LIBRARY} ${VJSON_LIBRARY} ${LIBCVMFS_LIBS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_LIBS}
+        DEPENDS ${LIBCVMFS_LIBS} ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
     )
   else (MACOSX)
     set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
     add_custom_command(
         OUTPUT libcvmfs.a
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${SHA3_LIBRARY} ${VJSON_LIBRARY} ${LIBCVMFS_LIBS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_LIBS}
+        DEPENDS ${LIBCVMFS_LIBS} ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
     )
   endif (MACOSX)
 
