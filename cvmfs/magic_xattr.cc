@@ -20,45 +20,45 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   : mount_point_(mountpoint),
     hide_magic_xattrs_(hide_magic_xattrs)
 {
-  xattr_list_["user.catalog_counters"] = new CatalogCountersMagicXattr();
-  xattr_list_["user.external_host"] = new ExternalHostMagicXattr();
-  xattr_list_["user.external_timeout"] = new ExternalTimeoutMagicXattr();
-  xattr_list_["user.fqrn"] = new FqrnMagicXattr();
-  xattr_list_["user.host"] = new HostMagicXattr();
-  xattr_list_["user.host_list"] = new HostListMagicXattr();
-  xattr_list_["user.ncleanup24"] = new NCleanup24MagicXattr();
-  xattr_list_["user.nclg"] = new NClgMagicXattr();
-  xattr_list_["user.ndiropen"] = new NDirOpenMagicXattr();
-  xattr_list_["user.ndownload"] = new NDownloadMagicXattr();
-  xattr_list_["user.nioerr"] = new NIOErrMagicXattr();
-  xattr_list_["user.nopen"] = new NOpenMagicXattr();
-  xattr_list_["user.proxy"] = new ProxyMagicXattr();
-  xattr_list_["user.pubkeys"] = new PubkeysMagicXattr();
-  xattr_list_["user.repo_counters"] = new RepoCountersMagicXattr();
-  xattr_list_["user.repo_metainfo"] = new RepoMetainfoMagicXattr();
-  xattr_list_["user.revision"] = new RevisionMagicXattr();
-  xattr_list_["user.root_hash"] = new RootHashMagicXattr();
-  xattr_list_["user.rx"] = new RxMagicXattr();
-  xattr_list_["user.speed"] = new SpeedMagicXattr();
-  xattr_list_["user.tag"] = new TagMagicXattr();
-  xattr_list_["user.timeout"] = new TimeoutMagicXattr();
-  xattr_list_["user.timeout_direct"] = new TimeoutDirectMagicXattr();
-  xattr_list_["user.usedfd"] = new UsedFdMagicXattr();
-  xattr_list_["user.useddirp"] = new UsedDirPMagicXattr();
-  xattr_list_["user.version"] = new VersionMagicXattr();
+  Register("user.catalog_counters", new CatalogCountersMagicXattr());
+  Register("user.external_host", new ExternalHostMagicXattr());
+  Register("user.external_timeout", new ExternalTimeoutMagicXattr());
+  Register("user.fqrn", new FqrnMagicXattr());
+  Register("user.host", new HostMagicXattr());
+  Register("user.host_list", new HostListMagicXattr());
+  Register("user.ncleanup24", new NCleanup24MagicXattr());
+  Register("user.nclg", new NClgMagicXattr());
+  Register("user.ndiropen", new NDirOpenMagicXattr());
+  Register("user.ndownload", new NDownloadMagicXattr());
+  Register("user.nioerr", new NIOErrMagicXattr());
+  Register("user.nopen", new NOpenMagicXattr());
+  Register("user.proxy", new ProxyMagicXattr());
+  Register("user.pubkeys", new PubkeysMagicXattr());
+  Register("user.repo_counters", new RepoCountersMagicXattr());
+  Register("user.repo_metainfo", new RepoMetainfoMagicXattr());
+  Register("user.revision", new RevisionMagicXattr());
+  Register("user.root_hash", new RootHashMagicXattr());
+  Register("user.rx", new RxMagicXattr());
+  Register("user.speed", new SpeedMagicXattr());
+  Register("user.tag", new TagMagicXattr());
+  Register("user.timeout", new TimeoutMagicXattr());
+  Register("user.timeout_direct", new TimeoutDirectMagicXattr());
+  Register("user.usedfd", new UsedFdMagicXattr());
+  Register("user.useddirp", new UsedDirPMagicXattr());
+  Register("user.version", new VersionMagicXattr());
 
-  xattr_list_["user.hash"] = new HashMagicXattr();
-  xattr_list_["user.lhash"] = new LHashMagicXattr();
+  Register("user.hash", new HashMagicXattr());
+  Register("user.lhash", new LHashMagicXattr());
 
-  xattr_list_["user.chunk_list"] = new ChunkListMagicXattr();
-  xattr_list_["user.chunks"] = new ChunksMagicXattr();
-  xattr_list_["user.compression"] = new CompressionMagicXattr();
-  xattr_list_["user.external_file"] = new ExternalFileMagicXattr();
+  Register("user.chunk_list", new ChunkListMagicXattr());
+  Register("user.chunks", new ChunksMagicXattr());
+  Register("user.compression", new CompressionMagicXattr());
+  Register("user.external_file", new ExternalFileMagicXattr());
 
-  xattr_list_["user.rawlink"] = new RawlinkMagicXattr();
-  xattr_list_["xfsroot.rawlink"] = new RawlinkMagicXattr();
+  Register("user.rawlink", new RawlinkMagicXattr());
+  Register("xfsroot.rawlink", new RawlinkMagicXattr());
 
-  xattr_list_["user.authz"] = new AuthzMagicXattr();
+  Register("user.authz", new AuthzMagicXattr());
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
@@ -86,6 +86,8 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
       case kXattrAuthz:
         if (!mount_point_->has_membership_req()) continue;
         break;
+      default:
+        PANIC("unknown magic xattr flavor");
     }
     result += (*it).first;
     result.push_back('\0');
@@ -102,12 +104,10 @@ MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
   if (xattr_list_.count(name) > 0) {
     result = xattr_list_[name];
   } else {
-    return MagicXattrRAIIWrapper(NULL);
+    return MagicXattrRAIIWrapper();
   }
 
-  result->mount_point_ = mount_point_;
-  result->Lock(path, d);
-  return MagicXattrRAIIWrapper(result);
+  return MagicXattrRAIIWrapper(result, path, d);
 }
 
 void MagicXattrManager::Register(const std::string &name,
@@ -118,6 +118,7 @@ void MagicXattrManager::Register(const std::string &name,
           "Magic extended attribute with name %s already registered",
           name.c_str());
   }
+  magic_xattr->mount_point_ = mount_point_;
   xattr_list_[name] = magic_xattr;
 }
 
@@ -237,7 +238,7 @@ std::string ExternalHostMagicXattr::GetValue() {
 
 std::string ExternalTimeoutMagicXattr::GetValue() {
   unsigned seconds, seconds_direct;
-  mount_point_->download_mgr()->GetTimeout(&seconds, &seconds_direct);
+  mount_point_->external_download_mgr()->GetTimeout(&seconds, &seconds_direct);
   return StringifyUint(seconds_direct);
 }
 
@@ -339,13 +340,8 @@ std::string NDownloadMagicXattr::GetValue() {
   return  mount_point_->statistics()->Lookup("fetch.n_downloads")->Print();
 }
 
-bool NIOErrMagicXattr::PrepareValueFenced() {
-  n_io_err_ = mount_point_->file_system()->n_io_error()->ToString();
-  return true;
-}
-
 std::string NIOErrMagicXattr::GetValue() {
-  return n_io_err_;
+  return mount_point_->file_system()->n_io_error()->ToString();;
 }
 
 std::string NOpenMagicXattr::GetValue() {
@@ -379,10 +375,6 @@ bool RawlinkMagicXattr::PrepareValueFenced() {
 
 std::string RawlinkMagicXattr::GetValue() {
   return dirent_->symlink().ToString();
-}
-
-MagicXattrFlavor RawlinkMagicXattr::GetXattrFlavor() {
-  return kXattrSymlink;
 }
 
 bool RepoCountersMagicXattr::PrepareValueFenced() {
@@ -492,22 +484,12 @@ std::string TimeoutDirectMagicXattr::GetValue() {
   return StringifyUint(seconds_direct);
 }
 
-bool UsedFdMagicXattr::PrepareValueFenced() {
-  n_used_fd_ = mount_point_->file_system()->no_open_files()->ToString();
-  return true;
-}
-
 std::string UsedFdMagicXattr::GetValue() {
-  return n_used_fd_;
-}
-
-bool UsedDirPMagicXattr::PrepareValueFenced() {
-  n_used_dirp_ = mount_point_->file_system()->no_open_dirs()->ToString();
-  return true;
+  return mount_point_->file_system()->no_open_files()->ToString();
 }
 
 std::string UsedDirPMagicXattr::GetValue() {
-  return n_used_dirp_;
+  return mount_point_->file_system()->no_open_dirs()->ToString();
 }
 
 std::string VersionMagicXattr::GetValue() {

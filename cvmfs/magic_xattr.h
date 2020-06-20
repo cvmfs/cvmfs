@@ -81,19 +81,26 @@ class BaseMagicXattr {
 };
 
 /**
- * This wrapper ensures that the attribute instance "ref_" is
+ * This wrapper ensures that the attribute instance "ptr_" is
  * released after the user finishes using it (on wrapper destruction).
  */
 class MagicXattrRAIIWrapper {
  public:
-  inline MagicXattrRAIIWrapper() : ref_(NULL) { }
-  inline explicit MagicXattrRAIIWrapper(BaseMagicXattr *ref) : ref_(ref) { }
-  inline ~MagicXattrRAIIWrapper() { if (ref_ != NULL) ref_->Release(); }
-  inline BaseMagicXattr* operator->() const { return ref_; }
-  inline bool IsNull() const { return ref_ == NULL; }
+  inline MagicXattrRAIIWrapper() : ptr_(NULL) { }
+  inline explicit MagicXattrRAIIWrapper(
+    BaseMagicXattr *ptr,
+    PathString path,
+    catalog::DirectoryEntry *d)
+    : ptr_(ptr)
+  {
+    if (ptr_ != NULL) ptr_->Lock(path, d);
+  }
+  inline ~MagicXattrRAIIWrapper() { if (ptr_ != NULL) ptr_->Release(); }
+  inline BaseMagicXattr* operator->() const { return ptr_; }
+  inline bool IsNull() const { return ptr_ == NULL; }
 
  protected:
-  BaseMagicXattr *ref_;
+  BaseMagicXattr *ptr_;
 };
 
 class WithHashMagicXattr : public BaseMagicXattr {
@@ -104,6 +111,9 @@ class RegularMagicXattr : public BaseMagicXattr {
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrRegular; }
 };
 
+class SymlinkMagicXattr : public BaseMagicXattr {
+  virtual MagicXattrFlavor GetXattrFlavor() { return kXattrSymlink; }
+};
 
 /**
  * This class is acting as a user entry point for magic extended attributes.
@@ -118,9 +128,9 @@ class RegularMagicXattr : public BaseMagicXattr {
  *    Instead, member variables are set and the original instance is returned.
  *    A mutex prevents from race conditions in case of concurrent access.
  */
-class MagicXattrManager {
+class MagicXattrManager : public SingleCopy {
  public:
-  explicit MagicXattrManager(MountPoint *mountpoint, bool hide_magic_xattrs);
+  MagicXattrManager(MountPoint *mountpoint, bool hide_magic_xattrs);
   MagicXattrRAIIWrapper Get(const std::string &name, PathString path,
                             catalog::DirectoryEntry *d);
   std::string GetListString(catalog::DirectoryEntry *dirent);
@@ -222,9 +232,6 @@ class NDownloadMagicXattr : public BaseMagicXattr {
 };
 
 class NIOErrMagicXattr : public BaseMagicXattr {
-  std::string n_io_err_;
-
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
@@ -243,10 +250,9 @@ class PubkeysMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
-class RawlinkMagicXattr : public BaseMagicXattr {
+class RawlinkMagicXattr : public SymlinkMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
-  virtual MagicXattrFlavor GetXattrFlavor();
 };
 
 class RepoCountersMagicXattr : public BaseMagicXattr {
@@ -304,16 +310,10 @@ class TimeoutDirectMagicXattr : public BaseMagicXattr {
 };
 
 class UsedFdMagicXattr : public BaseMagicXattr {
-  std::string n_used_fd_;
-
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 
 class UsedDirPMagicXattr : public BaseMagicXattr {
-  std::string n_used_dirp_;
-
-  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 

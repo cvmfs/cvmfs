@@ -1632,7 +1632,6 @@ class ExpiresMagicXattr : public BaseMagicXattr {
 };
 
 class InodeMaxMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced() { return true; }
   virtual std::string GetValue() {
     return StringifyInt(
       cvmfs::inode_generation_info_.inode_generation +
@@ -1641,19 +1640,16 @@ class InodeMaxMagicXattr : public BaseMagicXattr {
 };
 
 class MaxFdMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced() { return true; }
   virtual std::string GetValue() {
     return StringifyInt(cvmfs::max_open_files_ - cvmfs::kNumReservedFd);
   }
 };
 
 class PidMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced() { return true; }
   virtual std::string GetValue() { return StringifyInt(cvmfs::pid_); }
 };
 
 class UptimeMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced() { return true; }
   virtual std::string GetValue() {
     time_t now = time(NULL);
     uint64_t uptime = now - cvmfs::loader_exports_->boot_time;
