@@ -76,6 +76,7 @@ set(CVMFS_UNITTEST_FILES
   t_libcvmfs.cc
   t_logging.cc
   t_lru.cc
+  t_magic_xattr.cc
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
@@ -197,6 +198,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/magic_xattr.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
@@ -356,6 +358,7 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/kvstore.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/magic_xattr.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
