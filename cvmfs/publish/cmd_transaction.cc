@@ -41,11 +41,13 @@ int CmdTransaction::Main(const Options &options) {
     SettingsPublisher s =
         builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
     settings = &s;
-  } catch (const EPublishRepositoryNotFound &e) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "CernVM-FS error: repository %s not found.",
-             e.repository().c_str());
-    return 1;
+  } catch (const EPublish &e) {
+    if (e.failure() == EPublish::kFailRepositoryNotFound) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
+               e.msg().c_str());
+      return 1;
+    }
+    throw;
   }
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));

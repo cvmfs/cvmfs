@@ -329,7 +329,11 @@ SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
   const std::string server_path = config_path_ + "/" + alias + "/server.conf";
 
   if (FileExists(server_path) == false)
-    throw EPublishRepositoryNotFound(alias);
+    throw EPublish(
+        "Unable to find the configuration file `server.conf` for the cvmfs "
+        "publisher: " +
+            alias,
+        EPublish::kFailRepositoryNotFound);
 
   SettingsRepository settings_repository = CreateSettingsRepository(alias);
   if (needs_managed && !IsManagedRepository())

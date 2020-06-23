@@ -49,21 +49,6 @@ class EPublish : public std::runtime_error {
   static std::string GetStacktrace();
 };
 
-class EPublishRepositoryNotFound : public EPublish {
- public:
-  explicit EPublishRepositoryNotFound(const std::string repo)
-      : EPublish(
-            "Unable to find the configuration file `server.conf` for the cvmfs "
-            "publisher",
-            EPublish::kFailRepositoryNotFound),
-        repo_(repo) {}
-
-  const std::string repository() const { return repo_; }
-
- private:
-  const std::string repo_;
-};
-
 }  // namespace publish
 
 #endif  // CVMFS_PUBLISH_EXCEPT_H_
