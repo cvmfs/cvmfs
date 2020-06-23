@@ -36,13 +36,22 @@ int CmdTransaction::Main(const Options &options) {
   }
 
   SettingsBuilder builder;
-  SettingsPublisher settings =
-    builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
+  UniquePtr<SettingsPublisher> settings;
+  try {
+    settings = builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
+  } catch (const EPublish &e) {
+    if (e.failure() == EPublish::kFailRepositoryNotFound) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
+               e.msg().c_str());
+      return 1;
+    }
+    throw;
+  }
   if (options.Has("retry-timeout")) {
-    settings.GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
+    settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
   }
 
-  if (!SwitchCredentials(settings.owner_uid(), settings.owner_gid(),
+  if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
                          false /* temporarily */))
   {
     throw EPublish("No write permission to repository");
@@ -51,9 +60,9 @@ int CmdTransaction::Main(const Options &options) {
   if (fs_info.type == kFsTypeAutofs)
     throw EPublish("Autofs on /cvmfs has to be disabled");
 
-  settings.GetTransaction()->SetLeasePath(lease_path);
+  settings->GetTransaction()->SetLeasePath(lease_path);
 
-  Publisher publisher(settings);
+  Publisher publisher(*settings);
   if (publisher.whitelist()->IsExpired()) {
     throw EPublish("Repository whitelist for $name is expired");
   }
