@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
   }
 
   // Spawn monitoring process (watchdog)
-  Watchdog *watchdog = NULL;
+  UniquePtr<Watchdog> watchdog;
   if (watchdog_out_dir != "") {
     if (!MkdirDeep(watchdog_out_dir, 0755)) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
     }
     std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
     watchdog = Watchdog::Create(watchdog_out_dir + "/stacktrace." + timestamp);
-    if (watchdog == NULL) {
+    if (watchdog.IsValid() == false) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
                "Failed to initialize watchdog");
       return 1;
@@ -129,7 +129,6 @@ int main(int argc, char** argv) {
     if (!reactor.Run()) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "Error running CVMFS Receiver event loop");
-      delete watchdog;
       return 1;
     }
   } catch (const ECvmfsException& e) {
@@ -137,17 +136,14 @@ int main(int argc, char** argv) {
              "Runtime error during CVMFS Receiver event loop.\n"
              "%s",
              e.what());
-    delete watchdog;
     return 2;
   } catch (...) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Unknow error during CVMFS Receiver event loop.\n");
-      delete watchdog;
       return 3;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver finished");
 
-  delete watchdog;
   return 0;
 }
