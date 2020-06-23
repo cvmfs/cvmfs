@@ -103,12 +103,17 @@ The required package is called ${APACHE_WSGI_MODPKG}."
 
 # checks if proxy apache module is installed and enabled
 check_proxy_module() {
-  if check_apache_module "proxy_module"; then
-    return 0
+  if ! check_apache_module "proxy_module"; then
+    echo "The apache proxy module must be installed and enabled."
+    exit 1
   fi
 
-  echo "The apache proxy module must be installed and enabled."
-  exit 1
+  if ! check_apache_module "proxy_http_module"; then
+    echo "The apache proxy_http module must be installed and enabled."
+    exit 1
+  fi
+
+  return 0
 }
 
 
@@ -142,7 +147,7 @@ ensure_enabled_apache_modules() {
 
   local restart=0
   local retcode=0
-  local modules="headers expires"
+  local modules="headers expires proxy proxy_http"
 
   for module in $modules; do
     $apache2ctl_bin -M 2>/dev/null | grep -q "$module" && continue
