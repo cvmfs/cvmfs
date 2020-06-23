@@ -14,7 +14,6 @@
 #include "hash.h"
 #include "sync_union.h"
 #include "upload_spooler_definition.h"
-#include "util/pointer.h"
 
 class OptionsManager;
 
