@@ -1,4 +1,5 @@
 2.8.0:
+  * Spawn watchdog for `swissknife sync` command
   * Add 'chunk_list' magic extended attribute
   * Remove perl as a package dependency
   * [libcvmfs] add cvmfs_options_parse_default() 
