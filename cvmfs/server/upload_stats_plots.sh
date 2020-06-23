@@ -14,7 +14,7 @@ upload_statistics_plots_bg() {
   local repo_name="$2"
   local upstream="$3"
   root_file=$(mktemp -t stats.root.XXXXXX)
-  root -l -b -q /usr/share/cvmfs-server/generate_stats_plots.C+\("\"${db_path_copied}\", \"${root_file}\""\)
+  root -l -b -q /usr/share/cvmfs-server/generate_stats_plots.C\("\"${db_path_copied}\", \"${root_file}\""\)
   cvmfs_swissknife upload -i ${root_file} \
                           -o stats/stats.root \
                           -r $upstream

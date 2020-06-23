@@ -101,6 +101,21 @@ The required package is called ${APACHE_WSGI_MODPKG}."
   exit 1
 }
 
+# checks if proxy apache module is installed and enabled
+check_proxy_module() {
+  if ! check_apache_module "proxy_module"; then
+    echo "The apache proxy module must be installed and enabled."
+    exit 1
+  fi
+
+  if ! check_apache_module "proxy_http_module"; then
+    echo "The apache proxy_http module must be installed and enabled."
+    exit 1
+  fi
+
+  return 0
+}
+
 
 # retrieves the apache version string
 get_apache_version() {
@@ -132,7 +147,7 @@ ensure_enabled_apache_modules() {
 
   local restart=0
   local retcode=0
-  local modules="headers expires"
+  local modules="headers expires proxy proxy_http"
 
   for module in $modules; do
     $apache2ctl_bin -M 2>/dev/null | grep -q "$module" && continue
@@ -287,6 +302,36 @@ Alias /cvmfs/${name} ${storage_dir}
     ExpiresByType application/x-cvmfs "access plus 61 seconds"
     ExpiresByType application/json    "access plus 61 seconds"
 </Directory>
+EOF
+
+  if [ x"$with_wsgi" != x"" ]; then
+    create_apache_config_for_webapi
+  fi
+}
+
+
+# creates an Apache proxy-pass configuration file for a pass-through repository
+#
+# @param name         the name of the endpoint to be served
+# @param storage_dir  the storage location of the data
+# @param with_wsgi    whether or not to enable WSGI api functions
+create_apache_proxy_config_for_endpoint() {
+  local name=$1
+  local pt_url=$2
+  local with_wsgi="$3"
+
+  create_apache_config_file "$(get_apache_conf_filename $name)" << EOF
+# Created by cvmfs_server.  Don't touch.
+
+KeepAlive On
+AddType application/json .json
+
+# Do not ProxyPass GeoAPI requests
+ProxyPass /cvmfs/${name}/api/ !
+
+# ProxyPass data requests
+ProxyPass /cvmfs/${name} $pt_url
+ProxyPassReverse /cvmfs/${name} $pt_url
 EOF
 
   if [ x"$with_wsgi" != x"" ]; then

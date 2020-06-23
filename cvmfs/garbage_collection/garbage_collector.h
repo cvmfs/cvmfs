@@ -36,7 +36,7 @@
 
 #include <vector>
 
-#include "catalog_traversal.h"
+#include "catalog_traversal_parallel.h"
 #include "garbage_collection/hash_filter.h"
 #include "statistics.h"
 #include "upload_facility.h"
@@ -69,7 +69,8 @@ class GarbageCollector {
       , verbose(false)
       , deleted_objects_logfile(NULL)
       , statistics(NULL)
-      , extended_stats(false) {}
+      , extended_stats(false)
+      , num_threads(8) {}
 
     bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
@@ -83,6 +84,7 @@ class GarbageCollector {
     FILE                      *deleted_objects_logfile;
     perf::Statistics          *statistics;
     bool                       extended_stats;
+    unsigned int               num_threads;
   };
 
  public:
@@ -120,16 +122,22 @@ class GarbageCollector {
     public swissknife::CatalogTraversalInfoShim<CatalogTN>
   {
    public:
-    explicit ReflogBasedInfoShim(ReflogTN *reflog) : reflog_(reflog) { }
-    virtual ~ReflogBasedInfoShim() { }
+    explicit ReflogBasedInfoShim(ReflogTN *reflog) : reflog_(reflog) {
+      pthread_mutex_init(&reflog_mutex_, NULL);
+    }
+    virtual ~ReflogBasedInfoShim() {
+      pthread_mutex_destroy(&reflog_mutex_);
+    }
     virtual uint64_t GetLastModified(const CatalogTN *catalog) {
       uint64_t timestamp;
+      MutexLockGuard m(&reflog_mutex_);
       bool retval = reflog_->GetCatalogTimestamp(catalog->hash(), &timestamp);
       return retval ? timestamp : catalog->GetLastModified();
     }
 
    private:
     ReflogTN *reflog_;
+    pthread_mutex_t reflog_mutex_;
   };
 
   const Configuration  configuration_;

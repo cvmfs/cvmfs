@@ -285,7 +285,8 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
 //------------------------------------------------------------------------------
 
 
-unsigned int MockCatalog::instances = 0;
+
+atomic_int32 MockCatalog::instances;
 
 const std::string MockCatalog::rhs =
   "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
@@ -294,7 +295,7 @@ const shash::Any MockCatalog::root_hash =
              shash::kSuffixCatalog);
 
 void MockCatalog::ResetGlobalState() {
-  MockCatalog::instances = 0;
+  atomic_init32(&MockCatalog::instances);
 }
 
 MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,

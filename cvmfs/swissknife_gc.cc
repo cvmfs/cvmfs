@@ -23,7 +23,7 @@
 namespace swissknife {
 
 typedef HttpObjectFetcher<> ObjectFetcher;
-typedef CatalogTraversal<ObjectFetcher> ReadonlyCatalogTraversal;
+typedef CatalogTraversalParallel<ObjectFetcher> ReadonlyCatalogTraversal;
 typedef SmallhashFilter HashFilter;
 typedef GarbageCollector<ReadonlyCatalogTraversal, HashFilter> GC;
 typedef GarbageCollectorAux<ReadonlyCatalogTraversal, HashFilter> GCAux;
@@ -41,6 +41,7 @@ ParameterList CommandGc::GetParams() const {
   r.push_back(Parameter::Optional('k', "repository master key(s) / dir"));
   r.push_back(Parameter::Optional('t', "temporary directory"));
   r.push_back(Parameter::Optional('L', "path to deletion log file"));
+  r.push_back(Parameter::Optional('N', "number of threads to use"));
   r.push_back(Parameter::Switch('d', "dry run"));
   r.push_back(Parameter::Switch('l', "list objects to be removed"));
   r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
@@ -77,6 +78,8 @@ int CommandGc::Main(const ArgumentList &args) {
   const std::string deletion_log_path = (args.count('L') > 0) ?
     *args.find('L')->second : "";
   const bool upload_statsdb = (args.count('I') > 0);
+  const unsigned int num_threads = (args.count('N') > 0) ?
+    String2Uint64(*args.find('N')->second) : 8;
 
   if (revisions < 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -159,6 +162,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.deleted_objects_logfile = deletion_log_file;
   config.statistics              = statistics();
   config.extended_stats          = extended_stats;
+  config.num_threads             = num_threads;
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,

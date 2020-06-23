@@ -1,4 +1,11 @@
 2.8.0:
+  * Spawn watchdog for `swissknife sync` command
+  * Add 'chunk_list' magic extended attribute
+  * Remove perl as a package dependency
+  * [libcvmfs] add cvmfs_options_parse_default() 
+  * [libcvmfs] add cvmfs_listdir_stat()
+  * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
+  * Parallelize catalog traversal in garbage collection
   * Improve performance of uploading small objects to S3
   * Fix double counting in swissknife filestats command
   * [ducc] Parallelize check if images are up to date
@@ -26,6 +33,10 @@
   * Manage DUCC daemon with systemd units
 
 2.7.3:
+  * Fix spurious SElinux error message on EL8 package upgrade (CVM-1878)
+  * Add `add-replica -P` option to create pass-through replicas (CVM-1845)
+  * Fix `cvmfs_config chksetup` for squashed NFS alien cache (CVM-1888)
+  * Fix building with GCC >= 10 (CVM-1894)
   * Fix handling of .cvmfs_status.json after GC (CVM-1887)
   * Add hidden `cvmfs_server eliminate-bulk-hashes` command (CVM-1428)
 

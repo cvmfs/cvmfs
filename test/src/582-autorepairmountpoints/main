@@ -282,8 +282,8 @@ cvmfs_run_test() {
 
   echo "check the error and warning messages"
   cat $check_log_9 | grep -e "${CVMFS_TEST_REPO} .* not based on .* published revision" || return 48
-  cat $check_log_9 | grep -e "Trying to umount /cvmfs/${CVMFS_TEST_REPO}"               || return 49
-  cat $check_log_9 | grep -e "Trying to umount .*${CVMFS_TEST_REPO}/rdonly"             || return 150
+  cat $check_log_9 | grep -e "Trying to unmount /cvmfs/${CVMFS_TEST_REPO}"              || return 49
+  cat $check_log_9 | grep -e "Trying to unmount .*${CVMFS_TEST_REPO}/rdonly"            || return 150
   cat $check_log_9 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly"              || return 151
   cat $check_log_9 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"                || return 152
 

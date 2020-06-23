@@ -67,6 +67,7 @@ typename GarbageCollector<CatalogTraversalT, HashFilterT>::TraversalParameters
   params.no_repeat_history   = true;
   params.ignore_load_failure = true;
   params.quiet               = !config.verbose;
+  params.num_threads         = config.num_threads;
   return params;
 }
 
@@ -250,21 +251,23 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
        &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
         this);
 
-  bool success = true;
-  const typename CatalogTraversalT::TraversalType traversal_type =
-                                        CatalogTraversalT::kDepthFirstTraversal;
-        std::vector<shash::Any>::const_iterator i    = catalogs.begin();
-  const std::vector<shash::Any>::const_iterator iend = catalogs.end();
-  for (; i != iend && success; ++i) {
+  std::vector<shash::Any> to_sweep;
+  std::vector<shash::Any>::const_iterator i    = catalogs.begin();
+  std::vector<shash::Any>::const_iterator iend = catalogs.end();
+  for (; i != iend; ++i) {
     if (!hash_filter_.Contains(*i)) {
-      success =
-        success                                         &&
-        traversal_.TraverseRevision(*i, traversal_type) &&
-        RemoveCatalogFromReflog(*i);
+      to_sweep.push_back(*i);
     }
   }
-
+  bool success = traversal_.TraverseList(to_sweep,
+                                         CatalogTraversalT::kDepthFirst);
   traversal_.UnregisterListener(callback);
+
+  i = to_sweep.begin();
+  iend = to_sweep.end();
+  for (; i != iend; ++i) {
+    success = success && RemoveCatalogFromReflog(*i);
+  }
 
   // TODO(jblomer): turn current counters into perf::Counters
   if (configuration_.statistics) {

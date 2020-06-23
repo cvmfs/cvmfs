@@ -50,6 +50,8 @@ extern bool          foreground_;
 class Fetcher;
 }
 
+struct cvmfs_stat_t;
+
 
 /**
  * A singleton managing the cvmfs resources for all attached repositories.  A
@@ -104,6 +106,10 @@ class LibContext : SingleCopy {
                     size_t *listlen,
                     size_t *buflen,
                     bool self_reference);
+  int ListDirectoryStat(const char *c_path,
+                        cvmfs_stat_t **buf,
+                        size_t *listlen,
+                        size_t *buflen);
 
   int Open(const char *c_path);
   int64_t Pread(int fd, void *buf, uint64_t size, uint64_t off);
@@ -131,6 +137,10 @@ class LibContext : SingleCopy {
                           char       ***buf,
                           size_t       *listlen,
                           size_t       *buflen);
+  void AppendStatToList(const cvmfs_stat_t   st,
+                        cvmfs_stat_t       **buf,
+                        size_t              *listlen,
+                        size_t              *buflen);
   bool GetDirentForPath(const PathString         &path,
                         catalog::DirectoryEntry  *dirent);
   void CvmfsAttrFromDirent(const catalog::DirectoryEntry dirent,

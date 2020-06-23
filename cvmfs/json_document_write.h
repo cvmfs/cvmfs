@@ -50,6 +50,10 @@ class JsonStringGenerator {
     return output;
   }
 
+  void Clear() {
+    entries.clear();
+  }
+
  private:
   void Add(std::string key, std::string val, bool quoted = true) {
     JsonStringEntry entry;

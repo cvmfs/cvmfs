@@ -5,8 +5,8 @@ cvmfs_test_suites="quick"
 # This test covers the creation of subdirectories that don't yet exists when the reporitory upstream is of type GW.
 # Refers to [CVM-1696](https://sft.its.cern.ch/jira/projects/CVM/issues/CVM-1696)
 #
-# Basically it makes sure that 
-# `cvmfs_server transaction test.repo.org/DIR/SUBDIR` 
+# Basically it makes sure that
+# `cvmfs_server transaction test.repo.org/DIR/SUBDIR`
 # works even if both DIR and SUBDIR don't exists yet.
 
 clean_up() {
@@ -47,7 +47,10 @@ run_transactions() {
     cvmfs_server check test.repo.org
 
     cvmfs_server transaction test.repo.org
-    cp -r /usr/bin /cvmfs/test.repo.org
+    mkdir -p /cvmfs/test.repo.org/usr/bin
+    for f in $(find /usr/bin -type f | head -n32); do
+      cp -v $f /cvmfs/test.repo.org/usr/bin/
+    done
     cvmfs_server abort -f test.repo.org
     cvmfs_server check test.repo.org
 
@@ -83,6 +86,7 @@ run_transactions() {
     echo "  Getting lease on subdirectory that does not exists yet should not work"
     cvmfs_server transaction test.repo.org/foo/bar/
 
+    # Expect ENOENT
     if [ $? -ne 2 ]; then
         echo "  Error should not be possible to open a transaction on a directory that does not exists"
         return 103

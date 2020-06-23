@@ -87,7 +87,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   const bool upload_statsdb = (args.count('I') > 0);
 
-  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
+  perf::StatisticsTemplate publish_statistics("publish", this->statistics());
   StatisticsDatabase *stats_db =
     StatisticsDatabase::OpenStandardDB(params.repo_name);
 
@@ -206,7 +206,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
-  perf::Counter *revision_counter = statistics()->Register("Publish.revision",
+  perf::Counter *revision_counter = statistics()->Register("publish.revision",
                                                   "Published revision number");
   revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 

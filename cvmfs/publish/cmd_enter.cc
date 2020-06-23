@@ -169,7 +169,8 @@ int CmdEnter::Main(const Options &options) {
   preserved_fds.insert(2);
   pid_t pid_child;
   rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
-                    false /* drop_credentials */, false /* double_fork */,
+                    false /* drop_credentials */, false /* clear_env */,
+                    false /* double_fork */,
                     &pid_child);
   int exit_code = WaitForChild(pid_child);
 

@@ -54,7 +54,7 @@ template <typename RwCatalogMgr, typename RoCatalogMgr>
 bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     const Params& params, std::string* new_manifest_path) {
   UniquePtr<upload::Spooler> spooler;
-  perf::StatisticsTemplate stats_tmpl("Publish", statistics_);
+  perf::StatisticsTemplate stats_tmpl("publish", statistics_);
   counters_ = new perf::FsCounters(stats_tmpl);
 
   UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_prefix_));

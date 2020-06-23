@@ -209,4 +209,17 @@ class MockRedirectServer {
   int num_processed_requests_;
 };
 
+class MockGateway {
+ public:
+  explicit MockGateway(int port);
+  ~MockGateway();
+
+  HTTPResponse next_response_;
+
+ private:
+  static HTTPResponse GatewayHandler(const HTTPRequest &req, void *data);
+
+  MockHTTPServer *server_;
+};
+
 #endif  // TEST_UNITTESTS_C_HTTP_SERVER_H_

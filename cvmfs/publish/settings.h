@@ -61,6 +61,16 @@ class Setting {
 };  // Setting
 
 
+/**
+ * Steers the aggressiveness of Publisher::ManagedNode::Check()
+ */
+enum EUnionMountRepairMode {
+  kUnionMountRepairNever = 0,
+  kUnionMountRepairSafe,
+  kUnionMountRepairAlways
+};
+
+
 // Settings from the point of construction always represent a valid
 // configuration. The constructor sets default values, which can be overwritten
 // by setters. The setters throw errors when invalid options are detected.
@@ -70,24 +80,45 @@ class SettingsSpoolArea {
   explicit SettingsSpoolArea(const std::string &fqrn)
     : workspace_(std::string("/var/spool/cvmfs/") + fqrn)
     , tmp_dir_(workspace_() + "/tmp")
+    , union_mnt_(std::string("/cvmfs/") + fqrn)
+    , repair_mode_(kUnionMountRepairSafe)
   { }
 
   void UseSystemTempDir();
   void SetSpoolArea(const std::string &path);
+  void SetUnionMount(const std::string &path);
+  void SetRepairMode(const EUnionMountRepairMode val);
 
   std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
   std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
-  std::string union_mnt() const { return workspace_() + "/union"; }
+  std::string union_mnt() const { return union_mnt_; }
   std::string scratch_dir() const { return workspace_() + "/scratch/current"; }
   std::string client_config() const { return workspace_() + "/client.config"; }
+  std::string client_lconfig() const { return workspace_() + "/client.local"; }
   std::string client_log() const { return workspace_() + "/usyslog.log"; }
   std::string cache_dir() const { return workspace_() + "/cache"; }
   std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }
+  std::string checkout_marker() const { return workspace_() + "/checkout"; }
+  std::string gw_session_token() const {
+    return workspace_() + "/session_token";
+  }
+  std::string transaction_lock() const {
+    return workspace_() + "/in_transaction.lock";
+  }
+  std::string publishing_lock() const {
+    return workspace_() + "/is_publishing.lock";
+  }
+  EUnionMountRepairMode repair_mode() const { return repair_mode_; }
 
  private:
   Setting<std::string> workspace_;
   Setting<std::string> tmp_dir_;
+  Setting<std::string> union_mnt_;
+  /**
+   * How aggresively should the mount point stack be repaired
+   */
+  Setting<EUnionMountRepairMode> repair_mode_;
 };  // SettingsSpoolArea
 
 
@@ -100,10 +131,13 @@ class SettingsTransaction {
     , is_garbage_collectable_(true)
     , is_volatile_(false)
     , union_fs_(kUnionFsUnknown)
+    , timeout_s_(0)
     , spool_area_(fqrn)
   {}
 
   void SetUnionFsType(const std::string &union_fs);
+  void SetTimeout(unsigned seconds);
+  void SetLeasePath(const std::string &path);
   void DetectUnionFsType();
 
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
@@ -114,6 +148,8 @@ class SettingsTransaction {
   bool is_garbage_collectable() const { return is_garbage_collectable_; }
   bool is_volatile() const { return is_volatile_; }
   std::string voms_authz() const { return voms_authz_; }
+  unsigned timeout_s() const { return timeout_s_; }
+  std::string lease_path() const { return lease_path_; }
 
   const SettingsSpoolArea &spool_area() const { return spool_area_; }
   SettingsSpoolArea *GetSpoolArea() { return &spool_area_; }
@@ -128,6 +164,11 @@ class SettingsTransaction {
   Setting<bool> is_volatile_;
   Setting<std::string> voms_authz_;
   Setting<UnionFsType> union_fs_;
+  /**
+   * How long to retry taking a lease before giving up
+   */
+  Setting<unsigned> timeout_s_;
+  Setting<std::string> lease_path_;
 
   SettingsSpoolArea spool_area_;
 };  // class SettingsTransaction
@@ -150,8 +191,11 @@ class SettingsStorage {
   void SetLocator(const std::string &locator);
   void MakeLocal(const std::string &path);
   void MakeS3(const std::string &s3_config, const std::string &tmp_dir);
+  void MakeGateway(const std::string &host, unsigned port,
+                   const std::string &tmp_dir);
 
   upload::SpoolerDefinition::DriverType type() const { return type_; }
+  std::string endpoint() const { return endpoint_; }
 
  private:
   Setting<std::string> fqrn_;
@@ -170,6 +214,7 @@ class SettingsKeychain {
     , master_public_key_path_(keychain_dir_() + "/" + fqrn + ".pub")
     , private_key_path_(keychain_dir_() + "/" + fqrn + ".key")
     , certificate_path_(keychain_dir_() + "/" + fqrn + ".crt")
+    , gw_key_path_(keychain_dir_() + "/" + fqrn + ".gw")
   {}
 
   void SetKeychainDir(const std::string &keychain_dir);
@@ -178,6 +223,7 @@ class SettingsKeychain {
   bool HasMasterKeys() const;
   bool HasDanglingRepositoryKeys() const;
   bool HasRepositoryKeys() const;
+  bool HasGatewayKey() const;
 
   std::string keychain_dir() const { return keychain_dir_; }
   std::string master_private_key_path() const {
@@ -186,6 +232,7 @@ class SettingsKeychain {
   std::string master_public_key_path() const { return master_public_key_path_; }
   std::string private_key_path() const { return private_key_path_; }
   std::string certificate_path() const { return certificate_path_; }
+  std::string gw_key_path() const { return gw_key_path_; }
 
  private:
   Setting<std::string> fqrn_;
@@ -194,6 +241,7 @@ class SettingsKeychain {
   Setting<std::string> master_public_key_path_;
   Setting<std::string> private_key_path_;
   Setting<std::string> certificate_path_;
+  Setting<std::string> gw_key_path_;
 };  // class SettingsKeychain
 
 
@@ -236,22 +284,27 @@ class SettingsRepository {
  */
 class SettingsPublisher {
  public:
+  static const unsigned kDefaultWhitelistValidity;  // 30 days
+
   explicit SettingsPublisher(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn)
     , owner_uid_(0)
     , owner_gid_(0)
-    , whitelist_validity_days_(30)
+    , whitelist_validity_days_(kDefaultWhitelistValidity)
     , is_silent_(false)
+    , is_managed_(false)
     , storage_(fqrn_)
     , transaction_(fqrn_)
     , keychain_(fqrn_)
   { }
+  explicit SettingsPublisher(const SettingsRepository &settings_repository);
 
   void SetUrl(const std::string &url);
   void SetOwner(const std::string &user_name);
   void SetOwner(uid_t uid, gid_t gid);
   void SetIsSilent(bool value);
+  void SetIsManaged(bool value);
 
   std::string fqrn() const { return fqrn_; }
   std::string url() const { return url_; }
@@ -259,6 +312,7 @@ class SettingsPublisher {
   uid_t owner_uid() const { return owner_uid_; }
   uid_t owner_gid() const { return owner_gid_; }
   bool is_silent() const { return is_silent_; }
+  bool is_managed() const { return is_managed_; }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
@@ -274,6 +328,7 @@ class SettingsPublisher {
   Setting<gid_t> owner_gid_;
   Setting<unsigned> whitelist_validity_days_;
   Setting<bool> is_silent_;
+  Setting<bool> is_managed_;
 
   SettingsStorage storage_;
   SettingsTransaction transaction_;
@@ -318,11 +373,22 @@ class SettingsBuilder : SingleCopy {
   /**
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
-   * Otherweise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
+   * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
    * If alias is an empty string, the command still succeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    */
   SettingsRepository CreateSettingsRepository(const std::string &ident);
+
+  /**
+   * If ident is a url, creates a generic settings object inferring the fqrn
+   * from the url.
+   * Otherweise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
+   * If alias is an empty string, the command still succeds iff there is a
+   * single repository under /etc/cvmfs/repositories.d
+   * If needs_managed is true, remote repositories are rejected
+   */
+  SettingsPublisher* CreateSettingsPublisher(
+      const std::string &ident, bool needs_managed = false);
 
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }

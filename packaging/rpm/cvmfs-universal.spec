@@ -98,7 +98,6 @@ Requires: coreutils
 Requires: grep
 Requires: gawk
 Requires: sed
-Requires: perl
 Requires: psmisc
 Requires: autofs
 Requires: fuse
@@ -138,10 +137,6 @@ Requires: util-linux-ng
 Requires: util-linux
     %endif
   %endif
-%endif
-%if 0%{?fedora}
-# For cvmfs_talk, does not necessarily come with Fedora >= 25
-Requires: perl-Getopt-Long
 %endif
 Requires: cvmfs-config
 
@@ -427,6 +422,10 @@ EOF
 rm -rf $RPM_BUILD_ROOT
 
 %post
+if [ $1 -eq 1 ]; then
+   mkdir /cvmfs
+   chmod 755 /cvmfs
+fi
 %if 0%{?selinux_cvmfs}
 # Install SELinux policy modules
 for selinuxvariant in %{selinux_variants}
@@ -481,6 +480,8 @@ if [ $1 -eq 0 ]; then
    then
      rm -f /etc/auto.master.d/cvmfs.autofs
    fi
+   [ -f /var/lock/subsys/autofs ] && /sbin/service autofs reload >/dev/null
+   rmdir /cvmfs
 fi
 
 %if 0%{?selinux_cvmfs}
@@ -529,7 +530,6 @@ fi
 /sbin/mount.cvmfs
 %dir %{_sysconfdir}/cvmfs/config.d
 %dir %{_sysconfdir}/cvmfs/domain.d
-%dir /cvmfs
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf

@@ -24,6 +24,11 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#ifdef __APPLE__
+#include <sys/mount.h>  //  for statfs()
+#else
+#include <sys/statfs.h>
+#endif
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -52,6 +57,29 @@
 #include "util_concurrency.h"
 
 //using namespace std;  // NOLINT
+
+#ifndef ST_RDONLY
+// On Linux, this is in sys/statvfs.h
+// On macOS, this flag is called MNT_RDONLY /usr/include/sys/mount.h
+#define ST_RDONLY 1
+#endif
+
+// Older Linux glibc versions do not provide the f_flags member in struct statfs
+#define CVMFS_HAS_STATFS_F_FLAGS
+#ifndef __APPLE__
+#ifdef __GLIBC_MINOR__
+#if __GLIBC_MINOR__ < 12
+#undef CVMFS_HAS_STATFS_F_FLAGS
+#endif
+#endif
+#endif
+
+// Work around missing clearenv()
+#ifdef __APPLE__
+extern "C" {
+extern char **environ;
+}
+#endif
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -177,6 +205,88 @@ bool IsHttpUrl(const std::string &path) {
   std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
 
   return prefix == "http://";
+}
+
+
+FileSystemInfo GetFileSystemInfo(const std::string &path) {
+  FileSystemInfo result;
+
+  struct statfs info;
+  int retval = statfs(path.c_str(), &info);
+  if (retval != 0)
+    return result;
+
+  switch (info.f_type) {
+    case kFsTypeAutofs:
+      result.type = kFsTypeAutofs;
+      break;
+    case kFsTypeNFS:
+      result.type = kFsTypeNFS;
+      break;
+    case kFsTypeProc:
+      result.type = kFsTypeProc;
+      break;
+    case kFsTypeBeeGFS:
+      result.type = kFsTypeBeeGFS;
+      break;
+    default:
+      result.type = kFsTypeUnknown;
+  }
+
+#ifdef CVMFS_HAS_STATFS_F_FLAGS
+  if (info.f_flags & ST_RDONLY)
+    result.is_rdonly = true;
+#else
+  // On old Linux systems, fall back to access()
+  retval = access(path.c_str(), W_OK);
+  result.is_rdonly = (retval != 0);
+#endif
+
+
+
+  return result;
+}
+
+
+/**
+ * Follow all symlinks if possible. Equivalent to
+ * `readlink --canonicalize-missing`
+ */
+std::string ResolvePath(const std::string &path) {
+  if (path.empty() || (path == "/"))
+    return "/";
+  std::string name = GetFileName(path);
+  std::string result = name;
+  if (name != path) {
+    // There is a parent path of 'path'
+    std::string parent = ResolvePath(GetParentPath(path));
+    result = parent + (parent == "/" ? "" : "/") + name;
+  }
+  char *real_result = realpath(result.c_str(), NULL);
+  if (real_result) {
+    result = real_result;
+    free(real_result);
+  }
+  if (SymlinkExists(result)) {
+    char buf[PATH_MAX + 1];
+    ssize_t nchars = readlink(result.c_str(), buf, PATH_MAX);
+    if (nchars >= 0) {
+      buf[nchars] = '\0';
+      result = buf;
+    }
+  }
+  return result;
+}
+
+
+bool IsMountPoint(const std::string &path) {
+  std::vector<std::string> mount_list = platform_mountlist();
+  std::string resolved_path = ResolvePath(path);
+  for (unsigned i = 0; i < mount_list.size(); ++i) {
+    if (mount_list[i] == resolved_path)
+      return true;
+  }
+  return false;
 }
 
 
@@ -1196,6 +1306,15 @@ void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit) {
 }
 
 
+bool ProcessExists(pid_t pid) {
+  assert(pid > 0);
+  int retval = kill(pid, 0);
+  if (retval == 0)
+    return true;
+  return (errno != ESRCH);
+}
+
+
 /**
  * Blocks a signal for the calling thread.
  */
@@ -1310,7 +1429,8 @@ bool ExecuteBinary(
   if (!ManagedExec(cmd_line,
                    preserve_fildes,
                    map_fildes,
-                   true,
+                   true /* drop_credentials */,
+                   false /* clear_env */,
                    double_fork,
                    child_pid))
   {
@@ -1393,6 +1513,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
                  const std::set<int>        &preserve_fildes,
                  const std::map<int, int>   &map_fildes,
                  const bool             drop_credentials,
+                 const bool             clear_env,
                  const bool             double_fork,
                        pid_t           *child_pid)
 {
@@ -1406,6 +1527,15 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     int max_fd;
     int fd_flags;
     ForkFailures::Names failed = ForkFailures::kUnknown;
+
+    if (clear_env) {
+#ifdef __APPLE__
+      environ = NULL;
+#else
+      int retval = clearenv();
+      assert(retval == 0);
+#endif
+    }
 
     const char *argv[command_line.size() + 1];
     for (unsigned i = 0; i < command_line.size(); ++i)

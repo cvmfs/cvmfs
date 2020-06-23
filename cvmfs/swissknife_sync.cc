@@ -41,6 +41,7 @@
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
+#include "monitor.h"
 #include "path_filters/dirtab.h"
 #include "platform.h"
 #include "reflog.h"
@@ -559,6 +560,18 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   string start_time = GetGMTimestamp();
 
+  // Spawn monitoring process (watchdog)
+  std::string watchdog_dir = "/tmp";
+  char watchdog_path[PATH_MAX];
+  std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
+  int path_size = snprintf(watchdog_path, sizeof(watchdog_path),
+                           "%s/cvmfs-swissknife-sync-stacktrace.%s.%d",
+                           watchdog_dir.c_str(), timestamp.c_str(), getpid());
+  assert(path_size > 0);
+  assert(path_size < PATH_MAX);
+  UniquePtr<Watchdog> watchdog(Watchdog::Create(std::string(watchdog_path)));
+  watchdog->Spawn();
+
   SyncParameters params;
 
   // Initialization
@@ -710,7 +723,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
 
-  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
+  perf::StatisticsTemplate publish_statistics("publish", this->statistics());
 
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
@@ -869,7 +882,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
-  perf::Counter *revision_counter = statistics()->Register("Publish.revision",
+  perf::Counter *revision_counter = statistics()->Register("publish.revision",
                                                   "Published revision number");
   revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 

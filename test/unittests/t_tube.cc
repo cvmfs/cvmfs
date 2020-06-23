@@ -33,22 +33,22 @@ TEST_F(T_Tube, Fifo) {
   DummyItem a, b, c;
   EXPECT_EQ(0U, tube_.size());
   EXPECT_TRUE(tube_.IsEmpty());
-  Tube<DummyItem>::Link *l1 = tube_.Enqueue(&a);
+  Tube<DummyItem>::Link *l1 = tube_.EnqueueBack(&a);
   EXPECT_EQ(&a, l1->item());
   EXPECT_EQ(1U, tube_.size());
   EXPECT_FALSE(tube_.IsEmpty());
-  Tube<DummyItem>::Link *l2 = tube_.Enqueue(&b);
+  Tube<DummyItem>::Link *l2 = tube_.EnqueueBack(&b);
   EXPECT_NE(l1, l2);
-  tube_.Enqueue(&c);
+  tube_.EnqueueBack(&c);
   EXPECT_EQ(3U, tube_.size());
 
   DummyItem *x = tube_.Slice(l2);
   EXPECT_EQ(2U, tube_.size());
   EXPECT_EQ(&b, x);
-  x = tube_.Pop();
+  x = tube_.PopFront();
   EXPECT_EQ(1U, tube_.size());
   EXPECT_EQ(&a, x);
-  x = tube_.Pop();
+  x = tube_.PopFront();
   EXPECT_EQ(&c, x);
   EXPECT_TRUE(tube_.IsEmpty());
 }
@@ -67,9 +67,9 @@ TEST_F(T_Tube, Group) {
   grp1.Dispatch(&a1);
   grp1.Dispatch(&b);
   EXPECT_EQ(2U, t1->size());
-  DummyItem *x = t1->Pop();
+  DummyItem *x = t1->PopFront();
   EXPECT_EQ(&a1, x);
-  x = t1->Pop();
+  x = t1->PopFront();
   EXPECT_EQ(&b, x);
 
   TubeGroup<DummyItem> grp2;
@@ -84,8 +84,8 @@ TEST_F(T_Tube, Group) {
   grp2.Dispatch(&c);
   EXPECT_EQ(3U, t2->size());
   EXPECT_EQ(1U, t3->size());
-  x = t2->Pop();  EXPECT_EQ(&a1, x);
-  x = t2->Pop();  EXPECT_EQ(&a2, x);
-  x = t2->Pop();  EXPECT_EQ(&c, x);
-  x = t3->Pop();  EXPECT_EQ(&b, x);
+  x = t2->PopFront();  EXPECT_EQ(&a1, x);
+  x = t2->PopFront();  EXPECT_EQ(&a2, x);
+  x = t2->PopFront();  EXPECT_EQ(&c, x);
+  x = t3->PopFront();  EXPECT_EQ(&b, x);
 }

@@ -122,7 +122,7 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
                                   perf::Statistics *stats,
                                   std::string *start_time)
 {
-  perf::StatisticsTemplate stats_tmpl("Publish", stats);
+  perf::StatisticsTemplate stats_tmpl("publish", stats);
   upload::UploadCounters counters(stats_tmpl);
 
   const JSON* statistics = JsonDocument::SearchInObject(
@@ -133,18 +133,29 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
     return false;
   }
 
+  const JSON* publish_ctrs = JsonDocument::SearchInObject(
+    statistics, "publish", JSON_OBJECT);
+
+  if (publish_ctrs == NULL) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Could not find 'statistics.publish' field in request");
+    return false;
+  }
+
   const JSON *n_chunks_added = JsonDocument::SearchInObject(
-    statistics, "Publish.n_chunks_added", JSON_STRING);
+    publish_ctrs, "n_chunks_added", JSON_STRING);
   const JSON *n_chunks_duplicated = JsonDocument::SearchInObject(
-    statistics, "Publish.n_chunks_duplicated", JSON_STRING);
+    publish_ctrs, "n_chunks_duplicated", JSON_STRING);
   const JSON *n_catalogs_added = JsonDocument::SearchInObject(
-    statistics, "Publish.n_catalogs_added", JSON_STRING);
+    publish_ctrs, "n_catalogs_added", JSON_STRING);
   const JSON *sz_uploaded_bytes = JsonDocument::SearchInObject(
-    statistics, "Publish.sz_uploaded_bytes", JSON_STRING);
+    publish_ctrs, "sz_uploaded_bytes", JSON_STRING);
   const JSON *sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
-    statistics, "Publish.sz_uploaded_catalog_bytes", JSON_STRING);
+    publish_ctrs, "sz_uploaded_catalog_bytes", JSON_STRING);
+
   const JSON *start_time_json = JsonDocument::SearchInObject(
     statistics, "start_time", JSON_STRING);
+
   if (n_chunks_added == NULL || n_chunks_duplicated == NULL ||
       n_catalogs_added == NULL || sz_uploaded_bytes == NULL ||
       sz_uploaded_catalog_bytes == NULL || start_time_json == NULL) {

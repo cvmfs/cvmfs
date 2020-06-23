@@ -81,7 +81,7 @@ cvmfs_server_ingest() {
     cvmfs_server_transaction $name || die "Impossible to start a transaction"
   fi
 
-
+  load_repo_config $name
 
   upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)

@@ -311,6 +311,8 @@ void S3Uploader::DoUpload(
 
   if (HasPrefix(remote_path, ".cvmfs", false /*ignore_case*/)) {
     info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
+  } else if (HasSuffix(remote_path, ".html", false)) {
+    info->request = s3fanout::JobInfo::kReqPutHtml;
   } else {
     if (peek_before_put_)
       info->request = s3fanout::JobInfo::kReqHeadPut;
