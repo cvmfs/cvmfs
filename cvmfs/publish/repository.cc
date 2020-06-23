@@ -687,7 +687,7 @@ void Publisher::Sync() {
   params.union_fs_type = "overlayfs";  // TODO(jblomer): select union fs type
   params.print_changeset = true;
   SyncMediator mediator(&catalog_mgr, &params,
-                        perf::StatisticsTemplate("Publish", statistics_));
+                        perf::StatisticsTemplate("publish", statistics_));
   publish::SyncUnion *sync;
   sync = new publish::SyncUnionOverlayfs(&mediator,
     settings_.transaction().spool_area().readonly_mnt(),

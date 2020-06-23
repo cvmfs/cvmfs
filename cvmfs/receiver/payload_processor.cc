@@ -193,7 +193,7 @@ void PayloadProcessor::OnUploadJobComplete(
 }
 
 void PayloadProcessor::SetStatistics(perf::Statistics *st) {
-  statistics_ = new perf::StatisticsTemplate("Publish", st);
+  statistics_ = new perf::StatisticsTemplate("publish", st);
 }
 
 PayloadProcessor::Result PayloadProcessor::Initialize() {
