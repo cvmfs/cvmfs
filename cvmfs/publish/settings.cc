@@ -13,6 +13,7 @@
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "sanitizer.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -319,8 +320,7 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   return settings;
 }
 
-
-SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
+SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   const std::string &ident, bool needs_managed)
 {
   // we are creating a publisher, it need to have the `server.conf` file
@@ -342,23 +342,23 @@ SettingsPublisher SettingsBuilder::CreateSettingsPublisher(
   if (options_mgr_->GetValueOrDie("CVMFS_REPOSITORY_TYPE") != "stratum0")
     throw EPublish("Not a stratum 0 repository");
 
-  SettingsPublisher settings_publisher(settings_repository);
-  settings_publisher.SetIsManaged(IsManagedRepository());
-  settings_publisher.SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
-  settings_publisher.GetStorage()->SetLocator(
+  UniquePtr<SettingsPublisher> settings_publisher(
+      new SettingsPublisher(settings_repository));
+  settings_publisher->SetIsManaged(IsManagedRepository());
+  settings_publisher->SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
+  settings_publisher->GetStorage()->SetLocator(
     options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
 
   std::string arg;
   if (options_mgr_->GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
     if (!options_mgr_->IsOn(arg)) {
-      settings_publisher.GetTransaction()->GetSpoolArea()->SetRepairMode(
+      settings_publisher->GetTransaction()->GetSpoolArea()->SetRepairMode(
         kUnionMountRepairNever);
     }
   }
 
   // TODO(jblomer): process other parameters
-
-  return settings_publisher;
+  return settings_publisher.Release();
 }
 
 }  // namespace publish

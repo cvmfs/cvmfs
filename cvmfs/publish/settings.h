@@ -14,6 +14,7 @@
 #include "hash.h"
 #include "sync_union.h"
 #include "upload_spooler_definition.h"
+#include "util/pointer.h"
 
 class OptionsManager;
 
@@ -387,8 +388,8 @@ class SettingsBuilder : SingleCopy {
    * single repository under /etc/cvmfs/repositories.d
    * If needs_managed is true, remote repositories are rejected
    */
-  SettingsPublisher CreateSettingsPublisher(const std::string &ident,
-                                            bool needs_managed = false);
+  SettingsPublisher* CreateSettingsPublisher(
+      const std::string &ident, bool needs_managed = false);
 
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }

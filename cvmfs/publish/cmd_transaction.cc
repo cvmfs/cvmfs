@@ -36,11 +36,9 @@ int CmdTransaction::Main(const Options &options) {
   }
 
   SettingsBuilder builder;
-  SettingsPublisher* settings;
+  UniquePtr<SettingsPublisher> settings;
   try {
-    SettingsPublisher s =
-        builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
-    settings = &s;
+    settings = builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
   } catch (const EPublish &e) {
     if (e.failure() == EPublish::kFailRepositoryNotFound) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
