@@ -5,6 +5,7 @@
 #ifndef CVMFS_JSON_DOCUMENT_WRITE_H_
 #define CVMFS_JSON_DOCUMENT_WRITE_H_
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
