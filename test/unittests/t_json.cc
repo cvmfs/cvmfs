@@ -70,7 +70,7 @@ TEST(T_Json, GenerateValidJsonString) {
   input.Add("f2", "v2");
   input.Add("f3", "v3");
   input.Add("f4", "v\n4");
-  input.Add("integer", (int64_t)12);
+  input.Add("integer", 12);
 
   std::string output = input.GenerateString();
 
