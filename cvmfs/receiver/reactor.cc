@@ -527,7 +527,7 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       default:
         break;
     }
-  } catch (const ECvmfsException e) {
+  } catch (const ECvmfsException &e) {
     reply.clear();
 
     std::string error("runtime error: ");
