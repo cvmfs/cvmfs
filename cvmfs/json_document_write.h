@@ -14,12 +14,21 @@
  * string and the Unquoted variant when adding anything else.
  */
 class JsonStringGenerator {
-  struct JsonStringEntry {
+  enum JsonVariant { String, Integer, Float };
+
+  struct JsonEntry {
+    JsonVariant variant;
     std::string key;
-    std::string val;
+    std::string str_val;
+    int int_val;
+    float float_val;
     bool is_quoted;
 
-    JsonStringEntry() : is_quoted(true) {}
+    JsonEntry()
+        : variant(JsonVariant::String),
+          int_val(0),
+          float_val(0),
+          is_quoted(true) {}
   };
 
  public:
@@ -38,9 +47,9 @@ class JsonStringGenerator {
     for (size_t i = 0u; i < this->entries.size(); ++i) {
       output += std::string("\"") + this->entries[i].key + "\":";
       if (this->entries[i].is_quoted) {
-        output += std::string("\"") + this->entries[i].val + "\"";
+        output += std::string("\"") + this->entries[i].str_val + "\"";
       } else {
-        output += this->entries[i].val;
+        output += this->entries[i].str_val;
       }
       if (i < this->entries.size() - 1) {
         output += ',';
@@ -56,9 +65,9 @@ class JsonStringGenerator {
 
  private:
   void Add(std::string key, std::string val, bool quoted = true) {
-    JsonStringEntry entry;
+    JsonEntry entry;
     entry.key = Escape(key);
-    entry.val = Escape(val);
+    entry.str_val = Escape(val);
     entry.is_quoted = quoted;
     entries.push_back(entry);
   }
@@ -101,7 +110,7 @@ class JsonStringGenerator {
     return result;
   }
 
-  std::vector<JsonStringEntry> entries;
+  std::vector<JsonEntry> entries;
 };
 
 #endif  // CVMFS_JSON_DOCUMENT_WRITE_H_
