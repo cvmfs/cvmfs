@@ -24,28 +24,28 @@ class JsonStringGenerator {
     float float_val;
 
     JsonEntry(std::string key, std::string val)
-        : variant(JsonVariant::String),
+        : variant(String),
           key(key),
           str_val(val),
           int_val(0),
           float_val(0) {}
 
     JsonEntry(std::string key, int val)
-        : variant(JsonVariant::Integer),
+        : variant(Integer),
           key(key),
           str_val(),
           int_val(val),
           float_val(0) {}
 
     JsonEntry(std::string key, float val)
-        : variant(JsonVariant::Float),
+        : variant(Float),
           key(key),
           str_val(),
           int_val(0),
           float_val(val) {}
 
     JsonEntry(std::string key, int64_t val)
-        : variant(JsonVariant::Integer),
+        : variant(Integer),
           key(key),
           str_val(),
           int_val(val),
@@ -68,7 +68,7 @@ class JsonStringGenerator {
         case JsonObject:
           return "\"" + key + "\":" + str_val;
         default:
-          assert(false);
+          return "";
       }
     }
   };
@@ -97,7 +97,7 @@ class JsonStringGenerator {
   void AddJsonObject(std::string key, std::string json) {
     // we **do not escape** the value here
     JsonEntry entry(Escape(key), json);
-    entry.variant = JsonVariant::JsonObject;
+    entry.variant = JsonObject;
     entries.push_back(entry);
   }
 
