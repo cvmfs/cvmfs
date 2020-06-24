@@ -118,7 +118,7 @@ string Statistics::PrintJSON() {
 
     if (tokens[0] != last_namespace) {
       if (last_namespace != "") {
-        json_statistics.Add(last_namespace,
+        json_statistics.AddJsonObject(last_namespace,
                                     json_statistics_namespace.GenerateString());
       }
       json_statistics_namespace.Clear();
@@ -129,7 +129,7 @@ string Statistics::PrintJSON() {
     last_namespace = tokens[0];
   }
   if (last_namespace != "") {
-    json_statistics.Add(last_namespace,
+    json_statistics.AddJsonObject(last_namespace,
                                 json_statistics_namespace.GenerateString());
   }
 
