@@ -384,7 +384,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   // HandleSubmitPayload sends partial statistics back to the gateway
   std::string stats_json = statistics.PrintJSON();
-  reply_input.AddUnquoted("statistics", stats_json);
+  reply_input.Add("statistics", stats_json);
 
   std::string json = reply_input.GenerateString();
   *reply = json;

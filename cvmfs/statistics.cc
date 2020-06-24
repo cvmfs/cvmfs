@@ -118,19 +118,18 @@ string Statistics::PrintJSON() {
 
     if (tokens[0] != last_namespace) {
       if (last_namespace != "") {
-        json_statistics.AddUnquoted(last_namespace,
+        json_statistics.Add(last_namespace,
                                     json_statistics_namespace.GenerateString());
       }
       json_statistics_namespace.Clear();
     }
 
-    json_statistics_namespace.AddUnquoted(tokens[1],
-                                          i->second->counter.ToString());
+    json_statistics_namespace.Add(tokens[1], i->second->counter.Get());
 
     last_namespace = tokens[0];
   }
   if (last_namespace != "") {
-    json_statistics.AddUnquoted(last_namespace,
+    json_statistics.Add(last_namespace,
                                 json_statistics_namespace.GenerateString());
   }
 
