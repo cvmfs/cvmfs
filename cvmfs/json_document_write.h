@@ -14,7 +14,7 @@
  * string and the Unquoted variant when adding anything else.
  */
 class JsonStringGenerator {
-  enum JsonVariant { String, Integer, Float };
+  enum JsonVariant { String, Integer, Float, JsonObject };
 
   struct JsonEntry {
     JsonVariant variant;
@@ -22,53 +22,41 @@ class JsonStringGenerator {
     std::string str_val;
     long long int_val;
     float float_val;
-    bool is_quoted;
-
-    JsonEntry()
-        : variant(JsonVariant::String),
-          int_val(0),
-          float_val(0),
-          is_quoted(true) {}
 
     JsonEntry(std::string key, std::string val)
         : variant(JsonVariant::String),
           key(key),
           str_val(val),
           int_val(0),
-          float_val(0),
-          is_quoted(true) {}
+          float_val(0) {}
 
     JsonEntry(std::string key, long long val)
         : variant(JsonVariant::Integer),
           key(key),
           str_val(),
           int_val(val),
-          float_val(0),
-          is_quoted(false) {}
+          float_val(0) {}
 
     JsonEntry(std::string key, int val)
         : variant(JsonVariant::Integer),
           key(key),
           str_val(),
           int_val(val),
-          float_val(0),
-          is_quoted(false) {}
+          float_val(0) {}
 
     JsonEntry(std::string key, float val)
         : variant(JsonVariant::Float),
           key(key),
           str_val(),
           int_val(0),
-          float_val(val),
-          is_quoted(false) {}
+          float_val(val) {}
 
     JsonEntry(std::string key, int64_t val)
         : variant(JsonVariant::Integer),
           key(key),
           str_val(),
           int_val(val),
-          float_val(0),
-          is_quoted(false) {}
+          float_val(0) {}
 
     const std::string format() const {
       char buffer[64];
@@ -84,6 +72,8 @@ class JsonStringGenerator {
           rc = snprintf(buffer, 64, "%f", float_val);
           assert(rc > 0);
           return "\"" + key + "\":" + std::string(buffer);
+        case JsonObject:
+          return "\"" + key + "\":" + str_val;
       }
     }
   };
@@ -106,6 +96,13 @@ class JsonStringGenerator {
 
   void Add(std::string key, int64_t val) {
     JsonEntry entry(Escape(key), val);
+    entries.push_back(entry);
+  }
+
+  void AddJsonObject(std::string key, std::string json) {
+    // we **do not escape** the value here
+    JsonEntry entry(Escape(key), json);
+    entry.variant = JsonVariant::JsonObject;
     entries.push_back(entry);
   }
 
