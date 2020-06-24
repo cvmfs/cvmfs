@@ -20,7 +20,7 @@ class JsonStringGenerator {
     JsonVariant variant;
     std::string key;
     std::string str_val;
-    long long int_val;
+    int64_t int_val;
     float float_val;
 
     JsonEntry(std::string key, std::string val)
@@ -28,13 +28,6 @@ class JsonStringGenerator {
           key(key),
           str_val(val),
           int_val(0),
-          float_val(0) {}
-
-    JsonEntry(std::string key, long long val)
-        : variant(JsonVariant::Integer),
-          key(key),
-          str_val(),
-          int_val(val),
           float_val(0) {}
 
     JsonEntry(std::string key, int val)
@@ -65,15 +58,17 @@ class JsonStringGenerator {
         case String:
           return "\"" + key + "\":\"" + str_val + "\"";
         case Integer:
-          rc = snprintf(buffer, 64, "%lld", int_val);
+          rc = snprintf(buffer, sizeof(buffer), "%ld", int_val);
           assert(rc > 0);
           return "\"" + key + "\":" + std::string(buffer);
         case Float:
-          rc = snprintf(buffer, 64, "%f", float_val);
+          rc = snprintf(buffer, sizeof(buffer), "%f", float_val);
           assert(rc > 0);
           return "\"" + key + "\":" + std::string(buffer);
         case JsonObject:
           return "\"" + key + "\":" + str_val;
+        default:
+          assert(false);
       }
     }
   };
