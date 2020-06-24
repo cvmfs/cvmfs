@@ -30,32 +30,70 @@ class JsonStringGenerator {
           float_val(0),
           is_quoted(true) {}
 
-    std::string format() {
+    JsonEntry(std::string key, std::string val)
+        : variant(JsonVariant::String),
+          key(key),
+          str_val(val),
+          int_val(0),
+          float_val(0),
+          is_quoted(true) {}
+
+    JsonEntry(std::string key, long long val)
+        : variant(JsonVariant::Integer),
+          key(key),
+          str_val(),
+          int_val(val),
+          float_val(0),
+          is_quoted(false) {}
+
+    JsonEntry(std::string key, float val)
+        : variant(JsonVariant::Float),
+          key(key),
+          str_val(),
+          int_val(0),
+          float_val(val),
+          is_quoted(false) {}
+
+    const std::string format() const {
       char buffer[64];
       int rc = -1;
       switch (variant) {
-	case String:
-	  return "\"" + key + "\":\"" + str_val + "\"";
-	case Integer:
-	  rc = snprintf(buffer, 64, "%lld", int_val);
-	  assert(rc > 0);
-	  return "\"" + key + "\":\"" + std::string(buffer) + "\"";
-	case Float:
-	  rc = snprintf(buffer, 64, "%f", float_val);
-	  assert(rc > 0);
-	  return "\"" + key + "\":\"" + std::string(buffer) + "\"";
+        case String:
+          return "\"" + key + "\":\"" + str_val + "\"";
+        case Integer:
+          rc = snprintf(buffer, 64, "%lld", int_val);
+          assert(rc > 0);
+          return "\"" + key + "\":\"" + std::string(buffer) + "\"";
+        case Float:
+          rc = snprintf(buffer, 64, "%f", float_val);
+          assert(rc > 0);
+          return "\"" + key + "\":\"" + std::string(buffer) + "\"";
       }
     }
-
   };
 
  public:
-  void AddQuoted(std::string key, std::string val) {
-    this->Add(key, val, true);
+  void Add(std::string key, std::string val) {
+    JsonEntry entry(Escape(key), Escape(val));
+    entries.push_back(entry);
+  }
+
+  void Add(std::string key, long long val) {
+    JsonEntry entry(key, val);
+    entries.push_back(entry);
+  }
+
+  void Add(std::string key, float val) {
+    JsonEntry entry(key, val);
+    entries.push_back(entry);
+  }
+
+  void addQuoted(std::string key, std::string val) {
+    this->AddOld(key, val, true);
   }
 
   void AddUnquoted(std::string key, std::string val) {
-    this->Add(key, val, false);
+    this->AddOld(key, val, false);
   }
 
   std::string GenerateString() const {
@@ -63,11 +101,11 @@ class JsonStringGenerator {
 
     output += "{";
     for (size_t i = 0u; i < this->entries.size(); ++i) {
-      output += std::string("\"") + this->entries[i].key + "\":";
       if (this->entries[i].is_quoted) {
-        output += std::string("\"") + this->entries[i].str_val + "\"";
+        output += this->entries[i].format();
       } else {
-        output += this->entries[i].str_val;
+       output += std::string("\"") + this->entries[i].key + "\":";
+       output += this->entries[i].str_val;
       }
       if (i < this->entries.size() - 1) {
         output += ',';
@@ -82,7 +120,7 @@ class JsonStringGenerator {
   }
 
  private:
-  void Add(std::string key, std::string val, bool quoted = true) {
+  void AddOld(std::string key, std::string val, bool quoted = true) {
     JsonEntry entry;
     entry.key = Escape(key);
     entry.str_val = Escape(val);

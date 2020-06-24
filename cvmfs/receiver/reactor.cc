@@ -236,9 +236,9 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   }
 
   JsonStringGenerator input;
-  input.AddQuoted("token", session_token.c_str());
-  input.AddQuoted("id", public_token_id.c_str());
-  input.AddQuoted("secret", token_secret.c_str());
+  input.Add("token", session_token);
+  input.Add("id", public_token_id);
+  input.Add("secret", token_secret);
   std::string json = input.GenerateString();
   *reply = json;
 
@@ -253,11 +253,11 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   std::string token_id;
   JsonStringGenerator input;
   if (!GetTokenPublicId(req, &token_id)) {
-    input.AddQuoted("status", "error");
-    input.AddQuoted("reason", "invalid_token");
+    input.Add("status", "error");
+    input.Add("reason", "invalid_token");
   } else {
-    input.AddQuoted("status", "ok");
-    input.AddQuoted("id", token_id);
+    input.Add("status", "ok");
+    input.Add("id", token_id);
   }
   std::string json = input.GenerateString();
   *reply = json;
@@ -295,18 +295,18 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   switch (ret) {
     case kExpired:
       // Expired token
-      input.AddQuoted("status", "error");
-      input.AddQuoted("reason", "expired_token");
+      input.Add("status", "error");
+      input.Add("reason", "expired_token");
       break;
     case kInvalid:
       // Invalid token
-      input.AddQuoted("status", "error");
-      input.AddQuoted("reason", "invalid_token");
+      input.Add("status", "error");
+      input.Add("reason", "invalid_token");
       break;
     case kValid:
       // All ok
-      input.AddQuoted("status", "ok");
-      input.AddQuoted("path", path);
+      input.Add("status", "ok");
+      input.Add("path", path);
       break;
     default:
       // Should not be reached
@@ -361,19 +361,19 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   switch (res) {
     case PayloadProcessor::kPathViolation:
-      reply_input.AddQuoted("status", "error");
-      reply_input.AddQuoted("reason", "path_violation");
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "path_violation");
       break;
     case PayloadProcessor::kOtherError:
-      reply_input.AddQuoted("status", "error");
-      reply_input.AddQuoted("reason", "other_error");
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "other_error");
       break;
     case PayloadProcessor::kUploaderError:
-      reply_input.AddQuoted("status", "error");
-      reply_input.AddQuoted("reason", "uploader_error");
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "uploader_error");
       break;
     case PayloadProcessor::kSuccess:
-      reply_input.AddQuoted("status", "ok");
+      reply_input.Add("status", "ok");
       break;
     default:
       PANIC(kLogSyslogErr,
@@ -449,19 +449,19 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   JsonStringGenerator reply_input;
   switch (res) {
     case CommitProcessor::kSuccess:
-      reply_input.AddQuoted("status", "ok");
+      reply_input.Add("status", "ok");
       break;
     case CommitProcessor::kError:
-      reply_input.AddQuoted("status", "error");
-      reply_input.AddQuoted("reason", "miscellaneous");
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "miscellaneous");
       break;
     case CommitProcessor::kMergeFailure:
-      reply_input.AddQuoted("status", "error");
-      reply_input.AddQuoted("reason", "merge_error");
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "merge_error");
       break;
     case CommitProcessor::kMissingReflog:
-      reply_input.AddQuoted("status", "error");
-      reply_input.AddQuoted("reason", "missing_reflog");
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "missing_reflog");
       break;
     default:
       PANIC(kLogSyslogErr,
@@ -534,8 +534,8 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
     error += e.what();
 
     JsonStringGenerator input;
-    input.AddQuoted("status", "error");
-    input.AddQuoted("reason", error);
+    input.Add("status", "error");
+    input.Add("reason", error);
 
     reply = input.GenerateString();
     WriteReply(fdout_, reply);

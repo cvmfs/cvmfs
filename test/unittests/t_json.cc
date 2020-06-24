@@ -66,10 +66,10 @@ TEST(T_Json, SearchInObject) {
 
 TEST(T_Json, GenerateValidJsonString) {
   JsonStringGenerator input;
-  input.AddQuoted("f1", "v1");
-  input.AddQuoted("f2", "v2");
-  input.AddQuoted("f3", "v3");
-  input.AddQuoted("f4", "v\n4");
+  input.Add("f1", "v1");
+  input.Add("f2", "v2");
+  input.Add("f3", "v3");
+  input.Add("f4", "v\n4");
   input.AddUnquoted("integer", "12");
 
   std::string output = input.GenerateString();
