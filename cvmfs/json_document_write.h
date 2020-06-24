@@ -20,7 +20,7 @@ class JsonStringGenerator {
     JsonVariant variant;
     std::string key;
     std::string str_val;
-    int int_val;
+    long long int_val;
     float float_val;
     bool is_quoted;
 
@@ -29,6 +29,24 @@ class JsonStringGenerator {
           int_val(0),
           float_val(0),
           is_quoted(true) {}
+
+    std::string format() {
+      char buffer[64];
+      int rc = -1;
+      switch (variant) {
+	case String:
+	  return "\"" + key + "\":\"" + str_val + "\"";
+	case Integer:
+	  rc = snprintf(buffer, 64, "%lld", int_val);
+	  assert(rc > 0);
+	  return "\"" + key + "\":\"" + std::string(buffer) + "\"";
+	case Float:
+	  rc = snprintf(buffer, 64, "%f", float_val);
+	  assert(rc > 0);
+	  return "\"" + key + "\":\"" + std::string(buffer) + "\"";
+      }
+    }
+
   };
 
  public:
