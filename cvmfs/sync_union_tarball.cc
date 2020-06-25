@@ -146,10 +146,12 @@ void SyncUnionTarball::Traverse() {
 
       case ARCHIVE_EOF: {
         if (create_catalog_on_root_) {
-          SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
-              new SyncItemDummyCatalog(base_directory_, this));
-          ProcessFile(catalog);
-          to_create_catalog_dirs_.insert(base_directory_);
+          if (base_directory_ != "/") {
+            SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
+                new SyncItemDummyCatalog(base_directory_, this));
+            ProcessFile(catalog);
+            to_create_catalog_dirs_.insert(base_directory_);
+          }
         }
         for (set<string>::iterator dir = to_create_catalog_dirs_.begin();
              dir != to_create_catalog_dirs_.end(); ++dir) {
@@ -191,11 +193,14 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   archive_file_path = SanitizePath(archive_file_path);
 
   std::string complete_path =
-      MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
+      base_directory_ != "/"
+          ? MakeCanonicalPath(base_directory_ + "/" + archive_file_path)
+          : MakeCanonicalPath(archive_file_path);
 
   std::string parent_path;
   std::string filename;
   SplitPath(complete_path, &parent_path, &filename);
+  if (parent_path == ".") parent_path.clear();
 
   CreateDirectories(parent_path);
 
@@ -203,8 +208,10 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
       parent_path, filename, src, entry, read_archive_signal_, this));
 
   if (NULL != archive_entry_hardlink(entry)) {
-    const std::string hardlink =
-        base_directory_ + "/" + std::string(archive_entry_hardlink(entry));
+    const std::string hardlink_name(archive_entry_hardlink(entry));
+    const std::string hardlink = base_directory_ != "/"
+                                     ? base_directory_ + "/" + hardlink_name
+                                     : hardlink_name;
 
     if (hardlinks_.find(hardlink) != hardlinks_.end()) {
       hardlinks_.find(hardlink)->second.push_back(complete_path);
