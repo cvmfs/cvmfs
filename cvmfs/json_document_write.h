@@ -9,6 +9,13 @@
 #include <string>
 #include <vector>
 
+#include "util/exception.h"
+#include "util/string.h"
+
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 /**
  * This class is used for marshalling JSON objects to strings.
  * When adding an object, use the Quoted variant when adding a
@@ -52,24 +59,18 @@ class JsonStringGenerator {
           int_val(val),
           float_val(0.0) {}
 
-    const std::string Format() const {
-      char buffer[64];
-      int rc = -1;
+    std::string Format() const {
       switch (variant) {
         case String:
           return "\"" + key + "\":\"" + str_val + "\"";
         case Integer:
-          rc = snprintf(buffer, sizeof(buffer), "%ld", int_val);
-          assert(rc > 0);
-          return "\"" + key + "\":" + std::string(buffer);
+          return "\"" + key + "\":" + StringifyUint(int_val);
         case Float:
-          rc = snprintf(buffer, sizeof(buffer), "%f", float_val);
-          assert(rc > 0);
-          return "\"" + key + "\":" + std::string(buffer);
+          return "\"" + key + "\":" + StringifyDouble(float_val);
         case JsonObject:
           return "\"" + key + "\":" + str_val;
         default:
-          return "";
+          PANIC(kLogStdout | kLogStderr, "JSON creation failed");
       }
     }
   };
@@ -161,5 +162,9 @@ class JsonStringGenerator {
 
   std::vector<JsonEntry> entries;
 };
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}  // namespace CVMFS_NAMESPACE_GUARD
+#endif
 
 #endif  // CVMFS_JSON_DOCUMENT_WRITE_H_
