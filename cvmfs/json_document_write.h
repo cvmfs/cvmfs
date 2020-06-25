@@ -18,8 +18,13 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 /**
  * This class is used for marshalling JSON objects to strings.
- * When adding an object, use the Quoted variant when adding a
- * string and the Unquoted variant when adding anything else.
+ *
+ * When creating simple objects is sufficient to call the `Add()` methods to add
+ * new key - values to the final JSON.
+ *
+ * When creating complex objects, (an object that contains another object) is
+ * necessary to create first the nested object and then add it to the final
+ * object with the `AddJsonObject`. This will take care of all the escaping.
  */
 class JsonStringGenerator {
   enum JsonVariant { kString, kInteger, kFloat, kJsonObject };
