@@ -19,33 +19,33 @@ class JsonStringGenerator {
 
   struct JsonEntry {
     JsonVariant variant;
-    std::string key;
-    std::string str_val;
-    int64_t int_val;
-    float float_val;
+    const std::string key;
+    const std::string str_val;
+    const int64_t int_val;
+    const float float_val;
 
-    JsonEntry(std::string key, std::string val)
+    JsonEntry(const std::string& key, const std::string& val)
         : variant(String),
           key(key),
           str_val(val),
           int_val(0),
           float_val(0) {}
 
-    JsonEntry(std::string key, int val)
+    JsonEntry(const std::string& key, const int val)
         : variant(Integer),
           key(key),
           str_val(),
           int_val(val),
           float_val(0) {}
 
-    JsonEntry(std::string key, float val)
+    JsonEntry(const std::string& key, const float val)
         : variant(Float),
           key(key),
           str_val(),
           int_val(0),
           float_val(val) {}
 
-    JsonEntry(std::string key, int64_t val)
+    JsonEntry(const std::string& key, const int64_t val)
         : variant(Integer),
           key(key),
           str_val(),
@@ -75,27 +75,27 @@ class JsonStringGenerator {
   };
 
  public:
-  void Add(std::string key, std::string val) {
+  void Add(const std::string& key, const std::string& val) {
     JsonEntry entry(Escape(key), Escape(val));
     entries.push_back(entry);
   }
 
-  void Add(std::string key, int val) {
+  void Add(const std::string& key, const int val) {
     JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
-  void Add(std::string key, float val) {
+  void Add(const std::string& key, const float val) {
     JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
-  void Add(std::string key, int64_t val) {
+  void Add(const std::string& key, const int64_t val) {
     JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
-  void AddJsonObject(std::string key, std::string json) {
+  void AddJsonObject(const std::string& key, const std::string& json) {
     // we **do not escape** the value here
     JsonEntry entry(Escape(key), json);
     entry.variant = JsonObject;
@@ -125,7 +125,7 @@ class JsonStringGenerator {
   // we should manage ALL control chars from '\x00' to '\x1f'
   // however this are the one that we can expect to happen
   // More info: https://stackoverflow.com/a/33799784/869271
-  std::string Escape(const std::string input) const {
+  const std::string Escape(const std::string& input) const {
     std::string result;
     result.reserve(input.size());
     for (size_t i = 0; i < input.size(); i++) {
