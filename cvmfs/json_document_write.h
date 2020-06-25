@@ -30,7 +30,7 @@ class JsonStringGenerator {
   enum JsonVariant { kString, kInteger, kFloat, kJsonObject };
 
   struct JsonEntry {
-    JsonVariant variant;
+    const JsonVariant variant;
     const std::string key;
     const std::string str_val;
     const int64_t int_val;
@@ -90,28 +90,28 @@ class JsonStringGenerator {
 
  public:
   void Add(const std::string& key, const std::string& val) {
-    JsonEntry entry(Escape(key), Escape(val));
+    const JsonEntry entry(Escape(key), Escape(val));
     entries.push_back(entry);
   }
 
   void Add(const std::string& key, const int val) {
-    JsonEntry entry(Escape(key), val);
+    const JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
   void Add(const std::string& key, const float val) {
-    JsonEntry entry(Escape(key), val);
+    const JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
   void Add(const std::string& key, const int64_t val) {
-    JsonEntry entry(Escape(key), val);
+    const JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
   void AddJsonObject(const std::string& key, const std::string& json) {
     // we **do not escape** the value here
-    JsonEntry entry(Escape(key), json, kJsonObject);
+    const JsonEntry entry(Escape(key), json, kJsonObject);
     entries.push_back(entry);
   }
 
