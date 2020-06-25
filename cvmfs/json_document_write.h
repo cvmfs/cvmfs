@@ -52,7 +52,7 @@ class JsonStringGenerator {
           int_val(val),
           float_val(0.0) {}
 
-    const std::string format() const {
+    const std::string Format() const {
       char buffer[64];
       int rc = -1;
       switch (variant) {
@@ -107,7 +107,7 @@ class JsonStringGenerator {
 
     output += "{";
     for (size_t i = 0u; i < this->entries.size(); ++i) {
-      output += this->entries[i].format();
+      output += this->entries[i].Format();
       if (i < this->entries.size() - 1) {
         output += ',';
       }
