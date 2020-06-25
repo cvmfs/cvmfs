@@ -30,11 +30,11 @@ class JsonStringGenerator {
   enum JsonVariant { kString, kInteger, kFloat, kJsonObject };
 
   struct JsonEntry {
-    const JsonVariant variant;
-    const std::string key;
-    const std::string str_val;
-    const int64_t int_val;
-    const float float_val;
+    JsonVariant variant;
+    std::string key;
+    std::string str_val;
+    int64_t int_val;
+    float float_val;
 
     JsonEntry(const std::string& key, const std::string& val)
         : variant(kString),
