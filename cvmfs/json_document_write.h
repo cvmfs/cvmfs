@@ -29,14 +29,14 @@ class JsonStringGenerator {
           key(key),
           str_val(val),
           int_val(0),
-          float_val(0) {}
+          float_val(0.0) {}
 
     JsonEntry(const std::string& key, const int val)
         : variant(Integer),
           key(key),
           str_val(),
           int_val(val),
-          float_val(0) {}
+          float_val(0.0) {}
 
     JsonEntry(const std::string& key, const float val)
         : variant(Float),
@@ -50,7 +50,7 @@ class JsonStringGenerator {
           key(key),
           str_val(),
           int_val(val),
-          float_val(0) {}
+          float_val(0.0) {}
 
     const std::string format() const {
       char buffer[64];
