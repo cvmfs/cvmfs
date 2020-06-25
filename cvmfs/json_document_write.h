@@ -22,7 +22,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  * string and the Unquoted variant when adding anything else.
  */
 class JsonStringGenerator {
-  enum JsonVariant { String, Integer, Float, JsonObject };
+  enum JsonVariant { kString, kInteger, kFloat, kJsonObject };
 
   struct JsonEntry {
     JsonVariant variant;
@@ -32,28 +32,28 @@ class JsonStringGenerator {
     const float float_val;
 
     JsonEntry(const std::string& key, const std::string& val)
-        : variant(String),
+        : variant(kString),
           key(key),
           str_val(val),
           int_val(0),
           float_val(0.0) {}
 
     JsonEntry(const std::string& key, const int val)
-        : variant(Integer),
+        : variant(kInteger),
           key(key),
           str_val(),
           int_val(val),
           float_val(0.0) {}
 
     JsonEntry(const std::string& key, const float val)
-        : variant(Float),
+        : variant(kFloat),
           key(key),
           str_val(),
           int_val(0),
           float_val(val) {}
 
     JsonEntry(const std::string& key, const int64_t val)
-        : variant(Integer),
+        : variant(kInteger),
           key(key),
           str_val(),
           int_val(val),
@@ -61,13 +61,13 @@ class JsonStringGenerator {
 
     std::string Format() const {
       switch (variant) {
-        case String:
+        case kString:
           return "\"" + key + "\":\"" + str_val + "\"";
-        case Integer:
+        case kInteger:
           return "\"" + key + "\":" + StringifyUint(int_val);
-        case Float:
+        case kFloat:
           return "\"" + key + "\":" + StringifyDouble(float_val);
-        case JsonObject:
+        case kJsonObject:
           return "\"" + key + "\":" + str_val;
         default:
           PANIC(kLogStdout | kLogStderr, "JSON creation failed");
@@ -99,7 +99,7 @@ class JsonStringGenerator {
   void AddJsonObject(const std::string& key, const std::string& json) {
     // we **do not escape** the value here
     JsonEntry entry(Escape(key), json);
-    entry.variant = JsonObject;
+    entry.variant = kJsonObject;
     entries.push_back(entry);
   }
 
