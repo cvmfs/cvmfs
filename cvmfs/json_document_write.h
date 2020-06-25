@@ -77,7 +77,7 @@ class JsonStringGenerator {
         case kString:
           return "\"" + key + "\":\"" + str_val + "\"";
         case kInteger:
-          return "\"" + key + "\":" + StringifyUint(int_val);
+          return "\"" + key + "\":" + StringifyInt(int_val);
         case kFloat:
           return "\"" + key + "\":" + StringifyDouble(float_val);
         case kJsonObject:
