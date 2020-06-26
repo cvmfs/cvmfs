@@ -176,8 +176,8 @@ TEST_F(T_Reactor, FullCycle) {
 
   // Check the token validity
   JsonStringGenerator request_terms;
-  request_terms.AddQuoted("token", &token[0]);
-  request_terms.AddQuoted("secret", &secret[0]);
+  request_terms.Add("token", &token[0]);
+  request_terms.Add("secret", &secret[0]);
 
   std::string request = request_terms.GenerateString();
   ASSERT_TRUE(
