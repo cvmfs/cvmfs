@@ -174,7 +174,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	return firstError
 }
 
-func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThinImage bool) (err error) {
+func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThinImage, convertPodman bool) (err error) {
 
 	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
 	if err != nil {
@@ -213,7 +213,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 		} else {
 			outputWithTag.Tag = outputImage.Tag
 		}
-		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, createThinImage)
+		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, createThinImage, convertPodman)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
@@ -221,7 +221,62 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	return firstError
 }
 
-func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, createThinImage bool) (err error) {
+func ConvertWishPodman(wish WishFriendly, skipLayers bool) (err error) {
+	outputImage := wish.OutputImage
+	if outputImage == nil {
+		err = fmt.Errorf("error in parsing the output image, got a null image")
+		LogE(err).WithFields(log.Fields{"output image": wish.OutputName}).
+			Error("Null image, should not happen")
+		return
+	}
+
+	inputImage := wish.InputImage
+	if inputImage == nil {
+		err = fmt.Errorf("error in parsing the input image, got a null image")
+		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
+			Error("Null image, should not happen")
+		return
+	}
+
+	if skipLayers {
+		err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
+		if err != nil {
+			LogE(err).WithFields(log.Fields{
+				"directory": subDirInsideRepo}).Error(
+				"Impossible to create subcatalog in super-directory.")
+		}
+
+		var firstError error
+		for expandedImgTag := range wish.ExpandedTagImagesLayer {
+			tag := expandedImgTag.Tag
+			outputWithTag := *outputImage
+			if inputImage.TagWildcard {
+				outputWithTag.Tag = tag
+			} else {
+				outputWithTag.Tag = outputImage.Tag
+			}
+			err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, false, false, false, true)
+			if err != nil && firstError == nil {
+				firstError = err
+			}
+		}
+		if firstError != nil {
+			LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
+				Error("error in convertInputOutput")
+			return firstError
+		}
+	}
+
+	err = inputImage.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
+	if err != nil {
+		LogE(err).Warning("Unable to create Podman additional image store")
+		return err
+	}
+	Log().Info("Podman Store created successfully")
+	return nil
+}
+
+func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, createThinImage, convertPodman bool) (err error) {
 
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
@@ -351,7 +406,7 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 	defer os.RemoveAll(tmpDir)
 
 	// this wil start to feed the above goroutine by writing into layersChanell
-	err = inputImage.GetLayers(layersChanell, manifestChanell, stopGettingLayers, tmpDir)
+	err = inputImage.GetLayers(layersChanell, manifestChanell, stopGettingLayers, tmpDir, convertPodman)
 	if err != nil {
 		return err
 	}
