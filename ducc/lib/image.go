@@ -532,7 +532,7 @@ type downloadedLayer struct {
 	Path io.ReadCloser
 }
 
-func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, convertPodman bool) error {
+func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, skipPodman bool) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
@@ -587,7 +587,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 		go func(ctx context.Context, layer da.Layer) {
 			defer wg.Done()
 			Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Start working on layer")
-			toSend, err := img.downloadLayer(layer, token, rootPath, convertPodman)
+			toSend, err := img.downloadLayer(layer, token, rootPath, skipPodman)
 			if err != nil {
 				LogE(err).Error("Error in downloading a layer")
 				return
@@ -626,7 +626,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	}
 }
 
-func (img *Image) downloadLayer(layer da.Layer, token, rootPath string, convertPodman bool) (toSend downloadedLayer, err error) {
+func (img *Image) downloadLayer(layer da.Layer, token, rootPath string, skipPodman bool) (toSend downloadedLayer, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -664,7 +664,7 @@ func (img *Image) downloadLayer(layer da.Layer, token, rootPath string, convertP
 
 			var path io.ReadCloser
 			path = gread
-			if convertPodman {
+			if !skipPodman {
 				path, err = ComputeLayerInfo(layer, gread)
 				if err != nil {
 					return toSend, err

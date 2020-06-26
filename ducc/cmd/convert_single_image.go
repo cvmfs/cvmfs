@@ -17,7 +17,7 @@ func init() {
 	convertSingleImageCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat images (compatible with singularity)")
 	convertSingleImageCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image")
 	convertSingleImageCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
-	convertSingleImageCmd.Flags().BoolVarP(&convertPodman, "convert-podman", "p", true, "also create a podman image store")
+	convertSingleImageCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
 	convertSingleImageCmd.Flags().StringVarP(&username, "username", "u", "", "username to use when pushing thin image into the docker registry")
 	convertSingleImageCmd.Flags().StringVarP(&thinImageName, "thin-image-name", "", "", "name to use for the thin image to upload, if empty implies --skip-thin-image.")
 	rootCmd.AddCommand(convertSingleImageCmd)
@@ -71,12 +71,12 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 		}
 		if !skipLayers {
-			err := lib.ConvertWishDocker(wish, convertAgain, overwriteLayer, !skipThinImage, convertPodman)
+			err := lib.ConvertWishDocker(wish, convertAgain, overwriteLayer, !skipThinImage, skipPodman)
 			if err != nil {
 				lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
 			}
 		}
-		if convertPodman {
+		if !skipPodman {
 			err := lib.ConvertWishPodman(wish, skipLayers)
 			if err != nil {
 				lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")

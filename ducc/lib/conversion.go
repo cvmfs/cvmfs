@@ -174,7 +174,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	return firstError
 }
 
-func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThinImage, convertPodman bool) (err error) {
+func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThinImage, skipPodman bool) (err error) {
 
 	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
 	if err != nil {
@@ -213,7 +213,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 		} else {
 			outputWithTag.Tag = outputImage.Tag
 		}
-		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, createThinImage, convertPodman)
+		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, createThinImage, skipPodman)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
@@ -276,7 +276,7 @@ func ConvertWishPodman(wish WishFriendly, skipLayers bool) (err error) {
 	return nil
 }
 
-func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, createThinImage, convertPodman bool) (err error) {
+func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, createThinImage, skipPodman bool) (err error) {
 
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
@@ -406,7 +406,7 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 	defer os.RemoveAll(tmpDir)
 
 	// this wil start to feed the above goroutine by writing into layersChanell
-	err = inputImage.GetLayers(layersChanell, manifestChanell, stopGettingLayers, tmpDir, convertPodman)
+	err = inputImage.GetLayers(layersChanell, manifestChanell, stopGettingLayers, tmpDir, skipPodman)
 	if err != nil {
 		return err
 	}
