@@ -31,57 +31,57 @@ class JsonStringGenerator {
 
   struct JsonEntry {
     JsonVariant variant;
-    std::string key;
-    std::string str_val;
+    std::string key_escaped;
+    std::string str_val_escaped;
     int64_t int_val;
     float float_val;
 
-    JsonEntry(const std::string& key, const std::string& val)
+    JsonEntry(const std::string& key_escaped, const std::string& val)
         : variant(kString),
-          key(key),
-          str_val(val),
+          key_escaped(key_escaped),
+          str_val_escaped(val),
           int_val(0),
           float_val(0.0) {}
 
-    JsonEntry(const std::string& key, const std::string& val,
+    JsonEntry(const std::string& key_escaped, const std::string& val,
               const JsonVariant variant)
         : variant(variant),
-          key(key),
-          str_val(val),
+          key_escaped(key_escaped),
+          str_val_escaped(val),
           int_val(0),
           float_val(0.0) {}
 
-    JsonEntry(const std::string& key, const int val)
+    JsonEntry(const std::string& key_escaped, const int val)
         : variant(kInteger),
-          key(key),
-          str_val(),
+          key_escaped(key_escaped),
+          str_val_escaped(),
           int_val(val),
           float_val(0.0) {}
 
-    JsonEntry(const std::string& key, const float val)
+    JsonEntry(const std::string& key_escaped, const float val)
         : variant(kFloat),
-          key(key),
-          str_val(),
+          key_escaped(key_escaped),
+          str_val_escaped(),
           int_val(0),
           float_val(val) {}
 
-    JsonEntry(const std::string& key, const int64_t val)
+    JsonEntry(const std::string& key_escaped, const int64_t val)
         : variant(kInteger),
-          key(key),
-          str_val(),
+          key_escaped(key_escaped),
+          str_val_escaped(),
           int_val(val),
           float_val(0.0) {}
 
     std::string Format() const {
       switch (variant) {
         case kString:
-          return "\"" + key + "\":\"" + str_val + "\"";
+          return "\"" + key_escaped + "\":\"" + str_val_escaped + "\"";
         case kInteger:
-          return "\"" + key + "\":" + StringifyInt(int_val);
+          return "\"" + key_escaped + "\":" + StringifyInt(int_val);
         case kFloat:
-          return "\"" + key + "\":" + StringifyDouble(float_val);
+          return "\"" + key_escaped + "\":" + StringifyDouble(float_val);
         case kJsonObject:
-          return "\"" + key + "\":" + str_val;
+          return "\"" + key_escaped + "\":" + str_val_escaped;
         default:
           PANIC(kLogStdout | kLogStderr, "JSON creation failed");
       }
