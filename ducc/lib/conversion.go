@@ -238,6 +238,7 @@ func ConvertWishPodman(wish WishFriendly, skipLayers bool) (err error) {
 		return
 	}
 
+	//if skipLayers is true, the layers were not downloaded earlier. We download them here. 
 	if skipLayers {
 		err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
 		if err != nil {
@@ -255,7 +256,12 @@ func ConvertWishPodman(wish WishFriendly, skipLayers bool) (err error) {
 			} else {
 				outputWithTag.Tag = outputImage.Tag
 			}
-			err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, false, false, false, true)
+			
+			//Boolean arguments:
+			//We don't want to re-download or force download layers => convertAgain = false, forceDownload = false
+			//Also we don't want to convert thin images here => createThinImage = false
+			//skipPodman = false
+			err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, false, false, false, false)
 			if err != nil && firstError == nil {
 				firstError = err
 			}
