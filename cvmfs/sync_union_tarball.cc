@@ -145,13 +145,11 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_EOF: {
-        if (create_catalog_on_root_) {
-          if (base_directory_ != "/") {
-            SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
-                new SyncItemDummyCatalog(base_directory_, this));
-            ProcessFile(catalog);
-            to_create_catalog_dirs_.insert(base_directory_);
-          }
+        if (create_catalog_on_root_ && (base_directory_ != "/")) {
+          SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
+              new SyncItemDummyCatalog(base_directory_, this));
+          ProcessFile(catalog);
+          to_create_catalog_dirs_.insert(base_directory_);
         }
         for (set<string>::iterator dir = to_create_catalog_dirs_.begin();
              dir != to_create_catalog_dirs_.end(); ++dir) {
