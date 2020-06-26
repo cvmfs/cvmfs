@@ -56,6 +56,7 @@
 #include "sanitizer.h"
 #include "smalloc.h"
 #include "util/algorithm.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -353,6 +354,17 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   }
 
   return num_bytes;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+bool JobInfo::IsFileNotFound() {
+  if (HasPrefix(*url, "file://", true /* ignore_case */))
+    return error_code == kFailHostConnection;
+
+  return http_code == 404;
 }
 
 
@@ -832,7 +844,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
                  "%" PRId64 "-%" PRId64,
                  range_lower, range_upper) == 100)
     {
-      abort();  // Should be impossible given limits on offset size.
+      PANIC(NULL);  // Should be impossible given limits on offset size.
     }
     curl_easy_setopt(handle, CURLOPT_RANGE, byte_range_array);
   } else {
@@ -1438,7 +1450,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
             switch_host = true;
         } else {
           // No other errors expected when retrying
-          abort();
+          PANIC(NULL);
         }
     }
     if (switch_proxy) {
@@ -2025,40 +2037,41 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
  */
 void DownloadManager::SwitchHost(JobInfo *info) {
   MutexLockGuard m(lock_options_);
-  bool do_switch = true;
 
   if (!opt_host_chain_ || (opt_host_chain_->size() == 1)) {
     return;
   }
 
-  if (info) {
-    if (info->current_host_chain_index != opt_host_chain_current_) {
-      do_switch = false;
-      LogCvmfs(kLogDownload, kLogDebug,
-               "don't switch host, "
-               "last used host: %s, current host: %s",
-               (*opt_host_chain_)[info->current_host_chain_index].c_str(),
-               (*opt_host_chain_)[opt_host_chain_current_].c_str());
-    }
+  if (info && (info->current_host_chain_index != opt_host_chain_current_)) {
+    LogCvmfs(kLogDownload, kLogDebug,
+             "don't switch host, "
+             "last used host: %s, current host: %s",
+             (*opt_host_chain_)[info->current_host_chain_index].c_str(),
+             (*opt_host_chain_)[opt_host_chain_current_].c_str());
+    return;
   }
 
-  if (do_switch) {
-    string old_host = (*opt_host_chain_)[opt_host_chain_current_];
-    opt_host_chain_current_ =
-        (opt_host_chain_current_ + 1) % opt_host_chain_->size();
-    perf::Inc(counters_->n_host_failover);
-    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-             "switching host from %s to %s", old_host.c_str(),
-             (*opt_host_chain_)[opt_host_chain_current_].c_str());
+  string reason = "manually triggered";
+  if (info) {
+    reason = download::Code2Ascii(info->error_code);
+  }
 
-    // Remeber the timestamp of switching to backup host
-    if (opt_host_reset_after_ > 0) {
-      if (opt_host_chain_current_ != 0) {
-        if (opt_timestamp_backup_host_ == 0)
-          opt_timestamp_backup_host_ = time(NULL);
-      } else {
-        opt_timestamp_backup_host_ = 0;
-      }
+  string old_host = (*opt_host_chain_)[opt_host_chain_current_];
+  opt_host_chain_current_ =
+      (opt_host_chain_current_ + 1) % opt_host_chain_->size();
+  perf::Inc(counters_->n_host_failover);
+  LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+           "switching host from %s to %s (%s)", old_host.c_str(),
+           (*opt_host_chain_)[opt_host_chain_current_].c_str(),
+           reason.c_str());
+
+  // Remember the timestamp of switching to backup host
+  if (opt_host_reset_after_ > 0) {
+    if (opt_host_chain_current_ != 0) {
+      if (opt_timestamp_backup_host_ == 0)
+        opt_timestamp_backup_host_ = time(NULL);
+    } else {
+      opt_timestamp_backup_host_ = 0;
     }
   }
 }

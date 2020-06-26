@@ -6,6 +6,7 @@
 
 #include <logging.h>
 #include "json_document.h"
+#include "json_document_write.h"
 #include "pack.h"
 #include "receiver/payload_processor.h"
 #include "receiver/reactor.h"
@@ -174,12 +175,11 @@ TEST_F(T_Reactor, FullCycle) {
   }
 
   // Check the token validity
-  JsonStringInput request_terms;
-  request_terms.push_back(std::make_pair("token", &token[0]));
-  request_terms.push_back(std::make_pair("secret", &secret[0]));
+  JsonStringGenerator request_terms;
+  request_terms.Add("token", &token[0]);
+  request_terms.Add("secret", &secret[0]);
 
-  std::string request;
-  ASSERT_TRUE(ToJsonString(request_terms, &request));
+  std::string request = request_terms.GenerateString();
   ASSERT_TRUE(
       Reactor::WriteRequest(to_reactor_[1], Reactor::kCheckToken, request));
 

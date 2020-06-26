@@ -12,6 +12,16 @@ func ParseImage(image string) (img Image, err error) {
 		return Image{}, err
 	}
 	if url.Host == "" {
+
+		// likely the protocol `https://` is missing in the image string.
+		// worth to try to append it, and re-parse the image
+		image2 := "https://" + image
+		img2, err2 := ParseImage(image2)
+		if err2 == nil {
+			return img2, err2
+		}
+
+		// some other error, let's return the first error
 		return Image{}, fmt.Errorf("Impossible to identify the registry of the image: %s", image)
 	}
 	if url.Path == "" {
@@ -87,12 +97,14 @@ func ParseImage(image string) (img Image, err error) {
 		if repository == "" {
 			return Image{}, fmt.Errorf("Impossible to find the repository for: %s", image)
 		}
+		tag := colonRepoTagSplitted[1]
 		return Image{
-			Scheme:     url.Scheme,
-			Registry:   url.Host,
-			Repository: repository,
-			Tag:        colonRepoTagSplitted[1],
-			Digest:     digest,
+			Scheme:      url.Scheme,
+			Registry:    url.Host,
+			Repository:  repository,
+			Tag:         tag,
+			Digest:      digest,
+			TagWildcard: strings.Contains(tag, `*`),
 		}, nil
 	}
 	return Image{}, fmt.Errorf("Impossible to parse the image: %s", image)

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -8,8 +9,15 @@ import (
 	"github.com/cvmfs/ducc/lib"
 )
 
+func init() {
+	rootCmd.PersistentFlags().StringVarP(&lib.TemporaryBaseDir, "temporary-dir", "t", "", "Temporary directory to store files necessary during the conversion of images, it can grow large ~1G. If not set we use the standard of the system $TMP, usually /tmp")
+	if lib.TemporaryBaseDir == "" {
+		lib.TemporaryBaseDir = os.Getenv("DUCC_TMP_DIR")
+	}
+}
+
 var rootCmd = &cobra.Command{
-	Use:   "repository-manager",
+	Use:   "cvmfs_ducc",
 	Short: "Show the several commands available.",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

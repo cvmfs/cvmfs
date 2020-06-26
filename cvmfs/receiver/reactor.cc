@@ -12,22 +12,32 @@
 #include <vector>
 
 #include "commit_processor.h"
-#include "json_document.h"
+#include "json_document_write.h"
 #include "logging.h"
 #include "payload_processor.h"
 #include "repository_tag.h"
 #include "session_token.h"
+#include "upload_facility.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
 namespace receiver {
 
+// NOTE, during the handling of the messages between the gateway and the
+// receiver, we keep reading `4` bytes instead of the more common
+// `sizeof(req_id)` or `sizeof(int32_t)`.
+// This mirror well the behaviour of the gateway code.
+// It would be possible on both codebase to ask the size of the type, but then
+// we would need to make sure that the types are actually the same.
+// It is simpler to send `4` bytes.
+
 Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
   using namespace receiver;  // NOLINT
 
   // First, read the command identifier
-  int32_t req_id = 0;
+  int32_t req_id = kQuit;
   int nb = SafeRead(fd, &req_id, 4);
 
   if (nb != 4) {
@@ -52,10 +62,9 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
     }
 
     *data = std::string(&buffer[0], msg_size);
-    return static_cast<Request>(req_id);
   }
 
-  return kQuit;
+  return static_cast<Request>(req_id);
 }
 
 bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
@@ -109,6 +118,67 @@ bool Reactor::WriteReply(int fd, const std::string& data) {
   return SafeWrite(fd, &buffer[0], total_size);
 }
 
+bool Reactor::ExtractStatsFromReq(JsonDocument *req,
+                                  perf::Statistics *stats,
+                                  std::string *start_time)
+{
+  perf::StatisticsTemplate stats_tmpl("publish", stats);
+  upload::UploadCounters counters(stats_tmpl);
+
+  const JSON* statistics = JsonDocument::SearchInObject(
+    req->root(), "statistics", JSON_OBJECT);
+  if (statistics == NULL) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Could not find 'statistics' field in request");
+    return false;
+  }
+
+  const JSON* publish_ctrs = JsonDocument::SearchInObject(
+    statistics, "publish", JSON_OBJECT);
+
+  if (publish_ctrs == NULL) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Could not find 'statistics.publish' field in request");
+    return false;
+  }
+
+  const JSON *n_chunks_added = JsonDocument::SearchInObject(
+    publish_ctrs, "n_chunks_added", JSON_STRING);
+  const JSON *n_chunks_duplicated = JsonDocument::SearchInObject(
+    publish_ctrs, "n_chunks_duplicated", JSON_STRING);
+  const JSON *n_catalogs_added = JsonDocument::SearchInObject(
+    publish_ctrs, "n_catalogs_added", JSON_STRING);
+  const JSON *sz_uploaded_bytes = JsonDocument::SearchInObject(
+    publish_ctrs, "sz_uploaded_bytes", JSON_STRING);
+  const JSON *sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
+    publish_ctrs, "sz_uploaded_catalog_bytes", JSON_STRING);
+
+  const JSON *start_time_json = JsonDocument::SearchInObject(
+    statistics, "start_time", JSON_STRING);
+
+  if (n_chunks_added == NULL || n_chunks_duplicated == NULL ||
+      n_catalogs_added == NULL || sz_uploaded_bytes == NULL ||
+      sz_uploaded_catalog_bytes == NULL || start_time_json == NULL) {
+    return false;
+  }
+
+  perf::Xadd(counters.n_chunks_added,
+             String2Int64(n_chunks_added->string_value));
+  perf::Xadd(counters.n_chunks_duplicated,
+             String2Int64(n_chunks_duplicated->string_value));
+  perf::Xadd(counters.n_catalogs_added,
+             String2Int64(n_catalogs_added->string_value));
+  perf::Xadd(counters.sz_uploaded_bytes,
+             String2Int64(sz_uploaded_bytes->string_value));
+  perf::Xadd(counters.sz_uploaded_catalog_bytes,
+             String2Int64(sz_uploaded_catalog_bytes->string_value));
+
+  *start_time = start_time_json->string_value;
+
+  return true;
+}
+
+
 Reactor::Reactor(int fdin, int fdout) : fdin_(fdin), fdout_(fdout) {}
 
 Reactor::~Reactor() {}
@@ -131,11 +201,8 @@ bool Reactor::Run() {
 
 bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleGenerateToken: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleGenerateToken: Invalid reply pointer.");
   }
-
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -168,42 +235,39 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
     return false;
   }
 
-  JsonStringInput input;
-  input.push_back(std::make_pair("token", session_token.c_str()));
-  input.push_back(std::make_pair("id", public_token_id.c_str()));
-  input.push_back(std::make_pair("secret", token_secret.c_str()));
-
-  ToJsonString(input, reply);
+  JsonStringGenerator input;
+  input.Add("token", session_token);
+  input.Add("id", public_token_id);
+  input.Add("secret", token_secret);
+  std::string json = input.GenerateString();
+  *reply = json;
 
   return true;
 }
 
 bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleGetTokenId: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleGetTokenId: Invalid reply pointer.");
   }
 
   std::string token_id;
-  JsonStringInput input;
+  JsonStringGenerator input;
   if (!GetTokenPublicId(req, &token_id)) {
-    input.push_back(std::make_pair("status", "error"));
-    input.push_back(std::make_pair("reason", "invalid_token"));
+    input.Add("status", "error");
+    input.Add("reason", "invalid_token");
   } else {
-    input.push_back(std::make_pair("status", "ok"));
-    input.push_back(std::make_pair("id", token_id.c_str()));
+    input.Add("status", "ok");
+    input.Add("id", token_id);
   }
+  std::string json = input.GenerateString();
+  *reply = json;
 
-  ToJsonString(input, reply);
   return true;
 }
 
 bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleCheckToken: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleCheckToken: Invalid reply pointer.");
   }
 
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
@@ -225,33 +289,34 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
   }
 
   std::string path;
-  JsonStringInput input;
+  JsonStringGenerator input;
   TokenCheckResult ret =
       CheckToken(token->string_value, secret->string_value, &path);
   switch (ret) {
     case kExpired:
       // Expired token
-      input.push_back(std::make_pair("status", "error"));
-      input.push_back(std::make_pair("reason", "expired_token"));
+      input.Add("status", "error");
+      input.Add("reason", "expired_token");
       break;
     case kInvalid:
       // Invalid token
-      input.push_back(std::make_pair("status", "error"));
-      input.push_back(std::make_pair("reason", "invalid_token"));
+      input.Add("status", "error");
+      input.Add("reason", "invalid_token");
       break;
     case kValid:
       // All ok
-      input.push_back(std::make_pair("status", "ok"));
-      input.push_back(std::make_pair("path", path.c_str()));
+      input.Add("status", "ok");
+      input.Add("path", path);
       break;
     default:
       // Should not be reached
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "HandleCheckToken: Unknown value received. Exiting.");
-      abort();
+      PANIC(kLogSyslogErr,
+            "HandleCheckToken: Unknown value received. Exiting.");
   }
 
-  ToJsonString(input, reply);
+  std::string json = input.GenerateString();
+  *reply = json;
+
   return true;
 }
 
@@ -260,9 +325,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
 bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
                                   std::string* reply) {
   if (!reply) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleSubmitPayload: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleSubmitPayload: Invalid reply pointer.");
   }
 
   // Extract the Path (used for verification), Digest and DigestSize from the
@@ -287,48 +350,53 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
     return false;
   }
 
+  perf::Statistics statistics;
+
   UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
-  JsonStringInput reply_input;
+  proc->SetStatistics(&statistics);
+  JsonStringGenerator reply_input;
   PayloadProcessor::Result res =
       proc->Process(fdin, digest_json->string_value, path_json->string_value,
                     header_size_json->int_value);
 
   switch (res) {
     case PayloadProcessor::kPathViolation:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "path_violation"));
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "path_violation");
       break;
     case PayloadProcessor::kOtherError:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "other_error"));
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "other_error");
       break;
-    case PayloadProcessor::kSpoolerError:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "spooler_error"));
+    case PayloadProcessor::kUploaderError:
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "uploader_error");
       break;
     case PayloadProcessor::kSuccess:
-      reply_input.push_back(std::make_pair("status", "ok"));
+      reply_input.Add("status", "ok");
       break;
     default:
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "HandleSubmitPayload: Unknown value of PayloadProcessor::Result "
-               "encountered.");
-      abort();
+      PANIC(kLogSyslogErr,
+            "HandleSubmitPayload: Unknown value of PayloadProcessor::Result "
+            "encountered.");
       break;
   }
 
-  ToJsonString(reply_input, reply);
+  // HandleSubmitPayload sends partial statistics back to the gateway
+  std::string stats_json = statistics.PrintJSON();
+  reply_input.AddJsonObject("statistics", stats_json);
+
+  std::string json = reply_input.GenerateString();
+  *reply = json;
 
   return true;
 }
 
+
 bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   if (!reply) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "HandleCommit: Invalid reply pointer.");
-    abort();
+    PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
   }
-
   // Extract the Path from the request JSON.
   UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
@@ -357,8 +425,16 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     return false;
   }
 
+  perf::Statistics statistics;
+  std::string start_time;
+  if (!Reactor::ExtractStatsFromReq(req_json, &statistics, &start_time)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+      "HandleCommit: Could not extract statistics counters from request");
+  }
+
   // Here we use the path to commit the changes!
   UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
+  proc->SetStatistics(&statistics, start_time);
   shash::Any old_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(old_root_hash_json->string_value));
   shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
@@ -370,31 +446,31 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
                                               old_root_hash, new_root_hash,
                                               repo_tag);
 
-  JsonStringInput reply_input;
+  JsonStringGenerator reply_input;
   switch (res) {
     case CommitProcessor::kSuccess:
-      reply_input.push_back(std::make_pair("status", "ok"));
+      reply_input.Add("status", "ok");
       break;
     case CommitProcessor::kError:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "miscellaneous"));
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "miscellaneous");
       break;
     case CommitProcessor::kMergeFailure:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "merge_error"));
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "merge_error");
       break;
     case CommitProcessor::kMissingReflog:
-      reply_input.push_back(std::make_pair("status", "error"));
-      reply_input.push_back(std::make_pair("reason", "missing_reflog"));
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "missing_reflog");
       break;
     default:
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Unknown value of CommitProcessor::Result encountered.");
-      abort();
+      PANIC(kLogSyslogErr,
+            "Unknown value of CommitProcessor::Result encountered.");
       break;
   }
 
-  ToJsonString(reply_input, reply);
+  std::string json = reply_input.GenerateString();
+  *reply = json;
 
   return true;
 }
@@ -410,40 +486,60 @@ CommitProcessor* Reactor::MakeCommitProcessor() {
 bool Reactor::HandleRequest(Request req, const std::string& data) {
   bool ok = true;
   std::string reply;
-  switch (req) {
-    case kQuit:
-      ok = WriteReply(fdout_, "ok");
-      break;
-    case kEcho:
-      ok = WriteReply(fdout_, std::string("PID: ") + StringifyUint(getpid()));
-      break;
-    case kGenerateToken:
-      ok &= HandleGenerateToken(data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kGetTokenId:
-      ok &= HandleGetTokenId(data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kCheckToken:
-      ok &= HandleCheckToken(data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kSubmitPayload:
-      ok &= HandleSubmitPayload(fdin_, data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kCommit:
-      ok &= HandleCommit(data, &reply);
-      ok &= WriteReply(fdout_, reply);
-      break;
-    case kError:
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "Reactor: unknown command received.");
-      ok = false;
-      break;
-    default:
-      break;
+  try {
+    switch (req) {
+      case kQuit:
+        ok = WriteReply(fdout_, "ok");
+        break;
+      case kEcho:
+        ok = WriteReply(fdout_, std::string("PID: ") + StringifyUint(getpid()));
+        break;
+      case kGenerateToken:
+        ok &= HandleGenerateToken(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kGetTokenId:
+        ok &= HandleGetTokenId(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kCheckToken:
+        ok &= HandleCheckToken(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kSubmitPayload:
+        ok &= HandleSubmitPayload(fdin_, data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kCommit:
+        ok &= HandleCommit(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kTestCrash:
+        PANIC(kLogSyslogErr,
+              "Crash for test purposes. Should never happen in production "
+              "environment.");
+        break;
+      case kError:
+        LogCvmfs(kLogReceiver, kLogSyslogErr,
+                 "Reactor: unknown command received.");
+        ok = false;
+        break;
+      default:
+        break;
+    }
+  } catch (const ECvmfsException &e) {
+    reply.clear();
+
+    std::string error("runtime error: ");
+    error += e.what();
+
+    JsonStringGenerator input;
+    input.Add("status", "error");
+    input.Add("reason", error);
+
+    reply = input.GenerateString();
+    WriteReply(fdout_, reply);
+    throw e;
   }
 
   return ok;

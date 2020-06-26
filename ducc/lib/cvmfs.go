@@ -232,7 +232,7 @@ func getBacklinkFromLayer(CVMFSRepo, layerDigest string) (backlink Backlink, err
 	return
 }
 
-func SaveLayersBacklink(CVMFSRepo string, img Image, layerDigest []string) error {
+func SaveLayersBacklink(CVMFSRepo string, img *Image, layerDigest []string) error {
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{"action": "save backlink",
 			"repo":  CVMFSRepo,

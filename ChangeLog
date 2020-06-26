@@ -1,4 +1,48 @@
+2.8.0:
+  * Spawn watchdog for `swissknife sync` command
+  * Add 'chunk_list' magic extended attribute
+  * Remove perl as a package dependency
+  * [libcvmfs] add cvmfs_options_parse_default() 
+  * [libcvmfs] add cvmfs_listdir_stat()
+  * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
+  * Parallelize catalog traversal in garbage collection
+  * Improve performance of uploading small objects to S3
+  * Fix double counting in swissknife filestats command
+  * [ducc] Parallelize check if images are up to date
+  * Indicate error type by return value in `cvmfs_server transaction`
+  * [gw] add incoming publisher catalog to reflog to avoid dark garbage
+  * [ducc] Add support for converting from private registries
+  * Use multi-threaded upload facility on gateway (CVM-1739)
+  * Maintain publish statistics on gateway (CVM-1806)
+  * Add CVMFS_STATS_DB_DAYS_TO_KEEP parameter to prune publish statistics
+    database, defaults to 356 days (CVM-1841)
+  * [client] Add catalog_counters extended attribute (CVM-1824)
+  * [server] Add CVMFS_UPLOAD_STATS_PLOTS parameter to automatically generate
+    and upload publish statistics plots; requires ROOT (CVM-1836)
+  * [ducc] Improve robustness against intermittent registry failures (CVM-1829)
+  * [ducc] Add support for wildcards in tag names (CVM-1715)
+  * [ducc] Make temporary directory configurable (CVM-1826)
+  * [ducc] Require Singularity >= 3.5 (CVM-1840)
+  * [server] Add new parameter CVMFS_UPLOAD_STATS_DB=[true/false] in order to
+    push publish and GC statistics into the /stats location on the Stratum 0
+  * Add the cvmfs_publish transitional utility
+  * Add convert-singularity-image command to DUCC
+  * Enable readdir caching on fuse3 and kernel >= 4.20
+  * Add fuse forget_multi calback for fuse >= 2.9
+  * Add POSIX external cache plugin (CVM-1823)
+  * Manage DUCC daemon with systemd units
+
+2.7.3:
+  * Fix spurious SElinux error message on EL8 package upgrade (CVM-1878)
+  * Add `add-replica -P` option to create pass-through replicas (CVM-1845)
+  * Fix `cvmfs_config chksetup` for squashed NFS alien cache (CVM-1888)
+  * Fix building with GCC >= 10 (CVM-1894)
+  * Fix handling of .cvmfs_status.json after GC (CVM-1887)
+  * Add hidden `cvmfs_server eliminate-bulk-hashes` command (CVM-1428)
+
 2.7.2:
+  * Add `cvmfs_talk latency` command
+  * Improve logging when switching hosts (CVM-1844)
   * Minor improvements to geo db command line interface (CVM-1850, CVM-1851)
   * Reduce minimum and maximum days for geo db update
   * Fix packaging for Fedora 31
@@ -35,7 +79,7 @@
   * Fix publish statistics for several corner cases (CVM-1716 .. CVM-1720)
   * Add 'list_reflog' command to cvmfs_swissknife (CVM-1760)
   * Add 'filestats' command to cvmfs_swissknife (CVM-1756)
-  * Add fuse callback performance instrumentation through new switch 
+  * Add fuse callback performance instrumentation through new switch
     CVMFS_INSTRUMENT_FUSE (CVM-1770)
   * Add S3 standalone benchmark utility along with -DCVMFS_STRESS_TESTS build
     option (CVM-1749)
@@ -89,7 +133,7 @@
     checks (CVM-1704)
   * Fix a bug preventing GC on the repository gateway (CVM-1705)
   * Fix a bug in the gateway key parser when key contained repeated chars
-  * Fix transaction lock name for tarball ingest with gateway backend 
+  * Fix transaction lock name for tarball ingest with gateway backend
   * Add GC support for legacy catalogs before 1.0 schema stabilized (CVM-1698)
   * Fix potential race condition in the stats collector for the S3 uploader
   * Better control of memory consumption in file processing pipeline (CVM-1687)
@@ -121,7 +165,7 @@
 
 2.5.3:
   * [S3] fix rare crash during file upload
-  * [macOS] fix hanging reload during `cvmfs_config reload` 
+  * [macOS] fix hanging reload during `cvmfs_config reload`
   * Reduce IOPS during publishing to local backend
   * [S3] Add support for CVMFS_S3_PEEK_BEFORE_PUT
   * Prevent dirtab entries from wandering outside the repository (CVM-1608)

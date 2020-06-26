@@ -33,6 +33,29 @@ Breadcrumb::Breadcrumb(const std::string &from_string) {
   }
 }
 
+bool Breadcrumb::Export(const string &fqrn, const string &directory,
+                        const int mode) const {
+  string breadcrumb_path = MakeCanonicalPath(directory) +
+                                "/cvmfschecksum." + fqrn;
+  string tmp_path;
+  FILE *fbreadcrumb = CreateTempFile(breadcrumb_path, mode, "w", &tmp_path);
+  if (fbreadcrumb == NULL)
+    return false;
+  string str_breadcrumb = ToString();
+  int written = fwrite(&(str_breadcrumb[0]), 1, str_breadcrumb.length(),
+                       fbreadcrumb);
+  fclose(fbreadcrumb);
+  if (static_cast<unsigned>(written) != str_breadcrumb.length()) {
+    unlink(tmp_path.c_str());
+    return false;
+  }
+  int retval = rename(tmp_path.c_str(), breadcrumb_path.c_str());
+  if (retval != 0) {
+    unlink(tmp_path.c_str());
+    return false;
+  }
+  return true;
+}
 
 std::string Breadcrumb::ToString() const {
   return catalog_hash.ToString() + "T" + StringifyInt(timestamp);
@@ -207,27 +230,8 @@ bool Manifest::Export(const std::string &path) const {
  * Writes the cvmfschecksum.$repository file.  Atomic store.
  */
 bool Manifest::ExportBreadcrumb(const string &directory, const int mode) const {
-  string breadcrumb_path = MakeCanonicalPath(directory) + "/cvmfschecksum." +
-                           repository_name_;
-  string tmp_path;
-  FILE *fbreadcrumb = CreateTempFile(breadcrumb_path, mode, "w", &tmp_path);
-  if (fbreadcrumb == NULL)
-    return false;
-  string str_breadcrumb =
-    Breadcrumb(catalog_hash_, publish_timestamp_).ToString();
-  int written = fwrite(&(str_breadcrumb[0]), 1, str_breadcrumb.length(),
-                       fbreadcrumb);
-  fclose(fbreadcrumb);
-  if (static_cast<unsigned>(written) != str_breadcrumb.length()) {
-    unlink(tmp_path.c_str());
-    return false;
-  }
-  int retval = rename(tmp_path.c_str(), breadcrumb_path.c_str());
-  if (retval != 0) {
-    unlink(tmp_path.c_str());
-    return false;
-  }
-  return true;
+  return Breadcrumb(catalog_hash_, publish_timestamp_).Export(repository_name_,
+                                                              directory, mode);
 }
 
 
@@ -242,12 +246,16 @@ Breadcrumb Manifest::ReadBreadcrumb(
   Breadcrumb breadcrumb;
   const string breadcrumb_path = directory + "/cvmfschecksum." + repo_name;
   FILE *fbreadcrumb = fopen(breadcrumb_path.c_str(), "r");
+  if (!fbreadcrumb) {
+    // Return invalid breadcrumb if not found
+    return breadcrumb;
+  }
   char tmp[128];
   int read_bytes;
-  if (fbreadcrumb && (read_bytes = fread(tmp, 1, 128, fbreadcrumb)) > 0) {
+  if ((read_bytes = fread(tmp, 1, 128, fbreadcrumb)) > 0) {
     breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
   }
-  if (fbreadcrumb) fclose(fbreadcrumb);
+  fclose(fbreadcrumb);
 
   return breadcrumb;
 }

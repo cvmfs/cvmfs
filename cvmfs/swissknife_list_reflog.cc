@@ -115,7 +115,7 @@ bool CommandListReflog::Run(ObjectFetcherT *object_fetcher, string repo_name,
   const vector<shash::Any>::const_iterator iend = catalogs.end();
   for (; i != iend && success; i++) {
     success &= traversal.TraverseRevision(*i,
-                CatalogTraversal<ObjectFetcherT>::kBreadthFirstTraversal);
+                CatalogTraversal<ObjectFetcherT>::kBreadthFirst);
   }
 
   if (!success) {

@@ -9,29 +9,11 @@
 #include <cstring>
 
 #include "logging.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
-
-bool ToJsonString(const JsonStringInput &input, std::string *output) {
-  if (!output) {
-    return false;
-  }
-
-  output->clear();
-  *output = "{";
-  for (size_t i = 0u; i < input.size(); ++i) {
-    *output +=
-        std::string("\"") + input[i].first + "\":\"" + input[i].second + "\"";
-    if (i < input.size() - 1) {
-      *output += ',';
-    }
-  }
-  *output += std::string("}");
-
-  return true;
-}
 
 JsonDocument *JsonDocument::Create(const string &text) {
   UniquePtr<JsonDocument> json(new JsonDocument());
@@ -200,7 +182,7 @@ std::string JsonDocument::PrintValue(JSON *value, PrintOptions print_options) {
       result += value->int_value ? "true" : "false";
       break;
     default:
-      abort();
+      PANIC(NULL);
   }
   return result;
 }

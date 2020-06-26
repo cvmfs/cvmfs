@@ -53,7 +53,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.7.2
+Version: 2.8.0
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -98,7 +98,6 @@ Requires: coreutils
 Requires: grep
 Requires: gawk
 Requires: sed
-Requires: perl
 Requires: psmisc
 Requires: autofs
 Requires: fuse
@@ -138,10 +137,6 @@ Requires: util-linux-ng
 Requires: util-linux
     %endif
   %endif
-%endif
-%if 0%{?fedora}
-# For cvmfs_talk, does not necessarily come with Fedora >= 25
-Requires: perl-Getopt-Long
 %endif
 Requires: cvmfs-config
 
@@ -239,6 +234,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 Summary: ducc: Daemon Unpacking Containers in CVMFS
 Group: Application/System
 BuildRequires: golang >= 1.11.4
+Requires: singularity >= 3.5
 %description ducc
 Daemon to automatically unpack and expose containers images into CernVM-FS
 %endif
@@ -388,10 +384,6 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/serverorder.sh
 rm -f $RPM_BUILD_ROOT%{_libdir}/libcvmfs_fuse3*
 %endif
 
-# Remove experimental server binaries
-rm -f "$RPM_BUILD_ROOT%{_bindir}/cvmfs_publish"
-rm -f "$RPM_BUILD_ROOT%{_libdir}/libcvmfs_server*"
-
 # Fix docdir on SuSE
 %if 0%{?suse_version}
 mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
@@ -430,6 +422,10 @@ EOF
 rm -rf $RPM_BUILD_ROOT
 
 %post
+if [ $1 -eq 1 ]; then
+   mkdir /cvmfs
+   chmod 755 /cvmfs
+fi
 %if 0%{?selinux_cvmfs}
 # Install SELinux policy modules
 for selinuxvariant in %{selinux_variants}
@@ -484,6 +480,8 @@ if [ $1 -eq 0 ]; then
    then
      rm -f /etc/auto.master.d/cvmfs.autofs
    fi
+   [ -f /var/lock/subsys/autofs ] && /sbin/service autofs reload >/dev/null
+   rmdir /cvmfs
 fi
 
 %if 0%{?selinux_cvmfs}
@@ -518,6 +516,7 @@ fi
 /usr/libexec/cvmfs/authz/cvmfs_allow_helper
 /usr/libexec/cvmfs/authz/cvmfs_deny_helper
 /usr/libexec/cvmfs/cache/cvmfs_cache_ram
+/usr/libexec/cvmfs/cache/cvmfs_cache_posix
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}
@@ -531,7 +530,6 @@ fi
 /sbin/mount.cvmfs
 %dir %{_sysconfdir}/cvmfs/config.d
 %dir %{_sysconfdir}/cvmfs/domain.d
-%dir /cvmfs
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf
@@ -561,6 +559,8 @@ fi
 
 %files server
 %defattr(-,root,root)
+%{_bindir}/cvmfs_publish
+%{_bindir}/cvmfs_publish_debug
 %{_bindir}/cvmfs_receiver
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
@@ -569,10 +569,15 @@ fi
 %{_bindir}/cvmfs_rsync
 %{_libdir}/libcvmfs_server.so
 %{_libdir}/libcvmfs_server.so.%{version}
+%{_libdir}/libcvmfs_server_debug.so
+%{_libdir}/libcvmfs_server_debug.so.%{version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
+/usr/share/cvmfs-server/generate_stats_plots.C
+/usr/share/cvmfs-server/stats_index.html.tpl
+/usr/share/cvmfs-server/upload_stats_plots.sh
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
@@ -594,6 +599,7 @@ fi
 %if 0%{?build_ducc}
 %files ducc
 %{_bindir}/cvmfs_ducc
+%{_unitdir}/cvmfs_ducc.service
 %endif
 
 %changelog

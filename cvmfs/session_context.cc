@@ -11,7 +11,9 @@
 #include "cvmfs_config.h"
 #include "gateway_util.h"
 #include "json_document.h"
+#include "json_document_write.h"
 #include "swissknife_lease_curl.h"
+#include "util/exception.h"
 #include "util/string.h"
 
 namespace {
@@ -287,19 +289,13 @@ bool SessionContext::FinalizeDerived() {
 bool SessionContext::Commit(const std::string& old_root_hash,
                             const std::string& new_root_hash,
                             const RepositoryTag& tag) {
-  std::string request;
-  JsonStringInput request_input;
-  request_input.push_back(
-      std::make_pair("old_root_hash", old_root_hash.c_str()));
-  request_input.push_back(
-      std::make_pair("new_root_hash", new_root_hash.c_str()));
-  request_input.push_back(std::make_pair("tag_name",
-                                         tag.name_.c_str()));
-  request_input.push_back(std::make_pair("tag_channel",
-                                         tag.channel_.c_str()));
-  request_input.push_back(std::make_pair("tag_description",
-                                         tag.description_.c_str()));
-  ToJsonString(request_input, &request);
+  JsonStringGenerator request_input;
+  request_input.Add("old_root_hash", old_root_hash);
+  request_input.Add("new_root_hash", new_root_hash);
+  request_input.Add("tag_name", tag.name_);
+  request_input.Add("tag_channel", tag.channel_);
+  request_input.Add("tag_description", tag.description_);
+  std::string request = request_input.GenerateString();
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
                         request, &buffer);
@@ -400,9 +396,8 @@ void* SessionContext::UploadLoop(void* data) {
     while (jobs_processed < ctx->NumJobsSubmitted()) {
       UploadJob* job = ctx->upload_jobs_->Dequeue();
       if (!ctx->DoUpload(job)) {
-        LogCvmfs(kLogUploadGateway, kLogStderr,
-                 "SessionContext: could not submit payload. Aborting.");
-        abort();
+        PANIC(kLogStderr,
+              "SessionContext: could not submit payload. Aborting.");
       }
       job->result->Set(true);
       delete job->pack;

@@ -17,7 +17,7 @@
 
 #define LIBCVMFS_VERSION 2
 #define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
-#define LIBCVMFS_VERSION_MINOR 7
+#define LIBCVMFS_VERSION_MINOR 8
 // Revision Changelog
 // 13: revision introduced
 // 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
@@ -35,7 +35,11 @@
 // 26: CernVM-FS 2.5.0
 // 27: Add cvmfs_options_init_v2
 // 28: CernVM-FS 2.6.0
-#define LIBCVMFS_REVISION 28
+// 29: CernVM-FS 2.8
+//     * Add cvmfs_options_parse_default
+//     * Add cvmfs_listdir_stat
+//     * Add catalog counters to struct cvmfs_nc_attr
+#define LIBCVMFS_REVISION 29
 
 #include <stdint.h>
 #include <sys/stat.h>
@@ -108,6 +112,20 @@ struct cvmfs_nc_attr {
   char *mountpoint;
   char *hash;
   uint64_t size;
+
+  // Catalog counters
+  uint64_t ctr_regular;
+  uint64_t ctr_symlink;
+  uint64_t ctr_special;
+  uint64_t ctr_dir;
+  uint64_t ctr_nested;
+  uint64_t ctr_chunked;
+  uint64_t ctr_chunks;
+  uint64_t ctr_file_size;
+  uint64_t ctr_chunked_size;
+  uint64_t ctr_xattr;
+  uint64_t ctr_external;
+  uint64_t ctr_external_file_size;
 };
 
 /**
@@ -150,6 +168,16 @@ struct cvmfs_attr {
   char * cvm_parent;
   char * cvm_name;
   void * cvm_xattrs;
+};
+
+
+/**
+ * Struct for storing stat info about an object.
+ */
+struct cvmfs_stat_t {
+  // name of the object, owned by the struct (needs to be freed)
+  char * name;
+  struct stat info;
 };
 
 /**
@@ -230,6 +258,11 @@ void cvmfs_options_set(cvmfs_option_map *opts,
  * and -1 otherwise.
  */
 int cvmfs_options_parse(cvmfs_option_map *opts, const char *path);
+/**
+ * Sets default options from repository defaults in /etc/cvmfs.
+ * Returns 0 on success and -1 otherwise.
+ */
+void cvmfs_options_parse_default(cvmfs_option_map *opts, const char *fqrn);
 /**
  * Removes a key-value pair from a cvmfs_options_map.  The key may or may not
  * exist before the call.
@@ -426,6 +459,29 @@ int cvmfs_listdir_contents(
   cvmfs_context *ctx,
   const char *path,
   char ***buf,
+  size_t *listlen,
+  size_t *buflen);
+
+/**
+ * Get list of directory contents' stat info.
+ * The list does not include "." or "..".
+ *
+ * On return, @param buf will contain list of cvmfs_stat_t objects.
+ * The caller must free the cvmfs_stat_t::name and the array containing
+ * cvmfs_stat_t objects (*buf).
+ * The array (*buf) may be NULL when this function is called.
+ *
+ * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
+ * @param[out] buf, pointer to dynamically allocated array of cvmfs_stat_t
+ * @param[in] buflen, pointer to variable containing size of @param buf
+ * @param[in/out] listlen, pointer to number of entries in @param buf.
+ * Set @param listlen to 0 before to fill @param buf from index 0.
+ * \return 0 on success, -1 on failure (sets errno)
+ */
+int cvmfs_listdir_stat(
+  cvmfs_context *ctx,
+  const char *path,
+  struct cvmfs_stat_t **buf,
   size_t *listlen,
   size_t *buflen);
 

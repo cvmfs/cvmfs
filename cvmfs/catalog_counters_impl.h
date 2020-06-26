@@ -33,7 +33,7 @@ typename TreeCountersBase<FieldT>::FieldsMap
 }
 
 template<typename FieldT>
-std::string TreeCountersBase<FieldT>::GetCsvMap() const {
+std::map<std::string, FieldT> TreeCountersBase<FieldT>::GetValues() const {
   FieldsMap map_self;
   FieldsMap map_subtree;
   self.FillFieldsMap("", &map_self);
@@ -46,6 +46,13 @@ std::string TreeCountersBase<FieldT>::GetCsvMap() const {
   for (; i != iend; ++i) {
     map_summed[i->first] = *(map_self[i->first]) + *(map_subtree[i->first]);
   }
+
+  return map_summed;
+}
+
+template<typename FieldT>
+std::string TreeCountersBase<FieldT>::GetCsvMap() const {
+  std::map<std::string, FieldT> map_summed = GetValues();
 
   std::string result;
   typename std::map<std::string, FieldT>::const_iterator j    =

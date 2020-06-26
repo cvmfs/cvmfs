@@ -50,5 +50,5 @@ SOURCE_DIRS="cvmfs mount test/unittests test/micro-benchmarks test/stress"
 
 cd $REPO_ROOT
 FILE_LIST="$(find $SOURCE_DIRS -type f -not -name '\._*' -and \( -name '*.h' -or -name '*.cc' -or -name '*.hpp' -or -name '*.c' \))"
-$PYTHON $CPPLINT ${FILE_LIST} | tee ${SCRIPT_OUTPUT}
+$PYTHON $CPPLINT ${FILE_LIST} 2>&1 | tee ${SCRIPT_OUTPUT}
 exit ${PIPESTATUS[0]}

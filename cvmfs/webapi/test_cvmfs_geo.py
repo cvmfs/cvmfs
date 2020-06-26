@@ -26,6 +26,9 @@ CERNgeo = {
 }
 CERNname = 'cvmfs-stratum-one.cern.ch'
 CERNaddrs = getaddrs(CERNname, socket.AF_INET6)
+if len(CERNaddrs) == 0:  # fallback on IPv4-only systems
+    CERNaddrs = getaddrs(CERNname, socket.AF_INET)
+
 FNALgeo = {
     'latitude': 41.7768,
     'longitude': -88.4604
@@ -44,6 +47,9 @@ RALgeo = {
 }
 RALname = 'cernvmfs.gridpp.rl.ac.uk'
 RALaddrs = getaddrs(RALname, socket.AF_INET6)
+if len(RALaddrs) == 0:  # fallback on IPv4-only systems
+    RALaddrs = getaddrs(RALname, socket.AF_INET)
+
 
 class giTestDb():
     def get(self, addr):

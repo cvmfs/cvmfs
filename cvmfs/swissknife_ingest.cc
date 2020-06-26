@@ -11,6 +11,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "statistics.h"
+#include "statistics_database.h"
 #include "swissknife_capabilities.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
@@ -28,6 +29,8 @@
  * be good to consider creating different options handler for each command.
  */
 int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
+  std::string start_time = GetGMTimestamp();
+
   SyncParameters params;
   params.dir_rdonly = MakeCanonicalPath(*args.find('c')->second);
   params.dir_temp = MakeCanonicalPath(*args.find('t')->second);
@@ -82,7 +85,11 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.key_file = *args.find('H')->second;
   }
 
-  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
+  const bool upload_statsdb = (args.count('I') > 0);
+
+  perf::StatisticsTemplate publish_statistics("publish", this->statistics());
+  StatisticsDatabase *stats_db =
+    StatisticsDatabase::OpenStandardDB(params.repo_name);
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -192,10 +199,14 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
+    stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+    if (upload_statsdb) {
+      stats_db->UploadStatistics(params.spooler);
+    }
     return 5;
   }
 
-  perf::Counter *revision_counter = statistics()->Register("Publish.revision",
+  perf::Counter *revision_counter = statistics()->Register("publish.revision",
                                                   "Published revision number");
   revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 
@@ -216,8 +227,18 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
                                          params.repo_tag)) {
     PrintError("Failed to commit the transaction.");
+    stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+    if (upload_statsdb) {
+      stats_db->UploadStatistics(params.spooler);
+    }
     return 9;
   }
+
+  stats_db->StorePublishStatistics(this->statistics(), start_time, true);
+  if (upload_statsdb) {
+    stats_db->UploadStatistics(params.spooler);
+  }
+
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

@@ -25,6 +25,7 @@ script_location=$(portable_dirname $0)
 #  SHRINKWRAP_PACKAGE    location of the CernVM-FS shrinkwrap package
 #  LOG_DIRECTORY         location of the test log files to be created
 #  GATEWAY_BUILD_URL     location of the repository gateway build to install
+#  DUCC_PACKAGE          location of the DUCC package
 #
 
 SERVER_PACKAGE=""
@@ -37,6 +38,7 @@ CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
 LOG_DIRECTORY=""
 GATEWAY_BUILD_URL=""
+DUCC_PACKAGE=""
 
 usage() {
   local msg=$1
@@ -59,7 +61,7 @@ usage() {
 }
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:d:k:t:g:l:w:n:p:f:" option; do
+while getopts "s:c:d:k:t:g:l:w:n:p:f:D:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
@@ -90,6 +92,9 @@ while getopts "s:c:d:k:t:g:l:w:n:p:f:" option; do
       ;;
     w)
       GATEWAY_BUILD_URL=$OPTARG
+      ;;
+    D)
+      DUCC_PACKAGE=$OPTARG
       ;;
     n)
       echo "WARNING: the -n parameter is obsolete"

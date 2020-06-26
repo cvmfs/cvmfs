@@ -11,6 +11,7 @@
 #include <cstdlib>
 
 #include "logging.h"
+#include "util/exception.h"
 #include "util_concurrency.h"
 #include "xattr.h"
 
@@ -800,9 +801,7 @@ void WritableCatalog::VacuumDatabaseIfNecessary() {
              ratio * 100.0,
              reason.c_str());
     if (!db.Vacuum()) {
-      LogCvmfs(kLogCatalog, kLogStderr, "failed (SQLite: %s)",
-               db.GetLastErrorMsg().c_str());
-      assert(false);
+      PANIC(kLogStderr, "failed (SQLite: %s)", db.GetLastErrorMsg().c_str());
     }
     LogCvmfs(kLogCatalog, kLogStdout, "done");
   }

@@ -4,6 +4,8 @@
 
 #include "statistics_database.h"
 
+#include "util/exception.h"
+
 
 const float    StatisticsDatabase::kLatestCompatibleSchema = 1.0f;
 float          StatisticsDatabase::kLatestSchema           = 1.0f;
@@ -21,8 +23,13 @@ float          StatisticsDatabase::kLatestSchema           = 1.0f;
 //          * add column `symlinks_changed` to publish_statistics table
 //          * change column name `finished_time` -> `finish_time`
 //            in gc_statistics table
+// 2 --> 3: (Jan 14 2020)
+//          * add `success` column to publish_statistics table (1 for success
+//            0 for fail)
+//          * add `success` column to gc_statistics table (1 for success
+//            0 for fail)
 
-unsigned       StatisticsDatabase::kLatestSchemaRevision   = 2;
+unsigned       StatisticsDatabase::kLatestSchemaRevision   = 3;
 unsigned int   StatisticsDatabase::instances               = 0;
 bool           StatisticsDatabase::compacting_fails        = false;
 
@@ -50,39 +57,39 @@ struct PublishStats {
 
   explicit PublishStats(const perf::Statistics *statistics):
     revision(statistics->
-                    Lookup("Publish.revision")->ToString()),
+                    Lookup("publish.revision")->ToString()),
     files_added(statistics->
-                    Lookup("Publish.n_files_added")->ToString()),
+                    Lookup("publish.n_files_added")->ToString()),
     files_removed(statistics->
-                    Lookup("Publish.n_files_removed")->ToString()),
+                    Lookup("publish.n_files_removed")->ToString()),
     files_changed(statistics->
-                    Lookup("Publish.n_files_changed")->ToString()),
+                    Lookup("publish.n_files_changed")->ToString()),
     chunks_added(statistics->
-                    Lookup("Publish.n_chunks_added")->ToString()),
+                    Lookup("publish.n_chunks_added")->ToString()),
     chunks_duplicated(statistics->
-                    Lookup("Publish.n_chunks_duplicated")->ToString()),
+                    Lookup("publish.n_chunks_duplicated")->ToString()),
     catalogs_added(statistics->
-                    Lookup("Publish.n_catalogs_added")->ToString()),
+                    Lookup("publish.n_catalogs_added")->ToString()),
     dirs_added(statistics->
-                    Lookup("Publish.n_directories_added")->ToString()),
+                    Lookup("publish.n_directories_added")->ToString()),
     dirs_removed(statistics->
-                    Lookup("Publish.n_directories_removed")->ToString()),
+                    Lookup("publish.n_directories_removed")->ToString()),
     dirs_changed(statistics->
-                    Lookup("Publish.n_directories_changed")->ToString()),
+                    Lookup("publish.n_directories_changed")->ToString()),
     symlinks_added(statistics->
-                    Lookup("Publish.n_symlinks_added")->ToString()),
+                    Lookup("publish.n_symlinks_added")->ToString()),
     symlinks_removed(statistics->
-                    Lookup("Publish.n_symlinks_removed")->ToString()),
+                    Lookup("publish.n_symlinks_removed")->ToString()),
     symlinks_changed(statistics->
-                    Lookup("Publish.n_symlinks_changed")->ToString()),
+                    Lookup("publish.n_symlinks_changed")->ToString()),
     bytes_added(statistics->
-                    Lookup("Publish.sz_added_bytes")->ToString()),
+                    Lookup("publish.sz_added_bytes")->ToString()),
     bytes_removed(statistics->
-                    Lookup("Publish.sz_removed_bytes")->ToString()),
+                    Lookup("publish.sz_removed_bytes")->ToString()),
     bytes_uploaded(statistics->
-                    Lookup("Publish.sz_uploaded_bytes")->ToString()),
+                    Lookup("publish.sz_uploaded_bytes")->ToString()),
     catalog_bytes_uploaded(statistics->
-                    Lookup("Publish.sz_uploaded_catalog_bytes")->ToString()) {
+                    Lookup("publish.sz_uploaded_catalog_bytes")->ToString()) {
   }
 };
 
@@ -114,7 +121,8 @@ struct GcStats {
   */
 std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
                             const std::string &start_time,
-                            const std::string &finish_time) {
+                            const std::string &finish_time,
+                            const bool success) {
   struct PublishStats stats = PublishStats(statistics);
   std::string insert_statement =
     "INSERT INTO publish_statistics ("
@@ -136,7 +144,8 @@ std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
     "sz_bytes_added,"
     "sz_bytes_removed,"
     "sz_bytes_uploaded,"
-    "sz_catalog_bytes_uploaded)"
+    "sz_catalog_bytes_uploaded,"
+    "success)"
     " VALUES("
     "'"+start_time+"',"+
     "'"+finish_time+"',"+
@@ -156,7 +165,8 @@ std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
     stats.bytes_added + "," +
     stats.bytes_removed + "," +
     stats.bytes_uploaded + "," +
-    stats.catalog_bytes_uploaded + ");";
+    stats.catalog_bytes_uploaded + "," +
+    (success ? "1" : "0") + ");";
   return insert_statement;
 }
 
@@ -173,7 +183,8 @@ std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
 std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
                             const std::string &start_time,
                             const std::string &finish_time,
-                            const std::string &repo_name) {
+                            const std::string &repo_name,
+                            const bool success) {
   struct GcStats stats = GcStats(statistics);
   std::string insert_statement = "";
   if (StatisticsDatabase::GcExtendedStats(repo_name)) {
@@ -184,14 +195,16 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       "n_preserved_catalogs,"
       "n_condemned_catalogs,"
       "n_condemned_objects,"
-      "sz_condemned_bytes)"
+      "sz_condemned_bytes,"
+      "success)"
       " VALUES("
       "'" + start_time + "'," +
       "'" + finish_time + "'," +
       stats.n_preserved_catalogs + "," +
       stats.n_condemned_catalogs + ","+
       stats.n_condemned_objects + "," +
-      stats.sz_condemned_bytes + ");";
+      stats.sz_condemned_bytes + "," +
+      (success ? "1" : "0") + ");";
   } else {
     // insert values except sz_condemned_bytes
     insert_statement =
@@ -200,13 +213,15 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       "finish_time,"
       "n_preserved_catalogs,"
       "n_condemned_catalogs,"
-      "n_condemned_objects)"
+      "n_condemned_objects,"
+      "success)"
       " VALUES("
       "'" + start_time + "'," +
       "'" + finish_time + "'," +
       stats.n_preserved_catalogs + "," +
-      stats.n_condemned_catalogs + ","+
-      stats.n_condemned_objects + ");";
+      stats.n_condemned_catalogs + "," +
+      stats.n_condemned_objects + "," +
+      (success ? "1" : "0") + ");";
   }
   return insert_statement;
 }
@@ -237,7 +252,8 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "sz_bytes_added INTEGER,"
     "sz_bytes_removed INTEGER,"
     "sz_bytes_uploaded INTEGER,"
-    "sz_catalog_bytes_uploaded INTEGER);").Execute();
+    "sz_catalog_bytes_uploaded INTEGER,"
+    "success INTEGER);").Execute();
   bool ret2 = sqlite::Sql(sqlite_db(),
     "CREATE TABLE gc_statistics ("
     "gc_id INTEGER PRIMARY KEY,"
@@ -246,7 +262,8 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "n_preserved_catalogs INTEGER,"
     "n_condemned_catalogs INTEGER,"
     "n_condemned_objects INTEGER,"
-    "sz_condemned_bytes INTEGER);").Execute();
+    "sz_condemned_bytes INTEGER,"
+    "success INTEGER);").Execute();
   return ret1 & ret2;
 }
 
@@ -260,49 +277,48 @@ bool StatisticsDatabase::CheckSchemaCompatibility() {
 
 bool StatisticsDatabase::LiveSchemaUpgradeIfNecessary() {
   ++live_upgrade_calls;
-
   if (IsEqualSchema(schema_version(), kLatestSchema) &&
     (schema_revision() == 1)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "upgrading schema revision (1 --> 2) of "
       "statistics database");
 
-    sqlite::Sql publish_upgrade1(this->sqlite_db(), "ALTER TABLE "
+    sqlite::Sql publish_upgrade2_1(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics RENAME COLUMN finished_time TO finish_time;");
-    sqlite::Sql publish_upgrade2(this->sqlite_db(), "ALTER TABLE "
+    sqlite::Sql publish_upgrade2_2(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD revision INTEGER;");
-    sqlite::Sql publish_upgrade3(this->sqlite_db(), "ALTER TABLE "
-    "publish_statistics RENAME COLUMN duplicated_files TO chunks_duplicated");
-    sqlite::Sql publish_upgrade4(this->sqlite_db(), "ALTER TABLE "
+    sqlite::Sql publish_upgrade2_3(this->sqlite_db(), "ALTER TABLE "
+    "publish_statistics RENAME COLUMN duplicated_files TO chunks_duplicated;");
+    sqlite::Sql publish_upgrade2_4(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD chunks_added INTEGER;");
-    sqlite::Sql publish_upgrade5(this->sqlite_db(), "ALTER TABLE "
+    sqlite::Sql publish_upgrade2_5(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD symlinks_added INTEGER;");
-    sqlite::Sql publish_upgrade6(this->sqlite_db(), "ALTER TABLE "
+    sqlite::Sql publish_upgrade2_6(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD symlinks_removed INTEGER;");
-    sqlite::Sql publish_upgrade7(this->sqlite_db(), "ALTER TABLE "
+    sqlite::Sql publish_upgrade2_7(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD symlinks_changed INTEGER;");
-    sqlite::Sql publish_upgrade8(this->sqlite_db(), "ALTER TABLE "
+    sqlite::Sql publish_upgrade2_8(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD catalogs_added INTEGER;");
-    sqlite::Sql publish_upgrade9(this->sqlite_db(), "ALTER TABLE "
+    sqlite::Sql publish_upgrade2_9(this->sqlite_db(), "ALTER TABLE "
     "publish_statistics ADD sz_catalog_bytes_uploaded INTEGER;");
 
-    if (!publish_upgrade1.Execute() ||
-        !publish_upgrade2.Execute() ||
-        !publish_upgrade3.Execute() ||
-        !publish_upgrade4.Execute() ||
-        !publish_upgrade5.Execute() ||
-        !publish_upgrade6.Execute() ||
-        !publish_upgrade7.Execute() ||
-        !publish_upgrade8.Execute() ||
-        !publish_upgrade9.Execute()) {
+    if (!publish_upgrade2_1.Execute() ||
+        !publish_upgrade2_2.Execute() ||
+        !publish_upgrade2_3.Execute() ||
+        !publish_upgrade2_4.Execute() ||
+        !publish_upgrade2_5.Execute() ||
+        !publish_upgrade2_6.Execute() ||
+        !publish_upgrade2_7.Execute() ||
+        !publish_upgrade2_8.Execute() ||
+        !publish_upgrade2_9.Execute()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "failed to upgrade publish_statistics"
                " table of statistics database");
       return false;
     }
 
-    sqlite::Sql gc_upgrade1(this->sqlite_db(), "ALTER TABLE gc_statistics"
+    sqlite::Sql gc_upgrade2_1(this->sqlite_db(), "ALTER TABLE gc_statistics"
       " RENAME COLUMN finished_time TO finish_time;");
 
-    if (!gc_upgrade1.Execute()) {
+    if (!gc_upgrade2_1.Execute()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "failed to upgrade gc_statistics"
                " table of statistics database");
       return false;
@@ -315,7 +331,36 @@ bool StatisticsDatabase::LiveSchemaUpgradeIfNecessary() {
       return false;
     }
   }
+  if (IsEqualSchema(schema_version(), kLatestSchema) &&
+    (schema_revision() == 2)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "upgrading schema revision (2 --> 3) of "
+      "statistics database");
 
+    sqlite::Sql publish_upgrade3_1(this->sqlite_db(), "ALTER TABLE "
+    "publish_statistics ADD success INTEGER;");
+
+    if (!publish_upgrade3_1.Execute()) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "failed to upgrade publish_statistics"
+               " table of statistics database");
+      return false;
+    }
+
+    sqlite::Sql gc_upgrade3_1(this->sqlite_db(), "ALTER TABLE gc_statistics"
+      " ADD success INTEGER;");
+
+    if (!gc_upgrade3_1.Execute()) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "failed to upgrade gc_statistics"
+               " table of statistics database");
+      return false;
+    }
+
+    set_schema_revision(3);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "failed to upgrade schema revision"
+               " of statistics database");
+      return false;
+    }
+  }
   return true;
 }
 
@@ -331,49 +376,161 @@ StatisticsDatabase::~StatisticsDatabase() {
 }
 
 
-int StatisticsDatabase::StoreStatistics(const perf::Statistics *statistics,
-                                        const std::string &start_time,
-                                        const std::string &finish_time,
-                                        const std::string &command_name,
-                                        const std::string &repo_name) {
-  std::string insert_statement;
-  if (command_name == "ingest" || command_name == "sync") {
-    insert_statement = PrepareStatementIntoPublish(statistics, start_time,
-                                                               finish_time);
-  } else if (command_name == "gc") {
-    insert_statement = PrepareStatementIntoGc(statistics, start_time,
-                                              finish_time, repo_name);
+StatisticsDatabase *StatisticsDatabase::OpenStandardDB(
+  const std::string repo_name)
+{
+  StatisticsDatabase *db;
+  std::string db_file_path;
+  uint32_t days_to_keep;
+  GetDBParams(repo_name, &db_file_path, &days_to_keep);
+  if (FileExists(db_file_path)) {
+    db = StatisticsDatabase::Open(db_file_path, kOpenReadWrite);
+    if (db == NULL) {
+      PANIC(kLogSyslogErr, "Couldn't create StatisticsDatabase object!");
+    } else if (db->GetProperty<std::string>("repo_name") != repo_name) {
+      PANIC(kLogSyslogErr, "'repo_name' property of the statistics database %s "
+            "is incorrect. Please fix the database.", db_file_path.c_str());
+    }
+    if (!db->Prune(days_to_keep)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Failed to prune statistics database");
+    }
   } else {
-    return -5;
+    db = StatisticsDatabase::Create(db_file_path);
+    if (db == NULL) {
+      PANIC(kLogSyslogErr, "Couldn't create StatisticsDatabase object!");
+    // insert repo_name into properties table
+    } else if (!db->SetProperty("repo_name", repo_name)) {
+      PANIC(kLogSyslogErr,
+            "Couldn't insert repo_name into properties table!");
+    }
   }
-
-  sqlite::Sql insert(this->sqlite_db(), insert_statement);
-
-  if (!this->BeginTransaction()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "BeginTransaction failed!");
-    return -1;
-  }
-
-  if (!insert.Execute()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Execute failed!");
-    return -2;
-  }
-
-  if (!insert.Reset()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "insert.Reset() failed!");
-    return -3;
-  }
-
-  if (!this->CommitTransaction()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "CommitTransaction failed!");
-    return -4;
-  }
-
-  return 0;
+  db->repo_name_ = repo_name;
+  return db;
 }
 
 
-std::string StatisticsDatabase::GetDBPath(const std::string &repo_name) {
+bool StatisticsDatabase::StorePublishStatistics(
+  const perf::Statistics *statistics,
+  const std::string &start_time,
+  const bool success)
+{
+  std::string finish_time = GetGMTimestamp();
+  std::string statement = PrepareStatementIntoPublish(statistics, start_time,
+                                                      finish_time, success);
+  return StoreEntry(statement);
+}
+
+
+bool StatisticsDatabase::StoreGCStatistics(
+  const perf::Statistics *statistics,
+  const std::string &start_time,
+  const bool success)
+{
+  std::string finish_time = GetGMTimestamp();
+  std::string statement =
+    PrepareStatementIntoGc(statistics, start_time, finish_time,
+                           repo_name_, success);
+  return StoreEntry(statement);
+}
+
+
+bool StatisticsDatabase::StoreEntry(const std::string &insert_statement) {
+  sqlite::Sql insert(this->sqlite_db(), insert_statement);
+
+  if (!insert.Execute()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+      "Couldn't store statistics in %s: insert.Execute failed!",
+      this->filename().c_str());
+    return false;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "Statistics stored at: %s",
+            this->filename().c_str());
+  return true;
+}
+
+
+bool StatisticsDatabase::Prune(uint32_t days) {
+  if (days == 0) return true;
+
+  std::string publish_stmt =
+    "DELETE FROM publish_statistics WHERE "
+    "julianday('now','start of day')-julianday(start_time) > " +
+    StringifyUint(days) + ";";
+
+  std::string gc_stmt =
+    "DELETE FROM gc_statistics WHERE "
+    "julianday('now','start of day')-julianday(start_time) > " +
+    StringifyUint(days) + ";";
+
+  sqlite::Sql publish_sql(this->sqlite_db(), publish_stmt);
+  sqlite::Sql gc_sql(this->sqlite_db(), gc_stmt);
+  if (!publish_sql.Execute() || !gc_sql.Execute()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+      "Couldn't prune statistics DB %s: SQL Execute() failed!",
+      this->filename().c_str());
+    return false;
+  }
+  if (!this->Vacuum()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+      "Couldn't prune statistics DB %s: Vacuum() failed!",
+      this->filename().c_str());
+    return false;
+  }
+
+  return true;
+}
+
+
+bool StatisticsDatabase::UploadStatistics(upload::Spooler *spooler,
+                                          std::string local_path)
+{
+  if (local_path == "") {
+    local_path = this->filename();
+  }
+
+  spooler->WaitForUpload();
+  unsigned errors_before = spooler->GetNumberOfErrors();
+  spooler->Mkdir("stats");
+  spooler->RemoveAsync("stats/stats.db");
+  spooler->WaitForUpload();
+  spooler->Upload(local_path, "stats/stats.db");
+  spooler->WaitForUpload();
+  unsigned errors_after = spooler->GetNumberOfErrors();
+
+  if (errors_before != errors_after) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "Could not upload statistics DB file into storage backend");
+    return false;
+  }
+  return true;
+}
+
+
+bool StatisticsDatabase::UploadStatistics(
+  upload::AbstractUploader *uploader,
+  std::string local_path)
+{
+  if (local_path == "") {
+    local_path = this->filename();
+  }
+
+  uploader->WaitForUpload();
+  unsigned errors_before = uploader->GetNumberOfErrors();
+
+  uploader->RemoveAsync("stats/stats.db");
+  uploader->WaitForUpload();
+  uploader->UploadFile(local_path, "stats/stats.db");
+  uploader->WaitForUpload();
+  unsigned errors_after = uploader->GetNumberOfErrors();
+  return errors_before == errors_after;
+}
+
+
+void StatisticsDatabase::GetDBParams(const std::string &repo_name,
+                                     std::string *path,
+                                     uint32_t *days_to_keep)
+{
   // default location
   const std::string db_default_path =
       "/var/spool/cvmfs/" + repo_name + "/stats.db";
@@ -385,7 +542,9 @@ std::string StatisticsDatabase::GetDBPath(const std::string &repo_name) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "Could not parse repository configuration: %s.",
              repo_config_file.c_str());
-    return db_default_path;
+    *path = db_default_path;
+    *days_to_keep = kDefaultDaysToKeep;
+    return;
   }
 
   std::string statistics_db = "";
@@ -394,20 +553,32 @@ std::string StatisticsDatabase::GetDBPath(const std::string &repo_name) {
              "Parameter %s was not set in the repository configuration file. "
              "Using default value: %s",
              "CVMFS_STATISTICS_DB", db_default_path.c_str());
-    return db_default_path;
+    *path = db_default_path;
+  } else {
+    std::string dirname = GetParentPath(statistics_db);
+    int mode = S_IRUSR | S_IWUSR | S_IXUSR |
+               S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;  // 755
+    if (!MkdirDeep(dirname, mode, true)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr,
+        "Couldn't write statistics at the specified path %s.",
+        statistics_db.c_str());
+      *path = db_default_path;
+    } else {
+      *path = statistics_db;
+    }
   }
 
-  std::string dirname = GetParentPath(statistics_db);
-  int mode = S_IRUSR | S_IWUSR | S_IXUSR |
-             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;  // 755
-  if (!MkdirDeep(dirname, mode, true)) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr,
-      "Couldn't write statistics at the specified path %s.",
-      statistics_db.c_str());
-    return db_default_path;
+  std::string days_to_keep_str = "";
+  if (!parser.GetValue("CVMFS_STATS_DB_DAYS_TO_KEEP", &statistics_db)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "Parameter %s was not set in the repository configuration file. "
+             "Using default value: %s",
+             "CVMFS_STATS_DB_DAYS_TO_KEEP",
+             StringifyUint(kDefaultDaysToKeep).c_str());
+    *days_to_keep = kDefaultDaysToKeep;
+  } else {
+    *days_to_keep = static_cast<uint32_t> (String2Uint64(days_to_keep_str));
   }
-
-  return statistics_db;
 }
 
 
@@ -442,10 +613,12 @@ bool StatisticsDatabase::GcExtendedStats(const std::string &repo_name) {
 
 
 StatisticsDatabase::StatisticsDatabase(const std::string  &filename,
-              const OpenMode      open_mode) :
+                                       const OpenMode      open_mode) :
   sqlite::Database<StatisticsDatabase>(filename, open_mode),
   create_empty_db_calls(0),  check_compatibility_calls(0),
   live_upgrade_calls(0), compact_calls(0)
 {
   ++StatisticsDatabase::instances;
 }
+
+const uint32_t StatisticsDatabase::kDefaultDaysToKeep = 365;

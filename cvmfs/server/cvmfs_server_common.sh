@@ -530,7 +530,7 @@ read_repo_item() {
   load_repo_config $name
 
   if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-    cat $(get_upstream_config $upstream)/"$item" 2>/dev/null
+    cat $(get_upstream_config $CVMFS_UPSTREAM_STORAGE)/"$item" 2>/dev/null
   elif is_stratum0 $name; then
     get_item $name $CVMFS_STRATUM0/"$item" noproxy
   else
@@ -939,6 +939,8 @@ CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 CVMFS_AUTOCATALOGS=false
 CVMFS_ASYNC_SCRATCH_CLEANUP=true
 CVMFS_PRINT_STATISTICS=false
+CVMFS_UPLOAD_STATS_DB=false
+CVMFS_UPLOAD_STATS_PLOTS=false
 EOF
 
   if [ x"$voms_authz" != x"" ]; then
@@ -1304,5 +1306,3 @@ _run_catalog_migration() {
   sign_manifest $name $manifest      || die "Signing failed";
   set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
 }
-
-

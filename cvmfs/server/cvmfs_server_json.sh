@@ -60,12 +60,16 @@ _render_repos() {
   local i=$#
 
   for repo in $@; do
+    CVMFS_PASSTHROUGH=false
     load_repo_config $repo
 
     echo '    {'
     echo '      "name"  : "'$CVMFS_REPOSITORY_NAME'",'
     if [ x"$CVMFS_REPOSITORY_NAME" != x"$repo" ]; then
       echo '      "alias" : "'$repo'",'
+    fi
+    if [ x"$CVMFS_PASSTHROUGH" = x"true" ]; then
+      echo '      "pass-through" : true,'
     fi
     echo '      "url"   : "/cvmfs/'$repo'"'
     echo -n '    }'

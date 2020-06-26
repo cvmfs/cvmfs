@@ -39,15 +39,18 @@ run_transactions() {
     cvmfs_server check test.repo.org
 
     cvmfs_server transaction test.repo.org
-    cp -r /usr/bin /cvmfs/test.repo.org
+    mkdir -p /cvmfs/test.repo.org/usr/bin
+    for f in $(find /usr/bin -type f | head -n32); do
+      cp -v $f /cvmfs/test.repo.org/usr/bin/
+    done
     cvmfs_server abort -f test.repo.org
     cvmfs_server check test.repo.org
 
     echo "Checking transaction + publish"
 
-    ## Transaction 1 (Modifying existing file and creating a new one)
+    ## Transaction 1 (Modifying existing file and creating files)
 
-    echo "  Starting transaction 1"
+    echo "***  Starting transaction 1"
     cvmfs_server transaction test.repo.org
 
     echo "  Writing to a new file"
@@ -65,7 +68,7 @@ run_transactions() {
 
     ## Transaction 2 (Deleting a file and creating a new directory with the same name)
 
-    echo "  Starting transaction 2"
+    echo "***  Starting transaction 2"
     cvmfs_server transaction test.repo.org
 
     echo "  Replacing a file with a directory"
@@ -82,7 +85,7 @@ run_transactions() {
 
     ## Transaction 3 (Deleting the directory created in the previous transaction)
 
-    echo "  Starting transaction 3"
+    echo "***  Starting transaction 3"
     cvmfs_server transaction test.repo.org
 
     echo "  Deleting a directory"
@@ -97,7 +100,7 @@ run_transactions() {
 
     ## Transaction 4 (Creating a new deep directory sub-tree)
 
-    echo "  Starting transaction 4"
+    echo "***  Starting transaction 4"
     cvmfs_server transaction test.repo.org
 
     echo "  Create a deep directory hierarchy"
@@ -114,7 +117,7 @@ run_transactions() {
 
     ## Transaction 5 (Creating a new deep directory sub-tree in place of a former file)
 
-    echo "  Starting transaction 5"
+    echo "***  Starting transaction 5"
     cvmfs_server transaction test.repo.org
 
     echo "  Create a deep directory hierarchy"
@@ -131,7 +134,7 @@ run_transactions() {
 
     ## Transaction 6 (Lease on a subpath - valid changes)
 
-    echo "  Starting transaction 6"
+    echo "***  Starting transaction 6"
     cvmfs_server transaction test.repo.org/new/c
     echo "New file" > /cvmfs/test.repo.org/new/c/another_file.txt
 
@@ -144,7 +147,7 @@ run_transactions() {
 
     ## Transaction 7 (Lease on a subpath - changes outside of lease)
 
-    echo "  Starting transaction 7"
+    echo "***  Starting transaction 7"
     cvmfs_server transaction test.repo.org/new/c
     echo "New file" > /cvmfs/test.repo.org/new/invalid_file.txt
 
@@ -157,7 +160,7 @@ run_transactions() {
 
     ## Transaction 8 (Check creation of auto-tag)
 
-    echo "  Starting transaction 8"
+    echo "***  Starting transaction 8"
     num_tags_before=$(cvmfs_server tag -l test.repo.org | grep -a generic | wc -l)
     cvmfs_server transaction test.repo.org
     echo "New file" > /cvmfs/test.repo.org/marker
@@ -172,7 +175,7 @@ run_transactions() {
 
     ## Transaction 9 (Check creation of named tag)
 
-    echo "  Starting transaction 9"
+    echo "***  Starting transaction 9"
     cvmfs_server transaction test.repo.org
     echo "New file" > /cvmfs/test.repo.org/marker
 
@@ -187,7 +190,7 @@ run_transactions() {
     ## Transaction 10 (Lease on a subpath with trailing slash)
     ## Very similar to transaction 6, but note the trailing slash after the
     ## directory
-    echo "  Starting transaction 10"
+    echo "***  Starting transaction 10"
     cvmfs_server transaction test.repo.org/new/c/
     echo "New file" > /cvmfs/test.repo.org/new/c/another_file_trailing.txt
 
@@ -237,6 +240,19 @@ run_transactions() {
       echo "Named tag was not created during transaction 9"
       return 1
     fi
+
+    check_repo_integrity test.repo.org || return 1
+
+    local reflog_url="$(get_repo_url test.repo.org)/.cvmfsreflog"
+    curl -s $reflog_url > reflog.db
+    sqlite3 reflog.db "select hash from refs where type=0;" | sort | uniq > reflog_catalogs.txt
+    if running_on_s3 ; then
+        local repo_storage=${CVMFS_TEST_S3_STORAGE}/test.repo.org
+    else
+        local repo_storage=$(get_local_repo_storage test.repo.org)
+    fi
+    find ${repo_storage}/data -type f -name *C 2>/dev/null | rev | cut -d"/" -f 1-2 | rev | tr -d "/C" | sort | uniq > actual_catalogs.txt
+    diff reflog_catalogs.txt actual_catalogs.txt || return 1
 
     clean_up
     return 0

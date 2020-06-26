@@ -9,6 +9,7 @@
 #include "../logging.h"
 #include "../monitor.h"
 #include "../swissknife.h"
+#include "../util/exception.h"
 #include "../util/posix.h"
 #include "../util/string.h"
 
@@ -102,7 +103,7 @@ int main(int argc, char** argv) {
   }
 
   // Spawn monitoring process (watchdog)
-  Watchdog *watchdog = NULL;
+  UniquePtr<Watchdog> watchdog;
   if (watchdog_out_dir != "") {
     if (!MkdirDeep(watchdog_out_dir, 0755)) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
@@ -112,7 +113,7 @@ int main(int argc, char** argv) {
     }
     std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
     watchdog = Watchdog::Create(watchdog_out_dir + "/stacktrace." + timestamp);
-    if (watchdog == NULL) {
+    if (watchdog.IsValid() == false) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
                "Failed to initialize watchdog");
       return 1;
@@ -124,15 +125,25 @@ int main(int argc, char** argv) {
 
   receiver::Reactor reactor(fdin, fdout);
 
-  if (!reactor.Run()) {
+  try {
+    if (!reactor.Run()) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "Error running CVMFS Receiver event loop");
+      return 1;
+    }
+  } catch (const ECvmfsException& e) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error running CVMFS Receiver event loop");
-    delete watchdog;
-    return 1;
+             "Runtime error during CVMFS Receiver event loop.\n"
+             "%s",
+             e.what());
+    return 2;
+  } catch (...) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Unknow error during CVMFS Receiver event loop.\n");
+      return 3;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver finished");
 
-  delete watchdog;
   return 0;
 }

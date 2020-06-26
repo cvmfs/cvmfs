@@ -17,6 +17,7 @@
 #include "platform.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
+#include "util/exception.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 
@@ -130,8 +131,8 @@ void IngestionPipeline::Process(
     hash_suffix,
     allow_chunking && chunking_enabled_,
     generate_legacy_bulk_chunks_);
-  tube_counter_.Enqueue(file_item);
-  tube_input_.Enqueue(file_item);
+  tube_counter_.EnqueueBack(file_item);
+  tube_input_.EnqueueBack(file_item);
 }
 
 
@@ -174,11 +175,11 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
       delete block_item;
       delete chunk_item;
       delete file_item;
-      tube_counter_->Pop();
+      tube_counter_->PopFront();
       break;
 
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 
@@ -256,8 +257,8 @@ void ScrubbingPipeline::Process(
     hash_suffix,
     false,  /* may_have_chunks */
     true  /* hash_legacy_bulk_chunk */);
-  tube_counter_.Enqueue(file_item);
-  tube_input_.Enqueue(file_item);
+  tube_counter_.EnqueueBack(file_item);
+  tube_input_.EnqueueBack(file_item);
 }
 
 

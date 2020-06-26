@@ -221,11 +221,16 @@ __do_gc_cmd()
 
   # leave extra layer of indent for now to better show diff with previous
 
+    CVMFS_PASSTHROUGH=false
     load_repo_config $name
 
     # sanity checks
     check_repository_compatibility $name
     check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || die "Repository unavailable under $CVMFS_STRATUM0"
+    if [ x"$CVMFS_PASSTHROUGH" = x"true" ]; then
+      echo "Repository $name is a pass-through repository, nothing to do"
+      return 0
+    fi
     if is_empty_repository $name; then
       echo "Repository $name is empty, nothing to do"
       return 0
@@ -279,6 +284,9 @@ __do_gc_cmd()
       if is_stratum0 $name; then
         # close the transaction
         trap - EXIT HUP INT TERM
+        if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
+          /usr/share/cvmfs-server/upload_stats_plots.sh $name
+        fi
         close_transaction $name 0
       else
         # release the update lock
@@ -321,6 +329,10 @@ __run_gc() {
     additional_switches="$additional_switches -L $deletion_log"
   elif [ ! -z $CVMFS_GC_DELETION_LOG ]; then
     additional_switches="$additional_switches -L $CVMFS_GC_DELETION_LOG"
+  fi
+
+  if [ x"$CVMFS_UPLOAD_STATS_DB" = x"true" ]; then
+    additional_switches="$additional_switches -I"
   fi
 
   # do it!

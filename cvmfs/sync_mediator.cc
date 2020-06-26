@@ -21,52 +21,12 @@
 #include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
-
-struct Counters {
-  perf::Counter *n_files_added;
-  perf::Counter *n_files_removed;
-  perf::Counter *n_files_changed;
-  perf::Counter *n_directories_added;
-  perf::Counter *n_directories_removed;
-  perf::Counter *n_directories_changed;
-  perf::Counter *n_symlinks_added;
-  perf::Counter *n_symlinks_removed;
-  perf::Counter *n_symlinks_changed;
-  perf::Counter *sz_added_bytes;
-  perf::Counter *sz_removed_bytes;
-
-  explicit Counters(perf::StatisticsTemplate statistics) {
-    n_files_added = statistics.RegisterTemplated("n_files_added",
-        "Number of files added");
-    n_files_removed = statistics.RegisterTemplated("n_files_removed",
-        "Number of files removed");
-    n_files_changed = statistics.RegisterTemplated("n_files_changed",
-        "Number of files changed");
-    n_directories_added = statistics.RegisterTemplated("n_directories_added",
-        "Number of directories added");
-    n_directories_removed =
-                  statistics.RegisterTemplated("n_directories_removed",
-                                            "Number of directories removed");
-    n_directories_changed =
-                  statistics.RegisterTemplated("n_directories_changed",
-                                            "Number of directories changed");
-    n_symlinks_added = statistics.RegisterTemplated("n_symlinks_added",
-        "Number of symlinks added");
-    n_symlinks_removed = statistics.RegisterTemplated("n_symlinks_removed",
-        "Number of symlinks removed");
-    n_symlinks_changed = statistics.RegisterTemplated("n_symlinks_changed",
-        "Number of symlinks changed");
-    sz_added_bytes = statistics.RegisterTemplated("sz_added_bytes",
-                                            "Number of bytes added");
-    sz_removed_bytes = statistics.RegisterTemplated("sz_removed_bytes",
-                                            "Number of bytes removed");
-  }
-};  // Counters
 
 namespace publish {
 
@@ -87,7 +47,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
-  counters_ = new Counters(statistics);
+  counters_ = new perf::FsCounters(statistics);
 }
 
 
@@ -115,8 +75,8 @@ void SyncMediator::EnsureAllowed(SharedPtr<SyncItem> entry) {
                   string(catalog::VirtualCatalog::kVirtualPath) + "/",
                   ignore_case_setting)) )
   {
-    PrintError("invalid attempt to modify '" + relative_path + "'");
-    abort();
+    PANIC(kLogStderr, "[ERROR] invalid attempt to modify %s",
+          relative_path.c_str());
   }
 }
 
@@ -726,9 +686,8 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
            result.file_chunks.size(),
            result.return_code);
   if (result.return_code != 0) {
-    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
-             result.local_path.c_str(), result.return_code);
-    abort();
+    PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
+          result.return_code);
   }
 
   SyncItemList::iterator itr;
@@ -776,9 +735,8 @@ void SyncMediator::PublishHardlinksCallback(
            result.content_hash.ToString().c_str(),
            result.return_code);
   if (result.return_code != 0) {
-    LogCvmfs(kLogPublish, kLogStderr, "Spool failure for %s (%d)",
-             result.local_path.c_str(), result.return_code);
-    abort();
+    PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
+          result.return_code);
   }
 
   bool found = false;
@@ -889,18 +847,15 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
       // the graft file is missing information.  It's not clear that continuing
       // forward with the publish is the correct thing to do; abort for now.
-      LogCvmfs(kLogPublish, kLogStderr,
-               "Encountered a grafted file (%s) with "
-               "invalid grafting information; check contents of .cvmfsgraft-*"
-               " file.  Aborting publish.",
-               entry->GetRelativePath().c_str());
-      abort();
+      PANIC(kLogStderr,
+            "Encountered a grafted file (%s) with "
+            "invalid grafting information; check contents of .cvmfsgraft-*"
+            " file.  Aborting publish.",
+            entry->GetRelativePath().c_str());
     }
   } else if (entry->relative_parent_path().empty() &&
              entry->IsCatalogMarker()) {
-    LogCvmfs(kLogPublish, kLogStderr,
-             "Error: nested catalog marker in root directory");
-    abort();
+    PANIC(kLogStderr, "Error: nested catalog marker in root directory");
   } else {
     {
       // Push the file to the spooler, remember the entry for the path
@@ -1034,7 +989,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
       LogCvmfs(kLogPublish, kLogStdout, "Hardlinks across directories (%s)",
                i->second.master->GetUnionPath().c_str());
       if (!params_->ignore_xdir_hardlinks)
-        abort();
+        PANIC(NULL);
     }
 
     if (params_->print_changeset) {

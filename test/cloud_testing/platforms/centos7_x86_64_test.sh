@@ -38,7 +38,6 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 CVMFS_TEST_UNIONFS=overlayfs                                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
-                                 src/585-xattrs                               \
                                  src/600-securecvmfs                          \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/672-publish_stats_hardlinks              \
@@ -66,5 +65,11 @@ CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
          -o ${MIGRATIONTEST_SERVER_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
             migration_tests/5*                                    \
          || retval=1
+
+echo "running DUCC test cases..."
+CVMFS_TEST_CLASS_NAME=DUCCTests                                         \
+./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   src/4*                               \
+                                || retval=1
 
 exit $retval

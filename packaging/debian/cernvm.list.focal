@@ -1,0 +1,2 @@
+deb http://cvmrepo.web.cern.ch/cvmrepo/apt focal-prod main
+# deb http://cvmrepo.web.cern.ch/cvmrepo/apt focal-testing main

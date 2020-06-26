@@ -36,17 +36,18 @@
 #include <string>
 #include <vector>
 
-#ifndef CVMFS_LIBCVMFS
+#if defined(CVMFS_FUSE_MODULE)
 #include "cvmfs.h"
 #endif
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
 // Used for address offset calculation
-#ifndef CVMFS_LIBCVMFS
+#if defined(CVMFS_FUSE_MODULE)
 extern loader::CvmfsExports *g_cvmfs_exports;
 #endif
 
@@ -163,7 +164,6 @@ pid_t Watchdog::GetPid() {
   return getpid();
 }
 
-
 /**
  * Log a string to syslog and into the crash dump file.
  * We expect ideally nothing to be logged, so that file is created on demand.
@@ -176,9 +176,12 @@ void Watchdog::LogEmergency(string msg) {
     if (fp) {
       time_t now = time(NULL);
       msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
-      if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length())
-        msg += " (failed to report into crash dump file "
-               + crash_dump_path_ + ")";
+      if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length()) {
+        msg +=
+            " (failed to report into crash dump file " + crash_dump_path_ + ")";
+      } else {
+        msg += "\n Crash logged also on file: " + crash_dump_path_ + "\n";
+      }
       fclose(fp);
     } else {
       msg += " (failed to open crash dump file " + crash_dump_path_ + ")";
@@ -186,7 +189,6 @@ void Watchdog::LogEmergency(string msg) {
   }
   LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
 }
-
 
 /**
  * Reads from the file descriptor until the specific gdb prompt is reached or
@@ -314,7 +316,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
     if (++counter == 300) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
       // Last attempt to log something useful
-#ifndef CVMFS_LIBCVMFS
+#if defined(CVMFS_FUSE_MODULE)
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
                sig, send_errno);
       void *addr[kMaxBacktrace];
@@ -356,7 +358,7 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
   for (; i != iend; ++i) {
     struct sigaction old_signal_handler;
     if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
-      abort();
+      PANIC(NULL);
     }
     old_signal_handlers[i->first] = old_signal_handler;
   }
@@ -378,7 +380,7 @@ void Watchdog::Spawn() {
   int max_fd = sysconf(_SC_OPEN_MAX);
   assert(max_fd >= 0);
   switch (pid = fork()) {
-    case -1: abort();
+    case -1: PANIC(NULL);
     case 0:
       // Double fork to avoid zombie
       switch (fork()) {
@@ -414,8 +416,8 @@ void Watchdog::Spawn() {
     default:
       close(pipe_watchdog_->read_end);
       close(pipe_listener_->write_end);
-      if (waitpid(pid, &statloc, 0) != pid) abort();
-      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) abort();
+      if (waitpid(pid, &statloc, 0) != pid) PANIC(NULL);
+      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) PANIC(NULL);
   }
 
   // retrieve the watchdog PID from the pipe
@@ -437,7 +439,7 @@ void Watchdog::Spawn() {
   sighandler_stack_.ss_size = stack_size;
   sighandler_stack_.ss_flags = 0;
   if (sigaltstack(&sighandler_stack_, NULL) != 0)
-    abort();
+    PANIC(NULL);
 
   // define our crash signal handler
   struct sigaction sa;
@@ -493,10 +495,11 @@ void *Watchdog::MainWatchdogListener(void *data) {
           (watch_fds[0].revents & POLLNVAL))
       {
         LogCvmfs(kLogMonitor, kLogDebug | kLogSyslogErr,
-                 "watchdog disappeared, aborting");
-        abort();
+                 "watchdog disappeared, disabling stack trace reporting");
+        watchdog->SetSignalHandlers(watchdog->old_signal_handlers_);
+        PANIC(kLogDebug | kLogSyslogErr, "watchdog disappeared, aborting");
       }
-      assert(false);
+      PANIC(NULL);
     }
   }
   close(watchdog->pipe_listener_->read_end);

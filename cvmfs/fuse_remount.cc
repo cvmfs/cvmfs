@@ -21,6 +21,7 @@
 #include "mountpoint.h"
 #include "platform.h"
 #include "statistics.h"
+#include "util/exception.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -40,9 +41,8 @@ FuseRemounter::Status FuseRemounter::Check() {
   if (mountpoint_->ReloadBlacklists() &&
       mountpoint_->catalog_mgr()->IsRevisionBlacklisted())
   {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
-            "repository revision blacklisted, aborting");
-    abort();
+    PANIC(kLogDebug | kLogSyslogErr,
+          "repository revision blacklisted, aborting");
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
@@ -84,7 +84,7 @@ FuseRemounter::Status FuseRemounter::Check() {
       return kStatusUp2Date;
     }
     default:
-      abort();
+      PANIC(NULL);
   }
 }
 
@@ -180,9 +180,8 @@ void *FuseRemounter::MainRemountTrigger(void *data) {
         }
         continue;
       }
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "remount trigger connection failure (%d)", errno);
-      abort();
+      PANIC(kLogSyslogErr | kLogDebug,
+            "remount trigger connection failure (%d)", errno);
     }
 
     if (retval == 0) {

@@ -18,6 +18,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -800,9 +801,8 @@ void *CachePlugin::MainProcessRequests(void *data) {
     if (retval < 0) {
       if (errno == EINTR)
         continue;
-      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-               "cache plugin connection failure (%d)", errno);
-      abort();
+      PANIC(kLogSyslogErr | kLogDebug, "cache plugin connection failure (%d)",
+            errno);
     }
 
     // Termination or detach

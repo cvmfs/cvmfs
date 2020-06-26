@@ -12,6 +12,7 @@
 
 #include "atomic.h"
 #include "c_file_sandbox.h"
+#include "c_http_server.h"
 #include "hash.h"
 #include "logging.h"
 #include "testutil.h"
@@ -102,6 +103,7 @@ class T_Uploaders : public FileSandbox {
  protected:
   AbstractUploader *uploader_;
   UploadCallbacks   delegate_;
+  MockHTTPServer   *http_server_;
 
   virtual void SetUp() {
     CreateSandbox(T_Uploaders::tmp_dir);
@@ -125,7 +127,12 @@ class T_Uploaders : public FileSandbox {
   virtual void SetUp(const type<upload::S3Uploader> type_specifier) {
     repo_alias = "testdata";
     CreateTempS3ConfigFile(10, 10);
-    CreateS3Mockup();
+    http_server_ = new MockHTTPServer(CVMFS_S3_TEST_MOCKUP_SERVER_PORT);
+    // Use custom_handler_data to implement S3 retry logic
+    int *custom_handler_data = new int(kTotal429Replies);
+    http_server_->SetResponseCallback(S3MockupRequestHandler,
+                                      custom_handler_data);
+    assert(http_server_->Start());
   }
 
 
@@ -148,17 +155,7 @@ class T_Uploaders : public FileSandbox {
 
   virtual void TearDown(const type<upload::S3Uploader> type_specifier) {
     // Request S3 mockup server to finish
-    uploader_->Peek("EXIT");
-
-    // Wait S3 mockup server to finish
-    int stat_loc = 0;
-    int retval;
-    do {
-      retval = wait(&stat_loc);
-    } while ((retval == -1) && (errno == EINTR));
-    EXPECT_NE(-1, retval) << "wait returned with errno " << errno;
-    EXPECT_TRUE(WIFEXITED(stat_loc));
-    EXPECT_EQ(0, WEXITSTATUS(stat_loc));
+    assert(http_server_->Stop());
   }
 
 
@@ -324,16 +321,6 @@ class T_Uploaders : public FileSandbox {
 
   bool IsS3() const;
 
- private:
-  void CreateS3Mockup() {
-    int pid = fork();
-    ASSERT_GE(pid, 0);
-    if (pid == 0)  {
-      S3MockupServerThread();
-      exit(0);
-    }
-  }
-
 
   /**
    * Get the field number "idx" (e.g. 2) from a string
@@ -376,151 +363,53 @@ class T_Uploaders : public FileSandbox {
     return -1;
   }
 
-
-  void S3MockupServerThread() {
-    const int kReadBufferSize = 1000;
-    int listen_sockfd, accept_sockfd;
-    socklen_t clilen;
-    struct sockaddr_in serv_addr, cli_addr;
-    char buffer[kReadBufferSize];
-    int retval = 0;
-
-    // Listen incoming connections
-    listen_sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    ASSERT_GE(listen_sockfd, 0);
-    FdGuard fd_guard_listen(listen_sockfd);
-    bzero(reinterpret_cast<char *>(&serv_addr), sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(CVMFS_S3_TEST_MOCKUP_SERVER_PORT);
-    int on = 1;
-    retval = setsockopt(listen_sockfd, SOL_SOCKET,
-                        SO_REUSEADDR, &on, sizeof(on));
-    ASSERT_EQ(retval, 0);
-    retval = bind(listen_sockfd,
-                  (struct sockaddr *) &serv_addr,
-                  sizeof(serv_addr));
-    ASSERT_GE(retval, 0);
-    listen(listen_sockfd, 5);
-    clilen = sizeof(cli_addr);
-
+  static HTTPResponse S3MockupRequestHandler(const HTTPRequest &req,
+                                             void *data) {
     // Number of 429 retries in a row, should be larger than the number of
     // regular client retries
-    int n429 = kTotal429Replies;
+    // Used in tests testing the retry logic
+    int *n429 = static_cast<int *>(data);
 
-    struct timeval tv;
-    tv.tv_sec = 5;
-    tv.tv_usec = 0;
-    fd_set rfds;
-    bool quit = false;
-    while (!quit) {
-      // Wait for traffic
-      FD_ZERO(&rfds);
-      FD_SET(listen_sockfd, &rfds);
-      retval = select(listen_sockfd+1, &rfds, NULL, NULL, &tv);
-      ASSERT_GE(retval, 0);
-      if (retval == 0)  // Timeout
-        continue;
+    HTTPResponse response;
+    // strip bucket name
+    std::string req_file = req.path.substr(req.path.find("/", 1) + 1);
 
-      accept_sockfd = accept(listen_sockfd,
-                             (struct sockaddr *) &cli_addr,
-                             &clilen);
-      ASSERT_GE(accept_sockfd, 0);
-      FdGuard fd_guard_accept(accept_sockfd);
-      bzero(buffer, kReadBufferSize);
-
-      // Get header
-      std::string req_header = "";
-      char buf[4] = {'0', '0', '0', '0'};
-      do {
-        int n = read(accept_sockfd, buf, 1);
-        ASSERT_EQ(n, 1);
-        if (strncmp(buf, "\n\r\n\r", 4) == 0 ||
-            strncmp(buf, "\n\n", 2) == 0) {
-          break;
-        }
-        req_header += std::string(buf, 1);
-        for (int i = 3; i > 0; i--) {
-          buf[i] = buf[i-1];
-        }
-      } while (true);
-
-      // Parse header
-      std::string req_type = "";
-      std::string req_file = "";  // target name without bucket prefix
-      int content_length = 0;
-      req_type = GetField(req_header, ' ', 0);
-      req_file = GetField(req_header, ' ', 1);
-      req_file = req_file.substr(req_file.find("/", 1) + 1);  // no bucket
-      if (req_type.compare("PUT") == 0) {
-        content_length = GetValue(req_header, "Content-Length");
-        ASSERT_GE(content_length, 0);
+    if ((*n429 > 0) &&
+        (req.path.size() >= 5) &&
+        (req.path.compare(req.path.size() - 5, 5, "RETRY") == 0)) {
+      (*n429)--;
+      response.code = 429;
+      response.reason = "Too Many Requests";
+      response.AddHeader("Retry-After", "1");
+    } else if (req.method == "PUT") {
+      std::string path = T_Uploaders::dest_dir + "/" + req_file;
+      FILE* file = fopen(path.c_str(), "w");
+      assert(file != NULL);
+      FileGuard file_guard(file);
+      int fid = fileno(file);
+      assert(fid >= 0);
+      ssize_t bytes_written = write(fid, req.body.c_str(), req.content_length);
+      assert(bytes_written >= 0);
+      assert(req.content_length == (uint64_t)bytes_written);
+      int retval = fsync(fid);
+      assert(retval == 0);
+    } else if (req.method == "HEAD") {
+      if (!FileExists(T_Uploaders::dest_dir + "/" + req_file)) {
+        response.code = 404;
+        response.reason = "Not Found";
       }
 
-      if ((req_file.size() >= 5) &&
-          (req_file.compare(req_file.size() - 5, 5, "RETRY") == 0) &&
-          (n429 > 0))
-      {
-        int left_to_read = content_length;
-        while (left_to_read > 0) {
-          int n = read(accept_sockfd, buffer, kReadBufferSize-1);
-          left_to_read -= n;
-        }
-
-        n429--;
-        string reply = "HTTP/1.1 429 Too Many Requests\r\n"
-          "Retry-After: 1\r\n\r\n"
-          "Connection: close\r\n\r\n";
-        int n = write(accept_sockfd, reply.c_str(), reply.length());
-        ASSERT_GE(n, 0);
-        continue;
+    } else if (req.method == "DELETE") {
+      std::string path = T_Uploaders::dest_dir + "/" + req_file;
+      if (FileExists(path)) {
+        int retval = remove(path.c_str());
+        assert(retval == 0);
       }
-
-      // Get content
-      FILE *file = NULL;
-      if (req_type.compare("PUT") == 0) {
-        std::string path = T_Uploaders::dest_dir + "/" + req_file;
-        file = fopen(path.c_str(), "w");
-        ASSERT_TRUE(file != NULL);
-        FileGuard file_guard(file);
-        int fid = fileno(file);
-        ASSERT_GE(fid, 0);
-        int left_to_read = content_length;
-        while (left_to_read > 0) {
-          int n = read(accept_sockfd, buffer, kReadBufferSize-1);
-          EXPECT_EQ(n, write(fid, buffer, n));
-          left_to_read -= n;
-        }
-        retval = fsync(fid);
-        EXPECT_EQ(retval, 0);
-      }
-
-      // Reply to client
-      std::string reply = "HTTP/1.1 200 OK\r\n";
-      if (req_type.compare("HEAD") == 0) {
-        if (req_file.size() >= 4 &&
-            req_file.compare(req_file.size() - 4, 4, "EXIT") == 0)
-        {
-          reply = "HTTP/1.1 404 Not Found\r\n";
-          quit = true;
-        } else {
-          if (FileExists(T_Uploaders::dest_dir + "/" + req_file) == false)
-            reply = "HTTP/1.1 404 Not Found\r\n";
-        }
-      } else if (req_type.compare("DELETE") == 0) {
-        std::string path = T_Uploaders::dest_dir + "/" + req_file;
-        if (FileExists(path)) {
-          retval = remove(path.c_str());
-          ASSERT_EQ(retval, 0);
-        }
-        // "No Content"-reply even if file did not exist
-        reply = "HTTP/1.1 204 No Content\r\n";
-      }
-      reply += "Connection: close\r\n\r\n";
-
-      int n = write(accept_sockfd, reply.c_str(), reply.length());
-      ASSERT_GE(n, 0);
+      response.code = 204;
+      response.reason = "No Content";
     }
+
+    return response;
   }
 
 

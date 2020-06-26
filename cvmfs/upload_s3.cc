@@ -19,6 +19,7 @@
 #include "logging.h"
 #include "options.h"
 #include "s3fanout.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -49,7 +50,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   atomic_init32(&terminate_);
 
   if (!ParseSpoolerDefinition(spooler_definition)) {
-    abort();
+    PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
   s3fanout::S3FanoutManager::S3Config s3config;
@@ -184,10 +185,8 @@ bool S3Uploader::Create() {
         "\"http://s3.amazonaws.com/doc/2006-03-01/\">"
         "<LocationConstraint>") + region_ + "</LocationConstraint>"
         "</CreateBucketConfiguration>";
-    info->origin = s3fanout::kOriginMem;
-    info->origin_mem.size = request_content.length();
-    info->origin_mem.data =
-      reinterpret_cast<const unsigned char *>(request_content.data());
+    info->origin->Append(request_content.data(), request_content.length());
+    info->origin->Commit();
   }
 
   RequestCtrl req_ctrl;
@@ -253,17 +252,11 @@ void *S3Uploader::MainCollectResults(void *data) {
           uploader->DecUploadedChunks();
           uploader->CountUploadedBytes(-(info->payload_size));
         }
-        if (info->origin == s3fanout::kOriginMem) {
-          uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                            UploaderResults(UploaderResults::kChunkCommit,
-                                            reply_code));
-        } else {
-          uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                            UploaderResults(reply_code, info->origin_path));
-        }
+        uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                          UploaderResults(UploaderResults::kChunkCommit,
+                                          reply_code));
 
-        assert(info->mmf == NULL);
-        assert(info->origin_file == NULL);
+        assert(!info->origin.IsValid());
       }
       delete info;
     }
@@ -291,42 +284,35 @@ void S3Uploader::DoUpload(
   rvb = source->GetSize(&size);
   assert(rvb);
 
-  std::string local_path;
-  if (source->IsRealFile()) {
-    local_path = source->GetPath();
-  } else {
-    // TODO(jblomer): keep small files in memory
-    int tmp_fd = CreateAndOpenTemporaryChunkFile(&local_path);
-    if (tmp_fd < 0) {
+  FileBackedBuffer *origin =
+    FileBackedBuffer::Create(kInMemoryObjectThreshold,
+                             spooler_definition().temporary_path);
+
+  unsigned char buffer[kPageSize];
+  ssize_t nbytes;
+  do {
+    nbytes = source->Read(buffer, kPageSize);
+    if (nbytes > 0) origin->Append(buffer, nbytes);
+    if (nbytes < 0) {
       source->Close();
+      delete origin;
       Respond(callback, UploaderResults(100, source->GetPath()));
       return;
     }
-    unsigned char buffer[kPageSize];
-    ssize_t nbytes;
-    do {
-      nbytes = source->Read(buffer, kPageSize);
-      rvb = true;
-      if (nbytes > 0) rvb = SafeWrite(tmp_fd, buffer, nbytes);
-      if (nbytes < 0 || !rvb) {
-        source->Close();
-        close(tmp_fd);
-        unlink(local_path.c_str());
-        Respond(callback, UploaderResults(100, source->GetPath()));
-        return;
-      }
-    } while (nbytes == kPageSize);
-    close(tmp_fd);
-  }
+  } while (nbytes == kPageSize);
   source->Close();
+  origin->Commit();
+
   s3fanout::JobInfo *info =
     new s3fanout::JobInfo(repository_alias_ + "/" + remote_path,
                           const_cast<void*>(
                               static_cast<void const*>(callback)),
-                          local_path);
+                          origin);
 
   if (HasPrefix(remote_path, ".cvmfs", false /*ignore_case*/)) {
     info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
+  } else if (HasSuffix(remote_path, ".html", false)) {
+    info->request = s3fanout::JobInfo::kReqPutHtml;
   } else {
     if (peek_before_put_)
       info->request = s3fanout::JobInfo::kReqHeadPut;
@@ -343,18 +329,15 @@ void S3Uploader::DoUpload(
   req_ctrl.WaitFor();
   LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from source finished: %s",
            source->GetPath().c_str());
-
-  if (!source->IsRealFile()) unlink(local_path.c_str());
 }
 
 
 void S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
   LogCvmfs(kLogUploadS3, kLogDebug,
-           "Uploading from %s:\n"
+           "Uploading:\n"
            "--> Object: '%s'\n"
            "--> Bucket: '%s'\n"
            "--> Host:   '%s'\n",
-           info->origin_mem.data != NULL ? "buffer" : "file",
            info->object_key.c_str(),
            bucket_.c_str(),
            host_name_port_.c_str());
@@ -364,20 +347,8 @@ void S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
 
 
 UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
-  std::string tmp_path;
-  const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
-
-  LogCvmfs(kLogUploadS3, kLogDebug, "InitStreamedUpload: %s", tmp_path.c_str());
-
-  if (tmp_fd < 0) {
-    LogCvmfs(kLogUploadS3, kLogStderr, "Failed to open file (%d), %s",
-             errno, strerror(errno));
-    atomic_inc32(&io_errors_);
-
-    return NULL;
-  }
-
-  return new S3StreamHandle(callback, tmp_fd, tmp_path);
+  return new S3StreamHandle(callback, kInMemoryObjectThreshold,
+                            spooler_definition().temporary_path);
 }
 
 
@@ -386,23 +357,9 @@ void S3Uploader::StreamedUpload(
   UploadBuffer        buffer,
   const CallbackTN    *callback)
 {
-  S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
+  S3StreamHandle *s3_handle = static_cast<S3StreamHandle*>(handle);
 
-  LogCvmfs(kLogUploadS3, kLogDebug, "Upload target = %s",
-           local_handle->temporary_path.c_str());
-
-  if (!SafeWrite(local_handle->file_descriptor, buffer.data, buffer.size)) {
-    const int cpy_errno = errno;
-    LogCvmfs(kLogUploadS3, kLogStderr,
-             "failed to write %d bytes to '%s' (errno: %d)",
-             buffer.size,
-             local_handle->temporary_path.c_str(),
-             cpy_errno);
-    atomic_inc32(&io_errors_);
-    Respond(callback,
-            UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
-    return;
-  }
+  s3_handle->buffer->Append(buffer.data, buffer.size);
   Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
@@ -411,59 +368,33 @@ void S3Uploader::FinalizeStreamedUpload(
   UploadStreamHandle  *handle,
   const shash::Any    &content_hash)
 {
-  int retval = 0;
-  S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
+  S3StreamHandle *s3_handle = static_cast<S3StreamHandle*>(handle);
 
-  retval = close(local_handle->file_descriptor);
-  if (retval != 0) {
-    const int cpy_errno = errno;
-    LogCvmfs(kLogUploadS3, kLogStderr,
-             "failed to close temp file '%s' (errno: %d)",
-             local_handle->temporary_path.c_str(), cpy_errno);
-    atomic_inc32(&io_errors_);
-    Respond(handle->commit_callback,
-            UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
-    return;
+  // New file name based on content hash or remote_path override
+  std::string final_path;
+  if (s3_handle->remote_path != "") {
+    final_path = repository_alias_ + "/" + s3_handle->remote_path;
+  } else {
+    final_path = repository_alias_ + "/data/" + content_hash.MakePath();
   }
 
-  // Open the file for reading
-  MemoryMappedFile *mmf = new MemoryMappedFile(local_handle->temporary_path);
-  if (!mmf->Map()) {
-    LogCvmfs(kLogUploadS3, kLogStderr, "Failed to upload %s",
-             local_handle->temporary_path.c_str());
-    delete mmf;
-    atomic_inc32(&io_errors_);
-    Respond(handle->commit_callback,
-            UploaderResults(100, local_handle->temporary_path));
-    return;
-  }
+  s3_handle->buffer->Commit();
 
-  // New file name based on content hash
-  std::string final_path(
-    repository_alias_ + "/data/" + content_hash.MakePath());
+  size_t bytes_uploaded = s3_handle->buffer->GetSize();
 
   s3fanout::JobInfo *info =
       new s3fanout::JobInfo(final_path,
                             const_cast<void*>(
                                 static_cast<void const*>(
                                     handle->commit_callback)),
-                            mmf,
-                            reinterpret_cast<unsigned char *>(mmf->buffer()),
-                            static_cast<size_t>(mmf->size()));
-  assert(info != NULL);
-  size_t bytes_uploaded = mmf->size();
+                            s3_handle->buffer.Release());
 
   if (peek_before_put_)
       info->request = s3fanout::JobInfo::kReqHeadPut;
   UploadJobInfo(info);
 
-  LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from stream finished: %s",
-           local_handle->temporary_path.c_str());
-
   // Remove the temporary file
-  retval = unlink(local_handle->temporary_path.c_str());
-  assert(retval == 0);
-  delete local_handle;
+  delete s3_handle;
 
   // Update statistics counters
   if (!content_hash.HasSuffix() ||
@@ -478,11 +409,8 @@ void S3Uploader::FinalizeStreamedUpload(
 
 
 s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
-  return new s3fanout::JobInfo(path,
-                               NULL,
-                               NULL,
-                               NULL,
-                               0);
+  FileBackedBuffer *buf = FileBackedBuffer::Create(kInMemoryObjectThreshold);
+  return new s3fanout::JobInfo(path, NULL, buf);
 }
 
 
@@ -530,6 +458,12 @@ bool S3Uploader::Peek(const std::string& path) {
   req_ctrl.WaitFor();
 
   return req_ctrl.return_code == 0;
+}
+
+
+// noop: no mkdir needed in S3 storage
+bool S3Uploader::Mkdir(const std::string &path) {
+  return true;
 }
 
 

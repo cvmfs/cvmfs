@@ -365,7 +365,7 @@ cvmfs_server_mkfs() {
 
   health_check $name || die "fail! (health check after mount)"
 
-  if [ x"$upstream_type" != xgw ]; then
+  if [ x"$upstream_type" != xgw -a "x$voms_authz" = "x" ]; then
       echo -n "Initial commit... "
       cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
       echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository

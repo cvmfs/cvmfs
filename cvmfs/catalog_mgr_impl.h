@@ -479,7 +479,8 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
  */
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
-                                     DirectoryEntryList *listing)
+                                     DirectoryEntryList *listing,
+                                     const bool expand_symlink)
 {
   EnforceSqliteMemLimit();
   bool result;
@@ -501,7 +502,7 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
   }
 
   perf::Inc(statistics_.n_listing);
-  result = catalog->ListingPath(path, listing);
+  result = catalog->ListingPath(path, listing, expand_symlink);
 
   Unlock();
   return result;
@@ -581,6 +582,43 @@ bool AbstractCatalogManager<CatalogT>::ListFileChunks(
 
   Unlock();
   return result;
+}
+
+template <class CatalogT>
+catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
+  const PathString &path,
+  std::string *subcatalog_path)
+{
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Look past current path to mount up to intended location
+  PathString catalog_path(path);
+  catalog_path.Append("/.cvmfscatalog", 14);
+
+  // Find catalog, possibly load nested
+  CatalogT *best_fit = FindCatalog(catalog_path);
+  CatalogT *catalog = best_fit;
+  if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(catalog_path);
+    result =
+      MountSubtree(catalog_path, best_fit, false /* is_listable */, &catalog);
+    // Result is false if an available catalog failed to load (error happened)
+    if (!result) {
+      Unlock();
+      *subcatalog_path = "error: failed to load catalog!";
+      return catalog::Counters();
+    }
+  }
+
+  *subcatalog_path = catalog->mountpoint().ToString();
+  catalog::Counters counters = catalog->GetCounters();
+  Unlock();
+  return counters;
 }
 
 

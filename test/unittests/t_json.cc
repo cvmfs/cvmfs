@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "json_document.h"
+#include "json_document_write.h"
 #include "util/pointer.h"
 
 TEST(T_Json, Empty) {
@@ -63,16 +64,20 @@ TEST(T_Json, SearchInObject) {
   EXPECT_EQ(NULL, result);
 }
 
-TEST(T_Json, ToJsonString) {
-  JsonStringInput input;
-  input.push_back(std::make_pair("f1", "v1"));
-  input.push_back(std::make_pair("f2", "v2"));
-  input.push_back(std::make_pair("f3", "v3"));
+TEST(T_Json, GenerateValidJsonString) {
+  JsonStringGenerator input;
+  input.Add("f1", "v1");
+  input.Add("f2", "v2");
+  input.Add("f3", "v3");
+  input.Add("f4", "v\n4");
+  input.Add("integer", 12);
 
-  std::string output;
-  ASSERT_TRUE(ToJsonString(input, &output));
+  std::string output = input.GenerateString();
 
-  ASSERT_EQ("{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\"}", output);
+  ASSERT_EQ(
+      "{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\","
+      "\"f4\":\"v\\n4\",\"integer\":12}",
+      output);
 
   UniquePtr<JsonDocument> json(JsonDocument::Create(output));
   ASSERT_TRUE(json.IsValid());

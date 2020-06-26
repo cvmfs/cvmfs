@@ -1,0 +1,69 @@
+
+cvmfs_test_name="Test CVMFS with external cache plugins"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_CACHE_PLUGIN_PORT=8081
+CVMFS_CACHE_PLUGIN_POSIX_PATH=/usr/libexec/cvmfs/cache/cvmfs_cache_posix
+CVMFS_CACHE_PLUGIN_RAM_PATH=/usr/libexec/cvmfs/cache/cvmfs_cache_ram
+
+CVMFS_CACHE_PLUGIN_POSIX_PID=""
+CVMFS_CACHE_PLUGIN_RAM_PID=""
+
+cleanup() {
+  if [ "x$CVMFS_CACHE_PLUGIN_POSIX_PID" != "x" ]; then
+    kill $CVMFS_CACHE_PLUGIN_POSIX_PID
+    CVMFS_CACHE_PLUGIN_POSIX_PID=""
+  fi
+  if [ "x$CVMFS_CACHE_PLUGIN_RAM_PID" != "x" ]; then
+    kill $CVMFS_CACHE_PLUGIN_RAM_PID
+    CVMFS_CACHE_PLUGIN_RAM_PID=""
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  trap cleanup EXIT HUP INT TERM
+
+  mount_opts="CVMFS_CACHE_PRIMARY=externalplugin"
+  mount_opts="$mount_opts CVMFS_CACHE_externalplugin_TYPE=external"
+  mount_opts="$mount_opts CVMFS_CACHE_externalplugin_LOCATOR=tcp=127.0.0.1:$CVMFS_TEST_CACHE_PLUGIN_PORT"
+
+  echo "CVMFS_CACHE_PLUGIN_LOCATOR=tcp=127.0.0.1:$CVMFS_TEST_CACHE_PLUGIN_PORT" > cache.config || return 1
+  echo "CVMFS_CACHE_BASE=/tmp/cvmfs_integration_test_cache_posix/" >> cache.config || return 1
+  $CVMFS_CACHE_PLUGIN_POSIX_PATH cache.config > /dev/null &
+  CVMFS_CACHE_PLUGIN_POSIX_PID=$!
+  echo "*** PID of POSIX cache plugin is $CVMFS_CACHE_PLUGIN_POSIX_PID"
+
+  cvmfs_mount lhcb.cern.ch $mount_opts || return 3
+  ls /cvmfs/lhcb.cern.ch > /dev/null || return 4
+  filename=$(find /cvmfs/lhcb.cern.ch -type f | head -n1)
+  cat $filename > /dev/null || return 5
+  sudo cvmfs_config umount || return 6
+
+  wait_for_umount || return 7
+
+  kill -s INT $CVMFS_CACHE_PLUGIN_POSIX_PID || return 8
+  CVMFS_CACHE_PLUGIN_POSIX_PID=""
+
+
+  echo "CVMFS_CACHE_PLUGIN_LOCATOR=tcp=127.0.0.1:$CVMFS_TEST_CACHE_PLUGIN_PORT" > cache.config || return 9
+  echo "CVMFS_CACHE_PLUGIN_SIZE=20" >> cache.config || return 9  # 20 MB should be enough for testing purposes
+  echo "CVMFS_CACHE_PLUGIN_TEST=yes" >> cache.config || return 9
+  CVMFS_CACHE_PLUGIN_RAM_PID=$($CVMFS_CACHE_PLUGIN_RAM_PATH cache.config)
+  echo "*** PID of RAM cache plugin is $CVMFS_CACHE_PLUGIN_RAM_PID"
+
+  cvmfs_mount lhcb.cern.ch $mount_opts || return $?
+  ls /cvmfs/lhcb.cern.ch > /dev/null || return 10
+  filename=$(find /cvmfs/lhcb.cern.ch -type f | head -n1)
+  cat $filename > /dev/null || return 11
+  sudo cvmfs_config umount || return 12
+
+  wait_for_umount || return 13
+
+  kill -s INT $CVMFS_CACHE_PLUGIN_RAM_PID || return 14
+  CVMFS_CACHE_PLUGIN_RAM_PID=""
+
+  return 0
+}
+

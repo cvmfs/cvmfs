@@ -22,44 +22,41 @@ const size_t kConsumerBuffer = 10 * 1024 * 1024;  // 10 MB
 namespace receiver {
 
 FileInfo::FileInfo()
-  : total_size(0),
+  : handle(NULL),
+    total_size(0),
     current_size(0),
     hash_context(),
-    hash_buffer(),
-    skip(false)
+    hash_buffer()
 {}
 
 FileInfo::FileInfo(const ObjectPackBuild::Event& event)
-  : temp_path(),
+  : handle(NULL),
     total_size(event.size),
     current_size(0),
     hash_context(shash::ContextPtr(event.id.algorithm)),
-    hash_buffer(hash_context.size, 0),
-    skip(false)
+    hash_buffer(hash_context.size, 0)
 {
   hash_context.buffer = &hash_buffer[0];
   shash::Init(hash_context);
 }
 
 FileInfo::FileInfo(const FileInfo& other)
-  : temp_path(other.temp_path),
+  : handle(other.handle),
     total_size(other.total_size),
     current_size(other.current_size),
     hash_context(other.hash_context),
-    hash_buffer(other.hash_buffer),
-    skip(other.skip)
+    hash_buffer(other.hash_buffer)
 {
   hash_context.buffer = &hash_buffer[0];
 }
 
 FileInfo& FileInfo::operator=(const FileInfo& other) {
-  temp_path = other.temp_path;
+  handle = other.handle;
   total_size = other.total_size;
   current_size = other.current_size;
   hash_context = other.hash_context;
   hash_buffer = other.hash_buffer;
   hash_context.buffer = &hash_buffer[0];
-  skip = other.skip;
 
   return *this;
 }
@@ -67,9 +64,10 @@ FileInfo& FileInfo::operator=(const FileInfo& other) {
 PayloadProcessor::PayloadProcessor()
     : pending_files_(),
       current_repo_(),
-      spooler_(),
+      uploader_(),
       temp_dir_(),
-      num_errors_(0) {}
+      num_errors_(0),
+      statistics_(NULL) {}
 
 PayloadProcessor::~PayloadProcessor() {}
 
@@ -139,86 +137,63 @@ void PayloadProcessor::ConsumerEventCallback(
 
   FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
+    // Schedule file upload if it's not being uploaded yet.
+    // Uploaders later check if the file is already present
+    // in the upstream storage and will not upload it twice.
     FileInfo info(event);
-
-    // If the file already exists in the repository, don't create a temp file,
-    // mark it to be skipped in the FileInfo, but keep track of the number of
-    // bytes currently written
-    if (spooler_->Peek("data/" + path)) {
-      LogCvmfs(
-          kLogReceiver, kLogDebug,
-          "PayloadProcessor - file %s already exists at destination. "
-          "Marking it to be skipped.",
-          path.c_str());
-      info.skip = true;
-    } else {
-      // New file to unpack
-      const std::string tmp_path =
-          CreateTempPath(temp_dir_->dir() + "/payload", 0666);
-      if (tmp_path.empty()) {
-        LogCvmfs(kLogReceiver, kLogSyslogErr,
-                "PayloadProcessor - error: Unable to create temporary path.");
-        num_errors_++;
-        return;
-      }
-      info.temp_path = tmp_path;
-    }
-
+    // info.handle is later deleted by FinalizeStreamedUpload
+    info.handle = uploader_->InitStreamedUpload(NULL);
     pending_files_[event.id] = info;
   }
 
   FileInfo& info = pending_files_[event.id];
 
-  if (!info.skip) {
-    int fdout =
-        open(info.temp_path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0600);
-    if (fdout == -1) {
-      LogCvmfs(
-          kLogReceiver, kLogSyslogErr,
-          "PayloadProcessor - error: Unable to open temporary output file: %s",
-          info.temp_path.c_str());
-      return;
-    }
+  void *buf_copied = smalloc(event.buf_size);
+  memcpy(buf_copied, event.buf, event.buf_size);
+  upload::AbstractUploader::UploadBuffer buf(event.buf_size, buf_copied);
+  uploader_->ScheduleUpload(info.handle, buf,
+    upload::AbstractUploader::MakeClosure(
+      &PayloadProcessor::OnUploadJobComplete, this, buf_copied));
 
-    if (!WriteFile(fdout, event.buf, event.buf_size)) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "PayloadProcessor - error: Unable to write %s",
-               info.temp_path.c_str());
-      num_errors_++;
-      unlink(info.temp_path.c_str());
-      close(fdout);
-      return;
-    }
-    close(fdout);
-
-    shash::Update(static_cast<const unsigned char*>(event.buf),
-                  event.buf_size,
-                  info.hash_context);
-  }
+  shash::Update(static_cast<const unsigned char*>(event.buf),
+                event.buf_size,
+                info.hash_context);
 
   info.current_size += event.buf_size;
 
   if (info.current_size == info.total_size) {
-    if (!info.skip) {
-      shash::Any file_hash(event.id.algorithm);
-      shash::Final(info.hash_context, &file_hash);
+    shash::Any file_hash(event.id.algorithm);
+    shash::Final(info.hash_context, &file_hash);
 
-      if (file_hash != event.id) {
-        LogCvmfs(
-            kLogReceiver, kLogSyslogErr,
-            "PayloadProcessor - error: Hash mismatch for unpacked file: event "
-            "size: %ld, file size: %ld, event hash: %s, file hash: %s",
-            event.size, GetFileSize(info.temp_path),
-            event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
-        num_errors_++;
-        return;
-      }
-
-      Upload(info.temp_path, "data/" + path);
+    if (file_hash != event.id) {
+      LogCvmfs(
+          kLogReceiver, kLogSyslogErr,
+          "PayloadProcessor - error: Hash mismatch for unpacked file: event "
+          "size: %ld, file size: %ld, event hash: %s, file hash: %s",
+          event.size, info.current_size,
+          event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
+      num_errors_++;
+      return;
     }
+    // override final remote path if not CAS object
+    if (event.object_type == ObjectPack::kNamed) {
+      info.handle->remote_path = path;
+    }
+    uploader_->ScheduleCommit(info.handle, event.id);
 
     pending_files_.erase(event.id);
   }
+}
+
+void PayloadProcessor::OnUploadJobComplete(
+  const upload::UploaderResults &results,
+  void *buffer)
+{
+  free(buffer);
+}
+
+void PayloadProcessor::SetStatistics(perf::Statistics *st) {
+  statistics_ = new perf::StatisticsTemplate("publish", st);
 }
 
 PayloadProcessor::Result PayloadProcessor::Initialize() {
@@ -243,22 +218,35 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
       params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
       "dummy_token", "dummy_key");
 
-  spooler_.Destroy();
-  spooler_ = upload::Spooler::Construct(definition);
+  uploader_.Destroy();
+
+    // configure the uploader environment
+  uploader_ = upload::AbstractUploader::Construct(definition);
+  if (!uploader_) {
+    LogCvmfs(kLogSpooler, kLogWarning,
+             "Failed to initialize backend upload "
+             "facility in PayloadProcessor.");
+    return kUploaderError;
+  }
+
+  if (statistics_.IsValid()) {
+    uploader_->InitCounters(statistics_);
+  }
 
   return kSuccess;
 }
 
 PayloadProcessor::Result PayloadProcessor::Finalize() {
-  spooler_->WaitForUpload();
+  uploader_->WaitForUpload();
   temp_dir_.Destroy();
 
-  const unsigned num_spooler_errors = spooler_->GetNumberOfErrors();
-  if (num_spooler_errors > 0) {
+  const unsigned num_uploader_errors = uploader_->GetNumberOfErrors();
+  uploader_->TearDown();
+  if (num_uploader_errors > 0) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "PayloadProcessor - error: Spooler - %d upload(s) failed.",
-             num_spooler_errors);
-    return kSpoolerError;
+             "PayloadProcessor - error: Uploader - %d upload(s) failed.",
+             num_uploader_errors);
+    return kUploaderError;
   }
 
   if (GetNumErrors() > 0) {
@@ -268,16 +256,6 @@ PayloadProcessor::Result PayloadProcessor::Finalize() {
   }
 
   return kSuccess;
-}
-
-void PayloadProcessor::Upload(const std::string& source,
-                              const std::string& dest) {
-  spooler_->Upload(source, dest);
-}
-
-bool PayloadProcessor::WriteFile(int fd, const void* const buf,
-                                 size_t buf_size) {
-  return SafeWrite(fd, buf, buf_size);
 }
 
 }  // namespace receiver

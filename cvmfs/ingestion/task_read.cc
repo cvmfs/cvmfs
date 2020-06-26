@@ -14,6 +14,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/exception.h"
 #include "util/posix.h"
 
 
@@ -30,15 +31,11 @@ void TaskRead::Process(FileItem *item) {
   }
 
   if (item->Open() == false) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to open %s (%d)",
-             item->path().c_str(), errno);
-    abort();
+    PANIC(kLogStderr, "failed to open %s (%d)", item->path().c_str(), errno);
   }
   uint64_t size;
   if (item->GetSize(&size) == false) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fstat %s (%d)",
-             item->path().c_str(), errno);
-    abort();
+    PANIC(kLogStderr, "failed to fstat %s (%d)", item->path().c_str(), errno);
   }
   item->set_size(size);
 
@@ -54,9 +51,7 @@ void TaskRead::Process(FileItem *item) {
   do {
     nbytes = item->Read(buffer, kBlockSize);
     if (nbytes < 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read %s (%d)",
-               item->path().c_str(), errno);
-      abort();
+      PANIC(kLogStderr, "failed to read %s (%d)", item->path().c_str(), errno);
     }
 
     BlockItem *block_item = new BlockItem(tag, allocator_);

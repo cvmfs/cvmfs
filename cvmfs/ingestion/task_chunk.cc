@@ -7,6 +7,7 @@
 #include <cassert>
 
 #include "ingestion/task_chunk.h"
+#include "util/exception.h"
 
 /**
  * The tags from the read stage in the pipeline and the tags given in the
@@ -149,7 +150,7 @@ void TaskChunk::Process(BlockItem *input_block) {
       break;
 
     default:
-      abort();
+      PANIC(NULL);
   }
 
   delete input_block;

@@ -225,6 +225,7 @@ void FileSystem::CreateStatistics() {
 
   hist_fs_lookup_ = new Log2Histogram(30);
   hist_fs_forget_ = new Log2Histogram(30);
+  hist_fs_forget_multi_ = new Log2Histogram(30);
   hist_fs_getattr_ = new Log2Histogram(30);
   hist_fs_readlink_ = new Log2Histogram(30);
   hist_fs_opendir_ = new Log2Histogram(30);
@@ -408,6 +409,7 @@ FileSystem::~FileSystem() {
   SqliteMemoryManager::CleanupInstance();
 
   delete hist_fs_lookup_;
+  delete hist_fs_forget_multi_;
   delete hist_fs_forget_;
   delete hist_fs_getattr_;
   delete hist_fs_readlink_;
@@ -1645,7 +1647,6 @@ MountPoint::MountPoint(
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
-  , hide_magic_xattrs_(false)
   , enforce_acls_(false)
   , has_membership_req_(false)
 {
@@ -1727,11 +1728,14 @@ void MountPoint::SetupBehavior() {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
 
+  bool hide_magic_xattrs = false;
   if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
       && options_mgr_->IsOn(optarg))
   {
-    hide_magic_xattrs_ = true;
+    hide_magic_xattrs = true;
   }
+  magic_xattr_mgr_ = new MagicXattrManager(this, hide_magic_xattrs);
+
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)
       && options_mgr_->IsOn(optarg))

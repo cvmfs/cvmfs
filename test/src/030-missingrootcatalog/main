@@ -47,7 +47,7 @@ cvmfs_run_test() {
   cd ..
 
   echo "run a simple HTTP server"
-  cmd="python -m SimpleHTTPServer 8000"
+  cmd="${CVMFS_PYTHON2} -m SimpleHTTPServer 8000"
   http_pid=$(run_background_service $logfile "$cmd")
   if [ $? -ne 0 ]; then return 9; fi
   echo "simple HTTP server serving empty directory started with PID $http_pid"

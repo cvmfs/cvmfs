@@ -6,8 +6,11 @@
 
 #include <unistd.h>
 
+#include <cassert>
 #include <cstdio>
 
+#include "c_file_sandbox.h"
+#include "c_http_server.h"
 #include "compression.h"
 #include "download.h"
 #include "hash.h"
@@ -21,20 +24,24 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-class T_Download : public ::testing::Test {
+class T_Download : public FileSandbox {
+ public:
+  T_Download() : FileSandbox(string(tmp_path) + "/server_dir") {}
+
  protected:
   virtual void SetUp() {
     download_mgr.Init(8, false, /* use_system_proxy */
       perf::StatisticsTemplate("test", &statistics));
-    ffoo = CreateTemporaryFile(&foo_path);
-    assert(ffoo);
-    foo_url = "file://" + foo_path;
+
+    CreateSandbox();
+  }
+
+  virtual void TearDown() {
+    RemoveSandbox();
   }
 
   virtual ~T_Download() {
     download_mgr.Fini();
-    fclose(ffoo);
-    unlink(foo_path.c_str());
   }
 
   FILE *CreateTemporaryFile(std::string *path) const {
@@ -42,13 +49,13 @@ class T_Download : public ::testing::Test {
                           0600, "w+", path);
   }
 
+  static const char tmp_path[];
+
   perf::Statistics statistics;
   DownloadManager download_mgr;
-  FILE *ffoo;
-  string foo_path;
-  string foo_url;
 };
 
+const char T_Download::tmp_path[] = "./cvmfs_ut_download";
 
 class TestSink : public cvmfs::Sink {
  public:
@@ -83,19 +90,40 @@ class TestSink : public cvmfs::Sink {
 //------------------------------------------------------------------------------
 
 
-TEST_F(T_Download, File) {
+TEST_F(T_Download, LocalFile) {
   string dest_path;
   FILE *fdest = CreateTemporaryFile(&dest_path);
   ASSERT_TRUE(fdest != NULL);
   UnlinkGuard unlink_guard(dest_path);
 
-  JobInfo info(&foo_url, false /* compressed */, false /* probe hosts */,
+  string src_path = GetAbsolutePath(GetSmallFile());
+  string src_url = "file://" + src_path;
+
+  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
                fdest,  NULL);
   download_mgr.Fetch(&info);
   EXPECT_EQ(info.error_code, kFailOk);
   fclose(fdest);
 }
 
+TEST_F(T_Download, RemoteFile) {
+  string dest_path;
+  FILE *fdest = CreateTemporaryFile(&dest_path);
+  ASSERT_TRUE(fdest != NULL);
+  UnlinkGuard unlink_guard(dest_path);
+
+  MockFileServer file_server(8082, sandbox_path_);
+
+  string src_path = GetSmallFile();
+  string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
+
+  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
+               fdest,  NULL);
+  download_mgr.Fetch(&info);
+  EXPECT_EQ(file_server.num_processed_requests(), 1);
+  EXPECT_EQ(info.error_code, kFailOk);
+  fclose(fdest);
+}
 
 TEST_F(T_Download, Clone) {
   DownloadManager *download_mgr_cloned = download_mgr.Clone(
@@ -132,13 +160,16 @@ TEST_F(T_Download, Multiple) {
   ASSERT_TRUE(fdest != NULL);
   UnlinkGuard unlink_guard(dest_path);
 
+  string src_path = GetAbsolutePath(GetSmallFile());
+  string src_url = "file://" + src_path;
+
   DownloadManager second_mgr;
   second_mgr.Init(8, false, /* use_system_proxy */
     perf::StatisticsTemplate("second", &statistics));
 
-  JobInfo info(&foo_url, false /* compressed */, false /* probe hosts */,
+  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
                fdest,  NULL);
-  JobInfo info2(&foo_url, false /* compressed */, false /* probe hosts */,
+  JobInfo info2(&src_url, false /* compressed */, false /* probe hosts */,
                 fdest,  NULL);
   download_mgr.Fetch(&info);
   second_mgr.Fetch(&info2);
@@ -149,23 +180,164 @@ TEST_F(T_Download, Multiple) {
 }
 
 
-TEST_F(T_Download, LocalFile2Mem) {
-  string dest_path;
-  FILE *fdest = CreateTemporaryFile(&dest_path);
-  ASSERT_TRUE(fdest != NULL);
-  UnlinkGuard unlink_guard(dest_path);
-  char buf = '1';
-  fwrite(&buf, 1, 1, fdest);
-  fclose(fdest);
+TEST_F(T_Download, RemoteFile2Mem) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
 
-  string url = "file://" + dest_path;
+  MockFileServer file_server(8082, sandbox_path_);
+
+  string url = "http://127.0.0.1:8082/" + GetFileName(src_path);
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(file_server.num_processed_requests(), 1);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
+
+
+TEST_F(T_Download, RemoteFileRedirect) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
+
+  MockFileServer file_server(8082, sandbox_path_);
+  MockRedirectServer redirect_server(8083, "http://127.0.0.1:8082");
+
+  string url = "http://127.0.0.1:8083/" + GetFileName(src_path);
+
+  download_mgr.EnableRedirects();
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(file_server.num_processed_requests(), 1);
+  ASSERT_EQ(redirect_server.num_processed_requests(), 1);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
+
+TEST_F(T_Download, RemoteFileSimpleProxy) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
+
+  MockProxyServer proxy_server(8083);
+  MockFileServer file_server(8082, sandbox_path_);
+
+  download_mgr.SetProxyChain("http://127.0.0.1:8083", "",
+                             DownloadManager::kSetProxyRegular);
+  string url = "http://127.0.0.1:8082/" + GetFileName(src_path);
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(proxy_server.num_processed_requests(), 1);
+  ASSERT_EQ(file_server.num_processed_requests(), 1);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
+
+TEST_F(T_Download, RemoteFileProxyRedirect) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
+
+  MockProxyServer proxy_server(8084);
+  MockRedirectServer redirect_server(8083, "http://127.0.0.1:8082");
+  MockFileServer file_server(8082, sandbox_path_);
+
+  download_mgr.SetProxyChain("http://127.0.0.1:8084", "",
+                             DownloadManager::kSetProxyRegular);
+  download_mgr.EnableRedirects();
+  string url = "http://127.0.0.1:8083/" + GetFileName(src_path);
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(proxy_server.num_processed_requests(), 2);
+  ASSERT_EQ(redirect_server.num_processed_requests(), 1);
+  ASSERT_EQ(file_server.num_processed_requests(), 1);
+  ASSERT_EQ(info.num_used_hosts, 1);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
+
+TEST_F(T_Download, LocalFile2Mem) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
+
+  string url = "file://" + GetAbsolutePath(src_path);
   JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL);
   download_mgr.Fetch(&info);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(info.destination_mem.pos, 1U);
-  EXPECT_EQ(info.destination_mem.data[0], '1');
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
 }
 
+TEST_F(T_Download, RemoteFileSwitchHosts) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
+
+  MockFileServer file_server(8082, sandbox_path_);
+  download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
+  string url = "/" + GetFileName(src_path);
+  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(file_server.num_processed_requests(), 1);
+  ASSERT_EQ(info.num_used_hosts, 2);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
+
+TEST_F(T_Download, RemoteFileSwitchHostsAfterRedirect) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
+
+  MockRedirectServer redirect_server(8083, "http://127.0.0.1:8084");
+  MockFileServer file_server(8082, sandbox_path_);
+
+  download_mgr.EnableRedirects();
+  download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
+  string url = "/" + GetFileName(src_path);
+  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(info.num_used_hosts, 2);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
+
+TEST_F(T_Download, RemoteFileSwitchProxies) {
+  string src_path = GetSmallFile();
+  int src_fd = open(src_path.c_str(), O_RDONLY);
+  string src_content;
+  SafeReadToString(src_fd, &src_content);
+  close(src_fd);
+
+  MockFileServer file_server(8082, sandbox_path_);
+  MockProxyServer proxy_server(8083);
+  download_mgr.SetProxyChain("http://127.0.0.1:8084;http://127.0.0.1:8083",
+                             "", DownloadManager::kSetProxyRegular);
+
+  string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
+  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(file_server.num_processed_requests(), 1);
+  ASSERT_EQ(proxy_server.num_processed_requests(), 1);
+  ASSERT_EQ(info.num_used_proxies, 2);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, src_content.length());
+  EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
+
+TEST_F(T_Download, RemoteFileEmpty) {
+  string src_path = GetEmptyFile();
+
+  MockFileServer file_server(8082, sandbox_path_);
+
+  string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
+  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */, NULL);
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(file_server.num_processed_requests(), 1);
+  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info.destination_mem.pos, 0U);
+}
 
 TEST_F(T_Download, LocalFile2Sink) {
   string dest_path;

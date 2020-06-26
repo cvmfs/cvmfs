@@ -329,18 +329,6 @@ static int VfsRdOnlyAccess(
     return SQLITE_OK;
   }
 
-  /*int amode = 0;
-  switch (flags) {
-    case SQLITE_ACCESS_EXISTS:
-      amode = F_OK;
-      break;
-    case SQLITE_ACCESS_READ:
-      amode = R_OK;
-      break;
-    default:
-      assert(false);
-  }
-  *pResOut = (access(zPath, amode) == 0);*/
   // This VFS deals with file descriptors, we know the files are there
   *pResOut = 0;
   perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_access);

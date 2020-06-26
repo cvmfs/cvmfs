@@ -331,7 +331,7 @@ void SignatureManager::UnloadPublicRsaKeys() {
 }
 
 
-std::string SignatureManager::GenerateKeyText(RSA *pubkey) {
+std::string SignatureManager::GenerateKeyText(RSA *pubkey) const {
   if (!pubkey) {return "";}
 
   BIO *bp = BIO_new(BIO_s_mem());
@@ -354,7 +354,7 @@ std::string SignatureManager::GenerateKeyText(RSA *pubkey) {
 }
 
 
-std::string SignatureManager::GetActivePubkeys() {
+std::string SignatureManager::GetActivePubkeys() const {
   std::string pubkeys;
   for (std::vector<RSA *>::const_iterator it = public_keys_.begin();
        it != public_keys_.end();
@@ -367,7 +367,7 @@ std::string SignatureManager::GetActivePubkeys() {
 }
 
 
-std::string SignatureManager::GetCertificate() {
+std::string SignatureManager::GetCertificate() const {
   if (!certificate_) return "";
 
   BIO *bp = BIO_new(BIO_s_mem());

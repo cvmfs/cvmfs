@@ -41,11 +41,13 @@
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
+#include "monitor.h"
 #include "path_filters/dirtab.h"
 #include "platform.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "statistics.h"
+#include "statistics_database.h"
 #include "swissknife_capabilities.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
@@ -556,6 +558,20 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 }
 
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
+  string start_time = GetGMTimestamp();
+
+  // Spawn monitoring process (watchdog)
+  std::string watchdog_dir = "/tmp";
+  char watchdog_path[PATH_MAX];
+  std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
+  int path_size = snprintf(watchdog_path, sizeof(watchdog_path),
+                           "%s/cvmfs-swissknife-sync-stacktrace.%s.%d",
+                           watchdog_dir.c_str(), timestamp.c_str(), getpid());
+  assert(path_size > 0);
+  assert(path_size < PATH_MAX);
+  UniquePtr<Watchdog> watchdog(Watchdog::Create(std::string(watchdog_path)));
+  watchdog->Spawn();
+
   SyncParameters params;
 
   // Initialization
@@ -701,11 +717,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.repo_tag.description_ = *args.find('J')->second;
   }
 
+  const bool upload_statsdb = (args.count('I') > 0);
+
   if (!CheckParams(params)) return 2;
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
 
-  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
+  perf::StatisticsTemplate publish_statistics("publish", this->statistics());
 
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
@@ -771,6 +789,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!manifest) {
     return 3;
   }
+
+  StatisticsDatabase *stats_db =
+    StatisticsDatabase::OpenStandardDB(params.repo_name);
 
   const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
@@ -852,10 +873,16 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("something went wrong during sync");
+    if (!params.dry_run) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
+    }
     return 5;
   }
 
-  perf::Counter *revision_counter = statistics()->Register("Publish.revision",
+  perf::Counter *revision_counter = statistics()->Register("publish.revision",
                                                   "Published revision number");
   revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 
@@ -876,8 +903,22 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
                                          params.repo_tag)) {
     PrintError("Failed to commit transaction.");
+    if (!params.dry_run) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
+    }
     return 9;
-                                         }
+  }
+
+  if (!params.dry_run) {
+    stats_db->StorePublishStatistics(this->statistics(), start_time, true);
+    if (upload_statsdb) {
+      stats_db->UploadStatistics(params.spooler);
+    }
+  }
+
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {

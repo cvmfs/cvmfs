@@ -29,6 +29,7 @@ CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
+CVMFS_TEST_S3_STORAGE=${CVMFS_TEST_S3_STORAGE:=}
 CVMFS_TEST_HTTP_BASE=${CVMFS_TEST_HTTP_BASE:=}
 CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}   # backward compatibility! use CVMFS_TEST_HTTP_BASE instead
 
@@ -74,6 +75,12 @@ die() {
 running_on_osx() {
   [ "x$(uname)" == "xDarwin" ]
 }
+
+if running_on_osx; then
+  CVMFS_PYTHON2="python"
+else
+  CVMFS_PYTHON2="python2"
+fi
 
 running_on_s3() {
   [ "x$CVMFS_TEST_S3_CONFIG" != "x" ]
@@ -399,6 +406,17 @@ break_hardlink() {
   mv    $tmp_file $path
 }
 
+wait_for_umount() {
+  local timeout=60
+  while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
+    if [ $timeout -eq 0 ]; then
+      return 1
+    fi
+    timeout=$(($timeout-1))
+    sleep 1
+  done
+  return 0
+}
 
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null                   || return 100
@@ -407,14 +425,7 @@ cvmfs_clean() {
   sudo sh -c "rm -f /etc/cvmfs/config.d/*"               || return 103
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 104
 
-  local timeout=60
-  while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
-    if [ $timeout -eq 0 ]; then
-      return 99
-    fi
-    timeout=$(($timeout-1))
-    sleep 1
-  done
+  wait_for_umount || return 99
 
   return 0
 }
@@ -653,6 +664,20 @@ destroy_repo() {
   shift 1
   local additional_flags="$@"
 
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ] && [ x"$CVMFS_TEST_S3_STORAGE" != x"" ]; then
+    echo "Wiping repository S3 storage ${CVMFS_TEST_S3_STORAGE}/${repo}"
+    sudo rm -rf "${CVMFS_TEST_S3_STORAGE}/${repo}"
+  fi
+
+  load_repo_config $repo
+  if [ x"$TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE" != x"" ]; then
+    # It is possible to have publisher and gateway on the same machine for testing purposes.
+    # However, `cvmfs_server rmfs` then incorrectly does not delete the repository backend storage.
+    # Let's do it here instead.
+    echo "Wiping local repository storage in gateway setup /srv/cvmfs/${repo}"
+    sudo rm -rf /srv/cvmfs/${repo}
+  fi
+
   sudo cvmfs_server rmfs -f $additional_flags $repo || return 100
 }
 
@@ -723,9 +748,11 @@ create_empty_repo() {
 
   create_repo $repo $uid $debug_log "$@" || return 101
 
-  sudo cvmfs_server transaction $repo || return 102
-  rm -f /cvmfs/$repo/new_repository
-  sudo cvmfs_server publish $repo || return 103
+  if [ -f /cvmfs/$repo/new_repository ]; then
+    sudo cvmfs_server transaction $repo || return 102
+    rm -f /cvmfs/$repo/new_repository
+    sudo cvmfs_server publish $repo || return 103
+  fi
 }
 
 
@@ -772,12 +799,12 @@ create_filled_repo() {
 # @param  repo_dir   where to put the dummy dirents
 make_huge_repo() {
   local repo_dir=$1
-  python ${TEST_ROOT}/common/mock_services/make_repo.py \
-    --max-dir-depth        7                     \
-    --num-subdirs          5                     \
-    --num-files-per-dir    5                     \
-    --min-file-size        0                     \
-    --max-file-size     5120                     \
+  $CVMFS_PYTHON2 ${TEST_ROOT}/common/mock_services/make_repo.py \
+    --max-dir-depth        7                                    \
+    --num-subdirs          5                                    \
+    --num-files-per-dir    5                                    \
+    --min-file-size        0                                    \
+    --max-file-size     5120                                    \
     $repo_dir
 }
 
@@ -831,6 +858,33 @@ create_stratum1() {
                                    $stratum0_url          \
                                    $stratum0_pub
 }
+
+# creates a repository replica as a pass-through to a stratum 0
+# @param replica_name  the name of the new replica
+# @param replica_owner the owner of the new replica
+# @param stratum0_url  the url for the source repository
+create_passthrough_stratum1() {
+  local replica_name=$1
+  local replica_owner=$2
+  local stratum0_url=$3
+  shift 3
+  local additional_parameters="$*"
+  local s3_config=""
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    local stratum1_url="$CVMFS_TEST_HTTP_BASE"
+    [ ! -z "$stratum1_url" ] || die "\$CVMFS_TEST_HTTP_BASE needs to be set for S3 tests to work!"
+    echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
+    echo "  Stratum1:  $stratum1_url"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
+  fi
+  sudo -E cvmfs_server add-replica -P \
+                                   -o $replica_owner      \
+                                   -n $replica_name       \
+                                   $s3_config             \
+                                   $additional_parameters \
+                                   $stratum0_url
+}
+
 
 # creates a big file at a given location with a given size
 # @param path  the location of the new file
@@ -999,7 +1053,7 @@ open_silent_port() {
   local cmd
   local mock
 
-  mock="python ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
+  mock="${CVMFS_PYTHON2} ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
 
   # Do similar fifo-trick as in run_background_service() to get the PID of the
   # actual silent_socket.py process rather than just the `sudo` around it.
@@ -1023,7 +1077,7 @@ open_http_server() {
   local port="$2"
   local logfile="${3:=/dev/null}"
 
-  local http_server="${TEST_ROOT}/common/mock_services/http_server.py"
+  local http_server="${CVMFS_PYTHON2} ${TEST_ROOT}/common/mock_services/http_server.py"
   local http_pid=
   local http_sentinel="http://localhost:${port}/http_sentinel"
 
@@ -1121,6 +1175,18 @@ check_repository() {
   shift 1
 
   cvmfs_server check $@ $repo || return 100
+  return 0
+}
+
+check_repo_integrity() {
+  local repo=$1
+  for f in `find /cvmfs/${repo} -type f`; do
+    cat $f >/dev/null
+    if [ $? -ne 0 ]; then
+      echo "Integrity check: corrupted file ${f}"
+      return 1
+    fi
+  done
   return 0
 }
 
@@ -2412,6 +2478,9 @@ set_up_repository_gateway() {
     echo "  Stopping repository gateway"
     sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
 
+    echo "  Cleaning up the repository gateway db"
+    sudo rm -rf /var/lib/cvmfs-gateway/*
+
     echo "  Writing configuration files"
     sudo bash -c 'cat <<EOF > /etc/cvmfs/gateway/repo.json
 {
@@ -2448,4 +2517,9 @@ EOF'
 
     echo "  Starting repository gateway"
     sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
+    # Let the service boot up
+    sleep 1
+    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
+    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
+    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
 }

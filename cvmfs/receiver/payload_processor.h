@@ -22,12 +22,11 @@ struct FileInfo {
   FileInfo(const FileInfo& other);
   FileInfo& operator=(const FileInfo& other);
 
-  std::string temp_path;
+  upload::UploadStreamHandle *handle;
   size_t total_size;
   size_t current_size;
   shash::ContextPtr hash_context;
   std::vector<unsigned char> hash_buffer;
-  bool skip;
 };
 
 /**
@@ -41,7 +40,7 @@ struct FileInfo {
  */
 class PayloadProcessor {
  public:
-  enum Result { kSuccess, kPathViolation, kSpoolerError, kOtherError };
+  enum Result { kSuccess, kPathViolation, kUploaderError, kOtherError };
 
   PayloadProcessor();
   virtual ~PayloadProcessor();
@@ -51,24 +50,27 @@ class PayloadProcessor {
 
   virtual void ConsumerEventCallback(const ObjectPackBuild::Event& event);
 
+  virtual void OnUploadJobComplete(const upload::UploaderResults &results,
+                                   void *buffer);
+
   int GetNumErrors() const { return num_errors_; }
+
+  void SetStatistics(perf::Statistics *st);
 
  protected:
   // NOTE: These methods are made virtual such that they can be mocked for
   //       the purpose of unit testing
   virtual Result Initialize();
   virtual Result Finalize();
-  virtual void Upload(const std::string& source,
-                      const std::string& dest);
-  virtual bool WriteFile(int fd, const void* const buf, size_t buf_size);
 
  private:
   typedef std::map<shash::Any, FileInfo>::iterator FileIterator;
   std::map<shash::Any, FileInfo> pending_files_;
   std::string current_repo_;
-  UniquePtr<upload::Spooler> spooler_;
+  UniquePtr<upload::AbstractUploader> uploader_;
   UniquePtr<RaiiTempDir> temp_dir_;
   int num_errors_;
+  UniquePtr<perf::StatisticsTemplate> statistics_;
 };
 
 }  // namespace receiver

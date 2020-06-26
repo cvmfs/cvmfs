@@ -85,7 +85,10 @@ _remove_server() {
     rm -f "$pkgdir/usr/bin/$server_bin"
   done
   rm -f "$pkgdir/usr/lib/libcvmfs_server.so" \
-    "$pkgdir/usr/lib/libcvmfs_server.so.$pkgver"
+    "$pkgdir/usr/lib/libcvmfs_server.so.$pkgver" \
+    "$pkgdir/usr/lib/libcvmfs_server_debug.so" \
+    "$pkgdir/usr/lib/libcvmfs_server_debug.so.$pkgver"
+  rm -f "$pkgdir/usr/bin/cvmfs_publish $pkgdir/usr/bin/cvmfs_server_publish"
 }
 
 

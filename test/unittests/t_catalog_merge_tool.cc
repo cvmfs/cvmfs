@@ -11,12 +11,12 @@
 #include "xattr.h"
 
 namespace {
-const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d1000000",
-                        "26ab0db90d72e28ad0ba1e22ee510510000000",
-                        "6d7fce9fee471194aa8b5b6e47267f03000000",
-                        "48a24b70a0b376535542b996af517398000000",
-                        "1dcca23355272056f04fe8bf20edfce0000000",
-                        "11111111111111111111111111111111111111"};
+const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d100000000",
+                        "26ab0db90d72e28ad0ba1e22ee51051000000000",
+                        "6d7fce9fee471194aa8b5b6e47267f0300000000",
+                        "48a24b70a0b376535542b996af51739800000000",
+                        "1dcca23355272056f04fe8bf20edfce000000000",
+                        "1111111111111111111111111111111111111111"};
 
 DirSpec MakeBaseSpec() {
   DirSpec spec;
@@ -111,11 +111,13 @@ TEST_F(T_CatalogMergeTool, CRUD) {
 
   CatalogTestTool::History history = tester.history();
 
+  perf::Statistics statistics;
+
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
-                 server_tool->download_manager(), &first_manifest);
+                 server_tool->download_manager(), &first_manifest, &statistics);
   EXPECT_TRUE(merge_tool.Init());
 
   std::string output_manifest_path;

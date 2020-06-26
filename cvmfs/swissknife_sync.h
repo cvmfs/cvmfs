@@ -308,6 +308,7 @@ class CommandSync : public Command {
                                   "authenticated repos"));
     r.push_back(Parameter::Switch('Y', "enable external data"));
     r.push_back(Parameter::Switch('B', "branched catalog (no manifest)"));
+    r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
 
     r.push_back(Parameter::Optional('P', "session_token_file"));
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));

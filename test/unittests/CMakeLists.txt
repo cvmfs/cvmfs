@@ -40,6 +40,7 @@ set(CVMFS_UNITTEST_FILES
   t_catalog_counters.cc
   t_catalog_merge_tool.cc
   t_catalog_mgr.cc
+  t_catalog_mgr_rw.cc
   t_catalog_sql.cc
   t_catalog_traversal.cc
   t_catalog_virtual.cc
@@ -54,6 +55,7 @@ set(CVMFS_UNITTEST_FILES
   t_fd_table.cc
   t_fence.cc
   t_fetch.cc
+  t_file_backed_buffer.cc
   t_file_chunk.cc
   t_file_guard.cc
   t_file_sandbox.cc
@@ -67,12 +69,14 @@ set(CVMFS_UNITTEST_FILES
   t_history.cc
   t_ingestion.cc
   t_ingestion_stress.cc
+  t_ingestion_tube.cc
   t_json.cc
   t_kvstore.cc
   t_lease_path_util.cc
   t_libcvmfs.cc
   t_logging.cc
   t_lru.cc
+  t_magic_xattr.cc
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
@@ -82,6 +86,7 @@ set(CVMFS_UNITTEST_FILES
   t_object_fetcher.cc
   t_options.cc
   t_pack.cc
+  t_panic.cc
   t_pathspec.cc
   t_payload_processor.cc
   t_pipe.cc
@@ -193,6 +198,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/magic_xattr.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
@@ -249,6 +255,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/url.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/namespace.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
@@ -261,6 +269,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc
 
   cache.pb.cc cache.pb.h
+  c_http_server.cc
 )
 
 # Lower optimization level for this file. Xcode 9.3+ gives different results in Os and above
@@ -308,6 +317,7 @@ set (CVMFS_TEST_CACHE_SOURCES
   ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/quota.cc
+  ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
@@ -348,6 +358,7 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/kvstore.cc
   ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/magic_xattr.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
@@ -367,6 +378,7 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/tracer.cc
   ${CVMFS_SOURCE_DIR}/uuid.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
@@ -418,18 +430,31 @@ set (CVMFS_TEST_SHRINKWRAP_SOURCES
 )
 
 set (CVMFS_TEST_PUBLISH_SOURCES
+  c_http_server.cc
+  publish/c_repository.cc
   publish/main.cc
   publish/t_command.cc
+  publish/t_diff.cc
+  publish/t_session.cc
+  publish/t_repository.cc
   publish/t_settings.cc
+  publish/t_util.cc
 
   ../common/env.cc
 
   ${CVMFS_SOURCE_DIR}/publish/cmd_help.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_mkfs.cc
+  ${CVMFS_SOURCE_DIR}/publish/cmd_util.cc
   ${CVMFS_SOURCE_DIR}/publish/cmd_zpipe.cc
   ${CVMFS_SOURCE_DIR}/publish/command.cc
   ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_managed.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_session.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_transaction.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_util.cc
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
   ${CVMFS_SOURCE_DIR}/backoff.cc
@@ -441,6 +466,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
@@ -491,8 +517,11 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
+  ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc

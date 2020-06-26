@@ -80,7 +80,7 @@ std::string Whitelist::ExportString() const {
 }
 
 
-time_t Whitelist::expires() {
+time_t Whitelist::expires() const {
   assert(status_ == kStAvailable);
   return expires_;
 }

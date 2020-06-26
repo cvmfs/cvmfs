@@ -92,9 +92,9 @@ class AbstractUploader
    */
   struct UploadBuffer {
     UploadBuffer() : size(0), data(NULL) { }
-    UploadBuffer(uint64_t s, void *d) : size(s), data(d) { }
+    UploadBuffer(uint64_t s, const void *d) : size(s), data(d) { }
     uint64_t size;
-    void *data;
+    const void *data;
   };
 
   struct JobStatus {
@@ -300,6 +300,14 @@ class AbstractUploader
   virtual bool Peek(const std::string &path) = 0;
 
   /**
+   * Make directory in upstream storage. Noop if directory already present.
+   * 
+   * @param path relative directory path in the upstream storage
+   * @return true if the directory was successfully created or already present
+   */
+  virtual bool Mkdir(const std::string &path) = 0;
+
+  /**
    * Creates a top-level shortcut to the given data object. This is particularly
    * useful for bootstrapping repositories whose data-directory is secured by
    * a VOMS certificate.
@@ -470,6 +478,8 @@ struct UploadStreamHandle {
   const CallbackTN *commit_callback;
 
   int64_t tag;
+
+  std::string remote_path;  // override remote location of the object
 };
 
 }  // namespace upload

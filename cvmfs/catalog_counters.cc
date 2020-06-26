@@ -5,6 +5,7 @@
 #include "catalog_counters.h"
 
 #include "directory_entry.h"
+#include "util/exception.h"
 
 namespace catalog {
 
@@ -27,7 +28,7 @@ void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
   } else if (dirent.IsDirectory()) {
     self.directories += delta;
   } else {
-    assert(false);
+    PANIC(NULL);
   }
   if (dirent.HasXattrs()) {
     self.xattrs += delta;

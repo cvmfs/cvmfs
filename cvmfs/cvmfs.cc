@@ -89,6 +89,7 @@
 #include "loader.h"
 #include "logging.h"
 #include "lru_md.h"
+#include "magic_xattr.h"
 #include "manifest_fetch.h"
 #include "monitor.h"
 #include "mountpoint.h"
@@ -106,6 +107,7 @@
 #include "statistics.h"
 #include "talk.h"
 #include "tracer.h"
+#include "util/exception.h"
 #include "util_concurrency.h"
 #include "uuid.h"
 #include "wpad.h"
@@ -499,6 +501,39 @@ static void cvmfs_forget(
 }
 
 
+#if (FUSE_VERSION >= 29)
+static void cvmfs_forget_multi(
+  fuse_req_t req,
+  size_t count,
+  struct fuse_forget_data *forgets
+) {
+  HighPrecisionTimer guard_timer(file_system_->hist_fs_forget_multi());
+
+  perf::Xadd(file_system_->n_fs_forget(), count);
+  if (file_system_->IsNfsSource()) {
+    fuse_reply_none(req);
+    return;
+  }
+
+  fuse_remounter_->fence()->Enter();
+  for (size_t i = 0; i < count; ++i) {
+    if (forgets[i].ino == FUSE_ROOT_ID) {
+      continue;
+    }
+
+    uint64_t ino = mount_point_->catalog_mgr()->MangleInode(forgets[i].ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
+             ino, forgets[i].nlookup);
+
+    mount_point_->inode_tracker()->VfsPut(ino, forgets[i].nlookup);
+  }
+  fuse_remounter_->fence()->Leave();
+
+  fuse_reply_none(req);
+}
+#endif  // FUSE_VERSION >= 29
+
+
 /**
  * Looks into dirent to decide if this is an EIO negative reply or an
  * ENOENT negative reply.  We do not need to store the reply in the negative
@@ -730,6 +765,14 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   perf::Inc(file_system_->n_fs_dir_open());
   perf::Inc(file_system_->no_open_dirs());
 
+#if (FUSE_VERSION >= 30)
+#ifdef CVMFS_ENABLE_FUSE3_CACHE_READDIR
+  // This affects only reads on the same open directory handle (e.g. multiple
+  // reads with rewinddir() between them).  A new opendir on the same directory
+  // will trigger readdir calls independently of this setting.
+  fi->cache_readdir = 1;
+#endif
+#endif
   fuse_reply_open(req, fi);
 }
 
@@ -1270,44 +1313,6 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   fuse_reply_statfs(req, &info);
 }
 
-const uint64_t kMaxMetainfoLength = 64*1024;
-
-string GetRepoMetainfo(uint64_t size) {
-  if (!mount_point_->catalog_mgr()->manifest()) {
-    // message truncating not needed, handled at the end of cvmfs_getxattr
-    return "Manifest not available";
-  }
-
-  shash::Any hash = mount_point_->catalog_mgr()->manifest()->meta_info();
-  if (hash.IsNull()) {
-    return "Metainfo not available";
-  }
-  // Follow max size suggested by fuse, otherwise 64KiB
-  uint64_t max_size = (size && size < kMaxMetainfoLength)
-                      ? size : kMaxMetainfoLength;
-  int fd = mount_point_->fetcher()->
-            Fetch(hash, CacheManager::kSizeUnknown,
-                  "metainfo (" + hash.ToString() + ")",
-                  zlib::kZlibDefault, CacheManager::kTypeRegular, "");
-  if (fd < 0) {
-    return "Failed to open metadata file";
-  }
-  uint64_t actual_size = file_system_->cache_mgr()->GetSize(fd);
-  if (actual_size > max_size) {
-    file_system_->cache_mgr()->Close(fd);
-    return "Failed to open: metadata file is too big";
-  }
-  char buffer[actual_size];
-  int bytes_read =
-    file_system_->cache_mgr()->Pread(fd, buffer, actual_size, 0);
-  file_system_->cache_mgr()->Close(fd);
-  if (bytes_read < 0) {
-    return "Failed to read metadata file";
-  }
-  return string(buffer, buffer + bytes_read);
-}
-
-
 #ifdef __APPLE__
 static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                            size_t size, uint32_t position)
@@ -1353,6 +1358,14 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
     assert(retval);
   }
+
+  MagicXattrRAIIWrapper magic_xattr;
+  bool magic_xattr_success = true;
+  magic_xattr = mount_point_->magic_xattr_mgr()->Get(attr, path, &d);
+  if (!magic_xattr.IsNull()) {
+    magic_xattr_success = magic_xattr->PrepareValueFenced();
+  }
+
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
@@ -1360,221 +1373,15 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     return;
   }
 
+  if (!magic_xattr_success) {
+    fuse_reply_err(req, ENOATTR);
+    return;
+  }
+
   string attribute_value;
 
-  if (attr == "user.pid") {
-    attribute_value = StringifyInt(pid_);
-  } else if (attr == "user.version") {
-    attribute_value = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
-  } else if (attr == "user.pubkeys") {
-    attribute_value = mount_point_->signature_mgr()->GetActivePubkeys();
-  } else if (attr == "user.repo_counters") {
-    attribute_value = mount_point_->catalog_mgr()->GetRootCatalog()->
-                                    GetCounters().GetCsvMap();
-  } else if (attr == "user.repo_metainfo") {
-    attribute_value = GetRepoMetainfo(size);
-  } else if (attr == "user.hash") {
-    if (!d.checksum().IsNull()) {
-      attribute_value = d.checksum().ToString();
-    } else {
-      fuse_reply_err(req, ENOATTR);
-      return;
-    }
-  } else if (attr == "user.lhash") {
-    if (!d.checksum().IsNull()) {
-      string result;
-      CacheManager::ObjectInfo object_info;
-      object_info.description = path.ToString();
-      if (mount_point_->catalog_mgr()->volatile_flag())
-        object_info.type = CacheManager::kTypeVolatile;
-      int fd = file_system_->cache_mgr()->Open(
-        CacheManager::Bless(d.checksum(), object_info));
-      if (fd < 0) {
-        attribute_value = "Not in cache";
-      } else {
-        shash::Any hash(d.checksum().algorithm);
-        int retval_i = file_system_->cache_mgr()->ChecksumFd(fd, &hash);
-        if (retval_i != 0)
-          attribute_value = "I/O error (" + StringifyInt(retval_i) + ")";
-        else
-          attribute_value = hash.ToString();
-        file_system_->cache_mgr()->Close(fd);
-      }
-    } else {
-      fuse_reply_err(req, ENOATTR);
-      return;
-    }
-  } else if ((attr == "xfsroot.rawlink") || (attr == "user.rawlink")) {
-    if (d.IsLink()) {
-      attribute_value = d.symlink().ToString();
-    } else {
-      fuse_reply_err(req, ENOATTR);
-      return;
-    }
-  } else if (attr == "user.revision") {
-    const uint64_t revision = catalog_mgr->GetRevision();
-    attribute_value = StringifyInt(revision);
-  } else if (attr == "user.root_hash") {
-    attribute_value = catalog_mgr->GetRootHash().ToString();
-  } else if (attr == "user.tag") {
-    attribute_value = mount_point_->repository_tag();
-  } else if (attr == "user.expires") {
-    if (fuse_remounter_->catalogs_valid_until() ==
-        MountPoint::kIndefiniteDeadline)
-    {
-      attribute_value = "never (fixed root catalog)";
-    } else {
-      time_t now = time(NULL);
-      attribute_value = StringifyInt(
-        (fuse_remounter_->catalogs_valid_until() - now) / 60);
-    }
-  } else if (attr == "user.maxfd") {
-    attribute_value = StringifyInt(max_open_files_ - kNumReservedFd);
-  } else if (attr == "user.usedfd") {
-    attribute_value = file_system_->no_open_files()->ToString();
-  } else if (attr == "user.useddirp") {
-    attribute_value = file_system_->no_open_dirs()->ToString();
-  } else if (attr == "user.nioerr") {
-    attribute_value = file_system_->n_io_error()->ToString();
-  } else if (attr == "user.proxy") {
-    vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
-    unsigned current_group;
-    mount_point_->download_mgr()->GetProxyInfo(
-      &proxy_chain, &current_group, NULL);
-    if (proxy_chain.size()) {
-      attribute_value = proxy_chain[current_group][0].url;
-    } else {
-      attribute_value = "DIRECT";
-    }
-  } else if (attr == "user.authz") {
-    if (!mount_point_->has_membership_req()) {
-      fuse_reply_err(req, ENOATTR);
-      return;
-    }
-    attribute_value = mount_point_->membership_req();
-  } else if (attr == "user.chunks") {
-    if (d.IsRegular()) {
-      if (d.IsChunkedFile()) {
-        FileChunkList chunks;
-        if (!catalog_mgr->ListFileChunks(path, d.hash_algorithm(), &chunks) ||
-            chunks.IsEmpty())
-        {
-          LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
-                   "'chunked', but no chunks found.", path.c_str());
-          fuse_reply_err(req, EIO);
-          return;
-        } else {
-          attribute_value = StringifyInt(chunks.size());
-        }
-      } else {
-        attribute_value = "1";
-      }
-    } else {
-      fuse_reply_err(req, ENOATTR);
-      return;
-    }
-  } else if (attr == "user.external_file") {
-    if (d.IsRegular()) {
-      attribute_value = d.IsExternalFile() ? "1" : "0";
-    } else {
-      fuse_reply_err(req, ENOATTR);
-      return;
-    }
-  } else if (attr == "user.external_host") {
-    vector<string> host_chain;
-    vector<int> rtt;
-    unsigned current_host;
-    mount_point_->external_download_mgr()->GetHostInfo(
-      &host_chain, &rtt, &current_host);
-    if (host_chain.size()) {
-      attribute_value = string(host_chain[current_host]);
-    } else {
-      attribute_value = "internal error: no hosts defined";
-    }
-  } else if (attr == "user.compression") {
-    if (d.IsRegular()) {
-      attribute_value = zlib::AlgorithmName(d.compression_algorithm());
-    } else {
-      fuse_reply_err(req, ENOATTR);
-      return;
-    }
-  } else if (attr == "user.host") {
-    vector<string> host_chain;
-    vector<int> rtt;
-    unsigned current_host;
-    mount_point_->download_mgr()->GetHostInfo(&host_chain, &rtt, &current_host);
-    if (host_chain.size()) {
-      attribute_value = string(host_chain[current_host]);
-    } else {
-      attribute_value = "internal error: no hosts defined";
-    }
-  } else if (attr == "user.host_list") {
-    vector<string> host_chain;
-    vector<int> rtt;
-    unsigned current_host;
-    mount_point_->download_mgr()->GetHostInfo(&host_chain, &rtt, &current_host);
-    if (host_chain.size()) {
-      attribute_value = host_chain[current_host];
-      for (unsigned i = 1; i < host_chain.size(); ++i) {
-        attribute_value +=
-          ";" + host_chain[(i+current_host) % host_chain.size()];
-      }
-    } else {
-      attribute_value = "internal error: no hosts defined";
-    }
-  } else if (attr == "user.uptime") {
-    time_t now = time(NULL);
-    uint64_t uptime = now - loader_exports_->boot_time;
-    attribute_value = StringifyInt(uptime / 60);
-  } else if (attr == "user.nclg") {
-    const int num_catalogs = catalog_mgr->GetNumCatalogs();
-    attribute_value = StringifyInt(num_catalogs);
-  } else if (attr == "user.nopen") {
-    attribute_value = file_system_->n_fs_open()->ToString();
-  } else if (attr == "user.ndiropen") {
-    attribute_value = file_system_->n_fs_dir_open()->ToString();
-  } else if (attr == "user.ndownload") {
-    attribute_value =
-      mount_point_->statistics()->Lookup("fetch.n_downloads")->Print();
-  } else if (attr == "user.timeout") {
-    unsigned seconds, seconds_direct;
-    mount_point_->download_mgr()->GetTimeout(&seconds, &seconds_direct);
-    attribute_value = StringifyInt(seconds);
-  } else if (attr == "user.timeout_direct") {
-    unsigned seconds, seconds_direct;
-    mount_point_->download_mgr()->GetTimeout(&seconds, &seconds_direct);
-    attribute_value = StringifyInt(seconds_direct);
-  } else if (attr == "user.external_timeout") {
-    unsigned seconds, seconds_direct;
-    mount_point_->download_mgr()->GetTimeout(&seconds, &seconds_direct);
-    attribute_value = StringifyInt(seconds_direct);
-  } else if (attr == "user.rx") {
-    perf::Statistics *statistics = mount_point_->statistics();
-    int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
-    attribute_value = StringifyInt(rx/1024);
-  } else if (attr == "user.speed") {
-    perf::Statistics *statistics = mount_point_->statistics();
-    int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
-    int64_t time = statistics->Lookup("download.sz_transfer_time")->Get();
-    if (time == 0)
-      attribute_value = "n/a";
-    else
-      attribute_value = StringifyInt((1000 * (rx/1024))/time);
-  } else if (attr == "user.fqrn") {
-    attribute_value = loader_exports_->repository_name;
-  } else if (attr == "user.inode_max") {
-    attribute_value = StringifyInt(
-      inode_generation_info_.inode_generation +
-      catalog_mgr->inode_gauge());
-  } else if (attr == "user.ncleanup24") {
-    QuotaManager *quota_mgr = file_system_->cache_mgr()->quota_mgr();
-    if (!quota_mgr->HasCapability(QuotaManager::kCapIntrospectCleanupRate)) {
-      attribute_value = StringifyInt(-1);
-    } else {
-      const uint64_t period_s = 24 * 60 * 60;
-      const uint64_t rate = quota_mgr->GetCleanupRate(period_s);
-      attribute_value = StringifyInt(rate);
-    }
+  if (!magic_xattr.IsNull()) {
+    attribute_value = magic_xattr->GetValue();
   } else {
     if (!xattrs.Get(attr, &attribute_value)) {
       fuse_reply_err(req, ENOATTR);
@@ -1602,7 +1409,8 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   TraceInode(Tracer::kEventListAttr, ino, "listxattr()");
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_listxattr on inode: %" PRIu64 ", size %u [hide xattrs %d]",
-           uint64_t(ino), size, mount_point_->hide_magic_xattrs());
+           uint64_t(ino), size,
+           mount_point_->magic_xattr_mgr()->hide_magic_xattrs());
 
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
@@ -1621,38 +1429,9 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     return;
   }
 
-  const char base_list[] = "user.pid\0user.version\0user.revision\0"
-    "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
-    "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
-    "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
-    "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
-    "user.external_host\0user.external_timeout\0user.pubkeys\0"
-    "user.ncleanup24\0user.repo_counters\0user.repo_metainfo\0";
   string attribute_list;
-  if (mount_point_->hide_magic_xattrs()) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
-    attribute_list = xattrs.ListKeysPosix("");
-  } else {
-    attribute_list = string(base_list, sizeof(base_list)-1);
-    if (!d.checksum().IsNull()) {
-      const char regular_file_list[] = "user.hash\0user.lhash\0";
-      attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
-    }
-
-    if (d.IsLink()) {
-      const char symlink_list[] = "xfsroot.rawlink\0user.rawlink\0";
-      attribute_list += string(symlink_list, sizeof(symlink_list)-1);
-    } else if (d.IsRegular()) {
-      const char regular_file_list[] = "user.external_file\0user.compression\0"
-                                       "user.chunks\0";
-      attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
-    }
-
-    if (mount_point_->has_membership_req()) {
-      attribute_list += "user.authz\0";
-    }
-    attribute_list = xattrs.ListKeysPosix(attribute_list);
-  }
+  attribute_list = mount_point_->magic_xattr_mgr()->GetListString(&d);
+  attribute_list = xattrs.ListKeysPosix(attribute_list);
 
   if (size == 0) {
     fuse_reply_xattr(req, attribute_list.length());
@@ -1763,18 +1542,16 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   if (mount_point_->enforce_acls()) {
 #ifdef FUSE_CAP_POSIX_ACL
     if ((conn->capable & FUSE_CAP_POSIX_ACL) == 0) {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-               "ACL support requested but missing fuse kernel support, "
-               "aborting");
-      abort();
+      PANIC(kLogDebug | kLogSyslogErr,
+            "ACL support requested but missing fuse kernel support, "
+            "aborting");
     }
     conn->want |= FUSE_CAP_POSIX_ACL;
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "enforcing ACLs");
 #else
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "ACL support requested but not available in this version of "
-             "libfuse, aborting");
-    abort();
+    PANIC(kLogDebug | kLogSyslogErr,
+          "ACL support requested but not available in this version of "
+          "libfuse, aborting");
 #endif
   }
 }
@@ -1791,22 +1568,25 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   memset(cvmfs_operations, 0, sizeof(*cvmfs_operations));
 
   // Init/Fini
-  cvmfs_operations->init     = cvmfs_init;
-  cvmfs_operations->destroy  = cvmfs_destroy;
+  cvmfs_operations->init         = cvmfs_init;
+  cvmfs_operations->destroy      = cvmfs_destroy;
 
-  cvmfs_operations->lookup      = cvmfs_lookup;
-  cvmfs_operations->getattr     = cvmfs_getattr;
-  cvmfs_operations->readlink    = cvmfs_readlink;
-  cvmfs_operations->open        = cvmfs_open;
-  cvmfs_operations->read        = cvmfs_read;
-  cvmfs_operations->release     = cvmfs_release;
-  cvmfs_operations->opendir     = cvmfs_opendir;
-  cvmfs_operations->readdir     = cvmfs_readdir;
-  cvmfs_operations->releasedir  = cvmfs_releasedir;
-  cvmfs_operations->statfs      = cvmfs_statfs;
-  cvmfs_operations->getxattr    = cvmfs_getxattr;
-  cvmfs_operations->listxattr   = cvmfs_listxattr;
-  cvmfs_operations->forget      = cvmfs_forget;
+  cvmfs_operations->lookup       = cvmfs_lookup;
+  cvmfs_operations->getattr      = cvmfs_getattr;
+  cvmfs_operations->readlink     = cvmfs_readlink;
+  cvmfs_operations->open         = cvmfs_open;
+  cvmfs_operations->read         = cvmfs_read;
+  cvmfs_operations->release      = cvmfs_release;
+  cvmfs_operations->opendir      = cvmfs_opendir;
+  cvmfs_operations->readdir      = cvmfs_readdir;
+  cvmfs_operations->releasedir   = cvmfs_releasedir;
+  cvmfs_operations->statfs       = cvmfs_statfs;
+  cvmfs_operations->getxattr     = cvmfs_getxattr;
+  cvmfs_operations->listxattr    = cvmfs_listxattr;
+  cvmfs_operations->forget       = cvmfs_forget;
+#if (FUSE_VERSION >= 29)
+  cvmfs_operations->forget_multi = cvmfs_forget_multi;
+#endif
 }
 
 // Called by cvmfs_talk when switching into read-only cache mode
@@ -1829,6 +1609,66 @@ string *g_boot_error = NULL;
 __attribute__((visibility("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
 
+/**
+ * Begin section of cvmfs.cc-specific magic extended attributes
+ */
+
+class ExpiresMagicXattr : public BaseMagicXattr {
+  time_t catalogs_valid_until_;
+
+  virtual bool PrepareValueFenced() {
+    catalogs_valid_until_ = cvmfs::fuse_remounter_->catalogs_valid_until();
+    return true;
+  }
+
+  virtual std::string GetValue() {
+    if (catalogs_valid_until_ == MountPoint::kIndefiniteDeadline) {
+      return "never (fixed root catalog)";
+    } else {
+      time_t now = time(NULL);
+      return StringifyInt( (catalogs_valid_until_ - now) / 60);
+    }
+  }
+};
+
+class InodeMaxMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue() {
+    return StringifyInt(
+      cvmfs::inode_generation_info_.inode_generation +
+      mount_point_->catalog_mgr()->inode_gauge());
+  }
+};
+
+class MaxFdMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue() {
+    return StringifyInt(cvmfs::max_open_files_ - cvmfs::kNumReservedFd);
+  }
+};
+
+class PidMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue() { return StringifyInt(cvmfs::pid_); }
+};
+
+class UptimeMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue() {
+    time_t now = time(NULL);
+    uint64_t uptime = now - cvmfs::loader_exports_->boot_time;
+    return StringifyInt(uptime / 60);
+  }
+};
+
+/**
+ * Register cvmfs.cc-specific magic extended attributes to mountpoint's
+ * magic xattribute manager 
+ */
+static void RegisterMagicXattrs() {
+  MagicXattrManager *mgr = cvmfs::mount_point_->magic_xattr_mgr();
+  mgr->Register("user.expires", new ExpiresMagicXattr());
+  mgr->Register("user.inode_max", new InodeMaxMagicXattr());
+  mgr->Register("user.pid", new PidMagicXattr());
+  mgr->Register("user.maxfd", new MaxFdMagicXattr());
+  mgr->Register("user.uptime", new UptimeMagicXattr());
+}
 
 /**
  * Construct a file system but prevent hanging when already mounted.  That
@@ -1915,6 +1755,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     *g_boot_error = cvmfs::mount_point_->boot_error();
     return cvmfs::mount_point_->boot_status();
   }
+
+  RegisterMagicXattrs();
 
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));

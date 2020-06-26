@@ -13,9 +13,6 @@
 #include "util/single_copy.h"
 
 typedef struct json_value JSON;
-typedef std::vector<std::pair<const char *, const char *> > JsonStringInput;
-
-bool ToJsonString(const JsonStringInput &input, std::string *output);
 
 class JsonDocument : SingleCopy {
  public:

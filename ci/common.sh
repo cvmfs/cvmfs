@@ -218,6 +218,7 @@ expand_template() {
   echo "$tmp"
 }
 
+# we need at least go 1.12.0 for `strings.ReplaceAll`
 can_build_ducc() {
   if which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1 ; then
     go_version=$(go version)
@@ -225,14 +226,22 @@ can_build_ducc() {
     go_minor=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\2/p')
     go_patch=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\3/p')
 
-    if [ $go_minor -ge 11 ]; then
-      if [ $go_patch -ge 4 ]; then
-        echo "1"
-      else
-        echo "0"
-      fi
-    else
+    if [ $go_major -gt 1 ]; then
+      echo "1"
+    elif [ $go_major -lt 1 ]; then
       echo "0"
+    else
+      if [ $go_minor -gt 12 ]; then
+        echo "1"
+      elif [ $go_minor -lt 12 ]; then
+        echo "0"
+      else
+        if [ $go_patch -ge 0 ]; then
+          echo "1"
+        else
+          echo "0"
+        fi
+      fi
     fi
   else
     echo "0"

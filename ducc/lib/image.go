@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -27,18 +28,19 @@ type ManifestRequest struct {
 }
 
 type Image struct {
-	Id         int
-	User       string
-	Scheme     string
-	Registry   string
-	Repository string
-	Tag        string
-	Digest     string
-	IsThin     bool
-	Manifest   *da.Manifest
+	Id          int
+	User        string
+	Scheme      string
+	Registry    string
+	Repository  string
+	Tag         string
+	Digest      string
+	IsThin      bool
+	TagWildcard bool
+	Manifest    *da.Manifest
 }
 
-func (i Image) GetSimpleName() string {
+func (i *Image) GetSimpleName() string {
 	name := fmt.Sprintf("%s/%s", i.Registry, i.Repository)
 	if i.Tag == "" {
 		return name
@@ -47,7 +49,7 @@ func (i Image) GetSimpleName() string {
 	}
 }
 
-func (i Image) WholeName() string {
+func (i *Image) WholeName() string {
 	root := fmt.Sprintf("%s://%s/%s", i.Scheme, i.Registry, i.Repository)
 	if i.Tag != "" {
 		root = fmt.Sprintf("%s:%s", root, i.Tag)
@@ -58,7 +60,7 @@ func (i Image) WholeName() string {
 	return root
 }
 
-func (i Image) GetManifestUrl() string {
+func (i *Image) GetManifestUrl() string {
 	url := fmt.Sprintf("%s://%s/v2/%s/manifests/", i.Scheme, i.Registry, i.Repository)
 	if i.Digest != "" {
 		url = fmt.Sprintf("%s%s", url, i.Digest)
@@ -68,7 +70,7 @@ func (i Image) GetManifestUrl() string {
 	return url
 }
 
-func (i Image) GetReference() string {
+func (i *Image) GetReference() string {
 	if i.Digest == "" && i.Tag != "" {
 		return ":" + i.Tag
 	}
@@ -81,7 +83,7 @@ func (i Image) GetReference() string {
 	panic("Image wrong format, missing both tag and digest")
 }
 
-func (i Image) GetSimpleReference() string {
+func (i *Image) GetSimpleReference() string {
 	if i.Tag != "" {
 		return i.Tag
 	}
@@ -91,7 +93,7 @@ func (i Image) GetSimpleReference() string {
 	panic("Image wrong format, missing both tag and digest")
 }
 
-func (img Image) PrintImage(machineFriendly, csv_header bool) {
+func (img *Image) PrintImage(machineFriendly, csv_header bool) {
 	if machineFriendly {
 		if csv_header {
 			fmt.Printf("name,user,scheme,registry,repository,tag,digest,is_thin\n")
@@ -123,7 +125,7 @@ func (img Image) PrintImage(machineFriendly, csv_header bool) {
 	}
 }
 
-func (img Image) GetManifest() (da.Manifest, error) {
+func (img *Image) GetManifest() (da.Manifest, error) {
 	if img.Manifest != nil {
 		return *img.Manifest, nil
 	}
@@ -143,7 +145,7 @@ func (img Image) GetManifest() (da.Manifest, error) {
 	return manifest, nil
 }
 
-func (img Image) GetChanges() (changes []string, err error) {
+func (img *Image) GetChanges() (changes []string, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -204,16 +206,117 @@ func (img Image) GetChanges() (changes []string, err error) {
 	cmd := config.Config.Cmd
 
 	if len(cmd) > 0 {
+		command := fmt.Sprintf("CMD")
 		for _, c := range cmd {
-			changes = append(changes, fmt.Sprintf("CMD %s", c))
+			command = fmt.Sprintf("%s %s", command, c)
 		}
+		changes = append(changes, command)
 	}
 
 	return
 }
 
-func (img Image) GetSingularityLocation() string {
+func (img *Image) GetSingularityLocation() string {
 	return fmt.Sprintf("docker://%s/%s%s", img.Registry, img.Repository, img.GetReference())
+}
+
+func (img *Image) GetTagListUrl() string {
+	return fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository)
+}
+
+func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
+	r1 := make(chan *Image, 500)
+	r2 := make(chan *Image, 500)
+	var wg sync.WaitGroup
+	defer func() {
+		go func() {
+			wg.Wait()
+			close(r1)
+			close(r2)
+		}()
+	}()
+	if !img.TagWildcard {
+		img.GetManifest()
+		r1 <- img
+		r2 <- img
+		return r1, r2, nil
+	}
+	var tagsList struct {
+		Tags []string
+	}
+	pass, err := GetPassword()
+	if err != nil {
+		LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
+		pass = ""
+	}
+	user := img.User
+	url := img.GetTagListUrl()
+	token, err := firstRequestForAuth(url, user, pass)
+	if err != nil {
+		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
+		LogE(err).Error(errF)
+		return r1, r2, errF
+	}
+
+	client := http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		errF := fmt.Errorf("Error in making the request for retrieving the tags: %s", err)
+		LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
+		return r1, r2, errF
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		errF := fmt.Errorf("Got error status code (%d) trying to retrieve the tags", resp.StatusCode)
+		LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
+		return r1, r2, errF
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
+		errF := fmt.Errorf("Error in decoding the tags from the server: %s", err)
+		LogE(err).Error(errF)
+		return r1, r2, errF
+	}
+	pattern := img.Tag
+	filteredTags, err := filterUsingGlob(pattern, tagsList.Tags)
+	if err != nil {
+		return r1, r2, nil
+	}
+	for _, tag := range filteredTags {
+		wg.Add(1)
+		go func(tag string) {
+			defer wg.Done()
+			taggedImg := *img
+			taggedImg.Tag = tag
+			taggedImg.GetManifest()
+			r1 <- &taggedImg
+			r2 <- &taggedImg
+		}(tag)
+	}
+
+	return r1, r2, nil
+}
+
+func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
+	result := make([]string, 0)
+	regexPattern := strings.ReplaceAll(pattern, "*", ".*")
+	regex, err := regexp.Compile(regexPattern)
+	if err != nil {
+		return result, err
+	}
+	regex.Longest()
+	for _, toCheck := range toFilter {
+		s := regex.FindString(toCheck)
+		if s == "" {
+			continue
+		}
+		if s == toCheck {
+			result = append(result, s)
+		}
+	}
+	return result, nil
 }
 
 func GetSingularityPathFromManifest(manifest da.Manifest) string {
@@ -222,7 +325,7 @@ func GetSingularityPathFromManifest(manifest da.Manifest) string {
 }
 
 // here is where in the FS we are going to store the singularity image
-func (img Image) GetSingularityPath() (string, error) {
+func (img *Image) GetSingularityPath() (string, error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Error("Error in getting the manifest to figureout the singularity path")
@@ -236,32 +339,58 @@ type Singularity struct {
 	TempDirectory string
 }
 
-func (img Image) DownloadSingularityDirectory(rootPath string) (sing Singularity, err error) {
-	dir, err := ioutil.TempDir(rootPath, "singularity_buffer")
+func (img *Image) DownloadSingularityDirectory(rootPath string) (sing Singularity, err error) {
+	dir, err := UserDefinedTempDir(rootPath, "singularity_buffer")
 	if err != nil {
 		LogE(err).Error("Error in creating temporary directory for singularity")
 		return
-
 	}
-	singularityTempCache, err := ioutil.TempDir("", "tempDirSingularityCache")
+	singularityTempCache, err := UserDefinedTempDir(rootPath, "tempDirSingularityCache")
 	if err != nil {
 		LogE(err).Error("Error in creating temporary directory for singularity cache")
 		return
 	}
 	defer os.RemoveAll(singularityTempCache)
-	err = ExecCommand("singularity", "build", "--force", "--sandbox", dir, img.GetSingularityLocation()).Env(
-		"SINGULARITY_CACHEDIR", singularityTempCache).Env("PATH", os.Getenv("PATH")).Start()
-	if err != nil {
-		LogE(err).Error("Error in downloading the singularity image")
-		return
+	// we first try to download the image with the credentials
+	// if we fail, we try again without the credentials
+	user := img.User
+	pass, _ := GetPassword()
+	err = ExecCommand("singularity", "build", "--force", "--fix-perms",
+		"--sandbox", dir, img.GetSingularityLocation()).
+		Env("SINGULARITY_CACHEDIR", singularityTempCache).
+		Env("PATH", os.Getenv("PATH")).
+		Env("SINGULARITY_DOCKER_USERNAME", user).
+		Env("SINGULARITY_DOCKER_PASSWORD", pass).
+		Start()
+	if err == nil {
+		Log().Info("Successfully download the singularity image")
+		return Singularity{Image: img, TempDirectory: dir}, nil
 	}
+	if user != "" || pass != "" {
+		Log().Info("Detected error in downloading image with credentials, trying without.")
+		err = ExecCommand("singularity", "build", "--force", "--fix-perms",
+			"--sandbox", dir, img.GetSingularityLocation()).
+			Env("SINGULARITY_CACHEDIR", singularityTempCache).
+			Env("PATH", os.Getenv("PATH")).
+			Start()
+		if err == nil {
+			Log().Info("Successfully download the singularity image")
+			return Singularity{Image: img, TempDirectory: dir}, nil
+		}
+	}
+	LogE(err).Error("Error in downloading the singularity image")
+	return
 
-	Log().Info("Successfully download the singularity image")
-	return Singularity{Image: &img, TempDirectory: dir}, nil
+}
+
+// the one that the user see, without the /cvmfs/$repo.cern.ch prefix
+// used mostly by Singularity
+func (i *Image) GetPublicSymlinkPath() string {
+	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
 
 func (s Singularity) IngestIntoCVMFS(CVMFSRepo string) error {
-	symlinkPath := filepath.Join(s.Image.Registry, s.Image.Repository+":"+s.Image.GetSimpleReference())
+	symlinkPath := s.Image.GetPublicSymlinkPath()
 	singularityPath, err := s.Image.GetSingularityPath()
 	if err != nil {
 		LogE(err).Error(
@@ -303,7 +432,7 @@ func (s Singularity) IngestIntoCVMFS(CVMFSRepo string) error {
 	return nil
 }
 
-func (img Image) getByteManifest() ([]byte, error) {
+func (img *Image) getByteManifest() ([]byte, error) {
 	pass, err := GetPassword()
 	if err != nil {
 		LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
@@ -312,15 +441,15 @@ func (img Image) getByteManifest() ([]byte, error) {
 	return img.getManifestWithPassword(pass)
 }
 
-func (img Image) getAnonymousManifest() ([]byte, error) {
+func (img *Image) getAnonymousManifest() ([]byte, error) {
 	return getManifestWithUsernameAndPassword(img, "", "")
 }
 
-func (img Image) getManifestWithPassword(password string) ([]byte, error) {
+func (img *Image) getManifestWithPassword(password string) ([]byte, error) {
 	return getManifestWithUsernameAndPassword(img, img.User, password)
 }
 
-func getManifestWithUsernameAndPassword(img Image, user, pass string) ([]byte, error) {
+func getManifestWithUsernameAndPassword(img *Image, user, pass string) ([]byte, error) {
 
 	url := img.GetManifestUrl()
 
@@ -373,16 +502,27 @@ func firstRequestForAuth(url, user, pass string) (token string, err error) {
 		return "", err
 	}
 	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
+	// we first try to get the token with the authentication
+	// if we fail, and we might since the docker hub might not have our user
+	// we try again without authentication
 	token, err = requestAuthToken(WwwAuthenticate, user, pass)
-	if err != nil {
-		LogE(err).Error("Error in getting the authentication token")
-		return "", err
+	if err == nil {
+		// happy path
+		return token, nil
 	}
-	return token, nil
-
+	// some error, we should retry without auth
+	if user != "" || pass != "" {
+		token, err = requestAuthToken(WwwAuthenticate, "", "")
+		if err == nil {
+			// happy path without auth
+			return token, nil
+		}
+	}
+	LogE(err).Error("Error in getting the authentication token")
+	return "", err
 }
 
-func getLayerUrl(img Image, layer da.Layer) string {
+func getLayerUrl(img *Image, layer da.Layer) string {
 	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
 		img.Scheme, img.Registry, img.Repository, layer.Digest)
 }
@@ -392,7 +532,7 @@ type downloadedLayer struct {
 	Path io.ReadCloser
 }
 
-func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
+func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
@@ -486,7 +626,7 @@ func (img Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<
 	}
 }
 
-func (img Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend downloadedLayer, err error) {
+func (img *Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend downloadedLayer, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -576,6 +716,10 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	if err != nil {
+		err = fmt.Errorf("Error in getting the token, http request failed %s", err)
+		return
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {

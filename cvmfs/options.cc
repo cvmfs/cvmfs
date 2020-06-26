@@ -20,6 +20,7 @@
 
 #include "logging.h"
 #include "sanitizer.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -153,7 +154,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
     MakePipe(pipe_quit);
     switch (pid_child = fork()) {
       case -1:
-        abort();
+        PANIC(NULL);
       case 0: {  // Child
         close(pipe_open[0]);
         close(pipe_quit[1]);
@@ -380,6 +381,17 @@ bool OptionsManager::GetValue(const string &key, string *value) {
   }
   *value = "";
   return false;
+}
+
+
+std::string OptionsManager::GetValueOrDie(const string &key) {
+  std::string value;
+  bool retval = GetValue(key, &value);
+  if (!retval) {
+    PANIC(kLogStderr | kLogDebug,
+          "%s configuration parameter missing", key.c_str());
+  }
+  return value;
 }
 
 

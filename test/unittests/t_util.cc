@@ -361,6 +361,42 @@ TEST_F(T_Util, GetFileName) {
 }
 
 
+TEST_F(T_Util, GetFileSystemInfo) {
+  if (!DirectoryExists("/proc")) {
+    printf("Skipping\n");
+    return;
+  }
+
+  FileSystemInfo fs_info;
+  fs_info = GetFileSystemInfo("/proc");
+  EXPECT_EQ(kFsTypeProc, fs_info.type);
+  fs_info = GetFileSystemInfo("/");
+  EXPECT_EQ(kFsTypeUnknown, fs_info.type);
+}
+
+
+TEST_F(T_Util, ResolvePath) {
+  EXPECT_EQ("/", ResolvePath("/"));
+  EXPECT_EQ("/", ResolvePath(""));
+  EXPECT_EQ("/no/such/path", ResolvePath("/no/such/path"));
+  EXPECT_EQ("/", ResolvePath("/.//././."));
+  EXPECT_EQ("/", ResolvePath("/usr/.."));
+
+  EXPECT_EQ(0, symlink(".", "cvmfs_test_link"));
+  EXPECT_EQ(GetCurrentWorkingDirectory(), ResolvePath("cvmfs_test_link"));
+
+  EXPECT_EQ(0, symlink("/no/such/path", "cvmfs_test_link_dangling"));
+  EXPECT_EQ("/no/such/path", ResolvePath("cvmfs_test_link_dangling"));
+}
+
+
+TEST_F(T_Util, IsMountPoint) {
+  EXPECT_TRUE(IsMountPoint(""));
+  EXPECT_TRUE(IsMountPoint("/"));
+  EXPECT_FALSE(IsMountPoint("/no/such/file"));
+}
+
+
 TEST_F(T_Util, SplitPath) {
   string dirname;
   string filename;
@@ -1397,6 +1433,13 @@ TEST_F(T_Util, ReplaceAll) {
           "REPLACED"));
 }
 
+TEST_F(T_Util, ProcessExists) {
+  EXPECT_TRUE(ProcessExists(getpid()));
+  EXPECT_TRUE(ProcessExists(1));
+  EXPECT_FALSE(ProcessExists(999999999));
+  EXPECT_DEATH(ProcessExists(0), ".*");
+}
+
 TEST_F(T_Util, BlockSignal) {
   EXPECT_DEATH(kill(getpid(), SIGUSR1), ".*");
   BlockSignal(SIGUSR1);
@@ -1552,8 +1595,10 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   map<int, int> fd_map;
   fd_map[fd_stdout[1]] = 1;
 
-  success = ManagedExec(command_line, preserve_filedes, fd_map, true, true,
-      &pid);
+  success = ManagedExec(command_line, preserve_filedes, fd_map,
+                        true /* drop_credentials */, false /* clear_env */,
+                        true /* double_fork */,
+                        &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
   ssize_t bytes_read = read(fd_stdout[0], buffer, message.length());
@@ -1562,6 +1607,37 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   ASSERT_EQ(message, result);
   close(fd_stdout[0]);
 }
+
+
+TEST_F(T_Util, ManagedExecClearEnv) {
+  bool success;
+  pid_t pid;
+  int fd_stdout[2];
+  int fd_stdin[2];
+  UniquePtr<unsigned char> buffer(static_cast<unsigned char*>(
+    scalloc(100, 1)));
+  MakePipe(fd_stdout);
+  MakePipe(fd_stdin);
+  vector<string> command_line;
+  command_line.push_back("/usr/bin/env");
+
+  set<int> preserve_filedes;
+  preserve_filedes.insert(1);
+
+  map<int, int> fd_map;
+  fd_map[fd_stdout[1]] = 1;
+
+  success = ManagedExec(command_line, preserve_filedes, fd_map,
+                        true /* drop_credentials */, true /* clear_env */,
+                        true /* double_fork */,
+                        &pid);
+  close(fd_stdout[1]);
+  ASSERT_TRUE(success);
+  ssize_t bytes_read = read(fd_stdout[0], buffer, 64);
+  EXPECT_EQ(bytes_read, 0);
+  close(fd_stdout[0]);
+}
+
 
 TEST_F(T_Util, ManagedExecRunShell) {
   int fd_stdin;
@@ -1845,5 +1921,32 @@ TEST(Log2Histogram, 3Bins) {
   int res[4] = {1, 5, 2, 4};
   for (int i = 0; i < 4; i++) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
+  }
+}
+
+TEST(Log2Histogram, Quantiles) {
+  int N = 16;
+  int64_t max = 1 << N;
+  Log2Histogram log2hist(N + 1);
+
+  // the quantile computation to fail with tolerance ~0.001 (~0.1%) we add a
+  // safety factor of 50 (~5%)
+  float tolerance = 0.05;
+
+  Prng rng = Prng();
+  rng.InitLocaltime();
+
+  // we are oversampling to test the quantiles
+  int64_t i = 1 << (N + 4);
+  for (; i >= 0; i--) {
+    log2hist.Add(rng.Next(max));
+  }
+  float qs[12] = {0.15, 0.20, 0.3,   0.5,   0.75,   0.9,
+                  0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999};
+  for (int i = 0; i < 12; i++) {
+    double expected = max * qs[i];
+    double max_difference = expected * tolerance;
+    unsigned int q = log2hist.GetQuantile(qs[i]);
+    EXPECT_NEAR(q, expected, max_difference);
   }
 }

@@ -23,3 +23,17 @@ install (
   PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_ducc
   DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
 )
+
+
+# we first generate the services file, replacing the installation directory in the template file
+configure_file (
+  ${CMAKE_CURRENT_SOURCE_DIR}/unitfiles/cvmfs_ducc.service.in
+  ${CMAKE_BINARY_DIR}/cvmfs_ducc.service
+  @ONLY
+)
+
+# and then we install the generated file
+install (
+  FILES ${CMAKE_BINARY_DIR}/cvmfs_ducc.service
+  DESTINATION /usr/lib/systemd/system
+)

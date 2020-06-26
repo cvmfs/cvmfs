@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 
+#include "json_document_write.h"
 #include "platform.h"
 #include "smalloc.h"
 #include "util/string.h"
@@ -75,7 +76,6 @@ string Statistics::LookupDesc(const std::string &name) {
   return "";
 }
 
-
 string Statistics::PrintList(const PrintOptions print_options) {
   string result;
   if (print_options == kPrintHeader)
@@ -91,6 +91,50 @@ string Statistics::PrintList(const PrintOptions print_options) {
   return result;
 }
 
+/**
+ * Converts statistics counters into JSON string in following format
+ * {
+ *   "name_major1": {
+ *     "counter1": val1,
+ *     "counter2": val2
+ *   },
+ *   "name_major2": {
+ *     "counter3": val3
+ *   }
+ * }
+ */
+string Statistics::PrintJSON() {
+  MutexLockGuard lock_guard(lock_);
+
+  JsonStringGenerator json_statistics;
+
+  // Make use of std::map key ordering and add counters namespace by namespace
+  JsonStringGenerator json_statistics_namespace;
+  std::string last_namespace = "";
+  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
+                                                  iEnd = counters_.end();
+       i != iEnd; ++i) {
+    std::vector<std::string> tokens = SplitString(i->first, '.');
+
+    if (tokens[0] != last_namespace) {
+      if (last_namespace != "") {
+        json_statistics.AddJsonObject(last_namespace,
+                                    json_statistics_namespace.GenerateString());
+      }
+      json_statistics_namespace.Clear();
+    }
+
+    json_statistics_namespace.Add(tokens[1], i->second->counter.Get());
+
+    last_namespace = tokens[0];
+  }
+  if (last_namespace != "") {
+    json_statistics.AddJsonObject(last_namespace,
+                                json_statistics_namespace.GenerateString());
+  }
+
+  return json_statistics.GenerateString();
+}
 
 Counter *Statistics::Register(const string &name, const string &desc) {
   MutexLockGuard lock_guard(lock_);

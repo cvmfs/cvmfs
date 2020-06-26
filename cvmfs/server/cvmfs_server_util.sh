@@ -146,6 +146,21 @@ __swissknife() {
 }
 
 
+__publish_cmd() {
+  local might_be_debugging="$1"
+  if [ ! -z $might_be_debugging ]; then
+    echo "$CVMFS_SERVER_PUBLISH_DEBUG"
+  else
+    echo "$CVMFS_SERVER_PUBLISH"
+  fi
+}
+
+
+__publish() {
+  $(__publish_cmd) $@
+}
+
+
 # checks if a given list of strings contains a specific item
 #
 # @param haystack   the list to be searched
@@ -1053,8 +1068,8 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
-    eliminate-hardlinks update-info update-repoinfo mount fix-permissions \
-    masterkeycard ingest merge-stats print-stats"
+    eliminate-hardlinks eliminate-bulk-hashes update-info update-repoinfo mount \
+    fix-permissions masterkeycard ingest merge-stats print-stats"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1109,7 +1124,7 @@ Supported Commands:
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]
-                  [-g snapshot group]
+                  [-g snapshot group] [-P pass-through repository]
                   <stratum 0 url> <public key | keys directory>
                   Creates a Stratum 1 replica of a Stratum 0 repository
   import          [-w stratum0 url] [-o owner] [-u upstream storage]

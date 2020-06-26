@@ -81,7 +81,7 @@ cvmfs_server_ingest() {
     cvmfs_server_transaction $name || die "Impossible to start a transaction"
   fi
 
-
+  load_repo_config $name
 
   upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)
@@ -228,6 +228,10 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -+stats"
   fi
 
+  if [ "x$CVMFS_UPLOAD_STATS_DB" = "xtrue" ]; then
+    ingest_command="$ingest_command -I"
+  fi
+
   local upstream_storage=$CVMFS_UPSTREAM_STORAGE
   local upstream_type=$(get_upstream_type $upstream_storage)
   gw_key_file=/etc/cvmfs/keys/${name}.gw
@@ -265,6 +269,7 @@ cvmfs_server_ingest() {
   fi
 
   if [ x"$upstream_type" = xgw ]; then
+      # TODO(jpriessn): implement publication counters upload to gateway
       close_transaction  $name $use_fd_fallback
       publish_after_hook $name
       publish_succeeded $name
@@ -355,6 +360,9 @@ cvmfs_server_ingest() {
   fi
 
   # remount the repository
+  if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
+    /usr/share/cvmfs-server/upload_stats_plots.sh $name
+  fi
   close_transaction $name $use_fd_fallback
   publish_after_hook $name
   publish_succeeded  $name

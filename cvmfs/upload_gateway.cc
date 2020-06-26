@@ -9,6 +9,7 @@
 
 #include "gateway_util.h"
 #include "logging.h"
+#include "util/exception.h"
 #include "util/string.h"
 
 namespace upload {
@@ -32,7 +33,7 @@ bool GatewayUploader::ParseSpoolerDefinition(
 
   if (spooler_definition.session_token_file.empty()) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Failed to configure HTTP uploader. "
+             "Failed to configure gateway uploader. "
              "Missing session token file.\n");
     return false;
   }
@@ -40,8 +41,8 @@ bool GatewayUploader::ParseSpoolerDefinition(
 
   if (spooler_definition.key_file.empty()) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Failed to configure HTTP uploader. "
-             "Missing HTTP API key file.\n");
+             "Failed to configure gateway uploader. "
+             "Missing API key file.\n");
     return false;
   }
   config->key_file = spooler_definition.key_file;
@@ -60,7 +61,7 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
          spooler_definition.driver_type == SpoolerDefinition::Gateway);
 
   if (!ParseSpoolerDefinition(spooler_definition, &config_)) {
-    abort();
+    PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
   atomic_init32(&num_errors_);
@@ -116,6 +117,11 @@ void GatewayUploader::DoRemoveAsync(const std::string& /*file_to_delete*/) {
 }
 
 bool GatewayUploader::Peek(const std::string& /*path*/) { return false; }
+
+// TODO(jpriessn): implement Mkdir on gateway server-side
+bool GatewayUploader::Mkdir(const std::string &path) {
+  return true;
+}
 
 bool GatewayUploader::PlaceBootstrappingShortcut(const shash::Any& /*object*/) {
   return false;
@@ -202,8 +208,9 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
     return;
   }
 
+  // hd->remote_path is ignored when empty
   if (!session_context_->CommitBucket(ObjectPack::kCas, content_hash,
-                                      hd->bucket, "")) {
+                                      hd->bucket, hd->remote_path)) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - could not commit bucket");
     BumpErrors();

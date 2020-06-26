@@ -11,6 +11,7 @@
 #include "reflog.h"
 #include "server_tool.h"
 #include "upload.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 
 namespace {
@@ -30,7 +31,7 @@ SigningTool::Result SigningTool::Run(
     const std::string &repo_name, const std::string &pwd,
     const std::string &meta_info, const std::string &reflog_chksum_path,
     const bool garbage_collectable, const bool bootstrap_shortcuts,
-    const bool return_early) {
+    const bool return_early, const std::vector<shash::Any> reflog_catalogs) {
   shash::Any reflog_hash;
   if (reflog_chksum_path != "") {
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
@@ -159,6 +160,19 @@ SigningTool::Result SigningTool::Run(
       }
     }
 
+    // Callers of SigningTool may provide a list of additional catalogs that
+    // need to be added to reflog (e. g. for later garbage collection)
+    std::vector<shash::Any>::const_iterator i = reflog_catalogs.begin();
+    std::vector<shash::Any>::const_iterator iend = reflog_catalogs.end();
+    for (; i != iend; ++i) {
+      if (!reflog->AddCatalog(*i)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Failed to add additional catalog %s to Reflog",
+                 (*i).ToString().c_str());
+        return kError;
+      }
+    }
+
     reflog->CommitTransaction();
 
     // upload Reflog database
@@ -230,9 +244,7 @@ SigningTool::Result SigningTool::Run(
       reinterpret_cast<const unsigned char *>(published_hash.ToString().data()),
       published_hash.GetHexSize(), &sig, &sig_size);
   if (!manifest_was_signed) {
-    abort();
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
-    return kError;
+    PANIC(kLogStderr, "Failed to sign manifest");
   }
 
   // Write new manifest

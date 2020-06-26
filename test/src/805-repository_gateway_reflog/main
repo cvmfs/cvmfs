@@ -53,6 +53,8 @@ run_tests() {
         return 1;
     fi
 
+    check_repo_integrity test.repo.org || return 1
+
     return 0;
 }
 

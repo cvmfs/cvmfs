@@ -113,6 +113,15 @@ class OptionsManager {
   bool GetValue(const std::string &key, std::string *value);
 
   /**
+   * Gets the stored value for a concrete variable. Panics if the value is
+   * missing.
+   *
+   * @param  key variable to be accessed in the map
+   * @param  value container of the received value, if it exists
+   */
+  std::string GetValueOrDie(const std::string &key);
+
+  /**
    * Gets the stored last source of a concrete variable
    *
    * @param  key variable to be accessed in the map
@@ -217,7 +226,7 @@ class OptionsManager {
  *  "KEY=VALUE".
  *
  *  No comments (#) are allowed.
- * 
+ *
  *  @note In order to use this parse it is necessary to execute the program
  *        with the "-o simple_options_parsing" flag
  *  @note If using IgProf profiling tool it is necessary to use this parser in

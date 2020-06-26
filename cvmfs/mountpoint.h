@@ -20,6 +20,7 @@
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "loader.h"
+#include "magic_xattr.h"
 #include "util/algorithm.h"
 #include "util/pointer.h"
 
@@ -176,6 +177,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool found_previous_crash() { return found_previous_crash_; }
   Log2Histogram *hist_fs_lookup() { return hist_fs_lookup_; }
   Log2Histogram *hist_fs_forget() { return hist_fs_forget_; }
+  Log2Histogram *hist_fs_forget_multi() { return hist_fs_forget_multi_; }
   Log2Histogram *hist_fs_getattr() { return hist_fs_getattr_; }
   Log2Histogram *hist_fs_readlink() { return hist_fs_readlink_; }
   Log2Histogram *hist_fs_opendir() { return hist_fs_opendir_; }
@@ -296,6 +298,7 @@ class FileSystem : SingleCopy, public BootFactory {
 
   Log2Histogram *hist_fs_lookup_;
   Log2Histogram *hist_fs_forget_;
+  Log2Histogram *hist_fs_forget_multi_;
   Log2Histogram *hist_fs_getattr_;
   Log2Histogram *hist_fs_readlink_;
   Log2Histogram *hist_fs_opendir_;
@@ -414,11 +417,11 @@ class MountPoint : SingleCopy, public BootFactory {
   }
   cvmfs::Fetcher *fetcher() { return fetcher_; }
   bool fixed_catalog() { return fixed_catalog_; }
-  std::string fqrn() { return fqrn_; }
+  std::string fqrn() const { return fqrn_; }
   cvmfs::Fetcher *external_fetcher() { return external_fetcher_; }
   FileSystem *file_system() { return file_system_; }
+  MagicXattrManager *magic_xattr_mgr() { return magic_xattr_mgr_; }
   bool has_membership_req() { return has_membership_req_; }
-  bool hide_magic_xattrs() { return hide_magic_xattrs_; }
   bool enforce_acls() { return enforce_acls_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
@@ -539,6 +542,7 @@ class MountPoint : SingleCopy, public BootFactory {
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
   glue::NentryTracker *nentry_tracker_;
+  MagicXattrManager *magic_xattr_mgr_;
 
   file_watcher::FileWatcher* resolv_conf_watcher_;
 
@@ -546,7 +550,6 @@ class MountPoint : SingleCopy, public BootFactory {
   pthread_mutex_t lock_max_ttl_;
   double kcache_timeout_sec_;
   bool fixed_catalog_;
-  bool hide_magic_xattrs_;
   bool enforce_acls_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
