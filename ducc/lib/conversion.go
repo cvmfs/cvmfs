@@ -32,6 +32,7 @@ const (
 )
 
 var subDirInsideRepo = ".layers"
+var	layerLocations map[string]string
 
 func assureValidSingularity() error {
 	err, stdout, _ := ExecCommand("singularity", "version").StartWithOutput()
@@ -77,6 +78,13 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	if err != nil {
 		return err
 	}
+	err = CreateCatalogIntoDir(wish.CvmfsRepo, ".flat")
+	if err != nil {
+		LogE(err).WithFields(log.Fields{
+			"directory": ".flat"}).Error(
+			"Impossible to create subcatalog in super-directory.")
+	}
+
 	tmpDir, err := UserDefinedTempDir("", "conversion")
 	if err != nil {
 		LogE(err).Error("Error when creating tmp singularity directory")
@@ -174,19 +182,13 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	return firstError
 }
 
-func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThinImage, skipPodman bool) (err error) {
-
-	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
-	if err != nil {
-		LogE(err).WithFields(log.Fields{
-			"directory": subDirInsideRepo}).Error(
-			"Impossible to create subcatalog in super-directory.")
-	}
-	err = CreateCatalogIntoDir(wish.CvmfsRepo, ".flat")
-	if err != nil {
-		LogE(err).WithFields(log.Fields{
-			"directory": ".flat"}).Error(
-			"Impossible to create subcatalog in super-directory.")
+func ConvertWishDocker(wish WishFriendly) (err error) {
+	inputImage := wish.InputImage
+	if inputImage == nil {
+		err = fmt.Errorf("error in parsing the input image, got a null image")
+		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
+			Error("Null image, should not happen")
+		return
 	}
 
 	outputImage := wish.OutputImage
@@ -196,6 +198,160 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 			Error("Null image, should not happen")
 		return
 	}
+	
+	manifest, err := inputImage.GetManifest()
+	if err != nil {
+		return
+	}
+
+	err = CreateThinImage(manifest, layerLocations, *inputImage, *outputImage)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"input image": inputImage,"output image": outputImage}).
+			Error("Error creating thin image")
+		return
+	}
+
+	err = PushImageToRegistry(*outputImage)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{"output image": outputImage}).
+			Error("Error pushing the thin image to registry")
+		return
+	}
+	return
+}
+
+func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inputImage, outputImage Image) (err error) {
+	thin, err := da.MakeThinImage(manifest, layerLocations, inputImage.WholeName())
+	if err != nil {
+		return
+	}
+
+	thinJson, err := json.MarshalIndent(thin, "", "  ")
+	if err != nil {
+		return
+	}
+	var imageTar bytes.Buffer
+	tarFile := tar.NewWriter(&imageTar)
+	header := &tar.Header{Name: "thin.json", Mode: 0644, Size: int64(len(thinJson))}
+	err = tarFile.WriteHeader(header)
+	if err != nil {
+		return
+	}
+	_, err = tarFile.Write(thinJson)
+	if err != nil {
+		return
+	}
+	err = tarFile.Close()
+	if err != nil {
+		return
+	}
+
+	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	if err != nil {
+		return
+	}
+
+	changes, _ := inputImage.GetChanges()
+	image := types.ImageImportSource{
+		Source:     bytes.NewBuffer(imageTar.Bytes()),
+		SourceName: "-",
+	}
+	importOptions := types.ImageImportOptions{
+		Tag:     outputImage.Tag,
+		Message: "",
+		Changes: changes,
+	}
+	importResult, err := dockerClient.ImageImport(
+		context.Background(),
+		image,
+		outputImage.GetSimpleName(),
+		importOptions)
+	if err != nil {
+		LogE(err).Error("Error in image import")
+		return
+	}
+	defer importResult.Close()
+	Log().Info("Created the image in the local docker daemon")
+
+	return nil
+}
+
+func PushImageToRegistry(outputImage Image) (err error) {
+	password, err := GetPassword()
+	if err != nil {
+		return err
+	}
+	authStruct := struct {
+		Username string
+		Password string
+	}{
+		Username: outputImage.User,
+		Password: password,
+	}
+	authBytes, _ := json.Marshal(authStruct)
+	authCredential := base64.StdEncoding.EncodeToString(authBytes)
+	pushOptions := types.ImagePushOptions{
+		RegistryAuth: authCredential,
+	}
+	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	if err != nil {
+		return err
+	}
+	res, errImgPush := dockerClient.ImagePush(
+		context.Background(),
+		outputImage.GetSimpleName(),
+		pushOptions)
+	if errImgPush != nil {
+		err = fmt.Errorf("Error in pushing the image: %s", errImgPush)
+		return err
+	}
+	b, _ := ioutil.ReadAll(res)
+	Log().WithFields(log.Fields{"action": "prepared thin-image manifest"}).Info(string(b))
+	defer res.Close()
+	// here is possible to use the result of the above ReadAll to have
+	// informantion about the status of the upload.
+	_, errReadDocker := ioutil.ReadAll(res)
+	if err != nil {
+		LogE(errReadDocker).Warning("Error in reading the status from docker")
+	}
+	Log().Info("Finish pushing the image to the registry")
+	return nil
+}
+
+func ConvertWishPodman(wish WishFriendly) (err error) {
+	inputImage := wish.InputImage
+	if inputImage == nil {
+		err = fmt.Errorf("error in parsing the input image, got a null image")
+		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
+			Error("Null image, should not happen")
+		return
+	}
+
+	err = inputImage.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
+	if err != nil {
+		LogE(err).Warning("Unable to create Podman additional image store")
+		return err
+	}
+	Log().Info("Podman Store created successfully")
+	return nil
+}
+
+func ConvertWishLayers(wish WishFriendly, convertAgain, forceDownload, skipPodman bool) (err error) {
+	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{
+			"directory": subDirInsideRepo}).Error(
+			"Impossible to create subcatalog in super-directory.")
+	}
+	
+	outputImage := wish.OutputImage
+	if outputImage == nil {
+		err = fmt.Errorf("error in parsing the output image, got a null image")
+		LogE(err).WithFields(log.Fields{"output image": wish.OutputName}).
+			Error("Null image, should not happen")
+		return
+	}
+	
 	inputImage := wish.InputImage
 	if inputImage == nil {
 		err = fmt.Errorf("error in parsing the input image, got a null image")
@@ -213,77 +369,15 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 		} else {
 			outputWithTag.Tag = outputImage.Tag
 		}
-		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, createThinImage, skipPodman)
+		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, skipPodman)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
 	}
 	return firstError
-}
+} 
 
-func ConvertWishPodman(wish WishFriendly, skipLayers bool) (err error) {
-	outputImage := wish.OutputImage
-	if outputImage == nil {
-		err = fmt.Errorf("error in parsing the output image, got a null image")
-		LogE(err).WithFields(log.Fields{"output image": wish.OutputName}).
-			Error("Null image, should not happen")
-		return
-	}
-
-	inputImage := wish.InputImage
-	if inputImage == nil {
-		err = fmt.Errorf("error in parsing the input image, got a null image")
-		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
-			Error("Null image, should not happen")
-		return
-	}
-
-	//if skipLayers is true, the layers were not downloaded earlier. We download them here. 
-	if skipLayers {
-		err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
-		if err != nil {
-			LogE(err).WithFields(log.Fields{
-				"directory": subDirInsideRepo}).Error(
-				"Impossible to create subcatalog in super-directory.")
-		}
-
-		var firstError error
-		for expandedImgTag := range wish.ExpandedTagImagesLayer {
-			tag := expandedImgTag.Tag
-			outputWithTag := *outputImage
-			if inputImage.TagWildcard {
-				outputWithTag.Tag = tag
-			} else {
-				outputWithTag.Tag = outputImage.Tag
-			}
-			
-			//Boolean arguments:
-			//We don't want to re-download or force download layers => convertAgain = false, forceDownload = false
-			//Also we don't want to convert thin images here => createThinImage = false
-			//skipPodman = false
-			err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, false, false, false, false)
-			if err != nil && firstError == nil {
-				firstError = err
-			}
-		}
-		if firstError != nil {
-			LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
-				Error("error in convertInputOutput")
-			return firstError
-		}
-	}
-
-	err = inputImage.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
-	if err != nil {
-		LogE(err).Warning("Unable to create Podman additional image store")
-		return err
-	}
-	Log().Info("Podman Store created successfully")
-	return nil
-}
-
-func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, createThinImage, skipPodman bool) (err error) {
-
+func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, skipPodman bool) (err error) {
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
@@ -419,7 +513,7 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 
 	var wg sync.WaitGroup
 
-	layerLocations := make(map[string]string)
+	layerLocations = make(map[string]string)
 	wg.Add(1)
 	go func() {
 		for layerLocation := range layerRepoLocationChan {
@@ -438,13 +532,6 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 	}()
 	wg.Wait()
 
-	if createThinImage {
-		err = CreateThinImage(manifest, layerLocations, *inputImage, outputImage)
-		if err != nil {
-			return
-		}
-	}
-
 	// we wait for the goroutines to finish
 	// and if there was no error we conclude everything writing the manifest into the repository
 	noErrorInConversionValue := <-noErrorInConversion
@@ -456,48 +543,6 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 	}
 
 	if noErrorInConversionValue {
-		if createThinImage {
-			// is necessary this mechanism to pass the authentication to the
-			// dockers even if the documentation says otherwise
-			password, err := GetPassword()
-			if err != nil {
-				return err
-			}
-			authStruct := struct {
-				Username string
-				Password string
-			}{
-				Username: outputImage.User,
-				Password: password,
-			}
-			authBytes, _ := json.Marshal(authStruct)
-			authCredential := base64.StdEncoding.EncodeToString(authBytes)
-			pushOptions := types.ImagePushOptions{
-				RegistryAuth: authCredential,
-			}
-			dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
-			if err != nil {
-				return err
-			}
-			res, errImgPush := dockerClient.ImagePush(
-				context.Background(),
-				outputImage.GetSimpleName(),
-				pushOptions)
-			if errImgPush != nil {
-				err = fmt.Errorf("Error in pushing the image: %s", errImgPush)
-				return err
-			}
-			b, _ := ioutil.ReadAll(res)
-			Log().WithFields(log.Fields{"action": "prepared thin-image manifest"}).Info(string(b))
-			defer res.Close()
-			// here is possible to use the result of the above ReadAll to have
-			// informantion about the status of the upload.
-			_, errReadDocker := ioutil.ReadAll(res)
-			if err != nil {
-				LogE(errReadDocker).Warning("Error in reading the status from docker")
-			}
-			Log().Info("Finish pushing the image to the registry")
-		}
 		manifestPath := filepath.Join(".metadata", inputImage.GetSimpleName(), "manifest.json")
 		errIng := IngestIntoCVMFS(repo, manifestPath, <-manifestChanell)
 		if errIng != nil {
@@ -521,62 +566,6 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 		Log().Warn("Some error during the conversion, we are not storing it into the database")
 		return
 	}
-}
-
-func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inputImage, outputImage Image) (err error) {
-	thin, err := da.MakeThinImage(manifest, layerLocations, inputImage.WholeName())
-	if err != nil {
-		return
-	}
-
-	thinJson, err := json.MarshalIndent(thin, "", "  ")
-	if err != nil {
-		return
-	}
-	var imageTar bytes.Buffer
-	tarFile := tar.NewWriter(&imageTar)
-	header := &tar.Header{Name: "thin.json", Mode: 0644, Size: int64(len(thinJson))}
-	err = tarFile.WriteHeader(header)
-	if err != nil {
-		return
-	}
-	_, err = tarFile.Write(thinJson)
-	if err != nil {
-		return
-	}
-	err = tarFile.Close()
-	if err != nil {
-		return
-	}
-
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
-	if err != nil {
-		return
-	}
-
-	changes, _ := inputImage.GetChanges()
-	image := types.ImageImportSource{
-		Source:     bytes.NewBuffer(imageTar.Bytes()),
-		SourceName: "-",
-	}
-	importOptions := types.ImageImportOptions{
-		Tag:     outputImage.Tag,
-		Message: "",
-		Changes: changes,
-	}
-	importResult, err := dockerClient.ImageImport(
-		context.Background(),
-		image,
-		outputImage.GetSimpleName(),
-		importOptions)
-	if err != nil {
-		LogE(err).Error("Error in image import")
-		return
-	}
-	defer importResult.Close()
-	Log().Info("Created the image in the local docker daemon")
-
-	return nil
 }
 
 func AlreadyConverted(manifestPath, reference string) ConversionResult {

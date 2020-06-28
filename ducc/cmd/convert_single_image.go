@@ -15,7 +15,7 @@ var (
 
 func init() {
 	convertSingleImageCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat images (compatible with singularity)")
-	convertSingleImageCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image")
+	convertSingleImageCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
 	convertSingleImageCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	convertSingleImageCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
 	convertSingleImageCmd.Flags().StringVarP(&username, "username", "u", "", "username to use when pushing thin image into the docker registry")
@@ -34,7 +34,7 @@ var convertSingleImageCmd = &cobra.Command{
 		cvmfsRepo := args[1]
 
 		if skipLayers == true {
-			lib.Log().Info("Skipping the creation of the thin image since provided --skip-layers")
+			lib.Log().Info("Skipping the creation of the thin image and podman store since provided --skip-layers")
 			skipThinImage = true
 		}
 		if thinImageName == "" {
@@ -71,15 +71,23 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 		}
 		if !skipLayers {
-			err := lib.ConvertWishDocker(wish, convertAgain, overwriteLayer, !skipThinImage, skipPodman)
+			err := lib.ConvertWishLayers(wish, convertAgain, overwriteLayer, skipPodman)
 			if err != nil {
-				lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+				lib.LogE(err).WithFields(fields).Error("Error in populating subDirInsideRepo (.layers)")
 			}
-		}
-		if !skipPodman {
-			err := lib.ConvertWishPodman(wish, skipLayers)
-			if err != nil {
-				lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+
+			if !skipThinImage {
+				err := lib.ConvertWishDocker(wish)
+				if err != nil {
+					lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+				}
+			}
+
+			if !skipPodman {
+				err := lib.ConvertWishPodman(wish)
+				if err != nil {
+					lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+				}
 			}
 		}
 	},
