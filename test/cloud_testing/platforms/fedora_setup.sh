@@ -65,6 +65,9 @@ install_from_repo acl
 
 disable_systemd_rate_limit
 
+# Allow for proxying pass-through repositories
+sudo setsebool -P httpd_can_network_connect on
+
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
