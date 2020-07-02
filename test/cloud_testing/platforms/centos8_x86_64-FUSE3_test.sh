@@ -7,12 +7,15 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 retval=0
 
 cd ${SOURCE_DIRECTORY}/test
+# Note: 084-premounted does not work because EL8 stock fuse3 is too old
+# Re-enable once possible
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 ./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
+                                 src/084-premounted                           \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
