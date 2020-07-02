@@ -100,6 +100,9 @@ echo "done"
 
 disable_systemd_rate_limit
 
+# Allow for proxying pass-through repositories
+sudo setsebool -P httpd_can_network_connect on
+
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"
 
