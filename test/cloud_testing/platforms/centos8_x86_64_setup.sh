@@ -32,8 +32,8 @@ install_rpm $DUCC_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."
-install_from_repo mod_wsgi   || die "fail (installing mod_wsgi)"
-sudo systemctl restart httpd || die "fail (restarting apache)"
+install_from_repo python3-mod_wsgi || die "fail (installing mod_wsgi)"
+sudo systemctl restart httpd       || die "fail (restarting apache)"
 
 echo "installing mod_ssl for Apache"
 install_from_repo mod_ssl || die "fail (installing mod_ssl)"
