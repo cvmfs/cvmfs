@@ -2383,9 +2383,9 @@ try_automount() {
 #
 # @param optional  a list of files that should be appended to stdout
 cat_syslog() {
+  sync
+  sleep 1
   if running_on_osx; then
-    sync
-    sleep 1
     log show --style syslog --info --last 4h
   else
     local syslog_file=""
