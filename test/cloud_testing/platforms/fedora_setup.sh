@@ -53,6 +53,7 @@ install_from_repo openssl-devel
 install_from_repo libuuid-devel
 
 # install stuff necessary to build `cvmfs_preload`
+install_from_repo make
 install_from_repo cmake
 install_from_repo patch
 install_from_repo zlib-devel
