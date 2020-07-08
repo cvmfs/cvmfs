@@ -65,6 +65,7 @@ install_from_repo tree
 # Install test dependency for 647
 install_from_repo python2-pip
 sudo pip2 install flask                      || die "fail (installing python-flask)"
+install_from_repo python3-flask
 
 # Install the test S3 provider
 install_test_s3
