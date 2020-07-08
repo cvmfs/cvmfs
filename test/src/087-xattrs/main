@@ -53,7 +53,11 @@ cvmfs_run_test() {
   readme_chunk_offset=$(echo $readme_chunk_list_1 | cut -d"," -f2)
   readme_chunk_size=$(echo $readme_chunk_list_1 | cut -d"," -f3)
   readme_hash=$(get_xattr hash /cvmfs/grid.cern.ch/README)
-  readme_size=$(stat -c%s /cvmfs/grid.cern.ch/README)
+  if running_on_osx; then
+    readme_size=$(gstat -c%s /cvmfs/grid.cern.ch/README)
+  else
+    readme_size=$(stat -c%s /cvmfs/grid.cern.ch/README)
+  fi
   [ "x$readme_chunk_hash" = "x$readme_hash" ] || return 10
   [ "x$readme_chunk_offset" = "x0" ] || return 11
   [ "x$readme_chunk_size" = "x$readme_size" ] || return 12
