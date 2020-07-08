@@ -84,7 +84,7 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 
 			if !skipPodman {
-				err := lib.ConvertWishPodman(wish)
+				err := lib.ConvertWishPodman(wish, convertAgain)
 				if err != nil {
 					lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
 				}

@@ -318,13 +318,29 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	return nil
 }
 
-func ConvertWishPodman(wish WishFriendly) (err error) {
+func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
 	inputImage := wish.InputImage
 	if inputImage == nil {
 		err = fmt.Errorf("error in parsing the input image, got a null image")
 		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
 			Error("Null image, should not happen")
 		return
+	}
+
+	manifest, err := inputImage.GetManifest()
+	if err != nil {
+		return
+	}
+	imageID := strings.Split(manifest.Config.Digest, ":")[1]
+
+	manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, rootPath, imageMetadataDir, imageID, "manifest")
+	alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
+
+	if alreadyConverted == ConversionMatch {
+		if convertAgain == false {
+			Log().Info("Image already present in podman store, moving on")
+			return nil
+		}
 	}
 
 	err = inputImage.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
