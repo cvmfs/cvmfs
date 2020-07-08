@@ -16,7 +16,7 @@ cvmfs_run_test() {
 
   echo "Test 'repo_counters' magic extended attribute"
 
-  local repo_counters_err=$(get_xattr repo_counters /cvmfs/grid.cern.ch 2>&1 1>/dev/null)  
+  local repo_counters_err=$(get_xattr repo_counters /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
   local repo_counters=$(get_xattr repo_counters /cvmfs/grid.cern.ch)
   if [ "x$repo_counters" = "x" ] || [ "x$repo_counters_err" != "x" ]; then
     return 3
@@ -40,7 +40,7 @@ cvmfs_run_test() {
   runc_chunks=$(get_xattr chunks /cvmfs/grid.cern.ch/vc/containers/runc)
   runc_chunk_list=$(get_xattr chunk_list /cvmfs/grid.cern.ch/vc/containers/runc)
   [ "x$runc_chunks" = "x2" ] || return 6
-  runc_chunk_list_n=$(echo $runc_chunk_list | wc -w)
+  runc_chunk_list_n=$(echo $runc_chunk_list | wc -w | awk '{print $1}')
   [ "x$runc_chunk_list_n" = "x3" ] || return 7
   runc_chunk_list_header=$(echo $runc_chunk_list | cut -d" " -f1)
   [ "x$runc_chunk_list_header" = "xhash,offset,size" ] || return 8
