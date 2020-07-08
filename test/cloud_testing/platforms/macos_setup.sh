@@ -27,3 +27,6 @@ echo -n "Increasing open file limits ... "
 sudo launchctl limit maxfiles 65536 65536 \
     || die "fail (increasing open file limits)"
 echo "done"
+
+echo "Removing traces of previous runs"
+sudo cvmfs_config killall
