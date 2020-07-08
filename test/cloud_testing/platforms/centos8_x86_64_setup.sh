@@ -32,8 +32,8 @@ install_rpm $DUCC_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."
-install_from_repo mod_wsgi   || die "fail (installing mod_wsgi)"
-sudo systemctl restart httpd || die "fail (restarting apache)"
+install_from_repo python3-mod_wsgi || die "fail (installing mod_wsgi)"
+sudo systemctl restart httpd       || die "fail (restarting apache)"
 
 echo "installing mod_ssl for Apache"
 install_from_repo mod_ssl || die "fail (installing mod_ssl)"
@@ -65,6 +65,7 @@ install_from_repo tree
 # Install test dependency for 647
 install_from_repo python2-pip
 sudo pip2 install flask                      || die "fail (installing python-flask)"
+install_from_repo python3-flask
 
 # Install the test S3 provider
 install_test_s3
@@ -99,6 +100,9 @@ set_nofile_limit 65536 || die "fail"
 echo "done"
 
 disable_systemd_rate_limit
+
+# Allow for proxying pass-through repositories
+sudo setsebool -P httpd_can_network_connect on
 
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"

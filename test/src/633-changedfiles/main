@@ -75,9 +75,9 @@ cvmfs_run_test() {
   [ $no_chunks -gt 1 ] || return 22
 
   echo "*** open file descriptors"
-  tail -f ${mntpnt}/dir/small &
+  tail -f ${mntpnt}/dir/small > tail_small.log &
   TEST633_TAIL_SMALL=$!
-  tail -f ${mntpnt}/dir/large &
+  tail -f ${mntpnt}/dir/large > tail_large.log &
   TEST633_TAIL_LARGE=$!
 
   echo "*** add contents to files in repository"
@@ -86,6 +86,7 @@ cvmfs_run_test() {
   echo "modified" >> /cvmfs/$CVMFS_TEST_REPO/dir/small  || return 30
   echo "modified" >> /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 30
   publish_repo $CVMFS_TEST_REPO -v                      || return $?
+  ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
 
   echo "*** remount private mount point"
   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 40

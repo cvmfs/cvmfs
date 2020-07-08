@@ -53,6 +53,7 @@ install_from_repo openssl-devel
 install_from_repo libuuid-devel
 
 # install stuff necessary to build `cvmfs_preload`
+install_from_repo make
 install_from_repo cmake
 install_from_repo patch
 install_from_repo zlib-devel
@@ -64,6 +65,9 @@ install_from_repo redhat-rpm-config
 install_from_repo acl
 
 disable_systemd_rate_limit
+
+# Allow for proxying pass-through repositories
+sudo setsebool -P httpd_can_network_connect on
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

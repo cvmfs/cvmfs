@@ -2383,9 +2383,9 @@ try_automount() {
 #
 # @param optional  a list of files that should be appended to stdout
 cat_syslog() {
+  sync
+  sleep 1
   if running_on_osx; then
-    sync
-    sleep 1
     log show --style syslog --info --last 4h
   else
     local syslog_file=""
@@ -2454,8 +2454,10 @@ find_or_build_cvmfs_preload() {
         -DBUILD_UNITTESTS=no       \
         -DBUILD_UNITTESTS_DEBUG=no \
         -DBUILD_LIBCVMFS=no        \
+        -DBUILD_LIBCVMFS_CACHE=no  \
         -DINSTALL_MOUNT_SCRIPTS=no \
         -DBUILD_DOCUMENTATION=no   \
+        -DBUILD_RECEIVER=no        \
         $cvmfs_source_dir > $cvmfs_preload_build_log 2>&1 || return 4
   make -j $(nproc)        > $cvmfs_preload_build_log 2>&1 || return 5
 
