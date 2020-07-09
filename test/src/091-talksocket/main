@@ -32,7 +32,7 @@ cvmfs_run_test() {
   echo "*** remount cernvm-prod.cern.ch with public socket on $CVMFS_TEST091_TALK_SOCKET"
   trap cleanup HUP EXIT TERM INT || return $?
   cvmfs_mount cernvm-prod.cern.ch \
-    CVMFS_TALK_SOCKET=$CVMFS_TEST091_TALK_SOCKET CVMFS_TALK_OWNER=nobody \
+    CVMFS_TALK_SOCKET=$CVMFS_TEST091_TALK_SOCKET CVMFS_TALK_OWNER=$CVMFS_TEST_USER \
     CVMFS_TEST091_CACHE_BASE=/tmp/cvmfs_test_cache CVMFS_UID=0 || return 20
 
   ls -lah $CVMFS_TEST091_TALK_SOCKET || return 30
