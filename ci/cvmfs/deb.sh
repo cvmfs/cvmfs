@@ -58,8 +58,8 @@ echo "Debian release: $(lsb_release -sc)"
 if [ x"$(lsb_release -sc)" = x"bionic" ]; then
   sed -i -e "s/insserv, initscripts, //g" debian/control
 fi
-# Fuse3 is only available as of Debian 10 "buster"
-if [ x"$(lsb_release -sc)" = x"buster" ]; then
+# Fuse3 is only available as of Debian 10 "buster" and Ubuntu 20.04
+if [ x"$(lsb_release -sc)" = x"buster" -o x"$(lsb_release -sc)" = x"focal" ]; then
   sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control
   sed -i -e "s/^Recommends:/Recommends: cvmfs-fuse3,/g" debian/control
 else
