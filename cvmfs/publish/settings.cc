@@ -407,39 +407,39 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
 
   std::string arg;
   if (options_mgr_->GetValue("CVMFS_UNION_FS_TYPE", &arg)) {
-    settings_publisher.GetTransaction()->SetUnionFsType(arg);
+    settings_publisher->GetTransaction()->SetUnionFsType(arg);
   }
   if (options_mgr_->GetValue("CVMFS_HASH_ALGORITHM", &arg)) {
-    settings_publisher.GetTransaction()->SetHashAlgorithm(arg);
+    settings_publisher->GetTransaction()->SetHashAlgorithm(arg);
   }
   if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &arg)) {
-    settings_publisher.GetTransaction()->SetCompressionAlgorithm(arg);
+    settings_publisher->GetTransaction()->SetCompressionAlgorithm(arg);
   }
   if (options_mgr_->GetValue("CVMFS_ENFORCE_LIMITS", &arg)) {
-    settings_publisher.GetTransaction()->SetEnforceLimits(
+    settings_publisher->GetTransaction()->SetEnforceLimits(
       options_mgr_->IsOn(arg));
   }
   if (options_mgr_->GetValue("CVMFS_NESTED_KCATALOG_LIMIT", &arg)) {
-    settings_publisher.GetTransaction()->SetLimitNestedCatalogKentries(
+    settings_publisher->GetTransaction()->SetLimitNestedCatalogKentries(
       String2Uint64(arg));
   }
   if (options_mgr_->GetValue("CVMFS_ROOT_KCATALOG_LIMIT", &arg)) {
-    settings_publisher.GetTransaction()->SetLimitRootCatalogKentries(
+    settings_publisher->GetTransaction()->SetLimitRootCatalogKentries(
       String2Uint64(arg));
   }
   if (options_mgr_->GetValue("CVMFS_FILE_MBYTE_LIMIT", &arg)) {
-    settings_publisher.GetTransaction()->SetLimitFileSizeMb(String2Uint64(arg));
+    settings_publisher->GetTransaction()->SetLimitFileSizeMb(String2Uint64(arg));
   }
   if (options_mgr_->GetValue("CVMFS_AUTOCATALOGS", &arg)) {
-    settings_publisher.GetTransaction()->SetUseCatalogAutobalance(
+    settings_publisher->GetTransaction()->SetUseCatalogAutobalance(
       options_mgr_->IsOn(arg));
   }
   if (options_mgr_->GetValue("CVMFS_AUTOCATALOGS_MAX_WEIGHT", &arg)) {
-    settings_publisher.GetTransaction()->SetAutobalanceMaxWeight(
+    settings_publisher->GetTransaction()->SetAutobalanceMaxWeight(
       String2Uint64(arg));
   }
   if (options_mgr_->GetValue("CVMFS_AUTOCATALOGS_MIN_WEIGHT", &arg)) {
-    settings_publisher.GetTransaction()->SetAutobalanceMinWeight(
+    settings_publisher->GetTransaction()->SetAutobalanceMinWeight(
       String2Uint64(arg));
   }
   if (options_mgr_->GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {

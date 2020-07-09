@@ -55,7 +55,7 @@ int CmdTransaction::Main(const Options &options) {
     std::vector<std::string> tokens = SplitString(templ, ':');
     if (tokens.size() != 2)
       throw EPublish("invalid syntax for --template parameter: " + templ);
-    settings.GetTransaction()->SetTemplate(tokens[0], tokens[1]);
+    settings->GetTransaction()->SetTemplate(tokens[0], tokens[1]);
   }
 
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),

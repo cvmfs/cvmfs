@@ -26,8 +26,8 @@ TEST_F(T_Transaction, Template) {
   EXPECT_THROW(settings.SetTemplate("/foo", ""), EPublish);
   settings.SetTemplate("/foo", "/bar");
   EXPECT_TRUE(settings.HasTemplate());
-  EXPECT_EQ("/foo", settings.template_from());
-  EXPECT_EQ("/bar", settings.template_to());
+  EXPECT_EQ("foo", settings.template_from());
+  EXPECT_EQ("bar", settings.template_to());
 }
 
 }  // namespace publish
