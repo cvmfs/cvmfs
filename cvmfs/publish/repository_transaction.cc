@@ -75,7 +75,8 @@ void Publisher::Transaction() {
     SendTalkCommand(settings_.transaction().spool_area().readonly_talk_socket(),
       "chroot " + settings_.transaction().base_hash().ToString() + "\n");
     LogCvmfs(kLogCvmfs, llvl_ | kLogStdout, "[done]");
-    //PushReflog();
+    // TODO(jblomer): fix-me
+    // PushReflog();
   }
 
   in_transaction_ = true;

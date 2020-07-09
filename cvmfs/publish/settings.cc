@@ -428,7 +428,8 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
       String2Uint64(arg));
   }
   if (options_mgr_->GetValue("CVMFS_FILE_MBYTE_LIMIT", &arg)) {
-    settings_publisher->GetTransaction()->SetLimitFileSizeMb(String2Uint64(arg));
+    settings_publisher->GetTransaction()->SetLimitFileSizeMb(
+      String2Uint64(arg));
   }
   if (options_mgr_->GetValue("CVMFS_AUTOCATALOGS", &arg)) {
     settings_publisher->GetTransaction()->SetUseCatalogAutobalance(

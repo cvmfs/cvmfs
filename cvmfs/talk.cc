@@ -680,7 +680,7 @@ void *TalkManager::MainResponder(void *data) {
   }
 
   return NULL;
-}
+}  // NOLINT(readability/fn_size)
 
 string TalkManager::FormatLatencies(const MountPoint &mount_point,
                                     FileSystem *file_system) {
