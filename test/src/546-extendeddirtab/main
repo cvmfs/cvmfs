@@ -287,7 +287,7 @@ cvmfs_run_test() {
   echo "start a transaction to check dirtab efficiency"
   start_transaction $CVMFS_TEST_REPO || return 5
 
-  local pipe_path="${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
+  local pipe_path="${CVMFS_TALK_SOCKET}"
   local open_catalogs_cmd="sudo cvmfs_talk -p $pipe_path open catalogs"
   $open_catalogs_cmd
 

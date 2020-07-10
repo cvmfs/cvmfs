@@ -169,21 +169,18 @@ cvmfs_run_test() {
   echo "--- (12) test identical nested catalogs at different spots"
   tree /cvmfs/$CVMFS_TEST_REPO || return 80
   tree /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots || return 81
-  local cache_dir=$(cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf | \
-                    grep ^CVMFS_CACHE_BASE= | cut -d= -f2)
-  echo "cache dir is $cache_dir"
-  local num_open_nested=$(sudo cvmfs_talk -p $cache_dir/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
-                          open catalogs | grep nested | wc -l)
+  local talk_socket=$(cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf | \
+                      grep ^CVMFS_TALK_SOCKET= | cut -d= -f2)
+  echo "cvmfs_talk socket path is $talk_socket"
+  local num_open_nested=$(sudo cvmfs_talk -p $talk_socket open catalogs | grep nested | wc -l)
   if [ "x$num_open_nested" != "x5" ]; then
     echo "expected $num_open_nested = 5"
-    sudo cvmfs_talk -p $cache_dir/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO open catalogs
+    sudo cvmfs_talk -p $talk_socket open catalogs
     sudo tail /var/log/messages
     return 82
   fi
-  sudo cvmfs_talk -p $cache_dir/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
-                  detach nested catalogs || return 83
-  local num_open_nested=$(sudo cvmfs_talk -p $cache_dir/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
-                          cache list pinned | grep nested | wc -l)
+  sudo cvmfs_talk -p $talk_socket detach nested catalogs || return 83
+  local num_open_nested=$(sudo cvmfs_talk -p $talk_socket cache list pinned | grep nested | wc -l)
   if [ "x$num_open_nested" != "x0" ]; then
     return 84
   fi

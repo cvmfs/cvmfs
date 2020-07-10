@@ -17,7 +17,7 @@ cvmfs_run_test() {
   echo "load repository configuration"
   load_repo_config $CVMFS_TEST_REPO
   local spool_dir="$CVMFS_SPOOL_DIR"
-  local pipe_path="${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
+  local pipe_path="$CVMFS_TALK_SOCKET"
   local open_catalogs_cmd="sudo cvmfs_talk -p $pipe_path open catalogs"
   $open_catalogs_cmd
   [ $($open_catalogs_cmd | wc -l) -eq 1 ] || return 10
