@@ -649,13 +649,15 @@ _setcap_if_needed() {
 }
 
 
-# grants CAP_SYS_ADMIN to cvmfs_swissknife if it is necessary
+# grants CAP_SYS_ADMIN to cvmfs_swissknife and cvmfs_publish if it is necessary
 # Note: OverlayFS uses trusted extended attributes that are not readable by a
 #       normal unprivileged process
 ensure_swissknife_suid() {
   local unionfs="$1"
   local sk_bin="/usr/bin/$CVMFS_SERVER_SWISSKNIFE"
   local sk_dbg_bin="/usr/bin/${CVMFS_SERVER_SWISSKNIFE}_debug"
+  local pb_bin="/usr/bin/cvmfs_publish"
+  local pb_dbg_bin="/usr/bin/cvmfs_publish_debug"
   local cap_read="cap_dac_read_search"
   local cap_overlay="cap_sys_admin"
 
@@ -664,9 +666,13 @@ ensure_swissknife_suid() {
   if [ x"$unionfs" = x"overlayfs" ]; then
     _setcap_if_needed "$sk_bin"     "${cap_read},${cap_overlay}+p" || return 3
     _setcap_if_needed "$sk_dbg_bin" "${cap_read},${cap_overlay}+p" || return 4
+    _setcap_if_needed "$pb_bin"     "${cap_read},${cap_overlay}+p" || return 5
+    _setcap_if_needed "$pb_dbg_bin" "${cap_read},${cap_overlay}+p" || return 6
   else
     _setcap_if_needed "$sk_bin"     "${cap_read}+p" || return 1
     _setcap_if_needed "$sk_dbg_bin" "${cap_read}+p" || return 2
+    _setcap_if_needed "$pb_bin"     "${cap_read}+p" || return 7
+    _setcap_if_needed "$pb_dbg_bin" "${cap_read}+p" || return 8
   fi
 }
 
