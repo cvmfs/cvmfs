@@ -1,4 +1,6 @@
 2.7.4:
+  * Build cvmfs-fuse3 on Ubuntu 20.04 (CVM-1898)
+  * Remove insserv and initscripts as cvmfs-server dependencies (CVM-1897)
 
 2.7.3:
   * Fix spurious SElinux error message on EL8 package upgrade (CVM-1878)
