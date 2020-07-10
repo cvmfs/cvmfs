@@ -3,7 +3,7 @@
   * Spawn watchdog for `swissknife sync` command
   * Add 'chunk_list' magic extended attribute
   * Remove perl as a package dependency
-  * [libcvmfs] add cvmfs_options_parse_default() 
+  * [libcvmfs] add cvmfs_options_parse_default()
   * [libcvmfs] add cvmfs_listdir_stat()
   * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
   * Parallelize catalog traversal in garbage collection
@@ -32,6 +32,8 @@
   * Add fuse forget_multi calback for fuse >= 2.9
   * Add POSIX external cache plugin (CVM-1823)
   * Manage DUCC daemon with systemd units
+
+2.7.4:
 
 2.7.3:
   * Fix spurious SElinux error message on EL8 package upgrade (CVM-1878)
