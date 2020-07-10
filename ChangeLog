@@ -1,4 +1,5 @@
 2.8.0:
+  * Fix ingest into root directory
   * Spawn watchdog for `swissknife sync` command
   * Add 'chunk_list' magic extended attribute
   * Remove perl as a package dependency
