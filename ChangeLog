@@ -1,3 +1,5 @@
+2.7.4:
+
 2.7.3:
   * Fix spurious SElinux error message on EL8 package upgrade (CVM-1878)
   * Add `add-replica -P` option to create pass-through replicas (CVM-1845)
