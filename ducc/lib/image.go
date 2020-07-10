@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -661,14 +662,12 @@ func (img *Image) downloadLayer(layer da.Layer, token, rootPath string, skipPodm
 				LogE(err).Warning("Error in creating the zip to unzip the layer")
 				continue
 			}
-
 			var path io.ReadCloser
 			path = gread
 			if !skipPodman {
-				path, err = ComputeLayerInfo(layer, gread)
-				if err != nil {
-					return toSend, err
-				}
+				var buf bytes.Buffer
+				path = TeeReadCloser(path, &buf)
+				LayerReader[layer.Digest] = ReadCloserBuffer{&buf}
 			}
 			toSend = downloadedLayer{Name: layer.Digest, Path: path}
 			return toSend, nil
