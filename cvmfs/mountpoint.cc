@@ -1165,7 +1165,8 @@ MountPoint *MountPoint::Create(
 
   mountpoint->ReEvaluateAuthz();
   mountpoint->CreateTables();
-  mountpoint->SetupBehavior();
+  if (!mountpoint->SetupBehavior())
+    return mountpoint.Release();
 
   mountpoint->boot_status_ = loader::kFailOk;
   return mountpoint.Release();
@@ -1650,7 +1651,8 @@ MountPoint::MountPoint(
   , enforce_acls_(false)
   , has_membership_req_(false)
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
-  , talk_socket_owner_(0)
+  , talk_socket_uid_(0)
+  , talk_socket_gid_(0)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
@@ -1716,7 +1718,7 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
 }
 
 
-void MountPoint::SetupBehavior() {
+bool MountPoint::SetupBehavior() {
   string optarg;
 
   if (options_mgr_->GetValue("CVMFS_MAX_TTL", &optarg))
@@ -1749,13 +1751,15 @@ void MountPoint::SetupBehavior() {
     talk_socket_path_ = optarg;
   }
   if (options_mgr_->GetValue("CVMFS_TALK_OWNER", &optarg)) {
-    uid_t uid;
-    gid_t main_gid;
-    bool retval = GetUidOf(optarg, &uid, &main_gid);
-    // TODO(jblomer): fail gracefully
-    assert(retval);
-    talk_socket_owner_ = uid;
+    bool retval = GetUidOf(optarg, &talk_socket_uid_, &talk_socket_gid_);
+    if (!retval) {
+      boot_error_ = "unknown owner of cvmfs_talk socket: " + optarg;
+      boot_status_ = loader::kFailOptions;
+      return false;
+    }
   }
+
+  return true;
 }
 
 
