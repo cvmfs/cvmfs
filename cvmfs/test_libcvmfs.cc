@@ -120,7 +120,7 @@ cvmfs_context* cvmfs_test_attach(const char *repo_name)
       "http://cernvmfs.gridpp.rl.ac.uk/cvmfs/@fqrn@;"
       "http://cvmfs.racf.bnl.gov/cvmfs/@fqrn@");
     cvmfs_options_set(repo_opts, "CVMFS_PUBLIC_KEY",
-                      "/etc/cvmfs/keys/cern.ch/cern.ch.pub");
+                      "/etc/cvmfs/keys/cern.ch/cern-it4.pub");
 
     char *repo_options_str = cvmfs_options_dump(repo_opts);
     printf("attaching repo with options:\n%s\n", repo_options_str);

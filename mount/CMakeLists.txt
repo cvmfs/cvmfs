@@ -88,12 +88,6 @@ if (MACOSX)
 
   if (INSTALL_PUBLIC_KEYS)
     install (
-      FILES         keys/cern.ch.pub
-      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
-      PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
-    )
-
-    install (
       FILES         keys/cern-it1.cern.ch.pub
       DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
@@ -233,12 +227,6 @@ else (MACOSX)
   )
 
   if (INSTALL_PUBLIC_KEYS)
-    install (
-      FILES         keys/cern.ch.pub
-      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
-      PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
-    )
-
     install (
       FILES         keys/cern-it1.cern.ch.pub
       DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/keys/cern.ch"
