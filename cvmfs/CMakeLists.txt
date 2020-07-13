@@ -859,7 +859,7 @@ if (BUILD_LIBCVMFS)
   add_library (cvmfs_only STATIC ${LIBCVMFS_SOURCES})
   add_dependencies (cvmfs_only cache.pb.generated)
 
-  set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${CURL_LIBRARIES}
+  set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CURL_LIBRARIES}
                      ${PACPARSER_LIBRARIES}
                      ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
                      ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
