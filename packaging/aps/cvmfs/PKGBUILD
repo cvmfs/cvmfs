@@ -42,7 +42,6 @@ _remove_keys_and_config() {
   rm -rf "$pkgdir/etc/cvmfs/config.d"
   rm -rf "$pkgdir/etc/cvmfs/domain.d"
   rm -rf "$pkgdir/etc/cvmfs/default.d/50-cern.conf"
-  rm -rf "$pkgdir/etc/cvmfs/default.d/60-egi.conf"
   rm -f "$pkgdir/etc/cvmfs/serverorder.sh"
 }
 
