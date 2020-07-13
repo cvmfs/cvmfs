@@ -39,7 +39,7 @@ set (CVMFS_S3_MOCK_SERVER_SOURCES
 add_executable(s3benchmark test/stress/s3benchmark.cc ${CVMFS_STRESS_SOURCES})
 
 target_link_libraries (s3benchmark
-${CURL_LIBRARIES} ${CARES_LIBRARIES}
+${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
 ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
 ${VJSON_LIBRARIES} ${SHA3_LIBRARIES} pthread dl)
 
