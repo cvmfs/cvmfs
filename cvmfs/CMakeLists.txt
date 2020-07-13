@@ -630,7 +630,7 @@ if(BUILD_RECEIVER)
     )
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                         ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
                         ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
@@ -640,10 +640,11 @@ if(BUILD_RECEIVER)
 
   if(BUILD_RECEIVER_DEBUG)
     add_executable(cvmfs_receiver_debug ${CVMFS_RECEIVER_SOURCES})
-    target_link_libraries(cvmfs_receiver_debug ${CURL_LIBRARIES} ${CARES_LIBRARIES}
-    ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
-    ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
-    ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
+    target_link_libraries(cvmfs_receiver_debug
+                          ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                          ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
+                          ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
+                          ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
 
     set (CVMFS_RECEIVER_DEBUG_CFLAGS "${CVMFS_RECEIVER_CFLAGS} -DDEBUGMSG -g -O0")
     set_target_properties (cvmfs_receiver_debug PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_DEBUG_CFLAGS}")
@@ -737,7 +738,7 @@ if (BUILD_CVMFS)
 
   set (CVMFS_FUSE_LINK_LIBRARIES "")
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${CURL_LIBRARIES}
-                                        ${CARES_LIBRARIES}
+                                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                                         ${OPENSSL_LIBRARIES}
                                         ${PACPARSER_LIBRARIES}
                                         ${SQLITE3_LIBRARY}
@@ -858,7 +859,7 @@ if (BUILD_LIBCVMFS)
   add_library (cvmfs_only STATIC ${LIBCVMFS_SOURCES})
   add_dependencies (cvmfs_only cache.pb.generated)
 
-  set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CURL_LIBRARIES}
+  set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${CURL_LIBRARIES}
                      ${PACPARSER_LIBRARIES}
                      ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
                      ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
@@ -896,7 +897,7 @@ if (BUILD_LIBCVMFS)
   add_dependencies(test_libcvmfs libcvmfs)
 
   list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
-                                 ${CARES_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES}
+                                 ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES}
                                  ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
 
   target_link_libraries(test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${TEST_LIBCVMFS_LIBS})
@@ -908,7 +909,7 @@ if (BUILD_LIBCVMFS)
 
     set (CVMFS_SHRINKWRAP_LIBS
                           ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                           ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                           ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
                           ${PROTOBUF_LITE_LIBRARY}
@@ -926,7 +927,7 @@ if (BUILD_SHRINKWRAP)
 
   set (CVMFS_SHRINKWRAP_LIBS
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                         ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
                         ${PROTOBUF_LITE_LIBRARY}
@@ -962,7 +963,7 @@ if (BUILD_SERVER)
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
   list(APPEND LIBCVMFS_SERVER_LINK_LIBRARIES ${CURL_LIBRARIES}
-                                             ${CARES_LIBRARIES}
+                                             ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                                              ${OPENSSL_LIBRARIES}
                                              ${SQLITE3_LIBRARY}
                                              ${ZLIB_LIBRARIES}
@@ -974,7 +975,7 @@ if (BUILD_SERVER)
                                              pthread dl)
   target_link_libraries (cvmfs_swissknife
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
-                         ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                         ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${ZLIB_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
                          pthread dl)
@@ -985,7 +986,7 @@ if (BUILD_SERVER)
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS} -DDEBUGMSG -g -O0" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
     target_link_libraries (cvmfs_swissknife_debug
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
-                           ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                           ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${ZLIB_LIBRARIES}
                            ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                            ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
                            pthread dl)
@@ -1008,7 +1009,7 @@ if (BUILD_PRELOADER)
   add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
   target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
-                        ${CARES_LIBRARIES} ${ZLIB_LIBRARIES}
+                        ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${RT_LIBRARY}
                         ${UUID_LIBRARIES} ${VJSON_LIBRARIES} ${SHA3_LIBRARIES}
                         pthread dl)

@@ -603,7 +603,7 @@ endif (BUILD_SERVER)
 
 list (APPEND UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
                                      ${OPENSSL_LIBRARIES}
-                                     ${CURL_LIBRARIES} ${CARES_LIBRARIES}
+                                     ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                                      ${OPENSSL_LIBRARIES} ${SQLITE3_LIBRARY}
                                      ${ZLIB_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES}
                                      ${PACPARSER_LIBRARIES} ${SHA3_LIBRARIES}
@@ -629,7 +629,7 @@ if (BUILD_SHRINKWRAP)
   target_link_libraries (${PROJECT_TEST_SHRINKWRAP_NAME}
                           ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
                           ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
-                          ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
+                          ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${OPENSSL_LIBRARIES}
                           ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
                           ${UUID_LIBRARIES} ${PACPARSER_LIBRARIES}
                           ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
@@ -640,7 +640,7 @@ if (BUILD_SERVER)
   target_link_libraries (${PROJECT_TEST_PUBLISH_NAME}
                           ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
                           ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
-                          ${CARES_LIBRARIES} ${OPENSSL_LIBRARIES}
+                          ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${OPENSSL_LIBRARIES}
                           ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${RT_LIBRARY}
                           ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
                           ${CAP_LIBRARIES} ${LibArchive_LIBRARY} pthread dl)
