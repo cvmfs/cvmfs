@@ -10,4 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: run make
-        run: make 
+        run: make
+      - uses: actions/upload-artifact@v2
+        with:
+          path: out/
