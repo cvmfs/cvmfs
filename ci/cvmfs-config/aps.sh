@@ -32,7 +32,6 @@ cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/egi.eu.conf $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/opensciencegrid.org.conf \
   $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/50-cern.conf $PKGROOT_DEFAULT
-cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/60-egi.conf $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/config.d/*.cern.ch.conf $PKGROOT_DEFAULT
 
 echo "switching into the package root directory for config-default..."
