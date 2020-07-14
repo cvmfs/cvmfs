@@ -1,0 +1,12 @@
+name: Test
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build
+    container:
+      image: golang:1.13
+    steps:
+      - uses: actions/checkout@v2
+      - name: run make
+        run: make 
