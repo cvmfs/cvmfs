@@ -1,6 +1,6 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.7
+Version: 2.0
 Release: 1
 Source0: cern-it1.cern.ch.pub
 Source1: cern-it4.cern.ch.pub
@@ -53,7 +53,7 @@ for defaultconf in %{SOURCE8}; do
     install -D -m 444 "${defaultconf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/default.d
 done
 for conf in %{SOURCE9}; do
-    install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d
+    install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/README
 done
 
 %files

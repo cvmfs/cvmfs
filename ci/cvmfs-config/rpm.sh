@@ -36,7 +36,7 @@ cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/cern.ch.conf             ${CVMFS_RESU
 cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/egi.eu.conf              ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/opensciencegrid.org.conf ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/50-cern.conf            ${CVMFS_RESULT_LOCATION}/SOURCES
-cp ${CVMFS_SOURCE_LOCATION}/mount/config.d/README                   ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/config.d/README                   ${CVMFS_RESULT_LOCATION}/SOURCES/README-config.d
 
 echo "switching into the build directory..."
 cd ${CVMFS_RESULT_LOCATION}
