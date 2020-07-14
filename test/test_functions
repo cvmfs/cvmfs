@@ -59,6 +59,26 @@ if [ ! -z "$CVMFS_TEST_GEO_LICENSE_KEY" ]; then
   echo "CVMFS_GEO_LICENSE_KEY=$CVMFS_TEST_GEO_LICENSE_KEY" | sudo tee /etc/cvmfs/server.local > /dev/null
 fi
 
+cat << EOF | sudo tee /etc/cvmfs/default.d/90-config-repo.conf.disabled > /dev/null
+CVMFS_CONFIG_REPOSITORY=cvmfs-config-test.cern.ch
+EOF
+cat << EOF | sudo tee /etc/cvmfs/config.d/cvmfs-config-test.cern.ch.conf.disabled > /dev/null
+CVMFS_SERVER_URL=http://cvmfs-config-test.s3.cern.ch/cvmfs/cvmfs-config-test.cern.ch
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/cvmfs-config-test.cern.ch.pub
+EOF
+cat << EOF | sudo tee /etc/cvmfs/keys/cvmfs-config-test.cern.ch.pub > /dev/null
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5y7TgjJBH0L0WJDQXTGF
+CODm6VEL1ZaIsrM8w5wBKYPchuVSG1VPiIv9UpbGaKPUOTgMS//6BFN0lzZ/YiBA
+FbsFkwaM4WAuIi/7qywEqXDa/JWRXzpEknGMbpKr3IFo4y4vP9ZIyDClxQtM6eso
+uWWRyvPP1yxdt82a3de2XZO9ZORBhoLWNvCEVSFzTD2hN/gGeUAQpju3CKbvh7BS
+DccNWuaRZMlQ0dl6N7rc4Fdm3Jq5M+InUwoEnPv6T6X0icq6XiSEUI4+RocqbsuA
+e9q1EndU4FEBZdnwWi4h0ZSCyxoVMjxVoFl9Y1uptX+fEcmrl6jWZ3jSowB6gOtx
+0QIDAQAB
+-----END PUBLIC KEY-----
+EOF
+
 
 if [ -f /.dockerinit ]; then
   CVMFS_TEST_DOCKER=yes
@@ -422,8 +442,9 @@ cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null                   || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                   || return 101
   sudo rm -f /etc/cvmfs/default.local                    || return 102
-  sudo sh -c "rm -f /etc/cvmfs/config.d/*"               || return 103
-  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 104
+  sudo sh -c "rm -f /etc/cvmfs/config.d/*.conf"          || return 103
+  sudo sh -c "rm -f /etc/cvmfs/config.d/*.local"         || return 104
+  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 105
 
   wait_for_umount || return 99
 
@@ -464,6 +485,11 @@ cvmfs_mount() {
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_SERVER_URL=http://cvmfs-atlas-nightlies.cern.ch/cvmfs/atlas-nightlies.cern.ch" > /etc/cvmfs/config.d/atlas-nightlies.cern.ch.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
+
+  cat /etc/cvmfs/default.d/90-config-repo.conf.disabled | \
+    sudo tee /etc/cvmfs/default.d/90-config-repo.conf > /dev/null || return 100
+  cat /etc/cvmfs/config.d/cvmfs-config-test.cern.ch.conf.disabled | \
+    sudo tee /etc/cvmfs/config.d/cvmfs-config-test.cern.ch.conf > /dev/null || return 100
 
   # add additional parameters
   while [ $# -gt 0 ]; do
