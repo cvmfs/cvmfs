@@ -29,6 +29,7 @@ type readCloser struct {
 func (r readCloser) Close() error {
 	return r.c()
 }
+
 //wrapper around bytes.Buffer which implements close methods too.
 type ReadCloserBuffer struct {
 	*bytes.Buffer
@@ -36,7 +37,7 @@ type ReadCloserBuffer struct {
 
 func (cb ReadCloserBuffer) Close() (err error) {
 	return
-} 
+}
 
 func UserDefinedTempDir(dir, prefix string) (name string, err error) {
 	if strings.HasPrefix(dir, TemporaryBaseDir) {

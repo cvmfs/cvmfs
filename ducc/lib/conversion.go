@@ -32,7 +32,7 @@ const (
 )
 
 var subDirInsideRepo = ".layers"
-var	layerLocations map[string]string
+var layerLocations map[string]string
 
 func assureValidSingularity() error {
 	err, stdout, _ := ExecCommand("singularity", "version").StartWithOutput()
@@ -198,7 +198,7 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 			Error("Null image, should not happen")
 		return
 	}
-	
+
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
@@ -206,7 +206,7 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 
 	err = CreateThinImage(manifest, layerLocations, *inputImage, *outputImage)
 	if err != nil {
-		LogE(err).WithFields(log.Fields{"input image": inputImage,"output image": outputImage}).
+		LogE(err).WithFields(log.Fields{"input image": inputImage, "output image": outputImage}).
 			Error("Error creating thin image")
 		return
 	}
@@ -359,7 +359,7 @@ func ConvertWishLayers(wish WishFriendly, convertAgain, forceDownload, skipPodma
 			"directory": subDirInsideRepo}).Error(
 			"Impossible to create subcatalog in super-directory.")
 	}
-	
+
 	outputImage := wish.OutputImage
 	if outputImage == nil {
 		err = fmt.Errorf("error in parsing the output image, got a null image")
@@ -367,7 +367,7 @@ func ConvertWishLayers(wish WishFriendly, convertAgain, forceDownload, skipPodma
 			Error("Null image, should not happen")
 		return
 	}
-	
+
 	inputImage := wish.InputImage
 	if inputImage == nil {
 		err = fmt.Errorf("error in parsing the input image, got a null image")
@@ -391,7 +391,7 @@ func ConvertWishLayers(wish WishFriendly, convertAgain, forceDownload, skipPodma
 		}
 	}
 	return firstError
-} 
+}
 
 func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, skipPodman bool) (err error) {
 	manifest, err := inputImage.GetManifest()

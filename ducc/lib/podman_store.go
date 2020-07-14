@@ -17,7 +17,6 @@
 //	|	+--	layers.json
 //	|	+-- layers.lock
 
-
 package lib
 
 import (
@@ -38,24 +37,26 @@ import (
 type PodmanInfo struct {
 	LayerReaderMap map[string]ReadCloserBuffer
 	LayerDigestMap map[string]string
-	LayerIdMap map[string]string
+	LayerIdMap     map[string]string
 }
+
 //struct for entries in images.json
 type ImageInfo struct {
-	ID	string	`json:"id,omitempty"`
-	Names	[]string	`json:"names,omitempty"`
-	Layer	string	`json:"layer,omitempty"`
-	Created	time.Time	`json:"created,omitempty"`	
+	ID      string    `json:"id,omitempty"`
+	Names   []string  `json:"names,omitempty"`
+	Layer   string    `json:"layer,omitempty"`
+	Created time.Time `json:"created,omitempty"`
 }
+
 //struct for entries in layers.json
 type LayerInfo struct {
-	ID	string	`json:"id,omitempty"`
-	Parent	string	`json:"parent,omitempty"`
-	Created	time.Time	`json:"created,omitempty"`
-	CompressedDiffDigest	string	`json:"compressed-diff-digest,omitempty"`
-	CompressedSize	int	`json:"compressed-size,omitempty"`
-	UncompressedDigest	string	`json:"diff-digest,omitempty"`
-	UncompressedSize	int64	`json:"diff-size,omitempty"`
+	ID                   string    `json:"id,omitempty"`
+	Parent               string    `json:"parent,omitempty"`
+	Created              time.Time `json:"created,omitempty"`
+	CompressedDiffDigest string    `json:"compressed-diff-digest,omitempty"`
+	CompressedSize       int       `json:"compressed-size,omitempty"`
+	UncompressedDigest   string    `json:"diff-digest,omitempty"`
+	UncompressedSize     int64     `json:"diff-size,omitempty"`
 }
 
 var (
@@ -79,16 +80,16 @@ func (img *Image) ComputeLayerInfo(digest, parent string, layersize int) (layeri
 		LogE(err).Warning("Error in computing uncompressed layer digest (diffid)")
 		return layerinfo, err
 	}
-	diffID := fmt.Sprintf("%x",hash.Sum(nil))
+	diffID := fmt.Sprintf("%x", hash.Sum(nil))
 	created := time.Now()
 	layerinfo = &LayerInfo{
-		ID: diffID,
-		Created: created,
-		Parent: parent,
+		ID:                   diffID,
+		Created:              created,
+		Parent:               parent,
 		CompressedDiffDigest: digest,
-		CompressedSize: layersize,
-		UncompressedDigest: "sha256:" + diffID,
-		UncompressedSize: size,
+		CompressedSize:       layersize,
+		UncompressedDigest:   "sha256:" + diffID,
+		UncompressedSize:     size,
 	}
 	podmaninfo.LayerDigestMap[digest] = diffID
 	return
@@ -115,7 +116,7 @@ func (img Image) IngestImageInfo(CVMFSRepo string) (err error) {
 		}
 		json.Unmarshal(file, &layersdata)
 	}
-	
+
 	parent := ""
 	topLayer := ""
 	for _, layer := range manifest.Layers {
@@ -142,7 +143,7 @@ func (img Image) IngestImageInfo(CVMFSRepo string) (err error) {
 		LogE(err).Error("Error in writing layers.json file")
 		return err
 	}
-	
+
 	//create images.json file
 	Log().WithFields(log.Fields{"action": "Ingesting images.json in podman store"}).Info(img.GetSimpleName())
 	imagedata := []ImageInfo{}
@@ -161,9 +162,9 @@ func (img Image) IngestImageInfo(CVMFSRepo string) (err error) {
 	id := calculateId(manifest.Config.Digest)
 	creationTime := time.Now()
 	imageinfo := &ImageInfo{
-		ID: id,
-		Names: []string{img.GetSimpleName()},
-		Layer: topLayer,
+		ID:      id,
+		Names:   []string{img.GetSimpleName()},
+		Layer:   topLayer,
 		Created: creationTime,
 	}
 
@@ -222,19 +223,19 @@ func (img Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string) (err error) {
 
 		//generate the link id
 		lid := generateID(26)
-		podmaninfo.LayerIdMap[layer.Digest] = "l/"+lid
+		podmaninfo.LayerIdMap[layer.Digest] = "l/" + lid
 
 		//Create link dir
 		symlinkPath := filepath.Join(rootPath, rootfsDir, "l", lid)
 		targetPath := filepath.Join(rootPath, rootfsDir, layerdir, "diff")
-		
+
 		err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
 		if err != nil {
 			LogE(err).Error("Error in creating the symlink for the Link dir")
 			return err
 		}
 
-		linkPath := filepath.Join(rootPath,"overlay",layerdir,"link")
+		linkPath := filepath.Join(rootPath, "overlay", layerdir, "link")
 		err = writeDataToCvmfs(CVMFSRepo, linkPath, []byte(lid))
 		if err != nil {
 			LogE(err).Error("Error in writing link id to podman store")
@@ -351,7 +352,7 @@ func (img Image) IngestImageManifest(CVMFSRepo string) (err error) {
 	imageID := calculateId(manifest.Config.Digest)
 
 	symlinkPath := filepath.Join(rootPath, imageMetadataDir, imageID, "manifest")
-	targetPath := filepath.Join(".metadata", img.Registry, img.Repository + img.GetReference(), "manifest.json")
+	targetPath := filepath.Join(".metadata", img.Registry, img.Repository+img.GetReference(), "manifest.json")
 
 	err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
 	if err != nil {
@@ -387,8 +388,8 @@ func (img Image) CreateLockFiles(CVMFSRepo string) (err error) {
 //Ingest all the necessary files and dir in podmanStore dir.
 func (img Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Ingest the image into podman store"}).Info(img.GetSimpleName())
-	createCatalogIntoDirs := []string{rootPath, filepath.Join(rootPath,rootfsDir), filepath.Join(rootPath,imageMetadataDir), filepath.Join(rootPath,layerMetadataDir)}
-	for _, dir := range createCatalogIntoDirs {	
+	createCatalogIntoDirs := []string{rootPath, filepath.Join(rootPath, rootfsDir), filepath.Join(rootPath, imageMetadataDir), filepath.Join(rootPath, layerMetadataDir)}
+	for _, dir := range createCatalogIntoDirs {
 		err = CreateCatalogIntoDir(CVMFSRepo, dir)
 		if err != nil {
 			LogE(err).WithFields(log.Fields{

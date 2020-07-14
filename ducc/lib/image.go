@@ -39,7 +39,7 @@ type Image struct {
 	IsThin      bool
 	TagWildcard bool
 	Manifest    *da.Manifest
-	Podmaninfo	*PodmanInfo
+	Podmaninfo  *PodmanInfo
 }
 
 func (i *Image) GetSimpleName() string {
@@ -137,7 +137,7 @@ func (img *Image) GetPodmanInfo() PodmanInfo {
 	podmanInfo := PodmanInfo{
 		LayerReaderMap: readermap,
 		LayerDigestMap: digestmap,
-		LayerIdMap: idmap,
+		LayerIdMap:     idmap,
 	}
 	img.Podmaninfo = &podmanInfo
 	return *img.Podmaninfo
