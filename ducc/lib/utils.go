@@ -1,9 +1,16 @@
 package lib
 
 import (
+	"bytes"
+	"encoding/base32"
+	"encoding/base64"
+	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // this flag is populated in the main `rootCmd` (cmd/root.go)
@@ -22,6 +29,14 @@ type readCloser struct {
 func (r readCloser) Close() error {
 	return r.c()
 }
+//wrapper around bytes.Buffer which implements close methods too.
+type ReadCloserBuffer struct {
+	*bytes.Buffer
+}
+
+func (cb ReadCloserBuffer) Close() (err error) {
+	return
+} 
 
 func UserDefinedTempDir(dir, prefix string) (name string, err error) {
 	if strings.HasPrefix(dir, TemporaryBaseDir) {
@@ -31,7 +46,6 @@ func UserDefinedTempDir(dir, prefix string) (name string, err error) {
 }
 
 // TeeReadCloser returns a io.ReadCloser that writes everything it reads from r to w.
-// All writes must return before anything can be read. Any write error will be returned from Read. 
 // The Close method for the returned ReadCloser is same as that of r.
 func TeeReadCloser(r io.ReadCloser, w io.Writer) io.ReadCloser {
 	return readCloser{
@@ -68,6 +82,26 @@ func generateConfigFileName(digest string) (fname string, err error) {
 	}
 	if reader.Len() > 0 {
 		fname = "=" + base64.StdEncoding.EncodeToString([]byte(digest))
+	}
+	return
+}
+
+//writes data to file and ingest in cvmfs repo path
+func writeDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
+	tmpFile, err := ioutil.TempFile("", "write_data")
+	if err != nil {
+		LogE(err).Error("Error in creating temporary file for writing data")
+		return err
+	}
+	defer os.RemoveAll(tmpFile.Name())
+	err = ioutil.WriteFile(tmpFile.Name(), data, 0644)
+	if err != nil {
+		LogE(err).Error("Error in writing data to file")
+		return err
+	}
+	err = IngestIntoCVMFS(CVMFSRepo, path, tmpFile.Name())
+	if err != nil {
+		return err
 	}
 	return
 }

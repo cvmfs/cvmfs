@@ -21,7 +21,6 @@
 package lib
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -30,12 +29,17 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
+//podman related info stored in image struct.
+type PodmanInfo struct {
+	LayerReaderMap map[string]ReadCloserBuffer
+	LayerDigestMap map[string]string
+	LayerIdMap map[string]string
+}
 //struct for entries in images.json
 type ImageInfo struct {
 	ID	string	`json:"id,omitempty"`
@@ -54,13 +58,6 @@ type LayerInfo struct {
 	UncompressedSize	int64	`json:"diff-size,omitempty"`
 }
 
-type ReadCloserBuffer struct {
-	*bytes.Buffer
-}
-func (cb ReadCloserBuffer) Close() (err error) {
-	return
-} 
-
 var (
 	//Podman Additional Image Store inside unpacked.cern.ch
 	rootPath = "podmanStore"
@@ -70,81 +67,99 @@ var (
 	imageMetadataDir = "overlay-images"
 	//layerMetadataDir contains the metadata of layers
 	layerMetadataDir = "overlay-layers"
-	//LayerLinkIdMap contains the link id of rootfs
-	LayerLinkId []string
-	//LayerReader stores the io.Reader containing layer content
-	LayerReader = make(map[string]ReadCloserBuffer)
-	//LayerInfoMap contains the layer info 
-	LayerInfoMap = make(map[string]LayerInfo)
 )
 
 //Computes uncompressed digest and size for the given layer
-func (img Image) ComputeLayerInfo() (err error) {
+func (img *Image) ComputeLayerInfo(digest, parent string, layersize int) (layerinfo *LayerInfo, err error) {
+	hash := sha256.New()
+	podmaninfo := img.GetPodmanInfo()
+	in := podmaninfo.LayerReaderMap[digest]
+	size, err := io.Copy(hash, in)
+	if err != nil {
+		LogE(err).Warning("Error in computing uncompressed layer digest (diffid)")
+		return layerinfo, err
+	}
+	diffID := fmt.Sprintf("%x",hash.Sum(nil))
+	created := time.Now()
+	layerinfo = &LayerInfo{
+		ID: diffID,
+		Created: created,
+		Parent: parent,
+		CompressedDiffDigest: digest,
+		CompressedSize: layersize,
+		UncompressedDigest: "sha256:" + diffID,
+		UncompressedSize: size,
+	}
+	podmaninfo.LayerDigestMap[digest] = diffID
+	return
+}
+
+//creates images.json and layers.json file in podman store
+func (img Image) IngestImageInfo(CVMFSRepo string) (err error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Warn("Error in getting the image manifest")
 		return
 	}
-	
-	lastLayer := ""
-	for _, layer := range manifest.Layers {
-		Log().WithFields(log.Fields{"action": "Computing the layer info"}).Info(layer.Digest)
-		hash := sha256.New()
-		in := LayerReader[layer.Digest]
-		size, err := io.Copy(hash, in)
+	//create layers.json file
+	Log().WithFields(log.Fields{"action": "Ingesting layers.json in podman store"}).Info(img.GetSimpleName())
+	layersdata := []LayerInfo{}
+	layerInfoPath := filepath.Join("/", "cvmfs", CVMFSRepo, rootPath, layerMetadataDir, "layers.json")
+
+	//check if layers.json already exist and append to data
+	if _, err := os.Stat(layerInfoPath); err == nil {
+		file, err := ioutil.ReadFile(layerInfoPath)
 		if err != nil {
-			LogE(err).Warning("Error in computing uncompressed layer digest (diffid)")
+			LogE(err).Error("Error in reading layers.json file")
 			return err
 		}
-		diffID := fmt.Sprintf("%x",hash.Sum(nil))
-		parent := ""
-		if lastLayer != "" {
-			lastlayerinfo := LayerInfoMap[lastLayer]
-			parent = lastlayerinfo.ID
-		}
-		created := time.Now()
-		layerinfo := &LayerInfo{
-			ID: diffID,
-			Created: created,
-			Parent: parent,
-			CompressedDiffDigest: layer.Digest,
-			CompressedSize: layer.Size,
-			UncompressedDigest: "sha256:" + diffID,
-			UncompressedSize: size,
-		}
-		LayerInfoMap[layer.Digest] = *layerinfo
-		lastLayer = layer.Digest
+		json.Unmarshal(file, &layersdata)
 	}
-	return
-}
+	
+	parent := ""
+	topLayer := ""
+	for _, layer := range manifest.Layers {
+		layerinfo, err := img.ComputeLayerInfo(layer.Digest, parent, layer.Size)
+		if err != nil {
+			LogE(err).Error("Error in computing layer info")
+			return err
+		}
+		if parent == "" {
+			topLayer = layerinfo.ID
+		}
+		parent = layerinfo.ID
+		layersdata = append(layersdata, *layerinfo)
+	}
 
-//creates images.json file in podman store
-func(img Image) CreateImageInfo(CVMFSRepo string) (err error) {
+	jsonLayerInfo, err := json.MarshalIndent(layersdata, "", " ")
+	if err != nil {
+		LogE(err).Error("Error in marshaling json data for layers.json")
+		return err
+	}
+
+	err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(layerInfoPath), jsonLayerInfo)
+	if err != nil {
+		LogE(err).Error("Error in writing layers.json file")
+		return err
+	}
+	
+	//create images.json file
 	Log().WithFields(log.Fields{"action": "Ingesting images.json in podman store"}).Info(img.GetSimpleName())
-
-	data := []ImageInfo{}
-
+	imagedata := []ImageInfo{}
 	imageInfoPath := filepath.Join("/", "cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.json")
+
+	//check if images.json already exist and append to data
 	if _, err := os.Stat(imageInfoPath); err == nil {
 		file, err := ioutil.ReadFile(imageInfoPath)
 		if err != nil {
 			LogE(err).Error("Error in reading layers.json file")
 			return err
 		}
-		json.Unmarshal(file, &data)
-	}
-
-	manifest, err := img.GetManifest()
-	if err != nil {
-		LogE(err).Warn("Error in getting the image manifest")
-		return err
+		json.Unmarshal(file, &imagedata)
 	}
 
 	id := calculateId(manifest.Config.Digest)
-	layerid := manifest.Layers[len(manifest.Layers)-1].Digest
-	topLayer := LayerInfoMap[layerid].ID
 	creationTime := time.Now()
-
 	imageinfo := &ImageInfo{
 		ID: id,
 		Names: []string{img.GetSimpleName()},
@@ -152,79 +167,16 @@ func(img Image) CreateImageInfo(CVMFSRepo string) (err error) {
 		Created: creationTime,
 	}
 
-	data = append(data, *imageinfo)
-	imgInfo, err := json.MarshalIndent(data, "", " ")
-	tmpFile, err := ioutil.TempFile("", "images_json")
+	imagedata = append(imagedata, *imageinfo)
+	imgInfo, err := json.MarshalIndent(imagedata, "", " ")
 	if err != nil {
-		LogE(err).Error("Error in creating temporary images.json file")
-		return err
-	}
-	err = ioutil.WriteFile(tmpFile.Name(), imgInfo, 0644)
-	tmpFile.Close()
-	if err != nil {
-		LogE(err).Error("Error in writing to the images.json file")
+		LogE(err).Error("Error in marshaling json data for images.json")
 		return err
 	}
 
-	//Ingest images.json file
-	err = IngestIntoCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(imageInfoPath), tmpFile.Name())
-	os.RemoveAll(tmpFile.Name())
+	err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(imageInfoPath), imgInfo)
 	if err != nil {
-		return err
-	}
-	return nil
-}
-
-//Creates layers.json file in podman store.
-func (img Image) CreateLayerInfo(CVMFSRepo string) (err error) {
-	Log().WithFields(log.Fields{"action": "Ingesting layer to layers.json in podman store"}).Info(img.GetSimpleName())
-
-	data := []LayerInfo{}
-
-	layerInfoPath := filepath.Join("/", "cvmfs", CVMFSRepo, rootPath, layerMetadataDir, "layers.json")
-	if _, err := os.Stat(layerInfoPath); err == nil {
-		file, err := ioutil.ReadFile(layerInfoPath)
-		if err != nil {
-			LogE(err).Error("Error in reading layers.json file")
-			return err
-		}
-		json.Unmarshal(file, &data)
-	}
-	manifest, err := img.GetManifest()
-	if err != nil {
-		LogE(err).Warn("Error in getting the image manifest")
-		return
-	}
-	err = img.ComputeLayerInfo()
-	if err != nil {
-		LogE(err).Error("Error in computing layer info")
-		return err
-	}
-	for _, layer := range manifest.Layers {
-		data = append(data, LayerInfoMap[layer.Digest])
-	}
-
-	jsonLayerInfo, err := json.MarshalIndent(data, "", " ")
-	if err != nil {
-		LogE(err).Error("Error in marshaling json data for layers.json")
-		return err
-	}
-	tmpFile, err := ioutil.TempFile("", "layers_json")
-	if err != nil {
-		LogE(err).Error("Error in creating temporary layers.json file")
-		return err
-	}
-	err = ioutil.WriteFile(tmpFile.Name(), jsonLayerInfo, 0644)
-	tmpFile.Close()
-	if err != nil {
-		LogE(err).Error("Error in writing to the layers.json file")
-		return err
-	}
-
-	//Ingest layers.json file
-	err = IngestIntoCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(layerInfoPath), tmpFile.Name())
-	os.RemoveAll(tmpFile.Name())
-	if err != nil {
+		LogE(err).Error("Error in writing images.json")
 		return err
 	}
 	return nil
@@ -238,10 +190,10 @@ func (img Image) IngestRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string)
 		LogE(err).Warn("Error in getting the image manifest")
 		return err
 	}
-
+	podmaninfo := img.GetPodmanInfo()
 	for _, layer := range manifest.Layers {
 		layerid := calculateId(layer.Digest)
-		layerdir := LayerInfoMap[layer.Digest].ID
+		layerdir := podmaninfo.LayerDigestMap[layer.Digest]
 
 		//symlinkPath will contain the rootfs of the corresponding layer in podman store.
 		symlinkPath := filepath.Join(rootPath, rootfsDir, layerdir, "diff")
@@ -264,14 +216,13 @@ func (img Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string) (err error) {
 		LogE(err).Warn("Error in getting the image manifest")
 		return err
 	}
-
-	LayerLinkId = nil
+	podmaninfo := img.GetPodmanInfo()
 	for _, layer := range manifest.Layers {
-		layerdir := LayerInfoMap[layer.Digest].ID
+		layerdir := podmaninfo.LayerDigestMap[layer.Digest]
 
 		//generate the link id
 		lid := generateID(26)
-		LayerLinkId = append([]string{"l/"+lid}, LayerLinkId...)
+		podmaninfo.LayerIdMap[layer.Digest] = "l/"+lid
 
 		//Create link dir
 		symlinkPath := filepath.Join(rootPath, rootfsDir, "l", lid)
@@ -283,24 +234,10 @@ func (img Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string) (err error) {
 			return err
 		}
 
-		//Create link file
-		tmpFile, err := ioutil.TempFile("", "linkfile")
-		if err != nil {
-			return err
-		}
-
-		err = ioutil.WriteFile(tmpFile.Name(), []byte(lid), 0644)
-		tmpFile.Close()
-		if err != nil {
-			LogE(err).Error("Error in writing to the link file")
-			return err
-		}
-
-		//ingest the link file
 		linkPath := filepath.Join(rootPath,"overlay",layerdir,"link")
-		err = IngestIntoCVMFS(CVMFSRepo, linkPath, tmpFile.Name())
-		os.RemoveAll(tmpFile.Name())
+		err = writeDataToCvmfs(CVMFSRepo, linkPath, []byte(lid))
 		if err != nil {
+			LogE(err).Error("Error in writing link id to podman store")
 			return err
 		}
 	}
@@ -316,33 +253,28 @@ func (img Image) CreateLowerFiles(CVMFSRepo string) (err error) {
 		return err
 	}
 
-	LayersCount := len(manifest.Layers)
-	for i, layer := range manifest.Layers {
-		if i==0 {
+	lastLowerData := ""
+	lastDigest := ""
+	podmaninfo := img.GetPodmanInfo()
+	for _, layer := range manifest.Layers {
+		if lastDigest == "" {
+			lastDigest = layer.Digest
 			continue
 		}
 
-		lowerdata := strings.Join(LayerLinkId[LayersCount-i:], ":")
-		tmpFile, err := ioutil.TempFile("", "lowerfile")
-		if err != nil {
-			return err
+		lowerdata := podmaninfo.LayerIdMap[lastDigest]
+		if lastLowerData != "" {
+			lowerdata = lowerdata + ":" + lastLowerData
 		}
-
-		err = ioutil.WriteFile(tmpFile.Name(), []byte(lowerdata), 0644)
-		tmpFile.Close()
-		if err != nil {
-			LogE(err).Error("Error in writing to the lower file")
-			return err
-		}
-
-		//ingest the link file
-		layerdir := calculateId(LayerInfoMap[layer.Digest].UncompressedDigest)
+		layerdir := podmaninfo.LayerDigestMap[layer.Digest]
 		lowerPath := filepath.Join(rootPath, rootfsDir, layerdir, "lower")
-		err = IngestIntoCVMFS(CVMFSRepo, lowerPath, tmpFile.Name())
-		os.RemoveAll(tmpFile.Name())
+		err = writeDataToCvmfs(CVMFSRepo, lowerPath, []byte(lowerdata))
 		if err != nil {
+			LogE(err).Warn("Error in writing lower files")
 			return err
 		}
+		lastLowerData = lowerdata
+		lastDigest = layer.Digest
 	}
 	return nil
 }
@@ -390,15 +322,6 @@ func (img Image) IngestConfigFile(CVMFSRepo string) (err error) {
 		return err
 	}
 
-	//write configuration to a temp file
-	tmpFile, err := ioutil.TempFile("", "configFile")
-	err = ioutil.WriteFile(tmpFile.Name(), []byte(body), 0644)
-	tmpFile.Close()
-	if err != nil {
-		LogE(err).Error("Error in writing to the config file")
-		return err
-	}
-
 	//generate config file path to ingest above temp dir.
 	fname, err := generateConfigFileName(manifest.Config.Digest)
 	if err != nil {
@@ -409,10 +332,9 @@ func (img Image) IngestConfigFile(CVMFSRepo string) (err error) {
 	imageID := calculateId(manifest.Config.Digest)
 	configFilePath := filepath.Join(rootPath, imageMetadataDir, imageID, fname)
 
-	//Ingest config file
-	err = IngestIntoCVMFS(CVMFSRepo, configFilePath, tmpFile.Name())
-	os.RemoveAll(tmpFile.Name())
+	err = writeDataToCvmfs(CVMFSRepo, configFilePath, []byte(body))
 	if err != nil {
+		LogE(err).Warning("Error in writing config file")
 		return err
 	}
 	return nil
@@ -441,19 +363,22 @@ func (img Image) IngestImageManifest(CVMFSRepo string) (err error) {
 
 //Create images.lock and layers.lock file to be used by podman.
 //Libpod expects these files to be present in its image stores.
-func (img Image) CreateLockFiles(CVMFSRepo, fpath string) (err error) {
+func (img Image) CreateLockFiles(CVMFSRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating lock file for the image"}).Info(img.GetSimpleName())
-	lockFilePath := filepath.Join("/cvmfs", CVMFSRepo, fpath)
-	if _, err := os.Stat(lockFilePath); os.IsNotExist(err) {
-		tmpFile, err := ioutil.TempFile("", "lock")
-		tmpFile.Close()
-		if err != nil {
-			return err
-		}
-		err = IngestIntoCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(lockFilePath), tmpFile.Name())
-		os.RemoveAll(tmpFile.Name())
-		if err != nil {
-			return err
+	layerlockpath := filepath.Join("/cvmfs", CVMFSRepo, rootPath, layerMetadataDir, "layers.lock")
+	imagelockpath := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.lock")
+	for _, file := range []string{layerlockpath, imagelockpath} {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			tmpFile, err := ioutil.TempFile("", "lock")
+			tmpFile.Close()
+			if err != nil {
+				return err
+			}
+			err = IngestIntoCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(file), tmpFile.Name())
+			os.RemoveAll(tmpFile.Name())
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -472,29 +397,15 @@ func (img Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err
 		}
 	}
 
-	err = img.CreateLayerInfo(CVMFSRepo)
+	err = img.IngestImageInfo(CVMFSRepo)
 	if err != nil {
-		LogE(err).Error("Unable to create layers.json file in podman store")
+		LogE(err).Error("Unable to create images.json and layers.json file in podman store")
 		return err
 	}
 
-	layerlockpath := filepath.Join(rootPath, layerMetadataDir, "layers.lock")
-	err = img.CreateLockFiles(CVMFSRepo, layerlockpath)
+	err = img.CreateLockFiles(CVMFSRepo)
 	if err != nil {
 		LogE(err).Error("Unable to create layers lock file in podman store")
-		return err
-	}
-
-	err = img.CreateImageInfo(CVMFSRepo)
-	if err != nil {
-		LogE(err).Error("Unable to create images.json file in podman store")
-		return err
-	}
-
-	imagelockpath := filepath.Join(rootPath, imageMetadataDir, "images.lock")
-	err = img.CreateLockFiles(CVMFSRepo, imagelockpath)
-	if err != nil {
-		LogE(err).Error("Unable to create images lock file in podman store")
 		return err
 	}
 
