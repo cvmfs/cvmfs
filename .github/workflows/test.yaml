@@ -14,3 +14,4 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           path: out/
+          name: cvmfs-containerd-snapshotter-${{ github.sha }}
