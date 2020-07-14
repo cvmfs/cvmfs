@@ -27,7 +27,6 @@ echo "copying the files to be packaged in place..."
 cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/cvmfs-config-default.spec ${CVMFS_RESULT_LOCATION}
 cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/cvmfs-config-none.spec    ${CVMFS_RESULT_LOCATION}
 
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern.ch.pub                  ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it1.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it4.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it5.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
