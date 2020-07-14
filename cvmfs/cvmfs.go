@@ -10,8 +10,18 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/stargz-snapshotter/snapshot"
-	"github.com/containerd/stargz-snapshotter/stargz/handler"
 )
+
+const (
+	// targetRefLabelCRI is a label which contains image reference passed from CRI plugin
+	targetRefLabelCRI = "containerd.io/snapshot/cri.image-ref"
+	// targetDigestLabelCRI is a label which contains layer digest passed from CRI plugin
+	targetDigestLabelCRI = "containerd.io/snapshot/cri.layer-digest"
+	// targetImageLayersLabel is a label which contains layer digests contained in
+	// the target image and is passed from CRI plugin.
+	targetImageLayersLabel = "containerd.io/snapshot/cri.image-layers"
+)
+
 
 type filesystem struct {
 	repository    string
@@ -32,10 +42,10 @@ func NewFilesystem(ctx context.Context, root string, config *Config) (snapshot.F
 }
 
 func (fs *filesystem) Mount(ctx context.Context, mountpoint string, labels map[string]string) error {
-	log.G(ctx).Warning("Mount: cvmfs")
-	digest, ok := labels[handler.TargetDigestLabel]
+	log.G(ctx).Info("Mount layer from cvmfs")
+	digest, ok := labels[targetDigestLabelCRI]
 	if !ok {
-		err := fmt.Errorf("cvmfs: digest hasn't be passed")
+		err := fmt.Errorf("cvmfs: layer digest has not be passed")
 		log.G(ctx).Debug(err.Error())
 		return err
 	}
