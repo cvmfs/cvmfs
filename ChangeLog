@@ -1,4 +1,8 @@
 2.8.0:
+  * [macOS] update libressl to version 3.1.2
+  * Update c-ares to version 1.16.1
+  * Update libcurl to version 7.71.1
+  * Update sqlite to version 3.32.2
   * Fix ingest into root directory
   * Spawn watchdog for `swissknife sync` command
   * Add 'chunk_list' magic extended attribute
