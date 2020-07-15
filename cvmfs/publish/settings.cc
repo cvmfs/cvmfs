@@ -237,7 +237,7 @@ void SettingsPublisher::SetUrl(const std::string &url) {
 void SettingsPublisher::SetOwner(const std::string &user_name) {
   bool retval = GetUidOf(user_name, owner_uid_.GetPtr(), owner_gid_.GetPtr());
   if (!retval) {
-    throw EPublish("unknown user name for repository owner");
+    throw EPublish("unknown user name for repository owner: " + user_name);
   }
 }
 
