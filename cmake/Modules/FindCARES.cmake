@@ -3,6 +3,7 @@
 #
 #  CARES_INCLUDE_DIRS - where to find cares.h, etc.
 #  CARES_LIBRARIES    - List of libraries when using cares.
+#  CARES_LDFLAGS      - List of library dependencies (libresolv on macOS)
 #  CARES_FOUND        - True if cares found.
 
 
@@ -23,6 +24,12 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(CARES DEFAULT_MSG CARES_LIBRARY CARES_INCLUDE_
 
 IF(CARES_FOUND)
   SET( CARES_LIBRARIES ${CARES_LIBRARY} )
+  if (MACOSX)
+    SET( CARES_LDFLAGS -lresolv )
+  else ()
+    SET( CARES_LDFLAGS )
+  endif()
+
   SET( CARES_INCLUDE_DIRS ${CARES_INCLUDE_DIR} )
 ELSE(CARES_FOUND)
   SET( CARES_LIBRARIES )
