@@ -73,20 +73,20 @@ var convertSingleImageCmd = &cobra.Command{
 		if !skipLayers {
 			err := lib.ConvertWishLayers(wish, convertAgain, overwriteLayer, skipPodman)
 			if err != nil {
-				lib.LogE(err).WithFields(fields).Error("Error in populating subDirInsideRepo (.layers)")
-			}
-
-			if !skipThinImage {
-				err := lib.ConvertWishDocker(wish)
-				if err != nil {
-					lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+				lib.LogE(err).WithFields(fields).Error("Error in getting layers, skipping conversion for docker and podman")
+			} else {
+				if !skipThinImage {
+					err := lib.ConvertWishDocker(wish)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+					}
 				}
-			}
 
-			if !skipPodman {
-				err := lib.ConvertWishPodman(wish, convertAgain)
-				if err != nil {
-					lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+				if !skipPodman {
+					err := lib.ConvertWishPodman(wish, convertAgain)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+					}
 				}
 			}
 		}
