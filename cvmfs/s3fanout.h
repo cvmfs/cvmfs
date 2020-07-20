@@ -27,7 +27,8 @@ namespace s3fanout {
 
 enum AuthzMethods {
   kAuthzAwsV2 = 0,
-  kAuthzAwsV4
+  kAuthzAwsV4,
+  kAuthzAzure
 };
 
 /**
@@ -243,6 +244,8 @@ class S3FanoutManager : SingleCopy {
   bool MkV2Authz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   bool MkV4Authz(const JobInfo &info,
+                 std::vector<std::string> *headers) const;
+  bool MkAzureAuthz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &objkey) const {
     if (config_.dns_buckets) {

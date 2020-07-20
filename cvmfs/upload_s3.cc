@@ -157,7 +157,11 @@ bool S3Uploader::ParseSpoolerDefinition(
     timeout_sec_ = String2Uint64(parameter);
   }
   if (options_manager.GetValue("CVMFS_S3_REGION", &region_)) {
-    authz_method_ = s3fanout::kAuthzAwsV4;
+    if (region_ == "Azure") {
+      authz_method_ = s3fanout::kAuthzAzure;
+    } else {
+      authz_method_ = s3fanout::kAuthzAwsV4;
+    }
   }
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
     peek_before_put_ = options_manager.IsOn(parameter);
