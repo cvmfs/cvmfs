@@ -96,7 +96,7 @@ func (img *Image) ComputeLayerInfo(digest, parent string, layersize int) (layeri
 }
 
 //creates images.json and layers.json file in podman store
-func (img Image) IngestImageInfo(CVMFSRepo string) (err error) {
+func (img *Image) IngestImageInfo(CVMFSRepo string) (err error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Warn("Error in getting the image manifest")
@@ -184,7 +184,7 @@ func (img Image) IngestImageInfo(CVMFSRepo string) (err error) {
 }
 
 //Ingest the exploded rootfs in podman store.
-func (img Image) IngestRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string) (err error) {
+func (img *Image) IngestRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Ingesting layer rootfs into podman store for the image"}).Info(img.GetSimpleName())
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -210,7 +210,7 @@ func (img Image) IngestRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string)
 }
 
 //Create the link dir and link file for exploded rootfs.
-func (img Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string) (err error) {
+func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating Link files for layer rootfs for the image"}).Info(img.GetSimpleName())
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -246,7 +246,7 @@ func (img Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string) (err error) {
 }
 
 //Create the lower files for diff dirs to be used by podman.
-func (img Image) CreateLowerFiles(CVMFSRepo string) (err error) {
+func (img *Image) CreateLowerFiles(CVMFSRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating Lower files for diff dirs in podman store"}).Info(img.GetSimpleName())
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -281,7 +281,7 @@ func (img Image) CreateLowerFiles(CVMFSRepo string) (err error) {
 }
 
 //Ingest the image config file in podman store.
-func (img Image) IngestConfigFile(CVMFSRepo string) (err error) {
+func (img *Image) IngestConfigFile(CVMFSRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating config file for the image in podman store"}).Info(img.GetSimpleName())
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -342,7 +342,7 @@ func (img Image) IngestConfigFile(CVMFSRepo string) (err error) {
 }
 
 //Ingest the image manifest in podman store.
-func (img Image) IngestImageManifest(CVMFSRepo string) (err error) {
+func (img *Image) IngestImageManifest(CVMFSRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating manifest file for the image in podman store"}).Info(img.GetSimpleName())
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -364,7 +364,7 @@ func (img Image) IngestImageManifest(CVMFSRepo string) (err error) {
 
 //Create images.lock and layers.lock file to be used by podman.
 //Libpod expects these files to be present in its image stores.
-func (img Image) CreateLockFiles(CVMFSRepo string) (err error) {
+func (img *Image) CreateLockFiles(CVMFSRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating lock file for the image"}).Info(img.GetSimpleName())
 	layerlockpath := filepath.Join("/cvmfs", CVMFSRepo, rootPath, layerMetadataDir, "layers.lock")
 	imagelockpath := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.lock")
@@ -385,8 +385,65 @@ func (img Image) CreateLockFiles(CVMFSRepo string) (err error) {
 	return nil
 }
 
+//checks if older version of the image with same tag exists or not in the store.
+//If an older version is found, removes it from store and updates images.json file.
+//Note: The layers are not removed. Only the manifest, config file and images.json are updated. 
+func (img *Image) CheckImageChanged(CVMFSRepo string) error {
+	Log().WithFields(log.Fields{"action": "checking if old image version with same tag exists"}).Info(img.GetSimpleName())
+	path := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.json")
+	if _, err := os.Stat(path); err == nil {
+		var imagesinfo []ImageInfo
+		newimagesinfo := []ImageInfo{}
+
+		file, err := ioutil.ReadFile(path)
+		if err != nil {
+			LogE(err).Error("error in reading images.json file")
+			return err
+		}
+
+		json.Unmarshal(file, &imagesinfo)
+		for _, image := range imagesinfo {
+			present := false
+			for _, name := range image.Names {
+				if name == img.GetSimpleName() {
+					Log().WithFields(log.Fields{"image" : img.GetSimpleName()}).Info("older image version present, cleaning and ingesting newer version")
+					present = true
+					directory := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, image.ID)
+					err := RemoveDirectory(directory)
+					if err != nil {
+						LogE(err).Error("error while removing older image version from podman store")
+						return err
+					}
+					break
+				}
+			}
+			if !present {
+				newimagesinfo = append(newimagesinfo, image)
+			}
+		}
+		imgInfo, err := json.MarshalIndent(newimagesinfo, "", " ")
+		if err != nil {
+			LogE(err).Error("Error in marshaling json data for images.json")
+			return err
+		}
+
+		err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(path), imgInfo)
+		if err != nil {
+			LogE(err).Error("Error in writing images.json")
+			return err
+		}
+	}
+	return nil
+}
+
 //Ingest all the necessary files and dir in podmanStore dir.
-func (img Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err error) {
+func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err error) {
+	err = img.CheckImageChanged(CVMFSRepo)
+	if err != nil {
+		LogE(err).Error("error while checking if older image version with same tag present in store")
+		return err
+	}
+
 	Log().WithFields(log.Fields{"action": "Ingest the image into podman store"}).Info(img.GetSimpleName())
 	createCatalogIntoDirs := []string{rootPath, filepath.Join(rootPath, rootfsDir), filepath.Join(rootPath, imageMetadataDir), filepath.Join(rootPath, layerMetadataDir)}
 	for _, dir := range createCatalogIntoDirs {
