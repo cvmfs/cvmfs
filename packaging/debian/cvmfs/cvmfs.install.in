@@ -20,7 +20,6 @@ usr/libexec/cvmfs/cache/cvmfs_cache_posix
 etc/auto.cvmfs
 sbin/mount.cvmfs
 etc/cvmfs/config.sh
-etc/cvmfs/config.d/README
 etc/cvmfs/default.conf
 etc/cvmfs/default.d/README
 etc/bash_completion.d/cvmfs

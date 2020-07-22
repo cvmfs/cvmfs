@@ -374,6 +374,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/cvmfs-server
 
 # Keys and configs are in cvmfs-config
 rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
+rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/README
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
@@ -531,7 +532,6 @@ fi
 %dir %{_sysconfdir}/cvmfs/config.d
 %dir %{_sysconfdir}/cvmfs/domain.d
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
-%{_sysconfdir}/cvmfs/config.d/README
 %{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf
 %dir %{_sysconfdir}/bash_completion.d
