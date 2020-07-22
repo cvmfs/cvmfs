@@ -684,8 +684,9 @@ int S3FanoutManager::InitializeDnsSettings(
   }
 
   // Remove port number if such exists
-  if (!HasPrefix(host_with_port, "http://", false /*ignore_case*/))
-    host_with_port = "http://" + host_with_port;
+  if (!HasPrefix(host_with_port, "http://", false /*ignore_case*/) || 
+      !HasPrefix(host_with_port, "https://", false /*ignore_case*/))
+    host_with_port = config_.protocol + host_with_port;
   std::string remote_host = dns::ExtractHost(host_with_port);
   std::string remote_port = dns::ExtractPort(host_with_port);
 
