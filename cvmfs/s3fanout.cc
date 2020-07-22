@@ -622,7 +622,8 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   string canonical_resource = "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
 
   string string_to_sign;
-  if (info.request == JobInfo::kReqPutDotCvmfs) { 
+  if ((info.request == JobInfo::kReqPutDotCvmfs) ||
+     (info.request == JobInfo::kReqPutCas)) { 
     snprintf(payload_size, 256, "%lu", info.origin->GetSize());
     headers->push_back("cvmfs_request: " + GetRequestString(info));
     string_to_sign =
@@ -985,8 +986,8 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   retval = curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME,
                             config_.opt_timeout_sec);
   assert(retval == CURLE_OK);
-  retval = curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1L);
-  assert(retval == CURLE_OK);
+  //retval = curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1L);
+  //assert(retval == CURLE_OK);
 
   if (is_curl_debug_) {
     retval = curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1);
