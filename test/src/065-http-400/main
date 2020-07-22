@@ -40,7 +40,7 @@ cvmfs_run_test() {
   done
   [ $timeout -gt 0 ] || return 50
 
-  sudo tee /etc/cvmfs/config.d/grid.cern.ch.conf << EOF
+  sudo tee /etc/cvmfs/config.d/grid.cern.ch.local << EOF
 CVMFS_SERVER_URL="http://localhost:${faulty_port}/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch"
 CVMFS_USE_GEOAPI=no
 EOF

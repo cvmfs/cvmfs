@@ -12,6 +12,7 @@ Source6: egi.eu.conf
 Source7: opensciencegrid.org.conf
 Source8: 50-cern.conf
 Source9: README-config.d
+Source10: cvmfs-config.cern.ch.conf
 BuildArch: noarch
 Group: Applications/System
 License: BSD
@@ -52,9 +53,10 @@ done
 for defaultconf in %{SOURCE8}; do
     install -D -m 444 "${defaultconf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/default.d
 done
-for conf in %{SOURCE9}; do
-    install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/README
+for conf in %{SOURCE10}; do
+    install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d
 done
+install -D -m 444 "%{SOURCE9}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/README
 
 %files
 %dir %{_sysconfdir}/cvmfs/keys/cern.ch
@@ -63,6 +65,7 @@ done
 %{_sysconfdir}/cvmfs/keys/cern.ch/*
 %{_sysconfdir}/cvmfs/keys/egi.eu/*
 %{_sysconfdir}/cvmfs/keys/opensciencegrid.org/*
+%config %{_sysconfdir}/cvmfs/config.d/cvmfs-config.cern.ch.conf
 %config %{_sysconfdir}/cvmfs/domain.d/egi.eu.conf
 %config %{_sysconfdir}/cvmfs/domain.d/opensciencegrid.org.conf
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf

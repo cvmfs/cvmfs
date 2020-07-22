@@ -86,6 +86,12 @@ if (MACOSX)
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
+  install (
+    FILES         config.d/cvmfs-config.cern.ch.conf
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
   if (INSTALL_PUBLIC_KEYS)
     install (
       FILES         keys/cern-it1.cern.ch.pub
@@ -216,6 +222,12 @@ else (MACOSX)
 
   install (
     FILES         config.d/README
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         config.d/cvmfs-config.cern.ch.conf
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )

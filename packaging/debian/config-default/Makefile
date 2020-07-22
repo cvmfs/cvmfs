@@ -22,3 +22,4 @@ install:
 	cp mount/default.d/50-cern-debian.conf $(DESTDIR)/etc/cvmfs/default.d
 	mkdir -p $(DESTDIR)/etc/cvmfs/config.d
 	cp mount/config.d/README $(DESTDIR)/etc/cvmfs/config.d
+	cp mount/config.d/cvmfs-config.cern.ch.conf $(DESTDIR)/etc/cvmfs/config.d
