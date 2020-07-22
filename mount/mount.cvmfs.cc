@@ -131,7 +131,7 @@ static bool CheckStrictMount(const string &fqrn) {
 static bool CheckProxy() {
   string param;
   int retval = options_manager_.GetValue("CVMFS_HTTP_PROXY", &param);
-  if (!retval) {
+  if (!retval || param.empty()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_HTTP_PROXY required");
     return false;
   }
