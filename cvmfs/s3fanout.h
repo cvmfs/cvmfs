@@ -174,7 +174,7 @@ class S3FanoutManager : SingleCopy {
     S3Config() {
       authz_method = kAuthzAwsV4;
       dns_buckets = true;
-      use_https = false;
+      protocol = "http://";
       pool_max_handles = 0;
       opt_timeout_sec = 20;
       opt_max_retries = 3;
@@ -188,7 +188,7 @@ class S3FanoutManager : SingleCopy {
     std::string region;
     std::string bucket;
     bool dns_buckets;
-    bool use_https;
+    std::string protocol;
     uint32_t pool_max_handles;
     unsigned opt_timeout_sec;
     unsigned opt_max_retries;
@@ -247,14 +247,10 @@ class S3FanoutManager : SingleCopy {
   bool MkV4Authz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &objkey) const {
-    std::string protocol("http://");
-    if (config_.use_https) {
-      protocol = "https://";
-    }
     if (config_.dns_buckets) {
-      return protocol + complete_hostname_ + "/" + objkey;
+      return config_.protocol + complete_hostname_ + "/" + objkey;
     } else {
-      return protocol + complete_hostname_ + "/" + config_.bucket +
+      return config_.protocol + complete_hostname_ + "/" + config_.bucket +
              "/" + objkey;
     }
   }
