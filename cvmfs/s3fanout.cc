@@ -616,17 +616,37 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   const
 {
-  char payload_size [256];
-  snprintf(payload_size, 256, "%lu", info.origin->GetSize());
+  char payload_size [256] = "\0";
   string timestamp = RfcTimestamp();
   string canonical_headers = "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp + "\nx-ms-version:2011-08-18";
   string canonical_resource = "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
-  printf("\nrequest: %s\n", GetRequestString(info).c_str());
-  string string_to_sign =
-    string("PUT\n\n\n") +
+
+  string string_to_sign;
+  if (info.request == JobInfo::kReqPutDotCvmfs) { 
+    snprintf(payload_size, 256, "%lu", info.origin->GetSize());
+    headers->push_back("cvmfs_request: " + GetRequestString(info));
+    string_to_sign =
+      GetRequestString(info) +
+      string("\n\n\n") +
+      string(payload_size) + "\n\n\n\n\n\n\n\n\n" +
+      canonical_headers + "\n" +
+      canonical_resource; 
+  } 
+  if (info.request == JobInfo::kReqHeadPut) { 
+    headers->push_back("cvmfs_request: " + GetRequestString(info));
+    string_to_sign =
+      GetRequestString(info) +
+      string("\n\n\n") +
+      "\n\n\n\n\n\n\n\n\n" +
+      canonical_headers + "\n" +
+      canonical_resource; 
+  } 
+  /*string string_to_sign =
+    GetRequestString(info) +
+    string("\n\n\n") +
     string(payload_size) + "\n\n\n\n\n\n\n\n\n" +
     canonical_headers + "\n" +
-    canonical_resource; 
+    canonical_resource */; 
   string signing_key ;
   int retval = Debase64(config_.secret_key, &signing_key);
   if (!retval)
@@ -856,16 +876,18 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
     assert(retval == CURLE_OK);
-    info->http_headers =
-      curl_slist_append(info->http_headers, "Content-Length: 0");
 
-    if (info->request == JobInfo::kReqDelete) {
+    if ((info->request == JobInfo::kReqDelete) ||
+        (info->request == JobInfo::kReqHeadPut))
+      {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST,
                                GetRequestString(*info).c_str());
       assert(retval == CURLE_OK);
     } else {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
       assert(retval == CURLE_OK);
+      info->http_headers =
+        curl_slist_append(info->http_headers, "Content-Length: 0");
     }
   } else {
     retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
