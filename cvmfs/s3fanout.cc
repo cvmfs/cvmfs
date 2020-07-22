@@ -960,6 +960,17 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   retval = curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, info->errorbuffer);
   assert(retval == CURLE_OK);
 
+
+  retval = curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 1L);
+  assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(handle, CURLOPT_PROXY_SSL_VERIFYPEER, 1L);
+  assert(retval == CURLE_OK);
+  // TODO(simone) /etc/ssl/certs is correct for some distro, but not for all
+  // fedora seems to use /etc/pki/tls/certs/ and
+  // CentOS7 /etc/pki/ca-trust/extracted/pem/
+  retval = curl_easy_setopt(handle, CURLOPT_CAPATH, "/etc/ssl/certs/");
+  assert(retval == CURLE_OK);
+
   return kFailOk;
 }
 
