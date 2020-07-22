@@ -531,6 +531,7 @@ fi
 %dir %{_sysconfdir}/cvmfs/config.d
 %dir %{_sysconfdir}/cvmfs/domain.d
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
+%{_sysconfdir}/cvmfs/config.d/README
 %{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf
 %dir %{_sysconfdir}/bash_completion.d
@@ -575,9 +576,6 @@ fi
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
-/usr/share/cvmfs-server/generate_stats_plots.C
-/usr/share/cvmfs-server/stats_index.html.tpl
-/usr/share/cvmfs-server/upload_stats_plots.sh
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
