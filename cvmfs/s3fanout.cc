@@ -611,84 +611,33 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
 
 /**
  * The Azure Blob authorization header according to
- * tbd 
+ * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key 
  */
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   const
 {
-  //string payload_hash;
   char payload_size [256];
   snprintf(payload_size, 256, "%lu", info.origin->GetSize());
-  //bool retval = MkPayloadHash(info, &payload_hash);
-  //if (!retval)
-    //return false;
-  string content_type = GetContentType(info);
-  //string timestamp = IsoTimestamp();
   string timestamp = RfcTimestamp();
-  string date = timestamp.substr(0, 8);
-  vector<string> tokens = SplitString(complete_hostname_, ':');
-  assert(tokens.size() <= 2);
-  string canonical_hostname = tokens[0];
-  if (tokens.size() == 2 && String2Uint64(tokens[1]) != kDefaultHTTPPort)
-    canonical_hostname += ":" + tokens[1];
-
-  string signed_headers;
-  string canonical_headers;
-  string canonical_resource;
-  //if (!content_type.empty()) {
-    //signed_headers += "content-type;";
-    //headers->push_back("Content-Type: " + content_type);
-    //canonical_headers += "content-type:" + content_type + "\n";
-  //}
-  signed_headers += "host;x-amz-acl;x-amz-content-sha256;x-amz-date";
-  canonical_headers = "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp + "\nx-ms-version: 2011-08-18";
-    //"host:" + canonical_hostname + "\n" +
-    //"x-amz-acl:public-read\n"
-    //"x-amz-content-sha256:" + payload_hash + "\n" +
-    //"x-ms-date:" + timestamp + "\n";
-
-  canonical_resource = "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
-  printf("\nheaders: %s\n", canonical_headers.c_str());
-  printf("\nresource: %s\n", canonical_resource.c_str());
-  printf("\nsize: %s\n", payload_size);
-  
+  string canonical_headers = "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp + "\nx-ms-version:2011-08-18";
+  string canonical_resource = "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
+  printf("\nrequest: %s\n", GetRequestString(info).c_str());
   string string_to_sign =
     string("PUT\n\n\n") +
-    payload_size + "\n\n\n\n\n\n\n\n\n"; 
-
-  string scope = date + "/" + config_.region + "/s3/aws4_request";
-  string uri = config_.dns_buckets ?
-                 (string("/") + info.object_key) :
-                 (string("/") + config_.bucket + "/" + info.object_key);
-
-  string canonical_request =
-    GetRequestString(info) + "\n" +
-    GetUriEncode(uri, false) + "\n" +
-    "\n" +
+    string(payload_size) + "\n\n\n\n\n\n\n\n\n" +
     canonical_headers + "\n" +
-    signed_headers + "\n";
-    //payload_hash;
-
-  string hash_request = shash::Sha256String(canonical_request.c_str());
-
-  /*string string_to_sign =
-    "AWS4-HMAC-SHA256\n" +
-    timestamp + "\n" +
-    scope + "\n" +
-    hash_request;*/
-
-  string signing_key = GetAwsV4SigningKey(date);
-  string signature = shash::Hmac256(signing_key, string_to_sign);
+    canonical_resource; 
+  string signing_key ;
+  int retval = Debase64(config_.secret_key, &signing_key);
+  if (!retval)
+    return false;
+  string signature = shash::Hmac256(signing_key, string_to_sign, true);
+  string signature64 = Base64(signature);
 
   headers->push_back("x-ms-date: " + timestamp);
   headers->push_back("x-ms-version: 2011-08-18");
+  headers->push_back("Authorization: SharedKey " + config_.access_key + ":" + Base64(signature));
   headers->push_back("x-ms-blob-type: BlockBlob");
-  //headers->push_back("X-Amz-Content-Sha256: " + payload_hash);
-  headers->push_back(
-    "Authorization: SharedKey " + config_.access_key + ":" + signature);
-    //"Credential=" + config_.access_key + "/" + scope + ","
-    //"SignedHeaders=" + signed_headers + ","
-    //"Signature=" + signature);
   return true;
 }
 
@@ -800,6 +749,11 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
         *hex_hash =
           "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         break;
+      case kAuthzAzure:
+        // Sha256 over empty string
+        *hex_hash =
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        break;
       default:
         PANIC(NULL);
     }
@@ -823,6 +777,10 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
                       payload_hash.GetDigestSize()));
       return true;
     case kAuthzAwsV4:
+      *hex_hash =
+        shash::Sha256Mem(data, nbytes);
+      return true;
+    case kAuthzAzure:
       *hex_hash =
         shash::Sha256Mem(data, nbytes);
       return true;
@@ -903,20 +861,18 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
 
     if (info->request == JobInfo::kReqDelete) {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST,
-                                GetRequestString(*info).c_str());
+                               GetRequestString(*info).c_str());
       assert(retval == CURLE_OK);
     } else {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
       assert(retval == CURLE_OK);
     }
   } else {
-    // debug curl for Azure
-    retval = curl_easy_setopt(handle, CURLOPT_VERBOSE, 1L);
-    assert(retval == CURLE_OK);
-
     retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
     assert(retval == CURLE_OK);
-    retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
+    //retval = curl_easy_setopt(handle, CURLOPT_PUT, 1L);
+    //assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1L);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     assert(retval == CURLE_OK);
@@ -943,6 +899,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       break;
     case kAuthzAwsV4:
       retval_b = MkV4Authz(*info, &authz_headers);
+      break;
     case kAuthzAzure:
       retval_b = MkAzureAuthz(*info, &authz_headers);
       break;
@@ -957,15 +914,15 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   }
 
   // Common headers
-  info->http_headers =
-      curl_slist_append(info->http_headers, "Connection: Keep-Alive");
-  info->http_headers = curl_slist_append(info->http_headers, "Pragma:");
+  //info->http_headers =
+    //  curl_slist_append(info->http_headers, "Connection: Keep-Alive");
+ // info->http_headers = curl_slist_append(info->http_headers, "Pragma:");
   // No 100-continue
   info->http_headers = curl_slist_append(info->http_headers, "Expect:");
   // Strip unnecessary header
-  info->http_headers = curl_slist_append(info->http_headers, "Accept:");
-  info->http_headers = curl_slist_append(info->http_headers,
-                                         user_agent_->c_str());
+ // info->http_headers = curl_slist_append(info->http_headers, "Accept:");
+  //info->http_headers = curl_slist_append(info->http_headers,
+    //                                     user_agent_->c_str());
 
   // Set curl parameters
   retval = curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
@@ -1005,6 +962,8 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   assert(retval == CURLE_OK);
   retval = curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME,
                             config_.opt_timeout_sec);
+  assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1L);
   assert(retval == CURLE_OK);
 
   if (is_curl_debug_) {
