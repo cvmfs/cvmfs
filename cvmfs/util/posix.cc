@@ -198,14 +198,14 @@ std::string GetAbsolutePath(const std::string &path) {
 
 
 bool IsHttpUrl(const std::string &path) {
-  if (path.length() < 7) {
+  if (path.length() < 8) {
     return false;
   }
 
-  std::string prefix = path.substr(0, 7);
+  std::string prefix = path.substr(0, 8);
   std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
 
-  return prefix == "http://";
+  return prefix.substr(0, 7) == "http://" || prefix == "https://";
 }
 
 
