@@ -18,6 +18,7 @@
 #include "dns.h"
 #include "duplex_curl.h"
 #include "prng.h"
+#include "smalloc.h"
 #include "util/file_backed_buffer.h"
 #include "util/mmap_file.h"
 #include "util/pointer.h"
@@ -127,8 +128,11 @@ struct JobInfo {
     backoff_ms = 0;
     throttle_ms = 0;
     throttle_timestamp = 0;
+    errorbuffer = (char*)smalloc((sizeof(char) * CURL_ERROR_SIZE));
   }
-  ~JobInfo() {}
+  ~JobInfo() {
+    free(errorbuffer);
+  }
 
   // Internal state, don't touch
   CURL *curl_handle;
@@ -144,6 +148,7 @@ struct JobInfo {
   unsigned throttle_ms;
   // Remember when the 429 reply came in to only throttle if still necessary
   uint64_t throttle_timestamp;
+  char* errorbuffer;
 };  // JobInfo
 
 struct S3FanOutDnsEntry {

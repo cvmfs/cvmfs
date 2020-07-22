@@ -957,6 +957,9 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   retval = curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
   assert(retval == CURLE_OK);
 
+  retval = curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, info->errorbuffer);
+  assert(retval == CURLE_OK);
+
   return kFailOk;
 }
 
@@ -1098,8 +1101,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       break;
     default:
       LogCvmfs(kLogS3Fanout, kLogStderr | kLogSyslogErr,
-               "unexpected curl error (%d) while trying to upload %s",
-               curl_error, info->object_key.c_str());
+               "unexpected curl error (%d) while trying to upload %s: %s",
+               curl_error, info->object_key.c_str(), info->errorbuffer);
       info->error_code = kFailOther;
       break;
   }
