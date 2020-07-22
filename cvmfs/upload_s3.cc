@@ -38,6 +38,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   , timeout_sec_(kDefaultTimeoutSec)
   , authz_method_(s3fanout::kAuthzAwsV2)
   , peek_before_put_(true)
+  , use_https_(false)
   , temporary_path_(spooler_definition.temporary_path)
 {
   assert(spooler_definition.IsValid() &&
@@ -63,6 +64,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3config.opt_max_retries = num_retries_;
   s3config.opt_backoff_init_ms = kDefaultBackoffInitMs;
   s3config.opt_backoff_max_ms = kDefaultBackoffMaxMs;
+  s3config.use_https = use_https_;
 
   s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
   s3fanout_mgr_->Spawn();
@@ -164,6 +166,11 @@ bool S3Uploader::ParseSpoolerDefinition(
   }
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
     peek_before_put_ = options_manager.IsOn(parameter);
+  }
+  if (options_manager.GetValue("CVMFS_S3_USE_HTTPS", &parameter)) {
+    if (parameter == "true") {
+      use_https_ = true;
+    }
   }
 
   return true;
