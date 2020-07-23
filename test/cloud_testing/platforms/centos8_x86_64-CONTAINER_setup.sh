@@ -23,12 +23,13 @@ sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/dock
 sudo dnf install docker-ce --nobest -y || die "fail (install docker-ce)"
 sudo firewall-cmd --zone=public --add-masquerade --permanent
 sudo firewall-cmd --reload
-sudo cat /etc/group
-sudo cat /etc/passwd
-sudo usermod -aG docker sftnight
-newgrp docker
-id
-groups
+
+# Make docker available to sftnight
+sudo mkdir /usr/lib/systemd/system/docker.socket.d
+echo "[Socket]" | sudo tee /usr/lib/systemd/system/docker.socket.d/10-sftnight.conf
+echo "SocketGroup=sftnight" | sudo tee -a /usr/lib/systemd/system/docker.socket.d/10-sftnight.conf
+sudo systemctl daemon-reload
+
 sudo systemctl start docker            || die "fail (starting docker)"
 docker ps                              || die "fail (accessing docker)"
 
