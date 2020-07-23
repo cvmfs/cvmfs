@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 
@@ -45,6 +46,9 @@ func UserDefinedTempDir(dir, prefix string) (name string, err error) {
 	return ioutil.TempDir(path.Join(TemporaryBaseDir, dir), prefix)
 }
 
+func UserDefinedTempFile() (f *os.File, err error) {
+	return ioutil.TempFile(TemporaryBaseDir, "write_data")
+}
 // TeeReadCloser returns a io.ReadCloser that writes everything it reads from r to w.
 // The Close method for the returned ReadCloser is same as that of r.
 func TeeReadCloser(r io.ReadCloser, w io.Writer) io.ReadCloser {

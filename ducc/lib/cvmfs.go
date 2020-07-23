@@ -523,7 +523,7 @@ func RepositoryExists(CVMFSRepo string) bool {
 
 //writes data to file and ingest in cvmfs repo path
 func writeDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
-	tmpFile, err := ioutil.TempFile("", "write_data")
+	tmpFile, err := UserDefinedTempFile()
 	if err != nil {
 		LogE(err).Error("Error in creating temporary file for writing data")
 		return err
@@ -532,6 +532,11 @@ func writeDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
 	err = ioutil.WriteFile(tmpFile.Name(), data, 0644)
 	if err != nil {
 		LogE(err).Error("Error in writing data to file")
+		return err
+	}
+	err = tmpFile.Close()
+	if err != nil {
+		LogE(err).Error("Error in closing temporary file")
 		return err
 	}
 	err = IngestIntoCVMFS(CVMFSRepo, path, tmpFile.Name())
