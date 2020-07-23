@@ -81,6 +81,7 @@ class S3Uploader : public AbstractUploader {
 
  private:
   static const unsigned kDefaultPort = 80;
+  static const unsigned kHTTPSPort = 443;
   static const unsigned kDefaultNumParallelUploads = 16;
   static const unsigned kDefaultNumRetries = 3;
   static const unsigned kDefaultTimeoutSec = 60;

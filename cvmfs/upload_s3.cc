@@ -120,12 +120,6 @@ bool S3Uploader::ParseSpoolerDefinition(
              config_path.c_str());
     return false;
   }
-  if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
-    host_name_port_ = host_name_ + ":" + parameter;
-  } else {
-    host_name_port_ = host_name_;
-  }
-
   if (!options_manager.GetValue("CVMFS_S3_ACCESS_KEY", &access_key_)) {
     LogCvmfs(kLogUploadS3, kLogStderr,
              "Failed to parse CVMFS_S3_ACCESS_KEY from '%s'.",
@@ -175,6 +169,11 @@ bool S3Uploader::ParseSpoolerDefinition(
     if (parameter == "true") {
       use_https_ = true;
     }
+  }
+  if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
+    host_name_port_ = host_name_ + ":" + parameter;
+  } else {
+    host_name_port_ = host_name_;
   }
 
   return true;
