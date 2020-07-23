@@ -23,8 +23,11 @@ sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/dock
 sudo dnf install docker-ce --nobest -y || die "fail (install docker-ce)"
 sudo firewall-cmd --zone=public --add-masquerade --permanent
 sudo firewall-cmd --reload
+sudo cat /etc/group
+sudo cat /etc/passwd
 sudo usermod -aG docker sftnight
-newgrp - docker
+newgrp docker
+id
 groups
 sudo systemctl start docker            || die "fail (starting docker)"
 docker ps                              || die "fail (accessing docker)"
