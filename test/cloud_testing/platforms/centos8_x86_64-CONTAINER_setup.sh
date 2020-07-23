@@ -45,13 +45,4 @@ sudo systemctl start autofs                      || die "fail (systemctl start a
 sudo cvmfs_config chksetup > /dev/null           || die "fail (cvmfs_config chksetup)"
 echo "done"
 
-# install docker
-sudo yum install -y yum-utils
-sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-# Docker is not yet supported on RHEL8 (firewalld issues). Need to do a workaround.
-sudo yum install -y --nobest docker-ce
-sudo firewall-cmd --zone=public --add-masquerade --permanent
-sudo firewall-cmd --reload
-sudo systemctl restart docker
-
 disable_systemd_rate_limit
