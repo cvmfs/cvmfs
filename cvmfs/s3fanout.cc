@@ -14,6 +14,7 @@
 #include "cvmfs_config.h"
 #include "platform.h"
 #include "s3fanout.h"
+#include "ssl.h"
 #include "upload_facility.h"
 #include "util/exception.h"
 #include "util/posix.h"
@@ -968,8 +969,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   // TODO(simone) /etc/ssl/certs is correct for some distro, but not for all
   // fedora seems to use /etc/pki/tls/certs/ and
   // CentOS7 /etc/pki/ca-trust/extracted/pem/
-  retval = curl_easy_setopt(handle, CURLOPT_CAPATH, "/etc/ssl/certs/");
-  assert(retval == CURLE_OK);
+  bool add_cert = AddSSLCertificates(handle);
+  assert(add_cert);
 
   return kFailOk;
 }

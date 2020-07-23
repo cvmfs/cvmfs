@@ -55,6 +55,7 @@
 #include "prng.h"
 #include "sanitizer.h"
 #include "smalloc.h"
+#include "ssl.h"
 #include "util/algorithm.h"
 #include "util/exception.h"
 #include "util/posix.h"
@@ -974,9 +975,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   if (url.substr(0, 5) == "https") {
-    const char *cadir = getenv("X509_CERT_DIR");
-    if (!cadir || !*cadir) {cadir = "/etc/grid-security/certificates";}
-    curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
+    AddSSLCertificates(curl_handle);
     const char *cabundle = getenv("X509_CERT_BUNDLE");
     if (cabundle && *cabundle) {
       curl_easy_setopt(curl_handle, CURLOPT_CAINFO, cabundle);
