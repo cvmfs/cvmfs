@@ -767,7 +767,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
           "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         break;
       case kAuthzAzure:
-        // no payload has required for Azure signature
+        // no payload hash required for Azure signature
         break;
       default:
         PANIC(NULL);
@@ -796,7 +796,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
         shash::Sha256Mem(data, nbytes);
       return true;
     case kAuthzAzure:
-        // no payload has required for Azure signature
+        // no payload hash required for Azure signature
       return true;
     default:
       PANIC(NULL);
@@ -875,7 +875,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
         (info->request == JobInfo::kReqHeadPut))
       {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST,
-                               GetRequestString(*info).c_str());
+                                GetRequestString(*info).c_str());
       assert(retval == CURLE_OK);
     } else {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
@@ -886,7 +886,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   } else {
     retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
     assert(retval == CURLE_OK);
-    retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1L);
+    retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     assert(retval == CURLE_OK);
