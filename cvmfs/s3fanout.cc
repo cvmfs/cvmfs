@@ -642,16 +642,12 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
       canonical_headers + "\n" +
       canonical_resource; 
   } 
-  /*string string_to_sign =
-    GetRequestString(info) +
-    string("\n\n\n") +
-    string(payload_size) + "\n\n\n\n\n\n\n\n\n" +
-    canonical_headers + "\n" +
-    canonical_resource */; 
+
   string signing_key ;
   int retval = Debase64(config_.secret_key, &signing_key);
   if (!retval)
     return false;
+
   string signature = shash::Hmac256(signing_key, string_to_sign, true);
   string signature64 = Base64(signature);
 
@@ -771,9 +767,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
           "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         break;
       case kAuthzAzure:
-        // Sha256 over empty string
-        *hex_hash =
-          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        // no payload has required for Azure signature
         break;
       default:
         PANIC(NULL);
@@ -802,8 +796,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
         shash::Sha256Mem(data, nbytes);
       return true;
     case kAuthzAzure:
-      *hex_hash =
-        shash::Sha256Mem(data, nbytes);
+        // no payload has required for Azure signature
       return true;
     default:
       PANIC(NULL);
@@ -893,8 +886,6 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   } else {
     retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
     assert(retval == CURLE_OK);
-    //retval = curl_easy_setopt(handle, CURLOPT_PUT, 1L);
-    //assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1L);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
@@ -937,15 +928,15 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   }
 
   // Common headers
-  //info->http_headers =
-    //  curl_slist_append(info->http_headers, "Connection: Keep-Alive");
- // info->http_headers = curl_slist_append(info->http_headers, "Pragma:");
+  info->http_headers =
+      curl_slist_append(info->http_headers, "Connection: Keep-Alive");
+  info->http_headers = curl_slist_append(info->http_headers, "Pragma:");
   // No 100-continue
   info->http_headers = curl_slist_append(info->http_headers, "Expect:");
   // Strip unnecessary header
- // info->http_headers = curl_slist_append(info->http_headers, "Accept:");
-  //info->http_headers = curl_slist_append(info->http_headers,
-    //                                     user_agent_->c_str());
+  info->http_headers = curl_slist_append(info->http_headers, "Accept:");
+  info->http_headers = curl_slist_append(info->http_headers,
+                                         user_agent_->c_str());
 
   // Set curl parameters
   retval = curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
