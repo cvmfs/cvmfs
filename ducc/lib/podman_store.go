@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -159,7 +160,7 @@ func (img *Image) IngestImageInfo(CVMFSRepo string) (err error) {
 		json.Unmarshal(file, &imagedata)
 	}
 
-	id := calculateId(manifest.Config.Digest)
+	id := strings.Split(manifest.Config.Digest, ":")[1]
 	creationTime := time.Now()
 	imageinfo := &ImageInfo{
 		ID:      id,
@@ -193,7 +194,7 @@ func (img *Image) IngestRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string
 	}
 	podmaninfo := img.GetPodmanInfo()
 	for _, layer := range manifest.Layers {
-		layerid := calculateId(layer.Digest)
+		layerid := strings.Split(layer.Digest, ":")[1]
 		layerdir := podmaninfo.LayerDigestMap[layer.Digest]
 
 		//symlinkPath will contain the rootfs of the corresponding layer in podman store.
@@ -330,7 +331,7 @@ func (img *Image) IngestConfigFile(CVMFSRepo string) (err error) {
 		return err
 	}
 
-	imageID := calculateId(manifest.Config.Digest)
+	imageID := strings.Split(manifest.Config.Digest, ":")[1]
 	configFilePath := filepath.Join(rootPath, imageMetadataDir, imageID, fname)
 
 	err = writeDataToCvmfs(CVMFSRepo, configFilePath, []byte(body))
@@ -349,7 +350,7 @@ func (img *Image) IngestImageManifest(CVMFSRepo string) (err error) {
 		LogE(err).Warn("Error in getting the image manifest")
 		return err
 	}
-	imageID := calculateId(manifest.Config.Digest)
+	imageID := strings.Split(manifest.Config.Digest, ":")[1]
 
 	symlinkPath := filepath.Join(rootPath, imageMetadataDir, imageID, "manifest")
 	targetPath := filepath.Join(".metadata", img.Registry, img.Repository+img.GetReference(), "manifest.json")

@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"io"
 	"io/ioutil"
-	"os"
 	"path"
 	"strings"
 
@@ -55,11 +54,6 @@ func TeeReadCloser(r io.ReadCloser, w io.Writer) io.ReadCloser {
 	}
 }
 
-//Trim the digest algorithm name from digest
-func calculateId(digest string) string {
-	return strings.Split(digest, ":")[1]
-}
-
 //generates the file name for link dir in podman store
 func generateID(l int) string {
 	id := uuid.New()
@@ -83,26 +77,6 @@ func generateConfigFileName(digest string) (fname string, err error) {
 	}
 	if reader.Len() > 0 {
 		fname = "=" + base64.StdEncoding.EncodeToString([]byte(digest))
-	}
-	return
-}
-
-//writes data to file and ingest in cvmfs repo path
-func writeDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
-	tmpFile, err := ioutil.TempFile("", "write_data")
-	if err != nil {
-		LogE(err).Error("Error in creating temporary file for writing data")
-		return err
-	}
-	defer os.RemoveAll(tmpFile.Name())
-	err = ioutil.WriteFile(tmpFile.Name(), data, 0644)
-	if err != nil {
-		LogE(err).Error("Error in writing data to file")
-		return err
-	}
-	err = IngestIntoCVMFS(CVMFSRepo, path, tmpFile.Name())
-	if err != nil {
-		return err
 	}
 	return
 }
