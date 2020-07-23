@@ -43,7 +43,6 @@ inline bool AddSSLCertificates(CURL *handle) {
 
   for (std::vector<std::string>::const_iterator cadir = cadirs.begin();
        cadir != cadirs.end(); ++cadir) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Adding CA from: %s", (*cadir).c_str());
     if (count_ssl_certificates(*cadir) > 0) {
       CURLcode res = curl_easy_setopt(handle, CURLOPT_CAPATH, (*cadir).c_str());
       if (CURLE_OK == res) {
