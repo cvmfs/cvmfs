@@ -323,15 +323,23 @@ TEST_F(T_Util, String2Uint64) {
 
 TEST_F(T_Util, IsHttpUrl) {
   EXPECT_TRUE(IsHttpUrl("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
-  EXPECT_TRUE(IsHttpUrl("http://"));
+  EXPECT_TRUE(IsHttpUrl("https://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
+  EXPECT_TRUE(IsHttpUrl("http://a"));
+  EXPECT_TRUE(IsHttpUrl("https://"));
   EXPECT_TRUE(IsHttpUrl("http://foobar"));
+  EXPECT_TRUE(IsHttpUrl("https://foobar"));
   EXPECT_TRUE(IsHttpUrl("HTTP://www.google.com"));
+  EXPECT_TRUE(IsHttpUrl("HTTPS://www.google.com"));
   EXPECT_TRUE(IsHttpUrl("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
+  EXPECT_TRUE(IsHttpUrl("HTtPs://cvmfs-stratum-zero.cern.ch/ot/atlas"));
   EXPECT_FALSE(IsHttpUrl("http:/foobar"));
+  EXPECT_FALSE(IsHttpUrl("https:/foobar"));
   EXPECT_FALSE(IsHttpUrl("http"));
+  EXPECT_FALSE(IsHttpUrl("https"));
   EXPECT_FALSE(IsHttpUrl("/srv/cvmfs/cms.cern.ch"));
   EXPECT_FALSE(IsHttpUrl("srv/cvmfs/cms.cern.ch"));
   EXPECT_FALSE(IsHttpUrl("http//foobar"));
+  EXPECT_FALSE(IsHttpUrl("https//foobar"));
 }
 
 TEST_F(T_Util, MakeCannonicalPath) {
