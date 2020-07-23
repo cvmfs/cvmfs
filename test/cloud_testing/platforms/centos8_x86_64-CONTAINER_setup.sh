@@ -35,11 +35,14 @@ docker ps                              || die "fail (accessing docker)"
 
 install_rpm https://ecsft.cern.ch/dist/cvmfs/builddeps/minikube-1.9.2-0.x86_64.rpm || die "fail (install minikube)"
 
+sudo curl -o /usr/bin/kind \
+  https://ecsft.cern.ch/dist/cvmfs/builddeps/kind-v0.8.1 || die "fail (download kind)"
+sudo chmod +x /usr/bin/kind                              || die "fail (activate kind)"
+kind version                                             || die "fail (install kind)"
 
 # install packages to deploy CSI driver
 install_from_repo git     || die "fail (install git)"
 install_from_repo golang  || die "fail (install golang)"
-
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."
