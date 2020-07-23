@@ -122,11 +122,7 @@ bool S3Uploader::ParseSpoolerDefinition(
              config_path.c_str());
     return false;
   }
-  if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
-    host_name_port_ = host_name_ + ":" + parameter;
-  } else {
-    host_name_port_ = host_name_ + ":" + StringifyInt(kDefaultPort);
-  }
+
 
   if (!options_manager.GetValue("CVMFS_S3_ACCESS_KEY", &access_key_)) {
     LogCvmfs(kLogUploadS3, kLogStderr,
@@ -172,6 +168,11 @@ bool S3Uploader::ParseSpoolerDefinition(
     if (parameter == "true") {
       use_https_ = true;
     }
+  }
+  if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
+    host_name_port_ = host_name_ + ":" + parameter;
+  } else {
+    host_name_port_ = host_name_ + ":" + (use_https_ ? StringifyInt(kHTTPSPort) : StringifyInt(kDefaultPort));
   }
 
   return true;
