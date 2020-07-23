@@ -33,7 +33,7 @@ sudo systemctl daemon-reload
 sudo systemctl start docker            || die "fail (starting docker)"
 docker ps                              || die "fail (accessing docker)"
 
-install_rpm https://ecsft.cern.ch/cvmfs/dist/builddeps/minikube-1.9.2-0.x86_64.rpm || die "fail (install minikube)"
+install_rpm https://ecsft.cern.ch/dist/cvmfs/builddeps/minikube-1.9.2-0.x86_64.rpm || die "fail (install minikube)"
 
 
 # install packages to deploy CSI driver
