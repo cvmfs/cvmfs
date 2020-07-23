@@ -129,7 +129,7 @@ struct JobInfo {
     throttle_ms = 0;
     throttle_timestamp = 0;
     errorbuffer =
-        reinterpret_cast<char *> smalloc((sizeof(char) * CURL_ERROR_SIZE));
+        reinterpret_cast<char *>(smalloc(sizeof(char) * CURL_ERROR_SIZE));
   }
   ~JobInfo() {
     free(errorbuffer);
