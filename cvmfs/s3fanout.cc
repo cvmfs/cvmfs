@@ -687,7 +687,7 @@ int S3FanoutManager::InitializeDnsSettings(
   // Remove port number if such exists
   if (!HasPrefix(host_with_port, "http://", false /*ignore_case*/) || 
       !HasPrefix(host_with_port, "https://", false /*ignore_case*/))
-    host_with_port = config_.protocol + host_with_port;
+    host_with_port = config_.protocol + "://" + host_with_port;
   std::string remote_host = dns::ExtractHost(host_with_port);
   std::string remote_port = dns::ExtractPort(host_with_port);
 
@@ -961,7 +961,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   retval = curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, info->errorbuffer);
   assert(retval == CURLE_OK);
 
-  if (config_.protocol == "https://") {
+  if (config_.protocol == "https") {
     retval = curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 1L);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_PROXY_SSL_VERIFYPEER, 1L);

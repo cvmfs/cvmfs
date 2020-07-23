@@ -65,9 +65,9 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3config.opt_backoff_init_ms = kDefaultBackoffInitMs;
   s3config.opt_backoff_max_ms = kDefaultBackoffMaxMs;
   if (use_https_) {
-    s3config.protocol = "https://";
+    s3config.protocol = "https";
   } else {
-    s3config.protocol = "http://";
+    s3config.protocol = "http";
   }
 
   s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
