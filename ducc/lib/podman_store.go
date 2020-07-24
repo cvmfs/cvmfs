@@ -385,7 +385,7 @@ func (img *Image) CreateLockFiles(CVMFSRepo string) (err error) {
 
 //checks if older version of the image with same tag exists or not in the store.
 //If an older version is found, removes it from store and updates images.json file.
-//Note: The layers are not removed. Only the manifest, config file and images.json are updated. 
+//Note: The layers are not removed. Only the manifest, config file and images.json are updated.
 func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 	Log().WithFields(log.Fields{"action": "checking if old image version with same tag exists"}).Info(img.GetSimpleName())
 	path := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.json")
@@ -404,7 +404,7 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 			present := false
 			for _, name := range image.Names {
 				if name == img.GetSimpleName() {
-					Log().WithFields(log.Fields{"image" : img.GetSimpleName()}).Info("older image version present, cleaning and ingesting newer version")
+					Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("older image version present, cleaning and ingesting newer version")
 					present = true
 					directory := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, image.ID)
 					err := RemoveDirectory(directory)
