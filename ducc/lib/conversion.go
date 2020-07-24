@@ -352,7 +352,7 @@ func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
 	return nil
 }
 
-func ConvertWishLayers(wish WishFriendly, convertAgain, forceDownload, skipPodman bool) (err error) {
+func ConvertWishLayers(wish WishFriendly, convertAgain, forceDownload bool) (err error) {
 	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
 	if err != nil {
 		LogE(err).WithFields(log.Fields{
@@ -385,7 +385,7 @@ func ConvertWishLayers(wish WishFriendly, convertAgain, forceDownload, skipPodma
 		} else {
 			outputWithTag.Tag = outputImage.Tag
 		}
-		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, skipPodman)
+		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
@@ -393,7 +393,7 @@ func ConvertWishLayers(wish WishFriendly, convertAgain, forceDownload, skipPodma
 	return firstError
 }
 
-func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, skipPodman bool) (err error) {
+func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload bool) (err error) {
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
@@ -522,7 +522,7 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 	defer os.RemoveAll(tmpDir)
 
 	// this wil start to feed the above goroutine by writing into layersChanell
-	err = inputImage.GetLayers(layersChanell, manifestChanell, stopGettingLayers, tmpDir, skipPodman)
+	err = inputImage.GetLayers(layersChanell, manifestChanell, stopGettingLayers, tmpDir)
 	if err != nil {
 		return err
 	}

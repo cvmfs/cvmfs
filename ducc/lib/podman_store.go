@@ -20,10 +20,8 @@
 package lib
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -36,7 +34,7 @@ import (
 
 //podman related info stored in image struct.
 type PodmanInfo struct {
-	LayerReaderMap map[string]ReadCloserBuffer
+	LayerReaderMap map[string]*ReadAndHash
 	LayerDigestMap map[string]string
 	LayerIdMap     map[string]string
 }
@@ -73,15 +71,10 @@ var (
 
 //Computes uncompressed digest and size for the given layer
 func (img *Image) ComputeLayerInfo(digest, parent string, layersize int) (layerinfo *LayerInfo, err error) {
-	hash := sha256.New()
 	podmaninfo := img.GetPodmanInfo()
-	in := podmaninfo.LayerReaderMap[digest]
-	size, err := io.Copy(hash, in)
-	if err != nil {
-		LogE(err).Warning("Error in computing uncompressed layer digest (diffid)")
-		return layerinfo, err
-	}
-	diffID := fmt.Sprintf("%x", hash.Sum(nil))
+	r := podmaninfo.LayerReaderMap[digest]
+	diffID := fmt.Sprintf("%x", r.Sum256(nil))
+	size := r.GetSize()
 	created := time.Now()
 	layerinfo = &LayerInfo{
 		ID:                   diffID,
@@ -224,7 +217,7 @@ func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string) (err error) 
 
 		//generate the link id
 		lid := generateID(26)
-		podmaninfo.LayerIdMap[layer.Digest] = "l/" + lid
+		podmaninfo.LayerIdMap[layer.Digest] = filepath.Join("l", lid)
 
 		//Create link dir
 		symlinkPath := filepath.Join(rootPath, rootfsDir, "l", lid)

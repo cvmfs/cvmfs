@@ -1,9 +1,10 @@
 package lib
 
 import (
-	"bytes"
+	"crypto/sha256"
 	"encoding/base32"
 	"encoding/base64"
+	"hash"
 	"io"
 	"io/ioutil"
 	"os"
@@ -18,25 +19,39 @@ var (
 	TemporaryBaseDir string
 )
 
-//function that satisfies io.Closer.
-type CloseFunc func() error
-
-type readCloser struct {
-	io.Reader
-	c CloseFunc
+//encapsulates io.ReadCloser, with functionality to calculate hash and size of the content
+type ReadAndHash struct {
+	r    io.ReadCloser
+	size int64
+	hash hash.Hash
 }
 
-func (r readCloser) Close() error {
-	return r.c()
+func NewReadAndHash(r io.ReadCloser) *ReadAndHash {
+	return &ReadAndHash{r: r, hash: sha256.New()}
 }
 
-//wrapper around bytes.Buffer which implements close methods too.
-type ReadCloserBuffer struct {
-	*bytes.Buffer
+func (rh *ReadAndHash) Read(b []byte) (n int, err error) {
+	reader := io.TeeReader(rh.r, rh.hash)
+	tr := io.TeeReader(reader, rh)
+	return tr.Read(b)
 }
 
-func (cb ReadCloserBuffer) Close() (err error) {
-	return
+func (rh *ReadAndHash) Write(p []byte) (int, error) {
+	n := len(p)
+	rh.size += int64(n)
+	return n, nil
+}
+
+func (rh *ReadAndHash) Sum256(data []byte) []byte {
+	return rh.hash.Sum(data)
+}
+
+func (rh *ReadAndHash) GetSize() int64 {
+	return rh.size
+}
+
+func (rh *ReadAndHash) Close() error {
+	return rh.r.Close()
 }
 
 func UserDefinedTempDir(dir, prefix string) (name string, err error) {
@@ -48,14 +63,6 @@ func UserDefinedTempDir(dir, prefix string) (name string, err error) {
 
 func UserDefinedTempFile() (f *os.File, err error) {
 	return ioutil.TempFile(TemporaryBaseDir, "write_data")
-}
-// TeeReadCloser returns a io.ReadCloser that writes everything it reads from r to w.
-// The Close method for the returned ReadCloser is same as that of r.
-func TeeReadCloser(r io.ReadCloser, w io.Writer) io.ReadCloser {
-	return readCloser{
-		io.TeeReader(r, w),
-		r.Close,
-	}
 }
 
 //generates the file name for link dir in podman store

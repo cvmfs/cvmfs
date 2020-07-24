@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -131,7 +130,7 @@ func (img *Image) GetPodmanInfo() PodmanInfo {
 	if img.Podmaninfo != nil {
 		return *img.Podmaninfo
 	}
-	readermap := make(map[string]ReadCloserBuffer)
+	readermap := make(map[string]*ReadAndHash)
 	digestmap := make(map[string]string)
 	idmap := make(map[string]string)
 	podmanInfo := PodmanInfo{
@@ -141,6 +140,11 @@ func (img *Image) GetPodmanInfo() PodmanInfo {
 	}
 	img.Podmaninfo = &podmanInfo
 	return *img.Podmaninfo
+}
+
+func (img *Image) StoreLayerReaderToPodmanInfo(digest string, r *ReadAndHash) {
+	podmaninfo := img.GetPodmanInfo()
+	podmaninfo.LayerReaderMap[digest] = r
 }
 
 func (img *Image) GetManifest() (da.Manifest, error) {
@@ -550,7 +554,7 @@ type downloadedLayer struct {
 	Path io.ReadCloser
 }
 
-func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, skipPodman bool) error {
+func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
@@ -605,7 +609,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 		go func(ctx context.Context, layer da.Layer) {
 			defer wg.Done()
 			Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Start working on layer")
-			toSend, err := img.downloadLayer(layer, token, rootPath, skipPodman)
+			toSend, err := img.downloadLayer(layer, token, rootPath)
 			if err != nil {
 				LogE(err).Error("Error in downloading a layer")
 				return
@@ -644,7 +648,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	}
 }
 
-func (img *Image) downloadLayer(layer da.Layer, token, rootPath string, skipPodman bool) (toSend downloadedLayer, err error) {
+func (img *Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend downloadedLayer, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -679,17 +683,10 @@ func (img *Image) downloadLayer(layer da.Layer, token, rootPath string, skipPodm
 				LogE(err).Warning("Error in creating the zip to unzip the layer")
 				continue
 			}
-			var path io.ReadCloser
-			path = gread
-			if !skipPodman {
-				var buf bytes.Buffer
-				path = TeeReadCloser(path, &buf)
-				podmaninfo := img.GetPodmanInfo()
-				podmaninfo.LayerReaderMap[layer.Digest] = ReadCloserBuffer{&buf}
-			}
+			path := NewReadAndHash(gread)
+			img.StoreLayerReaderToPodmanInfo(layer.Digest, path)
 			toSend = downloadedLayer{Name: layer.Digest, Path: path}
 			return toSend, nil
-
 		} else {
 			Log().Warning("Received status code ", resp.StatusCode)
 			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
