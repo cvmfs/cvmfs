@@ -48,10 +48,10 @@ if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
   nightly_tag="0.${CVMFS_NIGHTLY_BUILD_NUMBER}.${git_hash}git"
 
   echo "creating nightly build '$nightly_tag'"
-  CVMFS_TAG="$nightly_tag"
+  CVMFS_TAG="${cvmfs_version}-$nightly_tag"
 else
   echo "creating release: $cvmfs_version"
-  CVMFS_TAG="$cvmfs_version"
+  CVMFS_TAG="${cvmfs_version}-1"
 fi
 
 ${CVMFS_SOURCE_LOCATION}/packaging/container/build.sh \
