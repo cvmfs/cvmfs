@@ -9,8 +9,32 @@ cleanup() {
 }
 
 CVMFS_REPOSITORIES="cvmfs-config.cern.ch,$CVMFS_REPOSITORIES"
-echo "CernVM-FS service container version " | tee -a $BOOT_LOG
+echo "CernVM-FS service container version $VERSION" | tee -a $BOOT_LOG
 date | tee -a $BOOT_LOG
+
+echo "==================================================================================="
+echo
+echo "                 ____             __     ____  __       _____ ____                 "
+echo "                / ___|___ _ __ _ _\ \   / /  \/  |     |  ___/ ___|                "
+echo "               | |   / _ \ '__| '_ \ \ / /| |\/| |_____| |_  \___ \                "
+echo "               | |__|  __/ |  | | | \ V / | |  | |_____|  _|  ___) |               "
+echo "                \____\___|_|  |_| |_|\_/  |_|  |_|     |_|   |____/                "
+echo
+echo "==================================================================================="
+echo "                                      NOTE                                         "
+echo "==================================================================================="
+echo "You should run me on Docker like this"
+echo "  docker run --cap-add SYS_ADMIN --device /dev/fuse --volume /cvmfs:/cvmfs:shared \\"
+echo "    -e CVMFS_HTTP_PROXY=<site squid>"
+echo
+echo "Optionally you can also set 'CVMFS_REPOSITORIES=unpacked.cern.ch,...'"
+echo "  and 'CVMFS_QUOTA_LIMIT=<cache limit in MB>'"
+echo
+echo "For even more control, you can bind mount (-v option) a config directory"
+echo "over the container's default /etc/cvmfs and bind mount a host location"
+echo "for the cache in /var/lib/cvmfs"
+echo "==================================================================================="
+
 echo "CVMFS_REPOSITORIES=$CVMFS_REPOSITORIES" > /etc/cvmfs/default.local
 
 if [ -z "$CVMFS_HTTP_PROXY" ]; then
