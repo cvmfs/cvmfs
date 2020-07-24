@@ -25,14 +25,14 @@ echo "                                      NOTE                                
 echo "==================================================================================="
 echo "You should run me on Docker like this"
 echo "  docker run --cap-add SYS_ADMIN --device /dev/fuse --volume /cvmfs:/cvmfs:shared \\"
-echo "    -e CVMFS_HTTP_PROXY=<site squid>"
+echo "    -e CVMFS_HTTP_PROXY=<site squid> cvmfs/service"
 echo
-echo "Optionally you can also set 'CVMFS_REPOSITORIES=unpacked.cern.ch,...'"
-echo "  and 'CVMFS_QUOTA_LIMIT=<cache limit in MB>'"
+echo "Optionally you can also set the 'CVMFS_REPOSITORIES=unpacked.cern.ch,...'"
+echo "  and 'CVMFS_QUOTA_LIMIT=<cache limit in MB>' environment variables"
 echo
 echo "For even more control, you can bind mount (-v option) a config directory"
 echo "over the container's default /etc/cvmfs and bind mount a host location"
-echo "for the cache in /var/lib/cvmfs"
+echo "for the cache over /var/lib/cvmfs"
 echo "==================================================================================="
 
 echo "CVMFS_REPOSITORIES=$CVMFS_REPOSITORIES" > /etc/cvmfs/default.local
