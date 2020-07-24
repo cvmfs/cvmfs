@@ -9,18 +9,23 @@ set -e
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/../common.sh
 
-if [ $# -lt 3 ]; then
-  echo "Usage: $0 <CernVM-FS source directory> <build result location> <busybox binary> [<nightly build number>]"
+if [ $# -lt 2 ]; then
+  echo "Usage: $0 <CernVM-FS source directory> <build result location> [<nightly build number>]"
   echo "This script builds CernVM-FS service container"
   exit 1
 fi
+
+CVMFS_SOURCE_LOCATION="$1"
+CVMFS_RESULT_LOCATION="$2"
+CVMFS_BUSYBOX=/usr/bin/busybox
+CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
 if ! buildah version; then
   echo "buildah required to build container image"
   exit 1
 fi
 
-if ! busybox --help | head -5; then
+if ! $CVMFS_BUSYBOX --help | head -5; then
   echo "functional busybox is required"
   exit 1
 fi
@@ -29,11 +34,6 @@ if ! lsb_release -sicr; then
   echo "lsb_release required to build container image"
   exit 1
 fi
-
-CVMFS_SOURCE_LOCATION="$1"
-CVMFS_RESULT_LOCATION="$2"
-CVMFS_BUSYBOX="$3"
-CVMFS_NIGHTLY_BUILD_NUMBER="${4-0}"
 
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
