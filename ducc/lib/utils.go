@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base32"
 	"encoding/base64"
@@ -10,8 +11,6 @@ import (
 	"os"
 	"path"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 // this flag is populated in the main `rootCmd` (cmd/root.go)
@@ -66,12 +65,14 @@ func UserDefinedTempFile() (f *os.File, err error) {
 }
 
 //generates the file name for link dir in podman store
-func generateID(l int) string {
-	id := uuid.New()
-	bytes, _ := id.MarshalText()
-	s := base32.StdEncoding.EncodeToString(bytes)
-
-	return s[:l]
+func generateID(l int) (string, error) {
+	randomid := make([]byte, 16)
+	n, err := io.ReadFull(rand.Reader, randomid)
+	if n != len(randomid) || err != nil {
+		return "", err
+	}
+	s := base32.StdEncoding.EncodeToString(randomid)
+	return s[:l], nil
 }
 
 //generates the file name for config file (compliant with libpod) in podman store.

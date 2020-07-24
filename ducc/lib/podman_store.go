@@ -216,7 +216,11 @@ func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string) (err error) 
 		layerdir := podmaninfo.LayerDigestMap[layer.Digest]
 
 		//generate the link id
-		lid := generateID(26)
+		lid, err := generateID(26)
+		if err != nil {
+			LogE(err).Error("Error generating file name for Link dir")
+			return err
+		}
 		podmaninfo.LayerIdMap[layer.Digest] = filepath.Join("l", lid)
 
 		//Create link dir
