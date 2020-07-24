@@ -33,6 +33,9 @@ get_redhat_version() {
 }
 
 get_package_type() {
+  # Build the cvmfs service container if the build container says so
+  [ -f /cvmfs-package-type ]  && cat /cvmfs-package-type && return 0
+
   which dpkg > /dev/null 2>&1 && echo "deb" && return 0
   which rpm  > /dev/null 2>&1 && echo "rpm" && return 0
   [ x"$(uname)" = x"Darwin" ] && echo "pkg" && return 0
