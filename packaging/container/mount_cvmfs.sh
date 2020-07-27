@@ -62,5 +62,5 @@ for r in $(echo $CVMFS_REPOSITORIES | tr , ' '); do
   cvmfs2 -o fsname=cvmfs2,system_mount,allow_other,grab_mountpoint $r /cvmfs/$r || exit 1
 done
 
-echo "[INF] done, entering service life cycle"
+echo "[INF] done mounting, entering service life cycle"
 sleep infinity

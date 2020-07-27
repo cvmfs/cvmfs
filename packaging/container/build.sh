@@ -91,18 +91,32 @@ cd ${CVMFS_RESULT_LOCATION}/rootfs
 tar --owner=root --group=root -cvf rootfs.tar .
 
 cp ${CVMFS_SOURCE_LOCATION}/packaging/container/Dockerfile .
-buildah bud \
+docker build \
   --build-arg VERSION=$CVMFS_TAG \
   --build-arg PLATFORM="$(lsb_release -sicr)" \
-  --tag cvmfs/service:$CVMFS_TAG
+  --tag cvmfs/service:$CVMFS_TAG \
+  .
+
+# TODO(jblomer): use buildah once build nodes are recent enough
+#buildah bud \
+#  --build-arg VERSION=$CVMFS_TAG \
+#  --build-arg PLATFORM="$(lsb_release -sicr)" \
+#  --tag cvmfs/service:$CVMFS_TAG
 
 ARCHIVE_NAME="cvmfs-service-${CVMFS_TAG}.$(uname -m)"
 IMAGE_NAME="cvmfs/service:$CVMFS_TAG"
 
-buildah inspect $IMAGE_NAME
-buildah push $IMAGE_NAME \
-  oci-archive:${CVMFS_RESULT_LOCATION}/${ARCHIVE_NAME}.oci.tar:${IMAGE_NAME}
-buildah push cvmfs/service:$CVMFS_TAG \
-  docker-archive:${CVMFS_RESULT_LOCATION}/${ARCHIVE_NAME}.docker.tar:${IMAGE_NAME}
+docker inspect $IMAGE_NAME
+docker save \
+  --output ${CVMFS_RESULT_LOCATION}/${ARCHIVE_NAME}.docker.tar \
+  $IMAGE_NAME
+docker rmi $IMAGE_NAME
+
+# buildah inspect $IMAGE_NAME
+#buildah push $IMAGE_NAME \
+#  oci-archive:${CVMFS_RESULT_LOCATION}/${ARCHIVE_NAME}.oci.tar:${IMAGE_NAME}
+#buildah push cvmfs/service:$CVMFS_TAG \
+#  docker-archive:${CVMFS_RESULT_LOCATION}/${ARCHIVE_NAME}.docker.tar:${IMAGE_NAME}
+#buildah rmi $IMAGE_NAME
+
 gzip --force ${CVMFS_RESULT_LOCATION}/${ARCHIVE_NAME}.docker.tar
-buildah rmi $IMAGE_NAME

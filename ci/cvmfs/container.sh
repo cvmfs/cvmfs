@@ -20,10 +20,19 @@ CVMFS_RESULT_LOCATION="$2"
 CVMFS_BUSYBOX=/usr/bin/busybox
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
-if ! buildah version; then
-  echo "buildah required to build container image"
+# For the time being, build with the host's docker until the builder nodes are
+# new enough to support fuse in user namespaces.  That's a precondition to
+# using buildah
+
+if ! docker version; then
+  echo "docker required to build container image"
   exit 1
 fi
+
+# if ! buildah version; then
+#   echo "buildah required to build container image"
+#   exit 1
+# fi
 
 if ! $CVMFS_BUSYBOX --help | head -5; then
   echo "functional busybox is required"
