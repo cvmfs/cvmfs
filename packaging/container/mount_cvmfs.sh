@@ -6,6 +6,7 @@ cleanup() {
   date | tee -a $BOOT_LOG
   echo "[INF] unmounting /cvmfs area" | tee -a $BOOT_LOG
   find /cvmfs -mindepth 1 -maxdepth 1 -type d -exec umount -l {} \;
+  exit 0
 }
 
 CVMFS_REPOSITORIES="cvmfs-config.cern.ch,$CVMFS_REPOSITORIES"
@@ -53,15 +54,25 @@ fi
 
 # TODO(jblomer): add all CVMFS_* environment variables to $CONFIG
 
-# unmount on container exit
-trap cleanup SIGTERM SIGINT
+# Gracefully unmount on container exit to avoid the error messge
+# "transport endpoint not connected" on /cvmfs/* directories
+trap cleanup SIGTERM SIGINT SIGQUIT SIGHUP
 
 echo "[INF] mounting $(echo $CVMFS_REPOSITORIES | tr , ' ')"
 for r in $(echo $CVMFS_REPOSITORIES | tr , ' '); do
-  mkdir -p /cvmfs/$r
+  mkdir -p /cvmfs/$r 2>/dev/null
+  # Gracefully recover from ungraceful previous shutdowns
+  if ls /cvmfs/$r 2>&1 | grep -q "not connected$"; then
+    echo "[WARN] unmounting stale /cvmfs/$r"
+    umount /cvmfs/$r
+  fi
   /usr/bin/cvmfs2 -o fsname=cvmfs2,system_mount,allow_other,grab_mountpoint \
     $r /cvmfs/$r || exit 1
 done
 
 echo "[INF] done mounting, entering service life cycle"
-sleep infinity
+# TODO(jblomer): figure out how the script can receive the TERM signal when
+# using sleep infinity
+while true; do
+  sleep 1
+done
