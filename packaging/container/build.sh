@@ -84,6 +84,10 @@ while [ $libs_missing -eq 1 ]; do
     done
   done
 done
+# TODO(jblomer): use readelf to not hardcode the interpreter
+if [ ! -f ${CVMFS_RESULT_LOCATION}/rootfs/lib64/ld-linux-x86-64.so.2 ]; then
+  cp -v /lib64/ld-linux-x86-64.so.2 ${CVMFS_RESULT_LOCATION}/rootfs/lib64/
+fi
 
 # Add the container-specific configuration
 mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/var/log
