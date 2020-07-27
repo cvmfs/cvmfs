@@ -59,7 +59,8 @@ trap cleanup SIGTERM SIGINT
 echo "[INF] mounting $(echo $CVMFS_REPOSITORIES | tr , ' ')"
 for r in $(echo $CVMFS_REPOSITORIES | tr , ' '); do
   mkdir -p /cvmfs/$r
-  cvmfs2 -o fsname=cvmfs2,system_mount,allow_other,grab_mountpoint $r /cvmfs/$r || exit 1
+  /usr/bin/cvmfs2 -o fsname=cvmfs2,system_mount,allow_other,grab_mountpoint \
+    $r /cvmfs/$r || exit 1
 done
 
 echo "[INF] done mounting, entering service life cycle"

@@ -52,6 +52,9 @@ rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib*/libcvmfs_fuse_debug.*
 rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib*/libcvmfs_fuse_stub.*
 rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib*/cvmfs/auto.cvmfs
 
+# cvmfs_config uses bash, which we don't have as a busybox applet
+rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/cvmfs_config
+
 # Add dependent libraries (openssl, libfuse, etc)
 mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib \
   ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib64
@@ -82,8 +85,10 @@ mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/var/run/cvmfs
 cp -v ${CVMFS_SOURCE_LOCATION}/mount/default.d/42-container.conf \
   ${CVMFS_RESULT_LOCATION}/rootfs/etc/cvmfs/default.d/
 
-# Add the entry point script
+# Add the entry point and health check scripts
 cp -v ${CVMFS_SOURCE_LOCATION}/packaging/container/mount_cvmfs.sh \
+  ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/
+cp -v ${CVMFS_SOURCE_LOCATION}/packaging/container/check_cvmfs.sh \
   ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/
 
 # Tar up the root file system and build the container
