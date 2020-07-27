@@ -58,8 +58,8 @@ rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/cvmfs_config
 # Add dependent libraries (openssl, libfuse, etc)
 mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib \
   ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib64
-ln -s /usr/lib ${CVMFS_RESULT_LOCATION}/rootfs/lib
-ln -s /usr/lib64 ${CVMFS_RESULT_LOCATION}/rootfs/lib64
+ln -s usr/lib ${CVMFS_RESULT_LOCATION}/rootfs/lib
+ln -s usr/lib64 ${CVMFS_RESULT_LOCATION}/rootfs/lib64
 libs_missing=1
 while [ $libs_missing -eq 1 ]; do
   libs_missing=0
