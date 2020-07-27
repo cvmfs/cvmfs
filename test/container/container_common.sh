@@ -8,6 +8,8 @@ k8s_create() {
     return 1
   fi
   minikube start --kubernetes-version=$version
+  minikube kubectl -- get componentstatuses
+  minikube kubectl -- get nodes
 }
 
 k8s_destroy() {

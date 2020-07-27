@@ -4,7 +4,7 @@ BOOT_LOG=/var/log/boot.log
 
 cleanup() {
   date | tee -a $BOOT_LOG
-  echo "[INF] unmounting /cvmfs area"
+  echo "[INF] unmounting /cvmfs area" | tee -a $BOOT_LOG
   find /cvmfs -mindepth 1 -maxdepth 1 -type d -exec umount -l {} \;
 }
 
@@ -35,19 +35,23 @@ echo "over the container's default /etc/cvmfs and bind mount a host location"
 echo "for the cache over /var/lib/cvmfs"
 echo "==================================================================================="
 
-echo "CVMFS_REPOSITORIES=$CVMFS_REPOSITORIES" > /etc/cvmfs/default.local
+CONFIG=/etc/cvmfs/config.d/95-container-local.conf
+
+echo "CVMFS_REPOSITORIES=$CVMFS_REPOSITORIES" > $CONFIG
 
 if [ -z "$CVMFS_HTTP_PROXY" ]; then
   echo "[ERR] CVMFS_HTTP_PROXY environment variable required" | tee -a $BOOT_LOG
   exit 1
 fi
 echo "[INF] using CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" | tee -a $BOOT_LOG
-echo "CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" >> /etc/cvmfs/default.local
+echo "CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" >> $CONFIG
 
 if [ ! -z "$CVMFS_QUOTA_LIMIT" ]; then
   echo "[INF] using CVMFS_QUOTA_LIMIT='$CVMFS_QUOTA_LIMIT'" | tee -a $BOOT_LOG
-  echo "CVMFS_QUOTA_LIMIT='$CVMFS_QUOTA_LIMIT'" >> /etc/cvmfs/default.local
+  echo "CVMFS_QUOTA_LIMIT='$CVMFS_QUOTA_LIMIT'" >> $CONFIG
 fi
+
+# TODO(jblomer): add all CVMFS_* environment variables to $CONFIG
 
 # unmount on container exit
 trap cleanup SIGTERM SIGINT
