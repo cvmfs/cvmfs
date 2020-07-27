@@ -68,7 +68,7 @@ while [ $libs_missing -eq 1 ]; do
     if ldd $f >/dev/null 2>&1; then
       echo "[DEP] $f"
       libs="$(ldd $f | awk '{print $3}' | grep -v 0x | grep -v '^$' || true)"
-      echo "  --> $libs"
+      echo "  --> $(echo $libs | tr \n ' ')"
     fi
     if [ -z "$libs" ]; then
       continue
