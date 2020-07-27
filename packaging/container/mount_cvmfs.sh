@@ -35,7 +35,7 @@ echo "over the container's default /etc/cvmfs and bind mount a host location"
 echo "for the cache over /var/lib/cvmfs"
 echo "==================================================================================="
 
-CONFIG=/etc/cvmfs/config.d/95-container-local.conf
+CONFIG=/etc/cvmfs/default.d/95-container-local.conf
 
 echo "CVMFS_REPOSITORIES=$CVMFS_REPOSITORIES" > $CONFIG
 
