@@ -67,18 +67,16 @@ ${CVMFS_SOURCE_LOCATION}/packaging/container/build.sh \
   ${CVMFS_SOURCE_LOCATION} ${CVMFS_RESULT_LOCATION} ${CVMFS_BUSYBOX} ${CVMFS_TAG} \
   || die "failed building service container"
 
-#
-## generating package map section for specific platform
-#if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
-#  echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
-#  generate_package_map                                                        \
-#    "$CVMFS_CI_PLATFORM_LABEL"                                                \
-#    "$(basename $(find . -regex '.*cvmfs-[0-9].*\.rpm' ! -name '*.src.rpm'))" \
-#    "$(basename $(find . -regex '.*cvmfs-server-[0-9].*\.rpm'))"              \
-#    "$(basename $(find . -regex '.*cvmfs-devel-[0-9].*\.rpm'))"               \
-#    "$(basename $(find . -regex '.*cvmfs-unittests-[0-9].*\.rpm'))"           \
-#    "$CVMFS_CONFIG_PACKAGE"                                                   \
-#    "$(basename $(find . -regex '.*cvmfs-shrinkwrap-[0-9].*\.rpm'))"          \
-#    "$(basename $(find . -regex '.*cvmfs-ducc-[0-9].*\.rpm'))"                \
-#    "$(basename $(find . -regex '.*cvmfs-fuse3-[0-9].*\.rpm'))"
-#fi
+
+# generating package map section for specific platform
+if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
+  echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
+  generate_package_map                                      \
+    "$CVMFS_CI_PLATFORM_LABEL"                              \
+    "cvmfs-service-${CVMFS_TAG}.$(uname -m).docker.tar.gz"  \
+    ""  \
+    ""  \
+    ""  \
+    ""  \
+    ""
+fi
