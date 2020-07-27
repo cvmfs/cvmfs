@@ -71,12 +71,15 @@ while [ $libs_missing -eq 1 ]; do
       echo "  --> $(echo $libs | tr \n ' ')"
     fi
     if [ -z "$libs" ]; then
+      echo "  --> empty list of dependencies, skipping"
       continue
     fi
     for l in $libs; do
       if [ ! -f ${CVMFS_RESULT_LOCATION}/rootfs/$l ]; then
         libs_missing=1
         cp -v $l ${CVMFS_RESULT_LOCATION}/rootfs/$l
+      else
+        echo "${CVMFS_RESULT_LOCATION}/rootfs/$l present, skipping"
       fi
     done
   done
