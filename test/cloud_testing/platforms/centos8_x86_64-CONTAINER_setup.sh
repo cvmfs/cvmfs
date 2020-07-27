@@ -9,6 +9,11 @@ echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 
+[ "x$CVMFS_SERVICE_CONTAINER" != "x" ] || die "fail (service container missing)"
+mkdir -p /tmp/cvmfs-service-container
+cp -v $CVMFS_SERVICE_CONTAINER /tmp/cvmfs-service-container/docker.tar.gz || \
+  die "fail (planting service container)"
+
 # Singularity is in epel
 echo "enabling epel yum repository..."
 install_from_repo epel-release    || die "fail (install epel-release)"

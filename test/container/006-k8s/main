@@ -1,0 +1,50 @@
+cvmfs_test_name="provide cvmfs to k8s pods"
+cvmfs_test_suites="quick"
+
+cleanup() {
+  echo "running cleanup()"
+
+  k8s_destroy
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../container_common.sh
+
+
+  echo "*** start k8s cluster"
+  k8s_create v1.18.0 || return 10
+  trap cleanup EXIT HUP INT TERM || return $?
+  k8s_kubectl get po -A || return 11
+
+  echo "*** add cvmfs service container image"
+  package_map="container_x86_64" install_package client  || return 12
+
+  echo "*** deploy cvmfs workspace"
+  k8s_kubectl apply -f ${script_location}/deploy/namespace-cvmfs.yaml || return 20
+  k8s_kubectl apply -f ${script_location}/deploy/user-cvmfs.yaml      || return 21
+
+  echo "*** deploy cvmfs storage bindings"
+  k8s_kubectl apply -f ${script_location}/deploy/pv-cvmfs-root.yaml   || return 22
+
+  k8s_kubectl get storageclass
+  k8s_kubectl get persistentvolume
+  k8s_kubectl get -A persistentvolumeclaim
+
+  #k8s_kubectl create -f deployments/kubernetes/csi-attacher-rbac.yaml           || return 31
+  ## TODO(jblomer): use upstream yaml once fixed
+  #k8s_kubectl create -f $script_location/csi-provisioner-rbac.yaml              || return 32
+  #k8s_kubectl create -f deployments/kubernetes/csi-nodeplugin-rbac.yaml         || return 33
+  #k8s_kubectl create -f $script_location/csi-cvmfsplugin-attacher.yaml          || return 34
+  #k8s_kubectl create -f deployments/kubernetes/csi-cvmfsplugin-provisioner.yaml || return 35
+
+
+  echo "*** run demo POD"
+  #k8s_kubectl create -f example/storageclass.yaml || return 40
+  #k8s_kubectl create -f example/pvc.yaml          || return 41
+  #k8s_kubectl create -f example/pod.yaml          || return 42
+
+  return 0
+}
