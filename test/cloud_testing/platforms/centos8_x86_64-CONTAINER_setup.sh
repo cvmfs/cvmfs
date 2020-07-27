@@ -9,9 +9,9 @@ echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 
-[ "x$CVMFS_SERVICE_CONTAINER" != "x" ] || die "fail (service container missing)"
+[ "x$SERVICE_CONTAINER" != "x" ] || die "fail (service container missing)"
 mkdir -p /tmp/cvmfs-service-container
-cp -v $CVMFS_SERVICE_CONTAINER /tmp/cvmfs-service-container/docker.tar.gz || \
+cp -v $SERVICE_CONTAINER /tmp/cvmfs-service-container/docker.tar.gz || \
   die "fail (planting service container)"
 
 # Singularity is in epel
@@ -23,6 +23,7 @@ install_from_repo singularity     || die "fail (install singularity)"
 install_from_repo runc            || die "fail (install runc)"
 install_from_repo fuse-overlayfs  || die "fail (install fuse-overlayfs)"
 install_from_repo podman          || die "fail (install podman)"
+install_from_repo jq              || die "fail (install jq)"
 
 sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
 sudo dnf install docker-ce --nobest -y || die "fail (install docker-ce)"

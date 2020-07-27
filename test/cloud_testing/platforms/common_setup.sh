@@ -135,4 +135,6 @@ if [ $(id -u -n) != "sftnight" ]; then
   exit 3
 fi
 
+echo "Platform environment:"
+env
 echo "Hostname is $(hostname)"

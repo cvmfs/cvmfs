@@ -13,14 +13,20 @@ cvmfs_run_test() {
 
   . ${script_location}/../container_common.sh
 
-
   echo "*** start k8s cluster"
   k8s_create v1.18.0 || return 10
   trap cleanup EXIT HUP INT TERM || return $?
   k8s_kubectl get po -A || return 11
 
   echo "*** add cvmfs service container image"
-  package_map="container_x86_64" install_package client  || return 12
+  # Planted by the platform setup script
+  local service_container=/tmp/cvmfs-service-container/docker.tar.gz
+  cat $service_container | docker load || return 15
+  docker images                        || return 16
+  local image_id=$(docker images -q cvmfs/service)
+  echo "*** Image ID: $image_id"
+  local image_name=$(docker inspect $image_id | jq -r .[0].RepoTags[0])
+  echo "*** Image name: $image_name"
 
   echo "*** deploy cvmfs workspace"
   k8s_kubectl apply -f ${script_location}/deploy/namespace-cvmfs.yaml || return 20

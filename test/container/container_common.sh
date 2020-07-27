@@ -10,6 +10,8 @@ k8s_create() {
   minikube start --kubernetes-version=$version
   minikube kubectl -- get componentstatuses
   minikube kubectl -- get nodes
+  eval $(minikube docker-env)
+  docker ps
 }
 
 k8s_destroy() {
