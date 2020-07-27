@@ -67,9 +67,12 @@ while [ $libs_missing -eq 1 ]; do
     libs=
     if ldd $f >/dev/null 2>&1; then
       echo "[DEP] $f"
-      libs=$(ldd $f | awk '{print $3}' | grep -v 0x | grep -v '^$' || true)
+      libs="$(ldd $f | awk '{print $3}' | grep -v 0x | grep -v '^$' || true)"
+      echo "  --> $libs"
     fi
-    [ -z "$libs" ] && continue
+    if [ -z "$libs" ]; then
+      continue
+    fi
     for l in $libs; do
       if [ ! -f ${CVMFS_RESULT_LOCATION}/rootfs/$l ]; then
         libs_missing=1
