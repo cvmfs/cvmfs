@@ -22,5 +22,5 @@ ADD rootfs.tar /
 
 ENTRYPOINT [ "/usr/bin/mount_cvmfs.sh" ]
 
-# HEALTHCHECK --interval=5m --start-period=5m --timeout=2m \
-#   CMD [ "/usr/bin/check_cvmfs.sh" ]
+HEALTHCHECK --interval=5m --start-period=1m --timeout=1m \
+  CMD [ "/usr/bin/check_cvmfs.sh", "liveness" ]
