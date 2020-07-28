@@ -42,8 +42,12 @@ cvmfs_run_test() {
   k8s_kubectl get -A persistentvolumeclaim
 
   echo "*** deploy nodeplugin daemonset (cvmfs service container)"
-  k8s_kubectl apply -f \
-    ${script_location}/deploy/daemonset-cvmfs-nodeplugin.yaml || return 30
+  cat ${script_location}/deploy/daemonset-cvmfs-nodeplugin.yaml.in |\
+    sed -e s,@IMAGE@,$image_name, |
+    sed -e "s~@PROXY@~${CVMFS_TEST_PROXY}~" >\
+    daemonset-cvmfs-nodeplugin.yaml || return 30
+  cat daemonset-cvmfs-nodeplugin.yaml
+  k8s_kubectl apply -f daemonset-cvmfs-nodeplugin.yaml || return 31
 
   echo "*** waiting for daemonset to become available..."
   local retries=30

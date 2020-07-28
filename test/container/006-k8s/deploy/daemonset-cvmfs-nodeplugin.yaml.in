@@ -22,7 +22,7 @@ spec:
       # Create the necessary base directories in the node's root file system
       initContainers:
       - name: create-mountpoint
-        image: cvmfs/service:2.8.0-0.2420.0209f72a3a6b0f43git
+        image: @IMAGE@
         command: ['sh', '-c', "mkdir -p /cvmfs-k8s/mounts /cvmfs-k8s/cache"]
         resources:
            limits:
@@ -36,10 +36,10 @@ spec:
           name:  cvmfs-noderoot
       containers:
       - name: cvmfs-service
-        image: cvmfs/service:2.8.0-0.2420.0209f72a3a6b0f43git
+        image: @IMAGE@
         env:
         - name: CVMFS_HTTP_PROXY
-          value: "DIRECT"
+          value: "@PROXY@"
         - name: CVMFS_REPOSITORIES
           value: alice.cern.ch,lhcb.cern.ch
         securityContext:
