@@ -1,0 +1,25 @@
+#
+# Let's see if we can start a pod that access /cvmfs/alice.cern.ch through
+# the cvmfs daemonset
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: list-cvmfs
+spec:
+  template:
+    spec:
+      containers:
+      - name: list-cvmfs
+        image: busybox
+        command: ["ls", "/cvmfs/alice.cern.ch"]
+        volumeMounts:
+        - mountPath: /cvmfs/alice.cern.ch
+          name: cvmfs-alice-cern-ch
+          readOnly: true
+      restartPolicy: Never
+      volumes:
+      - name: cvmfs-alice-cern-ch
+        persistentVolumeClaim:
+          claimName: cvmfs-alice-cern-ch
+  backoffLimit: 0

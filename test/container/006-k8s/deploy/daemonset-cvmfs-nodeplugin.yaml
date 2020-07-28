@@ -1,3 +1,8 @@
+#
+# The daemonset starts the cvmfs service container once per node.  It uses
+# the persistent volume cvmfs-noderoot to mount cvmfs volumes directly at
+# the node's filesystem.
+#
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -14,10 +19,11 @@ spec:
       labels:
         k8s-app: cvmfs-nodeplugin
     spec:
+      # Create the necessary base directories in the node's root file system
       initContainers:
       - name: create-mountpoint
-        image: cvmfs/service:2.8.0-0.2417.eb86d86d4d763990git
-        command: ['sh', '-c', "mkdir -p /cvmfs-workspace/mount-root"]
+        image: cvmfs/service:2.8.0-0.2420.0209f72a3a6b0f43git
+        command: ['sh', '-c', "mkdir -p /cvmfs-k8s/mounts /cvmfs-k8s/cache"]
         resources:
            limits:
              memory: 0.5Gi
@@ -26,33 +32,59 @@ spec:
              memory: 0.2Gi
              cpu: 0.01
         volumeMounts:
-        - mountPath: /cvmfs-workspace
-          name:  cvmfs-workspace
+        - mountPath: /cvmfs-noderoot
+          name:  cvmfs-noderoot
       containers:
       - name: cvmfs-service
-        image: cvmfs/service:2.8.0-0.2417.eb86d86d4d763990git
+        image: cvmfs/service:2.8.0-0.2420.0209f72a3a6b0f43git
         env:
         - name: CVMFS_HTTP_PROXY
-          value: DIRECT
+          value: "DIRECT"
+        - name: CVMFS_REPOSITORIES
+          value: alice.cern.ch,lhcb.cern.ch
         securityContext:
+          # To allow for bi-directional mount propagation
           privileged: true
+          # To mount fuse
           capabilities:
-            add: [ "SYS_ADMIN" ]
+            add: ["SYS_ADMIN"]
+        readinessProbe:
+          exec:
+            command: ["/usr/bin/check_cvmfs.sh", "readiness"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          exec:
+            command: ["/usr/bin/check_cvmfs.sh", "liveness"]
+          initialDelaySeconds: 60
+          periodSeconds: 300
         lifecycle:
           preStop:
             exec:
-              command: ["/usr/local/sbin/unmount-and-terminate.sh"]
+              # Properly unmount the /cvmfs-k8s/mounts area, i.e.
+              # avoid "transport endpoint not connected"
+              command: ["/usr/bin/terminate.sh"]
         resources:
-          # No limits (kernel imposed)
+          # No limits (fuse resource consumption is partly imposed by the kernel)
           requests:
             memory: 0.5Gi
             cpu: 0.01
         volumeMounts:
+        - mountPath: /dev/fuse
+          name: fuse-device
         - mountPath: /cvmfs
-          name:  cvmfs-workspace
-          subPath: mount-root
+          name:  cvmfs-noderoot
+          subPath: cvmfs-k8s/mounts
+          # Make cvmfs fuse mounts visible on the node
           mountPropagation: Bidirectional
+        - mountPath: /var/lib/cvmfs
+          name:  cvmfs-noderoot
+          subPath: cvmfs-k8s/cache
       volumes:
-      - name: cvmfs-workspace
+      - name: fuse-device
+        hostPath:
+          path: /dev/fuse
+          type: CharDevice
+      - name: cvmfs-noderoot
         persistentVolumeClaim:
-          claimName: cvmfs-workspace
+          claimName: cvmfs-noderoot
