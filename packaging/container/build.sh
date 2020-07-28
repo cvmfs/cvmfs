@@ -100,6 +100,8 @@ cp -v ${CVMFS_SOURCE_LOCATION}/packaging/container/mount_cvmfs.sh \
   ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/
 cp -v ${CVMFS_SOURCE_LOCATION}/packaging/container/check_cvmfs.sh \
   ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/
+cp -v ${CVMFS_SOURCE_LOCATION}/packaging/container/terminate.sh \
+  ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/
 
 # Tar up the root file system and build the container
 cd ${CVMFS_RESULT_LOCATION}/rootfs

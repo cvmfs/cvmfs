@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cvmfs-nodeplugin
+  namespace: cvmfs
+  labels:
+    k8s-app: cvmfs-nodeplugin
+spec:
+  selector:
+    matchLabels:
+      k8s-app: cvmfs-nodeplugin
+  template:
+    metadata:
+      labels:
+        k8s-app: cvmfs-nodeplugin
+    spec:
+      initContainers:
+      - name: create-mountpoint
+        image: cvmfs/service:2.8.0-0.2417.eb86d86d4d763990git
+        command: ['sh', '-c', "mkdir -p /cvmfs-workspace/mount-root"]
+        resources:
+           limits:
+             memory: 0.5Gi
+             cpu: 1
+           requests:
+             memory: 0.2Gi
+             cpu: 0.01
+        volumeMounts:
+        - mountPath: /cvmfs-workspace
+          name:  cvmfs-workspace
+      containers:
+      - name: cvmfs-service
+        image: cvmfs/service:2.8.0-0.2417.eb86d86d4d763990git
+        env:
+        - name: CVMFS_HTTP_PROXY
+          value: DIRECT
+        securityContext:
+          privileged: true
+          capabilities:
+            add: [ "SYS_ADMIN" ]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/usr/local/sbin/unmount-and-terminate.sh"]
+        resources:
+          # No limits (kernel imposed)
+          requests:
+            memory: 0.5Gi
+            cpu: 0.01
+        volumeMounts:
+        - mountPath: /cvmfs
+          name:  cvmfs-workspace
+          subPath: mount-root
+          mountPropagation: Bidirectional
+      volumes:
+      - name: cvmfs-workspace
+        persistentVolumeClaim:
+          claimName: cvmfs-workspace
