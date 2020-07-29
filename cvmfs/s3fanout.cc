@@ -616,7 +616,6 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   const
 {
-  char payload_size[256] = "\0";
   string timestamp = RfcTimestamp();
   string canonical_headers =
     "x-ms-blob-type:BlockBlob\nx-ms-date:" +
@@ -628,17 +627,14 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   string string_to_sign;
   if ((info.request == JobInfo::kReqPutDotCvmfs) ||
      (info.request == JobInfo::kReqPutCas)) {
-    snprintf(payload_size, sizeof(payload_size), "%lu", info.origin->GetSize());
-    headers->push_back("cvmfs_request: " + GetRequestString(info));
     string_to_sign =
       GetRequestString(info) +
       string("\n\n\n") +
-      string(payload_size) + "\n\n\n\n\n\n\n\n\n" +
+      string(StringifyInt(info.origin->GetSize())) + "\n\n\n\n\n\n\n\n\n" +
       canonical_headers + "\n" +
       canonical_resource;
   }
   if (info.request == JobInfo::kReqHeadPut) {
-    headers->push_back("cvmfs_request: " + GetRequestString(info));
     string_to_sign =
       GetRequestString(info) +
       string("\n\n\n") +
@@ -653,7 +649,6 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
     return false;
 
   string signature = shash::Hmac256(signing_key, string_to_sign, true);
-  string signature64 = Base64(signature);
 
   headers->push_back("x-ms-date: " + timestamp);
   headers->push_back("x-ms-version: 2011-08-18");
@@ -773,6 +768,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
         break;
       case kAuthzAzure:
         // no payload hash required for Azure signature
+        hex_hash->clear();
         break;
       default:
         PANIC(NULL);
