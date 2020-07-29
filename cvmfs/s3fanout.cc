@@ -625,16 +625,17 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
     "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
 
   string string_to_sign;
-  if ((info.request == JobInfo::kReqPutDotCvmfs) ||
-     (info.request == JobInfo::kReqPutCas)) {
+  //  if ((info.request == JobInfo::kReqPutDotCvmfs) ||
+  //   (info.request == JobInfo::kReqPutCas)) {
+  if (info.origin.IsValid()) {
     string_to_sign =
       GetRequestString(info) +
       string("\n\n\n") +
       string(StringifyInt(info.origin->GetSize())) + "\n\n\n\n\n\n\n\n\n" +
       canonical_headers + "\n" +
       canonical_resource;
-  }
-  if (info.request == JobInfo::kReqHeadPut) {
+  } else {
+  // if (info.request == JobInfo::kReqHeadPut) {
     string_to_sign =
       GetRequestString(info) +
       string("\n\n\n") +
@@ -797,7 +798,8 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
         shash::Sha256Mem(data, nbytes);
       return true;
     case kAuthzAzure:
-        // no payload hash required for Azure signature
+      // no payload hash required for Azure signature
+      hex_hash->clear();
       return true;
     default:
       PANIC(NULL);
@@ -872,17 +874,15 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
     assert(retval == CURLE_OK);
 
-    if ((info->request == JobInfo::kReqDelete) ||
-        (info->request == JobInfo::kReqHeadPut))
-      {
+    if (info->request == JobInfo::kReqDelete)
+    //    (info->request == JobInfo::kReqHeadPut))
+    {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST,
                                 GetRequestString(*info).c_str());
       assert(retval == CURLE_OK);
     } else {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
       assert(retval == CURLE_OK);
-      info->http_headers =
-        curl_slist_append(info->http_headers, "Content-Length: 0");
     }
   } else {
     retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
