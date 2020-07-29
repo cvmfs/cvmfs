@@ -618,9 +618,11 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
 {
   char payload_size[256] = "\0";
   string timestamp = RfcTimestamp();
-  string canonical_headers = 
-    "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp + "\nx-ms-version:2011-08-18";
-  string canonical_resource = 
+  string canonical_headers =
+    "x-ms-blob-type:BlockBlob\nx-ms-date:" +
+    timestamp +
+    "\nx-ms-version:2011-08-18";
+  string canonical_resource =
     "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
 
   string string_to_sign;
