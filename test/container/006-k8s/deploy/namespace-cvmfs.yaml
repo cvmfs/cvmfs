@@ -1,0 +1,8 @@
+#
+# The cvmfs daemonset and the persistent volume claim for the host's root
+# filesystem are in the cvmfs folder
+#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cvmfs

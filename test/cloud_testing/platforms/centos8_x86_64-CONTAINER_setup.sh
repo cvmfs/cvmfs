@@ -9,6 +9,11 @@ echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 
+[ "x$SERVICE_CONTAINER" != "x" ] || die "fail (service container missing)"
+mkdir -p /tmp/cvmfs-service-container
+cp -v $SERVICE_CONTAINER /tmp/cvmfs-service-container/docker.tar.gz || \
+  die "fail (planting service container)"
+
 # Singularity is in epel
 echo "enabling epel yum repository..."
 install_from_repo epel-release    || die "fail (install epel-release)"
@@ -18,6 +23,7 @@ install_from_repo singularity     || die "fail (install singularity)"
 install_from_repo runc            || die "fail (install runc)"
 install_from_repo fuse-overlayfs  || die "fail (install fuse-overlayfs)"
 install_from_repo podman          || die "fail (install podman)"
+install_from_repo jq              || die "fail (install jq)"
 
 sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
 sudo dnf install docker-ce --nobest -y || die "fail (install docker-ce)"
@@ -35,11 +41,14 @@ docker ps                              || die "fail (accessing docker)"
 
 install_rpm https://ecsft.cern.ch/dist/cvmfs/builddeps/minikube-1.9.2-0.x86_64.rpm || die "fail (install minikube)"
 
+sudo curl -o /usr/bin/kind \
+  https://ecsft.cern.ch/dist/cvmfs/builddeps/kind-v0.8.1 || die "fail (download kind)"
+sudo chmod +x /usr/bin/kind                              || die "fail (activate kind)"
+kind version                                             || die "fail (install kind)"
 
 # install packages to deploy CSI driver
 install_from_repo git     || die "fail (install git)"
 install_from_repo golang  || die "fail (install golang)"
-
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."

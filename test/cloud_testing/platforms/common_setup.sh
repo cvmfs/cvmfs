@@ -39,6 +39,7 @@ SOURCE_DIRECTORY=""
 LOG_DIRECTORY=""
 GATEWAY_BUILD_URL=""
 DUCC_PACKAGE=""
+SERVICE_CONTAINER=""
 
 usage() {
   local msg=$1
@@ -61,7 +62,7 @@ usage() {
 }
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:d:k:t:g:l:w:n:p:f:D:" option; do
+while getopts "s:c:d:k:t:g:l:w:n:p:f:D:C:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
@@ -95,6 +96,9 @@ while getopts "s:c:d:k:t:g:l:w:n:p:f:D:" option; do
       ;;
     D)
       DUCC_PACKAGE=$OPTARG
+      ;;
+    C)
+      SERVICE_CONTAINER=$OPTARG
       ;;
     n)
       echo "WARNING: the -n parameter is obsolete"
@@ -131,4 +135,6 @@ if [ $(id -u -n) != "sftnight" ]; then
   exit 3
 fi
 
+echo "Platform environment:"
+env
 echo "Hostname is $(hostname)"
