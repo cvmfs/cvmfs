@@ -616,34 +616,36 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   const
 {
-  char payload_size [256] = "\0";
+  char payload_size[256] = "\0";
   string timestamp = RfcTimestamp();
-  string canonical_headers = "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp + "\nx-ms-version:2011-08-18";
-  string canonical_resource = "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
+  string canonical_headers = 
+    "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp + "\nx-ms-version:2011-08-18";
+  string canonical_resource = 
+    "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
 
   string string_to_sign;
   if ((info.request == JobInfo::kReqPutDotCvmfs) ||
-     (info.request == JobInfo::kReqPutCas)) { 
-    snprintf(payload_size, 256, "%lu", info.origin->GetSize());
+     (info.request == JobInfo::kReqPutCas)) {
+    snprintf(payload_size, sizeof(payload_size), "%lu", info.origin->GetSize());
     headers->push_back("cvmfs_request: " + GetRequestString(info));
     string_to_sign =
       GetRequestString(info) +
       string("\n\n\n") +
       string(payload_size) + "\n\n\n\n\n\n\n\n\n" +
       canonical_headers + "\n" +
-      canonical_resource; 
-  } 
-  if (info.request == JobInfo::kReqHeadPut) { 
+      canonical_resource;
+  }
+  if (info.request == JobInfo::kReqHeadPut) {
     headers->push_back("cvmfs_request: " + GetRequestString(info));
     string_to_sign =
       GetRequestString(info) +
       string("\n\n\n") +
       "\n\n\n\n\n\n\n\n\n" +
       canonical_headers + "\n" +
-      canonical_resource; 
-  } 
+      canonical_resource;
+  }
 
-  string signing_key ;
+  string signing_key;
   int retval = Debase64(config_.secret_key, &signing_key);
   if (!retval)
     return false;
@@ -653,7 +655,8 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
 
   headers->push_back("x-ms-date: " + timestamp);
   headers->push_back("x-ms-version: 2011-08-18");
-  headers->push_back("Authorization: SharedKey " + config_.access_key + ":" + Base64(signature));
+  headers->push_back(
+    "Authorization: SharedKey " + config_.access_key + ":" + Base64(signature));
   headers->push_back("x-ms-blob-type: BlockBlob");
   return true;
 }
@@ -977,8 +980,6 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   retval = curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME,
                             config_.opt_timeout_sec);
   assert(retval == CURLE_OK);
-  //retval = curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1L);
-  //assert(retval == CURLE_OK);
 
   if (is_curl_debug_) {
     retval = curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1);
