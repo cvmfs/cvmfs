@@ -186,6 +186,7 @@ class S3FanoutManager : SingleCopy {
     std::string hostname_port;
     AuthzMethods authz_method;
     std::string region;
+    std::string flavor;
     std::string bucket;
     bool dns_buckets;
     uint32_t pool_max_handles;
