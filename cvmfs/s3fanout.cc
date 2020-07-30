@@ -625,21 +625,20 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
     "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
 
   string string_to_sign;
-  //  if ((info.request == JobInfo::kReqPutDotCvmfs) ||
-  //   (info.request == JobInfo::kReqPutCas)) {
-  if (info.origin.IsValid()) {
-    string_to_sign =
-      GetRequestString(info) +
-      string("\n\n\n") +
-      string(StringifyInt(info.origin->GetSize())) + "\n\n\n\n\n\n\n\n\n" +
-      canonical_headers + "\n" +
-      canonical_resource;
-  } else {
-  // if (info.request == JobInfo::kReqHeadPut) {
+  if ((info.request == JobInfo::kReqHeadOnly) ||
+     (info.request == JobInfo::kReqHeadPut) ||
+     (info.request == JobInfo::kReqDelete)) {
     string_to_sign =
       GetRequestString(info) +
       string("\n\n\n") +
       "\n\n\n\n\n\n\n\n\n" +
+      canonical_headers + "\n" +
+      canonical_resource;
+  } else {
+    string_to_sign =
+      GetRequestString(info) +
+      string("\n\n\n") +
+      string(StringifyInt(info.origin->GetSize())) + "\n\n\n\n\n\n\n\n\n" +
       canonical_headers + "\n" +
       canonical_resource;
   }
