@@ -324,7 +324,7 @@ TEST_F(T_Util, String2Uint64) {
 TEST_F(T_Util, IsHttpUrl) {
   EXPECT_TRUE(IsHttpUrl("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
   EXPECT_TRUE(IsHttpUrl("https://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
-  EXPECT_TRUE(IsHttpUrl("http://a"));
+  EXPECT_TRUE(IsHttpUrl("http://"));
   EXPECT_TRUE(IsHttpUrl("https://"));
   EXPECT_TRUE(IsHttpUrl("http://foobar"));
   EXPECT_TRUE(IsHttpUrl("https://foobar"));

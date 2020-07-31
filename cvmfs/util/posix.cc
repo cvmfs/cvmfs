@@ -198,7 +198,7 @@ std::string GetAbsolutePath(const std::string &path) {
 
 
 bool IsHttpUrl(const std::string &path) {
-  if (path.length() < 8) {
+  if (path.length() < 7) {
     return false;
   }
 
