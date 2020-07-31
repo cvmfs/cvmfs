@@ -179,7 +179,7 @@ class S3FanoutManager : SingleCopy {
 
   struct S3Config {
     S3Config() {
-      authz_method = kAuthzAwsV4;
+      authz_method = kAuthzAwsV2;
       dns_buckets = true;
       protocol = "http";
       pool_max_handles = 0;
