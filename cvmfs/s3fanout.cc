@@ -874,7 +874,6 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
 
     if (info->request == JobInfo::kReqDelete)
-    //    (info->request == JobInfo::kReqHeadPut))
     {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST,
                                 GetRequestString(*info).c_str());
