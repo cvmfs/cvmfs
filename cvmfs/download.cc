@@ -976,10 +976,6 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   if (url.substr(0, 5) == "https") {
     AddSSLCertificates(curl_handle);
-    const char *cabundle = getenv("X509_CERT_BUNDLE");
-    if (cabundle && *cabundle) {
-      curl_easy_setopt(curl_handle, CURLOPT_CAINFO, cabundle);
-    }
     if (info->pid != -1) {
       if (credentials_attachment_ == NULL) {
         LogCvmfs(kLogDownload, kLogDebug,

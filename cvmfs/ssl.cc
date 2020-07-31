@@ -28,33 +28,50 @@ unsigned int count_ssl_certificates(std::string directory) {
 }
 
 bool AddSSLCertificates(CURL *handle) {
+  bool add_system_certificates = false;
   std::vector<std::string> cadirs;
   const char *cadir = getenv("X509_CERT_DIR");
-  if (cadir != NULL) {
-    cadirs.push_back(std::string(cadir));
+  if (!cadir || !*cadir) {
+    cadir = "/etc/grid-security/certificates";
   }
-  cadirs.push_back("/etc/grid-security/certificates");
-
-  // most systems store the certificates here
-  cadirs.push_back("/etc/ssl/certs/");
-
-  cadirs.push_back("/etc/pki/tls/certs/");
-  cadirs.push_back("/etc/ssl/");
-  cadirs.push_back("/etc/pki/tls/");
-  cadirs.push_back("/etc/pki/ca-trust/extracted/pem/");
-  cadirs.push_back("/etc/ssl/");
-
-  for (std::vector<std::string>::const_iterator cadir = cadirs.begin();
-       cadir != cadirs.end(); ++cadir) {
-    if (count_ssl_certificates(*cadir) > 0) {
-      CURLcode res = curl_easy_setopt(handle, CURLOPT_CAPATH, (*cadir).c_str());
+  bool certificate_already_added = false;
+  if (count_ssl_certificates(cadir) > 0) {
+      CURLcode res = curl_easy_setopt(handle, CURLOPT_CAPATH, cadir);
       if (CURLE_OK == res) {
-        return true;
+        certificate_already_added = true;
+      }
+  }
+  const char *cabundle = getenv("X509_CERT_BUNDLE");
+  if (cabundle && *cabundle) {
+    CURLcode res = curl_easy_setopt(handle, CURLOPT_CAINFO, cabundle);
+    if (CURLE_OK == res) {
+      certificate_already_added = true;
+    }
+  }
+
+  if (certificate_already_added == false && add_system_certificates) {
+    // most systems store the certificates here
+    cadirs.push_back("/etc/ssl/certs/");
+
+    cadirs.push_back("/etc/pki/tls/certs/");
+    cadirs.push_back("/etc/ssl/");
+    cadirs.push_back("/etc/pki/tls/");
+    cadirs.push_back("/etc/pki/ca-trust/extracted/pem/");
+    cadirs.push_back("/etc/ssl/");
+
+    for (std::vector<std::string>::const_iterator cadir = cadirs.begin();
+         cadir != cadirs.end(); ++cadir) {
+      if (count_ssl_certificates(*cadir) > 0) {
+        CURLcode res =
+            curl_easy_setopt(handle, CURLOPT_CAPATH, (*cadir).c_str());
+        if (CURLE_OK == res) {
+          return true;
+        }
       }
     }
   }
 
-  return false;
+  return certificate_already_added;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
