@@ -18,13 +18,13 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-unsigned int count_ssl_certificates(std::string directory) {
+bool HasCertificates(std::string directory) {
   if (!DirectoryExists(directory)) return 0;
 
   std::vector<std::string> dotpem = FindFilesBySuffix(directory, ".pem");
   std::vector<std::string> dotcrt = FindFilesBySuffix(directory, ".crt");
 
-  return dotpem.size() + dotcrt.size();
+  return (dotpem.size() + dotcrt.size()) > 0;
 }
 
 bool AddSSLCertificates(CURL *handle) {
@@ -35,7 +35,7 @@ bool AddSSLCertificates(CURL *handle) {
     cadir = "/etc/grid-security/certificates";
   }
   bool certificate_already_added = false;
-  if (count_ssl_certificates(cadir) > 0) {
+  if (HasCertificates(cadir)) {
       CURLcode res = curl_easy_setopt(handle, CURLOPT_CAPATH, cadir);
       if (CURLE_OK == res) {
         certificate_already_added = true;
@@ -61,7 +61,7 @@ bool AddSSLCertificates(CURL *handle) {
 
     for (std::vector<std::string>::const_iterator cadir = cadirs.begin();
          cadir != cadirs.end(); ++cadir) {
-      if (count_ssl_certificates(*cadir) > 0) {
+      if (HasCertificates(*cadir)) {
         CURLcode res =
             curl_easy_setopt(handle, CURLOPT_CAPATH, (*cadir).c_str());
         if (CURLE_OK == res) {
