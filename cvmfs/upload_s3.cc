@@ -163,7 +163,7 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.GetValue("CVMFS_S3_FLAVOR", &flavor_)) {
     if (flavor_ == "azure") {
       authz_method_ = s3fanout::kAuthzAzure;
-    } 
+    }
   }
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
     peek_before_put_ = options_manager.IsOn(parameter);
