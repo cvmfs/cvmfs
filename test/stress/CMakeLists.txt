@@ -12,6 +12,7 @@ set (CVMFS_STRESS_SOURCES
   ${CVMFS_SOURCE_DIR}/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
+  ${CVMFS_SOURCE_DIR}/ssl.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
@@ -20,6 +21,7 @@ set (CVMFS_STRESS_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
