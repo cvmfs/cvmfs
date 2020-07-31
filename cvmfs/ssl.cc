@@ -5,6 +5,8 @@
 #ifndef CVMFS_SSL_H_
 #define CVMFS_SSL_H_
 
+#include "ssl.h"
+
 #include <string>
 #include <vector>
 
