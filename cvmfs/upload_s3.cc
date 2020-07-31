@@ -174,7 +174,7 @@ bool S3Uploader::ParseSpoolerDefinition(
   } else {
     host_name_port_ =
         host_name_ + ":" +
-        (use_https_ ? StringifyInt(kHTTPSPort) : StringifyInt(kDefaultPort));
+        (use_https_ ? StringifyInt(kHttpsPort) : StringifyInt(kDefaultPort));
   }
 
   return true;
