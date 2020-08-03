@@ -21,18 +21,20 @@ var (
 //encapsulates io.ReadCloser, with functionality to calculate hash and size of the content
 type ReadAndHash struct {
 	r    io.ReadCloser
+	tr   io.Reader
 	size int64
 	hash hash.Hash
 }
 
 func NewReadAndHash(r io.ReadCloser) *ReadAndHash {
-	return &ReadAndHash{r: r, hash: sha256.New()}
+	rh := &ReadAndHash{r: r, hash: sha256.New()}
+	reader := io.TeeReader(rh.r, rh.hash)
+	rh.tr = io.TeeReader(reader, rh)
+	return rh
 }
 
 func (rh *ReadAndHash) Read(b []byte) (n int, err error) {
-	reader := io.TeeReader(rh.r, rh.hash)
-	tr := io.TeeReader(reader, rh)
-	return tr.Read(b)
+	return rh.tr.Read(b)
 }
 
 func (rh *ReadAndHash) Write(p []byte) (int, error) {
