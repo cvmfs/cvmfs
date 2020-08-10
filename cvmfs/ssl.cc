@@ -21,7 +21,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 bool HasCertificates(std::string directory) {
-  if (!DirectoryExists(directory)) return 0;
+  if (!DirectoryExists(directory)) return false;
 
   DIR *dirp = opendir(directory.c_str());
   if (!dirp) return false;
@@ -42,9 +42,7 @@ bool HasCertificates(std::string directory) {
   return false;
 }
 
-bool AddSSLCertificates(CURL *handle) {
-  bool add_system_certificates = false;
-  std::vector<std::string> cadirs;
+bool Add_CVMFS_SSL_Certificates(CURL *handle) {
   const char *cadir = getenv("X509_CERT_DIR");
   if (!cadir || !*cadir) {
     cadir = "/etc/grid-security/certificates";
@@ -64,29 +62,41 @@ bool AddSSLCertificates(CURL *handle) {
     }
   }
 
-  if (certificate_already_added == false && add_system_certificates) {
-    // most systems store the certificates here
-    cadirs.push_back("/etc/ssl/certs/");
+  return certificate_already_added;
+}
 
-    cadirs.push_back("/etc/pki/tls/certs/");
-    cadirs.push_back("/etc/ssl/");
-    cadirs.push_back("/etc/pki/tls/");
-    cadirs.push_back("/etc/pki/ca-trust/extracted/pem/");
-    cadirs.push_back("/etc/ssl/");
+bool AddSystemSSLCertificates(CURL *handle) {
+  std::vector<std::string> cadirs;
 
-    for (std::vector<std::string>::const_iterator cadir = cadirs.begin();
-         cadir != cadirs.end(); ++cadir) {
-      if (HasCertificates(*cadir)) {
-        CURLcode res =
-            curl_easy_setopt(handle, CURLOPT_CAPATH, (*cadir).c_str());
-        if (CURLE_OK == res) {
-          return true;
-        }
+  // most systems store the certificates here
+  cadirs.push_back("/etc/ssl/certs/");
+
+  cadirs.push_back("/etc/pki/tls/certs/");
+  cadirs.push_back("/etc/ssl/");
+  cadirs.push_back("/etc/pki/tls/");
+  cadirs.push_back("/etc/pki/ca-trust/extracted/pem/");
+  cadirs.push_back("/etc/ssl/");
+
+  for (std::vector<std::string>::const_iterator cadir = cadirs.begin();
+       cadir != cadirs.end(); ++cadir) {
+    if (HasCertificates(*cadir)) {
+      CURLcode res = curl_easy_setopt(handle, CURLOPT_CAPATH, (*cadir).c_str());
+      if (CURLE_OK == res) {
+        return true;
       }
     }
   }
 
-  return certificate_already_added;
+  return false;
+}
+
+bool AddSSLCertificates(CURL *handle, bool add_system_certificates) {
+  bool already_added = Add_CVMFS_SSL_Certificates(handle);
+
+  if ((already_added == false) && (add_system_certificates == true)) {
+    return AddSystemSSLCertificates(handle);
+  }
+  return already_added;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
