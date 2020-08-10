@@ -595,9 +595,17 @@ class DownloadManager {
 
   CredentialsAttachment *credentials_attachment_;
 
-  // Writes and reads should be atomic because reading happens in a different
-  // thread than writing.
+  /**
+   * Writes and reads should be atomic because reading happens in a different
+   * thread than writing.
+   */
   Counters *counters_;
+
+  /**
+   * Allow the download manager to look for SSL / HTTPS certificates in the
+   * system directories.
+   */
+  bool use_system_ca_;
 };  // DownloadManager
 
 }  // namespace download

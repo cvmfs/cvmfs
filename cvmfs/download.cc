@@ -975,7 +975,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   if (url.substr(0, 5) == "https") {
-    AddSSLCertificates(curl_handle);
+    AddSSLCertificates(curl_handle, use_system_ca_);
     if (info->pid != -1) {
       if (credentials_attachment_ == NULL) {
         LogCvmfs(kLogDownload, kLogDebug,
@@ -1490,7 +1490,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 
-DownloadManager::DownloadManager() {
+DownloadManager::DownloadManager(): use_system_ca_(false) {
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
   pool_max_handles_ = 0;
@@ -1641,6 +1641,13 @@ void DownloadManager::Init(const unsigned max_pool_handles,
     } else {
       SetProxyChain(string(getenv("http_proxy")), "", kSetProxyRegular);
     }
+  }
+
+  const std::string use_certificates =
+      ToUpper(std::string(getenv("CVMFS_USE_SSL_SYSTEM_CA")));
+  if ((use_certificates == "YES") || (use_certificates == "ON") ||
+      (use_certificates == "1") || (use_certificates == "TRUE")) {
+    use_system_ca_ = true;
   }
 }
 

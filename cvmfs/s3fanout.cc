@@ -965,7 +965,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_PROXY_SSL_VERIFYPEER, 1L);
     assert(retval == CURLE_OK);
-    bool add_cert = AddSSLCertificates(handle);
+    bool add_cert = AddSSLCertificates(handle, /* add_system_certificates = */ true);
     assert(add_cert);
   }
 
