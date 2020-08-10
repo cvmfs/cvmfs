@@ -12,7 +12,9 @@
 #include <vector>
 
 #include "duplex_curl.h"
+#include "platform.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -21,10 +23,23 @@ namespace CVMFS_NAMESPACE_GUARD {
 bool HasCertificates(std::string directory) {
   if (!DirectoryExists(directory)) return 0;
 
-  std::vector<std::string> dotpem = FindFilesBySuffix(directory, ".pem");
-  std::vector<std::string> dotcrt = FindFilesBySuffix(directory, ".crt");
+  DIR *dirp = opendir(directory.c_str());
+  if (!dirp) return false;
 
-  return (dotpem.size() + dotcrt.size()) > 0;
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    if ((dirent->d_type == DT_REG) || (dirent->d_type == DT_UNKNOWN)) {
+      const std::string filename(dirent->d_name);
+      if (HasSuffix(filename, ".pem", /* ignore case = */ true) ||
+          HasSuffix(filename, ".crt", /* ignore case = */ true)) {
+        closedir(dirp);
+        return true;
+      }
+    }
+  }
+
+  closedir(dirp);
+  return false;
 }
 
 bool AddSSLCertificates(CURL *handle) {
