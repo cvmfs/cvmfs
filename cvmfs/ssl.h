@@ -1,5 +1,9 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * It helps managing the CA certificates for the servers mostly to enable
+ * HTTPS connections.
+ *
  */
 
 #ifndef CVMFS_SSL_H_
@@ -15,7 +19,7 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-unsigned int count_ssl_certificates(std::string directory);
+bool HasCertificates(std::string directory);
 
 bool AddSSLCertificates(CURL *handle);
 
