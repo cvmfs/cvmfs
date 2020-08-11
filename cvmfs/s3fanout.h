@@ -175,6 +175,7 @@ class S3FanoutManager : SingleCopy {
   // Report throttle operations only every so often
   static const unsigned kThrottleReportIntervalSec;
   static const unsigned kDefaultHTTPPort;
+  static const unsigned kDefaultHTTPSPort;
 
   struct S3Config {
     S3Config() {
