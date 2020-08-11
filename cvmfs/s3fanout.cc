@@ -32,6 +32,7 @@ const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
 const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
 const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
+const unsigned S3FanoutManager::kDefaultHTTPSPort = 443;
 
 
 /**
@@ -558,7 +559,11 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   vector<string> tokens = SplitString(complete_hostname_, ':');
   assert(tokens.size() <= 2);
   string canonical_hostname = tokens[0];
-  if (tokens.size() == 2 && String2Uint64(tokens[1]) != kDefaultHTTPPort)
+
+  // if we could split the hostname in two and if the port is *NOT* a default
+  // one
+  if (tokens.size() == 2 && !((String2Uint64(tokens[1]) == kDefaultHTTPPort) ||
+                              (String2Uint64(tokens[1]) == kDefaultHTTPSPort)))
     canonical_hostname += ":" + tokens[1];
 
   string signed_headers;
