@@ -6,9 +6,9 @@
 
 #include <fcntl.h>
 #include <pthread.h>
-#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstring>
