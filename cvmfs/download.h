@@ -443,6 +443,7 @@ class DownloadManager {
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnableRedirects();
+  void EnableUseOfSystemCertificates();
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
