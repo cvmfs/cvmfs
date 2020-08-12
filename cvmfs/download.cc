@@ -2720,6 +2720,7 @@ void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
 }
 
+void DownloadManager::EnableUseOfSystemCertificates() { use_system_ca_ = true; }
 
 /**
  * Creates a copy of the existing download manager.  Must only be called in
