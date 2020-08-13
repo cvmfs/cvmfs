@@ -783,7 +783,7 @@ TalkManager::TalkManager(
 TalkManager::~TalkManager() {
   if (!socket_path_.empty()) {
     int retval = unlink(socket_path_.c_str());
-    if (retval != 0) {
+    if ((retval != 0) && (errno != ENOENT)) {
       LogCvmfs(kLogTalk, kLogSyslogWarn,
                "Could not remove cvmfs_io socket from cache directory (%d)",
                errno);
