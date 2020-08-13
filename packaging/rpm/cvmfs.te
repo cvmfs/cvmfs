@@ -23,7 +23,7 @@ require {
 	type file_t;
 	type lib_t;
 	type rpm_var_lib_t;
-	class sock_file { create unlink };
+	class sock_file { create unlink setattr };
 	class fifo_file { create open unlink };
 	class capability { fowner sys_ptrace };
 	class process { sigstop signull sigkill };
@@ -46,7 +46,7 @@ allow mount_t var_lib_t:sock_file { create unlink };
 allow mount_t var_lib_t:fifo_file { create open unlink };
 allow mount_t cvmfs_cache_t:file { rename create unlink setattr getattr };
 allow mount_t cvmfs_cache_t:dir { create write add_name remove_name rmdir setattr };
-allow mount_t cvmfs_cache_t:sock_file { create unlink };
+allow mount_t cvmfs_cache_t:sock_file { create unlink setattr };
 allow mount_t cvmfs_cache_t:fifo_file { create open unlink };
 allow mount_t var_t:file { rename create unlink };
 allow mount_t file_t:dir { add_name remove_name create };
