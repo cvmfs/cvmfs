@@ -277,6 +277,13 @@ std::string SyncUnionTarball::SanitizePath(const std::string &path) {
       return to_return;
     }
   }
+  if (path.length() >= 1) {
+    if (path[0] == '/') {
+      std::string to_return(path);
+      to_return.erase(0, 1);
+      return to_return;
+    }
+  }
   return path;
 }
 
