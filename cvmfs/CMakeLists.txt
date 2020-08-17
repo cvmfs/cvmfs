@@ -254,6 +254,7 @@ set (CVMFS_PUBLISH_SOURCES
   options.cc
   publish/cmd_diff.cc
   publish/cmd_enter.cc
+  publish/cmd_hash.cc
   publish/cmd_help.cc
   publish/cmd_info.cc
   publish/cmd_mkfs.cc

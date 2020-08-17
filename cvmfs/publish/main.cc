@@ -12,6 +12,7 @@
 #include "logging.h"
 #include "publish/cmd_diff.h"
 #include "publish/cmd_enter.h"
+#include "publish/cmd_hash.h"
 #include "publish/cmd_help.h"
 #include "publish/cmd_info.h"
 #include "publish/cmd_mkfs.h"
@@ -70,6 +71,7 @@ int main(int argc, char **argv) {
   commands.TakeCommand(new publish::CmdDiff());
   commands.TakeCommand(new publish::CmdHelp(&commands));
   commands.TakeCommand(new publish::CmdZpipe());
+  commands.TakeCommand(new publish::CmdHash());
 
   if (argc < 2) {
     Usage(argv[0], commands);
