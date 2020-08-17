@@ -271,16 +271,12 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 std::string SyncUnionTarball::SanitizePath(const std::string &path) {
   if (path.length() >= 2) {
     if (path[0] == '.' && path[1] == '/') {
-      std::string to_return(path);
-      to_return.erase(0, 2);
-      return to_return;
+      return path.substr(2);
     }
   }
   if (path.length() >= 1) {
     if (path[0] == '/') {
-      std::string to_return(path);
-      to_return.erase(0, 1);
-      return to_return;
+      return path.substr(1);
     }
   }
   return path;
