@@ -208,7 +208,8 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 
   if (NULL != archive_entry_hardlink(entry)) {
     const std::string hardlink =
-        base_directory_ + "/" + std::string(archive_entry_hardlink(entry));
+        base_directory_ + "/" +
+        std::string(SanitizePath(archive_entry_hardlink(entry)));
 
     if (hardlinks_.find(hardlink) != hardlinks_.end()) {
       hardlinks_.find(hardlink)->second.push_back(complete_path);
