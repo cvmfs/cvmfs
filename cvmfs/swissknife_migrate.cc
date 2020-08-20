@@ -40,7 +40,8 @@ CommandMigrate::CommandMigrate() :
 ParameterList CommandMigrate::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v',
-    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink | bulkhash )"));
+    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink | bulkhash | "
+    "stats)"));
   r.push_back(Parameter::Mandatory('r',
     "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Mandatory('u', "upstream definition string"));
@@ -862,6 +863,9 @@ CommandMigrate::AbstractMigrationWorker<DerivedT>::GetWritable(
   return dynamic_cast<catalog::WritableCatalog*>(const_cast<catalog::Catalog*>(
     catalog));
 }
+
+
+//------------------------------------------------------------------------------
 
 
 CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
@@ -2028,6 +2032,138 @@ bool CommandMigrate::BulkhashRemovalMigrationWorker::RemoveRedundantBulkHashes(
   bulkhash_removal_sql.Execute();
 
   return db.CommitTransaction();
+}
+
+
+//------------------------------------------------------------------------------
+
+
+CommandMigrate::StatsMigrationWorker::StatsMigrationWorker(
+  const worker_context *context)
+  : AbstractMigrationWorker<StatsMigrationWorker>(context)
+{ }
+
+
+bool CommandMigrate::StatsMigrationWorker::RunMigration(PendingCatalog *data)
+  const
+{
+  return CheckDatabaseSchemaCompatibility(data) &&
+         StartDatabaseTransaction(data) &&
+         RepairStatisticsCounters(data) &&
+         CommitDatabaseTransaction(data);
+}
+
+
+bool CommandMigrate::StatsMigrationWorker::CheckDatabaseSchemaCompatibility(
+  PendingCatalog *data) const
+{
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &clg = data->old_catalog->database();
+  if (clg.schema_version() < 2.5 - catalog::CatalogDatabase::kSchemaEpsilon) {
+    Error("Given catalog schema is < 2.5.", data);
+    return false;
+  }
+
+  if (clg.schema_revision() < 5) {
+    Error("Given catalog revision is < 5", data);
+    return false;
+  }
+
+  return true;
+}
+
+
+bool CommandMigrate::StatsMigrationWorker::StartDatabaseTransaction(
+  PendingCatalog *data) const
+{
+  assert(!data->HasNew());
+  GetWritable(data->old_catalog)->Transaction();
+  return true;
+}
+
+
+bool CommandMigrate::StatsMigrationWorker::RepairStatisticsCounters(
+  PendingCatalog *data) const
+{
+  assert(!data->HasNew());
+  bool retval = false;
+  const catalog::CatalogDatabase &writable =
+    GetWritable(data->old_catalog)->database();
+
+  // Aggregated the statistics counters of all nested catalogs
+  // Note: we might need to wait until nested catalogs are sucessfully processed
+  catalog::DeltaCounters stats_counters;
+  PendingCatalogList::const_iterator i = data->nested_catalogs.begin();
+  PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
+  for (; i != iend; ++i) {
+    const PendingCatalog *nested_catalog = *i;
+    const catalog::DeltaCounters &s = nested_catalog->nested_statistics.Get();
+    s.PopulateToParent(&stats_counters);
+  }
+
+  // Count various directory entry types in the catalog to fill up the catalog
+  // statistics counters introduced in the current catalog schema
+  catalog::SqlCatalog count_chunked_files(writable,
+    "SELECT count(*), sum(size) FROM catalog "
+    "                WHERE flags & :flag_chunked_file;");
+  catalog::SqlCatalog count_file_chunks(writable,
+    "SELECT count(*) FROM chunks;");
+  catalog::SqlCatalog aggregate_file_size(writable,
+    "SELECT sum(size) FROM catalog WHERE  flags & :flag_file "
+    "                                     AND NOT flags & :flag_link;");
+
+  // Run the actual counting queries
+  retval =
+    count_chunked_files.BindInt64(1, catalog::SqlDirent::kFlagFileChunk) &&
+    count_chunked_files.FetchRow();
+  if (!retval) {
+    Error("Failed to count chunked files.", count_chunked_files, data);
+    return false;
+  }
+  retval = count_file_chunks.FetchRow();
+  if (!retval) {
+    Error("Failed to count file chunks", count_file_chunks, data);
+    return false;
+  }
+  retval =
+    aggregate_file_size.BindInt64(1, catalog::SqlDirent::kFlagFile) &&
+    aggregate_file_size.BindInt64(2, catalog::SqlDirent::kFlagLink) &&
+    aggregate_file_size.FetchRow();
+  if (!retval) {
+    Error("Failed to aggregate the file sizes.", aggregate_file_size, data);
+    return false;
+  }
+
+  // Insert the counted statistics into the DeltaCounters data structure
+  stats_counters.self.chunked_files     = count_chunked_files.RetrieveInt64(0);
+  stats_counters.self.chunked_file_size = count_chunked_files.RetrieveInt64(1);
+  stats_counters.self.file_chunks       = count_file_chunks.RetrieveInt64(0);
+  stats_counters.self.file_size         = aggregate_file_size.RetrieveInt64(0);
+
+  // Write back the generated statistics counters into the catalog database
+  catalog::Counters counters;
+  counters.ApplyDelta(stats_counters);
+  retval = counters.InsertIntoDatabase(writable);
+  if (!retval) {
+    Error("Failed to write new statistics counters to database", data);
+    return false;
+  }
+
+  // Push the generated statistics counters up to the parent catalog
+  data->nested_statistics.Set(stats_counters);
+
+  return true;
+}
+
+
+bool CommandMigrate::StatsMigrationWorker::CommitDatabaseTransaction(
+  PendingCatalog *data) const
+{
+  assert(!data->HasNew());
+  GetWritable(data->old_catalog)->Commit();
+  return true;
 }
 
 }  // namespace swissknife
