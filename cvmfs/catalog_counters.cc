@@ -41,6 +41,11 @@ void DeltaCounters::PopulateToParent(DeltaCounters *parent) const {
   parent->subtree.Add(subtree);
 }
 
+void DeltaCounters::RemoveFromSubtree(const DeltaCounters &child) {
+  subtree.Subtract(child.self);
+  subtree.Subtract(child.subtree);
+}
+
 
 void Counters::ApplyDelta(const DeltaCounters &delta) {
   self.Add(delta.self);
@@ -52,7 +57,6 @@ void Counters::AddAsSubtree(DeltaCounters *delta) const {
   delta->subtree.Add(self);
   delta->subtree.Add(subtree);
 }
-
 
 void Counters::MergeIntoParent(DeltaCounters *parent_delta) const {
   parent_delta->self.Add(self);

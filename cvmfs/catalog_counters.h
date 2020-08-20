@@ -137,6 +137,7 @@ class DeltaCounters : public TreeCountersBase<DeltaCounters_t> {
 
  public:
   void PopulateToParent(DeltaCounters *parent) const;
+  void RemoveFromSubtree(const DeltaCounters &child);
   void Increment(const DirectoryEntry &dirent) { ApplyDelta(dirent,  1); }
   void Decrement(const DirectoryEntry &dirent) { ApplyDelta(dirent, -1); }
 

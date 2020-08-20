@@ -75,6 +75,9 @@ run_transactions() {
     mkdir /cvmfs/test.repo.org/nested || return 21
     cp /cvmfs/test.repo.org/linux.tar.xz /cvmfs/test.repo.org/nested/ || return 22
     touch /cvmfs/test.repo.org/nested/.cvmfscatalog || return 23
+    mkdir /cvmfs/test.repo.org/nested/sub || return 24
+    touch /cvmfs/test.repo.org/nested/sub/.cvmfscatalog || return 24
+    mkdir /cvmfs/test.repo.org/nested/sub/dir || return 24
     cvmfs_server publish test.repo.org || return 24
     cvmfs_server check test.repo.org || return 25
 
@@ -84,7 +87,7 @@ run_transactions() {
     cvmfs_server check test.repo.org || return 42
 
     cvmfs_server transaction test.repo.org
-    rm /cvmfs/test.repo.org/nested/.cvmfscatalog || return 30
+    rm /cvmfs/test.repo.org/bar/.cvmfscatalog || return 30
     cvmfs_server publish test.repo.org || return 31
     cvmfs_server check test.repo.org || return 32
 
