@@ -234,6 +234,11 @@ int CommandMigrate::Main(const ArgumentList &args) {
     migration_succeeded =
       DoMigrationAndCommit<BulkhashRemovalMigrationWorker>(manifest_path,
                                                            &context);
+  } else if (migration_base == "stats") {
+    StatsMigrationWorker::worker_context context(
+      temporary_directory_, collect_catalog_statistics);
+    migration_succeeded =
+      DoMigrationAndCommit<StatsMigrationWorker>(manifest_path, &context);
   } else {
     const std::string err_msg = "Unknown migration base: " + migration_base;
     Error(err_msg);
@@ -2105,42 +2110,60 @@ bool CommandMigrate::StatsMigrationWorker::RepairStatisticsCounters(
 
   // Count various directory entry types in the catalog to fill up the catalog
   // statistics counters introduced in the current catalog schema
-  catalog::SqlCatalog count_chunked_files(writable,
-    "SELECT count(*), sum(size) FROM catalog "
-    "                WHERE flags & :flag_chunked_file;");
-  catalog::SqlCatalog count_file_chunks(writable,
+  catalog::SqlCatalog count_regular(writable,
+    std::string("SELECT count(*), sum(size) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFile) +
+    " AND NOT flags & " + StringifyInt(catalog::SqlDirent::kFlagLink) +
+    " AND NOT flags & " + StringifyInt(catalog::SqlDirent::kFlagFileSpecial) +
+    ";");
+  catalog::SqlCatalog count_external(writable,
+    std::string("SELECT count(*), sum(size) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileExternal) +
+    ";");
+  catalog::SqlCatalog count_symlink(writable,
+    std::string("SELECT count(*) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagLink) + ";");
+  catalog::SqlCatalog count_special(writable,
+    std::string("SELECT count(*) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileSpecial) +
+    ";");
+  catalog::SqlCatalog count_xattr(writable,
+    std::string("SELECT count(*) FROM catalog ") +
+    "WHERE xattr IS NOT NULL;");
+  catalog::SqlCatalog count_chunk(writable,
+    std::string("SELECT count(*), sum(size) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileChunk) + ";");
+  catalog::SqlCatalog count_dir(writable,
+    std::string("SELECT count(*) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagDir) + ";");
+  catalog::SqlCatalog count_chunk_blobs(writable,
     "SELECT count(*) FROM chunks;");
-  catalog::SqlCatalog aggregate_file_size(writable,
-    "SELECT sum(size) FROM catalog WHERE  flags & :flag_file "
-    "                                     AND NOT flags & :flag_link;");
 
-  // Run the actual counting queries
-  retval =
-    count_chunked_files.BindInt64(1, catalog::SqlDirent::kFlagFileChunk) &&
-    count_chunked_files.FetchRow();
+  retval = count_regular.FetchRow() &&
+           count_external.FetchRow() &&
+           count_symlink.FetchRow() &&
+           count_special.FetchRow() &&
+           count_xattr.FetchRow() &&
+           count_chunk.FetchRow() &&
+           count_dir.FetchRow() &&
+           count_chunk_blobs.FetchRow();
   if (!retval) {
-    Error("Failed to count chunked files.", count_chunked_files, data);
-    return false;
-  }
-  retval = count_file_chunks.FetchRow();
-  if (!retval) {
-    Error("Failed to count file chunks", count_file_chunks, data);
-    return false;
-  }
-  retval =
-    aggregate_file_size.BindInt64(1, catalog::SqlDirent::kFlagFile) &&
-    aggregate_file_size.BindInt64(2, catalog::SqlDirent::kFlagLink) &&
-    aggregate_file_size.FetchRow();
-  if (!retval) {
-    Error("Failed to aggregate the file sizes.", aggregate_file_size, data);
+    Error("Failed to collect catalog statistics", data);
     return false;
   }
 
-  // Insert the counted statistics into the DeltaCounters data structure
-  stats_counters.self.chunked_files     = count_chunked_files.RetrieveInt64(0);
-  stats_counters.self.chunked_file_size = count_chunked_files.RetrieveInt64(1);
-  stats_counters.self.file_chunks       = count_file_chunks.RetrieveInt64(0);
-  stats_counters.self.file_size         = aggregate_file_size.RetrieveInt64(0);
+  stats_counters.self.regular_files       = count_regular.RetrieveInt64(0);
+  stats_counters.self.symlinks            = count_symlink.RetrieveInt64(0);
+  stats_counters.self.specials            = count_special.RetrieveInt64(0);
+  stats_counters.self.directories         = count_dir.RetrieveInt64(0);
+  stats_counters.self.nested_catalogs     = data->nested_catalogs.size();
+  stats_counters.self.chunked_files       = count_chunk.RetrieveInt64(0);
+  stats_counters.self.file_chunks         = count_chunk_blobs.RetrieveInt64(0);
+  stats_counters.self.file_size           = count_regular.RetrieveInt64(1);
+  stats_counters.self.chunked_file_size   = count_chunk.RetrieveInt64(1);
+  stats_counters.self.xattrs              = count_xattr.RetrieveInt64(0);
+  stats_counters.self.externals           = count_external.RetrieveInt64(0);
+  stats_counters.self.external_file_size  = count_external.RetrieveInt64(1);
 
   // Write back the generated statistics counters into the catalog database
   catalog::Counters counters;
