@@ -69,16 +69,22 @@ var loopCmd = &cobra.Command{
 					"output image": wish.OutputName}
 				lib.Log().WithFields(fields).Info("Start conversion of wish")
 				if !skipLayers {
-					err = lib.ConvertWishDocker(wish, convertAgain, overwriteLayer, !skipThinImage)
+					err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+						continue
+					}
+				}
+				if !skipThinImage {
+					err = lib.ConvertWishDocker(wish)
 					if err != nil {
 						lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
-					} else {
-						if !skipPodman {
-							err := lib.ConvertWishPodman(wish, convertAgain)
-							if err != nil {
-								lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
-							}
-						}
+					}
+				}
+				if !skipPodman {
+					err = lib.ConvertWishPodman(wish, convertAgain)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
 					}
 				}
 				if !skipFlat {

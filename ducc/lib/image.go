@@ -38,7 +38,6 @@ type Image struct {
 	IsThin      bool
 	TagWildcard bool
 	Manifest    *da.Manifest
-	Podmaninfo  *PodmanInfo
 }
 
 func (i *Image) GetSimpleName() string {
@@ -124,27 +123,6 @@ func (img *Image) PrintImage(machineFriendly, csv_header bool) {
 		table.Append([]string{"IsThin", is_thin})
 		table.Render()
 	}
-}
-
-func (img *Image) GetPodmanInfo() PodmanInfo {
-	if img.Podmaninfo != nil {
-		return *img.Podmaninfo
-	}
-	readermap := make(map[string]*ReadAndHash)
-	digestmap := make(map[string]string)
-	idmap := make(map[string]string)
-	podmanInfo := PodmanInfo{
-		LayerReaderMap: readermap,
-		LayerDigestMap: digestmap,
-		LayerIdMap:     idmap,
-	}
-	img.Podmaninfo = &podmanInfo
-	return *img.Podmaninfo
-}
-
-func (img *Image) StoreLayerReaderToPodmanInfo(digest string, r *ReadAndHash) {
-	podmaninfo := img.GetPodmanInfo()
-	podmaninfo.LayerReaderMap[digest] = r
 }
 
 func (img *Image) GetManifest() (da.Manifest, error) {
@@ -684,7 +662,6 @@ func (img *Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend 
 				continue
 			}
 			path := NewReadAndHash(gread)
-			img.StoreLayerReaderToPodmanInfo(layer.Digest, path)
 			toSend = downloadedLayer{Name: layer.Digest, Path: path}
 			return toSend, nil
 		} else {

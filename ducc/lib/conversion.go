@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	da "github.com/cvmfs/ducc/docker-api"
 
@@ -91,7 +92,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	}
 	defer os.RemoveAll(tmpDir)
 	var firstError error
-	for inputImage := range wish.ExpandedTagImagesFlat {
+	for _, inputImage := range wish.ExpandedTagImagesFlat {
 		// we want to check if we have already ingested the Singularity image
 		// Several cases are possible
 		// Image not ingested, neither pubSymPath nor privatePath are present
@@ -181,7 +182,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	return firstError
 }
 
-func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
+func ConvertWishDocker(wish WishFriendly) (err error) {
 	inputImage := wish.InputImage
 	if inputImage == nil {
 		err = fmt.Errorf("error in parsing the input image, got a null image")
@@ -189,47 +190,6 @@ func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
 			Error("Null image, should not happen")
 		return
 	}
-
-	manifest, err := inputImage.GetManifest()
-	if err != nil {
-		return
-	}
-	imageID := strings.Split(manifest.Config.Digest, ":")[1]
-
-	manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, rootPath, imageMetadataDir, imageID, "manifest")
-	alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
-
-	if alreadyConverted == ConversionMatch {
-		if convertAgain == false {
-			Log().Info("Image already present in podman store, moving on")
-			return nil
-		}
-	}
-
-	err = inputImage.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
-	if err != nil {
-		LogE(err).Warning("Unable to create Podman additional image store")
-		return err
-	}
-	Log().Info("Podman Store created successfully")
-	return nil
-}
-
-func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThinImage bool) (err error) {
-
-	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
-	if err != nil {
-		LogE(err).WithFields(log.Fields{
-			"directory": subDirInsideRepo}).Error(
-			"Impossible to create subcatalog in super-directory.")
-	}
-	err = CreateCatalogIntoDir(wish.CvmfsRepo, ".flat")
-	if err != nil {
-		LogE(err).WithFields(log.Fields{
-			"directory": ".flat"}).Error(
-			"Impossible to create subcatalog in super-directory.")
-	}
-
 	outputImage := wish.OutputImage
 	if outputImage == nil {
 		err = fmt.Errorf("error in parsing the output image, got a null image")
@@ -237,16 +197,7 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 			Error("Null image, should not happen")
 		return
 	}
-	inputImage := wish.InputImage
-	if inputImage == nil {
-		err = fmt.Errorf("error in parsing the input image, got a null image")
-		LogE(err).WithFields(log.Fields{"input image": wish.InputName}).
-			Error("Null image, should not happen")
-		return
-	}
-
-	var firstError error
-	for expandedImgTag := range wish.ExpandedTagImagesLayer {
+	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
 		tag := expandedImgTag.Tag
 		outputWithTag := *outputImage
 		if inputImage.TagWildcard {
@@ -254,7 +205,64 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 		} else {
 			outputWithTag.Tag = outputImage.Tag
 		}
-		err = convertInputOutput(expandedImgTag, outputWithTag, wish.CvmfsRepo, convertAgain, forceDownload, createThinImage)
+
+		manifest, err := expandedImgTag.GetManifest()
+		if err != nil {
+			return err
+		}
+		layerLocations := make(map[string]string)
+		for _, layer := range manifest.Layers {
+			layerDigest := strings.Split(layer.Digest, ":")[1]
+			layerPath := LayerRootfsPath(wish.CvmfsRepo, layerDigest)
+			layerLocations[layer.Digest] = layerPath
+		}
+		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, *outputImage)
+		if err != nil {
+			return err
+		}
+		err = PushImageToRegistry(*outputImage)
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
+func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
+	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
+		manifest, err := expandedImgTag.GetManifest()
+		if err != nil {
+			return err
+		}
+		imageID := strings.Split(manifest.Config.Digest, ":")[1]
+		manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, rootPath, imageMetadataDir, imageID, "manifest")
+		alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
+		if alreadyConverted == ConversionMatch {
+			if convertAgain == false {
+				Log().Info("Image already present in podman store, moving on")
+				return nil
+			}
+		}
+		err = expandedImgTag.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
+		if err != nil {
+			LogE(err).Warning("Unable to create Podman additional image store")
+			return err
+		}
+		Log().Info("Image successfully ingested into podmanStore")
+	}
+	return nil
+}
+
+func ConvertWish(wish WishFriendly, convertAgain, forceDownload bool) (err error) {
+	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
+	if err != nil {
+		LogE(err).WithFields(log.Fields{
+			"directory": subDirInsideRepo}).Error(
+			"Impossible to create subcatalog in super-directory.")
+	}
+	var firstError error
+	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
+		err = convertInputOutput(expandedImgTag, wish.CvmfsRepo, convertAgain, forceDownload)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
@@ -262,13 +270,11 @@ func ConvertWishDocker(wish WishFriendly, convertAgain, forceDownload, createThi
 	return firstError
 }
 
-func convertInputOutput(inputImage *Image, outputImage Image, repo string, convertAgain, forceDownload, createThinImage bool) (err error) {
-
+func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownload bool) (err error) {
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
 	}
-
 	manifestPath := filepath.Join("/", "cvmfs", repo, ".metadata", inputImage.GetSimpleName(), "manifest.json")
 	alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
 	Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
@@ -285,18 +291,12 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 	stopGettingLayers := make(chan bool, 1)
 	noErrorInConversion := make(chan bool, 1)
 
-	type LayerRepoLocation struct {
-		Digest   string
-		Location string //location does NOT need the prefix `/cvmfs`
-	}
-	layerRepoLocationChan := make(chan LayerRepoLocation, 3)
 	layerDigestChan := make(chan string, 3)
 	go func() {
 		noErrors := true
 		var wg sync.WaitGroup
 		defer func() {
 			wg.Wait()
-			close(layerRepoLocationChan)
 			close(layerDigestChan)
 		}()
 		defer func() {
@@ -332,13 +332,10 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 
 			// need to run this into a goroutine to avoid a deadlock
 			wg.Add(1)
-			go func(layerName, layerLocation, layerDigest string) {
-				layerRepoLocationChan <- LayerRepoLocation{
-					Digest:   layerName,
-					Location: layerLocation}
+			go func(layerDigest string) {
 				layerDigestChan <- layerDigest
 				wg.Done()
-			}(layer.Name, layerPath, layerDigest)
+			}(layerDigest)
 
 			if pathExists == false || forceDownload {
 
@@ -375,6 +372,11 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 					cleanup(TrimCVMFSRepoPrefix(layerPath))
 					return
 				}
+
+				err = StoreLayerInfo(inputImage, repo, layer.Name, layer.Path.(*ReadAndHash))
+				if err != nil {
+					LogE(err).Error("Error in storing the layers.json file in the repository")
+				}
 				Log().WithFields(log.Fields{"layer": layer.Name}).Info("Finish Ingesting the file")
 			} else {
 				Log().WithFields(log.Fields{"layer": layer.Name}).Info("Skipping ingestion of layer, already exists")
@@ -399,15 +401,6 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 
 	var wg sync.WaitGroup
 
-	layerLocations := make(map[string]string)
-	wg.Add(1)
-	go func() {
-		for layerLocation := range layerRepoLocationChan {
-			layerLocations[layerLocation.Digest] = layerLocation.Location
-		}
-		wg.Done()
-	}()
-
 	var layerDigests []string
 	wg.Add(1)
 	go func() {
@@ -417,13 +410,6 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 		wg.Done()
 	}()
 	wg.Wait()
-
-	if createThinImage {
-		err = CreateThinImage(manifest, layerLocations, *inputImage, outputImage)
-		if err != nil {
-			return
-		}
-	}
 
 	// we wait for the goroutines to finish
 	// and if there was no error we conclude everything writing the manifest into the repository
@@ -436,48 +422,6 @@ func convertInputOutput(inputImage *Image, outputImage Image, repo string, conve
 	}
 
 	if noErrorInConversionValue {
-		if createThinImage {
-			// is necessary this mechanism to pass the authentication to the
-			// dockers even if the documentation says otherwise
-			password, err := GetPassword()
-			if err != nil {
-				return err
-			}
-			authStruct := struct {
-				Username string
-				Password string
-			}{
-				Username: outputImage.User,
-				Password: password,
-			}
-			authBytes, _ := json.Marshal(authStruct)
-			authCredential := base64.StdEncoding.EncodeToString(authBytes)
-			pushOptions := types.ImagePushOptions{
-				RegistryAuth: authCredential,
-			}
-			dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
-			if err != nil {
-				return err
-			}
-			res, errImgPush := dockerClient.ImagePush(
-				context.Background(),
-				outputImage.GetSimpleName(),
-				pushOptions)
-			if errImgPush != nil {
-				err = fmt.Errorf("Error in pushing the image: %s", errImgPush)
-				return err
-			}
-			b, _ := ioutil.ReadAll(res)
-			Log().WithFields(log.Fields{"action": "prepared thin-image manifest"}).Info(string(b))
-			defer res.Close()
-			// here is possible to use the result of the above ReadAll to have
-			// informantion about the status of the upload.
-			_, errReadDocker := ioutil.ReadAll(res)
-			if err != nil {
-				LogE(errReadDocker).Warning("Error in reading the status from docker")
-			}
-			Log().Info("Finish pushing the image to the registry")
-		}
 		manifestPath := filepath.Join(".metadata", inputImage.GetSimpleName(), "manifest.json")
 		errIng := IngestIntoCVMFS(repo, manifestPath, <-manifestChanell)
 		if errIng != nil {
@@ -557,6 +501,91 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	Log().Info("Created the image in the local docker daemon")
 
 	return nil
+}
+
+func PushImageToRegistry(outputImage Image) (err error) {
+	// is necessary this mechanism to pass the authentication to the
+	// dockers even if the documentation says otherwise
+	password, err := GetPassword()
+	if err != nil {
+		return err
+	}
+	authStruct := struct {
+		Username string
+		Password string
+	}{
+		Username: outputImage.User,
+		Password: password,
+	}
+	authBytes, _ := json.Marshal(authStruct)
+	authCredential := base64.StdEncoding.EncodeToString(authBytes)
+	pushOptions := types.ImagePushOptions{
+		RegistryAuth: authCredential,
+	}
+	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	if err != nil {
+		return err
+	}
+	res, errImgPush := dockerClient.ImagePush(
+		context.Background(),
+		outputImage.GetSimpleName(),
+		pushOptions)
+	if errImgPush != nil {
+		err = fmt.Errorf("Error in pushing the image: %s", errImgPush)
+		return err
+	}
+	b, _ := ioutil.ReadAll(res)
+	Log().WithFields(log.Fields{"action": "prepared thin-image manifest"}).Info(string(b))
+	defer res.Close()
+	// here is possible to use the result of the above ReadAll to have
+	// informantion about the status of the upload.
+	_, errReadDocker := ioutil.ReadAll(res)
+	if err != nil {
+		LogE(errReadDocker).Warning("Error in reading the status from docker")
+	}
+	Log().Info("Finish pushing the image to the registry")
+	return
+}
+
+func StoreLayerInfo(inputImage *Image, CVMFSRepo string, layerDigest string, r *ReadAndHash) (err error) {
+	Log().WithFields(log.Fields{"action": "Ingesting layers.json"}).Info("store layer information im .metadata")
+	layersdata := []LayerInfo{}
+	layerInfoPath := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata", inputImage.GetSimpleName(), "layers.json")
+
+	//check if layers.json already exist and append to data
+	if _, err := os.Stat(layerInfoPath); err == nil {
+		file, err := ioutil.ReadFile(layerInfoPath)
+		if err != nil {
+			LogE(err).Error("Error in reading layers.json file")
+			return err
+		}
+		json.Unmarshal(file, &layersdata)
+	}
+
+	diffID := fmt.Sprintf("%x", r.Sum256(nil))
+	size := r.GetSize()
+	created := time.Now()
+	layerinfo := LayerInfo{
+		ID:                   diffID,
+		Created:              created,
+		CompressedDiffDigest: layerDigest,
+		UncompressedDigest:   "sha256:" + diffID,
+		UncompressedSize:     size,
+	}
+	layersdata = append(layersdata, layerinfo)
+
+	jsonLayerInfo, err := json.MarshalIndent(layersdata, "", " ")
+	if err != nil {
+		LogE(err).Error("Error in marshaling json data for layers.json")
+		return err
+	}
+
+	err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(layerInfoPath), jsonLayerInfo)
+	if err != nil {
+		LogE(err).Error("Error in writing layers.json file")
+		return err
+	}
+	return
 }
 
 func AlreadyConverted(manifestPath, reference string) ConversionResult {

@@ -36,6 +36,7 @@ var convertSingleImageCmd = &cobra.Command{
 		if skipLayers == true {
 			lib.Log().Info("Skipping the creation of the thin image and podman store since provided --skip-layers")
 			skipThinImage = true
+			skipPodman = true
 		}
 		if thinImageName == "" {
 			lib.Log().Info("Skipping the creation of the thin image since did not provided a name for the thin image using the --thin-image-name flag")
@@ -71,16 +72,21 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 		}
 		if !skipLayers {
-			err := lib.ConvertWishDocker(wish, convertAgain, overwriteLayer, !skipThinImage)
+			err := lib.ConvertWish(wish, convertAgain, overwriteLayer)
+			if err != nil {
+				lib.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+			}
+		}
+		if !skipThinImage {
+			err := lib.ConvertWishDocker(wish)
 			if err != nil {
 				lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
-			} else {
-				if !skipPodman {
-					err := lib.ConvertWishPodman(wish, convertAgain)
-					if err != nil {
-						lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
-					}
-				}
+			}
+		}
+		if !skipPodman {
+			err := lib.ConvertWishPodman(wish, convertAgain)
+			if err != nil {
+				lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
 			}
 		}
 	},
