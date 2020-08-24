@@ -197,6 +197,7 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 			Error("Null image, should not happen")
 		return
 	}
+	var firstError error
 	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
 		tag := expandedImgTag.Tag
 		outputWithTag := *outputImage
@@ -217,40 +218,49 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 			layerLocations[layer.Digest] = layerPath
 		}
 		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, *outputImage)
-		if err != nil {
-			return err
+		if err != nil && firstError == nil {
+			firstError = err
 		}
 		err = PushImageToRegistry(*outputImage)
-		if err != nil {
-			return err
+		if err != nil && firstError == nil {
+			firstError = err
 		}
 	}
-	return
+	return firstError
 }
 
 func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
+	var firstError error
 	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
 		manifest, err := expandedImgTag.GetManifest()
 		if err != nil {
 			return err
 		}
 		imageID := strings.Split(manifest.Config.Digest, ":")[1]
+
+		// check if image is already present in podman store
 		manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, rootPath, imageMetadataDir, imageID, "manifest")
 		alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
 		if alreadyConverted == ConversionMatch {
 			if convertAgain == false {
 				Log().Info("Image already present in podman store, moving on")
-				return nil
+				continue
 			}
 		}
-		err = expandedImgTag.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
-		if err != nil {
-			LogE(err).Warning("Unable to create Podman additional image store")
-			return err
+
+		// convert for podman only after manifest is stored in .metadata
+		manifestPath = filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".metadata", expandedImgTag.GetSimpleName(), "manifest.json")
+		if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+			Log().Info("Layers not downloaded yet, moving on")
+			continue
 		}
-		Log().Info("Image successfully ingested into podmanStore")
+
+		err = expandedImgTag.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
+		if err != nil && firstError == nil {
+			firstError = err
+		}
 	}
-	return nil
+	return firstError
 }
 
 func ConvertWish(wish WishFriendly, convertAgain, forceDownload bool) (err error) {
@@ -373,7 +383,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 					return
 				}
 
-				err = StoreLayerInfo(inputImage, repo, layer.Name, layer.Path.(*ReadAndHash))
+				err = StoreLayerInfo(inputImage, repo, layer.Name, layer.Path)
 				if err != nil {
 					LogE(err).Error("Error in storing the layers.json file in the repository")
 				}

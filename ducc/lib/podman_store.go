@@ -198,10 +198,12 @@ func (img *Image) IngestRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string
 		symlinkPath := filepath.Join(rootPath, rootfsDir, layerdir, "diff")
 		targetPath := filepath.Join(subDirInsideRepo, layerid[:2], layerid, "layerfs")
 
-		err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
-		if err != nil {
-			LogE(err).Error("Error in creating the symlink for the diff dir")
-			return err
+		if _, err := os.Stat(symlinkPath); os.IsNotExist(err) {
+			err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
+			if err != nil {
+				LogE(err).Error("Error in creating the symlink for the diff dir")
+				return err
+			}
 		}
 	}
 	return nil
@@ -217,30 +219,37 @@ func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string, digestMap, l
 	}
 	for _, layer := range manifest.Layers {
 		layerdir := digestMap[layer.Digest]
+		linkPath := filepath.Join(rootPath, rootfsDir, layerdir, "link")
+		if _, err := os.Stat(linkPath); os.IsNotExist(err) {
+			//generate the link id
+			lid, err := generateID(26)
+			if err != nil {
+				LogE(err).Error("Error generating file name for Link dir")
+				return err
+			}
+			layerIdMap[layer.Digest] = filepath.Join("l", lid)
+			err = writeDataToCvmfs(CVMFSRepo, linkPath, []byte(lid))
+			if err != nil {
+				LogE(err).Error("Error in writing link id to podman store")
+				return err
+			}
 
-		//generate the link id
-		lid, err := generateID(26)
-		if err != nil {
-			LogE(err).Error("Error generating file name for Link dir")
-			return err
-		}
-		layerIdMap[layer.Digest] = filepath.Join("l", lid)
+			//Create link dir
+			symlinkPath := filepath.Join(rootPath, rootfsDir, "l", lid)
+			targetPath := filepath.Join(rootPath, rootfsDir, layerdir, "diff")
 
-		//Create link dir
-		symlinkPath := filepath.Join(rootPath, rootfsDir, "l", lid)
-		targetPath := filepath.Join(rootPath, rootfsDir, layerdir, "diff")
-
-		err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
-		if err != nil {
-			LogE(err).Error("Error in creating the symlink for the Link dir")
-			return err
-		}
-
-		linkPath := filepath.Join(rootPath, "overlay", layerdir, "link")
-		err = writeDataToCvmfs(CVMFSRepo, linkPath, []byte(lid))
-		if err != nil {
-			LogE(err).Error("Error in writing link id to podman store")
-			return err
+			err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
+			if err != nil {
+				LogE(err).Error("Error in creating the symlink for the Link dir")
+				return err
+			}
+		} else {
+			data, err := ioutil.ReadFile(linkPath)
+			if err != nil {
+				LogE(err).Error("Error in reading link file")
+				return err
+			}
+			layerIdMap[layer.Digest] = string(data)
 		}
 	}
 	return nil
@@ -258,23 +267,29 @@ func (img *Image) CreateLowerFiles(CVMFSRepo string, digestMap, layerIdMap map[s
 	lastLowerData := ""
 	lastDigest := ""
 	for _, layer := range manifest.Layers {
-		if lastDigest == "" {
-			lastDigest = layer.Digest
-			continue
+		if lastDigest != "" {
+			layerdir := digestMap[layer.Digest]
+			lowerPath := filepath.Join(rootPath, rootfsDir, layerdir, "lower")
+			if _, err := os.Stat(lowerPath); os.IsNotExist(err) {
+				lowerdata := layerIdMap[lastDigest]
+				if lastLowerData != "" {
+					lowerdata = lowerdata + ":" + lastLowerData
+				}
+				err = writeDataToCvmfs(CVMFSRepo, lowerPath, []byte(lowerdata))
+				if err != nil {
+					LogE(err).Warn("Error in writing lower files")
+					return err
+				}
+				lastLowerData = lowerdata
+			} else {
+				data, err := ioutil.ReadFile(lowerPath)
+				if err != nil {
+					LogE(err).Error("Error in reading lower file")
+					return err
+				}
+				lastLowerData = string(data)
+			}
 		}
-
-		lowerdata := layerIdMap[lastDigest]
-		if lastLowerData != "" {
-			lowerdata = lowerdata + ":" + lastLowerData
-		}
-		layerdir := digestMap[layer.Digest]
-		lowerPath := filepath.Join(rootPath, rootfsDir, layerdir, "lower")
-		err = writeDataToCvmfs(CVMFSRepo, lowerPath, []byte(lowerdata))
-		if err != nil {
-			LogE(err).Warn("Error in writing lower files")
-			return err
-		}
-		lastLowerData = lowerdata
 		lastDigest = layer.Digest
 	}
 	return nil
@@ -288,42 +303,7 @@ func (img *Image) IngestConfigFile(CVMFSRepo string) (err error) {
 		LogE(err).Warn("Error in getting the image manifest")
 		return err
 	}
-
-	user := img.User
-	pass, err := GetPassword()
-	if err != nil {
-		LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
-		user = ""
-		pass = ""
-	}
-
-	configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
-
-	token, err := firstRequestForAuth(configUrl, user, pass)
-	if err != nil {
-		LogE(err).Warning("Unable to retrieve the token for downloading config file")
-		return err
-	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", configUrl, nil)
-	if err != nil {
-		LogE(err).Warning("Unable to create a request for getting config file.")
-		return err
-	}
-	req.Header.Set("Authorization", token)
-	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-
-	resp, err := client.Do(req)
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		LogE(err).Warning("Error in reading the body from the configuration")
-		return err
-	}
-
-	//generate config file path to ingest above temp dir.
+	//generate config file path.
 	fname, err := generateConfigFileName(manifest.Config.Digest)
 	if err != nil {
 		LogE(err).Warning("Error in generating config file name")
@@ -332,11 +312,46 @@ func (img *Image) IngestConfigFile(CVMFSRepo string) (err error) {
 
 	imageID := strings.Split(manifest.Config.Digest, ":")[1]
 	configFilePath := filepath.Join(rootPath, imageMetadataDir, imageID, fname)
+	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
+		user := img.User
+		pass, err := GetPassword()
+		if err != nil {
+			LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
+			user = ""
+			pass = ""
+		}
 
-	err = writeDataToCvmfs(CVMFSRepo, configFilePath, []byte(body))
-	if err != nil {
-		LogE(err).Warning("Error in writing config file")
-		return err
+		configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
+			img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
+
+		token, err := firstRequestForAuth(configUrl, user, pass)
+		if err != nil {
+			LogE(err).Warning("Unable to retrieve the token for downloading config file")
+			return err
+		}
+
+		client := &http.Client{}
+		req, err := http.NewRequest("GET", configUrl, nil)
+		if err != nil {
+			LogE(err).Warning("Unable to create a request for getting config file.")
+			return err
+		}
+		req.Header.Set("Authorization", token)
+		req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+
+		resp, err := client.Do(req)
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			LogE(err).Warning("Error in reading the body from the configuration")
+			return err
+		}
+
+		err = writeDataToCvmfs(CVMFSRepo, configFilePath, []byte(body))
+		if err != nil {
+			LogE(err).Warning("Error in writing config file")
+			return err
+		}
 	}
 	return nil
 }
@@ -368,7 +383,14 @@ func (img *Image) CreateLockFiles(CVMFSRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating lock file for the image"}).Info(img.GetSimpleName())
 	layerlockpath := filepath.Join("/cvmfs", CVMFSRepo, rootPath, layerMetadataDir, "layers.lock")
 	imagelockpath := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.lock")
-	for _, file := range []string{layerlockpath, imagelockpath} {
+	var paths []string
+	if _, err := os.Stat(layerlockpath); os.IsNotExist(err) {
+		paths = append(paths, layerlockpath)
+	}
+	if _, err := os.Stat(imagelockpath); os.IsNotExist(err) {
+		paths = append(paths, imagelockpath)
+	}
+	for _, file := range paths {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			tmpFile, err := ioutil.TempFile("", "lock")
 			tmpFile.Close()
@@ -455,12 +477,6 @@ func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (er
 		}
 	}
 
-	err = img.IngestImageManifest(CVMFSRepo)
-	if err != nil {
-		LogE(err).Error("Unable to create manifest file in podman store")
-		return err
-	}
-
 	err = img.IngestConfigFile(CVMFSRepo)
 	if err != nil {
 		LogE(err).Error("Unable to create config file in podman store")
@@ -504,8 +520,15 @@ func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (er
 
 	err = img.CreateLockFiles(CVMFSRepo)
 	if err != nil {
-		LogE(err).Error("Unable to create layers lock file in podman store")
+		LogE(err).Error("Unable to create lock files in podman store")
 		return err
 	}
+
+	err = img.IngestImageManifest(CVMFSRepo)
+	if err != nil {
+		LogE(err).Error("Unable to create manifest file in podman store")
+		return err
+	}
+	Log().Info("Image successfully ingested into podmanStore")
 	return nil
 }

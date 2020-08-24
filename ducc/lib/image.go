@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -529,7 +528,7 @@ func getLayerUrl(img *Image, layer da.Layer) string {
 
 type downloadedLayer struct {
 	Name string
-	Path io.ReadCloser
+	Path *ReadAndHash
 }
 
 func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {

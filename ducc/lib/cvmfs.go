@@ -539,9 +539,5 @@ func writeDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
 		LogE(err).Error("Error in closing temporary file")
 		return err
 	}
-	err = IngestIntoCVMFS(CVMFSRepo, path, tmpFile.Name())
-	if err != nil {
-		return err
-	}
-	return
+	return IngestIntoCVMFS(CVMFSRepo, path, tmpFile.Name())
 }
