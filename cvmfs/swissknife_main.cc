@@ -16,7 +16,6 @@
 #include "swissknife_filestats.h"
 #include "swissknife_gc.h"
 #include "swissknife_graft.h"
-#include "swissknife_hash.h"
 #include "swissknife_history.h"
 #include "swissknife_info.h"
 #include "swissknife_ingest.h"
@@ -97,7 +96,6 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandPull());
   command_list.push_back(new swissknife::CommandZpipe());
   command_list.push_back(new swissknife::CommandGraft());
-  command_list.push_back(new swissknife::CommandHash());
   command_list.push_back(new swissknife::CommandInfo());
   command_list.push_back(new swissknife::CommandVersion());
   command_list.push_back(new swissknife::CommandMigrate());

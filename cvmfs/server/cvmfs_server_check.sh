@@ -146,7 +146,7 @@ __check_repair_reflog() {
       url="${CVMFS_STRATUM1}/.cvmfsreflog"
     fi
     local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $url \
-      | cvmfs_swissknife hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
+      | cvmfs_publish hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
     computed_checksum="$($user_shell "$rehash_cmd")"
   fi
 

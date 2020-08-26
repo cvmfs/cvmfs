@@ -94,11 +94,11 @@ create_whitelist() {
   else
     hash_algorithm="${CVMFS_HASH_ALGORITHM:-sha1}"
     openssl x509 -in /etc/cvmfs/keys/${name}.crt -outform der | \
-      __swissknife hash -a $hash_algorithm -f >> ${whitelist}.unsigned
+      __publish hash -a $hash_algorithm -f >> ${whitelist}.unsigned
   fi
 
   local hash;
-  hash="`cat ${whitelist}.unsigned | __swissknife hash -a $hash_algorithm`"
+  hash="`cat ${whitelist}.unsigned | __publish hash -a $hash_algorithm`"
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash

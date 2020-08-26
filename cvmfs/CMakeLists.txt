@@ -427,7 +427,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_check.cc
   swissknife_gc.cc
   swissknife_graft.cc
-  swissknife_hash.cc
   swissknife_history.cc
   swissknife_info.cc
   swissknife_ingest.cc
