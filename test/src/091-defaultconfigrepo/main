@@ -14,7 +14,7 @@ cvmfs_run_test() {
   echo "*** check OpenHTC servers"
   get_xattr host /cvmfs/cms.cern.ch | grep openhtc && return 20
 
-  cvmfs_mount grid.cern.ch CVMFS_USE_OPENHTC=yes || return 10
+  cvmfs_mount grid.cern.ch CVMFS_USE_CDN=yes || return 10
   get_xattr host /cvmfs/grid.cern.ch | grep openhtc || return 13
 
   echo "*** check proxy auto config"
