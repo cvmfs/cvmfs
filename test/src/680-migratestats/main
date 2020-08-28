@@ -63,6 +63,13 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return 13
   check_repository $CVMFS_TEST_REPO -i || return 14
 
+  # We might have picked up SElinux attributes.  We need to count to find the
+  # number of files extended attributes
+  local nattrs=$(find /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly \
+    -exec attr -l {} \; | awk '{print $NF}' | sort -u | wc -l)
+  # Nested catalogs are counted twice
+  nattrs=$((nattrs + $(attr -l /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/nested | head -1 | wc -l)))
+
   echo "*** check repo counters"
   cat << EOF > expected_counters
 chunked,2
@@ -76,7 +83,7 @@ nested,1
 regular,13
 special,7
 symlink,8
-xattr,3
+xattr,$nattrs
 EOF
 
   get_xattr repo_counters /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly | tee found_counters
