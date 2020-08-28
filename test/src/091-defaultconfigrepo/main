@@ -22,8 +22,10 @@ cvmfs_run_test() {
   cvmfs_config showconfig cernvm-prod.cern.ch | grep ^CVMFS_HTTP_PROXY= |\
     grep auto | grep cvmfs-config.cern.ch || return 31
 
-  echo "*** check that a decision on the proxy must be taken"
-  cvmfs_mount alice.cern.ch CVMFS_HTTP_PROXY= && return 40
+  if [ ! running_on_osx ]; then
+    echo "*** check that a decision on the proxy must be taken"
+    cvmfs_mount alice.cern.ch CVMFS_HTTP_PROXY= && return 40
+  fi
 
   return 0
 }
