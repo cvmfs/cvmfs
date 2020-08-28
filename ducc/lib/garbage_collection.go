@@ -137,6 +137,64 @@ func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
 	return result, nil
 }
 
+func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]string, error) {
+	podmanPathsToDelete := make([]string, 0)
+	layerInfoPath := filepath.Join("/cvmfs", CVMFSRepo, "podmanStore", "overlay-layers", "layers.json")
+
+	layersToDeleteMap := make(map[string]bool)
+	for _, layerpath := range layersToDelete {
+		components := strings.Split(layerpath, string(os.PathSeparator))
+		layerid := components[len(components)-1]
+		layersToDeleteMap[layerid] = true
+	}
+ 
+	_, err := os.Stat(layerInfoPath)
+	if err == nil {
+		layersdata := []LayerInfo{}
+		file, err := ioutil.ReadFile(layerInfoPath)
+		if err != nil {
+			LogE(err).Error("Error in reading layers.json file")
+			return podmanPathsToDelete, err
+		}
+		json.Unmarshal(file, &layersdata)
+
+		newlayersdata := []LayerInfo{}
+		for _, info := range layersdata {
+			layerid := strings.Split(info.CompressedDiffDigest, ":")[1]
+			if layersToDeleteMap[layerid] {
+				podmanLayerPath := filepath.Join("/cvmfs", CVMFSRepo, "podmanStore", "overlay", info.ID)
+				
+				linkFilePath := filepath.Join(podmanLayerPath, "link")
+				data, err := ioutil.ReadFile(linkFilePath)
+				if err != nil {
+					LogE(err).Error("Error in reading link file")
+					return podmanPathsToDelete, err
+				}
+				id := string(data)
+				
+				linkDirPath := filepath.Join("/cvmfs", CVMFSRepo, "overlay", "l", id)
+				podmanPathsToDelete = append(podmanPathsToDelete, podmanLayerPath)
+				podmanPathsToDelete = append(podmanPathsToDelete, linkDirPath)
+				continue
+			}
+			newlayersdata = append(newlayersdata, info)
+		}
+
+		layerInfo, err := json.MarshalIndent(newlayersdata, "", " ")
+		if err != nil {
+			LogE(err).Error("Error in marshaling json data for layers.json")
+			return podmanPathsToDelete, err
+		}
+
+		err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(layerInfoPath), layerInfo)
+		if err != nil {
+			LogE(err).Error("Error in writing layers.json")
+			return podmanPathsToDelete, err
+		}
+	}
+	return podmanPathsToDelete, nil
+}
+
 func FindImageToGarbageCollect(CVMFSRepo string) ([]da.Manifest, error) {
 	removeSchedulePath := RemoveScheduleLocation(CVMFSRepo)
 	llog := func(l *log.Entry) *log.Entry {

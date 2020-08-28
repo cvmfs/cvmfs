@@ -207,6 +207,11 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 			outputWithTag.Tag = outputImage.Tag
 		}
 
+		manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".metadata", expandedImgTag.GetSimpleName(), "manifest.json")
+		if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+			Log().Info("Layers not downloaded yet, not converting for docker, moving on")
+			continue
+		}
 		manifest, err := expandedImgTag.GetManifest()
 		if err != nil {
 			return err
@@ -251,7 +256,7 @@ func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
 		// convert for podman only after manifest is stored in .metadata
 		manifestPath = filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".metadata", expandedImgTag.GetSimpleName(), "manifest.json")
 		if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
-			Log().Info("Layers not downloaded yet, moving on")
+			Log().Info("Layers not downloaded yet, not converting for podman, moving on")
 			continue
 		}
 
