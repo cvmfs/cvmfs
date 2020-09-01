@@ -1,0 +1,104 @@
+cvmfs_test_name="fix-up catalog statistics"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  echo "CVMFS_INCLUDE_XATTRS=true" | sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+
+  echo "*** create several file types and and subdirs"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/nested/subdir
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/nested/subdir2
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/nested/subdir3
+  touch /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog
+
+  touch /cvmfs/$CVMFS_TEST_REPO/regular
+  ln -s regular /cvmfs/$CVMFS_TEST_REPO/symlink
+  touch /cvmfs/$CVMFS_TEST_REPO/nested/regular
+  ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink
+  ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink2
+  ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink3
+  ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink4
+  ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink5
+  ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink6
+  ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink7
+
+  cat /dev/zero | base64 -w0 | head -c $((1024*1024*32)) \
+    > /cvmfs/$CVMFS_TEST_REPO/chunks
+  cat /dev/zero | base64 -w0 | head -c $((1024*1024*32)) \
+    > /cvmfs/$CVMFS_TEST_REPO/nested/chunks
+
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/fifo
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/fifo
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/fifo2
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/fifo3
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/fifo4
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/fifo5
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/fifo6
+
+  echo xattr > /cvmfs/$CVMFS_TEST_REPO/xattr
+  attr -s a1 -V val /cvmfs/test.cern.ch/xattr
+  attr -s a1 -V val /cvmfs/test.cern.ch/xattr
+  echo xattr > /cvmfs/$CVMFS_TEST_REPO/nested/xattr
+  attr -s a1 -V val /cvmfs/test.cern.ch/nested/xattr
+  attr -s a1 -V val /cvmfs/test.cern.ch/nested/xattr
+  touch /cvmfs/$CVMFS_TEST_REPO/nested/xattr2
+  attr -s a1 -V val /cvmfs/test.cern.ch/nested/xattr2
+
+  publish_repo $CVMFS_TEST_REPO || return 10
+  check_repository $CVMFS_TEST_REPO -i || return 11
+
+  echo "CVMFS_EXTERNAL_DATA=true" | \
+    sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf || return 13
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo external > /cvmfs/test.cern.ch/external
+  echo external > /cvmfs/test.cern.ch/nested/external
+  touch /cvmfs/test.cern.ch/nested/external3
+  touch /cvmfs/test.cern.ch/nested/external4
+  touch /cvmfs/test.cern.ch/nested/external5
+  publish_repo $CVMFS_TEST_REPO || return 13
+  check_repository $CVMFS_TEST_REPO -i || return 14
+
+  # We might have picked up SElinux attributes.  We need to count to find the
+  # number of files extended attributes
+  local nattrs=$(find /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly \
+    -exec attr -l {} \; | awk '{print $NF}' | sort -u | wc -l)
+  # Nested catalogs are counted twice
+  nattrs=$((nattrs + $(attr -l /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/nested | head -1 | wc -l)))
+
+  echo "*** check repo counters"
+  cat << EOF > expected_counters
+chunked,2
+chunked_size,67108864
+chunks,4
+dir,6
+external,5
+external_file_size,18
+file_size,67108894
+nested,1
+regular,13
+special,7
+symlink,8
+xattr,$nattrs
+EOF
+
+  get_xattr repo_counters /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly | tee found_counters
+  diff found_counters expected_counters || return 20
+
+  local root_hash=$(get_xattr root_hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly)
+  echo "*** Hashes $root_hash (root)"
+
+  echo "*** Fix-up statistics"
+  sudo cvmfs_server fix-stats -f $CVMFS_TEST_REPO || return 30
+  check_repository $CVMFS_TEST_REPO -i || return 31
+  get_xattr repo_counters /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly | tee new_counters
+  diff new_counters expected_counters || return 32
+
+  [ "$(get_xattr root_hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly)" != "$root_hash" ] || return 40
+
+  return 0
+}
