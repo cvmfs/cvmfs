@@ -1068,8 +1068,8 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
     resign list info tag list-tags lstags check transaction abort snapshot           \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
-    eliminate-hardlinks eliminate-bulk-hashes update-info update-repoinfo mount \
-    fix-permissions masterkeycard ingest merge-stats print-stats"
+    eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
+    mount fix-permissions masterkeycard ingest merge-stats print-stats"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
