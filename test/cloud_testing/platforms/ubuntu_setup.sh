@@ -54,6 +54,7 @@ install_deb $SHRINKWRAP_PACKAGE
 echo "installing python WSGI module..."
 install_from_repo libapache2-mod-wsgi    || die "fail (installing libapache2-mod-wsgi)"
 install_from_repo default-jre            || die "fail (installing default-jre)"
+install_from_repo apache2                || die "fail (installing apache2)"
 sudo service apache2 restart > /dev/null || die "fail (restarting apache)"
 
 # setup environment
