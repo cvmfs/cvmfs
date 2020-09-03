@@ -72,6 +72,12 @@ cvmfs_run_test() {
   destroy_repo $CVMFS_TEST500_LONG_REPONAME || return $?
   CVMFS_TEST500_LONG_REPONAME=
 
+  echo "*** Repo name mix-up (CVM-1899)"
+  create_empty_repo repo-test.example.org $CVMFS_TEST_USER || return 20
+  create_empty_repo repo.test.example.org $CVMFS_TEST_USER || return 21
+  destroy_repo repo.test.example.org || return 22
+  destroy_repo repo-test.example.org || return 23
+
   return 0
 }
 
