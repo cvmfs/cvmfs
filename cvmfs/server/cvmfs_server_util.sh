@@ -222,7 +222,7 @@ is_mounted() {
   # Use canonicalize-missing because the mount point can be broken and
   # inaccessible
   absolute_mnt="$(readlink --canonicalize-missing $mountpoint)" || return 2
-  local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
+  local mnt_record="$(cat /proc/mounts 2>/dev/null | grep -F " $absolute_mnt ")"
   if [ x"$mnt_record" = x"" ]; then
     return 1
   fi
