@@ -34,8 +34,8 @@ func (r *MockReceiver) SubmitPayload(leasePath string, payload io.Reader, digest
 }
 
 // Commit command
-func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
-	return nil
+func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return 1, nil
 }
 
 // Commit command

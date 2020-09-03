@@ -9,6 +9,7 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/cvmfs/gateway/internal/gateway/receiver"
+	stats "github.com/cvmfs/gateway/internal/gateway/statistics"
 )
 
 // accessConfigV1 is an access configuration using the legacy syntax
@@ -140,10 +141,12 @@ func StartTestBackend(name string, maxLeaseTime time.Duration) (*Services, strin
 		os.Exit(3)
 	}
 
-	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver)
+	smgr := stats.NewStatisticsMgr()
+
+	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver, smgr)
 	if err != nil {
 		os.Exit(4)
 	}
 
-	return &Services{Access: ac, Leases: ldb, Pool: pool, Config: *cfg}, tmp
+	return &Services{Access: ac, Leases: ldb, Pool: pool, Config: *cfg, StatsMgr: smgr}, tmp
 }

@@ -124,12 +124,13 @@ func handleCommitLease(services be.ActionController, token string, w http.Respon
 	}
 
 	msg := make(map[string]interface{})
-	if err := services.CommitLease(
+	if finalRev, err := services.CommitLease(
 		ctx, token, reqMsg.OldRootHash, reqMsg.NewRootHash, reqMsg.RepositoryTag); err != nil {
 		msg["status"] = "error"
 		msg["reason"] = err.Error()
 	} else {
 		msg["status"] = "ok"
+		msg["final_revision"] = finalRev
 	}
 
 	replyJSON(ctx, w, msg)
