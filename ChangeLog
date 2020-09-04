@@ -1,4 +1,5 @@
 2.7.4:
+  * Fix name clash with certain concurrently hosted repository names (CVM-1899)
   * [gw] fix statistics counting on renaming of nested subtrees (CVM-1906)
   * Fix ingestion of tarballs with leading slashes (CVM-1907)
   * Build cvmfs-fuse3 on Ubuntu 20.04 (CVM-1898)
