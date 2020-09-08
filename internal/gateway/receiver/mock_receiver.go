@@ -38,3 +38,8 @@ func (r *MockReceiver) SubmitPayload(leasePath string, payload io.Reader, digest
 		Msg("Requested submit agains a testing mock, shortcircuit success")
 	return nil
 }
+
+// Commit command
+func (r *MockReceiver) Interrupt() error {
+	return nil
+}

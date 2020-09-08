@@ -43,16 +43,7 @@ cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/run_cvmfs_gateway.sh \
 togo file exclude root/usr/libexec
 
 # Place and flag config files in the togo workspace
-if [ "x$PLATFORM" = "xcc7" ]; then
-    mkdir -p ${TOGO_PROJECT}/root/etc/systemd/system
-    togo file exclude root/etc/systemd/system
-    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.service \
-        ${TOGO_PROJECT}/root/etc/systemd/system/
-    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway@.service \
-        ${TOGO_PROJECT}/root/etc/systemd/system/
-    togo file flag config-nr root/etc/systemd/system/cvmfs-gateway.service
-    togo file flag config-nr root/etc/systemd/system/cvmfs-gateway@.service
-else
+if [ "x$PLATFORM" = "xslc6" ]; then
     mkdir -p ${TOGO_PROJECT}/root/etc/init.d
     togo file exclude root/etc/init.d
     cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.initd \
@@ -64,6 +55,15 @@ else
     cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/90-cvmfs-gateway-rotate \
         ${TOGO_PROJECT}/root/etc/logrotate.d
     togo file flag config-nr root/etc/logrotate.d/90-cvmfs-gateway-rotate
+else
+    mkdir -p ${TOGO_PROJECT}/root/etc/systemd/system
+    togo file exclude root/etc/systemd/system
+    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway.service \
+        ${TOGO_PROJECT}/root/etc/systemd/system/
+    cp -v ${CVMFS_GATEWAY_SOURCES}/pkg/cvmfs-gateway@.service \
+        ${TOGO_PROJECT}/root/etc/systemd/system/
+    togo file flag config-nr root/etc/systemd/system/cvmfs-gateway.service
+    togo file flag config-nr root/etc/systemd/system/cvmfs-gateway@.service
 fi
 
 # cvmfs-gateway configuration files

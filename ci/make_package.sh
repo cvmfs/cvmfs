@@ -34,7 +34,7 @@ fi
 # Create an RPM or DEB package from the tarball
 if [[ x"${CVMFS_BUILD_PLATFORM}" = xubuntu* ]] || [[ x"${CVMFS_BUILD_PLATFORM}" = xdebian* ]]; then
     BUILDER_SCRIPT=${SCRIPT_LOCATION}/make_deb.sh
-elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ]; then
+elif [ x"${CVMFS_BUILD_PLATFORM}" = xslc6 ] || [ x"${CVMFS_BUILD_PLATFORM}" = xcc7 ] || [ x"${CVMFS_BUILD_PLATFORM}" == xcc8 ]; then
     BUILDER_SCRIPT=${SCRIPT_LOCATION}/make_rpm.sh
 else
   echo "Platform ${CVMFS_BUILD_PLATFORM} not recognized. Expect some error."
