@@ -1,0 +1,4 @@
+The repository-specific configuration is set in the cvmfs config repository,
+e.g. /cvmfs/cvmfs-config.cern.ch/etc/cvmfs/config.d/grid.cern.ch.conf
+
+Parameters can be overwritten in corresponding .local files.

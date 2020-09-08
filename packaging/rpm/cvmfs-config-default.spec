@@ -1,20 +1,18 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.7
+Version: 2.0
 Release: 1
-Source0: cern.ch.pub
-Source1: cern-it1.cern.ch.pub
-Source2: cern-it4.cern.ch.pub
-Source3: cern-it5.cern.ch.pub
-Source4: egi.eu.pub
-Source5: opensciencegrid.org.pub
-Source6: cern.ch.conf
-Source7: egi.eu.conf
-Source8: opensciencegrid.org.conf
-Source9: 50-cern.conf
-Source10: 60-egi.conf
-Source11: cms.cern.ch.conf
-Source12: grid.cern.ch.conf
+Source0: cern-it1.cern.ch.pub
+Source1: cern-it4.cern.ch.pub
+Source2: cern-it5.cern.ch.pub
+Source3: egi.eu.pub
+Source4: opensciencegrid.org.pub
+Source5: cern.ch.conf
+Source6: egi.eu.conf
+Source7: opensciencegrid.org.conf
+Source8: 50-cern.conf
+Source9: README-config.d
+Source10: cvmfs-config.cern.ch.conf
 BuildArch: noarch
 Group: Applications/System
 License: BSD
@@ -40,24 +38,25 @@ rm -rf $RPM_BUILD_ROOT
 for cvmfsdir in keys/cern.ch keys/egi.eu keys/opensciencegrid.org domain.d default.d config.d; do
     mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/$cvmfsdir
 done
-for key in %{SOURCE0} %{SOURCE1} %{SOURCE2} %{SOURCE3}; do
+for key in %{SOURCE0} %{SOURCE1} %{SOURCE2}; do
     install -D -m 444 "${key}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/keys/cern.ch
 done
-for key in %{SOURCE4}; do
+for key in %{SOURCE3}; do
     install -D -m 444 "${key}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/keys/egi.eu
 done
-for key in %{SOURCE5}; do
+for key in %{SOURCE4}; do
     install -D -m 444 "${key}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/keys/opensciencegrid.org
 done
-for domainconf in %{SOURCE6} %{SOURCE7} %{SOURCE8}; do
+for domainconf in %{SOURCE5} %{SOURCE6} %{SOURCE7}; do
     install -D -m 444 "${domainconf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/domain.d
 done
-for defaultconf in %{SOURCE9} %{SOURCE10}; do
+for defaultconf in %{SOURCE8}; do
     install -D -m 444 "${defaultconf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/default.d
 done
-for conf in %{SOURCE11} %{SOURCE12}; do
+for conf in %{SOURCE10}; do
     install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d
 done
+install -D -m 444 "%{SOURCE9}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/README
 
 %files
 %dir %{_sysconfdir}/cvmfs/keys/cern.ch
@@ -66,16 +65,20 @@ done
 %{_sysconfdir}/cvmfs/keys/cern.ch/*
 %{_sysconfdir}/cvmfs/keys/egi.eu/*
 %{_sysconfdir}/cvmfs/keys/opensciencegrid.org/*
+%config %{_sysconfdir}/cvmfs/config.d/cvmfs-config.cern.ch.conf
 %config %{_sysconfdir}/cvmfs/domain.d/egi.eu.conf
 %config %{_sysconfdir}/cvmfs/domain.d/opensciencegrid.org.conf
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %config %{_sysconfdir}/cvmfs/default.d/50-cern.conf
-%config %{_sysconfdir}/cvmfs/default.d/60-egi.conf
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Mon Jul 13 2020 Jakob Blomer <jblomer@cern.ch> - 2.0-1
+- Various minor fixes
+- Use config repository
+
 * Fri May 25 2018 Dave Dykstra <dwd@fnal.gov> - 1.7-1
-- Skipped versions 1.5 and 1.6 because debian packages with those 
+- Skipped versions 1.5 and 1.6 because debian packages with those
   versions already exist
 - Replace BNL and FNAL stratum 1s with their OSG aliases for the
   cern.ch domain

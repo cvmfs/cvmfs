@@ -1,0 +1,31 @@
+cvmfs_test_name="default config repository"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** check availability of default cvmfs-config.cern.ch repository"
+  cvmfs_mount cms.cern.ch || return 1
+  cvmfs_config showconfig cms.cern.ch | grep ^CVMFS_CONFIG_REPOSITORY= \
+    | grep cvmfs-config.cern.ch || return 2
+  ls /cvmfs/cvmfs-config.cern.ch || return 3
+  ls /cvmfs/cvmfs-config.cern.ch/TESTING || return 4
+
+  echo "*** check OpenHTC servers"
+  get_xattr host /cvmfs/cms.cern.ch | grep openhtc && return 20
+
+  cvmfs_mount grid.cern.ch CVMFS_USE_CDN=yes || return 10
+  get_xattr host /cvmfs/grid.cern.ch | grep openhtc || return 13
+
+  echo "*** check proxy auto config"
+  cvmfs_mount cernvm-prod.cern.ch CVMFS_CLIENT_PROFILE=single CVMFS_HTTP_PROXY= || return 30
+  cvmfs_config showconfig cernvm-prod.cern.ch | grep ^CVMFS_HTTP_PROXY= |\
+    grep auto | grep cvmfs-config.cern.ch || return 31
+
+  if [ ! running_on_osx ]; then
+    echo "*** check that a decision on the proxy must be taken"
+    cvmfs_mount alice.cern.ch CVMFS_HTTP_PROXY= && return 40
+  fi
+
+  return 0
+}

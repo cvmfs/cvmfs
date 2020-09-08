@@ -374,6 +374,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/cvmfs-server
 
 # Keys and configs are in cvmfs-config
 rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
+rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/README
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
@@ -575,9 +576,6 @@ fi
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
-/usr/share/cvmfs-server/generate_stats_plots.C
-/usr/share/cvmfs-server/stats_index.html.tpl
-/usr/share/cvmfs-server/upload_stats_plots.sh
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog

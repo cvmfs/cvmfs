@@ -30,3 +30,4 @@ echo "done"
 
 echo "Removing traces of previous runs"
 sudo cvmfs_config killall
+sudo rm -f /etc/cvmfs/default.local
