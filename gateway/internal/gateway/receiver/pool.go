@@ -155,8 +155,9 @@ M:
 			}
 			defer func() {
 				if err := receiver.Quit(); err != nil {
-					task.Reply() <- err
-					return
+					gw.Log("worker_pool", gw.LogInfo).
+						Int("worker_id", workerIdx).
+						Msgf("got an error while quitting: %s", err)
 				}
 			}()
 
