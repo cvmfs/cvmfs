@@ -17,7 +17,12 @@ type MockReceiver struct {
 // Receiver interface
 func NewMockReceiver(ctx context.Context, execPath string, args ...string) (Receiver, error) {
 	CvmfsReceiver, err := NewCvmfsReceiver(ctx, execPath, args...)
-	return &MockReceiver{*CvmfsReceiver}, err
+	// if some error happens, like the receiver code cannot be started,
+	// we want to handle it separately, otherwise it crash with Segmentation Fault.
+	if err != nil {
+		return &MockReceiver{}, err
+	}
+	return &MockReceiver{*CvmfsReceiver}, nil
 }
 
 func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
