@@ -100,7 +100,7 @@ func TestLeaseHandlerCommitLease(t *testing.T) {
 
 	expected, _ := json.Marshal(map[string]interface{}{
 		"status":         "ok",
-		"final_revision": 0,
+		"final_revision": 1,
 	})
 
 	resp := w.Result()
