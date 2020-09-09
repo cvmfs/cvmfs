@@ -109,13 +109,12 @@ func (p *Pool) SubmitPayload(ctx context.Context, leasePath string, payload io.R
 func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	reply := make(chan error, 1)
 	finalRevChan := make(chan uint64, 1)
-	var finalRev uint64
 	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, reply, finalRevChan}
 	result := <-reply
-	if reply == nil {
-		finalRev = <-finalRevChan
+	if result == nil {
+		return <-finalRevChan, nil
 	}
-	return finalRev, result
+	return 0, result
 }
 
 func worker(tasks <-chan task, pool *Pool, workerIdx int) {
