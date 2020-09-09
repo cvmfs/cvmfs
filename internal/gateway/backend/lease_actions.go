@@ -48,6 +48,14 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 		return "", err
 	}
 
+	// the StatsMgr does not handle the case in which a lease expires.
+	// However, if a lease expires, we should not upload it's statistics.
+	// If the LeaseMgr successfully create a new lease,
+	// then, the lease path must be free.
+	// We remove it, no matter what.
+	// We don't check the error because it return an error if the lease does not exist, the standard case.
+	s.StatsMgr.PopLease(leasePath)
+
 	if err := s.StatsMgr.CreateLease(leasePath); err != nil {
 		outcome = err.Error()
 		return "", err
