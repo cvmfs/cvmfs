@@ -458,6 +458,7 @@ void Publisher::PushWhitelist() {
 
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
   UniquePtr<Publisher> publisher(new Publisher());
+
   publisher->settings_ = settings;
   if (settings.is_silent())
     publisher->llvl_ = kLogNone;
@@ -629,6 +630,19 @@ Publisher::Publisher(const SettingsPublisher &settings)
   , sync_mediator_(NULL)
   , sync_union_(NULL)
 {
+  if (settings.transaction().layout_revision() != kRequiredLayoutRevision) {
+    unsigned layout_revision = settings.transaction().layout_revision();
+    throw EPublish(
+      "This repository uses layout revision " + StringifyInt(layout_revision)
+        + ".\n"
+      "This version of CernVM-FS requires layout revision " + StringifyInt(
+        kRequiredLayoutRevision) + ", which is\n"
+      "incompatible to " + StringifyInt(layout_revision) + ".\n\n"
+      "Please run `cvmfs_server migrate` to update your repository before "
+      "proceeding.",
+      EPublish::kFailLayoutRevision);
+  }
+
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
 

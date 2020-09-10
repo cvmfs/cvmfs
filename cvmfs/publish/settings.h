@@ -128,7 +128,8 @@ class SettingsSpoolArea {
 class SettingsTransaction {
  public:
   explicit SettingsTransaction(const std::string &fqrn)
-    : hash_algorithm_(shash::kShake128)
+    : layout_revision_(0)
+    , hash_algorithm_(shash::kShake128)
     , compression_algorithm_(zlib::kZlibDefault)
     , ttl_second_(240)
     , is_garbage_collectable_(true)
@@ -151,6 +152,7 @@ class SettingsTransaction {
     , spool_area_(fqrn)
   {}
 
+  void SetLayoutRevision(const unsigned revision);
   void SetBaseHash(const shash::Any &hash);
   void SetUnionFsType(const std::string &union_fs);
   void SetHashAlgorithm(const std::string &algorithm);
@@ -168,6 +170,7 @@ class SettingsTransaction {
   void SetTemplate(const std::string &from, const std::string &to);
   void DetectUnionFsType();
 
+  unsigned layout_revision() const { return layout_revision_; }
   shash::Any base_hash() const { return base_hash_; }
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
   zlib::Algorithms compression_algorithm() const {
@@ -203,6 +206,10 @@ class SettingsTransaction {
  private:
   bool ValidateUnionFs();
 
+  /**
+   * See CVMFS_CREATOR_VERSION
+   */
+  Setting<unsigned> layout_revision_;
   /**
    * The root catalog hash based on which the transaction takes place.
    * Usually the current root catalog from the manifest, which should be equal

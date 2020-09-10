@@ -43,6 +43,10 @@ void SettingsSpoolArea::SetRepairMode(const EUnionMountRepairMode val) {
 //------------------------------------------------------------------------------
 
 
+void SettingsTransaction::SetLayoutRevision(const unsigned revision) {
+  layout_revision_ = revision;
+}
+
 void SettingsTransaction::SetBaseHash(const shash::Any &hash) {
   base_hash_ = hash;
 }
@@ -406,6 +410,9 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
     options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
 
   std::string arg;
+  if (options_mgr_->GetValue("CVMFS_CREATOR_VERSION", &arg)) {
+    settings_publisher->GetTransaction()->SetLayoutRevision(String2Uint64(arg));
+  }
   if (options_mgr_->GetValue("CVMFS_UNION_FS_TYPE", &arg)) {
     settings_publisher->GetTransaction()->SetUnionFsType(arg);
   }
