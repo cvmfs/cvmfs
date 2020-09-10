@@ -50,9 +50,17 @@ int CmdTransaction::Main(const Options &options) {
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
   }
+  if (options.Has("template-from")) {
+    if (!options.Has("template-to"))
+      throw EPublish("invalid parameter combination for templates");
+    settings->GetTransaction()->SetTemplate(
+      options.GetString("template-from"), options.GetString("template-to"));
+  }
   if (options.Has("template")) {
+    if (options.Has("template-from") || options.Has("template-to"))
+      throw EPublish("invalid parameter combination for templates");
     std::string templ = options.GetString("template");
-    std::vector<std::string> tokens = SplitString(templ, ':');
+    std::vector<std::string> tokens = SplitString(templ, '=');
     if (tokens.size() != 2)
       throw EPublish("invalid syntax for --template parameter: " + templ);
     settings->GetTransaction()->SetTemplate(tokens[0], tokens[1]);

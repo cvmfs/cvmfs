@@ -19,7 +19,7 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return 7
 
   echo "*** open template transaction"
-  start_transaction $CVMFS_TEST_REPO -T /foo:/bar || return $?
+  start_transaction $CVMFS_TEST_REPO -T /foo=/bar || return $?
   cat /cvmfs/$CVMFS_TEST_REPO/bar/hello || return 10
   cat /cvmfs/$CVMFS_TEST_REPO/bar/nested/x || return 11
   echo "new" > /cvmfs/$CVMFS_TEST_REPO/bar/new || return 12
