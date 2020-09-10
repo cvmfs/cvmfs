@@ -1214,6 +1214,7 @@ Supported Commands:
                   [-i INT (initial retry delay seconds)]
                   [-m INT (max retry delay seconds)]
                   [-n INT (max number of retries)]
+                  [-T /template-from=/template-to]
                   <fully qualified name>
                   Start to edit a repository
   snapshot        [-t fail if other snapshot is in progress]
