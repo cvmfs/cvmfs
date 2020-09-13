@@ -12,43 +12,16 @@ run_unittests --gtest_shuffle \
 
 
 CVMFS_EXCLUDE=
-if [ x"$(lsb_release -cs)" = x"bionic" ]; then
-  # Ubuntu 18.04
-  # Kernel sources too old for gcc, TODO
-  CVMFS_EXCLUDE="src/006-buildkernel"
-  # Expected failure, see test case
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
-  # Hardlinks do not work with overlayfs
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+# Kernel sources too old for gcc, TODO
+CVMFS_EXCLUDE="src/006-buildkernel"
+# Expected failure, see test case
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
-  echo "Ubuntu 18.04... using overlayfs"
-  export CVMFS_TEST_UNIONFS=overlayfs
-fi
-if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-  # Ubuntu 16.04
-  # Kernel sources too old for gcc, TODO
-  CVMFS_EXCLUDE="src/006-buildkernel"
-  # Expected failure, see test case
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
+# Hardlinks do not work with overlayfs
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
 
-  # Hardlinks do not work with overlayfs
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
-
-  echo "Ubuntu 16.04... using overlayfs"
-  export CVMFS_TEST_UNIONFS=overlayfs
-fi
-if [ x"$(lsb_release -cs)" = x"trusty" ]; then
-  # Ubuntu 14.04
-  # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/585-xattrs src/673-acl src/700-overlayfs_validation src/8* src/9*"
-
-  # CVMFS config repository not enabled on Ubuntu 14.04
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany src/086-reloadmanualmount"
-
-  echo "Ubuntu 14.04... using aufs instead of overlayfs"
-fi
-
+export CVMFS_TEST_UNIONFS=overlayfs
 
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."

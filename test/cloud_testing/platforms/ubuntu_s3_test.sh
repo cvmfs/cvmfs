@@ -6,33 +6,22 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
-running unittests
+echo "running unittests"
 run_unittests --gtest_shuffle \
              --gtest_death_test_use_fork || retval=1
 
 
 CVMFS_EXCLUDE=
-if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-  # Ubuntu 16.04
-  # Kernel sources too old for gcc, TODO
-  CVMFS_EXCLUDE="src/006-buildkernel"
-  # Expected failure, see test case
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
-  # Hardlinks do not work with overlayfs
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+# Kernel sources too old for gcc, TODO
+CVMFS_EXCLUDE="src/006-buildkernel"
+# Expected failure, see test case
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
-  echo "Ubuntu 16.04... using overlayfs"
-  export CVMFS_TEST_UNIONFS=overlayfs
-fi
-if [ x"$(lsb_release -cs)" = x"trusty" ]; then
-  # Ubuntu 14.04
-  # aufs, expected failure
-  CVMFS_EXCLUDE="src/700-overlayfs_validation src/80*-repository_gateway*"
+# Hardlinks do not work with overlayfs
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
 
-  echo "Ubuntu 14.04... using aufs instead of overlayfs"
-fi
-
+export CVMFS_TEST_UNIONFS=overlayfs
 
 cd ${SOURCE_DIRECTORY}/test
 
