@@ -35,7 +35,7 @@ func (m *StatisticsMgr) CreateLease(leasePath string) error {
 	m.readLock.Lock()
 	defer m.readLock.Unlock()
 	if _, ex := m.leaseStatistics[leasePath]; ex {
-		return fmt.Errorf("Could not create statistics entry for lease %s, entry already exsts", leasePath)
+		return fmt.Errorf("Could not create statistics entry for lease %s, entry already exists", leasePath)
 	}
 	m.leaseStatistics[leasePath] = Statistics{StartTime: time.Now().Format("2006-01-02 15:04:05")}
 	return nil
