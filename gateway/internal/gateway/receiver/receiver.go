@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	stats "github.com/cvmfs/gateway/internal/gateway/statistics"
 	"github.com/pkg/errors"
 )
 
@@ -44,19 +45,26 @@ type Receiver interface {
 	Quit() error
 	Echo() error
 	SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error
-	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error
+	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 	Interrupt() error // like Ctrl-C SIGTERM -2
 	// Kill() error // like Crtl-D SIGKILL -9
 	TestCrash() error
 }
 
+type ReceiverReply struct {
+	Status        string           `json:"status"`
+	Reason        string           `json:"reason"`
+	FinalRevision uint64           `json:"final_revision"`
+	Statistics    stats.Statistics `json:"statistics"`
+}
+
 // NewReceiver is the factory method for Receiver types
-func NewReceiver(ctx context.Context, execPath string, mock bool, args ...string) (Receiver, error) {
+func NewReceiver(ctx context.Context, execPath string, mock bool, statsMgr *stats.StatisticsMgr, args ...string) (Receiver, error) {
 	if mock {
 		return NewMockReceiver(ctx, execPath, append(args, "-w ''")...)
 	}
 
-	return NewCvmfsReceiver(ctx, execPath, args...)
+	return NewCvmfsReceiver(ctx, execPath, statsMgr, args...)
 }
 
 // CvmfsReceiver spawns an external cvmfs_receiver worker process
@@ -67,15 +75,11 @@ type CvmfsReceiver struct {
 	workerStderr io.ReadCloser
 	workerStdout io.ReadCloser
 	ctx          context.Context
-}
-
-type ReceiverReply struct {
-	Status string `json:"status"`
-	Reason string `json:"reason"`
+	statsMgr     *stats.StatisticsMgr
 }
 
 // NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
-func NewCvmfsReceiver(ctx context.Context, execPath string, args ...string) (*CvmfsReceiver, error) {
+func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.StatisticsMgr, args ...string) (*CvmfsReceiver, error) {
 	if _, err := os.Stat(execPath); os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "worker process executable not found")
 	}
@@ -130,7 +134,7 @@ func NewCvmfsReceiver(ctx context.Context, execPath string, args ...string) (*Cv
 
 	return &CvmfsReceiver{
 		worker: cmd, workerCmdIn: workerInWrite, workerCmdOut: workerOutRead,
-		workerStderr: stderr, workerStdout: stdout, ctx: ctx}, nil
+		workerStderr: stderr, workerStdout: stdout, ctx: ctx, statsMgr: statsMgr}, nil
 }
 
 // Quit command is sent to the worker
@@ -208,17 +212,25 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 		return errors.Wrap(err, "worker 'payload submission' call failed")
 	}
 
-	result := toReceiverError(reply)
+	parsedReply, result := parseReceiverReply(reply)
 
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "submit payload").
 		Msgf("result: %v", result)
 
+	if result == nil {
+		r.statsMgr.MergeIntoLeaseStatistics(leasePath, &parsedReply.Statistics)
+	}
+
 	return result
 }
 
 // Commit command is sent to the worker
-func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	stats, err := r.statsMgr.PopLease(leasePath)
+	if err != nil {
+		return 0, errors.Wrap(err, "could not obtain statistics counters")
+	}
 	req := map[string]interface{}{
 		"lease_path":      leasePath,
 		"old_root_hash":   oldRootHash,
@@ -226,24 +238,25 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 		"tag_name":        tag.Name,
 		"tag_channel":     tag.Channel,
 		"tag_description": tag.Description,
+		"statistics":      stats,
 	}
 	buf, err := json.Marshal(&req)
 	if err != nil {
-		return errors.Wrap(err, "request encoding failed")
+		return 0, errors.Wrap(err, "request encoding failed")
 	}
 
 	reply, err := r.call(receiverCommit, buf, nil)
 	if err != nil {
-		return errors.Wrap(err, "worker 'commit' call failed")
+		return 0, errors.Wrap(err, "worker 'commit' call failed")
 	}
 
-	result := toReceiverError(reply)
+	parsedReply, result := parseReceiverReply(reply)
 
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "commit").
 		Msgf("result: %v", result)
 
-	return result
+	return parsedReply.FinalRevision, result
 }
 
 func (r *CvmfsReceiver) Interrupt() error {
@@ -256,7 +269,7 @@ func (r *CvmfsReceiver) TestCrash() error {
 	if err != nil {
 		return err
 	}
-	result := toReceiverError(reply)
+	_, result := parseReceiverReply(reply)
 	return result
 }
 
@@ -307,19 +320,13 @@ func (r *CvmfsReceiver) reply() ([]byte, error) {
 	return reply, nil
 }
 
-func toReceiverError(reply []byte) error {
-	res := ReceiverReply{}
-	if err := json.Unmarshal(reply, &res); err != nil {
-		return errors.Wrap(err, "could not decode reply")
+func parseReceiverReply(reply []byte) (*ReceiverReply, error) {
+	res := &ReceiverReply{}
+	if err := json.Unmarshal(reply, res); err != nil {
+		return nil, errors.Wrap(err, "could not decode reply")
 	}
-
-	if res.Status == "ok" {
-		return nil
+	if res.Status != "ok" {
+		return res, Error(res.Reason)
 	}
-
-	if res.Reason != "" {
-		return Error(res.Reason)
-	}
-
-	return fmt.Errorf("invalid reply")
+	return res, nil
 }
