@@ -48,6 +48,19 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 		return "", err
 	}
 
+	// the StatsMgr does not handle the case in which a lease expires.
+	// However, if a lease expires, we should not upload it's statistics.
+	// If the LeaseMgr successfully create a new lease,
+	// then, the lease path must be free.
+	// We remove it, no matter what.
+	// We don't check the error because it return an error if the lease does not exist, the standard case.
+	s.StatsMgr.PopLease(leasePath)
+
+	if err := s.StatsMgr.CreateLease(leasePath); err != nil {
+		outcome = err.Error()
+		return "", err
+	}
+
 	outcome = fmt.Sprintf("success: %v", token.TokenStr)
 	return token.TokenStr, err
 }
@@ -121,7 +134,7 @@ func (s *Services) CancelLease(ctx context.Context, tokenStr string) error {
 	outcome := "success"
 	defer logAction(ctx, "cancel_lease", &outcome, t0)
 
-	_, lease, err := s.Leases.GetLease(ctx, tokenStr)
+	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
 		outcome = err.Error()
 		return err
@@ -140,11 +153,16 @@ func (s *Services) CancelLease(ctx context.Context, tokenStr string) error {
 		return err
 	}
 
+	if _, err := s.StatsMgr.PopLease(leasePath); err != nil {
+		outcome = err.Error()
+		return err
+	}
+
 	return nil
 }
 
 // CommitLease associated with the token (transaction commit)
-func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -153,30 +171,40 @@ func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRo
 	leasePath, lease, err := s.Leases.GetLease(ctx, tokenStr)
 	if err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
 	if err := CheckToken(tokenStr, lease.Token.Secret); err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
 
 	repository, _, err := gw.SplitLeasePath(leasePath)
 	if err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
+	var finalRev uint64
 	if err := s.Leases.WithLock(ctx, repository, func() error {
-		return s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+		var err error
+		finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+		return err
 	}); err != nil {
 		outcome = err.Error()
-		return err
+		return 0, err
 	}
+
+	go func() {
+		plotsErr := s.StatsMgr.UploadStatsPlots(repository)
+		if plotsErr != nil {
+			gw.LogC(ctx, "actions", gw.LogError).Msgf(plotsErr.Error())
+		}
+	}()
 
 	if err := s.Leases.CancelLease(ctx, tokenStr); err != nil {
 		outcome = err.Error()
-		return err
+		return finalRev, err
 	}
 
-	return nil
+	return finalRev, nil
 }

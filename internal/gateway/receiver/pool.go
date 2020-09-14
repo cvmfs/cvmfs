@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	stats "github.com/cvmfs/gateway/internal/gateway/statistics"
 )
 
 // task is the common interface of all receiver tasks
@@ -38,12 +39,13 @@ func (p payloadTask) Context() context.Context {
 
 // commitTask is the input data for a commit task
 type commitTask struct {
-	ctx         context.Context
-	leasePath   string
-	oldRootHash string
-	newRootHash string
-	tag         gw.RepositoryTag
-	replyChan   chan<- error
+	ctx          context.Context
+	leasePath    string
+	oldRootHash  string
+	newRootHash  string
+	tag          gw.RepositoryTag
+	replyChan    chan<- error
+	finalRevChan chan<- uint64
 }
 
 // Reply returns the reply channel
@@ -78,15 +80,15 @@ type Pool struct {
 	wg         sync.WaitGroup
 	workerExec string
 	mock       bool
+	smgr       *stats.StatisticsMgr
 }
 
 // StartPool the receiver pool using the specified executable and number of payload
 // submission workers
-func StartPool(workerExec string, numWorkers int, mock bool) (*Pool, error) {
+func StartPool(workerExec string, numWorkers int, mock bool, smgr *stats.StatisticsMgr) (*Pool, error) {
 	// Start payload submission workers
 	tasks := make(chan task)
-
-	pool := &Pool{tasks, sync.WaitGroup{}, workerExec, mock}
+	pool := &Pool{tasks, sync.WaitGroup{}, workerExec, mock, smgr}
 
 	for i := 0; i < numWorkers; i++ {
 		pool.wg.Add(1)
@@ -109,7 +111,7 @@ func (p *Pool) Stop() error {
 // SubmitPayload to be unpacked into the repository
 // TODO: implement timeout or context?
 func (p *Pool) SubmitPayload(ctx context.Context, leasePath string, payload io.Reader, digest string, headerSize int) error {
-	reply := make(chan error)
+	reply := make(chan error, 1)
 	p.tasks <- payloadTask{ctx, leasePath, payload, digest, headerSize, reply}
 	result := <-reply
 	return result
@@ -117,11 +119,15 @@ func (p *Pool) SubmitPayload(ctx context.Context, leasePath string, payload io.R
 
 // CommitLease associated with the token (transaction commit)
 // TODO: implement timeout or context?
-func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
-	reply := make(chan error)
-	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, reply}
+func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	reply := make(chan error, 1)
+	finalRevChan := make(chan uint64, 1)
+	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, reply, finalRevChan}
 	result := <-reply
-	return result
+	if result == nil {
+		return <-finalRevChan, nil
+	}
+	return 0, result
 }
 
 // this is private, it is not enough to just make it private but it is a good start
@@ -148,28 +154,31 @@ M:
 
 		func() {
 			t0 := time.Now()
-			receiver, err := NewReceiver(task.Context(), pool.workerExec, pool.mock)
+			receiver, err := NewReceiver(task.Context(), pool.workerExec, pool.mock, pool.smgr)
 			if err != nil {
 				task.Reply() <- err
 				return
 			}
 			defer func() {
 				if err := receiver.Quit(); err != nil {
-					gw.Log("worker_pool", gw.LogInfo).
+					gw.LogC(task.Context(), "worker_pool", gw.LogError).
 						Int("worker_id", workerIdx).
-						Msgf("got an error while quitting: %s", err)
+						Msgf("error when quitting the receiver: %v", err.Error())
 				}
 			}()
 
 			var taskType string
 			var result error
+			var finalRev uint64
 			switch t := task.(type) {
 			case payloadTask:
 				result = receiver.SubmitPayload(t.leasePath, t.payload, t.digest, t.headerSize)
 				taskType = "payload"
 			case commitTask:
-				result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
+				finalRev, result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
 				taskType = "commit"
+				t.finalRevChan <- finalRev
+				close(t.finalRevChan)
 			case testCrashTask:
 				result = receiver.TestCrash()
 				taskType = "testcrash"
@@ -179,6 +188,7 @@ M:
 			}
 
 			task.Reply() <- result
+			close(task.Reply())
 
 			gw.LogC(task.Context(), "worker_pool", gw.LogDebug).
 				Int("worker_id", workerIdx).

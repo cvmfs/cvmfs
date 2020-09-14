@@ -5,6 +5,7 @@ import (
 	"io"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	stats "github.com/cvmfs/gateway/internal/gateway/statistics"
 )
 
 // MockReceiver is a mocked implementation of the Receiver interface, for testing
@@ -16,7 +17,7 @@ type MockReceiver struct {
 // NewMockReceiver constructs a new MockReceiver object which implements the
 // Receiver interface
 func NewMockReceiver(ctx context.Context, execPath string, args ...string) (Receiver, error) {
-	CvmfsReceiver, err := NewCvmfsReceiver(ctx, execPath, args...)
+	CvmfsReceiver, err := NewCvmfsReceiver(ctx, execPath, stats.NewStatisticsMgr(), args...)
 	// if some error happens, like the receiver code cannot be started,
 	// we want to handle it separately, otherwise it crash with Segmentation Fault.
 	if err != nil {
@@ -25,11 +26,11 @@ func NewMockReceiver(ctx context.Context, execPath string, args ...string) (Rece
 	return &MockReceiver{*CvmfsReceiver}, nil
 }
 
-func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) error {
+func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	gw.LogC(r.CvmfsReceiver.ctx, "mock receiver", gw.LogWarn).
 		Str("leaserPath", leasePath).
 		Msg("Requested commit agains a testing mock, shortcircuit success")
-	return nil
+	return 1, nil
 }
 
 func (r *MockReceiver) SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error {
@@ -39,7 +40,6 @@ func (r *MockReceiver) SubmitPayload(leasePath string, payload io.Reader, digest
 	return nil
 }
 
-// Commit command
 func (r *MockReceiver) Interrupt() error {
 	return nil
 }
