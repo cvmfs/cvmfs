@@ -17,6 +17,9 @@
 //	|	+--	layers.json
 //	|	+-- layers.lock
 
+// For more information, have a look at this document: 
+// https://docs.google.com/document/d/1uP_K6T5tB3qxbN4-S-tRdUkiFggv7Skw3MXZRgWYjS0/edit?usp=sharing
+
 package lib
 
 import (
@@ -63,7 +66,7 @@ var (
 )
 
 // creates layers.json file in podmanStore.
-func (img *Image) IngestLayerInfo(CVMFSRepo string, digestMap map[string]string) (err error) {
+func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string) (err error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Warn("Error in getting the image manifest")
@@ -85,15 +88,20 @@ func (img *Image) IngestLayerInfo(CVMFSRepo string, digestMap map[string]string)
 	}
 
 	storedlayersdata := []LayerInfo{}
-	storedLayerInfoPath := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata", img.GetSimpleName(), "layers.json")
-	//get stored layers.json for img
-	if _, err := os.Stat(storedLayerInfoPath); err == nil {
-		file, err := ioutil.ReadFile(storedLayerInfoPath)
-		if err != nil {
-			LogE(err).Error("layers.json file not found in .metadata")
-			return err
+	for _, layer := range manifest.Layers {
+		storedlayerdata := []LayerInfo{}
+		layerDigest := strings.Split(layer.Digest, ":")[1]
+		storedlayerinfopath := filepath.Join(LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
+		println(storedlayerinfopath)
+		if _, err := os.Stat(storedlayerinfopath); err == nil {
+			file, err := ioutil.ReadFile(storedlayerinfopath)
+			if err != nil {
+				LogE(err).Error("Error in reading layers.json file")
+				return err
+			}
+			json.Unmarshal(file, &storedlayerdata)
 		}
-		json.Unmarshal(file, &storedlayersdata)
+		storedlayersdata = append(storedlayersdata, storedlayerdata...)
 	}
 
 	// digestMap maps from compressed digest to uncompressed digest
@@ -134,7 +142,7 @@ func (img *Image) IngestLayerInfo(CVMFSRepo string, digestMap map[string]string)
 }
 
 // create images.json file in podmanStore
-func (img *Image) IngestImageInfo(CVMFSRepo string, digestMap map[string]string) (err error) {
+func (img *Image) PublishImageInfo(CVMFSRepo string, digestMap map[string]string) (err error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		LogE(err).Warn("Error in getting the image manifest")
@@ -183,7 +191,7 @@ func (img *Image) IngestImageInfo(CVMFSRepo string, digestMap map[string]string)
 }
 
 // Ingest the exploded rootfs in podman store.
-func (img *Image) IngestRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string, digestMap map[string]string) (err error) {
+func (img *Image) LinkRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string, digestMap map[string]string) (err error) {
 	Log().WithFields(log.Fields{"action": "Ingesting layer rootfs into podman store for the image"}).Info(img.GetSimpleName())
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -296,7 +304,7 @@ func (img *Image) CreateLowerFiles(CVMFSRepo string, digestMap, layerIdMap map[s
 }
 
 // Ingest the image config file in podman store.
-func (img *Image) IngestConfigFile(CVMFSRepo string) (err error) {
+func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating config file for the image in podman store"}).Info(img.GetSimpleName())
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -316,7 +324,7 @@ func (img *Image) IngestConfigFile(CVMFSRepo string) (err error) {
 		user := img.User
 		pass, err := GetPassword()
 		if err != nil {
-			LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
+			LogE(err).Warning("Unable to get the credential for downloading the configuration blob, trying anonymously")
 			user = ""
 			pass = ""
 		}
@@ -357,7 +365,7 @@ func (img *Image) IngestConfigFile(CVMFSRepo string) (err error) {
 }
 
 // Ingest the image manifest in podman store.
-func (img *Image) IngestImageManifest(CVMFSRepo string) (err error) {
+func (img *Image) PublishImageManifest(CVMFSRepo string) (err error) {
 	Log().WithFields(log.Fields{"action": "Creating manifest file for the image in podman store"}).Info(img.GetSimpleName())
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -397,7 +405,7 @@ func (img *Image) CreateLockFiles(CVMFSRepo string) (err error) {
 			if err != nil {
 				return err
 			}
-			err = IngestIntoCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(file), tmpFile.Name())
+			err = PublishToCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(file), tmpFile.Name())
 			os.RemoveAll(tmpFile.Name())
 			if err != nil {
 				return err
@@ -427,6 +435,8 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 		for _, image := range imagesinfo {
 			present := false
 			for _, name := range image.Names {
+				// we have already checked if the same image is present in the podman store or not.
+				// hence if the we find another image with same name, it means its content (digest) has changed.
 				if name == img.GetSimpleName() {
 					Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("older image version present, cleaning and ingesting newer version")
 					present = true
@@ -477,7 +487,7 @@ func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (er
 		}
 	}
 
-	err = img.IngestConfigFile(CVMFSRepo)
+	err = img.CreateConfigFile(CVMFSRepo)
 	if err != nil {
 		LogE(err).Error("Unable to create config file in podman store")
 		return err
@@ -488,19 +498,19 @@ func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (er
 	digestMap := make(map[string]string)
 	layerIdMap := make(map[string]string)
 
-	err = img.IngestLayerInfo(CVMFSRepo, digestMap)
+	err = img.PublishLayerInfo(CVMFSRepo, digestMap)
 	if err != nil {
 		LogE(err).Error("Unable to create layers.json file in podman store")
 		return err
 	}
 
-	err = img.IngestImageInfo(CVMFSRepo, digestMap)
+	err = img.PublishImageInfo(CVMFSRepo, digestMap)
 	if err != nil {
 		LogE(err).Error("Unable to create images.json file in podman store")
 		return err
 	}
 
-	err = img.IngestRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo, digestMap)
+	err = img.LinkRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo, digestMap)
 	if err != nil {
 		LogE(err).Error("Error ingesting rootfs into podman image store")
 		return err
@@ -524,7 +534,7 @@ func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (er
 		return err
 	}
 
-	err = img.IngestImageManifest(CVMFSRepo)
+	err = img.PublishImageManifest(CVMFSRepo)
 	if err != nil {
 		LogE(err).Error("Unable to create manifest file in podman store")
 		return err

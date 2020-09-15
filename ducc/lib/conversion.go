@@ -82,7 +82,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	if err != nil {
 		LogE(err).WithFields(log.Fields{
 			"directory": ".flat"}).Error(
-			"Impossible to create subcatalog in super-directory.")
+			"Impossible to create subcatalog in the directory.")
 	}
 
 	tmpDir, err := UserDefinedTempDir("", "conversion")
@@ -169,7 +169,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 			continue
 		}
 
-		err = singularity.IngestIntoCVMFS(wish.CvmfsRepo)
+		err = singularity.PublishToCVMFS(wish.CvmfsRepo)
 		if err != nil {
 			LogE(err).Error("Error in ingesting the singularity image into the CVMFS repository")
 			firstError = err
@@ -273,7 +273,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload bool) (err error
 	if err != nil {
 		LogE(err).WithFields(log.Fields{
 			"directory": subDirInsideRepo}).Error(
-			"Impossible to create subcatalog in super-directory.")
+			"Impossible to create subcatalog in the directory.")
 	}
 	var firstError error
 	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
@@ -388,7 +388,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 					return
 				}
 
-				err = StoreLayerInfo(inputImage, repo, layer.Name, layer.Path)
+				err = StoreLayerInfo(repo, layerDigest, layer.Path)
 				if err != nil {
 					LogE(err).Error("Error in storing the layers.json file in the repository")
 				}
@@ -438,7 +438,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 
 	if noErrorInConversionValue {
 		manifestPath := filepath.Join(".metadata", inputImage.GetSimpleName(), "manifest.json")
-		errIng := IngestIntoCVMFS(repo, manifestPath, <-manifestChanell)
+		errIng := PublishToCVMFS(repo, manifestPath, <-manifestChanell)
 		if errIng != nil {
 			LogE(errIng).Error("Error in storing the manifest in the repository")
 		}
@@ -562,20 +562,10 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	return
 }
 
-func StoreLayerInfo(inputImage *Image, CVMFSRepo string, layerDigest string, r *ReadAndHash) (err error) {
-	Log().WithFields(log.Fields{"action": "Ingesting layers.json"}).Info("store layer information im .metadata")
+func StoreLayerInfo(CVMFSRepo string, layerDigest string, r *ReadAndHash) (err error) {
+	Log().WithFields(log.Fields{"action": "Ingesting layers.json"}).Info("store layer information in .layers")
 	layersdata := []LayerInfo{}
-	layerInfoPath := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata", inputImage.GetSimpleName(), "layers.json")
-
-	//check if layers.json already exist and append to data
-	if _, err := os.Stat(layerInfoPath); err == nil {
-		file, err := ioutil.ReadFile(layerInfoPath)
-		if err != nil {
-			LogE(err).Error("Error in reading layers.json file")
-			return err
-		}
-		json.Unmarshal(file, &layersdata)
-	}
+	layerInfoPath := filepath.Join(LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
 
 	diffID := fmt.Sprintf("%x", r.Sum256(nil))
 	size := r.GetSize()
@@ -583,7 +573,7 @@ func StoreLayerInfo(inputImage *Image, CVMFSRepo string, layerDigest string, r *
 	layerinfo := LayerInfo{
 		ID:                   diffID,
 		Created:              created,
-		CompressedDiffDigest: layerDigest,
+		CompressedDiffDigest: "sha256:" + layerDigest,
 		UncompressedDigest:   "sha256:" + diffID,
 		UncompressedSize:     size,
 	}

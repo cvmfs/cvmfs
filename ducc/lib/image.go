@@ -388,7 +388,7 @@ func (i *Image) GetPublicSymlinkPath() string {
 	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
 
-func (s Singularity) IngestIntoCVMFS(CVMFSRepo string) error {
+func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 	symlinkPath := s.Image.GetPublicSymlinkPath()
 	singularityPath, err := s.Image.GetSingularityPath()
 	if err != nil {
@@ -397,7 +397,7 @@ func (s Singularity) IngestIntoCVMFS(CVMFSRepo string) error {
 		return err
 	}
 
-	err = IngestIntoCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
+	err = PublishToCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
 	if err != nil {
 		// if there is an error ingest does not remove the folder.
 		// we do want to remove the folder anyway
