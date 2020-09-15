@@ -20,7 +20,7 @@ notifications:
     on_failure: always
 
 before_install:
-  - wget https://ecsft.cern.ch/dist/cvmfs/nightlies/cvmfs-git-2478/cvmfs_2.8.0~0.2478gitacdac6f0b88f0111+ubuntu18.04_amd64.deb
-  - sudo apt-get install ./cvmfs-server_2.8.0~0.2478gitacdac6f0b88f0111+ubuntu18.04_amd64.deb
+  - wget https://ecsft.cern.ch/dist/cvmfs/nightlies/cvmfs-git-2478/cvmfs-server_2.8.0~0.2478gitacdac6f0b88f0111+ubuntu18.04_amd64.deb
+  - sudo apt-get install -y ./cvmfs-server_2.8.0~0.2478gitacdac6f0b88f0111+ubuntu18.04_amd64.deb
 
 script: go test -mod=vendor -v ./...
