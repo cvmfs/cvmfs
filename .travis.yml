@@ -12,6 +12,7 @@ jobs:
   include:
     - os: linux
       dist: focal
+      go: master
     - os: linux
       dist: bionic
       go: master
