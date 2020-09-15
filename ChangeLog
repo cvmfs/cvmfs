@@ -42,7 +42,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.5:
-  * Add CVMFS_CLIENT_PROFILE to cvmfs_config parameter list
+  * Add CVMFS_CLIENT_PROFILE, CVMFS_USE_CDN to cvmfs_config parameter list
   * Let mount helper detect defined but empty CVMFS_HTTP_PROXY
 
 2.7.4:
