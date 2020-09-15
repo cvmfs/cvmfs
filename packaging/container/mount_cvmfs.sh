@@ -40,12 +40,18 @@ CONFIG=/etc/cvmfs/default.d/95-container-local.conf
 
 echo "CVMFS_REPOSITORIES=$CVMFS_REPOSITORIES" > $CONFIG
 
-if [ -z "$CVMFS_HTTP_PROXY" ]; then
+if [ -z "$CVMFS_HTTP_PROXY" -a -z "$CVMFS_CLIENT_PROFILE" ]; then
   echo "[ERR] CVMFS_HTTP_PROXY environment variable required" | tee -a $BOOT_LOG
   exit 1
 fi
-echo "[INF] using CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" | tee -a $BOOT_LOG
-echo "CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" >> $CONFIG
+if [ -n "$CVMFS_HTTP_PROXY" ]; then
+  echo "[INF] using CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" | tee -a $BOOT_LOG
+  echo "CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" >> $CONFIG
+fi
+if [ -n "$CVMFS_CLIENT_PROFILE" ]; then
+  echo "[INF] using CVMFS_CLIENT_PROFILE='$CVMFS_CLIENT_PROFILE'" | tee -a $BOOT_LOG
+  echo "CVMFS_CLIENT_PROFILE='$CVMFS_CLIENT_PROFILE'" >> $CONFIG
+fi
 
 if [ ! -z "$CVMFS_QUOTA_LIMIT" ]; then
   echo "[INF] using CVMFS_QUOTA_LIMIT='$CVMFS_QUOTA_LIMIT'" | tee -a $BOOT_LOG
