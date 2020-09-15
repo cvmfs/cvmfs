@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
@@ -37,7 +36,8 @@ const (
 	receiverCheckToken    // Unused
 	receiverSubmitPayload
 	receiverCommit
-	receiverError // Unused
+	receiverError     // Unused
+	receiverTestCrash // Used only in testing
 )
 
 // Receiver contains the operations that "receiver" worker processes perform
@@ -48,6 +48,7 @@ type Receiver interface {
 	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 	Interrupt() error // like Ctrl-C SIGTERM -2
 	// Kill() error // like Crtl-D SIGKILL -9
+	TestCrash() error
 }
 
 type ReceiverReply struct {
@@ -58,12 +59,12 @@ type ReceiverReply struct {
 }
 
 // NewReceiver is the factory method for Receiver types
-func NewReceiver(ctx context.Context, execPath string, mock bool, statsMgr *stats.StatisticsMgr) (Receiver, error) {
+func NewReceiver(ctx context.Context, execPath string, mock bool, statsMgr *stats.StatisticsMgr, args ...string) (Receiver, error) {
 	if mock {
-		return NewMockReceiver(ctx)
+		return NewMockReceiver(ctx, execPath, append(args, "-w ''")...)
 	}
 
-	return NewCvmfsReceiver(ctx, execPath, statsMgr)
+	return NewCvmfsReceiver(ctx, execPath, statsMgr, args...)
 }
 
 // CvmfsReceiver spawns an external cvmfs_receiver worker process
@@ -78,12 +79,14 @@ type CvmfsReceiver struct {
 }
 
 // NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
-func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.StatisticsMgr) (*CvmfsReceiver, error) {
+func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.StatisticsMgr, args ...string) (*CvmfsReceiver, error) {
 	if _, err := os.Stat(execPath); os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "worker process executable not found")
 	}
 
-	cmd := exec.Command(execPath, "-i", strconv.Itoa(3), "-o", strconv.Itoa(4))
+	cmdLine := []string{"-i", "3", "-o", "4"}
+	cmdLine = append(cmdLine, args...)
+	cmd := exec.Command(execPath, cmdLine...)
 
 	workerInRead, workerInWrite, err := os.Pipe()
 	if err != nil {
@@ -118,6 +121,12 @@ func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.Stat
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "could not start worker process")
 	}
+
+	// it is necessary to close this two files, otherwise, if the receiver crash,
+	// a read on the `workerOutRead` / `workerCmdOut` will hang forever.
+	// details: https://web.archive.org/web/20200429092830/https://redbeardlab.com/2020/04/29/on-linux-pipes-fork-and-passing-file-descriptors-to-other-process/
+	workerInRead.Close()
+	workerOutWrite.Close()
 
 	gw.LogC(ctx, "receiver", gw.LogDebug).
 		Str("command", "start").
@@ -254,10 +263,21 @@ func (r *CvmfsReceiver) Interrupt() error {
 	return r.worker.Process.Signal(os.Interrupt)
 }
 
+// Method used only in testing, we provide an empty implementation here
+func (r *CvmfsReceiver) TestCrash() error {
+	reply, err := r.call(receiverTestCrash, nil, nil)
+	if err != nil {
+		return err
+	}
+	_, result := parseReceiverReply(reply)
+	return result
+}
+
 func (r *CvmfsReceiver) call(reqID receiverOp, msg []byte, payload io.Reader) ([]byte, error) {
 	if err := r.request(reqID, msg, payload); err != nil {
 		return nil, err
 	}
+
 	return r.reply()
 }
 
@@ -282,12 +302,18 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader)
 func (r *CvmfsReceiver) reply() ([]byte, error) {
 	buf := make([]byte, 4)
 	if _, err := io.ReadFull(r.workerCmdOut, buf); err != nil {
+		if (err == io.EOF) || (err == io.ErrUnexpectedEOF) {
+			return nil, errors.Wrap(err, "possible that the receiver crashed")
+		}
 		return nil, errors.Wrap(err, "could not read reply size")
 	}
 	repSize := int32(binary.LittleEndian.Uint32(buf))
 
 	reply := make([]byte, repSize)
 	if _, err := io.ReadFull(r.workerCmdOut, reply); err != nil {
+		if (err == io.EOF) || (err == io.ErrUnexpectedEOF) {
+			return nil, errors.Wrap(err, "possible that the receiver crashed")
+		}
 		return nil, errors.Wrap(err, "could not read reply body")
 	}
 
