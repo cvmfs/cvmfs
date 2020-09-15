@@ -68,7 +68,7 @@ run_transactions() {
         return 1
     fi
 
-    check_repo_integrity test.repo.org || return 1
+    cvmfs_server check test.repo.org || return 1
 
     echo "  Work on nested catalogs" || return 20
     cvmfs_server transaction test.repo.org
