@@ -58,6 +58,19 @@ func (p commitTask) Context() context.Context {
 	return p.ctx
 }
 
+type testCrashTask struct {
+	ctx       context.Context
+	replyChan chan<- error
+}
+
+func (p testCrashTask) Reply() chan<- error {
+	return p.replyChan
+}
+
+func (p testCrashTask) Context() context.Context {
+	return p.ctx
+}
+
 // Pool maintains a number of parallel receiver workers to service
 // payload submission and commit requests. Payload submissions are done in
 // parallel, using Config.NumReceivers workers, while only a single commit
@@ -117,6 +130,14 @@ func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootH
 	return 0, result
 }
 
+// this is private, it is not enough to just make it private but it is a good start
+func (p *Pool) testCrash(ctx context.Context) error {
+	reply := make(chan error)
+	p.tasks <- testCrashTask{ctx, reply}
+	result := <-reply
+	return result
+}
+
 func worker(tasks <-chan task, pool *Pool, workerIdx int) {
 	gw.Log("worker_pool", gw.LogDebug).
 		Int("worker_id", workerIdx).
@@ -158,6 +179,9 @@ M:
 				taskType = "commit"
 				t.finalRevChan <- finalRev
 				close(t.finalRevChan)
+			case testCrashTask:
+				result = receiver.TestCrash()
+				taskType = "testcrash"
 			default:
 				task.Reply() <- fmt.Errorf("unknown task type")
 				return

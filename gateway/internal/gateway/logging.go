@@ -16,6 +16,7 @@ type LogLevel zerolog.Level
 const (
 	LogDebug LogLevel = LogLevel(zerolog.DebugLevel)
 	LogInfo  LogLevel = LogLevel(zerolog.InfoLevel)
+	LogWarn  LogLevel = LogLevel(zerolog.WarnLevel)
 	LogError LogLevel = LogLevel(zerolog.ErrorLevel)
 )
 
