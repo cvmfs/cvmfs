@@ -15,9 +15,9 @@ if [ $# -lt 2 ]; then
   exit 1
 fi
 
-CVMFS_SOURCE_LOCATION="$1"
+CVMFS_SOURCE_LOCATION="$1" # not used
 CVMFS_RESULT_LOCATION="$2"
-CVMFS_BUSYBOX=/usr/bin/busybox
+CVMFS_BUSYBOX_URL="https://ecsft.cern.ch/dist/cvmfs/builddeps/busybox"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
 # For the time being, build with the host's docker until the builder nodes are
@@ -26,21 +26,6 @@ CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
 if ! docker version; then
   echo "docker required to build container image"
-  exit 1
-fi
-
-# if ! buildah version; then
-#   echo "buildah required to build container image"
-#   exit 1
-# fi
-
-if ! $CVMFS_BUSYBOX --help | head -5; then
-  echo "functional busybox is required"
-  exit 1
-fi
-
-if ! lsb_release -sicr; then
-  echo "lsb_release required to build container image"
   exit 1
 fi
 
@@ -64,7 +49,7 @@ else
 fi
 
 ${CVMFS_SOURCE_LOCATION}/packaging/container/build.sh \
-  ${CVMFS_SOURCE_LOCATION} ${CVMFS_RESULT_LOCATION} ${CVMFS_BUSYBOX} ${CVMFS_TAG} \
+  ${CVMFS_RESULT_LOCATION} ${CVMFS_BUSYBOX_URL} ${CVMFS_TAG} \
   || die "failed building service container"
 
 
