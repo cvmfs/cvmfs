@@ -22,7 +22,7 @@ RUN mkdir ~/root && \
         rm -rf ~/root/usr/lib*/libcvmfs_fuse_stub.* \
         rm -rf ~/root/usr/lib*/cvmfs/auto.cvmfs
 
-# the executable that we want are not in ~/root/usr
+# the executables that we want are now in ~/root/usr
 # however we need to isolate the runtime dependecies of those executables
 # we start by finding all the files with `find`
 # then we run ldd against each of those files to get their runtime dependencies
@@ -35,6 +35,8 @@ RUN mkdir ~/deps && \
         grep /lib | sort | uniq | \
         rsync -aL --files-from=- / ~/deps/
 
+# the executables and the dependencies are then pushed into a busybox
+# we also push the loader and we create the necessary directories
 FROM busybox
 COPY --from=builder /home/sftnight/deps /
 COPY --from=builder /home/sftnight/root /
