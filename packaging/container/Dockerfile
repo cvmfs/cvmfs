@@ -35,9 +35,18 @@ RUN mkdir ~/deps && \
         grep /lib | sort | uniq | \
         rsync -aL --files-from=- / ~/deps/
 
-# the executables and the dependencies are then pushed into a busybox
+# build our own custom busybox (BB)
+FROM build-base as BB-builder
+ARG BUSYBOX_URL=https://ecsft.cern.ch/dist/cvmfs/builddeps/busybox
+
+RUN curl ${BUSYBOX_URL} -o busybox
+RUN mkdir -p ~/BB/bin && chmod +x ./busybox && ./busybox --install ~/BB/bin
+
+# we start by re-creating our BB (the alternative would be to use the stock BB image)
+# the executables and the dependencies are then pushed into the BB
 # we also push the loader and we create the necessary directories
-FROM busybox
+FROM scratch
+COPY --from=BB-builder /home/sftnight/BB/bin /bin
 COPY --from=builder /home/sftnight/deps /
 COPY --from=builder /home/sftnight/root /
 COPY --from=builder /lib64/ld-linux-x86-64.so.2 /lib64
