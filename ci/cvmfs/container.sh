@@ -49,7 +49,7 @@ else
 fi
 
 ${CVMFS_SOURCE_LOCATION}/packaging/container/build.sh \
-  ${CVMFS_RESULT_LOCATION} ${CVMFS_BUSYBOX_URL} ${CVMFS_TAG} \
+  ${CVMFS_RESULT_LOCATION} ${CVMFS_BUSYBOX_URL} ${git_hash} \
   || die "failed building service container"
 
 
