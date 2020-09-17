@@ -9,6 +9,8 @@ LABEL maintainer="jblomer@cern.ch"
 LABEL version="$VERSION"
 LABEL platform="$PLATFORM"
 
+# Can be set to auto-discover the squid proxy
+ENV CVMFS_CLIENT_PROFILE=
 # Needs to be set to the site squid
 ENV CVMFS_HTTP_PROXY=
 # The cvmfs-config.cern.ch repository gets always mounted
