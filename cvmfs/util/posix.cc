@@ -53,6 +53,7 @@
 #include "logging.h"
 #include "platform.h"
 
+#include "util/algorithm.h"
 #include "util/exception.h"
 #include "util_concurrency.h"
 
@@ -1119,6 +1120,40 @@ std::vector<std::string> FindDirectories(const std::string &parent_dir) {
   closedir(dirp);
   sort(result.begin(), result.end());
   return result;
+}
+
+/**
+ * Finds all files and direct subdirectories under directory (except ., ..).
+ */
+bool ListDirectory(const std::string &directory,
+                   std::vector<std::string> *names,
+                   std::vector<mode_t> *modes)
+{
+  DIR *dirp = opendir(directory.c_str());
+  if (!dirp)
+    return false;
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const std::string name(dirent->d_name);
+    if ((name == ".") || (name == ".."))
+      continue;
+    const std::string path = directory + "/" + name;
+
+    platform_stat64 info;
+    int retval = platform_lstat(path.c_str(), &info);
+    if (retval != 0) {
+      closedir(dirp);
+      return false;
+    }
+
+    names->push_back(name);
+    modes->push_back(info.st_mode);
+  }
+  closedir(dirp);
+
+  SortTeam(names, modes);
+  return true;
 }
 
 
