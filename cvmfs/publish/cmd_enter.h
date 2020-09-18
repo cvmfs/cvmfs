@@ -39,6 +39,9 @@ class CmdEnter : public Command {
  private:
   void MountCvmfs(const SettingsPublisher &settings);
   void MountOverlayfs(const SettingsPublisher &settings);
+  void CreateUnderlay(const std::string &source_dir,
+                      const std::string &dest_dir,
+                      const std::vector<std::string> &empty_dirs);
 
   std::string cvmfs_binary_;
   std::string overlayfs_binary_;
