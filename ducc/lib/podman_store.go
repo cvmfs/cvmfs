@@ -92,7 +92,6 @@ func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string
 		storedlayerdata := []LayerInfo{}
 		layerDigest := strings.Split(layer.Digest, ":")[1]
 		storedlayerinfopath := filepath.Join(LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
-		println(storedlayerinfopath)
 		if _, err := os.Stat(storedlayerinfopath); err == nil {
 			file, err := ioutil.ReadFile(storedlayerinfopath)
 			if err != nil {

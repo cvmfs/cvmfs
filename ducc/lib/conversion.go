@@ -519,8 +519,8 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 }
 
 func PushImageToRegistry(outputImage Image) (err error) {
-	// is necessary this mechanism to pass the authentication to the
-	// dockers even if the documentation says otherwise
+	// the authentication must be provided for the ImagePush api,
+	// even if the documentation says otherwise
 	password, err := GetPassword()
 	if err != nil {
 		return err
