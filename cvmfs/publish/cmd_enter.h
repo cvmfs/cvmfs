@@ -34,6 +34,7 @@ class CmdEnter : public Command {
       "Path to the cvmfs2 binary"));
     p.push_back(Parameter::Optional("cvmfs-config", 'C', "path",
       "Path to extra configuration for the CernVM-FS client"));
+    p.push_back(Parameter::Switch("root", 'r', "Run as fake root"));
     return p;
   }
   virtual unsigned GetMinPlainArgs() const { return 1; }
@@ -47,6 +48,7 @@ class CmdEnter : public Command {
                       const std::vector<std::string> &empty_dirs);
   void WriteCvmfsConfig();
   void MountCvmfs();
+  pid_t RunInteractiveShell();
 
   std::string fqrn_;
   std::string session_dir_;
