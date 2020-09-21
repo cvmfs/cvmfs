@@ -1,5 +1,3 @@
-# Hello World!
-#
 # CMake build script to configure and build CernVM-FS and all it's
 # external dependencies, if they are statically linked into the binaries
 #
