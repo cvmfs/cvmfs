@@ -1,6 +1,7 @@
 package cvmfs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -114,11 +115,14 @@ func TestAbortAgainstACvmfs(t *testing.T) {
 func TestOperations(t *testing.T) {
 	t.Parallel()
 	repo := NewRepository("test5.ch")
+	t.Log("Making repo...")
 	err := repo.MkFs()
 	if err != nil {
 		t.Errorf("Error in creating a new cvmfs FS: %s", err)
 		return
 	}
+	t.Log("Done creating repo...")
+
 	defer repo.RmFs()
 
 	paths := []string{
@@ -130,17 +134,24 @@ func TestOperations(t *testing.T) {
 		filepath.Join(repo.Root(), "f", "5", "4", "3", "2", "1"),
 	}
 
+	waitFor := uint64(0)
 	for _, path := range paths {
-		repo.AddFSOperation(CreateDirectory{path})
+		waitFor, _ = repo.AddFSOperations(CreateDirectory{path})
+		fmt.Println(waitFor)
 	}
 
-	err, opsErr := repo.ExecuteFSOperations()
-	if err != nil {
-		t.Errorf("Error in executing operations; %s", err)
+	if waitFor != 6 {
+		t.Errorf("Expected index to wait equal to %d found equal to %d", 6, waitFor)
 	}
 
-	if len(opsErr) != len(paths) {
-		t.Errorf("Expeted %d operations got only %d", len(paths), len(opsErr))
+	go repo.Execs()
+
+	for {
+		done := repo.DoneIndex()
+		fmt.Println(done)
+		if done >= waitFor {
+			break
+		}
 	}
 
 	for _, path := range paths {
@@ -148,5 +159,4 @@ func TestOperations(t *testing.T) {
 			t.Errorf("Expected directory but directory not found: %s", path)
 		}
 	}
-
 }
