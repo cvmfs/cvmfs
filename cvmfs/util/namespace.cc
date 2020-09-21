@@ -88,6 +88,16 @@ bool BindMount(const std::string &from, const std::string &to) {
 }
 
 
+bool ProcMount(const std::string &to) {
+#ifdef __APPLE__
+  return false;
+#else
+  int rvi = mount("proc", to.c_str(), "proc", 0, NULL);
+  return rvi == 0;
+#endif
+}
+
+
 bool CreateMountNamespace() {
 #ifdef CVMFS_HAS_UNSHARE
   std::string cwd = GetCurrentWorkingDirectory();

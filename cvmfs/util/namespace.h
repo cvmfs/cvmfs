@@ -24,5 +24,6 @@ bool CreateMountNamespace();
 bool CreatePidNamespace(int *fd_parent);
 
 bool BindMount(const std::string &from, const std::string &to);
+bool ProcMount(const std::string &to);
 
 #endif  // CVMFS_UTIL_NAMESPACE_H_
