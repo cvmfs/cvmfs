@@ -19,10 +19,10 @@ type Repo struct {
 
 func NewRepo(name string) Repo {
 	r := cvmfs.NewRepository(name)
-	return Repo{&r}
+	return Repo{r}
 }
 
-func (repo Repo) statusLayer(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func (repo *Repo) statusLayer(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	// the layer to be correctly ingested, need to:
 	// 1. Exists
 	// 2. Have the layerfs directory

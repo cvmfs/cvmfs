@@ -2,12 +2,10 @@ package cvmfs
 
 import (
 	"fmt"
-	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/cvmfs/ducc/lib"
@@ -20,16 +18,36 @@ type Repository struct {
 	operationsLock sync.Mutex
 	opsIndex       uint64
 	doneIndex      uint64
+	commitCh       chan bool
+	waitingLists   map[uint64][]chan bool
 }
 
-func NewRepository(name string) Repository {
-	return Repository{name, sync.Mutex{}, make(chan FSOperation, 50), sync.Mutex{}, 0, 0}
+func NewRepository(name string) *Repository {
+	fsoperations := make(chan FSOperation, 50)
+	opsIndex := uint64(0)
+	doneIndex := uint64(0)
+	commitCh := make(chan bool, 5)
+	waitingLists := make(map[uint64][]chan bool)
+	repo := &Repository{name,
+		sync.Mutex{},
+		fsoperations,
+		sync.Mutex{},
+		opsIndex,
+		doneIndex,
+		commitCh,
+		waitingLists}
+	go repo.counter()
+	return repo
 }
 
+// returns the root of the repository
 func (repo *Repository) Root() string {
 	return filepath.Join("/", "cvmfs", repo.Name)
 }
 
+// add a filesyste operation that should execute against the repository
+// if everything goes well it returns an index (and nil error).
+// the index can be used with the `WaitFor` method
 func (repo *Repository) AddFSOperations(ops ...FSOperation) (uint64, error) {
 	basePath := filepath.Join("/", "cvmfs", repo.Name)
 	for _, op := range ops {
@@ -44,44 +62,100 @@ func (repo *Repository) AddFSOperations(ops ...FSOperation) (uint64, error) {
 	for _, op := range ops {
 		repo.fsoperations <- op
 	}
-	// we are inside a mutex, it is not strictly necessary to use atomic
-	atomic.AddUint64(&repo.opsIndex, uint64(len(ops)))
+	repo.opsIndex += uint64(len(ops))
+
 	return repo.opsIndex, nil
 }
 
+// the index of the last operation done
 func (repo *Repository) DoneIndex() uint64 {
-	return atomic.LoadUint64(&repo.doneIndex)
+	repo.operationsLock.Lock()
+	defer repo.operationsLock.Unlock()
+	return repo.doneIndex
 }
 
-func (repo *Repository) Execs() {
+// internal method to signal that an action was executed agains the repository
+func (repo *Repository) commit(op FSOperation, transactionOk bool) {
+	go op.Commit(transactionOk)
+	repo.commitCh <- true
+}
+
+// internal method to keep track of the actions executed
+// this MUST not fail
+func (repo *Repository) counter() {
+	for range repo.commitCh {
+
+		repo.operationsLock.Lock()
+
+		repo.doneIndex++
+		chs, ok := repo.waitingLists[repo.doneIndex]
+
+		if ok {
+			for _, ch := range chs {
+				ch <- true
+			}
+			delete(repo.waitingLists, repo.doneIndex)
+		}
+		repo.operationsLock.Unlock()
+	}
+}
+
+// wait for the commit of an action, the target/index to use is the one returned by `AddFSOperations`
+func (repo *Repository) WaitFor(target uint64) error {
+	repo.operationsLock.Lock()
+	// do not use defer to unlock this unless we also manage to wait outside of the function
+	// otherwise we will go in a deadlock
+
+	lowerBound := repo.doneIndex
+	upperBound := repo.opsIndex
+	if target < lowerBound {
+		repo.operationsLock.Unlock()
+		return NewWaitForExpiredErr(target, lowerBound)
+	}
+	if target > upperBound {
+		repo.operationsLock.Unlock()
+		return NewWaitForNotScheduledErr(target, upperBound)
+	}
+
+	ch := make(chan bool)
+	repo.waitingLists[target] = append(repo.waitingLists[target], ch)
+	repo.operationsLock.Unlock()
+
+	// here we wait
+	<-ch
+
+	return nil
+}
+
+// start to consume the File System operations scheduled agains the repository
+func (repo *Repository) StartOperationsLoop() {
 	scrathSpace := make([]FSOperation, 0, 30)
 
-	txtOpen := false
 	err := repo.Transaction()
+	txtOpen := (err == nil)
 	if err != nil {
-		// XXX this is somehow a problem
-		txtOpen = false
+		fmt.Println("Error in opening the transaction??", err)
 	}
 
 	abortAndCleanup := func() {
 		repo.Abort()
 		for _, op := range scrathSpace {
-			op.Commit(false)
+			repo.commit(op, false)
 		}
-		atomic.AddUint64(&repo.doneIndex, uint64(len(scrathSpace)))
 		scrathSpace = make([]FSOperation, 0, 30)
 	}
 
 	for {
 		select {
+		// if we don't receive anything, we commit what we have in the scratch space and we move on
 		case <-time.After(1 * time.Second):
 			if txtOpen {
 				err = repo.Publish()
 				txtOpen = false
 				for _, op := range scrathSpace {
-					op.Commit(err == nil)
+					repo.commit(op, err == nil)
 				}
-				atomic.AddUint64(&repo.doneIndex, uint64(len(scrathSpace)))
+				scrathSpace = make([]FSOperation, 0, 30)
 			}
 
 		case ops := <-repo.fsoperations:
@@ -92,36 +166,30 @@ func (repo *Repository) Execs() {
 				switch ops.RunOutsideTransaction() {
 				case false: // normal operation
 					err := ops.Execute()
+					scrathSpace = append(scrathSpace, ops)
 					if err != nil {
 						abortAndCleanup()
-					} else {
-						scrathSpace = append(scrathSpace, ops)
 					}
 
 				case true: // ingest operation
 
 					// first close the transaction
-					transactionOk := true
 					err := repo.Publish()
 					txtOpen = false
-					if err != nil {
-						transactionOk = false
-					}
 
 					// then we communicate if the transaction was committed
-					for _, ops := range scrathSpace {
-						ops.Commit(transactionOk)
+					for _, op := range scrathSpace {
+						repo.commit(op, err == nil)
 					}
-					atomic.AddUint64(&repo.doneIndex, uint64(len(scrathSpace)))
 					scrathSpace = make([]FSOperation, 0, 30)
 
 					// finally we execute the new operation
 					err = ops.Execute()
-					ops.Commit(err == nil)
-					atomic.AddUint64(&repo.doneIndex, 1)
+					repo.commit(ops, err == nil)
 				}
 
 			case false: // NOT in transaction
+
 				switch ops.RunOutsideTransaction() {
 				case false: // normal operation
 					err := repo.Transaction()
@@ -138,8 +206,7 @@ func (repo *Repository) Execs() {
 
 				case true: // ingest operation
 					err := ops.Execute()
-					ops.Commit(err == nil)
-					atomic.AddUint64(&repo.doneIndex, 1)
+					repo.commit(ops, err == nil)
 				}
 
 			}
@@ -148,9 +215,8 @@ func (repo *Repository) Execs() {
 				err := repo.Publish()
 				txtOpen = false
 				for _, op := range scrathSpace {
-					op.Commit(err == nil)
+					repo.commit(op, err == nil)
 				}
-				atomic.AddUint64(&repo.doneIndex, uint64(len(scrathSpace)))
 				scrathSpace = make([]FSOperation, 0, 30)
 			}
 
@@ -159,10 +225,12 @@ func (repo *Repository) Execs() {
 	}
 }
 
+// create the new cvmfs file system with the supplied user
 func (repo *Repository) MkFsWithUser(owner string) error {
 	return lib.ExecCommand("sudo", "cvmfs_server", "mkfs", "-o", owner, repo.Name).Start()
 }
 
+// create the new cvmfs file system with the current user
 func (repo *Repository) MkFs() error {
 	user, err := user.Current()
 	if err != nil {
@@ -171,46 +239,25 @@ func (repo *Repository) MkFs() error {
 	return repo.MkFsWithUser(user.Username)
 }
 
+// remove the cvmfs file system
 func (repo *Repository) RmFs() error {
 	return lib.ExecCommand("sudo", "cvmfs_server", "rmfs", "-f", repo.Name).Start()
 }
 
+// start a transaction
 func (repo *Repository) Transaction() error {
 	repo.FSLock.Lock()
 	return lib.ExecCommand("cvmfs_server", "transaction", repo.Name).Start()
 }
 
+// commit a transaction
 func (repo *Repository) Publish() error {
 	defer repo.FSLock.Unlock()
 	return lib.ExecCommand("cvmfs_server", "publish", repo.Name).Start()
 }
 
+// abort a transaction
 func (repo *Repository) Abort() error {
 	defer repo.FSLock.Unlock()
 	return lib.ExecCommand("cvmfs_server", "abort", "-f", repo.Name).Start()
 }
-
-type FSOperation interface {
-	Execute() error
-	Paths() []string
-	Commit(transactionOk bool)
-	RunInPrivateTransaction() bool
-	RunOutsideTransaction() bool
-}
-
-type CreateDirectory struct {
-	path string
-}
-
-func (c CreateDirectory) Execute() error {
-	return os.MkdirAll(c.path, 0755)
-}
-
-func (c CreateDirectory) Paths() []string {
-	return []string{c.path}
-}
-
-func (c CreateDirectory) Commit(txtOk bool) {}
-
-func (c CreateDirectory) RunInPrivateTransaction() bool { return false }
-func (c CreateDirectory) RunOutsideTransaction() bool   { return false }

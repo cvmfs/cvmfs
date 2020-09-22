@@ -1,7 +1,8 @@
 package cvmfs
 
 import (
-	"fmt"
+	"errors"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -115,13 +116,11 @@ func TestAbortAgainstACvmfs(t *testing.T) {
 func TestOperations(t *testing.T) {
 	t.Parallel()
 	repo := NewRepository("test5.ch")
-	t.Log("Making repo...")
 	err := repo.MkFs()
 	if err != nil {
 		t.Errorf("Error in creating a new cvmfs FS: %s", err)
 		return
 	}
-	t.Log("Done creating repo...")
 
 	defer repo.RmFs()
 
@@ -136,22 +135,18 @@ func TestOperations(t *testing.T) {
 
 	waitFor := uint64(0)
 	for _, path := range paths {
-		waitFor, _ = repo.AddFSOperations(CreateDirectory{path})
-		fmt.Println(waitFor)
+		waitFor, _ = repo.AddFSOperations(NewCreateDirectory(path))
 	}
 
 	if waitFor != 6 {
 		t.Errorf("Expected index to wait equal to %d found equal to %d", 6, waitFor)
 	}
 
-	go repo.Execs()
+	go repo.StartOperationsLoop()
 
-	for {
-		done := repo.DoneIndex()
-		fmt.Println(done)
-		if done >= waitFor {
-			break
-		}
+	err = repo.WaitFor(waitFor)
+	if err != nil {
+		t.Errorf("Internal inconsistency in the wait for")
 	}
 
 	for _, path := range paths {
@@ -159,4 +154,85 @@ func TestOperations(t *testing.T) {
 			t.Errorf("Expected directory but directory not found: %s", path)
 		}
 	}
+}
+
+func TestWaitForErrors(t *testing.T) {
+	t.Parallel()
+	repo := NewRepository("virtual.test.ch")
+	repo.opsIndex = uint64(20)
+	repo.doneIndex = uint64(20)
+
+	err := repo.WaitFor(uint64(10))
+	if !errors.Is(err, WaitForExpiredError) {
+		t.Errorf("returned from type of error")
+	}
+	err = repo.WaitFor(uint64(30))
+	if !errors.Is(err, WaitForNotScheduledError) {
+		t.Errorf("returned wrong typ of error")
+	}
+}
+
+func TestOperationsWithError(t *testing.T) {
+	t.Parallel()
+	repo := NewRepository("test6.ch")
+	err := repo.MkFs()
+	if err != nil {
+		t.Errorf("Error in creating a new cvmfs FS: %s", err)
+		return
+	}
+
+	defer repo.RmFs()
+
+	f, _ := ioutil.TempFile("", "testgocvmfsunreadablefile*")
+	defer os.Remove(f.Name())
+	ioutil.WriteFile(f.Name(), []byte("foooo"), 0200)
+	os.Chmod(f.Name(), 0200)
+	cp, err := NewCopyFile(f.Name(), filepath.Join(repo.Root(), "a", "b", ".cvmfscatalog"))
+
+	if err != nil {
+		t.Errorf("trying to copy a file that does not exists")
+	}
+	f2, _ := ioutil.TempFile("", "testgocvmfs*")
+	defer os.Remove(f2.Name())
+	cp2, err := NewCopyFile(f2.Name(), filepath.Join(repo.Root(), "1", "2", ".cvmfscatalog"))
+
+	repo.AddFSOperations(cp)
+	repo.AddFSOperations(cp2)
+
+	go repo.StartOperationsLoop()
+
+	ch := cp.ErrorsChannel()
+
+	err1 := <-ch
+	if err1 == nil {
+		t.Errorf("Expected error, file should not be readable")
+	}
+	err2 := <-ch
+	if err2 != nil {
+		t.Errorf("The transaction should conclude normally")
+	}
+	// we are checking that this channel is closed
+	_, ok := <-ch
+	if ok {
+		t.Errorf("The channel was not closed")
+	}
+
+	ch2 := cp2.ErrorsChannel()
+	if <-ch2 != nil {
+		t.Errorf("Unexpected error in creating file")
+	}
+	if <-ch2 != nil {
+		t.Errorf("Unexpected error in transaction")
+	}
+	if _, ok = <-ch2; ok {
+		t.Errorf("Channel not closed")
+	}
+
+	if _, err = os.Stat(filepath.Join(repo.Root(), "a", "b", ".cvmfscatalog")); err == nil {
+		t.Errorf("Unexpected file created")
+	}
+	if _, err = os.Stat(filepath.Join(repo.Root(), "1", "2", ".cvmfscatalog")); err != nil {
+		t.Errorf("File should be there")
+	}
+
 }
