@@ -135,3 +135,33 @@ func (op *IngestTar) Commit(transactionOk bool) {
 }
 
 func (op *IngestTar) RunOutsideTransaction() bool { return true }
+
+type DeletePathIngest struct {
+	path string
+	err  chan error
+}
+
+func NewDeletePathIngest(path string) *DeletePathIngest {
+	return &DeletePathIngest{path, make(chan error, 2)}
+}
+
+func (op *DeletePathIngest) Execute() error {
+	err := func() error {
+		tokens := strings.Split(op.path, string(os.PathSeparator))
+		repo := tokens[2]
+		path := strings.Join(tokens[3:], string(os.PathSeparator))
+		return lib.ExecCommand("cvmfs_server", "ingest", "--delete", path, repo).Start()
+	}()
+	op.err <- err
+	return nil
+}
+func (op *DeletePathIngest) Paths() []string {
+	return []string{op.path}
+}
+func (op *DeletePathIngest) Commit(transactionOk bool) {
+	defer close(op.err)
+	if transactionOk == false {
+		op.err <- fmt.Errorf("failed transaction")
+	}
+}
+func (op *DeletePathIngest) RunOutsideTransaction() bool { return true }

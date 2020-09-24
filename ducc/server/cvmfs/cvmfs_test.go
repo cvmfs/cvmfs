@@ -296,7 +296,7 @@ func CreateTarball(wantFiles ...string) (io.ReadCloser, error) {
 func TestIngestTarball(t *testing.T) {
 	t.Parallel()
 
-	tar, err := CreateTarball("simplefile.txt")
+	tar, err := CreateTarball("simplefile.txt", "filetodelete.txt")
 	if err != nil {
 		t.Errorf("Error in creating the tarball: %s", err)
 	}
@@ -307,11 +307,14 @@ func TestIngestTarball(t *testing.T) {
 		t.Errorf("Error in creating a new cvmfs FS: %s", err)
 		return
 	}
-	//defer repo.RmFs()
+	defer repo.RmFs()
 
 	ingest := NewIngestTar(tar, filepath.Join(repo.Root(), "some", "deep", "path"))
 
 	waitFor, _ := repo.AddFSOperations(ingest)
+	p2 := filepath.Join(repo.Root(), "some", "deep", "path", "filetodelete.txt")
+	waitFor2, _ := repo.AddFSOperations(
+		NewDeletePathIngest(p2))
 
 	go repo.StartOperationsLoop()
 	err = repo.WaitFor(waitFor)
@@ -319,6 +322,11 @@ func TestIngestTarball(t *testing.T) {
 	path := filepath.Join(repo.Root(), "some", "deep", "path", "simplefile.txt")
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("file ingested with tar not found")
+	}
+
+	repo.WaitFor(waitFor2)
+	if _, err := os.Stat(p2); err == nil {
+		t.Errorf("file was not deleted")
 	}
 
 }
