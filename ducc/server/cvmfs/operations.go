@@ -5,6 +5,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/cvmfs/ducc/lib"
 )
 
 type FSOperation interface {
@@ -88,5 +91,47 @@ func (op *CopyFile) Commit(transactionOk bool) {
 }
 
 func (op *CopyFile) RunOutsideTransaction() bool { return false }
+func (op *CopyFile) errorsChannel() chan error   { return op.err }
 
-func (op *CopyFile) ErrorsChannel() chan error { return op.err }
+func (op *CopyFile) SuccesfullyCompleted() bool {
+	for err := range op.errorsChannel() {
+		if err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+type IngestTar struct {
+	tar  io.ReadCloser
+	path string
+	err  chan error
+}
+
+func NewIngestTar(tar io.ReadCloser, path string) *IngestTar {
+	return &IngestTar{tar, path, make(chan error, 2)}
+}
+
+func (op *IngestTar) Execute() error {
+	err := func() error {
+		tokens := strings.Split(op.path, string(os.PathSeparator))
+		repo := tokens[2]
+		path := strings.Join(tokens[3:], string(os.PathSeparator))
+		return lib.ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", path, repo).StdIn(op.tar).Start()
+	}()
+	op.err <- err
+	return nil
+}
+
+func (op *IngestTar) Paths() []string {
+	return []string{op.path}
+}
+
+func (op *IngestTar) Commit(transactionOk bool) {
+	defer close(op.err)
+	if transactionOk == false {
+		op.err <- fmt.Errorf("failed transaction")
+	}
+}
+
+func (op *IngestTar) RunOutsideTransaction() bool { return true }
