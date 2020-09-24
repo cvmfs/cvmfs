@@ -1,8 +1,12 @@
 package cvmfs
 
 import (
+	"archive/tar"
+	"bytes"
 	"errors"
+	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 
@@ -201,7 +205,7 @@ func TestOperationsWithError(t *testing.T) {
 
 	go repo.StartOperationsLoop()
 
-	ch := cp.ErrorsChannel()
+	ch := cp.errorsChannel()
 
 	err1 := <-ch
 	if err1 == nil {
@@ -217,7 +221,7 @@ func TestOperationsWithError(t *testing.T) {
 		t.Errorf("The channel was not closed")
 	}
 
-	ch2 := cp2.ErrorsChannel()
+	ch2 := cp2.errorsChannel()
 	if <-ch2 != nil {
 		t.Errorf("Unexpected error in creating file")
 	}
@@ -233,6 +237,88 @@ func TestOperationsWithError(t *testing.T) {
 	}
 	if _, err = os.Stat(filepath.Join(repo.Root(), "1", "2", ".cvmfscatalog")); err != nil {
 		t.Errorf("File should be there")
+	}
+}
+
+type bufferCloser struct {
+	*bytes.Buffer
+}
+
+func (b bufferCloser) Close() error {
+	return nil
+}
+
+func CreateTarball(wantFiles ...string) (io.ReadCloser, error) {
+	var internalBuf bytes.Buffer
+	buf := bufferCloser{&internalBuf}
+	tw := tar.NewWriter(&buf)
+
+	dirs := []string{"a/", "b/", "a/1/", "b/1/2/"}
+
+	for _, path := range dirs {
+		hdr := &tar.Header{
+			Typeflag: tar.TypeDir,
+			Name:     path,
+			Size:     0,
+			Mode:     0755,
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return buf, err
+		}
+	}
+
+	files := []string{"a/foo1", "b/bar1", "b/bar2", "a/1/1.txt", "b/1/2/1.txt"}
+	for _, file := range wantFiles {
+		files = append(files, file)
+	}
+	for _, path := range files {
+		size := rand.Int31n(128)
+		hdr := &tar.Header{
+			Typeflag: tar.TypeReg,
+			Name:     path,
+			Size:     int64(size),
+			Mode:     0666,
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return buf, err
+		}
+		data := make([]byte, size)
+		rand.Read(data)
+		if _, err := tw.Write(data); err != nil {
+			return buf, err
+		}
+	}
+
+	err := tw.Close()
+	return buf, err
+}
+
+func TestIngestTarball(t *testing.T) {
+	t.Parallel()
+
+	tar, err := CreateTarball("simplefile.txt")
+	if err != nil {
+		t.Errorf("Error in creating the tarball: %s", err)
+	}
+
+	repo := NewRepository("test7.ch")
+	err = repo.MkFs()
+	if err != nil {
+		t.Errorf("Error in creating a new cvmfs FS: %s", err)
+		return
+	}
+	//defer repo.RmFs()
+
+	ingest := NewIngestTar(tar, filepath.Join(repo.Root(), "some", "deep", "path"))
+
+	waitFor, _ := repo.AddFSOperations(ingest)
+
+	go repo.StartOperationsLoop()
+	err = repo.WaitFor(waitFor)
+
+	path := filepath.Join(repo.Root(), "some", "deep", "path", "simplefile.txt")
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("file ingested with tar not found")
 	}
 
 }
