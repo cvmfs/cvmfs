@@ -184,7 +184,7 @@ TEST_F(T_GlueBuffer, StringHeap) {
     EXPECT_EQ(unsigned(256 * 1024), string_heap.GetSizeAlloc());
   }
 
-  std::uint64_t large_size;
+  uint64_t large_size;
   large_size = 1U << 31;
   large_size += 1;
   {
