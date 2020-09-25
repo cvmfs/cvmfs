@@ -23,6 +23,8 @@ type FSOperation interface {
 	RunOutsideTransaction() bool
 }
 
+func failedTransactionError() error { return fmt.Errorf("failed transaction") }
+
 type CreateDirectory struct {
 	path string
 }
@@ -41,8 +43,7 @@ func (c *CreateDirectory) Paths() []string {
 
 func (c *CreateDirectory) Commit(txtOk bool) {}
 
-func (c *CreateDirectory) RunInPrivateTransaction() bool { return false }
-func (c *CreateDirectory) RunOutsideTransaction() bool   { return false }
+func (c *CreateDirectory) RunOutsideTransaction() bool { return false }
 
 type CopyFile struct {
 	src  string
@@ -86,7 +87,7 @@ func (op *CopyFile) Execute() error {
 func (op *CopyFile) Commit(transactionOk bool) {
 	defer close(op.err)
 	if transactionOk == false {
-		op.err <- fmt.Errorf("failed transaction")
+		op.err <- failedTransactionError()
 	}
 }
 
@@ -130,7 +131,7 @@ func (op *IngestTar) Paths() []string {
 func (op *IngestTar) Commit(transactionOk bool) {
 	defer close(op.err)
 	if transactionOk == false {
-		op.err <- fmt.Errorf("failed transaction")
+		op.err <- failedTransactionError()
 	}
 }
 
@@ -161,7 +162,109 @@ func (op *DeletePathIngest) Paths() []string {
 func (op *DeletePathIngest) Commit(transactionOk bool) {
 	defer close(op.err)
 	if transactionOk == false {
-		op.err <- fmt.Errorf("failed transaction")
+		op.err <- failedTransactionError()
 	}
 }
 func (op *DeletePathIngest) RunOutsideTransaction() bool { return true }
+
+type Delete struct {
+	paths []string
+	err   chan error
+}
+
+func NewDelete(paths ...string) *Delete {
+	toDelete := []string{}
+	for _, p := range paths {
+		toDelete = append(toDelete, p)
+	}
+	return &Delete{toDelete, make(chan error, 2)}
+}
+
+func (op *Delete) Execute() error {
+	err := func() error {
+		for _, path := range op.paths {
+			err := os.RemoveAll(path)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}()
+	op.err <- err
+	return nil
+}
+
+func (op *Delete) Paths() []string {
+	return op.paths
+}
+
+func (op *Delete) Commit(transactionOk bool) {
+	defer close(op.err)
+	if transactionOk == false {
+		op.err <- failedTransactionError()
+	}
+}
+
+func (op *Delete) RunOutsideTransaction() bool { return false }
+
+type CreateSymlink struct {
+	// name -> target
+	name   string
+	target string
+	err    chan error
+}
+
+func NewCreateSymlink(name, target string) *CreateSymlink {
+	return &CreateSymlink{name, target, make(chan error, 2)}
+}
+
+func (op *CreateSymlink) Execute() error {
+	err := func() error {
+		// we remove the path that exists now
+		os.RemoveAll(op.name)
+
+		// we create the directory structure that point to the new link
+		linkDir := filepath.Dir(op.name)
+		err := os.MkdirAll(linkDir, 0755)
+		if err != nil {
+			return err
+		}
+
+		// we don't use directly the name since the name can contains
+		// symlinks itself.
+		// in this way we evaluate along with all the symlinks outside
+		name, err := filepath.EvalSymlinks(linkDir)
+		if err != nil {
+			name = linkDir
+		}
+		name = filepath.Join(name, filepath.Base(op.name))
+
+		relativePath, err := filepath.Rel(name, op.target)
+		if err != nil {
+			return err
+		}
+
+		linkChunks := strings.Split(relativePath, string(os.PathSeparator))
+		relativeTarget := filepath.Join(linkChunks[1:]...)
+
+		if err != nil {
+			return err
+		}
+		return os.Symlink(relativeTarget, op.name)
+	}()
+	op.err <- err
+	return nil
+}
+
+func (op *CreateSymlink) Paths() []string { return []string{op.name} }
+
+func (op *CreateSymlink) Commit(transactionOk bool) {
+	defer close(op.err)
+	if transactionOk == false {
+		op.err <- failedTransactionError()
+	}
+}
+
+func (op *CreateSymlink) RunOutsideTransaction() bool { return false }
+
+type CopyDirectory struct{}
