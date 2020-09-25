@@ -1,3 +1,7 @@
+2.7.5:
+  * Add CVMFS_CLIENT_PROFILE, CVMFS_USE_CDN to cvmfs_config parameter list
+  * Let mount helper detect defined but empty CVMFS_HTTP_PROXY
+
 2.7.4:
   * Fix name clash with certain concurrently hosted repository names (CVM-1899)
   * [gw] fix statistics counting on renaming of nested subtrees (CVM-1906)
