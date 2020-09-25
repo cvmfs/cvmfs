@@ -21,11 +21,12 @@ func TestCreateACvmfsRepository(t *testing.T) {
 		t.Errorf("Error in creating a new cvmfs FS: %s", err)
 		return
 	}
-	defer repo.RmFs()
 	_, err = os.Stat(repo.Root())
 	if err != nil {
 		t.Errorf("the new filesystem does not seems to be there: %s", err)
 	}
+
+	repo.RmFs()
 }
 
 func TestRemoveACvmfsRepository(t *testing.T) {
@@ -36,6 +37,7 @@ func TestRemoveACvmfsRepository(t *testing.T) {
 		t.Errorf("Error in creating a new cvmfs FS: %s", err)
 		return
 	}
+
 	repo.RmFs()
 	_, err = os.Stat(repo.Root())
 	if err == nil {
@@ -327,6 +329,57 @@ func TestIngestTarball(t *testing.T) {
 	repo.WaitFor(waitFor2)
 	if _, err := os.Stat(p2); err == nil {
 		t.Errorf("file was not deleted")
+	}
+}
+
+func TestSymlinks(t *testing.T) {
+	t.Parallel()
+
+	repo := NewRepository("test8.ch")
+	err := repo.MkFs()
+	if err != nil {
+		t.Errorf("Error in creating a new cvmfs FS: %s", err)
+		return
+	}
+	defer repo.RmFs()
+
+	dir := NewCreateDirectory(filepath.Join(repo.Root(), "dir", "path", "quite", "deep"))
+	symlink1 := NewCreateSymlink(
+		filepath.Join(repo.Root(), "a"),
+		filepath.Join(repo.Root(), "dir", "path", "quite", "deep"))
+	symlink2 := NewCreateSymlink(
+		filepath.Join(repo.Root(), "a", "b"),
+		filepath.Join(repo.Root(), "dir", "path", "quite"))
+	symlink3 := NewCreateSymlink(
+		filepath.Join(repo.Root(), "foo", "bar", "baz"),
+		filepath.Join(repo.Root(), "dir", "path"))
+	symlink4 := NewCreateSymlink(
+		filepath.Join(repo.Root(), "d"),
+		filepath.Join(repo.Root(), "a", "b"))
+
+	waitFor, _ := repo.AddFSOperations(dir, symlink1, symlink2, symlink3, symlink4)
+
+	go repo.StartOperationsLoop()
+	err = repo.WaitFor(waitFor)
+
+	path := filepath.Join(repo.Root(), "d")
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("Problem in ingesting the symlink")
+	}
+
+	path = filepath.Join(repo.Root(), "foo", "bar", "baz")
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("Problem in ingesting the symlink")
+	}
+
+	path = filepath.Join(repo.Root(), "a", "b")
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("Problem in ingesting the symlink")
+	}
+
+	path = filepath.Join(repo.Root(), "a")
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("Problem in ingesting the symlink")
 	}
 
 }
