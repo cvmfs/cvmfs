@@ -17,6 +17,7 @@ class EPublish : public std::runtime_error {
    */
   enum EFailures {
     kFailUnspecified = 0,
+    kFailInvocation,          // Invalid command line options
     kFailTransactionLocked,   // another publisher process has an open txn
     kFailGatewayKey,          // cannot access the gateway secret key
     kFailLeaseHttp,           // cannot connect to the gateway HTTP endpoint

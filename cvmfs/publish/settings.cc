@@ -265,11 +265,20 @@ SettingsBuilder::~SettingsBuilder() {
 
 std::string SettingsBuilder::GetSingleAlias() {
   std::vector<std::string> repositories = FindDirectories(config_path_);
-  if (repositories.empty())
-    throw EPublish("no repositories available in " + config_path_);
-  if (repositories.size() > 1)
-    throw EPublish("multiple repositories available in " + config_path_);
-  return GetFileName(repositories[0]);
+  if (repositories.empty()) {
+    throw EPublish("no repositories available in " + config_path_,
+                   EPublish::kFailInvocation);
+  }
+
+  for (unsigned i = 0; i < repositories.size(); ++i) {
+    repositories[i] = GetFileName(repositories[i]);
+  }
+  if (repositories.size() > 1) {
+    throw EPublish("multiple repositories available in " + config_path_ +
+                   ":\n  " + JoinStrings(repositories, "\n  "),
+                   EPublish::kFailInvocation);
+  }
+  return repositories[0];
 }
 
 

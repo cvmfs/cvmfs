@@ -95,7 +95,11 @@ int main(int argc, char **argv) {
     publish::Command::Options options = command->ParseOptions(argc, argv);
     return command->Main(options);
   } catch (const publish::EPublish& e) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
+    if (e.failure() == publish::EPublish::kFailInvocation) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Invocation error: %s", e.msg().c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
+    }
     return 1;
   }
 }
