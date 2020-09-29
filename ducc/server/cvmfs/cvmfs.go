@@ -78,6 +78,8 @@ func (repo *Repository) DoneIndex() uint64 {
 func (repo *Repository) commit(op FSOperation, transactionOk bool) {
 	go op.Commit(transactionOk)
 	repo.commitCh <- true
+
+	fmt.Println("Commited operation")
 }
 
 // internal method to keep track of the actions executed
@@ -134,7 +136,8 @@ func (repo *Repository) StartOperationsLoop() {
 	err := repo.Transaction()
 	txtOpen := (err == nil)
 	if err != nil {
-		fmt.Println("Error in opening the transaction??", err)
+		fmt.Println("Error in opening the transaction", err)
+		repo.Abort()
 	}
 
 	abortAndCleanup := func() {
@@ -149,7 +152,7 @@ func (repo *Repository) StartOperationsLoop() {
 		select {
 		// if we don't receive anything, we commit what we have in the scratch space and we move on
 		case <-time.After(1 * time.Second):
-			if txtOpen {
+			if txtOpen && (repo.opsIndex > repo.doneIndex) {
 				err = repo.Publish()
 				txtOpen = false
 				for _, op := range scrathSpace {

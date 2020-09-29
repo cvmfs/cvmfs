@@ -45,3 +45,11 @@ type LayerStatusErr struct {
 func NewLayerStatusErr(errors []DUCCStatError) LayerStatusErr {
 	return LayerStatusErr{"err", errors}
 }
+
+type LayerSuccessfullyIngested struct {
+	Digest string `json:"digest"`
+}
+
+func NewLayerSuccessfullyIngested(digest string) LayerSuccessfullyIngested {
+	return LayerSuccessfullyIngested{digest}
+}
