@@ -107,7 +107,7 @@ CVMFS_SERVER_DEBUG=${CVMFS_SERVER_DEBUG:=0}
 CVMFS_SERVER_SWISSKNIFE="cvmfs_swissknife"
 CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
 # cvmfs_publish will eventually become cvmfs_server, removing the shell wrapper
-CVMFS_SERVER_PUBLISH="cvmfs_publish"
+CVMFS_SERVER_PUBLISH="/usr/bin/cvmfs_publish"
 CVMFS_SERVER_PUBLISH_DEBUG=$CVMFS_SERVER_PUBLISH
 
 # On newer Apache version, reloading is asynchonrous and not guaranteed to succeed.
@@ -145,15 +145,15 @@ if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
     case $CVMFS_SERVER_DEBUG in
       1)
         # in case something breaks we are provided with a GDB prompt.
-        CVMFS_SERVER_PUBLISH_DEBUG="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_publish_debug"
+        CVMFS_SERVER_PUBLISH_DEBUG="gdb --quiet --eval-command=run --eval-command=quit --args /usr/bin/cvmfs_publish_debug"
       ;;
       2)
         # attach gdb and provide a prompt WITHOUT actual running the program
-        CVMFS_SERVER_PUBLISH_DEBUG="gdb --quiet --args cvmfs_publish_debug"
+        CVMFS_SERVER_PUBLISH_DEBUG="gdb --quiet --args /usr/bin/cvmfs_publish_debug"
       ;;
       3)
         # do not attach gdb just run debug version
-        CVMFS_SERVER_PUBLISH_DEBUG="cvmfs_publish_debug"
+        CVMFS_SERVER_PUBLISH_DEBUG="/usr/bin/cvmfs_publish_debug"
       ;;
     esac
   else
