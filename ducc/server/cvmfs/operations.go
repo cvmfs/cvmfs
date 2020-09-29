@@ -104,24 +104,23 @@ func (op *CopyFile) SuccesfullyCompleted() bool {
 }
 
 type IngestTar struct {
-	tar  io.ReadCloser
-	path string
-	err  chan error
+	tar        io.ReadCloser
+	path       string
+	err        chan error
+	firstError error
 }
 
 func NewIngestTar(tar io.ReadCloser, path string) *IngestTar {
-	return &IngestTar{tar, path, make(chan error, 2)}
+	return &IngestTar{tar, path, make(chan error, 2), nil}
 }
 
 func (op *IngestTar) Execute() error {
-	err := func() error {
-		tokens := strings.Split(op.path, string(os.PathSeparator))
-		repo := tokens[2]
-		path := strings.Join(tokens[3:], string(os.PathSeparator))
-		return lib.ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", path, repo).StdIn(op.tar).Start()
-	}()
+	tokens := strings.Split(op.path, string(os.PathSeparator))
+	repo := tokens[2]
+	path := strings.Join(tokens[3:], string(os.PathSeparator))
+	err := lib.ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", path, repo).StdIn(op.tar).Start()
 	op.err <- err
-	return nil
+	return err
 }
 
 func (op *IngestTar) Paths() []string {
@@ -136,6 +135,36 @@ func (op *IngestTar) Commit(transactionOk bool) {
 }
 
 func (op *IngestTar) RunOutsideTransaction() bool { return true }
+
+func (op *IngestTar) FirstError() error {
+	for e := range op.err {
+		if e != nil {
+			op.firstError = e
+		}
+	}
+	return op.firstError
+}
+
+type IngestTarIfNotExists struct {
+	*IngestTar
+}
+
+func NewIngestTarIfNotExists(tar io.ReadCloser, path string) *IngestTarIfNotExists {
+	inner := NewIngestTar(tar, path)
+	return &IngestTarIfNotExists{inner}
+}
+
+func (op *IngestTarIfNotExists) Execute() error {
+	stat, err := os.Open(op.IngestTar.path)
+	if err == nil { // the directory exists
+		files, err := stat.Readdir(1)
+		if err == nil && len(files) > 0 {
+			// there are files inside the directory
+			return nil
+		}
+	}
+	return op.IngestTar.Execute()
+}
 
 type DeletePathIngest struct {
 	path string
@@ -268,3 +297,41 @@ func (op *CreateSymlink) Commit(transactionOk bool) {
 func (op *CreateSymlink) RunOutsideTransaction() bool { return false }
 
 type CopyDirectory struct{}
+
+type AddCVMFSCatalog struct {
+	directory string
+	err       chan error
+}
+
+func NewAddCVMFSCatalog(path string) *AddCVMFSCatalog {
+	return &AddCVMFSCatalog{path, make(chan error, 2)}
+}
+
+func (op *AddCVMFSCatalog) Paths() []string { return []string{op.directory} }
+
+func (op *AddCVMFSCatalog) Execute() error {
+	err := func() error {
+		path := filepath.Join(op.directory, ".cvmfscatalog")
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+		err := os.MkdirAll(op.directory, 0755)
+		if err != nil {
+			return err
+		}
+		f, err := os.Create(path)
+		defer f.Close()
+		return err
+	}()
+	op.err <- err
+	return nil
+}
+
+func (op *AddCVMFSCatalog) Commit(transactionOk bool) {
+	defer close(op.err)
+	if transactionOk == false {
+		op.err <- failedTransactionError()
+	}
+}
+
+func (op *AddCVMFSCatalog) RunOutsideTransaction() bool { return false }

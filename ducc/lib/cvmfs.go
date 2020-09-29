@@ -408,6 +408,10 @@ func RemoveSingularityImageFromManifest(CVMFSRepo string, manifest da.Manifest) 
 	return nil
 }
 
+func LayerParentPath(CVMFSRepo, layerDigest string) string {
+	return filepath.Join("/", "cvmfs", CVMFSRepo, subDirInsideRepo, layerDigest[0:2])
+}
+
 func LayerPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join("/", "cvmfs", CVMFSRepo, subDirInsideRepo, layerDigest[0:2], layerDigest)
 }
