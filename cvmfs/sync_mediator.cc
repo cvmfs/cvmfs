@@ -923,10 +923,13 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
     if (!catalog_manager_->IsTransitionPoint(entry->GetRelativePath())) {
       CreateNestedCatalog(entry);
     } else {
-      PANIC(kLogStderr, "Error: There is no nested catalog starting at this path.");
+      PANIC(kLogStderr,
+            "Error: There is no nested catalog starting at this path.");
     }
   } else {
-    PANIC(kLogStderr, "Error: The .cvmfscatalog file is not present or it is not a regular file.");  }
+    PANIC(kLogStderr,
+    "Error: The .cvmfscatalog file is not present or it is not a regular file.");
+    }
 }
 
 
