@@ -924,11 +924,11 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
       CreateNestedCatalog(entry);
     } else {
       PANIC(kLogStderr,
-            "Error: There is no nested catalog starting at this path.");
+            "Error: There isn't a nested catalog starting at this path.");
     }
   } else {
     PANIC(kLogStderr,
-    "Error: The .cvmfscatalog file is not present or it is not a regular file.");
+    "Error: The .cvmfscatalog file isn't present or it isn't a regular file.");
     }
 }
 
