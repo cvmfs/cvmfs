@@ -919,10 +919,18 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
       free(xattrs);
   }
 
-  if (entry->HasCatalogMarker() &&
-      !catalog_manager_->IsTransitionPoint(entry->GetRelativePath())) {
-    CreateNestedCatalog(entry);
+  if (entry->HasCatalogMarker()){
+
+    if (!catalog_manager_->IsTransitionPoint(entry->GetRelativePath())) {
+      CreateNestedCatalog(entry);
+    } else {
+      PANIC(kLogStderr, "Error: There is no nested catalog starting at this path.");
+    }
+
+  } else {
+    PANIC(kLogStderr, "Error: The .cvmfscatalog file is not present or it is not a regular file.");
   }
+  
 }
 
 
