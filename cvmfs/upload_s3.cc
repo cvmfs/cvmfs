@@ -165,10 +165,8 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
     peek_before_put_ = options_manager.IsOn(parameter);
   }
-  if (options_manager.GetValue("CVMFS_S3_USE_HTTPS", &parameter)) {
-    if (parameter == "true") {
+  if (options_manager.IsOn("CVMFS_S3_USE_HTTPS")) {
       use_https_ = true;
-    }
   }
   if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
     host_name_port_ = host_name_ + ":" + parameter;
