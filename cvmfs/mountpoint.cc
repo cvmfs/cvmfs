@@ -1309,6 +1309,11 @@ bool MountPoint::CreateDownloadManagers() {
       download_mgr_->SetHostChain(host_chain);
     }
   }
+
+  if (options_mgr_->IsOn("CVMFS_USE_SSL_SYSTEM_CA")) {
+    download_mgr_->EnableUseOfSystemCertificates();
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 
