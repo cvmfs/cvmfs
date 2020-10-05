@@ -28,12 +28,15 @@ bool HasCertificates(std::string directory) {
 
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp))) {
-    if ((dirent->d_type == DT_REG) || (dirent->d_type == DT_UNKNOWN)) {
-      const std::string filename(dirent->d_name);
-      if (HasSuffix(filename, ".pem", /* ignore case = */ true) ||
-          HasSuffix(filename, ".crt", /* ignore case = */ true)) {
-        closedir(dirp);
-        return true;
+    platform_stat64 stat;
+    if (0 == platform_stat(dirent->d_name, &stat)) {
+      if (S_ISREG(stat.st_mode)) {
+        const std::string filename(dirent->d_name);
+        if (HasSuffix(filename, ".pem", /* ignore case = */ true) ||
+            HasSuffix(filename, ".crt", /* ignore case = */ true)) {
+          closedir(dirp);
+          return true;
+        }
       }
     }
   }
