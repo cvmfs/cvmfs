@@ -1641,15 +1641,6 @@ void DownloadManager::Init(const unsigned max_pool_handles,
       SetProxyChain(string(getenv("http_proxy")), "", kSetProxyRegular);
     }
   }
-
-  const char *use_cert_var = getenv("CVMFS_USE_SSL_SYSTEM_CA");
-  if (use_cert_var) {
-    const std::string use_certificates = ToUpper(std::string(use_cert_var));
-    if ((use_certificates == "YES") || (use_certificates == "ON") ||
-        (use_certificates == "1") || (use_certificates == "TRUE")) {
-      use_system_ca_ = true;
-    }
-  }
 }
 
 
