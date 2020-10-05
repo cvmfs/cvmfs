@@ -100,7 +100,7 @@ bool AddSSLCertificates(CURL *handle, bool add_system_certificates) {
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}  // namespace CVMFS_NAMESPACE_GUARD
+}  // namespace
 #endif
 
 #endif  // CVMFS_SSL_H_
