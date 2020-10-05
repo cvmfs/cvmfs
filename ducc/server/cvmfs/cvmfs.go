@@ -222,9 +222,7 @@ func (repo *Repository) StartOperationsLoop() {
 				}
 				scrathSpace = make([]FSOperation, 0, 30)
 			}
-
 		}
-
 	}
 }
 

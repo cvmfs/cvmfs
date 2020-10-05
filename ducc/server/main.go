@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cvmfs/ducc/lib"
 	cvmfs "github.com/cvmfs/ducc/server/cvmfs"
 	res "github.com/cvmfs/ducc/server/replies"
+	"github.com/docker/distribution/manifest/schema2"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -27,12 +30,13 @@ func NewRepo(name string) Repo {
 
 func (repo *Repo) statusLayer(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	// the layer to be correctly ingested, need to:
-	// 1. Exists
-	// 2. Have the layerfs directory
-	// 3. Have the .metadata directory
-	// 4. Have the origin.json inside the .metadata directory
-	// 5. Have the .cvmfs catalog inside the layerfs directory
+	// *. Exists
+	// *. Have the layerfs directory
+	// *. Have the .cvmfs catalog inside the layerfs directory
 	// if all these conditions are met, the layer is correctly ingested
+
+	lib.Log().Info("[BEGIN] status layer: ", p.ByName("digest"))
+	defer lib.Log().Info("[DONE]  status layer: ", p.ByName("digest"))
 
 	layerErrors := make([]res.DUCCStatError, 0)
 	pathsToCheck := make([]string, 0, 5)
@@ -44,11 +48,6 @@ func (repo *Repo) statusLayer(w http.ResponseWriter, r *http.Request, p httprout
 	catalog := filepath.Join(layerfs, ".cvmfscatalog")
 	pathsToCheck = append(pathsToCheck, layerfs)
 	pathsToCheck = append(pathsToCheck, catalog)
-
-	metadata := lib.LayerMetadataPath(repo.Name, p.ByName("digest"))
-	origin := filepath.Join(metadata, "origin.json")
-	pathsToCheck = append(pathsToCheck, metadata)
-	pathsToCheck = append(pathsToCheck, origin)
 
 	for _, path := range pathsToCheck {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -63,6 +62,7 @@ func (repo *Repo) statusLayer(w http.ResponseWriter, r *http.Request, p httprout
 			http.Error(w, jsonErr.Error(), http.StatusInternalServerError)
 			return
 		}
+		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(response)
 	} else {
@@ -72,6 +72,7 @@ func (repo *Repo) statusLayer(w http.ResponseWriter, r *http.Request, p httprout
 			http.Error(w, jsonErr.Error(), http.StatusInternalServerError)
 			return
 		}
+		w.WriteHeader(http.StatusNotFound)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(response)
 	}
@@ -148,9 +149,184 @@ func (repo Repo) ingestLayerFileSystem(w http.ResponseWriter, r *http.Request, p
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(response)
+	return
 }
 
-func (repo Repo) ingestLayerOrigin(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func (repo Repo) ingestLayerOrigin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+}
+
+func (repo Repo) checkLayerExists(digest string) error {
+	layerfs := lib.LayerRootfsPath(repo.Name, digest)
+	_, err := os.Stat(layerfs)
+	return err
+}
+
+func (repo Repo) statusFlat(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	name := ps.ByName("name")
+
+	// we just check if there is a symlink
+	// the symlink points to a directory
+	// the directory is populated
+
+	fullPath := filepath.Join(repo.Root(), name)
+
+	// we check if there is a symlink
+	_, err := os.Lstat(fullPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// we check if the link points to something
+	stat, err := os.Stat(fullPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// we check we point to a directory
+	if stat.Mode().IsDir() == false {
+		err = fmt.Errorf("error symlink does not point to a directory, name: %s", fullPath)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	f, err := os.Open(fullPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	finfo, err := f.Readdir(5)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if len(finfo) <= 0 {
+		err = fmt.Errorf("error symlink points to empty directory, name: %s", fullPath)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	dirName, err := os.Readlink(fullPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/text")
+	w.Write([]byte(filepath.Base(dirName)))
+	return
+}
+
+func (repo Repo) ingestFlat(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	lib.Log().Info("[BEGIN] ingesting flat image")
+	defer lib.Log().Info("[DONE] ingesting flat")
+	// we need to read the manifest
+	manifest := schema2.DeserializedManifest{}
+	manifestByte, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	err = manifest.UnmarshalJSON(manifestByte)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// we create the directory for the flat fs
+	flatDigest := strings.Split(manifest.Config.Digest.String(), ":")[1]
+	flatPath := filepath.Join(repo.Root(), ".flat", flatDigest[0:2], flatDigest)
+
+	writeSuccessfulReply := func() {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(flatDigest))
+		w.Header().Set("Content-Type", "application/text")
+	}
+
+	// we finish by creating the symlink
+	name := ps.ByName("name")
+	humanDir := filepath.Join(repo.Root(), name)
+
+	fmt.Println("Checking on flatPath: ", flatPath)
+	if flatInfo, err := os.Stat(flatPath); err == nil {
+		name := ps.ByName("name")
+		humanDir := filepath.Join(repo.Root(), name)
+
+		fmt.Println("Checking on humanDir: ", humanDir)
+		humanInfo, err := os.Stat(humanDir)
+		if err == nil {
+			if os.SameFile(flatInfo, humanInfo) {
+				writeSuccessfulReply()
+				return
+			}
+		}
+
+		manifestPath := filepath.Join(repo.Root(), ".metadata", name, "manifest.json")
+		addManifest := cvmfs.NewCreateRegularFile(manifestPath, manifestByte)
+		link := cvmfs.NewCreateSymlink(humanDir, flatPath)
+
+		repo.AddFSOperations(addManifest)
+		repo.AddFSOperations(link)
+
+		fmt.Println("shortcut just as name")
+		if err := link.FirstError(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeSuccessfulReply()
+		return
+	}
+
+	// we check that all layers are there
+	for _, layer := range manifest.Layers {
+		layerName := strings.Split(layer.Digest.String(), ":")[1]
+		fmt.Println("checking layer: ", layerName)
+		if err := repo.checkLayerExists(layerName); err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		fmt.Println("layer exists: ", layerName)
+	}
+
+	// create the directory
+	repo.AddFSOperations(cvmfs.NewCreateDirectory(flatPath))
+
+	// we apply all the layers on top of the single target
+	layers := []string{}
+	for _, layer := range manifest.Layers {
+		layerName := strings.Split(layer.Digest.String(), ":")[1]
+		layers = append(layers, lib.LayerRootfsPath(repo.Name, layerName))
+	}
+
+	// we create the flat fs
+	applyDirs := cvmfs.NewApplyDirectories(flatPath, layers...)
+	repo.AddFSOperations(applyDirs)
+
+	// fix the permissions of the directory to fit singularity
+	repo.AddFSOperations(cvmfs.NewFixPerms(flatPath))
+	repo.AddFSOperations(cvmfs.NewMakeSingularityEnv(flatPath))
+
+	link := cvmfs.NewCreateSymlink(humanDir, flatPath)
+	repo.AddFSOperations(link)
+
+	manifestPath := filepath.Join(repo.Root(), ".metadata", name, "manifest.json")
+	repo.AddFSOperations(cvmfs.NewCreateRegularFile(manifestPath, manifestByte))
+
+	if err := applyDirs.FirstError(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := link.FirstError(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeSuccessfulReply()
+	return
 }
 
 func main() {
@@ -160,6 +336,10 @@ func main() {
 	router.GET("/layer/status/:digest", repo.statusLayer)
 	router.POST("/layer/filesystem/:digest", repo.ingestLayerFileSystem)
 	router.POST("/layer/origin/:digest", repo.ingestLayerOrigin)
+	router.GET("/flat/human/*name", repo.statusFlat)
+	router.POST("/flat/human/*name", repo.ingestFlat)
+	router.GET("/image/metadata/manifest/*name", nil)
+	router.GET("/image/metadata/config/*name", nil)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

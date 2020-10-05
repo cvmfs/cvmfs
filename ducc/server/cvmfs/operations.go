@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/cvmfs/ducc/lib"
+	"github.com/cvmfs/ducc/server/cvmfs/applyDirectory"
+	"github.com/cvmfs/ducc/server/cvmfs/singularity"
 )
 
 type FSOperation interface {
@@ -22,6 +24,44 @@ type FSOperation interface {
 	// must return true if the operation need to run outside one transaction, for  instance `ingest` operations
 	RunOutsideTransaction() bool
 }
+
+type fsOperation interface {
+	Execute() error
+	Paths() []string
+}
+
+type InternalFsOperation struct {
+	fsOperation
+	err chan error
+}
+
+func newInternalFsOperation(op fsOperation, chansize int) *InternalFsOperation {
+	return &InternalFsOperation{op, make(chan error, chansize)}
+}
+
+func (op *InternalFsOperation) Execute() error {
+	err := op.fsOperation.Execute()
+	op.err <- err
+	return nil
+}
+
+func (op *InternalFsOperation) FirstError() error {
+	for e := range op.err {
+		if e != nil {
+			return e
+		}
+	}
+	return nil
+}
+
+func (op *InternalFsOperation) Commit(transactionOk bool) {
+	defer close(op.err)
+	if transactionOk == false {
+		op.err <- failedTransactionError()
+	}
+}
+
+func (op *InternalFsOperation) RunOutsideTransaction() bool { return false }
 
 func failedTransactionError() error { return fmt.Errorf("failed transaction") }
 
@@ -296,7 +336,14 @@ func (op *CreateSymlink) Commit(transactionOk bool) {
 
 func (op *CreateSymlink) RunOutsideTransaction() bool { return false }
 
-type CopyDirectory struct{}
+func (op *CreateSymlink) FirstError() error {
+	for e := range op.err {
+		if e != nil {
+			return e
+		}
+	}
+	return nil
+}
 
 type AddCVMFSCatalog struct {
 	directory string
@@ -335,3 +382,113 @@ func (op *AddCVMFSCatalog) Commit(transactionOk bool) {
 }
 
 func (op *AddCVMFSCatalog) RunOutsideTransaction() bool { return false }
+
+type ApplyDirectories struct {
+	target  string
+	toApply []string
+	err     chan error
+}
+
+func NewApplyDirectories(target string, directories ...string) *ApplyDirectories {
+	toApply := []string{}
+	for _, dir := range directories {
+		toApply = append(toApply, dir)
+	}
+	return &ApplyDirectories{target, toApply, make(chan error, 2)}
+}
+
+func (op *ApplyDirectories) Paths() []string { return []string{op.target} }
+
+func (op *ApplyDirectories) Execute() error {
+	err := func() error {
+		if err := os.MkdirAll(op.target, 0755); err != nil {
+			return err
+		}
+		for _, apply := range op.toApply {
+			if err := applyDirectory.ApplyDirectory(op.target, apply); err != nil {
+				os.RemoveAll(op.target)
+				return err
+			}
+		}
+		return nil
+	}()
+	op.err <- err
+	return nil
+}
+
+func (op *ApplyDirectories) Commit(transactionOk bool) {
+	defer close(op.err)
+	if transactionOk == false {
+		op.err <- failedTransactionError()
+	}
+}
+
+func (op *ApplyDirectories) FirstError() error {
+	for e := range op.err {
+		if e != nil {
+			return e
+		}
+	}
+	return nil
+}
+
+func (op *ApplyDirectories) RunOutsideTransaction() bool { return false }
+
+type fixPerms struct{ path string }
+
+func (op *fixPerms) Execute() error  { return applyDirectory.FixPerms(op.path) }
+func (op *fixPerms) Paths() []string { return []string{op.path} }
+
+type FixPerms struct {
+	*InternalFsOperation
+}
+
+func NewFixPerms(path string) *FixPerms {
+	internal := &fixPerms{path}
+	return &FixPerms{newInternalFsOperation(internal, 2)}
+}
+
+type makeSingularityEnv struct{ path string }
+
+func (op *makeSingularityEnv) Execute() error  { return singularity.MakeBaseEnv(op.path) }
+func (op *makeSingularityEnv) Paths() []string { return []string{op.path} }
+
+type MakeSingularityEnv struct{ *InternalFsOperation }
+
+func NewMakeSingularityEnv(path string) *MakeSingularityEnv {
+	internal := &makeSingularityEnv{path}
+	return &MakeSingularityEnv{newInternalFsOperation(internal, 2)}
+}
+
+type CreateRegularFile struct{ *InternalFsOperation }
+
+func NewCreateRegularFile(path string, content []byte) *CreateRegularFile {
+	internal := &createRegularFile{path, content}
+	return &CreateRegularFile{newInternalFsOperation(internal, 2)}
+}
+
+type createRegularFile struct {
+	path    string
+	content []byte
+}
+
+func (op *createRegularFile) Execute() error {
+	if err := os.RemoveAll(op.path); err != nil {
+		return err
+	}
+	dir := filepath.Dir(op.path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	f, err := os.Create(op.path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.Write(op.content); err != nil {
+		os.RemoveAll(op.path)
+		return err
+	}
+	return nil
+}
+func (op *createRegularFile) Paths() []string { return []string{op.path} }
