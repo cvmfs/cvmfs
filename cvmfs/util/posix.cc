@@ -715,6 +715,16 @@ bool FileExists(const std::string &path) {
           S_ISREG(info.st_mode));
 }
 
+bool PathExists(const std::string &path) {
+  platform_stat64 info;
+  return ((platform_lstat(path.c_str(), &info) == 0));
+}
+
+bool RegularExists(const std::string &path) {
+  platform_stat64 info;
+  return (S_ISREG(info.st_mode));
+}
+
 
 /**
  * Returns -1 on failure.

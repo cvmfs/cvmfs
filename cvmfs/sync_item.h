@@ -61,6 +61,7 @@ class SyncItem {
   SyncItem();
   virtual ~SyncItem();
 
+
   inline bool IsDirectory()       const { return IsType(kItemDir);             }
   inline bool WasDirectory()      const { return WasType(kItemDir);            }
   inline bool IsRegularFile()     const { return IsType(kItemFile);            }
@@ -105,6 +106,8 @@ class SyncItem {
   }
 
   bool HasCatalogMarker()         const { return has_catalog_marker_;          }
+  bool IsPathPresent()            const { return is_path_present_;             }
+  bool IsRegular()                const { return is_regular_;                  }
   bool HasGraftMarker()           const { return graft_marker_present_;        }
   bool IsValidGraft()             const { return valid_graft_;                 }
   bool IsChunkedGraft()           const { return graft_chunklist_;             }
@@ -254,6 +257,7 @@ class SyncItem {
                           const bool          refresh);
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
   void CheckMarkerFiles();
+  void CheckCatalog();
 
   mutable SyncItemType rdonly_type_;
   mutable EntryStat scratch_stat_;
@@ -267,6 +271,8 @@ class SyncItem {
 
  private:
   void CheckCatalogMarker();
+  void CheckPath();
+  void CheckRegular();
 
   std::string filename_;
 
@@ -282,6 +288,8 @@ class SyncItem {
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
   bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
+  bool is_path_present_;
+  bool is_regular_;
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 
