@@ -9,8 +9,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/cvmfs/ducc/lib"
 	cvmfs "github.com/cvmfs/ducc/server/cvmfs"
@@ -27,6 +30,25 @@ type Repo struct {
 func NewRepo(name string) Repo {
 	r := cvmfs.NewRepository(name)
 	return Repo{r}
+}
+
+func (repo *Repo) Exists() bool {
+	path := repo.Root()
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return stat.IsDir()
+}
+
+func (repo *Repo) GetOwnerUID() int {
+	path := repo.Root()
+
+	stat, _ := os.Stat(path)
+	if stat, ok := stat.Sys().(*syscall.Stat_t); ok {
+		return int(stat.Uid)
+	}
+	return -1
 }
 
 func (repo *Repo) statusLayer(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -352,7 +374,28 @@ func main() {
 		}
 	}
 
-	repo := NewRepo("new-unpacked.cern.ch")
+	if len(os.Args) < 2 {
+		err := fmt.Errorf("Missing repository name, provide it as first argument.")
+		lib.LogE(err).Fatal()
+	}
+
+	repositoryName := os.Args[1]
+	repo := NewRepo(repositoryName)
+
+	if repo.Exists() == false {
+		lib.LogE(fmt.Errorf("The repository does not seems to exists: %s", repositoryName)).Fatal()
+	}
+
+	user, _ := user.Current()
+	uidS := user.Uid
+	uid, err := strconv.Atoi(uidS)
+	if err != nil {
+		lib.LogE(fmt.Errorf("Error in getting the current UID")).Fatal()
+	}
+	if uid != repo.GetOwnerUID() {
+		lib.LogE(fmt.Errorf("Error, the user running is not the owner of the repository")).Fatal()
+	}
+
 	go repo.StartOperationsLoop()
 	router := httprouter.New()
 	router.GET("/layer/status/:digest", repo.statusLayer)
