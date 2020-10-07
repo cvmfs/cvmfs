@@ -473,6 +473,7 @@ _migrate_141() {
   fi
 
   echo "--> updating server.conf"
+  echo "CVMFS_USE_SSL_SYSTEM_CA=true" >> $server_conf
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information
