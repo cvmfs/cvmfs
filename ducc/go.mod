@@ -31,7 +31,7 @@ require (
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/sylabs/singularity v3.1.1+incompatible
-	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
+	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 	github.com/vbatts/tar-split v0.11.1 // indirect
 	golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b // indirect
 	golang.org/x/net v0.0.0-20190119204137-ed066c81e75e // indirect

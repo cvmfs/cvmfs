@@ -17,6 +17,7 @@ import (
 	res "github.com/cvmfs/ducc/server/replies"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/julienschmidt/httprouter"
+	"github.com/syndtr/gocapability/capability"
 )
 
 type Repo struct {
@@ -330,6 +331,27 @@ func (repo Repo) ingestFlat(w http.ResponseWriter, r *http.Request, ps httproute
 }
 
 func main() {
+	c, err := capability.NewPid2(0)
+	if err != nil {
+		lib.LogE(err).Fatal("Error in obtaining the necessary capability")
+		return
+	}
+	if err := c.Load(); err != nil {
+		lib.LogE(err).Fatal("Error in loading the capability for this process")
+		return
+	}
+	neededCaps := []capability.Cap{capability.CAP_CHOWN, capability.CAP_DAC_OVERRIDE, capability.CAP_DAC_READ_SEARCH, capability.CAP_FOWNER, capability.CAP_FSETID, capability.CAP_SETUID, capability.CAP_SETGID}
+	capNeeded := ""
+	for _, capability := range neededCaps {
+		capNeeded = fmt.Sprintf("%s %s", capNeeded, capability.String())
+	}
+	missingCapError := fmt.Errorf("Missing capability, we need: %s", capNeeded)
+	for _, neededCap := range neededCaps {
+		if c.Get(capability.EFFECTIVE, neededCap) == false {
+			lib.LogE(missingCapError).Fatal("Detected missing effective capability: ", neededCap.String())
+		}
+	}
+
 	repo := NewRepo("new-unpacked.cern.ch")
 	go repo.StartOperationsLoop()
 	router := httprouter.New()
