@@ -11,10 +11,24 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return 2
   echo "*** Create the folder /nested"
   mkdir /cvmfs/$CVMFS_TEST_REPO/nested || return 3
-  echo "*** Create non-regular .cvmfscatalog file"
+  echo "*** Create non-regular .cvmfscatalog file (fifo file)"
   mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 4
   echo "*** A non-regular file should not pass"
   publish_repo $CVMFS_TEST_REPO && return 5
+
+  echo "*** Remove .cvmfscatalog fifo file"
+  rm /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 6
+  echo "*** Create non-regular .cvmfscatalog file (directory)"
+  mkdir /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 7
+  echo "*** A non-regular file should not pass"
+  publish_repo $CVMFS_TEST_REPO && return 8
+
+  echo "*** Remove .cvmfscatalog directory"
+  rm -r /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 9
+  echo "*** Create non-regular .cvmfscatalog file (symbolic link)"
+  ln -s /dev/null /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 10
+  echo "*** A non-regular file should not pass"
+  publish_repo $CVMFS_TEST_REPO && return 11
 
   return 0
 }
