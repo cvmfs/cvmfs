@@ -263,7 +263,18 @@ void SyncItem::CheckMarkerFiles() {
 }
 
 void SyncItem::CheckCatalogMarker() {
-  has_catalog_marker_ = FileExists(GetUnionPath() + "/.cvmfscatalog");
+  std::string path(GetUnionPath() + "/.cvmfscatalog");
+  EntryStat stat;
+  StatGeneric(path, &stat, false);
+  if (stat.error_code) {
+    has_catalog_marker_ = false;
+    return;
+  }
+  if (stat.GetSyncItemType() == kItemFile) {
+    has_catalog_marker_ = true;
+    return;
+  }
+  PANIC(kLogStderr, "Error: The .cvmfscatalog file is not a regular one.");
 }
 
 
