@@ -2746,6 +2746,7 @@ DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
   clone->opt_proxy_groups_reset_after_ = opt_proxy_groups_reset_after_;
   clone->opt_host_reset_after_ = opt_host_reset_after_;
   clone->credentials_attachment_ = credentials_attachment_;
+  clone->use_system_ca_ = use_system_ca_;
 
   return clone;
 }
