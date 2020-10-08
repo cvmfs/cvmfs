@@ -1,0 +1,21 @@
+cvmfs_test_name="check that the .cvmfscatalog file is a regular file"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** Create a new repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+  echo "*** Start a transaction"
+  start_transaction $CVMFS_TEST_REPO || return 2
+  echo "*** Create the folder /nested"
+  mkdir /cvmfs/$CVMFS_TEST_REPO/nested || return 3
+  echo "*** Create non-regular .cvmfscatalog file"
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 4
+  echo "*** A non-regular file should not pass"
+  publish_repo $CVMFS_TEST_REPO && return 5
+
+  return 0
+}
+
