@@ -274,7 +274,7 @@ void SyncItem::CheckCatalogMarker() {
     has_catalog_marker_ = true;
     return;
   }
-  PANIC(kLogStderr, "Error: The .cvmfscatalog file is not a regular one.");
+  PANIC(kLogStderr, "Error: '%s' is not a regular file.", path.c_str());
 }
 
 
