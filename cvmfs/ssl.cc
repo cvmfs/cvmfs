@@ -16,9 +16,7 @@
 #include "util/posix.h"
 #include "util/string.h"
 
-#ifdef CVMFS_NAMESPACE_GUARD
 namespace {
-#endif
 
 bool HasCertificates(std::string directory) {
   if (!DirectoryExists(directory)) return false;
@@ -93,6 +91,8 @@ bool AddSystemSSLCertificates(CURL *handle) {
   return false;
 }
 
+}  // namespace
+
 bool AddSSLCertificates(CURL *handle, bool add_system_certificates) {
   bool already_added = Add_CVMFS_SSL_Certificates(handle);
 
@@ -101,9 +101,5 @@ bool AddSSLCertificates(CURL *handle, bool add_system_certificates) {
   }
   return already_added;
 }
-
-#ifdef CVMFS_NAMESPACE_GUARD
-}  // namespace
-#endif
 
 #endif  // CVMFS_SSL_H_
