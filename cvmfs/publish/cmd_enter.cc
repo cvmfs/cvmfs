@@ -170,7 +170,8 @@ void CmdEnter::MountCvmfs() {
   cmdline.push_back(lower_layer_);
   std::set<int> preserved_fds;
   preserved_fds.insert(0);
-  //preserved_fds.insert(1);
+  // TODO: redirect to usyslog
+  preserved_fds.insert(1);
   preserved_fds.insert(2);
   pid_t pid_child;
   bool rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
@@ -179,7 +180,11 @@ void CmdEnter::MountCvmfs() {
                          &pid_child);
   if (!rvb) throw EPublish("cannot run " + cvmfs2_binary_);
   int exit_code = WaitForChild(pid_child);
-  if (exit_code != 0) throw EPublish("cannot mount cvmfs read-only branch");
+  if (exit_code != 0) {
+    throw EPublish("cannot mount cvmfs read-only branch (" +
+          StringifyInt(exit_code) + ")\n" +
+          "  command: `" + JoinStrings(cmdline, " ").c_str() + "`");
+  }
 }
 
 
