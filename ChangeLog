@@ -1,4 +1,5 @@
 2.8.0:
+  * Refuse non-regular .cvmfscatalog files during publish (CVM-1868)
   * Replace `swissknife hash` by `publish hash` including MD5 support
   * Add experimental support for WSL2
   * [deb] demote apache2 dependency from required to recommended
