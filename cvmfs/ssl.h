@@ -19,8 +19,6 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-bool HasCertificates(std::string directory);
-
 bool AddSSLCertificates(CURL *handle, bool add_system_certificates);
 
 #ifdef CVMFS_NAMESPACE_GUARD
