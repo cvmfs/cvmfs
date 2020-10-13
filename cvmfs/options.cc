@@ -9,6 +9,7 @@
 #include "cvmfs_config.h"
 #include "options.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -179,6 +180,8 @@ void BashOptionsManager::ParsePath(const string &config_file,
   }
   const string config_path = GetParentPath(config_file);
   FILE *fconfig = fopen(config_file.c_str(), "r");
+  LogCvmfs(kLogCvmfs, kLogDebug, "attempt to open %s - %d %d",
+           config_file.c_str(), fconfig == NULL, errno);
   if (pid_child > 0) {
     char c = 'C';
     WritePipe(pipe_quit[1], &c, 1);
