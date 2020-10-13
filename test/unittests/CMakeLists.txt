@@ -438,6 +438,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   publish/t_session.cc
   publish/t_repository.cc
   publish/t_settings.cc
+  publish/t_transaction.cc
   publish/t_util.cc
 
   ../common/env.cc

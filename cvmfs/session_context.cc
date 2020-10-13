@@ -263,7 +263,11 @@ SessionContext::SessionContext()
     : SessionContextBase(),
       upload_jobs_(),
       worker_terminate_(),
-      worker_() {}
+      worker_()
+{
+  // Set to 0 in InitializeDerived()
+  atomic_write32(&worker_terminate_, 1);
+}
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
@@ -279,9 +283,8 @@ bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
 }
 
 bool SessionContext::FinalizeDerived() {
-  atomic_write32(&worker_terminate_, 1);
-
-  pthread_join(worker_, NULL);
+  if (atomic_cas32(&worker_terminate_, 0, 1))
+    pthread_join(worker_, NULL);
 
   return true;
 }

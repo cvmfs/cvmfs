@@ -1215,8 +1215,9 @@ check_repo_integrity() {
 # @param repo    the repository you want to start the transaction for
 start_transaction() {
   local repo=$1
+  shift
 
-  cvmfs_server transaction $repo || return 100
+  cvmfs_server transaction $@ $repo || return 100
   return 0
 }
 

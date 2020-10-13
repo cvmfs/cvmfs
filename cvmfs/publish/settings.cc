@@ -43,6 +43,55 @@ void SettingsSpoolArea::SetRepairMode(const EUnionMountRepairMode val) {
 //------------------------------------------------------------------------------
 
 
+void SettingsTransaction::SetLayoutRevision(const unsigned revision) {
+  layout_revision_ = revision;
+}
+
+void SettingsTransaction::SetBaseHash(const shash::Any &hash) {
+  base_hash_ = hash;
+}
+
+void SettingsTransaction::SetHashAlgorithm(const std::string &algorithm) {
+  hash_algorithm_ = shash::ParseHashAlgorithm(algorithm);
+}
+
+void SettingsTransaction::SetCompressionAlgorithm(const std::string &algorithm)
+{
+  compression_algorithm_ = zlib::ParseCompressionAlgorithm(algorithm);
+}
+
+void SettingsTransaction::SetEnforceLimits(bool value) {
+  enforce_limits_ = value;
+}
+
+void SettingsTransaction::SetLimitNestedCatalogKentries(unsigned value) {
+  limit_nested_catalog_kentries_ = value;
+}
+
+void SettingsTransaction::SetLimitRootCatalogKentries(unsigned value) {
+  limit_root_catalog_kentries_ = value;
+}
+
+void SettingsTransaction::SetLimitFileSizeMb(unsigned value) {
+  limit_file_size_mb_ = value;
+}
+
+void SettingsTransaction::SetUseCatalogAutobalance(bool value) {
+  use_catalog_autobalance_ = value;
+}
+
+void SettingsTransaction::SetAutobalanceMaxWeight(unsigned value) {
+  autobalance_max_weight_ = value;
+}
+
+void SettingsTransaction::SetAutobalanceMinWeight(unsigned value) {
+  autobalance_min_weight_ = value;
+}
+
+void SettingsTransaction::SetPrintChangeset(bool value) {
+  print_changeset_ = value;
+}
+
 void SettingsTransaction::SetUnionFsType(const std::string &union_fs) {
   if (union_fs == "aufs") {
     union_fs_ = kUnionFsAufs;
@@ -81,6 +130,17 @@ void SettingsTransaction::SetTimeout(unsigned seconds) {
 
 void SettingsTransaction::SetLeasePath(const std::string &path) {
   lease_path_ = path;
+}
+
+void SettingsTransaction::SetTemplate(
+  const std::string &from, const std::string &to)
+{
+  if (from.empty())
+    throw EPublish("template transaction's 'from' path must not be empty");
+  if (to.empty())
+    throw EPublish("template transaction's 'to' path must not be empty");
+  template_from_ = (from[0] == '/') ? from.substr(1) : from;
+  template_to_ = (to[0] == '/') ? to.substr(1) : to;
 }
 
 //------------------------------------------------------------------------------
@@ -359,6 +419,46 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
     options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
 
   std::string arg;
+  if (options_mgr_->GetValue("CVMFS_CREATOR_VERSION", &arg)) {
+    settings_publisher->GetTransaction()->SetLayoutRevision(String2Uint64(arg));
+  }
+  if (options_mgr_->GetValue("CVMFS_UNION_FS_TYPE", &arg)) {
+    settings_publisher->GetTransaction()->SetUnionFsType(arg);
+  }
+  if (options_mgr_->GetValue("CVMFS_HASH_ALGORITHM", &arg)) {
+    settings_publisher->GetTransaction()->SetHashAlgorithm(arg);
+  }
+  if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &arg)) {
+    settings_publisher->GetTransaction()->SetCompressionAlgorithm(arg);
+  }
+  if (options_mgr_->GetValue("CVMFS_ENFORCE_LIMITS", &arg)) {
+    settings_publisher->GetTransaction()->SetEnforceLimits(
+      options_mgr_->IsOn(arg));
+  }
+  if (options_mgr_->GetValue("CVMFS_NESTED_KCATALOG_LIMIT", &arg)) {
+    settings_publisher->GetTransaction()->SetLimitNestedCatalogKentries(
+      String2Uint64(arg));
+  }
+  if (options_mgr_->GetValue("CVMFS_ROOT_KCATALOG_LIMIT", &arg)) {
+    settings_publisher->GetTransaction()->SetLimitRootCatalogKentries(
+      String2Uint64(arg));
+  }
+  if (options_mgr_->GetValue("CVMFS_FILE_MBYTE_LIMIT", &arg)) {
+    settings_publisher->GetTransaction()->SetLimitFileSizeMb(
+      String2Uint64(arg));
+  }
+  if (options_mgr_->GetValue("CVMFS_AUTOCATALOGS", &arg)) {
+    settings_publisher->GetTransaction()->SetUseCatalogAutobalance(
+      options_mgr_->IsOn(arg));
+  }
+  if (options_mgr_->GetValue("CVMFS_AUTOCATALOGS_MAX_WEIGHT", &arg)) {
+    settings_publisher->GetTransaction()->SetAutobalanceMaxWeight(
+      String2Uint64(arg));
+  }
+  if (options_mgr_->GetValue("CVMFS_AUTOCATALOGS_MIN_WEIGHT", &arg)) {
+    settings_publisher->GetTransaction()->SetAutobalanceMinWeight(
+      String2Uint64(arg));
+  }
   if (options_mgr_->GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
     if (!options_mgr_->IsOn(arg)) {
       settings_publisher->GetTransaction()->GetSpoolArea()->SetRepairMode(

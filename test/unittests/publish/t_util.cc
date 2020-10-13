@@ -5,6 +5,13 @@
 #include <gtest/gtest.h>
 
 #include <fcntl.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+#include <cassert>
+#include <cstring>
 
 #include "publish/cmd_util.h"
 #include "publish/except.h"
@@ -134,6 +141,44 @@ TEST_F(T_Util, CallServerHook) {
                               "./cvmfs_test_hooks.sh"));
   EXPECT_EQ(42, CallServerHook("hookY", "x.cvmfs.io",
                                "./cvmfs_test_hooks.sh"));
+}
+
+namespace {
+
+void *MainTalkCommandAnswer(void *data) {
+  int socket_fd = *reinterpret_cast<int *>(data);
+  struct sockaddr_un remote;
+  socklen_t socket_size = sizeof(remote);
+  int con_fd = accept(socket_fd, (struct sockaddr *)&remote, &socket_size);
+  assert(con_fd > 0);
+  char buf[32];
+  int nbytes = recv(con_fd, buf, sizeof(buf) - 1, 0);
+  buf[nbytes] = '\0';
+  assert(strcmp("command", buf) == 0);
+  std::string answer = "answer";
+  (void)send(con_fd, &answer[0], answer.length(), MSG_NOSIGNAL);
+  shutdown(con_fd, SHUT_RDWR);
+  close(con_fd);
+  return NULL;
+}
+
+}  // anonymous namespace
+
+TEST_F(T_Util, SendTalkCommand) {
+  EXPECT_THROW(SendTalkCommand("/no/such/file", "command"), EPublish);
+  int socket_fd = MakeSocket("cvmfs_test_socket", 0600);
+  ASSERT_GE(socket_fd, 0);
+  ASSERT_EQ(0, listen(socket_fd, 1));
+  pthread_t thread;
+  int retval = pthread_create(&thread, NULL, MainTalkCommandAnswer, &socket_fd);
+  ASSERT_EQ(0, retval);
+
+  std::string answer = SendTalkCommand("cvmfs_test_socket", "command");
+  pthread_join(thread, NULL);
+  EXPECT_STREQ("answer", answer.c_str());
+
+  close(socket_fd);
+  unlink("cvmfs_test_socket");
 }
 
 }  // namespace publish

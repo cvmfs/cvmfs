@@ -19,6 +19,7 @@ namespace catalog {
 class DeltaCounters;
 class DirectoryEntry;
 class SimpleCatalogManager;
+class WritableCatalogManager;
 }
 namespace download {
 class DownloadManager;
@@ -32,10 +33,13 @@ class Reflog;
 }
 namespace perf {
 class Statistics;
+class StatisticsTemplate;
 }
 namespace signature {
 class SignatureManager;
 }
+class SyncMediator;
+class SyncParameters;
 namespace upload {
 class Spooler;
 }
@@ -44,6 +48,8 @@ class Whitelist;
 }
 
 namespace publish {
+
+class SyncUnion;
 
 /**
  * Users create derived instances to react on repository diffs
@@ -95,7 +101,6 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   const signature::SignatureManager *signature_mgr() const {
     return signature_mgr_;
   }
-  const upload::Spooler *spooler() const { return spooler_; }
   const whitelist::Whitelist *whitelist() const { return whitelist_; }
   const manifest::Manifest *manifest() const { return manifest_; }
   // Inheritance of History and SqliteHistory unknown in the header
@@ -119,7 +124,6 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
    * The read-only catalog manager, loaded on demand
    */
   catalog::SimpleCatalogManager *simple_catalog_mgr_;
-  upload::Spooler *spooler_;
   whitelist::Whitelist *whitelist_;
   manifest::Reflog *reflog_;
   manifest::Manifest *manifest_;
@@ -211,6 +215,10 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
     Settings settings_;
   };  // class Session
 
+  /**
+   * The directory layout of the publisher node must be of matching revision
+   */
+  static const unsigned kRequiredLayoutRevision = 142;
 
   static Publisher *Create(const SettingsPublisher &settings);
 
@@ -243,6 +251,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   const SettingsPublisher &settings() const { return settings_; }
   bool in_transaction() const { return in_transaction_; }
   ManagedNode *managed_node() const { return managed_node_.weak_ref(); }
+  const upload::Spooler *spooler_files() const { return spooler_files_; }
+  const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
 
  private:
   Publisher();  ///< Used by Create
@@ -250,7 +260,13 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   /**
    * Used just before a spooler is required, e.g. in Create()
    */
-  void ConstructSpooler();
+  void ConstructSpoolers();
+  /**
+   * Initializes the spooler, the writable catalog manager, and the sync
+   * mediator
+   */
+  void ConstructSyncManagers();
+  void WipeScratchArea();
 
   void CreateKeychain();
   void CreateStorage();
@@ -278,6 +294,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void CheckTagName(const std::string &name);
 
   SettingsPublisher settings_;
+  UniquePtr<perf::StatisticsTemplate> statistics_publish_;
   /**
    * The log level, set to kLogNone if settings_.is_silent() == true
    */
@@ -285,6 +302,13 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   bool in_transaction_;
   gateway::GatewayKey gw_key_;
   UniquePtr<ManagedNode> managed_node_;
+
+  upload::Spooler *spooler_files_;
+  upload::Spooler *spooler_catalogs_;
+  catalog::WritableCatalogManager *catalog_mgr_;
+  SyncParameters *sync_parameters_;
+  SyncMediator *sync_mediator_;
+  publish::SyncUnion *sync_union_;
 };
 
 class __attribute__((visibility("default"))) Replica : public Repository {

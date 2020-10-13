@@ -8,8 +8,10 @@
 #include <string>
 
 #include "catalog_mgr_ro.h"
+#include "catalog_mgr_rw.h"
 #include "directory_entry.h"
 #include "logging.h"
+#include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
@@ -47,11 +49,35 @@ void Publisher::Transaction() {
   }
 
   UniquePtr<Session> session(Session::Create(settings_));
-  ConstructSpooler();
+  ConstructSpoolers();
 
   const std::string transaction_lock =
     settings_.transaction().spool_area().transaction_lock();
   ServerLockFile::Acquire(transaction_lock, true /* ignore_stale */);
+
+  UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
+    settings_.transaction().spool_area().checkout_marker()));
+  // TODO(jblomer): take root hash from r/o mountpoint?
+  if (marker.IsValid())
+    settings_.GetTransaction()->SetBaseHash(marker->hash());
+  else
+    settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
+
+  if (settings_.transaction().HasTemplate()) {
+    LogCvmfs(kLogCvmfs, llvl_ | kLogStdout | kLogNoLinebreak,
+             "CernVM-FS: cloning template %s --> %s ... ",
+             settings_.transaction().template_from().c_str(),
+             settings_.transaction().template_to().c_str());
+    ConstructSyncManagers();
+    catalog_mgr_->CloneTree(settings_.transaction().template_from(),
+                            settings_.transaction().template_to());
+    Sync();
+    SendTalkCommand(settings_.transaction().spool_area().readonly_talk_socket(),
+      "chroot " + settings_.transaction().base_hash().ToString() + "\n");
+    LogCvmfs(kLogCvmfs, llvl_ | kLogStdout, "[done]");
+    // TODO(jblomer): fix-me
+    // PushReflog();
+  }
 
   in_transaction_ = true;
   LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
