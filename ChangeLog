@@ -1,4 +1,7 @@
 2.8.0:
+  * Add `cvmfs_talk chroot <hash>` command
+  * Add CVMFS_TALK_SOCKET and CVMFS_TALK_OWNER client parameters
+  * Add `cvmfs_server transaction -T /foo=/bar` template transactions
   * Refuse non-regular .cvmfscatalog files during publish (CVM-1868)
   * Replace `swissknife hash` by `publish hash` including MD5 support
   * Add experimental support for WSL2
