@@ -78,6 +78,7 @@ func ApplyDirectory(bottom, top string) error {
 	walkFn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			chWalkErrors <- err
+			return nil
 		}
 		if info.IsDir() {
 			rootRW.RLock()
@@ -105,12 +106,14 @@ func ApplyDirectory(bottom, top string) error {
 	// each dir is explored in a new goroutine
 	go func() {
 		for dir := range dirs {
+			fmt.Println("Walking on: ", dir)
 			wg.Add(1)
 			rootRW.Lock()
 			roots[dir] = true
 			rootRW.Unlock()
 			go func() {
 				defer wg.Done()
+				defer fmt.Println("done walking on: ", dir)
 				filepath.Walk(dir, walkFn)
 			}()
 		}
