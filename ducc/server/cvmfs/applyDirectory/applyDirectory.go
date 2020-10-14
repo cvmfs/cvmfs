@@ -99,22 +99,22 @@ func ApplyDirectory(bottom, top string) error {
 		return nil
 	}
 
+	// starting from the top directory
+	dirs <- top
+
 	// each dir is explored in a new goroutine
 	go func() {
 		for dir := range dirs {
+			wg.Add(1)
 			rootRW.Lock()
 			roots[dir] = true
 			rootRW.Unlock()
-			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				filepath.Walk(dir, walkFn)
 			}()
 		}
 	}()
-
-	// starting from the top directory
-	dirs <- top
 
 	var collectWg sync.WaitGroup
 
