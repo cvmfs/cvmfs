@@ -36,7 +36,6 @@ type Config struct {
 
 func NewFilesystem(ctx context.Context, root string, config *Config) (snapshot.FileSystem, error) {
 	var absolutePath string
-	defer log.G(ctx).WithField("root", root).WithField("absolutePath", absolutePath).Info("Mounting new filesystem")
 	mountedLayersMap := make(map[string]string)
 	if config.AbsoluteMountpoint == "" {
 		repository := config.Repository
@@ -47,6 +46,7 @@ func NewFilesystem(ctx context.Context, root string, config *Config) (snapshot.F
 	} else {
 		absolutePath = config.AbsoluteMountpoint
 	}
+	log.G(ctx).WithField("root", root).WithField("absolutePath", absolutePath).Info("Mounting new filesystem")
 	return &filesystem{fsAbsoluteMountpoint: absolutePath, mountedLayers: mountedLayersMap}, nil
 }
 
