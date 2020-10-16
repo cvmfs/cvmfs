@@ -24,22 +24,30 @@ const (
 )
 
 type filesystem struct {
-	repository        string
-	mountedLayers     map[string]string
-	mountedLayersLock sync.Mutex
+	fsAbsoluteMountpoint string
+	mountedLayers        map[string]string
+	mountedLayersLock    sync.Mutex
 }
 
 type Config struct {
-	Repository string `toml:"repository" default:"unpacked.cern.ch"`
+	Repository         string `toml:"repository" default:"unpacked.cern.ch"`
+	AbsoluteMountpoint string `toml:"absolute-mountpoint" default:""`
 }
 
 func NewFilesystem(ctx context.Context, root string, config *Config) (snapshot.FileSystem, error) {
-	log.G(ctx).WithField("root", root).Warning("New fs")
-	repository := config.Repository
-	if repository == "" {
-		repository = "unpacked.cern.ch"
+	var absolutePath string
+	defer log.G(ctx).WithField("root", root).WithField("absolutePath", absolutePath).Info("Mounting new filesystem")
+	mountedLayersMap := make(map[string]string)
+	if config.AbsoluteMountpoint == "" {
+		repository := config.Repository
+		if repository == "" {
+			repository = "unpacked.cern.ch"
+		}
+		absolutePath = filepath.Join("/", "cvmfs", repository)
+	} else {
+		absolutePath = config.AbsoluteMountpoint
 	}
-	return &filesystem{repository: repository, mountedLayers: make(map[string]string)}, nil
+	return &filesystem{fsAbsoluteMountpoint: absolutePath, mountedLayers: mountedLayersMap}, nil
 }
 
 func (fs *filesystem) Mount(ctx context.Context, mountpoint string, labels map[string]string) error {
@@ -52,7 +60,7 @@ func (fs *filesystem) Mount(ctx context.Context, mountpoint string, labels map[s
 	}
 	digest = strings.Split(digest, ":")[1]
 	firstTwo := digest[0:2]
-	path := filepath.Join("/", "cvmfs", fs.repository, ".layers", firstTwo, digest, "layerfs")
+	path := filepath.Join(fs.fsAbsoluteMountpoint, ".layers", firstTwo, digest, "layerfs")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		err = fmt.Errorf("layer %s not in the cvmfs repository", digest)
 		log.G(ctx).WithError(err).WithField("layer digest", digest).WithField("path", path).Debug("cvmfs: Layer not found")
