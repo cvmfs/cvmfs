@@ -27,6 +27,7 @@ import (
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/contrib/snapshotservice"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/snapshots"
 	snbase "github.com/containerd/stargz-snapshotter/snapshot"
 	"github.com/sirupsen/logrus"
 
@@ -74,9 +75,15 @@ func main() {
 	if err != nil {
 		log.G(ctx).WithError(err).Fatalf("failed to configure filesystem")
 	}
-	rs, err := snbase.NewSnapshotter(ctx, filepath.Join(*rootDir, "snapshotter"), fs, snbase.AsynchronousRemove)
+	var rs snapshots.Snapshotter
+	rs, err = snbase.NewSnapshotter(ctx, filepath.Join(*rootDir, "snapshotter"), fs, snbase.AsynchronousRemove)
 	if err != nil {
-		log.G(ctx).WithError(err).Fatalf("failed to configure snapshotter")
+		log.G(ctx).WithError(err).Warning("failed to configure snapshotter using the previous configuration")
+		os.RemoveAll(filepath.Join(*rootDir, "snapshotter"))
+		rs, err = snbase.NewSnapshotter(ctx, filepath.Join(*rootDir, "snapshotter"), fs, snbase.AsynchronousRemove)
+		if err != nil {
+			log.G(ctx).WithError(err).Fatalf("failed to configure snapshotter starting from a clean configuration")
+		}
 	}
 	defer func() {
 		log.G(ctx).Debug("Closing the snapshotter")

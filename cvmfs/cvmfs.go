@@ -47,6 +47,9 @@ func NewFilesystem(ctx context.Context, root string, config *Config) (snapshot.F
 		absolutePath = config.AbsoluteMountpoint
 	}
 	log.G(ctx).WithField("root", root).WithField("absolutePath", absolutePath).Info("Mounting new filesystem")
+	if _, err := os.Stat(absolutePath); err != nil {
+		log.G(ctx).WithField("absolutePath", absolutePath).Warning("Impossible to stat the absolute path, is the filesystem mounted properly? Error: ", err)
+	}
 	return &filesystem{fsAbsoluteMountpoint: absolutePath, mountedLayers: mountedLayersMap}, nil
 }
 
