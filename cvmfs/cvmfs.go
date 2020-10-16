@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/containerd/containerd/log"
@@ -22,10 +23,10 @@ const (
 	targetImageLayersLabel = "containerd.io/snapshot/cri.image-layers"
 )
 
-
 type filesystem struct {
-	repository    string
-	mountedLayers map[string]string
+	repository        string
+	mountedLayers     map[string]string
+	mountedLayersLock sync.Mutex
 }
 
 type Config struct {
@@ -63,13 +64,17 @@ func (fs *filesystem) Mount(ctx context.Context, mountpoint string, labels map[s
 		log.G(ctx).WithError(err).WithField("layer digest", digest).WithField("mountpoint", mountpoint).Debug("cvmfs: Error in bind mounting the layer.")
 		return err
 	}
+	fs.mountedLayersLock.Lock()
+	defer fs.mountedLayersLock.Unlock()
 	fs.mountedLayers[mountpoint] = path
 	return nil
 }
 
-func (fs *filesystem) Check(ctx context.Context, mountpoint string) error {
+func (fs *filesystem) Check(ctx context.Context, mountpoint string, labels map[string]string) error {
 	log.G(ctx).WithField("snapshotter", "cvmfs").WithField("mountpoint", mountpoint).Warning("checking layer")
+	fs.mountedLayersLock.Lock()
 	path, ok := fs.mountedLayers[mountpoint]
+	fs.mountedLayersLock.Unlock()
 	if !ok {
 		err := fmt.Errorf("Mountpoint: %s was not mounted", mountpoint)
 		log.G(ctx).WithError(err).WithField("mountpoint", mountpoint).Error("cvmfs: the requested mountpoint does not seem to be mounted")
@@ -91,4 +96,19 @@ func (fs *filesystem) Check(ctx context.Context, mountpoint string) error {
 		return err
 	}
 	return statErr
+}
+
+func (fs *filesystem) Unmount(ctx context.Context, mountpoint string) error {
+	// maybe we lost track of something somehow, does not hurt to try to unmount the mountpoint anyway
+
+	fs.mountedLayersLock.Lock()
+	_, ok := fs.mountedLayers[mountpoint]
+	delete(fs.mountedLayers, mountpoint)
+	fs.mountedLayersLock.Unlock()
+
+	if !ok {
+		err := fmt.Errorf("Trying to unmount mountpoint that does not seems mounted: %s", mountpoint)
+		log.G(ctx).WithError(err).Error("Layer does not seems mounted.")
+	}
+	return syscall.Unmount(mountpoint, syscall.MNT_FORCE)
 }
