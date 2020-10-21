@@ -111,6 +111,7 @@ std::vector<std::string> FindFilesBySuffix(const std::string &dir,
 std::vector<std::string> FindFilesByPrefix(const std::string &dir,
                                            const std::string &prefix);
 std::vector<std::string> FindDirectories(const std::string &parent_dir);
+std::string FindExecutable(const std::string &exe);
 bool ListDirectory(const std::string &directory,
                    std::vector<std::string> *names,
                    std::vector<mode_t> *modes);

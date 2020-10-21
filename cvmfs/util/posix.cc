@@ -55,6 +55,7 @@
 
 #include "util/algorithm.h"
 #include "util/exception.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 //using namespace std;  // NOLINT
@@ -1122,6 +1123,7 @@ std::vector<std::string> FindDirectories(const std::string &parent_dir) {
   return result;
 }
 
+
 /**
  * Finds all files and direct subdirectories under directory (except ., ..).
  */
@@ -1154,6 +1156,48 @@ bool ListDirectory(const std::string &directory,
 
   SortTeam(names, modes);
   return true;
+}
+
+
+/**
+ * Looks whether exe is an executable file.  If exe is not an absolute path,
+ * searches the PATH environment.
+ */
+std::string FindExecutable(const std::string &exe) {
+  if (exe.empty())
+    return "";
+
+  std::vector<std::string> search_paths;
+  if (exe[0] == '/') {
+    search_paths.push_back(GetParentPath(exe));
+  } else {
+    char *path_env = getenv("PATH");
+    if (path_env) {
+      search_paths = SplitString(path_env, ':');
+    }
+  }
+
+  for (unsigned i = 0; i < search_paths.size(); ++i) {
+    if (search_paths[i].empty())
+      continue;
+    if (search_paths[i][0] != '/')
+      continue;
+
+    std::string path = search_paths[i] + "/" + GetFileName(exe);
+    platform_stat64 info;
+    int retval = platform_stat(path.c_str(), &info);
+    if (retval != 0)
+      continue;
+    if (!S_ISREG(info.st_mode))
+      continue;
+    retval = access(path.c_str(), X_OK);
+    if (retval != 0)
+      continue;
+
+    return path;
+  }
+
+  return "";
 }
 
 

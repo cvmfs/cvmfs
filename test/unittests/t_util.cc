@@ -1087,6 +1087,17 @@ TEST_F(T_Util, ListDirectory) {
 }
 
 
+TEST_F(T_Util, FindExecutable) {
+  std::string ls = FindExecutable("ls");
+  ASSERT_FALSE(ls.empty());
+  EXPECT_EQ('/', ls[0]);
+  std::string ls_abs = FindExecutable(ls);
+  EXPECT_EQ(ls, ls_abs);
+  std::string fail = FindExecutable("no-such-exe");
+  EXPECT_TRUE(fail.empty());
+}
+
+
 TEST_F(T_Util, GetUmask) {
   unsigned test_umask = 0755;
   mode_t original_mask = umask(test_umask);
