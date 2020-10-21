@@ -28,6 +28,7 @@ class EPublish : public std::runtime_error {
     kFailRepositoryNotFound,  // the repository was not found on the machine
     kFailLayoutRevision,      // unsupported layout revision, migrate required
     kFailWhitelistExpired,    //
+    kFailMissingDependency,   // a program or service was not found
   };
 
   explicit EPublish(const std::string& what, EFailures f = kFailUnspecified)

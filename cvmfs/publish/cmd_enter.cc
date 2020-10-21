@@ -64,7 +64,7 @@ void CmdEnter::CreateUnderlay(
   const std::string &dest_dir,
   const std::vector<std::string> &empty_dirs)
 {
-  LogCvmfs(kLogCvmfs, kLogStdout, "underlay: entry %s --> %s",
+  LogCvmfs(kLogCvmfs, kLogDebug, "underlay: entry %s --> %s",
            source_dir.c_str(), dest_dir.c_str());
 
   // For an empty directory /cvmfs/atlas.cern.ch, we are going to store "/cvmfs"
@@ -128,7 +128,7 @@ void CmdEnter::CreateUnderlay(
       } else {
         CreateFile(dest, 0600, false /* ignore_failure */);
       }
-      LogCvmfs(kLogCvmfs, kLogStdout, "underlay: %s --> %s",
+      LogCvmfs(kLogCvmfs, kLogDebug, "underlay: %s --> %s",
                source.c_str(), dest.c_str());
       bool rv = BindMount(source, dest);
       if (!rv)
@@ -163,6 +163,11 @@ void CmdEnter::WriteCvmfsConfig() {
 
 
 void CmdEnter::MountCvmfs() {
+  if (FindExecutable(cvmfs2_binary_).empty()) {
+    throw EPublish("cannot find executable " + cvmfs2_binary_,
+                   EPublish::kFailMissingDependency);
+  }
+
   std::vector<std::string> cmdline;
   cmdline.push_back(cvmfs2_binary_);
   cmdline.push_back("-o");
@@ -190,6 +195,11 @@ void CmdEnter::MountCvmfs() {
 
 
 void CmdEnter::MountOverlayfs() {
+  if (FindExecutable(overlayfs_binary_).empty()) {
+    throw EPublish("cannot find executable " + overlayfs_binary_,
+                   EPublish::kFailMissingDependency);
+  }
+
   std::vector<std::string> args;
   args.push_back("-o");
   args.push_back(string("lowerdir=") + lower_layer_ +
