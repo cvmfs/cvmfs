@@ -77,7 +77,8 @@ void CmdEnter::CreateUnderlay(
 
     // We create $DEST/cvmfs (top-level dir)
     std::string dest_empty_dir = dest_dir + toplevel_dir;
-    LogCvmfs(kLogCvmfs, kLogStdout, "underlay: mkdir %s", dest_empty_dir.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "underlay: mkdir %s",
+             dest_empty_dir.c_str());
     EnsureDirectory(dest_empty_dir);
 
     // And recurse into it, i.e.
@@ -170,7 +171,7 @@ void CmdEnter::MountCvmfs() {
   cmdline.push_back(lower_layer_);
   std::set<int> preserved_fds;
   preserved_fds.insert(0);
-  // TODO: redirect to usyslog
+  // TODO(jblomer): redirect to usyslog
   preserved_fds.insert(1);
   preserved_fds.insert(2);
   pid_t pid_child;
@@ -207,302 +208,6 @@ void CmdEnter::MountOverlayfs() {
 }
 
 
-
-struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
-  enum Names {
-    kSendPid,
-    kUnknown,
-    kFailDupFd,
-    kFailGetMaxFd,
-    kFailGetFdFlags,
-    kFailSetFdFlags,
-    kFailDropCredentials,
-    kFailExec,
-  };
-
-  static std::string ToString(const Names name) {
-    switch (name) {
-      case kSendPid:
-        return "Sending PID";
-
-      default:
-      case kUnknown:
-        return "Unknown Status";
-      case kFailDupFd:
-        return "Duplicate File Descriptor";
-      case kFailGetMaxFd:
-        return "Read maximal File Descriptor";
-      case kFailGetFdFlags:
-        return "Read File Descriptor Flags";
-      case kFailSetFdFlags:
-        return "Set File Descriptor Flags";
-      case kFailDropCredentials:
-        return "Lower User Permissions";
-      case kFailExec:
-        return "Invoking execvp()";
-    }
-  }
-};
-
-/**
- * Execve to the given command line, preserving the given file descriptors.
- * If stdin, stdout, stderr should be preserved, add 0, 1, 2.
- * File descriptors from the parent process can also be mapped to the new
- * process (dup2) using map_fildes.  Can be useful for
- * stdout/in/err redirection.
- * NOTE: The destination fildes have to be preserved!
- * Does a double fork to detach child.
- * The command_line parameter contains the binary at index 0 and the arguments
- * in the rest of the vector.
- * Using the optional parameter *pid it is possible to retrieve the process ID
- * of the spawned process.
- */
-bool MyExec(const std::vector<std::string>  &command_line,
-                 const std::set<int>        &preserve_fildes,
-                 const std::map<int, int>   &map_fildes,
-                 const bool             drop_credentials,
-                 const bool             clear_env,
-                 const bool             double_fork,
-                       pid_t           *child_pid)
-{
-  assert(command_line.size() >= 1);
-
-  Pipe pipe_fork;
-  pid_t pid = fork();
-  assert(pid >= 0);
-  if (pid == 0) {
-    pid_t pid_grand_child;
-    int max_fd;
-    int fd_flags;
-    ForkFailures::Names failed = ForkFailures::kUnknown;
-
-    if (clear_env) {
-#ifdef __APPLE__
-      environ = NULL;
-#else
-      int retval = clearenv();
-      assert(retval == 0);
-#endif
-    }
-
-    const char *argv[command_line.size() + 1];
-    for (unsigned i = 0; i < command_line.size(); ++i)
-      argv[i] = command_line[i].c_str();
-    argv[command_line.size()] = NULL;
-
-    // Child, map file descriptors
-    for (std::map<int, int>::const_iterator i = map_fildes.begin(),
-         iEnd = map_fildes.end(); i != iEnd; ++i)
-    {
-      int retval = dup2(i->first, i->second);
-      if (retval == -1) {
-        failed = ForkFailures::kFailDupFd;
-        goto fork_failure;
-      }
-    }
-
-    // Child, close file descriptors
-    max_fd = sysconf(_SC_OPEN_MAX);
-    if (max_fd < 0) {
-      failed = ForkFailures::kFailGetMaxFd;
-      goto fork_failure;
-    }
-    for (int fd = 0; fd < max_fd; fd++) {
-      if ((fd != pipe_fork.write_end) && (preserve_fildes.count(fd) == 0)) {
-        close(fd);
-      }
-    }
-
-    // Double fork to disconnect from parent
-    if (double_fork) {
-      pid_grand_child = fork();
-      assert(pid_grand_child >= 0);
-      if (pid_grand_child != 0) _exit(0);
-    }
-
-    fd_flags = fcntl(pipe_fork.write_end, F_GETFD);
-    if (fd_flags < 0) {
-      failed = ForkFailures::kFailGetFdFlags;
-      goto fork_failure;
-    }
-    fd_flags |= FD_CLOEXEC;
-    if (fcntl(pipe_fork.write_end, F_SETFD, fd_flags) < 0) {
-      failed = ForkFailures::kFailSetFdFlags;
-      goto fork_failure;
-    }
-
-#ifdef DEBUGMSG
-    assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
-#endif
-    if (drop_credentials && !SwitchCredentials(geteuid(), getegid(), false)) {
-      failed = ForkFailures::kFailDropCredentials;
-      goto fork_failure;
-    }
-
-    // retrieve the PID of the new (grand) child process and send it to the
-    // grand father
-    pid_grand_child = getpid();
-    pipe_fork.Write(ForkFailures::kSendPid);
-    pipe_fork.Write(pid_grand_child);
-
-    execvp(command_line[0].c_str(), const_cast<char **>(argv));
-
-    failed = ForkFailures::kFailExec;
-
-   fork_failure:
-    pipe_fork.Write(failed);
-    _exit(1);
-  }
-  if (double_fork) {
-    int statloc;
-    waitpid(pid, &statloc, 0);
-  }
-
-  close(pipe_fork.write_end);
-
-  // Either the PID or a return value is sent
-  ForkFailures::Names status_code;
-  bool retcode = pipe_fork.Read(&status_code);
-  assert(retcode);
-  if (status_code != ForkFailures::kSendPid) {
-    close(pipe_fork.read_end);
-    LogCvmfs(kLogCvmfs, kLogDebug, "managed execve failed (%s)",
-             ForkFailures::ToString(status_code).c_str());
-    return false;
-  }
-
-  // read the PID of the spawned process if requested
-  // (the actual read needs to be done in any case!)
-  pid_t buf_child_pid = 0;
-  retcode = pipe_fork.Read(&buf_child_pid);
-  assert(retcode);
-  if (child_pid != NULL)
-    *child_pid = buf_child_pid;
-  close(pipe_fork.read_end);
-  LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
-           command_line[0].c_str(),
-           static_cast<int>(buf_child_pid));
-  return true;
-}
-
-
-pid_t MyShell() {
-  std::vector<std::string> cmdline;
-  cmdline.push_back(GetShell());
-  std::set<int> preserved_fds;
-  preserved_fds.insert(0);
-  preserved_fds.insert(1);
-  preserved_fds.insert(2);
-  pid_t pid_child;
-  bool rvb = MyExec(cmdline, preserved_fds, std::map<int, int>(),
-                    false /* drop_credentials */, false /* clear_env */,
-                    false /* double_fork */,
-                    &pid_child);
-  return pid_child;
-}
-
-pid_t CmdEnter::RunInteractiveShell() {
-  int fd_stdin;
-  int fd_stdout;
-  int fd_stderr;
-  std::vector<std::string> args;
-  // We disconnect the terminal and therefore need to force it to be an
-  // interactive shell
-  args.push_back("--norc");
-  args.push_back("-i");
-  pid_t pid;
-
-  setenv("PS1", "[ ] ", 1);
-  bool rv = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr,
-                          GetShell(), args,
-                          false /* double_fork */,
-                          &pid);
-  if (!rv)
-    throw EPublish("cannot start shell " + GetShell());
-
-  //std::string ps1_prefix = std::string("\\e[1;34m(") + fqrn_ + ")\\e[0m  ";
-  //std::string prompt = "PS1='" + ps1_prefix + "'\n";
-  //WritePipe(fd_stdin, prompt.data(), prompt.length());
-  //std::string dummy;
-  //GetLineFd(fd_stdout, &dummy);
-
-  //Block2Nonblock(0);
-  //Block2Nonblock(fd_stdout);
-  //Block2Nonblock(fd_stderr);
-  struct pollfd watch_fds[3];
-  while (true) {
-    char buf[1024];
-
-    watch_fds[0].fd = 0;
-    watch_fds[0].events = POLLIN | POLLPRI;
-    watch_fds[0].revents = 0;
-    watch_fds[1].fd = fd_stdout;
-    watch_fds[1].events = POLLIN | POLLPRI;
-    watch_fds[1].revents = 0;
-    watch_fds[2].fd = fd_stderr;
-    watch_fds[2].events = POLLIN | POLLPRI;
-    watch_fds[2].revents = 0;
-    int rv = poll(watch_fds, 3, -1);
-    printf("POLL %d\n", rv);
-    assert(rv != 0);
-    if (rv < 0) {
-      if (errno == EINTR)
-        continue;
-      break;
-    }
-
-    printf("POLLACT\n");
-
-    if (watch_fds[0].revents) {
-      if (watch_fds[0].revents & (POLLERR | POLLHUP)) {
-        printf("fd 0 error");
-        break;
-      }
-      ssize_t nbytes = read(0, buf, sizeof(buf));
-      printf("GOT %d INPUT\n", nbytes);
-      if (nbytes)
-        WritePipe(fd_stdin, buf, nbytes);
-    }
-
-    if (watch_fds[1].revents) {
-      if (watch_fds[1].revents & (POLLERR | POLLHUP)) {
-        printf("OUT ERR\n");
-        break;
-      }
-
-      //printf(" STDOUT\n");
-      ssize_t nbytes = read(fd_stdout, buf, sizeof(buf));
-      printf("GOT %d OUTPUT\n", nbytes);
-      if (nbytes)
-        WritePipe(1, buf, nbytes);
-    }
-
-    if (watch_fds[2].revents) {
-      if (watch_fds[2].revents & (POLLERR | POLLHUP))
-        break;
-
-      //printf(" STDERR\n");
-      ssize_t nbytes = read(fd_stderr, buf, sizeof(buf));
-      printf("GOT %d ERR\n", nbytes);
-      if (nbytes)
-        WritePipe(2, buf, nbytes);
-    }
-  }
-
-  printf("BYE!\n");
-
-  close(fd_stdin);
-  close(fd_stdout);
-  close(fd_stderr);
-
-  return pid;
-}
-
-
-
-
-
-
 int CmdEnter::Main(const Options &options) {
   fqrn_ = options.plain_args()[0].value_str;
   sanitizer::RepositorySanitizer sanitizer;
@@ -518,11 +223,6 @@ int CmdEnter::Main(const Options &options) {
   }
 
   target_dir_ = "/cvmfs/" + fqrn_;
-
-  //pid_t pid_shell = MyShell();
-  //int code = WaitForChild(pid_shell);
-  //printf("EXIT CODE %d\n", code);
-  //return 0;
 
   // Save context-sensitive directories before switching name spaces
   string cwd = GetCurrentWorkingDirectory();
@@ -591,7 +291,6 @@ int CmdEnter::Main(const Options &options) {
   // May fail if the working directory was invalid to begin with
   chdir(cwd.c_str());
 
-  //pid_t pid_child = RunInteractiveShell();
   std::vector<std::string> cmdline;
   cmdline.push_back(GetShell());
   std::set<int> preserved_fds;

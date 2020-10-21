@@ -6,6 +6,7 @@
 #define CVMFS_PUBLISH_CMD_ENTER_H_
 
 #include <string>
+#include <vector>
 
 #include "publish/command.h"
 
@@ -56,7 +57,7 @@ class CmdEnter : public Command {
   std::string lower_layer_;
   std::string cvmfs2_binary_;
   std::string rootfs_dir_;
-  std::string config_path_; ///< CernVM-FS configuration
+  std::string config_path_;  ///< CernVM-FS configuration
   std::string usyslog_path_;
   std::string cache_dir_;
   std::string upper_layer_;
