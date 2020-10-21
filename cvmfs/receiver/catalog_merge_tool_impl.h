@@ -231,7 +231,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
       output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
     }
     perf::Inc(counters_->n_directories_removed);
-    if (entry1.IsLink())
+    if (entry2.IsLink())
       perf::Inc(counters_->n_symlinks_added);
     else
       perf::Inc(counters_->n_files_added);
