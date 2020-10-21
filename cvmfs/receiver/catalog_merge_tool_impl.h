@@ -190,7 +190,8 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
   } else if (entry1.IsDirectory() && (entry2.IsRegular() || entry2.IsLink())) {
     // From directory to file
     if (entry1.IsNestedCatalogMountpoint()) {
-      output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()), false);
+      output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()),
+                                               false);
     }
 
     catalog::DirectoryEntry modified_entry = entry2;
