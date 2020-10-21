@@ -103,10 +103,10 @@ TEST_F(T_Namespace, UserMountPid) {
   if (!(ns_features_ & kNsFeatureMount)) return;
   if (!(ns_features_ & kNsFeaturePid)) return;
 
-  int pid = fork();
+  pid_t pid = fork();
   ASSERT_GE(pid, 0);
   if (pid > 0) {
-    EXPECT_EQ(0, WaitForChild(0));
+    EXPECT_EQ(0, WaitForChild(pid));
     return;
   }
 
@@ -121,9 +121,15 @@ TEST_F(T_Namespace, UserMountPid) {
   procpid[len] = '\0';
   EXPECT_EQ(StringifyInt(getpid()), std::string(procpid));
   EXPECT_EQ(pid_t(1), getpid());
-  char c = 0;
-  EXPECT_EQ(1, SafeRead(fd_parent, &c, 1));
-  EXPECT_EQ('x', c);
+  pid_t anchor_pid;
+  pid_t init_pid;
+  EXPECT_EQ(static_cast<int>(sizeof(pid_t)),
+            SafeRead(fd_parent, &anchor_pid, sizeof(pid_t)));
+  EXPECT_EQ(static_cast<int>(sizeof(pid_t)),
+            SafeRead(fd_parent, &init_pid, sizeof(pid_t)));
+  close(fd_parent);
+  EXPECT_GT(anchor_pid, 1);
+  EXPECT_GT(init_pid, 1);
 
   exit(testing::Test::HasFailure());
 }

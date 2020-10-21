@@ -39,13 +39,31 @@ using namespace std;  // NOLINT
 
 namespace {
 
-static void EnterRootContainer() {
+/**
+ * The parent pid and init pid in the outer PID namespace
+ */
+struct AnchorPid {
+  pid_t parent_pid;
+  pid_t init_pid;
+};
+
+static AnchorPid EnterRootContainer() {
   bool rvb = CreateUserNamespace(0, 0);
   if (!rvb) throw publish::EPublish("cannot create root user namespace");
   rvb = CreateMountNamespace();
   if (!rvb) throw publish::EPublish("cannot create mount namespace");
-  rvb = CreatePidNamespace(NULL);
+  int fd;
+  rvb = CreatePidNamespace(&fd);
   if (!rvb) throw publish::EPublish("cannot create pid namespace");
+  AnchorPid anchor_pid;
+  int rvi = SafeRead(fd, &anchor_pid.parent_pid, sizeof(pid_t));
+  if (rvi != sizeof(pid_t))
+    throw publish::EPublish("cannot initialize pid namespace");
+  rvi = SafeRead(fd, &anchor_pid.init_pid, sizeof(pid_t));
+  if (rvi != sizeof(pid_t))
+    throw publish::EPublish("cannot initialize pid namespace");
+  close(fd);
+  return anchor_pid;
 }
 
 static void EnsureDirectory(const std::string &path) {
@@ -171,7 +189,7 @@ void CmdEnter::MountCvmfs() {
   std::vector<std::string> cmdline;
   cmdline.push_back(cvmfs2_binary_);
   cmdline.push_back("-o");
-  cmdline.push_back("config=" + config_path_);
+  cmdline.push_back("allow_other,config=" + config_path_);
   cmdline.push_back(fqrn_);
   cmdline.push_back(lower_layer_);
   std::set<int> preserved_fds;
@@ -258,8 +276,10 @@ int CmdEnter::Main(const Options &options) {
   usyslog_path_ = session_dir_ + "/usyslog";
 
   LogCvmfs(kLogCvmfs, kLogStdout,
+           "*** NOTE: This is currently an experimental CernVM-FS feature\n");
+  LogCvmfs(kLogCvmfs, kLogStdout,
            "Entering ephemeral writable shell for %s... ", target_dir_.c_str());
-  EnterRootContainer();
+  AnchorPid anchor_pid = EnterRootContainer();
   std::vector<std::string> empty_dirs;
   empty_dirs.push_back(target_dir_);
   empty_dirs.push_back("/proc");
@@ -301,6 +321,21 @@ int CmdEnter::Main(const Options &options) {
   // May fail if the working directory was invalid to begin with
   chdir(cwd.c_str());
 
+  LogCvmfs(kLogCvmfs, kLogStdout, "\n"
+           "You can attach to this shell from another another terminal with\n");
+  if (options.Has("root")) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "    nsenter --preserve-credentials -U -p -m -t %u\n"
+             "    chroot %s\n",
+             anchor_pid.init_pid, rootfs_dir_.c_str());
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "    nsenter --preserve-credentials -U -m -t %u\n"
+             "    chroot %s\n"
+             "    nsenter --preserve-credentials -S %u -G %u -U -p -t 1\n",
+             anchor_pid.parent_pid, rootfs_dir_.c_str(), uid, gid);
+  }
+
   std::vector<std::string> cmdline;
   cmdline.push_back(GetShell());
   std::set<int> preserved_fds;
@@ -314,13 +349,20 @@ int CmdEnter::Main(const Options &options) {
                     &pid_child);
   int exit_code = WaitForChild(pid_child);
 
-  if (exit_code == 0) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Publishing changeset...");
-  } else {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Aborting transaction...");
-  }
+  LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Cleaning out session directory");
+  if (!options.Has("keep-session")) {
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+             "Cleaning out session directory... ");
+    LogCvmfs(kLogCvmfs, kLogStdout, "");
+    //rvb = RemoveTree(session_dir_);
+    //if (rvb) {
+    //  LogCvmfs(kLogCvmfs, kLogStdout, "done");
+    //} else {
+    //  LogCvmfs(kLogCvmfs, kLogStdout, "failed!");
+    //  exit_code |= 64;
+    //}
+  }
 
   return exit_code;
 }

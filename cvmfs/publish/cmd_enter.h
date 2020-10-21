@@ -35,9 +35,9 @@ class CmdEnter : public Command {
       "Path to the cvmfs2 binary"));
     p.push_back(Parameter::Optional("cvmfs-config", 'C', "path",
       "Path to extra configuration for the CernVM-FS client"));
-    p.push_back(Parameter::Optional("alien-cache", 'a', "cache directory",
-      "Use an unmanaged, shared alien cache directory"));
     p.push_back(Parameter::Switch("root", 'r', "Run as fake root"));
+    p.push_back(Parameter::Switch("keep-session", 'k',
+      "Do not remove the session directory when the shell exits"));
     return p;
   }
   virtual unsigned GetMinPlainArgs() const { return 1; }

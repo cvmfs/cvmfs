@@ -116,7 +116,7 @@ bool CreateMountNamespace() {
 /**
  * The fd_parent file descriptor, if passed, is the read end of a pipe whose
  * write end is connected to the parent process.  This gives the namespace's
- * init process a means to detect when the parent process is terminated.
+ * init process a means to know its pid in the context of the parent namespace.
  */
 bool CreatePidNamespace(int *fd_parent) {
 #ifdef CVMFS_HAS_UNSHARE
@@ -145,8 +145,9 @@ bool CreatePidNamespace(int *fd_parent) {
           close(fd);
       }
 
-      char c = 'x';
-      SafeWrite(pipe_parent[1], &c, 1);
+      pid_t parent_pid = getpid();
+      SafeWrite(pipe_parent[1], &parent_pid, sizeof(parent_pid));
+      SafeWrite(pipe_parent[1], &pid, sizeof(pid));
 
       rvi = waitpid(pid, &status, 0);
       if (rvi >= 0) {
