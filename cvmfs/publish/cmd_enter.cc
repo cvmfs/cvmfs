@@ -186,6 +186,11 @@ void CmdEnter::MountCvmfs() {
                    EPublish::kFailMissingDependency);
   }
 
+  int fd_stdout = open(stdout_path_.c_str(), O_CREAT | O_APPEND | O_WRONLY,
+                       kPrivateFileMode);
+  int fd_stderr = open(stderr_path_.c_str(), O_CREAT | O_APPEND | O_WRONLY,
+                       kPrivateFileMode);
+
   std::vector<std::string> cmdline;
   cmdline.push_back(cvmfs2_binary_);
   cmdline.push_back("-o");
@@ -194,16 +199,24 @@ void CmdEnter::MountCvmfs() {
   cmdline.push_back(lower_layer_);
   std::set<int> preserved_fds;
   preserved_fds.insert(0);
-  // TODO(jblomer): redirect to usyslog
   preserved_fds.insert(1);
   preserved_fds.insert(2);
+  std::map<int, int> map_fds;
+  map_fds[fd_stdout] = 1;
+  map_fds[fd_stderr] = 2;
   pid_t pid_child;
-  bool rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
+  bool rvb = ManagedExec(cmdline, preserved_fds, map_fds,
                          false /* drop_credentials */, false /* clear_env */,
                          false /* double_fork */,
                          &pid_child);
-  if (!rvb) throw EPublish("cannot run " + cvmfs2_binary_);
+  if (!rvb) {
+    close(fd_stdout);
+    close(fd_stderr);
+    throw EPublish("cannot run " + cvmfs2_binary_);
+  }
   int exit_code = WaitForChild(pid_child);
+  close(fd_stdout);
+  close(fd_stderr);
   if (exit_code != 0) {
     throw EPublish("cannot mount cvmfs read-only branch (" +
           StringifyInt(exit_code) + ")\n" +
@@ -218,21 +231,43 @@ void CmdEnter::MountOverlayfs() {
                    EPublish::kFailMissingDependency);
   }
 
-  std::vector<std::string> args;
-  args.push_back("-o");
-  args.push_back(string("lowerdir=") + lower_layer_ +
-                 ",upperdir=" + upper_layer_ +
-                 ",workdir=" + ovl_workdir_);
-  args.push_back(rootfs_dir_ + target_dir_);
-  int fd_stdin;
-  int fd_stdout;
-  int fd_stderr;
-  pid_t pid_ovl;
-  bool rvb = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, overlayfs_binary_,
-                           args, false /* double_fork */, &pid_ovl);
-  if (!rvb) EPublish("cannot run " + overlayfs_binary_);
-  int exit_code = WaitForChild(pid_ovl);
-  if (exit_code != 0) EPublish("cannot mount overlay file system");
+  int fd_stdout = open(stdout_path_.c_str(), O_CREAT | O_APPEND | O_WRONLY,
+                       kPrivateFileMode);
+  int fd_stderr = open(stderr_path_.c_str(), O_CREAT | O_APPEND | O_WRONLY,
+                       kPrivateFileMode);
+
+  std::vector<std::string> cmdline;
+  cmdline.push_back(overlayfs_binary_);
+  cmdline.push_back("-o");
+  cmdline.push_back(string("lowerdir=") + lower_layer_ +
+                           ",upperdir=" + upper_layer_ +
+                           ",workdir=" + ovl_workdir_);
+  cmdline.push_back(rootfs_dir_ + target_dir_);
+  std::set<int> preserved_fds;
+  preserved_fds.insert(0);
+  preserved_fds.insert(1);
+  preserved_fds.insert(2);
+  std::map<int, int> map_fds;
+  map_fds[fd_stdout] = 1;
+  map_fds[fd_stderr] = 2;
+  pid_t pid_child;
+  bool rvb = ManagedExec(cmdline, preserved_fds, map_fds,
+                         true /* drop_credentials */, false /* clear_env */,
+                         false /* double_fork */,
+                         &pid_child);
+  if (!rvb) {
+    close(fd_stdout);
+    close(fd_stderr);
+    throw EPublish("cannot run " + overlayfs_binary_);
+  }
+  int exit_code = WaitForChild(pid_child);
+  close(fd_stdout);
+  close(fd_stderr);
+  if (exit_code != 0) {
+    throw EPublish("cannot mount overlay file system (" +
+          StringifyInt(exit_code) + ")\n" +
+          "  command: `" + JoinStrings(cmdline, " ").c_str() + "`");
+  }
 }
 
 
@@ -273,7 +308,10 @@ int CmdEnter::Main(const Options &options) {
   cache_dir_ = session_dir_ + "/cache";
   EnsureDirectory(cache_dir_);
   config_path_ = session_dir_ + "/sysdefault.conf";
-  usyslog_path_ = session_dir_ + "/usyslog";
+  EnsureDirectory(session_dir_ + "/logs");
+  usyslog_path_ = session_dir_ + "/logs/cvmfs.log";
+  stdout_path_ = session_dir_ + "/logs/stdout.log";
+  stderr_path_ = session_dir_ + "/logs/stderr.log";
 
   LogCvmfs(kLogCvmfs, kLogStdout,
            "*** NOTE: This is currently an experimental CernVM-FS feature\n");

@@ -61,6 +61,8 @@ class CmdEnter : public Command {
   std::string rootfs_dir_;
   std::string config_path_;  ///< CernVM-FS configuration
   std::string usyslog_path_;
+  std::string stdout_path_;  ///< Logs stdout of background commands
+  std::string stderr_path_;  ///< Logs stdout of background commands
   std::string cache_dir_;
   std::string upper_layer_;
   std::string ovl_workdir_;
