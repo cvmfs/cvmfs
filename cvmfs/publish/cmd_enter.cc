@@ -374,6 +374,8 @@ int CmdEnter::Main(const Options &options) {
              anchor_pid.parent_pid, rootfs_dir_.c_str(), uid, gid);
   }
 
+  setenv("CVMFS_ENTER_SESSION_DIR", session_dir_.c_str(), 1 /* overwrite */);
+
   std::vector<std::string> cmdline;
   cmdline.push_back(GetShell());
   std::set<int> preserved_fds;
