@@ -1,3 +1,5 @@
+2.7.6:
+
 2.7.5:
   * Fix crash when kernel meta-data caches close to 4G get evicted (CVM-1918)
   * Add CVMFS_CLIENT_PROFILE, CVMFS_USE_CDN to cvmfs_config parameter list
