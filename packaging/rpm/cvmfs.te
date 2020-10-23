@@ -20,7 +20,7 @@ require {
 	type mount_var_run_t;
 	type fusermount_exec_t;
 	type mount_t;
-	type unconfined_mount_t
+	type unconfined_mount_t;
 	type shadow_t;
 	type var_t;
 	type var_lib_t;
