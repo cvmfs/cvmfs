@@ -46,7 +46,10 @@
   * Add POSIX external cache plugin (CVM-1823)
   * Manage DUCC daemon with systemd units
 
+2.7.6:
+
 2.7.5:
+  * Fix crash when kernel meta-data caches close to 4G get evicted (CVM-1918)
   * Add CVMFS_CLIENT_PROFILE, CVMFS_USE_CDN to cvmfs_config parameter list
   * Let mount helper detect defined but empty CVMFS_HTTP_PROXY
 
