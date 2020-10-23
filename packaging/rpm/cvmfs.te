@@ -1,7 +1,10 @@
 
-module cvmfs 1.1;
+module cvmfs 1.2;
 
 # Change Log
+# 1.2
+#   * Add "allow mount_t fusefs_t:lnk_file read;" (CVM-1922)
+#
 # 1.1
 #   * introduce cvmfs_cache_t for cache directory
 #
@@ -21,6 +24,7 @@ require {
 	type var_lib_t;
 	type var_run_t;
 	type file_t;
+	type fusefs_t;
 	type lib_t;
 	type rpm_var_lib_t;
 	class sock_file { create unlink };
@@ -28,6 +32,7 @@ require {
 	class capability { fowner sys_ptrace };
 	class process { sigstop signull sigkill };
 	class file { open execmod execute_no_trans rename create unlink setattr getattr };
+	class lnk_file { read };
 	class netlink_audit_socket create;
 	class dir { add_name remove_name create write rmdir setattr };
 }
@@ -57,3 +62,4 @@ allow mount_t lib_t:file execmod;
 allow mount_t self:capability sys_ptrace;
 allow mount_t self:process { sigstop signull sigkill };
 allow mount_t rpm_var_lib_t:dir write;
+allow mount_t fusefs_t:lnk_file read;
