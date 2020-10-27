@@ -31,12 +31,12 @@ save_repo_contents() {
 run_transactions() {
     set_up_repository_gateway
 
-    echo "Pre-checks"
+    echo "*** Pre-checks"
 
     ## Pre-checks: starting and aborting transactions should leave no trace
-    cvmfs_server transaction test.repo.org
-    cvmfs_server abort -f test.repo.org
-    cvmfs_server check test.repo.org
+    cvmfs_server transaction test.repo.org  || return 10
+    cvmfs_server abort -f test.repo.org     || return 11
+    cvmfs_server check test.repo.org        || return 12
 
     cvmfs_server transaction test.repo.org
     mkdir -p /cvmfs/test.repo.org/usr/bin
@@ -46,7 +46,7 @@ run_transactions() {
     cvmfs_server abort -f test.repo.org
     cvmfs_server check test.repo.org
 
-    echo "Checking transaction + publish"
+    echo "*** Checking transaction + publish"
 
     ## Transaction 1 (Modifying existing file and creating files)
 

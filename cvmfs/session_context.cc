@@ -84,7 +84,8 @@ SessionContextBase::SessionContextBase()
       current_pack_mtx_(),
       objects_dispatched_(0),
       bytes_committed_(0),
-      bytes_dispatched_(0) {}
+      bytes_dispatched_(0),
+      initialized_(false) {}
 
 SessionContextBase::~SessionContextBase() {}
 
@@ -134,6 +135,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
 
   ret = InitializeDerived(max_queue_size) && ret;
 
+  initialized_ = true;
+
   return ret;
 }
 
@@ -141,6 +144,11 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
                                   const std::string& new_root_hash,
                                   const RepositoryTag& tag) {
   assert(active_handles_.empty());
+  if (!initialized_) {
+    assert(!commit);
+    return true;
+  }
+
   {
     MutexLockGuard lock(current_pack_mtx_);
 
@@ -174,6 +182,9 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
 
   pthread_mutex_destroy(&current_pack_mtx_);
+
+  initialized_ = false;
+
   return results;
 }
 
