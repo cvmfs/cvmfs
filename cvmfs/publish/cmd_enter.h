@@ -38,6 +38,8 @@ class CmdEnter : public Command {
     p.push_back(Parameter::Switch("root", 'r', "Run as fake root"));
     p.push_back(Parameter::Switch("keep-session", 'k',
       "Do not remove the session directory when the shell exits"));
+    p.push_back(Parameter::Switch("keep-logs", 'l',
+      "Clean the session directory on shell exit except for the logs"));
     return p;
   }
   virtual unsigned GetMinPlainArgs() const { return 1; }
