@@ -16,7 +16,7 @@ version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.test-handler]
   runtime_type = "io.containerd.runc.v2"
 
-# Use stargz snapshotter
+# Use cvmfs snapshotter
 [proxy_plugins]
   [proxy_plugins.cvmfs-snapshotter]
     type = "snapshot"
