@@ -96,6 +96,8 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
   mutable atomic_int64 objects_dispatched_;
   uint64_t bytes_committed_;
   uint64_t bytes_dispatched_;
+
+  bool initialized_;
 };
 
 class SessionContext : public SessionContextBase {
