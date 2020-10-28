@@ -29,7 +29,7 @@ cvmfs_run_test() {
   cvmfs_mount cernvm-prod.cern.ch \
     CVMFS_TALK_SOCKET=$CVMFS_TEST091_TALK_SOCKET CVMFS_TALK_OWNER=cvmfs || return 20
 
-  ls -lah $CVMFS_TEST091_TALK_SOCKET || return 30
+  sudo ls -lah $CVMFS_TEST091_TALK_SOCKET || return 30
   sudo cvmfs_talk -i cernvm-prod.cern.ch pid && return 31
   sudo cvmfs_talk -p $CVMFS_TEST091_TALK_SOCKET pid || return 32
   # TODO(jblomer): changing socket ownership only works if cvmfs is mounted as root
