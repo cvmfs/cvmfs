@@ -7,15 +7,18 @@ cvmfs_run_test() {
 
   local cache_dir=$(get_cvmfs_cachedir grid.cern.ch)
   local workspace="$(dirname $cache_dir)/workspace"
+  local workspace_config="$(dirname $cache_dir)/workspace-config"
   echo "*** cache directory is $cache_dir"
   echo "*** workspace is $workspace"
 
   echo "*** cleaning up existing mount points"
   cvmfs_clean || return 2
+  mount
 
   echo "*** mount with dedicated workspace"
-  cvmfs_mount grid.cern.ch "CVMFS_WORKSPACE=$workspace" || return 3
-  cat /cvmfs/grid.cern.ch/README || return 4
+  cvmfs_mount cvmfs-config.cern.ch "CVMFS_WORKSPACE=$workspace_config" || return 3
+  cvmfs_mount grid.cern.ch "CVMFS_WORKSPACE=$workspace" || return 4
+  cat /cvmfs/grid.cern.ch/README || return 5
 
   local pid_talk=$(sudo cvmfs_talk -i grid.cern.ch pid)
   local pid_attr=$(get_xattr pid /cvmfs/grid.cern.ch)
