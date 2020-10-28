@@ -175,6 +175,9 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (!commit_result) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "SessionContext: could not commit session. Aborting.");
+      FinalizeDerived();
+      pthread_mutex_destroy(&current_pack_mtx_);
+      initialized_ = false;
       return false;
     }
   }
