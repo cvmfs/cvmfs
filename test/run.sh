@@ -269,7 +269,7 @@ do
   test_start=$(get_millisecond_epoch)
   timeout -s HUP $cvmfs_test_timeout \
     bash $debug -c "PID=\$\$                                                 && \
-                    trap 'echo KILLING:\$PID; pgrep -P \$PID; exit 124' HUP  && \
+                    trap 'echo KILLING:\$PID; pkill -P \$PID; exit 124' HUP  && \
                     . ./test_functions                                       && \
                     . $t/main                                                && \
                     cd $workdir                                              && \
