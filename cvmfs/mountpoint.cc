@@ -1309,7 +1309,8 @@ bool MountPoint::CreateDownloadManagers() {
     }
   }
 
-  if (options_mgr_->IsOn("CVMFS_USE_SSL_SYSTEM_CA")) {
+  if (options_mgr_->GetValue("CVMFS_USE_SSL_SYSTEM_CA", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableUseOfSystemCertificates();
   }
 
