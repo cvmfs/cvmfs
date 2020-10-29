@@ -34,7 +34,6 @@
 
 #include "catalog_mgr_rw.h"
 #include "compression.h"
-//#include "directory_entry.h"
 #include "file_chunk.h"
 #include "platform.h"
 #include "publish/repository.h"
@@ -54,7 +53,8 @@ namespace publish {
 
 class SyncDiffReporter : public DiffListener {
  public:
-  SyncDiffReporter(bool print_dots, unsigned int processing_dot_interval = 100)
+  explicit SyncDiffReporter(bool print_dots,
+                            unsigned int processing_dot_interval = 100)
       : print_dots_(print_dots),
         processing_dot_interval_(processing_dot_interval),
         changed_items_(0) {}
@@ -83,10 +83,11 @@ class SyncDiffReporter : public DiffListener {
  private:
   void PrintDots();
   void InternalAdd(const std::string &path);
-  void InternalRemove(const std::string &path, const catalog::DirectoryEntry &entry);
+  void InternalRemove(const std::string &path,
+                      const catalog::DirectoryEntry &entry);
   void InternalModify(const std::string &path,
-                const catalog::DirectoryEntry &entry_from,
-                const catalog::DirectoryEntry &entry_to);
+                      const catalog::DirectoryEntry &entry_from,
+                      const catalog::DirectoryEntry &entry_to);
 
   bool print_dots_;
   unsigned int processing_dot_interval_;
@@ -314,7 +315,6 @@ class SyncMediator : public virtual AbstractSyncMediator {
   UniquePtr<perf::FsCounters> counters_;
 
   UniquePtr<DiffListener> reporter_;
-  //UniquePtr<SyncDiffReporter::>
 };  // class SyncMediator
 
 }  // namespace publish

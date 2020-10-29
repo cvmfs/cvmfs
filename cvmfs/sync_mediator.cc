@@ -788,14 +788,10 @@ void SyncMediator::RemoveNestedCatalog(SharedPtr<SyncItem> directory) {
   }
 }
 
+void SyncDiffReporter::OnInit(const history::History::Tag &from_tag,
+                              const history::History::Tag &to_tag) {}
 
-void SyncDiffReporter::OnInit(const history::History::Tag &from_tag, const history::History::Tag &to_tag) {
-
-}
-
-void SyncDiffReporter::OnStats(const catalog::DeltaCounters &delta) {
-
-}
+void SyncDiffReporter::OnStats(const catalog::DeltaCounters &delta) {}
 
 void SyncDiffReporter::PrintDots() {
   if (!print_dots_) return;
@@ -954,9 +950,9 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
   perf::Inc(counters_->n_directories_removed);
 }
 
-
 void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
-  reporter_->OnModify(entry->GetUnionPath(), catalog::DirectoryEntry(), catalog::DirectoryEntry());
+  reporter_->OnModify(entry->GetUnionPath(), catalog::DirectoryEntry(),
+                      catalog::DirectoryEntry());
 
   const std::string directory_path = entry->GetRelativePath();
 
@@ -968,21 +964,17 @@ void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
     }
     catalog_manager_->TouchDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
                                      directory_path);
-    if (xattrs != &default_xattrs_)
-      free(xattrs);
+    if (xattrs != &default_xattrs_) free(xattrs);
   }
 
   if (entry->HasCatalogMarker() &&
-      !catalog_manager_->IsTransitionPoint(directory_path))
-  {
+      !catalog_manager_->IsTransitionPoint(directory_path)) {
     CreateNestedCatalog(entry);
   } else if (!entry->HasCatalogMarker() &&
-             catalog_manager_->IsTransitionPoint(directory_path))
-  {
+             catalog_manager_->IsTransitionPoint(directory_path)) {
     RemoveNestedCatalog(entry);
   }
 }
-
 
 /**
  * All hardlinks in the current directory have been picked up.  Now they are
