@@ -18,6 +18,7 @@
 #include "compression.h"
 #include "fs_traversal.h"
 #include "hash.h"
+#include "publish/repository.h"
 #include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
@@ -27,6 +28,10 @@
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
+
+namespace catalog {
+class DirectoryEntry;
+}
 
 namespace publish {
 
@@ -39,7 +44,8 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   union_engine_(NULL),
   handle_hardlinks_(false),
   params_(params),
-  changed_items_(0)
+  changed_items_(0),
+  reporter_(new SyncDiffReporter(params_->print_changeset))
 {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
@@ -765,7 +771,7 @@ void SyncMediator::PublishHardlinksCallback(
 
 void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
   const std::string notice = "Nested catalog at " + directory->GetUnionPath();
-  PrintChangesetNotice(kAddCatalog, notice);
+  reporter_->OnAdd(notice, catalog::DirectoryEntry());
 
   if (!params_->dry_run) {
     catalog_manager_->CreateNestedCatalog(directory->GetRelativePath());
@@ -775,7 +781,7 @@ void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
 
 void SyncMediator::RemoveNestedCatalog(SharedPtr<SyncItem> directory) {
   const std::string notice =  "Nested catalog at " + directory->GetUnionPath();
-  PrintChangesetNotice(kRemoveCatalog, notice);
+  reporter_->OnRemove(notice, catalog::DirectoryEntry());
 
   if (!params_->dry_run) {
     catalog_manager_->RemoveNestedCatalog(directory->GetRelativePath());
@@ -783,39 +789,41 @@ void SyncMediator::RemoveNestedCatalog(SharedPtr<SyncItem> directory) {
 }
 
 
-void SyncMediator::PrintChangesetNotice(const ChangesetAction  action,
-                                        const std::string     &extra) const {
-  if (!params_->print_changeset) {
-    ++changed_items_;
-    if (changed_items_ % processing_dot_interval == 0) {
-      LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, ".");
-    }
-    return;
-  }
+void SyncDiffReporter::OnInit(const history::History::Tag &from_tag, const history::History::Tag &to_tag) {
 
-  const char *action_label = NULL;
-  switch (action) {
-    case kAdd:
-    case kAddCatalog:
-    case kAddHardlinks:
-      action_label = "[add]";
-      break;
-    case kRemove:
-    case kRemoveCatalog:
-      action_label = "[rem]";
-      break;
-    case kTouch:
-      action_label = "[tou]";
-      break;
-    default:
-      assert(false && "unknown sync mediator action");
-  }
+}
 
-  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, extra.c_str());
+void SyncDiffReporter::OnStats(const catalog::DeltaCounters &delta) {
+
+}
+
+void SyncDiffReporter::PrintDots() {
+  if (!print_dots_) return;
+  if (changed_items_ % processing_dot_interval_ == 0) {
+    LogCvmfs(kLogPublish, kLogStdout, ".");
+  }
+}
+
+void SyncDiffReporter::InternalAdd(const std::string &path) {
+  const char *action_label = "[add]";
+  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+}
+
+void SyncDiffReporter::InternalRemove(const std::string &path,
+                                const catalog::DirectoryEntry & /*entry*/) {
+  const char *action_label = "[rem]";
+  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+}
+
+void SyncDiffReporter::InternalModify(const std::string &path,
+                                const catalog::DirectoryEntry & /*entry_from*/,
+                                const catalog::DirectoryEntry & /*entry_to*/) {
+  const char *action_label = "[tou]";
+  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
 }
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
-  PrintChangesetNotice(kAdd, entry->GetUnionPath());
+  reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) {
     assert(!entry->HasGraftMarker());
@@ -878,7 +886,7 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
-  PrintChangesetNotice(kRemove, entry->GetUnionPath());
+  reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   if (!params_->dry_run) {
     if (handle_hardlinks_ && entry->GetRdOnlyLinkcount() > 1) {
@@ -903,7 +911,7 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
-  PrintChangesetNotice(kAdd, entry->GetUnionPath());
+  reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   perf::Inc(counters_->n_directories_added);
   assert(!entry->HasGraftMarker());
@@ -938,7 +946,7 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
     RemoveNestedCatalog(entry);
   }
 
-  PrintChangesetNotice(kRemove, entry->GetUnionPath());
+  reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
   if (!params_->dry_run) {
     catalog_manager_->RemoveDirectory(directory_path);
   }
@@ -948,7 +956,8 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
 
 
 void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
-  PrintChangesetNotice(kTouch, entry->GetUnionPath());
+  reporter_->OnModify(entry->GetUnionPath(), catalog::DirectoryEntry(), catalog::DirectoryEntry());
+
   const std::string directory_path = entry->GetRelativePath();
 
   if (!params_->dry_run) {
@@ -981,6 +990,7 @@ void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
  */
 void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
   assert(handle_hardlinks_);
+  LogCvmfs(kLogPublish, kLogStdout, "Hardlinks!!!!!");
 
   for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
@@ -1000,7 +1010,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
       {
         changeset_notice += " " + j->second->filename();
       }
-      PrintChangesetNotice(kAddHardlinks, changeset_notice);
+      reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
     }
 
     if (params_->dry_run)
