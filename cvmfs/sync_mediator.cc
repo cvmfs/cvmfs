@@ -982,7 +982,6 @@ void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
  */
 void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
   assert(handle_hardlinks_);
-  LogCvmfs(kLogPublish, kLogStdout, "Hardlinks!!!!!");
 
   for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
