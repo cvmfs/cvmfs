@@ -20,10 +20,11 @@ cvmfs_server_publish() {
   local force_compression_algorithm=""
   local external_option=""
   local open_fd_dialog=1
+  local remove_reflog_hash=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "F:NXZ:pa:c:m:vn:fe" option
+  while getopts "F:NXZ:pa:c:m:vn:fer" option
   do
     case $option in
       p)
@@ -58,6 +59,9 @@ cvmfs_server_publish() {
       ;;
       f)
         open_fd_dialog=0
+      ;;
+      r)
+        remove_reflog_hash=1 
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -344,6 +348,14 @@ cvmfs_server_publish() {
     publish_starting $name
     $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+
+    if [ $(remove_reflog_hash) -eq 1 ]; then
+      echo $manifest
+      cat $manifest
+      sed -i '/^Y/d' $manifest
+      cat $manifest
+    fi
+
     local branch_hash=
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
     if is_checked_out $name; then
@@ -418,6 +430,7 @@ cvmfs_server_publish() {
 
     # committing newly created revision
     echo "Signing new manifest"
+    echo "test manifest" $manifest
     sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
     set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
     if is_checked_out $name; then
