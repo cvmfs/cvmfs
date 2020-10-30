@@ -505,7 +505,7 @@ func getDockerHubCredentials() (Credentials, error) {
 }
 
 func getGitlabContainersCredentials() (Credentials, error) {
-	return getCredentialsFromEnv("DUCC_GITLAB_USER", "DUCC_GITLAB_PASS")
+	return getCredentialsFromEnv("DUCC_GITLAB_REGISTRY_USER", "DUCC_GITLAB_REGISTRY_PASS")
 }
 
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
