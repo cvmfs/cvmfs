@@ -349,11 +349,8 @@ cvmfs_server_publish() {
     $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
 
-    if [ $(remove_reflog_hash) -eq 1 ]; then
-      echo $manifest
-      cat $manifest
+    if [ $remove_reflog_hash -eq 1 ]; then
       sed -i '/^Y/d' $manifest
-      cat $manifest
     fi
 
     local branch_hash=
