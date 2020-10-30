@@ -169,7 +169,7 @@ cvmfs_server_import() {
   local cvmfs_gid=$(echo $file_ownership | cut -d: -f2)
 
   local storage_location=$(get_upstream_config $upstream)
-  if [ $(is_local_upstream $upstream) -eq 1 ]; then
+  if [ x"$(is_local_upstream $upstream)" != "x" ]; then
     # investigate the given repository storage for sanity
     local needed_items="${storage_location}                 \
                         ${storage_location}/.cvmfspublished \
