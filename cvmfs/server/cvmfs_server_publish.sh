@@ -427,7 +427,6 @@ cvmfs_server_publish() {
 
     # committing newly created revision
     echo "Signing new manifest"
-    echo "test manifest" $manifest
     sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
     set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
     if is_checked_out $name; then
