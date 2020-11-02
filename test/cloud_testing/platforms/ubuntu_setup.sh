@@ -30,6 +30,12 @@ echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"
 echo "done"
 
+# Be gentle with the resolver
+echo -n "nscd... "
+install_from_repo nscd || die "fail (nscd)"
+sudo systemctl start nscd || die "cannot start nscd"
+echo "done"
+
 # install latest version of libc to make sure it has the symbols from the build machine
 echo -n "updating libc6, libstdc++6... "
 install_from_repo libc6 || die "fail (libc6)"
