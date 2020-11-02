@@ -2,7 +2,7 @@
   * Fix ingestion of hardlinked catalog markers (CVM-1931)
   * Add `cvmfs_talk chroot <hash>` command
   * Add CVMFS_TALK_SOCKET and CVMFS_TALK_OWNER client parameters
-  * Add `cvmfs_server transaction -T /foo=/bar` template transactions
+  * Add `cvmfs_server transaction -T /foo=/bar` template transactions (CVM-1801)
   * Refuse non-regular .cvmfscatalog files during publish (CVM-1868)
   * Replace `swissknife hash` by `publish hash` including MD5 support
   * Add experimental support for WSL2
@@ -21,6 +21,7 @@
   * [libcvmfs] add cvmfs_listdir_stat()
   * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
   * Parallelize catalog traversal in garbage collection
+  * [gw] publish files without writing temporaries to disk (CVM-1793)
   * Improve performance of uploading small objects to S3
   * Fix double counting in swissknife filestats command
   * [ducc] Parallelize check if images are up to date
