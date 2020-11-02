@@ -1,4 +1,5 @@
 2.8.0:
+  * Fix ingestion of hardlinked catalog markers (CVM-1931)
   * Add `cvmfs_talk chroot <hash>` command
   * Add CVMFS_TALK_SOCKET and CVMFS_TALK_OWNER client parameters
   * Add `cvmfs_server transaction -T /foo=/bar` template transactions
