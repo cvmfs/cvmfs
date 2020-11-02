@@ -15,7 +15,7 @@
   * Update sqlite to version 3.32.2
   * Fix ingest into root directory
   * Spawn watchdog for `swissknife sync` command
-  * Add 'chunk_list' magic extended attribute
+  * Add 'chunk_list' magic extended attribute (CVM-1875)
   * Remove perl as a package dependency
   * [libcvmfs] add cvmfs_options_parse_default()
   * [libcvmfs] add cvmfs_listdir_stat()
