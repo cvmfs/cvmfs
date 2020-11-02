@@ -1,5 +1,7 @@
 #!/bin/sh
 
+CVMFS_PLATFORM_NAME = "centos7_x86_64"
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
@@ -29,7 +31,9 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/084-premounted                           \
                                  --                                           \
-                                 src/0*                                       \
+                                 src/000                                      \
+				                     src/001                                      \
+                                 src/002                                      \
                               || retval=1
 
 
@@ -43,11 +47,9 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
                                  --                                           \
-                                 src/5*                                       \
-                                 src/6*                                       \
-                                 src/7*                                       \
-                                 src/8*                                       \
-                                 src/9*                                       \
+                                 src/500                                      \
+                                 src/501                                      \
+                                 src/502                                      \
                               || retval=1
 
 
@@ -69,7 +71,9 @@ CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
 echo "running DUCC test cases..."
 CVMFS_TEST_CLASS_NAME=DUCCTests                                         \
 ./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   src/4*                               \
-                                || retval=1
+                              src/400			                          	\
+				                  src/401                                   \
+                              src/402                                   \
+                           || retval=1    
 
 exit $retval
