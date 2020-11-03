@@ -226,7 +226,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   virtual ~Publisher();
 
   void UpdateMetaInfo();
-  void Transaction();
+  void Transaction() { TransactionRetry(); }
   void Abort();
   void Publish();
   void Ingest();
@@ -292,6 +292,10 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void OnUploadWhitelist(const upload::SpoolerResult &result);
 
   void CheckTagName(const std::string &name);
+
+  void TransactionRetry();
+  void TransactionImpl();
+  void CheckTransactionStatus();
 
   SettingsPublisher settings_;
   UniquePtr<perf::StatisticsTemplate> statistics_publish_;

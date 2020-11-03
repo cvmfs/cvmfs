@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "backoff.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "directory_entry.h"
@@ -20,7 +21,52 @@
 
 namespace publish {
 
-void Publisher::Transaction() {
+void Publisher::CheckTransactionStatus() {
+  // The process that opens the transaction does not stay alive for the life
+  // time of the transaction
+  const std::string transaction_lock =
+    settings_.transaction().spool_area().transaction_lock();
+  in_transaction_ =
+    ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
+}
+
+
+void Publisher::TransactionRetry() {
+  if (settings_.transaction().GetTimeoutS() < 0) {
+    TransactionImpl();
+    return;
+  }
+
+  BackoffThrottle throttle(500, 5000, 10000);
+  uint64_t deadline = platform_monotonic_time() +
+                      settings_.transaction().GetTimeoutS();
+  if (settings_.transaction().GetTimeoutS() == 0)
+    deadline = uint64_t(-1);
+
+  while (true) {
+    try {
+      TransactionImpl();
+    } catch (const publish::EPublish& e) {
+      if ((e.failure() == EPublish::kFailTransactionLocked) ||
+          (e.failure() == EPublish::kFailLeaseBusy))
+      {
+        if (platform_monotonic_time() > deadline)
+          throw;
+
+        LogCvmfs(kLogCvmfs, kLogStdout, "repository busy, retrying");
+        throttle.Throttle();
+        CheckTransactionStatus();
+        continue;
+      } else {
+        throw;
+      }
+    }  // try-catch
+    break;
+  }  // while (true)
+}
+
+
+void Publisher::TransactionImpl() {
   if (in_transaction_) {
     throw EPublish("another transaction is already open",
                    EPublish::kFailTransactionLocked);
