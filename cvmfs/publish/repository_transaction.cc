@@ -46,6 +46,7 @@ void Publisher::TransactionRetry() {
   while (true) {
     try {
       TransactionImpl();
+      break;
     } catch (const publish::EPublish& e) {
       if ((e.failure() == EPublish::kFailTransactionLocked) ||
           (e.failure() == EPublish::kFailLeaseBusy))
@@ -57,11 +58,10 @@ void Publisher::TransactionRetry() {
         throttle.Throttle();
         CheckTransactionStatus();
         continue;
-      } else {
-        throw;
       }
+
+      throw;
     }  // try-catch
-    break;
   }  // while (true)
 }
 
