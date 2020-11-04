@@ -155,7 +155,19 @@ class GarbageCollector {
   uint64_t              oldest_trunk_catalog_;
   bool                  oldest_trunk_catalog_found_;
   unsigned int          preserved_catalogs_;
+  /**
+   * Number of catalogs in the reflog that are to be deleted (in fact, some of
+   * them might not exist anymore).
+   */
+  unsigned int          unreferenced_catalogs_;
+  /**
+   * Number of catalogs garbage collected, count grows as GC progresses
+   */
   unsigned int          condemned_catalogs_;
+  /**
+   * Keeps track if the last status report issued, between 0 and 1
+   */
+  float                 last_reported_status_;
 
   unsigned int          condemned_objects_;
   uint64_t              condemned_bytes_;
