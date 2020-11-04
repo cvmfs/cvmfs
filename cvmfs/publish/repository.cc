@@ -673,14 +673,9 @@ Publisher::Publisher(const SettingsPublisher &settings)
     }
   }
 
-  // The process that opens the transaction does not stay alive for the life
-  // time of the transaction
-  const std::string transaction_lock =
-    settings_.transaction().spool_area().transaction_lock();
-  if (ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */)) {
-    in_transaction_ = true;
+  CheckTransactionStatus();
+  if (in_transaction_)
     ConstructSpoolers();
-  }
   if (settings.is_managed())
     managed_node_ = new ManagedNode(this);
 }

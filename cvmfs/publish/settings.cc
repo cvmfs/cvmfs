@@ -128,6 +128,12 @@ void SettingsTransaction::SetTimeout(unsigned seconds) {
   timeout_s_ = seconds;
 }
 
+int SettingsTransaction::GetTimeoutS() const {
+  if (timeout_s_.is_default())
+    return -1;
+  return timeout_s_;
+}
+
 void SettingsTransaction::SetLeasePath(const std::string &path) {
   lease_path_ = path;
 }
