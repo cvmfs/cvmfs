@@ -1,4 +1,5 @@
 2.8.0:
+  * [server] add support for wait & retry on opening transactions (CVM-1937)
   * [server] let return code of transaction indicate the error (CVM-1873)
   * Fix ingestion of hardlinked catalog markers (CVM-1931)
   * Add `cvmfs_talk chroot <hash>` command
