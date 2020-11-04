@@ -159,7 +159,11 @@ class GarbageCollector {
    * Number of catalogs in the reflog that are to be deleted (in fact, some of
    * them might not exist anymore).
    */
-  unsigned int          unreferenced_catalogs_;
+  unsigned int          unreferenced_trees_;
+  /**
+   * Number of root catalogs garbage collected, count grows as GC progresses
+   */
+  unsigned int          condemned_trees_;
   /**
    * Number of catalogs garbage collected, count grows as GC progresses
    */
