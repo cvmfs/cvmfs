@@ -16,6 +16,7 @@
 
 #include "catalog_virtual.h"
 #include "compression.h"
+#include "directory_entry.h"
 #include "fs_traversal.h"
 #include "hash.h"
 #include "publish/repository.h"
@@ -29,10 +30,11 @@
 
 using namespace std;  // NOLINT
 
+/**
 namespace catalog {
 class DirectoryEntry;
 }
-
+**/
 namespace publish {
 
 AbstractSyncMediator::~AbstractSyncMediator() {}
@@ -44,9 +46,10 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   union_engine_(NULL),
   handle_hardlinks_(false),
   params_(params),
-  changed_items_(0),
-  reporter_(new SyncDiffReporter(params_->print_changeset))
-{
+  // changed_items_(0),
+  reporter_(new SyncDiffReporter(params_->print_changeset ? PrintAction::kPrintChanges : PrintAction::kPrintDots))
+  // reporter_(new SyncDiffReporter(params_->print_changeset))
+  {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
@@ -793,28 +796,115 @@ void SyncDiffReporter::OnInit(const history::History::Tag &from_tag,
 
 void SyncDiffReporter::OnStats(const catalog::DeltaCounters &delta) {}
 
+void SyncDiffReporter::OnAdd(const std::string &path, const catalog::DirectoryEntry &entry) {
+  changed_items_++;
+  InternalAdd(path);
+}
+void SyncDiffReporter::OnRemove(const std::string &path, const catalog::DirectoryEntry &entry) {
+  changed_items_++;
+  // PrintDots();
+  InternalRemove(path, entry);
+}
+void SyncDiffReporter::OnModify(const std::string &path,
+              const catalog::DirectoryEntry &entry_from,
+              const catalog::DirectoryEntry &entry_to) {
+  changed_items_++;
+  // PrintDots();
+  InternalModify(path, entry_from, entry_to);
+}
+
 void SyncDiffReporter::PrintDots() {
-  if (!print_dots_) return;
+  // if (print_action_ != kPrintDots) return;
   if (changed_items_ % processing_dot_interval_ == 0) {
-    LogCvmfs(kLogPublish, kLogStdout, ".");
+    LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, ".");
   }
 }
 
+
 void SyncDiffReporter::InternalAdd(const std::string &path) {
-  const char *action_label = "[add]";
-  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+  const std::string keyword = "catalog";
+  const char *action_label;
+
+  if (print_action_ == kPrintChanges) {
+    if (path.find(keyword) != std::string::npos) {
+      action_label = "[x-catalog-add]";
+    } else {
+      action_label = "[add]";
+    }
+
+    LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+
+  } else if (print_action_ == kPrintDots) {
+    PrintDots();
+  } else {
+    LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
+  }
 }
 
-void SyncDiffReporter::InternalRemove(const std::string &path,
-                                const catalog::DirectoryEntry & /*entry*/) {
-  const char *action_label = "[rem]";
+
+/**
+void SyncDiffReporter::InternalAdd(const std::string &path) {
+  const std::string keyword = "catalog";
+  const char *action_label;
+
+
+  if (path.find(keyword) != std::string::npos) {
+    action_label = "[x-catalog-add]";
+  } else {
+    action_label = "[add]";
+  }
+
+  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+
+  PrintDots();
+}
+**/
+/**
+void SyncDiffReporter::InternalAdd(const PrintAction  action, const std::string &path) {
+  const std::string keyword = "catalog";
+  const char *action_label;
+
+  switch (action) {
+    case kPrintChanges:
+
+      if (path.find(keyword) != std::string::npos) {
+        action_label = "[x-catalog-add]";
+      } else {
+        action_label = "[add]";
+      }
+
+      LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+
+      break
+
+    case kPrintDots:
+      PrintDots();
+
+    default:
+      assert("unknown print action");
+  }
+
+}
+**/
+
+void SyncDiffReporter::InternalRemove(
+    const std::string &path, const catalog::DirectoryEntry & /*entry*/) {
+  const std::string keyword = "catalog";
+  const char *action_label;
+
+  if (path.find(keyword) != std::string::npos) {
+    action_label = "[x-catalog-rem]";
+  } else {
+    action_label = "[rem]";
+  }
+
   LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
 }
 
 void SyncDiffReporter::InternalModify(const std::string &path,
                                 const catalog::DirectoryEntry & /*entry_from*/,
                                 const catalog::DirectoryEntry & /*entry_to*/) {
-  const char *action_label = "[tou]";
+  const char *action_label = "[mod]";
   LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
 }
 

@@ -1,0 +1,58 @@
+cvmfs_test_name="PrintChangesetNotice prints"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+  ADD_COUNTER=0
+  MOD_COUNTER=0
+  REM_COUNTER=0
+
+  echo "*** Create a new repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+  echo "*** Start transaction for testing addition of entries"
+  start_transaction $CVMFS_TEST_REPO || return 2
+  touch /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 3
+  let ADD_COUNTER++
+  touch /cvmfs/$CVMFS_TEST_REPO/new_file2.txt || return 3
+  touch /cvmfs/$CVMFS_TEST_REPO/new_file3.txt || return 3
+  let ADD_COUNTER++
+  mkdir /cvmfs/$CVMFS_TEST_REPO/new_folder || return 4
+  let ADD_COUNTER++
+  mkdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 5
+  let ADD_COUNTER++
+  touch /cvmfs/$CVMFS_TEST_REPO/new_folder/.cvmfscatalog || return 6
+  let ADD_COUNTER++
+  let ADD_COUNTER++
+  ln /cvmfs/$CVMFS_TEST_REPO/new_file2.txt /cvmfs/$CVMFS_TEST_REPO/new_file4.txt || return 7
+  ls -li /cvmfs/$CVMFS_TEST_REPO/new_file4.txt /cvmfs/$CVMFS_TEST_REPO/new_file2.txt || return 7
+  let ADD_COUNTER++
+  ln -s /cvmfs/$CVMFS_TEST_REPO/new_file3.txt /cvmfs/$CVMFS_TEST_REPO/new_file5.txt || return 8
+  ls -l /cvmfs/$CVMFS_TEST_REPO/new_file5.txt || return 8
+  let ADD_COUNTER++
+  echo "*** Publish transaction for testing addition of entries"
+  publish_repo $CVMFS_TEST_REPO || return 9
+
+  echo "*** Start transaction for testing modification of entries"
+  start_transaction $CVMFS_TEST_REPO || return 10
+  touch /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 11
+  let MOD_COUNTER++
+  echo "*** Publish transaction for testing modification of entries"
+  publish_repo $CVMFS_TEST_REPO || return 12
+
+  echo "*** Start transaction for testing removal of entries"
+  start_transaction $CVMFS_TEST_REPO || return 20
+  rm /cvmfs/$CVMFS_TEST_REPO/new_folder/.cvmfscatalog || return 21
+  let REM_COUNTER++
+  let REM_COUNTER++
+  rm /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 23
+  let REM_COUNTER++
+  rmdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 24
+  let REM_COUNTER++
+  echo "*** Publish transaction for testing removal of entries"
+  publish_repo $CVMFS_TEST_REPO || return 25
+
+  return 0
+
+}
+

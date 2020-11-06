@@ -51,17 +51,38 @@ struct Counters;
 
 namespace publish {
 
+enum PrintAction {
+  kPrintDots,
+  kPrintChanges,
+};
+
 class SyncDiffReporter : public DiffListener {
  public:
-  explicit SyncDiffReporter(bool print_dots,
+ 
+ /**
+  enum PrintAction {
+    kPrintDots,
+    kPrintChanges,
+  };
+ **/ 
+  explicit SyncDiffReporter(bool print_changeset,
+                            PrintAction print_action = kPrintDots,
                             unsigned int processing_dot_interval = 100)
-      : print_dots_(print_dots),
-        processing_dot_interval_(processing_dot_interval),
+      : print_action_(print_action),
+        // processing_dot_interval_(processing_dot_interval),
         changed_items_(0) {}
 
-  void OnInit(const history::History::Tag &from_tag,
+  virtual void OnInit(const history::History::Tag &from_tag,
               const history::History::Tag &to_tag);
-  void OnStats(const catalog::DeltaCounters &delta);
+  virtual void OnStats(const catalog::DeltaCounters &delta);
+
+  virtual void OnAdd(const std::string &path, const catalog::DirectoryEntry &entry);
+  virtual void OnRemove(const std::string &path, const catalog::DirectoryEntry &entry);
+  virtual void OnModify(const std::string &path,
+                const catalog::DirectoryEntry &entry_from,
+                const catalog::DirectoryEntry &entry_to);
+
+  /**
   void OnAdd(const std::string &path, const catalog::DirectoryEntry &entry) {
     changed_items_++;
     PrintDots();
@@ -79,6 +100,7 @@ class SyncDiffReporter : public DiffListener {
     PrintDots();
     InternalModify(path, entry_from, entry_to);
   }
+  **/
 
  private:
   void PrintDots();
@@ -89,7 +111,7 @@ class SyncDiffReporter : public DiffListener {
                       const catalog::DirectoryEntry &entry_from,
                       const catalog::DirectoryEntry &entry_to);
 
-  bool print_dots_;
+  PrintAction print_action_;
   unsigned int processing_dot_interval_;
   unsigned int changed_items_;
 };
@@ -183,6 +205,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   }
 
  private:
+ /**
   enum ChangesetAction {
     kAdd,
     kAddCatalog,
@@ -191,7 +214,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
     kRemove,
     kRemoveCatalog
   };
-
+  **/
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
   typedef std::vector<HardlinkGroup> HardlinkGroupList;
 
