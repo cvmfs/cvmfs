@@ -835,6 +835,7 @@ void SyncDiffReporter::InternalAdd(const std::string &path) {
     LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
 
   } else if (print_action_ == kPrintDots) {
+    LogCvmfs(kLogPublish, kLogStdout, "DOTS!!");
     PrintDots();
   } else {
     LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");

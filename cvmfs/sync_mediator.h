@@ -65,11 +65,10 @@ class SyncDiffReporter : public DiffListener {
     kPrintChanges,
   };
  **/ 
-  explicit SyncDiffReporter(bool print_changeset,
-                            PrintAction print_action = kPrintDots,
+  explicit SyncDiffReporter(PrintAction print_action = kPrintDots,
                             unsigned int processing_dot_interval = 100)
       : print_action_(print_action),
-        // processing_dot_interval_(processing_dot_interval),
+        processing_dot_interval_(processing_dot_interval),
         changed_items_(0) {}
 
   virtual void OnInit(const history::History::Tag &from_tag,
