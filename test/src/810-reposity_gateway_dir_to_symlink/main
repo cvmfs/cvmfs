@@ -25,16 +25,6 @@ run_transactions() {
     cvmfs_server abort -f test.repo.org
     cvmfs_server check test.repo.org
 
-    cvmfs_server transaction test.repo.org
-    mkdir -p /cvmfs/test.repo.org/usr/bin
-    for f in $(find /usr/bin -type f | head -n32); do
-      cp -v $f /cvmfs/test.repo.org/usr/bin/
-    done
-    cvmfs_server abort -f test.repo.org
-    cvmfs_server check test.repo.org
-
-    echo "Checking transaction + publish"
-
     ## Transaction 1, create directory with catalog inside
     echo "***  Starting transaction 1"
     cvmfs_server transaction test.repo.org
