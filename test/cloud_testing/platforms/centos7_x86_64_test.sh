@@ -25,7 +25,7 @@ run_unittests --gtest_shuffle \
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
-./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+./run.sh $CLIENT_TEST_LOGFILE -o "${CLIENT_TEST_LOGFILE}_${CVMFS_PLATFORM_NAME}${XUNIT_OUTPUT_SUFFIX}" \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
@@ -40,7 +40,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 echo "running CernVM-FS server test cases..."
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 CVMFS_TEST_UNIONFS=overlayfs                                                  \
-./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${CVMFS_PLATFORM_NAME}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
                                  src/600-securecvmfs                          \
                                  src/628-pythonwrappedcvmfsserver             \
@@ -56,7 +56,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
 echo "running CernVM-FS client migration test cases..."
 CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
 ./run.sh $MIGRATIONTEST_CLIENT_LOGFILE                            \
-         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${CVMFS_PLATFORM_NAME}${XUNIT_OUTPUT_SUFFIX} \
             migration_tests/0*                                    \
          || retval=1
 
@@ -64,13 +64,13 @@ CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
 echo "running CernVM-FS server migration test cases..."
 CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
 ./run.sh $MIGRATIONTEST_SERVER_LOGFILE                            \
-         -o ${MIGRATIONTEST_SERVER_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+         -o ${MIGRATIONTEST_SERVER_LOGFILE}${CVMFS_PLATFORM_NAME}${XUNIT_OUTPUT_SUFFIX} \
             migration_tests/5*                                    \
          || retval=1
 
 echo "running DUCC test cases..."
 CVMFS_TEST_CLASS_NAME=DUCCTests                                         \
-./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${CVMFS_PLATFORM_NAME}${XUNIT_OUTPUT_SUFFIX} \
                               src/400			                          	\
 				                  src/401                                   \
                               src/402                                   \
