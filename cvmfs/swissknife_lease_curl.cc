@@ -121,6 +121,9 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
   curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
   curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, reply);
 
+  // we can wait up to 60 seconds for this call to complete
+  curl_easy_setopt(h_curl, CURLOPT_TIMEOUT, 60L);
+
   ret = curl_easy_perform(h_curl);
   if (ret) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
