@@ -158,16 +158,6 @@ void CmdEnter::CreateUnderlay(
     LogCvmfs(kLogCvmfs, kLogDebug, "underlay: mkdir %s",
              dest_empty_dir.c_str());
     EnsureDirectory(dest_empty_dir);
-
-    // And recurse into it, i.e.
-    // CreateUnderlay($SOURCE/cvmfs, $DEST/cvmfs, /atlas.cern.ch)
-    std::vector<std::string> empty_sub_dir;
-    empty_sub_dir.push_back(empty_dirs[i].substr(toplevel_dir.length()));
-    if (!empty_sub_dir[0].empty()) {
-      CreateUnderlay(source_dir + toplevel_dir,
-                     dest_dir + toplevel_dir,
-                     empty_sub_dir);
-    }
   }
 
   std::vector<std::string> names;
@@ -205,7 +195,6 @@ void CmdEnter::CreateUnderlay(
 
     std::string source = source_dir + "/" + names[i];
     std::string dest = dest_dir + "/" + names[i];
-    printf("NAMES %u %s %s\n", i, source.c_str(), dest.c_str());
     if (S_ISLNK(modes[i])) {
       char buf[PATH_MAX + 1];
       ssize_t nchars = readlink(source.c_str(), buf, PATH_MAX);
@@ -226,6 +215,19 @@ void CmdEnter::CreateUnderlay(
         throw EPublish("cannot bind mount " + source + " --> " + dest +
                        " (" + StringifyInt(errno) + ")");
       }
+    }
+  }
+
+  // Recurse into the directory trees containing empty directories
+  // CreateUnderlay($SOURCE/cvmfs, $DEST/cvmfs, /atlas.cern.ch)
+  for (unsigned i = 0; i < empty_toplevel_dirs.size(); ++i) {
+    std::string toplevel_dir = empty_toplevel_dirs[i];
+    std::vector<std::string> empty_sub_dir;
+    empty_sub_dir.push_back(empty_dirs[i].substr(toplevel_dir.length()));
+    if (!empty_sub_dir[0].empty()) {
+      CreateUnderlay(source_dir + toplevel_dir,
+                     dest_dir + toplevel_dir,
+                     empty_sub_dir);
     }
   }
 }
