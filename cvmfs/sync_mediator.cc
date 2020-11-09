@@ -811,7 +811,7 @@ void SyncDiffReporter::OnModify(const std::string &path,
 
 void SyncDiffReporter::PrintDots() {
   if (changed_items_ % processing_dot_interval_ == 0) {
-    LogCvmfs(kLogPublish, kLogStdout, ".");
+    LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, ".");
   }
 }
 
