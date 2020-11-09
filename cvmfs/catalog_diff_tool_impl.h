@@ -184,6 +184,13 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
         new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                          &chunks);
       }
+
+      if (old_entry.IsDirectory() && old_entry.IsNestedCatalogMountpoint() && !new_entry.IsDirectory()) {
+        ReportRemoval(old_path, old_entry);
+        ReportAddition(new_path, new_entry, xattrs, chunks);
+        continue;
+      }
+
       ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
     }
     if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
