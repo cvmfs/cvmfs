@@ -59,7 +59,7 @@ run_transactions() {
     compare_file_checksum /tmp/cvmfs_out_1/a/b f1885b1a57c71cacbd923fc5e9aefef3
     if [ x"$(cvmfs_server check test.repo.org | grep /a)" = x"" ]; then
         echo "Nested catalog not created at /a"
-        return 1
+        return 2
     else
         echo "Nested catalog was successfully created at /a"
     fi
@@ -85,7 +85,7 @@ run_transactions() {
     compare_file_checksum /tmp/cvmfs_out_2/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
     if [ x"$(cvmfs_server check test.repo.org | grep /a/b)" = x"" ]; then
         echo "Nested catalog not created at /a/b"
-        return 1
+        return 3
     else
         echo "Nested catalog was successfully created at /a/b"
     fi
@@ -110,13 +110,13 @@ run_transactions() {
     compare_file_checksum /tmp/cvmfs_out_2/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
     if [ x"$(cvmfs_server check test.repo.org | grep /a)" != x"" ]; then
         echo "Nested catalog at /a should have been removed"
-        return 1
+        return 4
     else
         echo "Nested catalog at /a was successfully removed"
     fi
     if [ x"$(cvmfs_server check test.repo.org | grep /a/b)" != x"" ]; then
         echo "Nested catalog at /a/b should have been removed"
-        return 1
+        return 5
     else
         echo "Nested catalog at /a/b was successfully removed"
     fi
@@ -141,13 +141,13 @@ run_transactions() {
     echo "  Checking results 4"
     if [ x"$(cvmfs_server check test.repo.org | grep /dir1)" = x"" ]; then
         echo "Nested catalog at /dir1 should have been created from .cvmfsdirtab"
-        return 1
+        return 6
     else
         echo "Nested catalog at /dir1 was successfully created from .cvmfsdirtab"
     fi
     if [ x"$(cvmfs_server check test.repo.org | grep /dir2)" = x"" ]; then
         echo "Nested catalog at /dir2 should have been created from .cvmfsdirtab"
-        return 1
+        return 7
     else
         echo "Nested catalog at /dir2 was successfully created from .cvmfsdirtab"
     fi
@@ -172,18 +172,18 @@ run_transactions() {
     compare_file_checksum /cvmfs/test.repo.org/dir2/b.txt f1885b1a57c71cacbd923fc5e9aefef3
     if [ x"$(cvmfs_server check test.repo.org | grep /dir1)" != x"" ]; then
         echo "Nested catalog at /dir1 should have been removed"
-        return 1
+        return 8
     else
         echo "Nested catalog at /dir1 was successfully removed"
     fi
     if [ x"$(cvmfs_server check test.repo.org | grep /dir2)" != x"" ]; then
         echo "Nested catalog at /dir2 should have been removed"
-        return 1
+        return 9
     else
         echo "Nested catalog at /dir2 was successfully removed"
     fi
 
-    check_repo_integrity test.repo.org || return 1
+    check_repo_integrity test.repo.org || return 10
 
     clean_up
 }
