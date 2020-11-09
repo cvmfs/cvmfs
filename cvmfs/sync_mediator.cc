@@ -42,11 +42,8 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
       handle_hardlinks_(false),
       params_(params),
       reporter_(new SyncDiffReporter(params_->print_changeset
-                                         ? PrintAction::kPrintDots
-                                         : PrintAction::kPrintChanges))
-// reporter_(new SyncDiffReporter(params_->print_changeset ?
-// PrintAction::kPrintDots : PrintAction::kPrintChanges))
-{
+                                         ? PrintAction::kPrintChanges
+                                         : PrintAction::kPrintDots)) {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
