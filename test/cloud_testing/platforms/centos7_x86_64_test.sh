@@ -25,7 +25,7 @@ run_unittests --gtest_shuffle \
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
-./run.sh $CLIENT_TEST_LOGFILE -o "${CLIENT_TEST_LOGFILE}_${CVMFS_PLATFORM_NAME}${XUNIT_OUTPUT_SUFFIX}" \
+./run.sh $CLIENT_TEST_LOGFILE -o "${CLIENT_TEST_LOGFILE}_centos7-x86_64${XUNIT_OUTPUT_SUFFIX}" \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
