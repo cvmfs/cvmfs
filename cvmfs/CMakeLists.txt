@@ -244,6 +244,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
 
 # TODO(jblomer) Rename to cvmfs_server
 set (CVMFS_PUBLISH_SOURCES
+  backoff.cc
   compression.cc
   directory_entry.cc
   dns.cc

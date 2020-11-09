@@ -5,6 +5,7 @@
 #include "cvmfs_config.h"
 #include "cmd_enter.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/limits.h>
@@ -25,8 +26,10 @@
 #include <string>
 #include <vector>
 
+#include "backoff.h"
 #include "logging.h"
 #include "options.h"
+#include "platform.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
@@ -70,6 +73,63 @@ static void EnsureDirectory(const std::string &path) {
   bool rv = MkdirDeep(path, 0700, true /* veryfy_writable */);
   if (!rv)
     throw publish::EPublish("cannot create directory " + path);
+}
+
+static void RemoveSingle(const std::string &path) {
+  platform_stat64 info;
+  int retval = platform_lstat(path.c_str(), &info);
+  if (retval != 0) {
+    if (errno == ENOENT)
+      return;
+    throw publish::EPublish("cannot remove " + path);
+  }
+
+  int rv = 0;
+  if (S_ISDIR(info.st_mode))
+    rv = rmdir(path.c_str());
+  else
+    rv = unlink(path.c_str());
+
+  if (rv == 0 || errno == ENOENT)
+    return;
+
+  throw publish::EPublish(
+  "cannot remove " + path + " (" + StringifyInt(errno) + ")");
+}
+
+
+static void RemoveUnderlay(const std::string &path) {
+  DIR *dirp = opendir(path.c_str());
+  if (dirp == NULL)
+    throw publish::EPublish("cannot open directory " + path);
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp)) != NULL) {
+    const std::string name = dirent->d_name;
+    if (name == "." || name == "..")
+      continue;
+
+    const std::string full_name = path + "/" + name;
+    platform_stat64 info;
+    int rvi = platform_lstat(full_name.c_str(), &info);
+    if (rvi != 0)
+      throw publish::EPublish("cannot access " + full_name);
+
+    if (S_ISDIR(info.st_mode))
+      RemoveUnderlay(full_name);
+
+    if (!S_ISLNK(info.st_mode)) {
+      bool rvb = platform_umount_lazy(full_name.c_str());
+      LogCvmfs(kLogCvmfs, kLogStdout, "TRY UNMOUNTING %s %d %d", full_name.c_str(), rvb, errno);
+      if (!rvb && errno != EINVAL) {
+        throw publish::EPublish(
+          "cannot unmount unmount " + full_name +
+          " (" + StringifyInt(errno) + ")");
+      }
+    }
+
+    RemoveSingle(full_name);
+  }
+  closedir(dirp);
 }
 
 }  // anonymous namespace
@@ -119,6 +179,18 @@ void CmdEnter::CreateUnderlay(
     if (!rv)
       throw EPublish("cannot list directory " + d);
   }
+  // We need to order creating the bindmounts such that the destination itself
+  // is handled first; otherwise, the recursive bind mount to the session dir
+  // creates all other sub bind mounts again.
+  for (unsigned i = 0; i < names.size(); ++i) {
+    std::string source = source_dir + "/" + names[i] + "/";
+    std::string dest = dest_dir + "/" + names[i] + "/";
+    if (HasPrefix(dest, source, false /* ignore_case */)) {
+      iter_swap(names.begin(), names.begin() + i);
+      iter_swap(modes.begin(), modes.begin() + i);
+      break;
+    }
+  }
 
   // List the contents of the source directory
   //   1. Symlinks are created as they are
@@ -133,6 +205,7 @@ void CmdEnter::CreateUnderlay(
 
     std::string source = source_dir + "/" + names[i];
     std::string dest = dest_dir + "/" + names[i];
+    printf("NAMES %u %s %s\n", i, source.c_str(), dest.c_str());
     if (S_ISLNK(modes[i])) {
       char buf[PATH_MAX + 1];
       ssize_t nchars = readlink(source.c_str(), buf, PATH_MAX);
@@ -149,8 +222,10 @@ void CmdEnter::CreateUnderlay(
       LogCvmfs(kLogCvmfs, kLogDebug, "underlay: %s --> %s",
                source.c_str(), dest.c_str());
       bool rv = BindMount(source, dest);
-      if (!rv)
-        throw EPublish("cannot bind mount " + source + " --> " + dest);
+      if (!rv) {
+        throw EPublish("cannot bind mount " + source + " --> " + dest +
+                       " (" + StringifyInt(errno) + ")");
+      }
     }
   }
 }
@@ -271,6 +346,53 @@ void CmdEnter::MountOverlayfs() {
 }
 
 
+void CmdEnter::CleanupSession(bool keep_logs) {
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+           "Cleaning out session directory... ");
+
+  std::string pid_xattr;
+  bool rvb = platform_getxattr(lower_layer_, "user.pid", &pid_xattr);
+  if (!rvb)
+    throw EPublish("cannot find CernVM-FS process");
+  pid_t pid_cvmfs = String2Uint64(pid_xattr);
+
+  rvb = platform_umount_lazy((rootfs_dir_ + target_dir_).c_str());
+  if (!rvb)
+    throw EPublish("cannot unmount overlayfs on " + rootfs_dir_ + target_dir_);
+  rvb = platform_umount_lazy(lower_layer_.c_str());
+  if (!rvb)
+    throw EPublish("cannot unmount CernVM-FS on " + lower_layer_);
+
+  BackoffThrottle backoff;
+  while (ProcessExists(pid_cvmfs)) {
+    backoff.Throttle();
+  }
+
+  RemoveSingle(lower_layer_);
+  RemoveSingle(session_dir_ + "/sysdefault.conf");
+  rvb = RemoveTree(ovl_workdir_);
+  if (!rvb)
+    throw EPublish("cannot remove " + ovl_workdir_);
+  rvb = RemoveTree(upper_layer_);
+  if (!rvb)
+    throw EPublish("cannot remove " + upper_layer_);
+  rvb = RemoveTree(cache_dir_);
+  if (!rvb)
+    throw EPublish("cannot remove " + cache_dir_);
+  RemoveUnderlay(rootfs_dir_);
+
+  if (keep_logs) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "[logs available in %s]",
+             (session_dir_ + "/logs").c_str());
+    return;
+  }
+
+  rvb = RemoveTree(session_dir_ + "/logs");
+  RemoveSingle(session_dir_);
+  LogCvmfs(kLogCvmfs, kLogStdout, "[done]");
+}
+
+
 int CmdEnter::Main(const Options &options) {
   fqrn_ = options.plain_args()[0].value_str;
   sanitizer::RepositorySanitizer sanitizer;
@@ -328,6 +450,7 @@ int CmdEnter::Main(const Options &options) {
   rvb = ProcMount(rootfs_dir_ + "/proc");
   if (!rvb)
     throw EPublish("cannot mount " + rootfs_dir_ + "/proc");
+  setenv("CVMFS_ENTER_SESSION_DIR", session_dir_.c_str(), 1 /* overwrite */);
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Mounting CernVM-FS read-only layer... ");
@@ -342,67 +465,63 @@ int CmdEnter::Main(const Options &options) {
   MountOverlayfs();
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-  if (!options.Has("root")) {
-    rvb = CreateUserNamespace(uid, gid);
-    if (!rvb) {
-      throw EPublish(std::string("cannot create user namespace (") +
-                     StringifyInt(uid) + ", " + StringifyInt(gid) + ")");
+  // Fork the inner process, the outer one is used later for cleanup
+  pid_t pid = fork();
+  if (pid < 0)
+    throw EPublish("cannot create subshell");
+
+  if (pid == 0) {
+    if (!options.Has("root")) {
+      rvb = CreateUserNamespace(uid, gid);
+      if (!rvb) {
+        throw EPublish(std::string("cannot create user namespace (") +
+                       StringifyInt(uid) + ", " + StringifyInt(gid) + ")");
+      }
     }
+
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+             "Switching to %s... ", rootfs_dir_.c_str());
+    int rvi = chroot(rootfs_dir_.c_str());
+    if (rvi != 0)
+      throw EPublish("cannot chroot to " + rootfs_dir_);
+    LogCvmfs(kLogCvmfs, kLogStdout, "done");
+    // May fail if the working directory was invalid to begin with
+    chdir(cwd.c_str());
+
+    LogCvmfs(kLogCvmfs, kLogStdout, "\n"
+      "You can attach to this shell from another another terminal with\n");
+    if (options.Has("root")) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "    nsenter --preserve-credentials -U -p -m -t %u\n"
+               "    chroot %s\n",
+               anchor_pid.init_pid, rootfs_dir_.c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "    nsenter --preserve-credentials -U -m -t %u\n"
+               "    chroot %s\n"
+               "    nsenter --preserve-credentials -S %u -G %u -U -p -t 1\n",
+               anchor_pid.parent_pid, rootfs_dir_.c_str(), uid, gid);
+    }
+
+    std::vector<std::string> cmdline;
+    cmdline.push_back(GetShell());
+    std::set<int> preserved_fds;
+    preserved_fds.insert(0);
+    preserved_fds.insert(1);
+    preserved_fds.insert(2);
+    pid_t pid_child;
+    rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
+                      false /* drop_credentials */, false /* clear_env */,
+                      false /* double_fork */,
+                      &pid_child);
+    return WaitForChild(pid_child);
   }
-
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-           "Switching to %s... ", rootfs_dir_.c_str());
-  int rvi = chroot(rootfs_dir_.c_str());
-  if (rvi != 0)
-    throw EPublish("cannot chroot to " + rootfs_dir_);
-  LogCvmfs(kLogCvmfs, kLogStdout, "done");
-  // May fail if the working directory was invalid to begin with
-  chdir(cwd.c_str());
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "\n"
-           "You can attach to this shell from another another terminal with\n");
-  if (options.Has("root")) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "    nsenter --preserve-credentials -U -p -m -t %u\n"
-             "    chroot %s\n",
-             anchor_pid.init_pid, rootfs_dir_.c_str());
-  } else {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "    nsenter --preserve-credentials -U -m -t %u\n"
-             "    chroot %s\n"
-             "    nsenter --preserve-credentials -S %u -G %u -U -p -t 1\n",
-             anchor_pid.parent_pid, rootfs_dir_.c_str(), uid, gid);
-  }
-
-  setenv("CVMFS_ENTER_SESSION_DIR", session_dir_.c_str(), 1 /* overwrite */);
-
-  std::vector<std::string> cmdline;
-  cmdline.push_back(GetShell());
-  std::set<int> preserved_fds;
-  preserved_fds.insert(0);
-  preserved_fds.insert(1);
-  preserved_fds.insert(2);
-  pid_t pid_child;
-  rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
-                    false /* drop_credentials */, false /* clear_env */,
-                    false /* double_fork */,
-                    &pid_child);
-  int exit_code = WaitForChild(pid_child);
+  int exit_code = WaitForChild(pid);
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
 
-  if (!options.Has("keep-session")) {
-    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-             "Cleaning out session directory... ");
-    LogCvmfs(kLogCvmfs, kLogStdout, "");
-    //rvb = RemoveTree(session_dir_);
-    //if (rvb) {
-    //  LogCvmfs(kLogCvmfs, kLogStdout, "done");
-    //} else {
-    //  LogCvmfs(kLogCvmfs, kLogStdout, "failed!");
-    //  exit_code |= 64;
-    //}
-  }
+  if (!options.Has("keep-session"))
+    CleanupSession(options.Has("keep-logs"));
 
   return exit_code;
 }

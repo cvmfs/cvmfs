@@ -55,11 +55,14 @@ class CmdEnter : public Command {
   void MountCvmfs();
   pid_t RunInteractiveShell();
 
+  void CleanupSession(bool keep_logs);
+
   std::string fqrn_;
   std::string session_dir_;
   std::string target_dir_;
   std::string lower_layer_;
   std::string cvmfs2_binary_;
+  std::string overlayfs_binary_;
   std::string rootfs_dir_;
   std::string config_path_;  ///< CernVM-FS configuration
   std::string usyslog_path_;
@@ -68,8 +71,6 @@ class CmdEnter : public Command {
   std::string cache_dir_;
   std::string upper_layer_;
   std::string ovl_workdir_;
-
-  std::string overlayfs_binary_;
 };
 
 }  // namespace publish

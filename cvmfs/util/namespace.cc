@@ -83,7 +83,7 @@ bool BindMount(const std::string &from, const std::string &to) {
 #ifdef __APPLE__
   return false;
 #else
-  int rvi = mount(from.c_str(), to.c_str(), "", MS_BIND | MS_REC, NULL);
+  int rvi = mount(from.c_str(), to.c_str(), "", MS_BIND | MS_REC | MS_UNBINDABLE, NULL);
   return rvi == 0;
 #endif
 }
