@@ -6,6 +6,7 @@
 #include "namespace.h"
 
 #include <fcntl.h>
+#include <signal.h>
 #ifndef __APPLE__
 #include <sched.h>
 #include <sys/mount.h>
@@ -113,6 +114,19 @@ bool CreateMountNamespace() {
 }
 
 
+namespace {
+
+static void Reaper(int /*sig*/, siginfo_t * /*siginfo*/, void * /*context*/) {
+  while (true) {
+    pid_t retval = waitpid(-1, NULL, WNOHANG);
+    if (retval <= 0)
+      return;
+  }
+}
+
+} // anonymous namespace
+
+
 /**
  * The fd_parent file descriptor, if passed, is the read end of a pipe whose
  * write end is connected to the parent process.  This gives the namespace's
@@ -162,6 +176,13 @@ bool CreatePidNamespace(int *fd_parent) {
 
   // Note: only signals for which signal handlers are established can be sent
   // by other processes of this pid namespace to the init process
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = Reaper;
+  sa.sa_flags = SA_SIGINFO;
+  sigfillset(&sa.sa_mask);
+  rvi = sigaction(SIGCHLD, &sa, NULL);
+  assert(rvi == 0);
 
   rvi = mount("", "/proc", "proc", 0, NULL);
   return rvi == 0;
