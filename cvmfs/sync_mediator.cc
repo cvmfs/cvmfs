@@ -30,26 +30,23 @@
 
 using namespace std;  // NOLINT
 
-/**
-namespace catalog {
-class DirectoryEntry;
-}
-**/
 namespace publish {
 
 AbstractSyncMediator::~AbstractSyncMediator() {}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params,
-                           perf::StatisticsTemplate statistics) :
-  catalog_manager_(catalog_manager),
-  union_engine_(NULL),
-  handle_hardlinks_(false),
-  params_(params),
-  // changed_items_(0),
-  reporter_(new SyncDiffReporter(params_->print_changeset ? PrintAction::kPrintChanges : PrintAction::kPrintDots))
-  // reporter_(new SyncDiffReporter(params_->print_changeset))
-  {
+                           perf::StatisticsTemplate statistics)
+    : catalog_manager_(catalog_manager),
+      union_engine_(NULL),
+      handle_hardlinks_(false),
+      params_(params),
+      reporter_(new SyncDiffReporter(params_->print_changeset
+                                         ? PrintAction::kPrintDots
+                                         : PrintAction::kPrintChanges))
+// reporter_(new SyncDiffReporter(params_->print_changeset ?
+// PrintAction::kPrintDots : PrintAction::kPrintChanges))
+{
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
@@ -58,7 +55,6 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
   counters_ = new perf::FsCounters(statistics);
 }
-
 
 SyncMediator::~SyncMediator() {
   pthread_mutex_destroy(&lock_file_queue_);
@@ -796,30 +792,28 @@ void SyncDiffReporter::OnInit(const history::History::Tag &from_tag,
 
 void SyncDiffReporter::OnStats(const catalog::DeltaCounters &delta) {}
 
-void SyncDiffReporter::OnAdd(const std::string &path, const catalog::DirectoryEntry &entry) {
+void SyncDiffReporter::OnAdd(const std::string &path,
+                             const catalog::DirectoryEntry &entry) {
   changed_items_++;
   InternalAdd(path);
 }
-void SyncDiffReporter::OnRemove(const std::string &path, const catalog::DirectoryEntry &entry) {
+void SyncDiffReporter::OnRemove(const std::string &path,
+                                const catalog::DirectoryEntry &entry) {
   changed_items_++;
-  // PrintDots();
   InternalRemove(path, entry);
 }
 void SyncDiffReporter::OnModify(const std::string &path,
-              const catalog::DirectoryEntry &entry_from,
-              const catalog::DirectoryEntry &entry_to) {
+                                const catalog::DirectoryEntry &entry_from,
+                                const catalog::DirectoryEntry &entry_to) {
   changed_items_++;
-  // PrintDots();
   InternalModify(path, entry_from, entry_to);
 }
 
 void SyncDiffReporter::PrintDots() {
-  // if (print_action_ != kPrintDots) return;
   if (changed_items_ % processing_dot_interval_ == 0) {
-    LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, ".");
+    LogCvmfs(kLogPublish, kLogStdout, ".");
   }
 }
-
 
 void SyncDiffReporter::InternalAdd(const std::string &path) {
   const std::string keyword = "catalog";
@@ -835,78 +829,45 @@ void SyncDiffReporter::InternalAdd(const std::string &path) {
     LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
 
   } else if (print_action_ == kPrintDots) {
-    LogCvmfs(kLogPublish, kLogStdout, "DOTS!!");
     PrintDots();
   } else {
     LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
   }
 }
 
-
-/**
-void SyncDiffReporter::InternalAdd(const std::string &path) {
-  const std::string keyword = "catalog";
-  const char *action_label;
-
-
-  if (path.find(keyword) != std::string::npos) {
-    action_label = "[x-catalog-add]";
-  } else {
-    action_label = "[add]";
-  }
-
-  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
-
-  PrintDots();
-}
-**/
-/**
-void SyncDiffReporter::InternalAdd(const PrintAction  action, const std::string &path) {
-  const std::string keyword = "catalog";
-  const char *action_label;
-
-  switch (action) {
-    case kPrintChanges:
-
-      if (path.find(keyword) != std::string::npos) {
-        action_label = "[x-catalog-add]";
-      } else {
-        action_label = "[add]";
-      }
-
-      LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
-
-      break
-
-    case kPrintDots:
-      PrintDots();
-
-    default:
-      assert("unknown print action");
-  }
-
-}
-**/
-
 void SyncDiffReporter::InternalRemove(
     const std::string &path, const catalog::DirectoryEntry & /*entry*/) {
   const std::string keyword = "catalog";
   const char *action_label;
 
-  if (path.find(keyword) != std::string::npos) {
-    action_label = "[x-catalog-rem]";
-  } else {
-    action_label = "[rem]";
-  }
+  if (print_action_ == kPrintChanges) {
+    if (path.find(keyword) != std::string::npos) {
+      action_label = "[x-catalog-rem]";
+    } else {
+      action_label = "[rem]";
+    }
 
-  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+    LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+
+  } else if (print_action_ == kPrintDots) {
+    PrintDots();
+  } else {
+    LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
+  }
 }
 
-void SyncDiffReporter::InternalModify(const std::string &path,
-                                const catalog::DirectoryEntry & /*entry_from*/,
-                                const catalog::DirectoryEntry & /*entry_to*/) {
-  const char *action_label = "[mod]";
-  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+void SyncDiffReporter::InternalModify(
+    const std::string &path, const catalog::DirectoryEntry & /*entry_from*/,
+    const catalog::DirectoryEntry & /*entry_to*/) {
+  if (print_action_ == kPrintChanges) {
+    const char *action_label = "[mod]";
+    LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+
+  } else if (print_action_ == kPrintDots) {
+    PrintDots();
+  } else {
+    LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
+  }
 }
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {

@@ -58,48 +58,23 @@ enum PrintAction {
 
 class SyncDiffReporter : public DiffListener {
  public:
- 
- /**
-  enum PrintAction {
-    kPrintDots,
-    kPrintChanges,
-  };
- **/ 
-  explicit SyncDiffReporter(PrintAction print_action = kPrintDots,
+  explicit SyncDiffReporter(PrintAction print_action = kPrintChanges,
                             unsigned int processing_dot_interval = 100)
       : print_action_(print_action),
         processing_dot_interval_(processing_dot_interval),
         changed_items_(0) {}
 
   virtual void OnInit(const history::History::Tag &from_tag,
-              const history::History::Tag &to_tag);
+                      const history::History::Tag &to_tag);
   virtual void OnStats(const catalog::DeltaCounters &delta);
 
-  virtual void OnAdd(const std::string &path, const catalog::DirectoryEntry &entry);
-  virtual void OnRemove(const std::string &path, const catalog::DirectoryEntry &entry);
+  virtual void OnAdd(const std::string &path,
+                     const catalog::DirectoryEntry &entry);
+  virtual void OnRemove(const std::string &path,
+                        const catalog::DirectoryEntry &entry);
   virtual void OnModify(const std::string &path,
-                const catalog::DirectoryEntry &entry_from,
-                const catalog::DirectoryEntry &entry_to);
-
-  /**
-  void OnAdd(const std::string &path, const catalog::DirectoryEntry &entry) {
-    changed_items_++;
-    PrintDots();
-    InternalAdd(path);
-  }
-  void OnRemove(const std::string &path, const catalog::DirectoryEntry &entry) {
-    changed_items_++;
-    PrintDots();
-    InternalRemove(path, entry);
-  }
-  void OnModify(const std::string &path,
-                const catalog::DirectoryEntry &entry_from,
-                const catalog::DirectoryEntry &entry_to) {
-    changed_items_++;
-    PrintDots();
-    InternalModify(path, entry_from, entry_to);
-  }
-  **/
+                        const catalog::DirectoryEntry &entry_from,
+                        const catalog::DirectoryEntry &entry_to);
 
  private:
   void PrintDots();
