@@ -104,16 +104,16 @@ if [ "x$(uname -s)" != "xDarwin" ]; then
     fi
 fi
 
-CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client"
-SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server"
-S3_TEST_LOGFILE="${LOG_DIRECTORY}/test_s3"
-TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3_instance"
-UNITTEST_LOGFILE="${LOG_DIRECTORY}/unittest"
-MIGRATIONTEST_CLIENT_LOGFILE="${LOG_DIRECTORY}/migrationtest_client"
-MIGRATIONTEST_SERVER_LOGFILE="${LOG_DIRECTORY}/migrationtest_server"
-DUCCTEST_LOGFILE="${LOG_DIRECTORY}/test_ducc"
+CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/${CVMFS_PLATFORM_NAME}_test_client.log"
+SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/${CVMFS_PLATFORM_NAME}_test_server.log"
+S3_TEST_LOGFILE="${LOG_DIRECTORY}/${CVMFS_PLATFORM_NAME}_test_s3.log"
+TEST_S3_LOGFILE="${LOG_DIRECTORY}/${CVMFS_PLATFORM_NAME}_test_s3_instance.log"
+UNITTEST_LOGFILE="${LOG_DIRECTORY}/${CVMFS_PLATFORM_NAME}_unittest.log"
+MIGRATIONTEST_CLIENT_LOGFILE="${LOG_DIRECTORY}/${CVMFS_PLATFORM_NAME}_migrationtest_client.log"
+MIGRATIONTEST_SERVER_LOGFILE="${LOG_DIRECTORY}/${CVMFS_PLATFORM_NAME}_migrationtest_server.log"
+DUCCTEST_LOGFILE="${LOG_DIRECTORY}/${CVMFS_PLATFORM_NAME}_test_ducc.log"
 
-XUNIT_OUTPUT_SUFFIX=".log.xunit.xml"
+XUNIT_OUTPUT_SUFFIX=".xunit.xml"
 
 # check that the script is running under the correct user account
 if [ $(id -u -n) != "sftnight" ]; then
