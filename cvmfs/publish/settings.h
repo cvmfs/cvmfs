@@ -170,6 +170,12 @@ class SettingsTransaction {
   void SetTemplate(const std::string &from, const std::string &to);
   void DetectUnionFsType();
 
+  /**
+   * 0 - wait infinitely
+   * <0: unset, fail immediately
+   */
+  int GetTimeoutS() const;
+
   unsigned layout_revision() const { return layout_revision_; }
   shash::Any base_hash() const { return base_hash_; }
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
@@ -193,7 +199,6 @@ class SettingsTransaction {
   bool print_changeset() const { return print_changeset_; }
   std::string voms_authz() const { return voms_authz_; }
   UnionFsType union_fs() const { return union_fs_; }
-  unsigned timeout_s() const { return timeout_s_; }
   std::string lease_path() const { return lease_path_; }
   std::string template_from() const { return template_from_; }
   std::string template_to() const { return template_to_; }

@@ -1,7 +1,11 @@
 2.8.0:
+  * [gc] show progress during sweep phase (CVM-1929)
+  * [server] add support for wait & retry on opening transactions (CVM-1937)
+  * [server] let return code of transaction indicate the error (CVM-1873)
+  * Fix ingestion of hardlinked catalog markers (CVM-1931)
   * Add `cvmfs_talk chroot <hash>` command
   * Add CVMFS_TALK_SOCKET and CVMFS_TALK_OWNER client parameters
-  * Add `cvmfs_server transaction -T /foo=/bar` template transactions
+  * Add `cvmfs_server transaction -T /foo=/bar` template transactions (CVM-1801)
   * Refuse non-regular .cvmfscatalog files during publish (CVM-1868)
   * Replace `swissknife hash` by `publish hash` including MD5 support
   * Add experimental support for WSL2
@@ -14,12 +18,13 @@
   * Update sqlite to version 3.32.2
   * Fix ingest into root directory
   * Spawn watchdog for `swissknife sync` command
-  * Add 'chunk_list' magic extended attribute
+  * Add 'chunk_list' magic extended attribute (CVM-1875)
   * Remove perl as a package dependency
   * [libcvmfs] add cvmfs_options_parse_default()
   * [libcvmfs] add cvmfs_listdir_stat()
   * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
   * Parallelize catalog traversal in garbage collection
+  * [gw] publish files without writing temporaries to disk (CVM-1793)
   * Improve performance of uploading small objects to S3
   * Fix double counting in swissknife filestats command
   * [ducc] Parallelize check if images are up to date

@@ -219,6 +219,10 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
       to_hardlink.push_back(complete_path);
       hardlinks_[hardlink] = to_hardlink;
     }
+    if (filename == ".cvmfscatalog") {
+      // the file is created in the PostUpload phase
+      to_create_catalog_dirs_.insert(parent_path);
+    }
     read_archive_signal_->Wakeup();
     return;
   }

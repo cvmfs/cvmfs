@@ -1211,9 +1211,6 @@ Supported Commands:
                   <fully qualified name>
                   Checks if the repository is sane
   transaction     [-r (retry if unable to acquire lease]
-                  [-i INT (initial retry delay seconds)]
-                  [-m INT (max retry delay seconds)]
-                  [-n INT (max number of retries)]
                   [-T /template-from=/template-to]
                   <fully qualified name>
                   Start to edit a repository

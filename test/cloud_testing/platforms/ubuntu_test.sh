@@ -13,8 +13,14 @@ run_unittests --gtest_shuffle \
 
 CVMFS_EXCLUDE=
 
+ubuntu_release="$(lsb_release -cs)"
+if [ "x$ubuntu_release" == "xxenial" ]; then
+   # This test has shown to occasionally hang in the GDB attach on Ubuntu 16
+   CVMFS_EXCLUDE="$CVMFS_EXCLUDE 015-rebuild_on_crash"
+fi
+
 # Kernel sources too old for gcc, TODO
-CVMFS_EXCLUDE="src/006-buildkernel"
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/006-buildkernel"
 # Expected failure, see test case
 CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
