@@ -50,12 +50,14 @@ class CmdEnter : public Command {
   void MountOverlayfs();
   void CreateUnderlay(const std::string &source_dir,
                       const std::string &dest_dir,
-                      const std::vector<std::string> &empty_dirs);
+                      const std::vector<std::string> &empty_dirs,
+                      std::vector<std::string> *new_paths);
   void WriteCvmfsConfig();
   void MountCvmfs();
   pid_t RunInteractiveShell();
 
-  void CleanupSession(bool keep_logs);
+  void CleanupSession(bool keep_logs,
+                      const std::vector<std::string> &new_paths);
 
   std::string fqrn_;
   std::string session_dir_;

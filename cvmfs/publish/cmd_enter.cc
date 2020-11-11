@@ -94,42 +94,51 @@ static void RemoveSingle(const std::string &path) {
     return;
 
   throw publish::EPublish(
-  "cannot remove " + path + " (" + StringifyInt(errno) + ")");
+    "cannot remove " + path + " (" + StringifyInt(errno) + ")");
 }
 
 
-static void RemoveUnderlay(const std::string &path) {
-  DIR *dirp = opendir(path.c_str());
-  if (dirp == NULL)
-    throw publish::EPublish("cannot open directory " + path);
-  platform_dirent64 *dirent;
-  while ((dirent = platform_readdir(dirp)) != NULL) {
-    const std::string name = dirent->d_name;
-    if (name == "." || name == "..")
-      continue;
-
-    const std::string full_name = path + "/" + name;
-    platform_stat64 info;
-    int rvi = platform_lstat(full_name.c_str(), &info);
-    if (rvi != 0)
-      throw publish::EPublish("cannot access " + full_name);
-
-    if (S_ISDIR(info.st_mode))
-      RemoveUnderlay(full_name);
-
-    if (!S_ISLNK(info.st_mode)) {
-      bool rvb = platform_umount_lazy(full_name.c_str());
-      LogCvmfs(kLogCvmfs, kLogStdout, "TRY UNMOUNTING %s %d %d", full_name.c_str(), rvb, errno);
-      if (!rvb && errno != EINVAL) {
-        throw publish::EPublish(
-          "cannot unmount unmount " + full_name +
-          " (" + StringifyInt(errno) + ")");
-      }
-    }
-
-    RemoveSingle(full_name);
+static void RemoveUnderlay(
+  const std::string &path, const std::vector<std::string> &new_paths)
+{
+  std::vector<std::string> all_mounts = platform_mountlist();
+  std::vector<std::string> umount_targets;
+  for (unsigned i = 0; i < all_mounts.size(); ++i) {
+    if (HasPrefix(all_mounts[i], path + "/", false /* ignore_case */))
+      umount_targets.push_back(all_mounts[i]);
   }
-  closedir(dirp);
+
+  std::sort(umount_targets.begin(), umount_targets.end());
+  std::vector<std::string>::reverse_iterator iter = umount_targets.rbegin();
+  std::vector<std::string>::reverse_iterator iend = umount_targets.rend();
+  for (; iter != iend; ++iter) {
+    bool rvb = platform_umount_lazy(iter->c_str());
+    // Some sub mounts, e.g. /sys/kernel/tracing, cannot be unmounted
+    if (!rvb && errno != EINVAL && errno != EACCES) {
+      throw publish::EPublish(
+        "cannot unmount " + *iter + " (" + StringifyInt(errno) + ")");
+    }
+  }
+
+  std::vector<std::string> sorted_new_paths(new_paths);
+  std::sort(sorted_new_paths.begin(), sorted_new_paths.end());
+  iter = sorted_new_paths.rbegin();
+  iend = sorted_new_paths.rend();
+  for (; iter != iend; ++iter) {
+    std::string p = *iter;
+    while (p.length() > path.length()) {
+      assert(HasPrefix(p, path, false /*ignore_case*/));
+      // The parent path might not be empty until all children are visited
+      try {
+        RemoveSingle(p);
+      } catch (const publish::EPublish &e) {
+        if (errno != ENOTEMPTY)
+          throw;
+      }
+      p = GetParentPath(p);
+    }
+  }
+  RemoveSingle(path);
 }
 
 }  // anonymous namespace
@@ -140,7 +149,8 @@ namespace publish {
 void CmdEnter::CreateUnderlay(
   const std::string &source_dir,
   const std::string &dest_dir,
-  const std::vector<std::string> &empty_dirs)
+  const std::vector<std::string> &empty_dirs,
+  std::vector<std::string> *new_paths)
 {
   LogCvmfs(kLogCvmfs, kLogDebug, "underlay: entry %s --> %s",
            source_dir.c_str(), dest_dir.c_str());
@@ -158,6 +168,7 @@ void CmdEnter::CreateUnderlay(
     LogCvmfs(kLogCvmfs, kLogDebug, "underlay: mkdir %s",
              dest_empty_dir.c_str());
     EnsureDirectory(dest_empty_dir);
+    new_paths->push_back(dest_empty_dir);
   }
 
   std::vector<std::string> names;
@@ -195,6 +206,7 @@ void CmdEnter::CreateUnderlay(
 
     std::string source = source_dir + "/" + names[i];
     std::string dest = dest_dir + "/" + names[i];
+    new_paths->push_back(dest);
     if (S_ISLNK(modes[i])) {
       char buf[PATH_MAX + 1];
       ssize_t nchars = readlink(source.c_str(), buf, PATH_MAX);
@@ -227,7 +239,8 @@ void CmdEnter::CreateUnderlay(
     if (!empty_sub_dir[0].empty()) {
       CreateUnderlay(source_dir + toplevel_dir,
                      dest_dir + toplevel_dir,
-                     empty_sub_dir);
+                     empty_sub_dir,
+                     new_paths);
     }
   }
 }
@@ -348,7 +361,9 @@ void CmdEnter::MountOverlayfs() {
 }
 
 
-void CmdEnter::CleanupSession(bool keep_logs) {
+void CmdEnter::CleanupSession(
+  bool keep_logs, const std::vector<std::string> &new_paths)
+{
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Cleaning out session directory... ");
 
@@ -381,7 +396,7 @@ void CmdEnter::CleanupSession(bool keep_logs) {
   rvb = RemoveTree(cache_dir_);
   if (!rvb)
     throw EPublish("cannot remove " + cache_dir_);
-  RemoveUnderlay(rootfs_dir_);
+  RemoveUnderlay(rootfs_dir_, new_paths);
 
   if (keep_logs) {
     LogCvmfs(kLogCvmfs, kLogStdout, "[logs available in %s]",
@@ -445,10 +460,12 @@ int CmdEnter::Main(const Options &options) {
   std::vector<std::string> empty_dirs;
   empty_dirs.push_back(target_dir_);
   empty_dirs.push_back("/proc");
-  CreateUnderlay("", rootfs_dir_, empty_dirs);
+  std::vector<std::string> new_paths;
+  CreateUnderlay("", rootfs_dir_, empty_dirs, &new_paths);
   bool rvb = SymlinkForced(session_dir_, rootfs_dir_ + "/.cvmfsenter");
   if (!rvb)
     throw EPublish("cannot create marker file " + rootfs_dir_ + "/.cvmfsenter");
+  new_paths.push_back(rootfs_dir_ + "/.cvmfsenter");
   rvb = ProcMount(rootfs_dir_ + "/proc");
   if (!rvb)
     throw EPublish("cannot mount " + rootfs_dir_ + "/proc");
@@ -523,7 +540,7 @@ int CmdEnter::Main(const Options &options) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
 
   if (!options.Has("keep-session"))
-    CleanupSession(options.Has("keep-logs"));
+    CleanupSession(options.Has("keep-logs"), new_paths);
 
   return exit_code;
 }
