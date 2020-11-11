@@ -135,17 +135,22 @@ void DirSpec::ToString(std::string* out) {
   for (DirSpec::ItemList::const_iterator it = items_.begin();
        it != items_.end(); ++it) {
     const DirSpecItem& item = it->second;
-    char item_type = ' ';
     if (item.entry_base().IsRegular()) {
-      item_type = 'F';
+      ostr << "F ";
     } else if (item.entry_base().IsDirectory()) {
-      item_type = 'D';
+      ostr << "D ";
+    } else if (item.entry_base().IsLink()) {
+      ostr << "S ";
     }
     std::string parent = item.parent();
     AddLeadingSlash(&parent);
 
-    ostr << item_type << " " << item.entry_base().GetFullPath(parent).c_str()
-         << std::endl;
+    ostr << item.entry_base().GetFullPath(parent).c_str();
+    if (item.entry_base().IsLink()) {
+      ostr << " -> " << item.entry_base().symlink().c_str();
+    }
+
+    ostr << std::endl;
   }
   *out = ostr.str();
 }
@@ -154,6 +159,11 @@ const DirSpecItem* DirSpec::Item(const std::string& full_path) const {
   ItemList::const_iterator it = items_.find(full_path);
   if (it != items_.end()) {
     return &it->second;
+  }
+  std::string no_slash(full_path);
+  RemoveLeadingSlash(&no_slash);
+  if (no_slash != full_path) {
+    return Item(full_path);
   }
   return NULL;
 }
@@ -183,8 +193,11 @@ static void RemoveItemHelper(
 }
 
 void DirSpec::RemoveItemRec(const std::string& full_path) {
+  std::string path(full_path);
+  RemoveLeadingSlash(&path);
+
   std::vector<std::string> acc(0);
-  RemoveItemHelper(*this, full_path, &acc);
+  RemoveItemHelper(*this, path, &acc);
 
   for (size_t i = 0u; i < acc.size(); ++i) {
     const DirSpecItem* item = Item(acc[i]);
