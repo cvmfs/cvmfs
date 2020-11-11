@@ -51,13 +51,13 @@ struct Counters;
 
 namespace publish {
 
-enum PrintAction {
-  kPrintDots,
-  kPrintChanges,
-};
-
 class SyncDiffReporter : public DiffListener {
  public:
+  enum PrintAction {
+  	kPrintDots,
+	kPrintChanges
+  };
+
   explicit SyncDiffReporter(PrintAction print_action = kPrintChanges,
                             unsigned int processing_dot_interval = 100)
       : print_action_(print_action),

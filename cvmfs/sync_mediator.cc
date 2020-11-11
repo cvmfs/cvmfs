@@ -42,8 +42,8 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
       handle_hardlinks_(false),
       params_(params),
       reporter_(new SyncDiffReporter(params_->print_changeset
-                                         ? PrintAction::kPrintChanges
-                                         : PrintAction::kPrintDots)) {
+                                         ? SyncDiffReporter::kPrintChanges
+                                         : SyncDiffReporter::kPrintDots)) {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
@@ -1031,7 +1031,6 @@ void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
  */
 void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
   assert(handle_hardlinks_);
-  LogCvmfs(kLogPublish, kLogStdout, "Hardlinks!!!!!");
 
   for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
@@ -1044,7 +1043,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
     }
 
     if (params_->print_changeset) {
-      std::string changeset_notice = "add hardlinks around ("
+      std::string changeset_notice = "Hardlinks around ("
                                    + i->second.master->GetUnionPath() + ")";
       for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
            jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
