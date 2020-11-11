@@ -107,7 +107,9 @@ bool DirSpec::AddDirectory(const std::string& name, const std::string& parent,
 
 bool DirSpec::AddNestedCatalog(const std::string& name) {
   bool ret = AddNC(name);
+  if (!ret) return ret;
   nested_catalogs_.push_back(name);
+  AddFile(".cvmfscatalog", name, "0000000000000000000000000000000000000001", 0);
   return ret;
 }
 
@@ -175,6 +177,7 @@ static void RemoveItemHelper(
   if (it != spec.items().end()) {
     const DirSpecItem item = it->second;
     acc->push_back(full_path);
+
     if (item.entry_base().IsDirectory()) {
       std::string rel_full_path(full_path);
       RemoveLeadingSlash(&rel_full_path);
@@ -193,7 +196,6 @@ static void RemoveItemHelper(
 void DirSpec::RemoveItemRec(const std::string& full_path) {
   std::string path(full_path);
   RemoveLeadingSlash(&path);
-
   std::vector<std::string> acc(0);
   RemoveItemHelper(*this, path, &acc);
 
@@ -203,6 +205,15 @@ void DirSpec::RemoveItemRec(const std::string& full_path) {
       RmDir(std::string(item->entry_base().name().c_str()), item->parent());
     }
     items_.erase(acc[i]);
+
+    DirSpec::NestedCatalogList::const_iterator n;
+    for (n = nested_catalogs().begin(); n != nested_catalogs().end();) {
+      if (*n == acc[i]) {
+        n = nested_catalogs_.erase(n);
+      } else {
+        ++n;
+      }
+    }
   }
 }
 
@@ -316,6 +327,13 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
         item.entry_base(), item.xattrs(), item.parent());
     }
   }
+
+  DirSpec::NestedCatalogList::const_iterator it;
+  for (it = spec.nested_catalogs().begin();
+       it != spec.nested_catalogs().end(); ++it) {
+    catalog_mgr_->CreateNestedCatalog(*it);
+  }
+
 
   if (!catalog_mgr_->Commit(false, 0, manifest_)) {
     return false;
