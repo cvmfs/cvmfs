@@ -163,16 +163,16 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   //
   // the .cvmfscatalog is not really generated
   DirSpec base;
-  EXPECT_TRUE( base.AddDirectory("foo", "", 4096) );
-  EXPECT_TRUE( base.AddDirectory("bar", "", 4096) );
-  EXPECT_TRUE( base.AddDirectory("baz", "bar", 4096) );
-  EXPECT_TRUE( base.AddNestedCatalog("bar/baz") );
+  EXPECT_TRUE(base.AddDirectory("foo", "", 4096));
+  EXPECT_TRUE(base.AddDirectory("bar", "", 4096));
+  EXPECT_TRUE(base.AddDirectory("baz", "bar", 4096));
+  EXPECT_TRUE(base.AddNestedCatalog("bar/baz"));
 
   CatalogTestTool tester("test_symlink");
-  EXPECT_TRUE( tester.Init() );
+  EXPECT_TRUE(tester.Init());
 
   // we apply the structure above to the tester
-  EXPECT_TRUE( tester.Apply("base", base) );
+  EXPECT_TRUE(tester.Apply("base", base));
   manifest::Manifest first_manifest = *(tester.manifest());
 
   // starting from the base structure, we remove the bar/baz directory
@@ -184,7 +184,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   DirSpec update = base;
 
   update.RemoveItemRec("bar/baz");
-  EXPECT_TRUE( update.LinkFile("baz", "bar", "/foo", 4) );
+  EXPECT_TRUE(update.LinkFile("baz", "bar", "/foo", 4));
 
   EXPECT_TRUE(tester.Apply("second", update));
 
@@ -225,5 +225,4 @@ TEST_F(T_CatalogMergeTool, Symlink) {
 
   // the printed form of the target and output dir specs should be the same
   EXPECT_EQ(0, strcmp(spec2_str.c_str(), out_spec_str.c_str()));
-
 }
