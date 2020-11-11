@@ -2235,6 +2235,7 @@ collect_benchmark_results() {
 xunit_preamble() {
   local xml_file="$1"
   local scratchdir="$2"
+  local platform_name="$3"
 
   local num_tests="$(cat ${scratchdir}/num_tests)"
   local num_fails="$(cat ${scratchdir}/num_failures)"
@@ -2244,7 +2245,7 @@ xunit_preamble() {
 
   cat > $xml_file << EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
+<testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" hostname="$platform_name" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
   <testsuite name="$CVMFS_TEST_SUITE_NAME" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
 EOF
 }
@@ -2305,8 +2306,9 @@ export_xunit_xml() {
   local xml_file="$1"
   local scratchdir="$2"
   local logfile="$3"
+  local platform_name="$4"
 
-  xunit_preamble "$xml_file" "$scratchdir"
+  xunit_preamble "$xml_file" "$scratchdir" "$platform_name"
   for testcase in $(find $scratchdir -mindepth 1 -maxdepth 1 -type d); do
     xunit_testcase "$xml_file" "$testcase" "$logfile"
   done
