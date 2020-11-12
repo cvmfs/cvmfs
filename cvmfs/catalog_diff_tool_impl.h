@@ -186,6 +186,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       }
       ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
     }
+
     if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
       if (old_entry.IsDirectory()) {
         DiffRec(old_path);
