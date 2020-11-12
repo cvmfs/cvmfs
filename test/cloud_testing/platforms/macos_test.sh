@@ -1,5 +1,7 @@
 #!/bin/sh
 
+CVMFS_PLATFORM_NAME="macos"
+
 export PATH=/usr/local/bin:$PATH
 
 # source the common platform independent functionality and option parsing

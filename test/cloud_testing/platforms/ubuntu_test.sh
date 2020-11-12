@@ -1,4 +1,5 @@
 
+CVMFS_PLATFORM_NAME="ubuntu"
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
