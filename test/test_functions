@@ -2235,7 +2235,7 @@ collect_benchmark_results() {
 xunit_preamble() {
   local xml_file="$1"
   local scratchdir="$2"
-  local platform_name="$3"
+  platform_name="$3"
 
   local num_tests="$(cat ${scratchdir}/num_tests)"
   local num_fails="$(cat ${scratchdir}/num_failures)"
