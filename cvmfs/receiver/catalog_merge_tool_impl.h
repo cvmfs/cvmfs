@@ -139,6 +139,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
       output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()),
                                                false);
     }
+
     output_catalog_mgr_->RemoveDirectory(rel_path.c_str());
   } else if (entry.IsRegular() || entry.IsLink()) {
     AbortIfHardlinked(entry);
@@ -190,15 +191,19 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
   } else if (entry1.IsDirectory() && (entry2.IsRegular() || entry2.IsLink())) {
     // From directory to file
     if (entry1.IsNestedCatalogMountpoint()) {
+      // we merge the nested catalog with its parent, it will be the recursive
+      // procedure that will take care of deleting all the files.
       output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()),
-                                               false);
+                                               /* merge = */ true);
     }
 
     catalog::DirectoryEntry modified_entry = entry2;
     SplitHardlink(&modified_entry);
     const catalog::DirectoryEntryBase* base_entry =
         static_cast<const catalog::DirectoryEntryBase*>(&modified_entry);
+
     output_catalog_mgr_->RemoveDirectory(rel_path.c_str());
+
     if (entry2.IsChunkedFile()) {
       assert(!chunks.IsEmpty());
       output_catalog_mgr_->AddChunkedFile(*base_entry, xattrs, parent_path,
@@ -206,7 +211,6 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     } else {
       output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
     }
-
   } else if ((entry1.IsRegular() || entry1.IsLink()) &&
              (entry2.IsRegular() || entry2.IsLink())) {
     // From file to file
