@@ -83,7 +83,7 @@ bool BindMount(const std::string &from, const std::string &to) {
 #ifdef __APPLE__
   return false;
 #else
-  int rvi = mount(from.c_str(), to.c_str(), "", MS_BIND | MS_REC | MS_UNBINDABLE, NULL);
+  int rvi = mount(from.c_str(), to.c_str(), "", MS_BIND | MS_REC, NULL);
   return rvi == 0;
 #endif
 }
@@ -124,7 +124,7 @@ static void Reaper(int /*sig*/, siginfo_t * /*siginfo*/, void * /*context*/) {
   }
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 
 /**
