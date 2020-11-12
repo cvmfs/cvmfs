@@ -25,7 +25,7 @@ class CmdEnter : public Command {
     return "Opens an ephemeral namespace to publish content";
   }
   virtual std::string GetUsage() const {
-    return "[options] <fully qualified repository name>";
+    return "[options] <fully qualified repository name> [-- <command> <parms>]";
   }
   virtual ParameterList GetParams() const {
     ParameterList p;

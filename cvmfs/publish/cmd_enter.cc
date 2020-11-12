@@ -523,7 +523,12 @@ int CmdEnter::Main(const Options &options) {
     }
 
     std::vector<std::string> cmdline;
-    cmdline.push_back(GetShell());
+    // options.plain_args()[0] is the repository name
+    for (unsigned i = 1; i < options.plain_args().size(); ++i) {
+      cmdline.push_back(options.plain_args()[i].value_str);
+    }
+    if (cmdline.empty())
+      cmdline.push_back(GetShell());
     std::set<int> preserved_fds;
     preserved_fds.insert(0);
     preserved_fds.insert(1);
