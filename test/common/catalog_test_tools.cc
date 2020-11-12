@@ -208,8 +208,8 @@ void DirSpec::RemoveItemRec(const std::string& full_path) {
     }
     items_.erase(acc[i]);
 
-    DirSpec::NestedCatalogList::const_iterator n;
-    for (n = nested_catalogs().begin(); n != nested_catalogs().end();) {
+    DirSpec::NestedCatalogList::iterator n;
+    for (n = nested_catalogs_.begin(); n != nested_catalogs_.end();) {
       if (*n == acc[i]) {
         n = nested_catalogs_.erase(n);
       } else {
