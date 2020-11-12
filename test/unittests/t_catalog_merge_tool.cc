@@ -164,8 +164,6 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   // |- bar
   //    |- baz
   //       |- .cvmfscatalog
-  //
-  // the .cvmfscatalog is not really generated
   DirSpec base;
   EXPECT_TRUE(base.AddDirectory("foo", "", 4096));
   EXPECT_TRUE(base.AddDirectory("bar", "", 4096));
@@ -184,7 +182,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   // .
   // |- foo
   // |- bar
-  //    |- bax -> /foo
+  //    |- baz -> /foo
   DirSpec update = base;
 
   update.RemoveItemRec("bar/baz");
