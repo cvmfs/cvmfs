@@ -58,7 +58,7 @@ int CheckNamespaceFeatures() {
 bool CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
 #ifdef CVMFS_HAS_UNSHARE
   std::string uid_str = StringifyInt(geteuid());
-  std::string gid_str = StringifyInt(geteuid());
+  std::string gid_str = StringifyInt(getegid());
 
   int rvi = unshare(CLONE_NEWUSER);
   if (rvi != 0) return false;
