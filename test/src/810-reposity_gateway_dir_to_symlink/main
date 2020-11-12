@@ -25,14 +25,6 @@ run_transactions() {
     cvmfs_server abort -f test.repo.org
     cvmfs_server check test.repo.org
 
-    cvmfs_server transaction test.repo.org
-    mkdir -p /cvmfs/test.repo.org/usr/bin
-    for f in $(find /usr/bin -type f | head -n32); do
-      cp -v $f /cvmfs/test.repo.org/usr/bin/
-    done
-    cvmfs_server abort -f test.repo.org
-    cvmfs_server check test.repo.org
-
     echo "Checking transaction + publish"
 
     ## Transaction 1, create directory with catalog inside
@@ -45,7 +37,7 @@ run_transactions() {
 
     echo "  Publishing changes 1"
     cvmfs_server publish test.repo.org
-    cvmfs_server check test.repo.org
+    cvmfs_server check test.repo.org || return 1
 
     ## Transaction 2, move from dir to symlink
     echo "***  Starting transaction 2"
@@ -53,12 +45,11 @@ run_transactions() {
     rm -rf /cvmfs/test.repo.org/foo/bar
     ln -s /cvmfs/test.repo.org/foo/miao /cvmfs/test.repo.org/foo/bar
 
-    tree -a /cvmfs/test.repo.org/foo
-
     echo "  Publishing changes 2"
     cvmfs_server publish test.repo.org
-    cvmfs_server check test.repo.org
+    cvmfs_server check test.repo.org || return 2
 
+    cvmfs_server check -c test.repo.org
     ## Check results
 
     if [ $? -ne 0 ]; then
