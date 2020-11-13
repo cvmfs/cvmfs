@@ -1,0 +1,44 @@
+cvmfs_test_name="PrintChangesetNotice prints"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+  echo "*** Create a new repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+  echo "*** Start a transaction: Add testcase"
+  start_transaction $CVMFS_TEST_REPO || return 2
+  echo "*** Create a file: SyncMediator::AddFile"
+  touch /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 3
+  touch /cvmfs/$CVMFS_TEST_REPO/new_file2.txt || return 3
+  echo "*** Create a directory: SyncMediator::AddDirectory"
+  mkdir /cvmfs/$CVMFS_TEST_REPO/new_folder || return 4
+  mkdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 5
+  echo "*** Create nested catalog: SyncMediator::CreateNestedCatalog"
+  touch /cvmfs/$CVMFS_TEST_REPO/new_folder/.cvmfscatalog || return 6
+  echo "*** Create HardLinks: SyncMediator::AddLocalHardlinkGroups"
+  ln /cvmfs/$CVMFS_TEST_REPO/new_file2.txt /cvmfs/$CVMFS_TEST_REPO/new_file3.txt
+  ls -li /cvmfs/$CVMFS_TEST_REPO/new_file3.txt /cvmfs/$CVMFS_TEST_REPO/new_file2.txt
+  echo "*** Publish changes"
+  publish_repo $CVMFS_TEST_REPO || return 7
+
+  echo "*** Start a transaction: Touch testcase"
+  start_transaction $CVMFS_TEST_REPO || return 10
+  echo "*** Touch a directory: SyncMediator::TouchDirectory"
+  touch /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 11
+  echo "*** Publish changes"
+  publish_repo $CVMFS_TEST_REPO || return 12
+
+  echo "*** Start a transaction: Remove testcase"
+  start_transaction $CVMFS_TEST_REPO || return 20
+  echo "*** Remove nested catalog: SyncMediator::RemoveNestedCatalog"
+  rm /cvmfs/$CVMFS_TEST_REPO/new_folder/.cvmfscatalog || return 21
+  echo "*** Remove file: SyncMediator::RemoveFile"
+  rm /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 23
+  echo "*** Remove directory: SyncMediator::RemoveDirectory"
+  rmdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 24
+  echo "*** Publish changes"
+  publish_repo $CVMFS_TEST_REPO || return 25
+
+  return 0
+}
