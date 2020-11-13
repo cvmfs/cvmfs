@@ -483,7 +483,56 @@ func getManifestWithUsernameAndPassword(img *Image, user, pass string) ([]byte, 
 	return body, nil
 }
 
+type Credentials struct {
+	username string
+	password string
+}
+
+func getCredentialsFromEnv(user, pass string) (Credentials, error) {
+	u := os.Getenv(user)
+	p := os.Getenv(pass)
+	c := Credentials{u, p}
+	err := error(nil)
+	if user == "" || pass == "" {
+		err = fmt.Errorf("missing either username ($%s) or password ($%s) or both for accessing the docker registry", user, pass)
+	}
+	return c, err
+
+}
+
+func getDockerHubCredentials() (Credentials, error) {
+	return getCredentialsFromEnv("DUCC_DOCKERHUB_USER", "DUCC_DOCKERHUB_PASS")
+}
+
+func getGitlabContainersCredentials() (Credentials, error) {
+	return getCredentialsFromEnv("DUCC_GITLAB_REGISTRY_USER", "DUCC_GITLAB_REGISTRY_PASS")
+}
+
+func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
+	docker, err := getDockerHubCredentials()
+	if err == nil {
+		credentials = append(credentials, docker)
+	}
+	gitlab, err := getGitlabContainersCredentials()
+	if err == nil {
+		credentials = append(credentials, gitlab)
+	}
+	for _, c := range credentials {
+		token, err = firstRequestForAuth_internal(url, c.username, c.password)
+		if err == nil {
+			return token, err
+		}
+	}
+	return token, err
+}
+
 func firstRequestForAuth(url, user, pass string) (token string, err error) {
+	c := Credentials{user, pass}
+	credentials := []Credentials{c}
+	return GetAuthToken(url, credentials)
+}
+
+func firstRequestForAuth_internal(url, user, pass string) (token string, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		LogE(err).Error("Error in making the first request for auth")
