@@ -256,8 +256,14 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     LogCvmfs(kLogPublish, kLogStdout, "");
   }
 
-  LogCvmfs(kLogPublish, kLogStdout,
-           "\nWaiting for upload of files before committing...");
+  if (!params_->print_changeset) {
+    LogCvmfs(kLogPublish, kLogStdout,
+             "\nWaiting for upload of files before committing...");  	
+  } else {
+    LogCvmfs(kLogPublish, kLogStdout,
+           "Waiting for upload of files before committing...");
+  }
+
   params_->spooler->WaitForUpload();
 
   if (!hardlink_queue_.empty()) {
