@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CVMFS_PLATFORM_NAME="centos7-x86_64_RAMCACHE"
+export CVMFS_PLATFORM_NAME="centos7-x86_64_RAMCACHE"
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)

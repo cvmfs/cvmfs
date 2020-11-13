@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CVMFS_PLATFORM_NAME="macos"
+export CVMFS_PLATFORM_NAME="macos"
 
 export PATH=/usr/local/bin:$PATH
 

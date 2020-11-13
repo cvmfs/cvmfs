@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CVMFS_PLATFORM_NAME="centos8-x86_64"
+export CVMFS_PLATFORM_NAME="centos8-x86_64"
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)

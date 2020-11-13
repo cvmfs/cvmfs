@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CVMFS_PLATFORM_NAME="slc6-x86_64_FUSE3"
+export CVMFS_PLATFORM_NAME="slc6-x86_64_FUSE3"
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
