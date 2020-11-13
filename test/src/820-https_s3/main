@@ -1,0 +1,128 @@
+#
+# Test for running CVMFS agains a HTTPS S3 implementation
+#
+# In this test we create our own CA (certificate authority).
+# the CA will create and sign the certificates for the minio/S3 backend
+
+cvmfs_test_name="HTTPS S3 implementation"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+set -x
+
+SETTING_DIR="/tmp/cvmfs_testing_out"
+MINIO_PID=""
+
+clean_up() {
+    echo "Cleaning up"
+
+    sudo rm -rf "/tmp/cvmfs_testing_out"
+
+    echo "Done clean up"
+}
+
+create_https_certificates() {
+    mkdir -p $SETTING_DIR/certs
+
+    openssl genrsa -out $SETTING_DIR/rootCA.key 4096 || return 1
+
+    openssl req -x509 -new -nodes -key $SETTING_DIR/rootCA.key \
+	-sha256 -days 1024 -out $SETTING_DIR/rootCA.crt \
+	-subj "/C=CH/ST=Geneva/L=Geneva/O=Security/OU=CERN/CN=localhost" || return 2
+
+    openssl genrsa -out $SETTING_DIR/localhost.key 2048 || return 3
+
+    openssl req -new -sha256 -key $SETTING_DIR/localhost.key \
+	-subj "/C=CH/ST=CH/O=CERN/CN=localhost" \
+	-out $SETTING_DIR/localhost.csr || return 4
+
+    openssl x509 \
+	-req -in localhost \
+	-in $SETTING_DIR/localhost.csr \
+	-CA $SETTING_DIR/rootCA.crt \
+	-CAkey $SETTING_DIR/rootCA.key \
+	-CAcreateserial \
+	-out $SETTING_DIR/certs/public.crt \
+	-days 500 -sha256 || return 5
+
+
+    # minio does not like this certificates
+    # I believe we are not really creating https certificates here
+
+    mv $SETTING_DIR/localhost.key $SETTING_DIR/certs/private.key
+
+}
+
+create_minio_config() {
+
+    mkdir -p $SETTING_DIR/
+    mkdir -p $SETTING_DIR/minio_server
+    mkdir -p $SETTING_DIR/minio_client
+
+    sudo tee $SETTING_DIR/cvmfs_config > /dev/null << EOF
+CVMFS_S3_HOST=localhost
+CVMFS_S3_PORT=13337
+CVMFS_S3_ACCESS_KEY=not
+CVMFS_S3_SECRET_KEY=important
+CVMFS_S3_BUCKETS_PER_ACCOUNT=1
+CVMFS_S3_DNS_BUCKETS=false
+CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10
+CVMFS_S3_BUCKET=https-bucket
+CVMFS_S3_USE_HTTPS=true
+EOF
+
+    sudo tee $SETTING_DIR/minio_server/config.json > /dev/null << EOF
+{
+	"version": "23",
+	"credential": {
+		"accessKey": "not",
+		"secretKey": "important"
+	}
+}
+EOF
+
+    sudo tee $SETTING_DIR/minio_client/config.json > /dev/null << EOF
+{
+	"version": "9",
+	"hosts": {
+		"cvmfs": {
+			"url": "https://localhost:13337",
+			"accessKey": "not",
+			"secretKey": "important",
+			"api": "S3v4",
+			"lookup": "auto"
+		}
+	}
+}
+EOF
+
+}
+
+start_minio() {
+    mkdir -p $SETTING_DIR/minio_storage
+
+    create_minio_config
+
+    minio_command="sudo /usr/local/bin/minio server \
+	--address :13337 \
+	--config-dir $SETTING_DIR/minio_server \
+	$SETTING_DIR/minio_storage"
+
+    local minio_pid=$(run_background_service $SETTING_DIR/minio_log "$minio_command")
+    sleep 5
+
+    sudo /usr/local/bin/mc -C $SETTING_DIR/minio_client mb cvmfs/https-bucket
+    sudo /usr/local/bin/mc -C $SETTING_DIR/minio_client policy public cvmfs/https-bucket
+
+    echo $minio_pid
+}
+
+cvmfs_run_test() {
+    trap clean_up EXIT HUP INT TERM || return $?
+
+    create_https_certificates || return 1
+
+    local minio_pid=$(start_minio)
+    trap "sudo kill -9 $minio_pid" EXIT HUP INT TERM || return $?
+
+}
