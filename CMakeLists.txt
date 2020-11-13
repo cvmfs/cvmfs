@@ -59,6 +59,13 @@ if (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 
 #
+# Explicitely check that the install prefix is not /usr/local.
+#
+if (LINUX AND "${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr/local")
+  message(WARNING "The installation path ${CMAKE_INSTALL_PREFIX} shouldn't be used")
+endif (LINUX AND "${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr/local")
+
+#
 # check if we use Clang
 #
 if (CMAKE_CXX_COMPILER MATCHES ".*clang")
