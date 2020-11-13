@@ -54,8 +54,8 @@ namespace publish {
 class SyncDiffReporter : public DiffListener {
  public:
   enum PrintAction {
-  	kPrintDots,
-	kPrintChanges
+    kPrintDots,
+    kPrintChanges
   };
 
   explicit SyncDiffReporter(PrintAction print_action = kPrintChanges,
