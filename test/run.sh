@@ -354,7 +354,7 @@ echo "$num_failures"           > ${scratch_basedir}/num_failures
 
 # export xunit XML
 if [ ! -z "$xml_output" ]; then
-  export_xunit_xml "$xml_output" $scratch_basedir $logfile $CVMFS_PLATFORM_NAME
+  export_xunit_xml "$xml_output" $scratch_basedir $logfile
 fi
 
 # remove runtime information
