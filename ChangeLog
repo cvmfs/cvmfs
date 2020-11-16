@@ -1,4 +1,6 @@
 2.8.0:
+  * [ducc] add support for pulling Docker images with authenticated user
+    using CVMFS_DOCKERHUB_[USER|PASS] environment variables
   * [gc] show progress during sweep phase (CVM-1929)
   * [server] add support for wait & retry on opening transactions (CVM-1937)
   * [server] let return code of transaction indicate the error (CVM-1873)
