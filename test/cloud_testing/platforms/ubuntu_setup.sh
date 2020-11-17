@@ -87,6 +87,7 @@ if [ "x$ubuntu_release" == "xxenial" ]; then
 fi
 install_from_repo bc                            || die "fail (installing bc)"
 install_from_repo tree                          || die "fail (installing tree)"
+install_from_repo fuse-overlayfs                || die "fail (installing fuse-overlayfs)"
 
 # traffic shaping
 install_from_repo trickle || die "fail (installing trickle)"
