@@ -246,8 +246,8 @@ void CmdEnter::CreateUnderlay(
 }
 
 void CmdEnter::WriteCvmfsConfig() {
-  BashOptionsManager options_manager;
-  options_manager.set_taint_environment(false);
+  BashOptionsManager options_manager(
+    new DefaultOptionsTemplateManager(fqrn_));
   options_manager.ParseDefault(fqrn_);
   options_manager.SetValue("CVMFS_MOUNT_DIR", lower_layer_);
   options_manager.SetValue("CVMFS_AUTO_UPDATE", "no");
@@ -473,10 +473,21 @@ int CmdEnter::Main(const Options &options) {
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Mounting CernVM-FS read-only layer... ");
-  WriteCvmfsConfig();
-  if (options.Has("cvmfs-config"))
-    config_path_ += std::string(":") + options.GetString("cvmfs-config");
-  MountCvmfs();
+  // We mount in a sub process in order to avoid tainting the main process
+  // with the CVMFS_* environment variables
+  pid_t pid = fork();
+  if (pid < 0)
+    throw EPublish("cannot fork");
+  if (pid == 0) {
+    WriteCvmfsConfig();
+    if (options.Has("cvmfs-config"))
+      config_path_ += std::string(":") + options.GetString("cvmfs-config");
+    MountCvmfs();
+    _exit(0);
+  }
+  int exit_code = WaitForChild(pid);
+  if (exit_code != 0)
+    _exit(exit_code);
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
@@ -485,7 +496,7 @@ int CmdEnter::Main(const Options &options) {
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   // Fork the inner process, the outer one is used later for cleanup
-  pid_t pid = fork();
+  pid = fork();
   if (pid < 0)
     throw EPublish("cannot create subshell");
 
@@ -540,7 +551,7 @@ int CmdEnter::Main(const Options &options) {
                       &pid_child);
     return WaitForChild(pid_child);
   }
-  int exit_code = WaitForChild(pid);
+  exit_code = WaitForChild(pid);
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
 
