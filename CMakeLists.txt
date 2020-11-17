@@ -62,7 +62,9 @@ endif (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 # Explicitely check that the install prefix is not /usr/local.
 #
 if (LINUX AND "${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr/local")
-  message(WARNING "The installation path ${CMAKE_INSTALL_PREFIX} shouldn't be used")
+  message("######################################################################")
+  message(WARNING "The installation path has been set to ${CMAKE_INSTALL_PREFIX}.")
+  message("######################################################################")
 endif (LINUX AND "${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr/local")
 
 #
