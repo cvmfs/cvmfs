@@ -87,7 +87,6 @@ if [ "x$ubuntu_release" == "xxenial" ]; then
 fi
 install_from_repo bc                            || die "fail (installing bc)"
 install_from_repo tree                          || die "fail (installing tree)"
-install_from_repo fuse-overlayfs                || die "fail (installing fuse-overlayfs)"
 
 # traffic shaping
 install_from_repo trickle || die "fail (installing trickle)"
@@ -107,8 +106,8 @@ install_test_s3 || die "fail (installing test S3)"
 # install 'jq'
 install_from_repo jq || die "fail (installing jq)"
 
-# On Ubuntu 16.04 install backported autofs
 if [ "x$ubuntu_release" = "xxenial" ]; then
+  # On Ubuntu 16.04 install backported autofs
   install_from_repo wget || die "fail (installing wget)"
   wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_2.0-3_all.deb
   sudo dpkg -i cvmfs-release_2.0-3_all.deb || die "fail (installing cvmfs-release)"
@@ -116,8 +115,11 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
   sudo apt-get install autofs || die "fail installing backported autofs"
   sudo cvmfs_config setup || die "re-running cvmfs setup"
   dpkg -s autofs
-elif [ "x$ubuntu_release" = "xfocal" ]; then
+else
   sudo apt-get install autofs || die "fail (installing autofs on 20.04)"
+
+  # fuse-overlayfs requires Ubuntu 18.04+
+  install_from_repo fuse-overlayfs || die "fail (installing fuse-overlayfs)"
 fi
 
 # On Ubuntu 16.04+ 64bit install the repository gateway
