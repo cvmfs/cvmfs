@@ -180,16 +180,6 @@ class SyncMediator : public virtual AbstractSyncMediator {
   }
 
  private:
- /**
-  enum ChangesetAction {
-    kAdd,
-    kAddCatalog,
-    kAddHardlinks,
-    kTouch,
-    kRemove,
-    kRemoveCatalog
-  };
-  **/
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
   typedef std::vector<HardlinkGroup> HardlinkGroupList;
 
