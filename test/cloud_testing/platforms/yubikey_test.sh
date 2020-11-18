@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export CVMFS_PLATFORM_NAME="yubikey"
+export CVMFS_PLATFORM_NAME="centos7-x86_64-YUBIKEY"
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
