@@ -4,37 +4,37 @@ cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
-  ADD_COUNTER=0
-  MOD_COUNTER=0
-  REM_COUNTER=0
+  local add_counter=0
+  local mod_counter=0
+  local rem_counter=0
 
   echo "*** Create a new repository"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
   echo "*** Start transaction for testing addition of entries"
   start_transaction $CVMFS_TEST_REPO || return 2
   touch /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 3
-  let ADD_COUNTER++
+  let add_counter++
   mkdir /cvmfs/$CVMFS_TEST_REPO/new_folder || return 4
-  let ADD_COUNTER++
+  let add_counter++
   mkdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 5
-  let ADD_COUNTER++
+  let add_counter++
   touch /cvmfs/$CVMFS_TEST_REPO/new_folder/.cvmfscatalog || return 6
-  let ADD_COUNTER++
-  let ADD_COUNTER++
+  let add_counter++
+  let add_counter++
   touch /cvmfs/$CVMFS_TEST_REPO/new_file2.txt || return 7
   ln /cvmfs/$CVMFS_TEST_REPO/new_file2.txt /cvmfs/$CVMFS_TEST_REPO/new_file4.txt || return 7
   ls -li /cvmfs/$CVMFS_TEST_REPO/new_file4.txt /cvmfs/$CVMFS_TEST_REPO/new_file2.txt || return 7
-  let ADD_COUNTER++
+  let add_counter++
   touch /cvmfs/$CVMFS_TEST_REPO/new_file3.txt || return 8
   ln -s /cvmfs/$CVMFS_TEST_REPO/new_file3.txt /cvmfs/$CVMFS_TEST_REPO/new_file5.txt || return 8
   ls -l /cvmfs/$CVMFS_TEST_REPO/new_file5.txt || return 8
-  let ADD_COUNTER++
-  let ADD_COUNTER++
+  let add_counter++
+  let add_counter++
   echo "*** Publish transaction for testing addition of entries"
-  sudo cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile1.txt || return 9
+  cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile1.txt || return 9
 
   add_value=$(grep -w "add" logfile1.txt | wc -l)
-  if [ $ADD_COUNTER != $add_value ]
+  if [ $add_counter != $add_value ]
   then
     echo "There is a missmatch between the number of additions printed and the ones performed" && return 9
   fi
@@ -42,12 +42,12 @@ cvmfs_run_test() {
   echo "*** Start transaction for testing modification of entries"
   start_transaction $CVMFS_TEST_REPO || return 10
   touch /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 11
-  let MOD_COUNTER++
+  let mod_counter++
   echo "*** Publish transaction for testing modification of entries"
-  sudo cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile2.txt || return 12
+  cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile2.txt || return 12
 
   mod_value=$(grep -w "mod" logfile2.txt | wc -l)
-  if [ $MOD_COUNTER != $mod_value ]
+  if [ $mod_counter != $mod_value ]
   then
     echo "There is a missmatch between the number of modifications printed and the ones performed" && return 12
   fi
@@ -55,32 +55,32 @@ cvmfs_run_test() {
   echo "*** Start transaction for testing removal of entries"
   start_transaction $CVMFS_TEST_REPO || return 20
   rm /cvmfs/$CVMFS_TEST_REPO/new_folder/.cvmfscatalog || return 21
-  let REM_COUNTER++
-  let REM_COUNTER++
+  let rem_counter++
+  let rem_counter++
   rm /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 23
-  let REM_COUNTER++
+  let rem_counter++
   rmdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 24
-  let REM_COUNTER++
+  let rem_counter++
   echo "*** Publish transaction for testing removal of entries"
-  sudo cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile3.txt || return 25
+  cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile3.txt || return 25
 
   rem_values=$(grep -w "rem" logfile3.txt | wc -l)
-  if [ $REM_COUNTER != $rem_values ]
+  if [ $rem_counter != $rem_values ]
   then
     echo "There is a missmatch between the number of deletions printed and the ones performed" && return 25
   fi
 
   echo "*** Start transaction for testing printing of dots in additons"
   start_transaction $CVMFS_TEST_REPO || return 30
-  echo "*** Create a hundred of folders"
-  for ii in {0..200}
+  echo "*** Create hundreds of folders"
+  for ii in {0..500}
   do
     mkdir /cvmfs/$CVMFS_TEST_REPO/"folder${ii}" || return 31
   done
   echo "*** Publish transaction for testing printing of dots in additons"
-  sudo cvmfs_server publish $CVMFS_TEST_REPO | tee logfile4.txt || return 32
+  cvmfs_server publish $CVMFS_TEST_REPO | tee logfile4.txt || return 32
 
-  add_dots=$(grep -x ".." logfile4.txt | wc -l)
+  add_dots=$(grep -x "....." logfile4.txt | wc -l)
   echo "Number of dots detected $add_dots"
   if [ $add_dots != 1 ]
   then
@@ -90,15 +90,15 @@ cvmfs_run_test() {
 
   echo "*** Start transaction for testing printing of dots in modifications"
   start_transaction $CVMFS_TEST_REPO || return 40
-  echo "*** Modify a hundred of folders"
-  for ii in {0..200}
+  echo "*** Modify hundreds of folders"
+  for ii in {0..500}
   do
     touch /cvmfs/$CVMFS_TEST_REPO/"folder${ii}" || return 41
   done
   echo "*** Publish transaction for testing printing of dots in modifications"
-  sudo cvmfs_server publish $CVMFS_TEST_REPO | tee logfile5.txt || return 42
+  cvmfs_server publish $CVMFS_TEST_REPO | tee logfile5.txt || return 42
 
-  mod_dots=$(grep -x ".." logfile5.txt | wc -l)
+  mod_dots=$(grep -x "....." logfile5.txt | wc -l)
   if [ $mod_dots != 1 ]
   then
     echo "There is a missmatch between the number of files modified and the changes printed" && return 42
@@ -107,15 +107,15 @@ cvmfs_run_test() {
 
   echo "*** Start transaction for testing printing of dots in removals"
   start_transaction $CVMFS_TEST_REPO || return 50
-  echo "*** Removing a hundred of folders"
-  for ii in {0..200}
+  echo "*** Removing hundreds of folders"
+  for ii in {0..500}
   do
     rmdir /cvmfs/$CVMFS_TEST_REPO/"folder${ii}" || return 51
   done
   echo "*** Publish transaction for testing printing of dots in removals"
-  sudo cvmfs_server publish $CVMFS_TEST_REPO | tee logfile6.txt || return 52
+  cvmfs_server publish $CVMFS_TEST_REPO | tee logfile6.txt || return 52
 
-  rem_dots=$(grep -x ".." logfile6.txt | wc -l)
+  rem_dots=$(grep -x "....." logfile6.txt | wc -l)
   if [ $rem_dots != 1 ]
   then
     echo "There is a missmatch between the number of files removed and the changes printed" && return 52
