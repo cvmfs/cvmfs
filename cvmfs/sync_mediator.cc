@@ -37,11 +37,11 @@ AbstractSyncMediator::~AbstractSyncMediator() {}
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params,
                            perf::StatisticsTemplate statistics)
-    : catalog_manager_(catalog_manager),
-      union_engine_(NULL),
-      handle_hardlinks_(false),
-      params_(params),
-      reporter_(new SyncDiffReporter(params_->print_changeset
+    : catalog_manager_(catalog_manager)
+    , union_engine_(NULL)
+    , handle_hardlinks_(false)
+    , params_(params)
+    , reporter_(new SyncDiffReporter(params_->print_changeset
                                          ? SyncDiffReporter::kPrintChanges
                                          : SyncDiffReporter::kPrintDots)) {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
@@ -257,13 +257,10 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
   }
 
   if (!params_->print_changeset) {
-    LogCvmfs(kLogPublish, kLogStdout,
-             "\nWaiting for upload of files before committing...");
-  } else {
-    LogCvmfs(kLogPublish, kLogStdout,
-             "Waiting for upload of files before committing...");
+    LogCvmfs(kLogPublish, kLogStdout, "");
   }
-
+  LogCvmfs(kLogPublish, kLogStdout,
+           "Waiting for upload of files before committing...");
 
   params_->spooler->WaitForUpload();
 
@@ -799,18 +796,18 @@ void SyncDiffReporter::OnStats(const catalog::DeltaCounters &delta) {}
 void SyncDiffReporter::OnAdd(const std::string &path,
                              const catalog::DirectoryEntry &entry) {
   changed_items_++;
-  InternalAdd(path);
+  AddImpl(path);
 }
 void SyncDiffReporter::OnRemove(const std::string &path,
                                 const catalog::DirectoryEntry &entry) {
   changed_items_++;
-  InternalRemove(path, entry);
+  RemoveImpl(path, entry);
 }
 void SyncDiffReporter::OnModify(const std::string &path,
                                 const catalog::DirectoryEntry &entry_from,
                                 const catalog::DirectoryEntry &entry_to) {
   changed_items_++;
-  InternalModify(path, entry_from, entry_to);
+  ModifyImpl(path, entry_from, entry_to);
 }
 
 void SyncDiffReporter::PrintDots() {
@@ -819,10 +816,28 @@ void SyncDiffReporter::PrintDots() {
   }
 }
 
-void SyncDiffReporter::InternalAdd(const std::string &path) {
+void SyncDiffReporter::AddImpl(const std::string &path) {
   const std::string keyword = "catalog";
   const char *action_label;
 
+  switch (print_action_) {
+    case kPrintChanges:
+      if (path.find(keyword) != std::string::npos) {
+        action_label = "[x-catalog-add]";
+      } else {
+        action_label = "[add]";
+      }
+      LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+      break;
+
+    case kPrintDots:
+      PrintDots();
+      break;
+    default:
+      assert("Invalid print action.");
+      break;
+  }
+/**
   if (print_action_ == kPrintChanges) {
     if (path.find(keyword) != std::string::npos) {
       action_label = "[x-catalog-add]";
@@ -837,13 +852,34 @@ void SyncDiffReporter::InternalAdd(const std::string &path) {
   } else {
     LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
   }
+**/
 }
 
-void SyncDiffReporter::InternalRemove(
+void SyncDiffReporter::RemoveImpl(
     const std::string &path, const catalog::DirectoryEntry & /*entry*/) {
   const std::string keyword = "catalog";
   const char *action_label;
 
+  switch (print_action_) {
+    case kPrintChanges:
+      if (path.find(keyword) != std::string::npos) {
+        action_label = "[x-catalog-rem]";
+      } else {
+        action_label = "[rem]";
+      }
+
+      LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+      break;
+
+    case kPrintDots:
+      PrintDots();
+      break;
+    default:
+      assert("Invalid print action.");
+      break;
+  }
+
+/**
   if (print_action_ == kPrintChanges) {
     if (path.find(keyword) != std::string::npos) {
       action_label = "[x-catalog-rem]";
@@ -858,11 +894,29 @@ void SyncDiffReporter::InternalRemove(
   } else {
     LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
   }
+**/
 }
 
-void SyncDiffReporter::InternalModify(
+void SyncDiffReporter::ModifyImpl(
     const std::string &path, const catalog::DirectoryEntry & /*entry_from*/,
     const catalog::DirectoryEntry & /*entry_to*/) {
+  const char *action_label;
+
+  switch (print_action_) {
+    case kPrintChanges:
+      action_label = "[mod]";
+      LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+      break;
+
+    case kPrintDots:
+      PrintDots();
+      break;
+    default:
+      assert("Invalid print action.");
+      break;
+  }
+
+  /**
   if (print_action_ == kPrintChanges) {
     const char *action_label = "[mod]";
     LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
@@ -872,6 +926,7 @@ void SyncDiffReporter::InternalModify(
   } else {
     LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
   }
+  **/
 }
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
@@ -1050,14 +1105,19 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
     }
 
     if (params_->print_changeset) {
-      std::string changeset_notice = "Hardlinks around ("
-                                   + i->second.master->GetUnionPath() + ")";
-      for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
-           jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
-      {
-        changeset_notice += " " + j->second->filename();
-      }
+      std::string changeset_notice =
+          "Hardlinks around (" + i->second.master->GetUnionPath() + ")";
+
       reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
+      for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
+                                        jEnd = i->second.hardlinks.end();
+           j != jEnd; ++j) {
+        changeset_notice += " " + j->second->filename();
+        GetParentPath(i->second.master->GetUnionPath()) + "/" +
+            j->second->filename();
+        reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
+      }
+      // reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
     }
 
     if (params_->dry_run)

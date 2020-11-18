@@ -40,6 +40,7 @@
 #include "statistics.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
+#include "util/pointer.h"
 #include "util/shared_ptr.h"
 #include "xattr.h"
 
@@ -78,10 +79,10 @@ class SyncDiffReporter : public DiffListener {
 
  private:
   void PrintDots();
-  void InternalAdd(const std::string &path);
-  void InternalRemove(const std::string &path,
+  void AddImpl(const std::string &path);
+  void RemoveImpl(const std::string &path,
                       const catalog::DirectoryEntry &entry);
-  void InternalModify(const std::string &path,
+  void ModifyImpl(const std::string &path,
                       const catalog::DirectoryEntry &entry_from,
                       const catalog::DirectoryEntry &entry_to);
 
