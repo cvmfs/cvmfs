@@ -822,7 +822,7 @@ void SyncDiffReporter::AddImpl(const std::string &path) {
 
   switch (print_action_) {
     case kPrintChanges:
-      if (path.find(keyword) != std::string::npos) {
+      if (path.at(0) != '/') {
         action_label = "[x-catalog-add]";
       } else {
         action_label = "[add]";
@@ -846,7 +846,7 @@ void SyncDiffReporter::RemoveImpl(
 
   switch (print_action_) {
     case kPrintChanges:
-      if (path.find(keyword) != std::string::npos) {
+      if (path.at(0) != '/') {
         action_label = "[x-catalog-rem]";
       } else {
         action_label = "[rem]";
@@ -1060,19 +1060,14 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
     }
 
     if (params_->print_changeset) {
-      std::string changeset_notice =
-          "Hardlinks around (" + i->second.master->GetUnionPath() + ")";
-
-      // reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
+      std::string changeset_notice = "";
       for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
-                                        jEnd = i->second.hardlinks.end();
-           j != jEnd; ++j) {
-        changeset_notice += " " + j->second->filename();
-        GetParentPath(i->second.master->GetUnionPath()) + "/" +
-            j->second->filename();
+           jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
+      {
+        changeset_notice = GetParentPath(i->second.master->GetUnionPath())
+          + "/" + j->second->filename();
         reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
       }
-      // reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
     }
 
     if (params_->dry_run)
