@@ -817,7 +817,6 @@ void SyncDiffReporter::PrintDots() {
 }
 
 void SyncDiffReporter::AddImpl(const std::string &path) {
-  const std::string keyword = "catalog";
   const char *action_label;
 
   switch (print_action_) {
@@ -841,7 +840,6 @@ void SyncDiffReporter::AddImpl(const std::string &path) {
 
 void SyncDiffReporter::RemoveImpl(
     const std::string &path, const catalog::DirectoryEntry & /*entry*/) {
-  const std::string keyword = "catalog";
   const char *action_label;
 
   switch (print_action_) {
