@@ -788,10 +788,10 @@ void SyncMediator::RemoveNestedCatalog(SharedPtr<SyncItem> directory) {
   }
 }
 
-void SyncDiffReporter::OnInit(const history::History::Tag &from_tag,
-                              const history::History::Tag &to_tag) {}
+void SyncDiffReporter::OnInit(const history::History::Tag & /*from_tag*/,
+                              const history::History::Tag & /*to_tag*/) {}
 
-void SyncDiffReporter::OnStats(const catalog::DeltaCounters &delta) {}
+void SyncDiffReporter::OnStats(const catalog::DeltaCounters & /*delta*/) {}
 
 void SyncDiffReporter::OnAdd(const std::string &path,
                              const catalog::DirectoryEntry &entry) {
@@ -1108,7 +1108,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
       std::string changeset_notice =
           "Hardlinks around (" + i->second.master->GetUnionPath() + ")";
 
-      reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
+      //reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
       for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
                                         jEnd = i->second.hardlinks.end();
            j != jEnd; ++j) {
@@ -1117,7 +1117,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
             j->second->filename();
         reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
       }
-      // reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
+      //reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
     }
 
     if (params_->dry_run)

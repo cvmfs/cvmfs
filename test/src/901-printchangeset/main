@@ -13,58 +13,59 @@ cvmfs_run_test() {
   echo "*** Start transaction for testing addition of entries"
   start_transaction $CVMFS_TEST_REPO || return 2
   touch /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 3
-  let add_counter++
+  add_counter=$((add_counter+1))
   mkdir /cvmfs/$CVMFS_TEST_REPO/new_folder || return 4
-  let add_counter++
+  add_counter=$((add_counter+1))
   mkdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 5
-  let add_counter++
+  add_counter=$((add_counter+1))
   touch /cvmfs/$CVMFS_TEST_REPO/new_folder/.cvmfscatalog || return 6
-  let add_counter++
-  let add_counter++
+  add_counter=$((add_counter+1))
+  add_counter=$((add_counter+1))
   touch /cvmfs/$CVMFS_TEST_REPO/new_file2.txt || return 7
   ln /cvmfs/$CVMFS_TEST_REPO/new_file2.txt /cvmfs/$CVMFS_TEST_REPO/new_file4.txt || return 7
   ls -li /cvmfs/$CVMFS_TEST_REPO/new_file4.txt /cvmfs/$CVMFS_TEST_REPO/new_file2.txt || return 7
-  let add_counter++
+  add_counter=$((add_counter+1))
+  add_counter=$((add_counter+1))
   touch /cvmfs/$CVMFS_TEST_REPO/new_file3.txt || return 8
   ln -s /cvmfs/$CVMFS_TEST_REPO/new_file3.txt /cvmfs/$CVMFS_TEST_REPO/new_file5.txt || return 8
   ls -l /cvmfs/$CVMFS_TEST_REPO/new_file5.txt || return 8
-  let add_counter++
-  let add_counter++
+  add_counter=$((add_counter+1))
+  add_counter=$((add_counter+1))
   echo "*** Publish transaction for testing addition of entries"
   cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile1.txt || return 9
 
   add_value=$(grep -w "add" logfile1.txt | wc -l)
   if [ $add_counter != $add_value ]
   then
-    echo "There is a missmatch between the number of additions printed and the ones performed" && return 9
+    echo "There is a missmatch between the number of additions printed and the ones performed" && return 10
   fi
 
   echo "*** Start transaction for testing modification of entries"
-  start_transaction $CVMFS_TEST_REPO || return 10
-  touch /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 11
-  let mod_counter++
+  start_transaction $CVMFS_TEST_REPO || return 11
+  touch /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 12
+  mod_counter=$((mod_counter+1))
   echo "*** Publish transaction for testing modification of entries"
-  cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile2.txt || return 12
+  cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile2.txt || return 13
 
-  mod_value=$(grep -w "mod" logfile2.txt | wc -l)
+  mod_value=$(grep -w "mod" logfile2.txt | wc -l)  
   if [ $mod_counter != $mod_value ]
   then
-    echo "There is a missmatch between the number of modifications printed and the ones performed" && return 12
+    echo "There is a missmatch between the number of modifications printed and the ones performed && return 14"
   fi
 
   echo "*** Start transaction for testing removal of entries"
   start_transaction $CVMFS_TEST_REPO || return 20
   rm /cvmfs/$CVMFS_TEST_REPO/new_folder/.cvmfscatalog || return 21
-  let rem_counter++
-  let rem_counter++
-  rm /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 23
-  let rem_counter++
-  rmdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 24
-  let rem_counter++
+  rem_counter=$((rem_counter+1))
+  rem_counter=$((rem_counter+1))
+  rm /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 22
+  rem_counter=$((rem_counter+1))
+  rmdir /cvmfs/$CVMFS_TEST_REPO/new_folder2 || return 23
+  rem_counter=$((rem_counter+1))
   echo "*** Publish transaction for testing removal of entries"
-  cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile3.txt || return 25
+  cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile3.txt || return 24
 
-  rem_values=$(grep -w "rem" logfile3.txt | wc -l)
+  rem_value=$(grep -w "rem" logfile3.txt | wc -l)
   if [ $rem_counter != $rem_values ]
   then
     echo "There is a missmatch between the number of deletions printed and the ones performed" && return 25
@@ -81,10 +82,9 @@ cvmfs_run_test() {
   cvmfs_server publish $CVMFS_TEST_REPO | tee logfile4.txt || return 32
 
   add_dots=$(grep -x "....." logfile4.txt | wc -l)
-  echo "Number of dots detected $add_dots"
   if [ $add_dots != 1 ]
   then
-    echo "There is a missmatch between the number of files added and the changes printed" && return 32
+    echo "There is a missmatch between the number of files added and the changes printed" && return 33
   fi
   
 
@@ -101,7 +101,7 @@ cvmfs_run_test() {
   mod_dots=$(grep -x "....." logfile5.txt | wc -l)
   if [ $mod_dots != 1 ]
   then
-    echo "There is a missmatch between the number of files modified and the changes printed" && return 42
+    echo "There is a missmatch between the number of files modified and the changes printed" && return 43
   fi
 
 
@@ -118,7 +118,7 @@ cvmfs_run_test() {
   rem_dots=$(grep -x "....." logfile6.txt | wc -l)
   if [ $rem_dots != 1 ]
   then
-    echo "There is a missmatch between the number of files removed and the changes printed" && return 52
+    echo "There is a missmatch between the number of files removed and the changes printed" && return 53
   fi
 
 
