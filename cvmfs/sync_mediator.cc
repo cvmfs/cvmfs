@@ -837,22 +837,6 @@ void SyncDiffReporter::AddImpl(const std::string &path) {
       assert("Invalid print action.");
       break;
   }
-/**
-  if (print_action_ == kPrintChanges) {
-    if (path.find(keyword) != std::string::npos) {
-      action_label = "[x-catalog-add]";
-    } else {
-      action_label = "[add]";
-    }
-
-    LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
-
-  } else if (print_action_ == kPrintDots) {
-    PrintDots();
-  } else {
-    LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
-  }
-**/
 }
 
 void SyncDiffReporter::RemoveImpl(
@@ -878,23 +862,6 @@ void SyncDiffReporter::RemoveImpl(
       assert("Invalid print action.");
       break;
   }
-
-/**
-  if (print_action_ == kPrintChanges) {
-    if (path.find(keyword) != std::string::npos) {
-      action_label = "[x-catalog-rem]";
-    } else {
-      action_label = "[rem]";
-    }
-
-    LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
-
-  } else if (print_action_ == kPrintDots) {
-    PrintDots();
-  } else {
-    LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
-  }
-**/
 }
 
 void SyncDiffReporter::ModifyImpl(
@@ -915,18 +882,6 @@ void SyncDiffReporter::ModifyImpl(
       assert("Invalid print action.");
       break;
   }
-
-  /**
-  if (print_action_ == kPrintChanges) {
-    const char *action_label = "[mod]";
-    LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
-
-  } else if (print_action_ == kPrintDots) {
-    PrintDots();
-  } else {
-    LogCvmfs(kLogPublish, kLogStdout, "Invalid print action.");
-  }
-  **/
 }
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
@@ -1108,7 +1063,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
       std::string changeset_notice =
           "Hardlinks around (" + i->second.master->GetUnionPath() + ")";
 
-      //reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
+      // reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
       for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
                                         jEnd = i->second.hardlinks.end();
            j != jEnd; ++j) {
@@ -1117,7 +1072,7 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
             j->second->filename();
         reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
       }
-      //reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
+      // reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
     }
 
     if (params_->dry_run)
