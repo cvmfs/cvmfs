@@ -193,19 +193,15 @@ TEST_F(T_CatalogMergeTool, Symlink) {
 
   CatalogTestTool::History history = tester.history();
 
-  perf::Statistics statistics;
-
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
-                 server_tool->download_manager(), &first_manifest, &statistics);
+                 server_tool->download_manager(), &first_manifest);
   EXPECT_TRUE(merge_tool.Init());
 
   std::string output_manifest_path;
-  uint64_t final_rev;
-  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path, &final_rev));
-  EXPECT_EQ(2U, final_rev);
+  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path));
 
   UniquePtr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
