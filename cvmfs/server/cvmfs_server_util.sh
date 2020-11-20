@@ -121,10 +121,10 @@ check_overlayfs() {
 #
 # @return   0 if at least one was found (name through stdout); abort otherwise
 get_available_union_fs() {
-  if check_aufs; then
-    echo "aufs"
-  elif check_overlayfs; then
+  if check_overlayfs; then
     echo "overlayfs"
+  elif check_aufs; then
+    echo "aufs"
   else
     die "neither AUFS nor OverlayFS detected on the system!"
   fi
