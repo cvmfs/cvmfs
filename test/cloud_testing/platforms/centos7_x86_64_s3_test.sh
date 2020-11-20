@@ -30,6 +30,9 @@ test_s3_pid=$(start_test_s3 $TEST_S3_LOGFILE) || { s3_retval=1; retval=1; echo "
 echo "done ($test_s3_pid)"
 create_test_s3_bucket
 
+# Exclusions
+# 682-enter: missing fuse-overlayfs
+
 if [ $s3_retval -eq 0 ]; then
   echo "running CernVM-FS server test cases against the test S3 provider..."
   CVMFS_TEST_S3_CONFIG=$TEST_S3_CONFIG                                      \
@@ -73,6 +76,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/670-listreflog                           \
                                src/672-publish_stats_hardlinks              \
                                src/673-acl                                  \
+                               src/682-enter                                \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \
