@@ -1673,7 +1673,8 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     // retrieve the PID of the new (grand) child process and send it to the
     // grand father
     pid_grand_child = getpid();
-    pipe_fork.Write(ForkFailures::kSendPid);
+    failed = ForkFailures::kSendPid;
+    pipe_fork.Write(failed);
     pipe_fork.Write(pid_grand_child);
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
