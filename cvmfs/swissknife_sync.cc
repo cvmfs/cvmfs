@@ -411,6 +411,12 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     // check if path points to a directory
     platform_stat64 candidate_info;
     const int lstat_retval = platform_lstat(candidate.c_str(), &candidate_info);
+    if (lstat_retval != 0) {
+      LogCvmfs(kLogCatalog, kLogDebug | kLogStderr | kLogSyslogErr,
+               "Error in processing .cvmfsdirtab: cannot access %s (%d)",
+               candidate.c_str(), errno);
+      abort();
+    }
     assert(lstat_retval == 0);
     if (!S_ISDIR(candidate_info.st_mode)) {
       // The GLOB_ONLYDIR flag is only a hint, non-directories can still be
