@@ -15,8 +15,17 @@ MINIO_PID=""
 
 clean_up() {
     echo "Cleaning up"
-
+    # stop minio
+    sudo kill -9 $(cat $SETTING_DIR/minio_pid)
+    
+    # remove the repository
+    sudo cvmfs_server rmfs -f https-test.cvmfs.ch    
+    
+    # remove all the configuration files
     sudo rm -rf "/tmp/cvmfs_testing_out"
+
+    sudo rm -f /etc/ssl/certs/cvmfs_https_test.key
+    sudo rm -f /etc/ssl/certs/cvmfs_https_test1.crt
 
     echo "Done clean up"
 }
@@ -24,42 +33,53 @@ clean_up() {
 create_https_certificates() {
     mkdir -p $SETTING_DIR/certs
 
+    # generating a random key of 4096 bits
     openssl genrsa -out $SETTING_DIR/rootCA.key 4096 || return 1
 
+    # generate a NEW PKCS#10 for a self signed certificate
+    # we use the random key generate above
+    # -nodes do not encrypt the private key
+    # The key is $__/rootCA.key
     openssl req -x509 -new -nodes -key $SETTING_DIR/rootCA.key \
 	-sha256 -days 1024 -out $SETTING_DIR/rootCA.crt \
-	-subj "/C=CH/ST=Geneva/L=Geneva/O=Security/OU=CERN/CN=localhost" || return 2
+	-subj "/C=CH/ST=CH/O=CERN/OU=CERN/CN=localhost" || return 2
 
     openssl genrsa -out $SETTING_DIR/localhost.key 2048 || return 3
 
+    # generate a new certificate REQUEST
     openssl req -new -sha256 -key $SETTING_DIR/localhost.key \
 	-subj "/C=CH/ST=CH/O=CERN/CN=localhost" \
 	-out $SETTING_DIR/localhost.csr || return 4
 
+    # expect a certificate request as input
     openssl x509 \
-	-req -in localhost \
-	-in $SETTING_DIR/localhost.csr \
+	-req -in $SETTING_DIR/localhost.csr \
 	-CA $SETTING_DIR/rootCA.crt \
 	-CAkey $SETTING_DIR/rootCA.key \
 	-CAcreateserial \
 	-out $SETTING_DIR/certs/public.crt \
 	-days 500 -sha256 || return 5
 
+    cp $SETTING_DIR/localhost.key $SETTING_DIR/certs/private.key
 
-    # minio does not like this certificates
-    # I believe we are not really creating https certificates here
+    # we are making minio client use the new root CAs
+    mkdir -p $SETTING_DIR/minio_client/certs/CAs
+    cp $SETTING_DIR/rootCA.* $SETTING_DIR/minio_client/certs/CAs
 
-    mv $SETTING_DIR/localhost.key $SETTING_DIR/certs/private.key
-
+    sudo cp $SETTING_DIR/rootCA.key /etc/ssl/certs/cvmfs_https_test.key
+    sudo cp $SETTING_DIR/certs/public.crt /etc/ssl/certs/cvmfs_https_test1.crt
 }
 
 create_minio_config() {
 
     mkdir -p $SETTING_DIR/
     mkdir -p $SETTING_DIR/minio_server
+    mkdir -p $SETTING_DIR/minio_server/certs
     mkdir -p $SETTING_DIR/minio_client
 
-    sudo tee $SETTING_DIR/cvmfs_config > /dev/null << EOF
+    cp $SETTING_DIR/certs/* $SETTING_DIR/minio_server/certs/
+
+    tee $SETTING_DIR/cvmfs_config > /dev/null << EOF
 CVMFS_S3_HOST=localhost
 CVMFS_S3_PORT=13337
 CVMFS_S3_ACCESS_KEY=not
@@ -67,11 +87,12 @@ CVMFS_S3_SECRET_KEY=important
 CVMFS_S3_BUCKETS_PER_ACCOUNT=1
 CVMFS_S3_DNS_BUCKETS=false
 CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10
-CVMFS_S3_BUCKET=https-bucket
+CVMFS_S3_BUCKET=cvmfs/https-bucket
 CVMFS_S3_USE_HTTPS=true
+CVMFS_USE_SSL_SYSTEM_CA=true
 EOF
 
-    sudo tee $SETTING_DIR/minio_server/config.json > /dev/null << EOF
+    tee $SETTING_DIR/minio_server/config.json > /dev/null << EOF
 {
 	"version": "23",
 	"credential": {
@@ -81,7 +102,7 @@ EOF
 }
 EOF
 
-    sudo tee $SETTING_DIR/minio_client/config.json > /dev/null << EOF
+    tee $SETTING_DIR/minio_client/config.json > /dev/null << EOF
 {
 	"version": "9",
 	"hosts": {
@@ -99,22 +120,23 @@ EOF
 }
 
 start_minio() {
+    # do NOT echo anything in here
     mkdir -p $SETTING_DIR/minio_storage
 
     create_minio_config
 
-    minio_command="sudo /usr/local/bin/minio server \
+    minio_command="/usr/local/bin/minio server \
 	--address :13337 \
 	--config-dir $SETTING_DIR/minio_server \
 	$SETTING_DIR/minio_storage"
 
     local minio_pid=$(run_background_service $SETTING_DIR/minio_log "$minio_command")
-    sleep 5
+    echo $minio_pid > $SETTING_DIR/minio_pid
+    
+    sleep 1
 
-    sudo /usr/local/bin/mc -C $SETTING_DIR/minio_client mb cvmfs/https-bucket
-    sudo /usr/local/bin/mc -C $SETTING_DIR/minio_client policy public cvmfs/https-bucket
-
-    echo $minio_pid
+    /usr/local/bin/mc -C $SETTING_DIR/minio_client mb cvmfs/https-bucket
+    /usr/local/bin/mc -C $SETTING_DIR/minio_client policy public cvmfs/https-bucket
 }
 
 cvmfs_run_test() {
@@ -122,7 +144,11 @@ cvmfs_run_test() {
 
     create_https_certificates || return 1
 
-    local minio_pid=$(start_minio)
-    trap "sudo kill -9 $minio_pid" EXIT HUP INT TERM || return $?
+    start_minio
 
+    sudo cvmfs_server mkfs \
+    	-o $CVMFS_TEST_USER \
+	-s $SETTING_DIR/cvmfs_config \
+	-w https://localhost:13337 \
+	https-test.cvmfs.ch
 }
