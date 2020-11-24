@@ -54,7 +54,8 @@ static AnchorPid EnterRootContainer() {
   NamespaceFailures failure = CreateUserNamespace(0, 0);
   if (failure != kFailNsOk) {
     throw publish::EPublish("cannot create root user namespace (" +
-      StringifyInt(failure) + " / " + StringifyInt(errno) + ")");
+      StringifyInt(failure) + " / " + StringifyInt(errno) + ") [euid=" +
+      StringifyInt(geteuid()) + ", egid=" + StringifyInt(getegid()) + "]");
   }
 
   bool rvb = CreateMountNamespace();
@@ -506,10 +507,12 @@ int CmdEnter::Main(const Options &options) {
 
   if (pid == 0) {
     if (!options.Has("root")) {
-      rvb = CreateUserNamespace(uid, gid);
-      if (!rvb) {
-        throw EPublish(std::string("cannot create user namespace (") +
-                       StringifyInt(uid) + ", " + StringifyInt(gid) + ")");
+      NamespaceFailures failure = CreateUserNamespace(uid, gid);
+      if (failure != kFailNsOk) {
+        throw publish::EPublish("cannot create root user namespace for " +
+          StringifyInt(uid) + ":" + StringifyInt(gid) + " (" +
+          StringifyInt(failure) + " / " + StringifyInt(errno) + ") [euid=" +
+          StringifyInt(geteuid()) + ", egid=" + StringifyInt(getegid()) + "]");
       }
     }
 
