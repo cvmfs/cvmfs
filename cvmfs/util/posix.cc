@@ -1674,7 +1674,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     // grand father
     pid_grand_child = getpid();
     failed = ForkFailures::kSendPid;
-    pipe_fork.Write(failed);
+    pipe_fork.Write(&failed, sizeof(failed));
     pipe_fork.Write(pid_grand_child);
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
@@ -1682,7 +1682,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     failed = ForkFailures::kFailExec;
 
    fork_failure:
-    pipe_fork.Write(failed);
+    pipe_fork.Write(&failed, sizeof(failed));
     _exit(1);
   }
   if (double_fork) {
@@ -1694,7 +1694,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
   // Either the PID or a return value is sent
   ForkFailures::Names status_code;
-  bool retcode = pipe_fork.Read(&status_code);
+  bool retcode = pipe_fork.Read(&status_code, sizeof(status_code));
   assert(retcode);
   if (status_code != ForkFailures::kSendPid) {
     close(pipe_fork.read_end);
