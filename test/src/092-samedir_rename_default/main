@@ -1,0 +1,15 @@
+cvmfs_test_name="Rename across directories in the cache space"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local repo="atlas.cern.ch"
+
+  cvmfs_mount ${repo} || return 1
+  rmdir /var/lib/cvmfs/shared/txn || return 2
+  cvmfs_config reload -c || return 3
+
+  return 0
+}
+
