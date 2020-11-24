@@ -51,9 +51,13 @@ struct AnchorPid {
 };
 
 static AnchorPid EnterRootContainer() {
-  bool rvb = CreateUserNamespace(0, 0);
-  if (!rvb) throw publish::EPublish("cannot create root user namespace");
-  rvb = CreateMountNamespace();
+  NamespaceFailures failure = CreateUserNamespace(0, 0);
+  if (failure != kFailNsOk) {
+    throw publish::EPublish("cannot create root user namespace (" +
+      StringifyInt(failure) + " / " + StringifyInt(errno) + ")");
+  }
+
+  bool rvb = CreateMountNamespace();
   if (!rvb) throw publish::EPublish("cannot create mount namespace");
   int fd;
   rvb = CreatePidNamespace(&fd);

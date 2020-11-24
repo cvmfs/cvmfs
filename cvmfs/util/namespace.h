@@ -17,9 +17,17 @@ const int kNsFeaturePid           = 0x02;
 const int kNsFeatureUserAvailable = 0x04;
 const int kNsFeatureUserEnabled   = 0x08;
 
+enum NamespaceFailures {
+  kFailNsOk = 0,
+  kFailNsUnshare,
+  kFailNsMapUid,
+  kFailNsSetgroups,
+  kFailNsMapGid,
+};
+
 int CheckNamespaceFeatures();
 
-bool CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to);
+NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to);
 bool CreateMountNamespace();
 bool CreatePidNamespace(int *fd_parent);
 

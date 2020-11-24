@@ -55,26 +55,26 @@ int CheckNamespaceFeatures() {
 }
 
 
-bool CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
+NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
 #ifdef CVMFS_HAS_UNSHARE
   std::string uid_str = StringifyInt(geteuid());
   std::string gid_str = StringifyInt(getegid());
 
   int rvi = unshare(CLONE_NEWUSER);
-  if (rvi != 0) return false;
+  if (rvi != 0) return kFailNsUnshare;
 
   bool rvb = SafeWriteToFile(StringifyInt(map_uid_to) + " " + uid_str + " 1",
                              "/proc/self/uid_map", kDefaultFileMode);
-  if (!rvb) return false;
+  if (!rvb) return kFailNsMapUid;
   rvb = SafeWriteToFile("deny", "/proc/self/setgroups", kDefaultFileMode);
-  if (!rvb) return false;
+  if (!rvb) return kFailNsSetgroups;
   rvb = SafeWriteToFile(StringifyInt(map_gid_to) + " " + gid_str + " 1",
                         "/proc/self/gid_map", kDefaultFileMode);
-  if (!rvb) return false;
+  if (!rvb) return kFailNsMapGid;
 
-  return true;
+  return kFailNsOk;
 #else
-  return false;
+  return kFailNsUnsuppored;
 #endif
 }
 
