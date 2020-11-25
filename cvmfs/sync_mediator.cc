@@ -984,13 +984,6 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
   for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
   {
-    if (i->second.hardlinks.size() != i->second.master->GetUnionLinkcount()) {
-      LogCvmfs(kLogPublish, kLogStdout, "Hardlinks across directories (%s)",
-               i->second.master->GetUnionPath().c_str());
-      if (!params_->ignore_xdir_hardlinks)
-        PANIC(NULL);
-    }
-
     if (params_->print_changeset) {
       std::string changeset_notice = "add hardlinks around ("
                                    + i->second.master->GetUnionPath() + ")";
