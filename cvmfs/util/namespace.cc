@@ -63,8 +63,8 @@ NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
   int rvi = unshare(CLONE_NEWUSER);
   if (rvi != 0) return kFailNsUnshare;
 
-  std::string uid_map = StringifyInt(map_uid_to) + " " + uid_str + " 1\n";
-  std::string gid_map = StringifyInt(map_gid_to) + " " + gid_str + " 1\n";
+  std::string uid_map = StringifyInt(map_uid_to) + " " + uid_str + " 1";
+  std::string gid_map = StringifyInt(map_gid_to) + " " + gid_str + " 1";
 
   int fd;
   ssize_t nbytes;
