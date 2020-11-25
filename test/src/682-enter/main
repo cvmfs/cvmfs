@@ -5,7 +5,15 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
+  id -a
+  id -ru
+  id -rg
+  id -rG
   unshare --user --map-root-user id -a || return 1
+  id -a
+  id -ru
+  id -rg
+  id -rG
 
   cvmfs_mount atlas.cern.ch || return 10
   rm -rf $HOME/.cvmfs/atlas.cern.ch || return 11
