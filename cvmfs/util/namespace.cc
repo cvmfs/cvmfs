@@ -63,12 +63,12 @@ NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
   int rvi = unshare(CLONE_NEWUSER);
   if (rvi != 0) return kFailNsUnshare;
 
-  bool rvb = SafeWriteToFile(StringifyInt(map_uid_to) + " " + uid_str + " 1",
+  bool rvb = SafeWriteToFile(StringifyInt(map_uid_to) + " " + uid_str + " 1\n",
                              "/proc/self/uid_map", kDefaultFileMode);
   if (!rvb) return kFailNsMapUid;
   rvb = SafeWriteToFile("deny", "/proc/self/setgroups", kDefaultFileMode);
   if (!rvb) return kFailNsSetgroups;
-  rvb = SafeWriteToFile(StringifyInt(map_gid_to) + " " + gid_str + " 1",
+  rvb = SafeWriteToFile(StringifyInt(map_gid_to) + " " + gid_str + " 1\n",
                         "/proc/self/gid_map", kDefaultFileMode);
   if (!rvb) return kFailNsMapGid;
 
