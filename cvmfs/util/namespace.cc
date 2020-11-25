@@ -63,14 +63,28 @@ NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
   int rvi = unshare(CLONE_NEWUSER);
   if (rvi != 0) return kFailNsUnshare;
 
-  bool rvb = SafeWriteToFile(StringifyInt(map_uid_to) + " " + uid_str + " 1\n",
-                             "/proc/self/uid_map", kDefaultFileMode);
-  if (!rvb) return kFailNsMapUid;
-  rvb = SafeWriteToFile("deny", "/proc/self/setgroups", kDefaultFileMode);
-  if (!rvb) return kFailNsSetgroups;
-  rvb = SafeWriteToFile(StringifyInt(map_gid_to) + " " + gid_str + " 1\n",
-                        "/proc/self/gid_map", kDefaultFileMode);
-  if (!rvb) return kFailNsMapGid;
+  std::string uid_map = StringifyInt(map_uid_to) + " " + uid_str + " 1\n";
+  std::string gid_map = StringifyInt(map_gid_to) + " " + gid_str + " 1\n";
+
+  int fd;
+  ssize_t nbytes;
+  fd = open("/proc/self/uid_map", O_WRONLY);
+  if (fd < 0) return kFailNsMapUid;
+  nbytes = write(fd, uid_map.data(), uid_map.length());
+  close(fd);
+  if (nbytes != static_cast<ssize_t>(uid_map.length())) return kFailNsMapUid;
+
+  fd = open("/proc/self/setgroups", O_WRONLY);
+  if (fd < 0) return kFailNsSetgroups;
+  nbytes = write(fd, "deny", 4);
+  close(fd);
+  if (nbytes != 4) return kFailNsSetgroups;
+
+  fd = open("/proc/self/gid_map", O_WRONLY);
+  if (fd < 0) return kFailNsMapGid;
+  nbytes = write(fd, gid_map.data(), gid_map.length());
+  close(fd);
+  if (nbytes != static_cast<ssize_t>(gid_map.length())) return kFailNsMapGid;
 
   return kFailNsOk;
 #else
