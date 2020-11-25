@@ -12,6 +12,7 @@ run_unittests --gtest_shuffle \
              --gtest_death_test_use_fork || retval=1
 
 
+ubuntu_release="$(lsb_release -cs)"
 CVMFS_EXCLUDE=
 
 # Kernel sources too old for gcc, TODO
