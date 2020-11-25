@@ -23,7 +23,6 @@ enum NamespaceFailures {
   kFailNsUnshare,
   kFailNsMapUidOpen,
   kFailNsMapUidWrite,
-  kFailNsSetgroups,
   kFailNsSetgroupsOpen,
   kFailNsSetgroupsWrite,
   kFailNsMapGidOpen,
