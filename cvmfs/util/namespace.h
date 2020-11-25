@@ -21,9 +21,13 @@ enum NamespaceFailures {
   kFailNsOk = 0,
   kFailNsUnsuppored,
   kFailNsUnshare,
-  kFailNsMapUid,
+  kFailNsMapUidOpen,
+  kFailNsMapUidWrite,
   kFailNsSetgroups,
-  kFailNsMapGid,
+  kFailNsSetgroupsOpen,
+  kFailNsSetgroupsWrite,
+  kFailNsMapGidOpen,
+  kFailNsMapGidWrite,
 };
 
 int CheckNamespaceFeatures();

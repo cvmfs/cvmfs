@@ -69,22 +69,24 @@ NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
   int fd;
   ssize_t nbytes;
   fd = open("/proc/self/uid_map", O_WRONLY);
-  if (fd < 0) return kFailNsMapUid;
+  if (fd < 0) return kFailNsMapUidOpen;
   nbytes = write(fd, uid_map.data(), uid_map.length());
   close(fd);
-  if (nbytes != static_cast<ssize_t>(uid_map.length())) return kFailNsMapUid;
+  if (nbytes != static_cast<ssize_t>(uid_map.length()))
+    return kFailNsMapUidWrite;
 
   fd = open("/proc/self/setgroups", O_WRONLY);
-  if (fd < 0) return kFailNsSetgroups;
+  if (fd < 0) return kFailNsSetgroupsOpen;
   nbytes = write(fd, "deny", 4);
   close(fd);
-  if (nbytes != 4) return kFailNsSetgroups;
+  if (nbytes != 4) return kFailNsSetgroupsWrite;
 
   fd = open("/proc/self/gid_map", O_WRONLY);
-  if (fd < 0) return kFailNsMapGid;
+  if (fd < 0) return kFailNsMapGidOpen;
   nbytes = write(fd, gid_map.data(), gid_map.length());
   close(fd);
-  if (nbytes != static_cast<ssize_t>(gid_map.length())) return kFailNsMapGid;
+  if (nbytes != static_cast<ssize_t>(gid_map.length()))
+    return kFailNsMapGidWrite;
 
   return kFailNsOk;
 #else
