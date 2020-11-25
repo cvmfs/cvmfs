@@ -118,8 +118,10 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
 else
   sudo apt-get install autofs || die "fail (installing autofs on 20.04)"
 
-  # fuse-overlayfs requires Ubuntu 18.04+
-  install_from_repo fuse-overlayfs || die "fail (installing fuse-overlayfs)"
+  # fuse-overlayfs requires Ubuntu 20.04+
+  if [ "x$ubuntu_release" != "xbionic" ]; then
+    install_from_repo fuse-overlayfs || die "fail (installing fuse-overlayfs)"
+  fi
 fi
 
 # On Ubuntu 16.04+ 64bit install the repository gateway

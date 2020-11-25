@@ -27,6 +27,11 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
 fi
 
+if [ "x$ubuntu_release" = "xbionic" ]; then
+  # Ubuntu 18.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+fi
+
 export CVMFS_TEST_UNIONFS=overlayfs
 
 cd ${SOURCE_DIRECTORY}/test
