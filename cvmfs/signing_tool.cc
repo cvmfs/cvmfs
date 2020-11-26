@@ -87,8 +87,7 @@ SigningTool::Result SigningTool::Run(
   if (!reflog_hash.IsNull()) {
     reflog = server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash);
     if (!reflog.IsValid()) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "reflog hash specified but reflog not present");
+      LogCvmfs(kLogCvmfs, kLogStderr, "reflog missing");
       return kReflogMissing;
     }
   } else {

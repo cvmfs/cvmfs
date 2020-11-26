@@ -146,5 +146,24 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -r || return 116
   check_repository $CVMFS_TEST634_REPLICA_NAME -r || return 116
 
+  echo "*** check repairing missing reflog with a zombie hash registered in the manifest"
+  delete_from_backend $CVMFS_TEST_REPO ".cvmfsreflog" || return 30
+  delete_from_backend $CVMFS_TEST634_REPLICA_NAME ".cvmfsreflog" || return 30
+  rm -f $checksum $replica_checksum
+  start_transaction $CVMFS_TEST_REPO || return $?
+  # Note: in this situation, gc on the S0 recreates the reflog automatically
+  # and thus does not fail (libcvmfs_server should handle the reflog more consistently)
+  publish_repo $CVMFS_TEST_REPO && return 31
+  check_repository $CVMFS_TEST_REPO -r || return 32
+  publish_repo $CVMFS_TEST_REPO || return 32
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 33
+  # Note: swissknife_pull looks only that reflog.chksum file (not in the manifest)
+  # Therefore, it would continue to work
+  # libcvmfs_server should handle the reflog more consistently
+  # cvmfs_server gc -f $CVMFS_TEST634_REPLICA_NAME && return 34
+  check_repository $CVMFS_TEST634_REPLICA_NAME -r || return 35
+  sudo cvmfs_server snapshot $CVMFS_TEST634_REPLICA_NAME || return 36
+  cvmfs_server gc -f $CVMFS_TEST634_REPLICA_NAME || return 36
+
   return 0
 }
