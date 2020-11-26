@@ -80,11 +80,8 @@ class SyncDiffReporter : public DiffListener {
  private:
   void PrintDots();
   void AddImpl(const std::string &path);
-  void RemoveImpl(const std::string &path,
-                      const catalog::DirectoryEntry &entry);
-  void ModifyImpl(const std::string &path,
-                      const catalog::DirectoryEntry &entry_from,
-                      const catalog::DirectoryEntry &entry_to);
+  void RemoveImpl(const std::string &path);
+  void ModifyImpl(const std::string &path);
 
   PrintAction print_action_;
   unsigned int processing_dot_interval_;

@@ -801,13 +801,13 @@ void SyncDiffReporter::OnAdd(const std::string &path,
 void SyncDiffReporter::OnRemove(const std::string &path,
                                 const catalog::DirectoryEntry &entry) {
   changed_items_++;
-  RemoveImpl(path, entry);
+  RemoveImpl(path);
 }
 void SyncDiffReporter::OnModify(const std::string &path,
                                 const catalog::DirectoryEntry &entry_from,
                                 const catalog::DirectoryEntry &entry_to) {
   changed_items_++;
-  ModifyImpl(path, entry_from, entry_to);
+  ModifyImpl(path);
 }
 
 void SyncDiffReporter::PrintDots() {
@@ -834,12 +834,10 @@ void SyncDiffReporter::AddImpl(const std::string &path) {
       break;
     default:
       assert("Invalid print action.");
-      break;
   }
 }
 
-void SyncDiffReporter::RemoveImpl(
-    const std::string &path, const catalog::DirectoryEntry & /*entry*/) {
+void SyncDiffReporter::RemoveImpl(const std::string &path) {
   const char *action_label;
 
   switch (print_action_) {
@@ -858,13 +856,10 @@ void SyncDiffReporter::RemoveImpl(
       break;
     default:
       assert("Invalid print action.");
-      break;
   }
 }
 
-void SyncDiffReporter::ModifyImpl(
-    const std::string &path, const catalog::DirectoryEntry & /*entry_from*/,
-    const catalog::DirectoryEntry & /*entry_to*/) {
+void SyncDiffReporter::ModifyImpl(const std::string &path) {
   const char *action_label;
 
   switch (print_action_) {
@@ -878,7 +873,6 @@ void SyncDiffReporter::ModifyImpl(
       break;
     default:
       assert("Invalid print action.");
-      break;
   }
 }
 
@@ -1058,12 +1052,12 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
     }
 
     if (params_->print_changeset) {
-      std::string changeset_notice = "";
       for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
            jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
       {
-        changeset_notice = GetParentPath(i->second.master->GetUnionPath())
-          + "/" + j->second->filename();
+        std::string changeset_notice =
+            GetParentPath(i->second.master->GetUnionPath()) + "/" +
+            j->second->filename();
         reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
       }
     }
