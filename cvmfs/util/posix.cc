@@ -53,7 +53,9 @@
 #include "logging.h"
 #include "platform.h"
 
+#include "util/algorithm.h"
 #include "util/exception.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 //using namespace std;  // NOLINT
@@ -1122,6 +1124,83 @@ std::vector<std::string> FindDirectories(const std::string &parent_dir) {
 }
 
 
+/**
+ * Finds all files and direct subdirectories under directory (except ., ..).
+ */
+bool ListDirectory(const std::string &directory,
+                   std::vector<std::string> *names,
+                   std::vector<mode_t> *modes)
+{
+  DIR *dirp = opendir(directory.c_str());
+  if (!dirp)
+    return false;
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const std::string name(dirent->d_name);
+    if ((name == ".") || (name == ".."))
+      continue;
+    const std::string path = directory + "/" + name;
+
+    platform_stat64 info;
+    int retval = platform_lstat(path.c_str(), &info);
+    if (retval != 0) {
+      closedir(dirp);
+      return false;
+    }
+
+    names->push_back(name);
+    modes->push_back(info.st_mode);
+  }
+  closedir(dirp);
+
+  SortTeam(names, modes);
+  return true;
+}
+
+
+/**
+ * Looks whether exe is an executable file.  If exe is not an absolute path,
+ * searches the PATH environment.
+ */
+std::string FindExecutable(const std::string &exe) {
+  if (exe.empty())
+    return "";
+
+  std::vector<std::string> search_paths;
+  if (exe[0] == '/') {
+    search_paths.push_back(GetParentPath(exe));
+  } else {
+    char *path_env = getenv("PATH");
+    if (path_env) {
+      search_paths = SplitString(path_env, ':');
+    }
+  }
+
+  for (unsigned i = 0; i < search_paths.size(); ++i) {
+    if (search_paths[i].empty())
+      continue;
+    if (search_paths[i][0] != '/')
+      continue;
+
+    std::string path = search_paths[i] + "/" + GetFileName(exe);
+    platform_stat64 info;
+    int retval = platform_stat(path.c_str(), &info);
+    if (retval != 0)
+      continue;
+    if (!S_ISREG(info.st_mode))
+      continue;
+    retval = access(path.c_str(), X_OK);
+    if (retval != 0)
+      continue;
+
+    return path;
+  }
+
+  return "";
+}
+
+
 std::string GetUserName() {
   struct passwd pwd;
   struct passwd *result = NULL;
@@ -1594,7 +1673,8 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     // retrieve the PID of the new (grand) child process and send it to the
     // grand father
     pid_grand_child = getpid();
-    pipe_fork.Write(ForkFailures::kSendPid);
+    failed = ForkFailures::kSendPid;
+    pipe_fork.Write(&failed, sizeof(failed));
     pipe_fork.Write(pid_grand_child);
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
@@ -1602,7 +1682,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     failed = ForkFailures::kFailExec;
 
    fork_failure:
-    pipe_fork.Write(failed);
+    pipe_fork.Write(&failed, sizeof(failed));
     _exit(1);
   }
   if (double_fork) {
@@ -1614,7 +1694,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
   // Either the PID or a return value is sent
   ForkFailures::Names status_code;
-  bool retcode = pipe_fork.Read(&status_code);
+  bool retcode = pipe_fork.Read(&status_code, sizeof(status_code));
   assert(retcode);
   if (status_code != ForkFailures::kSendPid) {
     close(pipe_fork.read_end);

@@ -1056,6 +1056,48 @@ TEST_F(T_Util, FindDirectories) {
 }
 
 
+TEST_F(T_Util, ListDirectory) {
+  std::vector<std::string> names;
+  std::vector<mode_t> modes;
+
+  EXPECT_FALSE(ListDirectory("/no/such/dir", &names, &modes));
+  string dir = sandbox + "/test-listdir";
+  ASSERT_TRUE(MkdirDeep(dir, 0700));
+
+  EXPECT_TRUE(ListDirectory(dir, &names, &modes));
+  EXPECT_TRUE(names.empty());
+  EXPECT_TRUE(modes.empty());
+
+  ASSERT_TRUE(MkdirDeep(dir + "/dir1/sub", 0700));
+  ASSERT_TRUE(MkdirDeep(dir + "/dir2", 0700));
+  EXPECT_TRUE(SymlinkForced(dir + "/dir1", dir + "/dirX"));
+  string temp_file = CreateTempPath(dir + "/tempfile", 0600);
+  ASSERT_FALSE(temp_file.empty());
+
+  EXPECT_TRUE(ListDirectory(dir, &names, &modes));
+  ASSERT_EQ(4U, names.size());
+  EXPECT_EQ("dir1", names[0]);
+  EXPECT_EQ("dir2", names[1]);
+  EXPECT_EQ("dirX", names[2]);
+  EXPECT_EQ(GetFileName(temp_file), names[3]);
+  EXPECT_TRUE(S_ISDIR(modes[0]));
+  EXPECT_TRUE(S_ISDIR(modes[1]));
+  EXPECT_TRUE(S_ISLNK(modes[2]));
+  EXPECT_TRUE(S_ISREG(modes[3]));
+}
+
+
+TEST_F(T_Util, FindExecutable) {
+  std::string ls = FindExecutable("ls");
+  ASSERT_FALSE(ls.empty());
+  EXPECT_EQ('/', ls[0]);
+  std::string ls_abs = FindExecutable(ls);
+  EXPECT_EQ(ls, ls_abs);
+  std::string fail = FindExecutable("no-such-exe");
+  EXPECT_TRUE(fail.empty());
+}
+
+
 TEST_F(T_Util, GetUmask) {
   unsigned test_umask = 0755;
   mode_t original_mask = umask(test_umask);

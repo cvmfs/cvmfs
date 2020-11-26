@@ -51,6 +51,7 @@ install_from_repo bc
 install_from_repo tree
 install_from_repo sqlite
 install_from_repo bzip2
+install_from_repo fuse-overlayfs
 
 # traffic shaping
 install_from_repo trickle
@@ -80,3 +81,6 @@ sudo setsebool -P httpd_can_network_connect on
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
+
+# Enable user namespaces
+sudo sysctl -w user.max_user_namespaces=10000 || die "fail (enable user namespace)"

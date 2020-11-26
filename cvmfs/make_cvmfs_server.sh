@@ -35,6 +35,7 @@ COMPONENTS="\
     server/cvmfs_server_common.sh
     server/cvmfs_server_health_check.sh
     server/cvmfs_server_compat.sh
+    server/cvmfs_server_enter.sh
     server/cvmfs_server_transaction.sh
     server/cvmfs_server_abort.sh
     server/cvmfs_server_publish.sh

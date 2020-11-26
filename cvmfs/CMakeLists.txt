@@ -244,6 +244,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
 
 # TODO(jblomer) Rename to cvmfs_server
 set (CVMFS_PUBLISH_SOURCES
+  backoff.cc
   compression.cc
   directory_entry.cc
   dns.cc
@@ -314,6 +315,7 @@ set (LIBCVMFS_SERVER_SOURCES
   pack.cc
   publish/except.cc
   publish/repository.cc
+  publish/repository_capabilities.cc
   publish/repository_diff.cc
   publish/repository_managed.cc
   publish/repository_session.cc

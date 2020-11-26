@@ -99,6 +99,9 @@ int main(int argc, char **argv) {
   } catch (const publish::EPublish& e) {
     if (e.failure() == publish::EPublish::kFailInvocation) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Invocation error: %s", e.msg().c_str());
+    } else if (e.failure() == publish::EPublish::kFailMissingDependency) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Missing dependency: %s", e.msg().c_str());
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
     }

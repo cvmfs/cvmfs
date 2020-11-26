@@ -81,7 +81,7 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
       free(longopts);
 
       throw EPublish(GetName() + ": unrecognized parameter '" +
-                     argv[optind - 1] + "'");
+                     argv[optind - 1] + "'", EPublish::kFailInvocation);
     }
   }
 
@@ -93,7 +93,8 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
   for (unsigned i = 0; i < params.size(); ++i) {
     if (!params[i].is_optional && !result.Has(params[i].key)) {
       throw EPublish(
-        GetName() + ": missing mandatory parameter '" + params[i].key + "'");
+        GetName() + ": missing mandatory parameter '" + params[i].key + "'",
+        EPublish::kFailInvocation);
     }
   }
 
@@ -104,7 +105,7 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
   if (result.plain_args().size() < GetMinPlainArgs()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Usage: %s %s %s",
              progname().c_str(), GetName().c_str(), GetUsage().c_str());
-    throw EPublish(GetName() + ": missing argument");
+    throw EPublish(GetName() + ": missing argument", EPublish::kFailInvocation);
   }
 
   return result;
