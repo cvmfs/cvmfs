@@ -1,4 +1,5 @@
 2.8.0:
+  * Fix reflog repair when there is a zombie hash in the manifest (CVM-1919)
   * [server] add `enter` command to open an ephemeral environment that gives
     writable access to a repository (CVM-1924)
   * [ducc] add support for pulling Docker images with authenticated user
