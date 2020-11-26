@@ -78,6 +78,13 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   static const char kRawHashSymbol = '@';
 
   static std::string GetFqrnFromUrl(const std::string &url);
+  /**
+   * Depending on the desired course of action, the permitted capabilites of the
+   * binary (cap_dac_read_search, cap_sys_admin) needs to be dropped or gained.
+   * Dropped for creating user namespaces in `enter`, gained for walking through
+   * overlayfs.
+   */
+  static void DropCapabilities();
 
   explicit Repository(const SettingsRepository &settings);
   virtual ~Repository();

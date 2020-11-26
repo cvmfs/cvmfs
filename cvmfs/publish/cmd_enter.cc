@@ -424,6 +424,11 @@ int CmdEnter::Main(const Options &options) {
     throw EPublish("malformed repository name: " + fqrn_);
   }
 
+  // We cannot have any capabilities or else we are not allowed to write
+  // to /proc/self/setgroups anc /proc/self/[u|g]id_map when creating a user
+  // namespace
+  Repository::DropCapabilities();
+
   if (options.Has("cvmfs2")) {
     cvmfs2_binary_ = options.GetString("cvmfs2");
     // Lucky guess: library in the same directory than the binary,
