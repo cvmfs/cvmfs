@@ -249,7 +249,7 @@ cvmfs_server_import() {
   # create reflog checksum
   if cvmfs_sys_file_is_regular ${storage_location}/.cvmfsreflog ; then
     echo -n "Re-creating reflog content hash... "
-    local reflog_hash=$(cat ${storage_location}/.cvmfsreflog | cvmfs_swissknife hash -a sha1)
+    local reflog_hash=$(cat ${storage_location}/.cvmfsreflog | cvmfs_publish hash -a sha1)
     echo -n $reflog_hash > "${CVMFS_SPOOL_DIR}/reflog.chksum"
     chown $CVMFS_USER "${CVMFS_SPOOL_DIR}/reflog.chksum"
     echo $reflog_hash

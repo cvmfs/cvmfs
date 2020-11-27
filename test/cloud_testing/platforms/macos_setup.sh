@@ -6,6 +6,10 @@ export PATH=/usr/local/bin:$PATH
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_setup.sh
 
+echo "Removing traces of previous runs"
+sudo cvmfs_config killall
+sudo rm -f /etc/cvmfs/default.local
+
 echo -n "Install client package: $CLIENT_PACKAGE ... "
 sudo installer -pkg "$CLIENT_PACKAGE" -target / \
     || die "fail (installing CernVM-FS client package)"
@@ -27,6 +31,3 @@ echo -n "Increasing open file limits ... "
 sudo launchctl limit maxfiles 65536 65536 \
     || die "fail (increasing open file limits)"
 echo "done"
-
-echo "Removing traces of previous runs"
-sudo cvmfs_config killall

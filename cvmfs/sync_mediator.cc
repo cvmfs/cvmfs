@@ -46,7 +46,6 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
 
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
-  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
   counters_ = new perf::FsCounters(statistics);
 }
 

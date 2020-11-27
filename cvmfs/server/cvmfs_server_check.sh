@@ -76,10 +76,10 @@ cvmfs_server_check() {
   # do it!
   if [ $check_integrity -ne 0 ]; then
     if ! is_local_upstream $upstream; then
-      echo "Storage Integrity Check only works locally. skipping."
+      echo "Storage integrity check only works locally. skipping."
     else
       echo
-      echo "Checking Storage Integrity of $name ... (may take a while)"
+      echo "Checking storage integrity of $name ... (may take a while)"
       storage_dir=$(get_upstream_config $upstream)
       __swissknife scrub -r ${storage_dir}/data || die "FAIL!"
     fi
@@ -135,19 +135,22 @@ __check_repair_reflog() {
   local stored_checksum=
   has_reflog_checksum $name && stored_checksum="$(cat $(get_reflog_checksum $name))"
 
+  local repository_url=
+  if is_stratum0 $name; then
+    repository_url="$CVMFS_STRATUM0"
+  else
+    repository_url="$CVMFS_STRATUM1"
+  fi
+
   local has_reflog=0
   local computed_checksum=
   if $user_shell "$(__swissknife_cmd) peek -d .cvmfsreflog -r $CVMFS_UPSTREAM_STORAGE" >/dev/null; then
     has_reflog=1
-    local url=
-    if is_stratum0 $name; then
-      url="${CVMFS_STRATUM0}/.cvmfsreflog"
-    else
-      url="${CVMFS_STRATUM1}/.cvmfsreflog"
-    fi
+    local url="$repository_url/.cvmfsreflog"
     local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $url \
-      | cvmfs_swissknife hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
+      | cvmfs_publish hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
     computed_checksum="$($user_shell "$rehash_cmd")"
+    echo "Info: found $url with content hash $computed_checksum"
   fi
 
   if has_reflog_checksum $name; then
@@ -165,6 +168,31 @@ __check_repair_reflog() {
     if [ $has_reflog -eq 1 ]; then
       $user_shell "echo $computed_checksum > $(get_reflog_checksum $name)"
       echo "Warning: re-created missing reflog checksum as $computed_checksum"
+    fi
+  fi
+
+  # At this point we either have no .cvmfsreflog and no local reflog.chksum or
+  # we have both files properly in sync.
+
+  # Remaining case: a reflog is registered in the manifest but the
+  # .cvmfsreflog file is missing.  In this case, we recreate the reflog.
+
+  if get_repo_info -R | grep -q ^Y; then
+    echo "Warning: a reflog hash is registered in the manifest, re-creating missing reflog"
+    to_syslog_for_repo $name "reference log reconstruction started"
+    local repository_url
+
+    local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
+                                                  -r $repository_url             \
+                                                  -u $CVMFS_UPSTREAM_STORAGE     \
+                                                  -n $CVMFS_REPOSITORY_NAME      \
+                                                  -t ${CVMFS_SPOOL_DIR}/tmp/     \
+                                                  -k $CVMFS_PUBLIC_KEY           \
+                                                  -R $(get_reflog_checksum $name)"
+    if ! $user_shell "$reflog_reconstruct_command"; then
+      to_syslog_for_repo $name "failed to reconstruction reference log"
+    else
+      to_syslog_for_repo $name "successfully reconstructed reference log"
     fi
   fi
 }

@@ -59,7 +59,6 @@ if [ ! -z "$CVMFS_TEST_GEO_LICENSE_KEY" ]; then
   echo "CVMFS_GEO_LICENSE_KEY=$CVMFS_TEST_GEO_LICENSE_KEY" | sudo tee /etc/cvmfs/server.local > /dev/null
 fi
 
-
 if [ -f /.dockerinit ]; then
   CVMFS_TEST_DOCKER=yes
 else
@@ -395,6 +394,27 @@ uses_overlayfs() {
 }
 
 
+is_linux() {
+  [ x"$(uname)" = x"Linux" ]
+}
+
+
+is_macos() {
+  [ x"$(uname)" = x"Darwin" ]
+}
+
+
+get_number_of_cpu_cores() {
+  if is_linux; then
+    cat /proc/cpuinfo | grep -e '^processor' | wc -l
+  elif is_macos; then
+    sysctl -n hw.ncpu
+  else
+    echo "1"
+  fi
+}
+
+
 break_hardlink() {
   local path="$1"
   local tmp_file="$(mktemp)"
@@ -422,8 +442,8 @@ cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null                   || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                   || return 101
   sudo rm -f /etc/cvmfs/default.local                    || return 102
-  sudo sh -c "rm -f /etc/cvmfs/config.d/*"               || return 103
-  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 104
+  sudo sh -c "rm -f /etc/cvmfs/config.d/*.local"         || return 104
+  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 105
 
   wait_for_umount || return 99
 
@@ -464,6 +484,7 @@ cvmfs_mount() {
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_SERVER_URL=http://cvmfs-atlas-nightlies.cern.ch/cvmfs/atlas-nightlies.cern.ch" > /etc/cvmfs/config.d/atlas-nightlies.cern.ch.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
+  sudo sh -c "echo CVMFS_REPOSITORY_TAG=TESTING > /etc/cvmfs/config.d/cvmfs-config.cern.ch.local" || return 100
 
   # add additional parameters
   while [ $# -gt 0 ]; do
@@ -578,6 +599,7 @@ CVMFS_GENERAL_WARNING_FLAG=0
 CVMFS_MEMORY_WARNING=254
 CVMFS_TIME_WARNING=253
 CVMFS_GENERAL_WARNING=252
+CVMFS_TEST_RETVAL_TIMEOUT=251
 mangle_test_retval() {
   local prior_retval=$1
 
@@ -684,7 +706,7 @@ destroy_repo() {
 
 has_repo() {
   local repo=$1
-  cvmfs_server list 2>/dev/null | grep -q "^$repo "
+  cvmfs_server list 2>/dev/null | grep "^$repo " | grep -q -F "$repo"
 }
 
 
@@ -1194,8 +1216,9 @@ check_repo_integrity() {
 # @param repo    the repository you want to start the transaction for
 start_transaction() {
   local repo=$1
+  shift
 
-  cvmfs_server transaction $repo || return 100
+  cvmfs_server transaction $@ $repo || return 100
   return 0
 }
 
@@ -1548,9 +1571,9 @@ _resign_legacy_repository() {
   echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$repo_name" >> ${whitelist}.unsigned
   openssl x509 -in /etc/cvmfs/keys/${repo_name}.crt -outform der | \
-    cvmfs_swissknife hash -a sha1 -f >> ${whitelist}.unsigned || return 2
+    cvmfs_publish hash -a sha1 -f >> ${whitelist}.unsigned || return 2
   local hash;
-  hash=`cat ${whitelist}.unsigned | cvmfs_swissknife hash -a sha1`
+  hash=`cat ${whitelist}.unsigned | cvmfs_publish hash -a sha1`
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
@@ -2222,7 +2245,7 @@ xunit_preamble() {
   cat > $xml_file << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
-  <testsuite name="$CVMFS_TEST_SUITE_NAME" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
+  <testsuite hostname="$CVMFS_PLATFORM_NAME" name="$CVMFS_TEST_SUITE_NAME" timestamp="$t_start" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
 EOF
 }
 

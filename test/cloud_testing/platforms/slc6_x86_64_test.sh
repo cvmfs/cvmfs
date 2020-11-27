@@ -1,5 +1,7 @@
 #!/bin/sh
 
+export CVMFS_PLATFORM_NAME="slc6-x86_64"
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
@@ -42,6 +44,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               -x src/518-hardlinkstresstest                   \
                                  src/585-xattrs                               \
                                  src/673-acl                                  \
+                                 src/682-enter                                \
                                  src/700-overlayfs_validation                 \
                                  --                                           \
                                  src/5*                                       \

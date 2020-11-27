@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
   snprintf(tmp, sizeof(tmp), "fd=%i,rootmode=%o,user_id=%u,group_id=%u",
         fd, stbuf.st_mode & S_IFMT, getuid(), getgid());
 
-  res = mount("", mnt, "fuse", 0, tmp);
+  res = mount("/dev/fuse", mnt, "fuse", 0, tmp);
   if (res == -1) {
     fprintf(stderr ,"%s: failed to mount -o %s /dev/fuse %s: %s\n",
                 argv[0], tmp, mnt, strerror(errno));

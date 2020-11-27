@@ -1,4 +1,5 @@
 
+export CVMFS_PLATFORM_NAME="ubuntu$(. /etc/os-release && echo "$VERSION_ID")-$(uname -m)_S3"
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
@@ -6,33 +7,33 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
-running unittests
+echo "running unittests"
 run_unittests --gtest_shuffle \
              --gtest_death_test_use_fork || retval=1
 
 
+ubuntu_release="$(lsb_release -cs)"
 CVMFS_EXCLUDE=
-if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-  # Ubuntu 16.04
-  # Kernel sources too old for gcc, TODO
-  CVMFS_EXCLUDE="src/006-buildkernel"
-  # Expected failure, see test case
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
-  # Hardlinks do not work with overlayfs
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+# Kernel sources too old for gcc, TODO
+CVMFS_EXCLUDE="src/006-buildkernel"
+# Expected failure, see test case
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
-  echo "Ubuntu 16.04... using overlayfs"
-  export CVMFS_TEST_UNIONFS=overlayfs
-fi
-if [ x"$(lsb_release -cs)" = x"trusty" ]; then
-  # Ubuntu 14.04
-  # aufs, expected failure
-  CVMFS_EXCLUDE="src/700-overlayfs_validation src/80*-repository_gateway*"
+# Hardlinks do not work with overlayfs
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
 
-  echo "Ubuntu 14.04... using aufs instead of overlayfs"
+if [ "x$ubuntu_release" = "xxenial" ]; then
+  # Ubuntu 16.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
 fi
 
+if [ "x$ubuntu_release" = "xbionic" ]; then
+  # Ubuntu 18.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+fi
+
+export CVMFS_TEST_UNIONFS=overlayfs
 
 cd ${SOURCE_DIRECTORY}/test
 
@@ -86,6 +87,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/670-listreflog                           \
                                src/672-publish_stats_hardlinks              \
                                src/673-acl                                  \
+                               $CVMFS_EXCLUDE                               \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

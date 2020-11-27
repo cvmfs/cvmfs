@@ -1,0 +1,90 @@
+#
+# The daemonset starts the cvmfs service container once per node.  It uses
+# the persistent volume cvmfs-noderoot to mount cvmfs volumes directly at
+# the node's filesystem.
+#
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cvmfs-nodeplugin
+  namespace: cvmfs
+  labels:
+    k8s-app: cvmfs-nodeplugin
+spec:
+  selector:
+    matchLabels:
+      k8s-app: cvmfs-nodeplugin
+  template:
+    metadata:
+      labels:
+        k8s-app: cvmfs-nodeplugin
+    spec:
+      # Create the necessary base directories in the node's root file system
+      initContainers:
+      - name: create-mountpoint
+        image: @IMAGE@
+        command: ['sh', '-c', "mkdir -p /cvmfs-k8s/mounts /cvmfs-k8s/cache"]
+        resources:
+           limits:
+             memory: 0.5Gi
+             cpu: 1
+           requests:
+             memory: 0.2Gi
+             cpu: 0.01
+        volumeMounts:
+        - mountPath: /cvmfs-noderoot
+          name:  cvmfs-noderoot
+      containers:
+      - name: cvmfs-service
+        image: @IMAGE@
+        env:
+        - name: CVMFS_HTTP_PROXY
+          value: "@PROXY@"
+        - name: CVMFS_REPOSITORIES
+          value: alice.cern.ch,lhcb.cern.ch
+        securityContext:
+          # To allow for bi-directional mount propagation
+          privileged: true
+          # To mount fuse
+          capabilities:
+            add: ["SYS_ADMIN"]
+        readinessProbe:
+          exec:
+            command: ["/usr/bin/check_cvmfs.sh", "readiness"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          exec:
+            command: ["/usr/bin/check_cvmfs.sh", "liveness"]
+          initialDelaySeconds: 60
+          periodSeconds: 300
+        lifecycle:
+          preStop:
+            exec:
+              # Properly unmount the /cvmfs-k8s/mounts area, i.e.
+              # avoid "transport endpoint not connected"
+              command: ["/usr/bin/terminate.sh"]
+        resources:
+          # No limits (fuse resource consumption is partly imposed by the kernel)
+          requests:
+            memory: 0.5Gi
+            cpu: 0.01
+        volumeMounts:
+        - mountPath: /dev/fuse
+          name: fuse-device
+        - mountPath: /cvmfs
+          name:  cvmfs-noderoot
+          subPath: cvmfs-k8s/mounts
+          # Make cvmfs fuse mounts visible on the node
+          mountPropagation: Bidirectional
+        - mountPath: /var/lib/cvmfs
+          name:  cvmfs-noderoot
+          subPath: cvmfs-k8s/cache
+      volumes:
+      - name: fuse-device
+        hostPath:
+          path: /dev/fuse
+          type: CharDevice
+      - name: cvmfs-noderoot
+        persistentVolumeClaim:
+          claimName: cvmfs-noderoot

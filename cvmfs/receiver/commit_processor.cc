@@ -99,7 +99,8 @@ CommitProcessor::~CommitProcessor() {}
  */
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
-    const shash::Any& new_root_hash, const RepositoryTag& tag) {
+    const shash::Any& new_root_hash, const RepositoryTag& tag,
+    uint64_t *final_revision) {
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
   if (HasPrefix(final_tag.name_, "generic-", false)) {
@@ -206,7 +207,7 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   std::string new_manifest_path;
-  if (!merge_tool.Run(params, &new_manifest_path)) {
+  if (!merge_tool.Run(params, &new_manifest_path, final_revision)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Catalog merge failed");
     return kMergeFailure;

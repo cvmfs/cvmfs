@@ -1,16 +1,35 @@
 2.8.0:
+  * Fix reflog repair when there is a zombie hash in the manifest (CVM-1919)
+  * [server] add `enter` command to open an ephemeral environment that gives
+    writable access to a repository (CVM-1924)
+  * [ducc] add support for pulling Docker images with authenticated user
+    using CVMFS_DOCKERHUB_[USER|PASS] environment variables
+  * [gc] show progress during sweep phase (CVM-1929)
+  * [server] add support for wait & retry on opening transactions (CVM-1937)
+  * [server] let return code of transaction indicate the error (CVM-1873)
+  * Fix ingestion of hardlinked catalog markers (CVM-1931)
+  * Add `cvmfs_talk chroot <hash>` command
+  * Add CVMFS_TALK_SOCKET and CVMFS_TALK_OWNER client parameters
+  * Add `cvmfs_server transaction -T /foo=/bar` template transactions (CVM-1801)
+  * Refuse non-regular .cvmfscatalog files during publish (CVM-1868)
+  * Replace `swissknife hash` by `publish hash` including MD5 support
+  * Add experimental support for WSL2
+  * [deb] demote apache2 dependency from required to recommended
+  * Add support for Azure blob storage as an S3 backend
+  * Add a Docker service container as a new package type
   * [macOS] update libressl to version 3.1.2
   * Update c-ares to version 1.16.1
   * Update libcurl to version 7.71.1
   * Update sqlite to version 3.32.2
   * Fix ingest into root directory
   * Spawn watchdog for `swissknife sync` command
-  * Add 'chunk_list' magic extended attribute
+  * Add 'chunk_list' magic extended attribute (CVM-1875)
   * Remove perl as a package dependency
   * [libcvmfs] add cvmfs_options_parse_default()
   * [libcvmfs] add cvmfs_listdir_stat()
   * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
   * Parallelize catalog traversal in garbage collection
+  * [gw] publish files without writing temporaries to disk (CVM-1793)
   * Improve performance of uploading small objects to S3
   * Fix double counting in swissknife filestats command
   * [ducc] Parallelize check if images are up to date
@@ -37,7 +56,17 @@
   * Add POSIX external cache plugin (CVM-1823)
   * Manage DUCC daemon with systemd units
 
+2.7.6:
+
+2.7.5:
+  * Fix crash when kernel meta-data caches close to 4G get evicted (CVM-1918)
+  * Add CVMFS_CLIENT_PROFILE, CVMFS_USE_CDN to cvmfs_config parameter list
+  * Let mount helper detect defined but empty CVMFS_HTTP_PROXY
+
 2.7.4:
+  * Fix name clash with certain concurrently hosted repository names (CVM-1899)
+  * [gw] fix statistics counting on renaming of nested subtrees (CVM-1906)
+  * Fix ingestion of tarballs with leading slashes (CVM-1907)
   * Build cvmfs-fuse3 on Ubuntu 20.04 (CVM-1898)
   * Remove insserv and initscripts as cvmfs-server dependencies (CVM-1897)
 

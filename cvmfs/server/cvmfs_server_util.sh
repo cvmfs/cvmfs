@@ -237,7 +237,7 @@ is_mounted() {
   # Use canonicalize-missing because the mount point can be broken and
   # inaccessible
   absolute_mnt="$(readlink --canonicalize-missing $mountpoint)" || return 2
-  local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
+  local mnt_record="$(cat /proc/mounts 2>/dev/null | grep -F " $absolute_mnt ")"
   if [ x"$mnt_record" = x"" ]; then
     return 1
   fi
@@ -649,13 +649,15 @@ _setcap_if_needed() {
 }
 
 
-# grants CAP_SYS_ADMIN to cvmfs_swissknife if it is necessary
+# grants CAP_SYS_ADMIN to cvmfs_swissknife and cvmfs_publish if it is necessary
 # Note: OverlayFS uses trusted extended attributes that are not readable by a
 #       normal unprivileged process
 ensure_swissknife_suid() {
   local unionfs="$1"
   local sk_bin="/usr/bin/$CVMFS_SERVER_SWISSKNIFE"
   local sk_dbg_bin="/usr/bin/${CVMFS_SERVER_SWISSKNIFE}_debug"
+  local pb_bin="/usr/bin/cvmfs_publish"
+  local pb_dbg_bin="/usr/bin/cvmfs_publish_debug"
   local cap_read="cap_dac_read_search"
   local cap_overlay="cap_sys_admin"
 
@@ -664,9 +666,13 @@ ensure_swissknife_suid() {
   if [ x"$unionfs" = x"overlayfs" ]; then
     _setcap_if_needed "$sk_bin"     "${cap_read},${cap_overlay}+p" || return 3
     _setcap_if_needed "$sk_dbg_bin" "${cap_read},${cap_overlay}+p" || return 4
+    _setcap_if_needed "$pb_bin"     "${cap_read},${cap_overlay}+p" || return 5
+    _setcap_if_needed "$pb_dbg_bin" "${cap_read},${cap_overlay}+p" || return 6
   else
     _setcap_if_needed "$sk_bin"     "${cap_read}+p" || return 1
     _setcap_if_needed "$sk_dbg_bin" "${cap_read}+p" || return 2
+    _setcap_if_needed "$pb_bin"     "${cap_read}+p" || return 7
+    _setcap_if_needed "$pb_dbg_bin" "${cap_read}+p" || return 8
   fi
 }
 
@@ -1065,11 +1071,11 @@ cvmfs_server_update_geodb() {
 # @return   0 if the command was recognized
 is_subcommand() {
   local subcommand="$1"
-  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
-    resign list info tag list-tags lstags check transaction abort snapshot           \
-    skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
-    eliminate-hardlinks eliminate-bulk-hashes update-info update-repoinfo mount \
-    fix-permissions masterkeycard ingest merge-stats print-stats"
+  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs   \
+    resign list info tag list-tags lstags check transaction enter abort snapshot    \
+    skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
+    eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
+    mount fix-permissions masterkeycard ingest merge-stats print-stats"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1205,9 +1211,7 @@ Supported Commands:
                   <fully qualified name>
                   Checks if the repository is sane
   transaction     [-r (retry if unable to acquire lease]
-                  [-i INT (initial retry delay seconds)]
-                  [-m INT (max retry delay seconds)]
-                  [-n INT (max number of retries)]
+                  [-T /template-from=/template-to]
                   <fully qualified name>
                   Start to edit a repository
   snapshot        [-t fail if other snapshot is in progress]

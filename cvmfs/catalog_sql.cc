@@ -25,6 +25,9 @@ namespace catalog {
  *
  * Repository rollbacks to an outdated catalog schema is not supported. Have a
  * look into CVM-252 if that becomes necessary at some point.
+ *
+ * If the statistics counters get modified, the swissknife migration 'stats'
+ * tools needs to be modified, too.
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  */
 

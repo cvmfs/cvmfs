@@ -431,6 +431,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
       "HandleCommit: Could not extract statistics counters from request");
   }
+  uint64_t final_revision;
 
   // Here we use the path to commit the changes!
   UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
@@ -444,12 +445,13 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
                          tag_description_json->string_value);
   CommitProcessor::Result res = proc->Process(lease_path_json->string_value,
                                               old_root_hash, new_root_hash,
-                                              repo_tag);
+                                              repo_tag, &final_revision);
 
   JsonStringGenerator reply_input;
   switch (res) {
     case CommitProcessor::kSuccess:
       reply_input.Add("status", "ok");
+      reply_input.Add("final_revision", static_cast<int>(final_revision));
       break;
     case CommitProcessor::kError:
       reply_input.Add("status", "error");

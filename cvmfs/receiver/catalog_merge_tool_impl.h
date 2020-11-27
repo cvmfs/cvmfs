@@ -52,7 +52,7 @@ namespace receiver {
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
-    const Params& params, std::string* new_manifest_path) {
+    const Params& params, std::string* new_manifest_path, uint64_t *final_rev) {
   UniquePtr<upload::Spooler> spooler;
   perf::StatisticsTemplate stats_tmpl("publish", statistics_);
   counters_ = new perf::FsCounters(stats_tmpl);
@@ -77,6 +77,8 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
   bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
 
   ret &= CreateNewManifest(new_manifest_path);
+
+  *final_rev = manifest_->revision();
 
   output_catalog_mgr_.Destroy();
 
@@ -148,15 +150,18 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
       output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()),
                                                false);
     }
+
     output_catalog_mgr_->RemoveDirectory(rel_path.c_str());
     perf::Inc(counters_->n_directories_removed);
   } else if (entry.IsRegular() || entry.IsLink()) {
     AbortIfHardlinked(entry);
     output_catalog_mgr_->RemoveFile(rel_path.c_str());
+
     if (entry.IsLink())
       perf::Inc(counters_->n_symlinks_removed);
     else
       perf::Inc(counters_->n_files_removed);
+
     perf::Xadd(counters_->sz_removed_bytes, entry.size());
   }
 }
@@ -211,11 +216,20 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
 
   } else if (entry1.IsDirectory() && (entry2.IsRegular() || entry2.IsLink())) {
     // From directory to file
+    if (entry1.IsNestedCatalogMountpoint()) {
+      // we merge the nested catalog with its parent, it will be the recursive
+      // procedure that will take care of deleting all the files.
+      output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()),
+                                               /* merge = */ true);
+    }
+
     catalog::DirectoryEntry modified_entry = entry2;
     SplitHardlink(&modified_entry);
     const catalog::DirectoryEntryBase* base_entry =
         static_cast<const catalog::DirectoryEntryBase*>(&modified_entry);
+
     output_catalog_mgr_->RemoveDirectory(rel_path.c_str());
+
     if (entry2.IsChunkedFile()) {
       assert(!chunks.IsEmpty());
       output_catalog_mgr_->AddChunkedFile(*base_entry, xattrs, parent_path,
@@ -223,8 +237,9 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     } else {
       output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
     }
+
     perf::Inc(counters_->n_directories_removed);
-    if (entry1.IsLink())
+    if (entry2.IsLink())
       perf::Inc(counters_->n_symlinks_added);
     else
       perf::Inc(counters_->n_files_added);

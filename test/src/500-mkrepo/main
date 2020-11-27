@@ -46,6 +46,16 @@ cvmfs_run_test() {
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
+  echo "*** checking transaction retries"
+  cvmfs_server transaction $CVMFS_TEST_REPO
+  # Expect EEXIST
+  [ $? -eq 17 ] || return 30
+  cvmfs_server transaction -t 0 $CVMFS_TEST_REPO &
+  local pid_txn=$!
+  sleep 2
+  abort_transaction $CVMFS_TEST_REPO || return 31
+  wait $pid_txn || return 32
+
   echo "putting some stuff in the new repository"
   produce_files_in $repo_dir || return 3
 
@@ -71,6 +81,12 @@ cvmfs_run_test() {
 
   destroy_repo $CVMFS_TEST500_LONG_REPONAME || return $?
   CVMFS_TEST500_LONG_REPONAME=
+
+  echo "*** Repo name mix-up (CVM-1899)"
+  create_empty_repo repo-test.example.org $CVMFS_TEST_USER || return 20
+  create_empty_repo repo.test.example.org $CVMFS_TEST_USER || return 21
+  destroy_repo repo.test.example.org || return 22
+  destroy_repo repo-test.example.org || return 23
 
   return 0
 }

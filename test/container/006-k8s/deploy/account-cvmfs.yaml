@@ -1,0 +1,8 @@
+#
+# The nodeplugin identity with which the daemonset calls the k8s API
+#
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cvmfs-nodeplugin
+  namespace: cvmfs

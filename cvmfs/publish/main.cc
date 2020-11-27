@@ -12,6 +12,7 @@
 #include "logging.h"
 #include "publish/cmd_diff.h"
 #include "publish/cmd_enter.h"
+#include "publish/cmd_hash.h"
 #include "publish/cmd_help.h"
 #include "publish/cmd_info.h"
 #include "publish/cmd_mkfs.h"
@@ -70,6 +71,7 @@ int main(int argc, char **argv) {
   commands.TakeCommand(new publish::CmdDiff());
   commands.TakeCommand(new publish::CmdHelp(&commands));
   commands.TakeCommand(new publish::CmdZpipe());
+  commands.TakeCommand(new publish::CmdHash());
 
   if (argc < 2) {
     Usage(argv[0], commands);
@@ -95,7 +97,14 @@ int main(int argc, char **argv) {
     publish::Command::Options options = command->ParseOptions(argc, argv);
     return command->Main(options);
   } catch (const publish::EPublish& e) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
+    if (e.failure() == publish::EPublish::kFailInvocation) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Invocation error: %s", e.msg().c_str());
+    } else if (e.failure() == publish::EPublish::kFailMissingDependency) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Missing dependency: %s", e.msg().c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
+    }
     return 1;
   }
 }

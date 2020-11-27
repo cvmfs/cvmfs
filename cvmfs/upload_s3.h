@@ -118,6 +118,7 @@ class S3Uploader : public AbstractUploader {
   std::string host_name_port_;
   std::string host_name_;
   std::string region_;
+  std::string flavor_;
   std::string bucket_;
   bool dns_buckets_;
   int num_parallel_uploads_;

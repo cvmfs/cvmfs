@@ -82,7 +82,8 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_IPFAMILY_PREFER CVMFS_DNS_RETRIES CVMFS_DNS_TIMEOUT \
           CVMFS_AUTHZ_HELPER CVMFS_AUTHZ_SEARCH_PATH CVMFS_WORKSPACE \
           CVMFS_EXTERNAL_SERVER_URL CVMFS_EXTERNAL_TIMEOUT CVMFS_EXTERNAL_TIMEOUT_DIRECT \
-          CVMFS_EXTERNAL_HTTP_PROXY CVMFS_EXTERNAL_FALLBACK_PROXY CVMFS_CACHE_PRIMARY"
+          CVMFS_EXTERNAL_HTTP_PROXY CVMFS_EXTERNAL_FALLBACK_PROXY CVMFS_CACHE_PRIMARY \
+          CVMFS_CLIENT_PROFILE CVMFS_USE_CDN"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI CVMFS_CLAIM_OWNERSHIP \
@@ -129,27 +130,64 @@ compare_versions() {
 }
 
 cvmfs_config_usage() {
- echo "Common configuration tasks for CernVM-FS"
- echo "Usage: $0 <command>"
- echo "Commands are"
- echo "  setup [nouser] [nocfgmod] [nostart]"
- echo "  chksetup"
- echo "  showconfig [-s(hort output, only non-empty parameters)] [<repository>]"
- echo "  stat [-v | <repository>]"
- echo "  status"
- echo "  probe [<repository list>]"
- echo "  fsck [<cvmfs_fsck options>]"
- echo "  reload [-c | <repository>]"
- echo "  umount"
- echo "  wipecache"
- echo "  killall"
- echo "  bugreport"
+  echo "Common configuration tasks for CernVM-FS"
+  echo "Usage: $0 <command>"
+  echo "Commands are"
+  echo "  setup [nouser] [nocfgmod] [nostart]"
+  if is_wsl2; then
+    echo "  wsl2_start"
+  fi
+  echo "  chksetup"
+  echo "  showconfig [-s(hort output, only non-empty parameters)] [<repository>]"
+  echo "  stat [-v | <repository>]"
+  echo "  status"
+  echo "  probe [<repository list>]"
+  echo "  fsck [<cvmfs_fsck options>]"
+  echo "  reload [-c | <repository>]"
+  echo "  umount"
+  echo "  wipecache"
+  echo "  killall"
+  echo "  bugreport"
 }
 
 has_selinux() {
   which getenforce > /dev/null 2>&1 && \
   which semodule   > /dev/null 2>&1 && \
   getenforce | grep -qi "enforc" || return 1
+}
+
+is_wsl2() {
+  # Another possibility is looking for the /run/WSL directory
+  grep -q microsoft-standard /proc/version 2>/dev/null
+}
+
+cvmfs_wsl2_start() {
+  is_wsl2 || die "WSL2 not detected, exiting"
+  [ $(id -u) -eq 0 ] || die "root privileges required"
+  if $pidof automount >/dev/null; then
+    echo "[WSL2] automounter already running"
+    exit 0
+  fi
+
+  local automounter="/usr/sbin/automount"
+  local automount_config=
+  if [ -f /etc/sysconfig/autofs ]; then
+    automount_config=/etc/sysconfig/autofs
+  elif [ -f /etc/default/autofs ]; then
+    automount_config=/etc/default/autofs
+  fi
+
+  local automounter=/usr/sbin/automount
+  echo "[WSL2] starting automounter"
+  $(
+    if [ -n $automount_config ]; then
+      . $automount_config
+    fi
+    $automounter $OPTIONS --pid-file /var/run/autofs.pid
+  )
+
+  # return value: process found
+  $pidof automount >/dev/null
 }
 
 cvmfs_setup() {
@@ -399,7 +437,7 @@ cvmfs_chksetup() {
     fi
 
     # Check autofs' kill mode when systemd managed
-    if [ -e /usr/bin/systemctl ]; then
+    if [ -e /usr/bin/systemctl -a ! is_wsl2 ]; then
       if ! /usr/bin/systemctl show -p KillMode autofs.service | grep -q process;
       then
         echo "Warning: autofs kill mode is not 'process', busy CernVM-FS mount points are likely to be forcefully killed when autofs is restarted"
@@ -1350,7 +1388,6 @@ cvmfs_bugreport() {
                  'ls -lR /var/run/cvmfs' 'grep cvmfs /var/log/messages' 'grep cvmfs /var/log/syslog' \
                  'journalctl -alm /usr/bin/cvmfs2' \
                  'journalctl -alm /usr/libexec/cvmfs/cache/cvmfs_cache_ram' \
-                 'journalctl -alm /usr/libexec/cvmfs/cache/cvmfs_cache_posix' \
                  "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
                  'cvmfs_config probe' 'mount' 'df -h' 'ps -ef' \
                  'cvmfs_config status' 'cvmfs_config showconfig' \
@@ -1712,6 +1749,12 @@ activate_service() {
 
   case $sys_arch in
     Linux )
+      if is_wsl2; then
+        echo "[WSL2] skipping activation of $1"
+	echo "[WSL2] start CernVM-FS with 'sudo cvmfs_config wsl2_start'"
+        exit 0
+      fi
+
       if [ -e /usr/bin/systemctl ]; then
         /usr/bin/systemctl start -q ${svc}.service
         /usr/bin/systemctl enable -q ${svc}.service
@@ -1753,6 +1796,14 @@ reload_service() {
 
   case $sys_arch in
     Linux )
+      if is_wsl2; then
+        [ "$svc" == "autofs" ] || die "[WSL2] internal error, expected autofs service ('$svc')"
+	echo -n "WSL2 automounter "
+	local autofs_pid=$(cat /var/run/autofs.pid)
+	/usr/bin/kill -HUP $autofs_pid
+	return 0
+      fi
+
       if [ -e /usr/bin/systemctl ]; then
         /usr/bin/systemctl reload -q ${svc}.service
       elif [ -e /sbin/service -o -e /usr/sbin/service ]; then
@@ -1799,7 +1850,7 @@ configure_autofs() {
         fi
       done
       # Fix 'systemctl restart autofs' on CentOS 7 (CVM-1200)
-      if [ -e /usr/bin/systemctl ]; then
+      if [ -e /usr/bin/systemctl -a ! is_wsl2 ]; then
         if /usr/bin/systemctl show -p KillMode autofs.service | \
            grep -q control-group;
         then
@@ -2174,6 +2225,12 @@ case "$1" in
      fi
      shift 1
      cvmfs_bugreport $@
+     RETVAL=$?
+     ;;
+
+   wsl2_start)
+     shift 1
+     cvmfs_wsl2_start $@
      RETVAL=$?
      ;;
 

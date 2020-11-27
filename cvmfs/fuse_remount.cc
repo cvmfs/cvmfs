@@ -27,6 +27,42 @@
 using namespace std;  // NOLINT
 
 
+FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
+  if (mountpoint_->catalog_mgr()->GetRootHash() == root_hash)
+    return kStatusUp2Date;
+
+  FenceGuard fence_guard(&fence_maintenance_);
+  if (IsInMaintenanceMode())
+    return kStatusMaintenance;
+
+  if (atomic_cas32(&drainout_mode_, 0, 1)) {
+    // As of this point, fuse callbacks return zero as cache timeout
+    LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
+    invalidator_handle_.Reset();
+    invalidator_->InvalidateInodes(&invalidator_handle_);
+    atomic_inc32(&drainout_mode_);
+    // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug, "already in drainout mode, leaving");
+    return kStatusDraining;
+  }
+
+  int32_t drainout_code = 0;
+  BackoffThrottle throttle;
+  do {
+    TryFinish(root_hash);
+    drainout_code = atomic_read32(&drainout_mode_);
+    if (drainout_code == 0)
+      break;
+    throttle.Throttle();
+  } while (true);
+
+  if (mountpoint_->catalog_mgr()->GetRootHash() == root_hash)
+    return kStatusUp2Date;
+  return kStatusFailGeneral;
+}
+
+
 /**
  * Executed by the trigger thread, or triggered from cvmfs_talk.  Moves into
  * drainout mode if a new catalog is available online.
@@ -257,7 +293,7 @@ void FuseRemounter::Spawn() {
  * immediately except when a new catalog is available and the kernel caches are
  * flushed.
  */
-void FuseRemounter::TryFinish() {
+void FuseRemounter::TryFinish(const shash::Any &root_hash) {
   FenceGuard fence_guard(&fence_maintenance_);
   if (IsInMaintenanceMode())
     return;
@@ -286,7 +322,12 @@ void FuseRemounter::TryFinish() {
 
   // Ensure that all Fuse callbacks left the catalog query code
   fence_->Drain();
-  catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(false);
+  catalog::LoadError retval;
+  if (root_hash.IsNull()) {
+    retval = mountpoint_->catalog_mgr()->Remount(false);
+  } else {
+    retval = mountpoint_->catalog_mgr()->ChangeRoot(root_hash);
+  }
   if (mountpoint_->inode_annotation()) {
     inode_generation_info_->inode_generation =
       mountpoint_->inode_annotation()->GetGeneration();

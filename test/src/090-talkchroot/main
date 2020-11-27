@@ -1,0 +1,27 @@
+
+cvmfs_test_name="cvmfs_talk chroot"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount cernvm-prod.cern.ch || return 1
+  ls /cvmfs/cernvm-prod.cern.ch/.cvmfs/snapshots/cernvm-system-4.1.0.0 || return 2
+
+  local head_root=$(get_xattr root_hash /cvmfs/cernvm-prod.cern.ch)
+  local tag_root=$(sudo cvmfs_talk -i cernvm-prod.cern.ch cache list catalogs |\
+    grep cernvm-system-4.1.0.0 | awk '{print $NF}' | tr -d \(\))
+
+  echo "*** HEAD root hash: $head_root"
+  echo "*** TAG 4.1.0.0 root hash: $tag_root"
+  [ "x$head_root" != "x$tag_root" ] || return 10
+
+  sudo cvmfs_talk -i cernvm-prod.cern.ch chroot $tag_root || return 20
+
+  local new_root=$(get_xattr root_hash /cvmfs/cernvm-prod.cern.ch)
+  echo "*** CHROOT to hash: $new_root"
+  [ "x$new_root" = "x$tag_root" ] || return 30
+  ls /cvmfs/cernvm-prod.cern.ch/cvm4/.installed_cernvm-system-4.1.0.0 || return 31
+
+  return 0
+}

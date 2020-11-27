@@ -137,6 +137,11 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
   return retval == 0;
 }
 
+inline bool platform_umount_lazy(const char *mountpoint) {
+  int retval = umount2(mountpoint, MNT_DETACH);
+  return retval == 0;
+}
+
 /**
  * Spinlocks are not necessarily part of pthread on all platforms.
  */

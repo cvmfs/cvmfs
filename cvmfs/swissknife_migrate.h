@@ -292,6 +292,24 @@ class CommandMigrate : public Command {
     bool RemoveRedundantBulkHashes(PendingCatalog *data) const;
   };
 
+  // Regenerate / repair statistics counters
+  class StatsMigrationWorker :
+    public AbstractMigrationWorker<StatsMigrationWorker>
+  {
+    friend class AbstractMigrationWorker<StatsMigrationWorker>;
+
+   public:
+    explicit StatsMigrationWorker(const worker_context *context);
+
+   protected:
+    bool RunMigration(PendingCatalog *data) const;
+
+    bool CheckDatabaseSchemaCompatibility(PendingCatalog *data) const;
+    bool StartDatabaseTransaction(PendingCatalog *data) const;
+    bool RepairStatisticsCounters(PendingCatalog *data) const;
+    bool CommitDatabaseTransaction(PendingCatalog *data) const;
+  };
+
  public:
   CommandMigrate();
   ~CommandMigrate() { }

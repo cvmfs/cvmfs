@@ -1,6 +1,5 @@
 cvmfs_test_name="Stratum1 / preloaded snapshot with uncompressed and external files"
 cvmfs_test_autofs_on_startup=false
-cvmfs_test_suites="quick"
 
 produce_more_files_in() {
   local working_dir=$1
@@ -49,8 +48,8 @@ graft_external() {
   local external_storage=$3
 
   echo "I'm external" | cvmfs_swissknife zpipe > ${external_storage}/external_file
-  local hash=$(cat ${external_storage}/external_file | cvmfs_swissknife hash -a shake128)
-  local size=$(cat ${external_storage}/external_file | cvmfs_swissknife zpipe -d | wc -c)
+  local hash=$(cat ${external_storage}/external_file | cvmfs_publish hash -a shake128)
+  local size=$(cat ${external_storage}/external_file | cvmfs_publish zpipe -d | wc -c)
   touch ${cvmfs_dir}/external_file
   cat > ${cvmfs_dir}/.cvmfsgraft-external_file << EOF
 checksum=$hash

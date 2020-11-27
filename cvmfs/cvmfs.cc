@@ -1659,7 +1659,7 @@ class UptimeMagicXattr : public BaseMagicXattr {
 
 /**
  * Register cvmfs.cc-specific magic extended attributes to mountpoint's
- * magic xattribute manager 
+ * magic xattribute manager
  */
 static void RegisterMagicXattrs() {
   MagicXattrManager *mgr = cvmfs::mount_point_->magic_xattr_mgr();
@@ -1803,9 +1803,23 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   // Control & command interface
   cvmfs::talk_mgr_ = TalkManager::Create(
-    "./cvmfs_io." + cvmfs::mount_point_->fqrn(),
+    cvmfs::mount_point_->talk_socket_path(),
     cvmfs::mount_point_,
     cvmfs::fuse_remounter_);
+  if ((cvmfs::mount_point_->talk_socket_uid() != 0) ||
+      (cvmfs::mount_point_->talk_socket_gid() != 0))
+  {
+    uid_t tgt_uid = cvmfs::mount_point_->talk_socket_uid();
+    gid_t tgt_gid = cvmfs::mount_point_->talk_socket_gid();
+    int rvi = chown(cvmfs::mount_point_->talk_socket_path().c_str(),
+                    tgt_uid, tgt_gid);
+    if (rvi != 0) {
+      *g_boot_error = std::string("failed to set talk socket ownership - ")
+        + "target " + StringifyInt(tgt_uid) + ":" + StringifyInt(tgt_uid)
+        + ", user " + StringifyInt(geteuid()) + ":" + StringifyInt(getegid());
+      return loader::kFailTalk;
+    }
+  }
   if (cvmfs::talk_mgr_ == NULL) {
     *g_boot_error = "failed to initialize talk socket (" +
                     StringifyInt(errno) + ")";

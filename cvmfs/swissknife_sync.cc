@@ -783,7 +783,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
           FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any());
     } else {
       manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                     params.base_hash);
+                                     shash::Any());
+                                  // TODO(jblomer): revert to params.base_hash);
     }
   }
   if (!manifest) {
@@ -803,6 +804,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
+  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations

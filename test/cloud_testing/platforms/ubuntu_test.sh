@@ -1,5 +1,5 @@
 
-
+export CVMFS_PLATFORM_NAME="ubuntu$(. /etc/os-release && echo "$VERSION_ID")-$(uname -m)"
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
@@ -12,43 +12,32 @@ run_unittests --gtest_shuffle \
 
 
 CVMFS_EXCLUDE=
-if [ x"$(lsb_release -cs)" = x"bionic" ]; then
-  # Ubuntu 18.04
-  # Kernel sources too old for gcc, TODO
-  CVMFS_EXCLUDE="src/006-buildkernel"
-  # Expected failure, see test case
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
-  # Hardlinks do not work with overlayfs
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
-
-  echo "Ubuntu 18.04... using overlayfs"
-  export CVMFS_TEST_UNIONFS=overlayfs
-fi
-if [ x"$(lsb_release -cs)" = x"xenial" ]; then
-  # Ubuntu 16.04
-  # Kernel sources too old for gcc, TODO
-  CVMFS_EXCLUDE="src/006-buildkernel"
-  # Expected failure, see test case
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
-
-  # Hardlinks do not work with overlayfs
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
-
-  echo "Ubuntu 16.04... using overlayfs"
-  export CVMFS_TEST_UNIONFS=overlayfs
-fi
-if [ x"$(lsb_release -cs)" = x"trusty" ]; then
-  # Ubuntu 14.04
-  # aufs, expected failure, disable gateway, disable notification system
-  CVMFS_EXCLUDE="src/585-xattrs src/673-acl src/700-overlayfs_validation src/8* src/9*"
-
-  # CVMFS config repository not enabled on Ubuntu 14.04
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/050-configrepo src/085-reloadmany src/086-reloadmanualmount"
-
-  echo "Ubuntu 14.04... using aufs instead of overlayfs"
+ubuntu_release="$(lsb_release -cs)"
+if [ "x$ubuntu_release" == "xxenial" ]; then
+   # This test has shown to occasionally hang in the GDB attach on Ubuntu 16
+   CVMFS_EXCLUDE="$CVMFS_EXCLUDE 015-rebuild_on_crash"
 fi
 
+# Kernel sources too old for gcc, TODO
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/006-buildkernel"
+# Expected failure, see test case
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
+
+# Hardlinks do not work with overlayfs
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+
+if [ "x$ubuntu_release" = "xxenial" ]; then
+  # Ubuntu 16.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+fi
+
+if [ "x$ubuntu_release" = "xbionic" ]; then
+  # Ubuntu 18.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+fi
+
+export CVMFS_TEST_UNIONFS=overlayfs
 
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
