@@ -251,12 +251,8 @@ void SyncMediator::LeaveDirectory(SharedPtr<SyncItem> entry)
  * To be called after change set traversal is finished.
  */
 bool SyncMediator::Commit(manifest::Manifest *manifest) {
-  if (!params_->print_changeset && changed_items_ >= processing_dot_interval) {
-    // line break the 'progress bar', see SyncMediator::PrintChangesetNotice()
-    LogCvmfs(kLogPublish, kLogStdout, "");
-  }
-
   if (!params_->print_changeset) {
+    reporter_->CommitReport();
     LogCvmfs(kLogPublish, kLogStdout, "");
   }
   LogCvmfs(kLogPublish, kLogStdout,
@@ -808,6 +804,12 @@ void SyncDiffReporter::OnModify(const std::string &path,
                                 const catalog::DirectoryEntry &entry_to) {
   changed_items_++;
   ModifyImpl(path);
+}
+
+void SyncDiffReporter::CommitReport() {
+  if (changed_items_ >= processing_dot_interval_) {
+  LogCvmfs(kLogPublish, kLogStdout, "");
+  }
 }
 
 void SyncDiffReporter::PrintDots() {

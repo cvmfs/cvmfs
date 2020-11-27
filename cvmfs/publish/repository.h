@@ -61,6 +61,7 @@ class __attribute__((visibility("default"))) DiffListener {
   virtual void OnModify(const std::string &path,
                         const catalog::DirectoryEntry &entry_from,
                         const catalog::DirectoryEntry &entry_to) = 0;
+  virtual void CommitReport() = 0;
 };
 
 

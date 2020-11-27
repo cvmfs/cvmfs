@@ -76,6 +76,7 @@ class SyncDiffReporter : public DiffListener {
   virtual void OnModify(const std::string &path,
                         const catalog::DirectoryEntry &entry_from,
                         const catalog::DirectoryEntry &entry_to);
+  virtual void CommitReport();
 
  private:
   void PrintDots();
