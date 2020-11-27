@@ -483,6 +483,13 @@ run_unittests() {
   local ut_retval=$?
   check_result $ut_retval
 
+
+  cat > $UNITTEST_LOGFILE << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
+  <testsuite hostname="$CVMFS_PLATFORM_NAME" name="$CVMFS_TEST_SUITE_NAME" timestamp="$CVMFS_TIMESTAMP" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
+EOF
+
   return $ut_retval
 }
 
