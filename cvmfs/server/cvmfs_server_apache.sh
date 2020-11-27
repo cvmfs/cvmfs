@@ -66,8 +66,14 @@ check_url() {
   local url="$1"
   local timeout="$2"
 
+  local certificate=""
+  if [ x"$X509_CERT_BUNDLE" != "x" ]; then
+      certificate="--cacert $X509_CERT_BUNDLE"
+  fi
+
   curl -f -I --max-time $timeout \
     --retry 2 --retry-delay 5 \
+    $certificate \
     $(get_follow_http_redirects_flag) "$url" >/dev/null 2>&1
 }
 
