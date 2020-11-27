@@ -62,6 +62,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/600-securecvmfs                          \
                                    src/647-bearercvmfs                          \
                                    src/673-acl                                  \
+                                   src/820-https_s3                             \
                                    $CVMFS_EXCLUDE                               \
                                    --                                           \
                                    src/5*                                       \
