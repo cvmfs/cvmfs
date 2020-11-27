@@ -139,6 +139,12 @@ start_minio() {
 }
 
 cvmfs_run_test() {
+
+    # lets run this test only in the S3 suite
+    if [ x"$CVMFS_TEST_S3_CONFIG" == x"" ]; then
+        return 0
+    fi
+
     trap clean_up EXIT HUP INT TERM || return $?
 
     create_https_certificates || return 1
