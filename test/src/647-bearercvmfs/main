@@ -67,8 +67,8 @@ cleanup() {
   [ -z "$TEST647_TESTCRL_HASH"                 ] || sudo rm -f $TEST647_TESTCRL_HASH
   [ -z "$TEST647_TESTSIGNING_HASH"             ] || sudo rm -f $TEST647_TESTSIGNING_HASH
   [ -z "$TEST647_AUTHZ_HELPER"                 ] || sudo rm -f $TEST647_AUTHZ_HELPER
-  [ -z "$TEST647_WSGI_SCRIPT"                 ] || sudo rm -f $TEST647_WSGI_SCRIPT
-  [ -z "$TEST647_WSGI_HELPER"                 ] || sudo rm -f $TEST647_WSGI_HELPER
+  [ -z "$TEST647_WSGI_SCRIPT"                  ] || sudo rm -f $TEST647_WSGI_SCRIPT
+  [ -z "$TEST647_WSGI_HELPER"                  ] || sudo rm -f $TEST647_WSGI_HELPER
   [ -z "$TEST647_HTTPD_DROPIN"                 ] || sudo rm -f $TEST647_HTTPD_DROPIN
   [ -z "$TEST647_HOSTNAME"                     ] || sudo sed -i -e "/$TEST647_HOSTNAME/d" /etc/hosts
   if [ ! -z "$TEST647_PRIVATE_MOUNT" ]; then
