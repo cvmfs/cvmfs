@@ -39,7 +39,10 @@
 //     * Add cvmfs_options_parse_default
 //     * Add cvmfs_listdir_stat
 //     * Add catalog counters to struct cvmfs_nc_attr
-#define LIBCVMFS_REVISION 29
+// 30: CernVM-FS 2.8
+//     * Implement cvmfs_remount()
+//     * Add cvmfs_get_revision()
+#define LIBCVMFS_REVISION 30
 
 #include <stdint.h>
 #include <sys/stat.h>
@@ -343,8 +346,8 @@ void cvmfs_detach_repo(cvmfs_context *ctx);
 
 
 /**
- * Load a new catalog if there is one.  Currently not implemented.
- * \return 0 on success
+ * Load a new catalog if there is one.
+ * \return 0 on success (up to date or new catalog loaded), -1 otherwise
  */
 int cvmfs_remount(cvmfs_context *ctx);
 
@@ -529,6 +532,11 @@ int cvmfs_list_nc(
 * @param[in] buf, pointer to the list that was allocated.
 */
 void cvmfs_list_free(char **buf);
+
+/**
+ * Return the root file catalog revision
+ */
+uint64_t cvmfs_get_revision(cvmfs_context *ctx);
 
 #ifdef __cplusplus
 }
