@@ -240,6 +240,17 @@ do
     continue
   fi
 
+  cvmfs_test_timeout=
+  cvmfs_test_timeout=$(. $t/main && echo $cvmfs_test_timeout)
+  if [ x"$cvmfs_test_timeout" = x ]; then
+    if is_in_suite $t quick; then
+      # Default 5min timeout for quick tests
+      cvmfs_test_timeout=300
+    else
+      cvmfs_test_timeout=0
+    fi
+  fi
+
   # configure the environment for the test
   setup_retval=0
   setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1 || setup_retval=$?
@@ -256,14 +267,20 @@ do
 
   # run the test
   test_start=$(get_millisecond_epoch)
-  bash $debug -c ". ./test_functions                     && \
-                  . $t/main                              && \
-                  cd $workdir                            && \
-                  cvmfs_run_test $logfile $(pwd)/${t}    && \
-                  retval=\$?                             && \
-                  retval=\$(mangle_test_retval \$retval) && \
-                  exit \$retval" >> $logfile 2>&1
+  timeout -s HUP $cvmfs_test_timeout \
+    bash $debug -c "PID=\$\$                                                 && \
+                    trap 'echo KILLING:\$PID; pkill -P \$PID; exit 124' HUP  && \
+                    . ./test_functions                                       && \
+                    . $t/main                                                && \
+                    cd $workdir                                              && \
+                    cvmfs_run_test $logfile $(pwd)/${t}                      && \
+                    retval=\$?                                               && \
+                    retval=\$(mangle_test_retval \$retval)                   && \
+                    exit \$retval" >> $logfile 2>&1
   RETVAL=$?
+  if [ $RETVAL -eq 124 ]; then
+    RETVAL=$CVMFS_TEST_RETVAL_TIMEOUT
+  fi
   test_end=$(get_millisecond_epoch)
   test_time_elapsed=$(( ( $test_end - $test_start ) ))
   echo "execution took $(milliseconds_to_seconds $test_time_elapsed) seconds" >> $logfile
@@ -306,6 +323,12 @@ do
       report_warning "Test case finished with warnings!" >> $logfile
       touch ${scratchdir}/generalwarning
       echo "Warning!"
+      ;;
+    $CVMFS_TEST_RETVAL_TIMEOUT)
+      to_syslog "Test $TEST_NR (${cvmfs_test_name}) timed out"
+      report_failure "Testcase timed out" $workdir >> $logfile
+      touch ${scratchdir}/failure
+      echo "Timeout!"
       ;;
     *)
       to_syslog "Test $TEST_NR (${cvmfs_test_name}) failed"

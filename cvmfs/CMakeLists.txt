@@ -244,6 +244,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
 
 # TODO(jblomer) Rename to cvmfs_server
 set (CVMFS_PUBLISH_SOURCES
+  backoff.cc
   compression.cc
   directory_entry.cc
   dns.cc
@@ -254,6 +255,7 @@ set (CVMFS_PUBLISH_SOURCES
   options.cc
   publish/cmd_diff.cc
   publish/cmd_enter.cc
+  publish/cmd_hash.cc
   publish/cmd_help.cc
   publish/cmd_info.cc
   publish/cmd_mkfs.cc
@@ -313,6 +315,7 @@ set (LIBCVMFS_SERVER_SOURCES
   pack.cc
   publish/except.cc
   publish/repository.cc
+  publish/repository_capabilities.cc
   publish/repository_diff.cc
   publish/repository_managed.cc
   publish/repository_session.cc
@@ -426,7 +429,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_check.cc
   swissknife_gc.cc
   swissknife_graft.cc
-  swissknife_hash.cc
   swissknife_history.cc
   swissknife_info.cc
   swissknife_ingest.cc

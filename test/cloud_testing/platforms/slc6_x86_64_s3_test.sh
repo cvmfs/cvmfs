@@ -1,5 +1,7 @@
 #!/bin/sh
 
+export CVMFS_PLATFORM_NAME="slc6-x86_64_s3"
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
@@ -76,6 +78,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/647-bearercvmfs                          \
                                src/670-listreflog                           \
                                src/673-acl                                  \
+                               src/682-enter                                \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

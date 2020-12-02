@@ -75,6 +75,12 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
   return retval == 0;
 }
 
+
+inline int platform_umount_lazy(const char *mountpoint) {
+  int retval = unmount(mountpoint, MNT_FORCE);
+  return retval == 0;
+}
+
 /**
  * Spinlocks on OS X are not in pthread but in OS X specific APIs.
  */

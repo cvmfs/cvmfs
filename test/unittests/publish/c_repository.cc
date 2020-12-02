@@ -24,6 +24,8 @@ publish::Publisher *GetTestPublisher() {
     spool_dir + "/union");
   settings.GetKeychain()->SetKeychainDir(keys_dir);
   settings.SetUrl("file://" + srv_dir);
+  settings.GetTransaction()->SetLayoutRevision(
+    publish::Publisher::kRequiredLayoutRevision);
 
   return publish::Publisher::Create(settings);
 }

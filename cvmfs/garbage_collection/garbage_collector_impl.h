@@ -40,7 +40,10 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
   , oldest_trunk_catalog_(static_cast<uint64_t>(-1))
   , oldest_trunk_catalog_found_(false)
   , preserved_catalogs_(0)
+  , unreferenced_trees_(0)
+  , condemned_trees_(0)
   , condemned_catalogs_(0)
+  , last_reported_status_(0.0)
   , condemned_objects_(0)
   , condemned_bytes_(0)
 {
@@ -121,6 +124,8 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
     TraversalCallbackDataTN &data  // NOLINT(runtime/references)
 ) {
   ++condemned_catalogs_;
+  if (data.catalog->IsRoot())
+    ++condemned_trees_;
 
   if (configuration_.verbose) {
     if (data.catalog->IsRoot()) {
@@ -143,6 +148,17 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
 
   // the catalog itself is also condemned and needs to be removed
   CheckAndSweep(data.catalog->hash());
+
+  float threshold =
+    static_cast<float>(condemned_trees_) /
+    static_cast<float>(unreferenced_trees_);
+  if (threshold > last_reported_status_ + 0.1) {
+    LogCvmfs(kLogGc, kLogStdout | kLogDebug,
+             "      - %02.0f%%    %u / %u unreferenced revisions removed [%s]",
+             100.0 * threshold, condemned_trees_, unreferenced_trees_,
+             RfcTimestamp().c_str());
+    last_reported_status_ = threshold;
+  }
 }
 
 
@@ -259,6 +275,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
       to_sweep.push_back(*i);
     }
   }
+  unreferenced_trees_ = to_sweep.size();
   bool success = traversal_.TraverseList(to_sweep,
                                          CatalogTraversalT::kDepthFirst);
   traversal_.UnregisterListener(callback);

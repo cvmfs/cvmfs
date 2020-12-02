@@ -1,0 +1,35 @@
+cvmfs_test_name="Template transaction"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** create source dir"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir /cvmfs/$CVMFS_TEST_REPO/foo || return 1
+  mkdir /cvmfs/$CVMFS_TEST_REPO/foo/nested || return 2
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/nested/.cvmfscatalog || return 3
+  echo "x" > /cvmfs/$CVMFS_TEST_REPO/foo/nested/x || return 4
+  echo "hello" > /cvmfs/$CVMFS_TEST_REPO/foo/hello || return 5
+  publish_repo $CVMFS_TEST_REPO || return 6
+  check_repository $CVMFS_TEST_REPO -i || return 7
+
+  echo "*** open template transaction"
+  start_transaction $CVMFS_TEST_REPO -T /foo=/bar || return $?
+  cat /cvmfs/$CVMFS_TEST_REPO/bar/hello || return 10
+  cat /cvmfs/$CVMFS_TEST_REPO/bar/nested/x || return 11
+  echo "new" > /cvmfs/$CVMFS_TEST_REPO/bar/new || return 12
+  echo "*** publish template transaction"
+  publish_repo $CVMFS_TEST_REPO || return 13
+
+  echo "*** verify structure"
+  check_repository $CVMFS_TEST_REPO -i || return 20
+  cat /cvmfs/$CVMFS_TEST_REPO/bar/hello /cvmfs/$CVMFS_TEST_REPO/bar/new \
+    /cvmfs/$CVMFS_TEST_REPO/bar/nested/x || return 21
+
+  return 0
+}

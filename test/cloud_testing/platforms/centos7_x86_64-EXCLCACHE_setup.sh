@@ -4,11 +4,13 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+echo "enabling epel yum repository..."
+install_from_repo epel-release
+
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
-install_rpm $SERVER_PACKAGE   # only needed for tbb shared libs (unit tests)
 install_rpm $UNITTEST_PACKAGE
 
 # setup environment
@@ -17,7 +19,7 @@ sudo sh -c "echo CVMFS_SHARED_CACHE=no > /etc/cvmfs/default.d/90-exclcache.conf"
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
 sudo mkdir -p /var/log/cvmfs-test                || die "fail (mkdir /var/log/cvmfs-test)"
 sudo chown sftnight:sftnight /var/log/cvmfs-test || die "fail (chown /var/log/cvmfs-test)"
-attach_user_group fuse                           || die "fail (add fuse group to user)"
+sudo systemctl start autofs                      || die "fail (systemctl start autofs)"
 sudo cvmfs_config chksetup > /dev/null           || die "fail (cvmfs_config chksetup)"
 echo "done"
 
@@ -25,11 +27,16 @@ echo "done"
 echo "installing additional RPM packages..."
 install_from_repo gcc
 install_from_repo gcc-c++
+install_from_repo wget
 
 # traffic shaping
 install_from_repo trickle
 
-# rebooting the system (returning 0 value)
-echo "sleep 1 && reboot" > killme.sh
-sudo nohup sh < killme.sh &
-exit 0
+# Migration test needs lsb_release
+echo "install lsb_release..."
+install_from_repo redhat-lsb-core
+
+# increase open file descriptor limits
+echo -n "increasing ulimit -n ... "
+set_nofile_limit 65536 || die "fail"
+echo "done"

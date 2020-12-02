@@ -22,6 +22,9 @@ produce_tarball() {
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/2.txt
   dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/3.txt
 
+  # generate an hardlink to a catalog
+  ln tarball_foo/a/.cvmfscatalog tarball_foo/d/e/.cvmfscatalog
+
   dd bs=1024 count=5 2>/dev/null  </dev/urandom >tarball_foo/d/e/f/foo.txt
 
   echo "*** Generating a tarball in $tarball_name"
@@ -92,6 +95,7 @@ cvmfs_run_test() {
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || return 5
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" || return 6
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$"  || return 7
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/d/e$"  || return 13
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/not/existing/catalog$"  && return 8
 
   local different_dir="different_dir"
@@ -104,8 +108,10 @@ cvmfs_run_test() {
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$" || die "Not found catalog /"
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a$" || return 9
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/a/b$"  || return 10
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$different_dir/tarball_foo/d/e$"  || return 14
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" && return 11
   cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$"  && return 12
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/d/e$"  && return 15
 
 
   return 0

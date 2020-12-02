@@ -163,4 +163,38 @@ TEST_F(T_GlueBuffer, NentryCleanerSlow) {
   tracker.EndEnumerate(&cursor);
 }
 
+TEST_F(T_GlueBuffer, StringHeap) {
+  {
+    StringHeap string_heap;
+    EXPECT_EQ(unsigned(128 * 1024), string_heap.GetSizeAlloc());
+  }
+
+  {
+    StringHeap string_heap(1);
+    EXPECT_EQ(unsigned(128 * 1024), string_heap.GetSizeAlloc());
+  }
+
+  {
+    StringHeap string_heap(128 * 1024);
+    EXPECT_EQ(unsigned(128 * 1024), string_heap.GetSizeAlloc());
+  }
+
+  {
+    StringHeap string_heap(128 * 1024 + 1);
+    EXPECT_EQ(unsigned(256 * 1024), string_heap.GetSizeAlloc());
+  }
+
+  if (sizeof(size_t) > 4) {
+    uint64_t large_size;
+    large_size = 1U << 31;
+    large_size += 1;
+    {
+      StringHeap string_heap(large_size);
+      EXPECT_EQ((uint64_t)(1) << 32, string_heap.GetSizeAlloc());
+    }
+  } else {
+    printf("Skipping 64bit allocation test\n");
+  }
+}
+
 }  // namespace glue

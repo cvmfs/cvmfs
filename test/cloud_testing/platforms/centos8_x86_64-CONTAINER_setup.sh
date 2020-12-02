@@ -25,8 +25,28 @@ install_from_repo fuse-overlayfs  || die "fail (install fuse-overlayfs)"
 install_from_repo podman          || die "fail (install podman)"
 install_from_repo jq              || die "fail (install jq)"
 
+# Now it gets hacky: podman and containerd.io conflict because the Docker
+# containerd.io package insists on bringing its own runc binary.
+# We install containerd manually and skip its runc but keep the one from RH.
+# Furthermore, we use the docker-ce-test repository to get containerd > 1.4
+# so that we can test the remote snapshotter
 sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-sudo dnf install docker-ce --nobest -y || die "fail (install docker-ce)"
+
+yumdownloader --enablerepo=docker-ce-test containerd.io
+rpm2cpio containerd.io-*.rpm | cpio -id
+sudo cp -av etc/containerd /etc
+sudo cp -av usr/bin/containerd* usr/bin/ctr /usr/bin/
+sudo cp usr/lib/systemd/system/containerd.service /usr/lib/systemd/system/
+# Don't bother with SELinux
+sudo setenforce 0
+sudo systemctl daemon-reload
+sudo systemctl enable containerd
+sudo systemctl start containerd
+systemctl status containerd  || die "fail (setup containerd.io)"
+# Now: satisfy the RPM dependency
+sudo rpm -i --justdb --replacefiles --nodeps containerd.io*.rpm
+
+sudo dnf install docker-ce -y || die "fail (install docker-ce)"
 sudo firewall-cmd --zone=public --add-masquerade --permanent
 sudo firewall-cmd --reload
 

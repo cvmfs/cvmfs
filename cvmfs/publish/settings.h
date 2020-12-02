@@ -92,6 +92,9 @@ class SettingsSpoolArea {
   std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
   std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
+  std::string readonly_talk_socket() const {
+     return workspace_() + "/cvmfs_io";
+  }
   std::string union_mnt() const { return union_mnt_; }
   std::string scratch_dir() const { return workspace_() + "/scratch/current"; }
   std::string client_config() const { return workspace_() + "/client.config"; }
@@ -125,21 +128,56 @@ class SettingsSpoolArea {
 class SettingsTransaction {
  public:
   explicit SettingsTransaction(const std::string &fqrn)
-    : hash_algorithm_(shash::kShake128)
+    : layout_revision_(0)
+    , hash_algorithm_(shash::kShake128)
     , compression_algorithm_(zlib::kZlibDefault)
     , ttl_second_(240)
     , is_garbage_collectable_(true)
     , is_volatile_(false)
+    , enforce_limits_(false)
+    // SyncParameters::kDefaultNestedKcatalogLimit
+    , limit_nested_catalog_kentries_(500)
+    // SyncParameters::kDefaultRootKcatalogLimit
+    , limit_root_catalog_kentries_(500)
+    // SyncParameters::kDefaultFileMbyteLimit
+    , limit_file_size_mb_(1024)
+    , use_catalog_autobalance_(false)
+    // SyncParameters::kDefaultMaxWeight
+    , autobalance_max_weight_(100000)
+    // SyncParameters::kDefaultMinWeight
+    , autobalance_min_weight_(1000)
+    , print_changeset_(false)
     , union_fs_(kUnionFsUnknown)
     , timeout_s_(0)
     , spool_area_(fqrn)
   {}
 
+  void SetLayoutRevision(const unsigned revision);
+  void SetBaseHash(const shash::Any &hash);
   void SetUnionFsType(const std::string &union_fs);
+  void SetHashAlgorithm(const std::string &algorithm);
+  void SetCompressionAlgorithm(const std::string &algorithm);
+  void SetEnforceLimits(bool value);
+  void SetLimitNestedCatalogKentries(unsigned value);
+  void SetLimitRootCatalogKentries(unsigned value);
+  void SetLimitFileSizeMb(unsigned value);
+  void SetUseCatalogAutobalance(bool value);
+  void SetAutobalanceMaxWeight(unsigned value);
+  void SetAutobalanceMinWeight(unsigned value);
+  void SetPrintChangeset(bool value);
   void SetTimeout(unsigned seconds);
   void SetLeasePath(const std::string &path);
+  void SetTemplate(const std::string &from, const std::string &to);
   void DetectUnionFsType();
 
+  /**
+   * 0 - wait infinitely
+   * <0: unset, fail immediately
+   */
+  int GetTimeoutS() const;
+
+  unsigned layout_revision() const { return layout_revision_; }
+  shash::Any base_hash() const { return base_hash_; }
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
   zlib::Algorithms compression_algorithm() const {
     return compression_algorithm_;
@@ -147,21 +185,57 @@ class SettingsTransaction {
   uint32_t ttl_second() const { return ttl_second_; }
   bool is_garbage_collectable() const { return is_garbage_collectable_; }
   bool is_volatile() const { return is_volatile_; }
+  bool enforce_limits() const { return enforce_limits_; }
+  unsigned limit_nested_catalog_kentries() const {
+    return limit_nested_catalog_kentries_;
+  }
+  unsigned limit_root_catalog_kentries() const {
+    return limit_root_catalog_kentries_;
+  }
+  unsigned limit_file_size_mb() const { return limit_file_size_mb_; }
+  bool use_catalog_autobalance() const { return use_catalog_autobalance_; }
+  unsigned autobalance_max_weight() const { return autobalance_max_weight_; }
+  unsigned autobalance_min_weight() const { return autobalance_min_weight_; }
+  bool print_changeset() const { return print_changeset_; }
   std::string voms_authz() const { return voms_authz_; }
-  unsigned timeout_s() const { return timeout_s_; }
+  UnionFsType union_fs() const { return union_fs_; }
   std::string lease_path() const { return lease_path_; }
+  std::string template_from() const { return template_from_; }
+  std::string template_to() const { return template_to_; }
 
   const SettingsSpoolArea &spool_area() const { return spool_area_; }
   SettingsSpoolArea *GetSpoolArea() { return &spool_area_; }
 
+  bool HasTemplate() const { return !template_to().empty(); }
+
  private:
   bool ValidateUnionFs();
 
+  /**
+   * See CVMFS_CREATOR_VERSION
+   */
+  Setting<unsigned> layout_revision_;
+  /**
+   * The root catalog hash based on which the transaction takes place.
+   * Usually the current root catalog from the manifest, which should be equal
+   * to the root hash of the mounted read-only volume.  In some cases, this
+   * can be different though, e.g. for checked out branches or after silent
+   * transactions such as template transactions.
+   */
+  Setting<shash::Any> base_hash_;
   Setting<shash::Algorithms> hash_algorithm_;
   Setting<zlib::Algorithms> compression_algorithm_;
   Setting<uint32_t> ttl_second_;
   Setting<bool> is_garbage_collectable_;
   Setting<bool> is_volatile_;
+  Setting<bool> enforce_limits_;
+  Setting<unsigned> limit_nested_catalog_kentries_;
+  Setting<unsigned> limit_root_catalog_kentries_;
+  Setting<unsigned> limit_file_size_mb_;
+  Setting<bool> use_catalog_autobalance_;
+  Setting<unsigned> autobalance_max_weight_;
+  Setting<unsigned> autobalance_min_weight_;
+  Setting<bool> print_changeset_;
   Setting<std::string> voms_authz_;
   Setting<UnionFsType> union_fs_;
   /**
@@ -169,6 +243,12 @@ class SettingsTransaction {
    */
   Setting<unsigned> timeout_s_;
   Setting<std::string> lease_path_;
+  /**
+   * Used for template transactions where a directory tree gets cloned
+   * (from --> to) as part of opening the transaction
+   */
+  Setting<std::string> template_from_;
+  Setting<std::string> template_to_;
 
   SettingsSpoolArea spool_area_;
 };  // class SettingsTransaction

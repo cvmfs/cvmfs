@@ -26,6 +26,7 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition)
     : spooler_definition_(spooler_definition) {}
 
 Spooler::~Spooler() {
+  FinalizeSession(false);
   if (uploader_) {
     uploader_->TearDown();
   }

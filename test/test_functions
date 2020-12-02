@@ -599,6 +599,7 @@ CVMFS_GENERAL_WARNING_FLAG=0
 CVMFS_MEMORY_WARNING=254
 CVMFS_TIME_WARNING=253
 CVMFS_GENERAL_WARNING=252
+CVMFS_TEST_RETVAL_TIMEOUT=251
 mangle_test_retval() {
   local prior_retval=$1
 
@@ -1215,8 +1216,9 @@ check_repo_integrity() {
 # @param repo    the repository you want to start the transaction for
 start_transaction() {
   local repo=$1
+  shift
 
-  cvmfs_server transaction $repo || return 100
+  cvmfs_server transaction $@ $repo || return 100
   return 0
 }
 
@@ -1569,9 +1571,9 @@ _resign_legacy_repository() {
   echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$repo_name" >> ${whitelist}.unsigned
   openssl x509 -in /etc/cvmfs/keys/${repo_name}.crt -outform der | \
-    cvmfs_swissknife hash -a sha1 -f >> ${whitelist}.unsigned || return 2
+    cvmfs_publish hash -a sha1 -f >> ${whitelist}.unsigned || return 2
   local hash;
-  hash=`cat ${whitelist}.unsigned | cvmfs_swissknife hash -a sha1`
+  hash=`cat ${whitelist}.unsigned | cvmfs_publish hash -a sha1`
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
@@ -2243,7 +2245,7 @@ xunit_preamble() {
   cat > $xml_file << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
-  <testsuite name="$CVMFS_TEST_SUITE_NAME" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
+  <testsuite hostname="$CVMFS_PLATFORM_NAME" name="$CVMFS_TEST_SUITE_NAME" timestamp="$t_start" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
 EOF
 }
 

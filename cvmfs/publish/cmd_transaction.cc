@@ -50,6 +50,21 @@ int CmdTransaction::Main(const Options &options) {
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
   }
+  if (options.Has("template-from")) {
+    if (!options.Has("template-to"))
+      throw EPublish("invalid parameter combination for templates");
+    settings->GetTransaction()->SetTemplate(
+      options.GetString("template-from"), options.GetString("template-to"));
+  }
+  if (options.Has("template")) {
+    if (options.Has("template-from") || options.Has("template-to"))
+      throw EPublish("invalid parameter combination for templates");
+    std::string templ = options.GetString("template");
+    std::vector<std::string> tokens = SplitString(templ, '=');
+    if (tokens.size() != 2)
+      throw EPublish("invalid syntax for --template parameter: " + templ);
+    settings->GetTransaction()->SetTemplate(tokens[0], tokens[1]);
+  }
 
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
                          false /* temporarily */))
@@ -62,18 +77,31 @@ int CmdTransaction::Main(const Options &options) {
 
   settings->GetTransaction()->SetLeasePath(lease_path);
 
-  Publisher publisher(*settings);
-  if (publisher.whitelist()->IsExpired()) {
-    throw EPublish("Repository whitelist for $name is expired");
+
+  UniquePtr<Publisher> publisher;
+  try {
+    publisher = new Publisher(*settings);
+    if (publisher->whitelist()->IsExpired()) {
+      throw EPublish("Repository whitelist for $name is expired",
+                     EPublish::kFailWhitelistExpired);
+    }
+  } catch (const EPublish &e) {
+    if (e.failure() == EPublish::kFailLayoutRevision ||
+        e.failure() == EPublish::kFailWhitelistExpired)
+    {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      return EINVAL;
+    }
   }
+
   double whitelist_valid_s =
-    difftime(publisher.whitelist()->expires(), time(NULL));
+    difftime(publisher->whitelist()->expires(), time(NULL));
   if (whitelist_valid_s < (12 * 60 * 60)) {
     LogCvmfs(kLogCvmfs, kLogStdout,
       "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
-  int rvi = publisher.managed_node()->Check(false /* is_quiet */);
+  int rvi = publisher->managed_node()->Check(false /* is_quiet */);
   if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
 
   rvi = CallServerHook("transaction_before_hook", fqrn);
@@ -84,7 +112,7 @@ int CmdTransaction::Main(const Options &options) {
   }
 
   try {
-    publisher.Transaction();
+    publisher->Transaction();
   } catch (const EPublish &e) {
     const char *msg_prefix = "CernVM-FS transaction error: ";
     if (e.failure() == EPublish::kFailTransactionLocked) {
@@ -107,7 +135,7 @@ int CmdTransaction::Main(const Options &options) {
     throw;
   }
 
-  publisher.managed_node()->Open();
+  publisher->managed_node()->Open();
 
   rvi = CallServerHook("transaction_after_hook", fqrn);
   if (rvi != 0) {

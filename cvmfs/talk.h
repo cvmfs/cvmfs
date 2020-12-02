@@ -6,6 +6,7 @@
 #define CVMFS_TALK_H_
 
 #include <pthread.h>
+#include <unistd.h>
 
 #include <string>
 #include <vector>

@@ -84,7 +84,8 @@ SessionContextBase::SessionContextBase()
       current_pack_mtx_(),
       objects_dispatched_(0),
       bytes_committed_(0),
-      bytes_dispatched_(0) {}
+      bytes_dispatched_(0),
+      initialized_(false) {}
 
 SessionContextBase::~SessionContextBase() {}
 
@@ -134,6 +135,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
 
   ret = InitializeDerived(max_queue_size) && ret;
 
+  initialized_ = true;
+
   return ret;
 }
 
@@ -141,6 +144,11 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
                                   const std::string& new_root_hash,
                                   const RepositoryTag& tag) {
   assert(active_handles_.empty());
+  if (!initialized_) {
+    assert(!commit);
+    return true;
+  }
+
   {
     MutexLockGuard lock(current_pack_mtx_);
 
@@ -167,6 +175,9 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (!commit_result) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "SessionContext: could not commit session. Aborting.");
+      FinalizeDerived();
+      pthread_mutex_destroy(&current_pack_mtx_);
+      initialized_ = false;
       return false;
     }
   }
@@ -174,6 +185,9 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
 
   pthread_mutex_destroy(&current_pack_mtx_);
+
+  initialized_ = false;
+
   return results;
 }
 
@@ -263,7 +277,11 @@ SessionContext::SessionContext()
     : SessionContextBase(),
       upload_jobs_(),
       worker_terminate_(),
-      worker_() {}
+      worker_()
+{
+  // Set to 0 in InitializeDerived()
+  atomic_write32(&worker_terminate_, 1);
+}
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
@@ -279,9 +297,8 @@ bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
 }
 
 bool SessionContext::FinalizeDerived() {
-  atomic_write32(&worker_terminate_, 1);
-
-  pthread_join(worker_, NULL);
+  if (atomic_cas32(&worker_terminate_, 0, 1))
+    pthread_join(worker_, NULL);
 
   return true;
 }

@@ -26,7 +26,9 @@
 #include "signature.h"
 #include "statistics.h"
 #include "sync_mediator.h"
+#include "sync_union_aufs.h"
 #include "sync_union_overlayfs.h"
+#include "sync_union_tarball.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
 #include "util/pointer.h"
@@ -50,7 +52,6 @@ Repository::Repository()
   , signature_mgr_(new signature::SignatureManager())
   , download_mgr_(NULL)
   , simple_catalog_mgr_(NULL)
-  , spooler_(NULL)
   , whitelist_(NULL)
   , reflog_(NULL)
   , manifest_(NULL)
@@ -65,7 +66,6 @@ Repository::Repository(const SettingsRepository &settings)
   , signature_mgr_(new signature::SignatureManager())
   , download_mgr_(NULL)
   , simple_catalog_mgr_(NULL)
-  , spooler_(NULL)
   , whitelist_(NULL)
   , reflog_(NULL)
   , manifest_(NULL)
@@ -107,7 +107,6 @@ Repository::~Repository() {
   delete manifest_;
   delete reflog_;
   delete whitelist_;
-  delete spooler_;
   delete signature_mgr_;
   delete download_mgr_;
   delete simple_catalog_mgr_;
@@ -246,9 +245,10 @@ bool Repository::IsMasterReplica() {
 //------------------------------------------------------------------------------
 
 
-void Publisher::ConstructSpooler() {
-  if (spooler_ != NULL)
+void Publisher::ConstructSpoolers() {
+  if ((spooler_files_ != NULL) && (spooler_catalogs_ != NULL))
     return;
+  assert((spooler_files_ == NULL) && (spooler_catalogs_ == NULL));
 
   upload::SpoolerDefinition sd(
     settings_.storage().GetLocator(),
@@ -257,8 +257,18 @@ void Publisher::ConstructSpooler() {
   sd.session_token_file =
     settings_.transaction().spool_area().gw_session_token();
   sd.key_file = settings_.keychain().gw_key_path();
-  spooler_ = upload::Spooler::Construct(sd);
-  if (spooler_ == NULL) throw EPublish("could not initialize spooler");
+
+  spooler_files_ = upload::Spooler::Construct(sd, statistics_publish_);
+  if (spooler_files_ == NULL)
+    throw EPublish("could not initialize file spooler");
+
+  upload::SpoolerDefinition sd_catalogs(sd.Dup2DefaultCompression());
+  spooler_catalogs_ =
+    upload::Spooler::Construct(sd_catalogs, statistics_publish_);
+  if (spooler_catalogs_ == NULL) {
+    delete spooler_files_;
+    throw EPublish("could not initialize catalog spooler");
+  }
 }
 
 
@@ -299,8 +309,8 @@ void Publisher::CreateRootObjects() {
     settings_.transaction().spool_area().tmp_dir(),
     settings_.transaction().is_volatile(),
     settings_.transaction().voms_authz(),
-    spooler_);
-  spooler_->WaitForUpload();
+    spooler_catalogs_);
+  spooler_catalogs_->WaitForUpload();
   if (manifest_ == NULL)
     throw EPublish("could not create initial file catalog");
   reflog_->AddCatalog(manifest_->catalog_hash());
@@ -332,19 +342,19 @@ void Publisher::CreateRootObjects() {
 
 
 void Publisher::CreateStorage() {
-  ConstructSpooler();
-  if (!spooler_->Create())
+  ConstructSpoolers();
+  if (!spooler_files_->Create())
     throw EPublish("could not initialize repository storage area");
 }
 
 
 void Publisher::PushCertificate() {
   upload::Spooler::CallbackPtr callback =
-    spooler_->RegisterListener(&Publisher::OnProcessCertificate, this);
-  spooler_->ProcessCertificate(
+    spooler_files_->RegisterListener(&Publisher::OnProcessCertificate, this);
+  spooler_files_->ProcessCertificate(
     new StringIngestionSource(signature_mgr_->GetCertificate()));
-  spooler_->WaitForUpload();
-  spooler_->UnregisterListener(callback);
+  spooler_files_->WaitForUpload();
+  spooler_files_->UnregisterListener(callback);
 }
 
 
@@ -356,10 +366,10 @@ void Publisher::PushHistory() {
   delete history_;
 
   upload::Spooler::CallbackPtr callback =
-    spooler_->RegisterListener(&Publisher::OnProcessHistory, this);
-  spooler_->ProcessHistory(history_path);
-  spooler_->WaitForUpload();
-  spooler_->UnregisterListener(callback);
+    spooler_files_->RegisterListener(&Publisher::OnProcessHistory, this);
+  spooler_files_->ProcessHistory(history_path);
+  spooler_files_->WaitForUpload();
+  spooler_files_->UnregisterListener(callback);
 
   history_ = history::SqliteHistory::OpenWritable(history_path);
   assert(history_ != NULL);
@@ -369,10 +379,10 @@ void Publisher::PushHistory() {
 
 void Publisher::PushMetainfo() {
   upload::Spooler::CallbackPtr callback =
-    spooler_->RegisterListener(&Publisher::OnProcessMetainfo, this);
-  spooler_->ProcessMetainfo(new StringIngestionSource(meta_info_));
-  spooler_->WaitForUpload();
-  spooler_->UnregisterListener(callback);
+    spooler_files_->RegisterListener(&Publisher::OnProcessMetainfo, this);
+  spooler_files_->ProcessMetainfo(new StringIngestionSource(meta_info_));
+  spooler_files_->WaitForUpload();
+  spooler_files_->UnregisterListener(callback);
 }
 
 
@@ -394,21 +404,22 @@ void Publisher::PushManifest() {
 
   // Create alternative bootstrapping symlinks for VOMS secured repos
   if (manifest_->has_alt_catalog_path()) {
-    rvb = spooler_->PlaceBootstrappingShortcut(manifest_->certificate()) &&
-          spooler_->PlaceBootstrappingShortcut(manifest_->catalog_hash()) &&
-          (manifest_->history().IsNull() ||
-            spooler_->PlaceBootstrappingShortcut(manifest_->history())) &&
-          (manifest_->meta_info().IsNull() ||
-            spooler_->PlaceBootstrappingShortcut(manifest_->meta_info()));
+    rvb =
+      spooler_files_->PlaceBootstrappingShortcut(manifest_->certificate()) &&
+      spooler_files_->PlaceBootstrappingShortcut(manifest_->catalog_hash()) &&
+      (manifest_->history().IsNull() ||
+        spooler_files_->PlaceBootstrappingShortcut(manifest_->history())) &&
+      (manifest_->meta_info().IsNull() ||
+        spooler_files_->PlaceBootstrappingShortcut(manifest_->meta_info()));
     if (!rvb) EPublish("cannot place VOMS bootstrapping symlinks");
   }
 
   upload::Spooler::CallbackPtr callback =
-    spooler_->RegisterListener(&Publisher::OnUploadManifest, this);
-  spooler_->Upload(".cvmfspublished",
+    spooler_files_->RegisterListener(&Publisher::OnUploadManifest, this);
+  spooler_files_->Upload(".cvmfspublished",
                    new StringIngestionSource(signed_manifest));
-  spooler_->WaitForUpload();
-  spooler_->UnregisterListener(callback);
+  spooler_files_->WaitForUpload();
+  spooler_files_->UnregisterListener(callback);
 }
 
 
@@ -421,10 +432,10 @@ void Publisher::PushReflog() {
   manifest::Reflog::HashDatabase(reflog_path, &hash_reflog);
 
   upload::Spooler::CallbackPtr callback =
-    spooler_->RegisterListener(&Publisher::OnUploadReflog, this);
-  spooler_->UploadReflog(reflog_path);
-  spooler_->WaitForUpload();
-  spooler_->UnregisterListener(callback);
+    spooler_files_->RegisterListener(&Publisher::OnUploadReflog, this);
+  spooler_files_->UploadReflog(reflog_path);
+  spooler_files_->WaitForUpload();
+  spooler_files_->UnregisterListener(callback);
 
   manifest_->set_reflog_hash(hash_reflog);
 
@@ -437,16 +448,17 @@ void Publisher::PushReflog() {
 void Publisher::PushWhitelist() {
   // TODO(jblomer): PKCS7 handling
   upload::Spooler::CallbackPtr callback =
-    spooler_->RegisterListener(&Publisher::OnUploadWhitelist, this);
-  spooler_->Upload(".cvmfswhitelist",
-                   new StringIngestionSource(whitelist_->ExportString()));
-  spooler_->WaitForUpload();
-  spooler_->UnregisterListener(callback);
+    spooler_files_->RegisterListener(&Publisher::OnUploadWhitelist, this);
+  spooler_files_->Upload(".cvmfswhitelist",
+                         new StringIngestionSource(whitelist_->ExportString()));
+  spooler_files_->WaitForUpload();
+  spooler_files_->UnregisterListener(callback);
 }
 
 
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
   UniquePtr<Publisher> publisher(new Publisher());
+
   publisher->settings_ = settings;
   if (settings.is_silent())
     publisher->llvl_ = kLogNone;
@@ -593,17 +605,44 @@ void Publisher::InitSpoolArea() {
 
 Publisher::Publisher()
   : settings_("invalid.cvmfs.io")
+  , statistics_publish_(new perf::StatisticsTemplate("publish", statistics_))
   , llvl_(kLogNormal)
   , in_transaction_(false)
+  , spooler_files_(NULL)
+  , spooler_catalogs_(NULL)
+  , catalog_mgr_(NULL)
+  , sync_parameters_(NULL)
+  , sync_mediator_(NULL)
+  , sync_union_(NULL)
 {
 }
 
 Publisher::Publisher(const SettingsPublisher &settings)
   : Repository(SettingsRepository(settings))
   , settings_(settings)
+  , statistics_publish_(new perf::StatisticsTemplate("publish", statistics_))
   , llvl_(settings.is_silent() ? kLogNone : kLogNormal)
   , in_transaction_(false)
+  , spooler_files_(NULL)
+  , spooler_catalogs_(NULL)
+  , catalog_mgr_(NULL)
+  , sync_parameters_(NULL)
+  , sync_mediator_(NULL)
+  , sync_union_(NULL)
 {
+  if (settings.transaction().layout_revision() != kRequiredLayoutRevision) {
+    unsigned layout_revision = settings.transaction().layout_revision();
+    throw EPublish(
+      "This repository uses layout revision " + StringifyInt(layout_revision)
+        + ".\n"
+      "This version of CernVM-FS requires layout revision " + StringifyInt(
+        kRequiredLayoutRevision) + ", which is\n"
+      "incompatible to " + StringifyInt(layout_revision) + ".\n\n"
+      "Please run `cvmfs_server migrate` to update your repository before "
+      "proceeding.",
+      EPublish::kFailLayoutRevision);
+  }
+
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
 
@@ -634,19 +673,20 @@ Publisher::Publisher(const SettingsPublisher &settings)
     }
   }
 
-  // The process that opens the transaction does not stay alive for the life
-  // time of the transaction
-  const std::string transaction_lock =
-    settings_.transaction().spool_area().transaction_lock();
-  if (ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */)) {
-    in_transaction_ = true;
-    ConstructSpooler();
-  }
+  CheckTransactionStatus();
+  if (in_transaction_)
+    ConstructSpoolers();
   if (settings.is_managed())
     managed_node_ = new ManagedNode(this);
 }
 
 Publisher::~Publisher() {
+  delete sync_union_;
+  delete sync_mediator_;
+  delete sync_parameters_;
+  delete catalog_mgr_;
+  delete spooler_catalogs_;
+  delete spooler_files_;
 }
 
 
@@ -654,51 +694,122 @@ void Publisher::Abort() {
   // TODO(jblomer): remove transaction lock
 }
 
+void Publisher::ConstructSyncManagers() {
+  ConstructSpoolers();
+
+  if (catalog_mgr_ == NULL) {
+    catalog_mgr_ = new catalog::WritableCatalogManager(
+      settings_.transaction().base_hash(),
+      settings_.url(),
+      settings_.transaction().spool_area().tmp_dir(),
+      spooler_catalogs_,
+      download_mgr_,
+      settings_.transaction().enforce_limits(),
+      settings_.transaction().limit_nested_catalog_kentries(),
+      settings_.transaction().limit_root_catalog_kentries(),
+      settings_.transaction().limit_file_size_mb(),
+      statistics_,
+      settings_.transaction().use_catalog_autobalance(),
+      settings_.transaction().autobalance_max_weight(),
+      settings_.transaction().autobalance_min_weight());
+    catalog_mgr_->Init();
+  }
+
+  if (sync_parameters_ == NULL) {
+    SyncParameters *p = new SyncParameters();
+    p->spooler = spooler_files_;
+    p->repo_name = settings_.fqrn();
+    p->dir_union = settings_.transaction().spool_area().union_mnt();
+    p->dir_scratch = settings_.transaction().spool_area().scratch_dir();
+    p->dir_rdonly = settings_.transaction().spool_area().readonly_mnt();
+    p->dir_temp = settings_.transaction().spool_area().tmp_dir();
+    p->base_hash = settings_.transaction().base_hash();
+    p->stratum0 = settings_.url();
+    // p->manifest_path = SHOULD NOT BE NEEDED
+    // p->spooler_definition = SHOULD NOT BE NEEDED;
+    // p->union_fs_type = SHOULD NOT BE NEEDED
+    p->print_changeset = settings_.transaction().print_changeset();
+    sync_parameters_ = p;
+  }
+
+  if (sync_mediator_ == NULL) {
+    sync_mediator_ =
+      new SyncMediator(catalog_mgr_, sync_parameters_, *statistics_publish_);
+  }
+
+  if (sync_union_ == NULL) {
+    switch (settings_.transaction().union_fs()) {
+      case kUnionFsAufs:
+        sync_union_ = new publish::SyncUnionAufs(
+          sync_mediator_,
+          settings_.transaction().spool_area().readonly_mnt(),
+          settings_.transaction().spool_area().union_mnt(),
+          settings_.transaction().spool_area().scratch_dir());
+        break;
+      case kUnionFsOverlay:
+        sync_union_ = new publish::SyncUnionOverlayfs(
+          sync_mediator_,
+          settings_.transaction().spool_area().readonly_mnt(),
+          settings_.transaction().spool_area().union_mnt(),
+          settings_.transaction().spool_area().scratch_dir());
+        break;
+      case kUnionFsTarball:
+        sync_union_ = new publish::SyncUnionTarball(
+          sync_mediator_,
+          settings_.transaction().spool_area().readonly_mnt(),
+          // TODO(jblomer): get from settings
+          "tar_file",
+          "base_directory",
+          "to_delete",
+          false /* create_catalog */);
+        break;
+      default:
+        throw EPublish("unknown union file system");
+    }
+    bool rvb = sync_union_->Initialize();
+    if (!rvb) {
+      delete sync_union_;
+      sync_union_ = NULL;
+      throw EPublish("cannot initialize union file system engine");
+    }
+  }
+}
+
+void Publisher::WipeScratchArea() {
+  // TODO(jblomer)
+}
+
 void Publisher::Sync() {
-  ConstructSpooler();
+  ConstructSyncManagers();
 
-  catalog::WritableCatalogManager catalog_mgr(
-    manifest_->catalog_hash(),
-    settings_.url(),
-    settings_.transaction().spool_area().tmp_dir(),
-    spooler_,
-    download_mgr_,
-    false /* enforce limits */,
-    100000,
-    100000,
-    1000,
-    statistics_,
-    false /* auto balance */,
-    1000,
-    100000);
-  catalog_mgr.Init();
-
-  SyncParameters params;
-  params.spooler = spooler_;
-  params.repo_name = settings_.fqrn();
-  params.dir_union = std::string("/cvmfs/") + settings_.fqrn();
-  params.dir_scratch = settings_.transaction().spool_area().scratch_dir();
-  params.dir_rdonly = settings_.transaction().spool_area().readonly_mnt();
-  params.dir_temp = settings_.transaction().spool_area().tmp_dir();
-  params.base_hash = manifest_->catalog_hash();
-  params.stratum0 = settings_.url();
-  // params.manifest_path = SHOULD NOT BE NEEDED
-  // params.spooler_definition = SHOULD NOT BE NEEDED;
-  params.union_fs_type = "overlayfs";  // TODO(jblomer): select union fs type
-  params.print_changeset = true;
-  SyncMediator mediator(&catalog_mgr, &params,
-                        perf::StatisticsTemplate("publish", statistics_));
-  publish::SyncUnion *sync;
-  sync = new publish::SyncUnionOverlayfs(&mediator,
-    settings_.transaction().spool_area().readonly_mnt(),
-    std::string("/cvmfs/") + settings_.fqrn(),
-    settings_.transaction().spool_area().scratch_dir());
-  bool rvb = sync->Initialize();
-  if (!rvb) throw EPublish("cannot initialize union file system engine");
-  sync->Traverse();
-  rvb = mediator.Commit(manifest_);
+  sync_union_->Traverse();
+  bool rvb = sync_mediator_->Commit(manifest_);
   if (!rvb) throw EPublish("cannot write change set to storage");
-  spooler_->WaitForUpload();
+  spooler_files_->WaitForUpload();
+  spooler_catalogs_->WaitForUpload();
+  spooler_files_->FinalizeSession(false /* commit */);
+
+  const std::string old_root_hash =
+    settings_.transaction().base_hash().ToString(true /* with_suffix */);
+  const std::string new_root_hash =
+    manifest_->catalog_hash().ToString(true /* with_suffix */);
+  rvb = spooler_catalogs_->FinalizeSession(true /* commit */,
+    old_root_hash, new_root_hash,
+    /* TODO(jblomer) */ sync_parameters_->repo_tag);
+  if (!rvb)
+    throw EPublish("failed to commit transaction");
+
+  // Reset to the new catalog root hash
+  settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
+  delete sync_union_;
+  delete sync_mediator_;
+  delete sync_parameters_;
+  delete catalog_mgr_;
+  sync_union_ = NULL;
+  sync_mediator_ = NULL;
+  sync_parameters_ = NULL;
+  catalog_mgr_ = NULL;
+  WipeScratchArea();
 
   LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %d", manifest_->revision());
   reflog_->AddCatalog(manifest_->catalog_hash());
@@ -714,15 +825,15 @@ void Publisher::Publish() {
 
 
 void Publisher::MarkReplicatible(bool value) {
-  ConstructSpooler();
+  ConstructSpoolers();
 
   if (value) {
-    spooler_->Upload("/dev/null", "/.cvmfs_master_replica");
+    spooler_files_->Upload("/dev/null", "/.cvmfs_master_replica");
   } else {
-    spooler_->RemoveAsync("/.cvmfs_master_replica");
+    spooler_files_->RemoveAsync("/.cvmfs_master_replica");
   }
-  spooler_->WaitForUpload();
-  if (spooler_->GetNumberOfErrors() > 0)
+  spooler_files_->WaitForUpload();
+  if (spooler_files_->GetNumberOfErrors() > 0)
     throw EPublish("cannot set replication mode");
 }
 

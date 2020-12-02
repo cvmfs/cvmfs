@@ -19,8 +19,10 @@ run_tests() {
     echo "*** Check transaction with missing reflog"
     sudo mv /var/spool/cvmfs/${test_repo}/reflog.chksum /tmp
     cvmfs_server transaction ${test_repo}
+    echo "*** Transaction opened"
 
-    local output=$(cvmfs_server publish ${test_repo} 2>&1 | grep "missing_reflog")
+    cvmfs_server publish ${test_repo} 2>&1 | tee publish.log
+    local output=$(cat publish.log | grep "missing_reflog")
 
     if [ x"$output" = x"" ]; then
         echo -n "Error: the missing reflog should have been reported "

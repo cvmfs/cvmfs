@@ -1,5 +1,7 @@
 #!/bin/sh
 
+export CVMFS_PLATFORM_NAME="centos7-x86_64"
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
@@ -19,6 +21,9 @@ echo "OK"
 # running unit test suite
 run_unittests --gtest_shuffle \
               --gtest_death_test_use_fork || retval=1
+
+# Exclusions
+# 682-enter: missing fuse-overlayfs
 
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
@@ -42,6 +47,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
+                                 src/682-enter                                \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \

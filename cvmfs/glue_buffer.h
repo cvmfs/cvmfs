@@ -93,23 +93,18 @@ class StringHeap : public SingleCopy {
     Init(128*1024);  // 128kB (should be >= 64kB+2B which is largest string)
   }
 
-  explicit StringHeap(const uint32_t minimum_size) {
+  explicit StringHeap(const uint64_t minimum_size) {
     Init(minimum_size);
   }
 
-  void Init(const uint32_t minimum_size) {
+  void Init(const uint64_t minimum_size) {
     size_ = 0;
     used_ = 0;
 
     // Initial bin: 128kB or smallest power of 2 >= minimum size
-    uint32_t pow2_size = minimum_size < 128*1024 ? 128*1024 : minimum_size;
-    pow2_size--;
-    pow2_size |= pow2_size >> 1;
-    pow2_size |= pow2_size >> 2;
-    pow2_size |= pow2_size >> 4;
-    pow2_size |= pow2_size >> 8;
-    pow2_size |= pow2_size >> 16;
-    pow2_size++;
+    uint64_t pow2_size = 128 * 1024;
+    while (pow2_size < minimum_size)
+      pow2_size *= 2;
     AddBin(pow2_size);
   }
 
@@ -146,6 +141,17 @@ class StringHeap : public SingleCopy {
   }
 
   uint64_t used() const { return used_; }
+
+  // mmap'd bytes, used for testing
+  uint64_t GetSizeAlloc() const {
+    uint64_t s = bin_size_;
+    uint64_t result = 0;
+    for (unsigned i = 0; i < bins_.size(); ++i) {
+      result += s;
+      s /= 2;
+    }
+    return result;
+  }
 
  private:
   void AddBin(const uint64_t size) {

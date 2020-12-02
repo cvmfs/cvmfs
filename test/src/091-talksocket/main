@@ -1,0 +1,42 @@
+
+cvmfs_test_name="Common cvmfs_talk socket"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST091_TALK_SOCKET=
+
+cleanup() {
+  if [ ! -z $CVMFS_TEST091_TALK_SOCKET ]; then
+    echo "*** cleanup, removing $CVMFS_TEST091_TALK_SOCKET"
+    sudo rm -f $CVMFS_TEST091_TALK_SOCKET
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** mount cernvm-prod.cern.ch normally"
+  cvmfs_mount cernvm-prod.cern.ch || return 1
+  sudo cvmfs_talk -i cernvm-prod.cern.ch pid || return 2
+  sudo -u nobody /usr/bin/cvmfs_talk -i cernvm-prod.cern.ch pid && return 3
+
+  echo "*** unmount cernvm-prod.cern.ch"
+  cvmfs_umount cernvm-prod.cern.ch || return 10
+
+  CVMFS_TEST091_TALK_SOCKET="$(cvmfs_config showconfig cernvm-prod.cern.ch | \
+    grep ^CVMFS_CACHE_DIR= | cut -d= -f2 | awk '{print $1}')/test.sock"
+  echo "*** remount cernvm-prod.cern.ch with public socket on $CVMFS_TEST091_TALK_SOCKET"
+  trap cleanup HUP EXIT TERM INT || return $?
+  cvmfs_mount cernvm-prod.cern.ch \
+    CVMFS_TALK_SOCKET=$CVMFS_TEST091_TALK_SOCKET CVMFS_TALK_OWNER=cvmfs || return 20
+
+  sudo ls -lah $CVMFS_TEST091_TALK_SOCKET || return 30
+  sudo cvmfs_talk -i cernvm-prod.cern.ch pid && return 31
+  sudo cvmfs_talk -p $CVMFS_TEST091_TALK_SOCKET pid || return 32
+  # TODO(jblomer): changing socket ownership only works if cvmfs is mounted as root
+  # sudo -u nobody /usr/bin/cvmfs_talk -p $CVMFS_TEST091_TALK_SOCKET pid || return 33
+
+  [ "x$(sudo cvmfs_talk -p $CVMFS_TEST091_TALK_SOCKET pid)" = "x$(get_xattr pid /cvmfs/cernvm-prod.cern.ch)" ] \
+    || return 40
+
+  return 0
+}

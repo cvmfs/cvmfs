@@ -1,3 +1,4 @@
+#
 # CMake build script to configure and build CernVM-FS and all it's
 # external dependencies, if they are statically linked into the binaries
 #
@@ -56,6 +57,15 @@ if (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set (CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "CVMFS install path default is /usr" FORCE)
   message("Setting default install prefix to ${CMAKE_INSTALL_PREFIX} on Linux")
 endif (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+
+#
+# Explicitly check that the install prefix is not /usr/local.
+#
+if (LINUX AND "${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr/local")
+  message("######################################################################")
+  message(WARNING "The installation path has been set to ${CMAKE_INSTALL_PREFIX}.")
+  message("######################################################################")
+endif (LINUX AND "${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr/local")
 
 #
 # check if we use Clang

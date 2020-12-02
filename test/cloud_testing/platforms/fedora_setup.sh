@@ -8,6 +8,12 @@ script_location=$(dirname $(readlink --canonicalize $0))
 echo "updating installed RPM packages..."
 sudo dnf -y update || echo "---- WARNING: dnf reported non-zero status code"
 
+# Be gentle with the resolver
+echo -n "nscd... "
+install_from_repo nscd || die "fail (nscd)"
+sudo systemctl start nscd || die "cannot start nscd"
+echo "done"
+
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
@@ -45,6 +51,7 @@ install_from_repo bc
 install_from_repo tree
 install_from_repo sqlite
 install_from_repo bzip2
+install_from_repo fuse-overlayfs
 
 # traffic shaping
 install_from_repo trickle
@@ -74,3 +81,6 @@ sudo setsebool -P httpd_can_network_connect on
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
+
+# Enable user namespaces
+sudo sysctl -w user.max_user_namespaces=10000 || die "fail (enable user namespace)"
