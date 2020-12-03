@@ -504,7 +504,7 @@ _migrate_142() {
   fi
 
   echo "--> updating server.conf"
-  if ! grep -q "CVMFS_IGNORE_XDIR_HARDLINKS" $server_conf; then
+  if ! grep -q "^CVMFS_IGNORE_XDIR_HARDLINKS=" $server_conf; then
       echo "CVMFS_IGNORE_XDIR_HARDLINKS=true" >> $server_conf
   fi
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
