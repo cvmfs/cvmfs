@@ -56,7 +56,7 @@ func IngestIntoCVMFS(CVMFSRepo string, path string, target string) (err error) {
 		if err != nil {
 			LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("Error in creating the directory where to copy the singularity")
 		}
-		err = copy.Copy(target, path)
+		err = copy.Copy(target, path, copy.Options{PreserveTimes: true})
 
 	} else if targetStat.Mode().IsRegular() {
 		err = func() error {
