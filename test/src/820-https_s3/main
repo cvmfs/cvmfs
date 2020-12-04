@@ -158,7 +158,7 @@ cvmfs_run_test() {
 
     start_minio || return 2
 
-    export X509_CERT_BUNDLE=$CVMFS_820_SETTING_DIR/rootCA.crt
+    export X509_CERT_BUNDLE=$(realpath $CVMFS_820_SETTING_DIR/rootCA.crt)
 
     sudo X509_CERT_BUNDLE=$X509_CERT_BUNDLE \
         cvmfs_server mkfs \
