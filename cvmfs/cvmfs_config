@@ -461,8 +461,8 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/osxfuse.fs ]; then
-    echo "Error: OSXFUSE is missing."
+  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/macfuse.fs ]; then
+    echo "Error: macFUSE is missing."
     num_errors=$(($num_errors+1))
   fi
   check_dev_fuse
@@ -1693,7 +1693,7 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      charDevice=/dev/osxfuse0 ;;
+      charDevice=/dev/macfuse0 ;;
 
     * )
      echo "Architecture $sys_arch is not supported"
@@ -1708,7 +1708,7 @@ check_dev_fuse() {
       return_code=$(($return_code+1))
     elif [ x"$sys_arch" = x"Darwin" ]; then
       echo -n "Warning: character device $charDevice does not exist. "
-      echo "Please make sure that OSXFUSE is installed."
+      echo "Please make sure that macFUSE is installed."
     fi
   else
     if ! runascvmfsuser "test -r $charDevice"; then
