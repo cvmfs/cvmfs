@@ -1,4 +1,5 @@
 2.8.0:
+  * New defaults overlayfs over aufs and CVMFS_IGNORE_XDIR_HARDLINKS (CVM-1909)
   * [macOS] update to macFUSE 4 (CVM-1960)
   * [ducc] preserve timestamp of extracted files
   * [libcvmfs] implement cvmfs_remount(), add cvmfs_get_revision() (CVM-1958)
