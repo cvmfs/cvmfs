@@ -18,7 +18,7 @@ class SettingsPublisher;
 class CmdEnter : public Command {
  public:
   CmdEnter()
-    : settings_spool_area_("unset") // will be set by SetSpoolArea in Main()
+    : settings_spool_area_("unset")  // will be set by SetSpoolArea in Main()
     , cvmfs2_binary_("/usr/bin/cvmfs2")
     , overlayfs_binary_("/usr/bin/fuse-overlayfs")
   { }
