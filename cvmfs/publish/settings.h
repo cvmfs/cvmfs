@@ -89,6 +89,10 @@ class SettingsSpoolArea {
   void SetUnionMount(const std::string &path);
   void SetRepairMode(const EUnionMountRepairMode val);
 
+  // Creates, if necessary, all the directories in the spool area and the temp
+  // directory.  Does not take care of the union mount point.
+  void EnsureDirectories();
+
   std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
   std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
@@ -96,10 +100,12 @@ class SettingsSpoolArea {
      return workspace_() + "/cvmfs_io";
   }
   std::string union_mnt() const { return union_mnt_; }
-  std::string scratch_dir() const { return workspace_() + "/scratch/current"; }
+  std::string scratch_base() const { return workspace_() + "/scratch"; }
+  std::string scratch_dir() const { return scratch_base() + "/current"; }
+  std::string log_dir() const { return workspace() + "/logs"; }
   std::string client_config() const { return workspace_() + "/client.config"; }
   std::string client_lconfig() const { return workspace_() + "/client.local"; }
-  std::string client_log() const { return workspace_() + "/usyslog.log"; }
+  std::string client_log() const { return log_dir() + "/cvmfs.log"; }
   std::string cache_dir() const { return workspace_() + "/cache"; }
   std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }
   std::string checkout_marker() const { return workspace_() + "/checkout"; }

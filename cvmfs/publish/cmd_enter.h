@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "publish/command.h"
+#include "publish/settings.h"
 
 namespace publish {
 
@@ -17,7 +18,8 @@ class SettingsPublisher;
 class CmdEnter : public Command {
  public:
   CmdEnter()
-    : cvmfs2_binary_("/usr/bin/cvmfs2")
+    : settings_spool_area_("unset") // will be set by SetSpoolArea in Main()
+    , cvmfs2_binary_("/usr/bin/cvmfs2")
     , overlayfs_binary_("/usr/bin/fuse-overlayfs")
   { }
   virtual std::string GetName() const { return "enter"; }
@@ -53,26 +55,20 @@ class CmdEnter : public Command {
                       const std::vector<std::string> &empty_dirs,
                       std::vector<std::string> *new_paths);
   void WriteCvmfsConfig();
-  void MountCvmfs();
+  void MountCvmfs(const std::string &extra_config);
   pid_t RunInteractiveShell();
 
   void CleanupSession(bool keep_logs,
                       const std::vector<std::string> &new_paths);
 
+  SettingsSpoolArea settings_spool_area_;
   std::string fqrn_;
-  std::string session_dir_;
-  std::string target_dir_;
-  std::string lower_layer_;
   std::string cvmfs2_binary_;
   std::string overlayfs_binary_;
-  std::string rootfs_dir_;
-  std::string config_path_;  ///< CernVM-FS configuration
-  std::string usyslog_path_;
+  std::string session_dir_;  ///< In $HOME/.cvmfs/fqrn, container spool area
+  std::string rootfs_dir_;  ///< Destination to chroot() to in the namespace
   std::string stdout_path_;  ///< Logs stdout of background commands
   std::string stderr_path_;  ///< Logs stdout of background commands
-  std::string cache_dir_;
-  std::string upper_layer_;
-  std::string ovl_workdir_;
 };
 
 }  // namespace publish
