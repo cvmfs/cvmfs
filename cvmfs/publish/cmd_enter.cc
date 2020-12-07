@@ -456,9 +456,11 @@ int CmdEnter::Main(const Options &options) {
 
   // Prepare the session directory
   std::string workspace = GetHomeDirectory() + "/.cvmfs/" + fqrn_;
+  EnsureDirectory(workspace);
   session_dir_ = CreateTempDir(workspace + "/session");
   if (session_dir_.empty())
     throw EPublish("cannot create session directory in " + workspace);
+  settings_spool_area_.SetUnionMount(std::string("/cvmfs/") + fqrn_);
   settings_spool_area_.SetSpoolArea(session_dir_);
   settings_spool_area_.EnsureDirectories();
   rootfs_dir_ = session_dir_ + "/rootfs";
