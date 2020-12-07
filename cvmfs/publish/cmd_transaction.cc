@@ -101,6 +101,7 @@ int CmdTransaction::Main(const Options &options) {
       "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
+  // TODO(jblomer): move inside transaction when abort() is ready
   int rvi = publisher->managed_node()->Check(false /* is_quiet */);
   if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
 
