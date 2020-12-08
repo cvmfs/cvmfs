@@ -6,9 +6,14 @@ cvmfs_run_test() {
 
   local repo="atlas.cern.ch"
 
+  echo "Mount repository"
   cvmfs_mount ${repo} || return 1
+  echo "Remove temporary"
   rmdir /var/lib/cvmfs/shared/txn || return 2
-  cvmfs_config reload -c || return 3
+  echo "Reload"
+  cvmfs_config reload || return 3
+  echo "Checksum the first regular file that is around"
+  md5sum $(find /cvmfs/${repo} -type f | head -n1) || return 4
 
   return 0
 }
