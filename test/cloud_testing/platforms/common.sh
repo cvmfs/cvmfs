@@ -485,8 +485,8 @@ run_unittests() {
 
 
   cat > $xml_output << EOF
-<?xml version="1.0" encoding="UTF-8" environment="env"?>
-<testsuites tests="${env.BUILD_NUMBER}" failures="0" disabled="0" errors="0" timestamp="$CVMFS_TIMESTAMP" time="0" name="CVMFS Test Runner">
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="$BUILD_NUMBER" failures="0" disabled="0" errors="0" timestamp="$CVMFS_TIMESTAMP" time="0" name="CVMFS Test Runner">
   <testsuite hostname="$CVMFS_PLATFORM_NAME" name="Unit Test" timestamp="$CVMFS_TIMESTAMP" tests="0" failures="0" disabled="0" errors="0" time="0">
   </testsuite>
 </testsuites>
