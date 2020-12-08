@@ -53,9 +53,8 @@ class PosixCacheManager : public CacheManager {
   };
 
   enum RenameWorkarounds {
-    // kRenameNormal = 0,
-    kRenameLink,
-    kRenameSamedir
+    kRenameSamedir = 0,
+    kRenameLink
   };
 
   /**

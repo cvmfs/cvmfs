@@ -146,6 +146,11 @@ static void *MainCheck(void *data __attribute__((unused))) {
     int n = atomic_xadd32(&g_num_files, 1);
     if (g_verbose)
       LogCvmfs(kLogCvmfs, kLogStdout, "Checking file %s", path.c_str());
+    if (path.find("/txn.") != std::string::npos) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Temporary txn file found. Not checking the hash.");
+      continue;
+    }
     if (!g_verbose && ((n % 1000) == 0))
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
 
