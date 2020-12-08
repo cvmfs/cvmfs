@@ -60,8 +60,6 @@ class DiffTester : public DiffListener {
   {
     n_mod_++;
   }
-
-  virtual void CommitReport() {}
 };
 
 TEST_F(T_Diff, Ident) {

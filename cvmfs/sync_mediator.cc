@@ -251,10 +251,7 @@ void SyncMediator::LeaveDirectory(SharedPtr<SyncItem> entry)
  * To be called after change set traversal is finished.
  */
 bool SyncMediator::Commit(manifest::Manifest *manifest) {
-  if (!params_->print_changeset) {
-    reporter_->CommitReport();
-    LogCvmfs(kLogPublish, kLogStdout, "");
-  }
+  reporter_->CommitReport();
   LogCvmfs(kLogPublish, kLogStdout,
            "Waiting for upload of files before committing...");
 
@@ -790,18 +787,18 @@ void SyncDiffReporter::OnInit(const history::History::Tag & /*from_tag*/,
 void SyncDiffReporter::OnStats(const catalog::DeltaCounters & /*delta*/) {}
 
 void SyncDiffReporter::OnAdd(const std::string &path,
-                             const catalog::DirectoryEntry &entry) {
+                             const catalog::DirectoryEntry & /*entry*/) {
   changed_items_++;
   AddImpl(path);
 }
 void SyncDiffReporter::OnRemove(const std::string &path,
-                                const catalog::DirectoryEntry &entry) {
+                                const catalog::DirectoryEntry & /*entry*/) {
   changed_items_++;
   RemoveImpl(path);
 }
 void SyncDiffReporter::OnModify(const std::string &path,
-                                const catalog::DirectoryEntry &entry_from,
-                                const catalog::DirectoryEntry &entry_to) {
+                                const catalog::DirectoryEntry & /*entry_from*/,
+                                const catalog::DirectoryEntry & /*entry_to*/) {
   changed_items_++;
   ModifyImpl(path);
 }

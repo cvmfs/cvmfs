@@ -142,8 +142,6 @@ class DiffReporter : public publish::DiffListener {
     }
   }
 
-  virtual void CommitReport() {}
-
  private:
   std::string PrintDifferences(catalog::DirectoryEntryBase::Differences diff) {
     std::vector<std::string> result_list;

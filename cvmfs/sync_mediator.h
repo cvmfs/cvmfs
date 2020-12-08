@@ -76,7 +76,7 @@ class SyncDiffReporter : public DiffListener {
   virtual void OnModify(const std::string &path,
                         const catalog::DirectoryEntry &entry_from,
                         const catalog::DirectoryEntry &entry_to);
-  virtual void CommitReport();
+  void CommitReport();
 
  private:
   void PrintDots();
@@ -300,7 +300,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   XattrList default_xattrs_;
   UniquePtr<perf::FsCounters> counters_;
 
-  UniquePtr<DiffListener> reporter_;
+  UniquePtr<SyncDiffReporter> reporter_;
 };  // class SyncMediator
 
 }  // namespace publish
