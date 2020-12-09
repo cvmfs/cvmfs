@@ -39,6 +39,22 @@ void SettingsSpoolArea::SetRepairMode(const EUnionMountRepairMode val) {
   repair_mode_ = val;
 }
 
+void SettingsSpoolArea::EnsureDirectories() {
+  std::vector<std::string> targets;
+  targets.push_back(tmp_dir());
+  targets.push_back(readonly_mnt());
+  targets.push_back(scratch_dir());
+  targets.push_back(cache_dir());
+  targets.push_back(log_dir());
+  targets.push_back(ovl_work_dir());
+
+  for (unsigned i = 0; i < targets.size(); ++i) {
+    bool rv = MkdirDeep(targets[i], 0700, true /* veryfy_writable */);
+    if (!rv)
+      throw publish::EPublish("cannot create directory " + targets[i]);
+  }
+}
+
 
 //------------------------------------------------------------------------------
 
