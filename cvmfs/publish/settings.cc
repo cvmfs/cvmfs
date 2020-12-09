@@ -460,6 +460,14 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
     session_dir);
 
+  std::string xattr;
+  bool rvb = platform_getxattr(
+    settings_publisher->transaction().spool_area().readonly_mnt(),
+    "user.root_hash", &xattr);
+  if (!rvb) {
+    throw EPublish("cannot get extrended attribute root_hash");
+  }
+
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
   omgr.ParsePath(settings_publisher->transaction().spool_area().client_config(),
@@ -473,7 +481,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->SetLayoutRevision(
     Publisher::kRequiredLayoutRevision);
   settings_publisher->GetTransaction()->SetBaseHash(shash::MkFromHexPtr(
-    shash::HexPtr(session_env["CVMFS_ROOT_HASH"]), shash::kSuffixCatalog));
+    shash::HexPtr(xattr), shash::kSuffixCatalog));
   settings_publisher->GetTransaction()->SetUnionFsType("overlayfs");
   settings_publisher->SetOwner(geteuid(), getegid());
 

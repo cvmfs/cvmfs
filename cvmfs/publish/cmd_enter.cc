@@ -541,11 +541,9 @@ int CmdEnter::Main(const Options &options) {
     _exit(exit_code);
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-  std::string env =
-    std::string("CVMFS_FQRN=") + fqrn_ + "\n" +
-    "CVMFS_ROOT_HASH=" + GetCvmfsXattr("root_hash") + "\n";
   env_conf_ = session_dir_ + "/env.conf";
-  rvb = SafeWriteToFile(env, env_conf_, kPrivateFileMode);
+  rvb = SafeWriteToFile(std::string("CVMFS_FQRN=") + fqrn_ + "\n",
+                        env_conf_, kPrivateFileMode);
   if (!rvb)
     throw EPublish("cannot create session environment file");
 
