@@ -331,6 +331,11 @@ void CmdEnter::MountCvmfs() {
           StringifyInt(exit_code) + ")\n" +
           "  command: `" + JoinStrings(cmdline, " ").c_str() + "`");
   }
+
+  rvb = BindMount(settings_spool_area_.readonly_mnt(),
+                  rootfs_dir_ + settings_spool_area_.readonly_mnt());
+  if (!rvb)
+    throw EPublish("cannot map CernVM-FS mount point");
 }
 
 
@@ -409,6 +414,12 @@ void CmdEnter::CleanupSession(
   rvb = platform_umount_lazy(union_mnt.c_str());
   if (!rvb)
     throw EPublish("cannot unmount overlayfs on " + union_mnt);
+  rvb = platform_umount_lazy(
+    (rootfs_dir_ + settings_spool_area_.readonly_mnt()).c_str());
+  if (!rvb) {
+    throw EPublish("cannot unmount mapped CernVM-FS on " +
+                   rootfs_dir_ + settings_spool_area_.readonly_mnt());
+  }
   rvb = platform_umount_lazy(settings_spool_area_.readonly_mnt().c_str());
   if (!rvb) {
     throw EPublish("cannot unmount CernVM-FS on " +
