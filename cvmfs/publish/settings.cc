@@ -108,6 +108,10 @@ void SettingsTransaction::SetPrintChangeset(bool value) {
   print_changeset_ = value;
 }
 
+void SettingsTransaction::SetDryRun(bool value) {
+  dry_run_ = value;
+}
+
 void SettingsTransaction::SetUnionFsType(const std::string &union_fs) {
   if (union_fs == "aufs") {
     union_fs_ = kUnionFsAufs;

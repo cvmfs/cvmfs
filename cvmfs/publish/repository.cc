@@ -783,24 +783,28 @@ void Publisher::Sync() {
   ConstructSyncManagers();
 
   sync_union_->Traverse();
-  bool rvb = sync_mediator_->Commit(manifest_);
-  if (!rvb) throw EPublish("cannot write change set to storage");
-  spooler_files_->WaitForUpload();
-  spooler_catalogs_->WaitForUpload();
-  spooler_files_->FinalizeSession(false /* commit */);
+  if (!settings_.transaction().dry_run()) {
+    bool rvb = sync_mediator_->Commit(manifest_);
+    if (!rvb) throw EPublish("cannot write change set to storage");
+    spooler_files_->WaitForUpload();
+    spooler_catalogs_->WaitForUpload();
+    spooler_files_->FinalizeSession(false /* commit */);
 
-  const std::string old_root_hash =
-    settings_.transaction().base_hash().ToString(true /* with_suffix */);
-  const std::string new_root_hash =
-    manifest_->catalog_hash().ToString(true /* with_suffix */);
-  rvb = spooler_catalogs_->FinalizeSession(true /* commit */,
-    old_root_hash, new_root_hash,
-    /* TODO(jblomer) */ sync_parameters_->repo_tag);
-  if (!rvb)
-    throw EPublish("failed to commit transaction");
+    const std::string old_root_hash =
+      settings_.transaction().base_hash().ToString(true /* with_suffix */);
+    const std::string new_root_hash =
+      manifest_->catalog_hash().ToString(true /* with_suffix */);
+    rvb = spooler_catalogs_->FinalizeSession(true /* commit */,
+      old_root_hash, new_root_hash,
+      /* TODO(jblomer) */ sync_parameters_->repo_tag);
+    if (!rvb)
+      throw EPublish("failed to commit transaction");
 
-  // Reset to the new catalog root hash
-  settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
+    // Reset to the new catalog root hash
+    settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
+    WipeScratchArea();
+  }
+
   delete sync_union_;
   delete sync_mediator_;
   delete sync_parameters_;
@@ -809,10 +813,11 @@ void Publisher::Sync() {
   sync_mediator_ = NULL;
   sync_parameters_ = NULL;
   catalog_mgr_ = NULL;
-  WipeScratchArea();
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %d", manifest_->revision());
-  reflog_->AddCatalog(manifest_->catalog_hash());
+  if (!settings_.transaction().dry_run()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %d", manifest_->revision());
+    reflog_->AddCatalog(manifest_->catalog_hash());
+  }
 }
 
 void Publisher::Publish() {
