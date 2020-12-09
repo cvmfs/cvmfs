@@ -58,7 +58,7 @@ case $sys_arch in
 
   Darwin )
     fuser="/usr/bin/fuser"
-    fuse_fs_type="osxfuse"
+    fuse_fs_type="macfuse"
     ;;
 
   * )
