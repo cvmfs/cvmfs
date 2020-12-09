@@ -251,10 +251,12 @@ void SyncMediator::LeaveDirectory(SharedPtr<SyncItem> entry)
  */
 bool SyncMediator::Commit(manifest::Manifest *manifest) {
   reporter_->CommitReport();
-  LogCvmfs(kLogPublish, kLogStdout,
-           "Waiting for upload of files before committing...");
 
-  params_->spooler->WaitForUpload();
+  if (!params_->dry_run) {
+    LogCvmfs(kLogPublish, kLogStdout,
+             "Waiting for upload of files before committing...");
+    params_->spooler->WaitForUpload();
+  }
 
   if (!hardlink_queue_.empty()) {
     assert(handle_hardlinks_);
@@ -304,6 +306,11 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
   if (union_engine_) union_engine_->PostUpload();
 
   params_->spooler->UnregisterListeners();
+
+  if (params_->dry_run) {
+    manifest = NULL;
+    return true;
+  }
 
   LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
   if (params_->spooler->GetNumberOfErrors() > 0) {
@@ -918,7 +925,7 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
   } else if (entry->relative_parent_path().empty() &&
              entry->IsCatalogMarker()) {
     PANIC(kLogStderr, "Error: nested catalog marker in root directory");
-  } else {
+  } else if (!params_->dry_run) {
     {
       // Push the file to the spooler, remember the entry for the path
       MutexLockGuard m(&lock_file_queue_);

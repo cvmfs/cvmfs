@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <map>
 #include <string>
 
 #include "compression.h"
@@ -103,6 +104,7 @@ class SettingsSpoolArea {
   std::string scratch_base() const { return workspace_() + "/scratch"; }
   std::string scratch_dir() const { return scratch_base() + "/current"; }
   std::string log_dir() const { return workspace() + "/logs"; }
+  // TODO(jblomer): shouldn't this be in /etc/cvmfs/repositor.../client.conf
   std::string client_config() const { return workspace_() + "/client.config"; }
   std::string client_lconfig() const { return workspace_() + "/client.local"; }
   std::string client_log() const { return log_dir() + "/cvmfs.log"; }
@@ -472,10 +474,12 @@ class SettingsBuilder : SingleCopy {
   /**
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
-   * Otherweise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
+   * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
    * If alias is an empty string, the command still succeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    * If needs_managed is true, remote repositories are rejected
+   * In an "enter environment" (see cmd_enter), the spool area of the enter
+   * environment is applied.
    */
   SettingsPublisher* CreateSettingsPublisher(
       const std::string &ident, bool needs_managed = false);
@@ -499,6 +503,17 @@ class SettingsBuilder : SingleCopy {
    * on the same node.
    */
   std::string GetSingleAlias();
+
+  /**
+   * If in a ephemeral writable shell, parse $session_dir/env.conf
+   * Otherwise return an empty map. A non-empty map has at least CVMFS_FQRN set.
+   */
+  std::map<std::string, std::string> GetSessionEnvironment();
+
+  /**
+   * Create settings from an ephermal writable shell
+   */
+  SettingsPublisher* CreateSettingsPublisherFromSession();
 };  // class SettingsBuilder
 
 }  // namespace publish

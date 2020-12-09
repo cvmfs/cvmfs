@@ -646,20 +646,30 @@ Publisher::Publisher(const SettingsPublisher &settings)
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
 
+  bool check_keys_match = true;
   int rvb;
   rvb =
     signature_mgr_->LoadCertificatePath(settings.keychain().certificate_path());
-  if (!rvb) throw EPublish("cannot load certificate");
+  if (!rvb) {
+    check_keys_match = false;
+    LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
+             "Warning: cannot load certificate, thus cannot commit changes");
+  }
   rvb = signature_mgr_->LoadPrivateKeyPath(
     settings.keychain().private_key_path(), "");
-  if (!rvb) throw EPublish("cannot load private key");
+  if (!rvb) {
+    check_keys_match = false;
+    LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
+             "Warning: cannot load private key, thus cannot commit changes");
+  }
   // The private master key might be on a key card instead
   if (FileExists(settings.keychain().master_private_key_path())) {
     rvb = signature_mgr_->LoadPrivateMasterKeyPath(
       settings.keychain().master_private_key_path());
     if (!rvb) throw EPublish("cannot load private master key");
   }
-  if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
+  if (check_keys_match && !signature_mgr_->KeysMatch())
+    throw EPublish("corrupted keychain");
 
   if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
     if (!settings.keychain().HasGatewayKey()) {
@@ -729,6 +739,7 @@ void Publisher::ConstructSyncManagers() {
     // p->spooler_definition = SHOULD NOT BE NEEDED;
     // p->union_fs_type = SHOULD NOT BE NEEDED
     p->print_changeset = settings_.transaction().print_changeset();
+    p->dry_run = settings_.transaction().dry_run();
     sync_parameters_ = p;
   }
 
@@ -783,9 +794,10 @@ void Publisher::Sync() {
   ConstructSyncManagers();
 
   sync_union_->Traverse();
+  bool rvb = sync_mediator_->Commit(manifest_);
+  if (!rvb) throw EPublish("cannot write change set to storage");
+
   if (!settings_.transaction().dry_run()) {
-    bool rvb = sync_mediator_->Commit(manifest_);
-    if (!rvb) throw EPublish("cannot write change set to storage");
     spooler_files_->WaitForUpload();
     spooler_catalogs_->WaitForUpload();
     spooler_files_->FinalizeSession(false /* commit */);

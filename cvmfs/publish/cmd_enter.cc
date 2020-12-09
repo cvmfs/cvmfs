@@ -252,16 +252,20 @@ void CmdEnter::CreateUnderlay(
   }
 }
 
-void CmdEnter::WriteCvmfsConfig() {
+void CmdEnter::WriteCvmfsConfig(const std::string &extra_config) {
   BashOptionsManager options_manager(
     new DefaultOptionsTemplateManager(fqrn_));
   options_manager.ParseDefault(fqrn_);
+  if (!extra_config.empty())
+    options_manager.ParsePath(extra_config, false /* external */);
+
   options_manager.SetValue("CVMFS_MOUNT_DIR",
                            settings_spool_area_.readonly_mnt());
   options_manager.SetValue("CVMFS_AUTO_UPDATE", "no");
   options_manager.SetValue("CVMFS_NFS_SOURCE", "no");
   options_manager.SetValue("CVMFS_HIDE_MAGIC_XATTRS", "yes");
   options_manager.SetValue("CVMFS_SERVER_CACHE_MODE", "yes");
+  options_manager.SetValue("CVMFS_CLAIM_OWNERSHIP", "yes");
   options_manager.SetValue("CVMFS_USYSLOG", settings_spool_area_.client_log());
   options_manager.SetValue("CVMFS_RELOAD_SOCKETS",
                            settings_spool_area_.cache_dir());
@@ -283,7 +287,7 @@ void CmdEnter::WriteCvmfsConfig() {
 }
 
 
-void CmdEnter::MountCvmfs(const std::string &extra_config) {
+void CmdEnter::MountCvmfs() {
   if (FindExecutable(cvmfs2_binary_).empty()) {
     throw EPublish("cannot find executable " + cvmfs2_binary_,
                    EPublish::kFailMissingDependency);
@@ -295,9 +299,6 @@ void CmdEnter::MountCvmfs(const std::string &extra_config) {
                        kPrivateFileMode);
 
   std::string cvmfs_config = settings_spool_area_.client_config();
-  if (!extra_config.empty()) {
-    cvmfs_config += ":" + extra_config;
-  }
 
   std::vector<std::string> cmdline;
   cmdline.push_back(cvmfs2_binary_);
@@ -379,6 +380,18 @@ void CmdEnter::MountOverlayfs() {
 }
 
 
+std::string CmdEnter::GetCvmfsXattr(const std::string &name) {
+  std::string xattr;
+  bool rvb = platform_getxattr(settings_spool_area_.readonly_mnt(),
+                               std::string("user.") + name, &xattr);
+  if (!rvb) {
+    throw EPublish("cannot get extrended attribute " + name + " from " +
+                   settings_spool_area_.readonly_mnt());
+  }
+  return xattr;
+}
+
+
 void CmdEnter::CleanupSession(
   bool keep_logs, const std::vector<std::string> &new_paths)
 {
@@ -390,7 +403,7 @@ void CmdEnter::CleanupSession(
                                "user.pid", &pid_xattr);
   if (!rvb)
     throw EPublish("cannot find CernVM-FS process");
-  pid_t pid_cvmfs = String2Uint64(pid_xattr);
+  pid_t pid_cvmfs = String2Uint64(GetCvmfsXattr("pid"));
 
   const std::string union_mnt = rootfs_dir_ + settings_spool_area_.union_mnt();
   rvb = platform_umount_lazy(union_mnt.c_str());
@@ -409,6 +422,7 @@ void CmdEnter::CleanupSession(
 
   RemoveSingle(settings_spool_area_.readonly_mnt());
   RemoveSingle(settings_spool_area_.client_config());
+  RemoveSingle(env_conf_);
   rvb = RemoveTree(settings_spool_area_.ovl_work_dir());
   if (!rvb)
     throw EPublish("cannot remove " + settings_spool_area_.ovl_work_dir());
@@ -442,10 +456,12 @@ int CmdEnter::Main(const Options &options) {
     throw EPublish("malformed repository name: " + fqrn_);
   }
 
+  bool rvb;
+
   // We cannot have any capabilities or else we are not allowed to write
   // to /proc/self/setgroups anc /proc/self/[u|g]id_map when creating a user
   // namespace
-  Repository::DropCapabilities();
+  Env::DropCapabilities();
 
   if (options.Has("cvmfs2")) {
     cvmfs2_binary_ = options.GetString("cvmfs2");
@@ -488,7 +504,7 @@ int CmdEnter::Main(const Options &options) {
   CreateUnderlay("", rootfs_dir_, empty_dirs, &new_paths);
   // The .cvmfsenter marker file helps when attaching to the mount namespace
   // to distinguish it from the system root
-  bool rvb = SymlinkForced(session_dir_, rootfs_dir_ + "/.cvmfsenter");
+  rvb = SymlinkForced(session_dir_, rootfs_dir_ + "/.cvmfsenter");
   if (!rvb)
     throw EPublish("cannot create marker file " + rootfs_dir_ + "/.cvmfsenter");
   new_paths.push_back(rootfs_dir_ + "/.cvmfsenter");
@@ -505,14 +521,22 @@ int CmdEnter::Main(const Options &options) {
   if (pid < 0)
     throw EPublish("cannot fork");
   if (pid == 0) {
-    WriteCvmfsConfig();
-    MountCvmfs(options.GetStringDefault("cvmfs-config", ""));
+    WriteCvmfsConfig(options.GetStringDefault("cvmfs-config", ""));
+    MountCvmfs();
     _exit(0);
   }
   int exit_code = WaitForChild(pid);
   if (exit_code != 0)
     _exit(exit_code);
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
+
+  std::string env =
+    std::string("CVMFS_FQRN=") + fqrn_ + "\n" +
+    "CVMFS_ROOT_HASH=" + GetCvmfsXattr("root_hash") + "\n";
+  env_conf_ = session_dir_ + "/env.conf";
+  rvb = SafeWriteToFile(env, env_conf_, kPrivateFileMode);
+  if (!rvb)
+    throw EPublish("cannot create session environment file");
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Mounting union file system... ");
