@@ -8,6 +8,7 @@ import (
 
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/lib"
+	l "github.com/cvmfs/ducc/log"
 )
 
 var (
@@ -35,12 +36,12 @@ var convertSingleImageCmd = &cobra.Command{
 		cvmfsRepo := args[1]
 
 		if skipLayers == true {
-			lib.Log().Info("Skipping the creation of the thin image and podman store since provided --skip-layers")
+			l.Log().Info("Skipping the creation of the thin image and podman store since provided --skip-layers")
 			skipThinImage = true
 			skipPodman = true
 		}
 		if thinImageName == "" {
-			lib.Log().Info("Skipping the creation of the thin image since did not provided a name for the thin image using the --thin-image-name flag")
+			l.Log().Info("Skipping the creation of the thin image since did not provided a name for the thin image using the --thin-image-name flag")
 			skipThinImage = true
 			// we need a thinImageName to parse the wish
 			thinImageName = inputImage + "_thin"
@@ -49,19 +50,19 @@ var convertSingleImageCmd = &cobra.Command{
 		if skipThinImage == false {
 			_, err := lib.GetPassword()
 			if err != nil {
-				lib.LogE(err).Warning("Asked to create the docker thin image but did not provide the password for the registry, we cannot push the thin image to the registry, hence we won't create it. We will unpack the layers.")
+				l.LogE(err).Warning("Asked to create the docker thin image but did not provide the password for the registry, we cannot push the thin image to the registry, hence we won't create it. We will unpack the layers.")
 				skipThinImage = true
 			}
 		}
 
 		if !cvmfs.RepositoryExists(cvmfsRepo) {
-			lib.Log().Error("The repository does not seems to exists.")
+			l.Log().Error("The repository does not seems to exists.")
 			os.Exit(RepoNotExistsError)
 		}
 
 		wish, err := lib.CreateWish(inputImage, thinImageName, cvmfsRepo, username, username)
 		if err != nil {
-			lib.LogE(err).Error("Error in creating the wish to convert")
+			l.LogE(err).Error("Error in creating the wish to convert")
 			os.Exit(1)
 		}
 		fields := log.Fields{"input image": wish.InputName,
@@ -69,25 +70,25 @@ var convertSingleImageCmd = &cobra.Command{
 		if !skipFlat {
 			err := lib.ConvertWishSingularity(wish)
 			if err != nil {
-				lib.LogE(err).WithFields(fields).Error("Error in converting singularity image")
+				l.LogE(err).WithFields(fields).Error("Error in converting singularity image")
 			}
 		}
 		if !skipLayers {
 			err := lib.ConvertWish(wish, convertAgain, overwriteLayer)
 			if err != nil {
-				lib.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+				l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
 			}
 		}
 		if !skipThinImage {
 			err := lib.ConvertWishDocker(wish)
 			if err != nil {
-				lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+				l.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
 			}
 		}
 		if !skipPodman {
 			err := lib.ConvertWishPodman(wish, convertAgain)
 			if err != nil {
-				lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+				l.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
 			}
 		}
 	},

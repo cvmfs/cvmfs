@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/cvmfs/ducc/lib"
+	l "github.com/cvmfs/ducc/log"
 	"github.com/cvmfs/ducc/temp"
 )
 
@@ -33,7 +33,7 @@ func AliveMessage() {
 	ticker := time.NewTicker(30 * time.Second)
 	go func() {
 		for range ticker.C {
-			lib.Log().Info("Process alive")
+			l.Log().Info("Process alive")
 		}
 	}()
 }

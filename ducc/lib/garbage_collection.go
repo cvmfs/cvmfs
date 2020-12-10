@@ -12,6 +12,7 @@ import (
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	exec "github.com/cvmfs/ducc/exec"
+	l "github.com/cvmfs/ducc/log"
 )
 
 func FindAllUsedFlatImages(CVMFSRepo string) ([]string, error) {
@@ -21,7 +22,7 @@ func FindAllUsedFlatImages(CVMFSRepo string) ([]string, error) {
 	walker := func(path string, info os.FileInfo, err error) error {
 		// some kind of error, we don't really care and we just move on.
 		if err != nil {
-			LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			l.LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
 			return nil
 		}
 		components := strings.Split(path, string(os.PathSeparator))
@@ -60,7 +61,7 @@ func FindAllFlatImages(CVMFSRepo string) ([]string, error) {
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			l.LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
 			return nil
 		}
 		components := strings.Split(path, string(os.PathSeparator))
@@ -87,7 +88,7 @@ func FindAllLayers(CVMFSRepo string) ([]string, error) {
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			l.LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
 			return nil
 		}
 		components := strings.Split(path, string(os.PathSeparator))
@@ -113,7 +114,7 @@ func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			l.LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
 			return nil
 		}
 		if info.Name() == "manifest.json" {
@@ -155,7 +156,7 @@ func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]strin
 		layersdata := []LayerInfo{}
 		file, err := ioutil.ReadFile(layerInfoPath)
 		if err != nil {
-			LogE(err).Error("Error in reading layers.json file")
+			l.LogE(err).Error("Error in reading layers.json file")
 			return podmanPathsToDelete, err
 		}
 		json.Unmarshal(file, &layersdata)
@@ -169,7 +170,7 @@ func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]strin
 				linkFilePath := filepath.Join(podmanLayerPath, "link")
 				data, err := ioutil.ReadFile(linkFilePath)
 				if err != nil {
-					LogE(err).Error("Error in reading link file")
+					l.LogE(err).Error("Error in reading link file")
 					return podmanPathsToDelete, err
 				}
 				id := string(data)
@@ -184,13 +185,13 @@ func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]strin
 
 		layerInfo, err := json.MarshalIndent(newlayersdata, "", " ")
 		if err != nil {
-			LogE(err).Error("Error in marshaling json data for layers.json")
+			l.LogE(err).Error("Error in marshaling json data for layers.json")
 			return podmanPathsToDelete, err
 		}
 
 		err = cvmfs.WriteDataToCvmfs(CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(layerInfoPath), layerInfo)
 		if err != nil {
-			LogE(err).Error("Error in writing layers.json")
+			l.LogE(err).Error("Error in writing layers.json")
 			return podmanPathsToDelete, err
 		}
 	}
@@ -212,30 +213,30 @@ func FindImageToGarbageCollect(CVMFSRepo string) ([]da.Manifest, error) {
 		return schedule, nil
 	}
 	if err != nil {
-		llog(LogE(err)).Error("Error in stating the schedule file")
+		llog(l.LogE(err)).Error("Error in stating the schedule file")
 		return schedule, err
 	}
 	scheduleFileRO, err := os.Open(removeSchedulePath)
 	if err != nil {
-		llog(LogE(err)).Error("Error in opening the schedule file")
+		llog(l.LogE(err)).Error("Error in opening the schedule file")
 		return schedule, err
 	}
 
 	scheduleBytes, err := ioutil.ReadAll(scheduleFileRO)
 	if err != nil {
-		llog(LogE(err)).Error("Impossible to read the schedule file")
+		llog(l.LogE(err)).Error("Impossible to read the schedule file")
 		return schedule, err
 	}
 
 	err = scheduleFileRO.Close()
 	if err != nil {
-		llog(LogE(err)).Error("Impossible to close the schedule file")
+		llog(l.LogE(err)).Error("Impossible to close the schedule file")
 		return schedule, err
 	}
 
 	err = json.Unmarshal(scheduleBytes, &schedule)
 	if err != nil {
-		llog(LogE(err)).Error("Impossible to unmarshal the schedule file")
+		llog(l.LogE(err)).Error("Impossible to unmarshal the schedule file")
 		return schedule, err
 	}
 
@@ -253,7 +254,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 			"layer": layer})
 	}
 	if err != nil {
-		llog(LogE(err)).Error("Impossible to retrieve the backlink information")
+		llog(l.LogE(err)).Error("Impossible to retrieve the backlink information")
 		return err
 	}
 	var newOrigin []string
@@ -267,7 +268,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 		backlink.Origin = newOrigin
 		backLinkMarshall, err := json.Marshal(backlink)
 		if err != nil {
-			llog(LogE(err)).Error("Error in marshaling the new backlink")
+			llog(l.LogE(err)).Error("Error in marshaling the new backlink")
 			return err
 		}
 
@@ -275,7 +276,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 
 		err = exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
 		if err != nil {
-			llog(LogE(err)).Error("Error in opening the transaction")
+			llog(l.LogE(err)).Error("Error in opening the transaction")
 			return err
 		}
 
@@ -283,7 +284,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			err = os.MkdirAll(dir, 0666)
 			if err != nil {
-				llog(LogE(err)).WithFields(log.Fields{"directory": dir}).Error(
+				llog(l.LogE(err)).WithFields(log.Fields{"directory": dir}).Error(
 					"Error in creating the directory for the backlinks file, skipping...")
 				return err
 			}
@@ -291,14 +292,14 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 
 		err = ioutil.WriteFile(backlinkPath, backLinkMarshall, 0666)
 		if err != nil {
-			llog(LogE(err)).WithFields(log.Fields{"file": backlinkPath}).Error(
+			llog(l.LogE(err)).WithFields(log.Fields{"file": backlinkPath}).Error(
 				"Error in writing the backlink file, skipping...")
 			return err
 		}
 
 		err = exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
 		if err != nil {
-			llog(LogE(err)).Error("Error in publishing after adding the backlinks")
+			llog(l.LogE(err)).Error("Error in publishing after adding the backlinks")
 			return err
 		}
 		// write it to file
@@ -306,7 +307,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 	} else {
 		err = cvmfs.RemoveLayer(CVMFSRepo, layer)
 		if err != nil {
-			llog(LogE(err)).Error("Error in deleting the layer")
+			llog(l.LogE(err)).Error("Error in deleting the layer")
 		}
 		return err
 	}

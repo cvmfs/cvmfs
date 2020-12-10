@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	exec "github.com/cvmfs/ducc/exec"
+	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -53,7 +54,7 @@ func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 	getLock(CVMFSRepo)
 	err := exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
 	if err != nil {
-		LogE(err).WithFields(
+		l.LogE(err).WithFields(
 			log.Fields{"repo": CVMFSRepo}).
 			Error("Error in opening the transaction")
 		abort(CVMFSRepo)
@@ -65,7 +66,7 @@ func Publish(CVMFSRepo string) error {
 	defer unlock(CVMFSRepo)
 	err := exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
 	if err != nil {
-		LogE(err).WithFields(
+		l.LogE(err).WithFields(
 			log.Fields{"repo": CVMFSRepo}).
 			Error("Error in publishing the repository")
 		abort(CVMFSRepo)
@@ -77,7 +78,7 @@ func Abort(CVMFSRepo string) error {
 	defer unlock(CVMFSRepo)
 	err := abort(CVMFSRepo)
 	if err != nil {
-		LogE(err).WithFields(
+		l.LogE(err).WithFields(
 			log.Fields{"repo": CVMFSRepo}).
 			Error("Error in abort the transaction")
 	}
@@ -92,7 +93,7 @@ func RepositoryExists(CVMFSRepo string) bool {
 	cmd := exec.ExecCommand("cvmfs_server", "list")
 	err, stdout, _ := cmd.StartWithOutput()
 	if err != nil {
-		LogE(fmt.Errorf("Error in listing the repository")).
+		l.LogE(fmt.Errorf("Error in listing the repository")).
 			Error("Repo not present")
 		return false
 	}
