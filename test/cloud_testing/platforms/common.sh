@@ -1,7 +1,6 @@
 #!/bin/bash
 
 export LC_ALL=C
-export BUILD_NUMBER=${BUILD_NUMBER:=}
 
 script_location=$(portable_dirname $0)
 . ${script_location}/../../test_functions
@@ -487,8 +486,8 @@ run_unittests() {
 
   cat > $xml_output << EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="$BUILD_NUMBER" failures="${BUILD_NUMBER}" disabled="${CERNVM_CI_SCRIPT_LOCATION}" errors="$BUILD_DISPLAY_NAME" timestamp="$CVMFS_TIMESTAMP" time="$BUILD_ID" name="CVMFS Test Runner">
-  <testsuite hostname="$CVMFS_PLATFORM_NAME" name="Unit Test" timestamp="$CVMFS_TIMESTAMP" tests="0" failures="0" disabled="0" errors="0" time="0">
+<testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$CVMFS_TIMESTAMP" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
+  <testsuite hostname="$CVMFS_PLATFORM_NAME" name="${BUILD_NUMBER}" timestamp="$CVMFS_TIMESTAMP" tests="0" failures="0" disabled="0" errors="0" time="0">
   </testsuite>
 </testsuites>
 EOF
