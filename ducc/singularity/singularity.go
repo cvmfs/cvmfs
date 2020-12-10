@@ -2,6 +2,7 @@ package singularity
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -48,4 +49,17 @@ func AssureValidSingularity() error {
 	errF := fmt.Errorf("Installed singularity is too old, we need at least 3.5: Installed version: %s", version)
 	l.LogE(errF).WithFields(log.Fields{"version": version}).Error("Too old singularity")
 	return errF
+}
+
+func BuildFilesystemDirectory(directoryPath, singularityURL string, env map[string]string) error {
+	cmd := exec.ExecCommand("singularity", "build", "--force", "--fix-perms",
+		"--sandbox", directoryPath, singularityURL).
+		Env("SINGULARITY_CACHEDIR", "").
+		Env("PATH", os.Getenv("PATH")).
+		Env("SINGULARITY_DOCKER_USERNAME", "").
+		Env("SINGULARITY_DOCKER_PASSWORD", "")
+	for key, value := range env {
+		cmd.Env(key, value)
+	}
+	return cmd.Start()
 }

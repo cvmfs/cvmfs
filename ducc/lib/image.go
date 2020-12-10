@@ -20,8 +20,8 @@ import (
 
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
-	exec "github.com/cvmfs/ducc/exec"
 	l "github.com/cvmfs/ducc/log"
+	singularity "github.com/cvmfs/ducc/singularity"
 	temp "github.com/cvmfs/ducc/temp"
 )
 
@@ -353,24 +353,26 @@ func (img *Image) DownloadSingularityDirectory(rootPath string) (sing Singularit
 	// if we fail, we try again without the credentials
 	user := img.User
 	pass, _ := GetPassword()
-	err = exec.ExecCommand("singularity", "build", "--force", "--fix-perms",
-		"--sandbox", dir, img.GetSingularityLocation()).
-		Env("SINGULARITY_CACHEDIR", singularityTempCache).
-		Env("PATH", os.Getenv("PATH")).
-		Env("SINGULARITY_DOCKER_USERNAME", user).
-		Env("SINGULARITY_DOCKER_PASSWORD", pass).
-		Start()
+
+	env := make(map[string]string)
+	env["SINGULARITY_CACHEDIR"] = singularityTempCache
+	env["PATH"] = os.Getenv("PATH")
+	env["SINGULARITY_DOCKER_USERNAME"] = user
+	env["SINGULARITY_DOCKER_PASSWORD"] = pass
+	err = singularity.BuildFilesystemDirectory(dir, img.GetSingularityLocation(), env)
+
 	if err == nil {
 		l.Log().Info("Successfully download the singularity image")
 		return Singularity{Image: img, TempDirectory: dir}, nil
 	}
 	if user != "" || pass != "" {
 		l.Log().Info("Detected error in downloading image with credentials, trying without.")
-		err = exec.ExecCommand("singularity", "build", "--force", "--fix-perms",
-			"--sandbox", dir, img.GetSingularityLocation()).
-			Env("SINGULARITY_CACHEDIR", singularityTempCache).
-			Env("PATH", os.Getenv("PATH")).
-			Start()
+
+		env := make(map[string]string)
+		env["SINGULARITY_CACHEDIR"] = singularityTempCache
+		env["PATH"] = os.Getenv("PATH")
+		err = singularity.BuildFilesystemDirectory(dir, img.GetSingularityLocation(), env)
+
 		if err == nil {
 			l.Log().Info("Successfully download the singularity image")
 			return Singularity{Image: img, TempDirectory: dir}, nil
