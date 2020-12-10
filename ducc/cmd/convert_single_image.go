@@ -56,11 +56,11 @@ var convertSingleImageCmd = &cobra.Command{
 			os.Exit(RepoNotExistsError)
 		}
 
-		wish := lib.WishFriendly{
-			CvmfsRepo:  cvmfsRepo,
-			InputName:  inputImage,
-			UserOutput: username,
-			OutputName: thinImageName}
+		wish, err := lib.CreateWish(inputImage, thinImageName, cvmfsRepo, username, username)
+		if err != nil {
+			lib.LogE(err).Error("Error in creating the wish to convert")
+			os.Exit(1)
+		}
 		fields := log.Fields{"input image": wish.InputName,
 			"repository": wish.CvmfsRepo}
 		if !skipFlat {
