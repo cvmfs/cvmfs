@@ -16,6 +16,7 @@ import (
 	"time"
 
 	da "github.com/cvmfs/ducc/docker-api"
+	exec "github.com/cvmfs/ducc/exec"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -35,7 +36,7 @@ const (
 var subDirInsideRepo = ".layers"
 
 func assureValidSingularity() error {
-	err, stdout, _ := ExecCommand("singularity", "version").StartWithOutput()
+	err, stdout, _ := exec.ExecCommand("singularity", "version").StartWithOutput()
 	if err != nil {
 		err := fmt.Errorf("No working version of Singularity: %s", err)
 		LogE(err).Error("No working version of Singularity")
@@ -322,12 +323,12 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 		cleanup := func(location string) {
 			Log().Info("Running clean up function deleting the last layer.")
 
-			err := ExecCommand("cvmfs_server", "abort", "-f", repo).Start()
+			err := exec.ExecCommand("cvmfs_server", "abort", "-f", repo).Start()
 			if err != nil {
 				LogE(err).Warning("Error in the abort command inside the cleanup function, this warning is usually normal")
 			}
 
-			err = ExecCommand("cvmfs_server", "ingest", "--delete", location, repo).Start()
+			err = exec.ExecCommand("cvmfs_server", "ingest", "--delete", location, repo).Start()
 			if err != nil {
 				LogE(err).Error("Error in the cleanup command")
 			}
@@ -379,7 +380,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 							"Created subcatalog in directory")
 					}
 				}
-				err = ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", TrimCVMFSRepoPrefix(layerPath), repo).StdIn(layer.Path).Start()
+				err = exec.ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", TrimCVMFSRepoPrefix(layerPath), repo).StdIn(layer.Path).Start()
 
 				if err != nil {
 					LogE(err).WithFields(log.Fields{"layer": layer.Name}).Error("Some error in ingest the layer")

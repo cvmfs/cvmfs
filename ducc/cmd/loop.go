@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	exec "github.com/cvmfs/ducc/exec"
 	"github.com/cvmfs/ducc/lib"
 )
 
@@ -27,7 +28,7 @@ var loopCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		AliveMessage()
-		defer lib.ExecCommand("docker", "system", "prune", "--force", "--all")
+		defer exec.ExecCommand("docker", "system", "prune", "--force", "--all")
 		showWeReceivedSignal := make(chan os.Signal, 1)
 		signal.Notify(showWeReceivedSignal, os.Interrupt)
 

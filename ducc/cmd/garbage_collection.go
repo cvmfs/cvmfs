@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	exec "github.com/cvmfs/ducc/exec"
 	"github.com/cvmfs/ducc/lib"
 )
 
@@ -150,7 +151,7 @@ var garbageCollectionCmd = &cobra.Command{
 			if dryRun {
 				fmt.Printf("%v\n", cmd)
 			} else {
-				lib.ExecCommand(cmd...).Start()
+				exec.ExecCommand(cmd...).Start()
 			}
 		}
 	},

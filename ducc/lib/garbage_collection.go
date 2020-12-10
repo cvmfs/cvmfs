@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	da "github.com/cvmfs/ducc/docker-api"
+	exec "github.com/cvmfs/ducc/exec"
 )
 
 func FindAllUsedFlatImages(CVMFSRepo string) ([]string, error) {
@@ -147,7 +148,7 @@ func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]strin
 		layerid := components[len(components)-1]
 		layersToDeleteMap[layerid] = true
 	}
- 
+
 	_, err := os.Stat(layerInfoPath)
 	if err == nil {
 		layersdata := []LayerInfo{}
@@ -163,7 +164,7 @@ func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]strin
 			layerid := strings.Split(info.CompressedDiffDigest, ":")[1]
 			if layersToDeleteMap[layerid] {
 				podmanLayerPath := filepath.Join("/cvmfs", CVMFSRepo, "podmanStore", "overlay", info.ID)
-				
+
 				linkFilePath := filepath.Join(podmanLayerPath, "link")
 				data, err := ioutil.ReadFile(linkFilePath)
 				if err != nil {
@@ -171,7 +172,7 @@ func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]strin
 					return podmanPathsToDelete, err
 				}
 				id := string(data)
-				
+
 				linkDirPath := filepath.Join("/cvmfs", CVMFSRepo, "overlay", "l", id)
 				podmanPathsToDelete = append(podmanPathsToDelete, podmanLayerPath)
 				podmanPathsToDelete = append(podmanPathsToDelete, linkDirPath)
@@ -271,7 +272,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 
 		backlinkPath := getBacklinkPath(CVMFSRepo, layer)
 
-		err = ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
+		err = exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
 		if err != nil {
 			llog(LogE(err)).Error("Error in opening the transaction")
 			return err
@@ -294,7 +295,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 			return err
 		}
 
-		err = ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
+		err = exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
 		if err != nil {
 			llog(LogE(err)).Error("Error in publishing after adding the backlinks")
 			return err

@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	exec "github.com/cvmfs/ducc/exec"
 	"github.com/cvmfs/ducc/lib"
 )
 
@@ -47,7 +48,7 @@ var convertCmd = &cobra.Command{
 			}
 		}
 
-		defer lib.ExecCommand("docker", "system", "prune", "--force", "--all")
+		defer exec.ExecCommand("docker", "system", "prune", "--force", "--all")
 
 		data, err := ioutil.ReadFile(args[0])
 		if err != nil {

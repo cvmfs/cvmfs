@@ -19,6 +19,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	da "github.com/cvmfs/ducc/docker-api"
+	exec "github.com/cvmfs/ducc/exec"
 )
 
 type ManifestRequest struct {
@@ -354,7 +355,7 @@ func (img *Image) DownloadSingularityDirectory(rootPath string) (sing Singularit
 	// if we fail, we try again without the credentials
 	user := img.User
 	pass, _ := GetPassword()
-	err = ExecCommand("singularity", "build", "--force", "--fix-perms",
+	err = exec.ExecCommand("singularity", "build", "--force", "--fix-perms",
 		"--sandbox", dir, img.GetSingularityLocation()).
 		Env("SINGULARITY_CACHEDIR", singularityTempCache).
 		Env("PATH", os.Getenv("PATH")).
@@ -367,7 +368,7 @@ func (img *Image) DownloadSingularityDirectory(rootPath string) (sing Singularit
 	}
 	if user != "" || pass != "" {
 		Log().Info("Detected error in downloading image with credentials, trying without.")
-		err = ExecCommand("singularity", "build", "--force", "--fix-perms",
+		err = exec.ExecCommand("singularity", "build", "--force", "--fix-perms",
 			"--sandbox", dir, img.GetSingularityLocation()).
 			Env("SINGULARITY_CACHEDIR", singularityTempCache).
 			Env("PATH", os.Getenv("PATH")).
