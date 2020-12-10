@@ -37,64 +37,56 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 	path = filepath.Join("/", "cvmfs", CVMFSRepo, path)
 
 	Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Start transaction")
-	err = OpenTransaction(CVMFSRepo)
-	if err != nil {
-		return err
-	}
 
-	Log().WithFields(log.Fields{"target": target, "path": path, "action": "ingesting"}).Info("Copying target into path")
+	err = WithinTransaction(CVMFSRepo, func() error {
+		Log().WithFields(log.Fields{"target": target, "path": path, "action": "ingesting"}).Info("Copying target into path")
 
-	targetStat, err := os.Stat(target)
-	if err != nil {
-		LogE(err).WithFields(log.Fields{"target": target}).Error("Impossible to obtain information about the target")
-		Abort(CVMFSRepo)
-		return err
-	}
-
-	if targetStat.Mode().IsDir() {
-		os.RemoveAll(path)
-		err = os.MkdirAll(path, dirPermision)
+		targetStat, err := os.Stat(target)
 		if err != nil {
-			LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("Error in creating the directory where to copy the singularity")
-		}
-		err = copy.Copy(target, path, copy.Options{PreserveTimes: true})
-
-	} else if targetStat.Mode().IsRegular() {
-		err = func() error {
-			os.MkdirAll(filepath.Dir(path), dirPermision)
-			os.Remove(path)
-
-			from, err := os.Open(target)
-			if err != nil {
-				return err
-			}
-			defer from.Close()
-
-			to, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, filePermision)
-			if err != nil {
-				return err
-			}
-			defer to.Close()
-
-			_, err = io.Copy(to, from)
+			LogE(err).WithFields(log.Fields{"target": target}).Error("Impossible to obtain information about the target")
 			return err
-		}()
-	} else {
-		err = fmt.Errorf("Trying to ingest neither a file nor a directory")
-	}
+		}
 
-	if err != nil {
-		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo, "target": target}).Error("Error in moving the target inside the CVMFS repo")
-		Abort(CVMFSRepo)
-		return err
-	}
+		if targetStat.Mode().IsDir() {
+			os.RemoveAll(path)
+			err = os.MkdirAll(path, dirPermision)
+			if err != nil {
+				LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("Error in creating the directory where to copy the singularity")
+			}
+			err = copy.Copy(target, path, copy.Options{PreserveTimes: true})
 
-	Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Publishing")
-	err = Publish(CVMFSRepo)
-	if err != nil {
-		return err
-	}
-	return nil
+		} else if targetStat.Mode().IsRegular() {
+			err = func() error {
+				os.MkdirAll(filepath.Dir(path), dirPermision)
+				os.Remove(path)
+
+				from, err := os.Open(target)
+				if err != nil {
+					return err
+				}
+				defer from.Close()
+
+				to, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, filePermision)
+				if err != nil {
+					return err
+				}
+				defer to.Close()
+
+				_, err = io.Copy(to, from)
+				return err
+			}()
+		} else {
+			err = fmt.Errorf("Trying to ingest neither a file nor a directory")
+		}
+
+		if err != nil {
+			LogE(err).WithFields(log.Fields{"repo": CVMFSRepo, "target": target}).Error("Error in moving the target inside the CVMFS repo")
+			return err
+		}
+		return nil
+	})
+
+	return err
 }
 
 // create a symbolic link inside the repository called `newLinkName`, the symlink will point to `toLinkPath`
@@ -127,55 +119,45 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 	linkChunks := strings.Split(relativePath, string(os.PathSeparator))
 	link := filepath.Join(linkChunks[1:]...)
 
-	err = OpenTransaction(CVMFSRepo)
-	if err != nil {
-		return err
-	}
-
-	linkDir := filepath.Dir(newLinkName)
-	err = os.MkdirAll(linkDir, dirPermision)
-	if err != nil {
-		llog(LogE(err)).WithFields(log.Fields{
-			"directory": linkDir}).Error(
-			"Error in creating the directory where to store the symlink")
-		Abort(CVMFSRepo)
-		return err
-	}
-
-	// the symlink exists already, we delete it and replace it
-	if lstat, err := os.Lstat(newLinkName); !os.IsNotExist(err) {
-		if lstat.Mode()&os.ModeSymlink != 0 {
-			// the file exists and it is a symlink, we overwrite it
-			err = os.Remove(newLinkName)
-			if err != nil {
-				err = fmt.Errorf("Error in removing existsing symlink: %s", err)
-				llog(LogE(err)).Error("Error in removing previous symlink")
-				Abort(CVMFSRepo)
-				return err
-			}
-		} else {
-			// the file exists but is not a symlink
-			err = fmt.Errorf(
-				"Error, trying to overwrite with a symlink something that is not a symlink")
-			llog(LogE(err)).Error("Error in creating a symlink")
-			Abort(CVMFSRepo)
+	err = WithinTransaction(CVMFSRepo, func() error {
+		linkDir := filepath.Dir(newLinkName)
+		err = os.MkdirAll(linkDir, dirPermision)
+		if err != nil {
+			llog(LogE(err)).WithFields(log.Fields{
+				"directory": linkDir}).Error(
+				"Error in creating the directory where to store the symlink")
 			return err
 		}
-	}
 
-	err = os.Symlink(link, newLinkName)
-	if err != nil {
-		llog(LogE(err)).Error(
-			"Error in creating the symlink")
-		Abort(CVMFSRepo)
-		return err
-	}
+		// the symlink exists already, we delete it and replace it
+		if lstat, err := os.Lstat(newLinkName); !os.IsNotExist(err) {
+			if lstat.Mode()&os.ModeSymlink != 0 {
+				// the file exists and it is a symlink, we overwrite it
+				err = os.Remove(newLinkName)
+				if err != nil {
+					err = fmt.Errorf("Error in removing existsing symlink: %s", err)
+					llog(LogE(err)).Error("Error in removing previous symlink")
+					return err
+				}
+			} else {
+				// the file exists but is not a symlink
+				err = fmt.Errorf(
+					"Error, trying to overwrite with a symlink something that is not a symlink")
+				llog(LogE(err)).Error("Error in creating a symlink")
+				return err
+			}
+		}
 
-	err = Publish(CVMFSRepo)
-	if err != nil {
-		return err
-	}
-	return nil
+		err = os.Symlink(link, newLinkName)
+		if err != nil {
+			llog(LogE(err)).Error(
+				"Error in creating the symlink")
+			return err
+		}
+		return nil
+	})
+
+	return err
 }
 
 type Backlink struct {
@@ -263,38 +245,34 @@ func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, imageName str
 	}
 
 	llog(Log()).Info("Start transaction")
-	err := OpenTransaction(CVMFSRepo)
-	if err != nil {
-		return err
-	}
+	err := WithinTransaction(CVMFSRepo, func() error {
 
-	for path, fileContent := range backlinks {
-		// the path may not be there, check, and if it doesn't exists create it
-		dir := filepath.Dir(path)
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			err = os.MkdirAll(dir, dirPermision)
+		for path, fileContent := range backlinks {
+			// the path may not be there, check,
+			// and if it doesn't exists create it
+			dir := filepath.Dir(path)
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				err = os.MkdirAll(dir, dirPermision)
+				if err != nil {
+					llog(LogE(err)).WithFields(
+						log.Fields{"file": path}).
+						Error("Error in creating the directory for the backlinks file, skipping...")
+					continue
+				}
+			}
+			err := ioutil.WriteFile(path, fileContent, filePermision)
 			if err != nil {
 				llog(LogE(err)).WithFields(log.Fields{"file": path}).Error(
-					"Error in creating the directory for the backlinks file, skipping...")
+					"Error in writing the backlink file, skipping...")
 				continue
 			}
+			llog(LogE(err)).WithFields(log.Fields{"file": path}).Info(
+				"Wrote backlink")
 		}
-		err = ioutil.WriteFile(path, fileContent, filePermision)
-		if err != nil {
-			llog(LogE(err)).WithFields(log.Fields{"file": path}).Error(
-				"Error in writing the backlink file, skipping...")
-			continue
-		}
-		llog(LogE(err)).WithFields(log.Fields{"file": path}).Info(
-			"Wrote backlink")
-	}
+		return nil
+	})
 
-	err = Publish(CVMFSRepo)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func RemoveScheduleLocation(CVMFSRepo string) string {
@@ -348,37 +326,30 @@ func AddManifestToRemoveScheduler(CVMFSRepo string, manifest da.Manifest) error 
 		return schedule
 	}()
 
-	err := OpenTransaction(CVMFSRepo)
-	if err != nil {
-		return err
-	}
-
-	if _, err = os.Stat(schedulePath); os.IsNotExist(err) {
-		err = os.MkdirAll(filepath.Dir(schedulePath), dirPermision)
-		if err != nil {
-			llog(LogE(err)).Error("Error in creating the directory where save the schedule")
+	err := WithinTransaction(CVMFSRepo, func() error {
+		if _, err := os.Stat(schedulePath); os.IsNotExist(err) {
+			err = os.MkdirAll(filepath.Dir(schedulePath), dirPermision)
+			if err != nil {
+				llog(LogE(err)).Error("Error in creating the directory where save the schedule")
+			}
 		}
-	}
 
-	bytes, err := json.Marshal(schedule)
-	if err != nil {
-		llog(LogE(err)).Error("Error in marshaling the new schedule")
-	} else {
-
-		err = ioutil.WriteFile(schedulePath, bytes, filePermision)
+		bytes, err := json.Marshal(schedule)
 		if err != nil {
-			llog(LogE(err)).Error("Error in writing the new schedule")
+			llog(LogE(err)).Error("Error in marshaling the new schedule")
 		} else {
-			llog(Log()).Info("Wrote new remove schedule")
+
+			err = ioutil.WriteFile(schedulePath, bytes, filePermision)
+			if err != nil {
+				llog(LogE(err)).Error("Error in writing the new schedule")
+			} else {
+				llog(Log()).Info("Wrote new remove schedule")
+			}
 		}
-	}
+		return nil
+	})
 
-	err = Publish(CVMFSRepo)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func RemoveSingularityImageFromManifest(CVMFSRepo string, manifest da.Manifest) error {
@@ -456,24 +427,15 @@ func RemoveDirectory(CVMFSRepo string, dirPath ...string) error {
 		llog(LogE(err)).Error("Error in opening the transaction")
 		return err
 	}
-	err = OpenTransaction(CVMFSRepo)
-	if err != nil {
+	err = WithinTransaction(CVMFSRepo, func() error {
+		err := os.RemoveAll(directory)
+		if err != nil {
+			llog(LogE(err)).Error("Error in publishing after adding the backlinks")
+		}
 		return err
-	}
+	})
 
-	err = os.RemoveAll(directory)
-	if err != nil {
-		llog(LogE(err)).Error("Error in publishing after adding the backlinks")
-		Abort(CVMFSRepo)
-		return err
-	}
-
-	err = Publish(CVMFSRepo)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func CreateCatalogIntoDir(CVMFSRepo, dir string) (err error) {

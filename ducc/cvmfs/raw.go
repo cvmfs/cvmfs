@@ -86,7 +86,7 @@ func WithinTransaction(CVMFSRepo string, f func() error, opts ...TransactionOpti
 	}
 	err = f()
 	if err != nil {
-		Abort(CVMFSRepo)
+		return Abort(CVMFSRepo)
 	}
 	return Publish(CVMFSRepo)
 }
