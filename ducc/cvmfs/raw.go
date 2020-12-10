@@ -116,3 +116,20 @@ func WithinTransaction(CVMFSRepo string, f func() error, opts ...TransactionOpti
 	}
 	return Publish(CVMFSRepo)
 }
+
+func Ingest(CVMFSRepo string, input io.ReadCloser, options ...string) error {
+	cmd := []string{"cvmfs_server", "ingest"}
+	for _, opt := range options {
+		cmd = append(cmd, opt)
+	}
+	cmd = append(cmd, CVMFSRepo)
+	getLock(CVMFSRepo)
+	defer unlock(CVMFSRepo)
+	return exec.ExecCommand(cmd...).StdIn(input).Start()
+}
+
+func IngestDelete(CVMFSRepo string, path string) error {
+	getLock(CVMFSRepo)
+	defer unlock(CVMFSRepo)
+	return exec.ExecCommand("cvmfs_server", "ingest", "--delete", path, CVMFSRepo).Start()
+}
