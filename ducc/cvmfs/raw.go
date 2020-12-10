@@ -78,3 +78,15 @@ func RepositoryExists(CVMFSRepo string) bool {
 		return false
 	}
 }
+
+func WithinTransaction(CVMFSRepo string, f func() error, opts ...TransactionOption) error {
+	err := OpenTransaction(CVMFSRepo, opts...)
+	if err != nil {
+		return err
+	}
+	err = f()
+	if err != nil {
+		Abort(CVMFSRepo)
+	}
+	return Publish(CVMFSRepo)
+}
