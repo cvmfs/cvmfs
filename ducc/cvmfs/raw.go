@@ -2,7 +2,9 @@ package cvmfs
 
 import (
 	"fmt"
+	"io"
 	"strings"
+	"sync"
 
 	exec "github.com/cvmfs/ducc/exec"
 	log "github.com/sirupsen/logrus"
@@ -21,12 +23,34 @@ func (t TemplateTransaction) ToString() string {
 	return fmt.Sprintf("-T %s=%s", t.source, t.destination)
 }
 
+var locksMap = make(map[string]*sync.Mutex)
+var lockMap = &sync.Mutex{}
+
+func getLock(CVMFSRepo string) {
+	lockMap.Lock()
+	l := locksMap[CVMFSRepo]
+	if l == nil {
+		locksMap[CVMFSRepo] = &sync.Mutex{}
+		l = locksMap[CVMFSRepo]
+	}
+	lockMap.Unlock()
+	l.Lock()
+}
+
+func unlock(CVMFSRepo string) {
+	lockMap.Lock()
+	l := locksMap[CVMFSRepo]
+	lockMap.Unlock()
+	l.Unlock()
+}
+
 func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 	cmd := []string{"cvmfs_server", "transaction"}
 	for _, opt := range options {
 		cmd = append(cmd, opt.ToString())
 	}
 	cmd = append(cmd, CVMFSRepo)
+	getLock(CVMFSRepo)
 	err := exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
 	if err != nil {
 		LogE(err).WithFields(
@@ -38,6 +62,7 @@ func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 }
 
 func Publish(CVMFSRepo string) error {
+	defer unlock(CVMFSRepo)
 	err := exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
 	if err != nil {
 		LogE(err).WithFields(
@@ -49,6 +74,7 @@ func Publish(CVMFSRepo string) error {
 }
 
 func Abort(CVMFSRepo string) error {
+	defer unlock(CVMFSRepo)
 	err := abort(CVMFSRepo)
 	if err != nil {
 		LogE(err).WithFields(
