@@ -12,6 +12,15 @@ type TransactionOption interface {
 	ToString() string
 }
 
+type TemplateTransaction struct {
+	source      string
+	destination string
+}
+
+func (t TemplateTransaction) ToString() string {
+	return fmt.Sprintf("-T %s=%s", t.source, t.destination)
+}
+
 func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 	cmd := []string{"cvmfs_server", "transaction"}
 	for _, opt := range options {
