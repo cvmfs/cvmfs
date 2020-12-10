@@ -397,7 +397,7 @@ func RemoveSingularityImageFromManifest(CVMFSRepo string, manifest da.Manifest) 
 		return l.WithFields(log.Fields{
 			"action": "removing singularity directory", "directory": dir})
 	}
-	err := RemoveDirectory(dir)
+	err := RemoveDirectory(CVMFSRepo, manifest.GetSingularityPath())
 	if err != nil {
 		llog(LogE(err)).Error("Error in removing singularity direcotry")
 		return err
@@ -423,12 +423,11 @@ func TrimCVMFSRepoPrefix(path string) string {
 }
 
 func RemoveLayer(CVMFSRepo, layerDigest string) error {
-	dir := LayerPath(CVMFSRepo, layerDigest)
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{
-			"action": "removing layer", "directory": dir, "layer": layerDigest})
+			"action": "removing layer", "layer": layerDigest})
 	}
-	err := RemoveDirectory(dir)
+	err := RemoveDirectory(CVMFSRepo, constants.SubDirInsideRepo, layerDigest[0:2], layerDigest)
 	if err != nil {
 		llog(LogE(err)).Error("Error in deleting a layer")
 		return err
@@ -436,7 +435,12 @@ func RemoveLayer(CVMFSRepo, layerDigest string) error {
 	return nil
 }
 
-func RemoveDirectory(directory string) error {
+func RemoveDirectory(CVMFSRepo string, dirPath ...string) error {
+	path := []string{"/cvmfs", CVMFSRepo}
+	for _, p := range dirPath {
+		path = append(path, p)
+	}
+	directory := filepath.Join(path...)
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{
 			"action": "removing directory", "directory": directory})
@@ -462,7 +466,6 @@ func RemoveDirectory(directory string) error {
 		llog(LogE(err)).Error("Error in opening the transaction")
 		return err
 	}
-	CVMFSRepo := dirsSplitted[2]
 	err = exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
 	if err != nil {
 		llog(LogE(err)).Error("Error in opening the transaction")

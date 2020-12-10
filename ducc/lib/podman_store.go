@@ -440,8 +440,7 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 				if name == img.GetSimpleName() {
 					Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("older image version present, cleaning and ingesting newer version")
 					present = true
-					directory := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, image.ID)
-					err := cvmfs.RemoveDirectory(directory)
+					err := cvmfs.RemoveDirectory(CVMFSRepo, rootPath, imageMetadataDir, image.ID)
 					if err != nil {
 						LogE(err).Error("error while removing older image version from podman store")
 						return err
