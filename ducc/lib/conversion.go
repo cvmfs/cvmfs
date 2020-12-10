@@ -18,7 +18,8 @@ import (
 	constants "github.com/cvmfs/ducc/constants"
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
-	exec "github.com/cvmfs/ducc/exec"
+	l "github.com/cvmfs/ducc/log"
+	singularity "github.com/cvmfs/ducc/singularity"
 	temp "github.com/cvmfs/ducc/temp"
 
 	"github.com/docker/docker/api/types"
@@ -36,47 +37,8 @@ const (
 	ConversionNotMatch = iota
 )
 
-func assureValidSingularity() error {
-	err, stdout, _ := exec.ExecCommand("singularity", "version").StartWithOutput()
-	if err != nil {
-		err := fmt.Errorf("No working version of Singularity: %s", err)
-		LogE(err).Error("No working version of Singularity")
-		return err
-	}
-	version := stdout.String()
-	sems := strings.Split(version, ".")
-	if len(sems) < 2 {
-		err := fmt.Errorf("Singularity version returned an unexpected format, unable to find Major and Minor number")
-		LogE(err).WithFields(log.Fields{"version": version}).Error("Not valid singularity")
-		return err
-	}
-	majorS := sems[0]
-	majorI, err := strconv.Atoi(majorS)
-	if err != nil {
-		errF := fmt.Errorf("Singularity version returned an unexpected format, unable to parse Major number: %s", err)
-		LogE(errF).WithFields(log.Fields{"version": version, "major number": majorS}).Error("Not valid singularity")
-		return errF
-	}
-	if majorI >= 4 {
-		return nil
-	}
-	minorS := sems[1]
-	minorI, err := strconv.Atoi(minorS)
-	if err != nil {
-		errF := fmt.Errorf("Singularity version returned an unexpected format, unable to parse Minor number: %s", err)
-		LogE(errF).WithFields(log.Fields{"version": version, "minor number": minorS}).Error("Not valid singularity")
-		return errF
-	}
-	if majorI >= 3 && minorI >= 5 {
-		return nil
-	}
-	errF := fmt.Errorf("Installed singularity is too old, we need at least 3.5: Installed version: %s", version)
-	LogE(errF).WithFields(log.Fields{"version": version}).Error("Too old singularity")
-	return errF
-}
-
 func ConvertWishSingularity(wish WishFriendly) (err error) {
-	err = assureValidSingularity()
+	err = singularity.AssureValidSingularity()
 	if err != nil {
 		return err
 	}
