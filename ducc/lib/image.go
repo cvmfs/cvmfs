@@ -18,8 +18,10 @@ import (
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
 
+	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	exec "github.com/cvmfs/ducc/exec"
+	temp "github.com/cvmfs/ducc/temp"
 )
 
 type ManifestRequest struct {
@@ -319,11 +321,6 @@ func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
 	return result, nil
 }
 
-func GetSingularityPathFromManifest(manifest da.Manifest) string {
-	digest := strings.Split(manifest.Config.Digest, ":")[1]
-	return filepath.Join(".flat", digest[0:2], digest)
-}
-
 // here is where in the FS we are going to store the singularity image
 func (img *Image) GetSingularityPath() (string, error) {
 	manifest, err := img.GetManifest()
@@ -331,7 +328,7 @@ func (img *Image) GetSingularityPath() (string, error) {
 		LogE(err).Error("Error in getting the manifest to figureout the singularity path")
 		return "", err
 	}
-	return GetSingularityPathFromManifest(manifest), nil
+	return manifest.GetSingularityPath(), nil
 }
 
 type Singularity struct {
@@ -340,12 +337,12 @@ type Singularity struct {
 }
 
 func (img *Image) DownloadSingularityDirectory(rootPath string) (sing Singularity, err error) {
-	dir, err := UserDefinedTempDir(rootPath, "singularity_buffer")
+	dir, err := temp.UserDefinedTempDir(rootPath, "singularity_buffer")
 	if err != nil {
 		LogE(err).Error("Error in creating temporary directory for singularity")
 		return
 	}
-	singularityTempCache, err := UserDefinedTempDir(rootPath, "tempDirSingularityCache")
+	singularityTempCache, err := temp.UserDefinedTempDir(rootPath, "tempDirSingularityCache")
 	if err != nil {
 		LogE(err).Error("Error in creating temporary directory for singularity cache")
 		return
@@ -398,7 +395,7 @@ func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 		return err
 	}
 
-	err = PublishToCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
+	err = cvmfs.PublishToCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
 	if err != nil {
 		// if there is an error ingest does not remove the folder.
 		// we do want to remove the folder anyway
@@ -410,7 +407,7 @@ func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 		filepath.Dir(singularityPath),
 		singularityPath} {
 
-		err = CreateCatalogIntoDir(CVMFSRepo, dir)
+		err = cvmfs.CreateCatalogIntoDir(CVMFSRepo, dir)
 		if err != nil {
 			LogE(err).WithFields(log.Fields{
 				"directory": dir}).Error(
@@ -424,7 +421,7 @@ func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 	}
 
 	// lets create the symlink
-	err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, singularityPath)
+	err = cvmfs.CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, singularityPath)
 	if err != nil {
 		LogE(err).Error("Error in creating the symlink for the singularity Image")
 		return err

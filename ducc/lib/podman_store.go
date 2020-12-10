@@ -17,7 +17,7 @@
 //	|	+--	layers.json
 //	|	+-- layers.lock
 
-// For more information, have a look at this document: 
+// For more information, have a look at this document:
 // https://docs.google.com/document/d/1uP_K6T5tB3qxbN4-S-tRdUkiFggv7Skw3MXZRgWYjS0/edit?usp=sharing
 
 package lib
@@ -32,6 +32,7 @@ import (
 	"strings"
 	"time"
 
+	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -91,7 +92,7 @@ func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string
 	for _, layer := range manifest.Layers {
 		storedlayerdata := []LayerInfo{}
 		layerDigest := strings.Split(layer.Digest, ":")[1]
-		storedlayerinfopath := filepath.Join(LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
+		storedlayerinfopath := filepath.Join(cvmfs.LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
 		if _, err := os.Stat(storedlayerinfopath); err == nil {
 			file, err := ioutil.ReadFile(storedlayerinfopath)
 			if err != nil {
@@ -132,7 +133,7 @@ func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string
 		return err
 	}
 
-	err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(layerInfoPath), jsonLayerInfo)
+	err = cvmfs.WriteDataToCvmfs(CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(layerInfoPath), jsonLayerInfo)
 	if err != nil {
 		LogE(err).Error("Error in writing layers.json file")
 		return err
@@ -181,7 +182,7 @@ func (img *Image) PublishImageInfo(CVMFSRepo string, digestMap map[string]string
 		return err
 	}
 
-	err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(imageInfoPath), imgInfo)
+	err = cvmfs.WriteDataToCvmfs(CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(imageInfoPath), imgInfo)
 	if err != nil {
 		LogE(err).Error("Error in writing images.json")
 		return err
@@ -206,7 +207,7 @@ func (img *Image) LinkRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string, 
 		targetPath := filepath.Join(subDirInsideRepo, layerid[:2], layerid, "layerfs")
 
 		if _, err := os.Stat(symlinkPath); os.IsNotExist(err) {
-			err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
+			err = cvmfs.CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
 			if err != nil {
 				LogE(err).Error("Error in creating the symlink for the diff dir")
 				return err
@@ -235,7 +236,7 @@ func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string, digestMap, l
 				return err
 			}
 			layerIdMap[layer.Digest] = filepath.Join("l", lid)
-			err = writeDataToCvmfs(CVMFSRepo, linkPath, []byte(lid))
+			err = cvmfs.WriteDataToCvmfs(CVMFSRepo, linkPath, []byte(lid))
 			if err != nil {
 				LogE(err).Error("Error in writing link id to podman store")
 				return err
@@ -245,7 +246,7 @@ func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string, digestMap, l
 			symlinkPath := filepath.Join(rootPath, rootfsDir, "l", lid)
 			targetPath := filepath.Join(rootPath, rootfsDir, layerdir, "diff")
 
-			err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
+			err = cvmfs.CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
 			if err != nil {
 				LogE(err).Error("Error in creating the symlink for the Link dir")
 				return err
@@ -282,7 +283,7 @@ func (img *Image) CreateLowerFiles(CVMFSRepo string, digestMap, layerIdMap map[s
 				if lastLowerData != "" {
 					lowerdata = lowerdata + ":" + lastLowerData
 				}
-				err = writeDataToCvmfs(CVMFSRepo, lowerPath, []byte(lowerdata))
+				err = cvmfs.WriteDataToCvmfs(CVMFSRepo, lowerPath, []byte(lowerdata))
 				if err != nil {
 					LogE(err).Warn("Error in writing lower files")
 					return err
@@ -354,7 +355,7 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 			return err
 		}
 
-		err = writeDataToCvmfs(CVMFSRepo, configFilePath, []byte(body))
+		err = cvmfs.WriteDataToCvmfs(CVMFSRepo, configFilePath, []byte(body))
 		if err != nil {
 			LogE(err).Warning("Error in writing config file")
 			return err
@@ -376,7 +377,7 @@ func (img *Image) PublishImageManifest(CVMFSRepo string) (err error) {
 	symlinkPath := filepath.Join(rootPath, imageMetadataDir, imageID, "manifest")
 	targetPath := filepath.Join(".metadata", img.Registry, img.Repository+img.GetReference(), "manifest.json")
 
-	err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
+	err = cvmfs.CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, targetPath)
 	if err != nil {
 		LogE(err).Error("Error in creating the symlink for manifest.json")
 		return err
@@ -404,7 +405,7 @@ func (img *Image) CreateLockFiles(CVMFSRepo string) (err error) {
 			if err != nil {
 				return err
 			}
-			err = PublishToCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(file), tmpFile.Name())
+			err = cvmfs.PublishToCVMFS(CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(file), tmpFile.Name())
 			os.RemoveAll(tmpFile.Name())
 			if err != nil {
 				return err
@@ -440,7 +441,7 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 					Log().WithFields(log.Fields{"image": img.GetSimpleName()}).Info("older image version present, cleaning and ingesting newer version")
 					present = true
 					directory := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, image.ID)
-					err := RemoveDirectory(directory)
+					err := cvmfs.RemoveDirectory(directory)
 					if err != nil {
 						LogE(err).Error("error while removing older image version from podman store")
 						return err
@@ -458,7 +459,7 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 			return err
 		}
 
-		err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(path), imgInfo)
+		err = cvmfs.WriteDataToCvmfs(CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(path), imgInfo)
 		if err != nil {
 			LogE(err).Error("Error in writing images.json")
 			return err
@@ -478,7 +479,7 @@ func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (er
 	Log().WithFields(log.Fields{"action": "Ingest the image into podman store"}).Info(img.GetSimpleName())
 	createCatalogIntoDirs := []string{rootPath, filepath.Join(rootPath, rootfsDir), filepath.Join(rootPath, imageMetadataDir), filepath.Join(rootPath, layerMetadataDir)}
 	for _, dir := range createCatalogIntoDirs {
-		err = CreateCatalogIntoDir(CVMFSRepo, dir)
+		err = cvmfs.CreateCatalogIntoDir(CVMFSRepo, dir)
 		if err != nil {
 			LogE(err).WithFields(log.Fields{
 				"directory": dir}).Error(

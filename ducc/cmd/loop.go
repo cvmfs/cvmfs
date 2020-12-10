@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	exec "github.com/cvmfs/ducc/exec"
 	"github.com/cvmfs/ducc/lib"
 )
@@ -60,7 +61,7 @@ var loopCmd = &cobra.Command{
 				lib.LogE(err).Fatal("Impossible to parse the recipe file")
 				os.Exit(1)
 			}
-			if !lib.RepositoryExists(recipe.Repo) {
+			if !cvmfs.RepositoryExists(recipe.Repo) {
 				lib.LogE(err).Error("The repository does not exists.")
 				os.Exit(RepoNotExistsError)
 			}

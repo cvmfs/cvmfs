@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/lib"
 )
 
@@ -53,7 +54,7 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 		}
 
-		if !lib.RepositoryExists(cvmfsRepo) {
+		if !cvmfs.RepositoryExists(cvmfsRepo) {
 			lib.Log().Error("The repository does not seems to exists.")
 			os.Exit(RepoNotExistsError)
 		}

@@ -15,8 +15,11 @@ import (
 	"sync"
 	"time"
 
+	constants "github.com/cvmfs/ducc/constants"
+	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	exec "github.com/cvmfs/ducc/exec"
+	temp "github.com/cvmfs/ducc/temp"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -32,8 +35,6 @@ const (
 	ConversionMatch    = iota
 	ConversionNotMatch = iota
 )
-
-var subDirInsideRepo = ".layers"
 
 func assureValidSingularity() error {
 	err, stdout, _ := exec.ExecCommand("singularity", "version").StartWithOutput()
@@ -79,14 +80,14 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 	if err != nil {
 		return err
 	}
-	err = CreateCatalogIntoDir(wish.CvmfsRepo, ".flat")
+	err = cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".flat")
 	if err != nil {
 		LogE(err).WithFields(log.Fields{
 			"directory": ".flat"}).Error(
 			"Impossible to create subcatalog in the directory.")
 	}
 
-	tmpDir, err := UserDefinedTempDir("", "conversion")
+	tmpDir, err := temp.UserDefinedTempDir("", "conversion")
 	if err != nil {
 		LogE(err).Error("Error when creating tmp singularity directory")
 		return
@@ -132,7 +133,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 			// make a new Link to the privatePaht
 			// after that skip and continue
 			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
-			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			err = cvmfs.CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
 			if err != nil {
 				errF := fmt.Errorf("Error in updating symlink for singularity image: %s", inputImage.GetSimpleName())
 				LogE(errF).WithFields(
@@ -149,7 +150,7 @@ func ConvertWishSingularity(wish WishFriendly) (err error) {
 		// we simply create the public directory
 		if errPri == nil && os.IsNotExist(errPub) {
 			Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Creating link for Singularity Image")
-			err = CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			err = cvmfs.CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
 			if err != nil {
 				errF := fmt.Errorf("Error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
 				LogE(errF).WithFields(
@@ -220,7 +221,7 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 		layerLocations := make(map[string]string)
 		for _, layer := range manifest.Layers {
 			layerDigest := strings.Split(layer.Digest, ":")[1]
-			layerPath := LayerRootfsPath(wish.CvmfsRepo, layerDigest)
+			layerPath := cvmfs.LayerRootfsPath(wish.CvmfsRepo, layerDigest)
 			layerLocations[layer.Digest] = layerPath
 		}
 		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, *outputImage)
@@ -261,7 +262,7 @@ func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
 			continue
 		}
 
-		err = expandedImgTag.CreatePodmanImageStore(wish.CvmfsRepo, subDirInsideRepo)
+		err = expandedImgTag.CreatePodmanImageStore(wish.CvmfsRepo, constants.SubDirInsideRepo)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
@@ -270,10 +271,10 @@ func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
 }
 
 func ConvertWish(wish WishFriendly, convertAgain, forceDownload bool) (err error) {
-	err = CreateCatalogIntoDir(wish.CvmfsRepo, subDirInsideRepo)
+	err = cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, constants.SubDirInsideRepo)
 	if err != nil {
 		LogE(err).WithFields(log.Fields{
-			"directory": subDirInsideRepo}).Error(
+			"directory": constants.SubDirInsideRepo}).Error(
 			"Impossible to create subcatalog in the directory.")
 	}
 	var firstError error
@@ -337,7 +338,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 
 			Log().WithFields(log.Fields{"layer": layer.Name}).Info("Start Ingesting the file into CVMFS")
 			layerDigest := strings.Split(layer.Name, ":")[1]
-			layerPath := LayerRootfsPath(repo, layerDigest)
+			layerPath := cvmfs.LayerRootfsPath(repo, layerDigest)
 
 			var pathExists bool
 			if _, err := os.Stat(layerPath); os.IsNotExist(err) {
@@ -364,12 +365,11 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 				// whole layer
 
 				for _, dir := range []string{
-					filepath.Dir(filepath.Dir(TrimCVMFSRepoPrefix(layerPath))),
-					//TrimCVMFSRepoPrefix(layerPath)} {
+					filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath))),
 				} {
 
 					Log().WithFields(log.Fields{"catalogdirectory": dir}).Info("Working on CATALOGDIRECTORY")
-					err = CreateCatalogIntoDir(repo, dir)
+					err = cvmfs.CreateCatalogIntoDir(repo, dir)
 					if err != nil {
 						LogE(err).WithFields(log.Fields{
 							"directory": dir}).Error(
@@ -380,12 +380,12 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 							"Created subcatalog in directory")
 					}
 				}
-				err = exec.ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", TrimCVMFSRepoPrefix(layerPath), repo).StdIn(layer.Path).Start()
+				err = exec.ExecCommand("cvmfs_server", "ingest", "--catalog", "-t", "-", "-b", cvmfs.TrimCVMFSRepoPrefix(layerPath), repo).StdIn(layer.Path).Start()
 
 				if err != nil {
 					LogE(err).WithFields(log.Fields{"layer": layer.Name}).Error("Some error in ingest the layer")
 					noErrors = false
-					cleanup(TrimCVMFSRepoPrefix(layerPath))
+					cleanup(cvmfs.TrimCVMFSRepoPrefix(layerPath))
 					return
 				}
 
@@ -402,7 +402,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 		Log().Info("Finished pushing the layers into CVMFS")
 	}()
 	// we create a temp directory for all the files needed, when this function finish we can remove the temp directory cleaning up
-	tmpDir, err := UserDefinedTempDir("", "conversion")
+	tmpDir, err := temp.UserDefinedTempDir("", "conversion")
 	if err != nil {
 		LogE(err).Error("Error in creating a temporary direcotry for all the files")
 		return
@@ -431,7 +431,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 	// and if there was no error we conclude everything writing the manifest into the repository
 	noErrorInConversionValue := <-noErrorInConversion
 
-	err = SaveLayersBacklink(repo, inputImage, layerDigests)
+	err = cvmfs.SaveLayersBacklink(repo, manifest, inputImage.GetSimpleName(), layerDigests)
 	if err != nil {
 		LogE(err).Error("Error in saving the backlinks")
 		noErrorInConversionValue = false
@@ -439,14 +439,14 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 
 	if noErrorInConversionValue {
 		manifestPath := filepath.Join(".metadata", inputImage.GetSimpleName(), "manifest.json")
-		errIng := PublishToCVMFS(repo, manifestPath, <-manifestChanell)
+		errIng := cvmfs.PublishToCVMFS(repo, manifestPath, <-manifestChanell)
 		if errIng != nil {
 			LogE(errIng).Error("Error in storing the manifest in the repository")
 		}
 		var errRemoveSchedule error
 		if alreadyConverted == ConversionNotMatch {
 			Log().Info("Image already converted, but it does not match the manifest, adding it to the remove scheduler")
-			errRemoveSchedule = AddManifestToRemoveScheduler(repo, manifest)
+			errRemoveSchedule = cvmfs.AddManifestToRemoveScheduler(repo, manifest)
 			if errRemoveSchedule != nil {
 				Log().Warning("Error in adding the image to the remove schedule")
 				return errRemoveSchedule
@@ -566,7 +566,7 @@ func PushImageToRegistry(outputImage Image) (err error) {
 func StoreLayerInfo(CVMFSRepo string, layerDigest string, r *ReadAndHash) (err error) {
 	Log().WithFields(log.Fields{"action": "Ingesting layers.json"}).Info("store layer information in .layers")
 	layersdata := []LayerInfo{}
-	layerInfoPath := filepath.Join(LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
+	layerInfoPath := filepath.Join(cvmfs.LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
 
 	diffID := fmt.Sprintf("%x", r.Sum256(nil))
 	size := r.GetSize()
@@ -586,7 +586,7 @@ func StoreLayerInfo(CVMFSRepo string, layerDigest string, r *ReadAndHash) (err e
 		return err
 	}
 
-	err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(layerInfoPath), jsonLayerInfo)
+	err = cvmfs.WriteDataToCvmfs(CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(layerInfoPath), jsonLayerInfo)
 	if err != nil {
 		LogE(err).Error("Error in writing layers.json file")
 		return err

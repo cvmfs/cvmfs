@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	exec "github.com/cvmfs/ducc/exec"
 )
@@ -187,7 +188,7 @@ func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]strin
 			return podmanPathsToDelete, err
 		}
 
-		err = writeDataToCvmfs(CVMFSRepo, TrimCVMFSRepoPrefix(layerInfoPath), layerInfo)
+		err = cvmfs.WriteDataToCvmfs(CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(layerInfoPath), layerInfo)
 		if err != nil {
 			LogE(err).Error("Error in writing layers.json")
 			return podmanPathsToDelete, err
@@ -197,7 +198,7 @@ func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]strin
 }
 
 func FindImageToGarbageCollect(CVMFSRepo string) ([]da.Manifest, error) {
-	removeSchedulePath := RemoveScheduleLocation(CVMFSRepo)
+	removeSchedulePath := cvmfs.RemoveScheduleLocation(CVMFSRepo)
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{
 			"action": "find image to garbage collect in schedule file",
@@ -244,7 +245,7 @@ func FindImageToGarbageCollect(CVMFSRepo string) ([]da.Manifest, error) {
 // with image and layer we pass the digest of the layer and the digest of the image,
 // both without the sha256: prefix
 func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
-	backlink, err := getBacklinkFromLayer(CVMFSRepo, layer)
+	backlink, err := cvmfs.GetBacklinkFromLayer(CVMFSRepo, layer)
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{"action": "garbage collect layer",
 			"repo":  CVMFSRepo,
@@ -270,7 +271,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 			return err
 		}
 
-		backlinkPath := getBacklinkPath(CVMFSRepo, layer)
+		backlinkPath := cvmfs.GetBacklinkPath(CVMFSRepo, layer)
 
 		err = exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
 		if err != nil {
@@ -303,7 +304,7 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 		// write it to file
 		return nil
 	} else {
-		err = RemoveLayer(CVMFSRepo, layer)
+		err = cvmfs.RemoveLayer(CVMFSRepo, layer)
 		if err != nil {
 			llog(LogE(err)).Error("Error in deleting the layer")
 		}

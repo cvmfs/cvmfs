@@ -2,6 +2,7 @@ package dockerutil
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -65,4 +66,9 @@ func MakeThinImage(m Manifest, layersMapping map[string]string, origin string) (
 	return ThinImage{Layers: layers,
 		Origin:  origin,
 		Version: thinImageVersion}, nil
+}
+
+func (manifest Manifest) GetSingularityPath() string {
+	digest := strings.Split(manifest.Config.Digest, ":")[1]
+	return filepath.Join(".flat", digest[0:2], digest)
 }

@@ -1,4 +1,4 @@
-package lib
+package cvmfs
 
 import (
 	"encoding/json"
@@ -12,8 +12,10 @@ import (
 	copy "github.com/otiai10/copy"
 	log "github.com/sirupsen/logrus"
 
+	constants "github.com/cvmfs/ducc/constants"
 	da "github.com/cvmfs/ducc/docker-api"
 	exec "github.com/cvmfs/ducc/exec"
+	temp "github.com/cvmfs/ducc/temp"
 )
 
 var dirPermision = os.FileMode(0755)
@@ -186,12 +188,12 @@ type Backlink struct {
 	Origin []string `json:"origin"`
 }
 
-func getBacklinkPath(CVMFSRepo, layerDigest string) string {
+func GetBacklinkPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join(LayerMetadataPath(CVMFSRepo, layerDigest), "origin.json")
 }
 
-func getBacklinkFromLayer(CVMFSRepo, layerDigest string) (backlink Backlink, err error) {
-	backlinkPath := getBacklinkPath(CVMFSRepo, layerDigest)
+func GetBacklinkFromLayer(CVMFSRepo, layerDigest string) (backlink Backlink, err error) {
+	backlinkPath := GetBacklinkPath(CVMFSRepo, layerDigest)
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{"action": "get backlink from layer",
 			"repo":         CVMFSRepo,
@@ -233,11 +235,11 @@ func getBacklinkFromLayer(CVMFSRepo, layerDigest string) (backlink Backlink, err
 	return
 }
 
-func SaveLayersBacklink(CVMFSRepo string, img *Image, layerDigest []string) error {
+func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, imageName string, layerDigest []string) error {
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{"action": "save backlink",
 			"repo":  CVMFSRepo,
-			"image": img.GetSimpleName()})
+			"image": imageName})
 	}
 
 	llog(Log()).Info("Start saving backlinks")
@@ -245,15 +247,9 @@ func SaveLayersBacklink(CVMFSRepo string, img *Image, layerDigest []string) erro
 	backlinks := make(map[string][]byte)
 
 	for _, layerDigest := range layerDigest {
-		imgManifest, err := img.GetManifest()
-		if err != nil {
-			llog(LogE(err)).Error(
-				"Error in getting the manifest from the image, skipping...")
-			continue
-		}
 		imgDigest := imgManifest.Config.Digest
 
-		backlink, err := getBacklinkFromLayer(CVMFSRepo, layerDigest)
+		backlink, err := GetBacklinkFromLayer(CVMFSRepo, layerDigest)
 		if err != nil {
 			llog(LogE(err)).WithFields(log.Fields{"layer": layerDigest}).Error(
 				"Error in obtaining the backlink from a layer digest, skipping...")
@@ -268,7 +264,7 @@ func SaveLayersBacklink(CVMFSRepo string, img *Image, layerDigest []string) erro
 			continue
 		}
 
-		backlinkPath := getBacklinkPath(CVMFSRepo, layerDigest)
+		backlinkPath := GetBacklinkPath(CVMFSRepo, layerDigest)
 		backlinks[backlinkPath] = backlinkBytesMarshal
 	}
 
@@ -396,7 +392,7 @@ func AddManifestToRemoveScheduler(CVMFSRepo string, manifest da.Manifest) error 
 }
 
 func RemoveSingularityImageFromManifest(CVMFSRepo string, manifest da.Manifest) error {
-	dir := filepath.Join("/", "cvmfs", CVMFSRepo, GetSingularityPathFromManifest(manifest))
+	dir := filepath.Join("/", "cvmfs", CVMFSRepo, manifest.GetSingularityPath())
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{
 			"action": "removing singularity directory", "directory": dir})
@@ -410,7 +406,7 @@ func RemoveSingularityImageFromManifest(CVMFSRepo string, manifest da.Manifest) 
 }
 
 func LayerPath(CVMFSRepo, layerDigest string) string {
-	return filepath.Join("/", "cvmfs", CVMFSRepo, subDirInsideRepo, layerDigest[0:2], layerDigest)
+	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.SubDirInsideRepo, layerDigest[0:2], layerDigest)
 }
 
 func LayerRootfsPath(CVMFSRepo, layerDigest string) string {
@@ -523,8 +519,8 @@ func RepositoryExists(CVMFSRepo string) bool {
 }
 
 //writes data to file and publish in cvmfs repo path
-func writeDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
-	tmpFile, err := UserDefinedTempFile()
+func WriteDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
+	tmpFile, err := temp.UserDefinedTempFile()
 	if err != nil {
 		LogE(err).Error("Error in creating temporary file for writing data")
 		return err
@@ -541,4 +537,12 @@ func writeDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
 		return err
 	}
 	return PublishToCVMFS(CVMFSRepo, path, tmpFile.Name())
+}
+
+func LogE(err error) *log.Entry {
+	return log.WithFields(log.Fields{"error": err})
+}
+
+func Log() *log.Entry {
+	return log.WithFields(log.Fields{})
 }
