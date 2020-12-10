@@ -11,7 +11,6 @@ import (
 
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
-	exec "github.com/cvmfs/ducc/exec"
 	l "github.com/cvmfs/ducc/log"
 )
 
@@ -274,30 +273,26 @@ func GarbageCollectSingleLayer(CVMFSRepo, image, layer string) error {
 
 		backlinkPath := cvmfs.GetBacklinkPath(CVMFSRepo, layer)
 
-		err = exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
-		if err != nil {
-			llog(l.LogE(err)).Error("Error in opening the transaction")
-			return err
-		}
+		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
+			dir := filepath.Dir(backlinkPath)
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				err = os.MkdirAll(dir, 0666)
+				if err != nil {
+					llog(l.LogE(err)).WithFields(log.Fields{"directory": dir}).Error(
+						"Error in creating the directory for the backlinks file, skipping...")
+					return err
+				}
+			}
 
-		dir := filepath.Dir(backlinkPath)
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			err = os.MkdirAll(dir, 0666)
+			err = ioutil.WriteFile(backlinkPath, backLinkMarshall, 0666)
 			if err != nil {
-				llog(l.LogE(err)).WithFields(log.Fields{"directory": dir}).Error(
-					"Error in creating the directory for the backlinks file, skipping...")
+				llog(l.LogE(err)).WithFields(log.Fields{"file": backlinkPath}).Error(
+					"Error in writing the backlink file, skipping...")
 				return err
 			}
-		}
+			return nil
+		})
 
-		err = ioutil.WriteFile(backlinkPath, backLinkMarshall, 0666)
-		if err != nil {
-			llog(l.LogE(err)).WithFields(log.Fields{"file": backlinkPath}).Error(
-				"Error in writing the backlink file, skipping...")
-			return err
-		}
-
-		err = exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
 		if err != nil {
 			llog(l.LogE(err)).Error("Error in publishing after adding the backlinks")
 			return err
