@@ -8,7 +8,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func OpenTransaction(CVMFSRepo string) error {
+type TransactionOption interface {
+	ToString() string
+}
+
+func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
+	cmd := []string{"cvmfs_server", "transaction"}
+	for _, opt := range options {
+		cmd = append(cmd, opt.ToString())
+	}
+	cmd = append(cmd, CVMFSRepo)
 	err := exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
 	if err != nil {
 		LogE(err).WithFields(
@@ -18,6 +27,7 @@ func OpenTransaction(CVMFSRepo string) error {
 	}
 	return err
 }
+
 func Publish(CVMFSRepo string) error {
 	err := exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
 	if err != nil {
