@@ -23,7 +23,7 @@ var filePermision = os.FileMode(0644)
 // path: the path inside the repository, without the prefix (ex: .foo/bar/baz), where to put the ingested target
 // target: the path of the target in the normal FS, the thing to ingest
 // if no error is returned, we remove the target from the FS
-func IngestIntoCVMFS(CVMFSRepo string, path string, target string) (err error) {
+func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 	defer func() {
 		if err == nil {
 			Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Deleting temporary directory")
@@ -496,7 +496,7 @@ func CreateCatalogIntoDir(CVMFSRepo, dir string) (err error) {
 		if err != nil {
 			return err
 		}
-		err = IngestIntoCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(catalogPath), tmpFile.Name())
+		err = PublishToCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(catalogPath), tmpFile.Name())
 		if err != nil {
 			return err
 		}
@@ -519,4 +519,25 @@ func RepositoryExists(CVMFSRepo string) bool {
 	} else {
 		return false
 	}
+}
+
+//writes data to file and publish in cvmfs repo path
+func writeDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
+	tmpFile, err := UserDefinedTempFile()
+	if err != nil {
+		LogE(err).Error("Error in creating temporary file for writing data")
+		return err
+	}
+	defer os.RemoveAll(tmpFile.Name())
+	err = ioutil.WriteFile(tmpFile.Name(), data, 0644)
+	if err != nil {
+		LogE(err).Error("Error in writing data to file")
+		return err
+	}
+	err = tmpFile.Close()
+	if err != nil {
+		LogE(err).Error("Error in closing temporary file")
+		return err
+	}
+	return PublishToCVMFS(CVMFSRepo, path, tmpFile.Name())
 }
