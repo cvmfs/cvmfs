@@ -11,7 +11,9 @@ import (
 func OpenTransaction(CVMFSRepo string) error {
 	err := exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
 	if err != nil {
-		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Error("Error in opening the transaction")
+		LogE(err).WithFields(
+			log.Fields{"repo": CVMFSRepo}).
+			Error("Error in opening the transaction")
 		abort(CVMFSRepo)
 	}
 	return err
@@ -19,7 +21,9 @@ func OpenTransaction(CVMFSRepo string) error {
 func Publish(CVMFSRepo string) error {
 	err := exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
 	if err != nil {
-		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Error("Error in publishing the repository")
+		LogE(err).WithFields(
+			log.Fields{"repo": CVMFSRepo}).
+			Error("Error in publishing the repository")
 		abort(CVMFSRepo)
 	}
 	return err
@@ -28,7 +32,9 @@ func Publish(CVMFSRepo string) error {
 func Abort(CVMFSRepo string) error {
 	err := abort(CVMFSRepo)
 	if err != nil {
-		LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Error("Error in abort the transaction")
+		LogE(err).WithFields(
+			log.Fields{"repo": CVMFSRepo}).
+			Error("Error in abort the transaction")
 	}
 	return err
 }
@@ -41,7 +47,8 @@ func RepositoryExists(CVMFSRepo string) bool {
 	cmd := exec.ExecCommand("cvmfs_server", "list")
 	err, stdout, _ := cmd.StartWithOutput()
 	if err != nil {
-		LogE(fmt.Errorf("Error in listing the repository")).Error("Repo not present")
+		LogE(fmt.Errorf("Error in listing the repository")).
+			Error("Repo not present")
 		return false
 	}
 	stdoutString := string(stdout.Bytes())
