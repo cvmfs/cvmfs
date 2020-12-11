@@ -793,3 +793,52 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	}
 	return
 }
+
+type LayerDownloader struct {
+	image *Image
+	token string
+}
+
+func NewLayerDownloader(image *Image) LayerDownloader {
+	return LayerDownloader{image: image, token: ""}
+}
+
+func (ld *LayerDownloader) getToken() (token string, err error) {
+	if ld.token != "" {
+		return ld.token, nil
+	}
+	manifest, err := ld.image.GetManifest()
+	if err != nil {
+		return
+	}
+	user := ld.image.User
+	pass, err := GetPassword()
+	if err != nil {
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
+		user = ""
+		pass = ""
+	}
+
+	firstLayer := manifest.Layers[0]
+	layerUrl := getLayerUrl(ld.image, firstLayer.Digest)
+	token, err = firstRequestForAuth(layerUrl, user, pass)
+	if err != nil {
+		return
+	}
+	ld.token = token
+	return
+}
+
+func (ld *LayerDownloader) downloadLayer(layer da.Layer) (downloadedLayer, error) {
+	token, err := ld.getToken()
+	if err != nil {
+		return downloadedLayer{}, err
+	}
+	return ld.image.downloadLayer(layer, token)
+}
+
+func (img *Image) CreateChainStructure(rootPath string) error {
+	// make sure we have the layers somewhere
+	// then we start creating the chain structure
+	return nil
+}
