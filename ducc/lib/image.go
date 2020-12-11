@@ -571,9 +571,9 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 	return "", err
 }
 
-func getLayerUrl(img *Image, layer da.Layer) string {
+func getLayerUrl(img *Image, layerDigest string) string {
 	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, layer.Digest)
+		img.Scheme, img.Registry, img.Repository, layerDigest)
 }
 
 type downloadedLayer struct {
@@ -602,7 +602,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 
 	// A first request is used to get the authentication
 	firstLayer := manifest.Layers[0]
-	layerUrl := getLayerUrl(img, firstLayer)
+	layerUrl := getLayerUrl(img, firstLayer.Digest)
 	token, err := firstRequestForAuth(layerUrl, user, pass)
 	if err != nil {
 		return err
@@ -635,8 +635,10 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 		wg.Add(1)
 		go func(ctx context.Context, layer da.Layer) {
 			defer wg.Done()
-			l.Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Start working on layer")
-			toSend, err := img.downloadLayer(layer, token, rootPath)
+			l.Log().WithFields(
+				log.Fields{"layer": layer.Digest}).
+				Info("Start working on layer")
+			toSend, err := img.downloadLayer(layer, token)
 			if err != nil {
 				l.LogE(err).Error("Error in downloading a layer")
 				return
@@ -675,7 +677,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	}
 }
 
-func (img *Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend downloadedLayer, err error) {
+func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloadedLayer, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -683,7 +685,7 @@ func (img *Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend 
 		user = ""
 		pass = ""
 	}
-	layerUrl := getLayerUrl(img, layer)
+	layerUrl := getLayerUrl(img, layer.Digest)
 	if token == "" {
 		token, err = firstRequestForAuth(layerUrl, user, pass)
 		if err != nil {

@@ -323,7 +323,9 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 					filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath))),
 				} {
 
-					l.Log().WithFields(log.Fields{"catalogdirectory": dir}).Info("Working on CATALOGDIRECTORY")
+					l.Log().WithFields(
+						log.Fields{"catalogdirectory": dir}).
+						Info("Working on CATALOGDIRECTORY")
 					err = cvmfs.CreateCatalogIntoDir(repo, dir)
 					if err != nil {
 						l.LogE(err).WithFields(log.Fields{
@@ -346,13 +348,17 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 
 				err = StoreLayerInfo(repo, layerDigest, layer.Path)
 				if err != nil {
-					l.LogE(err).Error("Error in storing the layers.json file in the repository")
+					l.LogE(err).
+						Error("Error in storing the layers.json file in the repository")
 				}
-				l.Log().WithFields(log.Fields{"layer": layer.Name}).Info("Finish Ingesting the file")
+				l.Log().WithFields(
+					log.Fields{"layer": layer.Name}).
+					Info("Finish Ingesting the file")
 			} else {
-				l.Log().WithFields(log.Fields{"layer": layer.Name}).Info("Skipping ingestion of layer, already exists")
+				l.Log().WithFields(
+					log.Fields{"layer": layer.Name}).
+					Info("Skipping ingestion of layer, already exists")
 			}
-			//os.Remove(layer.Path)
 		}
 		l.Log().Info("Finished pushing the layers into CVMFS")
 	}()
