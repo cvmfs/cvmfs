@@ -54,10 +54,7 @@ func AssureValidSingularity() error {
 func BuildFilesystemDirectory(directoryPath, singularityURL string, env map[string]string) error {
 	cmd := exec.ExecCommand("singularity", "build", "--force", "--fix-perms",
 		"--sandbox", directoryPath, singularityURL).
-		Env("SINGULARITY_CACHEDIR", "").
-		Env("PATH", os.Getenv("PATH")).
-		Env("SINGULARITY_DOCKER_USERNAME", "").
-		Env("SINGULARITY_DOCKER_PASSWORD", "")
+		Env("PATH", os.Getenv("PATH"))
 	for key, value := range env {
 		cmd.Env(key, value)
 	}
