@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	digest "github.com/opencontainers/go-digest"
 )
 
 type ConfigType struct {
@@ -68,7 +70,20 @@ func MakeThinImage(m Manifest, layersMapping map[string]string, origin string) (
 		Version: thinImageVersion}, nil
 }
 
-func (manifest Manifest) GetSingularityPath() string {
-	digest := strings.Split(manifest.Config.Digest, ":")[1]
+func (m Manifest) GetSingularityPath() string {
+	digest := strings.Split(m.Config.Digest, ":")[1]
 	return filepath.Join(".flat", digest[0:2], digest)
+}
+
+func (m Manifest) GetChainIDs() []digest.Digest {
+	result := make([]digest.Digest, len(m.Layers))
+	for i, l := range m.Layers {
+		if i == 0 {
+			result = append(result, digest.Digest(l.Digest))
+			continue
+		}
+		digest := digest.FromString(result[i-1].String() + " " + l.Digest)
+		result = append(result, digest)
+	}
+	return result
 }

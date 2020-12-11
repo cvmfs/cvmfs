@@ -18,7 +18,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/mattn/go-shellwords v1.0.3 // indirect
 	github.com/olekukonko/tablewriter v0.0.1
-	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
+	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.0.8 // indirect
 	github.com/opencontainers/runtime-spec v1.0.1 // indirect
