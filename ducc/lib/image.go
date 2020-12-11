@@ -585,26 +585,16 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	defer close(layersChan)
 	defer close(manifestChan)
 
-	user := img.User
-	pass, err := GetPassword()
+	layerDownloader := NewLayerDownloader(img)
+	_, err := layerDownloader.getToken()
 	if err != nil {
-		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
-		user = ""
-		pass = ""
+		return err
 	}
 
 	// then we try to get the manifest from our database
 	manifest, err := img.GetManifest()
 	if err != nil {
 		l.LogE(err).Warn("Error in getting the manifest")
-		return err
-	}
-
-	// A first request is used to get the authentication
-	firstLayer := manifest.Layers[0]
-	layerUrl := getLayerUrl(img, firstLayer.Digest)
-	token, err := firstRequestForAuth(layerUrl, user, pass)
-	if err != nil {
 		return err
 	}
 
@@ -638,7 +628,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 			l.Log().WithFields(
 				log.Fields{"layer": layer.Digest}).
 				Info("Start working on layer")
-			toSend, err := img.downloadLayer(layer, token)
+			toSend, err := layerDownloader.downloadLayer(layer)
 			if err != nil {
 				l.LogE(err).Error("Error in downloading a layer")
 				return
