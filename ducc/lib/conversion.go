@@ -311,46 +311,12 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 
 			if pathExists == false || forceDownload {
 
-				// need to create the "super-directory", those
-				// directory starting with 2 char prefix of the
-				// digest itself, and put a .cvmfscatalog files
-				// in it, if the directory still doesn't
-				// exists. Similarly we need a .cvmfscatalog in
-				// the layerfs directory, the one that host the
-				// whole layer
-
-				for _, dir := range []string{
-					filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath))),
-				} {
-
-					l.Log().WithFields(
-						log.Fields{"catalogdirectory": dir}).
-						Info("Working on CATALOGDIRECTORY")
-					err = cvmfs.CreateCatalogIntoDir(repo, dir)
-					if err != nil {
-						l.LogE(err).WithFields(log.Fields{
-							"directory": dir}).Error(
-							"Impossible to create subcatalog in super-directory.")
-					} else {
-						l.Log().WithFields(log.Fields{
-							"directory": dir}).Info(
-							"Created subcatalog in directory")
-					}
-				}
-				err = cvmfs.Ingest(repo, layer.Path, "--catalog", "-t", "-", "-b", cvmfs.TrimCVMFSRepoPrefix(layerPath))
+				err = layer.IngestIntoCVMFS(repo)
 
 				if err != nil {
-					l.LogE(err).WithFields(log.Fields{"layer": layer.Name}).Error("Some error in ingest the layer")
-					noErrors = false
-					cleanup(cvmfs.TrimCVMFSRepoPrefix(layerPath))
-					return
+					l.LogE(err).Error("Error in ingestng the layer in cvmfs")
 				}
 
-				err = StoreLayerInfo(repo, layerDigest, layer.Path)
-				if err != nil {
-					l.LogE(err).
-						Error("Error in storing the layers.json file in the repository")
-				}
 				l.Log().WithFields(
 					log.Fields{"layer": layer.Name}).
 					Info("Finish Ingesting the file")

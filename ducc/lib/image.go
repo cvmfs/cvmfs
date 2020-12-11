@@ -581,6 +581,33 @@ type downloadedLayer struct {
 	Path *ReadAndHash
 }
 
+func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
+	layerDigest := strings.Split(d.Name, ":")[1]
+	layerPath := cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)
+	if _, err := os.Stat(layerPath); err == nil {
+		// the layer already exists
+		return nil
+	}
+	superDir := filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath)))
+	go cvmfs.CreateCatalogIntoDir(CVMFSRepo, superDir)
+	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
+	err := cvmfs.Ingest(CVMFSRepo, d.Path,
+		"--catalog", "-t", "-",
+		"-b", ingestPath)
+	if err != nil {
+		l.LogE(err).WithFields(
+			log.Fields{"layer": d.Name}).
+			Error("Some error in ingest the layer")
+		go cvmfs.IngestDelete(CVMFSRepo, ingestPath)
+		return err
+	}
+	err = StoreLayerInfo(CVMFSRepo, layerDigest, d.Path)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
 	defer close(layersChan)
 	defer close(manifestChan)
