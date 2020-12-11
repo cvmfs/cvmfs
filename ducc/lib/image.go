@@ -702,7 +702,9 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 		}
 		req.Header.Set("Authorization", token)
 		resp, err := client.Do(req)
-		l.Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Make request for layer")
+		l.Log().WithFields(
+			log.Fields{"layer": layer.Digest}).
+			Info("Make request for layer")
 		if err != nil {
 			break
 		}
