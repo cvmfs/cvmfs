@@ -16,8 +16,10 @@
 
 #include "catalog_virtual.h"
 #include "compression.h"
+#include "directory_entry.h"
 #include "fs_traversal.h"
 #include "hash.h"
+#include "publish/repository.h"
 #include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
@@ -34,13 +36,14 @@ AbstractSyncMediator::~AbstractSyncMediator() {}
 
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params,
-                           perf::StatisticsTemplate statistics) :
-  catalog_manager_(catalog_manager),
-  union_engine_(NULL),
-  handle_hardlinks_(false),
-  params_(params),
-  changed_items_(0)
-{
+                           perf::StatisticsTemplate statistics)
+    : catalog_manager_(catalog_manager)
+    , union_engine_(NULL)
+    , handle_hardlinks_(false)
+    , params_(params)
+    , reporter_(new SyncDiffReporter(params_->print_changeset
+                                         ? SyncDiffReporter::kPrintChanges
+                                         : SyncDiffReporter::kPrintDots)) {
   int retval = pthread_mutex_init(&lock_file_queue_, NULL);
   assert(retval == 0);
 
@@ -48,7 +51,6 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
 
   counters_ = new perf::FsCounters(statistics);
 }
-
 
 SyncMediator::~SyncMediator() {
   pthread_mutex_destroy(&lock_file_queue_);
@@ -248,14 +250,13 @@ void SyncMediator::LeaveDirectory(SharedPtr<SyncItem> entry)
  * To be called after change set traversal is finished.
  */
 bool SyncMediator::Commit(manifest::Manifest *manifest) {
-  if (!params_->print_changeset && changed_items_ >= processing_dot_interval) {
-    // line break the 'progress bar', see SyncMediator::PrintChangesetNotice()
-    LogCvmfs(kLogPublish, kLogStdout, "");
-  }
+  reporter_->CommitReport();
 
-  LogCvmfs(kLogPublish, kLogStdout,
-           "Waiting for upload of files before committing...");
-  params_->spooler->WaitForUpload();
+  if (!params_->dry_run) {
+    LogCvmfs(kLogPublish, kLogStdout,
+             "Waiting for upload of files before committing...");
+    params_->spooler->WaitForUpload();
+  }
 
   if (!hardlink_queue_.empty()) {
     assert(handle_hardlinks_);
@@ -305,6 +306,11 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
   if (union_engine_) union_engine_->PostUpload();
 
   params_->spooler->UnregisterListeners();
+
+  if (params_->dry_run) {
+    manifest = NULL;
+    return true;
+  }
 
   LogCvmfs(kLogPublish, kLogStdout, "Committing file catalogs...");
   if (params_->spooler->GetNumberOfErrors() > 0) {
@@ -764,7 +770,7 @@ void SyncMediator::PublishHardlinksCallback(
 
 void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
   const std::string notice = "Nested catalog at " + directory->GetUnionPath();
-  PrintChangesetNotice(kAddCatalog, notice);
+  reporter_->OnAdd(notice, catalog::DirectoryEntry());
 
   if (!params_->dry_run) {
     catalog_manager_->CreateNestedCatalog(directory->GetRelativePath());
@@ -774,47 +780,111 @@ void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
 
 void SyncMediator::RemoveNestedCatalog(SharedPtr<SyncItem> directory) {
   const std::string notice =  "Nested catalog at " + directory->GetUnionPath();
-  PrintChangesetNotice(kRemoveCatalog, notice);
+  reporter_->OnRemove(notice, catalog::DirectoryEntry());
 
   if (!params_->dry_run) {
     catalog_manager_->RemoveNestedCatalog(directory->GetRelativePath());
   }
 }
 
+void SyncDiffReporter::OnInit(const history::History::Tag & /*from_tag*/,
+                              const history::History::Tag & /*to_tag*/) {}
 
-void SyncMediator::PrintChangesetNotice(const ChangesetAction  action,
-                                        const std::string     &extra) const {
-  if (!params_->print_changeset) {
-    ++changed_items_;
-    if (changed_items_ % processing_dot_interval == 0) {
-      LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, ".");
+void SyncDiffReporter::OnStats(const catalog::DeltaCounters & /*delta*/) {}
+
+void SyncDiffReporter::OnAdd(const std::string &path,
+                             const catalog::DirectoryEntry & /*entry*/) {
+  changed_items_++;
+  AddImpl(path);
+}
+void SyncDiffReporter::OnRemove(const std::string &path,
+                                const catalog::DirectoryEntry & /*entry*/) {
+  changed_items_++;
+  RemoveImpl(path);
+}
+void SyncDiffReporter::OnModify(const std::string &path,
+                                const catalog::DirectoryEntry & /*entry_from*/,
+                                const catalog::DirectoryEntry & /*entry_to*/) {
+  changed_items_++;
+  ModifyImpl(path);
+}
+
+void SyncDiffReporter::CommitReport() {
+  if (print_action_ == kPrintDots) {
+    if (changed_items_ >= processing_dot_interval_) {
+      LogCvmfs(kLogPublish, kLogStdout, "");
     }
-    return;
   }
+}
 
-  const char *action_label = NULL;
-  switch (action) {
-    case kAdd:
-    case kAddCatalog:
-    case kAddHardlinks:
-      action_label = "[add]";
+void SyncDiffReporter::PrintDots() {
+  if (changed_items_ % processing_dot_interval_ == 0) {
+    LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, ".");
+  }
+}
+
+void SyncDiffReporter::AddImpl(const std::string &path) {
+  const char *action_label;
+
+  switch (print_action_) {
+    case kPrintChanges:
+      if (path.at(0) != '/') {
+        action_label = "[x-catalog-add]";
+      } else {
+        action_label = "[add]";
+      }
+      LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
       break;
-    case kRemove:
-    case kRemoveCatalog:
-      action_label = "[rem]";
-      break;
-    case kTouch:
-      action_label = "[tou]";
+
+    case kPrintDots:
+      PrintDots();
       break;
     default:
-      assert(false && "unknown sync mediator action");
+      assert("Invalid print action.");
   }
+}
 
-  LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, extra.c_str());
+void SyncDiffReporter::RemoveImpl(const std::string &path) {
+  const char *action_label;
+
+  switch (print_action_) {
+    case kPrintChanges:
+      if (path.at(0) != '/') {
+        action_label = "[x-catalog-rem]";
+      } else {
+        action_label = "[rem]";
+      }
+
+      LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+      break;
+
+    case kPrintDots:
+      PrintDots();
+      break;
+    default:
+      assert("Invalid print action.");
+  }
+}
+
+void SyncDiffReporter::ModifyImpl(const std::string &path) {
+  const char *action_label;
+
+  switch (print_action_) {
+    case kPrintChanges:
+      action_label = "[mod]";
+      LogCvmfs(kLogPublish, kLogStdout, "%s %s", action_label, path.c_str());
+      break;
+
+    case kPrintDots:
+      PrintDots();
+      break;
+    default:
+      assert("Invalid print action.");
+  }
 }
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
-  PrintChangesetNotice(kAdd, entry->GetUnionPath());
+  reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) {
     assert(!entry->HasGraftMarker());
@@ -855,7 +925,7 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
   } else if (entry->relative_parent_path().empty() &&
              entry->IsCatalogMarker()) {
     PANIC(kLogStderr, "Error: nested catalog marker in root directory");
-  } else {
+  } else if (!params_->dry_run) {
     {
       // Push the file to the spooler, remember the entry for the path
       MutexLockGuard m(&lock_file_queue_);
@@ -877,7 +947,7 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
-  PrintChangesetNotice(kRemove, entry->GetUnionPath());
+  reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   if (!params_->dry_run) {
     if (handle_hardlinks_ && entry->GetRdOnlyLinkcount() > 1) {
@@ -902,7 +972,7 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
-  PrintChangesetNotice(kAdd, entry->GetUnionPath());
+  reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   perf::Inc(counters_->n_directories_added);
   assert(!entry->HasGraftMarker());
@@ -937,7 +1007,7 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
     RemoveNestedCatalog(entry);
   }
 
-  PrintChangesetNotice(kRemove, entry->GetUnionPath());
+  reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
   if (!params_->dry_run) {
     catalog_manager_->RemoveDirectory(directory_path);
   }
@@ -945,9 +1015,10 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
   perf::Inc(counters_->n_directories_removed);
 }
 
-
 void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
-  PrintChangesetNotice(kTouch, entry->GetUnionPath());
+  reporter_->OnModify(entry->GetUnionPath(), catalog::DirectoryEntry(),
+                      catalog::DirectoryEntry());
+
   const std::string directory_path = entry->GetRelativePath();
 
   if (!params_->dry_run) {
@@ -958,21 +1029,17 @@ void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
     }
     catalog_manager_->TouchDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
                                      directory_path);
-    if (xattrs != &default_xattrs_)
-      free(xattrs);
+    if (xattrs != &default_xattrs_) free(xattrs);
   }
 
   if (entry->HasCatalogMarker() &&
-      !catalog_manager_->IsTransitionPoint(directory_path))
-  {
+      !catalog_manager_->IsTransitionPoint(directory_path)) {
     CreateNestedCatalog(entry);
   } else if (!entry->HasCatalogMarker() &&
-             catalog_manager_->IsTransitionPoint(directory_path))
-  {
+             catalog_manager_->IsTransitionPoint(directory_path)) {
     RemoveNestedCatalog(entry);
   }
 }
-
 
 /**
  * All hardlinks in the current directory have been picked up.  Now they are
@@ -991,14 +1058,14 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
     }
 
     if (params_->print_changeset) {
-      std::string changeset_notice = "add hardlinks around ("
-                                   + i->second.master->GetUnionPath() + ")";
       for (SyncItemList::const_iterator j = i->second.hardlinks.begin(),
            jEnd = i->second.hardlinks.end(); j != jEnd; ++j)
       {
-        changeset_notice += " " + j->second->filename();
+        std::string changeset_notice =
+            GetParentPath(i->second.master->GetUnionPath()) + "/" +
+            j->second->filename();
+        reporter_->OnAdd(changeset_notice, catalog::DirectoryEntry());
       }
-      PrintChangesetNotice(kAddHardlinks, changeset_notice);
     }
 
     if (params_->dry_run)

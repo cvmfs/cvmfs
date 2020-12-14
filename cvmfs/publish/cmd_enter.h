@@ -54,10 +54,11 @@ class CmdEnter : public Command {
                       const std::string &dest_dir,
                       const std::vector<std::string> &empty_dirs,
                       std::vector<std::string> *new_paths);
-  void WriteCvmfsConfig();
-  void MountCvmfs(const std::string &extra_config);
+  void WriteCvmfsConfig(const std::string &extra_config);
+  void MountCvmfs();
   pid_t RunInteractiveShell();
 
+  std::string GetCvmfsXattr(const std::string &name);
   void CleanupSession(bool keep_logs,
                       const std::vector<std::string> &new_paths);
 
@@ -66,6 +67,7 @@ class CmdEnter : public Command {
   std::string cvmfs2_binary_;
   std::string overlayfs_binary_;
   std::string session_dir_;  ///< In $HOME/.cvmfs/fqrn, container spool area
+  std::string env_conf_;  ///< Stores the session directory environment
   std::string rootfs_dir_;  ///< Destination to chroot() to in the namespace
   std::string stdout_path_;  ///< Logs stdout of background commands
   std::string stderr_path_;  ///< Logs stdout of background commands

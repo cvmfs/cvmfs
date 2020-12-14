@@ -7,12 +7,14 @@
 
 #include <sys/capability.h>
 #include <sys/prctl.h>
+#include <unistd.h>
 
 #include "publish/except.h"
+#include "util/posix.h"
 
 namespace publish {
 
-void Repository::DropCapabilities() {
+void Env::DropCapabilities() {
   int retval;
 
   // Because the process has file capabilities, its dumpable state is set to
@@ -28,6 +30,13 @@ void Repository::DropCapabilities() {
   cap_free(caps);
   if (retval != 0)
     throw EPublish("cannot clear process capabilities");
+}
+
+
+std::string Env::GetEnterSessionDir() {
+  if (SymlinkExists("/.cvmfsenter"))
+    return ResolvePath("/.cvmfsenter");
+  return "";
 }
 
 }  // namespace publish
