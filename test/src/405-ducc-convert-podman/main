@@ -1,0 +1,66 @@
+cvmfs_test_name="DUCC podman image conversion"
+cvmfs_test_autofs_on_startup=true
+cvmfs_test_suites="ducc"
+
+CVMFS_TEST405_RECIPE="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
+CVMFS_TEST405_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
+CVMFS_TEST405_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+
+ducc_test_405_clean_up() {
+	# delete the recipe file
+    rm $CVMFS_TEST405_RECIPE
+    # delete the logs and error from ducc
+    rm $CVMFS_TEST405_DUCC_ERR
+
+	sudo cvmfs_server rmfs -f $CVMFS_TEST405_REPOSITORY
+}
+
+cvmfs_run_test() {
+	trap ducc_test_405_clean_up EXIT HUP INT TERM
+
+	# create a simple recipe file for the podman conversion in the local dir
+	echo -n "*** Creating recipe file..."
+	cat > $CVMFS_TEST405_RECIPE  << EOL
+version: 1
+user: ""
+cvmfs_repo: '$CVMFS_TEST405_REPOSITORY'
+output_format: '\$(scheme)://localhost:5000/mock/\$(image)'
+input:
+    - 'https://registry.hub.docker.com/library/ubuntu:latest'
+EOL
+	echo "done"
+
+	export CVMFS_TEST_UNIONFS=overlayfs
+
+	# crete the repository where to store the content
+    echo -n "*** Creating CVMFS repo..."
+    create_empty_repo $CVMFS_TEST405_REPOSITORY $USER || return $?
+    echo "done"
+
+	touch $CVMFS_TEST405_DUCC_ERR
+	echo "*** Converting recipe..."
+    echo "cvmfs_ducc convert --skip-flat --skip-thin-image $CVMFS_TEST405_RECIPE 2> $CVMFS_TEST405_DUCC_ERR"
+          cvmfs_ducc convert --skip-flat --skip-thin-image $CVMFS_TEST405_RECIPE 2> $CVMFS_TEST405_DUCC_ERR || return 101
+    grep -q "level=error" $CVMFS_TEST405_DUCC_ERR
+    while [ $? -ne 1 ]
+    do
+        echo -n "*** Some error during conversion, trying again. Converting recipe..."
+        rm $CVMFS_TEST405_DUCC_ERR
+        cvmfs_ducc convert --skip-flat --skip-thin-image $CVMFS_TEST405_RECIPE 2> $CVMFS_TEST405_DUCC_ERR || return 101
+        grep "level=error" $CVMFS_TEST405_DUCC_ERR
+    done
+    echo "*** Converted recipe successfully"
+
+	# add the repository to configuration file
+	additionalstore="/cvmfs/"$CVMFS_TEST405_REPOSITORY"/podmanStore"
+	sudo sed -i -e "/additionalimage.*/a\"$additionalstore\"," /etc/containers/storage.conf || return 10
+
+	# run the image using podman
+	sudo podman run --rm ubuntu echo "hello from ubuntu container" || return $?
+
+	echo "*** Test successfull ***"
+
+	sudo sed -i "/$CVMFS_TEST405_REPOSITORY/d" /etc/containers/storage.conf
+
+	return 0
+}

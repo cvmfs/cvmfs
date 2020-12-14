@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -389,7 +388,7 @@ func (i *Image) GetPublicSymlinkPath() string {
 	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
 
-func (s Singularity) IngestIntoCVMFS(CVMFSRepo string) error {
+func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 	symlinkPath := s.Image.GetPublicSymlinkPath()
 	singularityPath, err := s.Image.GetSingularityPath()
 	if err != nil {
@@ -398,7 +397,7 @@ func (s Singularity) IngestIntoCVMFS(CVMFSRepo string) error {
 		return err
 	}
 
-	err = IngestIntoCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
+	err = PublishToCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
 	if err != nil {
 		// if there is an error ingest does not remove the folder.
 		// we do want to remove the folder anyway
@@ -578,7 +577,7 @@ func getLayerUrl(img *Image, layer da.Layer) string {
 
 type downloadedLayer struct {
 	Name string
-	Path io.ReadCloser
+	Path *ReadAndHash
 }
 
 func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
@@ -710,10 +709,9 @@ func (img *Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend 
 				LogE(err).Warning("Error in creating the zip to unzip the layer")
 				continue
 			}
-
-			toSend = downloadedLayer{Name: layer.Digest, Path: gread}
+			path := NewReadAndHash(gread)
+			toSend = downloadedLayer{Name: layer.Digest, Path: path}
 			return toSend, nil
-
 		} else {
 			Log().Warning("Received status code ", resp.StatusCode)
 			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
