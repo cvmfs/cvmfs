@@ -14,6 +14,7 @@ import (
 
 	constants "github.com/cvmfs/ducc/constants"
 	da "github.com/cvmfs/ducc/docker-api"
+	fs "github.com/cvmfs/ducc/filesystem"
 	l "github.com/cvmfs/ducc/log"
 	temp "github.com/cvmfs/ducc/temp"
 )
@@ -480,4 +481,30 @@ func WriteDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
 		return err
 	}
 	return PublishToCVMFS(CVMFSRepo, path, tmpFile.Name())
+}
+
+func removeHashMarkerIfPresent(digest string) string {
+	t := strings.Split(digest, ":")
+	if len(t) == 2 {
+		return t[1]
+	}
+	return digest
+}
+
+func CreateChain(CVMFSRepo, chain, previous, layer string) error {
+	newChainPath := ChainPath(CVMFSRepo, chain)
+	baseChainPath := ChainPath(CVMFSRepo, previous)
+	layerPath := LayerRootfsPath(CVMFSRepo, removeHashMarkerIfPresent(layer))
+
+	opt := TemplateTransaction{
+		source:      TrimCVMFSRepoPrefix(baseChainPath),
+		destination: TrimCVMFSRepoPrefix(newChainPath)}
+
+	if previous == "" {
+		opt.source = TrimCVMFSRepoPrefix(layerPath)
+	}
+
+	return WithinTransaction(CVMFSRepo, func() error {
+		return fs.ApplyDirectory(newChainPath, layerPath)
+	}, opt)
 }
