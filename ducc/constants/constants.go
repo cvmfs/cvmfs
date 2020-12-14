@@ -8,4 +8,4 @@ var SubDirInsideRepo = ".layers"
 var ChainSubDir = ".chains"
 
 var DirPermision = os.FileMode(0755)
-var filePermision = os.FileMode(0644)
+var FilePermision = os.FileMode(0644)

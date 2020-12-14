@@ -19,9 +19,6 @@ import (
 	temp "github.com/cvmfs/ducc/temp"
 )
 
-var dirPermision = os.FileMode(0755)
-var filePermision = os.FileMode(0644)
-
 // ingest into the repository, inside the subpath, the target (directory or file) object
 // CVMFSRepo: just the name of the repository (ex: unpacked.cern.ch)
 // path: the path inside the repository, without the prefix (ex: .foo/bar/baz), where to put the ingested target
@@ -51,7 +48,7 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 
 		if targetStat.Mode().IsDir() {
 			os.RemoveAll(path)
-			err = os.MkdirAll(path, dirPermision)
+			err = os.MkdirAll(path, constants.DirPermision)
 			if err != nil {
 				l.LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("Error in creating the directory where to copy the singularity")
 			}
@@ -59,7 +56,7 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 
 		} else if targetStat.Mode().IsRegular() {
 			err = func() error {
-				os.MkdirAll(filepath.Dir(path), dirPermision)
+				os.MkdirAll(filepath.Dir(path), constants.DirPermision)
 				os.Remove(path)
 
 				from, err := os.Open(target)
@@ -68,7 +65,7 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 				}
 				defer from.Close()
 
-				to, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, filePermision)
+				to, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, constants.FilePermision)
 				if err != nil {
 					return err
 				}
@@ -123,7 +120,7 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 
 	err = WithinTransaction(CVMFSRepo, func() error {
 		linkDir := filepath.Dir(newLinkName)
-		err = os.MkdirAll(linkDir, dirPermision)
+		err = os.MkdirAll(linkDir, constants.DirPermision)
 		if err != nil {
 			llog(l.LogE(err)).WithFields(log.Fields{
 				"directory": linkDir}).Error(
@@ -254,7 +251,7 @@ func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, imageName str
 			// and if it doesn't exists create it
 			dir := filepath.Dir(path)
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
-				err = os.MkdirAll(dir, dirPermision)
+				err = os.MkdirAll(dir, constants.DirPermision)
 				if err != nil {
 					llog(l.LogE(err)).WithFields(
 						log.Fields{"file": path}).
@@ -262,7 +259,7 @@ func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, imageName str
 					continue
 				}
 			}
-			err := ioutil.WriteFile(path, fileContent, filePermision)
+			err := ioutil.WriteFile(path, fileContent, constants.FilePermision)
 			if err != nil {
 				llog(l.LogE(err)).WithFields(log.Fields{"file": path}).Error(
 					"Error in writing the backlink file, skipping...")
@@ -293,7 +290,7 @@ func AddManifestToRemoveScheduler(CVMFSRepo string, manifest da.Manifest) error 
 	// if the file exist, load from it
 	if _, err := os.Stat(schedulePath); !os.IsNotExist(err) {
 
-		scheduleFileRO, err := os.OpenFile(schedulePath, os.O_RDONLY, filePermision)
+		scheduleFileRO, err := os.OpenFile(schedulePath, os.O_RDONLY, constants.FilePermision)
 		if err != nil {
 			llog(l.LogE(err)).Error("Impossible to open the schedule file")
 			return err
@@ -330,7 +327,7 @@ func AddManifestToRemoveScheduler(CVMFSRepo string, manifest da.Manifest) error 
 
 	err := WithinTransaction(CVMFSRepo, func() error {
 		if _, err := os.Stat(schedulePath); os.IsNotExist(err) {
-			err = os.MkdirAll(filepath.Dir(schedulePath), dirPermision)
+			err = os.MkdirAll(filepath.Dir(schedulePath), constants.DirPermision)
 			if err != nil {
 				llog(l.LogE(err)).Error("Error in creating the directory where save the schedule")
 			}
@@ -341,7 +338,7 @@ func AddManifestToRemoveScheduler(CVMFSRepo string, manifest da.Manifest) error 
 			llog(l.LogE(err)).Error("Error in marshaling the new schedule")
 		} else {
 
-			err = ioutil.WriteFile(schedulePath, bytes, filePermision)
+			err = ioutil.WriteFile(schedulePath, bytes, constants.FilePermision)
 			if err != nil {
 				llog(l.LogE(err)).Error("Error in writing the new schedule")
 			} else {
