@@ -371,6 +371,11 @@ func LayerPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.SubDirInsideRepo, layerDigest[0:2], layerDigest)
 }
 
+func ChainPath(CVMFSRepo, layerDigest string) string {
+	layerDigest = removeHashMarkerIfPresent(layerDigest)
+	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.ChainSubDir, layerDigest[0:2], layerDigest)
+}
+
 func LayerRootfsPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join(LayerPath(CVMFSRepo, layerDigest), "layerfs")
 }
