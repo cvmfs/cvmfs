@@ -5,12 +5,15 @@
 #ifndef CVMFS_INGESTION_TASK_H_
 #define CVMFS_INGESTION_TASK_H_
 
+#include <errno.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <vector>
 
 #include "ingestion/tube.h"
+#include "util/exception.h"
 #include "util/single_copy.h"
 
 /**
@@ -80,7 +83,10 @@ class TubeConsumerGroup : SingleCopy {
     for (unsigned i = 0; i < N; ++i) {
       int retval = pthread_create(
         &threads_[i], NULL, TubeConsumer<ItemT>::MainConsumer, consumers_[i]);
-      assert(retval == 0);
+      if (retval != 0) {
+        PANIC(kLogStderr, "failed to create new thread (error: %d, pid: %d)",
+              errno, getpid());
+      }
     }
     is_active_ = true;
   }
