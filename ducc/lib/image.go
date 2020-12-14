@@ -873,11 +873,11 @@ func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) e
 	return err
 }
 
-func (img *Image) CreateChainStructure(CVMFSRepo string) error {
+func (img *Image) CreateChainStructure(CVMFSRepo string) (err error, lastChainId string) {
 	// make sure we have the layers somewhere
 	manifest, err := img.GetManifest()
 	if err != nil {
-		return err
+		return
 	}
 	layerToDownload := []da.Layer{}
 	for _, layer := range manifest.Layers {
@@ -902,10 +902,10 @@ func (img *Image) CreateChainStructure(CVMFSRepo string) error {
 		for _, layer := range manifest.Layers {
 			layerDigest := strings.Split(layer.Digest, ":")[1]
 			path := cvmfs.LayerPath(CVMFSRepo, layerDigest)
-			if _, err := os.Stat(path); err != nil {
+			if _, err = os.Stat(path); err != nil {
 				err = fmt.Errorf("%s: Error, impossible to get all layers in the CVMFS storage", err)
 				l.LogE(err).Error("Error in getting layers in CVMFS repo")
-				return err
+				return
 			}
 		}
 	}
@@ -913,6 +913,8 @@ func (img *Image) CreateChainStructure(CVMFSRepo string) error {
 	chainIDs := manifest.GetChainIDs()
 	for i, chain := range chainIDs {
 		digest := strings.Split(chain.String(), ":")[1]
+		lastChainId = digest
+
 		path := cvmfs.ChainPath(CVMFSRepo, digest)
 
 		if _, err := os.Stat(path); err == nil {
@@ -923,14 +925,14 @@ func (img *Image) CreateChainStructure(CVMFSRepo string) error {
 		if i != 0 {
 			previous = chainIDs[i-1].String()
 		}
-		err := cvmfs.CreateChain(CVMFSRepo,
+		err = cvmfs.CreateChain(CVMFSRepo,
 			chain.String(),
 			previous,
 			manifest.Layers[i].Digest)
 		if err != nil {
 			l.LogE(err).Error("Error in creating the chain")
-			return err
+			return
 		}
 	}
-	return nil
+	return
 }
