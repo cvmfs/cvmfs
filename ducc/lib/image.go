@@ -18,7 +18,12 @@ import (
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
 
+	constants "github.com/cvmfs/ducc/constants"
+	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
+	l "github.com/cvmfs/ducc/log"
+	singularity "github.com/cvmfs/ducc/singularity"
+	temp "github.com/cvmfs/ducc/temp"
 )
 
 type ManifestRequest struct {
@@ -148,7 +153,7 @@ func (img *Image) GetChanges() (changes []string, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
-		LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
+		l.LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
 		user = ""
 		pass = ""
 	}
@@ -156,20 +161,20 @@ func (img *Image) GetChanges() (changes []string, err error) {
 	changes = []string{"ENV CVMFS_IMAGE true"}
 	manifest, err := img.GetManifest()
 	if err != nil {
-		LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
+		l.LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
 		return
 	}
 	configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
 		img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
 	token, err := firstRequestForAuth(configUrl, user, pass)
 	if err != nil {
-		LogE(err).Warning("Impossible to retrieve the token for getting the changes from the repository, not changes set")
+		l.LogE(err).Warning("Impossible to retrieve the token for getting the changes from the repository, not changes set")
 		return
 	}
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", configUrl, nil)
 	if err != nil {
-		LogE(err).Warning("Impossible to create a request for getting the changes no chnages set.")
+		l.LogE(err).Warning("Impossible to create a request for getting the changes no chnages set.")
 		return
 	}
 	req.Header.Set("Authorization", token)
@@ -179,14 +184,14 @@ func (img *Image) GetChanges() (changes []string, err error) {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		LogE(err).Warning("Error in reading the body from the configuration, no change set")
+		l.LogE(err).Warning("Error in reading the body from the configuration, no change set")
 		return
 	}
 
 	var config image.Image
 	err = json.Unmarshal(body, &config)
 	if err != nil {
-		LogE(err).Warning("Error in unmarshaling the configuration of the image")
+		l.LogE(err).Warning("Error in unmarshaling the configuration of the image")
 		return
 	}
 	env := config.Config.Env
@@ -245,7 +250,7 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	}
 	pass, err := GetPassword()
 	if err != nil {
-		LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
 		pass = ""
 	}
 	user := img.User
@@ -253,7 +258,7 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	token, err := firstRequestForAuth(url, user, pass)
 	if err != nil {
 		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
-		LogE(err).Error(errF)
+		l.LogE(err).Error(errF)
 		return r1, r2, errF
 	}
 
@@ -264,18 +269,18 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		errF := fmt.Errorf("Error in making the request for retrieving the tags: %s", err)
-		LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
+		l.LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
 		return r1, r2, errF
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		errF := fmt.Errorf("Got error status code (%d) trying to retrieve the tags", resp.StatusCode)
-		LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
+		l.LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
 		return r1, r2, errF
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
 		errF := fmt.Errorf("Error in decoding the tags from the server: %s", err)
-		LogE(err).Error(errF)
+		l.LogE(err).Error(errF)
 		return r1, r2, errF
 	}
 	pattern := img.Tag
@@ -318,19 +323,14 @@ func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
 	return result, nil
 }
 
-func GetSingularityPathFromManifest(manifest da.Manifest) string {
-	digest := strings.Split(manifest.Config.Digest, ":")[1]
-	return filepath.Join(".flat", digest[0:2], digest)
-}
-
 // here is where in the FS we are going to store the singularity image
 func (img *Image) GetSingularityPath() (string, error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
-		LogE(err).Error("Error in getting the manifest to figureout the singularity path")
+		l.LogE(err).Error("Error in getting the manifest to figureout the singularity path")
 		return "", err
 	}
-	return GetSingularityPathFromManifest(manifest), nil
+	return manifest.GetSingularityPath(), nil
 }
 
 type Singularity struct {
@@ -339,14 +339,14 @@ type Singularity struct {
 }
 
 func (img *Image) DownloadSingularityDirectory(rootPath string) (sing Singularity, err error) {
-	dir, err := UserDefinedTempDir(rootPath, "singularity_buffer")
+	dir, err := temp.UserDefinedTempDir(rootPath, "singularity_buffer")
 	if err != nil {
-		LogE(err).Error("Error in creating temporary directory for singularity")
+		l.LogE(err).Error("Error in creating temporary directory for singularity")
 		return
 	}
-	singularityTempCache, err := UserDefinedTempDir(rootPath, "tempDirSingularityCache")
+	singularityTempCache, err := temp.UserDefinedTempDir(rootPath, "tempDirSingularityCache")
 	if err != nil {
-		LogE(err).Error("Error in creating temporary directory for singularity cache")
+		l.LogE(err).Error("Error in creating temporary directory for singularity cache")
 		return
 	}
 	defer os.RemoveAll(singularityTempCache)
@@ -354,30 +354,32 @@ func (img *Image) DownloadSingularityDirectory(rootPath string) (sing Singularit
 	// if we fail, we try again without the credentials
 	user := img.User
 	pass, _ := GetPassword()
-	err = ExecCommand("singularity", "build", "--force", "--fix-perms",
-		"--sandbox", dir, img.GetSingularityLocation()).
-		Env("SINGULARITY_CACHEDIR", singularityTempCache).
-		Env("PATH", os.Getenv("PATH")).
-		Env("SINGULARITY_DOCKER_USERNAME", user).
-		Env("SINGULARITY_DOCKER_PASSWORD", pass).
-		Start()
+
+	env := make(map[string]string)
+	env["SINGULARITY_CACHEDIR"] = singularityTempCache
+	env["PATH"] = os.Getenv("PATH")
+	env["SINGULARITY_DOCKER_USERNAME"] = user
+	env["SINGULARITY_DOCKER_PASSWORD"] = pass
+	err = singularity.BuildFilesystemDirectory(dir, img.GetSingularityLocation(), env)
+
 	if err == nil {
-		Log().Info("Successfully download the singularity image")
+		l.Log().Info("Successfully download the singularity image")
 		return Singularity{Image: img, TempDirectory: dir}, nil
 	}
 	if user != "" || pass != "" {
-		Log().Info("Detected error in downloading image with credentials, trying without.")
-		err = ExecCommand("singularity", "build", "--force", "--fix-perms",
-			"--sandbox", dir, img.GetSingularityLocation()).
-			Env("SINGULARITY_CACHEDIR", singularityTempCache).
-			Env("PATH", os.Getenv("PATH")).
-			Start()
+		l.Log().Info("Detected error in downloading image with credentials, trying without.")
+
+		env := make(map[string]string)
+		env["SINGULARITY_CACHEDIR"] = singularityTempCache
+		env["PATH"] = os.Getenv("PATH")
+		err = singularity.BuildFilesystemDirectory(dir, img.GetSingularityLocation(), env)
+
 		if err == nil {
-			Log().Info("Successfully download the singularity image")
+			l.Log().Info("Successfully download the singularity image")
 			return Singularity{Image: img, TempDirectory: dir}, nil
 		}
 	}
-	LogE(err).Error("Error in downloading the singularity image")
+	l.LogE(err).Error("Error in downloading the singularity image")
 	return
 
 }
@@ -392,12 +394,12 @@ func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 	symlinkPath := s.Image.GetPublicSymlinkPath()
 	singularityPath, err := s.Image.GetSingularityPath()
 	if err != nil {
-		LogE(err).Error(
+		l.LogE(err).Error(
 			"Error in ingesting singularity image into CVMFS, unable to get where save the image")
 		return err
 	}
 
-	err = PublishToCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
+	err = cvmfs.PublishToCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
 	if err != nil {
 		// if there is an error ingest does not remove the folder.
 		// we do want to remove the folder anyway
@@ -409,13 +411,13 @@ func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 		filepath.Dir(singularityPath),
 		singularityPath} {
 
-		err = CreateCatalogIntoDir(CVMFSRepo, dir)
+		err = cvmfs.CreateCatalogIntoDir(CVMFSRepo, dir)
 		if err != nil {
-			LogE(err).WithFields(log.Fields{
+			l.LogE(err).WithFields(log.Fields{
 				"directory": dir}).Error(
 				"Impossible to create subcatalog in super-directory.")
 		} else {
-			Log().WithFields(log.Fields{
+			l.Log().WithFields(log.Fields{
 				"directory": dir}).Info(
 				"Created subcatalog in directory")
 		}
@@ -423,9 +425,9 @@ func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 	}
 
 	// lets create the symlink
-	err = CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, singularityPath)
+	err = cvmfs.CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, singularityPath)
 	if err != nil {
-		LogE(err).Error("Error in creating the symlink for the singularity Image")
+		l.LogE(err).Error("Error in creating the symlink for the singularity Image")
 		return err
 	}
 	return nil
@@ -434,7 +436,7 @@ func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
 func (img *Image) getByteManifest() ([]byte, error) {
 	pass, err := GetPassword()
 	if err != nil {
-		LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
 		return img.getAnonymousManifest()
 	}
 	return img.getManifestWithPassword(pass)
@@ -454,14 +456,14 @@ func getManifestWithUsernameAndPassword(img *Image, user, pass string) ([]byte, 
 
 	token, err := firstRequestForAuth(url, user, pass)
 	if err != nil {
-		LogE(err).Error("Error in getting the authentication token")
+		l.LogE(err).Error("Error in getting the authentication token")
 		return nil, err
 	}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		LogE(err).Error("Impossible to create a HTTP request")
+		l.LogE(err).Error("Impossible to create a HTTP request")
 		return nil, err
 	}
 
@@ -470,13 +472,13 @@ func getManifestWithUsernameAndPassword(img *Image, user, pass string) ([]byte, 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		LogE(err).Error("Error in making the HTTP request")
+		l.LogE(err).Error("Error in making the HTTP request")
 		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		LogE(err).Error("Error in reading the second http response")
+		l.LogE(err).Error("Error in reading the second http response")
 		return nil, err
 	}
 	return body, nil
@@ -534,7 +536,7 @@ func firstRequestForAuth(url, user, pass string) (token string, err error) {
 func firstRequestForAuth_internal(url, user, pass string) (token string, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		LogE(err).Error("Error in making the first request for auth")
+		l.LogE(err).Error("Error in making the first request for auth")
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -544,7 +546,7 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 		}).Info("Expected status code 401, print body anyway.")
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			LogE(err).Error("Error in reading the first http response")
+			l.LogE(err).Error("Error in reading the first http response")
 		}
 		fmt.Println(string(body))
 		return "", err
@@ -566,13 +568,13 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 			return token, nil
 		}
 	}
-	LogE(err).Error("Error in getting the authentication token")
+	l.LogE(err).Error("Error in getting the authentication token")
 	return "", err
 }
 
-func getLayerUrl(img *Image, layer da.Layer) string {
+func getLayerUrl(img *Image, layerDigest string) string {
 	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, layer.Digest)
+		img.Scheme, img.Registry, img.Repository, layerDigest)
 }
 
 type downloadedLayer struct {
@@ -580,30 +582,47 @@ type downloadedLayer struct {
 	Path *ReadAndHash
 }
 
+func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
+	layerDigest := strings.Split(d.Name, ":")[1]
+	layerPath := cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)
+	if _, err := os.Stat(layerPath); err == nil {
+		// the layer already exists
+		return nil
+	}
+	superDir := filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath)))
+	go cvmfs.CreateCatalogIntoDir(CVMFSRepo, superDir)
+	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
+	err := cvmfs.Ingest(CVMFSRepo, d.Path,
+		"--catalog", "-t", "-",
+		"-b", ingestPath)
+	if err != nil {
+		l.LogE(err).WithFields(
+			log.Fields{"layer": d.Name}).
+			Error("Some error in ingest the layer")
+		go cvmfs.IngestDelete(CVMFSRepo, ingestPath)
+		return err
+	}
+	err = StoreLayerInfo(CVMFSRepo, layerDigest, d.Path)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
-	user := img.User
-	pass, err := GetPassword()
+	layerDownloader := NewLayerDownloader(img)
+	_, err := layerDownloader.getToken()
 	if err != nil {
-		LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
-		user = ""
-		pass = ""
+		return err
 	}
 
 	// then we try to get the manifest from our database
 	manifest, err := img.GetManifest()
 	if err != nil {
-		LogE(err).Warn("Error in getting the manifest")
-		return err
-	}
-
-	// A first request is used to get the authentication
-	firstLayer := manifest.Layers[0]
-	layerUrl := getLayerUrl(img, firstLayer)
-	token, err := firstRequestForAuth(layerUrl, user, pass)
-	if err != nil {
+		l.LogE(err).Warn("Error in getting the manifest")
 		return err
 	}
 
@@ -620,7 +639,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 		case <-stopGettingLayers:
 			err := fmt.Errorf("Detect errors, stop getting layer")
 			errorChannel <- err
-			LogE(err).Error("Detect error, stop getting layers")
+			l.LogE(err).Error("Detect error, stop getting layers")
 			cancel()
 			return
 		}
@@ -634,10 +653,12 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 		wg.Add(1)
 		go func(ctx context.Context, layer da.Layer) {
 			defer wg.Done()
-			Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Start working on layer")
-			toSend, err := img.downloadLayer(layer, token, rootPath)
+			l.Log().WithFields(
+				log.Fields{"layer": layer.Digest}).
+				Info("Start working on layer")
+			toSend, err := layerDownloader.downloadLayer(layer)
 			if err != nil {
-				LogE(err).Error("Error in downloading a layer")
+				l.LogE(err).Error("Error in downloading a layer")
 				return
 			}
 			select {
@@ -652,13 +673,13 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	// finally we marshal the manifest and store it into a file
 	manifestBytes, err := json.Marshal(manifest)
 	if err != nil {
-		LogE(err).Error("Error in marshaling the manifest")
+		l.LogE(err).Error("Error in marshaling the manifest")
 		return err
 	}
 	manifestPath := filepath.Join(rootPath, "manifest.json")
 	err = ioutil.WriteFile(manifestPath, manifestBytes, 0666)
 	if err != nil {
-		LogE(err).Error("Error in writing the manifest to file")
+		l.LogE(err).Error("Error in writing the manifest to file")
 		return err
 	}
 	// ship the manifest file
@@ -674,15 +695,15 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	}
 }
 
-func (img *Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend downloadedLayer, err error) {
+func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloadedLayer, err error) {
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
-		LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
 		user = ""
 		pass = ""
 	}
-	layerUrl := getLayerUrl(img, layer)
+	layerUrl := getLayerUrl(img, layer.Digest)
 	if token == "" {
 		token, err = firstRequestForAuth(layerUrl, user, pass)
 		if err != nil {
@@ -694,26 +715,28 @@ func (img *Image) downloadLayer(layer da.Layer, token, rootPath string) (toSend 
 		client := &http.Client{}
 		req, err := http.NewRequest("GET", layerUrl, nil)
 		if err != nil {
-			LogE(err).Error("Impossible to create the HTTP request.")
+			l.LogE(err).Error("Impossible to create the HTTP request.")
 			break
 		}
 		req.Header.Set("Authorization", token)
 		resp, err := client.Do(req)
-		Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Make request for layer")
+		l.Log().WithFields(
+			log.Fields{"layer": layer.Digest}).
+			Info("Make request for layer")
 		if err != nil {
 			break
 		}
 		if 200 <= resp.StatusCode && resp.StatusCode < 300 {
 			gread, err := gzip.NewReader(resp.Body)
 			if err != nil {
-				LogE(err).Warning("Error in creating the zip to unzip the layer")
+				l.LogE(err).Warning("Error in creating the zip to unzip the layer")
 				continue
 			}
 			path := NewReadAndHash(gread)
 			toSend = downloadedLayer{Name: layer.Digest, Path: path}
 			return toSend, nil
 		} else {
-			Log().Warning("Received status code ", resp.StatusCode)
+			l.Log().Warning("Received status code ", resp.StatusCode)
 			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
 		}
 	}
@@ -785,6 +808,161 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	} else {
 		err = fmt.Errorf("Didn't get the token key from the server")
 		return
+	}
+	return
+}
+
+type LayerDownloader struct {
+	image *Image
+	token string
+	lock  sync.Mutex
+}
+
+func NewLayerDownloader(image *Image) LayerDownloader {
+	return LayerDownloader{image: image, token: ""}
+}
+
+func (ld *LayerDownloader) getToken() (token string, err error) {
+	ld.lock.Lock()
+	defer ld.lock.Unlock()
+	if ld.token != "" {
+		return ld.token, nil
+	}
+	manifest, err := ld.image.GetManifest()
+	if err != nil {
+		return
+	}
+	user := ld.image.User
+	pass, err := GetPassword()
+	if err != nil {
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
+		user = ""
+		pass = ""
+	}
+
+	firstLayer := manifest.Layers[0]
+	layerUrl := getLayerUrl(ld.image, firstLayer.Digest)
+	token, err = firstRequestForAuth(layerUrl, user, pass)
+	if err != nil {
+		return
+	}
+	ld.token = token
+	return
+}
+
+func (ld *LayerDownloader) downloadLayer(layer da.Layer) (downloadedLayer, error) {
+	token, err := ld.getToken()
+	if err != nil {
+		return downloadedLayer{}, err
+	}
+	return ld.image.downloadLayer(layer, token)
+}
+
+func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) error {
+	err := error(nil)
+	for i := 0; i <= 5; i += 1 {
+		to_ingest, err := ld.downloadLayer(layer)
+		if err != nil {
+			// let's try again
+			continue
+		}
+		err = to_ingest.IngestIntoCVMFS(CVMFSRepo)
+		if err == nil {
+			return nil
+		}
+	}
+	return err
+}
+
+func (img *Image) CreateChainStructure(CVMFSRepo string) (err error, lastChainId string) {
+	// make sure we have the layers somewhere
+	manifest, err := img.GetManifest()
+	if err != nil {
+		return
+	}
+	layerToDownload := []da.Layer{}
+	for _, layer := range manifest.Layers {
+		// we download the layer if they are not already in storage
+		layerDigest := strings.Split(layer.Digest, ":")[1]
+		path := cvmfs.LayerPath(CVMFSRepo, layerDigest)
+		if _, err := os.Stat(path); err != nil {
+			layerToDownload = append(layerToDownload, layer)
+		}
+	}
+	if len(layerToDownload) > 0 {
+		ld := NewLayerDownloader(img)
+		var wg sync.WaitGroup
+		for _, layer := range layerToDownload {
+			wg.Add(1)
+			go func(layer da.Layer) {
+				defer wg.Done()
+				err := ld.DownloadAndIngest(CVMFSRepo, layer)
+				if err != nil {
+					l.LogE(err).
+						Error("Error in ingesting the layer")
+				}
+			}(layer)
+		}
+		wg.Wait()
+		for _, layer := range manifest.Layers {
+			layerDigest := strings.Split(layer.Digest, ":")[1]
+			path := cvmfs.LayerPath(CVMFSRepo, layerDigest)
+			if _, err = os.Stat(path); err != nil {
+				err = fmt.Errorf("%s: Error, impossible to get all layers in the CVMFS storage", err)
+				l.LogE(err).Error("Error in getting layers in CVMFS repo")
+				return
+			}
+		}
+	}
+	// then we start creating the chain structure
+	chainIDs := manifest.GetChainIDs()
+
+	paths := []string{}
+	for _, chain := range chainIDs {
+		path := cvmfs.ChainPath(CVMFSRepo, chain.String())
+		dir := filepath.Dir(path)
+		if _, err := os.Stat(dir); err != nil {
+			paths = append(paths, dir)
+		}
+	}
+
+	if len(paths) > 0 {
+		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
+			for _, dir := range paths {
+				if err := os.MkdirAll(dir, constants.DirPermision); err != nil {
+					return nil
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			l.LogE(err).Error("Impossible to create directory to contains the chainID")
+			return
+		}
+	}
+
+	for i, chain := range chainIDs {
+		digest := chain.String()
+		lastChainId = digest
+
+		path := cvmfs.ChainPath(CVMFSRepo, digest)
+
+		if _, err := os.Stat(path); err == nil {
+			// the chain is present, we skip the loop
+			continue
+		}
+		previous := ""
+		if i != 0 {
+			previous = chainIDs[i-1].String()
+		}
+		err = cvmfs.CreateChain(CVMFSRepo,
+			chain.String(),
+			previous,
+			manifest.Layers[i].Digest)
+		if err != nil {
+			l.LogE(err).Error("Error in creating the chain")
+			return
+		}
 	}
 	return
 }
