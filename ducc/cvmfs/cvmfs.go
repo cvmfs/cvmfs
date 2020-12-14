@@ -493,18 +493,27 @@ func removeHashMarkerIfPresent(digest string) string {
 
 func CreateChain(CVMFSRepo, chain, previous, layer string) error {
 	newChainPath := ChainPath(CVMFSRepo, chain)
-	baseChainPath := ChainPath(CVMFSRepo, previous)
 	layerPath := LayerRootfsPath(CVMFSRepo, removeHashMarkerIfPresent(layer))
 
 	opt := TemplateTransaction{
-		source:      TrimCVMFSRepoPrefix(baseChainPath),
+		source:      TrimCVMFSRepoPrefix(layerPath),
 		destination: TrimCVMFSRepoPrefix(newChainPath)}
 
-	if previous == "" {
-		opt.source = TrimCVMFSRepoPrefix(layerPath)
+	if previous != "" {
+		baseChainPath := ChainPath(CVMFSRepo, previous)
+		opt.source = TrimCVMFSRepoPrefix(baseChainPath)
+
+		return WithinTransaction(CVMFSRepo, func() error {
+			err := fs.ApplyDirectory(newChainPath, layerPath)
+			if err != nil {
+				l.LogE(err).Error("Error in Applying the layer on top of the chain")
+			}
+			return err
+		}, opt)
 	}
 
 	return WithinTransaction(CVMFSRepo, func() error {
-		return fs.ApplyDirectory(newChainPath, layerPath)
+		return nil
 	}, opt)
+
 }
