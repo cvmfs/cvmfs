@@ -18,6 +18,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
 
+	constants "github.com/cvmfs/ducc/constants"
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
@@ -890,8 +891,11 @@ func (img *Image) CreateChainStructure(CVMFSRepo string) (err error, lastChainId
 	}
 	if len(layerToDownload) > 0 {
 		ld := NewLayerDownloader(img)
+		var wg sync.WaitGroup
 		for _, layer := range layerToDownload {
+			wg.Add(1)
 			go func(layer da.Layer) {
+				defer wg.Done()
 				err := ld.DownloadAndIngest(CVMFSRepo, layer)
 				if err != nil {
 					l.LogE(err).
@@ -899,6 +903,7 @@ func (img *Image) CreateChainStructure(CVMFSRepo string) (err error, lastChainId
 				}
 			}(layer)
 		}
+		wg.Wait()
 		for _, layer := range manifest.Layers {
 			layerDigest := strings.Split(layer.Digest, ":")[1]
 			path := cvmfs.LayerPath(CVMFSRepo, layerDigest)
@@ -911,8 +916,33 @@ func (img *Image) CreateChainStructure(CVMFSRepo string) (err error, lastChainId
 	}
 	// then we start creating the chain structure
 	chainIDs := manifest.GetChainIDs()
+
+	paths := []string{}
+	for _, chain := range chainIDs {
+		path := cvmfs.ChainPath(CVMFSRepo, chain.String())
+		dir := filepath.Dir(path)
+		if _, err := os.Stat(dir); err != nil {
+			paths = append(paths, dir)
+		}
+	}
+
+	if len(paths) > 0 {
+		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
+			for _, dir := range paths {
+				if err := os.MkdirAll(dir, constants.DirPermision); err != nil {
+					return nil
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			l.LogE(err).Error("Impossible to create directory to contains the chainID")
+			return
+		}
+	}
+
 	for i, chain := range chainIDs {
-		digest := strings.Split(chain.String(), ":")[1]
+		digest := chain.String()
 		lastChainId = digest
 
 		path := cvmfs.ChainPath(CVMFSRepo, digest)
