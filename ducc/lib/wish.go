@@ -3,6 +3,7 @@ package lib
 import (
 	"fmt"
 
+	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -63,7 +64,7 @@ func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string
 	r1, r2, errEx := iImage.ExpandWildcard()
 	if errEx != nil {
 		err = errEx
-		LogE(err).WithFields(log.Fields{
+		l.LogE(err).WithFields(log.Fields{
 			"input image": inputImage}).
 			Error("Error in retrieving all the tags from the image")
 		return

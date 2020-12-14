@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cvmfs/ducc/lib"
+	l "github.com/cvmfs/ducc/log"
 )
 
 var (
@@ -40,11 +41,11 @@ var downloadManifestCmd = &cobra.Command{
 
 		manifest, err := img.GetManifest()
 		if err != nil {
-			lib.LogE(err).Fatal("Error in getting the manifest")
+			l.LogE(err).Fatal("Error in getting the manifest")
 		}
 		text, err := json.MarshalIndent(manifest, "", "  ")
 		if err != nil {
-			lib.LogE(err).Fatal("Error in encoding the manifest as JSON")
+			l.LogE(err).Fatal("Error in encoding the manifest as JSON")
 		}
 		fmt.Println(string(text))
 	},
