@@ -36,6 +36,124 @@ const (
 	ConversionNotMatch = iota
 )
 
+func ConvertWishFlat(wish WishFriendly) error {
+	var firstError = error(nil)
+	for _, inputImage := range wish.ExpandedTagImagesFlat {
+		publicSymlinkPath := inputImage.GetPublicSymlinkPath()
+		completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
+		pubDirInfo, errPub := os.Stat(completePubSymPath)
+
+		singularityPrivatePath, err := inputImage.GetSingularityPath()
+		if err != nil {
+			errF := fmt.Errorf("Error in getting the path where to save Singularity filesystem: %s", err)
+			l.LogE(err).Warning(errF)
+			firstError = errF
+			continue
+		}
+		completeSingularityPriPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, singularityPrivatePath)
+		priDirInfo, errPri := os.Stat(completeSingularityPriPath)
+
+		l.Log().WithFields(log.Fields{
+			"image":                  inputImage.GetSimpleName(),
+			"public path":            completePubSymPath,
+			"err stats pubblic path": errPub,
+			"private path":           completeSingularityPriPath,
+			"err stats private path": errPri,
+		}).Info("Checking if images links are up to date.")
+		// no error in stating both directories
+		// either the image is up to date or the image became stale
+		if errPub == nil && errPri == nil {
+			if os.SameFile(pubDirInfo, priDirInfo) {
+				// the link is up to date
+				l.Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Singularity Image up to date")
+				continue
+			}
+			// delete the old pubLink
+			// make a new Link to the privatePaht
+			// after that skip and continue
+			l.Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
+			err = cvmfs.CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			if err != nil {
+				errF := fmt.Errorf("Error in updating symlink for singularity image: %s", inputImage.GetSimpleName())
+				l.LogE(errF).WithFields(
+					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
+					Error("Error in creating symlink")
+				if firstError == nil {
+					firstError = errF
+				}
+			}
+			continue
+		}
+
+		// no error in stating the private directory, but the public one does not exists
+		// we simply create the public directory
+		if errPri == nil && os.IsNotExist(errPub) {
+			l.Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Creating link for Singularity Image")
+			err = cvmfs.CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			if err != nil {
+				errF := fmt.Errorf("Error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
+				l.LogE(errF).WithFields(
+					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
+					Error("Error in creating symlink")
+				if firstError == nil {
+					firstError = errF
+				}
+			}
+			continue
+		}
+
+		err, lastChain := inputImage.CreateChainStructure(wish.CvmfsRepo)
+		if err != nil {
+			if firstError == nil {
+				firstError = err
+			}
+			l.LogE(err).Error("Error in creating the chain structure")
+			continue
+		}
+
+		if _, err := os.Stat(filepath.Dir(completeSingularityPriPath)); err != nil {
+			cvmfs.WithinTransaction(wish.CvmfsRepo, func() error {
+				return os.MkdirAll(filepath.Dir(completeSingularityPriPath), constants.DirPermision)
+			})
+		}
+		// we create the image with the correct singularity's dotfiles
+		err = cvmfs.WithinTransaction(wish.CvmfsRepo,
+			func() error {
+				err := singularity.MakeBaseEnv(completeSingularityPriPath)
+				if err != nil {
+					l.LogE(err).Error("Error in creating the base singularity environment")
+				}
+				return err
+			},
+			cvmfs.NewTemplateTransaction(
+				cvmfs.TrimCVMFSRepoPrefix(cvmfs.ChainPath(wish.CvmfsRepo, lastChain)),
+				singularityPrivatePath))
+
+		if err != nil {
+			if firstError == nil {
+				firstError = err
+			}
+			l.LogE(err).Error("Error in creating the dotfile inside the flat directory")
+			continue
+		}
+		// we create the public link
+
+		err = cvmfs.CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+		if err != nil {
+			errF := fmt.Errorf("Error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
+			l.LogE(errF).WithFields(
+				log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
+				Error("Error in creating symlink")
+			if firstError == nil {
+				firstError = errF
+			}
+		}
+		continue
+
+	}
+	return firstError
+}
+
 func ConvertWishSingularity(wish WishFriendly) (err error) {
 	err = singularity.AssureValidSingularity()
 	if err != nil {
@@ -282,13 +400,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 			stopGettingLayers <- true
 			close(stopGettingLayers)
 		}()
-		cleanup := func(location string) {
-			l.Log().Info("Running clean up function deleting the last layer.")
-			err = cvmfs.IngestDelete(repo, location)
-			if err != nil {
-				l.LogE(err).Error("Error in the cleanup command")
-			}
-		}
+
 		for layer := range layersChanell {
 
 			l.Log().WithFields(log.Fields{"layer": layer.Name}).Info("Start Ingesting the file into CVMFS")

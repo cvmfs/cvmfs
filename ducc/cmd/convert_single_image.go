@@ -68,7 +68,7 @@ var convertSingleImageCmd = &cobra.Command{
 		fields := log.Fields{"input image": wish.InputName,
 			"repository": wish.CvmfsRepo}
 		if !skipFlat {
-			err := lib.ConvertWishSingularity(wish)
+			err := lib.ConvertWishFlat(wish)
 			if err != nil {
 				l.LogE(err).WithFields(fields).Error("Error in converting singularity image")
 			}
