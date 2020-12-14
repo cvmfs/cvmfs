@@ -2257,10 +2257,6 @@ bool DownloadManager::ProbeGeo() {
     // assumption that load-balanced servers are at the same location
     host_names.push_back(proxy_chain[i][0].host.name());
   }
-  // TODO(dwd): fallback proxies should be sorted too for maximum
-  // cache reuse.  For WLCG there's no reason to presort fallbacks
-  // because they're set by a widely shared config so they're already
-  // in a fixed order, but that can change in a different context.
 
   std::vector<uint64_t> geo_order;
   bool success = GeoSortServers(&host_names, &geo_order);
@@ -2274,6 +2270,7 @@ bool DownloadManager::ProbeGeo() {
   delete opt_host_chain_;
   opt_num_proxies_ = 0;
   opt_host_chain_ = new vector<string>(host_chain.size());
+  string old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0].url;
 
   // It's possible that opt_proxy_groups_fallback_ might have changed while
   // the lock wasn't held
@@ -2319,6 +2316,13 @@ bool DownloadManager::ProbeGeo() {
       opt_proxy_groups_current_ = opt_proxy_groups_->size() - 1;
     }
     opt_proxy_groups_current_burned_ = 0;
+  }
+
+  string new_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0].url;
+  if (old_proxy != new_proxy) {
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+             "switching proxy from %s to %s (geosort)",
+             old_proxy.c_str(), new_proxy.c_str());
   }
 
   delete opt_host_chain_rtt_;
