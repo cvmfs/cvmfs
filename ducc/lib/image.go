@@ -814,6 +814,7 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 type LayerDownloader struct {
 	image *Image
 	token string
+	lock  sync.Mutex
 }
 
 func NewLayerDownloader(image *Image) LayerDownloader {
@@ -821,6 +822,8 @@ func NewLayerDownloader(image *Image) LayerDownloader {
 }
 
 func (ld *LayerDownloader) getToken() (token string, err error) {
+	ld.lock.Lock()
+	defer ld.lock.Unlock()
 	if ld.token != "" {
 		return ld.token, nil
 	}
@@ -854,8 +857,80 @@ func (ld *LayerDownloader) downloadLayer(layer da.Layer) (downloadedLayer, error
 	return ld.image.downloadLayer(layer, token)
 }
 
-func (img *Image) CreateChainStructure(rootPath string) error {
+func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) error {
+	err := error(nil)
+	for i := 0; i <= 5; i += 1 {
+		to_ingest, err := ld.downloadLayer(layer)
+		if err != nil {
+			// let's try again
+			continue
+		}
+		err = to_ingest.IngestIntoCVMFS(CVMFSRepo)
+		if err == nil {
+			return nil
+		}
+	}
+	return err
+}
+
+func (img *Image) CreateChainStructure(CVMFSRepo string) error {
 	// make sure we have the layers somewhere
+	manifest, err := img.GetManifest()
+	if err != nil {
+		return err
+	}
+	layerToDownload := []da.Layer{}
+	for _, layer := range manifest.Layers {
+		// we download the layer if they are not already in storage
+		layerDigest := strings.Split(layer.Digest, ":")[1]
+		path := cvmfs.LayerPath(CVMFSRepo, layerDigest)
+		if _, err := os.Stat(path); err != nil {
+			layerToDownload = append(layerToDownload, layer)
+		}
+	}
+	if len(layerToDownload) > 0 {
+		ld := NewLayerDownloader(img)
+		for _, layer := range layerToDownload {
+			go func(layer da.Layer) {
+				err := ld.DownloadAndIngest(CVMFSRepo, layer)
+				if err != nil {
+					l.LogE(err).
+						Error("Error in ingesting the layer")
+				}
+			}(layer)
+		}
+		for _, layer := range manifest.Layers {
+			layerDigest := strings.Split(layer.Digest, ":")[1]
+			path := cvmfs.LayerPath(CVMFSRepo, layerDigest)
+			if _, err := os.Stat(path); err != nil {
+				err = fmt.Errorf("%s: Error, impossible to get all layers in the CVMFS storage", err)
+				l.LogE(err).Error("Error in getting layers in CVMFS repo")
+				return err
+			}
+		}
+	}
 	// then we start creating the chain structure
+	chainIDs := manifest.GetChainIDs()
+	for i, chain := range chainIDs {
+		digest := strings.Split(chain.String(), ":")[1]
+		path := cvmfs.ChainPath(CVMFSRepo, digest)
+
+		if _, err := os.Stat(path); err == nil {
+			// the chain is present, we skip the loop
+			continue
+		}
+		previous := ""
+		if i != 0 {
+			previous = chainIDs[i-1].String()
+		}
+		err := cvmfs.CreateChain(CVMFSRepo,
+			chain.String(),
+			previous,
+			manifest.Layers[i].Digest)
+		if err != nil {
+			l.LogE(err).Error("Error in creating the chain")
+			return err
+		}
+	}
 	return nil
 }
