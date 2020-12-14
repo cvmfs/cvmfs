@@ -80,10 +80,11 @@ func (m Manifest) GetSingularityPath() string {
 // layer, that can be found in the Config file of the image.
 // For our purposes, however, this is good enough.
 func (m Manifest) GetChainIDs() []digest.Digest {
-	result := make([]digest.Digest, len(m.Layers))
+	result := []digest.Digest{}
 	for i, l := range m.Layers {
 		if i == 0 {
-			result = append(result, digest.Digest(l.Digest))
+			d := digest.FromString(l.Digest)
+			result = append(result, d)
 			continue
 		}
 		digest := digest.FromString(result[i-1].String() + " " + l.Digest)
