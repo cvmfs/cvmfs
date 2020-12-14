@@ -20,6 +20,10 @@ type TemplateTransaction struct {
 	destination string
 }
 
+func NewTemplateTransaction(source, destination string) TemplateTransaction {
+	return TemplateTransaction{source, destination}
+}
+
 func (t TemplateTransaction) ToString() string {
 	return fmt.Sprintf("-T %s=%s", t.source, t.destination)
 }
@@ -52,7 +56,7 @@ func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 	}
 	cmd = append(cmd, CVMFSRepo)
 	getLock(CVMFSRepo)
-	err := exec.ExecCommand("cvmfs_server", "transaction", CVMFSRepo).Start()
+	err := exec.ExecCommand(cmd...).Start()
 	if err != nil {
 		l.LogE(err).WithFields(
 			log.Fields{"repo": CVMFSRepo}).
