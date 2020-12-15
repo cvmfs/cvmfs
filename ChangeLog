@@ -1,4 +1,5 @@
 2.8.0:
+  * [ducc] add support for podman image store meta-data
   * Add experimental `cvmfs_server diff --worktree` command (CVM-1869)
   * New defaults overlayfs over aufs and CVMFS_IGNORE_XDIR_HARDLINKS (CVM-1909)
   * [macOS] update to macFUSE 4 (CVM-1960)
