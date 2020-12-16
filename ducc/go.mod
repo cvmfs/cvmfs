@@ -23,7 +23,7 @@ require (
 	github.com/opencontainers/runc v0.0.8 // indirect
 	github.com/opencontainers/runtime-spec v1.0.1 // indirect
 	github.com/opencontainers/selinux v1.0.0 // indirect
-	github.com/otiai10/copy v1.2.0
+	github.com/otiai10/copy v1.3.0
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/sirupsen/logrus v1.3.0
 	github.com/spf13/cobra v0.0.3
@@ -41,5 +41,3 @@ require (
 )
 
 go 1.13
-
-replace github.com/otiai10/copy => github.com/siscia/copy v1.3.0
