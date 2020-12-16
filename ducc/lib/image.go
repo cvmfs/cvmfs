@@ -540,6 +540,12 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 		return "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 300 && resp.StatusCode >= 200 {
+		log.WithFields(log.Fields{
+			"status code": resp.StatusCode,
+		}).Info("Return valid response, token not necessary.")
+		return
+	}
 	if resp.StatusCode != 401 {
 		log.WithFields(log.Fields{
 			"status code": resp.StatusCode,
