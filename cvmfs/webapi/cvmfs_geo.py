@@ -47,24 +47,26 @@ def lookup_geoinfo(now, addr):
 
     if gireader is None or now > gichecktime + geo_cache_secs:
         gilock.acquire()
-        # gichecktime might have changed before acquiring the lock, look again
-        if gireader is None or now > gichecktime + geo_cache_secs:
-            if oldgireader is not None:
-                # By now we're sure nobody is still using the previous
-                #  gireader, so close it.  This delay avoids having to
-                #  acquire the lock for every lookup.
-                oldgireader.close()
-                oldgireader = None
-                print 'cvmfs_geo: closed old ' + gidb
-            gichecktime = now
-            modtime = os.stat(gidb).st_mtime
-            if modtime != gimodtime:
-                # database was modified, reopen it
-                oldgireader = gireader
-                gireader = open_geodb(gidb)
-                gimodtime = modtime
-                print 'cvmfs_geo: opened ' + gidb
-        gilock.release()
+        try:
+            # gichecktime might have changed before acquiring the lock, look again
+            if gireader is None or now > gichecktime + geo_cache_secs:
+                if oldgireader is not None:
+                    # By now we're sure nobody is still using the previous
+                    #  gireader, so close it.  This delay avoids having to
+                    #  acquire the lock for every lookup.
+                    oldgireader.close()
+                    oldgireader = None
+                    print 'cvmfs_geo: closed old ' + gidb
+                gichecktime = now
+                modtime = os.stat(gidb).st_mtime
+                if modtime != gimodtime:
+                    # database was modified, reopen it
+                    oldgireader = gireader
+                    gireader = open_geodb(gidb)
+                    gimodtime = modtime
+                    print 'cvmfs_geo: opened ' + gidb
+        finally:
+            gilock.release()
 
     return gireader.get(addr)
 
