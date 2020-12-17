@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -128,7 +127,7 @@ func ApplyDirectory(bottom, top string) error {
 			}
 			srcFile, err := os.Open(filepath.Join(top, file.Path))
 			if err != nil {
-				if errors.Is(err, os.ErrPermission) {
+				if err == os.ErrPermission {
 					fmt.Printf("Permission error detected! %s", err)
 				}
 				newFile.Close()
