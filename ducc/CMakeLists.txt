@@ -24,7 +24,6 @@ install (
   DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
 )
 
-
 # we first generate the services file, replacing the installation directory in the template file
 configure_file (
   ${CMAKE_CURRENT_SOURCE_DIR}/unitfiles/cvmfs_ducc.service.in

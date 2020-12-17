@@ -13,6 +13,7 @@ import (
 
 var (
 	thinImageName string
+	attempts      int
 )
 
 func init() {
@@ -22,6 +23,7 @@ func init() {
 	convertSingleImageCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
 	convertSingleImageCmd.Flags().StringVarP(&username, "username", "u", "", "username to use when pushing thin image into the docker registry")
 	convertSingleImageCmd.Flags().StringVarP(&thinImageName, "thin-image-name", "", "", "name to use for the thin image to upload, if empty implies --skip-thin-image.")
+	convertSingleImageCmd.Flags().IntVarP(&attempts, "attempts", "r", 1, "number of time to try to unpack the image, default one")
 	rootCmd.AddCommand(convertSingleImageCmd)
 }
 
@@ -65,30 +67,64 @@ var convertSingleImageCmd = &cobra.Command{
 			l.LogE(err).Error("Error in creating the wish to convert")
 			os.Exit(1)
 		}
-		fields := log.Fields{"input image": wish.InputName,
-			"repository": wish.CvmfsRepo}
+		fields := log.Fields{
+			"input image":    wish.InputName,
+			"repository":     wish.CvmfsRepo,
+			"total attempts": attempts}
+
 		if !skipFlat {
-			err := lib.ConvertWishFlat(wish)
-			if err != nil {
-				l.LogE(err).WithFields(fields).Error("Error in converting singularity image")
+			for i := 0; i < attempts; i++ {
+				err := lib.ConvertWishFlat(wish)
+				log := l.LogE(err).WithFields(fields).
+					WithFields(log.Fields{"attempts number": i})
+				if err != nil {
+					log.Error("Error in converting singularity image")
+				} else {
+					log.Info("Successfully created the singularity image")
+					break
+				}
 			}
 		}
+
 		if !skipLayers {
-			err := lib.ConvertWish(wish, convertAgain, overwriteLayer)
-			if err != nil {
-				l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+			for i := 0; i < attempts; i++ {
+				err := lib.ConvertWish(wish, convertAgain, overwriteLayer)
+				log := l.LogE(err).WithFields(fields).
+					WithFields(log.Fields{"attempts number": i})
+				if err != nil {
+					log.Error("Error in converting wish (layers)")
+				} else {
+					log.Info("Successfully converted the layers")
+					break
+				}
 			}
 		}
+
 		if !skipThinImage {
-			err := lib.ConvertWishDocker(wish)
-			if err != nil {
-				l.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+			for i := 0; i < attempts; i++ {
+				err := lib.ConvertWishDocker(wish)
+				log := l.LogE(err).WithFields(fields).
+					WithFields(log.Fields{"attempts number": i})
+				if err != nil {
+					log.Error("Error in converting wish (docker)")
+				} else {
+					log.Info("Successfully converted wish (docker)")
+					break
+				}
 			}
 		}
+
 		if !skipPodman {
-			err := lib.ConvertWishPodman(wish, convertAgain)
-			if err != nil {
-				l.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+			for i := 0; i < attempts; i++ {
+				err := lib.ConvertWishPodman(wish, convertAgain)
+				log := l.LogE(err).WithFields(fields).
+					WithFields(log.Fields{"attempts number": i})
+				if err != nil {
+					log.Error("Error in converting wish (podman)")
+				} else {
+					log.Info("Successfully converted with (podman)")
+					break
+				}
 			}
 		}
 	},
