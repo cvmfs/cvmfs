@@ -12,6 +12,7 @@ import (
 	"sync"
 	"syscall"
 
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
 	"github.com/iafan/cwalk"
@@ -149,6 +150,8 @@ func ApplyDirectory(bottom, top string) error {
 
 	log.Info("Start applying the files on top of the bottom dir")
 
+	errGrp := new(errgroup.Group)
+
 	for _, file := range standards {
 		// add the file or directory
 		// remember to set permision and owner
@@ -190,31 +193,32 @@ func ApplyDirectory(bottom, top string) error {
 			}(path, filemode, UID, GID)
 
 		case filemode.IsRegular():
-			// we remove the file, it may not exists and this call will return PathError.
-			// we just ignore this kind of error
-			os.Remove(path)
-			newFile, err := os.Create(path)
-			if err != nil {
-				return err
-			}
-			srcFile, err := os.Open(filepath.Join(top, file.Path))
-			if err != nil {
-				if err == os.ErrPermission {
-					fmt.Printf("Permission error detected! %s", err)
+			file := file
+			errGrp.Go(func() error {
+				// we remove the file, it may not exists and this call will return PathError.
+				// we just ignore this kind of error
+				os.Remove(path)
+				newFile, err := os.Create(path)
+				if err != nil {
+					return err
 				}
-				newFile.Close()
-				return err
-			}
-			_, err = io.Copy(newFile, srcFile)
-			srcFile.Close()
-			if err != nil {
-				newFile.Close()
-				return err
-			}
-			newFile.Chown(UID, GID)
-			newFile.Chmod(filemode)
-			newFile.Close()
-
+				defer newFile.Close()
+				srcFile, err := os.Open(filepath.Join(top, file.Path))
+				if err != nil {
+					if err == os.ErrPermission {
+						fmt.Printf("Permission error detected! %s", err)
+					}
+					return err
+				}
+				defer srcFile.Close()
+				_, err = io.Copy(newFile, srcFile)
+				if err != nil {
+					return err
+				}
+				newFile.Chown(UID, GID)
+				newFile.Chmod(filemode)
+				return nil
+			})
 		case filemode&os.ModeSymlink != 0:
 			os.RemoveAll(path)
 			link, err := os.Readlink(filepath.Join(top, file.Path))
@@ -252,6 +256,10 @@ func ApplyDirectory(bottom, top string) error {
 			os.Chown(path, UID, GID)
 		}
 
+	}
+	if err := errGrp.Wait(); err != nil {
+		log.Error("Got error when copying files: ", err)
+		return err
 	}
 	log.Info("Done applying the files on top of the bottom dir")
 	return nil
