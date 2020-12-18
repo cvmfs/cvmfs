@@ -153,7 +153,7 @@ func ApplyDirectory(bottom, top string) error {
 	log.Info("Start applying the files on top of the bottom dir")
 
 	errGrp := new(errgroup.Group)
-	sem := semaphore.NewWeighted(int64(100))
+	sem := semaphore.NewWeighted(int64(1000))
 
 	for _, file := range standards {
 		// add the file or directory
