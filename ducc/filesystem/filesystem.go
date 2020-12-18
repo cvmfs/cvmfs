@@ -144,10 +144,18 @@ func ApplyDirectory(bottom, top string) error {
 			newFile.Close()
 
 		case filemode&os.ModeSymlink != 0:
-			os.Remove(path)
+			os.RemoveAll(path)
 			link, err := os.Readlink(filepath.Join(top, file.Path))
 			if err != nil {
 				return err
+			}
+
+			// links can be either absolutes or relative
+			// if they are absolute we need to swap the top prefix with the bottom one
+			// if they are relative they are good to go
+			// even though we should pretty much have alway relative links
+			if strings.HasPrefix(link, top) {
+				link = strings.Replace(link, top, bottom, 1)
 			}
 
 			err = os.Symlink(link, path)

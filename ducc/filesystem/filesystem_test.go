@@ -60,6 +60,16 @@ func TestApplyDirectory(t *testing.T) {
 	os.Create(filepath.Join(bottom, "a", "b", "030.txt"))
 	os.Mkdir(filepath.Join(bottom, "a", "b", "c"), 0766)
 
+	// test for a absolute symlink
+	os.Mkdir(filepath.Join(bottom, "to_abs_symlink"), 0766)
+	os.Mkdir(filepath.Join(bottom, "to_abs_symlink", "a"), 0766)
+	os.Create(filepath.Join(bottom, "to_abs_symlink", "100.txt"))
+
+	// test for a relative symlink
+	os.Mkdir(filepath.Join(bottom, "to_rel_symlink"), 0766)
+	os.Mkdir(filepath.Join(bottom, "to_rel_symlink", "a"), 0766)
+	os.Create(filepath.Join(bottom, "to_rel_symlink", "100.txt"))
+
 	// Create top directory to apply
 	os.MkdirAll(filepath.Join(top, "a", "b"), 0766)
 	// this should delete everything in the $bottom/a/b directory, but not the directory itself
@@ -70,6 +80,12 @@ func TestApplyDirectory(t *testing.T) {
 	os.Create(filepath.Join(top, "a", ".wh.zzz"))
 	// this should delete the directory $bottom/a/xxx and all the content
 	os.Create(filepath.Join(top, "a", ".wh.xxx"))
+
+	// move the to_abs_symlink directory to a symlink against something else
+	os.MkdirAll(filepath.Join(top, "something_else_abs"), 0766)
+	os.Symlink(filepath.Join(top, "something_else_abs"), filepath.Join(top, "to_abs_symlink"))
+	os.MkdirAll(filepath.Join(top, "something_else_rel"), 0766)
+	os.Symlink(filepath.Join(".", "something_else_rel"), filepath.Join(top, "to_rel_symlink"))
 
 	// this should update the file $bottom/a/002.txt
 	f002, _ := os.Create(filepath.Join(top, "a", "002.txt"))
@@ -167,4 +183,37 @@ func TestApplyDirectory(t *testing.T) {
 	if string(simo_ema) != "Simo❤Ema" {
 		t.Errorf("Content of %s is not expected '%s' vs '%s'", created, string(simo_ema), "Simo❤Ema")
 	}
+
+	linkPathAbs := filepath.Join(bottom, "to_abs_symlink")
+	symlinkAbs, err := os.Stat(linkPathAbs)
+	if err != nil {
+		t.Errorf("Error in stating the new symlink")
+	}
+	if symlinkAbs.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("The symlink is not really a symlink")
+	}
+	AbsLinkPath, err := os.Readlink(linkPathAbs)
+	if err != nil {
+		t.Errorf("We cannot read the symlink")
+	}
+	if !filepath.IsAbs(AbsLinkPath) {
+		t.Errorf("Absolute symlink is not an absolute path")
+	}
+
+	linkPathRel := filepath.Join(bottom, "to_rel_symlink")
+	symlinkRel, err := os.Stat(linkPathRel)
+	if err != nil {
+		t.Errorf("Error in stating the new symlink")
+	}
+	if symlinkRel.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("The symlink is not really a symlink")
+	}
+	RelLinkPath, err := os.Readlink(linkPathRel)
+	if err != nil {
+		t.Errorf("We cannot read the symlink")
+	}
+	if filepath.IsAbs(RelLinkPath) {
+		t.Errorf("Relative symlink is not a relative path")
+	}
+
 }
