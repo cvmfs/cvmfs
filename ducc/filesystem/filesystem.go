@@ -6,11 +6,22 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
+	"sync"
 	"syscall"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/iafan/cwalk"
 )
+
+func init() {
+	// we need a lot more of goroutines when scanning CVMFS directories
+	cwalk.NumWorkers = runtime.GOMAXPROCS(0) * 10
+	cwalk.BufferSize = cwalk.NumWorkers
+}
 
 func ApplyDirectory(bottom, top string) error {
 	bottomDir, err := os.Stat(bottom)
@@ -29,23 +40,34 @@ func ApplyDirectory(bottom, top string) error {
 		return fmt.Errorf("top directory '%s' is not a directory", top)
 	}
 
+	var opaqueMtx sync.Mutex
 	var opaqueWhiteouts []string
+
+	var whiteMtx sync.Mutex
 	var whiteOuts []string
+
+	var standardMtx sync.Mutex
 	var standards []FilePathAndInfo
 
 	// navigating the filesystem in slow, especially on top of CVMFS
 	// for each file we need to go through fuse and to a network call if we are unlucky
 	// we make this walk in parallel, so to hide the latency
-	err = filepath.Walk(top, func(path string, info os.FileInfo, err error) error {
+	err = cwalk.Walk(top, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		path = strings.Replace(path, top, "", 1)
 		if isOpaqueWhiteout(path) {
+			opaqueMtx.Lock()
+			defer opaqueMtx.Unlock()
 			opaqueWhiteouts = append(opaqueWhiteouts, path)
 		} else if isWhiteout(path) {
+			whiteMtx.Lock()
+			defer whiteMtx.Unlock()
 			whiteOuts = append(whiteOuts, path)
 		} else {
+			standardMtx.Lock()
+			defer standardMtx.Unlock()
 			standards = append(standards, FilePathAndInfo{path, info})
 		}
 		return nil
@@ -55,6 +77,26 @@ func ApplyDirectory(bottom, top string) error {
 		return err
 	}
 
+	// it is necessary to sort everything since the parallel walk returns unsorted data
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		sort.Strings(opaqueWhiteouts)
+	}()
+	go func() {
+		defer wg.Done()
+		sort.Strings(whiteOuts)
+	}()
+	go func() {
+		defer wg.Done()
+		sort.Slice(standards,
+			func(i, j int) bool { return standards[i].Path < standards[j].Path })
+	}()
+	wg.Wait()
+
+	// all the call here happens against a local and fast filesystem
+	// we are not going to make effort to make this parallel
 	for _, opaqueWhiteout := range opaqueWhiteouts {
 		// delete all the sibling of the opaque whiteout file file
 		opaqueDirPath := filepath.Join(bottom, filepath.Dir(opaqueWhiteout))
