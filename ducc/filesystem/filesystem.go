@@ -15,6 +15,9 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/iafan/cwalk"
+	log "github.com/sirupsen/logrus"
+
+	l "github.com/cvmfs/ducc/log"
 )
 
 func init() {
@@ -39,6 +42,10 @@ func ApplyDirectory(bottom, top string) error {
 	if !topDir.IsDir() {
 		return fmt.Errorf("top directory '%s' is not a directory", top)
 	}
+
+	log := l.Log().WithFields(log.Fields{"top layer": top, "bottom": bottom})
+
+	log.Info("Start walking the top layer")
 
 	var opaqueMtx sync.Mutex
 	var opaqueWhiteouts []string
@@ -77,6 +84,10 @@ func ApplyDirectory(bottom, top string) error {
 		return err
 	}
 
+	log.Info("Done walking the top layer")
+
+	log.Info("Start sorting the files")
+
 	// it is necessary to sort everything since the parallel walk returns unsorted data
 	var wg sync.WaitGroup
 	wg.Add(3)
@@ -94,6 +105,10 @@ func ApplyDirectory(bottom, top string) error {
 			func(i, j int) bool { return standards[i].Path < standards[j].Path })
 	}()
 	wg.Wait()
+
+	log.Info("Done sorting the files")
+
+	log.Info("Start applying the opaque whiteouts")
 
 	// all the call here happens against a local and fast filesystem
 	// we are not going to make effort to make this parallel
@@ -114,6 +129,11 @@ func ApplyDirectory(bottom, top string) error {
 			}
 		}
 	}
+
+	log.Info("Done applying the opaque whiteouts")
+
+	log.Info("Start applying the whiteouts")
+
 	for _, whiteOut := range whiteOuts {
 		// delete the file that should be whiteout
 		whiteOutBaseFilename := filepath.Base(whiteOut)
@@ -124,6 +144,11 @@ func ApplyDirectory(bottom, top string) error {
 			return err
 		}
 	}
+
+	log.Info("Done applying the whiteouts")
+
+	log.Info("Start applying the files on top of the bottom dir")
+
 	for _, file := range standards {
 		// add the file or directory
 		// remember to set permision and owner
@@ -228,6 +253,7 @@ func ApplyDirectory(bottom, top string) error {
 		}
 
 	}
+	log.Info("Done applying the files on top of the bottom dir")
 	return nil
 }
 
