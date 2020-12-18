@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 	"syscall"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/sys/unix"
 
 	"github.com/iafan/cwalk"
@@ -151,6 +153,7 @@ func ApplyDirectory(bottom, top string) error {
 	log.Info("Start applying the files on top of the bottom dir")
 
 	errGrp := new(errgroup.Group)
+	sem := semaphore.NewWeighted(int64(100))
 
 	for _, file := range standards {
 		// add the file or directory
@@ -195,6 +198,8 @@ func ApplyDirectory(bottom, top string) error {
 		case filemode.IsRegular():
 			file := file
 			errGrp.Go(func() error {
+				sem.Acquire(context.TODO(), 1)
+				defer sem.Release(1)
 				// we remove the file, it may not exists and this call will return PathError.
 				// we just ignore this kind of error
 				os.Remove(path)
