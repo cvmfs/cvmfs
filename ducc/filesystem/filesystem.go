@@ -29,19 +29,22 @@ func ApplyDirectory(bottom, top string) error {
 		return fmt.Errorf("top directory '%s' is not a directory", top)
 	}
 
-	var opaqueWhiteouts []FilePathAndInfo
-	var whiteOuts []FilePathAndInfo
+	var opaqueWhiteouts []string
+	var whiteOuts []string
 	var standards []FilePathAndInfo
 
+	// navigating the filesystem in slow, especially on top of CVMFS
+	// for each file we need to go through fuse and to a network call if we are unlucky
+	// we make this walk in parallel, so to hide the latency
 	err = filepath.Walk(top, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		path = strings.Replace(path, top, "", 1)
 		if isOpaqueWhiteout(path) {
-			opaqueWhiteouts = append(opaqueWhiteouts, FilePathAndInfo{path, info})
+			opaqueWhiteouts = append(opaqueWhiteouts, path)
 		} else if isWhiteout(path) {
-			whiteOuts = append(whiteOuts, FilePathAndInfo{path, info})
+			whiteOuts = append(whiteOuts, path)
 		} else {
 			standards = append(standards, FilePathAndInfo{path, info})
 		}
@@ -54,10 +57,11 @@ func ApplyDirectory(bottom, top string) error {
 
 	for _, opaqueWhiteout := range opaqueWhiteouts {
 		// delete all the sibling of the opaque whiteout file file
-		opaqueDirPath := filepath.Join(bottom, filepath.Dir(opaqueWhiteout.Path))
+		opaqueDirPath := filepath.Join(bottom, filepath.Dir(opaqueWhiteout))
 		inOpaqueDirectory, err := ioutil.ReadDir(opaqueDirPath)
 		if err != nil {
-			// it may happen a directory that does not exists in the lower layer is an opaqueWhiteout in the top layer
+			// it may happen a directory that does not exists in the lower layer
+			// is an opaqueWhiteout in the top layer
 			continue
 		}
 		for _, toDelete := range inOpaqueDirectory {
@@ -70,9 +74,9 @@ func ApplyDirectory(bottom, top string) error {
 	}
 	for _, whiteOut := range whiteOuts {
 		// delete the file that should be whiteout
-		whiteOutBaseFilename := filepath.Base(whiteOut.Path)
+		whiteOutBaseFilename := filepath.Base(whiteOut)
 		toRemoveBaseFilename := getPathToWhiteout(whiteOutBaseFilename)
-		whiteOutPath := filepath.Join(bottom, filepath.Dir(whiteOut.Path), toRemoveBaseFilename)
+		whiteOutPath := filepath.Join(bottom, filepath.Dir(whiteOut), toRemoveBaseFilename)
 		err = os.RemoveAll(whiteOutPath)
 		if err != nil {
 			return err
@@ -81,8 +85,9 @@ func ApplyDirectory(bottom, top string) error {
 	for _, file := range standards {
 		// add the file or directory
 		// remember to set permision and owner
-		// if it is a directory, just create the directory with all the permision and the correct owner
-		// if is is a file, just create the file and then copy all the content
+		// If it is a directory, just create the directory with
+		//     all the permision and the correct owner
+		// If is is a file, just create the file and then copy all the content
 
 		// start by getting the UID and GID of the file
 		var UID int
