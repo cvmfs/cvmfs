@@ -2016,10 +2016,10 @@ canonicalize_path() {
 
   case $(uname) in
     Linux )
-      echo $(readlink -f $(basename $path_name))
+      echo $(readlink -f "$path_name")
       ;;
     Darwin )
-      echo $(/usr/local/bin/greadlink -f $(basename $path_name))
+      echo $(/usr/local/bin/greadlink -f "$path_name")
       ;;
   esac
 }
