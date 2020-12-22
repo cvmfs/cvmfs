@@ -1142,15 +1142,14 @@ cvmfs_reload() {
     for guard_file in $(cat "${CVMFS_RELOAD_SOCKETS}/guard_files"); do
       _cvmfs_reload_waitfor "$guard_file"
     done
-
-    if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
-      # If we have a config repository, now is the time to pause it at the very end
-      _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
-        _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
-    fi
-
-    rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
   fi
+
+  if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
+    # If we have a config repository, now is the time to pause it at the very end
+    _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
+      _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
+  fi
+  rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
 
   if [ $clean_cache -eq 1 ]; then
     for dir in $cache_directories; do
