@@ -1,4 +1,6 @@
 2.8.0:
+  * [macOS] fix reload on macOS >= 10.15
+  * Fix reload if only config repository is mounted
   * Log when geosort ends up switching a proxy (CVM-1920)
   * [server] fix stuck Apache processes with disabled geo API (CVM-1956)
   * [ducc] add support for podman image store meta-data
