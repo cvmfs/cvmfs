@@ -1127,7 +1127,7 @@ cvmfs_reload() {
   local m
   for m in $mount_list
   do
-    if [ x"$m" = x"${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" ]; then
+    if [ x"$m" = x"$(canonicalize_path ${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY})" ]; then
       # We need to finish pausing the other repositories first because they
       # might try to load the blacklist from the config repository as part of
       # their reload
@@ -1142,15 +1142,14 @@ cvmfs_reload() {
     for guard_file in $(cat "${CVMFS_RELOAD_SOCKETS}/guard_files"); do
       _cvmfs_reload_waitfor "$guard_file"
     done
-
-    if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
-      # If we have a config repository, now is the time to pause it at the very end
-      _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
-        _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
-    fi
-
-    rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
   fi
+
+  if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
+    # If we have a config repository, now is the time to pause it at the very end
+    _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
+      _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
+  fi
+  rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
 
   if [ $clean_cache -eq 1 ]; then
     for dir in $cache_directories; do
@@ -2008,6 +2007,19 @@ base64_nowrap() {
       ;;
     Darwin )
       base64 -b0
+      ;;
+  esac
+}
+
+canonicalize_path() {
+  local path_name="$1"
+
+  case $(uname) in
+    Linux )
+      echo $(readlink -f "$path_name")
+      ;;
+    Darwin )
+      echo $(/usr/local/bin/greadlink -f "$path_name")
       ;;
   esac
 }
