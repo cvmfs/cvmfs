@@ -90,7 +90,7 @@ var convertCmd = &cobra.Command{
 				}
 			}
 			if !skipFlat {
-				err = lib.ConvertWishSingularity(wish)
+				err = lib.ConvertWishFlat(wish)
 				if err != nil {
 					l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
 				}
