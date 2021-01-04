@@ -510,7 +510,16 @@ func CreateChain(CVMFSRepo, chain, previous, layer string) error {
 	}
 
 	return WithinTransaction(CVMFSRepo, func() error {
-		return nil
-	}, opt)
+		if err := os.MkdirAll(newChainPath, constants.DirPermision); err != nil {
+			l.LogE(err).Error("Error in creating the first directory of the chain")
+			return err
+		}
+		err := fs.ApplyDirectory(newChainPath, layerPath)
+		if err != nil {
+			l.LogE(err).Error("Error in Applying the layer on top of the chain")
+		}
+		return err
+
+	})
 
 }
