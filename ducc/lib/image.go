@@ -22,8 +22,6 @@ import (
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
-	singularity "github.com/cvmfs/ducc/singularity"
-	temp "github.com/cvmfs/ducc/temp"
 )
 
 type ManifestRequest struct {
@@ -333,104 +331,10 @@ func (img *Image) GetSingularityPath() (string, error) {
 	return manifest.GetSingularityPath(), nil
 }
 
-type Singularity struct {
-	Image         *Image
-	TempDirectory string
-}
-
-func (img *Image) DownloadSingularityDirectory(rootPath string) (sing Singularity, err error) {
-	dir, err := temp.UserDefinedTempDir(rootPath, "singularity_buffer")
-	if err != nil {
-		l.LogE(err).Error("Error in creating temporary directory for singularity")
-		return
-	}
-	singularityTempCache, err := temp.UserDefinedTempDir(rootPath, "tempDirSingularityCache")
-	if err != nil {
-		l.LogE(err).Error("Error in creating temporary directory for singularity cache")
-		return
-	}
-	defer os.RemoveAll(singularityTempCache)
-	// we first try to download the image with the credentials
-	// if we fail, we try again without the credentials
-	user := img.User
-	pass, _ := GetPassword()
-
-	env := make(map[string]string)
-	env["SINGULARITY_CACHEDIR"] = singularityTempCache
-	env["PATH"] = os.Getenv("PATH")
-	env["SINGULARITY_DOCKER_USERNAME"] = user
-	env["SINGULARITY_DOCKER_PASSWORD"] = pass
-	err = singularity.BuildFilesystemDirectory(dir, img.GetSingularityLocation(), env)
-
-	if err == nil {
-		l.Log().Info("Successfully download the singularity image")
-		return Singularity{Image: img, TempDirectory: dir}, nil
-	}
-	if user != "" || pass != "" {
-		l.Log().Info("Detected error in downloading image with credentials, trying without.")
-
-		env := make(map[string]string)
-		env["SINGULARITY_CACHEDIR"] = singularityTempCache
-		env["PATH"] = os.Getenv("PATH")
-		err = singularity.BuildFilesystemDirectory(dir, img.GetSingularityLocation(), env)
-
-		if err == nil {
-			l.Log().Info("Successfully download the singularity image")
-			return Singularity{Image: img, TempDirectory: dir}, nil
-		}
-	}
-	l.LogE(err).Error("Error in downloading the singularity image")
-	return
-
-}
-
 // the one that the user see, without the /cvmfs/$repo.cern.ch prefix
 // used mostly by Singularity
 func (i *Image) GetPublicSymlinkPath() string {
 	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
-}
-
-func (s Singularity) PublishToCVMFS(CVMFSRepo string) error {
-	symlinkPath := s.Image.GetPublicSymlinkPath()
-	singularityPath, err := s.Image.GetSingularityPath()
-	if err != nil {
-		l.LogE(err).Error(
-			"Error in ingesting singularity image into CVMFS, unable to get where save the image")
-		return err
-	}
-
-	err = cvmfs.PublishToCVMFS(CVMFSRepo, singularityPath, s.TempDirectory)
-	if err != nil {
-		// if there is an error ingest does not remove the folder.
-		// we do want to remove the folder anyway
-		os.RemoveAll(s.TempDirectory)
-		return err
-	}
-
-	for _, dir := range []string{
-		filepath.Dir(singularityPath),
-		singularityPath} {
-
-		err = cvmfs.CreateCatalogIntoDir(CVMFSRepo, dir)
-		if err != nil {
-			l.LogE(err).WithFields(log.Fields{
-				"directory": dir}).Error(
-				"Impossible to create subcatalog in super-directory.")
-		} else {
-			l.Log().WithFields(log.Fields{
-				"directory": dir}).Info(
-				"Created subcatalog in directory")
-		}
-
-	}
-
-	// lets create the symlink
-	err = cvmfs.CreateSymlinkIntoCVMFS(CVMFSRepo, symlinkPath, singularityPath)
-	if err != nil {
-		l.LogE(err).Error("Error in creating the symlink for the singularity Image")
-		return err
-	}
-	return nil
 }
 
 func (img *Image) getByteManifest() ([]byte, error) {
