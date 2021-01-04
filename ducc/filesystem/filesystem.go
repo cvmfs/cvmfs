@@ -191,7 +191,7 @@ func ApplyDirectory(bottom, top string) error {
 				return err
 			}
 			defer func(path string, filemode os.FileMode, UID, GID int) {
-				os.Chmod(path, filemode)
+				os.Chmod(path, filemode|0700)
 				os.Chown(path, UID, GID)
 			}(path, filemode, UID, GID)
 
@@ -221,7 +221,7 @@ func ApplyDirectory(bottom, top string) error {
 					return err
 				}
 				newFile.Chown(UID, GID)
-				newFile.Chmod(filemode)
+				newFile.Chmod(filemode | 0600)
 				return nil
 			})
 		case filemode&os.ModeSymlink != 0:
