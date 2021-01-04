@@ -153,7 +153,11 @@ func ApplyDirectory(bottom, top string) error {
 	log.Info("Start applying the files on top of the bottom dir")
 
 	errGrp := new(errgroup.Group)
-	sem := semaphore.NewWeighted(int64(1000))
+	sem := semaphore.NewWeighted(int64(500))
+
+	specialBitsMask := ^(os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
+
+	fmt.Println("specialBitsMask", specialBitsMask)
 
 	for _, file := range standards {
 		// add the file or directory
@@ -191,7 +195,7 @@ func ApplyDirectory(bottom, top string) error {
 				return err
 			}
 			defer func(path string, filemode os.FileMode, UID, GID int) {
-				os.Chmod(path, filemode|0700)
+				os.Chmod(path, (filemode|0700)&specialBitsMask)
 				os.Chown(path, UID, GID)
 			}(path, filemode, UID, GID)
 
@@ -221,7 +225,7 @@ func ApplyDirectory(bottom, top string) error {
 					return err
 				}
 				newFile.Chown(UID, GID)
-				newFile.Chmod(filemode | 0600)
+				newFile.Chmod((filemode | 0600) & specialBitsMask)
 				return nil
 			})
 		case filemode&os.ModeSymlink != 0:
