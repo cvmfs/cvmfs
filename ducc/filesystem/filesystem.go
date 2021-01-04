@@ -155,10 +155,6 @@ func ApplyDirectory(bottom, top string) error {
 	errGrp := new(errgroup.Group)
 	sem := semaphore.NewWeighted(int64(500))
 
-	specialBitsMask := ^(os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
-
-	fmt.Println("specialBitsMask", specialBitsMask)
-
 	for _, file := range standards {
 		// add the file or directory
 		// remember to set permision and owner
@@ -195,7 +191,7 @@ func ApplyDirectory(bottom, top string) error {
 				return err
 			}
 			defer func(path string, filemode os.FileMode, UID, GID int) {
-				os.Chmod(path, (filemode|0700)&specialBitsMask)
+				os.Chmod(path, filemode|0700)
 				os.Chown(path, UID, GID)
 			}(path, filemode, UID, GID)
 
@@ -225,7 +221,7 @@ func ApplyDirectory(bottom, top string) error {
 					return err
 				}
 				newFile.Chown(UID, GID)
-				newFile.Chmod((filemode | 0600) & specialBitsMask)
+				newFile.Chmod(filemode | 0600)
 				return nil
 			})
 		case filemode&os.ModeSymlink != 0:
