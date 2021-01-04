@@ -67,6 +67,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.6:
+  * Improve reporting of .cvmfsdirtab errors
 
 2.7.5:
   * Fix crash when kernel meta-data caches close to 4G get evicted (CVM-1918)
