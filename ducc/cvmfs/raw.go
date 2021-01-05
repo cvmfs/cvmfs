@@ -49,13 +49,17 @@ func unlock(CVMFSRepo string) {
 	l.Unlock()
 }
 
-func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
+func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...TransactionOption) error {
 	cmd := []string{"cvmfs_server", "transaction"}
 	for _, opt := range options {
 		cmd = append(cmd, opt.ToString())
 	}
 	cmd = append(cmd, CVMFSRepo)
 	getLock(CVMFSRepo)
+	if err := f(); err != nil {
+		unlock(CVMFSRepo)
+		return err
+	}
 	err := exec.ExecCommand(cmd...).Start()
 	if err != nil {
 		l.LogE(err).WithFields(
@@ -64,6 +68,11 @@ func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 		abort(CVMFSRepo)
 	}
 	return err
+
+}
+
+func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
+	return ExecuteAndOpenTransaction(CVMFSRepo, func() error { return nil }, options...)
 }
 
 func Publish(CVMFSRepo string) error {
