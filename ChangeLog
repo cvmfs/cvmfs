@@ -1,4 +1,5 @@
 2.8.0:
+  * Improve network error handling during GC (CVM-1957)
   * [macOS] fix reload on macOS >= 10.15
   * Fix reload if only config repository is mounted
   * Log when geosort ends up switching a proxy (CVM-1920)
