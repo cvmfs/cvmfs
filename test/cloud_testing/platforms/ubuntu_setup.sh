@@ -26,7 +26,7 @@ done
 echo "done"
 
 echo -n "wait for name resolution to work properly... "
-timeout=20
+timeout=1800
 while ! ping -c2 ecsft.cern.ch 2>&1; do
   sleep 1
   timeout=$(( $timeout - 1 ))
