@@ -592,6 +592,10 @@ class HttpObjectFetcher :
     const bool success = (retval == download::kFailOk);
     fclose(f);
 
+    static int test_fail = 0;
+    if (test_fail++ == 6)
+      return BaseTN::kFailNetwork;
+
     // check if download worked and remove temporary file if not
     if (!success) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to download file "
