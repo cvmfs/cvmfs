@@ -30,10 +30,12 @@ echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"
 echo "done"
 
-# Be gentle with the resolver
+# Be gentle with the resolver on Ubuntu < 20.04
 echo -n "nscd... "
-install_from_repo nscd || die "fail (nscd)"
-sudo systemctl start nscd || die "cannot start nscd"
+if [ "x$ubuntu_release" != "xfocal" ]; then
+  install_from_repo nscd || die "fail (nscd)"
+  sudo systemctl start nscd || die "cannot start nscd"
+fi
 echo "done"
 
 # install latest version of libc to make sure it has the symbols from the build machine
