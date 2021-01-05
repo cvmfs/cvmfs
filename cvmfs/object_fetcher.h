@@ -611,7 +611,7 @@ class HttpObjectFetcher :
         case download::kFailHostResolve:
         case download::kFailUnsupportedProtocol:
           LogCvmfs(kLogDownload, kLogDebug | kLogStderr,
-                   "unsupported protocol: %s", url.c_str());
+                   "HTTP connection error %d: %s", retval, url.c_str());
           return BaseTN::kFailNetwork;
 
         case download::kFailProxyHttp:
