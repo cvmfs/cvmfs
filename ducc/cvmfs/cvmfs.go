@@ -567,11 +567,13 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			}
 
 			path := filepath.Join(sneakyChainPath, header.Name)
+			dir := filepath.Dir(path)
+
+			os.MkdirAll(dir, constants.DirPermision)
 			if isWhiteout(path) {
 				// this will be an empty file
 				// check if it is an opaque directory or a standard whiteout file
 				base := filepath.Base(path)
-				dir := filepath.Dir(path)
 				if base == ".wh..wh..opq" {
 					// an opaque directory
 					if err := makeOpaqueDir(dir); err != nil {
