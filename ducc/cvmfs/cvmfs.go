@@ -623,9 +623,6 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					if err := os.Link(header.Linkname, path); err != nil {
 						return err
 					}
-					// TODO (smosciat)
-					// it is enough to just continue, or we want to actually invoke Lchmod and Lchown
-					continue loop
 				}
 			case tar.TypeSymlink:
 				{
@@ -633,7 +630,9 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					if err := os.Symlink(header.Linkname, path); err != nil {
 						return err
 					}
-
+					// TODO (smosciat)
+					// it is enough to just continue, or we want to actually invoke Lchmod and Lchown
+					continue loop
 				}
 			case tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
 				{
