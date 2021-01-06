@@ -620,7 +620,8 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				{
 					// hardlink
 					// maybe we should just copy the file
-					if err := os.Link(header.Linkname, path); err != nil {
+					oldLinkName := filepath.Join(sneakyChainPath, header.Linkname)
+					if err := os.Link(oldLinkName, path); err != nil {
 						return err
 					}
 				}
