@@ -10,11 +10,11 @@ import (
 )
 
 type PublishCounters struct {
-	ChunksAdded          int64 `json:"n_chunks_added,string"`
-	ChunksDuplicated     int64 `json:"n_chunks_duplicated,string"`
-	CatalogsAdded        int64 `json:"n_catalogs_added,string"`
-	UploadedBytes        int64 `json:"sz_uploaded_bytes,string"`
-	UploadedCatalogBytes int64 `json:"sz_uploaded_catalog_bytes,string"`
+	ChunksAdded          int64 `json:"n_chunks_added"`
+	ChunksDuplicated     int64 `json:"n_chunks_duplicated"`
+	CatalogsAdded        int64 `json:"n_catalogs_added"`
+	UploadedBytes        int64 `json:"sz_uploaded_bytes"`
+	UploadedCatalogBytes int64 `json:"sz_uploaded_catalog_bytes"`
 }
 
 type Statistics struct {

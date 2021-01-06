@@ -323,7 +323,7 @@ func (r *CvmfsReceiver) reply() ([]byte, error) {
 func parseReceiverReply(reply []byte) (*ReceiverReply, error) {
 	res := &ReceiverReply{}
 	if err := json.Unmarshal(reply, res); err != nil {
-		return nil, errors.Wrap(err, "could not decode reply")
+		return nil, errors.Wrap(err, "could not decode receiver reply '" + string(reply[:]) + "'")
 	}
 	if res.Status != "ok" {
 		return res, Error(res.Reason)
