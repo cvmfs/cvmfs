@@ -567,6 +567,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			}
 
 			path := filepath.Join(sneakyChainPath, header.Name)
+			l.Log().Info("Working on file", path)
 			dir := filepath.Dir(path)
 
 			os.MkdirAll(dir, constants.DirPermision)
