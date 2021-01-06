@@ -933,15 +933,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 			l.LogE(err).Error("Error in downloading the layer from the docker registry")
 			return err, lastChainId
 		}
-		gzipTar := layerStream.Path
-		defer gzipTar.Close()
-		gzipReader, err := gzip.NewReader(gzipTar)
-		if err != nil {
-			l.LogE(err).Error("Error in using the gzip reader, maybe the layer is not compressed")
-			return err, lastChainId
-		}
-		defer gzipReader.Close()
-		tarReader := *tar.NewReader(gzipReader)
+		tarReader := *tar.NewReader(layerStream.Path)
 
 		err = cvmfs.CreateSneakyChain(CVMFSRepo,
 			chain.String(),
