@@ -621,6 +621,9 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					if err := os.Link(header.Linkname, path); err != nil {
 						return err
 					}
+					// TODO (smosciat)
+					// it is enough to just continue, or we want to actually invoke Lchmod and Lchown
+					continue
 				}
 			case tar.TypeSymlink:
 				{
