@@ -557,12 +557,14 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 	loop:
 		for {
 			header, err := layer.Next()
-			if err != nil {
-				return err
-			}
 			if err == io.EOF {
 				return nil
 			}
+
+			if err != nil {
+				return err
+			}
+
 			if header == nil {
 				continue
 			}
