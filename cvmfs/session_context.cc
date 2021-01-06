@@ -14,6 +14,7 @@
 #include "json_document_write.h"
 #include "swissknife_lease_curl.h"
 #include "util/exception.h"
+#include "util/pointer.h"
 #include "util/string.h"
 
 namespace {
@@ -388,7 +389,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
              ret);
   }
 
-  JsonDocument *reply_json = JsonDocument::Create(reply);
+  UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply));
   const JSON *reply_status =
     JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
   const bool ok = (reply_status != NULL &&
