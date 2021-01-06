@@ -1013,10 +1013,18 @@ cvmfs_status() {
   mounted_repos=`list_mounts | awk '{print $3}'`
   for mountpoint in $mounted_repos
   do
+    local fqrn=
+    local pid=
     cd $mountpoint
     get_attr fqrn; fqrn=$attr_value
     get_attr pid; pid=$attr_value
-    echo "$fqrn mounted on $mountpoint with pid $pid"
+    echo -n "$fqrn mounted on $mountpoint with pid $pid"
+    if [ -z "$fqrn" -o -z "$pid" ]; then
+      echo " - mountpoint unhealthy!"
+      RETVAL=1
+    else
+      echo
+    fi
   done
 
   return $RETVAL
