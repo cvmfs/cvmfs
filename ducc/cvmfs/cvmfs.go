@@ -610,10 +610,10 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					if err != nil {
 						return err
 					}
-					defer f.Close()
 					if _, err = io.Copy(f, &layer); err != nil {
 						return err
 					}
+					f.Close()
 					permissionMask |= 0600
 				}
 			case tar.TypeLink:
