@@ -554,6 +554,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 	}
 	// finally we need the sneaky transaction to create the chain
 	if err := ExecuteAndOpenTransaction(CVMFSRepo, func() error {
+	loop:
 		for {
 			header, err := layer.Next()
 			if err != nil {
@@ -624,7 +625,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					}
 					// TODO (smosciat)
 					// it is enough to just continue, or we want to actually invoke Lchmod and Lchown
-					continue
+					continue loop
 				}
 			case tar.TypeSymlink:
 				{
@@ -654,7 +655,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			default:
 				{
 					// unclear what to do here, just skip it
-					continue
+					continue loop
 				}
 			}
 
