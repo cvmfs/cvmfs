@@ -1,6 +1,7 @@
 package cvmfs
 
 import (
+	"archive/tar"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,7 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	copy "github.com/otiai10/copy"
+	"github.com/pkg/xattr"
 	log "github.com/sirupsen/logrus"
 
 	constants "github.com/cvmfs/ducc/constants"
@@ -519,7 +523,175 @@ func CreateChain(CVMFSRepo, chain, previous, layer string) error {
 			l.LogE(err).Error("Error in Applying the layer on top of the chain")
 		}
 		return err
-
 	})
+}
 
+func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.Reader) error {
+	sneakyPath := filepath.Join("/", "var", "spool", "cvmfs", CVMFSRepo, "scratch", "current")
+	newChainPath := ChainPath(CVMFSRepo, newChainId)
+	sneakyChainPath := filepath.Join(sneakyPath, TrimCVMFSRepoPrefix(newChainPath))
+	// we need to create the directory were to do the template transaction
+	dir := filepath.Dir(newChainPath)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		// if the directory does not exists, we create it
+
+		if err := WithinTransaction(CVMFSRepo, func() error {
+			return os.MkdirAll(dir, constants.DirPermision)
+		}); err != nil {
+			return nil
+		}
+	}
+	// then we need the template transaction to populate it
+	if previousChainId != "" {
+		// if it is the very first chain, we don't need the template transaction
+		opt := TemplateTransaction{
+			source:      TrimCVMFSRepoPrefix(ChainPath(CVMFSRepo, previousChainId)),
+			destination: TrimCVMFSRepoPrefix(newChainPath),
+		}
+		if err := WithinTransaction(CVMFSRepo, func() error { return nil }, opt); err != nil {
+			return err
+		}
+	}
+	// finally we need the sneaky transaction to create the chain
+	if err := ExecuteAndOpenTransaction(CVMFSRepo, func() error {
+		for {
+			header, err := layer.Next()
+			if err != nil {
+				return err
+			}
+			if err == io.EOF {
+				return nil
+			}
+			if header == nil {
+				continue
+			}
+
+			path := filepath.Join(sneakyChainPath, header.Name)
+			if isWhiteout(path) {
+				// this will be an empty file
+				// check if it is an opaque directory or a standard whiteout file
+				base := filepath.Base(path)
+				dir := filepath.Dir(path)
+				if base == ".wh..wh..opq" {
+					// an opaque directory
+					if err := makeOpaqueDir(dir); err != nil {
+						return err
+					}
+				} else {
+					// a whiteout file
+					base = base[4:]
+					path := filepath.Join(path, base)
+					if err := makeWhiteoutFile(path); err != nil {
+						return err
+					}
+				}
+				// create the relative file or set the
+				continue
+			}
+
+			permissionMask := int64(0)
+			switch header.Typeflag {
+
+			case tar.TypeDir:
+				{
+					err := os.MkdirAll(path, constants.DirPermision)
+					if err != nil {
+						return err
+					}
+					permissionMask |= 0700
+				}
+			case tar.TypeReg, tar.TypeRegA:
+				{
+					f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, constants.FilePermision)
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+					if _, err = io.Copy(f, &layer); err != nil {
+						return err
+					}
+					permissionMask |= 0600
+				}
+			case tar.TypeLink:
+				{
+					// hardlink
+					// maybe we should just copy the file
+					linkPath := filepath.Join(sneakyChainPath, header.Linkname)
+					if err := os.Link(linkPath, path); err != nil {
+						return err
+					}
+				}
+			case tar.TypeSymlink:
+				{
+					// symlink
+					linkPath := filepath.Join(sneakyChainPath, header.Linkname)
+					if err := os.Symlink(linkPath, path); err != nil {
+						return err
+					}
+
+				}
+			case tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
+				{
+					// char device
+					var mode uint32
+					switch header.Typeflag {
+					case tar.TypeChar:
+						mode = unix.S_IFCHR
+					case tar.TypeBlock:
+						mode = unix.S_IFBLK
+					case tar.TypeFifo:
+						mode = unix.S_IFIFO
+					}
+					dev := unix.Mkdev(uint32(header.Devmajor), uint32(header.Devminor))
+					if err := unix.Mknod(path, uint32(os.FileMode(int64(mode)|header.Mode)), int(dev)); err != nil {
+						return err
+					}
+				}
+			default:
+				{
+					// unclear what to do here, just skip it
+					continue
+				}
+			}
+
+			// these are common to everything
+			if err := os.Chmod(path, os.FileMode(header.Mode|permissionMask)); err != nil {
+				return err
+			}
+			if err := os.Chown(path, header.Uid, header.Gid); err != nil {
+				return err
+			}
+			if err := os.Chtimes(path, header.AccessTime, header.ModTime); err != nil {
+				return err
+			}
+		}
+	}); err != nil {
+		return err
+	}
+	// no the transaction is open and the sneaky overlay is populated
+	// we don't need to do anything else at this point and we can close the transaction
+	return Publish(CVMFSRepo)
+}
+
+func isWhiteout(path string) bool {
+	base := filepath.Base(path)
+	if len(base) <= 3 {
+		return false
+	}
+	return base[0:4] == ".wh."
+}
+
+func makeWhiteoutFile(path string) error {
+	dev := unix.Mkdev(0, 0)
+	mode := os.FileMode(int64(unix.S_IFCHR) | 0000)
+	return unix.Mknod(path, uint32(mode), int(dev))
+}
+
+func makeOpaqueDir(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := os.MkdirAll(path, constants.DirPermision); err != nil {
+			return err
+		}
+	}
+	return xattr.Set(path, "trusted.overlay.opaque", []byte("y"))
 }

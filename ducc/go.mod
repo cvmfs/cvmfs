@@ -26,6 +26,7 @@ require (
 	github.com/opencontainers/selinux v1.0.0 // indirect
 	github.com/otiai10/copy v1.3.0
 	github.com/pkg/errors v0.8.1 // indirect
+	github.com/pkg/xattr v0.4.3
 	github.com/sirupsen/logrus v1.3.0
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3 // indirect
@@ -34,7 +35,7 @@ require (
 	golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b // indirect
 	golang.org/x/net v0.0.0-20190119204137-ed066c81e75e // indirect
 	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4
-	golang.org/x/sys v0.0.0-20190124100055-b90733256f2e
+	golang.org/x/sys v0.0.0-20201101102859-da207088b7d1
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
 	google.golang.org/grpc v1.18.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2
