@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"archive/tar"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -566,7 +567,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 			l.Log().WithFields(
 				log.Fields{"layer": layer.Digest}).
 				Info("Start working on layer")
-			toSend, err := layerDownloader.downloadLayer(layer)
+			toSend, err := layerDownloader.DownloadLayer(layer)
 			if err != nil {
 				l.LogE(err).Error("Error in downloading a layer")
 				return
@@ -760,7 +761,7 @@ func (ld *LayerDownloader) getToken() (token string, err error) {
 	return
 }
 
-func (ld *LayerDownloader) downloadLayer(layer da.Layer) (downloadedLayer, error) {
+func (ld *LayerDownloader) DownloadLayer(layer da.Layer) (downloadedLayer, error) {
 	token, err := ld.getToken()
 	if err != nil {
 		return downloadedLayer{}, err
@@ -771,7 +772,7 @@ func (ld *LayerDownloader) downloadLayer(layer da.Layer) (downloadedLayer, error
 func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) error {
 	err := error(nil)
 	for i := 0; i <= 5; i += 1 {
-		to_ingest, err := ld.downloadLayer(layer)
+		to_ingest, err := ld.DownloadLayer(layer)
 		if err != nil {
 			// let's try again
 			continue
@@ -872,6 +873,84 @@ func (img *Image) CreateChainStructure(CVMFSRepo string) (err error, lastChainId
 		if err != nil {
 			l.LogE(err).Error("Error in creating the chain")
 			return
+		}
+	}
+	return
+}
+
+func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastChainId string) {
+	// make sure we have the layers somewhere
+	manifest, err := img.GetManifest()
+	if err != nil {
+		return
+	}
+
+	// then we start creating the chain structure
+	chainIDs := manifest.GetChainIDs()
+
+	paths := []string{}
+	for _, chain := range chainIDs {
+		path := cvmfs.ChainPath(CVMFSRepo, chain.String())
+		dir := filepath.Dir(path)
+		if _, err := os.Stat(dir); err != nil {
+			paths = append(paths, dir)
+		}
+	}
+
+	if len(paths) > 0 {
+		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
+			for _, dir := range paths {
+				if err := os.MkdirAll(dir, constants.DirPermision); err != nil {
+					return nil
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			l.LogE(err).Error("Impossible to create directory to contains the chainID")
+			return
+		}
+	}
+
+	ld := NewLayerDownloader(img)
+	for i, chain := range chainIDs {
+		digest := chain.String()
+		lastChainId = digest
+
+		path := cvmfs.ChainPath(CVMFSRepo, digest)
+
+		if _, err := os.Stat(path); err == nil {
+			// the chain is present, we skip the loop
+			continue
+		}
+		previous := ""
+		if i != 0 {
+			previous = chainIDs[i-1].String()
+		}
+		// we need to get the layer tar reader here
+		layerStream, err := ld.DownloadLayer(manifest.Layers[i])
+		if err != nil {
+			l.LogE(err).Error("Error in downloading the layer from the docker registry")
+			return err, lastChainId
+		}
+		gzipTar := layerStream.Path
+		defer gzipTar.Close()
+		gzipReader, err := gzip.NewReader(gzipTar)
+		if err != nil {
+			l.LogE(err).Error("Error in using the gzip reader, maybe the layer is not compressed")
+			return err, lastChainId
+		}
+		defer gzipReader.Close()
+		tarReader := *tar.NewReader(gzipReader)
+
+		err = cvmfs.CreateSneakyChain(CVMFSRepo,
+			chain.String(),
+			previous,
+			tarReader)
+
+		if err != nil {
+			l.LogE(err).Error("Error in creating the chain")
+			return err, lastChainId
 		}
 	}
 	return

@@ -102,7 +102,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 			continue
 		}
 
-		err, lastChain := inputImage.CreateChainStructure(wish.CvmfsRepo)
+		err, lastChain := inputImage.CreateSneakyChainStructure(wish.CvmfsRepo)
 		if err != nil {
 			if firstError == nil {
 				firstError = err
