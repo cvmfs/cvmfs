@@ -57,7 +57,7 @@ func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...Tran
 	cmd = append(cmd, CVMFSRepo)
 	getLock(CVMFSRepo)
 	if err := f(); err != nil {
-		unlock(CVMFSRepo)
+		Abort(CVMFSRepo)
 		return err
 	}
 	err := exec.ExecCommand(cmd...).Start()
@@ -65,7 +65,7 @@ func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...Tran
 		l.LogE(err).WithFields(
 			log.Fields{"repo": CVMFSRepo}).
 			Error("Error in opening the transaction")
-		abort(CVMFSRepo)
+		Abort(CVMFSRepo)
 	}
 	return err
 
