@@ -4,3 +4,7 @@ cvmfs_ducc: cmd/*.go constants/*.go cvmfs/*.go docker-api/*.go exec/*.go filesys
 
 clean:
 	rm cvmfs_ducc
+
+install: cvmfs_ducc
+	sudo cp cvmfs_ducc /usr/bin
+	sudo setcap "cap_dac_override=ep cap_dac_read_search=ep cap_fowner=ep cap_chown=ep" /usr/bin/cvmfs_ducc
