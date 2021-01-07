@@ -624,22 +624,25 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 	for i := 0; i <= 5; i++ {
 		err = nil
 		client := &http.Client{}
-		req, err := http.NewRequest("GET", layerUrl, nil)
+		req, errR := http.NewRequest("GET", layerUrl, nil)
 		if err != nil {
-			l.LogE(err).Error("Impossible to create the HTTP request.")
+			l.LogE(errR).Error("Impossible to create the HTTP request.")
+			err = errR
 			break
 		}
 		req.Header.Set("Authorization", token)
-		resp, err := client.Do(req)
+		resp, errReq := client.Do(req)
 		l.Log().WithFields(
 			log.Fields{"layer": layer.Digest}).
 			Info("Make request for layer")
-		if err != nil {
+		if errReq != nil {
+			err = errReq
 			break
 		}
 		if 200 <= resp.StatusCode && resp.StatusCode < 300 {
-			gread, err := gzip.NewReader(resp.Body)
-			if err != nil {
+			gread, errG := gzip.NewReader(resp.Body)
+			if errG != nil {
+				err = errG
 				l.LogE(err).Warning("Error in creating the zip to unzip the layer")
 				continue
 			}
@@ -647,13 +650,21 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			toSend = downloadedLayer{Name: layer.Digest, Path: path}
 			return toSend, nil
 		} else {
-			l.Log().Warning("Received status code ", resp.StatusCode)
 			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
+			l.LogE(err).Warning("Received status code ", resp.StatusCode)
+			if resp.StatusCode == 401 {
+				// try to get the token again
+				newToken, errToken := firstRequestForAuth(layerUrl, user, pass)
+				if errToken != nil {
+					l.LogE(errToken).Warning("Error in refreshing the token")
+				} else {
+					token = newToken
+				}
+			}
 		}
 	}
 	l.LogE(err).Warning("return from error path")
 	return
-
 }
 
 func parseBearerToken(token string) (realm string, options map[string]string, err error) {
