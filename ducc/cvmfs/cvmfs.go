@@ -673,6 +673,8 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 		}
 	}); err != nil {
 		os.RemoveAll(filepath.Join(sneakyPath, ".chains"))
+		// the creation of the chain is not complete, we delete the template created as well
+		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(newChainPath))
 		return err
 	}
 	// no the transaction is open and the sneaky overlay is populated
