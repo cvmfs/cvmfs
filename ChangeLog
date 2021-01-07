@@ -1,4 +1,5 @@
 2.8.0:
+  * Fix committing publications with gateway >= 1.2
   * Fix cvmfs_config status for broken mountpoints (CVM-1959)
   * Improve network error handling during GC (CVM-1957)
   * [macOS] fix reload on macOS >= 10.15
