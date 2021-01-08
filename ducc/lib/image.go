@@ -976,10 +976,13 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 			return err
 		}
 		for attempt := 0; attempt < 5; attempt++ {
+			l.Log().Info("Start attempt", attempt)
 			err = downloadLayer(attempt)
 			if err == nil {
+				l.Log().Info("Attempt", attempt, "success")
 				break
 			}
+			l.Log().Warn("Attempt", attempt, "fail")
 		}
 		if err != nil {
 			l.LogE(err).Error("Error in creating the chain")
