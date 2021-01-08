@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ import (
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
+	temp "github.com/cvmfs/ducc/temp"
 )
 
 type ManifestRequest struct {
@@ -939,19 +941,46 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		if i != 0 {
 			previous = chainIDs[i-1].String()
 		}
-		// we need to get the layer tar reader here
-		layerStream, err := ld.DownloadLayer(manifest.Layers[i])
-		if err != nil {
-			l.LogE(err).Error("Error in downloading the layer from the docker registry")
-			return err, lastChainId
+		downloadLayer := func(attempt int) error {
+			// we need to get the layer tar reader here
+			layerStream, err := ld.DownloadLayer(manifest.Layers[i])
+			if err != nil {
+				l.LogE(err).Error("Error in downloading the layer from the docker registry")
+				return err
+			}
+			// the first time we just try to read from a network stream
+			// if this fail, we try to write to a real file,
+			// and then read from that file
+			var tarReader tar.Reader
+			if attempt == 0 {
+				tarReader = *tar.NewReader(layerStream.Path)
+			} else {
+				f, err := temp.UserDefinedTempFile()
+				if err != nil {
+					l.LogE(err).Error("Error in creating a temporary file")
+					return err
+				}
+				defer f.Close()
+				defer os.Remove(f.Name())
+				_, err = io.Copy(layerStream.Path, f)
+				if err != nil {
+					l.LogE(err).Error("Error in writing the stream into a standard file")
+					return err
+				}
+				tarReader = *tar.NewReader(f)
+			}
+			err = cvmfs.CreateSneakyChain(CVMFSRepo,
+				chain.String(),
+				previous,
+				tarReader)
+			return err
 		}
-		tarReader := *tar.NewReader(layerStream.Path)
-
-		err = cvmfs.CreateSneakyChain(CVMFSRepo,
-			chain.String(),
-			previous,
-			tarReader)
-
+		for attempt := 0; attempt < 5; attempt++ {
+			err = downloadLayer(attempt)
+			if err == nil {
+				break
+			}
+		}
 		if err != nil {
 			l.LogE(err).Error("Error in creating the chain")
 			return err, lastChainId
