@@ -593,7 +593,6 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 						return err
 					}
 				}
-				// create the relative file or set the
 				continue
 			}
 
@@ -617,7 +616,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 						return err
 					}
 					if _, err = io.Copy(f, &layer); err != nil {
-						l.LogE(err).Error("Error in copying file from tar")
+						l.LogE(err).Error("Error in copying file from tar", path)
 						return err
 					}
 					f.Close()
