@@ -562,11 +562,12 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			}
 
 			if err != nil {
+				l.LogE(err).Error("Error in getting next layer")
 				return err
 			}
 
 			if header == nil {
-				continue
+				continue loop
 			}
 
 			path := filepath.Join(sneakyChainPath, header.Name)
@@ -580,6 +581,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				if base == ".wh..wh..opq" {
 					// an opaque directory
 					if err := makeOpaqueDir(dir); err != nil {
+						l.LogE(err).Error("Error in making opaque directory")
 						return err
 					}
 				} else {
@@ -587,6 +589,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					base = base[4:]
 					path := filepath.Join(path, base)
 					if err := makeWhiteoutFile(path); err != nil {
+						l.LogE(err).Error("Error in creating whiteout file")
 						return err
 					}
 				}
@@ -601,6 +604,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				{
 					err := os.MkdirAll(path, constants.DirPermision)
 					if err != nil {
+						l.LogE(err).Error("Error in creating directory")
 						return err
 					}
 					permissionMask |= 0700
@@ -609,9 +613,11 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				{
 					f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, constants.FilePermision)
 					if err != nil {
+						l.LogE(err).Error("Error in creating file")
 						return err
 					}
 					if _, err = io.Copy(f, &layer); err != nil {
+						l.LogE(err).Error("Error in copying file from tar")
 						return err
 					}
 					f.Close()
@@ -623,6 +629,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					// maybe we should just copy the file
 					oldLinkName := filepath.Join(sneakyChainPath, header.Linkname)
 					if err := os.Link(oldLinkName, path); err != nil {
+						l.LogE(err).Error("Error in creating hard link")
 						return err
 					}
 				}
@@ -630,6 +637,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				{
 					// symlink
 					if err := os.Symlink(header.Linkname, path); err != nil {
+						l.LogE(err).Error("Error in creating symbolic link")
 						return err
 					}
 					// TODO (smosciat)
@@ -650,6 +658,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					}
 					dev := unix.Mkdev(uint32(header.Devmajor), uint32(header.Devminor))
 					if err := unix.Mknod(path, uint32(os.FileMode(int64(mode)|header.Mode)), int(dev)); err != nil {
+						l.LogE(err).Error("Error in creating special file")
 						return err
 					}
 				}
@@ -662,12 +671,15 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 
 			// these are common to everything
 			if err := os.Chmod(path, os.FileMode(header.Mode|permissionMask)); err != nil {
+				l.LogE(err).Error("Error in chmod")
 				return err
 			}
 			if err := os.Chown(path, header.Uid, header.Gid); err != nil {
+				l.LogE(err).Error("Error in chown")
 				return err
 			}
 			if err := os.Chtimes(path, header.AccessTime, header.ModTime); err != nil {
+				l.LogE(err).Error("Error in chtimes")
 				return err
 			}
 		}
