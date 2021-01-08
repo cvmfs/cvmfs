@@ -587,7 +587,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				} else {
 					// a whiteout file
 					base = base[4:]
-					path := filepath.Join(path, base)
+					path := filepath.Join(dir, base)
 					if err := makeWhiteoutFile(path); err != nil {
 						l.LogE(err).Error("Error in creating whiteout file")
 						return err
