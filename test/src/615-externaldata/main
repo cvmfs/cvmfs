@@ -234,7 +234,8 @@ cvmfs_run_test() {
   local test_dom2="cern.ch"
   local test_hosts="http://$test_dom:80;http://$test_dom2:80"
   local test_proxy="http://$test_dom:3128"
-  local test_pipe="${cvmfs_cache}/cvmfs_io.$CVMFS_TEST_REPO"
+  local test_pipe=$(cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf | \
+                      grep ^CVMFS_TALK_SOCKET= | cut -d= -f2)
 
   echo "*** test external host set"
   sudo cvmfs_talk -p $test_pipe external host set "$test_hosts"        || return 80
