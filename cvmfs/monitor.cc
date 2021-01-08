@@ -67,7 +67,7 @@ Watchdog *Watchdog::Create(const string &crash_dump_path) {
  * Uses an external shell and gdb to create a full stack trace of the dying
  * process. The same shell is used to force-quit the client afterwards.
  */
-string Watchdog::GenerateStackTrace(const string &exe_path, pid_t pid) {
+string Watchdog::GenerateStackTrace(pid_t pid) {
   int retval;
   string result = "";
 
@@ -82,13 +82,7 @@ string Watchdog::GenerateStackTrace(const string &exe_path, pid_t pid) {
   int fd_stdout;
   int fd_stderr;
   vector<string> argv;
-#ifndef __APPLE__
-  argv.push_back("-q");
-  argv.push_back("-n");
-  argv.push_back(exe_path);
-#else
   argv.push_back("-p");
-#endif
   argv.push_back(StringifyInt(pid));
   pid_t gdb_pid = 0;
   const bool double_fork = false;
@@ -130,6 +124,15 @@ string Watchdog::GenerateStackTrace(const string &exe_path, pid_t pid) {
   result += ReadUntilGdbPrompt(fd_stdout);
 #endif
   result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
+
+  // Check for output on stderr
+  string result_err;
+  Block2Nonblock(fd_stderr);
+  char cbuf;
+  while (read(fd_stderr, &cbuf, 1) == 1)
+    result_err.push_back(cbuf);
+  if (!result_err.empty())
+    result += "\nError output:\n" + result_err + "\n";
 
   // Close the connection to the terminated gdb process
   close(fd_stderr);
@@ -257,7 +260,7 @@ string Watchdog::ReportStacktrace() {
   debug += ", PID: "     + StringifyInt(crash_data.pid) + "\n";
   debug += "Executable path: " + exe_path_ + "\n";
 
-  debug += GenerateStackTrace(exe_path_, crash_data.pid);
+  debug += GenerateStackTrace(crash_data.pid);
 
   // Give the dying process the finishing stroke
   if (kill(crash_data.pid, SIGKILL) != 0) {
