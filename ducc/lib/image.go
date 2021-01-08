@@ -962,6 +962,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 				}
 				defer f.Close()
 				defer os.Remove(f.Name())
+				l.Log().Info("Coping layer into file: ", f.Name())
 				_, err = io.Copy(layerStream.Path, f)
 				if err != nil {
 					l.LogE(err).Error("Error in writing the stream into a standard file")
