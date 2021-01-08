@@ -60,12 +60,12 @@ TEST_F(T_Namespace, User) {
   uid_t uid = geteuid();
   uid_t gid = getegid();
 
-  EXPECT_TRUE(CreateUserNamespace(0, 0));
+  EXPECT_EQ(kFailNsOk, CreateUserNamespace(0, 0));
   EXPECT_EQ(uid_t(0), geteuid());
   EXPECT_EQ(uid_t(0), getuid());
   EXPECT_EQ(gid_t(0), getegid());
   EXPECT_EQ(gid_t(0), getgid());
-  EXPECT_TRUE(CreateUserNamespace(uid, gid));
+  EXPECT_EQ(kFailNsOk, CreateUserNamespace(uid, gid));
   EXPECT_EQ(uid, geteuid());
   EXPECT_EQ(gid, getuid());
   exit(testing::Test::HasFailure());
@@ -84,7 +84,7 @@ TEST_F(T_Namespace, UserMount) {
   }
 
   std::string cwd = GetCurrentWorkingDirectory();
-  EXPECT_TRUE(CreateUserNamespace(0, 0));
+  EXPECT_EQ(kFailNsOk, CreateUserNamespace(0, 0));
   EXPECT_TRUE(CreateMountNamespace());
   EXPECT_EQ(cwd, GetCurrentWorkingDirectory());
 
@@ -111,7 +111,7 @@ TEST_F(T_Namespace, UserMountPid) {
   }
 
   int fd_parent;
-  EXPECT_TRUE(CreateUserNamespace(0, 0));
+  EXPECT_EQ(kFailNsOk, CreateUserNamespace(0, 0));
   EXPECT_TRUE(CreateMountNamespace());
   EXPECT_TRUE(CreatePidNamespace(&fd_parent));
 
