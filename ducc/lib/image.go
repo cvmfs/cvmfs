@@ -948,6 +948,8 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 				l.LogE(err).Error("Error in downloading the layer from the docker registry")
 				return err
 			}
+			// TODO(smosciat) this idea of saving in a file and then re-try can be a good idea
+			// maybe it can be implemented on lower level of t
 			// the first time we just try to read from a network stream
 			// if this fail, we try to write to a real file,
 			// and then read from that file
@@ -963,11 +965,13 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 				defer f.Close()
 				defer os.Remove(f.Name())
 				l.Log().Info("Coping layer into file: ", f.Name())
-				_, err = io.Copy(layerStream.Path, f)
+				n, err := io.Copy(layerStream.Path, f)
 				if err != nil {
 					l.LogE(err).Error("Error in writing the stream into a standard file")
 					return err
 				}
+				l.Log().Info("Written into disk N bytes: ", n)
+				f.Sync()
 				tarReader = *tar.NewReader(f)
 			}
 			err = cvmfs.CreateSneakyChain(CVMFSRepo,
@@ -977,13 +981,13 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 			return err
 		}
 		for attempt := 0; attempt < 5; attempt++ {
-			l.Log().Info("Start attempt", attempt)
+			l.Log().Info("Start attempt: ", attempt)
 			err = downloadLayer(attempt)
 			if err == nil {
-				l.Log().Info("Attempt", attempt, "success")
+				l.Log().Info("Attempt ", attempt, " success")
 				break
 			}
-			l.Log().Warn("Attempt", attempt, "fail")
+			l.Log().Warn("Attempt ", attempt, " fail")
 		}
 		if err != nil {
 			l.LogE(err).Error("Error in creating the chain")
