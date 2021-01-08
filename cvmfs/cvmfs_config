@@ -1016,6 +1016,11 @@ cvmfs_status() {
     local fqrn=
     local pid=
     cd $mountpoint
+    if [ $? -ne 0 ]; then
+      echo "mountpoint $mountpoint inaccessible"
+      RETVAL=1
+      continue
+    fi
     get_attr fqrn; fqrn=$attr_value
     get_attr pid; pid=$attr_value
     echo -n "$fqrn mounted on $mountpoint with pid $pid"
