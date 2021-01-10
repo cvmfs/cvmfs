@@ -23,6 +23,8 @@ CVMFS_CACHE_BASE=$(pwd)/cache
 CVMFS_RELOAD_SOCKETS=$(pwd)/cache
 CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/${fqrn}
 CVMFS_HTTP_PROXY=DIRECT
+CVMFS_TIMEOUT=30
+CVMFS_TIMEOUT_DIRECT=30
 CVMFS_KEYS_DIR=/etc/cvmfs/keys/cern.ch
 EOF
 
