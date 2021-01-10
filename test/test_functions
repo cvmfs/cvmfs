@@ -190,6 +190,11 @@ elif which apache2 >/dev/null 2>&1; then # Debian based
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN=$(which apache2)
+elif which /usr/sbin/apache2 >/dev/null 2>&1; then # newer Ubuntu
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=/usr/sbin/apache2
+
 else
   APACHE_SERVICE="httpd" # EL based
   APACHE_CONF=${APACHE_SERVICE}
