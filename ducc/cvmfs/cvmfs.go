@@ -660,7 +660,10 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 						return err
 					}
 					// TODO (smosciat)
-					// it is enough to just continue, or we want to actually invoke Lchmod and Lchown
+					// do we want to invoke also Lchmod ?
+					// the function does not really exist in std
+					os.Lchown(path, header.Uid, header.Gid)
+
 					continue loop
 				}
 			case tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
