@@ -550,7 +550,24 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			source:      TrimCVMFSRepoPrefix(ChainPath(CVMFSRepo, previousChainId)),
 			destination: TrimCVMFSRepoPrefix(newChainPath),
 		}
-		if err := WithinTransaction(CVMFSRepo, func() error { return nil }, opt); err != nil {
+		if err := WithinTransaction(CVMFSRepo, func() error {
+			source := ChainPath(CVMFSRepo, previousChainId)
+			sourceDirs, err := ioutil.ReadDir(source)
+			if err != nil {
+				return err
+			}
+			destination := newChainPath
+			destinationDirs, err := ioutil.ReadDir(destination)
+			if err != nil {
+				return err
+			}
+			if len(sourceDirs) != len(destinationDirs) {
+				return fmt.Errorf("Different number of directories between the source and tha target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
+			}
+
+			os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			return nil
+		}, opt); err != nil {
 			return err
 		}
 	}
@@ -560,6 +577,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 		for {
 			header, err := layer.Next()
 			if err == io.EOF {
+				os.OpenFile(filepath.Join(sneakyChainPath, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
 				return nil
 			}
 
