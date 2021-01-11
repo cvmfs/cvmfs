@@ -949,7 +949,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 				return err
 			}
 			// TODO(smosciat) this idea of saving in a file and then re-try can be a good idea
-			// maybe it can be implemented on lower level of t
+			// maybe it can be implemented on lower level of
 			// the first time we just try to read from a network stream
 			// if this fail, we try to write to a real file,
 			// and then read from that file
@@ -962,16 +962,20 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 					l.LogE(err).Error("Error in creating a temporary file")
 					return err
 				}
-				defer f.Close()
 				defer os.Remove(f.Name())
+				defer f.Close()
 				l.Log().Info("Coping layer into file: ", f.Name())
 				n, err := io.Copy(f, layerStream.Path)
 				if err != nil {
 					l.LogE(err).Error("Error in writing the stream into a standard file")
 					return err
 				}
+				_, err := f.Seek(0, 0)
+				if err != nil {
+					l.LogE(err).Error("Error in seeking the file")
+					return err
+				}
 				l.Log().Info("Written into disk N bytes: ", n)
-				f.Sync()
 				tarReader = *tar.NewReader(f)
 			}
 			err = cvmfs.CreateSneakyChain(CVMFSRepo,

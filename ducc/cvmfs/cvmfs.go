@@ -688,7 +688,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(newChainPath))
 		return err
 	}
-	// no the transaction is open and the sneaky overlay is populated
+	// now the transaction is open and the sneaky overlay is populated
 	// we don't need to do anything else at this point and we can close the transaction
 	return Publish(CVMFSRepo)
 }
