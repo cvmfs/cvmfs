@@ -536,7 +536,9 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 		// if the directory does not exists, we create it
 
 		if err := WithinTransaction(CVMFSRepo, func() error {
-			return os.MkdirAll(dir, constants.DirPermision)
+			os.MkdirAll(dir, constants.DirPermision)
+			os.OpenFile(filepath.Join(dir, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			return nil
 		}); err != nil {
 			return nil
 		}
