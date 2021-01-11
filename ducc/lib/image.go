@@ -970,8 +970,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 					l.LogE(err).Error("Error in writing the stream into a standard file")
 					return err
 				}
-				_, err := f.Seek(0, 0)
-				if err != nil {
+				if _, err = f.Seek(0, 0); err != nil {
 					l.LogE(err).Error("Error in seeking the file")
 					return err
 				}
