@@ -315,9 +315,9 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 			if pathExists == false || forceDownload {
 
 				err = layer.IngestIntoCVMFS(repo)
-
 				if err != nil {
-					l.LogE(err).Error("Error in ingestng the layer in cvmfs")
+					l.LogE(err).Error("Error in ingesting the layer in cvmfs")
+					noErrors = false
 				}
 
 				l.Log().WithFields(
