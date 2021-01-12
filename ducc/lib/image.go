@@ -799,8 +799,8 @@ func (ld *LayerDownloader) DownloadLayer(layer da.Layer) (downloadedLayer, error
 	ld.attempts[layer.Digest] = (att + 1)
 	ld.lock.Unlock()
 
-	// if the layer is bigger than 100M we download it using the disk storage
-	if att == 0 && layer.Size < 1E8 {
+	// if the layer is bigger than 50M we download it using the disk storage
+	if att == 0 && layer.Size < 50E6 {
 		return ld.image.downloadLayer(layer, token)
 	}
 	inMem, err := ld.image.downloadLayer(layer, token)
