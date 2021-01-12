@@ -645,7 +645,7 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 		req.Header.Set("Authorization", token)
 		resp, errReq := client.Do(req)
 		l.Log().WithFields(
-			log.Fields{"layer": layer.Digest}).
+			log.Fields{"layer": layer.Digest, "size in MB": (layer.Size / 1E6)}).
 			Info("Make request for layer")
 		if errReq != nil {
 			err = errReq
@@ -660,6 +660,9 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			}
 			path := NewReadAndHash(gread)
 			toSend = newDownloadedLayer(layer.Digest, path)
+			l.Log().WithFields(
+				log.Fields{"layer": layer.Digest, "size in MB": (layer.Size / 1E6)}).
+				Info("Done downloading layer")
 			return toSend, nil
 		} else {
 			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
