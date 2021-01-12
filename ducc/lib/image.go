@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -24,7 +23,6 @@ import (
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
-	temp "github.com/cvmfs/ducc/temp"
 )
 
 type ManifestRequest struct {
@@ -492,7 +490,15 @@ func getLayerUrl(img *Image, layerDigest string) string {
 
 type downloadedLayer struct {
 	Name string
-	Path *ReadAndHash
+	Path ReadHashCloseSizer
+}
+
+func newDownloadedLayer(name string, path ReadHashCloseSizer) downloadedLayer {
+	return downloadedLayer{Name: name, Path: path}
+}
+
+func (d *downloadedLayer) Close() error {
+	return d.Path.Close()
 }
 
 func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
@@ -565,11 +571,15 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	for _, layer := range manifest.Layers {
 		wg.Add(1)
 		go func(ctx context.Context, layer da.Layer) {
+
 			defer wg.Done()
+
 			l.Log().WithFields(
 				log.Fields{"layer": layer.Digest}).
 				Info("Start working on layer")
+
 			toSend, err := layerDownloader.DownloadLayer(layer)
+
 			if err != nil {
 				l.LogE(err).Error("Error in downloading a layer")
 				return
@@ -649,7 +659,7 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 				continue
 			}
 			path := NewReadAndHash(gread)
-			toSend = downloadedLayer{Name: layer.Digest, Path: path}
+			toSend = newDownloadedLayer(layer.Digest, path)
 			return toSend, nil
 		} else {
 			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
@@ -738,13 +748,14 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 }
 
 type LayerDownloader struct {
-	image *Image
-	token string
-	lock  sync.Mutex
+	image    *Image
+	token    string
+	attempts map[string]int
+	lock     sync.Mutex
 }
 
 func NewLayerDownloader(image *Image) LayerDownloader {
-	return LayerDownloader{image: image, token: ""}
+	return LayerDownloader{image: image, token: "", attempts: make(map[string]int)}
 }
 
 func (ld *LayerDownloader) getToken() (token string, err error) {
@@ -780,7 +791,23 @@ func (ld *LayerDownloader) DownloadLayer(layer da.Layer) (downloadedLayer, error
 	if err != nil {
 		return downloadedLayer{}, err
 	}
-	return ld.image.downloadLayer(layer, token)
+	ld.lock.Lock()
+	att := ld.attempts[layer.Digest]
+	ld.attempts[layer.Digest] = (att + 1)
+	ld.lock.Unlock()
+
+	if att == 0 {
+		return ld.image.downloadLayer(layer, token)
+	}
+	inMem, err := ld.image.downloadLayer(layer, token)
+	if err != nil {
+		return inMem, err
+	}
+	r, err := NewOnDiskReadAndHash(inMem.Path)
+	if err != nil {
+		return inMem, err
+	}
+	return newDownloadedLayer(inMem.Name, r), nil
 }
 
 func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) error {
@@ -795,6 +822,7 @@ func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) e
 		if err == nil {
 			return nil
 		}
+		to_ingest.Close()
 	}
 	return err
 }
@@ -941,42 +969,22 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		if i != 0 {
 			previous = chainIDs[i-1].String()
 		}
-		downloadLayer := func(attempt int) error {
+		downloadLayer := func() error {
 			// we need to get the layer tar reader here
 			layerStream, err := ld.DownloadLayer(manifest.Layers[i])
 			if err != nil {
 				l.LogE(err).Error("Error in downloading the layer from the docker registry")
 				return err
 			}
+			defer layerStream.Close()
 			// TODO(smosciat) this idea of saving in a file and then re-try can be a good idea
 			// maybe it can be implemented on lower level of
 			// the first time we just try to read from a network stream
 			// if this fail, we try to write to a real file,
 			// and then read from that file
 			var tarReader tar.Reader
-			if attempt == 0 {
-				tarReader = *tar.NewReader(layerStream.Path)
-			} else {
-				f, err := temp.UserDefinedTempFile()
-				if err != nil {
-					l.LogE(err).Error("Error in creating a temporary file")
-					return err
-				}
-				defer os.Remove(f.Name())
-				defer f.Close()
-				l.Log().Info("Coping layer into file: ", f.Name())
-				n, err := io.Copy(f, layerStream.Path)
-				if err != nil {
-					l.LogE(err).Error("Error in writing the stream into a standard file")
-					return err
-				}
-				if _, err = f.Seek(0, 0); err != nil {
-					l.LogE(err).Error("Error in seeking the file")
-					return err
-				}
-				l.Log().Info("Written into disk N bytes: ", n)
-				tarReader = *tar.NewReader(f)
-			}
+			tarReader = *tar.NewReader(layerStream.Path)
+
 			err = cvmfs.CreateSneakyChain(CVMFSRepo,
 				chain.String(),
 				previous,
@@ -985,7 +993,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		}
 		for attempt := 0; attempt < 5; attempt++ {
 			l.Log().Info("Start attempt: ", attempt)
-			err = downloadLayer(attempt)
+			err = downloadLayer()
 			if err == nil {
 				l.Log().Info("Attempt ", attempt, " success")
 				break

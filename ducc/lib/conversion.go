@@ -328,13 +328,15 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 					log.Fields{"layer": layer.Name}).
 					Info("Skipping ingestion of layer, already exists")
 			}
+
+			layer.Close()
 		}
 		l.Log().Info("Finished pushing the layers into CVMFS")
 	}()
 	// we create a temp directory for all the files needed, when this function finish we can remove the temp directory cleaning up
 	tmpDir, err := temp.UserDefinedTempDir("", "conversion")
 	if err != nil {
-		l.LogE(err).Error("Error in creating a temporary direcotry for all the files")
+		l.LogE(err).Error("Error in creating a temporary directory for all the files")
 		return
 	}
 	defer os.RemoveAll(tmpDir)
@@ -493,12 +495,12 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	return
 }
 
-func StoreLayerInfo(CVMFSRepo string, layerDigest string, r *ReadAndHash) (err error) {
+func StoreLayerInfo(CVMFSRepo string, layerDigest string, r ReadHashCloseSizer) (err error) {
 	l.Log().WithFields(log.Fields{"action": "Ingesting layers.json"}).Info("store layer information in .layers")
 	layersdata := []LayerInfo{}
 	layerInfoPath := filepath.Join(cvmfs.LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
 
-	diffID := fmt.Sprintf("%x", r.Sum256(nil))
+	diffID := fmt.Sprintf("%x", r.Sum(nil))
 	size := r.GetSize()
 	created := time.Now()
 	layerinfo := LayerInfo{

@@ -7,8 +7,47 @@ import (
 	"encoding/base64"
 	"hash"
 	"io"
+	"os"
 	"strings"
+
+	temp "github.com/cvmfs/ducc/temp"
 )
+
+type ReadHashCloseSizer interface {
+	io.Reader
+	hash.Hash
+	io.Closer
+
+	GetSize() int64
+}
+
+type OnDiskReadAndHash struct {
+	ReadAndHash
+
+	path string
+}
+
+func NewOnDiskReadAndHash(r io.ReadCloser) (*OnDiskReadAndHash, error) {
+	f, err := temp.UserDefinedTempFile()
+	if err != nil {
+		return &OnDiskReadAndHash{}, err
+	}
+	if _, err = io.Copy(f, r); err != nil {
+		return &OnDiskReadAndHash{}, err
+	}
+	if _, err := f.Seek(0, 0); err != nil {
+		return &OnDiskReadAndHash{}, err
+	}
+	readAndHash := NewReadAndHash(f)
+	return &OnDiskReadAndHash{ReadAndHash: *readAndHash, path: f.Name()}, nil
+}
+
+func (r *OnDiskReadAndHash) Close() error {
+	if err := os.RemoveAll(r.path); err != nil {
+		return err
+	}
+	return r.ReadAndHash.Close()
+}
 
 //encapsulates io.ReadCloser, with functionality to calculate hash and size of the content
 type ReadAndHash struct {
@@ -35,12 +74,28 @@ func (rh *ReadAndHash) Write(p []byte) (int, error) {
 	return n, nil
 }
 
+func (rh *ReadAndHash) Sum(data []byte) []byte {
+	return rh.Sum256(data)
+}
+
 func (rh *ReadAndHash) Sum256(data []byte) []byte {
 	return rh.hash.Sum(data)
 }
 
 func (rh *ReadAndHash) GetSize() int64 {
 	return rh.size
+}
+
+func (rh *ReadAndHash) BlockSize() int {
+	return sha256.BlockSize
+}
+
+func (rh *ReadAndHash) Reset() {
+	rh.hash.Reset()
+}
+
+func (rh *ReadAndHash) Size() int {
+	return sha256.Size
 }
 
 func (rh *ReadAndHash) Close() error {
