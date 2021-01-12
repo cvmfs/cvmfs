@@ -537,7 +537,8 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 
 		if err := WithinTransaction(CVMFSRepo, func() error {
 			os.MkdirAll(dir, constants.DirPermision)
-			os.OpenFile(filepath.Join(dir, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			f, _ := os.OpenFile(filepath.Join(dir, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			f.Close()
 			return nil
 		}); err != nil {
 			return nil
@@ -565,7 +566,8 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				return fmt.Errorf("Different number of directories between the source and tha target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
 			}
 
-			os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			f, _ := os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			f.Close()
 			return nil
 		}, opt); err != nil {
 			return err
@@ -577,7 +579,8 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 		for {
 			header, err := layer.Next()
 			if err == io.EOF {
-				os.OpenFile(filepath.Join(sneakyChainPath, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+				f, _ := os.OpenFile(filepath.Join(sneakyChainPath, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+				f.Close()
 				return nil
 			}
 
@@ -637,6 +640,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 					}
 					if _, err = io.Copy(f, &layer); err != nil {
 						l.LogE(err).Error("Error in copying file from tar", path)
+						f.Close()
 						return err
 					}
 					f.Close()
