@@ -102,6 +102,10 @@ func ConvertWishFlat(wish WishFriendly) error {
 			continue
 		}
 
+		if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
+			l.LogE(err).Error("Error in creating catalog inside `.chains` directory")
+		}
+
 		err, lastChain := inputImage.CreateSneakyChainStructure(wish.CvmfsRepo)
 		if err != nil {
 			if firstError == nil {
@@ -315,6 +319,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 			if pathExists == false || forceDownload {
 
 				err = layer.IngestIntoCVMFS(repo)
+
 				if err != nil {
 					l.LogE(err).Error("Error in ingesting the layer in cvmfs")
 					noErrors = false

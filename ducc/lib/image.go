@@ -943,8 +943,12 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
 			for _, dir := range paths {
 				if err := os.MkdirAll(dir, constants.DirPermision); err != nil {
-					return nil
+					return err
 				}
+				// create the .cvmfscatalog, we don't really care if it fails
+				os.OpenFile(filepath.Join(dir, ".cvmfscatalog"),
+					os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+
 			}
 			return nil
 		})
