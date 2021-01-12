@@ -83,8 +83,13 @@ func Publish(CVMFSRepo string) error {
 			log.Fields{"repo": CVMFSRepo}).
 			Error("Error in publishing the repository")
 		abort(CVMFSRepo)
+		return err
 	}
-	return err
+
+	l.LogE(err).WithFields(
+		log.Fields{"repo": CVMFSRepo}).
+		Info("Publish complete")
+	return nil
 }
 
 func Abort(CVMFSRepo string) error {
