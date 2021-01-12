@@ -818,11 +818,11 @@ func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) e
 			// let's try again
 			continue
 		}
+		defer to_ingest.Close()
 		err = to_ingest.IngestIntoCVMFS(CVMFSRepo)
 		if err == nil {
 			return nil
 		}
-		to_ingest.Close()
 	}
 	return err
 }
