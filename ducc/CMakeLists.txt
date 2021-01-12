@@ -36,3 +36,7 @@ install (
   FILES ${CMAKE_BINARY_DIR}/cvmfs_ducc.service
   DESTINATION /usr/lib/systemd/system
 )
+
+install(
+	CODE "execute_process(COMMAND setcap \"cap_dac_override=ep cap_dac_read_search=ep cap_fowner=ep cap_chown=ep cap_sys_admin=ep cap_mknod=ep\" ${CMAKE_INSTALL_PREFIX}/bin/cvmfs_ducc)"
+)
