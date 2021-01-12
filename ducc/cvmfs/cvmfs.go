@@ -537,8 +537,11 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 
 		if err := WithinTransaction(CVMFSRepo, func() error {
 			os.MkdirAll(dir, constants.DirPermision)
-			f, _ := os.OpenFile(filepath.Join(dir, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-			f.Close()
+			f, err := os.OpenFile(filepath.Join(dir, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
 			return nil
 		}); err != nil {
 			return err
