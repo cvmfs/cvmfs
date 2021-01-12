@@ -14,7 +14,6 @@ etc/cvmfs/cvmfs_server_hooks.sh.demo
 var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 usr/share/cvmfs-server/webapi/*
 usr/share/cvmfs-server/webapi/*/*
-usr/share/cvmfs-server/webapi/*/*/*
 usr/share/cvmfs-server/generate_stats_plots.C
 usr/share/cvmfs-server/stats_index.html.tpl
 usr/share/cvmfs-server/upload_stats_plots.sh
