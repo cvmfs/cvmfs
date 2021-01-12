@@ -32,6 +32,8 @@ POSSIBILITY OF SUCH DAMAGE.
 // https://github.com/sylabs/singularity/blob/c2f720a6fcecf24a1b4859418b1b7778dac92022/internal/pkg/build/sources/base_environment.go
 // it is been adapted to fit the purposes of the project
 
+// we create the function MakeBaseEnv
+
 package singularity
 
 import (
@@ -412,7 +414,7 @@ func makeFiles(rootPath string) error {
 	return nil
 }
 
-func MakeBaseEnv(rootPath string) (err error) {
+func makeBaseEnv(rootPath string) (err error) {
 
 	var info os.FileInfo
 
@@ -442,4 +444,8 @@ func MakeBaseEnv(rootPath string) (err error) {
 	}
 
 	return err
+}
+
+func MakeBaseEnv(rootPath string) (err error) {
+	return makeBaseEnv(rootPath)
 }
