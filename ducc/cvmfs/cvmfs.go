@@ -541,7 +541,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			f.Close()
 			return nil
 		}); err != nil {
-			return nil
+			return err
 		}
 	}
 	// then we need the template transaction to populate it
@@ -562,6 +562,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			if err != nil {
 				return err
 			}
+
 			if len(sourceDirs) != len(destinationDirs) {
 				return fmt.Errorf("Different number of directories between the source and tha target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
 			}
