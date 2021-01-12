@@ -17,7 +17,7 @@
 
 #define LIBCVMFS_VERSION 2
 #define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
-#define LIBCVMFS_VERSION_MINOR 8
+#define LIBCVMFS_VERSION_MINOR 9
 // Revision Changelog
 // 13: revision introduced
 // 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context

@@ -1,3 +1,5 @@
+2.9.0:
+
 2.8.0:
   * Update maxminddb to version 1.5.4
   * Fix committing publications with gateway >= 1.2
