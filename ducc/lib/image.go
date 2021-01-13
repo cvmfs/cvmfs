@@ -948,8 +948,9 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 					return err
 				}
 				// create the .cvmfscatalog, we don't really care if it fails
-				os.OpenFile(filepath.Join(dir, ".cvmfscatalog"),
+				f, _ := os.OpenFile(filepath.Join(dir, ".cvmfscatalog"),
 					os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+				f.Close()
 			}
 			return nil
 		})
