@@ -38,6 +38,14 @@ const (
 
 func ConvertWishFlat(wish WishFriendly) error {
 	var firstError = error(nil)
+
+	// it may happend at the very first round that this two calls return an error, let it be
+	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
+		l.LogE(err).Error("Error in creating catalog inside `.chains` directory")
+	}
+	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".flat"); err != nil {
+		l.LogE(err).Error("Error in creating catalog inside `.flat` directory")
+	}
 	for _, inputImage := range wish.ExpandedTagImagesFlat {
 		publicSymlinkPath := inputImage.GetPublicSymlinkPath()
 		completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
@@ -100,10 +108,6 @@ func ConvertWishFlat(wish WishFriendly) error {
 				}
 			}
 			continue
-		}
-
-		if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
-			l.LogE(err).Error("Error in creating catalog inside `.chains` directory")
 		}
 
 		err, lastChain := inputImage.CreateSneakyChainStructure(wish.CvmfsRepo)

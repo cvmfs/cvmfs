@@ -582,6 +582,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 
 			if err != nil {
 				l.LogE(err).Error("Error in downloading a layer")
+				toSend.Close()
 				return
 			}
 			select {
@@ -660,9 +661,6 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			}
 			path := NewReadAndHash(gread)
 			toSend = newDownloadedLayer(layer.Digest, path)
-			l.Log().WithFields(
-				log.Fields{"layer": layer.Digest, "size in MB": (layer.Size / 1E6)}).
-				Info("Done downloading layer")
 			return toSend, nil
 		} else {
 			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
@@ -952,7 +950,6 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 				// create the .cvmfscatalog, we don't really care if it fails
 				os.OpenFile(filepath.Join(dir, ".cvmfscatalog"),
 					os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-
 			}
 			return nil
 		})
@@ -980,23 +977,22 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		downloadLayer := func() error {
 			// we need to get the layer tar reader here
 			layerStream, err := ld.DownloadLayer(manifest.Layers[i])
+
+			// we should call this even if there were issues in creating the file
+			defer layerStream.Close()
+
 			if err != nil {
 				l.LogE(err).Error("Error in downloading the layer from the docker registry")
 				return err
 			}
-			defer layerStream.Close()
-			// TODO(smosciat) this idea of saving in a file and then re-try can be a good idea
-			// maybe it can be implemented on lower level of
-			// the first time we just try to read from a network stream
-			// if this fail, we try to write to a real file,
-			// and then read from that file
-			var tarReader tar.Reader
-			tarReader = *tar.NewReader(layerStream.Path)
+
+			tarReader := *tar.NewReader(layerStream.Path)
 
 			err = cvmfs.CreateSneakyChain(CVMFSRepo,
 				chain.String(),
 				previous,
 				tarReader)
+
 			return err
 		}
 		for attempt := 0; attempt < 5; attempt++ {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	l "github.com/cvmfs/ducc/log"
 	temp "github.com/cvmfs/ducc/temp"
 )
 
@@ -28,16 +29,21 @@ type OnDiskReadAndHash struct {
 }
 
 func NewOnDiskReadAndHash(r io.ReadCloser) (*OnDiskReadAndHash, error) {
+	defer r.Close()
 	f, err := temp.UserDefinedTempFile()
 	if err != nil {
+		os.RemoveAll(f.Name())
 		return &OnDiskReadAndHash{}, err
 	}
 	if _, err = io.Copy(f, r); err != nil {
+		os.RemoveAll(f.Name())
 		return &OnDiskReadAndHash{}, err
 	}
 	if _, err := f.Seek(0, 0); err != nil {
+		os.RemoveAll(f.Name())
 		return &OnDiskReadAndHash{}, err
 	}
+	l.Log().Info("Done downloading")
 	readAndHash := NewReadAndHash(f)
 	return &OnDiskReadAndHash{ReadAndHash: *readAndHash, path: f.Name()}, nil
 }
