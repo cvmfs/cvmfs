@@ -18,7 +18,6 @@ import (
 
 	constants "github.com/cvmfs/ducc/constants"
 	da "github.com/cvmfs/ducc/docker-api"
-	fs "github.com/cvmfs/ducc/filesystem"
 	l "github.com/cvmfs/ducc/log"
 	temp "github.com/cvmfs/ducc/temp"
 )
@@ -490,40 +489,6 @@ func removeHashMarkerIfPresent(digest string) string {
 		return t[1]
 	}
 	return digest
-}
-
-func CreateChain(CVMFSRepo, chain, previous, layer string) error {
-	newChainPath := ChainPath(CVMFSRepo, chain)
-	layerPath := LayerRootfsPath(CVMFSRepo, removeHashMarkerIfPresent(layer))
-
-	opt := TemplateTransaction{
-		source:      TrimCVMFSRepoPrefix(layerPath),
-		destination: TrimCVMFSRepoPrefix(newChainPath)}
-
-	if previous != "" {
-		baseChainPath := ChainPath(CVMFSRepo, previous)
-		opt.source = TrimCVMFSRepoPrefix(baseChainPath)
-
-		return WithinTransaction(CVMFSRepo, func() error {
-			err := fs.ApplyDirectory(newChainPath, layerPath)
-			if err != nil {
-				l.LogE(err).Error("Error in Applying the layer on top of the chain")
-			}
-			return err
-		}, opt)
-	}
-
-	return WithinTransaction(CVMFSRepo, func() error {
-		if err := os.MkdirAll(newChainPath, constants.DirPermision); err != nil {
-			l.LogE(err).Error("Error in creating the first directory of the chain")
-			return err
-		}
-		err := fs.ApplyDirectory(newChainPath, layerPath)
-		if err != nil {
-			l.LogE(err).Error("Error in Applying the layer on top of the chain")
-		}
-		return err
-	})
 }
 
 func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.Reader) error {

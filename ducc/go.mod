@@ -1,7 +1,6 @@
 module github.com/cvmfs/ducc
 
 require (
-	bou.ke/monkey v1.0.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
@@ -14,7 +13,6 @@ require (
 	github.com/google/go-cmp v0.2.0 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.6.2 // indirect
-	github.com/iafan/cwalk v0.0.0-20191125092548-dd7f505d2f66
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/mattn/go-shellwords v1.0.3 // indirect
@@ -34,7 +32,7 @@ require (
 	github.com/vbatts/tar-split v0.11.1 // indirect
 	golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b // indirect
 	golang.org/x/net v0.0.0-20190119204137-ed066c81e75e // indirect
-	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4
+	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 // indirect
 	golang.org/x/sys v0.0.0-20201101102859-da207088b7d1
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
 	google.golang.org/grpc v1.18.0 // indirect
