@@ -434,6 +434,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   publish/c_repository.cc
   publish/main.cc
   publish/t_command.cc
+  publish/t_env.cc
   publish/t_diff.cc
   publish/t_session.cc
   publish/t_repository.cc
@@ -450,7 +451,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/command.cc
   ${CVMFS_SOURCE_DIR}/publish/except.cc
   ${CVMFS_SOURCE_DIR}/publish/repository.cc
-  ${CVMFS_SOURCE_DIR}/publish/repository_capabilities.cc
+  ${CVMFS_SOURCE_DIR}/publish/repository_env.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_managed.cc
   ${CVMFS_SOURCE_DIR}/publish/repository_session.cc

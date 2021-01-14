@@ -96,14 +96,6 @@ cvmfs_run_test() {
   echo "check if repostory is sane"
   check_repository $legacy_repo_name -i || return 3
 
-  if uses_overlayfs $legacy_repo_name; then
-    echo "check if OverlayFS warning is present"
-    cat $import_log | grep -e 'Warning'                          || return 101
-    cat $import_log | grep -e 'using OverlayFS'                  || return 101
-    cat $import_log | grep -e 'AUFS'                             || return 101
-    cat $import_log | grep -e 'cvmfs_server eliminate-hardlinks' || return 101
-  fi
-
   echo "count the number of hardlinked files (expecting 18)"
   [ $(count_hardlinks $repo_dir) -eq 18 ] || return 4
 

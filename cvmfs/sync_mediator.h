@@ -36,9 +36,11 @@
 #include "compression.h"
 #include "file_chunk.h"
 #include "platform.h"
+#include "publish/repository.h"
 #include "statistics.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
+#include "util/pointer.h"
 #include "util/shared_ptr.h"
 #include "xattr.h"
 
@@ -49,6 +51,43 @@ class Manifest;
 struct Counters;
 
 namespace publish {
+
+class SyncDiffReporter : public DiffListener {
+ public:
+  enum PrintAction {
+    kPrintDots,
+    kPrintChanges
+  };
+
+  explicit SyncDiffReporter(PrintAction print_action = kPrintChanges,
+                            unsigned int processing_dot_interval = 100)
+      : print_action_(print_action),
+        processing_dot_interval_(processing_dot_interval),
+        changed_items_(0) {}
+
+  virtual void OnInit(const history::History::Tag &from_tag,
+                      const history::History::Tag &to_tag);
+  virtual void OnStats(const catalog::DeltaCounters &delta);
+
+  virtual void OnAdd(const std::string &path,
+                     const catalog::DirectoryEntry &entry);
+  virtual void OnRemove(const std::string &path,
+                        const catalog::DirectoryEntry &entry);
+  virtual void OnModify(const std::string &path,
+                        const catalog::DirectoryEntry &entry_from,
+                        const catalog::DirectoryEntry &entry_to);
+  void CommitReport();
+
+ private:
+  void PrintDots();
+  void AddImpl(const std::string &path);
+  void RemoveImpl(const std::string &path);
+  void ModifyImpl(const std::string &path);
+
+  PrintAction print_action_;
+  unsigned int processing_dot_interval_;
+  unsigned int changed_items_;
+};
 
 /**
  * If we encounter a file with linkcount > 1 it will be added to a HardlinkGroup
@@ -139,20 +178,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
   }
 
  private:
-  enum ChangesetAction {
-    kAdd,
-    kAddCatalog,
-    kAddHardlinks,
-    kTouch,
-    kRemove,
-    kRemoveCatalog
-  };
-
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
   typedef std::vector<HardlinkGroup> HardlinkGroupList;
-
-  void PrintChangesetNotice(const ChangesetAction action,
-                            const std::string &extra_info) const;
 
   void EnsureAllowed(SharedPtr<SyncItem> entry);
 
@@ -272,6 +299,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
    */
   XattrList default_xattrs_;
   UniquePtr<perf::FsCounters> counters_;
+
+  UniquePtr<SyncDiffReporter> reporter_;
 };  // class SyncMediator
 
 }  // namespace publish

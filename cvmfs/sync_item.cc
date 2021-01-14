@@ -138,8 +138,8 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
     // should not happen (actually AUFS prevents users from creating whiteouts)
     // but can be provoked through an AUFS 'bug' (see test 593 or CVM-880).
     // --> Warn the user, continue with kItemUnknown and cross your fingers!
-    PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not "
-                 "found in repository.");
+    PrintWarning("'" + GetRelativePath() +
+                 "' should be deleted, but was not found in repository.");
   }
 }
 

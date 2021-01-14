@@ -1027,6 +1027,7 @@ bool RemoveTree(const std::string &path) {
   FileSystemTraversal<RemoveTreeHelper> traversal(remove_tree_helper, "",
                                                   true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_character_dev = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_socket = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_fifo = &RemoveTreeHelper::RemoveFile;

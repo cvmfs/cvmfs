@@ -25,6 +25,18 @@ while sudo echo "foo" 2>&1 | grep -q "unable to resolve host"; do
 done
 echo "done"
 
+echo -n "wait for name resolution to work properly... "
+timeout=1800
+while ! ping -c2 ecsft.cern.ch 2>&1; do
+  sleep 1
+  timeout=$(( $timeout - 1 ))
+  if [ $timeout -le 0 ]; then
+    echo "FAIL!"
+    exit 1
+  fi
+done
+echo "done"
+
 # update package manager cache
 echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"

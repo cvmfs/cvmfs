@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <map>
 #include <string>
 
 #include "compression.h"
@@ -89,6 +90,10 @@ class SettingsSpoolArea {
   void SetUnionMount(const std::string &path);
   void SetRepairMode(const EUnionMountRepairMode val);
 
+  // Creates, if necessary, all the directories in the spool area and the temp
+  // directory.  Does not take care of the union mount point.
+  void EnsureDirectories();
+
   std::string workspace() const { return workspace_; }
   std::string tmp_dir() const { return tmp_dir_; }
   std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
@@ -96,10 +101,13 @@ class SettingsSpoolArea {
      return workspace_() + "/cvmfs_io";
   }
   std::string union_mnt() const { return union_mnt_; }
-  std::string scratch_dir() const { return workspace_() + "/scratch/current"; }
+  std::string scratch_base() const { return workspace_() + "/scratch"; }
+  std::string scratch_dir() const { return scratch_base() + "/current"; }
+  std::string log_dir() const { return workspace() + "/logs"; }
+  // TODO(jblomer): shouldn't this be in /etc/cvmfs/repositor.../client.conf
   std::string client_config() const { return workspace_() + "/client.config"; }
   std::string client_lconfig() const { return workspace_() + "/client.local"; }
-  std::string client_log() const { return workspace_() + "/usyslog.log"; }
+  std::string client_log() const { return log_dir() + "/cvmfs.log"; }
   std::string cache_dir() const { return workspace_() + "/cache"; }
   std::string ovl_work_dir() const { return workspace_() + "/ovl_work"; }
   std::string checkout_marker() const { return workspace_() + "/checkout"; }
@@ -147,6 +155,7 @@ class SettingsTransaction {
     // SyncParameters::kDefaultMinWeight
     , autobalance_min_weight_(1000)
     , print_changeset_(false)
+    , dry_run_(false)
     , union_fs_(kUnionFsUnknown)
     , timeout_s_(0)
     , spool_area_(fqrn)
@@ -165,6 +174,7 @@ class SettingsTransaction {
   void SetAutobalanceMaxWeight(unsigned value);
   void SetAutobalanceMinWeight(unsigned value);
   void SetPrintChangeset(bool value);
+  void SetDryRun(bool value);
   void SetTimeout(unsigned seconds);
   void SetLeasePath(const std::string &path);
   void SetTemplate(const std::string &from, const std::string &to);
@@ -197,6 +207,7 @@ class SettingsTransaction {
   unsigned autobalance_max_weight() const { return autobalance_max_weight_; }
   unsigned autobalance_min_weight() const { return autobalance_min_weight_; }
   bool print_changeset() const { return print_changeset_; }
+  bool dry_run() const { return dry_run_; }
   std::string voms_authz() const { return voms_authz_; }
   UnionFsType union_fs() const { return union_fs_; }
   std::string lease_path() const { return lease_path_; }
@@ -236,6 +247,7 @@ class SettingsTransaction {
   Setting<unsigned> autobalance_max_weight_;
   Setting<unsigned> autobalance_min_weight_;
   Setting<bool> print_changeset_;
+  Setting<bool> dry_run_;
   Setting<std::string> voms_authz_;
   Setting<UnionFsType> union_fs_;
   /**
@@ -462,10 +474,12 @@ class SettingsBuilder : SingleCopy {
   /**
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
-   * Otherweise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
+   * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
    * If alias is an empty string, the command still succeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    * If needs_managed is true, remote repositories are rejected
+   * In an "enter environment" (see cmd_enter), the spool area of the enter
+   * environment is applied.
    */
   SettingsPublisher* CreateSettingsPublisher(
       const std::string &ident, bool needs_managed = false);
@@ -489,6 +503,17 @@ class SettingsBuilder : SingleCopy {
    * on the same node.
    */
   std::string GetSingleAlias();
+
+  /**
+   * If in a ephemeral writable shell, parse $session_dir/env.conf
+   * Otherwise return an empty map. A non-empty map has at least CVMFS_FQRN set.
+   */
+  std::map<std::string, std::string> GetSessionEnvironment();
+
+  /**
+   * Create settings from an ephermal writable shell
+   */
+  SettingsPublisher* CreateSettingsPublisherFromSession();
 };  // class SettingsBuilder
 
 }  // namespace publish

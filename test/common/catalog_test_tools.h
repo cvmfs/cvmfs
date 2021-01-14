@@ -164,6 +164,10 @@ class CatalogTestTool : public ServerTool {
   // configurations
   void DestroyCatalogManager() { catalog_mgr_.Destroy(); }
 
+  // ApplyAtRootHash creates the new catalog but does not write out the
+  // updated manifest
+  void UpdateManifest();
+
  private:
   static upload::Spooler* CreateSpooler(const std::string& config);
 

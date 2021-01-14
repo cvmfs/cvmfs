@@ -64,9 +64,7 @@ cvmfs_run_test() {
   fi
   check_trace 7 listxattr "/README"  || return 17
   check_trace 8 getxattr "/README"   || return 18
-  if running_on_osx; then
-    check_trace 6 getattr "/glite"   || return 19
-  else
+  if ! running_on_osx; then
     check_trace 4 lookup "/glite"    || return 19
     check_trace 4 lookup "/util"     || return 21
   fi

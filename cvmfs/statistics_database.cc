@@ -100,15 +100,16 @@ struct GcStats {
   std::string n_condemned_objects;
   std::string sz_condemned_bytes;
 
-  explicit GcStats(const perf::Statistics *statistics):
-    n_preserved_catalogs(statistics->
-                    Lookup("gc.n_preserved_catalogs")->ToString()),
-    n_condemned_catalogs(statistics->
-                    Lookup("gc.n_condemned_catalogs")->ToString()),
-    n_condemned_objects(statistics->
-                    Lookup("gc.n_condemned_objects")->ToString()),
-    sz_condemned_bytes(statistics->
-                    Lookup("gc.sz_condemned_bytes")->ToString()) {
+  explicit GcStats(const perf::Statistics *statistics) {
+    perf::Counter *c = NULL;
+    c = statistics->Lookup("gc.n_preserved_catalogs");
+    n_preserved_catalogs = c ? c->ToString() : "0";
+    c = statistics->Lookup("gc.n_condemned_catalogs");
+    n_condemned_catalogs = c ? c->ToString() : "0";
+    c = statistics->Lookup("gc.n_condemned_objects");
+    n_condemned_objects = c ? c->ToString() : "0";
+    c = statistics->Lookup("gc.sz_condemned_bytes");
+    sz_condemned_bytes = c ? c->ToString() : "0";
   }
 };
 

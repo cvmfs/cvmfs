@@ -1,4 +1,20 @@
+2.9.0:
+
 2.8.0:
+  * Update maxminddb to version 1.5.4
+  * Fix committing publications with gateway >= 1.2
+  * Fix cvmfs_config status for broken mountpoints (CVM-1959)
+  * Improve network error handling during GC (CVM-1957)
+  * [macOS] fix reload on macOS >= 10.15
+  * Fix reload if only config repository is mounted
+  * Log when geosort ends up switching a proxy (CVM-1920)
+  * [server] fix stuck Apache processes with disabled geo API (CVM-1956)
+  * [ducc] add support for podman image store meta-data
+  * Add experimental `cvmfs_server diff --worktree` command (CVM-1869)
+  * New defaults overlayfs over aufs and CVMFS_IGNORE_XDIR_HARDLINKS (CVM-1909)
+  * [macOS] update to macFUSE 4 (CVM-1960)
+  * [ducc] preserve timestamp of extracted files (CVM-1950)
+  * [libcvmfs] implement cvmfs_remount(), add cvmfs_get_revision() (CVM-1958)
   * Fix reflog repair when there is a zombie hash in the manifest (CVM-1919)
   * [server] add `enter` command to open an ephemeral environment that gives
     writable access to a repository (CVM-1924)
@@ -57,6 +73,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.6:
+  * Improve reporting of .cvmfsdirtab errors
 
 2.7.5:
   * Fix crash when kernel meta-data caches close to 4G get evicted (CVM-1918)

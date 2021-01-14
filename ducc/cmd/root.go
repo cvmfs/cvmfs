@@ -31,7 +31,7 @@ func EntryPoint() {
 func AliveMessage() {
 	ticker := time.NewTicker(30 * time.Second)
 	go func() {
-		for _ = range ticker.C {
+		for range ticker.C {
 			lib.Log().Info("Process alive")
 		}
 	}()

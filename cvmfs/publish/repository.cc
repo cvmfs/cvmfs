@@ -646,20 +646,30 @@ Publisher::Publisher(const SettingsPublisher &settings)
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
 
+  bool check_keys_match = true;
   int rvb;
   rvb =
     signature_mgr_->LoadCertificatePath(settings.keychain().certificate_path());
-  if (!rvb) throw EPublish("cannot load certificate");
+  if (!rvb) {
+    check_keys_match = false;
+    LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
+             "Warning: cannot load certificate, thus cannot commit changes");
+  }
   rvb = signature_mgr_->LoadPrivateKeyPath(
     settings.keychain().private_key_path(), "");
-  if (!rvb) throw EPublish("cannot load private key");
+  if (!rvb) {
+    check_keys_match = false;
+    LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
+             "Warning: cannot load private key, thus cannot commit changes");
+  }
   // The private master key might be on a key card instead
   if (FileExists(settings.keychain().master_private_key_path())) {
     rvb = signature_mgr_->LoadPrivateMasterKeyPath(
       settings.keychain().master_private_key_path());
     if (!rvb) throw EPublish("cannot load private master key");
   }
-  if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
+  if (check_keys_match && !signature_mgr_->KeysMatch())
+    throw EPublish("corrupted keychain");
 
   if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
     if (!settings.keychain().HasGatewayKey()) {
@@ -729,6 +739,7 @@ void Publisher::ConstructSyncManagers() {
     // p->spooler_definition = SHOULD NOT BE NEEDED;
     // p->union_fs_type = SHOULD NOT BE NEEDED
     p->print_changeset = settings_.transaction().print_changeset();
+    p->dry_run = settings_.transaction().dry_run();
     sync_parameters_ = p;
   }
 
@@ -785,22 +796,27 @@ void Publisher::Sync() {
   sync_union_->Traverse();
   bool rvb = sync_mediator_->Commit(manifest_);
   if (!rvb) throw EPublish("cannot write change set to storage");
-  spooler_files_->WaitForUpload();
-  spooler_catalogs_->WaitForUpload();
-  spooler_files_->FinalizeSession(false /* commit */);
 
-  const std::string old_root_hash =
-    settings_.transaction().base_hash().ToString(true /* with_suffix */);
-  const std::string new_root_hash =
-    manifest_->catalog_hash().ToString(true /* with_suffix */);
-  rvb = spooler_catalogs_->FinalizeSession(true /* commit */,
-    old_root_hash, new_root_hash,
-    /* TODO(jblomer) */ sync_parameters_->repo_tag);
-  if (!rvb)
-    throw EPublish("failed to commit transaction");
+  if (!settings_.transaction().dry_run()) {
+    spooler_files_->WaitForUpload();
+    spooler_catalogs_->WaitForUpload();
+    spooler_files_->FinalizeSession(false /* commit */);
 
-  // Reset to the new catalog root hash
-  settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
+    const std::string old_root_hash =
+      settings_.transaction().base_hash().ToString(true /* with_suffix */);
+    const std::string new_root_hash =
+      manifest_->catalog_hash().ToString(true /* with_suffix */);
+    rvb = spooler_catalogs_->FinalizeSession(true /* commit */,
+      old_root_hash, new_root_hash,
+      /* TODO(jblomer) */ sync_parameters_->repo_tag);
+    if (!rvb)
+      throw EPublish("failed to commit transaction");
+
+    // Reset to the new catalog root hash
+    settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
+    WipeScratchArea();
+  }
+
   delete sync_union_;
   delete sync_mediator_;
   delete sync_parameters_;
@@ -809,10 +825,11 @@ void Publisher::Sync() {
   sync_mediator_ = NULL;
   sync_parameters_ = NULL;
   catalog_mgr_ = NULL;
-  WipeScratchArea();
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %d", manifest_->revision());
-  reflog_->AddCatalog(manifest_->catalog_hash());
+  if (!settings_.transaction().dry_run()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %d", manifest_->revision());
+    reflog_->AddCatalog(manifest_->catalog_hash());
+  }
 }
 
 void Publisher::Publish() {

@@ -15,8 +15,9 @@ func init() {
 	loopCmd.Flags().BoolVarP(&overwriteLayer, "overwrite-layers", "f", false, "overwrite the layer if they are already inside the CVMFS repository")
 	loopCmd.Flags().BoolVarP(&convertAgain, "convert-again", "g", false, "convert again images that are already successfull converted")
 	loopCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat images (compatible with singularity)")
-	loopCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image")
+	loopCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
 	loopCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
+	loopCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
 	rootCmd.AddCommand(loopCmd)
 }
 
@@ -68,9 +69,21 @@ var loopCmd = &cobra.Command{
 					"output image": wish.OutputName}
 				lib.Log().WithFields(fields).Info("Start conversion of wish")
 				if !skipLayers {
-					err = lib.ConvertWishDocker(wish, convertAgain, overwriteLayer, !skipThinImage)
+					err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+					}
+				}
+				if !skipThinImage {
+					err = lib.ConvertWishDocker(wish)
 					if err != nil {
 						lib.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+					}
+				}
+				if !skipPodman {
+					err = lib.ConvertWishPodman(wish, convertAgain)
+					if err != nil {
+						lib.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
 					}
 				}
 				if !skipFlat {

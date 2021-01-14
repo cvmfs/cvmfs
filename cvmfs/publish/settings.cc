@@ -5,10 +5,13 @@
 #include "cvmfs_config.h"
 #include "publish/settings.h"
 
+#include <unistd.h>
+
 #include <cstdlib>
 #include <string>
 #include <vector>
 
+#include "hash.h"
 #include "options.h"
 #include "publish/except.h"
 #include "publish/repository.h"
@@ -37,6 +40,22 @@ void SettingsSpoolArea::SetUnionMount(const std::string &path) {
 
 void SettingsSpoolArea::SetRepairMode(const EUnionMountRepairMode val) {
   repair_mode_ = val;
+}
+
+void SettingsSpoolArea::EnsureDirectories() {
+  std::vector<std::string> targets;
+  targets.push_back(tmp_dir());
+  targets.push_back(readonly_mnt());
+  targets.push_back(scratch_dir());
+  targets.push_back(cache_dir());
+  targets.push_back(log_dir());
+  targets.push_back(ovl_work_dir());
+
+  for (unsigned i = 0; i < targets.size(); ++i) {
+    bool rv = MkdirDeep(targets[i], 0700, true /* veryfy_writable */);
+    if (!rv)
+      throw publish::EPublish("cannot create directory " + targets[i]);
+  }
 }
 
 
@@ -90,6 +109,10 @@ void SettingsTransaction::SetAutobalanceMinWeight(unsigned value) {
 
 void SettingsTransaction::SetPrintChangeset(bool value) {
   print_changeset_ = value;
+}
+
+void SettingsTransaction::SetDryRun(bool value) {
+  dry_run_ = value;
 }
 
 void SettingsTransaction::SetUnionFsType(const std::string &union_fs) {
@@ -329,7 +352,37 @@ SettingsBuilder::~SettingsBuilder() {
 }
 
 
+std::map<std::string, std::string> SettingsBuilder::GetSessionEnvironment() {
+  std::map<std::string, std::string> result;
+  std::string session_dir = Env::GetEnterSessionDir();
+  if (session_dir.empty())
+    return result;
+
+  // Get the repository name from the ephemeral writable shell
+  BashOptionsManager omgr;
+  omgr.set_taint_environment(false);
+  omgr.ParsePath(session_dir + "/env.conf", false /* external */);
+
+  // We require at least CVMFS_FQRN to be set
+  std::string fqrn;
+  if (!omgr.GetValue("CVMFS_FQRN", &fqrn)) {
+    throw EPublish("no repositories found in ephemeral writable shell",
+                   EPublish::kFailInvocation);
+  }
+
+  std::vector<std::string> keys = omgr.GetAllKeys();
+  for (unsigned i = 0; i < keys.size(); ++i) {
+    result[keys[i]] = omgr.GetValueOrDie(keys[i]);
+  }
+  return result;
+}
+
+
 std::string SettingsBuilder::GetSingleAlias() {
+  std::map<std::string, std::string> session_env = GetSessionEnvironment();
+  if (!session_env.empty())
+    return session_env["CVMFS_FQRN"];
+
   std::vector<std::string> repositories = FindDirectories(config_path_);
   if (repositories.empty()) {
     throw EPublish("no repositories available in " + config_path_,
@@ -395,20 +448,68 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   return settings;
 }
 
+
+SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
+  std::string session_dir = Env::GetEnterSessionDir();
+  std::map<std::string, std::string> session_env = GetSessionEnvironment();
+  std::string fqrn = session_env["CVMFS_FQRN"];
+
+  UniquePtr<SettingsPublisher> settings_publisher(
+      new SettingsPublisher(SettingsRepository(fqrn)));
+  // TODO(jblomer): work in progress
+  settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
+    session_dir);
+
+  std::string xattr;
+  bool rvb = platform_getxattr(
+    settings_publisher->transaction().spool_area().readonly_mnt(),
+    "user.root_hash", &xattr);
+  if (!rvb) {
+    throw EPublish("cannot get extrended attribute root_hash");
+  }
+
+  BashOptionsManager omgr;
+  omgr.set_taint_environment(false);
+  omgr.ParsePath(settings_publisher->transaction().spool_area().client_config(),
+                 false /* external */);
+
+  std::string arg;
+  if (omgr.GetValue("CVMFS_SERVER_URL", &arg))
+    settings_publisher->SetUrl(arg);
+  if (omgr.GetValue("CVMFS_KEYS_DIR", &arg))
+    settings_publisher->GetKeychain()->SetKeychainDir(arg);
+  settings_publisher->GetTransaction()->SetLayoutRevision(
+    Publisher::kRequiredLayoutRevision);
+  settings_publisher->GetTransaction()->SetBaseHash(shash::MkFromHexPtr(
+    shash::HexPtr(xattr), shash::kSuffixCatalog));
+  settings_publisher->GetTransaction()->SetUnionFsType("overlayfs");
+  settings_publisher->SetOwner(geteuid(), getegid());
+
+  return settings_publisher.Release();
+}
+
+
 SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   const std::string &ident, bool needs_managed)
 {
   // we are creating a publisher, it need to have the `server.conf` file
   // present, otherwise something is wrong and we should exit early
   const std::string alias(ident.empty() ? GetSingleAlias() : ident);
+
+  std::map<std::string, std::string> session_env = GetSessionEnvironment();
+  // We can be in an ephemeral writable shell but interested in a different
+  // repository
+  if (!session_env.empty() && (session_env["CVMFS_FQRN"] == alias))
+    return CreateSettingsPublisherFromSession();
+
   const std::string server_path = config_path_ + "/" + alias + "/server.conf";
 
-  if (FileExists(server_path) == false)
+  if (FileExists(server_path) == false) {
     throw EPublish(
         "Unable to find the configuration file `server.conf` for the cvmfs "
-        "publisher: " +
-            alias,
+        "publisher: " + alias,
         EPublish::kFailRepositoryNotFound);
+  }
 
   SettingsRepository settings_repository = CreateSettingsRepository(alias);
   if (needs_managed && !IsManagedRepository())
