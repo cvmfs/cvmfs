@@ -20,14 +20,17 @@ def catch_all(path):
         if tag:
             image = f'{image}:{tag}'
 
-        message = f'{action}|{image}'
 
         notification_file = f'{action}.notifications.txt'
         with open(notification_file, 'a+') as f:
-            f.write(f'{message}\n')
+            f.write(f'{image}\n')
 
+        message = f'{action}|{image}'
         with open('notifications.txt', 'a+') as f:
             f.write(f'{message}\n')
 
         print(f'{action}|{image}')
     return "ok"
+
+if __name__ == '__main__':
+    app.run()

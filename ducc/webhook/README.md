@@ -7,3 +7,9 @@ Run with
 ```
 FLASK_APP=app.py flask run --port=8080
 ```
+
+or with 
+
+```
+FLASK_APP=app.py python3 -m flask run --port=8080
+```
