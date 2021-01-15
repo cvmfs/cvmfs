@@ -7,8 +7,42 @@ app = Flask(__name__)
 
 @app.route("/<path:p>", methods=["POST"])
 def catch_all(p):
-    # pprint.pprint(request.json)
-    for event in request.json['events']:
+    try:
+        for (action, image) in handle_dockerhub(request.json):
+
+            publish_message(action, image)
+
+        return "ok"
+    except Exception:
+        pass
+
+    try:
+        for (action, image) in handle_harbor(request.json):
+
+            publish_message(action, image)
+
+        return "ok"
+    except Exception:
+        pass
+
+    pprint.pprint(request.json)
+    return "ok"
+
+def publish_message(action, image):
+    notification_file = f'{action}.notifications.txt'
+    with open(notification_file, 'a+') as f:
+        f.write(f'{image}\n')
+
+    message = f'{action}|{image}'
+    with open('notifications.txt', 'a+') as f:
+        f.write(f'{message}\n')
+
+    print(f'{action}|{image}')
+
+
+
+def handle_dockerhub(rjson):
+    for event in rjson['events']:
         action = event['action']
         # we need the protocol, the host, the repositor and the tag
         protocol = event['target']['url'].split(':')[0]
@@ -20,6 +54,7 @@ def catch_all(p):
         if tag:
             image = f'{image}:{tag}'
 
+        yield (action, image)
 
         notification_file = f'{action}.notifications.txt'
         with open(notification_file, 'a+') as f:
@@ -29,8 +64,14 @@ def catch_all(p):
         with open('notifications.txt', 'a+') as f:
             f.write(f'{message}\n')
 
-        print(f'{action}|{image}')
-    return "ok"
+def handle_harbor(rjson):
+    actions = {'PUSH_ARTIFACT': 'push'}
+    for event in rjson['even_data']['resources']:
+        resource_url = event['resource_url']
+        image = f'https://{resource_url}'
+
+        yield (actions[rjson['type']], image)
+
 
 if __name__ == '__main__':
     app.run()
