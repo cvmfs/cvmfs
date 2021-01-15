@@ -68,7 +68,7 @@ def handle_dockerhub(rjson):
 
 def handle_harbor(rjson):
     actions = {'PUSH_ARTIFACT': 'push'}
-    for event in rjson['even_data']['resources']:
+    for event in rjson['event_data']['resources']:
         resource_url = event['resource_url']
         image = f'https://{resource_url}'
 
