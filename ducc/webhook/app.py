@@ -5,8 +5,8 @@ import pprint
 
 app = Flask(__name__)
 
-@app.route("/<path>", methods=["POST"])
-def catch_all(path):
+@app.route("/<path:p>", methods=["POST"])
+def catch_all(p):
     # pprint.pprint(request.json)
     for event in request.json['events']:
         action = event['action']
