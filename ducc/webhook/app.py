@@ -8,22 +8,24 @@ app = Flask(__name__)
 @app.route("/<path:p>", methods=["POST"])
 def catch_all(p):
     try:
-        for (action, image) in handle_dockerhub(request.json):
-
-            publish_message(action, image)
-
-        return "ok"
-    except Exception:
-        pass
-
-    try:
         for (action, image) in handle_harbor(request.json):
 
             publish_message(action, image)
 
         return "ok"
-    except Exception:
-        pass
+    except Exception as e:
+        print("Fail to handle the harbor hook")
+        print(e)
+
+    try:
+        for (action, image) in handle_dockerhub(request.json):
+
+            publish_message(action, image)
+
+        return "ok"
+    except Exception as e:
+        print("Fail to handle the dockerhub hook")
+        print(e)
 
     pprint.pprint(request.json)
     return "ok"
