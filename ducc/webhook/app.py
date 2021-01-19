@@ -28,7 +28,7 @@ def catch_all(p):
         print(e)
 
     pprint.pprint(request.json)
-    return "ok"
+    return "ko", 500
 
 def publish_message(action, image):
     notification_file = f'{action}.notifications.txt'
@@ -67,7 +67,7 @@ def handle_dockerhub(rjson):
             f.write(f'{message}\n')
 
 def handle_harbor(rjson):
-    actions = {'PUSH_ARTIFACT': 'push'}
+    actions = {'PUSH_ARTIFACT': 'push', 'DELETE_ARTIFACT': 'delete'}
     for event in rjson['event_data']['resources']:
         resource_url = event['resource_url']
         image = f'https://{resource_url}'
