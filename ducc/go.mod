@@ -9,7 +9,7 @@ require (
 	github.com/docker/docker v0.0.0-20190123164140-de86ba27fbea
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.3.3 // indirect
-	github.com/gofrs/flock v0.8.0
+	github.com/gofrs/flock v0.8.0 // indirect
 	github.com/gogo/protobuf v1.2.0 // indirect
 	github.com/google/go-cmp v0.2.0 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
@@ -26,6 +26,7 @@ require (
 	github.com/otiai10/copy v1.3.0
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pkg/xattr v0.4.3
+	github.com/rubyist/lockfile v0.0.0-20140818014254-a66de41d77a7
 	github.com/sirupsen/logrus v1.3.0
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3 // indirect

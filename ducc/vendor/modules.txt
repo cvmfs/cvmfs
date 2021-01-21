@@ -61,8 +61,6 @@ github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.3.3
 github.com/docker/go-units
-# github.com/gofrs/flock v0.8.0
-github.com/gofrs/flock
 # github.com/gogo/protobuf v1.2.0
 github.com/gogo/protobuf/proto
 # github.com/inconshreveable/mousetrap v1.0.0
@@ -93,6 +91,8 @@ github.com/otiai10/copy
 github.com/pkg/errors
 # github.com/pkg/xattr v0.4.3
 github.com/pkg/xattr
+# github.com/rubyist/lockfile v0.0.0-20140818014254-a66de41d77a7
+github.com/rubyist/lockfile
 # github.com/sirupsen/logrus v1.3.0
 github.com/sirupsen/logrus
 # github.com/spf13/cobra v0.0.3

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gofrs/flock"
+	"github.com/rubyist/lockfile"
 
 	exec "github.com/cvmfs/ducc/exec"
 	l "github.com/cvmfs/ducc/log"
@@ -31,25 +31,27 @@ func (t TemplateTransaction) ToString() string {
 }
 
 var locksMap = make(map[string]*sync.Mutex)
-var processesLocks = make(map[string]*flock.Flock)
+var processesLocks = make(map[string]*lockfile.FcntlLockfile)
 var lockMap = &sync.Mutex{}
 
 func getLock(CVMFSRepo string) {
 	lockMap.Lock()
-	l := locksMap[CVMFSRepo]
-	if l == nil {
+	lc := locksMap[CVMFSRepo]
+	if lc == nil {
 		locksMap[CVMFSRepo] = &sync.Mutex{}
-		l = locksMap[CVMFSRepo]
+		lc = locksMap[CVMFSRepo]
 	}
 	f := processesLocks[CVMFSRepo]
 	if f == nil {
-		f = flock.New("/tmp/DUCC.lock")
+		f = lockfile.NewFcntlLockfile("/tmp/DUCC.lock")
 		processesLocks[CVMFSRepo] = f
 		f = processesLocks[CVMFSRepo]
 	}
 	lockMap.Unlock()
-	l.Lock()
-	f.Lock()
+	lc.Lock()
+	if err := f.LockWriteB(); err != nil {
+		l.LogE(err).Error("Error in locking the file")
+	}
 }
 
 func unlock(CVMFSRepo string) {
