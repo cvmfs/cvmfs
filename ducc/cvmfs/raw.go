@@ -43,9 +43,13 @@ func getLock(CVMFSRepo string) {
 		lc = locksMap[CVMFSRepo]
 	}
 	lc.Lock()
+	lockMap.Unlock()
 
 	err := lockFile.LockWriteB()
 	for err != nil {
+		// this may happen if the kernel detect a deadlock
+		// it should never happen in our case, (of a single global lock)
+		// but still we can protect against it
 		l.LogE(err).Info("Error in getting the FS lock")
 		time.Sleep(100 * time.Millisecond)
 		err = lockFile.LockWriteB()
