@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rubyist/lockfile"
-
 	exec "github.com/cvmfs/ducc/exec"
 	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
@@ -32,8 +30,8 @@ func (t TemplateTransaction) ToString() string {
 }
 
 var locksMap = make(map[string]*sync.Mutex)
+var locksFile = make(map[string]fSLock)
 var lockMap = &sync.Mutex{}
-var lockFile = lockfile.NewFcntlLockfile("/tmp/DUCC.lock")
 
 func getLock(CVMFSRepo string) {
 	lockMap.Lock()
@@ -42,26 +40,33 @@ func getLock(CVMFSRepo string) {
 		locksMap[CVMFSRepo] = &sync.Mutex{}
 		lc = locksMap[CVMFSRepo]
 	}
+	f := locksFile[CVMFSRepo]
+	if f == nil {
+		f = newFSLock("/tmp/DUCC.lock")
+		locksFile[CVMFSRepo] = f
+		f = locksFile[CVMFSRepo]
+	}
 	lc.Lock()
 	lockMap.Unlock()
 
-	err := lockFile.LockWriteB()
+	err := f.LockWriteB()
 	for err != nil {
 		// this may happen if the kernel detect a deadlock
 		// it should never happen in our case, (of a single global lock)
 		// but still we can protect against it
 		l.LogE(err).Info("Error in getting the FS lock")
 		time.Sleep(100 * time.Millisecond)
-		err = lockFile.LockWriteB()
+		err = f.LockWriteB()
 	}
 }
 
 func unlock(CVMFSRepo string) {
 	lockMap.Lock()
 	l := locksMap[CVMFSRepo]
+	f := locksFile[CVMFSRepo]
 	lockMap.Unlock()
 	l.Unlock()
-	lockFile.Unlock()
+	f.Unlock()
 }
 
 func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...TransactionOption) error {
