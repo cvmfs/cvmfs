@@ -872,6 +872,27 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		}
 	}
 
+	dirtyChains := cvmfs.GetDirtyChains(CVMFSRepo)
+	if len(dirtyChains) > 0 {
+		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
+			for _, chain := range dirtyChains {
+				chainPath := cvmfs.ChainPath(CVMFSRepo, chain)
+				dirtyChainPath := cvmfs.DirtyChainPath(CVMFSRepo, chain)
+				if err := os.RemoveAll(chainPath); err != nil {
+					return err
+				}
+				if err := os.RemoveAll(dirtyChainPath); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			l.LogE(err).Error("Error in deleting dirty chains, unsafe to continue")
+			return
+		}
+	}
+
 	ld := NewLayerDownloader(img)
 	for i, chain := range chainIDs {
 		digest := chain.String()

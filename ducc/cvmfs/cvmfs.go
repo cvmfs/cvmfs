@@ -377,6 +377,26 @@ func ChainPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.ChainSubDir, layerDigest[0:2], layerDigest)
 }
 
+func DirtyChainPath(CVMFSRepo, layerDigest string) string {
+	layerDigest = removeHashMarkerIfPresent(layerDigest)
+	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.DirtyChainSubDir, layerDigest)
+}
+
+func GetDirtyChains(CVMFSRepo string) []string {
+	path := filepath.Join("/", "cvmfs", "CVMFSRepo", constants.DirtyChainSubDir)
+	result := make([]string, 0)
+	dirs, err := ioutil.ReadDir(path)
+	if err != nil {
+		return result
+	}
+	for _, dir := range dirs {
+		if dir.IsDir() {
+			result = append(result, dir.Name())
+		}
+	}
+	return result
+}
+
 func LayerRootfsPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join(LayerPath(CVMFSRepo, layerDigest), "layerfs")
 }
@@ -494,6 +514,7 @@ func removeHashMarkerIfPresent(digest string) string {
 func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.Reader) error {
 	sneakyPath := filepath.Join("/", "var", "spool", "cvmfs", CVMFSRepo, "scratch", "current")
 	newChainPath := ChainPath(CVMFSRepo, newChainId)
+	dirtyChainPath := DirtyChainPath(CVMFSRepo, newChainId)
 	sneakyChainPath := filepath.Join(sneakyPath, TrimCVMFSRepoPrefix(newChainPath))
 	// we need to create the directory were to do the template transaction
 	dir := filepath.Dir(newChainPath)
@@ -540,6 +561,10 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 
 			f, _ := os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
 			f.Close()
+			err = os.MkdirAll(dirtyChainPath, constants.DirPermision)
+			if err != nil {
+				return err
+			}
 			return nil
 		}, opt); err != nil {
 			return err
@@ -685,8 +710,14 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 		os.RemoveAll(filepath.Join(sneakyPath, ".chains"))
 		// the creation of the chain is not complete, we delete the template created as well
 		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(newChainPath))
+		// we catch a problem in the creation of the chain, and the chain was destructed
+		// we don't need anymore the dirty flag
+		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(dirtyChainPath))
 		return err
 	}
+	// everything went well, this flag is not necessary anymore
+	os.RemoveAll(dirtyChainPath)
+
 	// now the transaction is open and the sneaky overlay is populated
 	// we don't need to do anything else at this point and we can close the transaction
 	return Publish(CVMFSRepo)
