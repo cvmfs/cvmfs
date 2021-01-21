@@ -383,7 +383,7 @@ func DirtyChainPath(CVMFSRepo, layerDigest string) string {
 }
 
 func GetDirtyChains(CVMFSRepo string) []string {
-	path := filepath.Join("/", "cvmfs", "CVMFSRepo", constants.DirtyChainSubDir)
+	path := filepath.Join("/", "cvmfs", CVMFSRepo, constants.DirtyChainSubDir)
 	result := make([]string, 0)
 	dirs, err := ioutil.ReadDir(path)
 	if err != nil {
