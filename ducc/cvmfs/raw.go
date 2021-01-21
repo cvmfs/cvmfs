@@ -46,9 +46,9 @@ func getLock(CVMFSRepo string) {
 		locksFile[CVMFSRepo] = f
 		f = locksFile[CVMFSRepo]
 	}
-	lc.Lock()
 	lockMap.Unlock()
 
+	lc.Lock()
 	err := f.LockWriteB()
 	for err != nil {
 		// this may happen if the kernel detect a deadlock
@@ -65,6 +65,7 @@ func unlock(CVMFSRepo string) {
 	l := locksMap[CVMFSRepo]
 	f := locksFile[CVMFSRepo]
 	lockMap.Unlock()
+
 	l.Unlock()
 	f.Unlock()
 }
