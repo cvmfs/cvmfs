@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gofrs/flock"
+
 	exec "github.com/cvmfs/ducc/exec"
 	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
@@ -29,6 +31,7 @@ func (t TemplateTransaction) ToString() string {
 }
 
 var locksMap = make(map[string]*sync.Mutex)
+var processesLocks = make(map[string]*flock.Flock)
 var lockMap = &sync.Mutex{}
 
 func getLock(CVMFSRepo string) {
@@ -38,15 +41,24 @@ func getLock(CVMFSRepo string) {
 		locksMap[CVMFSRepo] = &sync.Mutex{}
 		l = locksMap[CVMFSRepo]
 	}
+	f := processesLocks[CVMFSRepo]
+	if f == nil {
+		f = flock.New("/tmp/DUCC.lock")
+		processesLocks[CVMFSRepo] = f
+		f = processesLocks[CVMFSRepo]
+	}
 	lockMap.Unlock()
 	l.Lock()
+	f.Lock()
 }
 
 func unlock(CVMFSRepo string) {
 	lockMap.Lock()
 	l := locksMap[CVMFSRepo]
+	f := processesLocks[CVMFSRepo]
 	lockMap.Unlock()
 	l.Unlock()
+	f.Unlock()
 }
 
 func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...TransactionOption) error {
