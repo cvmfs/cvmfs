@@ -498,7 +498,12 @@ func newDownloadedLayer(name string, path ReadHashCloseSizer) downloadedLayer {
 }
 
 func (d *downloadedLayer) Close() error {
-	return d.Path.Close()
+	// sometimes we might be forced to return the zero value of downloadedLayer
+	// in that case Path will point to nil
+	if d.Path != nil {
+		return d.Path.Close()
+	}
+	return nil
 }
 
 func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
