@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rubyist/lockfile"
 
@@ -49,8 +50,11 @@ func getLock(CVMFSRepo string) {
 	}
 	lockMap.Unlock()
 	lc.Lock()
-	if err := f.LockWriteB(); err != nil {
-		l.LogE(err).Error("Error in locking the file")
+
+	err := f.LockWriteB()
+	for err != nil {
+		time.Sleep(100 * time.Millisecond)
+		err = f.LockWriteB()
 	}
 }
 
