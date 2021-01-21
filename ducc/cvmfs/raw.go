@@ -32,8 +32,8 @@ func (t TemplateTransaction) ToString() string {
 }
 
 var locksMap = make(map[string]*sync.Mutex)
-var processesLocks = make(map[string]*lockfile.FcntlLockfile)
 var lockMap = &sync.Mutex{}
+var lockFile = lockfile.NewFcntlLockfile("/tmp/DUCC.lock")
 
 func getLock(CVMFSRepo string) {
 	lockMap.Lock()
@@ -42,29 +42,21 @@ func getLock(CVMFSRepo string) {
 		locksMap[CVMFSRepo] = &sync.Mutex{}
 		lc = locksMap[CVMFSRepo]
 	}
-	f := processesLocks[CVMFSRepo]
-	if f == nil {
-		f = lockfile.NewFcntlLockfile("/tmp/DUCC.lock")
-		processesLocks[CVMFSRepo] = f
-		f = processesLocks[CVMFSRepo]
-	}
-	lockMap.Unlock()
 	lc.Lock()
 
-	err := f.LockWriteB()
+	err := lockFile.LockWriteB()
 	for err != nil {
 		time.Sleep(100 * time.Millisecond)
-		err = f.LockWriteB()
+		err = lockFile.LockWriteB()
 	}
 }
 
 func unlock(CVMFSRepo string) {
 	lockMap.Lock()
 	l := locksMap[CVMFSRepo]
-	f := processesLocks[CVMFSRepo]
 	lockMap.Unlock()
 	l.Unlock()
-	f.Unlock()
+	lockFile.Unlock()
 }
 
 func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...TransactionOption) error {
