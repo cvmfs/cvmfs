@@ -46,6 +46,7 @@ func getLock(CVMFSRepo string) {
 
 	err := lockFile.LockWriteB()
 	for err != nil {
+		l.LogE(err).Info("Error in getting the FS lock")
 		time.Sleep(100 * time.Millisecond)
 		err = lockFile.LockWriteB()
 	}
