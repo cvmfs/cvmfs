@@ -67,13 +67,20 @@ def handle_dockerhub(rjson):
             f.write(f'{message}\n')
 
 def handle_harbor(rjson):
-    actions = {'PUSH_ARTIFACT': 'push', 'DELETE_ARTIFACT': 'delete'}
-    for event in rjson['event_data']['resources']:
-        resource_url = event['resource_url']
-        image = f'https://{resource_url}'
+    actions = {'PUSH_ARTIFACT': 'push', 'DELETE_ARTIFACT': 'delete', 'REPLICATION': 'replication'}
+    action = actions[rjson['type']]
+    if action == 'push' or action == 'delete':
+        for event in rjson['event_data']['resources']:
+            resource_url = event['resource_url']
+            image = f'https://{resource_url}'
 
-        yield (actions[rjson['type']], image)
+            yield (action, image)
 
+    elif action == 'replication':
+        replication = rjson['event_data']['replication']
+        registry_info = replication["dest_resource"]
+        destination = f'{registry_info["endpoint"]}/{registry_info["namespace"]}'
+        pprint.pprint(replication)
 
 if __name__ == '__main__':
     app.run()
