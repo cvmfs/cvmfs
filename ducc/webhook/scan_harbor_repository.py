@@ -11,17 +11,17 @@ if len(sys.argv) == 1 or len(sys.argv) != 3:
     print("Pass as first argument the url with protocol of the harbor host")
     print("As second argument pass the name of the project")
     print("The username and password are to be provide as env var. HARBOR_{USER, PASS}")
-    os.exit(0)
+    sys.exit(0)
 
 user = os.getenv('HARBOR_USER')
 if user is None:
     print("Need an username to scan the repository, set the env variable `HARBOR_USER`")
-    os.exit(1)
+    sys.exit(1)
 
 password = os.getenv('HARBOR_PASS')
 if password is None:
     print("Need a password to scan the repository, set the env variable `HARBOR_PASS`")
-    os.exit(1)
+    sys.exit(1)
 
 url = sys.argv[1]
 project_name = sys.argv[2]
@@ -36,7 +36,7 @@ resp = requests.get(req_url, auth=(user, password), params={'page': 1, 'page_siz
 if resp.status_code != 200:
     print("Error in making the requests")
     print("Response: ", resp.json())
-    os.exit(1)
+    sys.exit(1)
 
 repositories = resp.json()
 
