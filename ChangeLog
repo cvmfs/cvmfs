@@ -1,4 +1,6 @@
 2.8.0:
+  * [gw] fix catalog corruption when a nested catalog turns into a symlink
+    (CVM-1930)
   * Update maxminddb to version 1.5.4
   * Fix committing publications with gateway >= 1.2
   * Fix cvmfs_config status for broken mountpoints (CVM-1959)
