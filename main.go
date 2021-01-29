@@ -120,12 +120,13 @@ func main() {
 			log.G(ctx).WithError(err).Fatalf("error on serving via socket %q", *address)
 		}
 	}()
-	waitForSIGINT()
+	waitForSIGINT(fs.(*cvmfs.Filesystem))
 	log.G(ctx).Info("Got SIGINT")
 }
 
-func waitForSIGINT() {
+func waitForSIGINT(fs *cvmfs.Filesystem) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
+	fs.UnmountAll()
 }

@@ -23,7 +23,7 @@ const (
 	targetImageLayersLabel = "containerd.io/snapshot/cri.image-layers"
 )
 
-type filesystem struct {
+type Filesystem struct {
 	fsAbsoluteMountpoint string
 	mountedLayers        map[string]string
 	mountedLayersLock    sync.Mutex
@@ -50,10 +50,10 @@ func NewFilesystem(ctx context.Context, root string, config *Config) (snapshot.F
 	if _, err := os.Stat(absolutePath); err != nil {
 		log.G(ctx).WithField("absolutePath", absolutePath).Warning("Impossible to stat the absolute path, is the filesystem mounted properly? Error: ", err)
 	}
-	return &filesystem{fsAbsoluteMountpoint: absolutePath, mountedLayers: mountedLayersMap}, nil
+	return &Filesystem{fsAbsoluteMountpoint: absolutePath, mountedLayers: mountedLayersMap}, nil
 }
 
-func (fs *filesystem) Mount(ctx context.Context, mountpoint string, labels map[string]string) error {
+func (fs *Filesystem) Mount(ctx context.Context, mountpoint string, labels map[string]string) error {
 	log.G(ctx).Info("Mount layer from cvmfs")
 	digest, ok := labels[targetDigestLabelCRI]
 	if !ok {
@@ -81,7 +81,7 @@ func (fs *filesystem) Mount(ctx context.Context, mountpoint string, labels map[s
 	return nil
 }
 
-func (fs *filesystem) Check(ctx context.Context, mountpoint string, labels map[string]string) error {
+func (fs *Filesystem) Check(ctx context.Context, mountpoint string, labels map[string]string) error {
 	log.G(ctx).WithField("snapshotter", "cvmfs").WithField("mountpoint", mountpoint).Warning("checking layer")
 	fs.mountedLayersLock.Lock()
 	path, ok := fs.mountedLayers[mountpoint]
@@ -109,7 +109,7 @@ func (fs *filesystem) Check(ctx context.Context, mountpoint string, labels map[s
 	return statErr
 }
 
-func (fs *filesystem) Unmount(ctx context.Context, mountpoint string) error {
+func (fs *Filesystem) Unmount(ctx context.Context, mountpoint string) error {
 	// maybe we lost track of something somehow, does not hurt to try to unmount the mountpoint anyway
 
 	fs.mountedLayersLock.Lock()
@@ -122,4 +122,19 @@ func (fs *filesystem) Unmount(ctx context.Context, mountpoint string) error {
 		log.G(ctx).WithError(err).Error("Layer does not seems mounted.")
 	}
 	return syscall.Unmount(mountpoint, syscall.MNT_FORCE)
+}
+
+func (fs *Filesystem) UnmountAll() {
+	m := make([]string, 0)
+	fs.mountedLayersLock.Lock()
+	for mountpoint := range fs.mountedLayers {
+		m = append(m, mountpoint)
+		delete(fs.mountedLayers, mountpoint)
+	}
+	fs.mountedLayersLock.Unlock()
+	for _, mountpoint := range m {
+		if err := syscall.Unmount(mountpoint, syscall.MNT_FORCE); err != nil {
+			log.G(context.TODO()).WithError(err).WithField("mountpoint", mountpoint).Error("Error in unmounting before to exit")
+		}
+	}
 }
