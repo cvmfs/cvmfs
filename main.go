@@ -72,6 +72,7 @@ func main() {
 
 	// Configure filesystem and snapshotter
 	fs, err := cvmfs.NewFilesystem(ctx, filepath.Join(*rootDir, "cvmfs"), config)
+	defer fs.(*cvmfs.Filesystem).UnmountAll(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).Fatalf("failed to configure filesystem")
 	}
@@ -120,13 +121,12 @@ func main() {
 			log.G(ctx).WithError(err).Fatalf("error on serving via socket %q", *address)
 		}
 	}()
-	waitForSIGINT(fs.(*cvmfs.Filesystem))
+	waitForSIGINT()
 	log.G(ctx).Info("Got SIGINT")
 }
 
-func waitForSIGINT(fs *cvmfs.Filesystem) {
+func waitForSIGINT() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
-	fs.UnmountAll()
 }

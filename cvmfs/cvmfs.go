@@ -124,7 +124,8 @@ func (fs *Filesystem) Unmount(ctx context.Context, mountpoint string) error {
 	return syscall.Unmount(mountpoint, syscall.MNT_FORCE)
 }
 
-func (fs *Filesystem) UnmountAll() {
+func (fs *Filesystem) UnmountAll(ctx context.Context) {
+	log.G(ctx).Info("Unmounting all the layers")
 	m := make([]string, 0)
 	fs.mountedLayersLock.Lock()
 	for mountpoint := range fs.mountedLayers {
@@ -132,7 +133,9 @@ func (fs *Filesystem) UnmountAll() {
 		delete(fs.mountedLayers, mountpoint)
 	}
 	fs.mountedLayersLock.Unlock()
+	log.G(ctx).WithField("layers", m).Info("Unmounting the layers")
 	for _, mountpoint := range m {
+		log.G(ctx).WithField("layer", mountpoint).Info("Unmounting the layer")
 		if err := syscall.Unmount(mountpoint, syscall.MNT_FORCE); err != nil {
 			log.G(context.TODO()).WithError(err).WithField("mountpoint", mountpoint).Error("Error in unmounting before to exit")
 		}
