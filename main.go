@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"google.golang.org/grpc"
 
@@ -72,7 +73,6 @@ func main() {
 
 	// Configure filesystem and snapshotter
 	fs, err := cvmfs.NewFilesystem(ctx, filepath.Join(*rootDir, "cvmfs"), config)
-	defer fs.(*cvmfs.Filesystem).UnmountAll(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).Fatalf("failed to configure filesystem")
 	}
@@ -121,12 +121,13 @@ func main() {
 			log.G(ctx).WithError(err).Fatalf("error on serving via socket %q", *address)
 		}
 	}()
-	waitForSIGINT()
+	waitForSignal(fs.(*cvmfs.Filesystem))
 	log.G(ctx).Info("Got SIGINT")
 }
 
-func waitForSIGINT() {
+func waitForSignal(fs *cvmfs.Filesystem) {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
+	fs.UnmountAll(context.TODO())
 }
