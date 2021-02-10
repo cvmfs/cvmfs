@@ -1,3 +1,6 @@
+2.8.1:
+  * Set CVMFS_USE_CDN=yes in service container
+
 2.8.0:
   * [gw] fix catalog corruption when a nested catalog turns into a symlink
     (CVM-1930)
