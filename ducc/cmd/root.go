@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	lib "github.com/cvmfs/ducc/lib"
 	l "github.com/cvmfs/ducc/log"
 	"github.com/cvmfs/ducc/temp"
 )
@@ -15,6 +16,7 @@ func init() {
 	if temp.TemporaryBaseDir == "" {
 		temp.TemporaryBaseDir = os.Getenv("DUCC_TMP_DIR")
 	}
+	rootCmd.PersistentFlags().StringVarP(&lib.NotificationFile, "notification-file", "n", "", "File where to publish notification about DUCC progression")
 }
 
 var rootCmd = &cobra.Command{
@@ -26,6 +28,7 @@ var rootCmd = &cobra.Command{
 }
 
 func EntryPoint() {
+	lib.SetupNotification()
 	rootCmd.Execute()
 }
 

@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/image"
 	"github.com/olekukonko/tablewriter"
@@ -23,6 +24,7 @@ import (
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
+	notification "github.com/cvmfs/ducc/notification"
 )
 
 type ManifestRequest struct {
@@ -893,6 +895,11 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		}
 	}
 
+	n := notification.NewNotification(NotificationService)
+	n.AddField("image", img.GetSimpleName())
+
+	n.AddField("action", "start_chains_ingestion").Send()
+
 	ld := NewLayerDownloader(img)
 	for i, chain := range chainIDs {
 		digest := chain.String()
@@ -929,6 +936,9 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 
 			return err
 		}
+		chainN := n.AddField("chain", chain.String())
+		t := time.Now()
+		chainN.AddField("action", "start_single_chain_ingestion").Send()
 		for attempt := 0; attempt < 5; attempt++ {
 			l.Log().Info("Start attempt: ", attempt)
 			err = downloadLayer()
@@ -938,10 +948,13 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 			}
 			l.Log().Warn("Attempt ", attempt, " fail")
 		}
+		chainN = chainN.Elapsed(t).AddField("action", "end_single_chain_ingestion")
 		if err != nil {
 			l.LogE(err).Error("Error in creating the chain")
+			chainN.AddField("result", "error").AddField("error", err.Error()).Send()
 			return err, lastChainId
 		}
+		chainN.AddField("result", "ok").Send()
 	}
 	return
 }

@@ -18,6 +18,7 @@ import (
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
+	notification "github.com/cvmfs/ducc/notification"
 	singularity "github.com/cvmfs/ducc/singularity"
 	temp "github.com/cvmfs/ducc/temp"
 
@@ -38,6 +39,12 @@ const (
 
 func ConvertWishFlat(wish WishFriendly) error {
 	var firstError = error(nil)
+
+	n := notification.NewNotification(NotificationService)
+
+	n.AddField("action", "start_flat_conversion").Send()
+	tFlat := time.Now()
+	defer n.Elapsed(tFlat).AddField("action", "end_flat_conversion").Send()
 
 	// it may happend at the very first round that this two calls return an error, let it be
 	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
@@ -110,12 +117,18 @@ func ConvertWishFlat(wish WishFriendly) error {
 			continue
 		}
 
+		i := n.AddField("image", inputImage.GetSimpleName()).AddId()
+		t1 := time.Now()
+		i.Action("start_flat_conversion").Send()
+		i = i.Action("end_flat_convertion")
+
 		err, lastChain := inputImage.CreateSneakyChainStructure(wish.CvmfsRepo)
 		if err != nil {
 			if firstError == nil {
 				firstError = err
 			}
 			l.LogE(err).Error("Error in creating the chain structure")
+			i.Error(err).Elapsed(t1).Send()
 			continue
 		}
 
@@ -142,6 +155,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 				firstError = err
 			}
 			l.LogE(err).Error("Error in creating the dotfile inside the flat directory")
+			i.Error(err).Send()
 			continue
 		}
 		// we create the public link
@@ -155,7 +169,10 @@ func ConvertWishFlat(wish WishFriendly) error {
 			if firstError == nil {
 				firstError = errF
 			}
+			i.Error(err).Elapsed(t1).Send()
+			continue
 		}
+		i.Error(err).Elapsed(t1).Send()
 		continue
 
 	}
@@ -287,6 +304,10 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 	noErrorInConversion := make(chan bool, 1)
 
 	layerDigestChan := make(chan string, 3)
+
+	n := notification.NewNotification(NotificationService)
+	n = n.AddField("image", inputImage.GetSimpleName())
+
 	go func() {
 		noErrors := true
 		var wg sync.WaitGroup
@@ -322,13 +343,18 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 
 			if pathExists == false || forceDownload {
 
+				ln := n.AddField("layer", layerDigest).AddId()
+				ln.Action("start_layer_conversion").Send()
+
+				t1 := time.Now()
 				err = layer.IngestIntoCVMFS(repo)
+
+				ln.Elapsed(t1).Action("end_layer_conversion").Error(err).Send()
 
 				if err != nil {
 					l.LogE(err).Error("Error in ingesting the layer in cvmfs")
 					noErrors = false
 				}
-
 				l.Log().WithFields(
 					log.Fields{"layer": layer.Name}).
 					Info("Finish Ingesting the file")
