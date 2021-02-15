@@ -22,13 +22,18 @@ func init() {
 var rootCmd = &cobra.Command{
 	Use:   "cvmfs_ducc",
 	Short: "Show the several commands available.",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		lib.SetupNotification()
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		lib.StopNotification()
 	},
 }
 
 func EntryPoint() {
-	lib.SetupNotification()
 	rootCmd.Execute()
 }
 

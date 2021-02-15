@@ -21,3 +21,9 @@ func SetupNotification() {
 	n := notification.NewNotificationServiceFromWriter(ioutil.Discard)
 	NotificationService = &n
 }
+
+func StopNotification() {
+	if NotificationService != nil {
+		NotificationService.Stop()
+	}
+}

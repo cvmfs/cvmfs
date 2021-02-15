@@ -34,6 +34,7 @@ import (
 
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	l "github.com/cvmfs/ducc/log"
+	notification "github.com/cvmfs/ducc/notification"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -470,6 +471,13 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 
 // Ingest all the necessary files and dir in podmanStore dir.
 func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err error) {
+	n := notification.NewNotification(NotificationService).AddField("image", img.GetSimpleName())
+	n.Action("start_podman_ingestion").Send()
+	t := time.Now()
+	defer func() {
+		n.Elapsed(t).Action("end_podman_ingestion").Send()
+	}()
+
 	err = img.CheckImageChanged(CVMFSRepo)
 	if err != nil {
 		l.LogE(err).Error("error while checking if older image version with same tag present in store")
