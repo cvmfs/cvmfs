@@ -56,8 +56,7 @@ fi
 
 # the function can_build_ducc is defined in ci/common.sh
 # it check a new enough version of the compiler >= 1.11.4
-# that go-junit-report is installed
-# and that we are on a 64bit architecture
+# and that go-junit-report is installed
 build_ducc="OFF"
 if [ $(can_build_ducc) -ge 1 ]; then
   build_ducc="ON"
