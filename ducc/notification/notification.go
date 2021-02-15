@@ -94,7 +94,7 @@ func (n *Notification) AddField(key string, value string) *Notification {
 
 func (n *Notification) Elapsed(t time.Time) *Notification {
 	ts := fmt.Sprintf("%f", time.Now().Sub(t).Seconds())
-	return n.AddField("elapsed (s)", ts)
+	return n.AddField("time_elapsed_s", ts)
 }
 
 /// Identifier are useful to match notification related between each other

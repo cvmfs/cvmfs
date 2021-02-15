@@ -40,11 +40,14 @@ const (
 func ConvertWishFlat(wish WishFriendly) error {
 	var firstError = error(nil)
 
-	n := notification.NewNotification(NotificationService)
+	n := notification.NewNotification(NotificationService).AddField("image_request", wish.InputName)
 
-	n.AddField("action", "start_flat_conversion").Send()
+	nFlat := n.AddField("action", "start_flat_conversion").AddId()
+	nFlat.Send()
 	tFlat := time.Now()
-	defer n.Elapsed(tFlat).AddField("action", "end_flat_conversion").Send()
+	defer func() {
+		nFlat.Elapsed(tFlat).AddField("action", "end_flat_conversion").Send()
+	}()
 
 	// it may happend at the very first round that this two calls return an error, let it be
 	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
@@ -97,6 +100,9 @@ func ConvertWishFlat(wish WishFriendly) error {
 					firstError = errF
 				}
 			}
+			if err == nil {
+				n.Action("publish_flat_image").AddField("public_path", publicSymlinkPath).AddField("private_path", singularityPrivatePath).Send()
+			}
 			continue
 		}
 
@@ -114,13 +120,16 @@ func ConvertWishFlat(wish WishFriendly) error {
 					firstError = errF
 				}
 			}
+			if err == nil {
+				n.Action("publish_flat_image").AddField("public_path", publicSymlinkPath).AddField("private_path", singularityPrivatePath).Send()
+			}
 			continue
 		}
 
 		i := n.AddField("image", inputImage.GetSimpleName()).AddId()
 		t1 := time.Now()
-		i.Action("start_flat_conversion").Send()
-		i = i.Action("end_flat_convertion")
+		i.Action("start_single_chain_conversion").Send()
+		i = i.Action("end_single_chain_convertion")
 
 		err, lastChain := inputImage.CreateSneakyChainStructure(wish.CvmfsRepo)
 		if err != nil {
@@ -155,7 +164,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 				firstError = err
 			}
 			l.LogE(err).Error("Error in creating the dotfile inside the flat directory")
-			i.Error(err).Send()
+			i.Error(err).Elapsed(t1).Send()
 			continue
 		}
 		// we create the public link
@@ -173,6 +182,9 @@ func ConvertWishFlat(wish WishFriendly) error {
 			continue
 		}
 		i.Error(err).Elapsed(t1).Send()
+		if err == nil {
+			n.Action("publish_flat_image").AddField("public_path", publicSymlinkPath).AddField("private_path", singularityPrivatePath).Send()
+		}
 		continue
 
 	}
@@ -349,11 +361,15 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 				t1 := time.Now()
 				err = layer.IngestIntoCVMFS(repo)
 
-				ln.Elapsed(t1).Action("end_layer_conversion").Error(err).Send()
+				size := fmt.Sprintf("%d", layer.GetSize())
+				ln.Elapsed(t1).Action("end_layer_conversion").Error(err).AddField("size", size).Send()
 
 				if err != nil {
 					l.LogE(err).Error("Error in ingesting the layer in cvmfs")
 					noErrors = false
+				}
+				if err == nil {
+					n.Action("publish_layer").AddField("layer_digest", layerDigest).Send()
 				}
 				l.Log().WithFields(
 					log.Fields{"layer": layer.Name}).
