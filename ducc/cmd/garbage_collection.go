@@ -10,7 +10,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	exec "github.com/cvmfs/ducc/exec"
 	"github.com/cvmfs/ducc/lib"
+	l "github.com/cvmfs/ducc/log"
 )
 
 const (
@@ -42,15 +44,15 @@ var garbageCollectionCmd = &cobra.Command{
 
 		// tried already to make them in parallel, we don't gain much
 		// from ~1min to ~30 sec
-		llog(lib.Log()).Info("Scanning images to delete")
+		llog(l.Log()).Info("Scanning images to delete")
 		imagesUsed, _ := lib.FindAllUsedFlatImages(CVMFSRepo)
 		imagesAll, _ := lib.FindAllFlatImages(CVMFSRepo)
 
-		llog(lib.Log()).Info("Scanning layers to delete")
+		llog(l.Log()).Info("Scanning layers to delete")
 		layersUsed, _ := lib.FindAllUsedLayers(CVMFSRepo)
 		layersAll, _ := lib.FindAllLayers(CVMFSRepo)
 
-		llog(lib.Log()).Info("Scanning completed. Computing paths to delete.")
+		llog(l.Log()).Info("Scanning completed. Computing paths to delete.")
 
 		// we first figure out all the unique paths that are used
 		imagesUsedMap := make(map[string]bool)
@@ -86,18 +88,18 @@ var garbageCollectionCmd = &cobra.Command{
 
 		pathShouldBeDeleted := func(path string) bool {
 			if !strings.HasPrefix(path, prefix) {
-				llog(lib.Log()).WithFields(log.Fields{"path": path, "prefix": prefix}).Warning("Path does not have the expected prefix")
+				llog(l.Log()).WithFields(log.Fields{"path": path, "prefix": prefix}).Warning("Path does not have the expected prefix")
 				return false
 			}
 			stat, err := os.Stat(path)
 			if err != nil {
-				llog(lib.Log()).WithFields(log.Fields{"path": path, "err": err}).Warning("Error in stating the path")
+				llog(l.Log()).WithFields(log.Fields{"path": path, "err": err}).Warning("Error in stating the path")
 				return false
 			}
 			modTime := stat.ModTime()
 			thirtyDays := 30 * 24 * time.Hour
 			if modTime.Add(thirtyDays).After(today) {
-				llog(lib.Log()).WithFields(log.Fields{"path": path, "grace period": "30 days", "path mod time": modTime}).Warning("Path still in its grace period")
+				llog(l.Log()).WithFields(log.Fields{"path": path, "grace period": "30 days", "path mod time": modTime}).Warning("Path still in its grace period")
 				return false
 			}
 			return true
@@ -120,7 +122,7 @@ var garbageCollectionCmd = &cobra.Command{
 			}
 		}
 
-		llog(lib.Log()).WithFields(log.Fields{"num. of path to delete": len(pathsToDelete)}).Info("Ready to delete paths")
+		llog(l.Log()).WithFields(log.Fields{"num. of path to delete": len(pathsToDelete)}).Info("Ready to delete paths")
 
 		// we send 50 folder to deletion at the time
 		commandPrefix := []string{"cvmfs_server", "ingest"}
@@ -150,7 +152,7 @@ var garbageCollectionCmd = &cobra.Command{
 			if dryRun {
 				fmt.Printf("%v\n", cmd)
 			} else {
-				lib.ExecCommand(cmd...).Start()
+				exec.ExecCommand(cmd...).Start()
 			}
 		}
 	},
