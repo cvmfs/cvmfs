@@ -28,6 +28,14 @@ type OnDiskReadAndHash struct {
 	path string
 }
 
+// this structure is useful, but each time we use this, we are hogging up the netowrk
+// we force to download all the layer, and **then** we check if the layer is already in CVMFS
+// this can be optimize
+// the constructor, this function, should be smarter.
+// it could return immediately while starting a goroutine that does the real downloading and copy work
+// on Read we block until the goroutine has not finished
+// we still use a lot of network, but we don't wait for it.
+// To avoid using the network, on Close() we could close the request body
 func NewOnDiskReadAndHash(r io.ReadCloser) (*OnDiskReadAndHash, error) {
 	defer r.Close()
 	f, err := temp.UserDefinedTempFile()
