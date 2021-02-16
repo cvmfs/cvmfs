@@ -310,12 +310,12 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 		}
 	}
 
-	layersChanell := make(chan downloadedLayer, 3)
+	layersChanell := make(chan downloadedLayer, 10)
 	manifestChanell := make(chan string, 1)
 	stopGettingLayers := make(chan bool, 1)
 	noErrorInConversion := make(chan bool, 1)
 
-	layerDigestChan := make(chan string, 3)
+	layerDigestChan := make(chan string, 10)
 
 	n := notification.NewNotification(NotificationService)
 	n = n.AddField("image", inputImage.GetSimpleName())
