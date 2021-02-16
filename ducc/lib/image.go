@@ -821,7 +821,7 @@ func (ld *LayerDownloader) DownloadLayer(layer da.Layer) (downloadedLayer, error
 	if err != nil {
 		return inMem, err
 	}
-	r, err := NewOnDiskReadAndHash(inMem.Path)
+	r, err := NewDiskBufferReadAndHash(inMem.Path)
 	if err != nil {
 		return inMem, err
 	}
