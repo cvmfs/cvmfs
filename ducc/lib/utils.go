@@ -23,7 +23,7 @@ type ReadHashCloseSizer interface {
 }
 
 type OnDiskReadAndHash struct {
-	ReadAndHash
+	*ReadAndHash
 
 	path string
 }
@@ -45,7 +45,7 @@ func NewOnDiskReadAndHash(r io.ReadCloser) (*OnDiskReadAndHash, error) {
 	}
 	l.Log().Info("Done downloading")
 	readAndHash := NewReadAndHash(f)
-	return &OnDiskReadAndHash{ReadAndHash: *readAndHash, path: f.Name()}, nil
+	return &OnDiskReadAndHash{ReadAndHash: readAndHash, path: f.Name()}, nil
 }
 
 func (r *OnDiskReadAndHash) Close() error {
