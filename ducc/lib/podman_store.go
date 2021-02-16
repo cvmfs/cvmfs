@@ -159,7 +159,7 @@ func (img *Image) PublishImageInfo(CVMFSRepo string, digestMap map[string]string
 	if _, err := os.Stat(imageInfoPath); err == nil {
 		file, err := ioutil.ReadFile(imageInfoPath)
 		if err != nil {
-			l.LogE(err).Error("Error in reading layers.json file")
+			l.LogE(err).Error("Error in reading images.json file")
 			return err
 		}
 		json.Unmarshal(file, &imagedata)
@@ -200,6 +200,8 @@ func (img *Image) LinkRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string, 
 		l.LogE(err).Warn("Error in getting the image manifest")
 		return err
 	}
+	// this is extremelly bad, we are making one transaction for each layer
+	// all of them could be done in a single transaction
 	for _, layer := range manifest.Layers {
 		layerid := strings.Split(layer.Digest, ":")[1]
 		layerdir := digestMap[layer.Digest]
@@ -227,6 +229,7 @@ func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string, digestMap, l
 		l.LogE(err).Warn("Error in getting the image manifest")
 		return err
 	}
+	// also here, we are making one transaction for each layer
 	for _, layer := range manifest.Layers {
 		layerdir := digestMap[layer.Digest]
 		linkPath := filepath.Join(rootPath, rootfsDir, layerdir, "link")
@@ -276,6 +279,7 @@ func (img *Image) CreateLowerFiles(CVMFSRepo string, digestMap, layerIdMap map[s
 
 	lastLowerData := ""
 	lastDigest := ""
+	// again, for each layer, one more transaction
 	for _, layer := range manifest.Layers {
 		if lastDigest != "" {
 			layerdir := digestMap[layer.Digest]
@@ -400,6 +404,7 @@ func (img *Image) CreateLockFiles(CVMFSRepo string) (err error) {
 	if _, err := os.Stat(imagelockpath); os.IsNotExist(err) {
 		paths = append(paths, imagelockpath)
 	}
+	// two more transaction that could be one
 	for _, file := range paths {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			tmpFile, err := ioutil.TempFile("", "lock")
@@ -471,6 +476,9 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 
 // Ingest all the necessary files and dir in podmanStore dir.
 func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err error) {
+	// this code is extremelly slow
+	// if opens and publish several transaction and I believe it is possible to do pretty much anything in a single transaction
+	// it should be rewritten.
 	n := notification.NewNotification(NotificationService).AddField("image", img.GetSimpleName())
 	n.Action("start_podman_ingestion").Send()
 	t := time.Now()
@@ -506,6 +514,7 @@ func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (er
 	digestMap := make(map[string]string)
 	layerIdMap := make(map[string]string)
 
+	// no one read the layers.json file
 	err = img.PublishLayerInfo(CVMFSRepo, digestMap)
 	if err != nil {
 		l.LogE(err).Error("Unable to create layers.json file in podman store")
