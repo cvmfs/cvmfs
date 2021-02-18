@@ -939,16 +939,20 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 
 			tarReader := *tar.NewReader(layerStream.Path)
 
+			chainN := n.AddField("chain", chain.String()).AddField("layer", layer.Digest)
+			t := time.Now()
+			chainN.AddField("action", "start_single_chain_ingestion").Send()
+
 			err = cvmfs.CreateSneakyChain(CVMFSRepo,
 				chain.String(),
 				previous,
 				tarReader)
 
+			layerStream.GetSize()
+			chainN.Elapsed(t).AddField("action", "end_single_chain_ingestion").Error(err).Send()
+
 			return err
 		}
-		chainN := n.AddField("chain", chain.String()).AddField("layer", layer.Digest)
-		t := time.Now()
-		chainN.AddField("action", "start_single_chain_ingestion").Send()
 		for attempt := 0; attempt < 5; attempt++ {
 			l.Log().Info("Start attempt: ", attempt)
 			err = downloadLayer()
@@ -958,13 +962,10 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 			}
 			l.Log().Warn("Attempt ", attempt, " fail")
 		}
-		chainN = chainN.Elapsed(t).AddField("action", "end_single_chain_ingestion")
 		if err != nil {
 			l.LogE(err).Error("Error in creating the chain")
-			chainN.AddField("result", "error").AddField("error", err.Error()).Send()
 			return err, lastChainId
 		}
-		chainN.AddField("result", "ok").Send()
 	}
 	return
 }
