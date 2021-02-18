@@ -948,8 +948,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 				previous,
 				tarReader)
 
-			layerStream.GetSize()
-			chainN.Elapsed(t).AddField("action", "end_single_chain_ingestion").Error(err).Send()
+			chainN.Elapsed(t).AddField("action", "end_single_chain_ingestion").SizeBytes(layerStream.GetSize()).Error(err).Send()
 
 			return err
 		}

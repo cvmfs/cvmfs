@@ -120,6 +120,11 @@ func (n *Notification) Action(action string) *Notification {
 	return n.AddField("action", action)
 }
 
+func (n *Notification) SizeBytes(size int64) *Notification {
+	s := fmt.Sprintf("%d", size)
+	return n.AddField("size_bytes", s)
+}
+
 func (n *Notification) ToString() string {
 	m := make(map[string]string)
 	for i := 0; i < len(n.fields); i += 2 {

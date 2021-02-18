@@ -361,8 +361,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 				t1 := time.Now()
 				err = layer.IngestIntoCVMFS(repo)
 
-				size := fmt.Sprintf("%d", layer.GetSize())
-				ln.Elapsed(t1).Action("end_layer_conversion").Error(err).AddField("size", size).Send()
+				ln.Elapsed(t1).Action("end_layer_conversion").Error(err).SizeBytes(layer.GetSize()).Send()
 
 				if err != nil {
 					l.LogE(err).Error("Error in ingesting the layer in cvmfs")
