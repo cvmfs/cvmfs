@@ -939,7 +939,10 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 
 			tarReader := *tar.NewReader(layerStream.Path)
 
-			chainN := n.AddField("chain", chain.String()).AddField("layer", layer.Digest)
+			chainN := n.AddField("chain", chain.String()).
+				AddField("layer", strings.Split(layer.Digest, ":")[1]).
+				AddId()
+
 			t := time.Now()
 			chainN.Action("start_single_chain_ingestion").Send()
 
