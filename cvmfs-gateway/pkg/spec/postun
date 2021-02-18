@@ -1,0 +1,5 @@
+%postun
+
+if [ x"$(pidof systemd >/dev/null && echo yes || echo no)" = "xyes" ]; then
+    systemctl daemon-reload
+fi

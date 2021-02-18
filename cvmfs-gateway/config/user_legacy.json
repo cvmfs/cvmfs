@@ -1,0 +1,12 @@
+{
+    "max_lease_time" : 7200,
+    "fe_tcp_port" : 4929,
+    "receiver_config" : {
+        "size" : 1
+    },
+    "receiver_worker_config" : {
+        "executable_path" : "/usr/bin/cvmfs_receiver"
+    },
+    "log_level" : "info",
+    "log_timestamps" : false
+}
