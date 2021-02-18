@@ -941,14 +941,18 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 
 			chainN := n.AddField("chain", chain.String()).AddField("layer", layer.Digest)
 			t := time.Now()
-			chainN.AddField("action", "start_single_chain_ingestion").Send()
+			chainN.Action("start_single_chain_ingestion").Send()
 
 			err = cvmfs.CreateSneakyChain(CVMFSRepo,
 				chain.String(),
 				previous,
 				tarReader)
 
-			chainN.Elapsed(t).AddField("action", "end_single_chain_ingestion").SizeBytes(layerStream.GetSize()).Error(err).Send()
+			chainN.Elapsed(t).
+				Action("end_single_chain_ingestion").
+				SizeBytes(layerStream.GetSize()).
+				Error(err).
+				Send()
 
 			return err
 		}
