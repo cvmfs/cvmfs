@@ -2,7 +2,10 @@ package dockerutil
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
+
+	digest "github.com/opencontainers/go-digest"
 )
 
 type ConfigType struct {
@@ -65,4 +68,27 @@ func MakeThinImage(m Manifest, layersMapping map[string]string, origin string) (
 	return ThinImage{Layers: layers,
 		Origin:  origin,
 		Version: thinImageVersion}, nil
+}
+
+func (m Manifest) GetSingularityPath() string {
+	digest := strings.Split(m.Config.Digest, ":")[1]
+	return filepath.Join(".flat", digest[0:2], digest)
+}
+
+// please note how we use the simple digest from the layers, it is not
+// striclty correct, since we would need the digest of the uncompressed
+// layer, that can be found in the Config file of the image.
+// For our purposes, however, this is good enough.
+func (m Manifest) GetChainIDs() []digest.Digest {
+	result := []digest.Digest{}
+	for i, l := range m.Layers {
+		if i == 0 {
+			d := digest.FromString(l.Digest)
+			result = append(result, d)
+			continue
+		}
+		digest := digest.FromString(result[i-1].String() + " " + l.Digest)
+		result = append(result, digest)
+	}
+	return result
 }

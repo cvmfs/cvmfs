@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -15,6 +14,12 @@ const (
 	// See https://github.com/otiai10/copy/pull/9 for more information.
 	tmpPermissionForDirectory = os.FileMode(0755)
 )
+
+type timespec struct {
+	Mtime time.Time
+	Atime time.Time
+	Ctime time.Time
+}
 
 // Copy copies src to dest, doesn't matter if src is a directory or a file.
 func Copy(src, dest string, opt ...Options) error {
@@ -27,15 +32,28 @@ func Copy(src, dest string, opt ...Options) error {
 
 // switchboard switches proper copy functions regarding file type, etc...
 // If there would be anything else here, add a case to this switchboard.
-func switchboard(src, dest string, info os.FileInfo, opt Options) error {
+func switchboard(src, dest string, info os.FileInfo, opt Options) (err error) {
 	switch {
 	case info.Mode()&os.ModeSymlink != 0:
-		return onsymlink(src, dest, info, opt)
+		err = onsymlink(src, dest, info, opt)
 	case info.IsDir():
-		return dcopy(src, dest, info, opt)
+		err = dcopy(src, dest, info, opt)
 	default:
-		return fcopy(src, dest, info, opt)
+		err = fcopy(src, dest, info, opt)
 	}
+
+	if err != nil {
+		return err
+	}
+
+	if opt.PreserveTimes {
+		spec := getTimeSpec(info)
+		if err := os.Chtimes(dest, spec.Atime, spec.Mtime); err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
 // copy decide if this src should be copied or not.
@@ -50,16 +68,7 @@ func copy(src, dest string, info os.FileInfo, opt Options) error {
 		return nil
 	}
 
-	err = switchboard(src, dest, info, opt)
-
-	if opt.PreserveTimes {
-		mtime := info.ModTime()
-		stat := info.Sys().(*syscall.Stat_t)
-		atime := time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec))
-		os.Chtimes(dest, atime, mtime)
-	}
-
-	return err
+	return switchboard(src, dest, info, opt)
 }
 
 // fcopy is for just a file,
@@ -130,7 +139,6 @@ func dcopy(srcdir, destdir string, info os.FileInfo, opt Options) (err error) {
 }
 
 func onsymlink(src, dest string, info os.FileInfo, opt Options) error {
-
 	switch opt.OnSymlink(src) {
 	case Shallow:
 		return lcopy(src, dest)
