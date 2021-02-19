@@ -43,6 +43,7 @@ type Image struct {
 	IsThin      bool
 	TagWildcard bool
 	Manifest    *da.Manifest
+	Config      *image.Image
 }
 
 func (i *Image) GetSimpleName() string {
@@ -150,7 +151,11 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 	return manifest, nil
 }
 
-func (img *Image) GetChanges() (changes []string, err error) {
+func (img *Image) GetConfig() (config image.Image, err error) {
+	if img.Config != nil {
+		return *img.Config, nil
+	}
+
 	user := img.User
 	pass, err := GetPassword()
 	if err != nil {
@@ -159,7 +164,6 @@ func (img *Image) GetChanges() (changes []string, err error) {
 		pass = ""
 	}
 
-	changes = []string{"ENV CVMFS_IMAGE true"}
 	manifest, err := img.GetManifest()
 	if err != nil {
 		l.LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
@@ -189,10 +193,21 @@ func (img *Image) GetChanges() (changes []string, err error) {
 		return
 	}
 
-	var config image.Image
 	err = json.Unmarshal(body, &config)
 	if err != nil {
 		l.LogE(err).Warning("Error in unmarshaling the configuration of the image")
+		return
+	}
+	img.Config = &config
+	return
+}
+
+func (img *Image) GetChanges() (changes []string, err error) {
+	changes = []string{"ENV CVMFS_IMAGE true"}
+
+	config, err := img.GetConfig()
+	if err != nil {
+		l.LogE(err).Warning("Error in getting configuration of the image")
 		return
 	}
 	env := config.Config.Env
