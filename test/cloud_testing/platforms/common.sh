@@ -483,10 +483,9 @@ run_unittests() {
   local ut_retval=$?
   check_result $ut_retval
 
-
   cat > $xml_output << EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$CVMFS_TIMESTAMP" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
+<testsuites tests="0" failures="0" disabled="0" errors="0" timestamp="$CVMFS_TIMESTAMP" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
   <testsuite hostname="$CVMFS_PLATFORM_NAME" name="Unit Test" timestamp="$CVMFS_TIMESTAMP" tests="0" failures="0" disabled="0" errors="0" time="0">
   </testsuite>
 </testsuites>
