@@ -43,7 +43,7 @@ type Image struct {
 	IsThin      bool
 	TagWildcard bool
 	Manifest    *da.Manifest
-	Config      *image.Image
+	OCIImage    *image.Image
 }
 
 func (i *Image) GetSimpleName() string {
@@ -151,9 +151,9 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 	return manifest, nil
 }
 
-func (img *Image) GetConfig() (config image.Image, err error) {
-	if img.Config != nil {
-		return *img.Config, nil
+func (img *Image) GetOCIImage() (config image.Image, err error) {
+	if img.OCIImage != nil {
+		return *img.OCIImage, nil
 	}
 
 	user := img.User
@@ -198,14 +198,14 @@ func (img *Image) GetConfig() (config image.Image, err error) {
 		l.LogE(err).Warning("Error in unmarshaling the configuration of the image")
 		return
 	}
-	img.Config = &config
+	img.OCIImage = &config
 	return
 }
 
 func (img *Image) GetChanges() (changes []string, err error) {
 	changes = []string{"ENV CVMFS_IMAGE true"}
 
-	config, err := img.GetConfig()
+	config, err := img.GetOCIImage()
 	if err != nil {
 		l.LogE(err).Warning("Error in getting configuration of the image")
 		return
