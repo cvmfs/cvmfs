@@ -2,6 +2,7 @@ package lib
 
 import (
 	"fmt"
+	"sync"
 
 	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
@@ -70,12 +71,23 @@ func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string
 		return
 	}
 	var expandedTagImagesLayer, expandedTagImagesFlat []*Image
-	for img := range r1 {
-		expandedTagImagesLayer = append(expandedTagImagesLayer, img)
-	}
-	for img := range r2 {
-		expandedTagImagesFlat = append(expandedTagImagesFlat, img)
-	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for img := range r1 {
+			expandedTagImagesLayer = append(expandedTagImagesLayer, img)
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for img := range r2 {
+			expandedTagImagesFlat = append(expandedTagImagesFlat, img)
+		}
+	}()
+	wg.Wait()
+
 	wish.ExpandedTagImagesLayer = expandedTagImagesLayer
 	wish.ExpandedTagImagesFlat = expandedTagImagesFlat
 

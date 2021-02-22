@@ -304,16 +304,29 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	if err != nil {
 		return r1, r2, nil
 	}
-	for _, tag := range filteredTags {
+
+	tagChan := make(chan string, 40)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, tag := range filteredTags {
+			tagChan <- tag
+		}
+		close(tagChan)
+	}()
+
+	for worker := 0; worker <= 20; worker += 1 {
 		wg.Add(1)
-		go func(tag string) {
+		go func() {
 			defer wg.Done()
-			taggedImg := *img
-			taggedImg.Tag = tag
-			taggedImg.GetManifest()
-			r1 <- &taggedImg
-			r2 <- &taggedImg
-		}(tag)
+			for tag := range tagChan {
+				taggedImg := *img
+				taggedImg.Tag = tag
+				taggedImg.GetManifest()
+				r1 <- &taggedImg
+				r2 <- &taggedImg
+			}
+		}()
 	}
 
 	return r1, r2, nil
