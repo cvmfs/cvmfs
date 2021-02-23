@@ -1,0 +1,27 @@
+language: go
+sudo: false
+
+go:
+  - "1.15.x"
+  - "1.14.x"
+
+os:
+  - linux
+  - osx
+  - windows
+
+before_install:
+  - export GO111MODULE=on
+  - go version
+  - go get golang.org/x/tools/cmd/goimports
+
+install:
+  - go build
+
+script:
+  - ./.travis.sh
+  # goimports on windows gives false positives
+  - if [[ "${TRAVIS_OS_NAME}" != "windows" ]]; then diff <(goimports -d .) <(printf ""); fi
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
