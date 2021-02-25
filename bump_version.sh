@@ -26,3 +26,6 @@ echo "Patching RPM"
 sed -i -e "s/^Version: \(.*\)/Version: $VERSION/" packaging/rpm/cvmfs-universal.spec
 grep Version packaging/rpm/cvmfs-universal.spec
 
+echo "Patching DUCC"
+sed -i -e "s/^var version = \"[^\"]*\"/var version = \"$VERSION\"/" ducc/cmd/version.go
+grep VERSION ducc/cmd/version.go
