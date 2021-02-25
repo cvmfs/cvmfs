@@ -1,4 +1,5 @@
 2.9.0:
+  * [ducc] Fix version string
   * [ducc] Ingest images using "sneaky layers" and template transactions
 
 2.8.1:
