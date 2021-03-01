@@ -1,6 +1,7 @@
 #!/bin/sh
 
 export CVMFS_PLATFORM_NAME="macos"
+export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 export PATH=/usr/local/bin:$PATH
 
