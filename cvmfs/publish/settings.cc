@@ -451,12 +451,19 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
 std::string SettingsPublisher::GetRootHashXAttr()
 {
   std::string xattr;
-  bool rvb = platform_getxattr(
-    this->transaction().spool_area().readonly_mnt(),
-    "user.root_hash", &xattr);
-  if (!rvb) {
-    throw EPublish("cannot get extrended attribute root_hash");
+  try {
+    bool rvb =
+        platform_getxattr(this->transaction().spool_area().readonly_mnt(),
+                          "user.root_hash", &xattr);
+    if (!rvb) {
+      throw EPublish("cannot get extended attribute root_hash");
+    }
+  } catch (const EPublish& e) {
+    // We ignore the exception.
+    // In case of exception, the base hash remains unset.
+    return xattr;
   }
+
   return xattr;
 }
 
