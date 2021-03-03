@@ -490,6 +490,8 @@ int PosixCacheManager::StartTxn(
   string path_in_cache = GetPathInCache(id);
   Transaction *transaction = new (txn) Transaction(id, path_in_cache);
 
+  string txn_prefix = "txn.";
+  path_in_cache.append(txn_prefix);
   char *template_path = NULL;
   unsigned temp_path_len = 0;
   if (rename_workaround_ == kRenameSamedir) {
@@ -497,6 +499,7 @@ int PosixCacheManager::StartTxn(
     template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
     memcpy(template_path, path_in_cache.data(), path_in_cache.length());
     memset(template_path + path_in_cache.length(), 'X', 6);
+
   } else {
     temp_path_len = txn_template_path_.length();
     template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
