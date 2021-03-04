@@ -532,7 +532,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
     // We ignore the exception.
     // In case of exception, the base hash remains unset.
   }
-  
+
   settings_publisher->SetIsManaged(IsManagedRepository());
   settings_publisher->SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
   settings_publisher->GetStorage()->SetLocator(
