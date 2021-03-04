@@ -11,7 +11,7 @@ cvmfs_run_test() {
   echo "Create file in cache"
   sudo touch /var/lib/cvmfs/shared/02/txn.hash.XXXXXX || return 2
   echo "Run cvmfs_fsck"
-  cvmfs_fsck -v /var/lib/cvmfs/shared 
+  cvmfs_fsck -v /var/lib/cvmfs/shared || return 3 
 
   return 0
 }

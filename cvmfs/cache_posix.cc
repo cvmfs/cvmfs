@@ -490,11 +490,18 @@ int PosixCacheManager::StartTxn(
   string path_in_cache = GetPathInCache(id);
   Transaction *transaction = new (txn) Transaction(id, path_in_cache);
 
-  string txn_prefix = "txn.";
-  path_in_cache.append(txn_prefix);
+
   char *template_path = NULL;
   unsigned temp_path_len = 0;
+
+  /**
   if (rename_workaround_ == kRenameSamedir) {
+    unsigned txn_position = 0;
+    string txn_prefix = "txn.";
+
+    txn_position = path_in_cache.length();
+    path_in_cache.insert(txn_position, txn_prefix);
+
     temp_path_len = path_in_cache.length() + 6;
     template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
     memcpy(template_path, path_in_cache.data(), path_in_cache.length());
@@ -505,6 +512,19 @@ int PosixCacheManager::StartTxn(
     template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
     memcpy(template_path, &txn_template_path_[0], temp_path_len);
   }
+  **/
+
+  unsigned txn_position = 0;
+  string txn_prefix = "txn.";
+
+  txn_position = path_in_cache.length();
+  path_in_cache.insert(txn_position - 38, txn_prefix);
+
+  temp_path_len = path_in_cache.length() + 6;
+  template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
+  memcpy(template_path, path_in_cache.data(), path_in_cache.length());
+  memset(template_path + path_in_cache.length(), 'X', 6);
+
   template_path[temp_path_len] = '\0';
 
   transaction->fd = mkstemp(template_path);
