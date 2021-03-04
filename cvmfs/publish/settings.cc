@@ -448,22 +448,13 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   return settings;
 }
 
-std::string SettingsPublisher::GetRootHashXAttr()
-{
+std::string SettingsPublisher::GetRootHashXAttr() {
   std::string xattr;
-  try {
-    bool rvb =
-        platform_getxattr(this->transaction().spool_area().readonly_mnt(),
-                          "user.root_hash", &xattr);
-    if (!rvb) {
-      throw EPublish("cannot get extended attribute root_hash");
-    }
-  } catch (const EPublish& e) {
-    // We ignore the exception.
-    // In case of exception, the base hash remains unset.
-    return xattr;
+  bool rvb = platform_getxattr(this->transaction().spool_area().readonly_mnt(),
+                               "user.root_hash", &xattr);
+  if (!rvb) {
+    throw EPublish("cannot get extended attribute root_hash");
   }
-
   return xattr;
 }
 
@@ -533,11 +524,16 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   UniquePtr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(settings_repository));
 
-  std::string xattr = settings_publisher->GetRootHashXAttr();
-
+  try {
+    std::string xattr = settings_publisher->GetRootHashXAttr();
+    settings_publisher->GetTransaction()->SetBaseHash(
+        shash::MkFromHexPtr(shash::HexPtr(xattr), shash::kSuffixCatalog));
+  } catch (const EPublish& e) {
+    // We ignore the exception.
+    // In case of exception, the base hash remains unset.
+  }
+  
   settings_publisher->SetIsManaged(IsManagedRepository());
-  settings_publisher->GetTransaction()->SetBaseHash(
-      shash::MkFromHexPtr(shash::HexPtr(xattr), shash::kSuffixCatalog));
   settings_publisher->SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
   settings_publisher->GetStorage()->SetLocator(
     options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
