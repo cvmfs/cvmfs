@@ -17,7 +17,6 @@ empty_transaction() {
   start_transaction $CVMFS_TEST_REPO || return 8
   cvmfs_server publish $CVMFS_TEST_REPO || return 9
 }
-}
 
 cvmfs_run_test() {
   logfile=$1
