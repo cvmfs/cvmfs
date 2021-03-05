@@ -30,7 +30,7 @@ cvmfs_run_test() {
   echo "*** Change hash algorithm to shake128"
   cd /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/ || return 6
   if grep -q "sha1" server.conf; then
-    sed -i 's/sha1/shake128/' server.conf || return 7
+    sed -i 's/sha1/shake128/' server.conf
   fi
 
   echo "*** Empty transaction for saving settings"
