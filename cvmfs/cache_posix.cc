@@ -493,27 +493,6 @@ int PosixCacheManager::StartTxn(
 
   char *template_path = NULL;
   unsigned temp_path_len = 0;
-
-  /**
-  if (rename_workaround_ == kRenameSamedir) {
-    unsigned txn_position = 0;
-    string txn_prefix = "txn.";
-
-    txn_position = path_in_cache.length();
-    path_in_cache.insert(txn_position, txn_prefix);
-
-    temp_path_len = path_in_cache.length() + 6;
-    template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
-    memcpy(template_path, path_in_cache.data(), path_in_cache.length());
-    memset(template_path + path_in_cache.length(), 'X', 6);
-
-  } else {
-    temp_path_len = txn_template_path_.length();
-    template_path = reinterpret_cast<char *>(alloca(temp_path_len + 1));
-    memcpy(template_path, &txn_template_path_[0], temp_path_len);
-  }
-  **/
-
   unsigned txn_position = 0;
   string txn_prefix = "txn.";
 
