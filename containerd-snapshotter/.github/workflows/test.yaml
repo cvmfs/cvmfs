@@ -1,0 +1,17 @@
+name: Test
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-18.04
+    container:
+      image: golang:1.13
+    steps:
+      - uses: actions/checkout@v2
+      - name: run make
+        run: make
+      - uses: actions/upload-artifact@v2
+        with:
+          path: out/
+          name: cvmfs-containerd-snapshotter-${{ github.sha }}
