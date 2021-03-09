@@ -398,6 +398,8 @@ class SettingsPublisher {
   void SetIsSilent(bool value);
   void SetIsManaged(bool value);
 
+  std::string GetRootHashXAttr();
+
   std::string fqrn() const { return fqrn_; }
   std::string url() const { return url_; }
   unsigned whitelist_validity_days() const { return whitelist_validity_days_; }
@@ -481,6 +483,7 @@ class SettingsBuilder : SingleCopy {
    * In an "enter environment" (see cmd_enter), the spool area of the enter
    * environment is applied.
    */
+
   SettingsPublisher* CreateSettingsPublisher(
       const std::string &ident, bool needs_managed = false);
 

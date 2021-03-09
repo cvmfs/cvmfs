@@ -448,6 +448,15 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   return settings;
 }
 
+std::string SettingsPublisher::GetRootHashXAttr() {
+  std::string xattr;
+  bool rvb = platform_getxattr(this->transaction().spool_area().readonly_mnt(),
+                               "user.root_hash", &xattr);
+  if (!rvb) {
+    throw EPublish("cannot get extended attribute root_hash");
+  }
+  return xattr;
+}
 
 SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   std::string session_dir = Env::GetEnterSessionDir();
@@ -460,13 +469,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
     session_dir);
 
-  std::string xattr;
-  bool rvb = platform_getxattr(
-    settings_publisher->transaction().spool_area().readonly_mnt(),
-    "user.root_hash", &xattr);
-  if (!rvb) {
-    throw EPublish("cannot get extrended attribute root_hash");
-  }
+  std::string xattr = settings_publisher->GetRootHashXAttr();
 
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
@@ -520,6 +523,16 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
 
   UniquePtr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(settings_repository));
+
+  try {
+    std::string xattr = settings_publisher->GetRootHashXAttr();
+    settings_publisher->GetTransaction()->SetBaseHash(
+        shash::MkFromHexPtr(shash::HexPtr(xattr), shash::kSuffixCatalog));
+  } catch (const EPublish& e) {
+    // We ignore the exception.
+    // In case of exception, the base hash remains unset.
+  }
+
   settings_publisher->SetIsManaged(IsManagedRepository());
   settings_publisher->SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
   settings_publisher->GetStorage()->SetLocator(

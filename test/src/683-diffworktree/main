@@ -1,0 +1,55 @@
+cvmfs_test_name="Set base hash in diff command"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+diff_command_worktree() {
+  echo "*** Start a transaction"
+  start_transaction $CVMFS_TEST_REPO || return 2
+  echo "*** Edit repository"
+  touch /cvmfs/$CVMFS_TEST_REPO/new_file.txt || return 3
+  echo "*** Run diff command"
+  cvmfs_server diff --worktree $CVMFS_TEST_REPO || return 4
+  echo "*** Abort transaction"
+  abort_transaction $CVMFS_TEST_REPO || return 5
+}
+
+empty_transaction() {
+  start_transaction $CVMFS_TEST_REPO || return 8
+  cvmfs_server publish $CVMFS_TEST_REPO || return 9
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** Create a new repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+
+  echo "*** Transaction with default hash algorithm"
+  diff_command_worktree
+
+  echo "*** Change hash algorithm to shake128"
+  cd /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/ || return 6
+  if grep -q "sha1" server.conf; then
+    sudo sed -i 's/sha1/shake128/' server.conf || return 7
+  fi
+
+  echo "*** Empty transaction for saving settings"
+  empty_transaction
+
+  echo "*** Transaction with shake128 algorithm"
+  diff_command_worktree
+
+  echo "*** Change hash algorithm to rmd160"
+  cd /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/ || return 10
+  if grep -q "shake128" server.conf; then
+    sudo sed -i 's/shake128/rmd160/' server.conf || return 11
+  fi
+
+  echo "*** Empty transaction for saving settings"
+  empty_transaction
+
+  echo "*** Transaction with rmd160 algorithm"
+  diff_command_worktree
+
+  return 0
+} 
