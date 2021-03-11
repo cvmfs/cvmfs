@@ -477,8 +477,15 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
                  false /* external */);
 
   std::string arg;
-  if (omgr.GetValue("CVMFS_SERVER_URL", &arg))
+  rvb = platform_getxattr(
+    settings_publisher->transaction().spool_area().readonly_mnt(),
+    "user.host", &arg);
+  if (!rvb) {
+    throw EPublish("cannot get extended attribute host");
+  } else {
     settings_publisher->SetUrl(arg);
+  }
+
   if (omgr.GetValue("CVMFS_KEYS_DIR", &arg))
     settings_publisher->GetKeychain()->SetKeychainDir(arg);
   settings_publisher->GetTransaction()->SetLayoutRevision(
