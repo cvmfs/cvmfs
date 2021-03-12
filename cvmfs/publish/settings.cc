@@ -469,7 +469,13 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
     session_dir);
 
-  std::string xattr = settings_publisher->GetRootHashXAttr();
+  std::string xattr;
+  bool is_roothash_present = platform_getxattr(
+    settings_publisher->transaction().spool_area().readonly_mnt(),
+    "user.root_hash", &xattr);
+  if (!is_roothash_present) {
+    throw EPublish("cannot get extrended attribute root_hash");
+  }
 
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
@@ -477,10 +483,10 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
                  false /* external */);
 
   std::string arg;
-  rvb = platform_getxattr(
+  bool is_host_present = platform_getxattr(
     settings_publisher->transaction().spool_area().readonly_mnt(),
     "user.host", &arg);
-  if (!rvb) {
+  if (!is_host_present) {
     throw EPublish("cannot get extended attribute host");
   } else {
     settings_publisher->SetUrl(arg);
