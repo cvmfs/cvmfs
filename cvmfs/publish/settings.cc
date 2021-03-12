@@ -461,10 +461,10 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
     session_dir);
 
   std::string xattr;
-  bool rvb = platform_getxattr(
+  bool is_roothash_present = platform_getxattr(
     settings_publisher->transaction().spool_area().readonly_mnt(),
     "user.root_hash", &xattr);
-  if (!rvb) {
+  if (!is_roothash_present) {
     throw EPublish("cannot get extrended attribute root_hash");
   }
 
@@ -474,10 +474,10 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
                  false /* external */);
 
   std::string arg;
-  rvb = platform_getxattr(
+  bool is_host_present = platform_getxattr(
     settings_publisher->transaction().spool_area().readonly_mnt(),
     "user.host", &arg);
-  if (!rvb) {
+  if (!is_host_present) {
     throw EPublish("cannot get extended attribute host");
   } else {
     settings_publisher->SetUrl(arg);
