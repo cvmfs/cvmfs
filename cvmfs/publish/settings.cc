@@ -461,10 +461,10 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
     session_dir);
 
   std::string xattr;
-  bool is_roothash_present = platform_getxattr(
+  bool rvb = platform_getxattr(
     settings_publisher->transaction().spool_area().readonly_mnt(),
     "user.root_hash", &xattr);
-  if (!is_roothash_present) {
+  if (!rvb) {
     throw EPublish("cannot get extrended attribute root_hash");
   }
 
