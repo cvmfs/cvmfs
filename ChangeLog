@@ -1,4 +1,5 @@
 2.8.1:
+  * Fix `cvmfs_server diff --worktree` on managed publishers (CVM-1972)
   * Set CVMFS_USE_CDN=yes in service container
 
 2.8.0:
