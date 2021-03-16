@@ -448,14 +448,14 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   return settings;
 }
 
-std::string SettingsPublisher::GetRootHashXAttr() {
-  std::string xattr;
+std::string SettingsPublisher::GetReadOnlyXAttr(const std::string &attr) {
+  std::string value;
   bool rvb = platform_getxattr(this->transaction().spool_area().readonly_mnt(),
-                               "user.root_hash", &xattr);
+                               attr, &value);
   if (!rvb) {
-    throw EPublish("cannot get extended attribute root_hash");
+    throw EPublish("cannot get extended attribute " + attr);
   }
-  return xattr;
+  return value;
 }
 
 SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
@@ -469,7 +469,8 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
     session_dir);
 
-  std::string xattr = settings_publisher->GetRootHashXAttr();
+  std::string base_hash =
+    settings_publisher->GetReadOnlyXAttr("user.root_hash");
 
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
@@ -477,21 +478,13 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
                  false /* external */);
 
   std::string arg;
-  bool is_host_present = platform_getxattr(
-    settings_publisher->transaction().spool_area().readonly_mnt(),
-    "user.host", &arg);
-  if (!is_host_present) {
-    throw EPublish("cannot get extended attribute host");
-  } else {
-    settings_publisher->SetUrl(arg);
-  }
-
+  settings_publisher->SetUrl(settings_publisher->GetReadOnlyXAttr("user.host"));
   if (omgr.GetValue("CVMFS_KEYS_DIR", &arg))
     settings_publisher->GetKeychain()->SetKeychainDir(arg);
   settings_publisher->GetTransaction()->SetLayoutRevision(
     Publisher::kRequiredLayoutRevision);
   settings_publisher->GetTransaction()->SetBaseHash(shash::MkFromHexPtr(
-    shash::HexPtr(xattr), shash::kSuffixCatalog));
+    shash::HexPtr(base_hash), shash::kSuffixCatalog));
   settings_publisher->GetTransaction()->SetUnionFsType("overlayfs");
   settings_publisher->SetOwner(geteuid(), getegid());
 
@@ -532,7 +525,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
       new SettingsPublisher(settings_repository));
 
   try {
-    std::string xattr = settings_publisher->GetRootHashXAttr();
+    std::string xattr = settings_publisher->GetReadOnlyXAttr("user.root_hash");
     settings_publisher->GetTransaction()->SetBaseHash(
         shash::MkFromHexPtr(shash::HexPtr(xattr), shash::kSuffixCatalog));
   } catch (const EPublish& e) {
