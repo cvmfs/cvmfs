@@ -4,6 +4,8 @@
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
+# 1.11 - 16.03.2021
+#    - Customize max fill ration (contributed by NIKHEF)
 # 1.10 - 19.06.2017
 #    - Check for cleanup rate within the last 24 hours
 # 1.9 - 13.02.2015:
@@ -22,7 +24,7 @@
 #    - return immediately if transport endpoint is not connected
 #    - start of ChangeLog
 
-VERSION=1.10
+VERSION=1.11
 
 STATUS_OK=0
 STATUS_WARNING=1     # Check timed out or CernVM-FS resource consumption high or
@@ -33,17 +35,19 @@ STATUS_UNKNOWN=3     # Internal or usage error
 BRIEF_INFO="OK"
 RETURN_STATUS=$STATUS_OK
 
+MAX_FILL_RATIO=95
 TIMEOUT_SECONDS=120
 
 
 usage() {
-   /bin/echo "Usage:   $0 [-t <seconds>][-m] [-n] [-i] <repository name> [expected cvmfs version]"
+   /bin/echo "Usage:   $0 [-t <seconds>][-m] [-n] [-f fill_ratio] [-i] <repository name> [expected cvmfs version]"
    /bin/echo "Example: $0 -t 60 -m -n atlas.cern.ch 2.0.4"
    /bin/echo "Options:"
    /bin/echo "  -t  second after which the check times out with a warning (default: ${TIMEOUT_SECONDS})"
    /bin/echo "  -n  run extended network checks"
    /bin/echo "  -m  check memory consumption of the cvmfs2 process"
    /bin/echo "      (less than 50M or 1% of available memory)"
+   /bin/echo "  -f  set max fill ratio warning level (default 95)"
    /bin/echo "  -i  check if inodes exceed 32bit which can break 32bit programs"
    /bin/echo "      that use the non-64bit glibc file system interface"
 }
@@ -109,7 +113,7 @@ try_get_xattr() {
 OPT_NETWORK_CHECK=0
 OPT_MEMORY_CHECK=0
 OPT_INODE_CHECK=0
-while getopts "hVvt:nmi" opt; do
+while getopts "hVvt:nmf:i" opt; do
   case $opt in
     h)
       help
@@ -134,6 +138,9 @@ while getopts "hVvt:nmi" opt; do
     ;;
     m)
       OPT_MEMORY_CHECK=1
+    ;;
+    f)
+      MAX_FILL_RATIO="$OPTARG"
     ;;
     i)
       OPT_INODE_CHECK=1
@@ -289,7 +296,7 @@ do_check() {
   else
     FILL_RATIO=`/bin/echo "$DF_CACHE" | /usr/bin/tail -n1 | \
                 /bin/awk '{print $5}' | /usr/bin/tr -Cd [:digit:]`
-    if [ $FILL_RATIO -gt 95 ]; then
+    if [ $FILL_RATIO -gt $MAX_FILL_RATIO ]; then
       append_info "space on cache partition low"
       RETURN_STATUS=$STATUS_WARNING
     fi
