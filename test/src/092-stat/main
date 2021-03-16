@@ -1,4 +1,3 @@
-
 cvmfs_test_name="Reporting in cvmfs_config stat"
 cvmfs_test_suites="quick"
 
