@@ -4,8 +4,8 @@
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
-# 1.10n - Nikhef local changes:
-#       - customize max fill ration
+# 1.11 - 16.03.2021
+#    - Customize max fill ration (contributed by NIKHEF)
 # 1.10 - 19.06.2017
 #    - Check for cleanup rate within the last 24 hours
 # 1.9 - 13.02.2015:
@@ -24,7 +24,7 @@
 #    - return immediately if transport endpoint is not connected
 #    - start of ChangeLog
 
-VERSION=1.10
+VERSION=1.11
 
 STATUS_OK=0
 STATUS_WARNING=1     # Check timed out or CernVM-FS resource consumption high or
