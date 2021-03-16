@@ -14,6 +14,7 @@
 #include "mountpoint.h"
 #include "quota.h"
 #include "signature.h"
+#include "util/string.h"
 
 MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
                                      bool hide_magic_xattrs)
@@ -338,7 +339,7 @@ std::string NDirOpenMagicXattr::GetValue() {
 }
 
 std::string NDownloadMagicXattr::GetValue() {
-  return  mount_point_->statistics()->Lookup("fetch.n_downloads")->Print();
+  return mount_point_->statistics()->Lookup("fetch.n_downloads")->Print();
 }
 
 std::string NIOErrMagicXattr::GetValue() {
@@ -350,7 +351,16 @@ std::string NOpenMagicXattr::GetValue() {
 }
 
 std::string HitrateMagicXattr::GetValue() {
-  return "TODO";
+  int64_t n_invocations =
+    mount_point_->statistics()->Lookup("fetch.n_invocations")->Get();
+  if (n_invocations == 0)
+    return "n/a";
+
+  int64_t n_downloads =
+    mount_point_->statistics()->Lookup("fetch.n_downloads")->Get();
+  float hitrate = 100. * (1. -
+    (static_cast<float>(n_downloads) / static_cast<float>(n_invocations)));
+  return StringifyDouble(hitrate);
 }
 
 std::string ProxyMagicXattr::GetValue() {
