@@ -398,7 +398,7 @@ class SettingsPublisher {
   void SetIsSilent(bool value);
   void SetIsManaged(bool value);
 
-  std::string GetRootHashXAttr();
+  std::string GetReadOnlyXAttr(const std::string &attr);
 
   std::string fqrn() const { return fqrn_; }
   std::string url() const { return url_; }
