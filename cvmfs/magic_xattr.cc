@@ -32,6 +32,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.ndownload", new NDownloadMagicXattr());
   Register("user.nioerr", new NIOErrMagicXattr());
   Register("user.nopen", new NOpenMagicXattr());
+  Register("user.hitrate", new HitrateMagicXattr());
   Register("user.proxy", new ProxyMagicXattr());
   Register("user.pubkeys", new PubkeysMagicXattr());
   Register("user.repo_counters", new RepoCountersMagicXattr());
@@ -346,6 +347,10 @@ std::string NIOErrMagicXattr::GetValue() {
 
 std::string NOpenMagicXattr::GetValue() {
   return mount_point_->file_system()->n_fs_open()->ToString();
+}
+
+std::string HitrateMagicXattr::GetValue() {
+  return "TODO";
 }
 
 std::string ProxyMagicXattr::GetValue() {
