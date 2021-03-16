@@ -12,11 +12,17 @@
  * The talk module runs in a separate thread.
  */
 
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include "cvmfs_config.h"
 #include "talk.h"
 
 #include <errno.h>
+#include <inttypes.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -749,11 +755,11 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
   for (unsigned int j = 0; j < hist.size(); j++) {
     Log2Histogram *h = hist[j];
     unsigned int format_index =
-        snprintf(buffer, bufSize, "\"%s\",\"%s\",%ld,\"%s\"", repo.c_str(),
-                 names[j].c_str(), h->N(), "nanoseconds");
+      snprintf(buffer, bufSize, "\"%s\",\"%s\",%" PRIu64 ",\"nanoseconds\"",
+               repo.c_str(), names[j].c_str(), h->N());
     for (unsigned int i = 0; i < qs.size(); i++) {
       format_index += snprintf(buffer + format_index, bufSize - format_index,
-                               ",%d", h->GetQuantile(qs[i]));
+                               ",%u", h->GetQuantile(qs[i]));
     }
     format_index +=
         snprintf(buffer + format_index, bufSize - format_index, "\n");
