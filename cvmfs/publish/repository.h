@@ -227,10 +227,18 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
     static Session *Create(const SettingsPublisher &settings_publisher,
                            int llvl = 0);
     ~Session();
+    void SetKeepAlive(bool value);
    private:
     explicit Session(const Settings &settings_session);
     void Acquire();
     Settings settings_;
+    /**
+     * If set to true, the session is not closed on destruction, i.e. the
+     * lease is not dropped and the lease token is not removed. A newly created
+     * Session object will pick up an existing lease token and not re-acquire
+     * it.
+     */
+    bool keep_alive_;
   };  // class Session
 
   /**

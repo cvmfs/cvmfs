@@ -130,6 +130,7 @@ void Publisher::TransactionImpl() {
     // PushReflog();
   }
 
+  //session->SetKeepAlive(true);
   in_transaction_ = true;
   LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
            "(%s) opened transaction", settings_.fqrn().c_str());

@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "publish/repository.h"
 
+#include <unistd.h>
+
 #include <cassert>
 #include <string>
 
@@ -161,7 +163,13 @@ namespace publish {
 
 Publisher::Session::Session(const Settings &settings_session)
   : settings_(settings_session)
+  , keep_alive_(false)
 {
+}
+
+
+void Publisher::Session::SetKeepAlive(bool value) {
+  keep_alive_ = value;
 }
 
 
@@ -169,6 +177,9 @@ Publisher::Session *Publisher::Session::Create(
   const Settings &settings_session)
 {
   Session *session = new Session(settings_session);
+  if (FileExists(session->settings_.token_path))
+    return session;
+
   session->Acquire();
   return session;
 }
@@ -229,6 +240,10 @@ void Publisher::Session::Acquire() {
 }
 
 Publisher::Session::~Session() {
+  if (keep_alive_)
+    return;
+
+  // unlink(settings_.token_path.c_str());
   // TODO(jblomer): drop lease
 }
 
