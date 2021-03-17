@@ -70,6 +70,7 @@ static inline bool EscapeUrlChar(char input, char output[3]) {
       ((input >= 'A') && (input <= 'Z')) ||
       ((input >= 'a') && (input <= 'z')) ||
       (input == '/') || (input == ':') || (input == '.') ||
+      (input == '@') ||
       (input == '+') || (input == '-') ||
       (input == '_') || (input == '~') ||
       (input == '[') || (input == ']') || (input == ','))
