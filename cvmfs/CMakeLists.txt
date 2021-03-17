@@ -253,6 +253,7 @@ set (CVMFS_PUBLISH_SOURCES
   logging.cc
   manifest.cc
   options.cc
+  publish/cmd_abort.cc
   publish/cmd_diff.cc
   publish/cmd_enter.cc
   publish/cmd_hash.cc
