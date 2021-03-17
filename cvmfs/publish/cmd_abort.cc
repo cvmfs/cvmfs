@@ -68,7 +68,7 @@ int CmdAbort::Main(const Options &options) {
     char answer[2];
     fgets(answer, 2, stdin);
     if ((answer[0] != 'Y') && (answer[0] != 'y'))
-      return 2;
+      return EINTR;
   }
 
   UniquePtr<Publisher> publisher;
@@ -77,6 +77,14 @@ int CmdAbort::Main(const Options &options) {
   int rvi = publisher->managed_node()->Check(false /* is_quiet */);
   if (rvi != 0) throw EPublish("publisher file system mount state is broken");
 
+  try {
+    publisher->Abort();
+  } catch (const EPublish &e) {
+    if (e.failure() == EPublish::kFailTransactionState) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      return EINVAL;
+    }
+  }
 
   return 0;
 }

@@ -316,6 +316,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void TransactionImpl();
   void CheckTransactionStatus();
 
+  void SyncImpl();
+
   SettingsPublisher settings_;
   UniquePtr<perf::StatisticsTemplate> statistics_publish_;
   /**

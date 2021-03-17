@@ -19,7 +19,7 @@ class EPublish : public std::runtime_error {
     kFailUnspecified = 0,
     kFailInvocation,          // Invalid command line options
     kFailPermission,          // Not owner of the repository
-    kFailTransactionLocked,   // another publisher process has an open txn
+    kFailTransactionState,    // The txn was expected to be in the other state
     kFailGatewayKey,          // cannot access the gateway secret key
     kFailLeaseHttp,           // cannot connect to the gateway HTTP endpoint
     kFailLeaseBody,           // corrupted session token

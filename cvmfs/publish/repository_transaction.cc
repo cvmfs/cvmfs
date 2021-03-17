@@ -32,7 +32,7 @@ void Publisher::CheckTransactionStatus() {
   const std::string publishing_lock =
     settings_.transaction().spool_area().publishing_lock();
   is_publishing_ =
-    ServerLockFile::IsLocked(publishing_lock, true /* ignore_stale */);
+    ServerLockFile::IsLocked(publishing_lock, false /* ignore_stale */);
 }
 
 
@@ -53,7 +53,7 @@ void Publisher::TransactionRetry() {
       TransactionImpl();
       break;
     } catch (const publish::EPublish& e) {
-      if ((e.failure() == EPublish::kFailTransactionLocked) ||
+      if ((e.failure() == EPublish::kFailTransactionState) ||
           (e.failure() == EPublish::kFailLeaseBusy))
       {
         if (platform_monotonic_time() > deadline)
@@ -74,7 +74,7 @@ void Publisher::TransactionRetry() {
 void Publisher::TransactionImpl() {
   if (in_transaction_) {
     throw EPublish("another transaction is already open",
-                   EPublish::kFailTransactionLocked);
+                   EPublish::kFailTransactionState);
   }
 
   InitSpoolArea();

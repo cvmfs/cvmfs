@@ -316,6 +316,7 @@ set (LIBCVMFS_SERVER_SOURCES
   pack.cc
   publish/except.cc
   publish/repository.cc
+  publish/repository_abort.cc
   publish/repository_env.cc
   publish/repository_diff.cc
   publish/repository_managed.cc

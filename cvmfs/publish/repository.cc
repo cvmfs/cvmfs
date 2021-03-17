@@ -700,10 +700,6 @@ Publisher::~Publisher() {
 }
 
 
-void Publisher::Abort() {
-  // TODO(jblomer): remove transaction lock
-}
-
 void Publisher::ConstructSyncManagers() {
   ConstructSpoolers();
 
@@ -791,6 +787,25 @@ void Publisher::WipeScratchArea() {
 }
 
 void Publisher::Sync() {
+  if (settings_.transaction().dry_run()) {
+    SyncImpl();
+    return;
+  }
+
+  const std::string publishing_lock =
+    settings_.transaction().spool_area().publishing_lock();
+
+  ServerLockFile::Acquire(publishing_lock, false /* ignore_stale */);
+  try {
+    SyncImpl();
+    ServerLockFile::Release(publishing_lock);
+  } catch (...) {
+    ServerLockFile::Release(publishing_lock);
+    throw;
+  }
+}
+
+void Publisher::SyncImpl() {
   ConstructSyncManagers();
 
   sync_union_->Traverse();

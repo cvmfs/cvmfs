@@ -123,7 +123,7 @@ int CmdTransaction::Main(const Options &options) {
     publisher->Transaction();
   } catch (const EPublish &e) {
     const char *msg_prefix = "CernVM-FS transaction error: ";
-    if (e.failure() == EPublish::kFailTransactionLocked) {
+    if (e.failure() == EPublish::kFailTransactionState) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
                msg_prefix, e.msg().c_str());
       return EEXIST;
