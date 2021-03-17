@@ -971,7 +971,7 @@ cvmfs_stat() {
   get_attr nopen; nopen=$attr_value
   get_attr ndiropen; ndiropen=$attr_value
   get_attr ndownload; ndownload=$attr_value
-  hitrate=`echo "$nopen $ndownload" | awk '{if ($1 == 0) print "n/a"; else print 100.0-($2*100.0/$1)}'` || exit 35
+  get_attr hitrate; hitrate=$attr_value
   get_attr rx; rx=$attr_value
   get_attr speed; speed=$attr_value
 

@@ -14,6 +14,7 @@
 #include "mountpoint.h"
 #include "quota.h"
 #include "signature.h"
+#include "util/string.h"
 
 MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
                                      bool hide_magic_xattrs)
@@ -32,6 +33,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.ndownload", new NDownloadMagicXattr());
   Register("user.nioerr", new NIOErrMagicXattr());
   Register("user.nopen", new NOpenMagicXattr());
+  Register("user.hitrate", new HitrateMagicXattr());
   Register("user.proxy", new ProxyMagicXattr());
   Register("user.pubkeys", new PubkeysMagicXattr());
   Register("user.repo_counters", new RepoCountersMagicXattr());
@@ -337,7 +339,7 @@ std::string NDirOpenMagicXattr::GetValue() {
 }
 
 std::string NDownloadMagicXattr::GetValue() {
-  return  mount_point_->statistics()->Lookup("fetch.n_downloads")->Print();
+  return mount_point_->statistics()->Lookup("fetch.n_downloads")->Print();
 }
 
 std::string NIOErrMagicXattr::GetValue() {
@@ -346,6 +348,19 @@ std::string NIOErrMagicXattr::GetValue() {
 
 std::string NOpenMagicXattr::GetValue() {
   return mount_point_->file_system()->n_fs_open()->ToString();
+}
+
+std::string HitrateMagicXattr::GetValue() {
+  int64_t n_invocations =
+    mount_point_->statistics()->Lookup("fetch.n_invocations")->Get();
+  if (n_invocations == 0)
+    return "n/a";
+
+  int64_t n_downloads =
+    mount_point_->statistics()->Lookup("fetch.n_downloads")->Get();
+  float hitrate = 100. * (1. -
+    (static_cast<float>(n_downloads) / static_cast<float>(n_invocations)));
+  return StringifyDouble(hitrate);
 }
 
 std::string ProxyMagicXattr::GetValue() {
