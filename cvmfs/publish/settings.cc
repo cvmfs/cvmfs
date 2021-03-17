@@ -66,6 +66,10 @@ void SettingsTransaction::SetLayoutRevision(const unsigned revision) {
   layout_revision_ = revision;
 }
 
+void SettingsTransaction::SetInEnterSession(const bool value) {
+  in_enter_session_ = value;
+}
+
 void SettingsTransaction::SetBaseHash(const shash::Any &hash) {
   base_hash_ = hash;
 }
@@ -466,6 +470,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   UniquePtr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(SettingsRepository(fqrn)));
   // TODO(jblomer): work in progress
+  settings_publisher->GetTransaction()->SetInEnterSession(true);
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
     session_dir);
 
