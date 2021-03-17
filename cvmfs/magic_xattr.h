@@ -239,6 +239,10 @@ class NOpenMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
+class HitrateMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue();
+};
+
 class ProxyMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
