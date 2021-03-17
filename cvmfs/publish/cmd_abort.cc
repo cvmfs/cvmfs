@@ -33,10 +33,10 @@ int CmdAbort::Main(const Options &options) {
   }
 
   if (settings->transaction().in_enter_session()) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: "
-             "aborting a transaction is unsupported within the ephemeral "
-             "writable shell");
-    return 1;
+    throw EPublish(
+      "aborting a transaction is unsupported within the ephemeral "
+      "writable shell",
+      EPublish::kFailInvocation);
   }
 
 
