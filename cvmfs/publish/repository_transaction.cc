@@ -28,6 +28,11 @@ void Publisher::CheckTransactionStatus() {
     settings_.transaction().spool_area().transaction_lock();
   in_transaction_ =
     ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
+
+  const std::string publishing_lock =
+    settings_.transaction().spool_area().publishing_lock();
+  is_publishing_ =
+    ServerLockFile::IsLocked(publishing_lock, true /* ignore_stale */);
 }
 
 

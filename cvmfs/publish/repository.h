@@ -268,6 +268,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   const SettingsPublisher &settings() const { return settings_; }
   bool in_transaction() const { return in_transaction_; }
+  bool is_publishing() const { return is_publishing_; }
   ManagedNode *managed_node() const { return managed_node_.weak_ref(); }
   const upload::Spooler *spooler_files() const { return spooler_files_; }
   const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
@@ -322,6 +323,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    */
   int llvl_;
   bool in_transaction_;
+  bool is_publishing_;
   gateway::GatewayKey gw_key_;
   UniquePtr<ManagedNode> managed_node_;
 

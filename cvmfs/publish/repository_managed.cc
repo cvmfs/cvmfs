@@ -116,15 +116,13 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
 
   // Check whether we can repair
 
-  bool is_publishing =
-    ServerLockFile::IsLocked(publishing_lock, false /* ignore_stale */);
   switch (repair_mode) {
     case kUnionMountRepairNever:
       return result;
     case kUnionMountRepairAlways:
       break;
     case kUnionMountRepairSafe:
-      if (is_publishing) {
+      if (publisher_->is_publishing()) {
         LogCvmfs(kLogCvmfs, logFlags,
           "WARNING: The repository %s is currently publishing and should not\n"
           "be touched. If you are absolutely sure, that this is _not_ the "
