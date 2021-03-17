@@ -26,6 +26,7 @@ class EPublish : public std::runtime_error {
     kFailLeaseNoEntry,        // the lease path does not exist
     kFailLeaseNoDir,          // the lease path is no a directory
     kFailRepositoryNotFound,  // the repository was not found on the machine
+    kFailRepositoryType,      // the stratum type (0, 1) does not match
     kFailLayoutRevision,      // unsupported layout revision, migrate required
     kFailWhitelistExpired,    //
     kFailMissingDependency,   // a program or service was not found
