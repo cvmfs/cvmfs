@@ -11,6 +11,7 @@
 #include "publish/except.h"
 #include "publish/settings.h"
 #include "util/pointer.h"
+#include "util/posix.h"
 
 namespace publish {
 
@@ -37,6 +38,13 @@ int CmdAbort::Main(const Options &options) {
       "aborting a transaction is unsupported within the ephemeral "
       "writable shell",
       EPublish::kFailInvocation);
+  }
+
+  if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
+                         false /* temporarily */))
+  {
+    throw EPublish("No write permission to repository",
+                   EPublish::kFailPermission);
   }
 
 

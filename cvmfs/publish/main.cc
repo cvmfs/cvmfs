@@ -104,6 +104,9 @@ int main(int argc, char **argv) {
     } else if (e.failure() == publish::EPublish::kFailMissingDependency) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Missing dependency: %s", e.msg().c_str());
+    } else if (e.failure() == publish::EPublish::kFailPermission) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Permission error: %s", e.msg().c_str());
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
     }

@@ -75,7 +75,8 @@ int CmdTransaction::Main(const Options &options) {
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
                          false /* temporarily */))
   {
-    throw EPublish("No write permission to repository");
+    throw EPublish("No write permission to repository",
+                   EPublish::kFailPermission);
   }
   FileSystemInfo fs_info = GetFileSystemInfo("/cvmfs");
   if (fs_info.type == kFsTypeAutofs)
