@@ -1,4 +1,5 @@
 2.8.1:
+  * Fix client cache hitrate reporting (CVM-1965)
   * Fix server statistics display for JSROOT 6 (CVM-1970)
   * Get repository host from read-only layer in enter shell (CVM-1969)
   * Fix `cvmfs_server diff --worktree` on managed publishers (CVM-1972)
