@@ -16,7 +16,7 @@ class CmdHelp : public Command {
   explicit CmdHelp(CommandList *commands) : commands_(commands) { }
   virtual std::string GetName() const { return "help"; }
   virtual std::string GetBrief() const {
-    return "Prints information about a command";
+    return "Print information about a command";
   }
   virtual std::string GetUsage() const { return "<command>"; }
   virtual unsigned GetMinPlainArgs() const { return 1; }

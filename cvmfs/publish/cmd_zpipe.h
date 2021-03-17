@@ -15,7 +15,7 @@ class CmdZpipe : public Command {
  public:
   virtual std::string GetName() const { return "zpipe"; }
   virtual std::string GetBrief() const {
-    return "Compresses and decompresses data with zlib";
+    return "Compress and decompress data with zlib";
   }
   virtual std::string GetDescription() const {
     return "Compresses or decompresses a file using the DEFLATE algorithm.\n"
