@@ -164,7 +164,32 @@ namespace publish {
 Publisher::Session::Session(const Settings &settings_session)
   : settings_(settings_session)
   , keep_alive_(false)
+  // TODO(jblomer): it would be better to actually read & validate the token
+  , has_lease_(FileExists(settings_.token_path))
 {
+}
+
+
+Publisher::Session::Session(const SettingsPublisher &settings_publisher,
+                            int llvl)
+{
+  keep_alive_ = false;
+  if (settings_publisher.storage().type() != upload::SpoolerDefinition::Gateway)
+  {
+    has_lease_ = true;
+    return;
+  }
+
+  settings_.service_endpoint = settings_publisher.storage().endpoint();
+  settings_.repo_path = settings_publisher.fqrn() + "/" +
+                        settings_publisher.transaction().lease_path();
+  settings_.gw_key_path = settings_publisher.keychain().gw_key_path();
+  settings_.token_path =
+    settings_publisher.transaction().spool_area().gw_session_token();
+  settings_.llvl = llvl;
+
+  // TODO(jblomer): it would be better to actually read & validate the token
+  has_lease_ = FileExists(settings_.token_path);
 }
 
 
@@ -173,40 +198,10 @@ void Publisher::Session::SetKeepAlive(bool value) {
 }
 
 
-Publisher::Session *Publisher::Session::Create(
-  const Settings &settings_session)
-{
-  Session *session = new Session(settings_session);
-  if (FileExists(session->settings_.token_path))
-    return session;
-
-  session->Acquire();
-  return session;
-}
-
-
-Publisher::Session *Publisher::Session::Create(
-  const SettingsPublisher &settings_publisher,
-  int llvl)
-{
-  // For all but the gateway storage type, acquiring session tokens is currently
-  // a no-op.
-  if (settings_publisher.storage().type() != upload::SpoolerDefinition::Gateway)
-    return NULL;
-
-  Settings settings_session;
-  settings_session.service_endpoint = settings_publisher.storage().endpoint();
-  settings_session.repo_path = settings_publisher.fqrn() + "/" +
-                               settings_publisher.transaction().lease_path();
-  settings_session.gw_key_path = settings_publisher.keychain().gw_key_path();
-  settings_session.token_path =
-    settings_publisher.transaction().spool_area().gw_session_token();
-  settings_session.llvl = llvl;
-  return Create(settings_session);
-}
-
-
 void Publisher::Session::Acquire() {
+  if (has_lease_)
+    return;
+
   gateway::GatewayKey gw_key = gateway::ReadGatewayKey(settings_.gw_key_path);
   if (!gw_key.IsValid()) {
     throw EPublish("cannot read gateway key: " + settings_.gw_key_path,
@@ -239,12 +234,24 @@ void Publisher::Session::Acquire() {
   }
 }
 
+void Publisher::Session::Drop() {
+  if (!has_lease_)
+    return;
+
+  // TODO(jblomer): there might be a better way to distinguish between the
+  // nop-session and a real session
+  if (settings_.service_endpoint.empty())
+    return;
+
+  // TODO(jblomer): drop lease
+  unlink(settings_.token_path.c_str());
+}
+
 Publisher::Session::~Session() {
   if (keep_alive_)
     return;
 
-  // unlink(settings_.token_path.c_str());
-  // TODO(jblomer): drop lease
+  Drop();
 }
 
 }  // namespace publish

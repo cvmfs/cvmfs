@@ -143,6 +143,7 @@ int CmdTransaction::Main(const Options &options) {
     throw;
   }
 
+  publisher->session()->SetKeepAlive(true);
   publisher->managed_node()->Open();
 
   rvi = CallServerHook("transaction_after_hook", fqrn);

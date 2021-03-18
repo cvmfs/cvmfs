@@ -33,6 +33,8 @@ void Publisher::CheckTransactionStatus() {
     settings_.transaction().spool_area().publishing_lock();
   is_publishing_ =
     ServerLockFile::IsLocked(publishing_lock, false /* ignore_stale */);
+
+  session_ = new Session(settings_, llvl_);
 }
 
 
@@ -53,6 +55,8 @@ void Publisher::TransactionRetry() {
       TransactionImpl();
       break;
     } catch (const publish::EPublish& e) {
+      session_->Drop();
+
       if ((e.failure() == EPublish::kFailTransactionState) ||
           (e.failure() == EPublish::kFailLeaseBusy))
       {
@@ -99,7 +103,7 @@ void Publisher::TransactionImpl() {
     }
   }
 
-  UniquePtr<Session> session(Session::Create(settings_));
+  session_->Acquire();  // On error, Transaction() will drop it
   ConstructSpoolers();
 
   const std::string transaction_lock =
@@ -130,7 +134,6 @@ void Publisher::TransactionImpl() {
     // PushReflog();
   }
 
-  //session->SetKeepAlive(true);
   in_transaction_ = true;
   LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
            "(%s) opened transaction", settings_.fqrn().c_str());

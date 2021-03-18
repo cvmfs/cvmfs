@@ -34,16 +34,19 @@ TEST_F(T_Session, Acquire) {
   settings.token_path = "token";
   settings.llvl = kLogNone;
 
+  Publisher::Session session_incomplete(settings);
+
   try {
-    Publisher::Session::Create(settings);
+    session_incomplete.Acquire();
     EXPECT_TRUE(false);
   } catch (const EPublish &e) {
     EXPECT_EQ(EPublish::kFailGatewayKey, e.failure()) << e.what();
   }
 
   settings.gw_key_path = "gw_key";
+  Publisher::Session session(settings);
   try {
-    Publisher::Session::Create(settings);
+    session.Acquire();
     EXPECT_TRUE(false);
   } catch (const EPublish &e) {
     EXPECT_EQ(EPublish::kFailLeaseHttp, e.failure()) << e.what();
@@ -54,7 +57,7 @@ TEST_F(T_Session, Acquire) {
   gateway.next_response_.code = 404;
   gateway.next_response_.reason = "Not Found";
   try {
-    Publisher::Session::Create(settings);
+    session.Acquire();
     EXPECT_TRUE(false);
   } catch (const EPublish &e) {
     EXPECT_EQ(EPublish::kFailLeaseBody, e.failure()) << e.what();
@@ -65,7 +68,7 @@ TEST_F(T_Session, Acquire) {
   gateway.next_response_.body =
     "{ \"status\" : \"error\", \"reason\" : \"XXX\"}";
   try {
-    Publisher::Session::Create(settings);
+    session.Acquire();
     EXPECT_TRUE(false);
   } catch (const EPublish &e) {
     EXPECT_EQ(EPublish::kFailLeaseBody, e.failure()) << e.what();
@@ -74,7 +77,7 @@ TEST_F(T_Session, Acquire) {
   gateway.next_response_.body =
     "{ \"status\" : \"path_busy\", \"time_remaining\" : 42}";
   try {
-    Publisher::Session::Create(settings);
+    session.Acquire();
     EXPECT_TRUE(false);
   } catch (const EPublish &e) {
     EXPECT_EQ(EPublish::kFailLeaseBusy, e.failure()) << e.what();
@@ -82,9 +85,11 @@ TEST_F(T_Session, Acquire) {
 
   gateway.next_response_.body =
     "{ \"status\" : \"ok\", \"session_token\" : \"ABC\" }";
-  Publisher::Session *session = Publisher::Session::Create(settings);
-  EXPECT_TRUE(session != NULL);
-  delete session;
+  try {
+    session.Acquire();
+  } catch (...) {
+    EXPECT_TRUE(false);
+  }
 }
 
 }  // namespace publish
