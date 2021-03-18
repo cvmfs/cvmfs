@@ -5,6 +5,7 @@
 #include "cvmfs_config.h"
 #include "publish/repository.h"
 
+#include <fcntl.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -106,6 +107,59 @@ static void MakeAcquireRequest(
   }
 }
 
+// TODO(jblomer): This should eventually also handle the POST request for
+// committing a transaction
+static void MakeDropRequest(
+  const gateway::GatewayKey &key,
+  const std::string &session_token,
+  const std::string &repo_service_url,
+  int llvl,
+  CurlBuffer *reply)
+{
+  CURLcode ret = static_cast<CURLcode>(0);
+
+  CURL *h_curl = PrepareCurl("DELETE");
+
+  shash::Any hmac(shash::kSha1);
+  shash::HmacString(key.secret(), session_token, &hmac);
+
+  const std::string header_str =
+    std::string("Authorization: ") + key.id() + " " +
+    Base64(hmac.ToString(false));
+  struct curl_slist *auth_header = NULL;
+  auth_header = curl_slist_append(auth_header, header_str.c_str());
+  curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
+
+  curl_easy_setopt(h_curl, CURLOPT_URL,
+                   (repo_service_url + "/leases/" + session_token).c_str());
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
+                   static_cast<curl_off_t>(0));
+  curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, NULL);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
+  curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, reply);
+
+  ret = curl_easy_perform(h_curl);
+  curl_easy_cleanup(h_curl);
+  if (ret != CURLE_OK) {
+    LogCvmfs(kLogUploadGateway, llvl | kLogStderr,
+             "Make lease drop request failed: %d. Reply: '%s'",
+             ret, reply->data.c_str());
+    throw publish::EPublish("cannot drop lease",
+                            publish::EPublish::kFailLeaseHttp);
+  }
+
+  //UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply->data));
+  //const JSON *reply_status =
+  //  JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
+  //const bool ok = (reply_status != NULL &&
+  //                 std::string(reply_status->string_value) == "ok");
+  //if (!ok) {
+  //  LogCvmfs(kLogUploadGateway, kLogStderr,
+  //           "Lease end request - error reply: %s",
+  //           reply->data.c_str());
+  //}
+}
+
 static LeaseReply ParseAcquireReply(
   const CurlBuffer &buffer,
   std::string *session_token,
@@ -144,10 +198,42 @@ static LeaseReply ParseAcquireReply(
     } else if (status == "error") {
       const JSON *reason =
           JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
-      if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: %s",
-                 reason->string_value);
-      }
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: '%s'",
+               (reason != NULL) ? reason->string_value : "");
+    } else {
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Unknown reply. Status: %s",
+               status.c_str());
+    }
+  }
+
+  return kLeaseReplyFailure;
+}
+
+
+static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
+  if (buffer.data.size() == 0) {
+    return kLeaseReplyFailure;
+  }
+
+  const UniquePtr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
+  if (!reply || !reply->IsValid()) {
+    return kLeaseReplyFailure;
+  }
+
+  const JSON *result =
+      JsonDocument::SearchInObject(reply->root(), "status", JSON_STRING);
+  if (result != NULL) {
+    const std::string status = result->string_value;
+    if (status == "ok") {
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Gateway reply: ok");
+      return kLeaseReplySuccess;
+    } else if (status == "invalid_token") {
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: invalid session token");
+    } else if (status == "error") {
+      const JSON *reason =
+          JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: '%s'",
+               (reason != NULL) ? reason->string_value : "");
     } else {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Unknown reply. Status: %s",
                status.c_str());
@@ -237,14 +323,41 @@ void Publisher::Session::Acquire() {
 void Publisher::Session::Drop() {
   if (!has_lease_)
     return;
-
   // TODO(jblomer): there might be a better way to distinguish between the
   // nop-session and a real session
   if (settings_.service_endpoint.empty())
     return;
 
-  // TODO(jblomer): drop lease
-  unlink(settings_.token_path.c_str());
+  std::string token;
+  int fd_token = open(settings_.token_path.c_str(), O_RDONLY);
+  bool rvb = SafeReadToString(fd_token, &token);
+  close(fd_token);
+  if (!rvb) {
+    throw EPublish("cannot read session token: " + settings_.token_path,
+                   EPublish::kFailGatewayKey);
+  }
+  gateway::GatewayKey gw_key = gateway::ReadGatewayKey(settings_.gw_key_path);
+  if (!gw_key.IsValid()) {
+    throw EPublish("cannot read gateway key: " + settings_.gw_key_path,
+                   EPublish::kFailGatewayKey);
+  }
+
+  CurlBuffer buffer;
+  MakeDropRequest(gw_key, token, settings_.service_endpoint, settings_.llvl,
+                  &buffer);
+  LeaseReply rep = ParseDropReply(buffer, settings_.llvl);
+  int rvi = 0;
+  switch (rep) {
+    case kLeaseReplySuccess:
+      has_lease_ = false;
+      rvi = unlink(settings_.token_path.c_str());
+      if (rvi != 0)
+        throw EPublish("cannot delete session token " + settings_.token_path);
+      break;
+    case kLeaseReplyFailure:
+    default:
+      throw EPublish("cannot drop request reply", EPublish::kFailLeaseBody);
+  }
 }
 
 Publisher::Session::~Session() {
