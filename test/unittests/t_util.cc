@@ -143,6 +143,13 @@ TEST_F(T_Util, GetShell) {
 }
 
 
+TEST_F(T_Util, GetUserNameOf) {
+  std::string name;
+  EXPECT_TRUE(GetUserNameOf(0, &name));
+  EXPECT_EQ("root", name);
+}
+
+
 TEST_F(T_Util, GetUidOf) {
   uid_t uid;
   gid_t gid;

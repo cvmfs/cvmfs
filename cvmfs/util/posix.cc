@@ -1250,6 +1250,29 @@ std::string GetShell() {
 }
 
 /**
+ * UID -> Name from passwd database
+ */
+bool GetUserNameOf(uid_t uid, std::string *username) {
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(uid, &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return false;
+  }
+  if (username)
+    *username = result->pw_name;
+  free(buf);
+  return true;
+}
+
+
+/**
  * Name -> UID from passwd database
  */
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {

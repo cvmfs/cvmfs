@@ -129,6 +129,7 @@ bool ListDirectory(const std::string &directory,
 
 std::string GetUserName();
 std::string GetShell();
+bool GetUserNameOf(uid_t uid, std::string *username);
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid);
 bool GetGidOf(const std::string &groupname, gid_t *gid);
 mode_t GetUmask();
