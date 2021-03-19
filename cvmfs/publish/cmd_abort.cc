@@ -75,6 +75,9 @@ int CmdAbort::Main(const Options &options) {
   UniquePtr<Publisher> publisher;
   publisher = new Publisher(*settings);
 
+  LogCvmfs(kLogCvmfs, kLogSyslog, "(%s) aborting transaction",
+           settings->fqrn().c_str());
+
   int rvi = CallServerHook("abort_before_hook", settings->fqrn());
   if (rvi != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
