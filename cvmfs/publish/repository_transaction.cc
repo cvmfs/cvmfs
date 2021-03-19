@@ -39,12 +39,9 @@ void Publisher::CheckTransactionStatus() {
 
 
 void Publisher::TransactionRetry() {
-  if (settings_.transaction().GetTimeoutS() < 0) {
-    TransactionImpl();
-    return;
-  }
-
   BackoffThrottle throttle(500, 5000, 10000);
+  // Negative timeouts (i.e.: no retry) will result in a deadline that has
+  // already passed and thus has the correct effect
   uint64_t deadline = platform_monotonic_time() +
                       settings_.transaction().GetTimeoutS();
   if (settings_.transaction().GetTimeoutS() == 0)
@@ -56,6 +53,8 @@ void Publisher::TransactionRetry() {
       break;
     } catch (const publish::EPublish& e) {
       session_->Drop();
+      ServerLockFile::Release(
+        settings_.transaction().spool_area().transaction_lock());
 
       if ((e.failure() == EPublish::kFailTransactionState) ||
           (e.failure() == EPublish::kFailLeaseBusy))
@@ -103,12 +102,12 @@ void Publisher::TransactionImpl() {
     }
   }
 
-  session_->Acquire();  // On error, Transaction() will drop it
-  ConstructSpoolers();
-
   const std::string transaction_lock =
     settings_.transaction().spool_area().transaction_lock();
   ServerLockFile::Acquire(transaction_lock, true /* ignore_stale */);
+
+  session_->Acquire();  // On error, Transaction() will drop it
+  ConstructSpoolers();
 
   UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
     settings_.transaction().spool_area().checkout_marker()));
