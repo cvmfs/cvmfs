@@ -121,8 +121,8 @@ void Publisher::TransactionImpl() {
       catalog_mgr_->CloneTree(settings_.transaction().template_from(),
                               settings_.transaction().template_to());
     } catch (const ECvmfsException &e) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "%s", e.what());
-      throw publish::EPublish("cannot clone directory tree",
+      std::string panic_msg = e.what();
+      throw publish::EPublish("cannot clone directory tree. " + panic_msg,
                               publish::EPublish::kFailInput);
     }
 

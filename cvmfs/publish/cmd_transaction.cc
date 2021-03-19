@@ -133,9 +133,9 @@ int CmdTransaction::Main(const Options &options) {
                msg_prefix, e.msg().c_str());
       return ENOTDIR;
     } else if (e.failure() == EPublish::kFailInput) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s",
-               msg_prefix);
-      throw;
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
+               msg_prefix, e.msg().c_str());
+      return EINVAL;
     }
     throw;
   }
