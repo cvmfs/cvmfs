@@ -87,6 +87,7 @@ TEST_F(T_Session, Acquire) {
     "{ \"status\" : \"ok\", \"session_token\" : \"ABC\" }";
   try {
     session.Acquire();
+    session.SetKeepAlive(true);
   } catch (...) {
     EXPECT_TRUE(false);
   }

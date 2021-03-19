@@ -683,11 +683,11 @@ Publisher::Publisher(const SettingsPublisher &settings)
     }
   }
 
+  if (settings.is_managed())
+    managed_node_ = new ManagedNode(this);
   CheckTransactionStatus();
   if (in_transaction_)
     ConstructSpoolers();
-  if (settings.is_managed())
-    managed_node_ = new ManagedNode(this);
 }
 
 Publisher::~Publisher() {

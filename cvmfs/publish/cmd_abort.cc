@@ -9,6 +9,7 @@
 #include <string>
 
 #include "logging.h"
+#include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
@@ -74,8 +75,12 @@ int CmdAbort::Main(const Options &options) {
   UniquePtr<Publisher> publisher;
   publisher = new Publisher(*settings);
 
-  int rvi = publisher->managed_node()->Check(false /* is_quiet */);
-  if (rvi != 0) throw EPublish("publisher file system mount state is broken");
+  int rvi = CallServerHook("abort_before_hook", settings->fqrn());
+  if (rvi != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "abort hook failed, not aborting");
+    return rvi;
+  }
 
   try {
     publisher->Abort();
@@ -84,6 +89,13 @@ int CmdAbort::Main(const Options &options) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
       return EINVAL;
     }
+  }
+
+  rvi = CallServerHook("abort_after_hook", settings->fqrn());
+  if (rvi != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "post abort hook failed");
+    return rvi;
   }
 
   return 0;

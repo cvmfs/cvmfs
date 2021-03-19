@@ -108,11 +108,7 @@ int CmdTransaction::Main(const Options &options) {
       "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
-  // TODO(jblomer): move inside transaction when abort() is ready
-  int rvi = publisher->managed_node()->Check(false /* is_quiet */);
-  if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
-
-  rvi = CallServerHook("transaction_before_hook", fqrn);
+  int rvi = CallServerHook("transaction_before_hook", fqrn);
   if (rvi != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "transaction hook failed, not opening a transaction");
@@ -144,7 +140,6 @@ int CmdTransaction::Main(const Options &options) {
   }
 
   publisher->session()->SetKeepAlive(true);
-  publisher->managed_node()->Open();
 
   rvi = CallServerHook("transaction_after_hook", fqrn);
   if (rvi != 0) {

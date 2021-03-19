@@ -39,6 +39,11 @@ void Publisher::CheckTransactionStatus() {
 
 
 void Publisher::TransactionRetry() {
+  if (managed_node_) {
+    int rvi = managed_node_->Check(false /* is_quiet */);
+    if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
+  }
+
   BackoffThrottle throttle(500, 5000, 10000);
   // Negative timeouts (i.e.: no retry) will result in a deadline that has
   // already passed and thus has the correct effect
@@ -52,9 +57,11 @@ void Publisher::TransactionRetry() {
       TransactionImpl();
       break;
     } catch (const publish::EPublish& e) {
-      session_->Drop();
-      ServerLockFile::Release(
-        settings_.transaction().spool_area().transaction_lock());
+      if (e.failure() != EPublish::kFailTransactionState) {
+        session_->Drop();
+        ServerLockFile::Release(
+          settings_.transaction().spool_area().transaction_lock());
+      }
 
       if ((e.failure() == EPublish::kFailTransactionState) ||
           (e.failure() == EPublish::kFailLeaseBusy))
@@ -71,6 +78,9 @@ void Publisher::TransactionRetry() {
       throw;
     }  // try-catch
   }  // while (true)
+
+  if (managed_node_)
+    managed_node_->Open();
 }
 
 
@@ -81,6 +91,13 @@ void Publisher::TransactionImpl() {
   }
 
   InitSpoolArea();
+
+  // On error, Transaction() will release the transaction lock and drop
+  // the session
+  const std::string transaction_lock =
+    settings_.transaction().spool_area().transaction_lock();
+  ServerLockFile::Acquire(transaction_lock, true /* ignore_stale */);
+  session_->Acquire();
 
   // We might have a valid lease for a non-existing path. Nevertheless, we run
   // run into problems when merging catalogs later, so for the time being we
@@ -102,11 +119,6 @@ void Publisher::TransactionImpl() {
     }
   }
 
-  const std::string transaction_lock =
-    settings_.transaction().spool_area().transaction_lock();
-  ServerLockFile::Acquire(transaction_lock, true /* ignore_stale */);
-
-  session_->Acquire();  // On error, Transaction() will drop it
   ConstructSpoolers();
 
   UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
