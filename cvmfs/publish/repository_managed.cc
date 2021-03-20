@@ -35,6 +35,9 @@ void Publisher::ManagedNode::Unmount() {
     AlterMountpoint(kAlterUnionUnmount, kLogSyslog);
   } catch (const EPublish &e) {
     AlterMountpoint(kAlterUnionLazyUnmount, kLogSyslog);
+    AlterMountpoint(kAlterRdOnlyKillUnmount, kLogSyslog);
+    AlterMountpoint(kAlterRdOnlyLazyUnmount, kLogSyslog);
+    return;
   }
 
   try {
