@@ -782,10 +782,6 @@ void Publisher::ConstructSyncManagers() {
   }
 }
 
-void Publisher::WipeScratchArea() {
-  // TODO(jblomer)
-}
-
 void Publisher::Sync() {
   if (settings_.transaction().dry_run()) {
     SyncImpl();
@@ -829,7 +825,9 @@ void Publisher::SyncImpl() {
 
     // Reset to the new catalog root hash
     settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
-    WipeScratchArea();
+    // TODO(jblomer): think about how to deal with the scratch area at
+    // this point
+    // WipeScratchArea();
   }
 
   delete sync_union_;

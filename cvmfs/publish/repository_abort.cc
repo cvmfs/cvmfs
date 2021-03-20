@@ -17,6 +17,14 @@
 
 namespace publish {
 
+void Publisher::WipeScratchArea() {
+  // TODO(jblomer): implement for enter shell etc.
+  if (!managed_node_)
+    return;
+
+  managed_node_->ClearScratch();
+}
+
 void Publisher::Abort() {
   if (is_publishing()) {
     throw EPublish(
@@ -35,6 +43,8 @@ void Publisher::Abort() {
       EPublish::kFailTransactionState);
   }
 
+  session_->Drop();
+
   if (managed_node_) {
     // We already checked for is_publishing and in_transaction.  Normally, at
     // this point we do want to repair the mount points of a repository
@@ -49,13 +59,10 @@ void Publisher::Abort() {
     settings_.GetTransaction()->GetSpoolArea()->SetRepairMode(repair_mode);
     if (rvi != 0) throw EPublish("publisher file system mount state is broken");
 
-    // Check of file descriptors
+    managed_node_->Unmount();
+    managed_node_->ClearScratch();
+    managed_node_->Mount();
   }
-
-  session_->Drop();
-
-  // Wipe out spool area
-  // Remount r/o
 
   ServerLockFile::Release(
     settings_.transaction().spool_area().transaction_lock());

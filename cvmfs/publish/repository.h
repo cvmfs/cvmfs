@@ -184,6 +184,19 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      * Re-mount /cvmfs/$fqrn read-only
      */
     void Lock();
+    /**
+     * Regular unmount of the read-write and the read-only layer and, if this
+     * does not work, a forced unmount
+     */
+    void Unmount();
+    /**
+     * Mounts the read-only layer followed by the union layer
+     */
+    void Mount();
+    /**
+     * Move scratch space to waste bin and clear it out asynchonously
+     */
+    void ClearScratch();
 
    private:
     /**
@@ -192,11 +205,15 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      */
     enum EMountpointAlterations {
       kAlterUnionUnmount,
+      kAlterUnionLazyUnmount,
       kAlterRdOnlyUnmount,
+      kAlterRdOnlyKillUnmount,
+      kAlterRdOnlyLazyUnmount,
       kAlterUnionMount,
       kAlterRdOnlyMount,
       kAlterUnionOpen,
       kAlterUnionLock,
+      kAlterScratchWipe,
     };
 
     void AlterMountpoint(EMountpointAlterations how, int log_level);

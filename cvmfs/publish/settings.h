@@ -103,6 +103,7 @@ class SettingsSpoolArea {
   std::string union_mnt() const { return union_mnt_; }
   std::string scratch_base() const { return workspace_() + "/scratch"; }
   std::string scratch_dir() const { return scratch_base() + "/current"; }
+  std::string scratch_wastebin() const { return scratch_base() + "/wastebin"; }
   std::string log_dir() const { return workspace() + "/logs"; }
   // TODO(jblomer): shouldn't this be in /etc/cvmfs/repositor.../client.conf
   std::string client_config() const { return workspace_() + "/client.config"; }
