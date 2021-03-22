@@ -14,7 +14,7 @@ option (BUILD_RECEIVER_DEBUG    "Build the receiver program with debug symbols a
 option (BUILD_GEOAPI            "Build the geo api service"                                        ON)
 option (BUILD_LIBCVMFS          "Build the CernVM-FS client library"                               ON)
 option (BUILD_LIBCVMFS_CACHE    "Build the cache plugin library"                                   ON)
-option (BUILD_SHRINKWRAP  "Build the shrinkwrap tool"                                        OFF)
+option (BUILD_SHRINKWRAP        "Build the shrinkwrap tool"                                        OFF)
 
 option (BUILD_PRELOADER         "Build the alien cache pre-loader"                                 OFF)
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
