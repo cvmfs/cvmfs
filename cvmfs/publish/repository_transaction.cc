@@ -123,6 +123,7 @@ void Publisher::TransactionImpl() {
     } catch (const ECvmfsException &e) {
       std::string panic_msg = e.what();
       ServerLockFile::Release(transaction_lock);
+      // TODO(aandvalenzuela): release session token (gateway publishing)
       throw publish::EPublish("cannot clone directory tree. " + panic_msg,
                               publish::EPublish::kFailInput);
     }
