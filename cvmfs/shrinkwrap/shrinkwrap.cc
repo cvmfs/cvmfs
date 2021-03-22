@@ -105,8 +105,6 @@ int main(int argc, char **argv) {
   Params params;
 
   int c;
-  char *endptr = NULL;
-  long long tmp_value = 0; // NOLINT
   static struct option long_opts[] = {
       /* All of the options require an argument */
       {"help",        no_argument, 0, 'h'},
