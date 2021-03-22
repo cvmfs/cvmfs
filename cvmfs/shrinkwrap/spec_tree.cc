@@ -107,9 +107,12 @@ void SpecTree::Parse(FILE *spec_file) {
   SpecTreeNode *cur_node;
   // Whether there is a path on the stack disallowing inclusion
   while (GetLineFile(spec_file, &line)) {  // Go through spec file lines
+    std::string raw_line = line;
     line = Trim(line);
     if (line.empty() || line[0] == '#')
       continue;
+    if ((line[0] != '/') && (line[0] != '!') && (line[0] != '^'))
+      PANIC(kLogStderr, "Invalid specification: %s", raw_line.c_str());
 
     // FIND inclusion_mode (START)
     inclusion_mode = 0;
@@ -117,14 +120,18 @@ void SpecTree::Parse(FILE *spec_file) {
       inclusion_mode = line.at(0);
       line.erase(0, 1);
     }
+    if (line.empty())
+      PANIC(kLogStderr, "Invalid specification: %s", raw_line.c_str());
     if (line.at(line.length()-1) == '*') {
       if (inclusion_mode == 0) {
         inclusion_mode = '*';
       }
       line.erase(line.length()-1);
     } else if (inclusion_mode == '^') {
-        inclusion_mode = 0;
+      inclusion_mode = 0;
     }
+    if (line.empty() || (line[0] != '/'))
+      PANIC(kLogStderr, "Invalid specification: %s", raw_line.c_str());
     // FIND inclusion_mode (END)
     while (!node_cache.empty()) {  // Find nearest parent node in node cache
       entr = node_cache.top();
