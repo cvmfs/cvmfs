@@ -13,6 +13,7 @@
 #include "logging.h"
 #include "smalloc.h"
 #include "util.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -30,17 +31,14 @@ struct NodeCacheEntry {
 
 void SpecTree::Open(const std::string &path) {
   if (!FileExists(path)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Cannot find specfile at '%s'",
-      path.c_str());
-      return;
+    PANIC(kLogStderr, "Cannot find specfile at '%s'", path.c_str());
   }
 
   FILE *spec_file = fopen(path.c_str(), "r");
   if (spec_file == NULL) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-      "Cannot open specfile for reading at '%s' (errno: %d)",
-      path.c_str(), errno);
-    return;
+    PANIC(kLogStderr,
+          "Cannot open specfile for reading at '%s' (errno: %d)",
+          path.c_str(), errno);
   }
   Parse(spec_file);
   fclose(spec_file);
