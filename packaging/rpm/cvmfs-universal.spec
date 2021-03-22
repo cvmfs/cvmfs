@@ -26,7 +26,7 @@
 %endif
 
 # List of platforms that require systemd/autofs fix as described in CVM-1200
-%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?suse_version} > 1500
 %define systemd_autofs_patch 1
 %endif
 
@@ -36,7 +36,7 @@
 %endif
 
 %define cvmfs_python python
-%if 0%{?el8} || 0%{?fedora} >= 31
+%if 0%{?el8} || 0%{?fedora} >= 31 || 0%{?suse_version} > 1500 || 0%{?rhel} >= 8
 %define cvmfs_python python2
 %endif
 
@@ -53,7 +53,8 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.9.0
+URL: https://cernvm.cern.ch/fs/
+Version: 2.8.0
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -93,6 +94,11 @@ BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python}-devel
 BuildRequires: unzip
 
+BuildRequires: zlib-devel
+
+BuildRequires: systemd
+
+
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -103,12 +109,12 @@ Requires: autofs
 Requires: fuse
 Requires: curl
 Requires: attr
-Requires: zlib
+# Requires: zlib
 Requires: gdb
 # Account for different package names
 %if 0%{?suse_version}
 Requires: aaa_base
-Requires: libfuse2
+# Requires: libfuse2
 Requires: glibc
 Requires: pwdutils
   %if 0%{?suse_version} < 1200
@@ -183,11 +189,9 @@ BuildRequires: %{cvmfs_python}-devel
 BuildRequires: libcap-devel
 BuildRequires: unzip
 BuildRequires: %{cvmfs_python}-setuptools
-%if 0%{?suse_version}
-Requires: insserv
-%else
+
 Requires: initscripts
-%endif
+
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -198,7 +202,7 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
-Requires: libcap
+# Requires: libcap
 Requires: lsof
 Requires: rsync
 Requires: usbutils
@@ -353,12 +357,13 @@ exit 0
   if [ $? -ne 0 ]; then
     /usr/sbin/groupadd -r cvmfs
   fi
-%endif
 
-/usr/bin/getent group fuse | grep -q cvmfs
-if [ $? -ne 0 ]; then
-  /usr/sbin/usermod -aG fuse cvmfs > /dev/null 2>&1 || :
-fi
+  /usr/bin/getent group fuse | grep -q cvmfs
+  if [ $? -ne 0 ]; then
+    /usr/sbin/usermod -aG fuse cvmfs > /dev/null 2>&1 || :
+  fi
+
+%endif
 
 %install
 export DONT_STRIP=1
@@ -422,6 +427,7 @@ EOF
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+
 %post
 if [ $1 -eq 1 ]; then
    mkdir /cvmfs
@@ -443,12 +449,13 @@ restorecon -R /var/lib/cvmfs
 if [ -d /var/run/cvmfs ]; then
   /usr/bin/cvmfs_config reload
 fi
-:
+
 
 %if 0%{?build_fuse3}
 %post fuse3
 /sbin/ldconfig
 %endif
+
 
 %post server
 /usr/bin/cvmfs_server fix-permissions || :
@@ -458,6 +465,8 @@ fi
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
+/sbin/ldconfig
+
 
 %preun
 if [ $1 = 0 ] ; then
@@ -499,10 +508,13 @@ if [ $1 -eq 0 ]; then
   /usr/sbin/semanage port -d -t http_port_t -p tcp 8000 2>/dev/null || :
 fi
 %endif
+/sbin/ldconfig
+
 
 
 %files
 %defattr(-,root,root)
+
 %{_bindir}/cvmfs2
 %{_libdir}/libcvmfs_fuse_stub.so
 %{_libdir}/libcvmfs_fuse_stub.so.%{version}
@@ -513,26 +525,37 @@ fi
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
+
+%dir /usr/libexec/cvmfs
 /usr/libexec/cvmfs/auto.cvmfs
+%dir /usr/libexec/cvmfs/authz
 /usr/libexec/cvmfs/authz/cvmfs_allow_helper
 /usr/libexec/cvmfs/authz/cvmfs_deny_helper
+%dir /usr/libexec/cvmfs/cache
 /usr/libexec/cvmfs/cache/cvmfs_cache_ram
 /usr/libexec/cvmfs/cache/cvmfs_cache_posix
+
 %{_sysconfdir}/auto.cvmfs
-%{_sysconfdir}/cvmfs/config.sh
+%dir %{_sysconfdir}/cvmfs
+%config %{_sysconfdir}/cvmfs/config.sh
+%{_sysconfdir}/cvmfs/default.d
+
 %if 0%{?selinux_cvmfs}
 %{_datadir}/selinux/mls/cvmfs.pp
 %{_datadir}/selinux/strict/cvmfs.pp
 %{_datadir}/selinux/targeted/cvmfs.pp
 %endif
+
 %if 0%{?systemd_autofs_patch}
+/usr/lib/systemd/system/autofs.service.d
 /usr/lib/systemd/system/autofs.service.d/50-cvmfs.conf
 %endif
+
 /sbin/mount.cvmfs
 %dir %{_sysconfdir}/cvmfs/config.d
 %dir %{_sysconfdir}/cvmfs/domain.d
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
-%{_sysconfdir}/cvmfs/default.d/README
+%config %{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
@@ -572,18 +595,22 @@ fi
 %{_libdir}/libcvmfs_server.so.%{version}
 %{_libdir}/libcvmfs_server_debug.so
 %{_libdir}/libcvmfs_server_debug.so.%{version}
-%{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
+%config %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
+%dir /var/www/
+/var/www/wsgi-scripts
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
 /var/lib/cvmfs-server/
+%dir /var/spool/cvmfs
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
 
 %files shrinkwrap
 %defattr(-,root,root)
 %{_bindir}/cvmfs_shrinkwrap
-/usr/libexec/cvmfs/shrinkwrap/spec_builder.py*
+%dir /usr/libexec/cvmfs/shrinkwrap
+/usr/libexec/cvmfs/shrinkwrap/spec_builder.py
 %doc COPYING AUTHORS README.md ChangeLog
 
 %files unittests
