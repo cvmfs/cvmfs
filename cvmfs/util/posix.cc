@@ -1451,7 +1451,7 @@ std::vector<LsofEntry> Lsof(const std::string &path) {
         LsofEntry entry;
         entry.pid = String2Uint64(proc_names[i]);
         entry.owner = proc_uid;
-        entry.read_only = true; // A bit sloppy but good enough for the moment
+        entry.read_only = true;  // A bit sloppy but good enough for the moment
         entry.executable = ReadSymlink(proc_dir + "/exe");
         entry.path = cwd;
         result.push_back(entry);

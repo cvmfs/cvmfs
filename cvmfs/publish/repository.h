@@ -246,7 +246,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      */
     Session() : keep_alive_(false), has_lease_(true) {}
     explicit Session(const Settings &settings_session);
-    Session(const SettingsPublisher &settings_publisher, int llvl = 0);
+    explicit Session(const SettingsPublisher &settings_publisher, int llvl = 0);
     /**
      * Drops the lease unless keep_alive_ is set
      */
@@ -257,8 +257,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
     void SetKeepAlive(bool value);
 
     bool has_lease() const { return has_lease_; }
-   private:
 
+   private:
     Settings settings_;
     /**
      * If set to true, the session is not closed on destruction, i.e. the

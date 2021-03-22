@@ -148,4 +148,4 @@ int CmdAbort::Main(const Options &options) {
   return 0;
 }
 
-} // namespace publish
+}  // namespace publish
