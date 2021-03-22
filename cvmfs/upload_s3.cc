@@ -120,7 +120,7 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
     host_name_port_ = host_name_ + ":" + parameter;
   } else {
-    host_name_port_ = host_name_ + ":" + StringifyInt(kDefaultPort);
+    host_name_port_ = host_name_;
   }
 
   if (!options_manager.GetValue("CVMFS_S3_ACCESS_KEY", &access_key_)) {
