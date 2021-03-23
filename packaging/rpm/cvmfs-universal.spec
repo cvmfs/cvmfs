@@ -36,7 +36,8 @@
 %endif
 
 %define cvmfs_python python
-%if 0%{?el8} || 0%{?fedora} >= 31 || 0%{?suse_version} > 1500 || 0%{?rhel} >= 8
+# %if 0%{?el8} || 0%{?fedora} >= 31 || 0%{?suse_version} > 1500 || 0%{?rhel} >= 8
+%if 0%{?el8} || 0%{?fedora} >= 31 || 0%{?suse_version} > 1500
 %define cvmfs_python python2
 %endif
 
@@ -61,8 +62,9 @@ Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.
 Source1: cvmfs.te
 Source2: cvmfs.fc
 %endif
+Source3: cvmfs-rpmlintrc
 Group: Applications/System
-License: BSD
+License: BSD-Source-Code
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires: bzip2
@@ -93,12 +95,10 @@ BuildRequires: patch
 BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python}-devel
 BuildRequires: unzip
-
 BuildRequires: zlib-devel
-
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?suse_version} > 1500
 BuildRequires: systemd
-
-
+%endif
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -109,19 +109,17 @@ Requires: autofs
 Requires: fuse
 Requires: curl
 Requires: attr
-# Requires: zlib
 Requires: gdb
 # Account for different package names
 %if 0%{?suse_version}
 Requires: aaa_base
-# Requires: libfuse2
 Requires: glibc
 Requires: pwdutils
-  %if 0%{?suse_version} < 1200
+%if 0%{?suse_version} < 1200
 Requires: sysvinit
-  %else
+%else
 Requires: sysvinit-tools
-  %endif
+%endif
 %else
 Requires: chkconfig
 Requires: fuse-libs
@@ -189,9 +187,7 @@ BuildRequires: %{cvmfs_python}-devel
 BuildRequires: libcap-devel
 BuildRequires: unzip
 BuildRequires: %{cvmfs_python}-setuptools
-
 Requires: initscripts
-
 Requires: bash
 Requires: coreutils
 Requires: grep
@@ -202,13 +198,15 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
-# Requires: libcap
 Requires: lsof
 Requires: rsync
 Requires: usbutils
 Requires: sqlite
 %if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
+%endif
+%if 0%{?suse_version} <= 1200
+Requires: insserv
 %endif
 %if 0%{?selinux_cvmfs_server}
 Requires(post): /usr/sbin/semanage
@@ -427,7 +425,6 @@ EOF
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-
 %post
 if [ $1 -eq 1 ]; then
    mkdir /cvmfs
@@ -450,12 +447,10 @@ if [ -d /var/run/cvmfs ]; then
   /usr/bin/cvmfs_config reload
 fi
 
-
 %if 0%{?build_fuse3}
 %post fuse3
 /sbin/ldconfig
 %endif
-
 
 %post server
 /usr/bin/cvmfs_server fix-permissions || :
@@ -467,7 +462,6 @@ fi
 rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
-
 %preun
 if [ $1 = 0 ] ; then
 %if 0%{?selinux_cvmfs}
@@ -475,7 +469,6 @@ if [ $1 = 0 ] ; then
     /usr/sbin/semodule -s ${variant} -r cvmfs &> /dev/null || :
   done
 %endif
-
   /usr/bin/cvmfs_config umount
 fi
 
@@ -493,7 +486,6 @@ if [ $1 -eq 0 ]; then
    [ -f /var/lock/subsys/autofs ] && /sbin/service autofs reload >/dev/null
    rmdir /cvmfs
 fi
-
 %if 0%{?selinux_cvmfs}
 if [ $1 -eq 0 ]; then
     for variant in %{selinux_variants} ; do
@@ -501,6 +493,7 @@ if [ $1 -eq 0 ]; then
     done
 fi
 %endif
+/sbin/ldconfig
 
 %postun server
 %if 0%{?selinux_cvmfs_server}
@@ -509,8 +502,6 @@ if [ $1 -eq 0 ]; then
 fi
 %endif
 /sbin/ldconfig
-
-
 
 %files
 %defattr(-,root,root)
@@ -526,6 +517,8 @@ fi
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
 
+# possibly conditional on old suse?
+%dir /usr/libexec
 %dir /usr/libexec/cvmfs
 /usr/libexec/cvmfs/auto.cvmfs
 %dir /usr/libexec/cvmfs/authz
