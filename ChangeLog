@@ -6,6 +6,8 @@
   * [ducc] Ingest images using "sneaky layers" and template transactions
 
 2.8.1:
+  * Gracefully handle template transaction failures (CVM-1964)
+  * [shrinkwrap] fix parsing of spec file (CVM-1708)
   * Fix client cache hitrate reporting (CVM-1965)
   * Fix server statistics display for JSROOT 6 (CVM-1970)
   * Get repository host from read-only layer in enter shell (CVM-1969)

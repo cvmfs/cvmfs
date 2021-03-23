@@ -129,9 +129,13 @@ int CmdTransaction::Main(const Options &options) {
                msg_prefix, e.msg().c_str());
       return ENOENT;
     } else if (e.failure() == EPublish::kFailLeaseNoDir) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%%s",
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
                msg_prefix, e.msg().c_str());
       return ENOTDIR;
+    } else if (e.failure() == EPublish::kFailInput) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
+               msg_prefix, e.msg().c_str());
+      return EINVAL;
     }
     throw;
   }

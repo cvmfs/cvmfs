@@ -42,5 +42,12 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return 40
   cat /cvmfs/$CVMFS_TEST_REPO/foo/new/x /cvmfs/$CVMFS_TEST_REPO/foo/new/y || return 41
 
+  echo "*** fail if the template transaction is performed to an existing directory"
+  start_transaction $CVMFS_TEST_REPO -T /foo=/bar && return 50
+
+  echo "*** successful template transaction after the failure"
+  start_transaction $CVMFS_TEST_REPO -T /foo=/new_bar || return 60
+  publish_repo $CVMFS_TEST_REPO || return 61
+
   return 0
 }

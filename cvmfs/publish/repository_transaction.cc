@@ -16,6 +16,7 @@
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
+#include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 
@@ -115,8 +116,18 @@ void Publisher::TransactionImpl() {
              settings_.transaction().template_from().c_str(),
              settings_.transaction().template_to().c_str());
     ConstructSyncManagers();
-    catalog_mgr_->CloneTree(settings_.transaction().template_from(),
-                            settings_.transaction().template_to());
+
+    try {
+      catalog_mgr_->CloneTree(settings_.transaction().template_from(),
+                              settings_.transaction().template_to());
+    } catch (const ECvmfsException &e) {
+      std::string panic_msg = e.what();
+      ServerLockFile::Release(transaction_lock);
+      // TODO(aandvalenzuela): release session token (gateway publishing)
+      throw publish::EPublish("cannot clone directory tree. " + panic_msg,
+                              publish::EPublish::kFailInput);
+    }
+
     Sync();
     SendTalkCommand(settings_.transaction().spool_area().readonly_talk_socket(),
       "chroot " + settings_.transaction().base_hash().ToString() + "\n");
