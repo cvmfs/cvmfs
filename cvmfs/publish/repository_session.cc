@@ -265,6 +265,8 @@ Publisher::Session::Session(const SettingsPublisher &settings_publisher,
 
   // TODO(jblomer): it would be better to actually read & validate the token
   has_lease_ = FileExists(settings_.token_path);
+  // If a lease is already present, we don't want to remove it automatically
+  keep_alive_ = has_lease_;
 }
 
 

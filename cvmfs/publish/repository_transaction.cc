@@ -97,6 +97,10 @@ void Publisher::TransactionImpl() {
   const std::string transaction_lock =
     settings_.transaction().spool_area().transaction_lock();
   ServerLockFile::Acquire(transaction_lock, true /* ignore_stale */);
+  if (session_->has_lease()) {
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
+             "Warning: stale lease found for %s", settings_.fqrn().c_str());
+  }
   session_->Acquire();
 
   // We might have a valid lease for a non-existing path. Nevertheless, we run
