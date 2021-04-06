@@ -13,7 +13,7 @@ add_custom_target(
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cvmfs-snapshotter  
-  COMMAND ${GO_COMPILER} build -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs-snapshotter
+  COMMAND ${GO_COMPILER} build -mod=vendor -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs-snapshotter
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*
   COMMENT "Build containerd snapshotter using the Go Compiler"
