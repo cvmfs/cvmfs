@@ -55,7 +55,8 @@ run_transactions() {
         return 23
     fi
     # We need to remove the token, otherwise it's just taken by the transaction
-    rm /var/spool/cvmfs/test.repo.org/session_token || return 30
+    mv /var/spool/cvmfs/test.repo.org/session_token \
+      /var/spool/cvmfs/test.repo.org/session_token.save || return 30
 
     echo "  *** Checking that the lease is taken and that cvmfs_transaction fails"
     cvmfs_server transaction test.repo.org/new/c
@@ -64,6 +65,16 @@ run_transactions() {
         echo "Return code should be 16 EBUSY instead of ${retcode}"
         return 24
     fi
+
+    echo "  *** Checking that the repository is still in a sane state"
+    mv /var/spool/cvmfs/test.repo.org/session_token.save \
+      /var/spool/cvmfs/test.repo.org/session_token || return 31
+    cvmfs_swissknife lease -u http://localhost:4929/api/v1 -a drop \
+      -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/new/c || return 32
+    ls /var/spool/cvmfs/test.repo.org/session_token && return 33
+
+    cvmfs_server transaction test.repo.org/new/c || return 34
+    cvmfs_server abort -f test.repo.org || return 35
 
     return 0
 }
