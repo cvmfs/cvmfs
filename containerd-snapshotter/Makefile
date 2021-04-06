@@ -2,7 +2,7 @@ PREFIX ?= out/
 
 all: cvmfs-snapshotter
 
-cvmfs-snapshotter: 
+cvmfs-snapshotter: vendor/
 	go build -o $(PREFIX)$@
 
 
