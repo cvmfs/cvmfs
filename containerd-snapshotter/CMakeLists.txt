@@ -7,6 +7,7 @@ else()
 endif()
 
 add_custom_target(
+  cvmfs-snapshotter
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cvmfs-snapshotter  
 )
 
