@@ -20,6 +20,6 @@ add_custom_command(
 )
 
 install (
-  PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cvmfs-snapshotter
+  PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}
   DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
 )
