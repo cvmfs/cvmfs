@@ -7,19 +7,19 @@ else()
 endif()
 
 add_custom_target(
-  cvmfs-snapshotter
-  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cvmfs-snapshotter  
+  containerd-snapshotter
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/containerd-snapshotter  
 )
 
 add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cvmfs-snapshotter  
-  COMMAND ${GO_COMPILER} build -mod vendor -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs-snapshotter
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/containerd-snapshotter  
+  COMMAND ${GO_COMPILER} build -mod vendor -o ${CMAKE_CURRENT_BINARY_DIR}/containerd-snapshotter
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*
   COMMENT "Build containerd snapshotter using the Go Compiler"
 )
 
 install (
-  PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}
+  PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/containerd-snapshotter
   DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
 )
