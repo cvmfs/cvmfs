@@ -237,6 +237,8 @@ void BashOptionsManager::ParsePath(const string &config_file,
     ConfigValue value;
     value.source = config_file;
     string parameter = TrimParameter(tokens[0]);
+    if (parameter.find(" ") != string::npos)
+      continue;
     if (parameter.empty())
       continue;
 
