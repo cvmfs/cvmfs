@@ -490,9 +490,13 @@ cvmfs_mount() {
   sudo sh -c "echo CVMFS_REPOSITORY_TAG=TESTING > /etc/cvmfs/config.d/cvmfs-config.cern.ch.local" || return 100
 
   # add additional parameters
+  local proberunner
   while [ $# -gt 0 ]; do
     local param="$1"
-    sudo sh -c "echo \"$1\" >> /etc/cvmfs/default.local" || return 100
+    if [ "$param" = "CVMFS_SUID=yes" ]; then
+      proberunner="sudo"
+    fi
+    sudo sh -c "echo \"$param\" >> /etc/cvmfs/default.local" || return 100
     shift 1
   done
 
@@ -504,7 +508,7 @@ cvmfs_mount() {
     cvmfs_mount_direct $repositories
   fi
 
-  cvmfs_config probe > /dev/null 2>&1 || return 101
+  $proberunner cvmfs_config probe > /dev/null 2>&1 || return 101
 
   return 0
 }
