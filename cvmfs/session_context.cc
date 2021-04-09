@@ -19,8 +19,9 @@
 
 namespace {
 // Maximum number of jobs during a session. No limit, for practical
-// purposes.
-const uint64_t kMaxNumJobs = std::numeric_limits<uint64_t>::max();
+// purposes. Note that we use uint32_t so that the FifoChannel code works
+// correctly with this limit on 32bit systems.
+const uint32_t kMaxNumJobs = std::numeric_limits<uint32_t>::max();
 }
 
 namespace upload {
