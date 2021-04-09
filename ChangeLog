@@ -5,6 +5,9 @@
   * [ducc] Fix version string
   * [ducc] Ingest images using "sneaky layers" and template transactions
 
+2.8.2:
+  * [preloader] make network timeout and retries configurable (CVM-1992)
+
 2.8.1:
   * Gracefully handle template transaction failures (CVM-1964)
   * [shrinkwrap] fix parsing of spec file (CVM-1708)
