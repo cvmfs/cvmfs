@@ -67,9 +67,9 @@ int CmdAbort::Main(const Options &options) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
              "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION "
              "for %s!  Are you sure (y/N)? ", settings->fqrn().c_str());
-    char answer[3];
-    fgets(answer, 3, stdin);
-    if ((answer[0] != 'Y') && (answer[0] != 'y'))
+    char answer[] = {0, 0, 0};
+    char *rv_charp = fgets(answer, 3, stdin);
+    if (rv_charp && (answer[0] != 'Y') && (answer[0] != 'y'))
       return EINTR;
   }
 
@@ -109,9 +109,9 @@ int CmdAbort::Main(const Options &options) {
     if (!options.Has("force")) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
                "\n      Do you want to proceed anyway? (y/N) ");
-      char answer[3];
-      fgets(answer, 3, stdin);
-      if ((answer[0] != 'Y') && (answer[0] != 'y'))
+      char answer[] = {0, 0, 0};
+      char *rv_charp = fgets(answer, 3, stdin);
+      if (rv_charp && (answer[0] != 'Y') && (answer[0] != 'y'))
         return EINTR;
     }
   }
