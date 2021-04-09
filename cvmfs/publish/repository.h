@@ -184,6 +184,19 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      * Re-mount /cvmfs/$fqrn read-only
      */
     void Lock();
+    /**
+     * Regular unmount of the read-write and the read-only layer and, if this
+     * does not work, a forced unmount
+     */
+    void Unmount();
+    /**
+     * Mounts the read-only layer followed by the union layer
+     */
+    void Mount();
+    /**
+     * Move scratch space to waste bin and clear it out asynchonously
+     */
+    void ClearScratch();
 
    private:
     /**
@@ -192,11 +205,15 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      */
     enum EMountpointAlterations {
       kAlterUnionUnmount,
+      kAlterUnionLazyUnmount,
       kAlterRdOnlyUnmount,
+      kAlterRdOnlyKillUnmount,
+      kAlterRdOnlyLazyUnmount,
       kAlterUnionMount,
       kAlterRdOnlyMount,
       kAlterUnionOpen,
       kAlterUnionLock,
+      kAlterScratchWipe,
     };
 
     void AlterMountpoint(EMountpointAlterations how, int log_level);
@@ -223,14 +240,34 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
       int llvl;
     };
 
-    static Session *Create(const Settings &settings_session);
-    static Session *Create(const SettingsPublisher &settings_publisher,
-                           int llvl = 0);
-    ~Session();
-   private:
+    /**
+     * For non-gateway nodes, we have an implicit lease for the entire
+     * repository
+     */
+    Session() : keep_alive_(false), has_lease_(true) {}
     explicit Session(const Settings &settings_session);
+    explicit Session(const SettingsPublisher &settings_publisher, int llvl = 0);
+    /**
+     * Drops the lease unless keep_alive_ is set
+     */
+    ~Session();
+
     void Acquire();
+    void Drop();
+    void SetKeepAlive(bool value);
+
+    bool has_lease() const { return has_lease_; }
+
+   private:
     Settings settings_;
+    /**
+     * If set to true, the session is not closed on destruction, i.e. the
+     * lease is not dropped and the lease token is not removed. A newly created
+     * Session object will pick up an existing lease token and not re-acquire
+     * it.
+     */
+    bool keep_alive_;
+    bool has_lease_;
   };  // class Session
 
   /**
@@ -268,7 +305,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   const SettingsPublisher &settings() const { return settings_; }
   bool in_transaction() const { return in_transaction_; }
-  ManagedNode *managed_node() const { return managed_node_.weak_ref(); }
+  bool is_publishing() const { return is_publishing_; }
+  Session *session() const { return session_.weak_ref(); }
   const upload::Spooler *spooler_files() const { return spooler_files_; }
   const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
 
@@ -315,6 +353,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void TransactionImpl();
   void CheckTransactionStatus();
 
+  void SyncImpl();
+
   SettingsPublisher settings_;
   UniquePtr<perf::StatisticsTemplate> statistics_publish_;
   /**
@@ -322,7 +362,16 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    */
   int llvl_;
   bool in_transaction_;
+  bool is_publishing_;
   gateway::GatewayKey gw_key_;
+  /**
+   * Only really used gateway mode when a transaction is opened. The session
+   * takes an existing session token if it exists and drops the lease in abort.
+   * TODO(jblomer): that is not yet done.  Once publish, tag, etc. are
+   * implemented, the lease should be dropped after the last successful write
+   * operation.
+   */
+  UniquePtr<Session> session_;
   UniquePtr<ManagedNode> managed_node_;
 
   upload::Spooler *spooler_files_;

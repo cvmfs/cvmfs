@@ -15,7 +15,7 @@ class CmdInfo : public Command {
  public:
   virtual std::string GetName() const { return "info"; }
   virtual std::string GetBrief() const {
-    return "Shows summary information about a repository";
+    return "Show summary information about a repository";
   }
   virtual std::string GetDescription() const {
     return "Shows high-level data about a repository, such as its name, "

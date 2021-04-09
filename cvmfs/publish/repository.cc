@@ -683,11 +683,11 @@ Publisher::Publisher(const SettingsPublisher &settings)
     }
   }
 
+  if (settings.is_managed())
+    managed_node_ = new ManagedNode(this);
   CheckTransactionStatus();
   if (in_transaction_)
     ConstructSpoolers();
-  if (settings.is_managed())
-    managed_node_ = new ManagedNode(this);
 }
 
 Publisher::~Publisher() {
@@ -699,10 +699,6 @@ Publisher::~Publisher() {
   delete spooler_files_;
 }
 
-
-void Publisher::Abort() {
-  // TODO(jblomer): remove transaction lock
-}
 
 void Publisher::ConstructSyncManagers() {
   ConstructSpoolers();
@@ -786,11 +782,26 @@ void Publisher::ConstructSyncManagers() {
   }
 }
 
-void Publisher::WipeScratchArea() {
-  // TODO(jblomer)
+void Publisher::Sync() {
+  if (settings_.transaction().dry_run()) {
+    SyncImpl();
+    return;
+  }
+
+  const std::string publishing_lock =
+    settings_.transaction().spool_area().publishing_lock();
+
+  ServerLockFile::Acquire(publishing_lock, false /* ignore_stale */);
+  try {
+    SyncImpl();
+    ServerLockFile::Release(publishing_lock);
+  } catch (...) {
+    ServerLockFile::Release(publishing_lock);
+    throw;
+  }
 }
 
-void Publisher::Sync() {
+void Publisher::SyncImpl() {
   ConstructSyncManagers();
 
   sync_union_->Traverse();
@@ -814,7 +825,9 @@ void Publisher::Sync() {
 
     // Reset to the new catalog root hash
     settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
-    WipeScratchArea();
+    // TODO(jblomer): think about how to deal with the scratch area at
+    // this point
+    // WipeScratchArea();
   }
 
   delete sync_union_;

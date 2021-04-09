@@ -52,7 +52,6 @@
 #include "fs_traversal.h"
 #include "logging.h"
 #include "platform.h"
-
 #include "util/algorithm.h"
 #include "util/exception.h"
 #include "util/string.h"
@@ -247,6 +246,18 @@ FileSystemInfo GetFileSystemInfo(const std::string &path) {
 
 
   return result;
+}
+
+
+std::string ReadSymlink(const std::string &path) {
+  // TODO(jblomer): avoid PATH_MAX
+  char buf[PATH_MAX + 1];
+  ssize_t nchars = readlink(path.c_str(), buf, PATH_MAX);
+  if (nchars >= 0) {
+    buf[nchars] = '\0';
+    return std::string(buf);
+  }
+  return "";
 }
 
 
@@ -1239,6 +1250,29 @@ std::string GetShell() {
 }
 
 /**
+ * UID -> Name from passwd database
+ */
+bool GetUserNameOf(uid_t uid, std::string *username) {
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(uid, &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return false;
+  }
+  if (username)
+    *username = result->pw_name;
+  free(buf);
+  return true;
+}
+
+
+/**
  * Name -> UID from passwd database
  */
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
@@ -1383,6 +1417,68 @@ void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit) {
 #else
   *hard_limit = rpl.rlim_max;
 #endif
+}
+
+
+std::vector<LsofEntry> Lsof(const std::string &path) {
+  std::vector<LsofEntry> result;
+
+  std::vector<std::string> proc_names;
+  std::vector<mode_t> proc_modes;
+  ListDirectory("/proc", &proc_names, &proc_modes);
+
+  for (unsigned i = 0; i < proc_names.size(); ++i) {
+    if (!S_ISDIR(proc_modes[i]))
+      continue;
+    if (proc_names[i].find_first_not_of("1234567890") != std::string::npos)
+      continue;
+
+    std::vector<std::string> fd_names;
+    std::vector<mode_t> fd_modes;
+    std::string proc_dir = "/proc/" + proc_names[i];
+    std::string fd_dir   = proc_dir + "/fd";
+    bool rvb = ListDirectory(fd_dir, &fd_names, &fd_modes);
+    uid_t proc_uid = 0;
+
+    // The working directory of the process requires special handling
+    if (rvb) {
+      platform_stat64 info;
+      platform_stat(proc_dir.c_str(), &info);
+      proc_uid = info.st_uid;
+
+      std::string cwd = ReadSymlink(proc_dir + "/cwd");
+      if (HasPrefix(cwd + "/", path + "/", false /* ignore_case */)) {
+        LsofEntry entry;
+        entry.pid = String2Uint64(proc_names[i]);
+        entry.owner = proc_uid;
+        entry.read_only = true;  // A bit sloppy but good enough for the moment
+        entry.executable = ReadSymlink(proc_dir + "/exe");
+        entry.path = cwd;
+        result.push_back(entry);
+      }
+    }
+
+    for (unsigned j = 0; j < fd_names.size(); ++j) {
+      if (!S_ISLNK(fd_modes[j]))
+        continue;
+      if (fd_names[j].find_first_not_of("1234567890") != std::string::npos)
+        continue;
+
+      std::string target = ReadSymlink(fd_dir + "/" + fd_names[j]);
+      if (!HasPrefix(target + "/", path + "/", false /* ignore_case */))
+        continue;
+
+      LsofEntry entry;
+      entry.pid = String2Uint64(proc_names[i]);
+      entry.owner = proc_uid;
+      entry.read_only = !((fd_modes[j] & S_IWUSR) == S_IWUSR);
+      entry.executable = ReadSymlink(proc_dir + "/exe");
+      entry.path = target;
+      result.push_back(entry);
+    }
+  }
+
+  return result;
 }
 
 

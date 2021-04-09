@@ -575,7 +575,11 @@ int CmdEnter::Main(const Options &options) {
       throw EPublish("cannot chroot to " + rootfs_dir_);
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
     // May fail if the working directory was invalid to begin with
-    chdir(cwd.c_str());
+    rvi = chdir(cwd.c_str());
+    if (rvi != 0) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Warning: cannot chdir to %s",
+               cwd.c_str());
+    }
 
     LogCvmfs(kLogCvmfs, kLogStdout, "\n"
       "You can attach to this shell from another another terminal with\n");

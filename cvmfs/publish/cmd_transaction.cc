@@ -47,6 +47,12 @@ int CmdTransaction::Main(const Options &options) {
     }
     throw;
   }
+  if (settings->transaction().in_enter_session()) {
+    throw EPublish(
+      "opening a transaction is unsupported within the ephemeral "
+      "writable shell",
+      EPublish::kFailInvocation);
+  }
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
   }
@@ -69,7 +75,8 @@ int CmdTransaction::Main(const Options &options) {
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
                          false /* temporarily */))
   {
-    throw EPublish("No write permission to repository");
+    throw EPublish("No write permission to repository",
+                   EPublish::kFailPermission);
   }
   FileSystemInfo fs_info = GetFileSystemInfo("/cvmfs");
   if (fs_info.type == kFsTypeAutofs)
@@ -101,11 +108,7 @@ int CmdTransaction::Main(const Options &options) {
       "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
-  // TODO(jblomer): move inside transaction when abort() is ready
-  int rvi = publisher->managed_node()->Check(false /* is_quiet */);
-  if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
-
-  rvi = CallServerHook("transaction_before_hook", fqrn);
+  int rvi = CallServerHook("transaction_before_hook", fqrn);
   if (rvi != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "transaction hook failed, not opening a transaction");
@@ -116,7 +119,7 @@ int CmdTransaction::Main(const Options &options) {
     publisher->Transaction();
   } catch (const EPublish &e) {
     const char *msg_prefix = "CernVM-FS transaction error: ";
-    if (e.failure() == EPublish::kFailTransactionLocked) {
+    if (e.failure() == EPublish::kFailTransactionState) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
                msg_prefix, e.msg().c_str());
       return EEXIST;
@@ -140,7 +143,7 @@ int CmdTransaction::Main(const Options &options) {
     throw;
   }
 
-  publisher->managed_node()->Open();
+  publisher->session()->SetKeepAlive(true);
 
   rvi = CallServerHook("transaction_after_hook", fqrn);
   if (rvi != 0) {

@@ -52,6 +52,16 @@ struct FileSystemInfo {
   bool is_rdonly;
 };
 
+struct LsofEntry {
+  pid_t pid;
+  uid_t owner;
+  bool read_only;
+  std::string executable;
+  std::string path;
+
+  LsofEntry() : pid(0), owner(0), read_only(false) {}
+};
+
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
@@ -64,6 +74,7 @@ bool IsAbsolutePath(const std::string &path);
 std::string GetAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 
+std::string ReadSymlink(const std::string &path);
 std::string ResolvePath(const std::string &path);
 bool IsMountPoint(const std::string &path);
 FileSystemInfo GetFileSystemInfo(const std::string &path);
@@ -118,6 +129,7 @@ bool ListDirectory(const std::string &directory,
 
 std::string GetUserName();
 std::string GetShell();
+bool GetUserNameOf(uid_t uid, std::string *username);
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid);
 bool GetGidOf(const std::string &groupname, gid_t *gid);
 mode_t GetUmask();
@@ -126,6 +138,12 @@ std::string GetHomeDirectory();
 
 int SetLimitNoFile(unsigned limit_nofile);
 void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit);
+
+/**
+ * Searches for open file descriptors on the subtree starting at path.
+ * For the time being works only on Linux, not on macOS.
+ */
+std::vector<LsofEntry> Lsof(const std::string &path);
 
 bool ProcessExists(pid_t pid);
 void BlockSignal(int signum);

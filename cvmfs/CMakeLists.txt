@@ -253,6 +253,7 @@ set (CVMFS_PUBLISH_SOURCES
   logging.cc
   manifest.cc
   options.cc
+  publish/cmd_abort.cc
   publish/cmd_diff.cc
   publish/cmd_enter.cc
   publish/cmd_hash.cc
@@ -315,6 +316,7 @@ set (LIBCVMFS_SERVER_SOURCES
   pack.cc
   publish/except.cc
   publish/repository.cc
+  publish/repository_abort.cc
   publish/repository_env.cc
   publish/repository_diff.cc
   publish/repository_managed.cc

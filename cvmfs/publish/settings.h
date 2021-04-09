@@ -103,6 +103,7 @@ class SettingsSpoolArea {
   std::string union_mnt() const { return union_mnt_; }
   std::string scratch_base() const { return workspace_() + "/scratch"; }
   std::string scratch_dir() const { return scratch_base() + "/current"; }
+  std::string scratch_wastebin() const { return scratch_base() + "/wastebin"; }
   std::string log_dir() const { return workspace() + "/logs"; }
   // TODO(jblomer): shouldn't this be in /etc/cvmfs/repositor.../client.conf
   std::string client_config() const { return workspace_() + "/client.config"; }
@@ -137,6 +138,7 @@ class SettingsTransaction {
  public:
   explicit SettingsTransaction(const std::string &fqrn)
     : layout_revision_(0)
+    , in_enter_session_(false)
     , hash_algorithm_(shash::kShake128)
     , compression_algorithm_(zlib::kZlibDefault)
     , ttl_second_(240)
@@ -162,6 +164,7 @@ class SettingsTransaction {
   {}
 
   void SetLayoutRevision(const unsigned revision);
+  void SetInEnterSession(const bool value);
   void SetBaseHash(const shash::Any &hash);
   void SetUnionFsType(const std::string &union_fs);
   void SetHashAlgorithm(const std::string &algorithm);
@@ -187,6 +190,7 @@ class SettingsTransaction {
   int GetTimeoutS() const;
 
   unsigned layout_revision() const { return layout_revision_; }
+  bool in_enter_session() const { return in_enter_session_; }
   shash::Any base_hash() const { return base_hash_; }
   shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
   zlib::Algorithms compression_algorithm() const {
@@ -226,6 +230,11 @@ class SettingsTransaction {
    * See CVMFS_CREATOR_VERSION
    */
   Setting<unsigned> layout_revision_;
+  /**
+   * Set to true if the settings have been created from the environment of
+   * the ephemeral writable shell (cvmfs_server enter command).
+   */
+  Setting<bool> in_enter_session_;
   /**
    * The root catalog hash based on which the transaction takes place.
    * Usually the current root catalog from the manifest, which should be equal

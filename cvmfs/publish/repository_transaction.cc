@@ -29,16 +29,25 @@ void Publisher::CheckTransactionStatus() {
     settings_.transaction().spool_area().transaction_lock();
   in_transaction_ =
     ServerLockFile::IsLocked(transaction_lock, true /* ignore_stale */);
+
+  const std::string publishing_lock =
+    settings_.transaction().spool_area().publishing_lock();
+  is_publishing_ =
+    ServerLockFile::IsLocked(publishing_lock, false /* ignore_stale */);
+
+  session_ = new Session(settings_, llvl_);
 }
 
 
 void Publisher::TransactionRetry() {
-  if (settings_.transaction().GetTimeoutS() < 0) {
-    TransactionImpl();
-    return;
+  if (managed_node_) {
+    int rvi = managed_node_->Check(false /* is_quiet */);
+    if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
   }
 
   BackoffThrottle throttle(500, 5000, 10000);
+  // Negative timeouts (i.e.: no retry) will result in a deadline that has
+  // already passed and thus has the correct effect
   uint64_t deadline = platform_monotonic_time() +
                       settings_.transaction().GetTimeoutS();
   if (settings_.transaction().GetTimeoutS() == 0)
@@ -49,7 +58,13 @@ void Publisher::TransactionRetry() {
       TransactionImpl();
       break;
     } catch (const publish::EPublish& e) {
-      if ((e.failure() == EPublish::kFailTransactionLocked) ||
+      if (e.failure() != EPublish::kFailTransactionState) {
+        session_->Drop();
+        ServerLockFile::Release(
+          settings_.transaction().spool_area().transaction_lock());
+      }
+
+      if ((e.failure() == EPublish::kFailTransactionState) ||
           (e.failure() == EPublish::kFailLeaseBusy))
       {
         if (platform_monotonic_time() > deadline)
@@ -64,16 +79,26 @@ void Publisher::TransactionRetry() {
       throw;
     }  // try-catch
   }  // while (true)
+
+  if (managed_node_)
+    managed_node_->Open();
 }
 
 
 void Publisher::TransactionImpl() {
   if (in_transaction_) {
     throw EPublish("another transaction is already open",
-                   EPublish::kFailTransactionLocked);
+                   EPublish::kFailTransactionState);
   }
 
   InitSpoolArea();
+
+  // On error, Transaction() will release the transaction lock and drop
+  // the session
+  const std::string transaction_lock =
+    settings_.transaction().spool_area().transaction_lock();
+  ServerLockFile::Acquire(transaction_lock, true /* ignore_stale */);
+  session_->Acquire();
 
   // We might have a valid lease for a non-existing path. Nevertheless, we run
   // run into problems when merging catalogs later, so for the time being we
@@ -95,12 +120,7 @@ void Publisher::TransactionImpl() {
     }
   }
 
-  UniquePtr<Session> session(Session::Create(settings_));
   ConstructSpoolers();
-
-  const std::string transaction_lock =
-    settings_.transaction().spool_area().transaction_lock();
-  ServerLockFile::Acquire(transaction_lock, true /* ignore_stale */);
 
   UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
     settings_.transaction().spool_area().checkout_marker()));

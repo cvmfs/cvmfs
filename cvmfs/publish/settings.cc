@@ -66,6 +66,10 @@ void SettingsTransaction::SetLayoutRevision(const unsigned revision) {
   layout_revision_ = revision;
 }
 
+void SettingsTransaction::SetInEnterSession(const bool value) {
+  in_enter_session_ = value;
+}
+
 void SettingsTransaction::SetBaseHash(const shash::Any &hash) {
   base_hash_ = hash;
 }
@@ -466,6 +470,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   UniquePtr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(SettingsRepository(fqrn)));
   // TODO(jblomer): work in progress
+  settings_publisher->GetTransaction()->SetInEnterSession(true);
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
     session_dir);
 
@@ -518,8 +523,10 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   if (needs_managed && !IsManagedRepository())
     throw EPublish("remote repositories are not supported in this context");
 
-  if (options_mgr_->GetValueOrDie("CVMFS_REPOSITORY_TYPE") != "stratum0")
-    throw EPublish("Not a stratum 0 repository");
+  if (options_mgr_->GetValueOrDie("CVMFS_REPOSITORY_TYPE") != "stratum0") {
+    throw EPublish("Repository " + alias + " is not a stratum 0 repository",
+                   EPublish::kFailRepositoryType);
+  }
 
   UniquePtr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(settings_repository));
