@@ -1,6 +1,6 @@
-Name:           cvmfs-release       
+Name:           cvmfs-release
 Version:        2
-Release:        6
+Release:        7
 Summary:        Packages for the CernVM File System
 
 Group:          Applications/System
@@ -11,8 +11,8 @@ License:        BSD
 # within this srpm.
 URL:            http://cvmrepo.web.cern.ch/cvmrepo/yum
 Source0:        http://cvmrepo.web.cern.ch/cvmrepo/yum/RPM-GPG-KEY-CernVM
-Source1:        BSD	
-Source2:        cernvm.repo	
+Source1:        BSD
+Source2:        cernvm.repo
 
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -54,6 +54,8 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Sat Apr 10 2021 Jakob Blomer <jblomer@cern.ch> - 2-7
+- Fix RPM linter errors
 * Tue Apr 05 2016 Jakob Blomer <jblomer@cern.ch> - 2-6
 - Update GPG key
 * Tue Mar 31 2015 Jakob Blomer <jblomer@cern.ch> - 2-5
@@ -61,5 +63,5 @@ rm -rf $RPM_BUILD_ROOT
 - Remove dist tag from release
 * Wed Jan 30 2013 Jakob Blomer <jblomer@cern.ch> - 2-3
 - Added cvmfs-testing repositories
-* Fri Apr 24 2012 Jakob Blomer <jblomer@cern.ch> - 1-1
+* Tue Apr 24 2012 Jakob Blomer <jblomer@cern.ch> - 1-1
 - Initial package
