@@ -1,4 +1,4 @@
-module github.com/cvmfs/containerd-remote-snapshotter
+module github.com/cvmfs/cvmfs/containerd-snapshotter
 
 go 1.14
 
