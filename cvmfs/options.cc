@@ -78,7 +78,7 @@ string OptionsManager::SanitizeParameterAssignment(string *line,
     if (comment_idx != string::npos)
       *line = line->substr(0, comment_idx);
     *line = Trim(*line);
-    if (line->empty() || line->find("if ") == 0)
+    if (line->empty())
       return "";
     *tokens = SplitString(*line, '=');
     if (tokens->size() < 2)
