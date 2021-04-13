@@ -42,7 +42,7 @@ option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party librar
 
 option (BUILD_DUCC              "Build cvmfs_ducc, it requires a modern go compiler > 1.11.5"      OFF)
 
-option (BUILD_CONTAINERD        "Build cvmfs-snapshotter, it requires a modern go compiler"         ON)
+option (BUILD_SNAPSHOTTER        "Build cvmfs-snapshotter, it requires a modern go compiler"       OFF)
 
 if (BUILD_ALL)
   set (BUILD_CVMFS ON)

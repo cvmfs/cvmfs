@@ -473,9 +473,9 @@ if (BUILD_DUCC)
   add_subdirectory (ducc)
 endif(BUILD_DUCC)
 
-if (BUILD_CONTAINERD)
+if (BUILD_SNAPSHOTTER)
   add_subdirectory (containerd-snapshotter)
-endif(BUILD_CONTAINERD)
+endif(BUILD_SNAPSHOTTER)
 
 if (BUILD_STRESS_TESTS)
   include(test/stress/CMakeLists.txt)
