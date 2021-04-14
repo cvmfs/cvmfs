@@ -28,6 +28,10 @@ cvmfs_readconfig() {
   local domain; domain=`cvmfs_getdomain $fqrn`
 
   CVMFS_PARMS=$(cvmfs2 -o parse "$fqrn" /)
+  local ret=$?
+  if [ $ret != 0 ]; then
+    return $ret
+  fi
   unset CVMFS_CACHE_DIR
   eval "$CVMFS_PARMS"
 
