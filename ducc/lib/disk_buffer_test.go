@@ -3,18 +3,9 @@ package lib
 import (
 	"bytes"
 	"crypto/rand"
-	"io"
 	"io/ioutil"
 	"testing"
 )
-
-type TestReadCloser struct {
-	io.Reader
-}
-
-func (r TestReadCloser) Close() error {
-	return nil
-}
 
 func TestOnDiskBufferSize(t *testing.T) {
 	array := make([]byte, 1024*1024)
