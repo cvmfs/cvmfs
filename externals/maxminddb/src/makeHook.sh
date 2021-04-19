@@ -3,9 +3,12 @@
 set -e
 rm -rf build
 
-PYTHON=python
+PYTHON=python3
 if ! $PYTHON -V >/dev/null 2>&1; then
-  PYTHON=python2
+  PYTHON=python
+  if ! $PYTHON -V >/dev/null 2>&1; then
+    PYTHON=python2
+  fi
 fi
 
 $PYTHON setup.py build

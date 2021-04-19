@@ -1,9 +1,17 @@
-
 %{?suse_version:%define dist .suse%suse_version}
 %if 0%{?suse_version} == 1315
 %define sle12 1
 %define dist .sle12
 %endif
+%if 0%{?suse_version} == 1500
+%define sle15 1
+%define dist .sle15
+%endif
+%if 0%{?dist:1}
+%else
+  %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
+%endif
+
 %if 0%{?rhel} >= 6 || 0%{?fedora}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
@@ -11,33 +19,46 @@
 %if 0%{?rhel} >= 7 || 0%{?fedora}
 %define selinux_cvmfs_server 1
 %endif
+
 %if 0%{?rhel} >= 7 || 0%{?fedora} >= 29
   %if "%{?_arch}" != "aarch64"
     %define build_ducc 1
   %endif
 %endif
-%if 0%{?dist:1}
-%else
-  %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
-  %if 0%{?redhat_major} == 4
-    %define el4 1
-    %define dist .el4
-  %endif
+%if 0%{?sle15}
+  %define build_ducc 1
 %endif
 
+
 # List of platforms that require systemd/autofs fix as described in CVM-1200
-%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
 %define systemd_autofs_patch 1
 %endif
 
-# fuse3 is in epel starting with epel6
+# fuse3 is in epel starting with epel6;
+# the fuse3 libraries are available in SLES 15, too, but the devel package is missing
 %if 0%{?fedora} >= 29 || 0%{?rhel} >= 6
 %define build_fuse3 1
 %endif
 
 %define cvmfs_python python
+%define cvmfs_python_devel python-devel
+%define cvmfs_python_setuptools python-setuptools
 %if 0%{?el8} || 0%{?fedora} >= 31
 %define cvmfs_python python2
+%define cvmfs_python_devel python2-devel
+%define cvmfs_python_setuptools python2-setuptools
+%endif
+# On SLES15, we need the python2 interpreter but python3 devel and setuptools
+# TODO(jblomer): upgrade all python components to Python3
+%if 0%{?sle15}
+%define cvmfs_python_devel python3-devel
+%define cvmfs_python_setuptools python3-setuptools
+%endif
+
+%define cvmfs_go golang
+%if 0%{?sle15}
+%define cvmfs_go go
 %endif
 
 %define hardlink /usr/sbin/hardlink
@@ -55,6 +76,7 @@ Summary: CernVM File System
 Name: cvmfs
 Version: 2.9.0
 Release: 1%{?dist}
+URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
 Source1: cvmfs.te
@@ -90,8 +112,12 @@ BuildRequires: libattr-devel
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig
-BuildRequires: %{cvmfs_python}-devel
+BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
+BuildRequires: zlib-devel
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
+BuildRequires: systemd
+%endif
 
 Requires: bash
 Requires: coreutils
@@ -110,7 +136,9 @@ Requires: gdb
 Requires: aaa_base
 Requires: libfuse2
 Requires: glibc
+  %if 0%{?suse_version} < 1500
 Requires: pwdutils
+  %endif
   %if 0%{?suse_version} < 1200
 Requires: sysvinit
   %else
@@ -179,12 +207,16 @@ CernVM-FS static client library for pure user-space use
 %package server
 Summary: CernVM-FS server tools
 Group: Application/System
-BuildRequires: %{cvmfs_python}-devel
+BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
 BuildRequires: unzip
-BuildRequires: %{cvmfs_python}-setuptools
+BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}
+  %if 0%{?suse_version} < 1500
 Requires: insserv
+  %else
+Requires: libcap-progs
+  %endif
 %else
 Requires: initscripts
 %endif
@@ -198,7 +230,11 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
+%if 0%{?sle15}
+Requires: libcap2
+%else
 Requires: libcap
+%endif
 Requires: lsof
 Requires: rsync
 Requires: usbutils
@@ -233,8 +269,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 %package ducc
 Summary: ducc: Daemon Unpacking Containers in CVMFS
 Group: Application/System
-BuildRequires: golang >= 1.11.4
-Requires: singularity >= 3.5
+BuildRequires: %{cvmfs_go} >= 1.11.4
 %description ducc
 Daemon to automatically unpack and expose containers images into CernVM-FS
 %endif
@@ -458,6 +493,7 @@ fi
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
+/sbin/ldconfig
 
 %preun
 if [ $1 = 0 ] ; then
@@ -492,6 +528,7 @@ if [ $1 -eq 0 ]; then
     done
 fi
 %endif
+/sbin/ldconfig
 
 %postun server
 %if 0%{?selinux_cvmfs_server}
@@ -499,6 +536,7 @@ if [ $1 -eq 0 ]; then
   /usr/sbin/semanage port -d -t http_port_t -p tcp 8000 2>/dev/null || :
 fi
 %endif
+/sbin/ldconfig
 
 
 %files
@@ -601,6 +639,8 @@ fi
 %endif
 
 %changelog
+* Mon Apr 19 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Add SLES15 support
 * Tue Apr 14 2020 Jan Priessnitz <jan.priessnitz@cern.ch> - 2.7.2
 - Fix python2-devel dependency for Fedora >=31
 - Change to /usr/bin/hardlink for Fedora >=31
