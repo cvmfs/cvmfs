@@ -6,7 +6,10 @@
 %if 0%{?suse_version} == 1500
 %define sle15 1
 %define dist .sle15
-%define build_ducc 1
+%endif
+%if 0%{?dist:1}
+%else
+  %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
 %endif
 
 %if 0%{?rhel} >= 6 || 0%{?fedora}
@@ -16,19 +19,16 @@
 %if 0%{?rhel} >= 7 || 0%{?fedora}
 %define selinux_cvmfs_server 1
 %endif
+
 %if 0%{?rhel} >= 7 || 0%{?fedora} >= 29
   %if "%{?_arch}" != "aarch64"
     %define build_ducc 1
   %endif
 %endif
-%if 0%{?dist:1}
-%else
-  %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
-  %if 0%{?redhat_major} == 4
-    %define el4 1
-    %define dist .el4
-  %endif
+%if 0%{?sle15}
+  %define build_ducc 1
 %endif
+
 
 # List of platforms that require systemd/autofs fix as described in CVM-1200
 %if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
@@ -76,6 +76,7 @@ Summary: CernVM File System
 Name: cvmfs
 Version: 2.9.0
 Release: 1%{?dist}
+URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
 Source1: cvmfs.te
@@ -114,6 +115,9 @@ BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
 BuildRequires: zlib-devel
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
+BuildRequires: systemd
+%endif
 
 Requires: bash
 Requires: coreutils
@@ -489,6 +493,7 @@ fi
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
+/sbin/ldconfig
 
 %preun
 if [ $1 = 0 ] ; then
@@ -523,6 +528,7 @@ if [ $1 -eq 0 ]; then
     done
 fi
 %endif
+/sbin/ldconfig
 
 %postun server
 %if 0%{?selinux_cvmfs_server}
@@ -530,6 +536,7 @@ if [ $1 -eq 0 ]; then
   /usr/sbin/semanage port -d -t http_port_t -p tcp 8000 2>/dev/null || :
 fi
 %endif
+/sbin/ldconfig
 
 
 %files
@@ -632,6 +639,8 @@ fi
 %endif
 
 %changelog
+* Mon Apr 19 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Add SLES15 support
 * Tue Apr 14 2020 Jan Priessnitz <jan.priessnitz@cern.ch> - 2.7.2
 - Fix python2-devel dependency for Fedora >=31
 - Change to /usr/bin/hardlink for Fedora >=31
