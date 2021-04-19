@@ -1,4 +1,5 @@
 2.9.0:
+  * Add support for SLES15 (CVM-1656)
   * Do not include an explicit default port number within S3 upload URI
     (see also libcurl issue #6769)
   * Do not escape '@' in URI strings
