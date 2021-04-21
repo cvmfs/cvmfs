@@ -140,16 +140,8 @@ int CmdMkfs::Main(const Options &options) {
 
   // TODO(jblomer): for local backend we need to create the path as root and
   // then hand it over
-  UniquePtr<Publisher> publisher(Publisher::Create(settings));
+  Publisher::Bootstrap(settings);
   // if (options.Has("no-apache"))
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "PUBLIC MASTER KEY:\n%s",
-           publisher->signature_mgr()->GetActivePubkeys().c_str());
-  LogCvmfs(kLogCvmfs, kLogStdout, "CERTIFICATE:\n%s",
-           publisher->signature_mgr()->GetCertificate().c_str());
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "MANIFEST:\n%s",
-           publisher->manifest()->ExportString().c_str());
 
   return 0;
 }

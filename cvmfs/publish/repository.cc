@@ -476,7 +476,7 @@ void Publisher::PushWhitelist() {
 }
 
 
-Publisher *Publisher::Create(const SettingsPublisher &settings) {
+void Publisher::Bootstrap(const SettingsPublisher &settings) {
   UniquePtr<Publisher> publisher(new Publisher());
 
   publisher->settings_ = settings;
@@ -492,14 +492,15 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
-           "Creating Backend Storage... ");
+           "Creating Backend Storage... ");\
   publisher->CreateStorage();
   publisher->PushWhitelist();
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Initial Repository... ");
-  publisher->InitSpoolArea();
+  // TODO(jblomer): if we configure a publisher, we have to initialize the
+  // spool area, too
   publisher->CreateRootObjects();
   publisher->PushHistory();
   publisher->PushCertificate();
@@ -508,13 +509,10 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
   publisher->PushManifest();
   // TODO(jblomer): meta-info
 
-  // Re-create from empty repository in order to properly initialize
-  // parent Repository object
-  publisher = new Publisher(settings);
+  // The publisher object is incomplete and should be discarded now that the
+  // repository is created
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
-
-  return publisher.Release();
 }
 
 void Publisher::ExportKeychain() {

@@ -275,7 +275,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    */
   static const unsigned kRequiredLayoutRevision = 142;
 
-  static Publisher *Create(const SettingsPublisher &settings);
+  static void Bootstrap(const SettingsPublisher &settings);
 
   explicit Publisher(const SettingsPublisher &settings);
   virtual ~Publisher();

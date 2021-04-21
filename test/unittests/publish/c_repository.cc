@@ -27,7 +27,8 @@ publish::Publisher *GetTestPublisher() {
   settings.GetTransaction()->SetLayoutRevision(
     publish::Publisher::kRequiredLayoutRevision);
 
-  return publish::Publisher::Create(settings);
+  publish::Publisher::Bootstrap(settings);
+  return new publish::Publisher(settings);
 }
 
 
