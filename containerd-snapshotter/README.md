@@ -29,12 +29,12 @@ A basic configuration would look like:
 ```
 # tell containerd to use this particular snapshotter
 [plugins."io.containerd.grpc.v1.cri".containerd]
-  snapshotter = "cvmfs-snapshotter"
+  snapshotter = "snapshotter"
   disable_snapshot_annotations = false
 
 # tell containerd how to communicate with this snapshotter
 [proxy_plugins]
-  [proxy_plugins.cvmfs-snapshotter]
+  [proxy_plugins.snapshotter]
     type = "snapshot"
     address = "/run/containerd-cvmfs-grpc/containerd-cvmfs-grpc.sock"
 ```

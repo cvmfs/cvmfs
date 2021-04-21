@@ -77,6 +77,6 @@ COPY --from=containerd-dev /out/bin/containerd /out/bin/containerd-shim-runc-v2 
 COPY --from=snapshotter-dev /out/* /usr/local/bin/
 COPY ./script/config/ /
 RUN apt-get update -y && apt-get install --no-install-recommends -y fuse && \
-    systemctl enable cvmfs-snapshotter
+    systemctl enable snapshotter
 ENTRYPOINT [ "/usr/local/bin/entrypoint", "/sbin/init" ]
 

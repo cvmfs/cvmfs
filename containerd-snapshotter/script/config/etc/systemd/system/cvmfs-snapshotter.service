@@ -5,7 +5,7 @@ Before=containerd.service
 
 [Service]
 Environment=HOME=/root
-ExecStart=/usr/local/bin/cvmfs-snapshotter --log-level=debug --config=/etc/containerd-cvmfs-grpc/config.toml
+ExecStart=/usr/local/bin/snapshotter --log-level=debug --config=/etc/containerd-cvmfs-grpc/config.toml
 Restart=always
 RestartSec=1
 
