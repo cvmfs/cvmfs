@@ -279,10 +279,28 @@ void Publisher::CreateKeychain() {
   if (settings_.keychain().HasDanglingRepositoryKeys()) {
     throw EPublish("dangling repository keys");
   }
-  if (!settings_.keychain().HasMasterKeys())
+
+  if (!settings_.keychain().HasMasterKeys()) {
     signature_mgr_->GenerateMasterKeyPair();
-  if (!settings_.keychain().HasRepositoryKeys())
+  } else {
+    bool rvb = signature_mgr_->LoadPrivateMasterKeyPath(
+      settings_.keychain().master_private_key_path());
+    if (!rvb) throw EPublish("cannot load private master key");
+    rvb = signature_mgr_->LoadPublicRsaKeys(
+      settings_.keychain().master_public_key_path());
+    if (!rvb) throw EPublish("cannot load public master key");
+  }
+  if (!settings_.keychain().HasRepositoryKeys()) {
     signature_mgr_->GenerateCertificate(settings_.fqrn());
+  } else {
+    bool rvb = signature_mgr_->LoadCertificatePath(
+      settings_.keychain().certificate_path());
+    if (!rvb) throw EPublish("cannot load certificate");
+    rvb = signature_mgr_->LoadPrivateKeyPath(
+      settings_.keychain().private_key_path(), "");
+    if (!rvb) throw EPublish("cannot load private key");
+  }
+  if (!signature_mgr_->KeysMatch()) throw EPublish("corrupted keychain");
 
   whitelist_ = new whitelist::Whitelist(settings_.fqrn(), NULL, signature_mgr_);
   std::string whitelist_str = whitelist::Whitelist::CreateString(
@@ -291,8 +309,10 @@ void Publisher::CreateKeychain() {
     settings_.transaction().hash_algorithm(),
     signature_mgr_);
   whitelist::Failures rv_wl = whitelist_->LoadMem(whitelist_str);
-  if (rv_wl != whitelist::kFailOk)
-    throw EPublish("whitelist generation failed");
+  if (rv_wl != whitelist::kFailOk) {
+    throw EPublish(std::string("whitelist generation failed (") +
+                   whitelist::Code2Ascii(rv_wl) + ")");
+  }
 }
 
 

@@ -19,11 +19,18 @@ class CmdMkfs : public Command {
   }
   virtual ParameterList GetParams() const {
     ParameterList p;
-    p.push_back(Parameter::Optional("stratum0", 'w', "stratum0 url",
+    p.push_back(Parameter::Optional("stratum0", 'w', "url",
       "HTTP endpoint of the authoritative storage if not localhost"));
 
     p.push_back(Parameter::Optional("storage", 'u', "upstream storage",
-      "Upstream storage definition if other than local file system"));
+      "Upstream storage definition if other than local file system, "
+      "don't use with -s or -l flags"));
+
+    p.push_back(Parameter::Optional("storage-s3", 's', "config file",
+      "Settings for an S3 bucket, use with -w flag"));
+
+    p.push_back(Parameter::Optional("storage-local", 'l', "directory",
+      "Path of the repository storage, don't use with -u option"));
 
     p.push_back(Parameter::Optional("owner", 'o', "user name",
       "User account that should own the published files"));
@@ -33,9 +40,6 @@ class CmdMkfs : public Command {
 
     p.push_back(Parameter::Optional("unionfs", 'f', "aufs | overlayfs",
       "Enforce aufs or overlayfs if both are available"));
-
-    p.push_back(Parameter::Optional("s3config", 's', "s3 config file",
-      "Settings for an S3 bucket, use with -w and -u flags"));
 
     p.push_back(Parameter::Switch("no-autotags", 'g',
       "Disable automatic creation of timestamp tags, useful with --gc"));

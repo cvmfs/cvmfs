@@ -46,7 +46,8 @@ int CmdMkfs::Main(const Options &options) {
   // Sanity checks
   if (options.Has("no-autotags") && options.Has("autotag-span")) {
     throw EPublish(
-        "options 'no-autotags' and 'autotag-span' are mutually exclusive");
+        "options 'no-autotags' and 'autotag-span' are mutually exclusive",
+        EPublish::kFailInvocation);
   }
   if (options.HasNot("no-autotags") && options.HasNot("autotag-span") &&
       options.Has("gc"))
@@ -58,20 +59,38 @@ int CmdMkfs::Main(const Options &options) {
   // Needs to be done before the storage and its temp dir is configured
   if (options.Has("no-publisher")) {
     settings.GetTransaction()->GetSpoolArea()->UseSystemTempDir();
-    settings.GetKeychain()->SetKeychainDir(".");
+    if (options.Has("export-keychain")) {
+      settings.GetKeychain()->SetKeychainDir(
+        options.GetString("export-keychain"));
+    } else {
+      settings.GetKeychain()->SetKeychainDir(".");
+    }
   }
 
   // Storage configuration
   if (options.Has("storage")) {
-    if (options.Has("s3config")) {
+    if (options.Has("storage-s3")) {
       throw EPublish(
-        "options 'storage' and 's3config' are mutually exclusive");
+        "options 'storage' and 'storage-s3' are mutually exclusive",
+        EPublish::kFailInvocation);
+    }
+    if (options.Has("storage-local")) {
+      throw EPublish(
+        "options 'storage' and 'storage-local' are mutually exclusive",
+        EPublish::kFailInvocation);
     }
     settings.GetStorage()->SetLocator(options.GetString("storage"));
-  } else if (options.Has("s3config")) {
+  } else if (options.Has("storage-s3")) {
+    if (options.Has("storage-local")) {
+      throw EPublish(
+        "options 'storage-s3' and 'storage-local' are mutually exclusive",
+        EPublish::kFailInvocation);
+    }
     settings.GetStorage()->MakeS3(
-      options.GetString("s3config"),
+      options.GetString("storage-s3"),
       settings.transaction().spool_area().tmp_dir());
+  } else if (options.Has("storage-local")) {
+    settings.GetStorage()->MakeLocal(options.GetString("storage-local"));
   }
   bool configure_apache =
     (settings.storage().type() == upload::SpoolerDefinition::Local) &&
@@ -82,7 +101,9 @@ int CmdMkfs::Main(const Options &options) {
     bool can_unprivileged =
       options.Has("no-publisher") && !configure_apache &&
       (user_name == GetUserName());
-    if (!can_unprivileged) throw EPublish("root privileges required");
+    if (!can_unprivileged) {
+      throw EPublish("root privileges required", EPublish::kFailPermission);
+    }
   }
 
   // Stratum 0 URL
@@ -93,8 +114,8 @@ int CmdMkfs::Main(const Options &options) {
       (settings.storage().type() != upload::SpoolerDefinition::Local) &&
       options.HasNot("no-publisher");
     if (need_stratum0) {
-      throw EPublish("repository stratum 0 URL for non-local storage "
-                     "(add option -w)");
+      throw EPublish("missing repository stratum 0 URL for non-local storage "
+                     "(add option -w)", EPublish::kFailInvocation);
     }
   }
 
@@ -108,7 +129,8 @@ int CmdMkfs::Main(const Options &options) {
   } else {
     if (options.Has("unionfs")) {
       throw EPublish(
-        "options 'no-publisher' and 'unionfs' are mutually exclusive");
+        "options 'no-publisher' and 'unionfs' are mutually exclusive",
+        EPublish::kFailInvocation);
     }
   }
 

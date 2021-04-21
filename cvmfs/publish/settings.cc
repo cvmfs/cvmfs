@@ -132,14 +132,12 @@ void SettingsTransaction::SetUnionFsType(const std::string &union_fs) {
 }
 
 void SettingsTransaction::DetectUnionFsType() {
-  // TODO(jblomer): shall we switch the order?
-  if (DirectoryExists("/sys/fs/aufs")) {
-    union_fs_ = kUnionFsAufs;
-    return;
-  }
-  // TODO(jblomer): modprobe aufs, try again
   if (DirectoryExists("/sys/module/overlay")) {
     union_fs_ = kUnionFsOverlay;
+    return;
+  }
+  if (DirectoryExists("/sys/fs/aufs")) {
+    union_fs_ = kUnionFsAufs;
     return;
   }
   // TODO(jblomer): modprobe overlay, try again
