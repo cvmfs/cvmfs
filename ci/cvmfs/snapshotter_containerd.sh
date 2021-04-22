@@ -15,6 +15,8 @@ if [ $# -lt 2 ]; then
   exit 1
 fi
 
+CVMFS_SOURCE_LOCATION="$1"
+CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
 # retrieve the upstream version string from CVMFS
@@ -36,14 +38,6 @@ else
   CVMFS_TAG="${cvmfs_version}-1"
 fi
 
-# sanity checks
-# TODO: add externals?
-for d in build rootfs; do
-  if [ -d ${CVMFS_RESULT_LOCATION}/${d} ]; then
-    echo "build directory seems to be used before (${CVMFS_RESULT_LOCATION}/${d} exists)"
-    exit 1
-  fi
-done
 for d in build rootfs; do
   mkdir -p ${CVMFS_RESULT_LOCATION}/${d}
 done
@@ -58,15 +52,4 @@ cmake -DBUILD_SNAPSHOTTER=yes -DBUILD_CVMFS=no \
   ${CVMFS_SOURCE_LOCATION}
 make -j4
 
-# generating package map section for specific platform
-if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
-  echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
-  generate_package_map                                      \
-    "$CVMFS_CI_PLATFORM_LABEL"                              \
-    "cvmfs-service-${CVMFS_TAG}.$(uname -m).docker.tar.gz"  \
-    ""  \
-    ""  \
-    ""  \
-    ""  \
-    ""
-fi
+mv ${CVMFS_RESULT_LOCATION}/build/containerd-snapshotter/cvmfs-snapshotter ${CVMFS_RESULT_LOCATION}/build/containerd-snapshotter/cvmfs-snapshotter.${CVMFS_TAG}.$(uname -m)
