@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# This script builds the CernVM-FS service container.
+# This script builds the CernVM-FS snapshotter container.
 #
 
 set -e
@@ -11,7 +11,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 if [ $# -lt 2 ]; then
   echo "Usage: $0 <CernVM-FS source directory> <build result location> [<nightly build number>]"
-  echo "This script builds CernVM-FS service container"
+  echo "This script builds CernVM-FS snapshotter container"
   exit 1
 fi
 
