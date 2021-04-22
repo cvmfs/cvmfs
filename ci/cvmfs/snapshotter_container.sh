@@ -52,4 +52,4 @@ cmake -DBUILD_SNAPSHOTTER=yes -DBUILD_CVMFS=no \
   ${CVMFS_SOURCE_LOCATION}
 make -j4
 
-mv ${CVMFS_RESULT_LOCATION}/build/containerd-snapshotter/cvmfs-snapshotter ${CVMFS_RESULT_LOCATION}/build/containerd-snapshotter/cvmfs-snapshotter.${CVMFS_TAG}.$(uname -m)
+mv ${CVMFS_RESULT_LOCATION}/build/snapshotter/cvmfs_snapshotter ${CVMFS_RESULT_LOCATION}/build/snapshotter/cvmfs_snapshotter.${CVMFS_TAG}.$(uname -m)

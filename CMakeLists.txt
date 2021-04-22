@@ -474,7 +474,7 @@ if (BUILD_DUCC)
 endif(BUILD_DUCC)
 
 if (BUILD_SNAPSHOTTER)
-  add_subdirectory (containerd-snapshotter)
+  add_subdirectory (snapshotter)
 endif(BUILD_SNAPSHOTTER)
 
 if (BUILD_STRESS_TESTS)
