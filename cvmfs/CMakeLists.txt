@@ -1142,6 +1142,15 @@ if (BUILD_RECEIVER)
     RUNTIME
     DESTINATION bin
     )
+
+  if (BUILD_RECEIVER_DEBUG)
+    install (
+      TARGETS     cvmfs_receiver_debug
+      RUNTIME
+      DESTINATION   bin
+    )
+  endif (BUILD_RECEIVER_DEBUG)
+
 endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)
