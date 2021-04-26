@@ -18,8 +18,3 @@ add_custom_command(
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*
   COMMENT "Build containerd cvmfs_snapshotter using the Go Compiler"
 )
-
-install (
-  PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_snapshotter
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
-)

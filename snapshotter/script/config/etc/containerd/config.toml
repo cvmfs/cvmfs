@@ -7,7 +7,7 @@ version = 2
 # - Enable to use stargz snapshotter
 [plugins."io.containerd.grpc.v1.cri".containerd]
   default_runtime_name = "runc"
-  snapshotter = "snapshotter"
+  snapshotter = "cvmfs-snapshotter"
   disable_snapshot_annotations = false
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
   runtime_type = "io.containerd.runc.v2"
@@ -19,7 +19,7 @@ version = 2
 
 # Use cvmfs snapshotter
 [proxy_plugins]
-  [proxy_plugins.snapshotter]
+  [proxy_plugins.cvmfs-snapshotter]
     type = "snapshot"
     address = "/run/containerd-cvmfs-grpc/containerd-cvmfs-grpc.sock"
 

@@ -29,7 +29,7 @@ A basic configuration would look like:
 ```
 # tell containerd to use this particular snapshotter
 [plugins."io.containerd.grpc.v1.cri".containerd]
-  snapshotter = "snapshotter"
+  snapshotter = "cvmfs-snapshotter"
   disable_snapshot_annotations = false
 
 # tell containerd how to communicate with this snapshotter

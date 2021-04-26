@@ -38,9 +38,15 @@ else
   CVMFS_TAG="${cvmfs_version}-1"
 fi
 
-for d in build rootfs; do
-  mkdir -p ${CVMFS_RESULT_LOCATION}/${d}
-done
+if [ -d ${CVMFS_RESULT_LOCATION}/build ]; then
+  if [ ! -z "$(ls -A ${CVMFS_RESULT_LOCATION}/build)" ]; then
+    echo "The /build directory should be empty"
+    exit 1
+  fi
+else
+  echo "The /build directory should exists at ${CVMFS_RESULT_LOCATION}"
+  exit 1
+fi
 
 # build commands
 cd ${CVMFS_RESULT_LOCATION}/build
