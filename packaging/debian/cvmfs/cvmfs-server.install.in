@@ -1,6 +1,7 @@
 usr/bin/cvmfs_publish
 usr/bin/cvmfs_publish_debug
 usr/bin/cvmfs_receiver
+usr/bin/cvmfs_receiver_debug
 usr/bin/cvmfs_swissknife
 usr/bin/cvmfs_swissknife_debug
 usr/bin/cvmfs_suid_helper

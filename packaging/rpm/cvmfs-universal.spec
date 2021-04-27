@@ -309,6 +309,8 @@ BUILD_DUCC=yes
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
   -DBUILD_SERVER_DEBUG=yes \
+  -DBUILD_RECEIVER=yes \
+  -DBUILD_RECEIVER_DEBUG=yes \
   -DBUILD_LIBCVMFS=yes \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
@@ -324,6 +326,8 @@ EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
 %cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
   -DBUILD_SERVER_DEBUG=yes \
+  -DBUILD_RECEIVER=yes \
+  -DBUILD_RECEIVER_DEBUG=yes \
   -DBUILD_LIBCVMFS=yes \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
@@ -601,6 +605,7 @@ fi
 %{_bindir}/cvmfs_publish
 %{_bindir}/cvmfs_publish_debug
 %{_bindir}/cvmfs_receiver
+%{_bindir}/cvmfs_receiver_debug
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
@@ -639,6 +644,8 @@ fi
 %endif
 
 %changelog
+* Tue Apr 27 2021 Michael Brown <mbrown@fensystems.co.uk> - 2.9.0
+- Add cvmfs_receiver_debug binary
 * Mon Apr 19 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Add SLES15 support
 * Tue Apr 14 2020 Jan Priessnitz <jan.priessnitz@cern.ch> - 2.7.2
