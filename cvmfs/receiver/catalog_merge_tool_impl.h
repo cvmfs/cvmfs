@@ -180,7 +180,9 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
    *       The correct course of action is to ignore this change here.
    * */
   if (!IsPathInLease(lease_path_, rel_path)) {
-    return true;
+    // All child paths will similarly be outside of the lease path,
+    // and so there is no need to recurse any further.
+    return false;
   }
 
   const std::string parent_path =
