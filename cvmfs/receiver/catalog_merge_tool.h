@@ -99,7 +99,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                               const FileChunkList& chunks);
   virtual void ReportRemoval(const PathString& path,
                              const catalog::DirectoryEntry& entry);
-  virtual void ReportModification(const PathString& path,
+  virtual bool ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry,
                                   const XattrList& xattrs,

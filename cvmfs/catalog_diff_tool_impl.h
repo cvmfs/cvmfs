@@ -184,7 +184,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
         new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                          &chunks);
       }
-      ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
+      bool recurse =
+        ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
+      if (!recurse) continue;
     }
 
     if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {

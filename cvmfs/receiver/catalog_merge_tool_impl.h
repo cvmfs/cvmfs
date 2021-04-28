@@ -167,7 +167,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
-void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const PathString& path, const catalog::DirectoryEntry& entry1,
     const catalog::DirectoryEntry& entry2, const XattrList& xattrs,
     const FileChunkList& chunks) {
@@ -180,7 +180,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
    *       The correct course of action is to ignore this change here.
    * */
   if (!IsPathInLease(lease_path_, rel_path)) {
-    return;
+    return true;
   }
 
   const std::string parent_path =
@@ -276,6 +276,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     perf::Xadd(counters_->sz_removed_bytes, entry1.size());
     perf::Xadd(counters_->sz_added_bytes, entry2.size());
   }
+  return true;
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
