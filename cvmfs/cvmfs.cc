@@ -564,6 +564,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
+  fuse_ino_t fuse_inode = ino;
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %" PRIu64,
            uint64_t(ino));
@@ -584,6 +585,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   }
 
   struct stat info = dirent.GetStatStructure();
+  if (fuse_inode == FUSE_ROOT_ID)
+    info.st_ino = FUSE_ROOT_ID;
 
   fuse_reply_attr(req, &info, GetKcacheTimeout());
 }
@@ -661,6 +664,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
+  fuse_ino_t fuse_inode = ino;
   ino = catalog_mgr->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %" PRIu64,
            uint64_t(ino));
@@ -701,6 +705,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // Add current directory link
   struct stat info;
   info = d.GetStatStructure();
+  if (fuse_inode == FUSE_ROOT_ID)
+    info.st_ino = FUSE_ROOT_ID;
   AddToDirListing(req, ".", &info, &fuse_listing);
 
   // Add parent directory link
@@ -709,6 +715,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
       GetDirentForPath(GetParentPath(path), &p))
   {
     info = p.GetStatStructure();
+    if (p.inode() == catalog_mgr->GetRootInode())
+      info.st_ino = FUSE_ROOT_ID;
     AddToDirListing(req, "..", &info, &fuse_listing);
   }
 
