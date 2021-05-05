@@ -286,8 +286,11 @@ static bool GetDirentForPath(const PathString &path,
   if (mount_point_->md5path_cache()->Lookup(md5path, dirent)) {
     if (dirent->GetSpecial() == catalog::kDirentNegative)
       return false;
-    if (!file_system_->IsNfsSource() && (live_inode != 0))
+    if (!file_system_->IsNfsSource() && (live_inode != 0)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "fix-up inode %" PRIu64 " --> %" PRIu64,
+               dirent->inode(), live_inode);
       dirent->set_inode(live_inode);
+    }
     return true;
   }
 
@@ -301,8 +304,11 @@ static bool GetDirentForPath(const PathString &path,
       // Fix inode
       dirent->set_inode(file_system_->nfs_maps()->GetInode(path));
     } else {
-      if (live_inode != 0)
+      if (live_inode != 0) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "fix-up inode %" PRIu64 " --> %" PRIu64,
+                 dirent->inode(), live_inode);
         dirent->set_inode(live_inode);
+      }
     }
     mount_point_->md5path_cache()->Insert(md5path, *dirent);
     return true;
@@ -443,6 +449,9 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "positive lookup for (%" PRIu64 ", %s): %" PRIu64,
+           parent_fuse, name, result.ino);
   fuse_reply_entry(req, &result);
   return;
 
@@ -452,11 +461,15 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   fuse_remounter_->fence()->Leave();
   perf::Inc(file_system_->n_fs_lookup_negative());
   result.ino = 0;
+  LogCvmfs(kLogCvmfs, kLogDebug, "negative lookup for (%" PRIu64 ", %s)",
+           parent_fuse, name);
   fuse_reply_entry(req, &result);
   return;
 
  lookup_reply_error:
   fuse_remounter_->fence()->Leave();
+  LogCvmfs(kLogCvmfs, kLogDebug, "failed lookup for (%" PRIu64 ", %s)",
+           parent_fuse, name);
   fuse_reply_err(req, EIO);
 }
 
