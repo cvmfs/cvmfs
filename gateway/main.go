@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -10,7 +11,10 @@ import (
 	fe "github.com/cvmfs/gateway/internal/gateway/frontend"
 )
 
+var Version = "development"
+
 func main() {
+	fmt.Println("CernVM-FS Gateway Service Version:\t", Version, "\n")
 	gw.InitLogging(os.Stderr)
 	cfg, err := gw.ReadConfig()
 	if err != nil {

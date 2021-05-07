@@ -13,7 +13,7 @@ add_custom_target(
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_gateway
-  COMMAND ${GO_COMPILER} build -mod=vendor -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_gateway
+  COMMAND ${GO_COMPILER} build -mod=vendor -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_gateway -ldflags='-X main.Version=${CernVM-FS_VERSION_STRING}'
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*
   COMMENT "Build gateway using the Go Compiler"
