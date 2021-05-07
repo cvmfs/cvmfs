@@ -9,6 +9,7 @@ StandardOutput=journal
 Restart=always
 RestartSec=5
 User=root
+LimitNOFILE=131072
 
 [Install]
 WantedBy=multi-user.target
