@@ -1,3 +1,6 @@
+2.9:
+  * Import in cvmfs main repository
+
 1.2.0:
   * Maintain publish and gc statistics database (CVM-1806)
 
