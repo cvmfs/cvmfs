@@ -460,6 +460,10 @@ if (BUILD_QC_TESTS)
   add_subdirectory (test/quickcheck)
 endif(BUILD_QC_TESTS)
 
+if (BUILD_GATEWAY)
+  add_subdirectory (gateway)
+endif(BUILD_GATEWAY)
+
 if (BUILD_DUCC)
   add_subdirectory (ducc)
 endif(BUILD_DUCC)
