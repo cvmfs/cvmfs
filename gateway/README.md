@@ -1,8 +1,6 @@
 CernVM-FS Repository Gateway
 ============================
 
-Build status: [![build status](https://travis-ci.org/cvmfs/cvmfs-gateway.svg?branch=master)](https://travis-ci.org/cvmfs/cvmfs-gateway)
-
 The CernVM-FS repository gateway exposes a service API which is consumed by the CernVM-FS publisher tools, and mediates all interactions between publisher machines and the repository.
 
 Building
