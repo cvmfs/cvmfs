@@ -1,3 +1,7 @@
+2.9
+  * Merge with cvmfs main sources
+  * Increase maximum number of open files in systemd unit (CVM-1997)
+
 1.2.0:
   * Maintain publish and gc statistics database (CVM-1806)
 
