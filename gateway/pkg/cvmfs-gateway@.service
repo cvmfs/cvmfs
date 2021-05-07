@@ -1,0 +1,15 @@
+[Unit]
+Description=CernVM-FS Repository Gateway
+After=syslog.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cvmfs_gateway
+StandardOutput=journal
+Restart=always
+RestartSec=5
+User=%I
+LimitNOFILE=131072
+
+[Install]
+WantedBy=multi-user.target
