@@ -34,7 +34,7 @@ A basic configuration would look like:
 
 # tell containerd how to communicate with this snapshotter
 [proxy_plugins]
-  [proxy_plugins.snapshotter]
+  [proxy_plugins.cvmfs-snapshotter]
     type = "snapshot"
     address = "/run/containerd-cvmfs-grpc/containerd-cvmfs-grpc.sock"
 ```
