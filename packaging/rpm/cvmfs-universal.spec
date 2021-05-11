@@ -477,6 +477,10 @@ KillMode=process
 EOF
 %endif
 
+%if 0%{?build_gateway}
+mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs-gateway
+%endif
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
