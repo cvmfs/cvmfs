@@ -675,7 +675,7 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_gateway
 %{_unitdir}/cvmfs-gateway.service
 %{_unitdir}/cvmfs-gateway@.service
-%dir %{_sysconfdir}/var/lib/cvmfs-gateway
+%dir /var/lib/cvmfs-gateway
 %config(noreplace) %{_sysconfdir}/cvmfs/gateway/repo.json
 %config(noreplace) %{_sysconfdir}/cvmfs/gateway/user.json
 %endif
