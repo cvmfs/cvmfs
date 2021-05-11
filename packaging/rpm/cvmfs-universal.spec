@@ -669,8 +669,11 @@ systemctl daemon-reload
 %if 0%{?build_gateway}
 %files gateway
 %{_bindir}/cvmfs_gateway
-%{_unitdir}/cvmfs_gateway.service
-%{_unitdir}/cvmfs_gateway@.service
+%{_unitdir}/cvmfs-gateway.service
+%{_unitdir}/cvmfs-gateway@.service
+%dir %{_sysconfdir}/var/lib/cvmfs-gateway
+%config(noreplace) %{_sysconfdir}/cvmfs/gateway/repo.json
+%config(noreplace) %{_sysconfdir}/cvmfs/gateway/user.json
 %endif
 
 %if 0%{?build_ducc}

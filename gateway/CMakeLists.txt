@@ -26,7 +26,13 @@ install (
 
 # Systemd service unit
 install (
-  FILES ${CMAKE_BINARY_DIR}/pkg/cvmfs_gateway.service
-        ${CMAKE_BINARY_DIR}/pkg/cvmfs_gateway@.service
+  FILES pkg/cvmfs-gateway.service pkg/cvmfs-gateway@.service
   DESTINATION /usr/lib/systemd/system
+  PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+)
+
+install (
+  FILES         config/repo.json config/user.json
+  DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/gateway"
+  PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
