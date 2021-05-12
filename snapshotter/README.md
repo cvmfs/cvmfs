@@ -6,38 +6,9 @@ This repository contains a containerd snapshotter that exploits the CernVM-FS to
 
 ## Background
 
-From version 1.4.0, containerd introduce the concept of remote snapshotter.
-It allows starting containers in which the filesystem is provided externally from the containerd machinery.
-Without the need to download all the layers for each image. And getting rid of the pulling time.
+From version 1.4.0, containerd introduced the concept of remote snapshotter, a specialized component responsible for assembling all the layers of container images into a stacked filesystem that containerd can use.
 
-We exploit this new capability to mount OCI layers directly from a filesystem on the local machine.
-We focus on layers provided by CernVM-FS, but with minor changes is possible to mount layers from any filesystem, like NFS.
-
-Overall this new mechanism should bring down the time to start-up a new container image.
-
-If the layers are not in the local filesystem, `containerd` simply follow the standard path and download the tarball.
-
-## Configuration
-
-This remote snapshotter communicates with `containerd` via gRPC over linux socket.
-The default socket is `/run/containerd-cvmfs-grpc/containerd-cvmfs-grpc.sock`.
-The socket is created automatically by the snapshotter if it does not exists.
-
-It is necessary to configure containerd to use this new remote snapshotter.
-A basic configuration would look like:
-
-```
-# tell containerd to use this particular snapshotter
-[plugins."io.containerd.grpc.v1.cri".containerd]
-  snapshotter = "cvmfs-snapshotter"
-  disable_snapshot_annotations = false
-
-# tell containerd how to communicate with this snapshotter
-[proxy_plugins]
-  [proxy_plugins.cvmfs-snapshotter]
-    type = "snapshot"
-    address = "/run/containerd-cvmfs-grpc/containerd-cvmfs-grpc.sock"
-```
+We refer users to the official [documentation](https://cvmfs.readthedocs.io/en/latest/cpt-containers.html#containerd-remote-snapshotter-plugin) for information about how to configure and use the CVMFS Containerd Snapshotter.
 
 ## Work in progress
 
