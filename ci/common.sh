@@ -259,3 +259,8 @@ can_build_ducc() {
     echo "0"
   fi
 }
+
+# The gateway services require a Go compiler
+can_build_gateway() {
+  which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1
+}

@@ -13,6 +13,7 @@ usage() {
   echo "Usage: $0 [-q only quick tests] [-s shrinkwrap test binary]\\"
   echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
   echo "          [-d run the ducc unittests] \\"
+  echo "          [-G run the gateway unittests] \\"
   echo "          [-p run the publish unit tests] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
@@ -24,9 +25,10 @@ CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
 CVMFS_TEST_DUCC=0
+CVMFS_TEST_GATEWAY=0
 CVMFS_TEST_PUBLISH=0
 
-while getopts "qc:g:s:l:dp" option; do
+while getopts "qc:g:s:l:Gdp" option; do
   case $option in
     q)
       CVMFS_UNITTESTS_QUICK=1
@@ -43,6 +45,9 @@ while getopts "qc:g:s:l:dp" option; do
     l)
       # Preloading a library now unused
       :
+    ;;
+    G)
+      CVMFS_TEST_GATEWAY=1
     ;;
     d)
       CVMFS_TEST_DUCC=1
@@ -117,6 +122,13 @@ if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
   $CVMFS_SHRINKWRAP_TEST_BINARY --gtest_shuffle                                     \
     --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.shrinkwrap \
     --gtest_filter=$test_filter
+fi
+
+if [ $CVMFS_TEST_GATEWAY = 1 ] && can_build_gateway; then
+  echo "running gateway unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  pushd ${SCRIPT_LOCATION}/../gateway > /dev/null
+  go test -v -mod=vendor internal/... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway
+  popd > /dev/null
 fi
 
 if [ $CVMFS_TEST_DUCC = 1 ] && [ $(can_build_ducc) -ge 1 ]; then
