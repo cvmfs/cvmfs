@@ -66,3 +66,14 @@ Homepage: http://cernvm.cern.ch
 Description: CernVM File System fuse3 libraries
  Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 #FUSE3-END
+
+#GATEWAY-BEGIN
+Package: cvmfs-gateway
+Architecture: i386 amd64 armhf arm64
+#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
+Depends: ${misc:Depends}
+#Multi-Arch: same   (preparation for multiarch support)
+Homepage: http://cernvm.cern.ch
+Description: CernVM-FS Repository Gateway
+ The CernVM-FS repository gateway service enables multiple remote publishers to write to the same repository.
+#GATEWAY-END

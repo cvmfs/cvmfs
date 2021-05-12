@@ -66,6 +66,11 @@ else
   cat debian/control | awk '/#FUSE3-BEGIN/{flag=1;next}/#FUSE3-END/{flag=0;next}!flag' > debian/control.tmp
   mv debian/control.tmp debian/control
 fi
+# The cvmfs-gateway requires a go compiler
+if ! go version >/dev/null 2>&1; then
+  cat debian/control | awk '/#GATEWAY-BEGIN/{flag=1;next}/#GATEWAY-END/{flag=0;next}!flag' > debian/control.tmp
+  mv debian/control.tmp debian/control
+fi
 
 cpu_cores=$(get_number_of_cpu_cores)
 echo "do the build (with $cpu_cores cores)..."
