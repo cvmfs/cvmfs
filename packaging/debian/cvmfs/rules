@@ -23,7 +23,7 @@ Makefile:
 		-DBUILD_RECEIVER=yes -DBUILD_RECEIVER_DEBUG=yes -DBUILD_SHRINKWRAP=yes \
 		-DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no \
 		-DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes \
-		-DBUILD_GATEWAY=$(if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi) \
+		-DBUILD_GATEWAY=$(shell if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi) \
 		-DCMAKE_INSTALL_PREFIX:PATH=/usr
 
 build: build-stamp
