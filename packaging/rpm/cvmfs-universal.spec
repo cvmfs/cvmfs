@@ -418,6 +418,16 @@ if [ $? -ne 0 ]; then
   /usr/sbin/usermod -aG fuse cvmfs > /dev/null 2>&1 || :
 fi
 
+%if 0%{?build_gateway}
+%pre gateway
+if $(systemctl is-active --quiet cvmfs-gateway); then
+  systemctl stop cvmfs-gateway
+fi
+if $(systemctl is-active --quiet cvmfs-gateway@*); then
+  systemctl stop cvmfs-gateway@*
+fi
+%endif
+
 %install
 export DONT_STRIP=1
 rm -rf $RPM_BUILD_ROOT
@@ -537,6 +547,18 @@ if [ $1 = 0 ] ; then
 
   /usr/bin/cvmfs_config umount
 fi
+
+%if 0%{?build_gateway}
+%preun gateway
+if [ $1 = 0 ]; then
+  if $(systemctl is-active --quiet cvmfs-gateway); then
+    systemctl stop cvmfs-gateway
+  fi
+  if $(systemctl is-active --quiet cvmfs-gateway@*); then
+    systemctl stop cvmfs-gateway@*
+  fi
+fi
+%endif
 
 %postun
 if [ $1 -eq 0 ]; then
