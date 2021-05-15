@@ -23,8 +23,8 @@ script_location=$(portable_dirname $0)
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
 #  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
 #  SHRINKWRAP_PACKAGE    location of the CernVM-FS shrinkwrap package
+#  GATEWAY_PACKAGE       location of the CernVM-FS gateway package
 #  LOG_DIRECTORY         location of the test log files to be created
-#  GATEWAY_BUILD_URL     location of the repository gateway build to install
 #  DUCC_PACKAGE          location of the DUCC package
 #
 
@@ -34,10 +34,10 @@ FUSE3_PACKAGE=""
 DEVEL_PACKAGE=""
 UNITTEST_PACKAGE=""
 SHRINKWRAP_PACKAGE=""
+GATEWAY_PACKAGE=""
 CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
 LOG_DIRECTORY=""
-GATEWAY_BUILD_URL=""
 DUCC_PACKAGE=""
 SERVICE_CONTAINER=""
 
@@ -56,7 +56,7 @@ usage() {
   echo " -k <cvmfs config packages>  CernVM-FS config packages to be tested"
   echo " -g <cvmfs unittest package> CernVM-FS unittest package to be tested"
   echo " -p <shrinkwrap package>     CernVM-FS shrinkwrap package to be tested"
-  echo " -w <gateway build url>      URL of gateway build to be tested"
+  echo " -w <gateway package>        CernVM-FS gateway to be tested"
 
   exit 1
 }
@@ -92,7 +92,7 @@ while getopts "s:c:d:k:t:g:l:w:n:p:f:D:C:" option; do
       LOG_DIRECTORY=$OPTARG
       ;;
     w)
-      GATEWAY_BUILD_URL=$OPTARG
+      GATEWAY_PACKAGE=$OPTARG
       ;;
     D)
       DUCC_PACKAGE=$OPTARG
@@ -122,7 +122,6 @@ if [ "x$(uname -s)" != "xDarwin" ]; then
        [ "x$CONFIG_PACKAGES"       = "x" ] ||
        [ "x$UNITTEST_PACKAGE"      = "x" ] ||
        [ "x$SHRINKWRAP_PACKAGE"    = "x" ] ||
-       [ "x$GATEWAY_BUILD_URL"     = "x" ] ||
        [ "x$DEVEL_PACKAGE"         = "x" ]; then
       echo "missing parameter(s), cannot run platform dependent test script"
       exit 200
