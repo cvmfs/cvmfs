@@ -63,6 +63,11 @@ if [ $(can_build_ducc) -ge 1 ]; then
   build_ducc="ON"
 fi
 
+build_gateway="OFF"
+if [ $(can_build_gateway) -ge 1 ]; then
+  build_gateway="ON"
+fi
+
 echo "configuring using CMake..."
 cmake -DBUILD_SERVER=$build_server          \
       -DBUILD_SERVER_DEBUG=$build_server    \
@@ -71,6 +76,7 @@ cmake -DBUILD_SERVER=$build_server          \
       -DBUILD_SHRINKWRAP=$build_shrinkwrap  \
       -DBUILD_GEOAPI=$build_geoapi          \
       -DBUILD_PRELOADER=yes                 \
+      -DBUILD_GATEWAY=$build_gateway        \
       -DBUILD_DUCC=$build_ducc              \
       $CVMFS_SOURCE_LOCATION
 

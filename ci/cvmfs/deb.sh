@@ -66,11 +66,18 @@ else
   cat debian/control | awk '/#FUSE3-BEGIN/{flag=1;next}/#FUSE3-END/{flag=0;next}!flag' > debian/control.tmp
   mv debian/control.tmp debian/control
 fi
+# The cvmfs-gateway requires a go compiler
+if ! go version >/dev/null 2>&1; then
+  cat debian/control | awk '/#GATEWAY-BEGIN/{flag=1;next}/#GATEWAY-END/{flag=0;next}!flag' > debian/control.tmp
+  mv debian/control.tmp debian/control
+fi
 
 cpu_cores=$(get_number_of_cpu_cores)
 echo "do the build (with $cpu_cores cores)..."
 dch -v $cvmfs_version -M "bumped upstream version number"
-DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild -us -uc  # -us -uc == skip signing
+# -us -uc == skip signing
+DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild --prepend-path=/usr/local/go/bin \
+  -us -uc
 cd ${CVMFS_RESULT_LOCATION}
 
 # generating package map section for specific platform
@@ -83,7 +90,9 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
                        "$(basename $(find . -name 'cvmfs-unittests*.deb'))" \
                        "$CVMFS_CONFIG_PACKAGE"                              \
                        "$(basename $(find . -name 'cvmfs-shrinkwrap*.deb'))"\
-                       "$(basename $(find . -name 'cvmfs-fuse3*.deb'))"
+                       ""                                                   \
+                       "$(basename $(find . -name 'cvmfs-fuse3*.deb'))"     \
+                       "$(basename $(find . -name 'cvmfs-gateway*.deb'))"
 fi
 
 # clean up the source tree

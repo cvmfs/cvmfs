@@ -117,11 +117,6 @@ echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
 
-# Install repository gateway
-echo "Installing repository gateway"
-package_map=pkgmap.slc6_x86_64
-install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
-
 # rebooting the system (returning 0 value)
 echo "sleep 1 && reboot" > killme.sh
 sudo nohup sh < killme.sh &

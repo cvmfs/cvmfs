@@ -1,0 +1,75 @@
+2.9
+  * Merge with cvmfs main sources
+  * Increase maximum number of open files in systemd unit (CVM-1997)
+
+1.2.0:
+  * Maintain publish and gc statistics database (CVM-1806)
+
+1.1.1:
+  * Allow additional unknown fields in receiver JSON reply
+
+1.1.0:
+  * This package now obsoletes `cvmfs-notify`
+  * Added notification system functionality
+  * Added HTTP endpoints for administrative tasks (CVM-1685, CVM-1712)
+  * Lower memory use during payload submission: object packs are now streamed
+    to receiver
+  * The application was rewritten in Go, with full backward compatibility
+
+1.0.0:
+  * More robust and less verbose repository and key configuration (CVM-1679)
+  * A "path_busy" reply to a "new_lease" request now provides the remaining lease time
+    in seconds
+  * systemd service file: `cvmfs-gateway` is automatically restarted (CVM-1680)
+
+0.3.1:
+  * Refactored protocol version checks with clients. Protocol version is now 2
+    (CVM-1626).
+  * DEB package now also runs post-install tasks automatically
+  * Updated DEB: Debian/Ubuntu package depends on cvmfs-server
+  * Updated RPM: depends on cvmfs-server, modified config files are kept,
+    adds an init.d script for SLC6, and other fixes (CVM-1615)
+  * Fix bug allowing conflicting leases to be acquired (CVM-1642)
+
+0.3.0:
+  * Updated the RPM packaging: when installing RPMs, the setup.sh script
+    no longer needs to be explicitly run, it's steps have been integrated
+    into the RPM pre/post install/uninstall hooks (CVM-1557)
+  * Creating or cancelling a lease can no longer be blocked by longer requests (CVM-1547)
+  * Make logging less verbose by default: HTTP and backend req tracing are now
+    done at "debug" log level, the default log level is now "info" (CVM-1573)
+
+0.2.6:
+  * Key file parsing is more robust w.r.t whitespace and tabs (CVM-1535)
+  * Application is now installed in /usr/libexec/cvmfs-gateway while
+    the Mnesia database is created under /var/lib/cvmfs-gateway (CVM-1538)
+  * Setup script now checks the existence of individual config files (CVM-1532)
+  * Package names now include a package version number which is either 1,
+    for final builds, or 0.$NIGHTLY_NUMBER, for nightly builds (CVM-1546)
+  * Spooler errors are now detected in the cvmfs_receiver worker process and
+    the client is notified, aborting the publication process (CVM-1545)
+
+0.2.5:
+  * Renaming project to "cvmfs-gateway" - this name is now used in user facing
+    locations
+  * Package signing bug on Ubuntu is solved by updating signing tool
+    (dpkg-sig) to the latest stable version
+
+0.2.4:
+  * Enable package signing for SLC6 and CC7 (currently the signing doesn't
+    work on Ubuntu 16.04 - see CVM-1525)
+
+0.2.3:
+  * Fixing bug where the cvmfs_receiver process was not able to detect
+    that its worker process had died
+
+0.2.2:
+  * Changing default port to 4929 (GWAY)
+
+0.2.1:
+  * Systemd integration
+  * Adding ability to do repository configuration hot-reloading
+  * Fixing bug overwriting configuration files during setup
+
+0.2.0:
+  * Start of ChangeLog

@@ -22,10 +22,12 @@
 
 %if 0%{?rhel} >= 7 || 0%{?fedora} >= 29
   %if "%{?_arch}" != "aarch64"
+    %define build_gateway 1
     %define build_ducc 1
   %endif
 %endif
 %if 0%{?sle15}
+  %define build_gateway 1
   %define build_ducc 1
 %endif
 
@@ -265,6 +267,17 @@ Group: Application/System
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
+%if 0%{?build_gateway}
+%package gateway
+Summary: CernVM-FS Repository Gateway
+Group: Application/System
+BuildRequires: %{cvmfs_go} >= 1.11.4
+Requires: cvmfs-server = %{version}
+%description gateway
+The CernVM-FS repository gateway service enables multiple remote publishers
+to write to the same repository.
+%endif
+
 %if 0%{?build_ducc}
 %package ducc
 Summary: ducc: Daemon Unpacking Containers in CVMFS
@@ -300,6 +313,10 @@ export CFLAGS="$CFLAGS -O0"
 export CXXFLAGS="$CXXFLAGS -O0"
 %endif
 
+BUILD_GATEWAY=no
+%if 0%{?build_gateway}
+BUILD_GATEWAY=yes
+%endif
 BUILD_DUCC=no
 %if 0%{?build_ducc}
 BUILD_DUCC=yes
@@ -315,6 +332,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
   -DBUILD_UNITTESTS=yes \
+  -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DINSTALL_UNITTESTS=yes \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
@@ -332,6 +350,7 @@ EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
   -DBUILD_UNITTESTS=yes \
+  -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
 %endif
@@ -399,6 +418,16 @@ if [ $? -ne 0 ]; then
   /usr/sbin/usermod -aG fuse cvmfs > /dev/null 2>&1 || :
 fi
 
+%if 0%{?build_gateway}
+%pre gateway
+if $(systemctl is-active --quiet cvmfs-gateway); then
+  systemctl stop cvmfs-gateway
+fi
+if $(systemctl is-active --quiet cvmfs-gateway@*); then
+  systemctl stop cvmfs-gateway@*
+fi
+%endif
+
 %install
 export DONT_STRIP=1
 rm -rf $RPM_BUILD_ROOT
@@ -458,6 +487,10 @@ KillMode=process
 EOF
 %endif
 
+%if 0%{?build_gateway}
+mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs-gateway
+%endif
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -499,6 +532,11 @@ fi
 rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
+%if 0%{?build_gateway}
+%post gateway
+systemctl daemon-reload
+%endif
+
 %preun
 if [ $1 = 0 ] ; then
 %if 0%{?selinux_cvmfs}
@@ -509,6 +547,18 @@ if [ $1 = 0 ] ; then
 
   /usr/bin/cvmfs_config umount
 fi
+
+%if 0%{?build_gateway}
+%preun gateway
+if [ $1 = 0 ]; then
+  if $(systemctl is-active --quiet cvmfs-gateway); then
+    systemctl stop cvmfs-gateway
+  fi
+  if $(systemctl is-active --quiet cvmfs-gateway@*); then
+    systemctl stop cvmfs-gateway@*
+  fi
+fi
+%endif
 
 %postun
 if [ $1 -eq 0 ]; then
@@ -541,6 +591,11 @@ if [ $1 -eq 0 ]; then
 fi
 %endif
 /sbin/ldconfig
+
+%if 0%{?build_gateway}
+%postun gateway
+systemctl daemon-reload
+%endif
 
 
 %files
@@ -637,6 +692,17 @@ fi
 %{_bindir}/cvmfs_test_publish
 %doc COPYING AUTHORS README.md ChangeLog
 
+%if 0%{?build_gateway}
+%files gateway
+%{_bindir}/cvmfs_gateway
+/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+%{_unitdir}/cvmfs-gateway.service
+%{_unitdir}/cvmfs-gateway@.service
+%dir /var/lib/cvmfs-gateway
+%config(noreplace) %{_sysconfdir}/cvmfs/gateway/repo.json
+%config(noreplace) %{_sysconfdir}/cvmfs/gateway/user.json
+%endif
+
 %if 0%{?build_ducc}
 %files ducc
 %{_bindir}/cvmfs_ducc
@@ -644,6 +710,8 @@ fi
 %endif
 
 %changelog
+* Fri May 7 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Add gateway sub package
 * Tue Apr 27 2021 Michael Brown <mbrown@fensystems.co.uk> - 2.9.0
 - Add cvmfs_receiver_debug binary
 * Mon Apr 19 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
