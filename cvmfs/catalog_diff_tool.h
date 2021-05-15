@@ -70,6 +70,12 @@ class CatalogDiffTool {
   const catalog::Catalog* GetNewCatalog() const {
     return new_catalog_mgr_->GetRootCatalog();
   }
+  RoCatalogMgr* GetOldCatalogMgr() {
+    return old_catalog_mgr_;
+  }
+  RoCatalogMgr* GetNewCatalogMgr() {
+    return new_catalog_mgr_;
+  }
 
  private:
   RoCatalogMgr* OpenCatalogManager(const std::string& repo_path,
