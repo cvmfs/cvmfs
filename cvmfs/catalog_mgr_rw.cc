@@ -886,6 +886,106 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
 
 
 /**
+ * Swap in a new nested catalog
+ *
+ * The old nested catalog must not have been already attached to the
+ * catalog tree.  This method will not attach the new nested catalog
+ * to the catalog tree.
+ *
+ * @param mountpoint - the path of the nested catalog to be removed
+ * @param new_hash - the hash of the new nested catalog
+ * @param new_size - the size of the new nested catalog
+ */
+void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
+                                               const shash::Any &new_hash,
+                                               const uint64_t new_size) {
+  const string nested_root_path = MakeRelativePath(mountpoint);
+  const string parent_path = GetParentPath(nested_root_path);
+  const PathString nested_root_ps = PathString(nested_root_path);
+
+  SyncLock();
+
+  // Find the immediate parent catalog
+  WritableCatalog *parent = NULL;
+  if (!FindCatalog(parent_path, &parent)) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': could not find parent '%s'",
+          nested_root_path.c_str(), parent_path.c_str());
+  }
+
+  // Get old catalog hash
+  shash::Any old_hash;
+  uint64_t old_size;
+  const bool old_found = parent->FindNested(nested_root_ps, &old_hash,
+                                            &old_size);
+  if (!old_found) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': not found in parent",
+          nested_root_path.c_str());
+  }
+
+  // Check that old catalog was not already attached
+  if (parent->FindChild(nested_root_ps)) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': already attached",
+          nested_root_path.c_str());
+  }
+
+  // Load freely attached old catalog
+  UniquePtr<Catalog> old_catalog(LoadFreeCatalog(nested_root_ps, old_hash));
+  if (!old_catalog) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': failed to load old catalog",
+          nested_root_path.c_str());
+  }
+
+  // Load freely attached new catalog
+  UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
+  if (!new_catalog) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': failed to load new catalog",
+          nested_root_path.c_str());
+  }
+
+  // Get new catalog root directory entry
+  DirectoryEntry dirent;
+  XattrList xattrs;
+  const bool dirent_found = new_catalog->LookupPath(nested_root_ps, &dirent);
+  if (!dirent_found) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': missing dirent in new catalog",
+          nested_root_path.c_str());
+  }
+  if (dirent.HasXattrs()) {
+    const bool xattrs_found = new_catalog->LookupXattrsPath(nested_root_ps,
+                                                            &xattrs);
+    if (!xattrs_found) {
+      PANIC(kLogStderr,
+            "failed to swap nested catalog '%s': missing xattrs in new catalog",
+            nested_root_path.c_str());
+    }
+  }
+
+  // Swap catalogs
+  parent->RemoveNestedCatalog(nested_root_path, NULL);
+  parent->InsertNestedCatalog(nested_root_path, NULL, new_hash, new_size);
+
+  // Update parent directory entry
+  dirent.set_is_nested_catalog_mountpoint(true);
+  dirent.set_is_nested_catalog_root(false);
+  parent->UpdateEntry(dirent, nested_root_path);
+  parent->TouchEntry(dirent, xattrs, nested_root_path);
+
+  // Update counters
+  DeltaCounters delta = Counters::Diff(old_catalog->GetCounters(),
+                                       new_catalog->GetCounters());
+  delta.PopulateToParent(&parent->delta_counters_);
+
+  SyncUnlock();
+}
+
+
+/**
  * Checks if a nested catalog starts at this path.  The path must be valid.
  */
 bool WritableCatalogManager::IsTransitionPoint(const string &mountpoint) {
