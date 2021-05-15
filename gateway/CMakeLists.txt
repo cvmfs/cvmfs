@@ -24,6 +24,11 @@ install (
   DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
 )
 
+install (
+  PROGRAMS pkg/run_cvmfs_gateway.sh
+  DESTINATION "${CVMFS_LIBEXEC_DIR}-gateway/scripts"
+)
+
 # Systemd service unit
 install (
   FILES pkg/cvmfs-gateway.service pkg/cvmfs-gateway@.service

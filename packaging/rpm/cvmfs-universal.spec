@@ -695,6 +695,7 @@ systemctl daemon-reload
 %if 0%{?build_gateway}
 %files gateway
 %{_bindir}/cvmfs_gateway
+/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
 %{_unitdir}/cvmfs-gateway.service
 %{_unitdir}/cvmfs-gateway@.service
 %dir /var/lib/cvmfs-gateway
