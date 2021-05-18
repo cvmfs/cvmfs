@@ -477,6 +477,10 @@ if (BUILD_DUCC)
   add_subdirectory (ducc)
 endif(BUILD_DUCC)
 
+if (BUILD_SNAPSHOTTER)
+  add_subdirectory (snapshotter)
+endif(BUILD_SNAPSHOTTER)
+
 if (BUILD_STRESS_TESTS)
   include(test/stress/CMakeLists.txt)
 endif (BUILD_STRESS_TESTS)
