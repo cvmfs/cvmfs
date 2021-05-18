@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# This script builds the CernVM-FS snapshotter container.
+# This script builds the CernVM-FS snapshotter.
 #
 
 set -e
