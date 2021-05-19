@@ -44,8 +44,7 @@ if [ -d ${CVMFS_RESULT_LOCATION}/build ]; then
     exit 1
   fi
 else
-  echo "The /build directory should exists at ${CVMFS_RESULT_LOCATION}"
-  exit 1
+  mkdir -p ${CVMFS_RESULT_LOCATION}/build
 fi
 
 # build commands
