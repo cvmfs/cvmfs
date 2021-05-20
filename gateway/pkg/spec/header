@@ -1,0 +1,50 @@
+# The name of your package
+Name: cvmfs-gateway
+
+# A short summary of your package
+Summary: CernVM-FS Repository Gateway
+
+# The version of your package
+Version: <<CVMFS_GATEWAY_VERSION>>
+
+# The release number of your package
+Release: <<CVMFS_GATEWAY_RELEASE>>%{?dist}
+
+# Any license you wish to list
+License: BSD-3-Clause
+
+# What group this RPM would typically reside in
+Group: Applications/System
+
+# Who packaged this RPM
+Packager: Radu Popescu <radu.popescu@cern.ch>
+
+# The build architecture of this RPM (noarch/x86_64/i386/etc)
+Buildarch: x86_64
+
+# You generally should not need to mess with this setting
+Buildroot: %{_tmppath}/%{name}
+
+# Change this extension to change the compression level in your RPM
+#  tar / tar.gz / tar.bz2
+Source0: %{name}.tar
+
+# If you are having trouble building a package and need to disable
+#  automatic dependency/provides checking, uncomment this:
+# AutoReqProv: no
+
+# If this package has prerequisites, uncomment this line and
+#  list them here - examples are already listed
+Requires: cvmfs-server >= 2.5.2
+
+# cvmfs-gateway >= 1.1.0 includes the notification system server,
+# obsoleting the cvmfs-notify package
+Obsoletes: cvmfs-notify
+
+# A more verbose description of your package
+%description
+CernVM-FS Repository Gateway
+
+# You probably do not need to change this
+%define debug_package %{nil}
+

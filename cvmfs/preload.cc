@@ -18,12 +18,15 @@
 #include "swissknife.h"
 #include "swissknife_pull.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "uuid.h"
 
 
 using namespace std;  // NOLINT
 
 const char *kVersion = VERSION;
+const int kDefaultPreloaderTimeout = 10;
+const int kDefaultPreloaderRetries = 2;
 
 namespace swissknife {
 download::DownloadManager *g_download_manager;
@@ -38,7 +41,10 @@ void Usage() {
     "              [-k <public key>]\n"
     "              [-m <fully qualified repository name>]\n"
     "              [-n <num of parallel download threads>]\n"
-    "              [-x <directory for temporary files>]\n\n", kVersion);
+    "              [-t <timeout in seconds (default %d)>]\n"
+    "              [-a <number of retries (default %d)>]\n"
+    "              [-x <directory for temporary files>]\n\n",
+    kVersion, kDefaultPreloaderTimeout, kDefaultPreloaderRetries);
 }
 }  // namespace swissknife
 
@@ -109,7 +115,7 @@ int main(int argc, char *argv[]) {
   swissknife::ArgumentList args;
   args['n'].Reset(new string("4"));
 
-  string option_string = "u:r:k:m:x:d:n:vh";
+  string option_string = "u:r:k:m:x:d:n:t:a:vh";
   int c;
   while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
     if ((c == 'v') || (c == 'h')) {
@@ -145,8 +151,10 @@ int main(int argc, char *argv[]) {
   const string dirtab_in_cache = cache_directory + "/dirtab." + fqrn;
 
   // Default network parameters: 5 seconds timeout, 2 retries
-  args['t'].Reset(new string("5"));
-  args['a'].Reset(new string("2"));
+  if (args.find('t') == args.end())
+    args['t'].Reset(new string(StringifyInt(kDefaultPreloaderTimeout)));
+  if (args.find('a') == args.end())
+    args['a'].Reset(new string(StringifyInt(kDefaultPreloaderRetries)));
 
   // first create the alien cache
   const string& alien_cache_dir = *(args['r']);

@@ -1,0 +1,6 @@
+usr/bin/cvmfs_gateway
+usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+usr/lib/systemd/system/cvmfs-gateway.service
+usr/lib/systemd/system/cvmfs-gateway@.service
+etc/cvmfs/gateway/repo.json
+etc/cvmfs/gateway/user.json

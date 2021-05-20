@@ -1,7 +1,7 @@
 Summary: CernVM File System Empty Configuration
 Name: cvmfs-config-none
 Version: 1.0
-Release: 2
+Release: 3
 BuildArch: noarch
 Group: Applications/System
 License: BSD
@@ -16,11 +16,16 @@ Empty configuration for CernVM-FS, used to fulfill the cvmfs dependency on cvmfs
 
 %prep
 
+%build
+
 %install
 
 %files
 
 %changelog
+* Sat Apr 10 2021 Jakob Blomer <jblomer@cern.ch> - 1.0-3
+- Fix RPM linter errors
+
 * Mon Feb 23 2015 Jakob Blomer <jblomer@cern.ch> - 1.0-2
 - use versioned provides
 

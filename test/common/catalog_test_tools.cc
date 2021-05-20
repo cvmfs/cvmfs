@@ -304,6 +304,10 @@ bool CatalogTestTool::Init() {
   return true;
 }
 
+void CatalogTestTool::UpdateManifest() {
+  CreateManifest(stratum0_, manifest_);
+}
+
 // Note: we always apply the dir spec to the revision corresponding to the
 // original,
 //       empty repository.

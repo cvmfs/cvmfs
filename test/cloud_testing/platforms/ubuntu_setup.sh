@@ -25,6 +25,18 @@ while sudo echo "foo" 2>&1 | grep -q "unable to resolve host"; do
 done
 echo "done"
 
+echo -n "wait for name resolution to work properly... "
+timeout=1800
+while ! ping -c2 ecsft.cern.ch 2>&1; do
+  sleep 1
+  timeout=$(( $timeout - 1 ))
+  if [ $timeout -le 0 ]; then
+    echo "FAIL!"
+    exit 1
+  fi
+done
+echo "done"
+
 # update package manager cache
 echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"
@@ -116,28 +128,12 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
   sudo cvmfs_config setup || die "re-running cvmfs setup"
   dpkg -s autofs
 else
+  install_deb $GATEWAY_PACKAGE
   sudo apt-get install autofs || die "fail (installing autofs on 20.04)"
 
   # fuse-overlayfs requires Ubuntu 20.04+
   if [ "x$ubuntu_release" != "xbionic" ]; then
     install_from_repo fuse-overlayfs || die "fail (installing fuse-overlayfs)"
-  fi
-fi
-
-# On Ubuntu 16.04+ 64bit install the repository gateway
-if [ "x$(uname -m)" = "xx86_64" ]; then
-  package_map=""
-  if [ "x$ubuntu_release" = "xxenial" ]; then
-    package_map="pkgmap.ubuntu1604_x86_64"
-  elif [ "x$ubuntu_release" = "xbionic" ]; then
-    package_map="pkgmap.ubuntu1804_x86_64"
-  elif [ "x$ubuntu_release" = "xfocal" ]; then
-    package_map="pkgmap.ubuntu2004_x86_64"
-  fi
-
-  if [ "x$package_map" != "x" ]; then
-    echo "Installing repository gateway"
-    install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
   fi
 fi
 

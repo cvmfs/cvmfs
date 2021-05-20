@@ -610,13 +610,18 @@ class HttpObjectFetcher :
         case download::kFailProxyResolve:
         case download::kFailHostResolve:
         case download::kFailUnsupportedProtocol:
+          LogCvmfs(kLogDownload, kLogDebug | kLogStderr,
+                   "HTTP connection error %d: %s", retval, url.c_str());
           return BaseTN::kFailNetwork;
 
         case download::kFailProxyHttp:
         case download::kFailHostHttp:
-          return (download_job.http_code == 404)
-            ? BaseTN::kFailNotFound
-            : BaseTN::kFailNetwork;
+          if (download_job.http_code == 404)
+            return BaseTN::kFailNotFound;
+          LogCvmfs(kLogDownload, kLogDebug | kLogStderr,
+                   "HTTP protocol error %d: %s (%d)",
+                   download_job.http_code, url.c_str(), retval);
+          return BaseTN::kFailNetwork;
 
         case download::kFailBadData:
         case download::kFailTooBig:
@@ -624,7 +629,11 @@ class HttpObjectFetcher :
 
         default:
           if (download::IsProxyTransferError(retval) ||
-              download::IsHostTransferError(retval)) {
+              download::IsHostTransferError(retval))
+          {
+            LogCvmfs(kLogDownload, kLogDebug | kLogStderr,
+                     "HTTP transfer error %d (HTTP code %d): %s",
+                     retval, download_job.http_code, url.c_str());
             return BaseTN::kFailNetwork;
           }
           return BaseTN::kFailUnknown;

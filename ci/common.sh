@@ -95,6 +95,7 @@ create_cvmfs_source_tarball() {
         ${source_directory}/cvmfs              \
         ${source_directory}/doc                \
         ${source_directory}/externals          \
+        ${source_directory}/gateway            \
         ${source_directory}/mount              \
         ${source_directory}/test               \
         ${source_directory}/ducc               \
@@ -117,6 +118,7 @@ generate_package_map() {
   local shrinkwrap="$7"
   local ducc="$8"
   local fuse3="$9"
+  local gateway="${10}"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
@@ -131,6 +133,9 @@ $(if [ "x$ducc" != "x" ]; then
 fi)
 $(if [ "x$fuse3" != "x" ]; then
         echo "fuse3=$fuse3"
+fi)
+$(if [ "x$gateway" != "x" ]; then
+        echo "gateway=$gateway"
 fi)
 EOF
 }
@@ -222,7 +227,15 @@ expand_template() {
 }
 
 # we need at least go 1.12.0 for `strings.ReplaceAll`
+# we also need go-junit-report installed
+# moreover we build only on 64bits due to github.com/otiai10/copy.Copy(..., copy.Options{PreserveTimes: true})
+# requiring 64bits architecture
 can_build_ducc() {
+  arch=$(go env GOARCH)
+  if [ $arch != "amd64" ]; then
+    echo "0"
+    return
+  fi
   if which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1 ; then
     go_version=$(go version)
     go_major=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\1/p')
@@ -249,4 +262,9 @@ can_build_ducc() {
   else
     echo "0"
   fi
+}
+
+# The gateway services require a Go compiler
+can_build_gateway() {
+  which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1
 }

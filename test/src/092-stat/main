@@ -1,0 +1,37 @@
+cvmfs_test_name="Reporting in cvmfs_config stat"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** mount cernvm-prod.cern.ch normally"
+  cvmfs_mount cernvm-prod.cern.ch || return 1
+
+  cvmfs_config stat -v cernvm-prod.cern.ch
+
+  local hitrate_init=$(cvmfs_config stat cernvm-prod.cern.ch | tail -1 | cut -d" " -f14)
+  echo "*** Initial hitrate: $hitrate_init"
+
+  local files=
+  for f in $(find /cvmfs/cernvm-prod.cern.ch -type f | head -n 20); do
+    files="$f $files"
+    md5sum $f || return 10
+  done
+
+  cvmfs_config stat -v cernvm-prod.cern.ch
+  local hitrate_2nd=$(cvmfs_config stat cernvm-prod.cern.ch | tail -1 | cut -d" " -f14)
+  echo "*** Hitrate after 20 downloads: $hitrate_2nd"
+
+  for f in $files; do
+    md5sum $f || return 20
+  done
+
+  local hitrate_3rd=$(cvmfs_config stat cernvm-prod.cern.ch | tail -1 | cut -d" " -f14)
+  echo "*** Hitrate after re-downloading: $hitrate_3rd"
+
+  awk -v HR=$hitrate_init 'BEGIN {exit HR >= 0. && HR < 10.}' && return 30
+  awk -v HR=$hitrate_2nd 'BEGIN {exit HR >= 0. && HR < 10.}' && return 31
+  awk -v HR=$hitrate_3rd 'BEGIN {exit HR > 35. && HR < 65.}' && return 32
+
+  return 0
+}

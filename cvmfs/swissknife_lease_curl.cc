@@ -8,7 +8,9 @@
 
 #include "gateway_util.h"
 #include "hash.h"
+#include "json_document.h"
 #include "logging.h"
+#include "util/pointer.h"
 #include "util/string.h"
 
 namespace {
@@ -127,7 +129,11 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
              "Lease end request - curl_easy_perform failed: %d", ret);
   }
 
-  const bool ok = (reply->data == "{\"status\":\"ok\"}");
+  UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply->data));
+  const JSON *reply_status =
+    JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
+  const bool ok = (reply_status != NULL &&
+                   std::string(reply_status->string_value) == "ok");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Lease end request - error reply: %s",

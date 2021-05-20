@@ -72,6 +72,23 @@ string OptionsManager::TrimParameter(const string &parameter) {
   return result;
 }
 
+string OptionsManager::SanitizeParameterAssignment(string *line,
+                                                   vector <string> *tokens) {
+    size_t comment_idx = line->find("#");
+    if (comment_idx != string::npos)
+      *line = line->substr(0, comment_idx);
+    *line = Trim(*line);
+    if (line->empty())
+      return "";
+    *tokens = SplitString(*line, '=');
+    if (tokens->size() < 2)
+      return "";
+    string parameter = TrimParameter((*tokens)[0]);
+    if (parameter.find(" ") != string::npos)
+      return "";
+    return parameter;
+}
+
 void OptionsManager::SwitchTemplateManager(
   OptionsTemplateManager *opt_templ_mgr_param) {
   delete opt_templ_mgr_;
@@ -90,7 +107,6 @@ void OptionsManager::SwitchTemplateManager(
   }
 }
 
-
 bool SimpleOptionsParser::TryParsePath(const string &config_file) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s",
       config_file.c_str());
@@ -101,18 +117,8 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
 
   // Read line by line and extract parameters
   while (GetLineFile(fconfig, &line)) {
-    size_t comment_idx = line.find("#");
-    if (comment_idx != string::npos)
-      line = line.substr(0, comment_idx);
-    line = Trim(line);
-    if (line.empty())
-      continue;
-    vector<string> tokens = SplitString(line, '=');
-    if (tokens.size() < 2)
-      continue;
-    string parameter = TrimParameter(tokens[0]);
-    if (parameter.find(" ") != string::npos)
-      continue;
+    vector <string> tokens;
+    string parameter = SanitizeParameterAssignment(&line, &tokens);
     if (parameter.empty())
       continue;
 
@@ -227,19 +233,13 @@ void BashOptionsManager::ParsePath(const string &config_file,
 
   // Read line by line and extract parameters
   while (GetLineFile(fconfig, &line)) {
-    line = Trim(line);
-    if (line.empty() || line[0] == '#' || line.find("if ") == 0)
-      continue;
-    vector<string> tokens = SplitString(line, '=');
-    if (tokens.size() < 2)
+    vector <string> tokens;
+    string parameter = SanitizeParameterAssignment(&line, &tokens);
+    if (parameter.empty())
       continue;
 
     ConfigValue value;
     value.source = config_file;
-    string parameter = TrimParameter(tokens[0]);
-    if (parameter.empty())
-      continue;
-
     const string sh_echo = "echo $" + parameter + "\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
     GetLineFd(fd_stdout, &value.value);

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"sync"
 
+	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v2"
@@ -44,13 +45,13 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 			defer wg.Done()
 			input, err := ParseImage(inputImage)
 			if err != nil {
-				LogE(err).WithFields(log.Fields{"image": inputImage}).Warning("Impossible to parse the image")
+				l.LogE(err).WithFields(log.Fields{"image": inputImage}).Warning("Impossible to parse the image")
 				return
 			}
 			output := formatOutputImage(recipeYamlV1.OutputFormat, input)
 			wish, err := CreateWish(inputImage, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
 			if err != nil {
-				LogE(err).Warning("Error in creating the wish")
+				l.LogE(err).Warning("Error in creating the wish")
 			} else {
 				recipe.Wishes <- wish
 			}

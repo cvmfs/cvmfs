@@ -16,7 +16,7 @@ class CmdTransaction : public Command {
  public:
   virtual std::string GetName() const { return "transaction"; }
   virtual std::string GetBrief() const {
-    return "Opens a managed repository for writing";
+    return "Open a managed repository for writing";
   }
   virtual std::string GetDescription() const {
     return "A transaction gets a lease for a repository in order to write "

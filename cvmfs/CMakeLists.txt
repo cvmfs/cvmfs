@@ -253,6 +253,7 @@ set (CVMFS_PUBLISH_SOURCES
   logging.cc
   manifest.cc
   options.cc
+  publish/cmd_abort.cc
   publish/cmd_diff.cc
   publish/cmd_enter.cc
   publish/cmd_hash.cc
@@ -315,7 +316,8 @@ set (LIBCVMFS_SERVER_SOURCES
   pack.cc
   publish/except.cc
   publish/repository.cc
-  publish/repository_capabilities.cc
+  publish/repository_abort.cc
+  publish/repository_env.cc
   publish/repository_diff.cc
   publish/repository_managed.cc
   publish/repository_session.cc
@@ -947,8 +949,8 @@ if(NOT BUILD_SERVER)
 endif(NOT BUILD_SERVER)
 
 if (BUILD_SERVER)
-  set (CVMFS_PUBLISH_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
-  set (LIBCVMFS_SERVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
+  set (CVMFS_PUBLISH_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
+  set (LIBCVMFS_SERVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
 
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
@@ -1140,6 +1142,15 @@ if (BUILD_RECEIVER)
     RUNTIME
     DESTINATION bin
     )
+
+  if (BUILD_RECEIVER_DEBUG)
+    install (
+      TARGETS     cvmfs_receiver_debug
+      RUNTIME
+      DESTINATION   bin
+    )
+  endif (BUILD_RECEIVER_DEBUG)
+
 endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)

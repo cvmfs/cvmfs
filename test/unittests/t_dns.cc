@@ -235,6 +235,11 @@ TEST_F(T_Dns, ExtractHost) {
   EXPECT_EQ(ExtractHost("http://:"), "");
   EXPECT_EQ(ExtractHost("http://["), "");
   EXPECT_EQ(ExtractHost("http://[]"), "[]");
+  EXPECT_EQ(ExtractHost("http://user:pw@localhost:3128"), "localhost");
+  EXPECT_EQ(ExtractHost("http://user:pw@[::1]:3128"), "[::1]");
+  EXPECT_EQ(ExtractHost("http://user:pw@localhost/path"), "localhost");
+  EXPECT_EQ(ExtractHost("http://user:pw@localhost/p@th"), "localhost");
+  EXPECT_EQ(ExtractHost("http://user:pw@"), "");
 }
 
 

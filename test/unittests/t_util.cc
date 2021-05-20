@@ -143,6 +143,13 @@ TEST_F(T_Util, GetShell) {
 }
 
 
+TEST_F(T_Util, GetUserNameOf) {
+  std::string name;
+  EXPECT_TRUE(GetUserNameOf(0, &name));
+  EXPECT_EQ("root", name);
+}
+
+
 TEST_F(T_Util, GetUidOf) {
   uid_t uid;
   gid_t gid;
@@ -372,6 +379,13 @@ TEST_F(T_Util, GetFileSystemInfo) {
   EXPECT_EQ(kFsTypeProc, fs_info.type);
   fs_info = GetFileSystemInfo("/");
   EXPECT_EQ(kFsTypeUnknown, fs_info.type);
+}
+
+
+TEST_F(T_Util, ReadSymlink) {
+  EXPECT_TRUE(ReadSymlink(".").empty());
+  EXPECT_EQ(0, symlink(".", "cvmfs_read_symlink_test"));
+  EXPECT_EQ(".", ReadSymlink("cvmfs_read_symlink_test"));
 }
 
 
@@ -1887,6 +1901,51 @@ TEST_F(T_Util, GetLimitNoFile) {
   EXPECT_LT(0U, soft_limit);
   EXPECT_LE(soft_limit, hard_limit);
   EXPECT_LT(hard_limit, 10000000U);
+}
+
+
+TEST_F(T_Util, Lsof) {
+  std::vector<LsofEntry> list;
+  CreateFile("cvmfs_test_lsof", 0600, false /* ignore_failure */);
+  int fd = open("cvmfs_test_lsof", O_RDWR);
+  EXPECT_GE(fd, 0);
+  list = Lsof(GetCurrentWorkingDirectory());
+  close(fd);
+#ifndef __APPLE__
+  EXPECT_GT(list.size(), 0U);
+
+  bool found = false;
+  for (unsigned i = 0; i < list.size(); ++i) {
+    if (list[i].pid != getpid())
+      continue;
+    if (list[i].path != GetCurrentWorkingDirectory())
+      continue;
+
+    found = true;
+    EXPECT_EQ(geteuid(), list[i].owner);
+    EXPECT_EQ(ReadSymlink("/proc/self/exe"), list[i].executable);
+    EXPECT_TRUE(list[i].read_only);
+    break;
+  }
+  EXPECT_TRUE(found);
+
+  found = false;
+  for (unsigned i = 0; i < list.size(); ++i) {
+    if (list[i].pid != getpid())
+      continue;
+    if (list[i].path != GetCurrentWorkingDirectory() + "/cvmfs_test_lsof")
+      continue;
+
+    found = true;
+    EXPECT_EQ(geteuid(), list[i].owner);
+    EXPECT_EQ(ReadSymlink("/proc/self/exe"), list[i].executable);
+    EXPECT_FALSE(list[i].read_only);
+    break;
+  }
+  EXPECT_TRUE(found);
+#else
+  EXPECT_TRUE(list.empty());
+#endif
 }
 
 

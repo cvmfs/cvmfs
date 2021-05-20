@@ -15,11 +15,12 @@ cvmfs_run_test() {
   rm -rf $HOME/.cvmfs/atlas.cern.ch || return 11
 
   cvmfs_server enter atlas.cern.ch -- touch /cvmfs/atlas.cern.ch/test || return 20
-  cvmfs_server enter atlas.cern.ch -- touch /cvmfs/cvmfs-config.cern.ch/test && return 30
-  cvmfs_server enter atlas.cern.ch -- false && return 40
+  cvmfs_server enter atlas.cern.ch -- cvmfs_server diff --worktree || return 30
+  cvmfs_server enter atlas.cern.ch -- touch /cvmfs/cvmfs-config.cern.ch/test && return 40
+  cvmfs_server enter atlas.cern.ch -- false && return 50
 
   echo "*** checking that session dir properly cleaned up"
-  [ -z "$(ls -A $HOME/.cvmfs/atlas.cern.ch)" ] || return 50
+  [ -z "$(ls -A $HOME/.cvmfs/atlas.cern.ch)" ] || return 60
 
   return 0
 }

@@ -68,10 +68,22 @@ static void PinpointHostSubstr(
     }
   }
 
+  // Search '@' within the hostname part and jump behind if present
+  if (*pos_begin > 0) {
+    for (i = *pos_begin; i < len; ++i) {
+      if (url[i] == '/') {
+        break;
+      } else if (url[i] == '@') {
+        *pos_begin = ++i;
+        break;
+      }
+    }
+  }
+
   // Find the end of the hostname part
   if (*pos_begin > 0) {
-    bool in_ipv6 = (url[i] == '[');
-    for (; i < len; ++i) {
+    bool in_ipv6 = (url[*pos_begin] == '[');
+    for (i = *pos_begin; i < len; ++i) {
       if (in_ipv6) {
         if (url[i] != ']')
           continue;

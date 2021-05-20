@@ -28,6 +28,7 @@ install_rpm $SERVER_PACKAGE
 install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 install_rpm $SHRINKWRAP_PACKAGE
+install_rpm $GATEWAY_PACKAGE
 install_rpm $DUCC_PACKAGE
 
 # installing WSGI apache module
@@ -107,9 +108,3 @@ sudo setsebool -P httpd_can_network_connect on
 
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"
-
-# Install repository gateway
-echo "Installing repository gateway"
-# TODO: change to cc8 once we start building gateway for cc8
-package_map=pkgmap.cc7_x86_64
-install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"

@@ -17,8 +17,10 @@ class EPublish : public std::runtime_error {
    */
   enum EFailures {
     kFailUnspecified = 0,
+    kFailInput,               // Invalid input
     kFailInvocation,          // Invalid command line options
-    kFailTransactionLocked,   // another publisher process has an open txn
+    kFailPermission,          // Not owner of the repository
+    kFailTransactionState,    // The txn was expected to be in the other state
     kFailGatewayKey,          // cannot access the gateway secret key
     kFailLeaseHttp,           // cannot connect to the gateway HTTP endpoint
     kFailLeaseBody,           // corrupted session token
@@ -26,6 +28,7 @@ class EPublish : public std::runtime_error {
     kFailLeaseNoEntry,        // the lease path does not exist
     kFailLeaseNoDir,          // the lease path is no a directory
     kFailRepositoryNotFound,  // the repository was not found on the machine
+    kFailRepositoryType,      // the stratum type (0, 1) does not match
     kFailLayoutRevision,      // unsupported layout revision, migrate required
     kFailWhitelistExpired,    //
     kFailMissingDependency,   // a program or service was not found

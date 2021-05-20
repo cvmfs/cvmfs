@@ -14,7 +14,7 @@ option (BUILD_RECEIVER_DEBUG    "Build the receiver program with debug symbols a
 option (BUILD_GEOAPI            "Build the geo api service"                                        ON)
 option (BUILD_LIBCVMFS          "Build the CernVM-FS client library"                               ON)
 option (BUILD_LIBCVMFS_CACHE    "Build the cache plugin library"                                   ON)
-option (BUILD_SHRINKWRAP  "Build the shrinkwrap tool"                                        OFF)
+option (BUILD_SHRINKWRAP        "Build the shrinkwrap tool"                                        OFF)
 
 option (BUILD_PRELOADER         "Build the alien cache pre-loader"                                 OFF)
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
@@ -40,7 +40,10 @@ option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* comman
 # libraries are picked up from the system
 option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party libraries"               ON)
 
-option (BUILD_DUCC              "Build cvmfs_ducc, it requires a modern go compiler > 1.11.5"      OFF)
+option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler > 1.11.5"               OFF)
+option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler > 1.11.5"                  OFF)
+
+option (BUILD_SNAPSHOTTER       "Build cvmfs_snapshotter, it requires a go compiler > 1.11.5"      OFF)
 
 if (BUILD_ALL)
   set (BUILD_CVMFS ON)

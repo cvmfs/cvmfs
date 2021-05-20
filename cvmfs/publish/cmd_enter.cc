@@ -252,28 +252,38 @@ void CmdEnter::CreateUnderlay(
   }
 }
 
-void CmdEnter::WriteCvmfsConfig() {
+void CmdEnter::WriteCvmfsConfig(const std::string &extra_config) {
   BashOptionsManager options_manager(
     new DefaultOptionsTemplateManager(fqrn_));
   options_manager.ParseDefault(fqrn_);
-  options_manager.SetValue("CVMFS_MOUNT_DIR", lower_layer_);
+  if (!extra_config.empty())
+    options_manager.ParsePath(extra_config, false /* external */);
+
+  options_manager.SetValue("CVMFS_MOUNT_DIR",
+                           settings_spool_area_.readonly_mnt());
   options_manager.SetValue("CVMFS_AUTO_UPDATE", "no");
   options_manager.SetValue("CVMFS_NFS_SOURCE", "no");
   options_manager.SetValue("CVMFS_HIDE_MAGIC_XATTRS", "yes");
   options_manager.SetValue("CVMFS_SERVER_CACHE_MODE", "yes");
-  options_manager.SetValue("CVMFS_USYSLOG", usyslog_path_);
-  options_manager.SetValue("CVMFS_RELOAD_SOCKETS", cache_dir_);
-  options_manager.SetValue("CVMFS_WORKSPACE", cache_dir_);
+  options_manager.SetValue("CVMFS_CLAIM_OWNERSHIP", "yes");
+  options_manager.SetValue("CVMFS_USYSLOG", settings_spool_area_.client_log());
+  options_manager.SetValue("CVMFS_RELOAD_SOCKETS",
+                           settings_spool_area_.cache_dir());
+  options_manager.SetValue("CVMFS_WORKSPACE", settings_spool_area_.cache_dir());
   options_manager.SetValue("CVMFS_CACHE_PRIMARY", "private");
   options_manager.SetValue("CVMFS_CACHE_private_TYPE", "posix");
-  options_manager.SetValue("CVMFS_CACHE_private_BASE", cache_dir_);
+  options_manager.SetValue("CVMFS_CACHE_private_BASE",
+                           settings_spool_area_.cache_dir());
   options_manager.SetValue("CVMFS_CACHE_private_SHARED", "on");
   options_manager.SetValue("CVMFS_CACHE_private_QUOTA_LIMIT", "4000");
 
-  bool rv = SafeWriteToFile(options_manager.Dump(), config_path_,
+  bool rv = SafeWriteToFile(options_manager.Dump(),
+                            settings_spool_area_.client_config(),
                             kPrivateFileMode);
-  if (!rv)
-    throw EPublish("cannot write client config to " + config_path_);
+  if (!rv) {
+    throw EPublish("cannot write client config to " +
+                   settings_spool_area_.client_config());
+  }
 }
 
 
@@ -288,12 +298,14 @@ void CmdEnter::MountCvmfs() {
   int fd_stderr = open(stderr_path_.c_str(), O_CREAT | O_APPEND | O_WRONLY,
                        kPrivateFileMode);
 
+  std::string cvmfs_config = settings_spool_area_.client_config();
+
   std::vector<std::string> cmdline;
   cmdline.push_back(cvmfs2_binary_);
   cmdline.push_back("-o");
-  cmdline.push_back("allow_other,config=" + config_path_);
+  cmdline.push_back("allow_other,config=" + cvmfs_config);
   cmdline.push_back(fqrn_);
-  cmdline.push_back(lower_layer_);
+  cmdline.push_back(settings_spool_area_.readonly_mnt());
   std::set<int> preserved_fds;
   preserved_fds.insert(0);
   preserved_fds.insert(1);
@@ -319,6 +331,11 @@ void CmdEnter::MountCvmfs() {
           StringifyInt(exit_code) + ")\n" +
           "  command: `" + JoinStrings(cmdline, " ").c_str() + "`");
   }
+
+  rvb = BindMount(settings_spool_area_.readonly_mnt(),
+                  rootfs_dir_ + settings_spool_area_.readonly_mnt());
+  if (!rvb)
+    throw EPublish("cannot map CernVM-FS mount point");
 }
 
 
@@ -336,10 +353,10 @@ void CmdEnter::MountOverlayfs() {
   std::vector<std::string> cmdline;
   cmdline.push_back(overlayfs_binary_);
   cmdline.push_back("-o");
-  cmdline.push_back(string("lowerdir=") + lower_layer_ +
-                           ",upperdir=" + upper_layer_ +
-                           ",workdir=" + ovl_workdir_);
-  cmdline.push_back(rootfs_dir_ + target_dir_);
+  cmdline.push_back(string("lowerdir=") + settings_spool_area_.readonly_mnt() +
+                           ",upperdir=" + settings_spool_area_.scratch_dir() +
+                           ",workdir=" + settings_spool_area_.ovl_work_dir());
+  cmdline.push_back(rootfs_dir_ + settings_spool_area_.union_mnt());
   std::set<int> preserved_fds;
   preserved_fds.insert(0);
   preserved_fds.insert(1);
@@ -368,6 +385,18 @@ void CmdEnter::MountOverlayfs() {
 }
 
 
+std::string CmdEnter::GetCvmfsXattr(const std::string &name) {
+  std::string xattr;
+  bool rvb = platform_getxattr(settings_spool_area_.readonly_mnt(),
+                               std::string("user.") + name, &xattr);
+  if (!rvb) {
+    throw EPublish("cannot get extrended attribute " + name + " from " +
+                   settings_spool_area_.readonly_mnt());
+  }
+  return xattr;
+}
+
+
 void CmdEnter::CleanupSession(
   bool keep_logs, const std::vector<std::string> &new_paths)
 {
@@ -375,43 +404,57 @@ void CmdEnter::CleanupSession(
            "Cleaning out session directory... ");
 
   std::string pid_xattr;
-  bool rvb = platform_getxattr(lower_layer_, "user.pid", &pid_xattr);
+  bool rvb = platform_getxattr(settings_spool_area_.readonly_mnt(),
+                               "user.pid", &pid_xattr);
   if (!rvb)
     throw EPublish("cannot find CernVM-FS process");
-  pid_t pid_cvmfs = String2Uint64(pid_xattr);
+  pid_t pid_cvmfs = String2Uint64(GetCvmfsXattr("pid"));
 
-  rvb = platform_umount_lazy((rootfs_dir_ + target_dir_).c_str());
+  const std::string union_mnt = rootfs_dir_ + settings_spool_area_.union_mnt();
+  rvb = platform_umount_lazy(union_mnt.c_str());
   if (!rvb)
-    throw EPublish("cannot unmount overlayfs on " + rootfs_dir_ + target_dir_);
-  rvb = platform_umount_lazy(lower_layer_.c_str());
-  if (!rvb)
-    throw EPublish("cannot unmount CernVM-FS on " + lower_layer_);
+    throw EPublish("cannot unmount overlayfs on " + union_mnt);
+  rvb = platform_umount_lazy(
+    (rootfs_dir_ + settings_spool_area_.readonly_mnt()).c_str());
+  if (!rvb) {
+    throw EPublish("cannot unmount mapped CernVM-FS on " +
+                   rootfs_dir_ + settings_spool_area_.readonly_mnt());
+  }
+  rvb = platform_umount_lazy(settings_spool_area_.readonly_mnt().c_str());
+  if (!rvb) {
+    throw EPublish("cannot unmount CernVM-FS on " +
+                   settings_spool_area_.readonly_mnt());
+  }
 
   BackoffThrottle backoff;
   while (ProcessExists(pid_cvmfs)) {
     backoff.Throttle();
   }
 
-  RemoveSingle(lower_layer_);
-  RemoveSingle(session_dir_ + "/sysdefault.conf");
-  rvb = RemoveTree(ovl_workdir_);
+  RemoveSingle(settings_spool_area_.readonly_mnt());
+  RemoveSingle(settings_spool_area_.client_config());
+  RemoveSingle(env_conf_);
+  rvb = RemoveTree(settings_spool_area_.ovl_work_dir());
   if (!rvb)
-    throw EPublish("cannot remove " + ovl_workdir_);
-  rvb = RemoveTree(upper_layer_);
+    throw EPublish("cannot remove " + settings_spool_area_.ovl_work_dir());
+  rvb = RemoveTree(settings_spool_area_.scratch_base());
   if (!rvb)
-    throw EPublish("cannot remove " + upper_layer_);
-  rvb = RemoveTree(cache_dir_);
+    throw EPublish("cannot remove " + settings_spool_area_.scratch_base());
+  rvb = RemoveTree(settings_spool_area_.cache_dir());
   if (!rvb)
-    throw EPublish("cannot remove " + cache_dir_);
+    throw EPublish("cannot remove " + settings_spool_area_.cache_dir());
   RemoveUnderlay(rootfs_dir_, new_paths);
+  rvb = RemoveTree(settings_spool_area_.tmp_dir());
+  if (!rvb)
+    throw EPublish("cannot remove " + settings_spool_area_.tmp_dir());
 
   if (keep_logs) {
     LogCvmfs(kLogCvmfs, kLogStdout, "[logs available in %s]",
-             (session_dir_ + "/logs").c_str());
+             settings_spool_area_.log_dir().c_str());
     return;
   }
 
-  rvb = RemoveTree(session_dir_ + "/logs");
+  rvb = RemoveTree(settings_spool_area_.log_dir());
   RemoveSingle(session_dir_);
   LogCvmfs(kLogCvmfs, kLogStdout, "[done]");
 }
@@ -424,10 +467,12 @@ int CmdEnter::Main(const Options &options) {
     throw EPublish("malformed repository name: " + fqrn_);
   }
 
+  bool rvb;
+
   // We cannot have any capabilities or else we are not allowed to write
   // to /proc/self/setgroups anc /proc/self/[u|g]id_map when creating a user
   // namespace
-  Repository::DropCapabilities();
+  Env::DropCapabilities();
 
   if (options.Has("cvmfs2")) {
     cvmfs2_binary_ = options.GetString("cvmfs2");
@@ -436,45 +481,41 @@ int CmdEnter::Main(const Options &options) {
     setenv("CVMFS_LIBRARY_PATH", GetParentPath(cvmfs2_binary_).c_str(), 0);
   }
 
-  target_dir_ = "/cvmfs/" + fqrn_;
-
-  // Save context-sensitive directories before switching name spaces
-  string cwd = GetCurrentWorkingDirectory();
-  uid_t uid = geteuid();
-  gid_t gid = getegid();
-  string workspace = GetHomeDirectory() + "/.cvmfs/" + fqrn_;
-
+  // Prepare the session directory
+  std::string workspace = GetHomeDirectory() + "/.cvmfs/" + fqrn_;
   EnsureDirectory(workspace);
   session_dir_ = CreateTempDir(workspace + "/session");
   if (session_dir_.empty())
     throw EPublish("cannot create session directory in " + workspace);
+  settings_spool_area_.SetUnionMount(std::string("/cvmfs/") + fqrn_);
+  settings_spool_area_.SetSpoolArea(session_dir_);
+  settings_spool_area_.EnsureDirectories();
   rootfs_dir_ = session_dir_ + "/rootfs";
   EnsureDirectory(rootfs_dir_);
-  lower_layer_ = session_dir_ + "/lower_layer";
-  EnsureDirectory(lower_layer_);
-  upper_layer_ = session_dir_ + "/upper_layer";
-  EnsureDirectory(upper_layer_);
-  ovl_workdir_ = session_dir_ + "/ovl_workdir";
-  EnsureDirectory(ovl_workdir_);
-  cache_dir_ = session_dir_ + "/cache";
-  EnsureDirectory(cache_dir_);
-  config_path_ = session_dir_ + "/sysdefault.conf";
-  EnsureDirectory(session_dir_ + "/logs");
-  usyslog_path_ = session_dir_ + "/logs/cvmfs.log";
-  stdout_path_ = session_dir_ + "/logs/stdout.log";
-  stderr_path_ = session_dir_ + "/logs/stderr.log";
+  stdout_path_ = settings_spool_area_.log_dir() + "/stdout.log";
+  stderr_path_ = settings_spool_area_.log_dir() + "/stderr.log";
+
+  // Save process context information before switching namespaces
+  string cwd = GetCurrentWorkingDirectory();
+  uid_t uid = geteuid();
+  gid_t gid = getegid();
 
   LogCvmfs(kLogCvmfs, kLogStdout,
            "*** NOTE: This is currently an experimental CernVM-FS feature\n");
   LogCvmfs(kLogCvmfs, kLogStdout,
-           "Entering ephemeral writable shell for %s... ", target_dir_.c_str());
+           "Entering ephemeral writable shell for %s... ",
+           settings_spool_area_.union_mnt().c_str());
+
+  // Create root user namespace and rootfs underlay
   AnchorPid anchor_pid = EnterRootContainer();
   std::vector<std::string> empty_dirs;
-  empty_dirs.push_back(target_dir_);
+  empty_dirs.push_back(settings_spool_area_.union_mnt());
   empty_dirs.push_back("/proc");
   std::vector<std::string> new_paths;
   CreateUnderlay("", rootfs_dir_, empty_dirs, &new_paths);
-  bool rvb = SymlinkForced(session_dir_, rootfs_dir_ + "/.cvmfsenter");
+  // The .cvmfsenter marker file helps when attaching to the mount namespace
+  // to distinguish it from the system root
+  rvb = SymlinkForced(session_dir_, rootfs_dir_ + "/.cvmfsenter");
   if (!rvb)
     throw EPublish("cannot create marker file " + rootfs_dir_ + "/.cvmfsenter");
   new_paths.push_back(rootfs_dir_ + "/.cvmfsenter");
@@ -491,9 +532,7 @@ int CmdEnter::Main(const Options &options) {
   if (pid < 0)
     throw EPublish("cannot fork");
   if (pid == 0) {
-    WriteCvmfsConfig();
-    if (options.Has("cvmfs-config"))
-      config_path_ += std::string(":") + options.GetString("cvmfs-config");
+    WriteCvmfsConfig(options.GetStringDefault("cvmfs-config", ""));
     MountCvmfs();
     _exit(0);
   }
@@ -501,6 +540,12 @@ int CmdEnter::Main(const Options &options) {
   if (exit_code != 0)
     _exit(exit_code);
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
+
+  env_conf_ = session_dir_ + "/env.conf";
+  rvb = SafeWriteToFile(std::string("CVMFS_FQRN=") + fqrn_ + "\n",
+                        env_conf_, kPrivateFileMode);
+  if (!rvb)
+    throw EPublish("cannot create session environment file");
 
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Mounting union file system... ");
@@ -530,7 +575,11 @@ int CmdEnter::Main(const Options &options) {
       throw EPublish("cannot chroot to " + rootfs_dir_);
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
     // May fail if the working directory was invalid to begin with
-    chdir(cwd.c_str());
+    rvi = chdir(cwd.c_str());
+    if (rvi != 0) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Warning: cannot chdir to %s",
+               cwd.c_str());
+    }
 
     LogCvmfs(kLogCvmfs, kLogStdout, "\n"
       "You can attach to this shell from another another terminal with\n");

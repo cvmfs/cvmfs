@@ -16,7 +16,7 @@ class CmdDiff : public Command {
  public:
   virtual std::string GetName() const { return "diff"; }
   virtual std::string GetBrief() const {
-    return "Shows the change set between two repository revisions";
+    return "Show the change set between two repository revisions";
   }
   virtual std::string GetDescription() const {
     return "Shows the added, removed, and modified files between any two "
@@ -50,6 +50,8 @@ class CmdDiff : public Command {
       "The source tag name [default='trunk-previous']"));
     p.push_back(Parameter::Optional("to", 'd', "repository tag",
       "The destination tag name [default='trunk']"));
+    p.push_back(Parameter::Switch("worktree", 'w',
+      "Show the diff of the unpublished changes in the open transaction"));
     p.push_back(Parameter::Switch("header", 'h', "Show the header line"));
     p.push_back(Parameter::Switch("ignore-timediff", 'i',
       "Ignore changes that only differ in their timestamps"));

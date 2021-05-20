@@ -51,6 +51,9 @@ cvmfs_run_test() {
 
   echo "try to list the repository"
   ls /cvmfs/atlas.cern.ch || retval=4
+  if [ $retval -eq 4 ]; then
+    cat_syslog | tail -n 100
+  fi
 
   echo "checking host chain"
   sudo cvmfs_talk -i atlas.cern.ch host probe || retval=5

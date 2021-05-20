@@ -117,16 +117,16 @@ check_overlayfs() {
 
 
 # check if at least one of the supported union file systems is available
-# currently AUFS get preference over OverlayFS if both are available
+# currently OverlayFS get preference over AUFS if both are available
 #
 # @return   0 if at least one was found (name through stdout); abort otherwise
 get_available_union_fs() {
-  if check_aufs; then
-    echo "aufs"
-  elif check_overlayfs; then
+  if check_overlayfs; then
     echo "overlayfs"
+  elif check_aufs; then
+    echo "aufs"
   else
-    die "neither AUFS nor OverlayFS detected on the system!"
+    die "neither OverlayFS nor AUFS detected on the system!"
   fi
 }
 
