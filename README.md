@@ -28,3 +28,4 @@ the CernVM-FS storage format.
 CernVM-FS is actively used by small and large scientific collaborations. In many
 cases, it replaces package managers and shared software areas on cluster file 
 systems as means to distribute the software used to process experiment data.
+
