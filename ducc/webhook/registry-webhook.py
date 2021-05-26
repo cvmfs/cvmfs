@@ -1,6 +1,7 @@
 from flask import Flask
 from flask import request
 
+import argparse
 import pprint
 import os
 
@@ -10,7 +11,7 @@ app = Flask(__name__)
 def catch_all(p):
     try:
         for (action, image) in handle_harbor(request.json):
-            publish_message(action, image)
+            publish_message(notifications_file, action, image)
 
         return "ok"
     except Exception as e:
@@ -18,9 +19,9 @@ def catch_all(p):
         print(e)
 
     try:
-        for (action, image) in handle_dockerhub(request.json):
+        for (action, image) in handle_dockerhub(request.json, notifications_file):
 
-            publish_message(action, image)
+            publish_message(notifications_file, action, image)
 
         return "ok"
     except Exception as e:
@@ -30,10 +31,10 @@ def catch_all(p):
     pprint.pprint(request.json)
     return "ko", 500
 
-def publish_message(action, image):
+def publish_message(notifications_file, action, image):
 
-    with open('notifications.txt', 'a+') as f:
-        if os.stat('notifications.txt').st_size == 0:
+    with open(notifications_file, 'a+') as f:
+        if os.stat(notifications_file).st_size == 0:
             current_id = 0
         else:
             f.seek(0)
@@ -42,8 +43,8 @@ def publish_message(action, image):
             current_id = int(last_line_id) + 1
             if (int(last_line_id) % 1000 == 0 and int(last_line_id) != 0):
                 f.write(f'--- FILE ROTATION ---\n')
-                os.rename('notifications.txt', 'notifications'+str(last_line_id)+'.txt')
-                with open('notifications.txt', 'a+') as f:
+                os.rename(notifications_file, notifications_file.replace('.txt','')+str(last_line_id)+'.txt')
+                with open(notifications_file, 'a+') as f:
                     message = f'{str(current_id)}|{action}|{image}'
                     f.write(f'{message}\n')
                     return
@@ -53,7 +54,7 @@ def publish_message(action, image):
     print(f'{action}|{image}')
 
 
-def handle_dockerhub(rjson):
+def handle_dockerhub(rjson, notifications_file):
     for event in rjson['events']:
         action = event['action']
         # we need the protocol, the host, the repositor and the tag
@@ -69,7 +70,7 @@ def handle_dockerhub(rjson):
         yield (action, image)
 
         message = f'{action}|{image}'
-        with open('notifications.txt', 'a+') as f:
+        with open(notifications_file, 'a+') as f:
             f.write(f'{message}\n')
 
 def handle_harbor(rjson):
@@ -96,4 +97,13 @@ def handle_harbor(rjson):
             print("The replicated artifact already exists")
 
 if __name__ == '__main__':
-    app.run()
+    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-f", "--file")
+    parser.add_argument("-h", "--host")
+    parser.add_argument("-p", "--port")
+    args = parser.parse_args()
+    args_dic = vars(args)
+    notifications_file = args_dic["file"]
+
+    app.run(host=args_dic["host"], port=args_dic["port"])
