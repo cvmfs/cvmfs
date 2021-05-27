@@ -237,6 +237,9 @@ class AbstractCatalogManager : public SingleCopy {
                     bool can_listing,
                     CatalogT **leaf_catalog);
 
+  CatalogT *LoadFreeCatalog(const PathString &mountpoint,
+                            const shash::Any &hash);
+
   bool AttachCatalog(const std::string &db_path, CatalogT *new_catalog);
   void DetachCatalog(CatalogT *catalog);
   void DetachSubtree(CatalogT *catalog);
