@@ -278,17 +278,12 @@ void SessionContextBase::Dispatch() {
 SessionContext::SessionContext()
     : SessionContextBase(),
       upload_jobs_(),
-      worker_terminate_(),
       worker_()
 {
-  // Set to 0 in InitializeDerived()
-  atomic_write32(&worker_terminate_, 1);
 }
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
-  atomic_init32(&worker_terminate_);
-
   upload_jobs_ = new FifoChannel<UploadJob*>(max_queue_size, max_queue_size);
   upload_jobs_->Drop();
 
@@ -299,8 +294,16 @@ bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
 }
 
 bool SessionContext::FinalizeDerived() {
-  if (atomic_cas32(&worker_terminate_, 0, 1))
-    pthread_join(worker_, NULL);
+  // Note: in FinalizedDerived, we know that the worker is running.  The
+  // SessionContext is called only from GatewayUploader::FinalizeSession(),
+  // which in turn is from Spooler::FinalizeSession().  The Spooler ensures
+  // that GatewayUploader::Initialize() is called on construction.
+  //
+  // TODO(jblomer): Refactor SessionContext (and Uploader*) classes to
+  // use a factory method for construction.
+  //
+  upload_jobs_->Enqueue(&terminator_);
+  pthread_join(worker_, NULL);
 
   return true;
 }
@@ -409,11 +412,11 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
 void* SessionContext::UploadLoop(void* data) {
   SessionContext* ctx = reinterpret_cast<SessionContext*>(data);
+  UploadJob *job;
 
-  int64_t jobs_processed = 0;
-  while (!ctx->ShouldTerminate()) {
-    while (jobs_processed < ctx->NumJobsSubmitted()) {
-      UploadJob* job = ctx->upload_jobs_->Dequeue();
+  do {
+    job = ctx->upload_jobs_->Dequeue();
+    if (job != &terminator_) {
       if (!ctx->DoUpload(job)) {
         PANIC(kLogStderr,
               "SessionContext: could not submit payload. Aborting.");
@@ -421,18 +424,15 @@ void* SessionContext::UploadLoop(void* data) {
       job->result->Set(true);
       delete job->pack;
       delete job;
-      jobs_processed++;
     }
-    if (ctx->queue_was_flushed_.IsEmpty()) {
+    if (ctx->upload_jobs_->IsEmpty() && ctx->queue_was_flushed_.IsEmpty()) {
       ctx->queue_was_flushed_.Enqueue(true);
     }
-  }
+  } while (job != &terminator_);
 
   return NULL;
 }
 
-bool SessionContext::ShouldTerminate() {
-  return atomic_read32(&worker_terminate_);
-}
+SessionContext::UploadJob SessionContext::terminator_;
 
 }  // namespace upload

@@ -125,12 +125,11 @@ class SessionContext : public SessionContextBase {
  private:
   static void* UploadLoop(void* data);
 
-  bool ShouldTerminate();
-
   UniquePtr<FifoChannel<UploadJob*> > upload_jobs_;
 
-  atomic_int32 worker_terminate_;
   pthread_t worker_;
+
+  static UploadJob terminator_;
 };
 
 }  // namespace upload
