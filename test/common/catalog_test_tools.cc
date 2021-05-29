@@ -498,9 +498,10 @@ void CatalogTestTool::CreateHistory(
   manifest::Manifest *manifest,
   shash::Any *history_hash
 ) {
+  const string history_path = CreateTempPath(repo_path_ + "/history", 0600);
   {
     UniquePtr<history::SqliteHistory> history(
-      history::SqliteHistory::Create(repo_path_ + "/history",
+      history::SqliteHistory::Create(history_path,
                                      "keys.cern.ch"));
     ASSERT_TRUE(history.IsValid());
     history::History::Tag tag;
@@ -510,10 +511,10 @@ void CatalogTestTool::CreateHistory(
     ASSERT_TRUE(history->Insert(tag));
   }
   history_hash->suffix = shash::kSuffixHistory;
-  ASSERT_TRUE(zlib::CompressPath2Null(repo_path_ + "/history", history_hash));
+  ASSERT_TRUE(zlib::CompressPath2Null(history_path, history_hash));
   ASSERT_TRUE(
     zlib::CompressPath2Path(
-      repo_path_ + "/history",
+      history_path,
       repo_path_ + "/data/" + history_hash->MakePath()));
 }
 
