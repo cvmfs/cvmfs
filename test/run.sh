@@ -137,17 +137,18 @@ setup_environment() {
   # if we are not inside a docker
   if [ x"$CVMFS_TEST_DOCKER" = xno ] && ! running_on_osx; then
     # configure autofs to the test's needs
-    service_switch autofs restart || true
-    local timeout=10 # wait until autofs restarts (possible race >.<)
-    while [ $timeout -gt 0 ] && ! autofs_check; do
-      timeout=$(( $timeout - 1))
-      sleep 1
-    done
-    if [ $timeout -eq 0 ]; then
-      echo "failed to restart autofs"
-      return 103
-    fi
-    if ! $autofs_demand; then
+    if $autofs_demand; then
+      service_switch autofs restart || true
+      local timeout=10 # wait until autofs restarts (possible race >.<)
+      while [ $timeout -gt 0 ] && ! autofs_check; do
+        timeout=$(( $timeout - 1))
+        sleep 1
+      done
+      if [ $timeout -eq 0 ]; then
+        echo "failed to restart autofs"
+        return 103
+      fi
+    else
       if ! autofs_switch off; then
         echo "failed to switch off autofs"
         return 104
