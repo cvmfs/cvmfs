@@ -90,6 +90,22 @@ run_transactions() {
         echo "Nested catalog was successfully created at /a/b"
     fi
 
+    ## Transaction 2a
+    echo "  Starting transaction 2a (add files within nested catalogs)"
+    cvmfs_server transaction test.repo.org || return $?
+
+    echo "  Create new files"
+    echo "New file in top-level nested catalog" > /cvmfs/test.repo.org/a/new_file_top.txt
+    echo "New file in sub-level nested catalog" > /cvmfs/test.repo.org/a/b/new_file_sub.txt
+
+    echo "  Publishing changes 2a"
+    cvmfs_server publish -v test.repo.org || return $?
+    cvmfs_server check test.repo.org || return $?
+
+    echo "  Checking results 2a"
+    compare_file_checksum /cvmfs/test.repo.org/a/new_file_top.txt e85971ec6b62a6de7f4091ef265e53ac || return $?
+    compare_file_checksum /cvmfs/test.repo.org/a/b/new_file_sub.txt 1d136477561f9aa5ee6a42707148c786 || return $?
+
     ## Transaction 3
     echo "  Starting transaction 3 (Remove nested catalogs)"
     cvmfs_server transaction test.repo.org || return $?
