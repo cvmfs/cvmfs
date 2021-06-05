@@ -3,25 +3,17 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 
-clean_up() {
-    echo "Cleaning up"
-}
-
-check_status() {
-    echo $(( $1 || 0 ))
-}
-
-run_tests() {
-    set_up_repository_gateway
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
 
     local test_repo="test.repo.org"
 
     echo "*** Check transaction with missing reflog"
-    sudo mv /var/spool/cvmfs/${test_repo}/reflog.chksum /tmp
-    cvmfs_server transaction ${test_repo}
+    sudo mv /var/spool/cvmfs/${test_repo}/reflog.chksum /tmp || return 10
+    cvmfs_server transaction ${test_repo} || return 11
     echo "*** Transaction opened"
 
-    cvmfs_server publish ${test_repo} 2>&1 | tee publish.log
+    cvmfs_server publish ${test_repo} 2>&1 | tee publish.log || return 12
     local output=$(cat publish.log | grep "missing_reflog")
 
     if [ x"$output" = x"" ]; then
@@ -30,42 +22,32 @@ run_tests() {
 
         cvmfs_server abort -f ${test_repo}
 
-        return 1;
+        return 13
     fi
 
     echo "*** Aborting transaction"
-    cvmfs_server abort -f ${test_repo}
+    cvmfs_server abort -f ${test_repo} || return 20
 
     # Run repository check
     echo "*** Repository verification"
-    cvmfs_server check ${test_repo}
+    cvmfs_server check -i ${test_repo}
     if [ $? -ne 0 ]; then
         echo "Repository integrity check failed with \"reflog.chksum\" present"
-        return 1;
+        return 30
     fi
 
     # Move reflog.chksum out of the way to reproduce the environment of a
     # publisher running on a separate machine
-    mv /var/spool/cvmfs/${test_repo}/reflog.chksum /tmp/
+    rm -f /var/spool/cvmfs/${test_repo}/reflog.chksum || return 40
 
     # Re-run repository check
-    cvmfs_server check ${test_repo}
+    cvmfs_server check -i ${test_repo} || return 41
     if [ $? -ne 0 ]; then
         echo "Repository integrity check failed with \"reflog.chksum\" missing"
-        return 1;
+        return 42
     fi
 
-    check_repo_integrity test.repo.org || return 1
+    check_repo_integrity test.repo.org || return 50
 
-    return 0;
+    return 0
 }
-
-cvmfs_run_test() {
-    trap clean_up EXIT HUP INT TERM || return $?
-
-    run_tests
-    local status=$?
-
-    return $(check_status $status)
-}
-
