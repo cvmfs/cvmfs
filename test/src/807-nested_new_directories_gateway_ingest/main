@@ -1,4 +1,4 @@
-cvmfs_test_name="Repository gateway lease on not existsing directory"
+cvmfs_test_name="Repository gateway lease on non-existing directory"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
