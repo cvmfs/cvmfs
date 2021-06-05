@@ -9,17 +9,6 @@ cvmfs_test_suites="quick"
 # `cvmfs_server transaction test.repo.org/DIR/SUBDIR`
 # works even if both DIR and SUBDIR don't exists yet.
 
-clean_up() {
-    echo "Cleaning up"
-
-    echo "  Removing output directories"
-    rm -rvf /tmp/cvmfs_out_{1,2,3}
-}
-
-check_status() {
-    echo $(( $1 || 0 ))
-}
-
 compare_file_checksum() {
     local file_name=$1
     local target_checksum=$2
@@ -31,20 +20,8 @@ compare_file_checksum() {
     fi
 }
 
-save_repo_contents() {
-    local dest=$1
-    rm -rf $dest
-    mkdir -p $dest
-    cp -r /cvmfs/test.repo.org/* $dest/
-}
-
-run_transactions() {
-    set_up_repository_gateway
-
-    ## Pre-checks: starting and aborting transactions should leave no trace
-    cvmfs_server transaction test.repo.org
-    cvmfs_server abort -f test.repo.org
-    cvmfs_server check test.repo.org
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
 
     cvmfs_server transaction test.repo.org
     mkdir -p /cvmfs/test.repo.org/usr/bin
@@ -104,16 +81,7 @@ run_transactions() {
 
     compare_file_checksum /tmp/cvmfs_out_2/foo/bar.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 105
 
-    clean_up
-}
-
-cvmfs_run_test() {
-    trap clean_up EXIT HUP INT TERM || return $?
-
-    run_transactions
-    local status=$?
-
-    return $(check_status $status)
+    return 0
 }
 
 
