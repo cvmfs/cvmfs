@@ -167,7 +167,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
-void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const PathString& path, const catalog::DirectoryEntry& entry1,
     const catalog::DirectoryEntry& entry2, const XattrList& xattrs,
     const FileChunkList& chunks) {
@@ -180,13 +180,33 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
    *       The correct course of action is to ignore this change here.
    * */
   if (!IsPathInLease(lease_path_, rel_path)) {
-    return;
+    // All child paths will similarly be outside of the lease path,
+    // and so there is no need to recurse any further.
+    return false;
   }
 
   const std::string parent_path =
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
 
-  if (entry1.IsDirectory() && entry2.IsDirectory()) {
+  if (entry1.IsNestedCatalogMountpoint() &&
+      entry2.IsNestedCatalogMountpoint()) {
+    // From nested catalog to nested catalog
+    RoCatalogMgr *new_catalog_mgr =
+      CatalogDiffTool<RoCatalogMgr>::GetNewCatalogMgr();
+    PathString mountpoint;
+    shash::Any new_hash;
+    uint64_t new_size;
+    const bool found = new_catalog_mgr->LookupNested(path, &mountpoint,
+                                                     &new_hash, &new_size);
+    if (!found || !new_size) {
+      PANIC(kLogSyslogErr,
+            "CatalogMergeTool - nested catalog %s not found. Aborting",
+            rel_path.c_str());
+    }
+    output_catalog_mgr_->SwapNestedCatalog(rel_path.ToString(), new_hash,
+                                           new_size);
+    return false; // skip recursion into nested catalog mountpoints
+  } else if (entry1.IsDirectory() && entry2.IsDirectory()) {
     // From directory to directory
     const catalog::DirectoryEntryBase* base_entry =
         static_cast<const catalog::DirectoryEntryBase*>(&entry2);
@@ -276,6 +296,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     perf::Xadd(counters_->sz_removed_bytes, entry1.size());
     perf::Xadd(counters_->sz_added_bytes, entry2.size());
   }
+  return true;
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>

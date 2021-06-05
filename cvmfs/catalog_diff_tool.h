@@ -58,7 +58,7 @@ class CatalogDiffTool {
                               const FileChunkList& chunks) = 0;
   virtual void ReportRemoval(const PathString& path,
                              const catalog::DirectoryEntry& entry) = 0;
-  virtual void ReportModification(const PathString& path,
+  virtual bool ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry,
                                   const XattrList& xattrs,
@@ -69,6 +69,12 @@ class CatalogDiffTool {
   }
   const catalog::Catalog* GetNewCatalog() const {
     return new_catalog_mgr_->GetRootCatalog();
+  }
+  RoCatalogMgr* GetOldCatalogMgr() {
+    return old_catalog_mgr_;
+  }
+  RoCatalogMgr* GetNewCatalogMgr() {
+    return new_catalog_mgr_;
   }
 
  private:

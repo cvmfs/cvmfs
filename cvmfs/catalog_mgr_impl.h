@@ -901,6 +901,29 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
 
 
 /**
+ * Load a catalog file as a freestanding Catalog object.
+ * Loading of catalogs is implemented by derived classes.
+ */
+template <class CatalogT>
+CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
+                                            const PathString     &mountpoint,
+                                            const shash::Any     &hash)
+{
+  string new_path;
+  shash::Any check_hash;
+  const LoadError load_error = LoadCatalog(mountpoint, hash, &new_path,
+                                           &check_hash);
+  if (load_error != kLoadNew)
+    return NULL;
+  assert(hash == check_hash);
+  CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
+                                             new_path, hash);
+  catalog->TakeDatabaseFileOwnership();
+  return catalog;
+}
+
+
+/**
  * Attaches a newly created catalog.
  * @param db_path the file on a local file system containing the database
  * @param new_catalog the catalog to attach to this CatalogManager
