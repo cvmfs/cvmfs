@@ -1,4 +1,6 @@
 2.9.0:
+  * [gw] Fast merging of nested catalogs (CVM-1998)
+  * [gw] Accommodate cvmfs-gateway Go sources (CVM-1871)
   * Install cvmfs_receiver_debug (CVM-1988)
   * Register redundant bulk hashes in filestats db
   * Add support for SLES15 (CVM-1656)
