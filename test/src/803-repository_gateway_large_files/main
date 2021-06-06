@@ -5,70 +5,31 @@ cvmfs_test_suites="quick"
 # This test verifies the correct publication of large files
 # through a repository gateway
 
-clean_up() {
-    echo "Cleaning up"
-
-    echo "  Removing test output data"
-    rm -rf /tmp/cvmfs_out
-}
-
-check_status() {
-    echo $(( $1 || 0 ))
-}
-
-run_transactions() {
-    set_up_repository_gateway
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
 
     echo "Checking transaction + publish"
 
     ## Transaction 1
 
     echo "  Starting transaction 1"
-    cvmfs_server transaction test.repo.org
+    cvmfs_server transaction test.repo.org || return 10
 
     echo "  Copying the payload into repository"
-    rm -v /cvmfs/test.repo.org/new_repository
+    rm -v /cvmfs/test.repo.org/new_repository || return 11
     curl -o /tmp/linux.tar.xz http://ecsft.cern.ch/dist/cvmfs/test-data/linux-4.12.8.tar.xz
-    cp -v /tmp/linux.tar.xz /cvmfs/test.repo.org/
+    cp -v /tmp/linux.tar.xz /cvmfs/test.repo.org/ || return 12
     local hash_in_1=$(sha1sum /tmp/linux.tar.xz | cut -d' ' -f1)
 
     echo "  Publishing changes 1"
-    cvmfs_server publish test.repo.org
-    cvmfs_server check test.repo.org
+    cvmfs_server publish test.repo.org || return 13
+    cvmfs_server check -i test.repo.org || return 14
 
     echo "  Computing hash of published file"
     local hash_out_1=$(sha1sum /cvmfs/test.repo.org/linux.tar.xz | cut -d' ' -f1)
-
-
-    ## Transaction 2 (remove all the files from the repo)
-
-    echo "  Starting transaction 2"
-    cvmfs_server transaction test.repo.org
-
-    echo "  Copying the payload into repository"
-    curl -o /tmp/linux.tar.xz http://ecsft.cern.ch/dist/cvmfs/test-data/linux-4.9.20.tar.xz
-    cp -v /tmp/linux.tar.xz /cvmfs/test.repo.org/
-    local hash_in_2=$(sha1sum /tmp/linux.tar.xz | cut -d' ' -f1)
-
-    echo "  Publishing changes 2"
-    cvmfs_server publish test.repo.org
-    cvmfs_server check test.repo.org
-
-    echo "  Computing hash of published file"
-    local hash_out_2=$(sha1sum /cvmfs/test.repo.org/linux.tar.xz | cut -d' ' -f1)
-
-    ## Check results with a poor man's Merkle tree
-    echo "Checking results"
-
-    echo "Input hash 1  : $hash_in_1"
-    echo "Output hash 1 : $hash_out_1"
-    echo "Input hash 2  : $hash_in_2"
-    echo "Output hash 2 : $hash_out_2"
-    if [ x"$hash_in_1" != x"$hash_out_1" ] || [ x"$hash_in_2" != x"$hash_out_2" ]; then
-        return 1
+    if [ x"$hash_in_1" != x"$hash_out_1" ]; then
+        return 15
     fi
-
-    cvmfs_server check test.repo.org || return 1
 
     echo "  Work on nested catalogs" || return 20
     cvmfs_server transaction test.repo.org
@@ -79,27 +40,18 @@ run_transactions() {
     touch /cvmfs/test.repo.org/nested/sub/.cvmfscatalog || return 24
     mkdir /cvmfs/test.repo.org/nested/sub/dir || return 24
     cvmfs_server publish test.repo.org || return 24
-    cvmfs_server check test.repo.org || return 25
+    cvmfs_server check -i test.repo.org || return 25
 
     cvmfs_server transaction test.repo.org
     mv /cvmfs/test.repo.org/nested /cvmfs/test.repo.org/bar || return 40
     cvmfs_server publish test.repo.org || return 41
-    cvmfs_server check test.repo.org || return 42
+    cvmfs_server check -i test.repo.org || return 42
 
     cvmfs_server transaction test.repo.org
     rm /cvmfs/test.repo.org/bar/.cvmfscatalog || return 30
     cvmfs_server publish test.repo.org || return 31
-    cvmfs_server check test.repo.org || return 32
+    cvmfs_server check -i test.repo.org || return 32
 
-    clean_up
-}
-
-cvmfs_run_test() {
-    trap clean_up EXIT HUP INT TERM || return $?
-
-    run_transactions
-    local status=$?
-
-    return $(check_status $status)
+    return 0
 }
 

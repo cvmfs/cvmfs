@@ -4,66 +4,31 @@ cvmfs_test_suites="quick"
 
 # ref to https://sft.its.cern.ch/jira/browse/CVM-1927
 
-compare_file_checksum() {
-    local file_name=$1
-    local target_checksum=$2
-    local checksum=$(md5sum $file_name | cut -d' ' -f1)
-    echo "Checksum of $file_name is $checksum"
-    if [ "$checksum" != "$target_checksum" ]; then
-        echo "Checksum mismatch for $file_name. Expected $target_checksum. Found $checksum"
-        return 1
-    fi
-}
-
-run_transactions() {
-    set_up_repository_gateway
-
-    echo "Pre-checks"
-
-    ## Pre-checks: starting and aborting transactions should leave no trace
-    cvmfs_server transaction test.repo.org
-    cvmfs_server abort -f test.repo.org
-    cvmfs_server check test.repo.org
-
-    echo "Checking transaction + publish"
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
 
     ## Transaction 1, create directory with catalog inside
     echo "***  Starting transaction 1"
-    cvmfs_server transaction test.repo.org
+    cvmfs_server transaction test.repo.org || return 10
 
-    mkdir -p /cvmfs/test.repo.org/foo/bar
-    mkdir -p /cvmfs/test.repo.org/foo/miao
-    touch /cvmfs/test.repo.org/foo/bar/.cvmfscatalog
+    mkdir -p /cvmfs/test.repo.org/foo/bar || return 11
+    mkdir -p /cvmfs/test.repo.org/foo/miao || return 12
+    touch /cvmfs/test.repo.org/foo/bar/.cvmfscatalog || return 13
 
     echo "  Publishing changes 1"
-    cvmfs_server publish test.repo.org
-    cvmfs_server check test.repo.org || return 1
+    cvmfs_server publish test.repo.org || return 14
+    cvmfs_server check -i test.repo.org || return 15
 
     ## Transaction 2, move from dir to symlink
     echo "***  Starting transaction 2"
-    cvmfs_server transaction test.repo.org
-    rm -rf /cvmfs/test.repo.org/foo/bar
-    ln -s /cvmfs/test.repo.org/foo/miao /cvmfs/test.repo.org/foo/bar
+    cvmfs_server transaction test.repo.org || return 20
+    rm -rf /cvmfs/test.repo.org/foo/bar || return 21
+    ln -s /cvmfs/test.repo.org/foo/miao /cvmfs/test.repo.org/foo/bar || return 22
 
     echo "  Publishing changes 2"
-    cvmfs_server publish test.repo.org
-    cvmfs_server check test.repo.org || return 2
-
-    cvmfs_server check -c test.repo.org
-    ## Check results
-
-    if [ $? -ne 0 ]; then
-        echo "Repository integrity check failed: $integrity_check_res"
-        return 1
-    fi
+    cvmfs_server publish test.repo.org || return 23
+    cvmfs_server check -i test.repo.org || return 24
+    cvmfs_server check -c test.repo.org || return 25
 
     return 0
 }
-
-cvmfs_run_test() {
-    run_transactions
-    local status=$?
-
-    return $status
-}
-

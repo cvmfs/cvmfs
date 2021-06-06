@@ -3,61 +3,47 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 
-clean_up() {
-    echo "Cleaning up"
-}
-
-check_status() {
-    echo $(( $1 || 0 ))
-}
-
-run_transactions() {
-    set_up_repository_gateway
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
 
     echo "Checking named tag creation"
-    cvmfs_server transaction test.repo.org
-    cvmfs_server publish -a tag1 test.repo.org
+    cvmfs_server transaction test.repo.org || return 10
+    cvmfs_server publish -a tag1 test.repo.org || return 11
     cvmfs_server tag -l test.repo.org
     local tags=$(cvmfs_server tag -l -x test.repo.org)
     local num_tags=$(echo "$tags" | wc -l)
     local num_generic_tags=$(echo "$tags" | grep generic | wc -l)
     if [ x"$num_tags" != x4 ] || [ x"$num_generic_tags" != x1 ]; then
-        return 1
+        return 12
     fi
 
     echo "Checking tag creation with autotags"
     sudo bash -c "echo CVMFS_AUTO_TAG=true >> /etc/cvmfs/repositories.d/test.repo.org/server.conf"
-    cvmfs_server transaction test.repo.org
-    cvmfs_server publish test.repo.org
+    cvmfs_server transaction test.repo.org || return 20
+    cvmfs_server publish test.repo.org || return 21
     cvmfs_server tag -l test.repo.org
     local tags=$(cvmfs_server tag -l -x test.repo.org)
     local num_tags=$(echo "$tags" | wc -l)
     local num_generic_tags=$(echo "$tags" | grep generic | wc -l)
     if [ x"$num_tags" != x5 ] || [ x"$num_generic_tags" != x2 ]; then
-        return 1
+        return 22
     fi
 
     echo "Checking tag creation without autotags"
     sudo bash -c "echo CVMFS_AUTO_TAG=false >> /etc/cvmfs/repositories.d/test.repo.org/server.conf"
-    cvmfs_server transaction test.repo.org
-    cvmfs_server publish test.repo.org
+    cvmfs_server transaction test.repo.org || return 30
+    cvmfs_server publish test.repo.org || return 31
     cvmfs_server tag -l test.repo.org
     local tags=$(cvmfs_server tag -l -x test.repo.org)
     local num_tags=$(echo "$tags" | wc -l)
     local num_generic_tags=$(echo "$tags" | grep generic | wc -l)
     if [ x"$num_tags" != x5 ] || [ x"$num_generic_tags" != x2 ]; then
-        return 1
+        return 32
     fi
 
-    check_repo_integrity test.repo.org || return 1
-}
+    cvmfs_server check -i test.repo.org || return 40
+    check_repo_integrity test.repo.org || return 41
 
-cvmfs_run_test() {
-    trap clean_up EXIT HUP INT TERM || return $?
-
-    run_transactions
-    local status=$?
-
-    return $(check_status $status)
+    return 0
 }
 

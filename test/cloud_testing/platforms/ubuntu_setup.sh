@@ -67,6 +67,7 @@ install_deb $SERVER_PACKAGE
 install_deb $DEVEL_PACKAGE
 install_deb $UNITTEST_PACKAGE
 install_deb $SHRINKWRAP_PACKAGE
+install_deb $GATEWAY_PACKAGE
 
 # installing WSGI apache module
 echo "installing apache2 and python WSGI module..."
@@ -128,7 +129,6 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
   sudo cvmfs_config setup || die "re-running cvmfs setup"
   dpkg -s autofs
 else
-  install_deb $GATEWAY_PACKAGE
   sudo apt-get install autofs || die "fail (installing autofs on 20.04)"
 
   # fuse-overlayfs requires Ubuntu 20.04+
