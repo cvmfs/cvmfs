@@ -1,4 +1,5 @@
 2.9.0:
+  * Reduce time spent in lsof during publishing
   * [gw] Fast merging of nested catalogs (CVM-1998)
   * [gw] Accommodate cvmfs-gateway Go sources (CVM-1871)
   * Install cvmfs_receiver_debug (CVM-1988)
