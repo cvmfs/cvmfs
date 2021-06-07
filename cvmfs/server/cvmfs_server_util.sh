@@ -806,7 +806,7 @@ If you go for production, backup your masterkey from /etc/cvmfs/keys/!"
 
 get_fd_modes() {
   local path=$1
-  $LSOF_BIN -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
+  $LSOF_BIN -Fan +f -- $path 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
 }
 
 # gets the number of open read-only file descriptors beneath a given path
