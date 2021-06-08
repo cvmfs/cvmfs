@@ -123,7 +123,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
   }
 
   // .cvmfsbundles file type
-  if(entry->isBundlesFile()){
+  if(entry->isBundleSpec()){
     printf("cvmfsbundles file found\n");
   }
   
