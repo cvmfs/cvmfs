@@ -122,6 +122,11 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     return;
   }
 
+  // .cvmfsbundles file type
+  if(entry->isBundlesFile()){
+    printf("cvmfsbundles file found\n");
+  }
+  
   PrintWarning("'" + entry->GetRelativePath() +
                "' cannot be added. Unrecognized file type.");
 }
