@@ -79,7 +79,6 @@ SessionContextBase::SessionContextBase()
       session_token_(),
       key_id_(),
       secret_(),
-      queue_was_flushed_(1, 1),
       max_pack_size_(ObjectPack::kDefaultLimit),
       active_handles_(),
       current_pack_(NULL),
@@ -123,9 +122,6 @@ bool SessionContextBase::Initialize(const std::string& api_url,
 
   // Ensure that the upload job and result queues are empty
   upload_results_.Drop();
-
-  queue_was_flushed_.Drop();
-  queue_was_flushed_.Enqueue(true);
 
   // Ensure that there are not open object packs
   if (current_pack_) {
@@ -191,12 +187,6 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
   initialized_ = false;
 
   return results;
-}
-
-void SessionContextBase::WaitForUpload() {
-  if (!upload_results_.IsEmpty()) {
-    queue_was_flushed_.Dequeue();
-  }
 }
 
 ObjectPack::BucketHandle SessionContextBase::NewBucket() {
@@ -414,23 +404,18 @@ void* SessionContext::UploadLoop(void* data) {
   SessionContext* ctx = reinterpret_cast<SessionContext*>(data);
   UploadJob *job;
 
-  do {
+  while (true) {
     job = ctx->upload_jobs_->Dequeue();
-    if (job != &terminator_) {
-      if (!ctx->DoUpload(job)) {
-        PANIC(kLogStderr,
-              "SessionContext: could not submit payload. Aborting.");
-      }
-      job->result->Set(true);
-      delete job->pack;
-      delete job;
+    if (job == &terminator_)
+      return NULL;
+    if (!ctx->DoUpload(job)) {
+      PANIC(kLogStderr,
+            "SessionContext: could not submit payload. Aborting.");
     }
-    if (ctx->upload_jobs_->IsEmpty() && ctx->queue_was_flushed_.IsEmpty()) {
-      ctx->queue_was_flushed_.Enqueue(true);
-    }
-  } while (job != &terminator_);
-
-  return NULL;
+    job->result->Set(true);
+    delete job->pack;
+    delete job;
+  }
 }
 
 SessionContext::UploadJob SessionContext::terminator_;
