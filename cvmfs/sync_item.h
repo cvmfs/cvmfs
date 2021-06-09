@@ -95,9 +95,9 @@ class SyncItem {
   }
   inline bool isBundleSpec() const {
     return filename_ == ".cvmfsbundles";
-    //if(strstr(filename_, ".cvmfsbundles") != NULL) {
-      //return true;
-    //}
+  }
+  inline bool wasBundleSpec() const {
+    return filename_ == ".cvmfsbundles";
   }
 
   inline unsigned int GetRdevMajor()     const {
