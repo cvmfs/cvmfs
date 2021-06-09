@@ -355,8 +355,8 @@ void *S3FanoutManager::MainUpload(void *data) {
         s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
         s3fanout_mgr->available_jobs_->Decrement();
 
-        MutexLockGuard m(s3fanout_mgr->jobs_completed_lock_);
-        s3fanout_mgr->jobs_completed_.push_back(info);
+        // Add to list of completed jobs
+        s3fanout_mgr->PushCompletedJob(info);
       }
     }
   }
@@ -1165,12 +1165,9 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   atomic_init32(&multi_threaded_);
   MakePipe(pipe_terminate_);
   MakePipe(pipe_jobs_);
+  MakePipe(pipe_completed_);
 
-  jobs_completed_lock_ =
-      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval;
-  retval = pthread_mutex_init(jobs_completed_lock_, NULL);
-  assert(retval == 0);
   jobs_todo_lock_ =
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(jobs_todo_lock_, NULL);
@@ -1232,8 +1229,6 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
 }
 
 S3FanoutManager::~S3FanoutManager() {
-  pthread_mutex_destroy(jobs_completed_lock_);
-  free(jobs_completed_lock_);
   pthread_mutex_destroy(jobs_todo_lock_);
   free(jobs_todo_lock_);
   pthread_mutex_destroy(curl_handle_lock_);
@@ -1247,6 +1242,7 @@ S3FanoutManager::~S3FanoutManager() {
   }
   ClosePipe(pipe_terminate_);
   ClosePipe(pipe_jobs_);
+  ClosePipe(pipe_completed_);
 
   set<CURL *>::iterator             i    = pool_handles_idle_->begin();
   const set<CURL *>::const_iterator iEnd = pool_handles_idle_->end();
@@ -1297,26 +1293,27 @@ const Statistics &S3FanoutManager::GetStatistics() {
 }
 
 /**
- * Get completed jobs, so they can be cleaned and deleted properly.
- */
-int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
-  MutexLockGuard m(jobs_completed_lock_);
-  std::vector<JobInfo*>::iterator             it    = jobs_completed_.begin();
-  const std::vector<JobInfo*>::const_iterator itend = jobs_completed_.end();
-  for (; it != itend; ++it) {
-    jobs->push_back(*it);
-  }
-  jobs_completed_.clear();
-
-  return 0;
-}
-
-/**
  * Push new job to be uploaded to the S3 cloud storage.
  */
 void S3FanoutManager::PushNewJob(JobInfo *info) {
   available_jobs_->Increment();
   WritePipe(pipe_jobs_[1], &info, sizeof(info));
+}
+
+/**
+ * Push completed job to list of completed jobs
+ */
+void S3FanoutManager::PushCompletedJob(JobInfo *info) {
+  WritePipe(pipe_completed_[1], &info, sizeof(info));
+}
+
+/**
+ * Pop completed job
+ */
+JobInfo *S3FanoutManager::PopCompletedJob() {
+  JobInfo *info;
+  ReadPipe(pipe_completed_[0], &info, sizeof(info));
+  return info;
 }
 
 //------------------------------------------------------------------------------
