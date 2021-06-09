@@ -204,6 +204,13 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
     RemoveDirectoryRecursively(entry);
     return;
   }
+  
+  if(entry->wasBundleSpec()) {
+    printf("found a cvmfsbundles file to remove: filename: %s\n", (entry->GetRelativePath()).c_str());
+    // for now remove using RemoveFile()
+    RemoveFile(entry);
+    return;
+  }
 
   if (entry->WasRegularFile() || entry->WasSymlink() ||
       entry->WasSpecialFile()) {
