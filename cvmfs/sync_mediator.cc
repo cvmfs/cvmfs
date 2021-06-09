@@ -97,6 +97,8 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
   // .cvmfsbundles file type
   if(entry->isBundleSpec()){
     printf("cvmfsbundles file found. filename: %s\n", (entry->GetRelativePath()).c_str());
+    // for now using AddFile()
+    AddFile(entry);
     return;
   }
 
