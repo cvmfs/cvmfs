@@ -93,6 +93,12 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     AddDirectoryRecursively(entry);
     return;
   }
+  
+  // .cvmfsbundles file type
+  if(entry->isBundleSpec()){
+    printf("cvmfsbundles file found. filename: %s\n", (entry->GetRelativePath()).c_str());
+    return;
+  }
 
   if (entry->IsRegularFile() || entry->IsSymlink()) {
     // A file is a hard link if the link count is greater than 1
@@ -120,11 +126,6 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
         AddFile(entry);
     }
     return;
-  }
-
-  // .cvmfsbundles file type
-  if(entry->isBundleSpec()){
-    printf("cvmfsbundles file found\n");
   }
   
   PrintWarning("'" + entry->GetRelativePath() +
