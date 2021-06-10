@@ -42,8 +42,10 @@ def publish_message(notifications_file, action, image):
             last_line_id = last_line.split('|')[0]
             current_id = int(last_line_id) + 1
             if (int(last_line_id) % 1000 == 0 and int(last_line_id) != 0):
-                f.write(f'--- FILE ROTATION ---\n')
-                os.rename(notifications_file, notifications_file.replace('.txt','')+str(last_line_id)+'.txt')
+                new_notifications_file = notifications_file.replace('.txt','')+str(last_line_id)+'.txt'
+                os.rename(notifications_file, new_notifications_file)
+                with open(new_notifications_file, 'a+') as f:
+                    f.write(f'--- FILE ROTATION ---\n')
                 with open(notifications_file, 'a+') as f:
                     message = f'{str(current_id)}|{action}|{image}'
                     f.write(f'{message}\n')
