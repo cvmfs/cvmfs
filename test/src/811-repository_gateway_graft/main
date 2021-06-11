@@ -1,0 +1,94 @@
+cvmfs_test_name="Grafted files via gateway"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+verify_sha1sum() {
+  local filename=$1
+  local expected=$2
+  local actual=$(sha1sum ${filename} | cut -d' ' -f1)
+  if [ "${actual}" != "${expected}" ]; then
+    echo "Checksum mismatch for ${filename}: expected ${expected} actual ${actual}"
+    return 101
+  fi
+}
+
+verify_compression() {
+  local filename=$1
+  local expected=$2
+  local actual=$(attr -qg compression ${filename})
+  if [ "${actual}" != "${expected}" ] ; then
+    echo "Compression mismatch for ${filename}: expected ${expected} actual ${actual}"
+    return 102
+  fi
+}
+
+cvmfs_run_test() {
+  local reponame=test.repo.org
+  local repodir=/cvmfs/${reponame}
+
+  echo "set up gateway"
+  set_up_repository_gateway || return 1
+
+  echo "parse configuration"
+  load_repo_config ${reponame}
+  local spooldir=${CVMFS_SPOOL_DIR}
+
+  echo "start transaction 1"
+  cvmfs_server transaction ${reponame} || return 11
+
+  echo "create test files"
+  echo "Hello uncompressed world!" > file1
+  echo "Hello compressed world!" > file2
+  cvmfs_publish zpipe < file2 > file2.z || return 12
+  local hash1=bfc7a4e4317c6601b632801b210d0359a6315a11
+  local hash2=f558929030c0b03ac8ee1dc087ca98ed8b2adf61
+  local hash2z=58356c914c5b602d889b45ca00c9e8b68e5809af
+  verify_sha1sum file1 ${hash1} || return $?
+  verify_sha1sum file2 ${hash2} || return $?
+  verify_sha1sum file2.z ${hash2z} || return $?
+
+  echo "create graft files"
+  cvmfs_swissknife graft -i file1 -o ${repodir}/file1 -Z none || return 13
+  cvmfs_swissknife graft -i file2 -o ${repodir}/file2 -Z zlib || return 14
+  touch ${repodir}/file3
+  grep -v compression= ${repodir}/.cvmfsgraft-file2 > ${repodir}/.cvmfsgraft-file3
+  echo "----- START GRAFT -----"
+  cat ${repodir}/.cvmfsgraft-file1
+  echo "----- END GRAFT -----"
+  echo "----- START GRAFT -----"
+  cat ${repodir}/.cvmfsgraft-file2
+  echo "----- END GRAFT -----"
+  echo "----- START GRAFT -----"
+  cat ${repodir}/.cvmfsgraft-file3
+  echo "----- END GRAFT -----"
+  grep compression= ${repodir}/.cvmfsgraft-file1 || return 15
+  grep compression= ${repodir}/.cvmfsgraft-file2 || return 16
+  grep compression= ${repodir}/.cvmfsgraft-file3 && return 17
+
+  echo "publish (no check) 1"
+  cvmfs_server publish ${reponame} || return 18
+
+  echo "verify nonexistence of grafted files"
+  cat ${repodir}/file1 && return 19
+  cat ${repodir}/file2 && return 20
+  cat ${repodir}/file3 && return 21
+
+  echo "start transaction 2"
+  cvmfs_server transaction ${reponame} || return 22
+
+  echo "add raw files to repo"
+  upload_into_backend ${reponame} file1 $(make_path ${hash1}) || return 23
+  upload_into_backend ${reponame} file2.z $(make_path ${hash2z}) || return 24
+
+  echo "publish and check 2"
+  cvmfs_server publish ${reponame} || return 25
+  cvmfs_server check -i ${reponame} || return 26
+  verify_compression ${spooldir}/rdonly/file1 none || return $?
+  verify_compression ${spooldir}/rdonly/file2 zlib || return $?
+  verify_compression ${spooldir}/rdonly/file3 zlib || return $?
+  verify_sha1sum ${repodir}/file1 ${hash1} || return $?
+  verify_sha1sum ${repodir}/file2 ${hash2} || return $?
+  verify_sha1sum ${repodir}/file3 ${hash2} || return $?
+
+  return 0
+}
