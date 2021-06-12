@@ -19,6 +19,7 @@
 #include "directory_entry.h"
 #include "fs_traversal.h"
 #include "hash.h"
+#include "json_document.h"
 #include "publish/repository.h"
 #include "smalloc.h"
 #include "sync_union.h"
@@ -97,6 +98,22 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
   // .cvmfsbundles file type
   if(entry->isBundleSpec()){
     printf("cvmfsbundles file found. filename: %s\n", (entry->GetRelativePath()).c_str());
+
+    std::string json_string;
+
+    int fd = open (entry->GetUnionPath().c_str(), O_RDONLY);
+    if(fd >= 0) {
+      if(SafeReadToString(fd, &json_string)) {
+        printf("creating JSON\n");
+        JsonDocument* json = JsonDocument::Create(json_string);
+        printf("content found:\n");
+        printf("%s\n", (json->PrintPretty()).c_str());
+      }
+    }
+    else{
+      printf("Could not open file: %s\n", entry->GetUnionPath().c_str());
+    }
+
     // for now using AddFile()
     AddFile(entry);
     return;
