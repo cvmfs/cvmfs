@@ -9,7 +9,7 @@ python3 registry-webhook.py -f "notifications.txt" -h 127.0.0.1 -p 8080
 ```
 where the flags account for:
 * `--file`(`-f'): name of the file where the notifications are appended.
-* `--host`(`-h'): name of the server.
+* `--host`(`-h'): IP address of the interface to bind to.
 * `--port`(`-p'): port number to listen on.
 
 The notifications appended are of the form:
