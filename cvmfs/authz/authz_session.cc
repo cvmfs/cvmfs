@@ -300,7 +300,13 @@ bool AuthzSessionManager::LookupSessionKey(
   LogCvmfs(kLogAuthz, kLogDebug,
            "Session key not found in cache, getting information from OS");
   PidKey sid_key;
-  if (!GetPidInfo(pid_key->sid, &sid_key))
+  pid_t sid = pid_key->sid;
+  if (sid == 0) {
+    // This can happen inside process namespaces such as those used by
+    //   singularity and cvmfsexec.  Use init process id instead.
+    sid = 1;
+  }
+  if (!GetPidInfo(sid, &sid_key))
     return false;
 
   session_key->sid = sid_key.pid;
