@@ -35,7 +35,8 @@ SyncItem::SyncItem() :
   graft_marker_present_(false),
   external_data_(false),
   graft_chunklist_(NULL),
-  compression_algorithm_(zlib::kZlibDefault) {}
+  compression_algorithm_(zlib::kZlibDefault),
+  has_compression_algorithm_(false) {}
 
 SyncItem::SyncItem(const std::string  &relative_parent_path,
                    const std::string  &filename,
@@ -55,7 +56,8 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   external_data_(false),
   relative_parent_path_(relative_parent_path),
   graft_chunklist_(NULL),
-  compression_algorithm_(zlib::kZlibDefault) {
+  compression_algorithm_(zlib::kZlibDefault),
+  has_compression_algorithm_(false) {
   content_hash_.algorithm = shash::kAny;
 }
 
@@ -377,6 +379,8 @@ void SyncItem::CheckGraft() {
           break;
         }
       }
+    } else if (info[0] == "compression") {
+      SetCompressionAlgorithm(zlib::ParseCompressionAlgorithm(info[1]));
     }
   }
   if (!feof(fp)) {
