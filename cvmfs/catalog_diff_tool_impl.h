@@ -178,7 +178,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       if (id_nested_from == id_nested_to) continue;
     }
 
-    if (old_entry.CompareTo(new_entry) > 0) {
+    if ((diff != catalog::DirectoryEntryBase::Difference::kIdentical) ||
+        old_entry.IsNestedCatalogMountpoint()) {
+      // Modified directory entry, or nested catalog with modified hash
       FileChunkList chunks;
       if (new_entry.IsChunkedFile()) {
         new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
