@@ -1,5 +1,5 @@
 2.9.0:
-  * [gw] Fix publishing empty uncompressed files
+  * [gw] Fix publishing empty uncompressed files (CVM-2012)
   * Fix building Doxygen documentation
   * Add support for setting "compression" key in graft files
   * Remove spinlock in S3 uploader
