@@ -6,27 +6,20 @@
 
 namespace receiver {
 
-bool IsPathInLease(const PathString& lease, const PathString& path) {
-  // If lease is "", any path falls within item
-  if (!strcmp(lease.c_str(), "")) {
+bool IsSubPath(const PathString& parent, const PathString& path) {
+
+  // If parent is "", then any path is a subpath
+  if (parent.GetLength() == 0) {
     return true;
   }
 
-  // Is the lease string is the prefix of the path string and the next
-  // character of the path string is a "/".
-  if (path.StartsWith(lease) && path.GetChars()[lease.GetLength()] == '/') {
-    return true;
-  }
-
-  // The lease is a prefix of the path and the last char of the lease is a "/"
-  if (path.StartsWith(lease) &&
-      lease.GetChars()[lease.GetLength() - 1] == '/') {
-    return true;
-  }
-
-  // If the path string is exactly the lease path return true (allow the
-  // creation of the leased directory during the lease itself)
-  if (lease == path) {
+  // If the parent string is the prefix of the path string and either
+  // the strings are identical or the separator character is a "/",
+  // then the path is a subpath
+  if (path.StartsWith(parent) &&
+      ((path.GetLength() == parent.GetLength()) ||
+       (path.GetChars()[parent.GetLength()] == '/') ||
+       (path.GetChars()[parent.GetLength() - 1] == '/'))) {
     return true;
   }
 
