@@ -35,7 +35,7 @@ send_delete() {
 }
 
 send_replication() {
-    curl -X POST http://webhook-c8vm:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"REPLICATION\", \"event_data\": {\"replication\": { \"dest_resource\": {\"endpoint\": \"https://registry.cern.ch\", \"namespace\": \"unpacked-dev\"}, \"successful_artifact\": [{\"type\": \"image\", \"status\": \"Success\", \"name_tag\": \"image:tag\"}]}}}" || return 5
+    curl -X POST http://localhost:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"REPLICATION\", \"event_data\": {\"replication\": { \"dest_resource\": {\"endpoint\": \"https://registry.cern.ch\", \"namespace\": \"unpacked-dev\"}, \"successful_artifact\": [{\"type\": \"image\", \"status\": \"Success\", \"name_tag\": \"image:tag\"}]}}}" || return 5
 }
 
 cvmfs_run_test() {
