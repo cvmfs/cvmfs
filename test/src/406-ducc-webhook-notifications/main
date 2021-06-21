@@ -27,7 +27,7 @@ check_id_action() {
 }
 
 send_push() {
-    curl -X POST http://webhook-c8vm:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"PUSH_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}" || return 3
+    curl -X POST http://localhost:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"PUSH_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}" || return 3
 }
 
 send_delete() {
