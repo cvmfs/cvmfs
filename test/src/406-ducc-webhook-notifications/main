@@ -39,7 +39,6 @@ send_replication() {
 }
 
 cvmfs_run_test() {
-
     notifications_file="notifications.txt"
     sudo python3 /root/cvmfs/test/src/406-ducc-webhook-notifications/registry-webhook.py -f $notifications_file -h 188.185.120.234 -p 8080 &
 
