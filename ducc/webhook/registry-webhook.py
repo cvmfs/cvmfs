@@ -12,7 +12,6 @@ def catch_all(p):
     try:
         for (action, image) in handle_harbor(request.json):
             publish_message(notifications_file, action, image)
-
         return "ok"
     except Exception as e:
         print("Fail to handle the harbor hook")
@@ -32,20 +31,22 @@ def catch_all(p):
     return "ko", 500
 
 def publish_message(notifications_file, action, image):
-
     with open(notifications_file, 'a+') as f:
         if os.stat(notifications_file).st_size == 0:
             current_id = 0
         else:
             f.seek(0)
-            last_line = f.readlines()[-1]
+            lines = f.readlines()
+            first_line = lines[0]
+            first_line_id = first_line.split('|')[0]
+            last_line = lines[-1]
             last_line_id = last_line.split('|')[0]
             current_id = int(last_line_id) + 1
-            if (int(last_line_id) % 1000 == 0 and int(last_line_id) != 0):
-                new_notifications_file = notifications_file.replace('.txt','')+str(last_line_id)+'.txt'
+            if (int(last_line_id) % int(args_dic["rotation"]) == 0 and int(last_line_id) != 0):
+                new_notifications_file = str(first_line_id)+"-"+str(last_line_id)+notifications_file
                 os.rename(notifications_file, new_notifications_file)
                 with open(new_notifications_file, 'a+') as f:
-                    f.write(f'--- FILE ROTATION ---\n')
+                    f.write(f'xx|file rotation|xx\n')
                 with open(notifications_file, 'a+') as f:
                     message = f'{str(current_id)}|{action}|{image}'
                     f.write(f'{message}\n')
@@ -69,8 +70,6 @@ def handle_dockerhub(rjson, notifications_file):
         if tag:
             image = f'{image}:{tag}'
 
-        yield (action, image)
-
         message = f'{action}|{image}'
         with open(notifications_file, 'a+') as f:
             f.write(f'{message}\n')
@@ -87,8 +86,10 @@ def handle_harbor(rjson):
 
     elif action == 'replication':
         replication = rjson['event_data']['replication']
-        registry_info = replication["dest_resource"]
-        destination = f'{registry_info["endpoint"]}/{registry_info["namespace"]}'
+        registry_dst = replication["dest_resource"]
+        registry_src = replication["src_resource"]
+        destination = f'{registry_dst["endpoint"]}/{registry_dst["namespace"]}'
+        source = f'{registry_src["endpoint"]}/{registry_src["namespace"]}'
         try:
             artifact = rjson['event_data']['replication']['successful_artifact']
             for event in artifact:
@@ -96,7 +97,7 @@ def handle_harbor(rjson):
             image = str(destination + '/' + image_name)
             yield (action, image)
         except Exception as e:
-            print("The replicated artifact already exists")
+            print("The replicated artifact from {} already exists in {}".format(str(source), str(destination)))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -104,6 +105,7 @@ if __name__ == '__main__':
     parser.add_argument("-f", "--file")
     parser.add_argument("-h", "--host")
     parser.add_argument("-p", "--port")
+    parser.add_argument("-r", "--rotation")
     args = parser.parse_args()
     args_dic = vars(args)
     notifications_file = args_dic["file"]
