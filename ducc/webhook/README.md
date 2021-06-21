@@ -11,6 +11,7 @@ where the flags account for:
 * `--file`(`-f'): name of the file where the notifications are appended.
 * `--host`(`-h'): IP address of the interface to bind to.
 * `--port`(`-p'): port number to listen on.
+* `--rotation`(`-r`): maximum action id per file.
 
 The notifications appended are of the form:
 ```
