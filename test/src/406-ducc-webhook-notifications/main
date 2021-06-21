@@ -31,7 +31,7 @@ send_push() {
 }
 
 send_delete() {
-    curl -X POST http://webhook-c8vm:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"DELETE_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}" || return 4
+    curl -X POST http://localhost:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"DELETE_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}" || return 4
 }
 
 send_replication() {
