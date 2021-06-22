@@ -1,0 +1,15 @@
+cvmfs_test_name="cvmfsbundles"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** Create a new repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+
+
+
+  return 0
+} 
