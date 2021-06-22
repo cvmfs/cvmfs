@@ -15,16 +15,16 @@ TEST_F(T_LeasePathUtil, RootLease) {
   const PathString path2("a");
   const PathString path3("b");
 
-  ASSERT_TRUE(receiver::IsPathInLease(lease, path1));
-  ASSERT_TRUE(receiver::IsPathInLease(lease, path2));
-  ASSERT_TRUE(receiver::IsPathInLease(lease, path3));
+  ASSERT_TRUE(receiver::IsSubPath(lease, path1));
+  ASSERT_TRUE(receiver::IsSubPath(lease, path2));
+  ASSERT_TRUE(receiver::IsSubPath(lease, path3));
 }
 
 TEST_F(T_LeasePathUtil, Identical) {
   const PathString lease("lease-dir");
   const PathString path("lease-dir");
 
-  ASSERT_TRUE(receiver::IsPathInLease(lease, path));
+  ASSERT_TRUE(receiver::IsSubPath(lease, path));
 }
 
 TEST_F(T_LeasePathUtil, SubPathLease) {
@@ -36,10 +36,10 @@ TEST_F(T_LeasePathUtil, SubPathLease) {
 
   const PathString path_above_lease("sub");
 
-  ASSERT_TRUE(receiver::IsPathInLease(lease, path1));
-  ASSERT_FALSE(receiver::IsPathInLease(lease, path2));
-  ASSERT_FALSE(receiver::IsPathInLease(lease, path3));
-  ASSERT_FALSE(receiver::IsPathInLease(lease, empty_path));
+  ASSERT_TRUE(receiver::IsSubPath(lease, path1));
+  ASSERT_FALSE(receiver::IsSubPath(lease, path2));
+  ASSERT_FALSE(receiver::IsSubPath(lease, path3));
+  ASSERT_FALSE(receiver::IsSubPath(lease, empty_path));
 
-  ASSERT_FALSE(receiver::IsPathInLease(lease, path_above_lease));
+  ASSERT_FALSE(receiver::IsSubPath(lease, path_above_lease));
 }

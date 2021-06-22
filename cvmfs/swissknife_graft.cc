@@ -285,8 +285,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   }
   const bool with_suffix = true;
   std::string graft_contents = "size=" + StringifyInt(processed_size) + "\n" +
-                               "checksum=" + file_hash.ToString(with_suffix) +
-                               "\n";
+                               "checksum=" + file_hash.ToString(with_suffix) + "\n" +
+                               "compression=" + zlib::AlgorithmName(compression_alg_) + "\n";
   if (!chunk_offsets.empty()) {
     std::vector<std::string> chunk_off_str;
     chunk_off_str.reserve(chunk_offsets.size());

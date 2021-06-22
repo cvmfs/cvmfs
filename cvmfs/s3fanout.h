@@ -205,7 +205,8 @@ class S3FanoutManager : SingleCopy {
   void Spawn();
 
   void PushNewJob(JobInfo *info);
-  int PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs);
+  void PushCompletedJob(JobInfo *info);
+  JobInfo *PopCompletedJob();
 
   const Statistics &GetStatistics();
 
@@ -220,8 +221,6 @@ class S3FanoutManager : SingleCopy {
   static void *MainUpload(void *data);
   std::vector<s3fanout::JobInfo*> jobs_todo_;
   pthread_mutex_t *jobs_todo_lock_;
-  std::vector<s3fanout::JobInfo*> jobs_completed_;
-  pthread_mutex_t *jobs_completed_lock_;
   pthread_mutex_t *curl_handle_lock_;
 
   CURL *AcquireCurlHandle() const;
@@ -302,6 +301,10 @@ class S3FanoutManager : SingleCopy {
   // S3FanoutManager writes a JobInfo* pointer. MainUpload then reads the
   // pointer and processes the job.
   int pipe_jobs_[2];
+  // A pipe used to collect completed jobs.  MainUpload writes in the
+  // pointer to the completed job.  PopCompletedJob() used to
+  // retrieve pointer.
+  int pipe_completed_[2];
 
   bool opt_ipv4_only_;
 

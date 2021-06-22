@@ -97,7 +97,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
    *       by another writer running concurrently.
    *       The correct course of action is to ignore this change here.
    * */
-  if (!IsPathInLease(lease_path_, rel_path)) {
+  if (!IsSubPath(lease_path_, rel_path)) {
     return;
   }
 
@@ -141,7 +141,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
    *       by another writer running concurrently.
    *       The correct course of action is to ignore this change here.
    * */
-  if (!IsPathInLease(lease_path_, rel_path)) {
+  if (!IsSubPath(lease_path_, rel_path)) {
     return;
   }
 
@@ -179,10 +179,11 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
    *       by another writer running concurrently.
    *       The correct course of action is to ignore this change here.
    * */
-  if (!IsPathInLease(lease_path_, rel_path)) {
-    // All child paths will similarly be outside of the lease path,
-    // and so there is no need to recurse any further.
-    return false;
+  if (!IsSubPath(lease_path_, rel_path)) {
+    // If the current path is not a parent of the lease path, then all
+    // child paths will similarly be outside of the lease path, and so
+    // there is no need to recurse any further.
+    return IsSubPath(rel_path, lease_path_);
   }
 
   const std::string parent_path =
