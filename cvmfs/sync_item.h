@@ -112,6 +112,7 @@ class SyncItem {
 
   bool HasCatalogMarker()         const { return has_catalog_marker_;          }
   bool HasGraftMarker()           const { return graft_marker_present_;        }
+  bool HasCompressionAlgorithm()  const { return has_compression_algorithm_;   }
   bool IsValidGraft()             const { return valid_graft_;                 }
   bool IsChunkedGraft()           const { return graft_chunklist_;             }
 
@@ -126,6 +127,7 @@ class SyncItem {
   }
   inline void SetCompressionAlgorithm(const zlib::Algorithms &alg) {
     compression_algorithm_ = alg;
+    has_compression_algorithm_ = true;
   }
 
   /**
@@ -301,6 +303,8 @@ class SyncItem {
 
   // The compression algorithm for the file
   zlib::Algorithms compression_algorithm_;
+  // The compression algorithm has been set explicitly
+  bool has_compression_algorithm_;
 
   // Lazy evaluation and caching of results of file stats
   inline void StatRdOnly(const bool refresh = false) const {

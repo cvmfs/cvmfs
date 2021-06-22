@@ -1,4 +1,8 @@
 2.9.0:
+  * [gw] Fix publishing empty uncompressed files (CVM-2012)
+  * Fix building Doxygen documentation
+  * Add support for setting "compression" key in graft files
+  * Remove spinlock in S3 uploader
   * Remove spinlock in gateway uploader
   * Reduce time spent in lsof during publishing
   * [gw] Fast merging of nested catalogs (CVM-1998)
@@ -13,6 +17,7 @@
   * [ducc] Ingest images using "sneaky layers" and template transactions
 
 2.8.2:
+  * Fix authz session identifiers with namespaces (CVM-2011)
   * Improve error handling when parsing config files
   * [preloader] make network timeout and retries configurable (CVM-1992)
 
