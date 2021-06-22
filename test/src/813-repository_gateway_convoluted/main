@@ -41,6 +41,9 @@ cvmfs_run_test() {
   cvmfs_server publish -v ${reponame} || return 12
   cvmfs_server check -i ${reponame} || return 13
 
+  echo "verify nested catalog count"
+  [ $(get_catalog_count ${reponame}) -eq 40 ] || return 14
+
   echo "start transaction 2"
   cvmfs_server transaction ${reponame}/tree1/branch1 || return 21
 
@@ -53,6 +56,36 @@ cvmfs_run_test() {
 
   echo "verify files"
   verify_sha1sum ${repodir}/tree1/branch1/leaf1/nested.txt 0f5117db205e0f5e7314de1db0b1f07d64ba16a0 || return 24
+
+  echo "start transaction 3"
+  cvmfs_server transaction ${reponame} || return 31
+
+  echo "remove a containing nested catalog"
+  rm ${repodir}/tree2/.cvmfscatalog
+
+  echo "publish and check 3"
+  cvmfs_server publish -v ${reponame} || return 32
+  cvmfs_server check -i ${reponame} || return 33
+
+  echo "verify nested catalog count"
+  [ $(get_catalog_count ${reponame}) -eq 39 ] || return 34
+
+  echo "start transaction 4"
+  cvmfs_server transaction ${reponame} || return 41
+
+  echo "recreate containing nested catalog and modify subcatalog"
+  touch ${repodir}/tree2/.cvmfscatalog
+  echo "Modified in subcatalog of newly created catalog" > ${repodir}/tree2/branch1/test.txt
+
+  echo "publish and check 4"
+  cvmfs_server publish -v ${reponame} || return 42
+  cvmfs_server check -i ${reponame} || return 43
+
+  echo "verify nested catalog count"
+  [ $(get_catalog_count ${reponame}) -eq 40 ] || return 44
+
+  echo "verify files"
+  verify_sha1sum ${repodir}/tree2/branch1/test.txt d231feb3b7963bd26a6b12db5fa5c4fb93beff04 || return 45
 
   return 0
 }
