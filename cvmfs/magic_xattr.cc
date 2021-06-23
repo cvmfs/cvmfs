@@ -98,7 +98,7 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
   return result;
 }
 
-BaseMagicXattr* MagicXattrManager::Get(const std::string &name,
+BaseMagicXattr* MagicXattrManager::GetLocked(const std::string &name,
                                              PathString path,
                                              catalog::DirectoryEntry *d)
 {
@@ -110,7 +110,7 @@ BaseMagicXattr* MagicXattrManager::Get(const std::string &name,
   }
 
   result->Lock(path, d);
-  
+
   return result;
 }
 

@@ -1360,7 +1360,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
 
   bool magic_xattr_success = true;
-  MagicXattrRAIIWrapper magic_xattr(mount_point_->magic_xattr_mgr()->Get(attr, path, &d));
+  MagicXattrRAIIWrapper magic_xattr(mount_point_->magic_xattr_mgr()->GetLocked(
+    attr, path, &d));
   if (!magic_xattr.IsNull()) {
     magic_xattr_success = magic_xattr->PrepareValueFenced();
   }

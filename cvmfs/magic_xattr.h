@@ -96,6 +96,7 @@ class MagicXattrRAIIWrapper: public SingleCopy {
   {
     if (ptr_ != NULL) ptr_->Lock(path, d);
   }
+  /// Wraps around a BaseMagicXattr* tha is already locked (or NULL)
   inline explicit MagicXattrRAIIWrapper(BaseMagicXattr *ptr) : ptr_(ptr) { }
 
   inline ~MagicXattrRAIIWrapper() { if (ptr_ != NULL) ptr_->Release(); }
@@ -136,7 +137,9 @@ class SymlinkMagicXattr : public BaseMagicXattr {
 class MagicXattrManager : public SingleCopy {
  public:
   MagicXattrManager(MountPoint *mountpoint, bool hide_magic_xattrs);
-  BaseMagicXattr* Get(const std::string &name, PathString path,
+  /// The returned BaseMagicXattr* is supposed to be wrapped by a
+  /// MagicXattrRAIIWrapper
+  BaseMagicXattr* GetLocked(const std::string &name, PathString path,
                             catalog::DirectoryEntry *d);
   std::string GetListString(catalog::DirectoryEntry *dirent);
   void Register(const std::string &name, BaseMagicXattr *magic_xattr);
