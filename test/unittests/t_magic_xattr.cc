@@ -67,7 +67,7 @@ TEST_F(T_MagicXattr, TestFqrn) {
   catalog::DirectoryEntry dirent =
     catalog::DirectoryEntryTestFactory::ExternalFile();
   PathString path("/asdf");
-  MagicXattrRAIIWrapper attr = mgr->Get("user.fqrn", path, &dirent);
+  MagicXattrRAIIWrapper attr(mgr->GetLocked("user.fqrn", path, &dirent));
   ASSERT_FALSE(attr.IsNull());
   ASSERT_TRUE(attr->PrepareValueFenced());
   EXPECT_STREQ("keys.cern.ch", attr->GetValue().c_str());

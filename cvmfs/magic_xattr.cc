@@ -98,7 +98,7 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
   return result;
 }
 
-MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
+BaseMagicXattr* MagicXattrManager::GetLocked(const std::string &name,
                                              PathString path,
                                              catalog::DirectoryEntry *d)
 {
@@ -106,10 +106,12 @@ MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
   if (xattr_list_.count(name) > 0) {
     result = xattr_list_[name];
   } else {
-    return MagicXattrRAIIWrapper();
+    return NULL;
   }
 
-  return MagicXattrRAIIWrapper(result, path, d);
+  result->Lock(path, d);
+
+  return result;
 }
 
 void MagicXattrManager::Register(const std::string &name,
