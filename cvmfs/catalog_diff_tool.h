@@ -52,6 +52,41 @@ class CatalogDiffTool {
   bool Run(const PathString& path);
 
  protected:
+  /**
+   * Check if a path (and, by implication, any subpath) should be
+   * ignored and not considered for comparison purposes.
+   *
+   * This can be used to avoid unnecessary work by avoiding recursion
+   * into paths that will not be of interest (e.g. paths that are
+   * neither above nor within the lease path, when using a gateway).
+   */
+  virtual bool IsIgnoredPath(const PathString& path) { return false; }
+
+  /**
+   * Check if a difference found on a path should be reported via
+   * ReportAddition(), ReportRemoval(), or ReportModification().
+   *
+   * This can be used to filter out differences that are not of
+   * interest (e.g. paths that are not within the lease path, when
+   * using a gateway).
+   *
+   * Note that an ignored path must necessarily be a non-reportable
+   * path, since an ignored path will never even be compared (and so
+   * can never be reported upon).  However, there do exist paths that
+   * are neither ignored nor reportable: when using a gateway, a
+   * parent of the lease path is not reportable (since it is not
+   * within the lease path) but must not be ignored (since we need to
+   * recurse into the parent path in order to reach the lease path).
+   *
+   * As a concrete example, with a lease path of /foo/bar:
+   *
+   * /foo             <-  not ignored, not reportable
+   * /foo/bar         <-  not ignored      reportable
+   * /foo/bar/thing   <-  not ignored      reportable
+   * /foo/baz         <-      ignored (and therefore not reportable)
+   */
+  virtual bool IsReportablePath(const PathString& path) { return true; }
+
   virtual void ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& xattrs,

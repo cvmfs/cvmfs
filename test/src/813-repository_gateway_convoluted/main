@@ -87,5 +87,33 @@ cvmfs_run_test() {
   echo "verify files"
   verify_sha1sum ${repodir}/tree2/branch1/test.txt d231feb3b7963bd26a6b12db5fa5c4fb93beff04 || return 45
 
+  echo "start transaction 5"
+  cvmfs_server transaction ${reponame}/tree2/branch3 || return 51
+
+  echo "modify files above lease path"
+  echo "Above lease path" > ${repodir}/above.txt
+  echo "Above lease path" > ${repodir}/tree2/above.txt
+
+  echo "modify files within lease path"
+  echo "Within lease path" > ${repodir}/tree2/branch3/within.txt
+
+  echo "modify files outside lease path"
+  echo "Outside lease path" > ${repodir}/tree1/branch1/outside.txt
+  echo "Outside lease path" > ${repodir}/tree2/branch2/outside.txt
+
+  echo "publish and check 5"
+  cvmfs_server publish -v ${reponame} || return 52
+  cvmfs_server check -i ${reponame} || return 53
+
+  echo "verify nested catalog count"
+  [ $(get_catalog_count ${reponame}) -eq 40 ] || return 54
+
+  echo "verify files"
+  [ -e ${repodir}/above.txt ] && return 55
+  [ -e ${repodir}/tree2/above.txt ] && return 56
+  verify_sha1sum ${repodir}/tree2/branch3/within.txt 5c0427c65ae080a35f780a6d78db3db7fad8079e || return 57
+  [ -e ${repodir}/tree1/branch1/outside.txt ] && return 58
+  [ -e ${repodir}/tree1/branch1/outside.txt ] && return 59
+
   return 0
 }
