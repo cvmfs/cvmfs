@@ -93,7 +93,7 @@ class SyncItem {
            WasType(kItemFifo) ||
            WasType(kItemSocket);
   }
-  inline bool isBundleSpec() const {
+  inline bool IsBundleSpec() const {
     return filename_ == ".cvmfsbundles";
   }
   inline bool wasBundleSpec() const {
