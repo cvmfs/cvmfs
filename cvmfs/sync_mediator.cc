@@ -101,7 +101,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
     std::string json_string;
 
-    int fd = open (entry->GetUnionPath().c_str(), O_RDONLY);
+    int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
     if(fd >= 0) {
       if(SafeReadToString(fd, &json_string)) {
         printf("creating JSON\n");
