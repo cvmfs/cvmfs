@@ -19,6 +19,7 @@
 #include "directory_entry.h"
 #include "fs_traversal.h"
 #include "hash.h"
+#include "json_document.h"
 #include "publish/repository.h"
 #include "smalloc.h"
 #include "sync_union.h"
