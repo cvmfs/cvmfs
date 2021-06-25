@@ -96,7 +96,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
   }
   
   // .cvmfsbundles file type
-  if (entry->isBundleSpec()) {
+  if (entry->IsBundleSpec()) {
     printf("cvmfsbundles file found. filename: %s\n",
         (entry->GetRelativePath()).c_str());
 
@@ -228,7 +228,7 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
     return;
   }
   
-  if (entry->wasBundleSpec()) {
+  if (entry->WasBundleSpec()) {
     printf("found a cvmfsbundles file to remove: filename: %s\n", (entry->GetRelativePath()).c_str());
     // for now remove using RemoveFile()
     RemoveFile(entry);
