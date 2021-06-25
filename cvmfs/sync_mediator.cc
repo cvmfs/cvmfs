@@ -103,7 +103,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
     int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
     if(fd >= 0) {
-      if(SafeReadToString(fd, &json_string)) {
+      if (SafeReadToString(fd, &json_string)) {
         printf("creating JSON\n");
         JsonDocument* json = JsonDocument::Create(json_string);
         printf("content found:\n");
