@@ -96,7 +96,7 @@ class SyncItem {
   inline bool IsBundleSpec() const {
     return filename_ == ".cvmfsbundles";
   }
-  inline bool wasBundleSpec() const {
+  inline bool WasBundleSpec() const {
     return filename_ == ".cvmfsbundles";
   }
 
