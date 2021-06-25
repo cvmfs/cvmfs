@@ -1385,4 +1385,4 @@ XattrList SqlLookupXattrs::GetXattrs() {
   return *xattrs;
 }
 
-}  // namespace catalog
+}  // namespace catalog 
