@@ -97,21 +97,25 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
   
   // .cvmfsbundles file type
   if (entry->isBundleSpec()) {
-    printf("cvmfsbundles file found. filename: %s\n", (entry->GetRelativePath()).c_str());
+    printf("cvmfsbundles file found. filename: %s\n",
+        (entry->GetRelativePath()).c_str());
 
     std::string json_string;
 
     int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
-    if(fd >= 0) {
+    if(fd < 0) {
+      PANIC(kLogStderr, "Could not open file: %s", 
+          entry->GetUnionPath().c_str());
+    } else {
       if (SafeReadToString(fd, &json_string)) {
         printf("creating JSON\n");
         JsonDocument* json = JsonDocument::Create(json_string);
         printf("content found:\n");
         printf("%s\n", (json->PrintPretty()).c_str());
+      } else {
+        PANIC(kLogStderr, "Could not read contents of file: %s", 
+            entry->GetUnionPath().c_str());
       }
-    }
-    else{
-      printf("Could not open file: %s\n", entry->GetUnionPath().c_str());
     }
 
     // for now using AddFile()
@@ -146,7 +150,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     }
     return;
   }
-  
+
   PrintWarning("'" + entry->GetRelativePath() +
                "' cannot be added. Unrecognized file type.");
 }
