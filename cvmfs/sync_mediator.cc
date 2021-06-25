@@ -96,7 +96,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
   }
   
   // .cvmfsbundles file type
-  if(entry->isBundleSpec()){
+  if (entry->isBundleSpec()) {
     printf("cvmfsbundles file found. filename: %s\n", (entry->GetRelativePath()).c_str());
 
     std::string json_string;
