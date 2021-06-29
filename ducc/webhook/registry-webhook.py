@@ -10,9 +10,6 @@ app = Flask(__name__)
 @app.route("/<path:p>", methods=["POST"])
 def catch_all(p):
     print(request.json)
-    if request.environ.get('HTTP_X_REAL_IP', request.remote_addr) != "137.138.148.174":
-        return "ip address not authorized"
-
     try:
         for (action, image) in handle_harbor(request.json):
             publish_message(notifications_file, action, image)
