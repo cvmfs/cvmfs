@@ -9,6 +9,7 @@ app = Flask(__name__)
 
 @app.route("/<path:p>", methods=["POST"])
 def catch_all(p):
+    print(request.json)
     try:
         for (action, image) in handle_harbor(request.json):
             publish_message(notifications_file, action, image)
@@ -38,11 +39,11 @@ def publish_message(notifications_file, action, image):
             f.seek(0)
             lines = f.readlines()
             first_line = lines[0]
-            first_line_id = first_line.split('|')[0]
+            first_line_id = int(first_line.split('|')[0])
             last_line = lines[-1]
-            last_line_id = last_line.split('|')[0]
-            current_id = int(last_line_id) + 1
-            if (int(last_line_id) % int(args_dic["rotation"]) == 0 and int(last_line_id) != 0):
+            last_line_id = int(last_line.split('|')[0])
+            current_id = last_line_id + 1
+            if (last_line_id % int(args_dic["rotation"]) == 0 and last_line_id != 0):
                 new_notifications_file = str(first_line_id)+"-"+str(last_line_id)+notifications_file
                 os.rename(notifications_file, new_notifications_file)
                 with open(new_notifications_file, 'a+') as f:
@@ -51,6 +52,7 @@ def publish_message(notifications_file, action, image):
                     message = f'{str(current_id)}|{action}|{image}'
                     f.write(f'{message}\n')
                     return
+
         message = f'{str(current_id)}|{action}|{image}'
         f.write(f'{message}\n')
 
@@ -71,11 +73,11 @@ def handle_dockerhub(rjson, notifications_file):
             image = f'{image}:{tag}'
 
         message = f'{action}|{image}'
-        with open(notifications_file, 'a+') as f:
-            f.write(f'{message}\n')
+
+        yield (action, image)
+
 
 def handle_harbor(rjson):
-    print(rjson)
     actions = {'PUSH_ARTIFACT': 'push', 'DELETE_ARTIFACT': 'delete', 'REPLICATION': 'replication'}
     action = actions[rjson['type']]
     if action == 'push' or action == 'delete':
