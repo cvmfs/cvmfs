@@ -281,6 +281,7 @@ set (CVMFS_PUBLISH_SOURCES
 
 set (LIBCVMFS_SERVER_SOURCES
   backoff.cc
+  bundle.cc
   catalog.cc
   catalog_counters.cc
   catalog_rw.cc
@@ -363,6 +364,7 @@ set (LIBCVMFS_SERVER_SOURCES
 
 set (CVMFS_SWISSKNIFE_SOURCES
   backoff.cc
+  bundle.cc
   catalog.cc
   catalog_counters.cc
   catalog_mgr_ro.cc
