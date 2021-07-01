@@ -783,8 +783,6 @@ TEST_F(T_Libcvmfs, Remount) {
     // Initialize client repo based on options
     ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
 
-    printf("NAME: %s\n", tester.repo_name().c_str());
-
     // Attach to client repo
     cvmfs_context *ctx;
     EXPECT_EQ(LIBCVMFS_ERR_OK,
