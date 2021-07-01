@@ -95,7 +95,7 @@ class DirectoryEntryBase {
     static const unsigned int kExternalFileFlag             = 0x800;
     static const unsigned int kBindMountpointFlag           = 0x1000;
     static const unsigned int kHiddenFlag                   = 0x2000;
-    static const unsigned int kDirectIo                     = 0x4000;
+    static const unsigned int kDirectIoFlag                 = 0x4000;
   };
   typedef unsigned int Differences;
 

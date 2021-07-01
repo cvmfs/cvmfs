@@ -63,6 +63,9 @@ DirectoryEntryBase::Differences DirectoryEntry::CompareTo(
   if (IsHidden() != other.IsHidden()) {
     result |= Difference::kHiddenFlag;
   }
+  if (IsDirectIo() != other.IsDirectIo()) {
+    result |= Difference::kDirectIoFlag;
+  }
 
   return result;
 }
