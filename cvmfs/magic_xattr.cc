@@ -55,6 +55,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.chunk_list", new ChunkListMagicXattr());
   Register("user.chunks", new ChunksMagicXattr());
   Register("user.compression", new CompressionMagicXattr());
+  Register("user.direct_io", new DirectIoMagicXattr());
   Register("user.external_file", new ExternalFileMagicXattr());
 
   Register("user.rawlink", new RawlinkMagicXattr());
@@ -217,6 +218,14 @@ bool CompressionMagicXattr::PrepareValueFenced() {
 
 std::string CompressionMagicXattr::GetValue() {
   return zlib::AlgorithmName(dirent_->compression_algorithm());
+}
+
+bool DirectIoMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular();
+}
+
+std::string DirectIoMagicXattr::GetValue() {
+  return dirent_->IsDirectIo() ? "1" : "0";
 }
 
 bool ExternalFileMagicXattr::PrepareValueFenced() {
