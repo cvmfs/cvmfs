@@ -795,6 +795,7 @@ int FuseMain(int argc, char *argv[]) {
   loader_exports_->foreground = foreground_;
   loader_exports_->repository_name = *repository_name_;
   loader_exports_->mount_point = *mount_point_;
+  loader_exports_->device_id = "0:0"; // initially unknown, set after mount
   loader_exports_->disable_watchdog = disable_watchdog_;
   loader_exports_->simple_options_parsing = simple_options_parsing_;
   if (config_files_)
@@ -1045,6 +1046,26 @@ int FuseMain(int argc, char *argv[]) {
       cvmfs_exports_->fnFini();
       return kFailPermission;
     }
+  }
+
+  // Determine device id
+  int fd_mountinfo = open("/proc/self/mountinfo", O_RDONLY);
+  if (fd_mountinfo > 0) {
+    std::string line;
+    while (GetLineFd(fd_mountinfo, &line)) {
+      std::vector<std::string> tokens = SplitString(line, ' ');
+      if (tokens.size() < 5) continue;
+      if (tokens[4] != loader_exports_->mount_point) continue;
+      unsigned i = 5;
+      for (; i < tokens.size(); ++i) {
+        if (tokens[i] == "-") break;
+      }
+      if (tokens.size() < i + 3) continue;
+      if (tokens[i + 2] != "cvmfs2") continue;
+      loader_exports_->device_id = tokens[2];
+      break;
+    }
+    close(fd_mountinfo);
   }
 
   if (!premounted_) {
