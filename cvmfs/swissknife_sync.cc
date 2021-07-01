@@ -608,6 +608,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
   if (args.find('Y') != args.end()) params.external_data = true;
+  if (args.find('W') != args.end()) params.direct_io = true;
   if (args.find('S') != args.end()) {
     bool retval = catalog::VirtualCatalog::ParseActions(
         *args.find('S')->second, &params.virtual_dir_actions);

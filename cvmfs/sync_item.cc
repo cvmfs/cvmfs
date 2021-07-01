@@ -34,6 +34,7 @@ SyncItem::SyncItem() :
   valid_graft_(false),
   graft_marker_present_(false),
   external_data_(false),
+  direct_io_(false),
   graft_chunklist_(NULL),
   compression_algorithm_(zlib::kZlibDefault),
   has_compression_algorithm_(false) {}
@@ -54,6 +55,7 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   valid_graft_(false),
   graft_marker_present_(false),
   external_data_(false),
+  direct_io_(false),
   relative_parent_path_(relative_parent_path),
   graft_chunklist_(NULL),
   compression_algorithm_(zlib::kZlibDefault),
@@ -209,14 +211,15 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   // (i.e. on setups using OverlayFS)
   dirent.linkcount_      = HasHardlinks() ? this->GetUnionStat().st_nlink : 1;
 
-  dirent.mode_           = this->GetUnionStat().st_mode;
-  dirent.uid_            = this->GetUnionStat().st_uid;
-  dirent.gid_            = this->GetUnionStat().st_gid;
-  dirent.size_           = graft_size_ > -1 ? graft_size_ :
-                           this->GetUnionStat().st_size;
-  dirent.mtime_          = this->GetUnionStat().st_mtime;
-  dirent.checksum_       = this->GetContentHash();
+  dirent.mode_             = this->GetUnionStat().st_mode;
+  dirent.uid_              = this->GetUnionStat().st_uid;
+  dirent.gid_              = this->GetUnionStat().st_gid;
+  dirent.size_             = graft_size_ > -1 ? graft_size_ :
+                             this->GetUnionStat().st_size;
+  dirent.mtime_            = this->GetUnionStat().st_mtime;
+  dirent.checksum_         = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
+  dirent.is_direct_io_     = this->IsDirectIo();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
 
   dirent.name_.Assign(filename().data(), filename().length());

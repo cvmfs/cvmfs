@@ -112,6 +112,7 @@ class DirectoryEntryBase {
     , linkcount_(1)  // generally a normal file has linkcount 1 -> default
     , has_xattrs_(false)
     , is_external_file_(false)
+    , is_direct_io_(false)
     , compression_algorithm_(zlib::kZlibDefault)
     { }
 
@@ -126,6 +127,7 @@ class DirectoryEntryBase {
     return IsFifo() || IsSocket() || IsCharDev() || IsBlockDev();
   }
   inline bool IsExternalFile() const            { return is_external_file_; }
+  inline bool IsDirectIo() const                { return is_direct_io_; }
   inline bool HasXattrs() const                 { return has_xattrs_;    }
 
   inline inode_t inode() const                  { return inode_; }
@@ -230,6 +232,7 @@ class DirectoryEntryBase {
   shash::Any checksum_;
 
   bool is_external_file_;
+  bool is_direct_io_;
 
   // The compression algorithm
   zlib::Algorithms compression_algorithm_;
@@ -274,7 +277,6 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_bind_mountpoint_(false)
     , is_chunked_file_(false)
     , is_hidden_(false)
-    , is_direct_io_(false)
     , is_negative_(false) { }
 
   inline DirectoryEntry()
@@ -284,7 +286,6 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_bind_mountpoint_(false)
     , is_chunked_file_(false)
     , is_hidden_(false)
-    , is_direct_io_(false)
     , is_negative_(false) { }
 
   inline explicit DirectoryEntry(SpecialDirents special_type)
@@ -294,7 +295,6 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_bind_mountpoint_(false)
     , is_chunked_file_(false)
     , is_hidden_(false)
-    , is_direct_io_(false)
     , is_negative_(true) { assert(special_type == kDirentNegative); }
 
   inline SpecialDirents GetSpecial() const {
@@ -317,7 +317,6 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline bool IsBindMountpoint() const { return is_bind_mountpoint_; }
   inline bool IsChunkedFile() const { return is_chunked_file_; }
   inline bool IsHidden() const { return is_hidden_; }
-  inline bool IsDirectIo() const { return is_direct_io_; }
   inline uint32_t hardlink_group() const { return hardlink_group_; }
 
   inline void set_hardlink_group(const uint32_t group) {
@@ -338,9 +337,6 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline void set_is_hidden(const bool val) {
     is_hidden_ = val;
   }
-  inline void set_is_direct_io(const bool val) {
-    is_direct_io_ = val;
-  }
 
  private:
   /**
@@ -355,7 +351,6 @@ class DirectoryEntry : public DirectoryEntryBase {
   bool is_bind_mountpoint_;
   bool is_chunked_file_;
   bool is_hidden_;
-  bool is_direct_io_;
   bool is_negative_;
 };
 

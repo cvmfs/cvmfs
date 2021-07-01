@@ -43,6 +43,7 @@ class MockSyncMediator : public AbstractSyncMediator {
   MOCK_METHOD1(LeaveDirectory, void(SharedPtr<SyncItem> entry));
   MOCK_METHOD1(Commit, bool(manifest::Manifest *manifest));
   MOCK_CONST_METHOD0(IsExternalData, bool());
+  MOCK_CONST_METHOD0(IsDirectIo, bool());
   MOCK_CONST_METHOD0(GetCompressionAlgorithm, zlib::Algorithms());
 };  // class MockSyncMediator
 

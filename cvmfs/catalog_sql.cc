@@ -437,6 +437,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
       database_flags |= kFlagFileChunk;
     if (entry.IsExternalFile())
       database_flags |= kFlagFileExternal;
+    if (entry.IsDirectIo())
+      database_flags |= kFlagDirectIo;
   }
 
   if (!entry.checksum_ptr()->IsNull() || entry.IsChunkedFile())
@@ -444,8 +446,6 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
 
   if (entry.IsHidden())
     database_flags |= kFlagHidden;
-  if (entry.IsDirectIo())
-    database_flags |= kFlagDirectIo;
 
   return database_flags;
 }

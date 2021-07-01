@@ -17,13 +17,15 @@ cvmfs_server_publish() {
   local authz_file=""
   local force_external=0
   local force_native=0
+  local force_direct_io=0
   local force_compression_algorithm=""
   local external_option=""
+  local direct_io_option=""
   local open_fd_dialog=1
 
   # optional parameter handling
   OPTIND=1
-  while getopts "F:NXZ:pa:c:m:vn:fe" option
+  while getopts "F:NXZ:pa:c:m:vn:fed" option
   do
     case $option in
       p)
@@ -55,6 +57,9 @@ cvmfs_server_publish() {
       ;;
       F)
         authz_file="-F $OPTARG"
+      ;;
+      d)
+        force_direct_io=1
       ;;
       f)
         open_fd_dialog=0
@@ -117,6 +122,9 @@ cvmfs_server_publish() {
       if [ $force_native -eq 0 ]; then
         external_option="-Y"
       fi
+    fi
+    if [ $force_direct_io -eq 1 ]; then
+      direct_io_option="-W"
     fi
 
     # more sanity checks
@@ -198,7 +206,7 @@ cvmfs_server_publish() {
         -K $CVMFS_PUBLIC_KEY                           \
         $(get_follow_http_redirects_flag)              \
         $authz_file                                    \
-        $log_level $tweaks_option $external_option $verbosity"
+        $log_level $tweaks_option $external_option $direct_io_option $verbosity"
 
     if [ ! -z "$tag_name" ]; then
       sync_command="$sync_command -D $tag_name"

@@ -129,6 +129,7 @@ class AbstractSyncMediator {
   virtual bool Commit(manifest::Manifest *manifest) = 0;
 
   virtual bool IsExternalData() const = 0;
+  virtual bool IsDirectIo() const = 0;
   virtual zlib::Algorithms GetCompressionAlgorithm() const = 0;
 };
 
@@ -173,6 +174,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   // The sync union engine uses this information to create properly initialized
   // sync items
   bool IsExternalData() const { return params_->external_data; }
+  bool IsDirectIo() const { return params_->direct_io; }
   zlib::Algorithms GetCompressionAlgorithm() const {
     return params_->compression_alg;
   }
