@@ -16,7 +16,7 @@ cvmfs_run_test() {
   if running_on_osx; then
     [ "x$device_id" = "x0:0" ] || return 10
   else
-    [ "x$device_id" != "x$(cat /proc/self/mountinfo | grep cernvm-prod.cern.ch | cut -d ' ' -f3)" ] || return 11
+    [ "x$device_id" = "x$(cat /proc/self/mountinfo | grep cernvm-prod.cern.ch | cut -d ' ' -f3)" ] || return 11
   fi
 
   return 0
