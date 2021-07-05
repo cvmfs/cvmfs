@@ -1,4 +1,5 @@
 2.9.0:
+  * Add 'device id' command to cvmfs_talk (CVM-2004)
   * Fix potential crash when accessing extended attributes (CVM-2014)
   * [gw] Fix publishing empty uncompressed files (CVM-2012)
   * Fix building Doxygen documentation
