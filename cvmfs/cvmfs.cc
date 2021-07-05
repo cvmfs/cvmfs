@@ -998,6 +998,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                                         unique_inode);
     // The same inode can refer to different revisions of a path.  Don't cache.
     fi->keep_cache = 0;
+    fi->direct_io = dirent.IsDirectIo();
     fi->fh = static_cast<uint64_t>(-chunk_tables->next_handle);
     ++chunk_tables->next_handle;
     chunk_tables->Unlock();
@@ -1025,6 +1026,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                path.c_str(), fd);
       // The same inode can refer to different revisions of a path. Don't cache.
       fi->keep_cache = 0;
+      fi->direct_io = dirent.IsDirectIo();
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;

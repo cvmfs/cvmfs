@@ -413,6 +413,13 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Checks depending of entry type
+    if (!entries[i].IsRegular()) {
+      if (entries[i].IsDirectIo()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "invalid direct i/o flag found: %s",
+                 full_path.c_str());
+        retval = false;
+      }
+    }
     if (entries[i].IsDirectory()) {
       computed_counters->self.directories++;
       num_subdirs++;

@@ -209,6 +209,10 @@ class SqlDirent : public SqlCatalog {
    * directory.
    */
   static const int kFlagHidden              = 0x8000;  // 2^15
+  /**
+   * For regular files, indicates that the file should be opened with direct I/O
+   */
+  static const int kFlagDirectIo            = 0x10000;  // 2^16
 
 
  protected:

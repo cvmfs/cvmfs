@@ -185,6 +185,11 @@ class CompressionMagicXattr : public RegularMagicXattr {
   virtual std::string GetValue();
 };
 
+class DirectIoMagicXattr : public RegularMagicXattr {
+  virtual bool PrepareValueFenced();
+  virtual std::string GetValue();
+};
+
 class ExternalFileMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();

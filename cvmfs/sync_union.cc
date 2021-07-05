@@ -36,6 +36,7 @@ SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
   PreprocessSyncItem(entry);
   if (entry_type == kItemFile) {
     entry->SetExternalData(mediator_->IsExternalData());
+    entry->SetDirectIo(mediator_->IsDirectIo());
     if (!(entry->IsValidGraft() && entry->HasCompressionAlgorithm())) {
       entry->SetCompressionAlgorithm(mediator_->GetCompressionAlgorithm());
     }
