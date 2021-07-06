@@ -12,14 +12,13 @@
 #include "util/posix.h"
 #include "util/string.h"
 
-ObjectPack* Bundle::CreateBundle(const JSON* json_obj)
-{
-  const JSON* value = json_obj;
+ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
+  const JSON *value = json_obj;
   if (value->type != JSON_OBJECT) {
     PANIC(kLogStderr, "JSON object not found");
   } else {
     // create an ObjectPack
-    ObjectPack* op = new ObjectPack();
+    ObjectPack *op = new ObjectPack();
 
     if (op == NULL) {
       PANIC(kLogStderr, "Insufficient memory");

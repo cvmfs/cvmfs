@@ -33,7 +33,7 @@ class Bundle {
  * Returns a pointer to the created ObjectPack on success, NULL
  * otherwise
  */
-  ObjectPack* CreateBundle(const JSON* json_obj);
+  ObjectPack *CreateBundle(const JSON *json_obj);
 };
 
 #endif  // CVMFS_BUNDLE_H_
