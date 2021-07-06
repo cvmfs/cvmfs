@@ -103,14 +103,12 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     if (fd < 0) {
       PANIC(kLogStderr, "Could not open file: %s",
             entry->GetUnionPath().c_str());
-    } else {
-      if (SafeReadToString(fd, &json_string)) {
-        JsonDocument *json = JsonDocument::Create(json_string);
-      } else {
-        PANIC(kLogStderr, "Could not read contents of file: %s",
-            entry->GetUnionPath().c_str());
-      }
     }
+    if (!SafeReadToString(fd, &json_string)) {
+      PANIC(kLogStderr, "Could not read contents of file: %s",
+            entry->GetUnionPath().c_str());
+    }
+    JsonDocument *json = JsonDocument::Create(json_string);
 
     // for now using AddFile()
     AddFile(entry);
