@@ -86,20 +86,31 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::IsIgnoredPath(
+    const PathString& path) {
+  const PathString rel_path = MakeRelative(path);
+
+  // Ignore any paths that are not either within the lease path or
+  // above the lease path
+  return !(IsSubPath(lease_path_, rel_path) ||
+           IsSubPath(rel_path, lease_path_));
+}
+
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::IsReportablePath(
+    const PathString& path) {
+  const PathString rel_path = MakeRelative(path);
+
+  // Do not report any changes occurring outside the lease path (which
+  // will be due to other concurrent writers)
+  return IsSubPath(lease_path_, rel_path);
+}
+
+template <typename RwCatalogMgr, typename RoCatalogMgr>
 void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
     const XattrList& xattrs, const FileChunkList& chunks) {
   const PathString rel_path = MakeRelative(path);
-
-  /*
-   * Note: If the addition of a file or directory outside of the lease
-   *       path is encountered here, this means that the item was deleted
-   *       by another writer running concurrently.
-   *       The correct course of action is to ignore this change here.
-   * */
-  if (!IsSubPath(lease_path_, rel_path)) {
-    return;
-  }
 
   const std::string parent_path =
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
@@ -135,16 +146,6 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
     const PathString& path, const catalog::DirectoryEntry& entry) {
   const PathString rel_path = MakeRelative(path);
 
-  /*
-   * Note: If the removal of a file or directory outside of the lease
-   *       path is encountered here, this means that the item was created
-   *       by another writer running concurrently.
-   *       The correct course of action is to ignore this change here.
-   * */
-  if (!IsSubPath(lease_path_, rel_path)) {
-    return;
-  }
-
   if (entry.IsDirectory()) {
     if (entry.IsNestedCatalogMountpoint()) {
       output_catalog_mgr_->RemoveNestedCatalog(std::string(rel_path.c_str()),
@@ -172,19 +173,6 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const catalog::DirectoryEntry& entry2, const XattrList& xattrs,
     const FileChunkList& chunks) {
   const PathString rel_path = MakeRelative(path);
-
-  /*
-   * Note: If the modification of a file or directory outside of the lease
-   *       path is encountered here, this means that the item was modified
-   *       by another writer running concurrently.
-   *       The correct course of action is to ignore this change here.
-   * */
-  if (!IsSubPath(lease_path_, rel_path)) {
-    // If the current path is not a parent of the lease path, then all
-    // child paths will similarly be outside of the lease path, and so
-    // there is no need to recurse any further.
-    return IsSubPath(rel_path, lease_path_);
-  }
 
   const std::string parent_path =
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";

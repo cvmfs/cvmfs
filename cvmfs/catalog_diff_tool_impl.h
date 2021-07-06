@@ -94,6 +94,13 @@ RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
 
 template <typename RoCatalogMgr>
 void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
+
+  // Terminate recursion upon reaching an ignored path
+  if (IsIgnoredPath(path)) {
+    assert(!IsReportablePath(path));
+    return;
+  }
+
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
   old_catalog_mgr_->Listing(path, &old_listing);
@@ -143,12 +150,14 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
 
     if (IsSmaller(new_entry, old_entry)) {
       i_to++;
-      FileChunkList chunks;
-      if (new_entry.IsChunkedFile()) {
-        new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
-                                         &chunks);
+      if (IsReportablePath(new_path)) {
+        FileChunkList chunks;
+        if (new_entry.IsChunkedFile()) {
+          new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
+                                           &chunks);
+        }
+        ReportAddition(new_path, new_entry, xattrs, chunks);
       }
-      ReportAddition(new_path, new_entry, xattrs, chunks);
       if (new_entry.IsDirectory()) {
         DiffRec(new_path);
       }
@@ -158,7 +167,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       if (old_entry.IsDirectory() && !old_entry.IsNestedCatalogMountpoint()) {
         DiffRec(old_path);
       }
-      ReportRemoval(old_path, old_entry);
+      if (IsReportablePath(old_path)) {
+        ReportRemoval(old_path, old_entry);
+      }
       continue;
     }
 
@@ -178,8 +189,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       if (id_nested_from == id_nested_to) continue;
     }
 
-    if ((diff != catalog::DirectoryEntryBase::Difference::kIdentical) ||
-        old_entry.IsNestedCatalogMountpoint()) {
+    if (IsReportablePath(old_path) &&
+        ((diff != catalog::DirectoryEntryBase::Difference::kIdentical) ||
+         old_entry.IsNestedCatalogMountpoint())) {
       // Modified directory entry, or nested catalog with modified hash
       FileChunkList chunks;
       if (new_entry.IsChunkedFile()) {
