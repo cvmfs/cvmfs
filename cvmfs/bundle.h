@@ -23,16 +23,29 @@ class Bundle {
  public:
   const int64_t kMaxFileSize = 1024 * 1024 * 100;
 
-/**
- * Creates a ObjectPack bundle of one or more regular files
- * The bundle is not created if any of the files to be included is not found or
- * if the file size of any of the files exceeds a maximum value kMaxFileSize
- * The JSON Object json_obj passed has a bundle id and a JSON array of file
- * paths
- *
- * Returns a pointer to the created ObjectPack on success, NULL
- * otherwise
- */
+  /**
+   * Creates a ObjectPack bundle of one or more regular files
+   * The bundle is not created if any of the files to be included is not found or
+   * if the file size of any of the files exceeds a maximum value kMaxFileSize
+   *
+   * Returns a pointer to the created ObjectPack on success, NULL
+   * otherwise
+   *
+   * The `json_obj` must be a JSON Object having a bundle ID and a JSON array
+   * of paths to regular files. The bundle ID is given as a key-value pair where
+   * the key must be `bundle_id` and the value must be a unique bundle name over
+   * all the other bundles. Each of the file paths must be a string.
+   *
+   * An example JSON Object:
+   * {
+   *   "bundle_id": "bundle1",
+   *   "filepaths": [
+   *     "/cvmfs/test.cern.ch/example1.txt",
+   *     "/cvmfs/test.cern.ch/a/example2.txt",
+   *     ...
+   *   ]
+   * }
+   */
   ObjectPack *CreateBundle(const JSON *json_obj);
 };
 
