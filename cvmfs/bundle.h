@@ -11,7 +11,7 @@
 #include "pack.h"
 
 /**
- * A bundle has the binary format of object packs used by the gateway as
+ * A bundle has the binary format of object packs used as
  * a form to concatenate multiple objects in a single BLOB.
  * Bundle files can be chunked the same way regular large files get chunked.
  * Chunked and non-chunked bundle files get a B as a hash suffix
