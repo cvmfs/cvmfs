@@ -143,6 +143,7 @@ cvmfs_config_usage() {
   echo "  status"
   echo "  probe [<repository list>]"
   echo "  fsck [<cvmfs_fsck options>]"
+  echo "  fuser <repository>"
   echo "  reload [-c | <repository>]"
   echo "  umount"
   echo "  wipecache"
@@ -1260,6 +1261,22 @@ cvmfs_config_fsck() {
 }
 
 
+cvmfs_config_fuser() {
+  local retval=0
+  [ $# -eq 1 ] || die "one repository name required"
+  local fqrn="$1"
+
+  local deviceid
+  deviceid="$(cvmfs_talk -i $fqrn device id)"
+  local retval=$?
+  if [ $retval != 0 ]; then
+    return $retval
+  fi
+  [ -n "$deviceid" ] || die "Could not obtain device id for $fqrn"
+
+  lsof | awk '{if ($6 == "'${deviceid/:/,}'") print $2}' | sort -un | paste -sd ' '
+}
+
 cvmfs_umount() {
   local silent=$1
   local force=$2
@@ -2211,6 +2228,16 @@ case "$1" in
   fsck)
     shift 1
     cvmfs_config_fsck $@
+    RETVAL=$?
+    ;;
+
+  fuser)
+    if [ `id -u` -ne 0 ]; then
+      echo "root privileges required"
+      exit 1
+    fi
+    shift 1
+    cvmfs_config_fuser $@
     RETVAL=$?
     ;;
 
