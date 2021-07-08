@@ -1,6 +1,20 @@
-cvmfs_test_name="Webhook notifications"
+cvmfs_test_name="Webhook notifications test"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="ducc"
+
+cleanup() {
+  pid=$(ps aux | grep 'registry-webhook.py' | awk -F' ' '{print $2}' )
+  kill $pid
+}
+
+check_port() {
+    if nc -zv webhook-c8vm 8080 2>&1;
+    then
+        return 0
+    else 
+        check_port
+    fi
+}
 
 check_id_action() {
     expected_id=$1
@@ -11,128 +25,67 @@ check_id_action() {
 
     if [ ${id[0]} != ${expected_id} ]
     then
-        echo 'The id of the action is not correct'
-        kill $pid
-        return 1
+        echo 'The action id is not correct' && return 10
     fi
 
     if [ ${id[1]} != ${expected_action} ]
     then
-        echo 'The action not correct'
-        kill $pid
-        return 2
+        echo 'The action type is not correct' && return 20
     fi
-
-    sleep 1
 }
 
-send_push() {
-    curl -X POST http://localhost:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"PUSH_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}" || return 3
+send_harbor_push() {
+    curl -X POST http://webhook-c8vm:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"PUSH_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}"
 }
 
-send_delete() {
-    curl -X POST http://localhost:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"DELETE_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}" || return 4
+send_harbor_delete() {
+    curl -X POST http://webhook-c8vm:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"DELETE_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}"
 }
 
-send_replication() {
-    curl -X POST http://localhost:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"REPLICATION\", \"event_data\": {\"replication\": { \"dest_resource\": {\"endpoint\": \"https://registry.cern.ch\", \"namespace\": \"unpacked-dev\"}, \"successful_artifact\": [{\"type\": \"image\", \"status\": \"Success\", \"name_tag\": \"image:tag\"}]}}}" || return 5
+send_harbor_replication() {
+    curl -X POST http://webhook-c8vm:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"REPLICATION\", \"event_data\": {\"replication\": { \"dest_resource\": {\"endpoint\": \"https://registry.cern.ch\", \"namespace\": \"unpacked-dev\"}, \"src_resource\": {\"endpoint\": \"https://hub.docker.com\", \"namespace\": \"unpacked-dev\"}, \"successful_artifact\": [{\"type\": \"image\", \"status\": \"Success\", \"name_tag\": \"image:tag\"}]}}}"
+}
+
+
+send_docker_push() {
+    curl -X POST http://webhook-c8vm:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"events\": [{\"action\": \"push\", \"target\": {\"repository\": \"unpacked.cern.ch\", \"url\": \"http://hub.docker.com\", \"tag\": \"latest\"}, \"request\": {\"host\": \"hub.docker.com\"}}]}"
 }
 
 cvmfs_run_test() {
-    notifications_file="notifications.txt"
-    sudo python3 /root/cvmfs/test/src/406-ducc-webhook-notifications/registry-webhook.py -f $notifications_file -h 188.185.120.234 -p 8080 &
 
-    sleep 1
-    pid=$(echo $!)
+    trap cleanup EXIT
 
-    yes | touch $notifications_file
+    notifications_file="/root/cvmfs/ducc/webhook/notifications.txt"
 
-    send_push
-    check_id_action '0' 'push'
+    yes | rm $notifications_file
+    touch $notifications_file
 
-    send_delete
-    check_id_action '1' 'delete'
+    (python3 /root/cvmfs/ducc/webhook/registry-webhook.py -f $notifications_file -h 188.185.120.234 -p 8080 -r 5 &) || return 1
 
-    send_replication
-    check_id_action '2' 'replication'
+    if check_port;
+    then 
+	send_harbor_push || return 2
+        check_id_action '0' 'push' || return $?
+        send_harbor_delete || return 3
+        check_id_action '1' 'delete' || return $?
+        send_harbor_replication || return 4
+        check_id_action '2' 'replication' || return $?
+        send_docker_push || return 5
+        check_id_action '3' 'push' || return $?
+        send_harbor_push || return 6
+        check_id_action '4' 'push' || return $?
+        send_harbor_delete || return 7
+        check_id_action '5' 'delete' || return $?
 
-    yes | touch $notifications_file
+	tmp_notifications_file="${notifications_file%".txt"}" || return 8
+	tmp_notifications_file="${tmp_notifications_file}_tmp.txt" || return 9
+	cp $notifications_file $tmp_notifications_file || return 11
 
-    send_delete
-    check_id_action '0' 'delete'
-
-    send_replication
-    check_id_action '1' 'replication'
-
-    send_replication
-    check_id_action '2' 'replication'
-
-    send_push
-    check_id_action '3' 'push'
-
-    yes | touch $notifications_file
-
-    send_replication
-    check_id_action '0' 'replication'
-
-    send_push
-    check_id_action '1' 'push'
-
-    send_push
-    check_id_action '2' 'push'
-
-    send_push
-    check_id_action '3' 'push'
-
-    send_delete
-    check_id_action '4' 'delete'
-
-    send_delete
-    check_id_action '5' 'delete'
-
-    send_delete
-    check_id_action '6' 'delete'
-
-    echo "999|push|https://registry.cern.ch/unpacked-dev/image:tag" >> $notifications_file
-
-    send_delete
-    check_id_action '1000' 'delete'
-
-    original_content=$(<$notifications_file)
-    original_content="${original_content}\n"
-    original_content=$(echo -e $original_content)
-
-    send_push
-    check_id_action '1001' 'push'
-
-    rotated_file="${notifications_file%".txt"}"
-    rotated_file="${rotated_file}1000.txt"
-
-    rotated_content=$(<$rotated_file)
-    pattern="--- FILE ROTATION ---"
-    rotated_content=${rotated_content%$pattern}
-    rotated_content=$(echo -e $rotated_content)
-
-    if [ "$original_content" != "$rotated_content" ]
-    then
-        echo -e "\nAn error ocurred during file rotation: content mismatch"
-        kill $pid
-        return 10
-    fi
-
-    if [ ! -f "$rotated_file" ]; then
-        echo -e "\nAn error ocurred during file rotation: backup file does not exist"
-        kill $pid
-        return 11
-    fi
-
-    send_delete
-    check_id_action '1002' 'delete'
-
-    send_replication
-    check_id_action '1003' 'replication'
-
-    kill $pid
+	if !(diff -q $tmp_notifications_file "/root/cvmfs/ducc/webhook/0-5notifications.txt");
+	then
+	    echo 'File rotation failed' && return 30
+	fi
+     fi
 
     return 0
 }
