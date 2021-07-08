@@ -96,7 +96,8 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
   }
 
   // .cvmfsbundles file type
-  if (entry->IsBundleSpec()) {
+  if (entry->IsBundleSpec() && entry->IsRegularFile() &&
+      !entry->HasHardlinks()) {
     std::string json_string;
 
     int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
