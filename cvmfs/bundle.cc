@@ -31,31 +31,9 @@ ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
       return NULL;
     } else {
       value = value->first_child;
-      std::string filepath = std::string(value->string_value);
+      std::string filepath;
 
-      // if file doesn't exist then bundle is not created
-      if (!FileExists(filepath)) {
-        PrintWarning("File not found: " + filepath);
-        delete op;
-        return NULL;
-      }
-
-      // if the file size exceeds kMaxFileSize then bundle is not created
-      int64_t currentFileSize = GetFileSize(filepath);
-      if (currentFileSize > kMaxFileSize) {
-        PrintWarning("Large file found: " + filepath + " of size: "
-          + StringifyInt(currentFileSize));
-        delete op;
-        return NULL;
-      }
-
-      if (!AddFileToObjectPack(op, filepath)) {
-        delete op;
-        return NULL;
-      }
-
-      while (value->next_sibling) {
-        value = value->next_sibling;
+      do {
         filepath = std::string(value->string_value);
 
         // if file doesn't exist then bundle is not created
@@ -66,7 +44,7 @@ ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
         }
 
         // if the file size exceeds kMaxFileSize then bundle is not created
-        currentFileSize = GetFileSize(filepath);
+        int64_t currentFileSize = GetFileSize(filepath);
         if (currentFileSize > kMaxFileSize) {
           PrintWarning("Large file found: " + filepath + " of size: "
                 + StringifyInt(currentFileSize));
@@ -78,7 +56,7 @@ ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
           delete op;
           return NULL;
         }
-      }
+      } while(value->next_sibling);
     }
 
     return op;
