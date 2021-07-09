@@ -26,7 +26,10 @@ ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
 
     value = (value->first_child);  // bundleid
     value = (value->next_sibling);  // JSON array
-    if (value->first_child) {
+    if (!value->first_child) {
+      PrintWarning("Empty bundle not created");
+      return NULL;
+    } else {
       value = value->first_child;
       std::string filepath = std::string(value->string_value);
 
@@ -76,9 +79,6 @@ ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
           return NULL;
         }
       }
-    } else {
-      PrintWarning("Empty bundle not created");
-      return NULL;
     }
 
     return op;
