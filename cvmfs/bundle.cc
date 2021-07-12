@@ -9,18 +9,19 @@
 #include "json_document.h"
 #include "pack.h"
 #include "util/exception.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
-ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
+UniquePtr<ObjectPack> *Bundle::CreateBundle(const JSON *json_obj) {
   const JSON *value = json_obj;
   if (value->type != JSON_OBJECT) {
     PANIC(kLogStderr, "JSON object not found");
   } else {
     // create an ObjectPack
-    ObjectPack *op = new ObjectPack();
+    UniquePtr<ObjectPack>* op = new UniquePtr<ObjectPack>(new ObjectPack());
 
-    if (op == NULL) {
+    if (!op->IsValid()) {
       PANIC(kLogStderr, "Insufficient memory");
     }
 
@@ -28,7 +29,7 @@ ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
     value = (value->next_sibling);  // JSON array
     if (!value->first_child) {
       PrintWarning("Empty bundle not created");
-      return NULL;
+      return op;
     } else {
       value = value->first_child;
       std::string filepath;
@@ -46,13 +47,13 @@ ObjectPack *Bundle::CreateBundle(const JSON *json_obj) {
           if (currentFileSize > kMaxFileSize) {
             PrintWarning("Large file found: " + filepath + " of size: "
                   + StringifyInt(currentFileSize));
-            delete op;
-            return NULL;
+            op->Release();
+            return op;
           }
 
           if (!AddFileToObjectPack(op, filepath)) {
-            delete op;
-            return NULL;
+            op->Release();
+            return op;
           }
         }
       } while (value->next_sibling);

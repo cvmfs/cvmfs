@@ -9,6 +9,7 @@
 
 #include "json_document.h"
 #include "pack.h"
+#include "util/pointer.h"
 
 /**
  * A bundle has the binary format of object packs used as
@@ -46,7 +47,7 @@ class Bundle {
    *   ]
    * }
    */
-  ObjectPack *CreateBundle(const JSON *json_obj);
+  UniquePtr<ObjectPack> *CreateBundle(const JSON *json_obj);
 };
 
 #endif  // CVMFS_BUNDLE_H_
