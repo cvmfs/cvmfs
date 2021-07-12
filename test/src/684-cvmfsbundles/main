@@ -9,9 +9,6 @@ cvmfs_run_test() {
   echo "*** Create a new repository"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
 
-  echo "*** Create a new repository"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
-
   echo "*** Create and edit a .cvmfsbundles file"
   start_transaction $CVMFS_TEST_REPO || return 2
   touch /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 3
