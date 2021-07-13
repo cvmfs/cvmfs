@@ -20,5 +20,26 @@ cvmfs_run_test() {
   rm -f /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 7
   publish_repo $CVMFS_TEST_REPO || return 8
 
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  # Test for failure in case a .cvmfsbundles file is found in a subdirectory
+  # of a repository
+
+  echo "*** Create a .cvmfsbundles file in a subdirectory"
+  start_transaction $CVMFS_TEST_REPO || return 9
+  mkdir /cvmfs/$CVMFS_TEST_REPO/test_dir || return 10
+  touch /cvmfs/$CVMFS_TEST_REPO/test_dir/.cvmfsbundles || return 11
+  echo "{}" > /cvmfs/$CVMFS_TEST_REPO/test_dir/.cvmfsbundles || return 12
+
+  echo "*** Publish repository"
+  publish_repo $CVMFS_TEST_REPO
+  if [ $? -eq 0 ]
+  then
+    return 13
+  else
+    echo "*** Abort transaction"
+    abort_transaction $CVMFS_TEST_REPO || return 14
+  fi
+
   return 0
 }
