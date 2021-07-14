@@ -688,6 +688,92 @@ void SendMsg2Socket(const int fd, const std::string &msg) {
   (void)send(fd, &msg[0], msg.length(), MSG_NOSIGNAL);
 }
 
+/**
+ * Sends the file descriptor passing_fd to the socket socket_fd. Can be used
+ * to transfer an open file descriptor from one process to another. Use
+ * ConnectSocket() to get the socket_fd.
+ */
+bool SendFd2Socket(int socket_fd, int passing_fd) {
+  union {
+    // Make sure that ctrl_msg is properly aligned.
+    struct cmsghdr align;
+    // Buffer large enough to store the file descriptor (ancillary data)
+    unsigned char buf[CMSG_SPACE(sizeof(int))];
+  } ctrl_msg;
+
+  memset(ctrl_msg.buf, 0, sizeof(ctrl_msg.buf));
+
+  struct msghdr msgh;
+  msgh.msg_name = NULL;
+  msgh.msg_namelen = 0;
+
+  unsigned char dummy = 0;
+  struct iovec iov;
+  iov.iov_base = &dummy;
+  iov.iov_len = 1;
+  msgh.msg_iov = &iov;
+  msgh.msg_iovlen = 1;
+
+  msgh.msg_control = ctrl_msg.buf;
+  msgh.msg_controllen = sizeof(ctrl_msg.buf);
+  struct cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
+  cmsgp->cmsg_len = CMSG_LEN(sizeof(int));
+  cmsgp->cmsg_level = SOL_SOCKET;
+  cmsgp->cmsg_type = SCM_RIGHTS;
+  memcpy(CMSG_DATA(cmsgp), &passing_fd, sizeof(int));
+
+  ssize_t retval = sendmsg(socket_fd, &msgh, 0);
+  return (retval != -1);
+}
+
+
+/**
+ * Returns the file descriptor that has been sent with SendFd2Socket. The
+ * msg_fd file descriptor needs to come from a call to accept() on the socket
+ * where the passing file descriptor has been sent to.
+ * Returns -errno on error.
+ */
+int RecvFdFromSocket(int msg_fd) {
+  union {
+    // Make sure that ctrl_msg is properly aligned.
+    struct cmsghdr align;
+    // Buffer large enough to store the file descriptor (ancillary data)
+    unsigned char buf[CMSG_SPACE(sizeof(int))];
+  } ctrl_msg;
+
+  memset(ctrl_msg.buf, 0, sizeof(ctrl_msg.buf));
+
+  struct msghdr msgh;
+  msgh.msg_name = NULL;
+  msgh.msg_namelen = 0;
+
+  unsigned char dummy;
+  struct iovec iov;
+  iov.iov_base = &dummy;
+  iov.iov_len = 1;
+  msgh.msg_iov = &iov;
+  msgh.msg_iovlen = 1;
+
+  msgh.msg_control = ctrl_msg.buf;
+  msgh.msg_controllen = sizeof(ctrl_msg.buf);
+
+  ssize_t retval = recvmsg(msg_fd, &msgh, 0);
+  if (retval == -1)
+    return -errno;
+
+  struct cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
+  assert(cmsgp != NULL);
+  if (cmsgp->cmsg_len != CMSG_LEN(sizeof(int)))
+    return -ERANGE;
+  assert(cmsgp->cmsg_level == SOL_SOCKET);
+  assert(cmsgp->cmsg_type == SCM_RIGHTS);
+
+  int passing_fd;
+  memcpy(&passing_fd, CMSG_DATA(cmsgp), sizeof(int));
+  assert(passing_fd >= 0);
+  return passing_fd;
+}
+
 
 /**
  * set(e){g/u}id wrapper.

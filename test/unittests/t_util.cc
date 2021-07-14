@@ -749,6 +749,46 @@ TEST_F(T_Util, SendMes2Socket) {
 }
 
 
+TEST_F(T_Util, SendRecvFd) {
+  int fd_server = MakeSocket(socket_address, 0700);
+  ASSERT_LE(0, fd_server);
+  FdGuard fd_guard_server(fd_server);
+  listen(fd_server, 1);
+
+  pid_t pid = fork();
+  switch (pid) {
+    case -1:
+      ASSERT_TRUE(false);
+    case 0:
+      struct sockaddr_un client_addr;
+      unsigned int client_length = sizeof(client_addr);
+      int fd_conn = accept(fd_server, (struct sockaddr *) &client_addr,
+                           &client_length);
+      if (fd_conn < 0)
+        _exit(1);
+      int fd_recv = RecvFdFromSocket(fd_conn);
+      if (fd_recv < 0)
+        _exit(10 - fd_recv);
+      char zero = 42;
+      int retval = read(fd_recv, &zero, 1);
+      if (retval != 1)
+        _exit(3);
+      if (zero != 0)
+        _exit(4);
+      _exit(0);
+  }
+
+  int fd_client = ConnectSocket(socket_address);
+  ASSERT_LE(0, fd_client);
+  FdGuard fd_guard_client(fd_client);
+
+  int fd_pass = open("/dev/zero", O_RDONLY);
+  ASSERT_LE(0, fd_pass);
+  EXPECT_TRUE(SendFd2Socket(fd_client, fd_pass));
+  EXPECT_EQ(0, WaitForChild(pid));
+}
+
+
 TEST_F(T_Util, TcpEndpoints) {
   EXPECT_EQ(-1, MakeTcpEndpoint("foobar", 0));
   int fd_server = MakeTcpEndpoint("", 12345);
