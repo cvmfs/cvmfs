@@ -105,7 +105,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     }
 
     std::string parent_path = GetParentPath(entry->GetUnionPath());
-    if (!IsMountPoint(parent_path)) {
+    if (parent_path != union_engine_->union_path()) {
       PANIC(kLogStderr, "Error: .cvmfsbundles file must be in the root"
             " directory of the repository. Found in %s", parent_path.c_str());
     }
