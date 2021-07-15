@@ -96,8 +96,14 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
   }
 
   // .cvmfsbundles file type
-  if (entry->IsBundleSpec() && entry->IsRegularFile() &&
-      !entry->HasHardlinks()) {
+  if (entry->IsBundleSpec()) {
+    if (!entry->IsRegularFile()) {
+      PANIC(kLogStderr, "Error: .cvmfsbundles file must be a regular file");
+    }
+    if (entry->HasHardlinks()) {
+      PANIC(kLogStderr, "Error: .cvmfsbundles file must not be a hard link");
+    }
+
     std::string parent_path = GetParentPath(entry->GetUnionPath());
     if (!IsMountPoint(parent_path)) {
       PANIC(kLogStderr, "Error: .cvmfsbundles file must be in the root"
