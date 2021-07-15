@@ -574,6 +574,35 @@ int CmdEnter::Main(const Options &options) {
     if (rvi != 0)
       throw EPublish("cannot chroot to " + rootfs_dir_);
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
+
+    if (options.Has("transaction")) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Starting a transaction!");
+  
+      if (options.Has("repo-config")) {
+        LogCvmfs(kLogCvmfs, kLogStdout, "External configuration for the repository");
+        repo_config_ = options.GetString("repo-config");
+      }
+  
+      // We need a builder that points to the new path --> Override the default value in the constructor
+      SettingsBuilder builder;
+      builder.config_path_ = repo_config_;
+    
+      SettingsPublisher* settings_publisher = builder.CreateSettingsPublisher(fqrn_, false);
+      LogCvmfs(kLogCvmfs, kLogStdout, "Publisher settings created, TMP: %s",
+               SettingsRepository(*settings_publisher).tmp_dir().c_str());
+      
+      /*
+      Publisher::Session session(*settings_publisher);
+      session.Acquire();
+      */
+     
+      // Create Publisher object
+      UniquePtr<Publisher> publisher;
+      publisher = new Publisher(*settings_publisher);
+  
+      publisher->Transaction();
+    }
+
     // May fail if the working directory was invalid to begin with
     rvi = chdir(cwd.c_str());
     if (rvi != 0) {

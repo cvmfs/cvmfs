@@ -42,6 +42,10 @@ class CmdEnter : public Command {
       "Do not remove the session directory when the shell exits"));
     p.push_back(Parameter::Switch("keep-logs", 'l',
       "Clean the session directory on shell exit except for the logs"));
+    p.push_back(Parameter::Switch("transaction", 't',
+      "Open a transaction within the enter shell"));
+    p.push_back(Parameter::Optional("repo-config", 'x', "repository configuration",
+      "Path to the configuration of the repository gateway"));
     return p;
   }
   virtual unsigned GetMinPlainArgs() const { return 1; }
@@ -65,6 +69,7 @@ class CmdEnter : public Command {
   SettingsSpoolArea settings_spool_area_;
   std::string fqrn_;
   std::string cvmfs2_binary_;
+  std::string repo_config_;
   std::string overlayfs_binary_;
   std::string session_dir_;  ///< In $HOME/.cvmfs/fqrn, container spool area
   std::string env_conf_;  ///< Stores the session directory environment

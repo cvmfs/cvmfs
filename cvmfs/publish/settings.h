@@ -499,13 +499,18 @@ class SettingsBuilder : SingleCopy {
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }
 
- private:
+  void ApplyOptionsFromServerPath(SettingsPublisher &settings_publisher,
+                                  OptionsManager &options_mgr_);
+
   std::string config_path_;
+  OptionsManager *options_mgr_;
+
+ private:
   /**
    * For locally managed repositories, the options manager is non NULL and
    * contains the configuration after a call to CreateSettingsRepository()
    */
-  OptionsManager *options_mgr_;
+  //OptionsManager *options_mgr_;
 
   /**
    * Returns the name of the one and only repository under kConfigPath

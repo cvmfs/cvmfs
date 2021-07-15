@@ -38,12 +38,14 @@ int CmdAbort::Main(const Options &options) {
     throw;
   }
 
+  /**
   if (settings->transaction().in_enter_session()) {
     throw EPublish(
       "aborting a transaction is unsupported within the ephemeral "
       "writable shell",
       EPublish::kFailInvocation);
   }
+  */
 
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
                          false /* temporarily */))

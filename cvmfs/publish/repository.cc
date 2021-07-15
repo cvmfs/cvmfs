@@ -154,6 +154,7 @@ void Repository::DownloadRootObjects(
   std::string reflog_path;
   FILE *reflog_fd =
     CreateTempFile(tmp_dir + "/reflog", kPrivateFileMode, "w", &reflog_path);
+  LogCvmfs(kLogCvmfs, kLogStdout, "Reflog target %s %p\n", reflog_path.c_str(), reflog_fd);
   std::string reflog_url = url + "/.cvmfsreflog";
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
@@ -164,6 +165,7 @@ void Repository::DownloadRootObjects(
        reflog_fd,
        NULL);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
+  //if (reflog_fd == NULL) throw EPublish("Null reflog");
   fclose(reflog_fd);
   if (rv_dl == download::kFailOk) {
     delete reflog_;
