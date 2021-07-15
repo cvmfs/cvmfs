@@ -97,6 +97,9 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
   // .cvmfsbundles file type
   if (entry->IsBundleSpec()) {
+    PrintWarning(".cvmfsbundles file encountered. "
+                 "Bundles is currently an experimental feature.");
+
     if (!entry->IsRegularFile()) {
       PANIC(kLogStderr, "Error: .cvmfsbundles file must be a regular file");
     }
