@@ -318,13 +318,21 @@ static std::string GetCvmfsBinary() {
 }
 
 static int AttachMount(const std::string &mountpoint, int fuse_fd) {
-  char mntopt[50];
+  platform_stat64 info;
+  int retval = platform_stat(mountpoint.c_str(), &info);
+  if (retval != 0)
+    return 1;
+
+  char mntopt[100];
   snprintf(mntopt, sizeof(mntopt),
-           "default_permissions,allow_other,fd=%i", fuse_fd);
-  int rvi = mount("/dev/fuse", mountpoint.c_str(), "fuse", 0, mntopt);
-  if (rvi != 0) {
+           "ro,fd=%i,rootmode=%o,user_id=%d,group_id=%d",
+           fuse_fd, info.st_mode & S_IFMT, geteuid(), getegid());
+  // TODO(jblomer): remove NOSUID according to options
+  retval = mount("cvmfs2", mountpoint.c_str(), "fuse",
+                 MS_NODEV | MS_RDONLY | MS_NOSUID, mntopt);
+  if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-             "Cannot attach to existing fuse module");
+             "Cannot attach to existing fuse module (%d)", errno);
     return 1;
   }
   return 0;

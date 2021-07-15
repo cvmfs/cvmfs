@@ -8,7 +8,7 @@ CVMFS_TEST094_PID_NAMESPACE=
 cleanup() {
   if [ ! -z $CVMFS_TEST094_PID_NAMESPACE ]; then
     echo "*** Kill namespaced process $CVMFS_TEST094_PID_NAMESPACE"
-    sudo kill -9 $CVMFS_TEST094_PID_NAMESPACE
+    sudo pkill -P $CVMFS_TEST094_PID_NAMESPACE
   fi
   # If the test fails, return to a sane state
   sudo cvmfs_config killall
@@ -20,6 +20,9 @@ cvmfs_run_test() {
 
   echo "*** mount cernvm-prod.cern.ch"
   cvmfs_mount cernvm-prod.cern.ch || return 1
+
+  cat /proc/mounts | grep fuse
+  cat /proc/self/mountinfo | grep fuse
 
   local fuse_pid=$(sudo cvmfs_talk -i cernvm-prod.cern.ch pid)
   echo "*** Fuse PID is $fuse_pid"
@@ -36,7 +39,8 @@ cvmfs_run_test() {
 
   echo "*** unmount system-wide mount"
   cvmfs_umount cernvm-prod.cern.ch || return 20
-  cat /proc/mounts
+  cat /proc/mounts | grep fuse
+  cat /proc/self/mountinfo | grep fuse
   ps -eaf | grep cvmfs2
 
   if [ "x$(sudo cvmfs_talk -i cernvm-prod.cern.ch pid)" != "x$fuse_pid" ]; then
@@ -48,15 +52,35 @@ cvmfs_run_test() {
   echo "*** try to remount system-wide mount"
   sudo mount -t cvmfs cernvm-prod.cern.ch /cvmfs/cernvm-prod.cern.ch
   if [ $? -ne 0 ]; then
-    cat_syslog | tail -n 32
+    cat_syslog | grep -e '(cernvm-prod.cern.ch)' | tail -n 8
     return 30
   fi
+
+  ls -lah /cvmfs/cernvm-prod.cern.ch/|| return 31
+  cat /proc/mounts | grep fuse
+  cat /proc/self/mountinfo | grep fuse
 
   if [ "x$(sudo cvmfs_talk -i cernvm-prod.cern.ch pid)" != "x$fuse_pid" ]; then
     echo "Fuse daemon should have stayed the same"
     sudo cvmfs_talk -i cernvm-prod.cern.ch pid
-    return 31
+    return 32
   fi
+
+  echo "*** Unmount system mount"
+  cvmfs_umount cernvm-prod.cern.ch || return 40
+
+  echo "*** Stop namespace'd process"
+  sudo kill -0 $CVMFS_TEST094_PID_NAMESPACE || return 41
+  sudo pkill -P $CVMFS_TEST094_PID_NAMESPACE || return 42
+  while sudo kill -0 $CVMFS_TEST094_PID_NAMESPACE; do
+    :
+  done
+  CVMFS_TEST094_PID_NAMESPACE=
+
+  # Last one turns out the lights (failure caught be timeout)
+  while sudo cvmfs_talk -i cernvm-prod.cern.ch pid; do
+    sleep 1
+  done
 
   return 0
 }
