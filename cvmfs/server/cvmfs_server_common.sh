@@ -1258,11 +1258,14 @@ get_auto_tags_timespan() {
 unmount_and_teardown_repository() {
   local name=$1
   load_repo_config $name
-  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
   local rw_mnt="/cvmfs/$name"
   local rdonly_mnt="${CVMFS_SPOOL_DIR}/rdonly"
-  is_mounted "$rw_mnt"     && ( umount $rw_mnt     || return 1; )
-  is_mounted "$rdonly_mnt" && ( umount $rdonly_mnt || return 2; )
+  is_mounted "$rw_mnt"     && ( run_suid_helper rw_umount $name || return 1; )
+  is_mounted "$rdonly_mnt" && ( run_suid_helper rdonly_umount $name || return 2; )
+  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
+  if is_systemd; then
+    systemctl daemon-reload
+  fi
   return 0
 }
 
