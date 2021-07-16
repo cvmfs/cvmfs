@@ -318,6 +318,11 @@ static std::string GetCvmfsBinary() {
 }
 
 static int AttachMount(const std::string &mountpoint, int fuse_fd) {
+#ifdef __APPLE__
+  (void) mountpoint;
+  (void) fuse_fd;
+  return 1;
+#else
   platform_stat64 info;
   int retval = platform_stat(mountpoint.c_str(), &info);
   if (retval != 0)
@@ -336,6 +341,7 @@ static int AttachMount(const std::string &mountpoint, int fuse_fd) {
     return 1;
   }
   return 0;
+#endif
 }
 
 
