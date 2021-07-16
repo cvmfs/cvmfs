@@ -60,6 +60,28 @@ static void ExecAsRoot(const char *binary,
 }
 
 
+static bool HasSystemctl(void) {
+  platform_stat64 info;
+  int retval = platform_stat("/bin/systemctl", &info);
+  return (retval == 0);
+}
+
+static void Systemctl(const string &action, const string &path) {
+  string systemd_unit = cvmfs_suid::EscapeSystemdUnit(path);
+  // On newer versions of systemd, the mount unit is based on the fully
+  // resolved path (discovered on Ubuntu 18.04, test 539)
+  if (!cvmfs_suid::PathExists(string("/run/systemd/generator/") +
+                              systemd_unit)) {
+    string resolved_path = cvmfs_suid::ResolvePath(path);
+    if (resolved_path.empty()) {
+      fprintf(stderr, "cannot resolve %s\n", path.c_str());
+      exit(1);
+    }
+    systemd_unit = cvmfs_suid::EscapeSystemdUnit(resolved_path);
+  }
+  ExecAsRoot("/bin/systemctl", action.c_str(), systemd_unit.c_str(), NULL);
+}
+
 static void Remount(const string &path, const RemountType how) {
   string remount_option = "remount,";
   switch (how) {
@@ -78,34 +100,30 @@ static void Remount(const string &path, const RemountType how) {
 }
 
 static void Mount(const string &path) {
-  platform_stat64 info;
-  int retval = platform_stat("/bin/systemctl", &info);
-  if (retval == 0) {
-    string systemd_unit = cvmfs_suid::EscapeSystemdUnit(path);
-    // On newer versions of systemd, the mount unit is based on the fully
-    // resolved path (discovered on Ubuntu 18.04, test 539)
-    if (!cvmfs_suid::PathExists(
-          string("/run/systemd/generator/") + systemd_unit))
-    {
-      string resolved_path = cvmfs_suid::ResolvePath(path);
-      if (resolved_path.empty()) {
-        fprintf(stderr, "cannot resolve %s\n", path.c_str());
-        exit(1);
-      }
-      systemd_unit = cvmfs_suid::EscapeSystemdUnit(resolved_path);
-    }
-    ExecAsRoot("/bin/systemctl", "start", systemd_unit.c_str(), NULL);
+  // Use systemctl if available, otherwise perform a raw mount
+  if (HasSystemctl()) {
+    Systemctl("start", path);
   } else {
     ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
   }
 }
 
 static void Umount(const string &path) {
-  ExecAsRoot("/bin/umount", path.c_str(), NULL, NULL);
+  // Use systemctl if available, and always follow up with a raw
+  // unmount to cover cases where there is no corresponding systemd
+  // unit (e.g. for autofs mounts)
+  if (HasSystemctl()) {
+    Systemctl("stop", path);
+  }
+  ExecAsRoot("/bin/umount", "-q", path.c_str(), NULL, NULL);
 }
 
 static void LazyUmount(const string &path) {
-  ExecAsRoot("/bin/umount", "-l", path.c_str(), NULL);
+  if (HasSystemctl()) {
+    Systemctl("stop", path);
+  } else {
+    ExecAsRoot("/bin/umount", "-l", path.c_str(), NULL);
+  }
 }
 
 static void KillCvmfs(const string &fqrn) {
