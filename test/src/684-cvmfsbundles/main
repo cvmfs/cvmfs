@@ -41,5 +41,24 @@ cvmfs_run_test() {
     abort_transaction $CVMFS_TEST_REPO || return 14
   fi
 
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  # Test for failure in case a .cvmfsbundles directory is found in the
+  # repository
+
+  echo "*** Create a .cvmfsbundles directory in the repository"
+  start_transaction $CVMFS_TEST_REPO || return 15
+  mkdir /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 16
+
+  echo "*** Publish repository"
+  publish_repo $CVMFS_TEST_REPO
+  if [ $? -eq 0 ]
+  then
+    return 17
+  else
+    echo "*** Abort transaction"
+    abort_transaction $CVMFS_TEST_REPO || return 18
+  fi
+
   return 0
 }
