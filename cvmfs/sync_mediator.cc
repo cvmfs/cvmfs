@@ -126,7 +126,6 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     }
     JsonDocument *json = JsonDocument::Create(json_string);
 
-    // for now using AddFile()
     AddFile(entry);
     return;
   }
