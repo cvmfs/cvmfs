@@ -5,6 +5,7 @@
 #ifndef CVMFS_BUNDLE_H_
 #define CVMFS_BUNDLE_H_
 
+#include <set>
 #include <string>
 
 #include "json_document.h"
@@ -48,6 +49,7 @@ class Bundle {
    * }
    */
   UniquePtr<ObjectPack> *CreateBundle(const JSON *json_obj);
+  std::set<std::string> ParseBundleSpec(const JSON *json_obj);
 };
 
 #endif  // CVMFS_BUNDLE_H_

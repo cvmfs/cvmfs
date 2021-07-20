@@ -4,6 +4,7 @@
 
 #include "bundle.h"
 
+#include <set>
 #include <string>
 
 #include "json_document.h"
@@ -61,4 +62,30 @@ UniquePtr<ObjectPack> *Bundle::CreateBundle(const JSON *json_obj) {
 
     return op;
   }
+}
+
+std::set<std::string> Bundle::ParseBundleSpec(const JSON *json_obj) {
+  std::set<std::string> filepath_set;
+  const JSON *value = json_obj;
+  if (value->type != JSON_OBJECT) {
+    PANIC(kLogStderr, "JSON object not found");
+  }
+
+  value = (value->first_child);  // bundleid
+  value = (value->next_sibling);  // JSON array
+  if (value->first_child) {
+    value = value->first_child;
+    std::string filepath;
+    do {
+      filepath = std::string(value->string_value);
+      if (filepath_set.find(filepath) != filepath_set.end()) {
+        PANIC(kLogStderr, "Duplicate filepath found: %s", filepath.c_str());
+      }
+      filepath_set.insert(filepath);
+
+      value = value->next_sibling;
+    } while (value);
+  }
+
+  return filepath_set;
 }
