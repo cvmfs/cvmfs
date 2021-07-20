@@ -302,20 +302,20 @@ int main(int argc, char *argv[]) {
   const string command = argv[1];
   const string fqrn = argv[2];
 
-  // Verify if repository exists
-  platform_stat64 info;
-  retval = platform_lstat((string(kSpoolArea) + "/" + fqrn).c_str(), &info);
-  if (retval != 0) {
-    fprintf(stderr, "unknown repository: %s\n", fqrn.c_str());
-    return 1;
-  }
-  repository_uid = info.st_uid;
-
-  // Verify if caller uid matches
-  if ((calling_uid != 0) && (calling_uid != repository_uid)) {
-    fprintf(stderr, "called as %d, repository owned by %d\n",
-            calling_uid, repository_uid);
-    return 1;
+  // Verify if caller uid matches (or is root)
+  if (calling_uid != 0) {
+    platform_stat64 info;
+    retval = platform_lstat((string(kSpoolArea) + "/" + fqrn).c_str(), &info);
+    if (retval != 0) {
+      fprintf(stderr, "unknown repository: %s\n", fqrn.c_str());
+      return 1;
+    }
+    repository_uid = info.st_uid;
+    if (calling_uid != repository_uid) {
+      fprintf(stderr, "called as %d, repository owned by %d\n",
+              calling_uid, repository_uid);
+      return 1;
+    }
   }
 
   if (command == "lock") {
