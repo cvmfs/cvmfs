@@ -758,6 +758,12 @@ int FuseMain(int argc, char *argv[]) {
     options_manager->ParseDefault(*repository_name_);
   }
 
+  // Use "cvmfs2" as the fsname for the mount point device, to prevent
+  // systemd from inferring a non-functional dependency on the
+  // (non-existent) dev-fuse.device unit
+  string fsname = "-ofsname=cvmfs2";
+  fuse_opt_add_arg(mount_options, fsname.c_str());
+
 #ifdef __APPLE__
   string volname = "-ovolname=" + *repository_name_;
   fuse_opt_add_arg(mount_options, volname.c_str());
