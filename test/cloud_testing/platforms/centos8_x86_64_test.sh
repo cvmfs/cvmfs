@@ -32,6 +32,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/056-lowspeedlimit                        \
                                  src/084-premounted                           \
+                                 src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

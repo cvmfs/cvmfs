@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export CVMFS_PLATFORM_NAME="fedora$(. /etc/os-release && echo "$VERSION_ID")-$(uname -m)" 
+export CVMFS_PLATFORM_NAME="fedora$(. /etc/os-release && echo "$VERSION_ID")-$(uname -m)"
 export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # source the common platform independent functionality and option parsing
@@ -23,6 +23,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/006-buildkernel                          \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
+                                 src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

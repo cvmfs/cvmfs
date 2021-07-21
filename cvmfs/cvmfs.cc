@@ -1603,6 +1603,27 @@ void UnregisterQuotaListener() {
   }
 }
 
+bool SendFuseFd(const std::string &socket_path) {
+  int fuse_fd;
+#if (FUSE_VERSION >= 30)
+  fuse_fd = fuse_session_fd(*reinterpret_cast<struct fuse_session**>(
+    loader_exports_->fuse_channel_or_session));
+#else
+  fuse_fd = fuse_chan_fd(*reinterpret_cast<struct fuse_chan**>(
+    loader_exports_->fuse_channel_or_session));
+#endif
+  assert(fuse_fd >= 0);
+  int sock_fd = ConnectSocket(socket_path);
+  if (sock_fd < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "cannot connect to socket %s: %d",
+             socket_path.c_str(), errno);
+    return false;
+  }
+  bool retval = SendFd2Socket(sock_fd, fuse_fd);
+  close(sock_fd);
+  return retval;
+}
+
 }  // namespace cvmfs
 
 
