@@ -1014,7 +1014,7 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
-  if (entry->filename() == ".cvmfsbundles") {
+  if (entry->IsBundleSpec()) {
     PANIC(kLogStderr, "Illegal directory name: .cvmfsbundles (%s). "
           ".cvmfsbundles is reserved for bundles specification files",
           entry->GetUnionPath().c_str());
