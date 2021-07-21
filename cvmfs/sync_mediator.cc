@@ -124,7 +124,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
       PANIC(kLogStderr, "Could not read contents of file: %s",
             entry->GetUnionPath().c_str());
     }
-    JsonDocument *json = JsonDocument::Create(json_string);
+    UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
 
     AddFile(entry);
     return;
