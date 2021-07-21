@@ -1274,7 +1274,7 @@ cvmfs_config_fuser() {
   fi
   [ -n "$deviceid" ] || die "Could not obtain device id for $fqrn"
 
-  lsof | awk '{if ($6 == "'${deviceid/:/,}'") print $2}' | sort -un | paste -sd ' '
+  lsof | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
 }
 
 cvmfs_umount() {
