@@ -94,7 +94,7 @@ static void Mount(const string &path) {
       }
       systemd_unit = cvmfs_suid::EscapeSystemdUnit(resolved_path);
     }
-    ExecAsRoot("/bin/systemctl", "start", systemd_unit.c_str(), NULL);
+    ExecAsRoot("/bin/systemctl", "restart", systemd_unit.c_str(), NULL);
   } else {
     ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
   }
