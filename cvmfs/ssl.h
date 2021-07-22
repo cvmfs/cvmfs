@@ -3,7 +3,6 @@
  *
  * It helps managing the CA certificates for the servers mostly to enable
  * HTTPS connections.
- *
  */
 
 #ifndef CVMFS_SSL_H_

@@ -1490,7 +1490,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 
-DownloadManager::DownloadManager(): use_system_ca_(false) {
+DownloadManager::DownloadManager() {
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
   pool_max_handles_ = 0;
@@ -1534,6 +1534,7 @@ DownloadManager::DownloadManager(): use_system_ca_(false) {
   opt_ipv4_only_ = false;
   follow_redirects_ = false;
   use_system_proxy_ = false;
+  use_system_ca_ = false;
 
   resolver_ = NULL;
 
