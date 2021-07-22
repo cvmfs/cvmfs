@@ -10,19 +10,22 @@ cvmfs_run_test() {
 
   echo "Start background process accessing it and check that it is being used"
   set -m # enables job control handling
-  (cd /cvmfs/grid.cern.ch; sleep 30) &
+  (cd /cvmfs/grid.cern.ch; sleep 10000) &
   backpid="$!"
   pids="`sudo cvmfs_config fuser grid.cern.ch`"
-  [[ " $pids " == *" $backpid "* ]] || return 10
   kill -15 -$backpid
   wait $backpid 2>/dev/null || true
+  [[ " $pids " == *" $backpid "* ]] || return 10
   pids="`sudo cvmfs_config fuser grid.cern.ch`"
   [ -z "$pids" ] || return 11
 
   echo "Start unshared background process accessing it, and check that"
-  unshare -Um sh -c "cd /cvmfs/grid.cern.ch && /bin/sleep 60" & 
+  unshare -Um sh -c "cd /cvmfs/grid.cern.ch && touch $PWD/started && /bin/sleep 10000" & 
   backpid="$!"
-  sleep 1
+  while [ ! -f started ]; do
+    sleep 1
+  done
+  rm started
   cvmfs_umount grid.cern.ch
   # can't get error code from background proc before wait, so instead do
   #   kill -0 on it to see if it is still running
@@ -32,12 +35,11 @@ cvmfs_run_test() {
     CVMFS_GENERAL_WARNING_FLAG=1
   else
     pids="`sudo cvmfs_config fuser grid.cern.ch`"
-    [[ " $pids " == *" $backpid "* ]] || return 20
     kill -15 -$backpid
     wait $backpid 2>/dev/null || true
+    [[ " $pids " == *" $backpid "* ]] || return 20
     echo "Checking once more, where it should be completely unmounted"
-    pids="`sudo cvmfs_config fuser grid.cern.ch`"
-    [ -z "$pids" ] || return 21
+    ! sudo cvmfs_config fuser grid.cern.ch || return 21
   fi
 
   return 0
