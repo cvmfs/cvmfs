@@ -27,28 +27,11 @@ class Bundle {
 
   /**
    * Creates a ObjectPack bundle of one or more regular files
-   * The bundle is not created if any of the files to be included is not found or
-   * if the file size of any of the files exceeds a maximum value kMaxFileSize
    *
-   * Returns a pointer to the created ObjectPack on success, NULL
-   * otherwise
-   *
-   * The `json_obj` must be a JSON Object having a bundle ID and a JSON array
-   * of paths to regular files. The bundle ID is given as a key-value pair where
-   * the key must be `bundle_id` and the value must be a unique bundle name over
-   * all the other bundles. Each of the file paths must be a string.
-   *
-   * An example JSON Object:
-   * {
-   *   "bundle_id": "bundle1",
-   *   "filepaths": [
-   *     "/cvmfs/test.cern.ch/example1.txt",
-   *     "/cvmfs/test.cern.ch/a/example2.txt",
-   *     ...
-   *   ]
-   * }
+   * Returns a UniquePtr to the created ObjectPack on success, an invalid
+   * UniquePtr otherwise
    */
-  UniquePtr<ObjectPack> *CreateBundle(const JSON *json_obj);
+  UniquePtr<ObjectPack> *CreateBundle(std::set<std::string> filepaths);
   std::set<std::string> ParseBundleSpec(const JSON *json_obj);
 };
 
