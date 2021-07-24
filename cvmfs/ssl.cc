@@ -4,6 +4,8 @@
 
 #include "ssl.h"
 
+#include <dirent.h>
+
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -66,14 +68,12 @@ bool SslCertificateStore::ApplySslCertificatePath(CURL *handle) const {
 void SslCertificateStore::UseSystemCertificatePath() {
   std::vector<std::string> candidates;
 
-  // most systems store the certificates here
-  candidates.push_back("/etc/ssl/certs/");
-
-  candidates.push_back("/etc/pki/tls/certs/");
-  candidates.push_back("/etc/ssl/");
-  candidates.push_back("/etc/pki/tls/");
-  candidates.push_back("/etc/pki/ca-trust/extracted/pem/");
-  candidates.push_back("/etc/ssl/");
+  candidates.push_back("/etc/ssl/certs");
+  candidates.push_back("/etc/pki/tls/certs");
+  candidates.push_back("/etc/ssl");
+  candidates.push_back("/etc/pki/tls");
+  candidates.push_back("/etc/pki/ca-trust/extracted/pem");
+  candidates.push_back("/etc/ssl");
 
   for (unsigned i = 0; i < candidates.size(); ++i) {
     if (HasCertificates(candidates[i])) {
