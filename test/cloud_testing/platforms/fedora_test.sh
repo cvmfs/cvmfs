@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export CVMFS_PLATFORM_NAME="fedora$(. /etc/os-release && echo "$VERSION_ID")-$(uname -m)" 
+export CVMFS_PLATFORM_NAME="fedora$(. /etc/os-release && echo "$VERSION_ID")-$(uname -m)"
 export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # source the common platform independent functionality and option parsing
@@ -39,6 +39,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/647-bearercvmfs                          \
                                  src/672-publish_stats_hardlinks              \
+                                 src/684-https_s3                             \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \

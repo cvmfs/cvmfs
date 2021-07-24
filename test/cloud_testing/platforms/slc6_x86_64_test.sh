@@ -47,7 +47,6 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/673-acl                                  \
                                  src/682-enter                                \
                                  src/700-overlayfs_validation                 \
-                                 src/820-https_s3                             \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \

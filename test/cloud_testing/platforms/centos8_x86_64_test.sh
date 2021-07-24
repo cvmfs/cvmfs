@@ -46,7 +46,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
-                                 src/820-https_s3                             \
+                                 src/684-https_s3                             \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
