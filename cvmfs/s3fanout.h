@@ -9,6 +9,7 @@
 #include <semaphore.h>
 
 #include <climits>
+#include <cstdlib>
 #include <map>
 #include <set>
 #include <string>
@@ -23,6 +24,7 @@
 #include "util/file_backed_buffer.h"
 #include "util/mmap_file.h"
 #include "util/pointer.h"
+#include "util/single_copy.h"
 #include "util_concurrency.h"
 
 namespace s3fanout {
@@ -92,7 +94,7 @@ struct Statistics {
 /**
  * Contains all the information to specify an upload job.
  */
-struct JobInfo {
+struct JobInfo : SingleCopy {
   enum RequestType {
     kReqHeadOnly = 0,  // peek
     kReqHeadPut,  // conditional upload of content-addressed objects
@@ -150,7 +152,7 @@ struct JobInfo {
   unsigned throttle_ms;
   // Remember when the 429 reply came in to only throttle if still necessary
   uint64_t throttle_timestamp;
-  char* errorbuffer;
+  char *errorbuffer;
 };  // JobInfo
 
 struct S3FanOutDnsEntry {
