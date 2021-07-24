@@ -1130,9 +1130,11 @@ EOF
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
 
-  # avoid racing against apache
+  # avoid racing against apache; we can safely ignore the certificate validation
+  # at this step, we only want to check that the endpoint is up.
+  # NB: Normally, we are anyway dealing with HTTP URLs at this point.
   local waiting=0
-  while ! curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
+  while ! curl --insecure -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
         [ $http_timeout -gt 0 ]; do
     [ $waiting -eq 1 ] || echo -n "waiting for apache... "
     waiting=1
