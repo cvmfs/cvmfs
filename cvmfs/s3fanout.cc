@@ -14,7 +14,6 @@
 #include "cvmfs_config.h"
 #include "platform.h"
 #include "s3fanout.h"
-#include "ssl.h"
 #include "upload_facility.h"
 #include "util/exception.h"
 #include "util/posix.h"
@@ -617,7 +616,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
 
 /**
  * The Azure Blob authorization header according to
- * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key 
+ * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key
  */
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   const
@@ -970,8 +969,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_PROXY_SSL_VERIFYPEER, 1L);
     assert(retval == CURLE_OK);
-    bool add_cert =
-        AddSSLCertificates(handle, /* add_system_certificates = */ true);
+    bool add_cert = ssl_certificate_store_.ApplySslCertificatePath(handle);
     assert(add_cert);
   }
 
@@ -1245,6 +1243,8 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   watch_fds_ = static_cast<struct pollfd *>(smalloc(4 * sizeof(struct pollfd)));
   watch_fds_size_ = 4;
   watch_fds_inuse_ = 0;
+
+  ssl_certificate_store_.UseSystemCertificatePath();
 }
 
 S3FanoutManager::~S3FanoutManager() {

@@ -19,6 +19,7 @@
 #include "duplex_curl.h"
 #include "prng.h"
 #include "smalloc.h"
+#include "ssl.h"
 #include "util/file_backed_buffer.h"
 #include "util/mmap_file.h"
 #include "util/pointer.h"
@@ -328,6 +329,11 @@ class S3FanoutManager : SingleCopy {
   uint64_t timestamp_last_throttle_report_;
 
   bool is_curl_debug_;
+
+  /**
+   * Carries the path settings for SSL certificates
+   */
+  SslCertificateStore ssl_certificate_store_;
 };  // S3FanoutManager
 
 }  // namespace s3fanout

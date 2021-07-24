@@ -975,7 +975,12 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   if (url.substr(0, 5) == "https") {
-    AddSSLCertificates(curl_handle, use_system_ca_);
+    bool rvb = ssl_certificate_store_.ApplySslCertificatePath(curl_handle);
+    if (!rvb) {
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+               "Failed to set SSL certificate path %s",
+               ssl_certificate_store_.GetCaPath().c_str());
+    }
     if (info->pid != -1) {
       if (credentials_attachment_ == NULL) {
         LogCvmfs(kLogDownload, kLogDebug,
@@ -1534,7 +1539,6 @@ DownloadManager::DownloadManager() {
   opt_ipv4_only_ = false;
   follow_redirects_ = false;
   use_system_proxy_ = false;
-  use_system_ca_ = false;
 
   resolver_ = NULL;
 
@@ -2712,7 +2716,9 @@ void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
 }
 
-void DownloadManager::EnableUseOfSystemCertificates() { use_system_ca_ = true; }
+void DownloadManager::UseSystemCertificatePath() {
+  ssl_certificate_store_.UseSystemCertificatePath();
+}
 
 /**
  * Creates a copy of the existing download manager.  Must only be called in
@@ -2747,7 +2753,7 @@ DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
   clone->opt_proxy_groups_reset_after_ = opt_proxy_groups_reset_after_;
   clone->opt_host_reset_after_ = opt_host_reset_after_;
   clone->credentials_attachment_ = credentials_attachment_;
-  clone->use_system_ca_ = use_system_ca_;
+  clone->ssl_certificate_store_ = ssl_certificate_store_;
 
   return clone;
 }

@@ -24,6 +24,7 @@
 #include "hash.h"
 #include "prng.h"
 #include "sink.h"
+#include "ssl.h"
 #include "statistics.h"
 
 
@@ -443,7 +444,7 @@ class DownloadManager {
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnableRedirects();
-  void EnableUseOfSystemCertificates();
+  void UseSystemCertificatePath();
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -603,10 +604,9 @@ class DownloadManager {
   Counters *counters_;
 
   /**
-   * Allow the download manager to look for SSL / HTTPS certificates in the
-   * system directories.
+   * Carries the path settings for SSL certificates
    */
-  bool use_system_ca_;
+  SslCertificateStore ssl_certificate_store_;
 };  // DownloadManager
 
 }  // namespace download
