@@ -95,6 +95,9 @@ Please upgrade CernVM-FS to manipulate this repository."
   #   141 --> 142
   #     -> Set CVMFS_TALK_SOCKET, CVMFS_TALK_OWNER parameters on publisher node
   #
+  #   142 --> 143
+  #     -> Set CVMFS_USE_SSL_SYSTEM_CA client parameter on publisher node
+  #
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
@@ -179,6 +182,11 @@ Please upgrade CernVM-FS to manipulate this repository."
   if [ "$creator" -eq 141 ] && is_stratum1 $name; then
     # skip this migrate if not on stratum 0
     creator=142
+  fi
+
+  if [ "$creator" -eq 142 ] && is_stratum1 $name; then
+    # skip this migrate if not on stratum 0
+    creator=143
   fi
 
   if [ "$creator" -lt "$(cvmfs_layout_revision)" ]; then
