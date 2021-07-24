@@ -1,0 +1,171 @@
+#
+# Test for running CVMFS agains a HTTPS S3 implementation
+#
+# In this test we create our own CA (certificate authority).
+# the CA will create and sign the certificates for the minio/S3 backend
+
+cvmfs_test_name="S3 via HTTPS"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cleanup() {
+  echo "*** cleaning up"
+  /usr/local/bin/mc -C minio_client rm --recursive --force cvmfs/https-bucket
+  if [ -f minio_pid ]; then
+    sudo kill -9 $(cat minio_pid)
+  fi
+  sudo cvmfs_server rmfs -f https-test.cvmfs.ch
+  sudo rm -f /etc/ssl/certs/cvmfs_https_test.crt
+  unset X509_CERT_BUNDLE
+}
+
+create_https_certificates() {
+  mkdir certs || return 1
+
+  # generating a random key of 4096 bits
+  openssl genrsa -out rootCA.key 4096 || return 1
+
+  # generate a NEW PKCS#10 for a self signed certificate
+  # we use the random key generate above
+  # -nodes do not encrypt the private key
+  # The key is $__/rootCA.key
+  openssl req -x509 -new -nodes -key rootCA.key \
+    -sha256 -days 1024 -out rootCA.crt \
+    -subj "/C=CH/ST=CH/O=CERN/OU=CERN/CN=localhost" || return 2
+
+  openssl genrsa -out certs/private.key 2048 || return 3
+
+  # generate a new certificate REQUEST
+  openssl req -new -sha256 -key certs/private.key \
+    -subj "/C=CH/ST=CH/O=CERN/CN=localhost" \
+    -out localhost.csr || return 4
+
+  # expect a certificate request as input
+  openssl x509 \
+    -req -in localhost.csr \
+    -CA rootCA.crt \
+    -CAkey rootCA.key \
+    -CAcreateserial \
+    -out certs/public.crt \
+    -days 500 -sha256 || return 5
+
+  # we are making minio server use the new certificate
+  mkdir -p minio_server/certs
+  cp certs/* minio_server/certs/ || return 6
+
+  # we are making minio client use the new root CAs
+  mkdir -p minio_client/certs/CAs
+  cp rootCA.* minio_client/certs/CAs/ || return 7
+
+  # we are making the whole system accept the new key
+  # useful for when we call curl in the bash script, libcurl does not care of this
+  if [ -d /etc/ssl/certs ]; then
+    sudo cp rootCA.crt /etc/ssl/certs/cvmfs_https_test.crt || return 8
+  else
+    sudo cp rootCA.crt /etc/pki/tls/certs/cvmfs_https_test.crt || return 8
+  fi
+}
+
+create_minio_config() {
+  mkdir -p minio_server
+  mkdir -p minio_server/certs
+  mkdir -p minio_client
+
+  tee cvmfs_s3.conf > /dev/null << EOF
+CVMFS_S3_HOST=localhost
+CVMFS_S3_PORT=13437
+CVMFS_S3_ACCESS_KEY=not
+CVMFS_S3_SECRET_KEY=important
+CVMFS_S3_DNS_BUCKETS=false
+CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10
+CVMFS_S3_BUCKET=https-bucket
+CVMFS_S3_USE_HTTPS=true
+# CVMFS_USE_SSL_SYSTEM_CA=true
+# we comment this above out, since we are going to pass the key in the x509 variable
+# otherwise libcurl does not accept a self signed key
+EOF
+
+  tee minio_server/config.json > /dev/null << EOF
+{
+	"version": "23",
+	"credential": {
+		"accessKey": "not",
+		"secretKey": "important"
+	}
+}
+EOF
+
+  tee minio_client/config.json > /dev/null << EOF
+{
+	"version": "9",
+	"hosts": {
+		"cvmfs": {
+			"url": "https://localhost:13437",
+			"accessKey": "not",
+			"secretKey": "important",
+			"api": "S3v4",
+			"lookup": "auto"
+		}
+	}
+}
+EOF
+}
+
+start_minio() {
+  mkdir -p minio_storage || return 1
+
+  echo "*** create minio configuration"
+  create_minio_config || return 2
+
+  echo "*** start minio"
+  minio_command="/usr/local/bin/minio server \
+    --address :13437 \
+    --config-dir minio_server \
+    minio_storage"
+  local minio_pid=$(run_background_service minio_log "$minio_command")
+  echo $minio_pid > minio_pid
+  echo "*** minio PID is $minio_pid"
+  if [ "x$minio_pid" = "x" ]; then
+    return 10
+  fi
+
+  while ! nc -vz localhost 13437; do
+    sleep 2
+  done
+
+  echo "*** create the bucket and we make it public"
+  /usr/local/bin/mc -C minio_client mb cvmfs/https-bucket || return 3
+  /usr/local/bin/mc -C minio_client policy public cvmfs/https-bucket || return 4
+}
+
+cvmfs_run_test() {
+  # lets run this test only in the S3 suite
+  if [ x"$CVMFS_TEST_S3_CONFIG" == x"" ]; then
+    return 1
+  fi
+
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** create HTTPS CA chain"
+  create_https_certificates || return 10
+
+  echo "*** setup minio"
+  start_minio || return 20
+
+  echo "*** create repository"
+  export X509_CERT_BUNDLE=$(realpath rootCA.crt)
+  sudo X509_CERT_BUNDLE=$X509_CERT_BUNDLE \
+    cvmfs_server mkfs \
+    -o $CVMFS_TEST_USER \
+    -s cvmfs_s3.conf \
+    -w https://localhost:13437/https-bucket \
+    https-test.cvmfs.ch
+
+  echo "*** poke around the new repository"
+  cvmfs_server transaction https-test.cvmfs.ch || return 40
+  touch /cvmfs/https-test.cvmfs.ch/miaomiao || return 41
+  cvmfs_server publish https-test.cvmfs.ch || return 42
+  ls /cvmfs/https-test.cvmfs.ch/miaomiao || return 43
+
+  return 0
+}
