@@ -50,7 +50,9 @@ wait_for_apache() {
   local now=$(date +%s)
   local deadline=$(($now + 60))
   while [ $now -lt $deadline ]; do
-    if curl -f -I --max-time 10 $(get_follow_http_redirects_flag) "$url" >/dev/null 2>&1; then
+    if curl -f -I --max-time 10 $(get_x509_cert_settings) \
+       $(get_follow_http_redirects_flag) "$url" >/dev/null 2>&1;
+    then
       return 0
     fi
     sleep 1
@@ -66,14 +68,9 @@ check_url() {
   local url="$1"
   local timeout="$2"
 
-  local certificate=""
-  if [ x"$X509_CERT_BUNDLE" != "x" ]; then
-      certificate="--cacert $X509_CERT_BUNDLE"
-  fi
-
   curl -f -I --max-time $timeout \
     --retry 2 --retry-delay 5 \
-    $certificate \
+    $(get_x509_cert_settings) \
     $(get_follow_http_redirects_flag) "$url" >/dev/null 2>&1
 }
 

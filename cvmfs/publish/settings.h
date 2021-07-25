@@ -363,10 +363,12 @@ class SettingsRepository {
 
   void SetUrl(const std::string &url);
   void SetTmpDir(const std::string &tmp_dir);
+  void SetCertBundle(const std::string &cert_bundle);
 
   std::string fqrn() const { return fqrn_; }
   std::string url() const { return url_; }
   std::string tmp_dir() const { return tmp_dir_; }
+  std::string cert_bundle() const { return cert_bundle_; }
 
   const SettingsKeychain &keychain() const { return keychain_; }
   SettingsKeychain *GetKeychain() { return &keychain_; }
@@ -375,6 +377,9 @@ class SettingsRepository {
   Setting<std::string> fqrn_;
   Setting<std::string> url_;
   Setting<std::string> tmp_dir_;
+  // Currently only used for testing, steered by X509_CERT_BUNDLE
+  // in /etc/cvmfs/server.local
+  Setting<std::string> cert_bundle_;
 
   SettingsKeychain keychain_;
 };  // class SettingsRepository

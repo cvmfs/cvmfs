@@ -84,6 +84,12 @@ Repository::Repository(const SettingsRepository &settings)
     throw EPublish("cannot load public rsa key");
   }
 
+  if (!settings.cert_bundle().empty()) {
+    int rvi = setenv("X509_CERT_BUNDLE", settings.cert_bundle().c_str(),
+                     1 /* overwrite */);
+    if (rvi != 0)
+      throw EPublish("cannot set X509_CERT_BUNDLE environment variable");
+  }
   download_mgr_ = new download::DownloadManager();
   download_mgr_->Init(16, false,
                       perf::StatisticsTemplate("download", statistics_));
