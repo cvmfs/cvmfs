@@ -298,6 +298,11 @@ void SettingsRepository::SetTmpDir(const std::string &tmp_dir) {
 }
 
 
+void SettingsRepository::SetCertBundle(const std::string &cert_bundle) {
+  cert_bundle_ = cert_bundle;
+}
+
+
 //------------------------------------------------------------------------------
 
 
@@ -432,6 +437,7 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   options_mgr_ = new BashOptionsManager();
   std::string arg;
   options_mgr_->set_taint_environment(false);
+  options_mgr_->ParsePath("/etc/cvmfs/server.local", false /* external */);
   options_mgr_->ParsePath(server_path, false /* external */);
   options_mgr_->ParsePath(replica_path, false /* external */);
   if (options_mgr_->GetValue("CVMFS_REPOSITORY_NAME", &arg))
@@ -448,6 +454,8 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
     settings.SetUrl(arg);
   if (options_mgr_->GetValue("CVMFS_SPOOL_DIR", &arg))
     settings.SetTmpDir(arg + "/tmp");
+  if (options_mgr_->GetValue("X509_CERT_BUNDLE", &arg))
+    settings.SetCertBundle(arg);
 
   return settings;
 }

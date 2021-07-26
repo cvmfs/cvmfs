@@ -273,7 +273,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   /**
    * The directory layout of the publisher node must be of matching revision
    */
-  static const unsigned kRequiredLayoutRevision = 142;
+  static const unsigned kRequiredLayoutRevision = 143;
 
   static Publisher *Create(const SettingsPublisher &settings);
 

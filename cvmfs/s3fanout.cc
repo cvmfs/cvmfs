@@ -31,6 +31,7 @@ const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
 const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
 const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
+const unsigned S3FanoutManager::kDefaultHTTPSPort = 443;
 
 
 /**
@@ -557,7 +558,11 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   vector<string> tokens = SplitString(complete_hostname_, ':');
   assert(tokens.size() <= 2);
   string canonical_hostname = tokens[0];
-  if (tokens.size() == 2 && String2Uint64(tokens[1]) != kDefaultHTTPPort)
+
+  // if we could split the hostname in two and if the port is *NOT* a default
+  // one
+  if (tokens.size() == 2 && !((String2Uint64(tokens[1]) == kDefaultHTTPPort) ||
+                              (String2Uint64(tokens[1]) == kDefaultHTTPSPort)))
     canonical_hostname += ":" + tokens[1];
 
   string signed_headers;
@@ -611,7 +616,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
 
 /**
  * The Azure Blob authorization header according to
- * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key 
+ * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key
  */
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   const
@@ -683,9 +688,9 @@ int S3FanoutManager::InitializeDnsSettings(
     return 0;
   }
 
-  // Remove port number if such exists
-  if (!HasPrefix(host_with_port, "http://", false /*ignore_case*/))
-    host_with_port = "http://" + host_with_port;
+  // Add protocol information for extraction of fields for DNS
+  if (!IsHttpUrl(host_with_port))
+    host_with_port = config_.protocol + "://" + host_with_port;
   std::string remote_host = dns::ExtractHost(host_with_port);
   std::string remote_port = dns::ExtractPort(host_with_port);
 
@@ -956,6 +961,18 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   retval = curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
   assert(retval == CURLE_OK);
 
+  retval = curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, info->errorbuffer);
+  assert(retval == CURLE_OK);
+
+  if (config_.protocol == "https") {
+    retval = curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 1L);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_PROXY_SSL_VERIFYPEER, 1L);
+    assert(retval == CURLE_OK);
+    bool add_cert = ssl_certificate_store_.ApplySslCertificatePath(handle);
+    assert(add_cert);
+  }
+
   return kFailOk;
 }
 
@@ -1097,8 +1114,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       break;
     default:
       LogCvmfs(kLogS3Fanout, kLogStderr | kLogSyslogErr,
-               "unexpected curl error (%d) while trying to upload %s",
-               curl_error, info->object_key.c_str());
+               "unexpected curl error (%d) while trying to upload %s: %s",
+               curl_error, info->object_key.c_str(), info->errorbuffer);
       info->error_code = kFailOther;
       break;
   }
@@ -1226,6 +1243,8 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   watch_fds_ = static_cast<struct pollfd *>(smalloc(4 * sizeof(struct pollfd)));
   watch_fds_size_ = 4;
   watch_fds_inuse_ = 0;
+
+  ssl_certificate_store_.UseSystemCertificatePath();
 }
 
 S3FanoutManager::~S3FanoutManager() {

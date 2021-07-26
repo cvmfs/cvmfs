@@ -27,7 +27,8 @@ namespace swissknife {
  * Checks if the given path looks like a remote path
  */
 static bool IsRemote(const string &repository) {
-  return repository.substr(0, 7) == "http://";
+  return HasPrefix(repository, "http://", false) ||
+         HasPrefix(repository, "https://", false);
 }
 
 /**

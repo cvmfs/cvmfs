@@ -55,6 +55,7 @@
 #include "prng.h"
 #include "sanitizer.h"
 #include "smalloc.h"
+#include "ssl.h"
 #include "util/algorithm.h"
 #include "util/exception.h"
 #include "util/posix.h"
@@ -974,12 +975,11 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   if (url.substr(0, 5) == "https") {
-    const char *cadir = getenv("X509_CERT_DIR");
-    if (!cadir || !*cadir) {cadir = "/etc/grid-security/certificates";}
-    curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
-    const char *cabundle = getenv("X509_CERT_BUNDLE");
-    if (cabundle && *cabundle) {
-      curl_easy_setopt(curl_handle, CURLOPT_CAINFO, cabundle);
+    bool rvb = ssl_certificate_store_.ApplySslCertificatePath(curl_handle);
+    if (!rvb) {
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+               "Failed to set SSL certificate path %s",
+               ssl_certificate_store_.GetCaPath().c_str());
     }
     if (info->pid != -1) {
       if (credentials_attachment_ == NULL) {
@@ -2716,6 +2716,9 @@ void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
 }
 
+void DownloadManager::UseSystemCertificatePath() {
+  ssl_certificate_store_.UseSystemCertificatePath();
+}
 
 /**
  * Creates a copy of the existing download manager.  Must only be called in
@@ -2750,6 +2753,7 @@ DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
   clone->opt_proxy_groups_reset_after_ = opt_proxy_groups_reset_after_;
   clone->opt_host_reset_after_ = opt_host_reset_after_;
   clone->credentials_attachment_ = credentials_attachment_;
+  clone->ssl_certificate_store_ = ssl_certificate_store_;
 
   return clone;
 }

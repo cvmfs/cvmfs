@@ -32,6 +32,7 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
 
   download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);
   download_manager_->SetRetryParameters(kDownloadRetries, 2000, 5000);
+  download_manager_->UseSystemCertificatePath();
 
   if (follow_redirects) {
     download_manager_->EnableRedirects();

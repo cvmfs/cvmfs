@@ -512,9 +512,11 @@ get_item() {
   load_repo_config $name
 
   if [ x"$noproxy" != x"" ]; then
-    unset http_proxy && curl -f $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
+    unset http_proxy && curl -f $(get_x509_cert_settings) \
+      $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
   else
-    curl -f $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
+    curl -f $(get_x509_cert_settings) $(get_follow_http_redirects_flag) \
+      "$url" 2>/dev/null | tr -d '\0'
   fi
 }
 
@@ -543,6 +545,14 @@ read_repo_item() {
 get_follow_http_redirects_flag() {
   if [ x"$CVMFS_FOLLOW_REDIRECTS" = x"yes" ]; then
     echo "-L"
+  fi
+}
+
+
+# Parse special CA path settings for curl invocation
+get_x509_cert_settings() {
+  if [ x"$X509_CERT_BUNDLE" != "x" ]; then
+      echo "--cacert $X509_CERT_BUNDLE"
   fi
 }
 
@@ -984,7 +994,14 @@ CVMFS_SERVER_CACHE_MODE=yes
 CVMFS_NFILES=65536
 CVMFS_TALK_SOCKET=/var/spool/cvmfs/${name}/cvmfs_io
 CVMFS_TALK_OWNER=$cvmfs_user
+CVMFS_USE_SSL_SYSTEM_CA=true
 EOF
+
+  if [ "x$X509_CERT_BUNDLE" != "x" ]; then
+    cat >> $client_conf << EOF
+X509_CERT_BUNDLE=$X509_CERT_BUNDLE
+EOF
+  fi
 }
 
 
@@ -1129,9 +1146,11 @@ EOF
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
 
-  # avoid racing against apache
+  # avoid racing against apache; we can safely ignore the certificate validation
+  # at this step, we only want to check that the endpoint is up.
+  # NB: Normally, we are anyway dealing with HTTP URLs at this point.
   local waiting=0
-  while ! curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
+  while ! curl --insecure -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
         [ $http_timeout -gt 0 ]; do
     [ $waiting -eq 1 ] || echo -n "waiting for apache... "
     waiting=1

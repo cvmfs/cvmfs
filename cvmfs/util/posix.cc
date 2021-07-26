@@ -202,10 +202,10 @@ bool IsHttpUrl(const std::string &path) {
     return false;
   }
 
-  std::string prefix = path.substr(0, 7);
+  std::string prefix = path.substr(0, 8);
   std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
 
-  return prefix == "http://";
+  return prefix.substr(0, 7) == "http://" || prefix == "https://";
 }
 
 

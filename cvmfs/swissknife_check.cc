@@ -925,7 +925,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     reflog_chksum_path = *args.find('R')->second;
 
   // Repository can be HTTP address or on local file system
-  is_remote_ = (repo_base_path_.substr(0, 7) == "http://");
+  is_remote_ = IsHttpUrl(repo_base_path_);
 
   // initialize the (swissknife global) download and signature managers
   if (is_remote_) {
