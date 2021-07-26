@@ -172,7 +172,7 @@ static int GetExistingFuseFd(
   std::string recv_sock_path = recv_sock_dir + "/sock";
   int recv_sock_fd = MakeSocket(recv_sock_path, 0660);
   if ((recv_sock_fd < 0) ||
-      (fchown(recv_sock_fd, cvmfs_uid, getegid()) != 0))
+      (chown(recv_sock_path.c_str(), cvmfs_uid, getegid()) != 0))
   {
     if (recv_sock_fd >= 0)
       close(recv_sock_fd);
@@ -317,9 +317,12 @@ static std::string GetCvmfsBinary() {
   return result;
 }
 
-static int AttachMount(const std::string &mountpoint, int fuse_fd) {
+static int AttachMount(const std::string &mountpoint, const std::string &fqrn,
+                       int fuse_fd)
+{
 #ifdef __APPLE__
   (void) mountpoint;
+  (void) fqrn;
   (void) fuse_fd;
   return 1;
 #else
@@ -340,6 +343,9 @@ static int AttachMount(const std::string &mountpoint, int fuse_fd) {
              "Cannot attach to existing fuse module (%d)", errno);
     return 1;
   }
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
+           "CernVM-FS: linking %s to repository %s (attaching)",
+           mountpoint.c_str(), fqrn.c_str());
   return 0;
 #endif
 }
@@ -461,7 +467,7 @@ int main(int argc, char **argv) {
                  "Cannot connect to existing fuse module");
         return 1;
       }
-      return AttachMount(mountpoint, fuse_fd);
+      return AttachMount(mountpoint, fqrn, fuse_fd);
     }
     LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is already mounted on %s",
              fqrn.c_str(), prev_mountpoint.c_str());
