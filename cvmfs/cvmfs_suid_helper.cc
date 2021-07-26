@@ -59,6 +59,25 @@ static void ExecAsRoot(const char *binary,
   exit(1);
 }
 
+static void ForkAndExecAsRoot(const char *binary,const char *arg1,
+                              const char *arg2, const char *arg3)
+{
+  pid_t child = fork();
+  if (child == -1) {
+    fprintf(stderr, "failed to fork %s... (%d)\n", binary, errno);
+    exit(1);
+  } else if (child == 0) {
+    ExecAsRoot(binary, arg1, arg2, arg3);
+  } else {
+    int wstatus;
+    waitpid(child, &wstatus, 0);
+    if (WIFSIGNALED(wstatus)) {
+      exit(128 + WTERMSIG(wstatus));
+    } else if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus)) {
+      exit(WEXITSTATUS(wstatus));
+    }
+  }
+}
 
 static void Remount(const string &path, const RemountType how) {
   string remount_option = "remount,";
@@ -94,7 +113,8 @@ static void Mount(const string &path) {
       }
       systemd_unit = cvmfs_suid::EscapeSystemdUnit(resolved_path);
     }
-    ExecAsRoot("/bin/systemctl", "restart", systemd_unit.c_str(), NULL);
+    ForkAndExecAsRoot("/bin/systemctl", "restart", systemd_unit.c_str(), NULL);
+    ExecAsRoot("/bin/systemctl", "reset-failed", systemd_unit.c_str(), NULL);
   } else {
     ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
   }
