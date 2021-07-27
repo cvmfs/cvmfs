@@ -7,7 +7,6 @@
 namespace receiver {
 
 bool IsSubPath(const PathString& parent, const PathString& path) {
-
   // If parent is "", then any path is a subpath
   if (parent.GetLength() == 0) {
     return true;

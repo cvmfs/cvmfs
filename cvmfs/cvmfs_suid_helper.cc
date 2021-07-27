@@ -59,7 +59,7 @@ static void ExecAsRoot(const char *binary,
   exit(1);
 }
 
-static void ForkAndExecAsRoot(const char *binary,const char *arg1,
+static void ForkAndExecAsRoot(const char *binary, const char *arg1,
                               const char *arg2, const char *arg3)
 {
   pid_t child = fork();

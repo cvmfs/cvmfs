@@ -94,7 +94,6 @@ RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
 
 template <typename RoCatalogMgr>
 void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
-
   // Terminate recursion upon reaching an ignored path
   if (IsIgnoredPath(path)) {
     assert(!IsReportablePath(path));

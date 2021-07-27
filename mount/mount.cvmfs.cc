@@ -7,9 +7,9 @@
 
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/uio.h>
-#include <sys/socket.h>
 #include <sys/wait.h>
 #ifdef __APPLE__
 #include <sys/sysctl.h>
