@@ -219,7 +219,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
   //               an std::map<> just to check if an xattr is there...
   UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
-  assert(xattrs);
+  assert(xattrs.IsValid());
 
   std::vector<std::string> attrs = xattrs->ListKeys();
   std::vector<std::string>::const_iterator i = attrs.begin();
@@ -229,7 +229,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %s", i->c_str());
   }
 
-  return xattrs && xattrs->Has(attr_name);
+  return xattrs.IsValid() && xattrs->Has(attr_name);
 }
 
 bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {

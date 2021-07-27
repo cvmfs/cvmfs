@@ -141,7 +141,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
                                      params.base_hash);
     }
   }
-  if (!manifest) {
+  if (!manifest.IsValid()) {
     return 3;
   }
 

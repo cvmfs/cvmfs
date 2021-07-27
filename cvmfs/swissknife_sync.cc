@@ -794,7 +794,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                   // TODO(jblomer): revert to params.base_hash);
     }
   }
-  if (!manifest) {
+  if (!manifest.IsValid()) {
     return 3;
   }
 

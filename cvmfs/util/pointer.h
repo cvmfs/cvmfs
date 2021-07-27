@@ -30,7 +30,6 @@ class UniquePtrBase : SingleCopy {
   inline explicit UniquePtrBase(T *ref) : ref_(ref) { }
   inline ~UniquePtrBase()                 { Free(); }
 
-  inline explicit operator bool() const   { return IsValid(); }
   inline T* operator->() const            { return ref_; }
   // NOLINTNEXTLINE(misc-unconventional-assign-operator)
   inline DerivedT& operator=(T *ref) {

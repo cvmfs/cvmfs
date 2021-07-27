@@ -1513,7 +1513,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   UnlinkGuard history_file(history_path);
   UniquePtr<history::History> tag_db(
     history::SqliteHistory::Open(history_path));
-  if (!tag_db) {
+  if (!tag_db.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "failed to open history database (%s)", history_path.c_str());
     boot_error_ = "failed to open history database";
