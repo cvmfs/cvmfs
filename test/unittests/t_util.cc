@@ -554,7 +554,8 @@ TEST_F(T_Util, ClosePipe) {
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
-  ASSERT_DEATH(ReadPipe(fd[0], buffer_output, to_write.length()), ".*");
+  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.weak_ref(), to_write.length()),
+               ".*");
 }
 
 
@@ -1705,7 +1706,7 @@ TEST_F(T_Util, ManagedExecCommandLine) {
                         &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
-  ssize_t bytes_read = read(fd_stdout[0], buffer, message.length());
+  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
   string result(reinterpret_cast<char *>(buffer.weak_ref()));
   ASSERT_EQ(message, result);
@@ -1737,7 +1738,7 @@ TEST_F(T_Util, ManagedExecClearEnv) {
                         &pid);
   close(fd_stdout[1]);
   ASSERT_TRUE(success);
-  ssize_t bytes_read = read(fd_stdout[0], buffer, 64);
+  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), 64);
   EXPECT_EQ(bytes_read, 0);
   close(fd_stdout[0]);
 }

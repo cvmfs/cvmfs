@@ -230,7 +230,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   }
 
   if (statistics_.IsValid()) {
-    uploader_->InitCounters(statistics_);
+    uploader_->InitCounters(statistics_.weak_ref());
   }
 
   return kSuccess;

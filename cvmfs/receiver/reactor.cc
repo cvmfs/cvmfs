@@ -427,7 +427,9 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
 
   perf::Statistics statistics;
   std::string start_time;
-  if (!Reactor::ExtractStatsFromReq(req_json, &statistics, &start_time)) {
+  if (!Reactor::ExtractStatsFromReq(req_json.weak_ref(),
+                                    &statistics, &start_time))
+  {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
       "HandleCommit: Could not extract statistics counters from request");
   }

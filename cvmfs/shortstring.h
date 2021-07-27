@@ -94,10 +94,11 @@ class ShortString {
   }
 
   const char *GetChars() const {
-    if (long_string_)
+    if (long_string_) {
       return long_string_->data();
-    else
+    } else {
       return stack_;
+    }
   }
 
   unsigned GetLength() const {

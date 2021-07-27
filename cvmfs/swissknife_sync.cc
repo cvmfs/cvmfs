@@ -140,7 +140,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   UniquePtr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
-          dir_temp, volatile_content, voms_authz, spooler));
+          dir_temp, volatile_content, voms_authz, spooler.weak_ref()));
   if (!manifest.IsValid()) {
     PrintError("Failed to create new repository");
     return 1;
@@ -804,7 +804,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
   catalog::WritableCatalogManager catalog_manager(
-      params.base_hash, params.stratum0, params.dir_temp, spooler_catalogs,
+      params.base_hash, params.stratum0, params.dir_temp,
+      spooler_catalogs.weak_ref(),
       download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
       params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
       params.is_balanced, params.max_weight, params.min_weight);

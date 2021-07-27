@@ -197,7 +197,8 @@ static int GetExistingFuseFd(
   if (result == "OK") {
     struct sockaddr_un addr;
     unsigned int len = sizeof(addr);
-    int con_fd = accept(recv_sock_fd, (struct sockaddr *) &addr, &len);
+    int con_fd =
+      accept(recv_sock_fd, reinterpret_cast<struct sockaddr *>(&addr), &len);
     fuse_fd = RecvFdFromSocket(con_fd);
     close(con_fd);
   }
@@ -646,7 +647,7 @@ int main(int argc, char **argv) {
         break;
     } while (true);
     char buf;
-    int num_bytes;
+    ssize_t num_bytes;
     if (FD_ISSET(fd_stdout, &readfds)) {
       num_bytes = read(fd_stdout, &buf, 1);
       switch (num_bytes) {
