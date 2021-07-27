@@ -52,7 +52,7 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
                 const std::string& new_root_hash,
                 const RepositoryTag& tag);
 
-  void WaitForUpload() {};
+  void WaitForUpload() {}
 
   ObjectPack::BucketHandle NewBucket();
 

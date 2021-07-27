@@ -917,7 +917,6 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   Catalog *old_attached_catalog = parent->FindChild(nested_root_ps);
   Counters old_counters;
   if (old_attached_catalog) {
-
     // Old catalog was already attached (e.g. as a child catalog
     // attached by a prior call to CreateNestedCatalog()).  Ensure
     // that it has not been modified, get counters, and detach it.
@@ -931,7 +930,6 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     DetachSubtree(old_attached_catalog);
 
   } else {
-
     // Old catalog was not attached.  Download a freely attached
     // version and get counters.
     shash::Any old_hash;
@@ -943,7 +941,8 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
             "failed to swap nested catalog '%s': not found in parent",
             nested_root_path.c_str());
     }
-    UniquePtr<Catalog> old_free_catalog(LoadFreeCatalog(nested_root_ps, old_hash));
+    UniquePtr<Catalog> old_free_catalog(
+      LoadFreeCatalog(nested_root_ps, old_hash));
     if (!old_free_catalog) {
       PANIC(kLogStderr,
             "failed to swap nested catalog '%s': failed to load old catalog",

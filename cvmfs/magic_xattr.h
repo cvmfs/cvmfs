@@ -103,7 +103,11 @@ class MagicXattrRAIIWrapper: public SingleCopy {
 
   inline BaseMagicXattr* operator->() const { return ptr_; }
   inline bool IsNull() const { return ptr_ == NULL; }
-  inline BaseMagicXattr* Move() { BaseMagicXattr* ret = ptr_; ptr_ = NULL; return ret; }
+  inline BaseMagicXattr* Move() {
+    BaseMagicXattr* ret = ptr_;
+    ptr_ = NULL;
+    return ret;
+  }
 
  protected:
   BaseMagicXattr *ptr_;

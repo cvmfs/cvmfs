@@ -194,7 +194,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     }
     output_catalog_mgr_->SwapNestedCatalog(rel_path.ToString(), new_hash,
                                            new_size);
-    return false; // skip recursion into nested catalog mountpoints
+    return false;  // skip recursion into nested catalog mountpoints
   } else if (entry1.IsDirectory() && entry2.IsDirectory()) {
     // From directory to directory
     const catalog::DirectoryEntryBase* base_entry =
