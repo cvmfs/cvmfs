@@ -528,9 +528,9 @@ def ParseNolintSuppressions(filename, raw_line, linenum, error):
         category = category[1:-1]
         if category in _ERROR_CATEGORIES:
           _error_suppressions.setdefault(category, set()).add(suppressed_line)
-        elif category not in _LEGACY_ERROR_CATEGORIES:
-          error(filename, linenum, 'readability/nolint', 5,
-                'Unknown NOLINT error category: %s' % category)
+        #elif category not in _LEGACY_ERROR_CATEGORIES:
+        #  error(filename, linenum, 'readability/nolint', 5,
+        #        'Unknown NOLINT error category: %s' % category)
 
 
 def ResetNolintSuppressions():
