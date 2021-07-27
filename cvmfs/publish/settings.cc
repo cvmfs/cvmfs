@@ -359,7 +359,6 @@ SettingsBuilder::~SettingsBuilder() {
 std::map<std::string, std::string> SettingsBuilder::GetSessionEnvironment() {
   std::map<std::string, std::string> result;
   std::string session_dir = Env::GetEnterSessionDir();
-
   if (session_dir.empty())
     return result;
 

@@ -640,8 +640,8 @@ int CmdEnter::Main(const Options &options) {
   }
   exit_code = WaitForChild(pid);
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell..."); 
-  
+  LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
+
   if (!options.Has("keep-session"))
     CleanupSession(options.Has("keep-logs"), new_paths);
 

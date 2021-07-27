@@ -281,7 +281,6 @@ void Publisher::Session::Acquire() {
 
   gateway::GatewayKey gw_key = gateway::ReadGatewayKey(settings_.gw_key_path);
   if (!gw_key.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Gateway Key Path: %s", settings_.gw_key_path.c_str());
     throw EPublish("cannot read gateway key: " + settings_.gw_key_path,
                    EPublish::kFailGatewayKey);
   }

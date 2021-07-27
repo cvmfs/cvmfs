@@ -154,7 +154,6 @@ void Repository::DownloadRootObjects(
   std::string reflog_path;
   FILE *reflog_fd =
     CreateTempFile(tmp_dir + "/reflog", kPrivateFileMode, "w", &reflog_path);
-
   std::string reflog_url = url + "/.cvmfsreflog";
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
