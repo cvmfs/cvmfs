@@ -10,15 +10,21 @@ set -e
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/common.sh
 
+BUILD=0
 DIFF=0
 BUILD_DIR=$1
+if [ "x$BUILD_DIR" = "x-build" ]; then
+  BUILD=1
+  shift
+  BUILD_DIR=$1
+fi
 if [ "x$BUILD_DIR" = "x-diff" ]; then
   DIFF=1
   shift
   BUILD_DIR=$1
 fi
 if [ "x$BUILD_DIR" = "x" ]; then
-  die "build directory missing (usage: '$0 [-diff] <build dir>')"
+  die "build directory missing (usage: '$0 [-build] [-diff] <build dir>')"
 fi
 SCRIPT_OUTPUT=$2
 
@@ -27,9 +33,13 @@ REPO_ROOT="$(get_repository_root)"
 [ -d $REPO_ROOT ] || die "$REPO_ROOT is malformed"
 clang-tidy --version >/dev/null 2>&1 || die "clang-tidy missing"
 
-SOURCE_FILES=$(find $REPO_ROOT/mount -name '*.cc')
-SOURCE_FILES="$SOURCE_FILES $REPO_ROOT/cvmfs/util/exception.cc"
-SOURCE_FILES="$SOURCE_FILES $REPO_ROOT/cvmfs/util/algorithm.cc"
+if [ $BUILD -eq 1 ]; then
+  cd $BUILD_DIR
+  cmake -DBUILD_ALL=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON $REPO_ROOT
+  make -j$(nproc)
+fi
+
+SOURCE_FILES=$(find $REPO_ROOT/mount $REPO_ROOT/cvmfs/util -name '*.cc')
 
 cd $REPO_ROOT
 if [ $DIFF -eq 0 ]; then
