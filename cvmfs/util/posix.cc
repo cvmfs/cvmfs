@@ -5,6 +5,7 @@
  */
 
 #ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 #endif
 
@@ -95,10 +96,11 @@ static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
 std::string MakeCanonicalPath(const std::string &path) {
   if (path.length() == 0) return path;
 
-  if (path[path.length()-1] == '/')
+  if (path[path.length()-1] == '/') {
     return path.substr(0, path.length()-1);
-  else
+  } else {
     return path;
+  }
 }
 
 
@@ -128,10 +130,11 @@ void SplitPath(
  */
 std::string GetParentPath(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
-  if (idx != std::string::npos)
+  if (idx != std::string::npos) {
     return path.substr(0, idx);
-  else
+  } else {
     return "";
+  }
 }
 
 
@@ -139,7 +142,7 @@ std::string GetParentPath(const std::string &path) {
  * Gets the file name part of a path.
  */
 PathString GetParentPath(const PathString &path) {
-  unsigned length = path.GetLength();
+  int length = static_cast<int>(path.GetLength());
   if (length == 0)
     return path;
   const char *chars  = path.GetChars();
@@ -158,16 +161,17 @@ PathString GetParentPath(const PathString &path) {
  */
 std::string GetFileName(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
-  if (idx != std::string::npos)
+  if (idx != std::string::npos) {
     return path.substr(idx+1);
-  else
+  } else {
     return path;
+  }
 }
 
 
 NameString GetFileName(const PathString &path) {
   NameString name;
-  int length = path.GetLength();
+  int length = static_cast<int>(path.GetLength());
   const char *chars  = path.GetChars();
 
   int i;
@@ -381,12 +385,12 @@ int MakeSocket(const std::string &path, const int mode) {
     goto make_socket_failure;
 #endif
 
-  if (bind(socket_fd, (struct sockaddr *)&sock_addr,
+  if (bind(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
            sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
     if ((errno == EADDRINUSE) && (unlink(path.c_str()) == 0)) {
       // Second try, perhaps the file was left over
-      if (bind(socket_fd, (struct sockaddr *)&sock_addr,
+      if (bind(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
                sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
       {
         LogCvmfs(kLogCvmfs, kLogDebug, "binding socket failed (%d)", errno);
@@ -437,7 +441,7 @@ int MakeTcpEndpoint(const std::string &ipv4_address, int portno) {
   }
   endpoint_addr.sin_port = htons(portno);
 
-  retval = bind(socket_fd, (struct sockaddr *)&endpoint_addr,
+  retval = bind(socket_fd, reinterpret_cast<struct sockaddr *>(&endpoint_addr),
                 sizeof(endpoint_addr));
   if (retval < 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "binding TCP endpoint failed (%d)", errno);
@@ -470,7 +474,7 @@ int ConnectSocket(const std::string &path) {
   assert(socket_fd != -1);
 
   int retval =
-    connect(socket_fd, (struct sockaddr *)&sock_addr,
+    connect(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
             sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
   if (short_path != path)
     RemoveShortSocketLink(short_path);
@@ -502,8 +506,9 @@ int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
   }
   endpoint_addr.sin_port = htons(portno);
 
-  retval = connect(socket_fd, (struct sockaddr *)&endpoint_addr,
-                   sizeof(endpoint_addr));
+  retval =
+  connect(socket_fd, reinterpret_cast<struct sockaddr *>(&endpoint_addr),
+          sizeof(endpoint_addr));
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "failed to connect to TCP endpoint (%d)",
              errno);

@@ -3,15 +3,18 @@ Checks: -*,
   ,bugprone-*,
   ,cert-*,
   ,-cert-dcl50-cpp,
+  ,-cert-dcl03-c,
   ,clang-analyzer-*,
   ,google-*,
   ,misc-*,
+  ,-misc-static-assert,
+  ,-misc-no-recursion,
   ,-misc-non-private-member-variables-in-classes,
   ,performance-*,
   ,-performance-inefficient-string-concatenation,
   ,portability-*,
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*'
+HeaderFilterRegex: '.*h$'
 CheckOptions:
   - key:             google-readability-braces-around-statements.ShortStatementLines
     value:           '2'

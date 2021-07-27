@@ -29,6 +29,7 @@ clang-tidy --version >/dev/null 2>&1 || die "clang-tidy missing"
 
 SOURCE_FILES=$(find $REPO_ROOT/mount -name '*.cc')
 SOURCE_FILES="$SOURCE_FILES $REPO_ROOT/cvmfs/util/exception.cc"
+SOURCE_FILES="$SOURCE_FILES $REPO_ROOT/cvmfs/util/algorithm.cc"
 
 cd $REPO_ROOT
 if [ $DIFF -eq 0 ]; then
