@@ -16,7 +16,7 @@ class T_BlockingCounter : public ::testing::Test {
                         int_counter_(max_value_)
   {
     EXPECT_TRUE(int_counter_.HasMaximalValue());
-    EXPECT_EQ(0, int_counter_);
+    EXPECT_EQ(0, int_counter_.Get());
     EXPECT_EQ(max_value_, int_counter_.maximal_value());
   }
 
@@ -92,29 +92,29 @@ int T_BlockingCounter::concurrent_state_ = 0;
 
 
 TEST_F(T_BlockingCounter, Initialize) {
-  EXPECT_EQ(0, int_counter_);
+  EXPECT_EQ(0, int_counter_.Get());
   EXPECT_EQ(100, int_counter_.maximal_value());
 }
 
 
 TEST_F(T_BlockingCounter, Increment) {
   const int postcrement = int_counter_++;
-  EXPECT_EQ(1, int_counter_);
+  EXPECT_EQ(1, int_counter_.Get());
   EXPECT_EQ(0, postcrement);
 
   const int precrement = ++int_counter_;
-  EXPECT_EQ(2, int_counter_);
+  EXPECT_EQ(2, int_counter_.Get());
   EXPECT_EQ(2, precrement);
 
   int_counter_.Increment();
-  EXPECT_EQ(3, int_counter_);
+  EXPECT_EQ(3, int_counter_.Get());
 }
 
 
 TEST_F(T_BlockingCounter, Assignment) {
   const int val = max_value_ / 2;
   int_counter_ = val;
-  EXPECT_EQ(val, int_counter_);
+  EXPECT_EQ(val, int_counter_.Get());
 }
 
 
@@ -123,15 +123,15 @@ TEST_F(T_BlockingCounter, Decrement) {
   int_counter_ = val;
 
   const int postcrement = int_counter_--;
-  EXPECT_EQ(val - 1, int_counter_);
+  EXPECT_EQ(val - 1, int_counter_.Get());
   EXPECT_EQ(val,     postcrement);
 
   const int precrement = --int_counter_;
-  EXPECT_EQ(val - 2, int_counter_);
+  EXPECT_EQ(val - 2, int_counter_.Get());
   EXPECT_EQ(val - 2, precrement);
 
   int_counter_.Decrement();
-  EXPECT_EQ(val - 3, int_counter_);
+  EXPECT_EQ(val - 3, int_counter_.Get());
 }
 
 
@@ -154,7 +154,7 @@ TEST_F(T_BlockingCounter, IncrementAndWait) {
   --int_counter_;
   sleep(1);
   EXPECT_EQ(2,          T_BlockingCounter::concurrent_state_);
-  EXPECT_EQ(max_value_, int_counter_);
+  EXPECT_EQ(max_value_, int_counter_.Get());
 
   const int killed = pthread_kill(thread, 0);
   EXPECT_EQ(ESRCH, killed) << "Thread did not exit properly";
@@ -170,7 +170,7 @@ TEST_F(T_BlockingCounter, BecomeZeroSlow) {
   T_BlockingCounter::concurrent_state_ = 0;
   EXPECT_EQ(0, T_BlockingCounter::concurrent_state_);
 
-  ASSERT_EQ(0, int_counter_);
+  ASSERT_EQ(0, int_counter_.Get());
   pthread_t thread;
   const int res = pthread_create(&thread,
                                   NULL,
@@ -181,18 +181,18 @@ TEST_F(T_BlockingCounter, BecomeZeroSlow) {
   sleep(1);
   EXPECT_EQ(1,  T_BlockingCounter::concurrent_state_) <<
     "Waited, even though counter was zero!";
-  EXPECT_NE(0, int_counter_);
+  EXPECT_NE(0, int_counter_.Get());
 
   int_counter_ = 1;
   --int_counter_;
-  EXPECT_EQ(0, int_counter_);
+  EXPECT_EQ(0, int_counter_.Get());
   sleep(1);
   EXPECT_EQ(2,  T_BlockingCounter::concurrent_state_) <<
     "Thread did not wake up for zero counter!";
-  EXPECT_NE(0, int_counter_);
+  EXPECT_NE(0, int_counter_.Get());
 
   int_counter_ = 0;
-  EXPECT_EQ(0, int_counter_);
+  EXPECT_EQ(0, int_counter_.Get());
   sleep(1);
   EXPECT_EQ(3, T_BlockingCounter::concurrent_state_) <<
     "Thread didn't wake up for zero'ed counter!";
@@ -212,7 +212,7 @@ TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZeroSlow) {
   EXPECT_EQ(0, T_BlockingCounter::concurrent_state_);
 
   int_counter_ = max_value_;
-  EXPECT_EQ(max_value_, int_counter_);
+  EXPECT_EQ(max_value_, int_counter_.Get());
 
   pthread_t thread;
   const int res = pthread_create(
@@ -222,20 +222,21 @@ TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZeroSlow) {
 
   sleep(1);
   EXPECT_EQ(1, T_BlockingCounter::concurrent_state_) << "Thread didn't start";
-  EXPECT_NE(0, int_counter_);
+  EXPECT_NE(0, int_counter_.Get());
 
   int_counter_--;
-  EXPECT_EQ(max_value_ - 1, int_counter_);
+  EXPECT_EQ(max_value_ - 1, int_counter_.Get());
   sleep(1);
   EXPECT_EQ(2, T_BlockingCounter::concurrent_state_);
-  EXPECT_EQ(max_value_, int_counter_);
+  EXPECT_EQ(max_value_, int_counter_.Get());
 
   int decr_state = 0;
   for (int i = 0; i < max_value_; ++i) {
     if (decr_state == 0) --int_counter_;
     if (decr_state == 1) int_counter_--;
     if (decr_state == 2) int_counter_.Decrement();
-    if (decr_state == 3) int_counter_ = int_counter_ - 1;  // not thread safe!
+    // not thread safe!
+    if (decr_state == 3) int_counter_ = int_counter_.Get() - 1;
     ++decr_state;
     decr_state = decr_state % 4;
   }
@@ -255,7 +256,7 @@ TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZeroSlow) {
 
 TEST_F(T_BlockingCounter, OrchestrateMultipleWaitingThreadsSlow) {
   int_counter_ = max_value_;
-  EXPECT_EQ(max_value_, int_counter_);
+  EXPECT_EQ(max_value_, int_counter_.Get());
 
   const int thread_count = 10;
   ASSERT_LE(5, thread_count);

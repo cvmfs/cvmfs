@@ -162,7 +162,7 @@ static size_t CallbackCurlBody(
 int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                         void *userp, void *socketp) {
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(userp);
-  const int ajobs = *s3fanout_mgr->available_jobs_;
+  const int ajobs = s3fanout_mgr->available_jobs_->Get();
   LogCvmfs(kLogS3Fanout, kLogDebug, "CallbackCurlSocket called with easy "
            "handle %p, socket %d, action %d, up %d, "
            "sp %d, fds_inuse %d, jobs %d",
