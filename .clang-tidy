@@ -2,6 +2,7 @@
 Checks: -*,
   ,bugprone-*,
   ,cert-*,
+  ,-cert-dcl50-cpp,
   ,clang-analyzer-*,
   ,google-*,
   ,misc-*,
@@ -9,7 +10,7 @@ Checks: -*,
   ,performance-*,
   ,-performance-inefficient-string-concatenation,
   ,portability-*,
-WarningsAsErrors: ''
+WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'
 CheckOptions:
   - key:             google-readability-braces-around-statements.ShortStatementLines
