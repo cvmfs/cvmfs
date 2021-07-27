@@ -1,0 +1,64 @@
+cvmfs_test_name="cvmfsbundles"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** Create a new repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+
+  echo "*** Create and edit a .cvmfsbundles file"
+  start_transaction $CVMFS_TEST_REPO || return 2
+  touch /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 3
+  echo "{}" > /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 4
+  publish_repo $CVMFS_TEST_REPO || return 5
+
+  echo "*** Remove a .cvmfsbundles file"
+  start_transaction $CVMFS_TEST_REPO || return 6
+  rm -f /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 7
+  publish_repo $CVMFS_TEST_REPO || return 8
+
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  # Test for failure in case a .cvmfsbundles file is found in a subdirectory
+  # of a repository
+
+  echo "*** Create a .cvmfsbundles file in a subdirectory"
+  start_transaction $CVMFS_TEST_REPO || return 9
+  mkdir /cvmfs/$CVMFS_TEST_REPO/test_dir || return 10
+  touch /cvmfs/$CVMFS_TEST_REPO/test_dir/.cvmfsbundles || return 11
+  echo "{}" > /cvmfs/$CVMFS_TEST_REPO/test_dir/.cvmfsbundles || return 12
+
+  echo "*** Publish repository"
+  publish_repo $CVMFS_TEST_REPO
+  if [ $? -eq 0 ]
+  then
+    return 13
+  else
+    echo "*** Abort transaction"
+    abort_transaction $CVMFS_TEST_REPO || return 14
+  fi
+
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  # Test for failure in case a .cvmfsbundles directory is found in the
+  # repository
+
+  echo "*** Create a .cvmfsbundles directory in the repository"
+  start_transaction $CVMFS_TEST_REPO || return 15
+  mkdir /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 16
+
+  echo "*** Publish repository"
+  publish_repo $CVMFS_TEST_REPO
+  if [ $? -eq 0 ]
+  then
+    return 17
+  else
+    echo "*** Abort transaction"
+    abort_transaction $CVMFS_TEST_REPO || return 18
+  fi
+
+  return 0
+}

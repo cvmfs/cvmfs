@@ -94,6 +94,12 @@ class SyncItem {
            WasType(kItemFifo) ||
            WasType(kItemSocket);
   }
+  inline bool IsBundleSpec() const {
+    return filename_ == ".cvmfsbundles";
+  }
+  inline bool WasBundleSpec() const {
+    return filename_ == ".cvmfsbundles";
+  }
 
   inline unsigned int GetRdevMajor()     const {
     assert(IsSpecialFile());
