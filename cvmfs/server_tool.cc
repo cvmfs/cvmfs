@@ -26,7 +26,7 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
   }
 
   download_manager_ = new download::DownloadManager();
-  assert(download_manager_);
+  assert(download_manager_.IsValid());
   download_manager_->Init(max_pool_handles, use_system_proxy,
                           perf::StatisticsTemplate("download", statistics()));
 
@@ -48,7 +48,7 @@ bool ServerTool::InitVerifyingSignatureManager(
   }
 
   signature_manager_ = new signature::SignatureManager();
-  assert(signature_manager_);
+  assert(signature_manager_.IsValid());
   signature_manager_->Init();
 
   if (!signature_manager_->LoadPublicRsaKeys(pubkey_path)) {
@@ -74,7 +74,7 @@ bool ServerTool::InitSigningSignatureManager(
   }
 
   signature_manager_ = new signature::SignatureManager();
-  assert(signature_manager_);
+  assert(signature_manager_.IsValid());
   signature_manager_->Init();
 
   // Load certificate
@@ -153,7 +153,7 @@ manifest::Manifest *ServerTool::FetchRemoteManifest(
   }
 
   // check if manifest fetching was successful
-  if (!manifest) {
+  if (!manifest.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return NULL;
   }

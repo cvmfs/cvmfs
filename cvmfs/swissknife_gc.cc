@@ -189,7 +189,7 @@ int CommandGc::Main(const ArgumentList &args) {
     if (!dry_run) {
       stats_db->StoreGCStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
-        stats_db->UploadStatistics(uploader);
+        stats_db->UploadStatistics(uploader.weak_ref());
       }
     }
     uploader->TearDown();
@@ -210,7 +210,7 @@ int CommandGc::Main(const ArgumentList &args) {
     if (!dry_run) {
       stats_db->StoreGCStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
-        stats_db->UploadStatistics(uploader);
+        stats_db->UploadStatistics(uploader.weak_ref());
       }
     }
     uploader->TearDown();
@@ -249,7 +249,7 @@ int CommandGc::Main(const ArgumentList &args) {
 
     stats_db->StoreGCStatistics(this->statistics(), start_time, false);
     if (upload_statsdb) {
-      stats_db->UploadStatistics(uploader);
+      stats_db->UploadStatistics(uploader.weak_ref());
     }
 
     uploader->TearDown();
@@ -259,7 +259,7 @@ int CommandGc::Main(const ArgumentList &args) {
   if (!dry_run) {
     stats_db->StoreGCStatistics(this->statistics(), start_time, true);
     if (upload_statsdb) {
-      stats_db->UploadStatistics(uploader);
+      stats_db->UploadStatistics(uploader.weak_ref());
     }
   }
   uploader->TearDown();

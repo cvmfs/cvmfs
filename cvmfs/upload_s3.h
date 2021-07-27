@@ -77,7 +77,9 @@ class S3Uploader : public AbstractUploader {
   int64_t DoGetObjectSize(const std::string &file_name);
 
   // Only for testing
-  s3fanout::S3FanoutManager *GetS3FanoutManager() { return s3fanout_mgr_; }
+  s3fanout::S3FanoutManager *GetS3FanoutManager() {
+    return s3fanout_mgr_.weak_ref();
+  }
 
  private:
   static const unsigned kDefaultPort = 80;

@@ -106,10 +106,10 @@ class CatalogDiffTool {
     return new_catalog_mgr_->GetRootCatalog();
   }
   RoCatalogMgr* GetOldCatalogMgr() {
-    return old_catalog_mgr_;
+    return old_catalog_mgr_.weak_ref();
   }
   RoCatalogMgr* GetNewCatalogMgr() {
-    return new_catalog_mgr_;
+    return new_catalog_mgr_.weak_ref();
   }
 
  private:

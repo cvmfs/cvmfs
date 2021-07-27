@@ -138,7 +138,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   temporary_directory_ = tmp_dir;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
   spooler_ = upload::Spooler::Construct(spooler_definition);
-  if (!spooler_) {
+  if (!spooler_.IsValid()) {
     Error("Failed to create upstream Spooler.");
     return 5;
   }

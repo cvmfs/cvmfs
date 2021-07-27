@@ -943,7 +943,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     }
     UniquePtr<Catalog> old_free_catalog(
       LoadFreeCatalog(nested_root_ps, old_hash));
-    if (!old_free_catalog) {
+    if (!old_free_catalog.IsValid()) {
       PANIC(kLogStderr,
             "failed to swap nested catalog '%s': failed to load old catalog",
             nested_root_path.c_str());
@@ -953,7 +953,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
 
   // Load freely attached new catalog
   UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
-  if (!new_catalog) {
+  if (!new_catalog.IsValid()) {
     PANIC(kLogStderr,
           "failed to swap nested catalog '%s': failed to load new catalog",
           nested_root_path.c_str());
