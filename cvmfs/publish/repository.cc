@@ -164,7 +164,6 @@ void Repository::DownloadRootObjects(
        reflog_fd,
        NULL);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
-
   fclose(reflog_fd);
   if (rv_dl == download::kFailOk) {
     delete reflog_;
