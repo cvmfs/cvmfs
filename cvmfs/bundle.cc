@@ -8,6 +8,7 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
 #include "json_document.h"
 #include "pack.h"
@@ -64,28 +65,88 @@ UniquePtr<ObjectPack> * Bundle::CreateBundle(std::set<std::string> filepaths) {
   return op;
 }
 
-std::set<std::string> Bundle::ParseBundleSpec(const JSON *json_obj) {
-  std::set<std::string> filepath_set;
-  const JSON *value = json_obj;
-  if (value->type != JSON_OBJECT) {
-    PANIC(kLogStderr, "JSON object not found");
+UniquePtr<std::vector<FilepathSet>> *ParseBundleSpecFile(
+    std::string bundle_spec_path) {
+  // open the bundle specification file for reading
+  int fd = open(bundle_spec_path.c_str(), O_RDONLY);
+  if (fd < 0) {
+    PANIC(kLogStderr, "Could not open bundle specification file: %s",
+          bundle_spec_path.c_str());
   }
 
-  value = (value->first_child);  // bundleid
-  value = (value->next_sibling);  // JSON array
-  if (value->first_child) {
-    value = value->first_child;
-    std::string filepath;
-    do {
-      filepath = std::string(value->string_value);
-      if (filepath_set.find(filepath) != filepath_set.end()) {
-        PANIC(kLogStderr, "Duplicate filepath found: %s", filepath.c_str());
-      }
-      filepath_set.insert(filepath);
-
-      value = value->next_sibling;
-    } while (value);
+  // copy JSON contents to the string
+  std::string json_string;
+  if (!SafeReadToString(fd, &json_string)) {
+    PANIC(kLogStderr, "Could not read contents of file: %s",
+          bundle_spec_path.c_str());
   }
 
-  return filepath_set;
+  // create JsonDocument from the JSON string
+  UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
+
+  UniquePtr<std::vector<FilepathSet>> *all_filepaths =
+      new UniquePtr<std::vector<FilepathSet>>(new std::vector<FilepathSet>());
+
+  // parse the array of bundle spec JSON objects
+  const JSON *value = json->root();
+  if (value->type != JSON_ARRAY) {
+    PANIC(kLogStderr, "JSON array not found");
+  }
+
+  if (!value->first_child) {
+    PANIC(kLogStderr, "No bundle specifications found");
+  }
+  value = value->first_child;
+  do {
+    if (value->type != JSON_OBJECT) {
+      PANIC(kLogStderr, "Malformed bundle specification");
+    }
+
+    FilepathSet filepath_set;
+    const JSON *p = value;
+
+    if (!p->first_child) {
+      PANIC(kLogStderr, "Malformed bundle specification");
+    }
+
+    // bundle name
+    p = p->first_child;
+    if (std::string(p->name) != "bundle_name") {
+      PANIC(kLogStderr, "Malformed bundle specification: no bundle name found");
+    }
+    std::string bundle_name = std::string(p->string_value);
+
+    // filepaths
+    p = p->next_sibling;
+    if (std::string(p->name) != "filepaths") {
+      PANIC(kLogStderr, "Malformed bundle specification: "
+            "no filepaths array found");
+    }
+    if (p->first_child) {
+      p = p->first_child;
+      std::string filepath;
+      do {
+        filepath = std::string(p->string_value);
+        if (filepath_set.find(filepath) != filepath_set.end()) {
+          PANIC(kLogStderr, "Duplicate filepath found: %s", filepath.c_str());
+        }
+        for (std::vector<FilepathSet>::iterator it = (*all_filepaths)->begin();
+          it != (*all_filepaths)->end(); it++) {
+          if (it->find(filepath) != it->end()) {
+            PANIC(kLogStderr, "Duplicate filepath found: %s already exists in"
+                  " %s", filepath.c_str(), bundle_name.c_str());
+          }
+        }
+        filepath_set.insert(filepath);
+
+        p = p->next_sibling;
+      } while (p);
+    }
+
+    (*all_filepaths)->push_back(filepath_set);
+
+    value = value->next_sibling;
+  } while (value);
+
+  return all_filepaths;
 }

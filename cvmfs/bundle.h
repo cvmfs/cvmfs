@@ -7,10 +7,13 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
 #include "json_document.h"
 #include "pack.h"
 #include "util/pointer.h"
+
+typedef std::set<std::string> FilepathSet;
 
 /**
  * A bundle has the binary format of object packs used as
@@ -32,7 +35,29 @@ class Bundle {
    * UniquePtr otherwise
    */
   UniquePtr<ObjectPack> *CreateBundle(std::set<std::string> filepaths);
-  std::set<std::string> ParseBundleSpec(const JSON *json_obj);
 };
+
+/**
+ * Parses a bundle specification file
+ *
+ * The bundle specification file contains a JSON array of one or more bundle
+ * specifications. Each bundle specification is a JSON object containing the
+ * bundle name and the list of filepaths.
+ *
+ * The bundle name must be unique among all the bundle names in the specification
+ * file. Each file specified in the filepaths array, must exist, and can belong
+ * to atmost one bundle.
+ *
+ * Bundle specification JSON format:
+ *  [
+ *    {
+ *      "bundle_name": "examplebundle",
+ *      "filepaths": ["filepath1", ... "filepathN"]
+ *    },
+ *    ...
+ *  ]
+ */
+UniquePtr<std::vector<FilepathSet>> *ParseBundleSpecFile(
+    std::string bundle_spec_path);
 
 #endif  // CVMFS_BUNDLE_H_
