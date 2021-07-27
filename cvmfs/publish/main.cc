@@ -11,6 +11,7 @@
 
 #include "logging.h"
 #include "publish/cmd_abort.h"
+#include "publish/cmd_commit.h"
 #include "publish/cmd_diff.h"
 #include "publish/cmd_enter.h"
 #include "publish/cmd_hash.h"
@@ -67,6 +68,7 @@ int main(int argc, char **argv) {
   publish::CommandList commands;
   commands.TakeCommand(new publish::CmdMkfs());
   commands.TakeCommand(new publish::CmdTransaction());
+  commands.TakeCommand(new publish::CmdCommit());
   commands.TakeCommand(new publish::CmdAbort());
   commands.TakeCommand(new publish::CmdEnter());
   commands.TakeCommand(new publish::CmdInfo());

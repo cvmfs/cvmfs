@@ -145,7 +145,7 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
 
 void BashOptionsManager::ParsePath(const string &config_file,
                                    const bool external) {
-  LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
+  //LogCvmfs(kLogCvmfs, kLogStdout, "Parsing config file %s", config_file.c_str());
   int retval;
   int pipe_open[2];
   int pipe_quit[2];

@@ -38,15 +38,6 @@ int CmdAbort::Main(const Options &options) {
     throw;
   }
 
-  /**
-  if (settings->transaction().in_enter_session()) {
-    throw EPublish(
-      "aborting a transaction is unsupported within the ephemeral "
-      "writable shell",
-      EPublish::kFailInvocation);
-  }
-  */
-
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
                          false /* temporarily */))
   {
@@ -130,6 +121,19 @@ int CmdAbort::Main(const Options &options) {
              "abort hook failed, not aborting");
     return rvi;
   }
+
+  /*
+  if (settings->transaction().in_enter_session()) {
+    try {
+      publisher->Abort();
+    } catch (const EPublish &e) {
+      if (e.failure() == EPublish::kFailTransactionState) {
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+        return EINVAL;
+      }
+    }
+  }
+  */
 
   try {
     publisher->Abort();

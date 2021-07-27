@@ -359,7 +359,7 @@ SettingsBuilder::~SettingsBuilder() {
 std::map<std::string, std::string> SettingsBuilder::GetSessionEnvironment() {
   std::map<std::string, std::string> result;
   std::string session_dir = Env::GetEnterSessionDir();
-  LogCvmfs(kLogCvmfs, kLogStdout, "SESSION DIR: %s", session_dir.c_str());
+
   if (session_dir.empty())
     return result;
 
@@ -427,9 +427,6 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   std::string repo_path = config_path_ + "/" + alias;
   std::string server_path = repo_path + "/server.conf";
   std::string replica_path = repo_path + "/replica.conf";
-  // Path to the shell settings
-  std::string shell_path = repo_path + "/shell.conf";
-  LogCvmfs(kLogCvmfs, kLogStdout, "Config path inside the settings: %s", config_path_.c_str());
   std::string fqrn = alias;
 
   delete options_mgr_;
@@ -438,8 +435,6 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   options_mgr_->set_taint_environment(false);
   options_mgr_->ParsePath(server_path, false /* external */);
   options_mgr_->ParsePath(replica_path, false /* external */);
-  // Settings for the enter shell
-  options_mgr_->ParsePath(shell_path, false /* external */);
   if (options_mgr_->GetValue("CVMFS_REPOSITORY_NAME", &arg))
     fqrn = arg;
   SettingsRepository settings(fqrn);
@@ -517,6 +512,14 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
   if (options_mgr_.GetValue("CVMFS_HASH_ALGORITHM", &arg)) {
     settings_publisher.GetTransaction()->SetHashAlgorithm(arg);
   }
+  if (options_mgr_.GetValue("CVMFS_UPSTREAM_STORAGE", &arg)) {
+    settings_publisher.GetStorage()->SetLocator(arg);
+    //LogCvmfs(kLogCvmfs, kLogStdout, "CVMFS_UPSTREAM_STORAGE: %s", arg.c_str());
+  }
+  if (options_mgr_.GetValue("CVMFS_KEYS_DIR", &arg)) {
+    settings_publisher.GetKeychain()->SetKeychainDir(arg);
+    //LogCvmfs(kLogCvmfs, kLogStdout, "CVMFS_KEYS_DIR: %s", arg.c_str());
+  }
   if (options_mgr_.GetValue("CVMFS_COMPRESSION_ALGORITHM", &arg)) {
     settings_publisher.GetTransaction()->SetCompressionAlgorithm(arg);
   }
@@ -568,8 +571,6 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   std::map<std::string, std::string> session_env = GetSessionEnvironment();
   // We can be in an ephemeral writable shell but interested in a different
   // repository
-  LogCvmfs(kLogCvmfs, kLogStdout, "SESSION CONF: %d %s",
-          session_env.empty(), session_env.empty() ? "NOTHING" : session_env["CVMFS_FQRN"].c_str());
 
   const std::string server_path = config_path_ + "/" + alias + "/server.conf";
 
@@ -584,7 +585,6 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
       options_mgr_->ParsePath(server_path, false /* external */);
       ApplyOptionsFromServerPath(*settings_publisher, *options_mgr_);
     }
-    LogCvmfs(kLogCvmfs, kLogStdout, " --> Returning settings publisher from session");
     return settings_publisher;
   }
 

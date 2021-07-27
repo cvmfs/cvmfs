@@ -576,10 +576,10 @@ int CmdEnter::Main(const Options &options) {
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
     if (options.Has("transaction")) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Starting a transaction!");
+      LogCvmfs(kLogCvmfs, kLogStdout, "Starting a transaction inside the enter shell");
   
       if (options.Has("repo-config")) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "External configuration for the repository");
+        LogCvmfs(kLogCvmfs, kLogStdout, "Parsing external configuration for the repository");
         repo_config_ = options.GetString("repo-config");
       }
   
@@ -588,17 +588,12 @@ int CmdEnter::Main(const Options &options) {
       builder.config_path_ = repo_config_;
     
       SettingsPublisher* settings_publisher = builder.CreateSettingsPublisher(fqrn_, false);
-      LogCvmfs(kLogCvmfs, kLogStdout, "Publisher settings created, TMP: %s",
-               SettingsRepository(*settings_publisher).tmp_dir().c_str());
-      
-      /*
-      Publisher::Session session(*settings_publisher);
-      session.Acquire();
-      */
      
       // Create Publisher object
       UniquePtr<Publisher> publisher;
       publisher = new Publisher(*settings_publisher);
+
+      publisher->session()->SetKeepAlive(true);
   
       publisher->Transaction();
     }
@@ -645,8 +640,8 @@ int CmdEnter::Main(const Options &options) {
   }
   exit_code = WaitForChild(pid);
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
-
+  LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell..."); 
+  
   if (!options.Has("keep-session"))
     CleanupSession(options.Has("keep-logs"), new_paths);
 
