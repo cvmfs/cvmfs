@@ -109,7 +109,7 @@ std::vector<atomic_int32> UTLog2Histogram::GetBins(const Log2Histogram &h) {
 unsigned int Log2Histogram::GetQuantile(float n) {
   uint64_t total = this->N();
   // pivot is the index of the element corresponding to the requested quantile
-  uint64_t pivot = total * static_cast<uint64_t>(n);
+  uint64_t pivot = static_cast<uint64_t>(static_cast<float>(total) * n);
   float normalized_pivot = 0.0;
   // now we iterate through all the bins
   // note that we _exclude_ the overflow bin
