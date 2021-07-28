@@ -46,7 +46,7 @@ if [ $DIFF -eq 0 ]; then
   CMD0="true"
   CMD1="clang-tidy -p $BUILD_DIR $SOURCE_FILES"
 else
-  CMD0="git diff -U0 devel"
+  CMD0="git diff -U0 origin/devel"
   CMD1="/usr/share/clang/clang-tidy-diff.py -path $BUILD_DIR -p1"
 fi
 
