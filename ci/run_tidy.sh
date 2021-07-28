@@ -24,9 +24,12 @@ if [ "x$BUILD_DIR" = "x-diff" ]; then
   BUILD_DIR=$1
 fi
 if [ "x$BUILD_DIR" = "x" ]; then
-  die "build directory missing (usage: '$0 [-build] [-diff] <build dir>')"
+  die "build directory missing (usage: '$0 [-build] [-diff] <build dir> <output>')"
 fi
 SCRIPT_OUTPUT=$2
+if [ "x$SCRIPT_OUTPUT" = "x" ]; then
+  die "output file missing (usage: '$0 [-build] [-diff] <build dir> <output>')"
+fi
 
 REPO_ROOT="$(get_repository_root)"
 
@@ -47,12 +50,9 @@ if [ $DIFF -eq 0 ]; then
   CMD1="clang-tidy -p $BUILD_DIR $SOURCE_FILES"
 else
   CMD0="git diff -U0 origin/devel"
-  CMD1="/usr/share/clang/clang-tidy-diff.py -path $BUILD_DIR -p1"
+  CMD1="/usr/share/clang/clang-tidy-diff.py -j$(nproc) -path $BUILD_DIR -p1"
 fi
 
-if [ "x$SCRIPT_OUTPUT" != "x" ]; then
-  $CMD0 | $CMD1 2>&1 | tee ${SCRIPT_OUTPUT}
-  exit ${PIPESTATUS[0]}
-else
-  $CMD0 | $CMD1
-fi
+echo "Running '$CMD0 | $CMD1'"
+$CMD0 | $CMD1 2>&1 | tee ${SCRIPT_OUTPUT}
+! grep -q "warning treated as error" ${SCRIPT_OUTPUT}
