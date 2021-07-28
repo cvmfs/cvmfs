@@ -19,7 +19,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "lru.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "shortstring.h"
 
 

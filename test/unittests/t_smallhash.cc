@@ -10,7 +10,7 @@
 #include <limits>
 
 #include "hash.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "smallhash.h"
 
 static uint32_t hasher_int(const int &key) {

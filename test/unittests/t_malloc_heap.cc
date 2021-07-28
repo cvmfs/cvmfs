@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "malloc_heap.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "prng.h"
 #include "smalloc.h"
 #include "util/async.h"

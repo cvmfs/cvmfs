@@ -9,7 +9,7 @@
 
 #include "ingestion/item.h"
 #include "ingestion/task.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "smallhash.h"
 #include "util/posix.h"
 
