@@ -48,7 +48,6 @@ int CmdCommit::Main(const Options &options) {
 
   UniquePtr<SettingsPublisher> settings;
   try {
-    LogCvmfs(kLogCvmfs, kLogStdout, "cmd_commit.cc");
     settings = builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
   } catch (const EPublish &e) {
     if (e.failure() == EPublish::kFailRepositoryNotFound) {
@@ -65,8 +64,6 @@ int CmdCommit::Main(const Options &options) {
   {
     throw EPublish("No write permission to repository");
   }
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "--- SWITCH CREDENTIALS DONE ---");
 
   // Do we need to check for autofs? yes
   FileSystemInfo fs_info = GetFileSystemInfo("/cvmfs");

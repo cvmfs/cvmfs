@@ -650,6 +650,8 @@ Publisher::Publisher(const SettingsPublisher &settings)
   int rvb;
   rvb =
     signature_mgr_->LoadCertificatePath(settings.keychain().certificate_path());
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "Certificate path: %s", settings.keychain().certificate_path().c_str());
   if (!rvb) {
     check_keys_match = false;
     LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
@@ -657,6 +659,8 @@ Publisher::Publisher(const SettingsPublisher &settings)
   }
   rvb = signature_mgr_->LoadPrivateKeyPath(
     settings.keychain().private_key_path(), "");
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "Private key path: %s", settings.keychain().private_key_path().c_str());
   if (!rvb) {
     check_keys_match = false;
     LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
