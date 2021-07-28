@@ -138,7 +138,7 @@ static bool CheckConcurrentMount(const string &fqrn,
                                  const string &workspace,
                                  string *mountpointp) {
   // Try connecting to cvmfs_io socket
-  int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
+  float socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (socket_fd < 0)
     return false;
 
