@@ -151,7 +151,11 @@ UniquePtr<std::vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
       } while (p);
     }
 
-    (*all_filepaths)->push_back(filepath_set);
+    if(filepath_set.size() == 0) {
+      PrintWarning("Empty bundle: " + bundle_name + " will not be created");
+    } else {
+      (*all_filepaths)->push_back(filepath_set);
+    }
 
     value = value->next_sibling;
   } while (value);
