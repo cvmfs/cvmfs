@@ -20,7 +20,7 @@ cvmfs_run_test() {
   [ -z "$pids" ] || return 11
 
   echo "Start unshared background process accessing it, and check that"
-  unshare -Um sh -c "cd /cvmfs/grid.cern.ch && touch $PWD/started && /bin/sleep 10000" & 
+  sudo unshare -m sh -c "cd /cvmfs/grid.cern.ch && touch $PWD/started && /bin/sleep 10000" &
   backpid="$!"
   while [ ! -f started ]; do
     sleep 1
