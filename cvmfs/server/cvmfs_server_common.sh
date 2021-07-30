@@ -503,21 +503,15 @@ is_due_auto_garbage_collection() {
 # download a given file from the backend storage
 # @param name  the name of the repository to download from
 # @param url   the url to download from
-# @param noproxy  (optional)
 get_item() {
   local name="$1"
   local url="$2"
-  local noproxy="$3"
 
   load_repo_config $name
 
-  if [ x"$noproxy" != x"" ]; then
-    unset http_proxy && curl -f $(get_x509_cert_settings) \
-      $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
-  else
-    curl -f $(get_x509_cert_settings) $(get_follow_http_redirects_flag) \
-      "$url" 2>/dev/null | tr -d '\0'
-  fi
+  curl -f -H "Cache-Control: max-age=0" \
+       $(get_x509_cert_settings) $(get_follow_http_redirects_flag) \
+       "$url" 2>/dev/null | tr -d '\0'
 }
 
 # read an item from local or backend repository storage to stdout
@@ -534,9 +528,9 @@ read_repo_item() {
   if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
     cat $(get_upstream_config $CVMFS_UPSTREAM_STORAGE)/"$item" 2>/dev/null
   elif is_stratum0 $name; then
-    get_item $name $CVMFS_STRATUM0/"$item" noproxy
+    get_item $name $CVMFS_STRATUM0/"$item"
   else
-    get_item $name $CVMFS_STRATUM1/"$item" noproxy
+    get_item $name $CVMFS_STRATUM1/"$item"
   fi
 }
 
@@ -587,7 +581,7 @@ get_expiry_from_string() {
 get_expiry() {
   local name=$1
   local stratum0=$2
-  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist 'noproxy')"
+  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist)"
 }
 
 
