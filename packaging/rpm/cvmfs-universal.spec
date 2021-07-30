@@ -99,6 +99,7 @@ Requires: grep
 Requires: gawk
 Requires: sed
 Requires: psmisc
+Requires: lsof
 Requires: autofs
 Requires: fuse
 Requires: curl
@@ -601,6 +602,8 @@ fi
 %endif
 
 %changelog
+* Wed Aug 25 2021 Jakob Blomer <jblomer@cern.ch> - 2.8.2
+- Add lsof dependency for cvmfs package due to new cvmfs_config fuser command
 * Tue Apr 14 2020 Jan Priessnitz <jan.priessnitz@cern.ch> - 2.7.2
 - Fix python2-devel dependency for Fedora >=31
 - Change to /usr/bin/hardlink for Fedora >=31
