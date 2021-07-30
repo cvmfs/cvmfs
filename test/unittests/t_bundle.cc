@@ -69,7 +69,7 @@ TEST(T_Bundle, ParseBundleSpecFile) {
   fs.insert("/cvmfs/test.cern.ch/file3.txt");
   exp_result.push_back(fs);
 
-  UniquePtr<std::vector<FilepathSet>> *result = ParseBundleSpecFile(
+  UniquePtr<std::vector<FilepathSet>> *result = Bundle::ParseBundleSpecFile(
       bundle_spec_path);
   EXPECT_TRUE(*(*result) == exp_result);
 

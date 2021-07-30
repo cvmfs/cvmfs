@@ -65,7 +65,7 @@ UniquePtr<ObjectPack> * Bundle::CreateBundle(std::set<std::string> filepaths) {
   return op;
 }
 
-UniquePtr<std::vector<FilepathSet>> *ParseBundleSpecFile(
+UniquePtr<std::vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
     std::string bundle_spec_path) {
   // open the bundle specification file for reading
   int fd = open(bundle_spec_path.c_str(), O_RDONLY);
