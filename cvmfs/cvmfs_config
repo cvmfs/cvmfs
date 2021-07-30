@@ -1262,6 +1262,11 @@ cvmfs_config_fsck() {
 
 
 cvmfs_config_fuser() {
+  if [ "$sys_arch" = "Darwin" ]; then
+    echo "The fuser command is unsupported on macOS"
+    return 1
+  fi
+
   local retval=0
   [ $# -eq 1 ] || die "one repository name required"
   local fqrn="$1"
