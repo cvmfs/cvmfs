@@ -26,7 +26,7 @@ typedef std::set<std::string> FilepathSet;
  */
 class Bundle {
  public:
-  const int64_t kMaxFileSize = 1024 * 1024 * 100;
+  static const int64_t kMaxFileSize = 1024 * 1024 * 100;
 
   /**
    * Creates a ObjectPack bundle of one or more regular files

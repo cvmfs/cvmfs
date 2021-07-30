@@ -127,17 +127,25 @@ UniquePtr<std::vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
       std::string filepath;
       do {
         filepath = std::string(p->string_value);
-        if (filepath_set.find(filepath) != filepath_set.end()) {
-          PANIC(kLogStderr, "Duplicate filepath found: %s", filepath.c_str());
-        }
-        for (std::vector<FilepathSet>::iterator it = (*all_filepaths)->begin();
-          it != (*all_filepaths)->end(); it++) {
-          if (it->find(filepath) != it->end()) {
-            PANIC(kLogStderr, "Duplicate filepath found: %s already exists in"
-                  " %s", filepath.c_str(), bundle_name.c_str());
+
+        // if the file size exceeds kMaxFileSize then the file is skipped
+        int64_t currentFileSize = GetFileSize(filepath);
+        if (currentFileSize > kMaxFileSize) {
+          PrintWarning("Large file skipped: " + filepath + " of size: "
+                + StringifyInt(currentFileSize) + " bytes");
+        } else {
+          if (filepath_set.find(filepath) != filepath_set.end()) {
+            PANIC(kLogStderr, "Duplicate filepath found: %s", filepath.c_str());
           }
+          for (std::vector<FilepathSet>::iterator it =
+              (*all_filepaths)->begin(); it != (*all_filepaths)->end(); it++) {
+            if (it->find(filepath) != it->end()) {
+              PANIC(kLogStderr, "Duplicate filepath found: %s already exists in"
+                    " %s", filepath.c_str(), bundle_name.c_str());
+            }
+          }
+          filepath_set.insert(filepath);
         }
-        filepath_set.insert(filepath);
 
         p = p->next_sibling;
       } while (p);
