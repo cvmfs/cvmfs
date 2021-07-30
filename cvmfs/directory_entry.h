@@ -95,6 +95,7 @@ class DirectoryEntryBase {
     static const unsigned int kExternalFileFlag             = 0x800;
     static const unsigned int kBindMountpointFlag           = 0x1000;
     static const unsigned int kHiddenFlag                   = 0x2000;
+    static const unsigned int kDirectIoFlag                 = 0x4000;
   };
   typedef unsigned int Differences;
 
@@ -111,6 +112,7 @@ class DirectoryEntryBase {
     , linkcount_(1)  // generally a normal file has linkcount 1 -> default
     , has_xattrs_(false)
     , is_external_file_(false)
+    , is_direct_io_(false)
     , compression_algorithm_(zlib::kZlibDefault)
     { }
 
@@ -125,6 +127,7 @@ class DirectoryEntryBase {
     return IsFifo() || IsSocket() || IsCharDev() || IsBlockDev();
   }
   inline bool IsExternalFile() const            { return is_external_file_; }
+  inline bool IsDirectIo() const                { return is_direct_io_; }
   inline bool HasXattrs() const                 { return has_xattrs_;    }
 
   inline inode_t inode() const                  { return inode_; }
@@ -229,6 +232,7 @@ class DirectoryEntryBase {
   shash::Any checksum_;
 
   bool is_external_file_;
+  bool is_direct_io_;
 
   // The compression algorithm
   zlib::Algorithms compression_algorithm_;

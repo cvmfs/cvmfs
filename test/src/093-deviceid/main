@@ -1,0 +1,23 @@
+cvmfs_test_name="Report device id"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** mount cernvm-prod.cern.ch normally"
+  cvmfs_mount cernvm-prod.cern.ch || return 1
+
+  local device_id=$(sudo cvmfs_talk -i cernvm-prod.cern.ch device id)
+  echo "*** Device id: $device_id"
+  echo "*** Mountinfo:"
+  cat /proc/self/mountinfo
+  echo "***"
+
+  if running_on_osx; then
+    [ "x$device_id" = "x0:0" ] || return 10
+  else
+    [ "x$device_id" = "x$(cat /proc/self/mountinfo | grep cernvm-prod.cern.ch | cut -d ' ' -f3)" ] || return 11
+  fi
+
+  return 0
+}

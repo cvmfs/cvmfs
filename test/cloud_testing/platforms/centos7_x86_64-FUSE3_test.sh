@@ -16,6 +16,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
+                                 src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

@@ -46,7 +46,7 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
   // Download repository manifest
   std::string manifest_contents;
   const std::string manifest_url = repo_url + "/.cvmfspublished";
-  if (HasPrefix(repo_url, "http://", false)) {
+  if (IsHttpUrl(repo_url)) {
     perf::Statistics stats;
     UniquePtr<download::DownloadManager> download_manager(
         new download::DownloadManager());

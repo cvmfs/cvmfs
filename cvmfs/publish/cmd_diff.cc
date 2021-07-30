@@ -177,6 +177,8 @@ class DiffReporter : public publish::DiffListener {
       result_list.push_back(machine_readable_ ? "B" : "bind-mountpoint");
     if (diff & catalog::DirectoryEntryBase::Difference::kHiddenFlag)
       result_list.push_back(machine_readable_ ? "H" : "hidden");
+    if (diff & catalog::DirectoryEntryBase::Difference::kDirectIoFlag)
+      result_list.push_back(machine_readable_ ? "D" : "direct-io");
 
     return machine_readable_ ? ("[" + JoinStrings(result_list, "") + "]")
                              : (" [" + JoinStrings(result_list, ", ") + "]");

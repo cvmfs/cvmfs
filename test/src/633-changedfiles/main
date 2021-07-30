@@ -63,6 +63,17 @@ cvmfs_run_test() {
      | awk '{print $1}')                                          || return 3
   publish_repo $CVMFS_TEST_REPO -v                                || return $?
 
+  local directio=$(get_xattr direct_io /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/dir/small)
+  echo "*** directio: $directio"
+  [ "x$directio" = "x0" ]                 || return 70
+  start_transaction $CVMFS_TEST_REPO      || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/dir/small || return 71
+  touch /cvmfs/$CVMFS_TEST_REPO/dir/large || return 71
+  publish_repo $CVMFS_TEST_REPO -d        || return 72
+  directio=$(get_xattr direct_io /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/dir/small)
+  echo "*** directio: $directio"
+  [ "x$directio" = "x1" ]                 || return 73
+
   local mntpnt="${scratch_dir}/private_mnt"
   echo "*** mount private mount point"
   private_mount $mntpnt || return 20

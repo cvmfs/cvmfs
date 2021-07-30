@@ -235,6 +235,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/ssl.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
   ${CVMFS_SOURCE_DIR}/statistics_database.cc
   ${CVMFS_SOURCE_DIR}/supervisor.cc
@@ -376,6 +377,7 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/ssl.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
   ${CVMFS_SOURCE_DIR}/tracer.cc
   ${CVMFS_SOURCE_DIR}/uuid.cc
@@ -505,6 +507,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
+  ${CVMFS_SOURCE_DIR}/ssl.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
   ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc

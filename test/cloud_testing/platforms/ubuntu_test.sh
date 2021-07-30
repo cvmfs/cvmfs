@@ -50,6 +50,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
                                  src/084-premounted                           \
+                                 src/094-attachmount                          \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \
@@ -64,6 +65,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/600-securecvmfs                          \
                                    src/647-bearercvmfs                          \
                                    src/673-acl                                  \
+                                   src/684-https_s3                             \
                                    $CVMFS_EXCLUDE                               \
                                    --                                           \
                                    src/5*                                       \

@@ -634,7 +634,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
 
   if (settings.is_managed) {
-    if (!SetupPosixQuotaMgr(settings, cache_mgr))
+    if (!SetupPosixQuotaMgr(settings, cache_mgr.weak_ref()))
       return NULL;
   }
   return cache_mgr.Release();
@@ -1309,6 +1309,12 @@ bool MountPoint::CreateDownloadManagers() {
       download_mgr_->SetHostChain(host_chain);
     }
   }
+
+  if (options_mgr_->GetValue("CVMFS_USE_SSL_SYSTEM_CA", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+    download_mgr_->UseSystemCertificatePath();
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 
@@ -1507,7 +1513,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   UnlinkGuard history_file(history_path);
   UniquePtr<history::History> tag_db(
     history::SqliteHistory::Open(history_path));
-  if (!tag_db) {
+  if (!tag_db.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "failed to open history database (%s)", history_path.c_str());
     boot_error_ = "failed to open history database";

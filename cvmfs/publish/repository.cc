@@ -84,9 +84,16 @@ Repository::Repository(const SettingsRepository &settings)
     throw EPublish("cannot load public rsa key");
   }
 
+  if (!settings.cert_bundle().empty()) {
+    int rvi = setenv("X509_CERT_BUNDLE", settings.cert_bundle().c_str(),
+                     1 /* overwrite */);
+    if (rvi != 0)
+      throw EPublish("cannot set X509_CERT_BUNDLE environment variable");
+  }
   download_mgr_ = new download::DownloadManager();
   download_mgr_->Init(16, false,
                       perf::StatisticsTemplate("download", statistics_));
+  download_mgr_->UseSystemCertificatePath();
   try {
     DownloadRootObjects(settings.url(), settings.fqrn(), settings.tmp_dir());
   } catch (const EPublish& e) {
@@ -258,13 +265,14 @@ void Publisher::ConstructSpoolers() {
     settings_.transaction().spool_area().gw_session_token();
   sd.key_file = settings_.keychain().gw_key_path();
 
-  spooler_files_ = upload::Spooler::Construct(sd, statistics_publish_);
+  spooler_files_ =
+    upload::Spooler::Construct(sd, statistics_publish_.weak_ref());
   if (spooler_files_ == NULL)
     throw EPublish("could not initialize file spooler");
 
   upload::SpoolerDefinition sd_catalogs(sd.Dup2DefaultCompression());
   spooler_catalogs_ =
-    upload::Spooler::Construct(sd_catalogs, statistics_publish_);
+    upload::Spooler::Construct(sd_catalogs, statistics_publish_.weak_ref());
   if (spooler_catalogs_ == NULL) {
     delete spooler_files_;
     throw EPublish("could not initialize catalog spooler");

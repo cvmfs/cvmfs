@@ -160,6 +160,8 @@ static void Usage(const std::string &exe) {
     "  evict <path>           removes <path> from the cache            \n"
     "  pin <path>             pins <path> in the cache                 \n"
     "  mountpoint             returns the mount point                  \n"
+    "  device id              returns major:minor virtual device id    \n"
+    "                         on Linux and 0:0 on macOS                \n"
     "  remount [sync]         look for new catalogs                    \n"
     "  revision               gets the repository revision             \n"
     "  max ttl info           gets the maximum ttl                     \n"

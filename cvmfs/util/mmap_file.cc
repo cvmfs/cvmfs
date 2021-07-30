@@ -5,6 +5,7 @@
  */
 
 #ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 #endif
 
@@ -67,7 +68,7 @@ bool MemoryMappedFile::Map() {
   if (filesize.st_size > 0) {
     // map the given file into memory
     mapping = mmap(NULL, filesize.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (mapping == MAP_FAILED) {
+    if (mapping == MAP_FAILED) {  // NOLINT(performance-no-int-to-ptr)
       LogCvmfs(kLogUtility, kLogStderr, "failed to mmap %s (file size: %d) "
                                         "(errno: %d)",
                 file_path_.c_str(),

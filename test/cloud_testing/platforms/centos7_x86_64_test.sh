@@ -34,6 +34,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
                                  src/084-premounted                           \
+                                 src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
@@ -49,6 +50,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
                                  src/682-enter                                \
+                                 src/684-https_s3                             \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \

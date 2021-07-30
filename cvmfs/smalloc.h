@@ -72,6 +72,7 @@ static inline void * __attribute__((used)) smmap(size_t size) {
          anonymous_fd,
          offset));
   // printf("SMMAP %d bytes at %p\n", pages*4096, mem);
+  // NOLINTNEXTLINE(performance-no-int-to-ptr)
   assert((mem != MAP_FAILED) && "Out Of Memory");
   *(reinterpret_cast<size_t *>(mem)) = kMemMarker;
   *(reinterpret_cast<size_t *>(mem) + 1) = pages;
@@ -100,6 +101,7 @@ static inline void * __attribute__((used)) sxmmap(size_t size) {
                    MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
                    anonymous_fd,
                    offset);
+  // NOLINTNEXTLINE(performance-no-int-to-ptr)
   assert((mem != MAP_FAILED) && "Out Of Memory");
   return mem;
 }
