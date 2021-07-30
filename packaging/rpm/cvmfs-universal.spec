@@ -127,6 +127,7 @@ Requires: grep
 Requires: gawk
 Requires: sed
 Requires: psmisc
+Requires: lsof
 Requires: autofs
 Requires: fuse
 Requires: curl
@@ -710,6 +711,8 @@ systemctl daemon-reload
 %endif
 
 %changelog
+* Fri Jul 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Add lsof dependency for cvmfs package due to new cvmfs_config fuser command
 * Fri May 7 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Add gateway sub package
 * Tue Apr 27 2021 Michael Brown <mbrown@fensystems.co.uk> - 2.9.0
