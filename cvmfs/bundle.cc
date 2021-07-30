@@ -40,7 +40,7 @@ UniquePtr<ObjectPack> * Bundle::CreateBundle(std::set<std::string> filepaths) {
     if (!buffer.IsValid()) {
       PANIC(kLogStderr, "Insufficient memory");
     }
-    ssize_t nbytes = SafeRead(fd, buffer, file_size);
+    ssize_t nbytes = SafeRead(fd, buffer.weak_ref(), file_size);
     if (nbytes < file_size) {
       PANIC(kLogStderr, "Incomplete file read: %s", path.c_str());
     }
@@ -48,11 +48,11 @@ UniquePtr<ObjectPack> * Bundle::CreateBundle(std::set<std::string> filepaths) {
     // add buffer to Bucket
     ObjectPack::BucketHandle bucket_handle = (*op)->NewBucket();
     bucket_handle->name = path;
-    ObjectPack::AddToBucket(buffer, file_size, bucket_handle);
+    ObjectPack::AddToBucket(buffer.weak_ref(), file_size, bucket_handle);
 
     // commit Bucket
     shash::Any id(shash::kSha1);
-    shash::HashMem(buffer, file_size, &id);
+    shash::HashMem(buffer.weak_ref(), file_size, &id);
     if (!((*op)->CommitBucket(ObjectPack::kNamed, id, bucket_handle,
                               path))) {
       PANIC(kLogStderr, "Could not commit bucket");
