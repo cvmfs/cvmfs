@@ -17,7 +17,8 @@
 #include "util/posix.h"
 #include "util/string.h"
 
-UniquePtr<ObjectPack> * Bundle::CreateBundle(std::set<std::string> filepaths) {
+UniquePtr<ObjectPack> * Bundle::CreateBundle(
+    const std::set<std::string> &filepaths) {
   // create an ObjectPack
   UniquePtr<ObjectPack> *op = new UniquePtr<ObjectPack>(new ObjectPack());
   if (!op->IsValid()) {
