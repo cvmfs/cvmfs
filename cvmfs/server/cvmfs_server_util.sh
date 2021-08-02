@@ -1125,6 +1125,7 @@ Supported Commands:
                   [-k path to existing keychain] [-p no apache config]
                   [-R require masterkeycard key ]
                   [-V VOMS authorization] [-X (external data)]
+                  [-x proxy url]
                   <fully qualified repository name>
                   Creates a new repository with a given name
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
@@ -1139,6 +1140,7 @@ Supported Commands:
                   [-k path to keys] [-g chown backend] [-r recreate whitelist]
                   [-p no apache config] [-t recreate repo key and certificate]
                   [ -R recreate whitelist and require masterkeycard ]
+                  [-x proxy url]
                   <fully qualified repository name>
                   Imports an old CernVM-FS repository into a fresh repo
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]

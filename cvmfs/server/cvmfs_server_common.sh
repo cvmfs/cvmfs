@@ -332,7 +332,7 @@ set_ro_root_hash() {
 get_repo_info_from_url() {
   local url="$1"
   shift 1
-  __swissknife info $(get_follow_http_redirects_flag) -r "$url" $@ 2>/dev/null
+  __swissknife info $(get_follow_http_redirects_flag) $(get_swissknife_proxy) -r "$url" $@ 2>/dev/null
 }
 
 
@@ -509,7 +509,7 @@ get_item() {
 
   load_repo_config $name
 
-  curl -f -H "Cache-Control: max-age=0" \
+  curl -f -H "Cache-Control: max-age=0" $(get_curl_proxy) \
        $(get_x509_cert_settings) $(get_follow_http_redirects_flag) \
        "$url" 2>/dev/null | tr -d '\0'
 }
@@ -550,6 +550,19 @@ get_x509_cert_settings() {
   fi
 }
 
+# Parse proxy server for curl command
+get_curl_proxy() {
+  if [ x"$CVMFS_SERVER_PROXY" != x"" ]; then
+    echo "-x $CVMFS_SERVER_PROXY"
+  fi
+}
+
+# Parse proxy server for cvmfs_swissknife command
+get_swissknife_proxy() {
+  if [ x"$CVMFS_SERVER_PROXY" != x"" ]; then
+    echo "-@ $CVMFS_SERVER_PROXY"
+  fi
+}
 
 get_expiry_from_string() {
   local whitelist="$1"
@@ -651,6 +664,7 @@ sign_manifest() {
           -u $CVMFS_STRATUM0                   \
           -m $unsigned_manifest                \
           -t ${CVMFS_SPOOL_DIR}/tmp            \
+          $(get_swissknife_proxy)              \
           -r $CVMFS_UPSTREAM_STORAGE $return_early"
 
   if [ x"$metainfo_file" != x"" ]; then
@@ -906,6 +920,7 @@ create_config_files_for_new_repository() {
   local external_data=${11}
   local voms_authz=${12}
   local auto_tag_timespan="${13}"
+  local proxy_url=${14}
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -960,6 +975,10 @@ CVMFS_AUTO_GC=true
 EOF
   fi
 
+  if [ x"$proxy_url" != x"" ]; then
+    echo "CVMFS_SERVER_PROXY=$proxy_url" >> $server_conf
+  fi
+
   if [ $configure_apache -eq 1 ] && is_local_upstream $upstream; then
     local repository_dir=$(get_upstream_config $upstream)
     # make sure that the config file does not exist, yet
@@ -975,7 +994,7 @@ CVMFS_RELOAD_SOCKETS=$cache_dir
 CVMFS_QUOTA_LIMIT=4000
 CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_SERVER_URL=$stratum0
-CVMFS_HTTP_PROXY=DIRECT
+CVMFS_HTTP_PROXY=${proxy_url:-DIRECT}
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
 CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
 CVMFS_CHECK_PERMISSIONS=yes
@@ -1144,7 +1163,7 @@ EOF
   # at this step, we only want to check that the endpoint is up.
   # NB: Normally, we are anyway dealing with HTTP URLs at this point.
   local waiting=0
-  while ! curl --insecure -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
+  while ! curl $(get_curl_proxy) --insecure -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
         [ $http_timeout -gt 0 ]; do
     [ $waiting -eq 1 ] || echo -n "waiting for apache... "
     waiting=1
