@@ -246,14 +246,17 @@ set (CVMFS_SHRINKWRAP_SOURCES
 # TODO(jblomer) Rename to cvmfs_server
 set (CVMFS_PUBLISH_SOURCES
   backoff.cc
+  bundle.cc
   compression.cc
   directory_entry.cc
   dns.cc
   download.cc
   hash.cc
+  json_document.cc
   logging.cc
   manifest.cc
   options.cc
+  pack.cc
   publish/cmd_abort.cc
   publish/cmd_diff.cc
   publish/cmd_enter.cc

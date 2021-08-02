@@ -466,6 +466,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
   ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/bundle.cc
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc

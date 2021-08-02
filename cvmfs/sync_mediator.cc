@@ -13,18 +13,23 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <set>
+#include <vector>
 
+#include "bundle.h"
 #include "catalog_virtual.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "fs_traversal.h"
 #include "hash.h"
 #include "json_document.h"
+#include "pack.h"
 #include "publish/repository.h"
 #include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
 #include "util/exception.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -113,19 +118,17 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
             " directory of the repository. Found in %s", parent_path.c_str());
     }
 
-    std::string json_string;
+    UniquePtr<vector<set<string>>> *all_filepaths =
+            Bundle::ParseBundleSpecFile(entry->GetUnionPath());
+    for (vector<set<string>>::iterator it = (*all_filepaths)->begin();
+        it != (*all_filepaths)->end(); it++) {
+      Bundle b;
+      UniquePtr<ObjectPack> *op = b.CreateBundle(*it);
 
-    int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
-    if (fd < 0) {
-      PANIC(kLogStderr, "Could not open file: %s",
-            entry->GetUnionPath().c_str());
+      op->Release();
     }
-    if (!SafeReadToString(fd, &json_string)) {
-      PANIC(kLogStderr, "Could not read contents of file: %s",
-            entry->GetUnionPath().c_str());
-    }
-    UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
 
+    all_filepaths->Release();
     AddFile(entry);
     return;
   }
