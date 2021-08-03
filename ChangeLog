@@ -1,4 +1,5 @@
 2.9.0:
+  * Add `cvmfs_config fuser` command
   * Add support for HTTPS S3 endpoints
   * Fix union mountpoint handling on Fedora >= 34
   * Add support for attaching mount to an existing fuse module
