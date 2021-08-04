@@ -38,6 +38,7 @@ class SigningTool {
              const std::string &repo_name = "", const std::string &pwd = "",
              const std::string &meta_info = "",
              const std::string &reflog_chksum_path = "",
+             const std::string &proxy = "",
              const bool garbage_collectable = false,
              const bool bootstrap_shortcuts = false,
              const bool return_early = false,

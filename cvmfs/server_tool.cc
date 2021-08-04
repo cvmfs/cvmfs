@@ -19,6 +19,7 @@ ServerTool::~ServerTool() {
 }
 
 bool ServerTool::InitDownloadManager(const bool follow_redirects,
+                                     const std::string &proxy,
                                      const unsigned max_pool_handles,
                                      const bool use_system_proxy) {
   if (download_manager_.IsValid()) {
@@ -33,6 +34,11 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
   download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);
   download_manager_->SetRetryParameters(kDownloadRetries, 2000, 5000);
   download_manager_->UseSystemCertificatePath();
+
+  if (proxy != "") {
+    download_manager_->SetProxyChain(proxy, "",
+                                     download::DownloadManager::kSetProxyBoth);
+  }
 
   if (follow_redirects) {
     download_manager_->EnableRedirects();

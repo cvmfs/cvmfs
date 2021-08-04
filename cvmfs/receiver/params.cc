@@ -37,6 +37,10 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     return false;
   }
 
+  if (parser.IsDefined("CVMFS_SERVER_PROXY")) {
+    parser.GetValue("CVMFS_SERVER_PROXY", &params->proxy);
+  }
+
   // Note: TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE is used to provide an
   //       an overriding value for CVMFS_UPSTREAM_STORAGE, to be used
   //       only by the cvmfs_receiver application. Useful for testing

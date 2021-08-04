@@ -581,8 +581,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   const bool     follow_redirects = false;
   const unsigned max_pool_handles = num_parallel+1;
+  const string proxy =
+      (args.find('@') != args.end()) ? *args.find('@')->second : "";
 
-  if (!this->InitDownloadManager(follow_redirects, max_pool_handles)) {
+  if (!this->InitDownloadManager(follow_redirects, proxy, max_pool_handles)) {
     return 1;
   }
 
