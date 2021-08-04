@@ -354,17 +354,20 @@ class SettingsRepository {
   explicit SettingsRepository(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn_())
+    , proxy_("")
     , tmp_dir_("/tmp")
     , keychain_(fqrn)
   {}
   explicit SettingsRepository(const SettingsPublisher &settings_publisher);
 
   void SetUrl(const std::string &url);
+  void SetProxy(const std::string &proxy);
   void SetTmpDir(const std::string &tmp_dir);
   void SetCertBundle(const std::string &cert_bundle);
 
   std::string fqrn() const { return fqrn_(); }
   std::string url() const { return url_(); }
+  std::string proxy() const { return proxy_(); }
   std::string tmp_dir() const { return tmp_dir_(); }
   std::string cert_bundle() const { return cert_bundle_(); }
 
@@ -374,6 +377,7 @@ class SettingsRepository {
  private:
   Setting<std::string> fqrn_;
   Setting<std::string> url_;
+  Setting<std::string> proxy_;
   Setting<std::string> tmp_dir_;
   // Currently only used for testing, steered by X509_CERT_BUNDLE
   // in /etc/cvmfs/server.local
@@ -393,6 +397,7 @@ class SettingsPublisher {
   explicit SettingsPublisher(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn)
+    , proxy_("")
     , owner_uid_(0)
     , owner_gid_(0)
     , whitelist_validity_days_(kDefaultWhitelistValidity)
@@ -405,6 +410,7 @@ class SettingsPublisher {
   explicit SettingsPublisher(const SettingsRepository &settings_repository);
 
   void SetUrl(const std::string &url);
+  void SetProxy(const std::string &proxy);
   void SetOwner(const std::string &user_name);
   void SetOwner(uid_t uid, gid_t gid);
   void SetIsSilent(bool value);
@@ -414,6 +420,7 @@ class SettingsPublisher {
 
   std::string fqrn() const { return fqrn_(); }
   std::string url() const { return url_(); }
+  std::string proxy() const { return proxy_(); }
   unsigned whitelist_validity_days() const {
     return whitelist_validity_days_();
   }
@@ -432,6 +439,7 @@ class SettingsPublisher {
  private:
   Setting<std::string> fqrn_;
   Setting<std::string> url_;
+  Setting<std::string> proxy_;
   Setting<uid_t> owner_uid_;
   Setting<gid_t> owner_gid_;
   Setting<unsigned> whitelist_validity_days_;
