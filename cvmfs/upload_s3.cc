@@ -39,6 +39,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   , authz_method_(s3fanout::kAuthzAwsV2)
   , peek_before_put_(true)
   , use_https_(false)
+  , proxy_("")
   , temporary_path_(spooler_definition.temporary_path)
 {
   assert(spooler_definition.IsValid() &&
@@ -69,6 +70,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   } else {
     s3config.protocol = "http";
   }
+  s3config.proxy = proxy_;
 
   s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
   s3fanout_mgr_->Spawn();
@@ -173,6 +175,10 @@ bool S3Uploader::ParseSpoolerDefinition(
     host_name_port_ = host_name_ + ":" + parameter;
   } else {
     host_name_port_ = host_name_;
+  }
+
+  if (options_manager.IsDefined("CVMFS_S3_PROXY")) {
+    options_manager.GetValue("CVMFS_S3_PROXY", &proxy_);
   }
 
   return true;
