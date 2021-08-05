@@ -597,7 +597,6 @@ int CmdEnter::Main(const Options &options) {
       publisher = new Publisher(*settings_publisher);
       publisher->session()->SetKeepAlive(true);
       publisher->Transaction();
-      publisher->session()->SetKeepAlive(false);
     }
 
     // May fail if the working directory was invalid to begin with
@@ -638,11 +637,10 @@ int CmdEnter::Main(const Options &options) {
                       false /* drop_credentials */, false /* clear_env */,
                       false /* double_fork */,
                       &pid_child);
+    std::string s = std::to_string(pid_child);
+    SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
     return WaitForChild(pid_child);
   }
-
-  std::string s = std::to_string(pid);
-  SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
 
   exit_code = WaitForChild(pid);
   LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
