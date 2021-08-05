@@ -1,3 +1,10 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef CVMFS_PUBLISH_CMD_COMMIT_H_
+#define CVMFS_PUBLISH_CMD_COMMIT_H_
+
 #include <string>
 #include <vector>
 
@@ -7,7 +14,6 @@ namespace publish {
 
 class CmdCommit : public Command {
  public:
-
   virtual std::string GetName() const { return "commit"; }
 
   virtual std::string GetBrief() const {
@@ -41,7 +47,8 @@ class CmdCommit : public Command {
   virtual int Main(const Options &options);
 
   std::string repo_config_;
+};
 
-}; 
+}  // namespace publish
 
-} // namespace publish
+#endif  // CVMFS_PUBLISH_CMD_COMMIT_H_

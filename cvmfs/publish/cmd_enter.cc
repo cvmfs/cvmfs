@@ -459,6 +459,7 @@ void CmdEnter::CleanupSession(
   RemoveSingle(session_dir_ + "/tmp.conf");
   RemoveSingle(session_dir_ + "/session_token");
   RemoveSingle(session_dir_ + "/in_transaction.lock");
+  RemoveSingle(session_dir_ + "/shellaction.marker");
   RemoveSingle(session_dir_);
   LogCvmfs(kLogCvmfs, kLogStdout, "[done]");
 }
@@ -579,21 +580,25 @@ int CmdEnter::Main(const Options &options) {
       throw EPublish("cannot chroot to " + rootfs_dir_);
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-    if (options.Has("transaction")) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Starting a transaction inside the enter shell");
+    SettingsBuilder builder;
+    UniquePtr<Publisher> publisher;
 
-      UniquePtr<Publisher> publisher;
-      SettingsBuilder builder;
+    if (options.Has("transaction")) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Starting a transaction inside the enter shell");
 
       if (options.Has("repo-config")) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Parsing external configuration for the repository");
         repo_config_ = options.GetString("repo-config");
+        LogCvmfs(kLogCvmfs, kLogStdout,
+                 "Parsing the external configuration for the repository at %s",
+                 repo_config_.c_str());
 
         SafeWriteToFile(repo_config_, session_dir_ + "/tmp.conf", 0600);
         builder.config_path_ = repo_config_;
       }
-    
-      SettingsPublisher* settings_publisher = builder.CreateSettingsPublisher(fqrn_, false);
+
+      SettingsPublisher *settings_publisher =
+          builder.CreateSettingsPublisher(fqrn_, false);
       publisher = new Publisher(*settings_publisher);
       publisher->session()->SetKeepAlive(true);
       publisher->Transaction();
@@ -639,7 +644,13 @@ int CmdEnter::Main(const Options &options) {
                       &pid_child);
     std::string s = std::to_string(pid_child);
     SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
-    return WaitForChild(pid_child);
+    exit_code = WaitForChild(pid_child);
+
+    if (!FileExists(session_dir_ + "/shellaction.marker")) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Closing current transaction...");
+      publisher->session()->SetKeepAlive(false);
+    }
+    return exit_code;
   }
 
   exit_code = WaitForChild(pid);

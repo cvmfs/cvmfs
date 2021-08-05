@@ -37,14 +37,11 @@ int CmdCommit::Main(const Options &options) {
   }
 
   std::string session_dir = Env::GetEnterSessionDir();
-  LogCvmfs(kLogCvmfs, kLogStdout, "Enter session dir: %s", session_dir.c_str());
-
   std::string config_tmp = session_dir + "/tmp.conf";
   std::string config;
   int fd_config = open(config_tmp.c_str(), O_RDONLY);
   SafeReadToString(fd_config, &config);
-  LogCvmfs(kLogCvmfs, kLogStdout, "Config path in commit: %s", config.c_str());
-  
+
   SettingsBuilder builder;
   builder.config_path_ = config;
 
@@ -79,7 +76,8 @@ int CmdCommit::Main(const Options &options) {
       throw EPublish("Repository whitelist for $name is expired",
                      EPublish::kFailWhitelistExpired);
     }
-  } catch (const EPublish &e) {    if (e.failure() == EPublish::kFailLayoutRevision ||
+  } catch (const EPublish &e) {
+    if (e.failure() == EPublish::kFailLayoutRevision ||
         e.failure() == EPublish::kFailWhitelistExpired)
     {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
@@ -95,6 +93,8 @@ int CmdCommit::Main(const Options &options) {
   }
 
   publisher->Sync();
+  SafeWriteToFile("commit", session_dir + "/shellaction.marker", 0600);
+  LogCvmfs(kLogCvmfs, kLogStdout, "Changes saved!");
   publisher->ExitShell();
 
   return 0;

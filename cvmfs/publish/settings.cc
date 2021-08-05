@@ -500,11 +500,9 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
     SettingsPublisher &settings_publisher,
     OptionsManager &options_mgr_) {
   std::string arg;
-  // CVMFS_CREATOR_VERSION Not needed 
   if (options_mgr_.GetValue("CVMFS_CREATOR_VERSION", &arg)) {
     settings_publisher.GetTransaction()->SetLayoutRevision(String2Uint64(arg));
   }
-  // CVMFS_UNION_FS_TYPE Not needed 
   if (options_mgr_.GetValue("CVMFS_UNION_FS_TYPE", &arg)) {
     settings_publisher.GetTransaction()->SetUnionFsType(arg);
   }
@@ -513,11 +511,9 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
   }
   if (options_mgr_.GetValue("CVMFS_UPSTREAM_STORAGE", &arg)) {
     settings_publisher.GetStorage()->SetLocator(arg);
-    //LogCvmfs(kLogCvmfs, kLogStdout, "CVMFS_UPSTREAM_STORAGE: %s", arg.c_str());
   }
   if (options_mgr_.GetValue("CVMFS_KEYS_DIR", &arg)) {
     settings_publisher.GetKeychain()->SetKeychainDir(arg);
-    //LogCvmfs(kLogCvmfs, kLogStdout, "CVMFS_KEYS_DIR: %s", arg.c_str());
   }
   if (options_mgr_.GetValue("CVMFS_COMPRESSION_ALGORITHM", &arg)) {
     settings_publisher.GetTransaction()->SetCompressionAlgorithm(arg);
@@ -550,7 +546,6 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
     settings_publisher.GetTransaction()->SetAutobalanceMinWeight(
         String2Uint64(arg));
   }
-  // CVMFS_AUTO_REPAIR_MOUNTPOINT Not needed 
   if (options_mgr_.GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
     if (!options_mgr_.IsOn(arg)) {
       settings_publisher.GetTransaction()->GetSpoolArea()->SetRepairMode(

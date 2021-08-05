@@ -25,16 +25,10 @@ int CmdAbort::Main(const Options &options) {
   std::string session_dir = Env::GetEnterSessionDir();
 
   if (!session_dir.empty()) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "Parsing external configuration for the repository");
-    LogCvmfs(kLogCvmfs, kLogStdout, "Enter session dir: %s",
-             session_dir.c_str());
     std::string config_tmp = session_dir + "/tmp.conf";
     std::string config;
     int fd_config = open(config_tmp.c_str(), O_RDONLY);
     SafeReadToString(fd_config, &config);
-    LogCvmfs(kLogCvmfs, kLogStdout, "Config path in commit: %s",
-             config.c_str());
     builder.config_path_ = config;
   }
 
@@ -125,8 +119,6 @@ int CmdAbort::Main(const Options &options) {
     UniquePtr<Publisher> publisher;
     publisher = new Publisher(*settings);
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "Publisher created at abort");
-
     LogCvmfs(kLogCvmfs, kLogSyslog, "(%s) aborting transaction",
              settings->fqrn().c_str());
 
@@ -139,7 +131,6 @@ int CmdAbort::Main(const Options &options) {
 
     try {
       publisher->Abort();
-      LogCvmfs(kLogCvmfs, kLogStdout, "Abort done!");
     } catch (const EPublish &e) {
       if (e.failure() == EPublish::kFailTransactionState) {
         LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
@@ -155,8 +146,9 @@ int CmdAbort::Main(const Options &options) {
     }
 
     if (settings->transaction().in_enter_session()) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
-               "Exiting the shell after abort...");
+      LogCvmfs(kLogCvmfs, kLogStdout, "Changes discarded!");
+
+      SafeWriteToFile("abort", session_dir + "/shellaction.marker", 0600);
       publisher->ExitShell();
     }
 
