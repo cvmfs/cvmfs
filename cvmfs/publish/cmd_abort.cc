@@ -41,11 +41,12 @@ int CmdAbort::Main(const Options &options) {
   UniquePtr<SettingsPublisher> settings;
   try {
     settings = builder.CreateSettingsPublisher(
-        options.plain_args().empty() ? "" : options.plain_args()[0].value_str,
-        true /* needs_managed */);
+      options.plain_args().empty() ? "" : options.plain_args()[0].value_str,
+      true /* needs_managed */);
   } catch (const EPublish &e) {
     if ((e.failure() == EPublish::kFailRepositoryNotFound) ||
-        (e.failure() == EPublish::kFailRepositoryType)) {
+        (e.failure() == EPublish::kFailRepositoryType)) 
+    {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
                e.msg().c_str());
       return 1;
@@ -148,7 +149,8 @@ int CmdAbort::Main(const Options &options) {
 
     rvi = CallServerHook("abort_after_hook", settings->fqrn());
     if (rvi != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "post abort hook failed");
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "post abort hook failed");
       return rvi;
     }
 
