@@ -191,9 +191,9 @@ class DirectoryEntryBase {
     s.st_uid = uid();
     s.st_gid = gid();
     s.st_rdev = rdev();
-    s.st_size = size();
+    s.st_size = static_cast<__off_t>(size());
     s.st_blksize = 4096;  // will be ignored by Fuse
-    s.st_blocks = 1 + size() / 512;
+    s.st_blocks = static_cast<__blkcnt_t>(1 + size() / 512);
     s.st_atime = mtime_;
     s.st_mtime = mtime_;
     s.st_ctime = mtime_;

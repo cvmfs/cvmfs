@@ -141,8 +141,8 @@ class SmallHashBase {
   uint32_t ScaleHash(const Key &key) const {
     double bucket =
       (static_cast<double>(hasher_(key)) * static_cast<double>(capacity_) /
-      static_cast<double>((uint32_t)(-1)));
-    return (uint32_t)bucket % capacity_;
+      static_cast<double>(static_cast<uint32_t>(-1)));
+    return static_cast<uint32_t>(bucket) % capacity_;
   }
 
   void AllocMemory() {
@@ -258,7 +258,7 @@ class SmallHashDynamic :
     threshold_shrink_ = 0;
   }
 
-  explicit SmallHashDynamic(const SmallHashDynamic<Key, Value> &other) : Base()
+  SmallHashDynamic(const SmallHashDynamic<Key, Value> &other) : Base()
   {
     num_migrates_ = 0;
     CopyFrom(other);
@@ -338,9 +338,10 @@ class SmallHashDynamic :
     if (new_capacity < old_capacity) {
       uint32_t *shuffled_indices = ShuffleIndices(old_capacity);
       for (uint32_t i = 0; i < old_capacity; ++i) {
-        if (old_keys[shuffled_indices[i]] != Base::empty_key_)
+        if (old_keys[shuffled_indices[i]] != Base::empty_key_) {
           Base::Insert(old_keys[shuffled_indices[i]],
                        old_values[shuffled_indices[i]]);
+        }
       }
       smunmap(shuffled_indices);
     } else {
@@ -358,9 +359,10 @@ class SmallHashDynamic :
   void CopyFrom(const SmallHashDynamic<Key, Value> &other) {
     uint32_t *shuffled_indices = ShuffleIndices(other.capacity_);
     for (uint32_t i = 0; i < other.capacity_; ++i) {
-      if (other.keys_[shuffled_indices[i]] != other.empty_key_)
+      if (other.keys_[shuffled_indices[i]] != other.empty_key_) {
         this->Insert(other.keys_[shuffled_indices[i]],
                      other.values_[shuffled_indices[i]]);
+      }
     }
     smunmap(shuffled_indices);
   }
@@ -463,8 +465,8 @@ class MultiHash {
     uint32_t hash = MurmurHash2(&key, sizeof(key), 0x37);
     double bucket =
       static_cast<double>(hash) * static_cast<double>(num_hashmaps_) /
-      static_cast<double>((uint32_t)(-1));
-    return (uint32_t)bucket % num_hashmaps_;
+      static_cast<double>(static_cast<uint32_t>(-1));
+    return static_cast<uint32_t>(bucket) % num_hashmaps_;
   }
 
   inline void Lock(const uint8_t target) {

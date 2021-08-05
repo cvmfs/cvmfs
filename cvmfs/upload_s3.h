@@ -59,12 +59,12 @@ class S3Uploader : public AbstractUploader {
    */
   virtual void DoUpload(const std::string &remote_path,
                         IngestionSource *source,
-                        const CallbackTN *callback = NULL);
+                        const CallbackTN *callback);
 
   virtual UploadStreamHandle *InitStreamedUpload(
     const CallbackTN *callback = NULL);
   virtual void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,
-                              const CallbackTN *callback = NULL);
+                              const CallbackTN *callback);
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
                                       const shash::Any &content_hash);
 

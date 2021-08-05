@@ -166,20 +166,17 @@ class Pathspec {
  private:
   ElementPatterns             patterns_;
 
-  mutable bool                regex_compiled_;
   mutable regex_t            *regex_;
-
-  mutable bool                relaxed_regex_compiled_;
   mutable regex_t            *relaxed_regex_;
-
-  mutable bool                prefix_regex_compiled_;
   mutable regex_t            *prefix_regex_;
-
-  mutable bool                glob_string_compiled_;
   mutable std::string         glob_string_;
-
-  mutable bool                glob_string_sequence_compiled_;
   mutable GlobStringSequence  glob_string_sequence_;
+
+  mutable bool                regex_compiled_;
+  mutable bool                relaxed_regex_compiled_;
+  mutable bool                prefix_regex_compiled_;
+  mutable bool                glob_string_compiled_;
+  mutable bool                glob_string_sequence_compiled_;
 
   bool valid_;
   bool absolute_;
