@@ -45,7 +45,7 @@ int CmdAbort::Main(const Options &options) {
       true /* needs_managed */);
   } catch (const EPublish &e) {
     if ((e.failure() == EPublish::kFailRepositoryNotFound) ||
-        (e.failure() == EPublish::kFailRepositoryType)) 
+        (e.failure() == EPublish::kFailRepositoryType))
     {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
                e.msg().c_str());
@@ -153,7 +153,6 @@ int CmdAbort::Main(const Options &options) {
                "post abort hook failed");
       return rvi;
     }
-
 
     if (settings->transaction().in_enter_session()) {
       LogCvmfs(kLogCvmfs, kLogStdout,

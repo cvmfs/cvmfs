@@ -11,15 +11,15 @@ class CmdCommit : public Command {
   virtual std::string GetName() const { return "commit"; }
 
   virtual std::string GetBrief() const {
-    return "Commit changes of a transaction";
+    return "Commit changes made inside the ephemeral shell";
   }
 
   virtual std::string GetDescription() const {
-    return "This is a first implementation of the commit command";
+    return "Commit new content from the ephemeral shell";
   }
 
   virtual std::string GetUsage() const {
-    return "[options] <repository name>[path]";
+    return "[options] <repository name>";
   }
 
   virtual ParameterList GetParams() const {

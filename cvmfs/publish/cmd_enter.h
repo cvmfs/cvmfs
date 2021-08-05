@@ -43,7 +43,7 @@ class CmdEnter : public Command {
     p.push_back(Parameter::Switch("keep-logs", 'l',
       "Clean the session directory on shell exit except for the logs"));
     p.push_back(Parameter::Switch("transaction", 't',
-      "Open a transaction within the enter shell"));
+      "Open a transaction within the ephemeral shell"));
     p.push_back(Parameter::Optional("repo-config", 'x', "repository configuration",
       "Path to the configuration of the repository gateway"));
     return p;
@@ -51,9 +51,6 @@ class CmdEnter : public Command {
   virtual unsigned GetMinPlainArgs() const { return 1; }
 
   virtual int Main(const Options &options);
-
-  void CleanupSession(bool keep_logs,
-                      const std::vector<std::string> &new_paths);
 
  private:
   void MountOverlayfs();
@@ -66,6 +63,8 @@ class CmdEnter : public Command {
   pid_t RunInteractiveShell();
 
   std::string GetCvmfsXattr(const std::string &name);
+  void CleanupSession(bool keep_logs,
+                      const std::vector<std::string> &new_paths);
 
   SettingsSpoolArea settings_spool_area_;
   std::string fqrn_;
