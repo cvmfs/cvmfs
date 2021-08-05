@@ -120,15 +120,41 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
     UniquePtr<vector<set<string>>> *all_filepaths =
             Bundle::ParseBundleSpecFile(entry->GetUnionPath());
-    for (vector<set<string>>::iterator it = (*all_filepaths)->begin();
-        it != (*all_filepaths)->end(); it++) {
-      Bundle b;
-      UniquePtr<ObjectPack> *op = b.CreateBundle(*it);
 
+    params_->spooler->UnregisterListeners();
+    params_->spooler->RegisterListener(&SyncMediator::PublishBundlesCallback,
+                                      this);
+    for (unsigned int i = 0; i < ((*all_filepaths)->size()); i++) {
+      Bundle bundle;
+      UniquePtr<ObjectPack> *op = bundle.CreateBundle((*(*all_filepaths))[i]);
+
+      // bundle path is simply the index of the set of filepaths in the vector
+      std::string bundle_path = StringifyInt(i);
+
+      uint64_t bundle_size = (*op)->size();
+      UniquePtr<unsigned char> buffer(new unsigned char[bundle_size]);
+      if (!buffer.IsValid()) {
+        PANIC(kLogStderr, "Insufficient memory");
+      }
+
+      ObjectPackProducer op_producer((*op).weak_ref());
+      op_producer.ProduceNext(bundle_size, buffer.weak_ref());
+
+      IngestionSource *source = new MemoryIngestionSource(bundle_path,
+          buffer.weak_ref(), bundle_size);
+      params_->spooler->Process(source);
+
+      params_->spooler->WaitForUpload();
+      buffer.Release();
       op->Release();
     }
 
     all_filepaths->Release();
+
+    params_->spooler->UnregisterListeners();
+    params_->spooler->RegisterListener(&SyncMediator::PublishFilesCallback,
+                                      this);
+
     AddFile(entry);
     return;
   }
