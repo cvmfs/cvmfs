@@ -812,6 +812,18 @@ void SyncMediator::PublishHardlinksCallback(
   assert(found);
 }
 
+void SyncMediator::PublishBundlesCallback(const upload::SpoolerResult &result) {
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Spooler callback for %s, digest %s, produced %d chunks, retval %d",
+           result.local_path.c_str(),
+           result.content_hash.ToString().c_str(),
+           result.file_chunks.size(),
+           result.return_code);
+  if (result.return_code != 0) {
+    PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
+          result.return_code);
+  }
+}
 
 void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
   const std::string notice = "Nested catalog at " + directory->GetUnionPath();

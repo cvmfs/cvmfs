@@ -247,6 +247,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
+  void PublishBundlesCallback(const upload::SpoolerResult &result);
 
   // Hardlink handling
   void CompleteHardlinks(SharedPtr<SyncItem> entry);
