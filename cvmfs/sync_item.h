@@ -79,6 +79,7 @@ class SyncItem {
   inline bool IsSocket()          const { return IsType(kItemSocket);          }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
   inline bool IsExternalData()    const { return external_data_;               }
+  inline bool IsDirectIo()        const { return direct_io_;                   }
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
@@ -92,6 +93,12 @@ class SyncItem {
            WasType(kItemBlockDevice) ||
            WasType(kItemFifo) ||
            WasType(kItemSocket);
+  }
+  inline bool IsBundleSpec() const {
+    return filename_ == ".cvmfsbundles";
+  }
+  inline bool WasBundleSpec() const {
+    return filename_ == ".cvmfsbundles";
   }
 
   inline unsigned int GetRdevMajor()     const {
@@ -115,6 +122,7 @@ class SyncItem {
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
   void SetExternalData(bool val) {external_data_ = val;}
+  void SetDirectIo(bool val) {direct_io_ = val;}
 
   inline zlib::Algorithms GetCompressionAlgorithm() const {
     return compression_algorithm_;
@@ -288,6 +296,7 @@ class SyncItem {
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 
   bool external_data_;
+  bool direct_io_;
   std::string relative_parent_path_;
 
   /**

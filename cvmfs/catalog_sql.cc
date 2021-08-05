@@ -75,7 +75,9 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //   4 --> 5: (Dec 07 2017):
 //            * add kFlagFileSpecial (rebranded unused kFlagFileStat)
 //            * add self_special and subtree_special statistics counters
-const unsigned CatalogDatabase::kLatestSchemaRevision = 5;
+//   5 --> 6: (Jul 01 2021):
+//            * Add kFlagDirectIo
+const unsigned CatalogDatabase::kLatestSchemaRevision = 6;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -190,6 +192,17 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
 
     set_schema_revision(5);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 5)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (5 --> 6)");
+
+    set_schema_revision(6);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
@@ -424,6 +437,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
       database_flags |= kFlagFileChunk;
     if (entry.IsExternalFile())
       database_flags |= kFlagFileExternal;
+    if (entry.IsDirectIo())
+      database_flags |= kFlagDirectIo;
   }
 
   if (!entry.checksum_ptr()->IsNull() || entry.IsChunkedFile())
@@ -709,6 +724,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.is_bind_mountpoint_ = (database_flags & kFlagDirBindMountpoint);
     result.is_chunked_file_    = (database_flags & kFlagFileChunk);
     result.is_hidden_          = (database_flags & kFlagHidden);
+    result.is_direct_io_       = (database_flags & kFlagDirectIo);
     result.is_external_file_   = (database_flags & kFlagFileExternal);
     result.has_xattrs_         = RetrieveInt(15) != 0;
     result.checksum_           =

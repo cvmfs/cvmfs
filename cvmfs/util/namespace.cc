@@ -169,7 +169,7 @@ bool CreatePidNamespace(int *fd_parent) {
       // Parent, wait for the namespace to exit
 
       // Close all file descriptors
-      max_fd = sysconf(_SC_OPEN_MAX);
+      max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
       for (int fd = 0; fd < max_fd; fd++) {
         if (fd != pipe_parent[1])
           close(fd);

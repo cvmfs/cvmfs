@@ -93,6 +93,9 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
            uint64_t *final_rev);
 
  protected:
+  virtual bool IsIgnoredPath(const PathString& path);
+  virtual bool IsReportablePath(const PathString& path);
+
   virtual void ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& xattrs,

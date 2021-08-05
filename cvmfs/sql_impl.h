@@ -239,8 +239,11 @@ bool Database<DerivedT>::PrepareCommonQueries() {
                                     "WHERE key = :key;");
   set_property_       = new Sql(db, "INSERT OR REPLACE INTO properties "
                                     "(key, value) VALUES (:key, :value);");
-  return (begin_transaction_ && commit_transaction_ &&
-          has_property_ && get_property_ && set_property_);
+  return (begin_transaction_.IsValid() &&
+          commit_transaction_.IsValid() &&
+          has_property_.IsValid() &&
+          get_property_.IsValid() &&
+          set_property_.IsValid());
 }
 
 
@@ -286,7 +289,7 @@ bool Database<DerivedT>::CreatePropertiesTable() {
 
 template <class DerivedT>
 bool Database<DerivedT>::HasProperty(const std::string &key) const {
-  assert(has_property_);
+  assert(has_property_.IsValid());
   const bool retval = has_property_->BindText(1, key) &&
                       has_property_->FetchRow();
   assert(retval);
@@ -298,7 +301,7 @@ bool Database<DerivedT>::HasProperty(const std::string &key) const {
 template <class DerivedT>
 template <typename T>
 T Database<DerivedT>::GetProperty(const std::string &key) const {
-  assert(get_property_);
+  assert(get_property_.IsValid());
   const bool retval = get_property_->BindText(1, key) &&
                       get_property_->FetchRow();
   assert(retval);
@@ -319,7 +322,7 @@ template <class DerivedT>
 template <typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key,
                                      const T            value) {
-  assert(set_property_);
+  assert(set_property_.IsValid());
   return set_property_->BindText(1, key) &&
          set_property_->Bind(2, value)   &&
          set_property_->Execute()        &&

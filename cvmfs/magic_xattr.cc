@@ -55,6 +55,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.chunk_list", new ChunkListMagicXattr());
   Register("user.chunks", new ChunksMagicXattr());
   Register("user.compression", new CompressionMagicXattr());
+  Register("user.direct_io", new DirectIoMagicXattr());
   Register("user.external_file", new ExternalFileMagicXattr());
 
   Register("user.rawlink", new RawlinkMagicXattr());
@@ -98,7 +99,7 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
   return result;
 }
 
-MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
+BaseMagicXattr* MagicXattrManager::GetLocked(const std::string &name,
                                              PathString path,
                                              catalog::DirectoryEntry *d)
 {
@@ -106,10 +107,12 @@ MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
   if (xattr_list_.count(name) > 0) {
     result = xattr_list_[name];
   } else {
-    return MagicXattrRAIIWrapper();
+    return NULL;
   }
 
-  return MagicXattrRAIIWrapper(result, path, d);
+  result->Lock(path, d);
+
+  return result;
 }
 
 void MagicXattrManager::Register(const std::string &name,
@@ -215,6 +218,14 @@ bool CompressionMagicXattr::PrepareValueFenced() {
 
 std::string CompressionMagicXattr::GetValue() {
   return zlib::AlgorithmName(dirent_->compression_algorithm());
+}
+
+bool DirectIoMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular();
+}
+
+std::string DirectIoMagicXattr::GetValue() {
+  return dirent_->IsDirectIo() ? "1" : "0";
 }
 
 bool ExternalFileMagicXattr::PrepareValueFenced() {

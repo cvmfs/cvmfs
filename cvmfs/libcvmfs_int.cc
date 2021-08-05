@@ -61,7 +61,7 @@
 #include "libcvmfs.h"
 #include "logging.h"
 #include "lru_md.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "platform.h"
 #include "quota.h"
 #include "shortstring.h"

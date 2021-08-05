@@ -43,6 +43,8 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/083-suid                                 \
                                    src/084-premounted                           \
                                    src/089-external_cache_plugin                \
+                                   src/094-attachmount                          \
+                                   src/095-fuser                                \
                                    --                                           \
                                    src/0*
 

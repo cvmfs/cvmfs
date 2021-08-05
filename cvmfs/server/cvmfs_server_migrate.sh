@@ -514,6 +514,28 @@ _migrate_142() {
 }
 
 
+_migrate_143() {
+  local name=$1
+  local destination_version="143"
+  local client_conf="/etc/cvmfs/repositories.d/${name}/client.conf"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  echo "--> updating client.conf"
+  if ! grep -q "CVMFS_USE_SSL_SYSTEM_CA" $client_conf; then
+    echo "CVMFS_USE_SSL_SYSTEM_CA=true" >> $client_conf
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -649,6 +671,11 @@ cvmfs_server_migrate() {
 
     if [ "$creator" -lt 142 ] && is_stratum0 $name; then
       _migrate_142 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" -lt 143 ] && is_stratum0 $name; then
+      _migrate_143 $name
       creator="$(repository_creator_version $name)"
     fi
 

@@ -150,10 +150,11 @@ typedef std::vector<LoadEvent *> EventList;
  * CernVM-FS 2.2.0 --> Version 3
  * CernVM-FS 2.4.0 --> Version 4
  * CernVM-FS 2.7.0 --> Version 4, fuse_channel --> fuse_channel_or_session
+ * CernVM-FS 2.9.0 --> Version 5, add device_id
  */
 struct LoaderExports {
   LoaderExports() :
-    version(4),
+    version(5),
     size(sizeof(LoaderExports)),
     boot_time(0),
     foreground(false),
@@ -191,6 +192,11 @@ struct LoaderExports {
   // void **fuse_channel_or_session
   // in order to work with both libfuse2 and libfuse3
   void **fuse_channel_or_session;
+
+  // Linux only, stores the major:minor internal mountpoint identifier
+  // The identifier is read just after mount from /proc/self/mountinfo
+  // If it cannot be determined (e.g. on macOS), device_id is "0:0".
+  std::string device_id;
 };
 
 

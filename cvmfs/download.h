@@ -24,6 +24,7 @@
 #include "hash.h"
 #include "prng.h"
 #include "sink.h"
+#include "ssl.h"
 #include "statistics.h"
 
 
@@ -443,6 +444,7 @@ class DownloadManager {
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnableRedirects();
+  void UseSystemCertificatePath();
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -595,9 +597,16 @@ class DownloadManager {
 
   CredentialsAttachment *credentials_attachment_;
 
-  // Writes and reads should be atomic because reading happens in a different
-  // thread than writing.
+  /**
+   * Writes and reads should be atomic because reading happens in a different
+   * thread than writing.
+   */
   Counters *counters_;
+
+  /**
+   * Carries the path settings for SSL certificates
+   */
+  SslCertificateStore ssl_certificate_store_;
 };  // DownloadManager
 
 }  // namespace download

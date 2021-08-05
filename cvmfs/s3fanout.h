@@ -9,6 +9,7 @@
 #include <semaphore.h>
 
 #include <climits>
+#include <cstdlib>
 #include <map>
 #include <set>
 #include <string>
@@ -18,9 +19,12 @@
 #include "dns.h"
 #include "duplex_curl.h"
 #include "prng.h"
+#include "smalloc.h"
+#include "ssl.h"
 #include "util/file_backed_buffer.h"
 #include "util/mmap_file.h"
 #include "util/pointer.h"
+#include "util/single_copy.h"
 #include "util_concurrency.h"
 
 namespace s3fanout {
@@ -90,7 +94,7 @@ struct Statistics {
 /**
  * Contains all the information to specify an upload job.
  */
-struct JobInfo {
+struct JobInfo : SingleCopy {
   enum RequestType {
     kReqHeadOnly = 0,  // peek
     kReqHeadPut,  // conditional upload of content-addressed objects
@@ -127,8 +131,12 @@ struct JobInfo {
     backoff_ms = 0;
     throttle_ms = 0;
     throttle_timestamp = 0;
+    errorbuffer =
+        reinterpret_cast<char *>(smalloc(sizeof(char) * CURL_ERROR_SIZE));
   }
-  ~JobInfo() {}
+  ~JobInfo() {
+    free(errorbuffer);
+  }
 
   // Internal state, don't touch
   CURL *curl_handle;
@@ -144,6 +152,7 @@ struct JobInfo {
   unsigned throttle_ms;
   // Remember when the 429 reply came in to only throttle if still necessary
   uint64_t throttle_timestamp;
+  char *errorbuffer;
 };  // JobInfo
 
 struct S3FanOutDnsEntry {
@@ -170,11 +179,13 @@ class S3FanoutManager : SingleCopy {
   // Report throttle operations only every so often
   static const unsigned kThrottleReportIntervalSec;
   static const unsigned kDefaultHTTPPort;
+  static const unsigned kDefaultHTTPSPort;
 
   struct S3Config {
     S3Config() {
       authz_method = kAuthzAwsV2;
       dns_buckets = true;
+      protocol = "http";
       pool_max_handles = 0;
       opt_timeout_sec = 20;
       opt_max_retries = 3;
@@ -189,6 +200,7 @@ class S3FanoutManager : SingleCopy {
     std::string flavor;
     std::string bucket;
     bool dns_buckets;
+    std::string protocol;
     uint32_t pool_max_handles;
     unsigned opt_timeout_sec;
     unsigned opt_max_retries;
@@ -249,10 +261,10 @@ class S3FanoutManager : SingleCopy {
                  std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &objkey) const {
     if (config_.dns_buckets) {
-      return "http://" + complete_hostname_ + "/" + objkey;
+      return config_.protocol + "://" + complete_hostname_ + "/" + objkey;
     } else {
-      return "http://" + complete_hostname_ + "/" + config_.bucket +
-             "/" + objkey;
+      return config_.protocol + "://" + complete_hostname_ + "/" +
+             config_.bucket + "/" + objkey;
     }
   }
   std::string MkCompleteHostname() {
@@ -319,6 +331,11 @@ class S3FanoutManager : SingleCopy {
   uint64_t timestamp_last_throttle_report_;
 
   bool is_curl_debug_;
+
+  /**
+   * Carries the path settings for SSL certificates
+   */
+  SslCertificateStore ssl_certificate_store_;
 };  // S3FanoutManager
 
 }  // namespace s3fanout
