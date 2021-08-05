@@ -316,7 +316,7 @@ class SyncItem {
   inline void StatUnion(const bool refresh = false) const {
     StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  virtual void StatScratch(const bool refresh = false) const = 0;
+  virtual void StatScratch(const bool refresh) const = 0;
 };
 
 typedef std::map<std::string, SharedPtr<SyncItem> > SyncItemList;
@@ -328,7 +328,7 @@ class SyncItemNative : public SyncItem {
   virtual void MakePlaceholderDirectory() const { assert(false); }
   virtual SyncItemType GetScratchFiletype() const;
   virtual bool IsType(const SyncItemType expected_type) const;
-  virtual void StatScratch(const bool refresh = false) const {
+  virtual void StatScratch(const bool refresh) const {
     StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
   }
 

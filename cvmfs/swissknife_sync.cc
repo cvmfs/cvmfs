@@ -553,10 +553,11 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 
     if (arg != args.end()) {
       size_t arg_value = static_cast<size_t>(String2Uint64(*arg->second));
-      if (arg_value > 0)
+      if (arg_value > 0) {
         *i->save_to = arg_value;
-      else
+      } else {
         return false;
+      }
     }
   }
 
@@ -766,16 +767,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  bool with_gateway =
-      spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
   /*
    * Note: If the upstream is of type gateway, due to the possibility of
-   * concurrent
-   *       release managers, it's possible to have a different local and remote
-   * root
-   *       hashes. We proceed by loading the remote manifest but we give an
-   * empty base
-   *       hash.
+   * concurrent release managers, it's possible to have a different local and
+   * remote root hashes. We proceed by loading the remote manifest but we give
+   * an empty base hash.
    */
   UniquePtr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
@@ -786,14 +782,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     manifest = this->OpenLocalManifest(params.manifest_path);
     params.base_hash = manifest->catalog_hash();
   } else {
-    if (with_gateway) {
-      manifest =
-          FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any());
-    } else {
-      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                     shash::Any());
-                                  // TODO(jblomer): revert to params.base_hash);
-    }
+    // TODO(jblomer): revert to params.base_hash if spooler driver type is not
+    // upload::SpoolerDefinition::Gateway
+    manifest =
+      FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any());
   }
   if (!manifest.IsValid()) {
     return 3;
@@ -895,7 +887,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   perf::Counter *revision_counter = statistics()->Register("publish.revision",
                                                   "Published revision number");
-  revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
+  revision_counter->Set(static_cast<int64_t>(
+    catalog_manager.GetRootCatalog()->revision()));
 
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
