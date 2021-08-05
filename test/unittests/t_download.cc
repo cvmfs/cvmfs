@@ -30,7 +30,7 @@ class T_Download : public FileSandbox {
 
  protected:
   virtual void SetUp() {
-    download_mgr.Init(8, false, /* use_system_proxy */
+    download_mgr.Init(8,
       perf::StatisticsTemplate("test", &statistics));
 
     CreateSandbox();
@@ -164,7 +164,7 @@ TEST_F(T_Download, Multiple) {
   string src_url = "file://" + src_path;
 
   DownloadManager second_mgr;
-  second_mgr.Init(8, false, /* use_system_proxy */
+  second_mgr.Init(8,
     perf::StatisticsTemplate("second", &statistics));
 
   JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,

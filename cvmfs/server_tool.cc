@@ -20,15 +20,14 @@ ServerTool::~ServerTool() {
 
 bool ServerTool::InitDownloadManager(const bool follow_redirects,
                                      const std::string &proxy,
-                                     const unsigned max_pool_handles,
-                                     const bool use_system_proxy) {
+                                     const unsigned max_pool_handles) {
   if (download_manager_.IsValid()) {
     return true;
   }
 
   download_manager_ = new download::DownloadManager();
   assert(download_manager_.IsValid());
-  download_manager_->Init(max_pool_handles, use_system_proxy,
+  download_manager_->Init(max_pool_handles,
                           perf::StatisticsTemplate("download", statistics()));
 
   download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);

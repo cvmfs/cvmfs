@@ -397,7 +397,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   static int ParseHttpCode(const char digits[3]);
 
   void Init(const unsigned max_pool_handles,
-            const bool use_system_proxy,
             perf::StatisticsTemplate statistics);
   void Fini();
   void Spawn();
@@ -515,7 +514,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
-  bool use_system_proxy_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;

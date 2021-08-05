@@ -21,8 +21,7 @@ class ServerTool {
 
   bool InitDownloadManager(const bool follow_redirects,
                            const std::string &proxy = "",
-                           const unsigned max_pool_handles = 1,
-                           const bool use_system_proxy = true);
+                           const unsigned max_pool_handles = 1);
   bool InitVerifyingSignatureManager(const std::string &pubkey_path,
                                      const std::string &trusted_certs = "");
   bool InitSigningSignatureManager(const std::string &certificate_path,
