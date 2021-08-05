@@ -434,9 +434,9 @@ void Database<DerivedT>::PrintSqlError(const std::string &error_msg) {
 template <class DerivedT>
 const float Database<DerivedT>::kSchemaEpsilon = 0.0005;
 template <class DerivedT>
-const std::string Database<DerivedT>::kSchemaVersionKey = "schema";
+const char *Database<DerivedT>::kSchemaVersionKey = "schema";
 template <class DerivedT>
-const std::string Database<DerivedT>::kSchemaRevisionKey = "schema_revision";
+const char *Database<DerivedT>::kSchemaRevisionKey = "schema_revision";
 
 
 //

@@ -108,7 +108,8 @@ CommitProcessor::Result CommitProcessor::Process(
     // note the millisecond accurracy
     uint64_t nanoseconds_timestamp = platform_realtime_ns();
 
-    time_t seconds = nanoseconds_timestamp / 1000000000;  // 1E9
+    time_t seconds = static_cast<time_t>(
+      nanoseconds_timestamp / 1000000000);  // 1E9
     struct tm timestamp;
     gmtime_r(&seconds, &timestamp);
     char seconds_buffer[32];
@@ -118,7 +119,8 @@ CommitProcessor::Result CommitProcessor::Process(
     // first we get the raw nanoseconds from the timestamp using the module
     // and then we divide to extract the millisecond.
     // the division truncate the number brutally, it should be enough.
-    time_t milliseconds = (nanoseconds_timestamp % 1000000000) / 1000000;
+    time_t milliseconds = static_cast<time_t>(
+      (nanoseconds_timestamp % 1000000000) / 1000000);
     char millis_buffer[48];
     snprintf(millis_buffer, sizeof(millis_buffer), "%s.%03ldZ", seconds_buffer,
              milliseconds);
@@ -329,7 +331,7 @@ CommitProcessor::Result CommitProcessor::Process(
 }
 
 void CommitProcessor::SetStatistics(perf::Statistics *st,
-                                    std::string start_time)
+                                    const std::string &start_time)
 {
   statistics_ = st;
   statistics_->Register("publish.revision", "");

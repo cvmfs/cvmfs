@@ -6,6 +6,7 @@
 #define CVMFS_SMALLHASH_H_
 
 #ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 #endif
 

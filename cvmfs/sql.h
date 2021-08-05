@@ -282,8 +282,8 @@ class Database : SingleCopy {
     Database<DerivedT>  *delegate_;
   };
 
-  static const std::string kSchemaVersionKey;
-  static const std::string kSchemaRevisionKey;
+  static const char *kSchemaVersionKey;
+  static const char *kSchemaRevisionKey;
 
   DatabaseRaiiWrapper database_;
 
