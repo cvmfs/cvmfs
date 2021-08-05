@@ -455,6 +455,10 @@ void CmdEnter::CleanupSession(
   }
 
   rvb = RemoveTree(settings_spool_area_.log_dir());
+  RemoveSingle(session_dir_ + "/session_pid");
+  RemoveSingle(session_dir_ + "/tmp.conf");
+  RemoveSingle(session_dir_ + "/session_token");
+  RemoveSingle(session_dir_ + "/in_transaction.lock");
   RemoveSingle(session_dir_);
   LogCvmfs(kLogCvmfs, kLogStdout, "[done]");
 }
@@ -577,25 +581,23 @@ int CmdEnter::Main(const Options &options) {
 
     if (options.Has("transaction")) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Starting a transaction inside the enter shell");
-  
+
+      UniquePtr<Publisher> publisher;
+      SettingsBuilder builder;
+
       if (options.Has("repo-config")) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Parsing external configuration for the repository");
         repo_config_ = options.GetString("repo-config");
+
+        SafeWriteToFile(repo_config_, session_dir_ + "/tmp.conf", 0600);
+        builder.config_path_ = repo_config_;
       }
-  
-      // We need a builder that points to the new path --> Override the default value in the constructor
-      SettingsBuilder builder;
-      builder.config_path_ = repo_config_;
     
       SettingsPublisher* settings_publisher = builder.CreateSettingsPublisher(fqrn_, false);
-     
-      // Create Publisher object
-      UniquePtr<Publisher> publisher;
       publisher = new Publisher(*settings_publisher);
-
       publisher->session()->SetKeepAlive(true);
-  
       publisher->Transaction();
+      publisher->session()->SetKeepAlive(false);
     }
 
     // May fail if the working directory was invalid to begin with
@@ -638,8 +640,11 @@ int CmdEnter::Main(const Options &options) {
                       &pid_child);
     return WaitForChild(pid_child);
   }
-  exit_code = WaitForChild(pid);
 
+  std::string s = std::to_string(pid);
+  SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
+
+  exit_code = WaitForChild(pid);
   LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
 
   if (!options.Has("keep-session"))

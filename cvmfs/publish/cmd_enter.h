@@ -52,6 +52,9 @@ class CmdEnter : public Command {
 
   virtual int Main(const Options &options);
 
+  void CleanupSession(bool keep_logs,
+                      const std::vector<std::string> &new_paths);
+
  private:
   void MountOverlayfs();
   void CreateUnderlay(const std::string &source_dir,
@@ -63,8 +66,6 @@ class CmdEnter : public Command {
   pid_t RunInteractiveShell();
 
   std::string GetCvmfsXattr(const std::string &name);
-  void CleanupSession(bool keep_logs,
-                      const std::vector<std::string> &new_paths);
 
   SettingsSpoolArea settings_spool_area_;
   std::string fqrn_;

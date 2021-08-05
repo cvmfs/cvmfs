@@ -286,6 +286,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Publish();
   void Ingest();
   void Sync();
+  void ExitShell();
 
   /**
    * Must not edit magic tags 'trunk' and 'trunk-previous'.

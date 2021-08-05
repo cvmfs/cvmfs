@@ -33,6 +33,7 @@
 #include "upload_spooler_definition.h"
 #include "util/pointer.h"
 #include "whitelist.h"
+#include "publish/cmd_enter.h"
 
 // TODO(jblomer): Remove Me
 namespace swissknife {
@@ -805,6 +806,17 @@ void Publisher::Sync() {
   }
 }
 
+void Publisher::ExitShell() {
+  std::string session_dir = Env::GetEnterSessionDir();
+  std::string session_pid_tmp = session_dir + "/session_pid";
+  std::string session_pid;
+  int fd_session_pid = open(session_pid_tmp.c_str(), O_RDONLY);
+  SafeReadToString(fd_session_pid, &session_pid);
+
+  pid_t pid_child = stoi(session_pid);
+  kill(pid_child, SIGKILL);
+}
+
 void Publisher::SyncImpl() {
   ConstructSyncManagers();
 
@@ -831,7 +843,7 @@ void Publisher::SyncImpl() {
     settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
     // TODO(jblomer): think about how to deal with the scratch area at
     // this point
-    // WipeScratchArea();
+    WipeScratchArea();
   }
 
   delete sync_union_;

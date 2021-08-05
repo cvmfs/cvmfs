@@ -36,15 +36,17 @@ int CmdCommit::Main(const Options &options) {
       lease_path = MakeCanonicalPath(tokens[1]);
   }
 
-  // Create SettingsPublisher object
-  SettingsBuilder builder;
+  std::string session_dir = Env::GetEnterSessionDir();
+  LogCvmfs(kLogCvmfs, kLogStdout, "Enter session dir: %s", session_dir.c_str());
 
-  if (options.Has("repo-config")) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "External configuration for the repository");
-    repo_config_ = options.GetString("repo-config");
-    builder.config_path_ = repo_config_;
-  }
+  std::string config_tmp = session_dir + "/tmp.conf";
+  std::string config;
+  int fd_config = open(config_tmp.c_str(), O_RDONLY);
+  SafeReadToString(fd_config, &config);
+  LogCvmfs(kLogCvmfs, kLogStdout, "Config path in commit: %s", config.c_str());
+  
+  SettingsBuilder builder;
+  builder.config_path_ = config;
 
   UniquePtr<SettingsPublisher> settings;
   try {
@@ -58,22 +60,18 @@ int CmdCommit::Main(const Options &options) {
     throw;
   }
 
-  // Do we need read-write permission? yes
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
                          false /* temporarily */))
   {
     throw EPublish("No write permission to repository");
   }
 
-  // Do we need to check for autofs? yes
   FileSystemInfo fs_info = GetFileSystemInfo("/cvmfs");
   if (fs_info.type == kFsTypeAutofs)
     throw EPublish("Autofs on /cvmfs has to be disabled");
 
-  // Do we need to get a lease? yes, because of the gateway
   settings->GetTransaction()->SetLeasePath(lease_path);
 
-  // Create Publisher object
   UniquePtr<Publisher> publisher;
   try {
     publisher = new Publisher(*settings);
@@ -96,8 +94,8 @@ int CmdCommit::Main(const Options &options) {
       "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
-  publisher->session()->SetKeepAlive(true);
   publisher->Sync();
+  publisher->ExitShell();
 
   return 0;
 }
