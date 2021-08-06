@@ -250,7 +250,10 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")        .Execute()  &&
   SqlCatalog(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
-    "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
+    "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute()  &&
+  SqlCatalog(*this,
+    "CREATE TABLE bundles (bundleid INTEGER, hash BLOB, size INTEGER, "
+    "CONSTRAINT pk_bundles PRIMARY KEY (bundleid));")             .Execute();
 
   if (!retval) {
     PrintSqlError("failed to create catalog database tables.");
