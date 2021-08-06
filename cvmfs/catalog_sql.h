@@ -140,7 +140,8 @@ class SqlCatalog : public sqlite::Sql {
   {
     uint64_t high, low;
     hash.ToIntPair(&high, &low);
-    const bool retval = BindInt64(idx_high, high) && BindInt64(idx_low, low);
+    const bool retval = BindInt64(idx_high, static_cast<int64_t>(high)) &&
+                        BindInt64(idx_low, static_cast<int64_t>(low));
     return retval;
   }
 

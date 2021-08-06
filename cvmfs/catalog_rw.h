@@ -175,7 +175,7 @@ class WritableCatalog : public Catalog {
   void MakeTransitionPoint(const std::string &mountpoint);
   void MakeNestedRoot();
   inline void MoveToNested(
-    const std::string dir_structure_root,
+    const std::string &dir_structure_root,
     WritableCatalog *new_nested_catalog,
     std::vector<std::string> *grand_child_mountpoints)
   {

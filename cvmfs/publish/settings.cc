@@ -158,7 +158,7 @@ void SettingsTransaction::SetTimeout(unsigned seconds) {
 int SettingsTransaction::GetTimeoutS() const {
   if (timeout_s_.is_default())
     return -1;
-  return timeout_s_;
+  return timeout_s_();
 }
 
 void SettingsTransaction::SetLeasePath(const std::string &path) {
@@ -180,7 +180,7 @@ void SettingsTransaction::SetTemplate(
 
 
 std::string SettingsStorage::GetLocator() const {
-  return std::string(upload::SpoolerDefinition::kDriverNames[type_]) +
+  return std::string(upload::SpoolerDefinition::kDriverNames[type_()]) +
     "," + tmp_dir_() +
     "," + endpoint_();
 }
@@ -243,34 +243,34 @@ void SettingsKeychain::SetKeychainDir(const std::string &keychain_dir) {
 
 
 bool SettingsKeychain::HasDanglingMasterKeys() const {
-  return (FileExists(master_private_key_path_) &&
-          !FileExists(master_public_key_path_)) ||
-         (!FileExists(master_private_key_path_) &&
-          FileExists(master_public_key_path_));
+  return (FileExists(master_private_key_path_()) &&
+          !FileExists(master_public_key_path_())) ||
+         (!FileExists(master_private_key_path_()) &&
+          FileExists(master_public_key_path_()));
 }
 
 
 bool SettingsKeychain::HasMasterKeys() const {
-  return FileExists(master_private_key_path_) &&
-         FileExists(master_public_key_path_);
+  return FileExists(master_private_key_path_()) &&
+         FileExists(master_public_key_path_());
 }
 
 
 bool SettingsKeychain::HasDanglingRepositoryKeys() const {
-  return (FileExists(private_key_path_) &&
-          !FileExists(certificate_path_)) ||
-         (!FileExists(private_key_path_) &&
-          FileExists(certificate_path_));
+  return (FileExists(private_key_path_()) &&
+          !FileExists(certificate_path_())) ||
+         (!FileExists(private_key_path_()) &&
+          FileExists(certificate_path_()));
 }
 
 
 bool SettingsKeychain::HasRepositoryKeys() const {
-  return FileExists(private_key_path_) &&
-         FileExists(certificate_path_);
+  return FileExists(private_key_path_()) &&
+         FileExists(certificate_path_());
 }
 
 bool SettingsKeychain::HasGatewayKey() const {
-  return FileExists(gw_key_path_);
+  return FileExists(gw_key_path_());
 }
 
 //------------------------------------------------------------------------------
@@ -318,9 +318,9 @@ SettingsPublisher::SettingsPublisher(
   , whitelist_validity_days_(kDefaultWhitelistValidity)
   , is_silent_(false)
   , is_managed_(false)
-  , storage_(fqrn_)
-  , transaction_(fqrn_)
-  , keychain_(fqrn_)
+  , storage_(fqrn_())
+  , transaction_(fqrn_())
+  , keychain_(fqrn_())
 {
   keychain_.SetKeychainDir(settings_repository.keychain().keychain_dir());
 }

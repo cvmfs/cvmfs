@@ -75,6 +75,7 @@ class MallocArena {
    * Returns the MallocArena that houses the destination of ptr.
    */
   static inline MallocArena *GetMallocArena(void *ptr, unsigned arena_size) {
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     void *arena = reinterpret_cast<void *>(
       uintptr_t(ptr) & ~(uintptr_t(arena_size) - uintptr_t(1)));
     return *reinterpret_cast<MallocArena **>(arena);
@@ -109,7 +110,7 @@ class MallocArena {
       return reinterpret_cast<AvailBlockCtl *>(base + link_prev);
     }
     int32_t ConvertToLink(char *base) {
-      return reinterpret_cast<char *>(this) - base;
+      return static_cast<int>(reinterpret_cast<char *>(this) - base);
     }
     void ShrinkTo(int32_t smaller_size) {
       size = smaller_size;

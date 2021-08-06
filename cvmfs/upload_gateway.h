@@ -70,10 +70,10 @@ class GatewayUploader : public AbstractUploader {
  protected:
   virtual void DoUpload(const std::string& remote_path,
                         IngestionSource *source,
-                        const CallbackTN* callback = NULL);
+                        const CallbackTN* callback);
 
   virtual UploadStreamHandle* InitStreamedUpload(
-      const CallbackTN* callback = NULL);
+      const CallbackTN* callback);
 
   virtual void StreamedUpload(UploadStreamHandle* handle, UploadBuffer buffer,
                               const CallbackTN* callback);

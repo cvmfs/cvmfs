@@ -25,9 +25,9 @@ namespace catalog {
 
 const char *VirtualCatalog::kVirtualPath = ".cvmfs";
 const char *VirtualCatalog::kSnapshotDirectory = "snapshots";
-const unsigned VirtualCatalog::kActionNone              = 0x00;
-const unsigned VirtualCatalog::kActionGenerateSnapshots = 0x01;
-const unsigned VirtualCatalog::kActionRemove            = 0x02;
+const int VirtualCatalog::kActionNone              = 0x00;
+const int VirtualCatalog::kActionGenerateSnapshots = 0x01;
+const int VirtualCatalog::kActionRemove            = 0x02;
 
 
 void VirtualCatalog::CreateBaseDirectory() {
@@ -191,7 +191,7 @@ void VirtualCatalog::GenerateSnapshots() {
 
 bool VirtualCatalog::ParseActions(
   const string &action_desc,
-  unsigned *actions)
+  int *actions)
 {
   *actions = kActionNone;
   if (action_desc.empty())

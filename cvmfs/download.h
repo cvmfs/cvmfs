@@ -344,8 +344,9 @@ class CredentialsAttachment {
 
 /**
  * Note when adding new fields: Clone() probably needs to be adjusted, too.
+ * TODO(jblomer): improve ordering of members
  */
-class DownloadManager {
+class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
 

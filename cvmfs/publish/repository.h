@@ -38,7 +38,6 @@ class StatisticsTemplate;
 namespace signature {
 class SignatureManager;
 }
-class SyncMediator;
 class SyncParameters;
 namespace upload {
 class Spooler;
@@ -49,6 +48,7 @@ class Whitelist;
 
 namespace publish {
 
+class SyncMediator;
 class SyncUnion;
 
 /**

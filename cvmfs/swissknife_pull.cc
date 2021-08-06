@@ -5,7 +5,9 @@
  * to calculate the difference set.
  */
 
+// NOLINTNEXTLINE
 #define _FILE_OFFSET_BITS 64
+// NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
@@ -219,7 +221,7 @@ static void Store(
 
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const std::string dest_path, const bool compress) {
+                        const std::string &dest_path, const bool compress) {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
@@ -471,6 +473,8 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
   delete catalog;
   unlink(file_catalog.c_str());
   WaitForStorage();
+  if (!retval)
+    return false;
   Store(file_catalog_vanilla, catalog_hash);
   return true;
 
@@ -557,7 +561,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     timestamp_threshold = String2Int64(*args.find('Z')->second);
   }
 
-  if (!preload_cache && stratum1_url == NULL) {
+  if (!preload_cache && stratum1_url.Get() == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "need -w <stratum 1 URL>");
     return 1;
   }
@@ -807,7 +811,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     WritePipe(pipe_chunks[1], &terminate_workers, sizeof(terminate_workers));
   }
   for (unsigned i = 0; i < num_parallel; ++i) {
-    int retval = pthread_join(workers[i], NULL);
+    int retval = pthread_join(workers[i], NULL);  // NOLINT (false positive)
     assert(retval == 0);
   }
   ClosePipe(pipe_chunks);
@@ -853,7 +857,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       if (!success) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "failed to place root catalog bootstrapping symlinks");
-        return 1;
+        goto fini;
       }
     }
 

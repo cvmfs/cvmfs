@@ -24,7 +24,8 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 class Prng {
  public:
-  Prng() {
+  // Cannot throw an exception
+  Prng() throw() {
     state_ = 0;
   }
 

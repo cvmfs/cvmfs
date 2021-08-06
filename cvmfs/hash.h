@@ -153,7 +153,9 @@ struct Digest {
       return kAlgorithmIds[digest_.algorithm][position - hash_length_];
     }
 
-    char ToHex(const char c) const { return c + ((c <= 9) ? '0' : 'a' - 10); }
+    char ToHex(const char c) const {
+      return static_cast<char>(c + ((c <= 9) ? '0' : 'a' - 10));
+    }
 
    private:
     const Digest<digest_size_, algorithm_>  &digest_;
@@ -377,9 +379,10 @@ struct Digest {
   }
 
   bool IsNull() const {
-    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
       if (digest[i] != 0)
         return false;
+    }
     return true;
   }
 
@@ -392,9 +395,10 @@ struct Digest {
   bool operator ==(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return false;
-    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
       if (this->digest[i] != other.digest[i])
         return false;
+    }
     return true;
   }
 

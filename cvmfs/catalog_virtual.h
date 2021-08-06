@@ -28,11 +28,11 @@ namespace catalog {
 class VirtualCatalog {
  public:
   static const char *kVirtualPath;  // = ".cvmfs"
-  static const unsigned kActionNone;  // = 0x00
-  static const unsigned kActionGenerateSnapshots;  // = 0x01
-  static const unsigned kActionRemove;  // 0x02;
+  static const int kActionNone;  // = 0x00
+  static const int kActionGenerateSnapshots;  // = 0x01
+  static const int kActionRemove;  // 0x02;
 
-  static bool ParseActions(const std::string &action_desc, unsigned *actions);
+  static bool ParseActions(const std::string &action_desc, int *actions);
 
   VirtualCatalog(manifest::Manifest *m,
                  download::DownloadManager *d,

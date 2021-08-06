@@ -15,7 +15,7 @@ Checks: -*,
   ,-performance-inefficient-string-concatenation,
   ,portability-*,
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*h$'
+HeaderFilterRegex: '/cvmfs/.*\.h$'
 CheckOptions:
   - key:    google-readability-braces-around-statements.ShortStatementLines
     value:  '2'

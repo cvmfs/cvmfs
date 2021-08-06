@@ -133,11 +133,12 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     } else {
       output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
     }
-    if (entry.IsLink())
+    if (entry.IsLink()) {
       perf::Inc(counters_->n_symlinks_added);
-    else
+    } else {
       perf::Inc(counters_->n_files_added);
-    perf::Xadd(counters_->sz_added_bytes, entry.size());
+    }
+    perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry.size()));
   }
 }
 
@@ -158,12 +159,13 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
     AbortIfHardlinked(entry);
     output_catalog_mgr_->RemoveFile(rel_path.c_str());
 
-    if (entry.IsLink())
+    if (entry.IsLink()) {
       perf::Inc(counters_->n_symlinks_removed);
-    else
+    } else {
       perf::Inc(counters_->n_files_removed);
+    }
 
-    perf::Xadd(counters_->sz_removed_bytes, entry.size());
+    perf::Xadd(counters_->sz_removed_bytes, static_cast<int64_t>(entry.size()));
   }
 }
 
@@ -216,11 +218,13 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     if (entry2.IsNestedCatalogMountpoint()) {
       output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
     }
-    if (entry1.IsLink())
+    if (entry1.IsLink()) {
       perf::Inc(counters_->n_symlinks_removed);
-    else
+    } else {
       perf::Inc(counters_->n_files_removed);
-    perf::Xadd(counters_->sz_removed_bytes, entry1.size());
+    }
+    perf::Xadd(counters_->sz_removed_bytes,
+               static_cast<int64_t>(entry1.size()));
     perf::Inc(counters_->n_directories_added);
 
   } else if (entry1.IsDirectory() && (entry2.IsRegular() || entry2.IsLink())) {
@@ -248,11 +252,12 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     }
 
     perf::Inc(counters_->n_directories_removed);
-    if (entry2.IsLink())
+    if (entry2.IsLink()) {
       perf::Inc(counters_->n_symlinks_added);
-    else
+    } else {
       perf::Inc(counters_->n_files_added);
-    perf::Xadd(counters_->sz_added_bytes, entry2.size());
+    }
+    perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry2.size()));
 
   } else if ((entry1.IsRegular() || entry1.IsLink()) &&
              (entry2.IsRegular() || entry2.IsLink())) {
@@ -282,8 +287,9 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     } else {
       perf::Inc(counters_->n_symlinks_changed);
     }
-    perf::Xadd(counters_->sz_removed_bytes, entry1.size());
-    perf::Xadd(counters_->sz_added_bytes, entry2.size());
+    perf::Xadd(counters_->sz_removed_bytes,
+               static_cast<int64_t>(entry1.size()));
+    perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry2.size()));
   }
   return true;
 }
