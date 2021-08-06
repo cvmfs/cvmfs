@@ -30,6 +30,7 @@ SigningTool::Result SigningTool::Run(
     const std::string &certificate, const std::string &priv_key,
     const std::string &repo_name, const std::string &pwd,
     const std::string &meta_info, const std::string &reflog_chksum_path,
+    const std::string &proxy,
     const bool garbage_collectable, const bool bootstrap_shortcuts,
     const bool return_early, const std::vector<shash::Any> reflog_catalogs) {
   shash::Any reflog_hash;
@@ -50,7 +51,7 @@ SigningTool::Result SigningTool::Run(
 
   // prepare global manager modules
   const bool follow_redirects = false;
-  if (!server_tool_->InitDownloadManager(follow_redirects) ||
+  if (!server_tool_->InitDownloadManager(follow_redirects, proxy) ||
       !server_tool_->InitSigningSignatureManager(certificate, priv_key, pwd)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return kInitError;

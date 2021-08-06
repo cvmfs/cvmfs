@@ -315,6 +315,7 @@ class CommandSync : public Command {
 
     r.push_back(Parameter::Optional('P', "session_token_file"));
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
+    r.push_back(Parameter::Optional('@', "proxy URL"));
 
     return r;
   }

@@ -1538,7 +1538,6 @@ DownloadManager::DownloadManager() {
   enable_info_header_ = false;
   opt_ipv4_only_ = false;
   follow_redirects_ = false;
-  use_system_proxy_ = false;
 
   resolver_ = NULL;
 
@@ -1592,7 +1591,6 @@ void DownloadManager::FiniHeaders() {
 
 
 void DownloadManager::Init(const unsigned max_pool_handles,
-                           const bool use_system_proxy,
                            perf::StatisticsTemplate statistics)
 {
   atomic_init32(&multi_threaded_);
@@ -1637,16 +1635,6 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   resolver_ = dns::NormalResolver::Create(opt_ipv4_only_,
     kDnsDefaultRetries, kDnsDefaultTimeoutMs);
   assert(resolver_);
-
-  // Parsing environment variables
-  if (use_system_proxy) {
-    use_system_proxy_ = true;
-    if (getenv("http_proxy") == NULL) {
-      SetProxyChain("", "", kSetProxyRegular);
-    } else {
-      SetProxyChain(string(getenv("http_proxy")), "", kSetProxyRegular);
-    }
-  }
 }
 
 
@@ -2726,7 +2714,7 @@ void DownloadManager::UseSystemCertificatePath() {
  */
 DownloadManager *DownloadManager::Clone(perf::StatisticsTemplate statistics) {
   DownloadManager *clone = new DownloadManager();
-  clone->Init(pool_max_handles_, use_system_proxy_, statistics);
+  clone->Init(pool_max_handles_, statistics);
   if (resolver_) {
     clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
     clone->SetDnsTtlLimits(resolver_->min_ttl(), resolver_->max_ttl());

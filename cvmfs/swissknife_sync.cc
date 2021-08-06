@@ -758,7 +758,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs.IsValid()) return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
-  if (!InitDownloadManager(follow_redirects)) {
+  const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
+  if (!InitDownloadManager(follow_redirects, proxy)) {
     return 3;
   }
 

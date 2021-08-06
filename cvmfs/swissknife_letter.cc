@@ -126,7 +126,9 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
 
     const bool     follow_redirects = false;
     const unsigned max_pool_handles = 2;
-    if (!this->InitDownloadManager(follow_redirects, max_pool_handles)) {
+    const string proxy =
+      (args.find('@') != args.end()) ? *args.find('@')->second : "";
+    if (!this->InitDownloadManager(follow_redirects, proxy, max_pool_handles)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
       return 2;
     }

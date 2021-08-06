@@ -131,6 +131,7 @@ class S3Uploader : public AbstractUploader {
   s3fanout::AuthzMethods authz_method_;
   bool peek_before_put_;
   bool use_https_;
+  std::string proxy_;
 
   const std::string temporary_path_;
   mutable atomic_int32 io_errors_;

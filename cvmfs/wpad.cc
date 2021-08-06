@@ -279,7 +279,7 @@ int MainResolveProxyDescription(int argc, char **argv) {
   string host_list = argv[3];
 
   DownloadManager download_manager;
-  download_manager.Init(1, false, perf::StatisticsTemplate("pac", &statistics));
+  download_manager.Init(1, perf::StatisticsTemplate("pac", &statistics));
   download_manager.SetHostChain(host_list);
   string resolved_proxies = ResolveProxyDescription(proxy_configuration, "",
                                                     &download_manager);
