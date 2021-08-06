@@ -1,4 +1,5 @@
 2.9.0:
+  * Fix potential activation of corruption stratum 1 snapshot
   * Add `cvmfs_config fuser` command
   * Add support for HTTPS S3 endpoints
   * Fix union mountpoint handling on Fedora >= 34
