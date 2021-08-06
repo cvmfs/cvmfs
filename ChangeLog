@@ -1,4 +1,7 @@
 2.9.0:
+  * Add support for explicit server-side proxy, removing support for
+    server-side system proxy; new parameters CVMFS_SERVER_PROXY and
+    CVMFS_S3_PROXY
   * Fix potential activation of corruption stratum 1 snapshot
   * Add `cvmfs_config fuser` command
   * Add support for HTTPS S3 endpoints
