@@ -2633,7 +2633,7 @@ void DownloadManager::RebalanceProxiesUnlocked() {
   opt_timestamp_failover_proxies_ = 0;
   opt_proxy_groups_current_burned_ = 1;
   vector<ProxyInfo> *group = &((*opt_proxy_groups_)[opt_proxy_groups_current_]);
-  std::uint32_t select = prng_.Next(group->size());
+  unsigned select = prng_.Next(group->size());
   swap((*group)[select], (*group)[0]);
   // LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
   //          "switching proxy from %s to %s (rebalance)",
