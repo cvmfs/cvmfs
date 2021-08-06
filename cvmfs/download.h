@@ -397,10 +397,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   static int ParseHttpCode(const char digits[3]);
 
   void Init(const unsigned max_pool_handles,
-            perf::StatisticsTemplate statistics);
+            const perf::StatisticsTemplate &statistics);
   void Fini();
   void Spawn();
-  DownloadManager *Clone(perf::StatisticsTemplate statistics);
+  DownloadManager *Clone(const perf::StatisticsTemplate &statistics);
   Failures Fetch(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);

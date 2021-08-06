@@ -2,6 +2,7 @@
 Checks: -*,
   ,bugprone-*,
   ,cert-*,
+  ,-cert-err34-c,
   ,-cert-dcl50-cpp,
   ,-cert-dcl03-c,
   ,-cert-str34-c,
