@@ -289,6 +289,23 @@ void *TalkManager::MainResponder(void *data) {
       }
     } else if (line == "mountpoint") {
       talk_mgr->Answer(con_fd, cvmfs::loader_exports_->mount_point + "\n");
+    } else if (line == "device id") {
+      if (cvmfs::loader_exports_->version >= 5)
+        talk_mgr->Answer(con_fd, cvmfs::loader_exports_->device_id + "\n");
+      else
+        talk_mgr->Answer(con_fd, "0:0\n");
+    } else if (line.substr(0, 13) == "send mount fd") {
+      // Hidden command intended to be used only by the cvmfs mount helper
+      if (line.length() < 15) {
+        talk_mgr->Answer(con_fd, "EINVAL\n");
+      } else {
+        std::string socket_path = line.substr(14);
+        bool retval = cvmfs::SendFuseFd(socket_path);
+        talk_mgr->Answer(con_fd, retval ? "OK\n" : "Failed\n");
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                 "Transfer fuse connection to new mount (via %s): %s",
+                 socket_path.c_str(), retval ? "success" : "failure");
+      }
     } else if (line.substr(0, 7) == "remount") {
       FuseRemounter::Status status;
       if (line == "remount sync")

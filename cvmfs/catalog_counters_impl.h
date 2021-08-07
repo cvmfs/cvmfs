@@ -89,7 +89,7 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(
     } else if ( (legacy == LegacyMode::kNoSpecials) &&
                 ((i->first == "self_special") ||
                  (i->first == "subtree_special")) )
-    {
+    {  // NOLINT(bugprone-branch-clone)
       *(const_cast<FieldT*>(i->second)) = FieldT(0);
       current_retval = true;
     } else if ( (legacy == LegacyMode::kNoExternals) &&

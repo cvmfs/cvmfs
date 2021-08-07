@@ -85,76 +85,76 @@ class T_SynchronizingCounter : public ::testing::Test {
 
 TEST_F(T_SynchronizingCounter, Initialize) {
   SynchronizingCounter<int64_t> counter;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 }
 
 
 TEST_F(T_SynchronizingCounter, Increment) {
   SynchronizingCounter<int64_t> counter;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 
   counter++;
-  EXPECT_EQ(1, counter);
+  EXPECT_EQ(1, counter.Get());
 
   int value = 0;
   value = counter++;
   EXPECT_EQ(1, value);
-  EXPECT_EQ(2, counter);
+  EXPECT_EQ(2, counter.Get());
 
   value = ++counter;
   EXPECT_EQ(3, value);
-  EXPECT_EQ(3, counter);
+  EXPECT_EQ(3, counter.Get());
 
   counter.Increment();
-  EXPECT_EQ(4, counter);
+  EXPECT_EQ(4, counter.Get());
 
   value = counter.Increment();
   EXPECT_EQ(5, value);
-  EXPECT_EQ(5, counter);
+  EXPECT_EQ(5, counter.Get());
 }
 
 
 TEST_F(T_SynchronizingCounter, Assign) {
   SynchronizingCounter<int64_t> counter;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 
   counter = 100;
-  EXPECT_EQ(100, counter);
+  EXPECT_EQ(100, counter.Get());
 
   counter = 0;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
 }
 
 
 TEST_F(T_SynchronizingCounter, Decrement) {
   SynchronizingCounter<int64_t> counter;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 
   counter = 100;
-  EXPECT_EQ(100, counter);
+  EXPECT_EQ(100, counter.Get());
 
   counter--;
-  EXPECT_EQ(99, counter);
+  EXPECT_EQ(99, counter.Get());
 
   int value = 0;
   value = counter--;
   EXPECT_EQ(99, value);
-  EXPECT_EQ(98, counter);
+  EXPECT_EQ(98, counter.Get());
 
   value = --counter;
   EXPECT_EQ(97, value);
-  EXPECT_EQ(97, counter);
+  EXPECT_EQ(97, counter.Get());
 
   counter.Decrement();
-  EXPECT_EQ(96, counter);
+  EXPECT_EQ(96, counter.Get());
 
   value = counter.Decrement();
   EXPECT_EQ(95, value);
-  EXPECT_EQ(95, counter);
+  EXPECT_EQ(95, counter.Get());
 }
 
 
@@ -173,7 +173,7 @@ void *thread_wait_for_assignment(void *arg) {
 
 TEST_F(T_SynchronizingCounter, WaitForAssignment) {
   SynchronizingCounter<int64_t> counter;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 
   counter = 1;
@@ -182,14 +182,14 @@ TEST_F(T_SynchronizingCounter, WaitForAssignment) {
   sleep(1);
 
   CheckStateValues(1, "Thread didn't start properly");
-  EXPECT_EQ(1, counter);
+  EXPECT_EQ(1, counter.Get());
 
   counter = 0;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   sleep(1);
 
   CheckStateValues(2, "Thread didn't continue properly");
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
 
   JoinThreads();
 }
@@ -221,7 +221,7 @@ void *thread_wait_for_decrement(void *arg) {
 TEST_F(T_SynchronizingCounter, WaitForDecrementSlow) {
   const unsigned int n_threads = 5;
   SynchronizingCounter<int64_t> counter;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 
   counter = 1;
@@ -230,12 +230,12 @@ TEST_F(T_SynchronizingCounter, WaitForDecrementSlow) {
   sleep(1);
 
   CheckStateValues(1, "Thread didn't start properly");
-  EXPECT_EQ(1, counter);
+  EXPECT_EQ(1, counter.Get());
 
   counter--;
   sleep(2);
   CheckStateValues(2, "Thread didn't continue properly on post-decrement");
-  EXPECT_EQ(static_cast<int>(n_threads), counter);
+  EXPECT_EQ(static_cast<int>(n_threads), counter.Get());
 
   for (unsigned int i = 0; i < n_threads - 1; ++i) {
     --counter;
@@ -246,7 +246,7 @@ TEST_F(T_SynchronizingCounter, WaitForDecrementSlow) {
   --counter;
   sleep(2);
   CheckStateValues(3, "Threads didn't continue properly on pre-decrement");
-  EXPECT_EQ(static_cast<int>(n_threads), counter);
+  EXPECT_EQ(static_cast<int>(n_threads), counter.Get());
 
   counter = 1;
   sleep(1);
@@ -290,7 +290,7 @@ void *thread_wait_for_increment(void *arg) {
 TEST_F(T_SynchronizingCounter, WaitForIncrementSlow) {
   const unsigned int n_threads = 5;
   SynchronizingCounter<int64_t> counter;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 
   counter = -1;
@@ -299,12 +299,12 @@ TEST_F(T_SynchronizingCounter, WaitForIncrementSlow) {
   sleep(1);
 
   CheckStateValues(1, "Thread didn't start properly");
-  EXPECT_EQ(-1, counter);
+  EXPECT_EQ(-1, counter.Get());
 
   counter++;
   sleep(2);
   CheckStateValues(2, "Thread didn't continue properly on post-decrement");
-  EXPECT_EQ(-static_cast<int>(n_threads), counter);
+  EXPECT_EQ(-static_cast<int>(n_threads), counter.Get());
 
   for (unsigned int i = 0; i < n_threads - 1; ++i) {
     ++counter;
@@ -315,7 +315,7 @@ TEST_F(T_SynchronizingCounter, WaitForIncrementSlow) {
   ++counter;
   sleep(2);
   CheckStateValues(3, "Threads didn't continue properly on pre-decrement");
-  EXPECT_EQ(-static_cast<int>(n_threads), counter);
+  EXPECT_EQ(-static_cast<int>(n_threads), counter.Get());
 
   counter = -1;
   sleep(1);
@@ -358,7 +358,7 @@ TEST_F(T_SynchronizingCounter, MultiThreadCountingSlow) {
   ASSERT_EQ(0, thread_count % 2);
 
   SynchronizingCounter<int64_t> counter;
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 
   pthread_t   threads[thread_count];
@@ -382,5 +382,5 @@ TEST_F(T_SynchronizingCounter, MultiThreadCountingSlow) {
     pthread_join(threads[i], NULL);
   }
 
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, counter.Get());
 }

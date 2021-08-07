@@ -1,4 +1,15 @@
 2.9.0:
+  * Add support for explicit server-side proxy, removing support for
+    server-side system proxy; new parameters CVMFS_SERVER_PROXY and
+    CVMFS_S3_PROXY
+  * Fix potential activation of corruption stratum 1 snapshot
+  * Add `cvmfs_config fuser` command
+  * Add support for HTTPS S3 endpoints
+  * Fix union mountpoint handling on Fedora >= 34
+  * Add support for attaching mount to an existing fuse module
+  * Add support for "direct I/O" files (CVM-2001)
+  * Add 'device id' command to cvmfs_talk (CVM-2004)
+  * Fix potential crash when accessing extended attributes (CVM-2014)
   * [gw] Fix publishing empty uncompressed files (CVM-2012)
   * Fix building Doxygen documentation
   * Add support for setting "compression" key in graft files

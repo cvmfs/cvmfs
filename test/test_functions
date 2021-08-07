@@ -507,6 +507,9 @@ cvmfs_mount() {
   if running_on_osx; then
     cvmfs_mount_direct $repositories
   fi
+  if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ]; then
+    cvmfs_mount_direct $repositories
+  fi
 
   $proberunner cvmfs_config probe > /dev/null 2>&1 || return 101
 
@@ -517,7 +520,7 @@ cvmfs_mount() {
 _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
-  mkdir -p "/cvmfs/$repository" || sudo mkdir -p "/cvmfs/$repository"
+  mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
   sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
 }
 

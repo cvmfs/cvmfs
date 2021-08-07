@@ -323,15 +323,23 @@ TEST_F(T_Util, String2Uint64) {
 
 TEST_F(T_Util, IsHttpUrl) {
   EXPECT_TRUE(IsHttpUrl("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
+  EXPECT_TRUE(IsHttpUrl("https://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
   EXPECT_TRUE(IsHttpUrl("http://"));
+  EXPECT_TRUE(IsHttpUrl("https://"));
   EXPECT_TRUE(IsHttpUrl("http://foobar"));
+  EXPECT_TRUE(IsHttpUrl("https://foobar"));
   EXPECT_TRUE(IsHttpUrl("HTTP://www.google.com"));
+  EXPECT_TRUE(IsHttpUrl("HTTPS://www.google.com"));
   EXPECT_TRUE(IsHttpUrl("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
+  EXPECT_TRUE(IsHttpUrl("HTtPs://cvmfs-stratum-zero.cern.ch/ot/atlas"));
   EXPECT_FALSE(IsHttpUrl("http:/foobar"));
+  EXPECT_FALSE(IsHttpUrl("https:/foobar"));
   EXPECT_FALSE(IsHttpUrl("http"));
+  EXPECT_FALSE(IsHttpUrl("https"));
   EXPECT_FALSE(IsHttpUrl("/srv/cvmfs/cms.cern.ch"));
   EXPECT_FALSE(IsHttpUrl("srv/cvmfs/cms.cern.ch"));
   EXPECT_FALSE(IsHttpUrl("http//foobar"));
+  EXPECT_FALSE(IsHttpUrl("https//foobar"));
 }
 
 TEST_F(T_Util, MakeCannonicalPath) {
@@ -546,7 +554,8 @@ TEST_F(T_Util, ClosePipe) {
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
-  ASSERT_DEATH(ReadPipe(fd[0], buffer_output, to_write.length()), ".*");
+  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.weak_ref(), to_write.length()),
+               ".*");
 }
 
 
@@ -746,6 +755,46 @@ TEST_F(T_Util, SendMes2Socket) {
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
+}
+
+
+TEST_F(T_Util, SendRecvFd) {
+  int fd_server = MakeSocket(socket_address, 0700);
+  ASSERT_LE(0, fd_server);
+  FdGuard fd_guard_server(fd_server);
+  listen(fd_server, 1);
+
+  pid_t pid = fork();
+  switch (pid) {
+    case -1:
+      ASSERT_TRUE(false);
+    case 0:
+      struct sockaddr_un client_addr;
+      unsigned int client_length = sizeof(client_addr);
+      int fd_conn = accept(fd_server, (struct sockaddr *) &client_addr,
+                           &client_length);
+      if (fd_conn < 0)
+        _exit(1);
+      int fd_recv = RecvFdFromSocket(fd_conn);
+      if (fd_recv < 0)
+        _exit(10 - fd_recv);
+      char zero = 42;
+      int retval = read(fd_recv, &zero, 1);
+      if (retval != 1)
+        _exit(3);
+      if (zero != 0)
+        _exit(4);
+      _exit(0);
+  }
+
+  int fd_client = ConnectSocket(socket_address);
+  ASSERT_LE(0, fd_client);
+  FdGuard fd_guard_client(fd_client);
+
+  int fd_pass = open("/dev/zero", O_RDONLY);
+  ASSERT_LE(0, fd_pass);
+  EXPECT_TRUE(SendFd2Socket(fd_client, fd_pass));
+  EXPECT_EQ(0, WaitForChild(pid));
 }
 
 
@@ -1657,7 +1706,7 @@ TEST_F(T_Util, ManagedExecCommandLine) {
                         &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
-  ssize_t bytes_read = read(fd_stdout[0], buffer, message.length());
+  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
   string result(reinterpret_cast<char *>(buffer.weak_ref()));
   ASSERT_EQ(message, result);
@@ -1689,7 +1738,7 @@ TEST_F(T_Util, ManagedExecClearEnv) {
                         &pid);
   close(fd_stdout[1]);
   ASSERT_TRUE(success);
-  ssize_t bytes_read = read(fd_stdout[0], buffer, 64);
+  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), 64);
   EXPECT_EQ(bytes_read, 0);
   close(fd_stdout[0]);
 }

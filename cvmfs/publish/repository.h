@@ -38,7 +38,6 @@ class StatisticsTemplate;
 namespace signature {
 class SignatureManager;
 }
-class SyncMediator;
 class SyncParameters;
 namespace upload {
 class Spooler;
@@ -49,6 +48,7 @@ class Whitelist;
 
 namespace publish {
 
+class SyncMediator;
 class SyncUnion;
 
 /**
@@ -273,7 +273,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   /**
    * The directory layout of the publisher node must be of matching revision
    */
-  static const unsigned kRequiredLayoutRevision = 142;
+  static const unsigned kRequiredLayoutRevision = 143;
 
   static Publisher *Create(const SettingsPublisher &settings);
 

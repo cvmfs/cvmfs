@@ -282,8 +282,8 @@ class Database : SingleCopy {
     Database<DerivedT>  *delegate_;
   };
 
-  static const std::string kSchemaVersionKey;
-  static const std::string kSchemaRevisionKey;
+  static const char *kSchemaVersionKey;
+  static const char *kSchemaRevisionKey;
 
   DatabaseRaiiWrapper database_;
 
@@ -352,16 +352,20 @@ class Sql {
    */
   std::string GetLastErrorMsg() const;
 
-  bool BindBlob(const int index, const void* value, const int size) {
+  bool BindBlob(const int index, const void* value, const unsigned size) {
     LazyInit();
-    last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
-                                         SQLITE_STATIC);
+    last_error_code_ =
+      sqlite3_bind_blob(statement_, index, value, static_cast<int>(size),
+                        SQLITE_STATIC);
     return Successful();
   }
-  bool BindBlobTransient(const int index, const void* value, const int size) {
+  bool BindBlobTransient(const int index, const void* value,
+                         const unsigned size)
+  {
     LazyInit();
-    last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
-                                         SQLITE_TRANSIENT);
+    last_error_code_ =
+      sqlite3_bind_blob(statement_, index, value, static_cast<int>(size),
+                        SQLITE_TRANSIENT);  // NOLINT
     return Successful();
   }
   bool BindDouble(const int index, const double value) {
@@ -385,13 +389,16 @@ class Sql {
     return Successful();
   }
   bool BindTextTransient(const int index, const std::string &value) {
-    return BindTextTransient(index, value.data(), value.length());
+    return BindTextTransient(
+      index, value.data(), static_cast<int>(value.length()));
   }
   bool BindTextTransient(const int index, const char *value, const int size) {
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     return BindText(index, value, size, SQLITE_TRANSIENT);
   }
   bool BindText(const int index, const std::string &value) {
-    return BindText(index, value.data(), value.length(), SQLITE_STATIC);
+    return BindText(index, value.data(), static_cast<int>(value.length()),
+                    SQLITE_STATIC);
   }
   bool BindText(const int   index,
                 const char* value,
@@ -404,13 +411,11 @@ class Sql {
 
   /**
    * Figures out the type to be bound by template parameter deduction
-   * NOTE: For strings or char* buffers this is suboptimal, since it needs to
-   *       assume that the provided buffer is transient and copy it to be sure.
-   *       Furthermore, for char* buffers we need to assume a null-terminated
-   *       C-like string to obtain its length using strlen().
+   * NOTE: For strings this is suboptimal, since it needs to assume that the
+   *       provided buffer is transient and copy it to be sure.
    */
   template <typename T>
-  inline bool Bind(const int index, const T value);
+  inline bool Bind(const int index, const T &value);
 
 
   int RetrieveType(const int idx_column) const {

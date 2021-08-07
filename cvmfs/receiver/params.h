@@ -16,6 +16,7 @@ std::string GetSpoolerTempDir(const std::string& spooler_config);
 
 struct Params {
   std::string stratum0;
+  std::string proxy;
   std::string spooler_configuration;
   shash::Algorithms hash_alg;
   std::string hash_alg_str;

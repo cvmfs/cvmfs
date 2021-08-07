@@ -713,7 +713,7 @@ int AbstractCatalogManager<CatalogT>::GetNumCatalogs() const {
 template <class CatalogT>
 string AbstractCatalogManager<CatalogT>::PrintHierarchy() const {
   ReadLock();
-  const string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
+  string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
   Unlock();
   return output;
 }

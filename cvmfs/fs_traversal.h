@@ -256,9 +256,9 @@ class FileSystemTraversal {
       return absolute_path;
     } else if (relative_to_directory_ == "/") {
       return absolute_path.substr(1);
-    } else {
-      return "";
     }
+
+    return "";
   }
 };  // FileSystemTraversal
 

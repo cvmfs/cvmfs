@@ -38,6 +38,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   , timeout_sec_(kDefaultTimeoutSec)
   , authz_method_(s3fanout::kAuthzAwsV2)
   , peek_before_put_(true)
+  , use_https_(false)
+  , proxy_("")
   , temporary_path_(spooler_definition.temporary_path)
 {
   assert(spooler_definition.IsValid() &&
@@ -63,6 +65,12 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3config.opt_max_retries = num_retries_;
   s3config.opt_backoff_init_ms = kDefaultBackoffInitMs;
   s3config.opt_backoff_max_ms = kDefaultBackoffMaxMs;
+  if (use_https_) {
+    s3config.protocol = "https";
+  } else {
+    s3config.protocol = "http";
+  }
+  s3config.proxy = proxy_;
 
   s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
   s3fanout_mgr_->Spawn();
@@ -114,12 +122,6 @@ bool S3Uploader::ParseSpoolerDefinition(
              config_path.c_str());
     return false;
   }
-  if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
-    host_name_port_ = host_name_ + ":" + parameter;
-  } else {
-    host_name_port_ = host_name_;
-  }
-
   if (!options_manager.GetValue("CVMFS_S3_ACCESS_KEY", &access_key_)) {
     LogCvmfs(kLogUploadS3, kLogStderr,
              "Failed to parse CVMFS_S3_ACCESS_KEY from '%s'.",
@@ -164,6 +166,19 @@ bool S3Uploader::ParseSpoolerDefinition(
   }
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
     peek_before_put_ = options_manager.IsOn(parameter);
+  }
+  if (options_manager.GetValue("CVMFS_S3_USE_HTTPS", &parameter)) {
+    use_https_ = options_manager.IsOn(parameter);
+  }
+
+  if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
+    host_name_port_ = host_name_ + ":" + parameter;
+  } else {
+    host_name_port_ = host_name_;
+  }
+
+  if (options_manager.IsDefined("CVMFS_S3_PROXY")) {
+    options_manager.GetValue("CVMFS_S3_PROXY", &proxy_);
   }
 
   return true;

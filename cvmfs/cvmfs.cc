@@ -998,6 +998,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                                         unique_inode);
     // The same inode can refer to different revisions of a path.  Don't cache.
     fi->keep_cache = 0;
+    fi->direct_io = dirent.IsDirectIo();
     fi->fh = static_cast<uint64_t>(-chunk_tables->next_handle);
     ++chunk_tables->next_handle;
     chunk_tables->Unlock();
@@ -1025,6 +1026,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                path.c_str(), fd);
       // The same inode can refer to different revisions of a path. Don't cache.
       fi->keep_cache = 0;
+      fi->direct_io = dirent.IsDirectIo();
       fi->fh = fd;
       fuse_reply_open(req, fi);
       return;
@@ -1359,9 +1361,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     assert(retval);
   }
 
-  MagicXattrRAIIWrapper magic_xattr;
   bool magic_xattr_success = true;
-  magic_xattr = mount_point_->magic_xattr_mgr()->Get(attr, path, &d);
+  MagicXattrRAIIWrapper magic_xattr(mount_point_->magic_xattr_mgr()->GetLocked(
+    attr, path, &d));
   if (!magic_xattr.IsNull()) {
     magic_xattr_success = magic_xattr->PrepareValueFenced();
   }
@@ -1599,6 +1601,27 @@ void UnregisterQuotaListener() {
     quota::UnregisterListener(cvmfs::watchdog_listener_);
     cvmfs::watchdog_listener_ = NULL;
   }
+}
+
+bool SendFuseFd(const std::string &socket_path) {
+  int fuse_fd;
+#if (FUSE_VERSION >= 30)
+  fuse_fd = fuse_session_fd(*reinterpret_cast<struct fuse_session**>(
+    loader_exports_->fuse_channel_or_session));
+#else
+  fuse_fd = fuse_chan_fd(*reinterpret_cast<struct fuse_chan**>(
+    loader_exports_->fuse_channel_or_session));
+#endif
+  assert(fuse_fd >= 0);
+  int sock_fd = ConnectSocket(socket_path);
+  if (sock_fd < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "cannot connect to socket %s: %d",
+             socket_path.c_str(), errno);
+    return false;
+  }
+  bool retval = SendFd2Socket(sock_fd, fuse_fd);
+  close(sock_fd);
+  return retval;
 }
 
 }  // namespace cvmfs

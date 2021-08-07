@@ -25,13 +25,12 @@ class T_Settings : public ::testing::Test {
 TEST_F(T_Settings, Setting) {
   Setting<int32_t> sint;
   EXPECT_TRUE(sint.is_default());
-  EXPECT_EQ(0, sint);
   EXPECT_EQ(0, sint());
   sint = 42;
   EXPECT_FALSE(sint.is_default());
-  EXPECT_EQ(42, sint);
+  EXPECT_EQ(42, sint());
   EXPECT_FALSE(sint.SetIfDefault(1));
-  EXPECT_EQ(42, sint);
+  EXPECT_EQ(42, sint());
 
   Setting<std::string> sstring("abc");
   EXPECT_TRUE(sstring.is_default());

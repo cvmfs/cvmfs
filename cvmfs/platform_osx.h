@@ -228,12 +228,12 @@ inline void platform_disable_kcache(int filedes) {
 }
 
 inline void platform_invalidate_kcache(const int fd, const off_t offset,
-                                       const size_t length) {
+                                       const off_t length) {
   // NOOP
   // TODO(rmeusel): implement
 }
 
-inline int platform_readahead(int filedes) {
+inline ssize_t platform_readahead(int filedes) {
   // TODO(jblomer): is there a readahead equivalent?
   return 0;
 }

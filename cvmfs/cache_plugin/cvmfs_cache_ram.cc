@@ -27,7 +27,7 @@
 #include "logging.h"
 #include "lru.h"
 #include "malloc_heap.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "platform.h"
 #include "smallhash.h"
 #include "smalloc.h"

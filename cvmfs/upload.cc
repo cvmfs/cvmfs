@@ -27,7 +27,7 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition)
 
 Spooler::~Spooler() {
   FinalizeSession(false);
-  if (uploader_) {
+  if (uploader_.IsValid()) {
     uploader_->TearDown();
   }
 }
@@ -37,7 +37,7 @@ std::string Spooler::backend_name() const { return uploader_->name(); }
 bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   // configure the uploader environment
   uploader_ = AbstractUploader::Construct(spooler_definition_);
-  if (!uploader_) {
+  if (!uploader_.IsValid()) {
     LogCvmfs(kLogSpooler, kLogWarning,
              "Failed to initialize backend upload "
              "facility in Spooler.");

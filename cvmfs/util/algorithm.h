@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "atomic.h"
-#include "murmur.h"
+#include "murmur.hxx"
 // TODO(jblomer): should be also part of algorithm
 #include "platform.h"
 #include "prng.h"
@@ -52,10 +52,10 @@ void SortTeam(std::vector<T> *tractor, std::vector<U> *towed) {
   assert(tractor);
   assert(towed);
   assert(tractor->size() == towed->size());
-  unsigned N = tractor->size();
+  int N = tractor->size();
 
   // Insertion sort on both, tractor and towed
-  for (unsigned i = 1; i < N; ++i) {
+  for (int i = 1; i < N; ++i) {
     T val_tractor = (*tractor)[i];
     U val_towed = (*towed)[i];
     int pos;
@@ -148,7 +148,7 @@ friend class UTLog2Histogram;
     uint64_t n = 0;
     unsigned int i;
     for (i = 0; i <= this->bins_.size() - 1; i++) {
-      n += (unsigned int)atomic_read32(&(this->bins_[i]));
+      n += static_cast<unsigned int>(atomic_read32(&(this->bins_[i])));
     }
     return n;
   }

@@ -36,7 +36,7 @@ class CommitProcessor {
 
   int GetNumErrors() const { return num_errors_; }
 
-  void SetStatistics(perf::Statistics *st, std::string start_time);
+  void SetStatistics(perf::Statistics *st, const std::string &start_time);
 
  private:
   int num_errors_;

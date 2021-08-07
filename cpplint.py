@@ -400,7 +400,7 @@ _CPP_HEADERS = frozenset([
 #   uppercase character, such as Python.h or nsStringAPI.h, for example).
 # - Lua headers.
 _THIRD_PARTY_HEADERS_PATTERN = re.compile(
-    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|gtest/gtest\.h|benchmark/benchmark\.h)$')
+    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|sys/types\.h|gtest/gtest\.h|benchmark/benchmark\.h)$')
 
 
 # Assertion macros.  These are defined in base/logging.h and
@@ -528,9 +528,9 @@ def ParseNolintSuppressions(filename, raw_line, linenum, error):
         category = category[1:-1]
         if category in _ERROR_CATEGORIES:
           _error_suppressions.setdefault(category, set()).add(suppressed_line)
-        elif category not in _LEGACY_ERROR_CATEGORIES:
-          error(filename, linenum, 'readability/nolint', 5,
-                'Unknown NOLINT error category: %s' % category)
+        #elif category not in _LEGACY_ERROR_CATEGORIES:
+        #  error(filename, linenum, 'readability/nolint', 5,
+        #        'Unknown NOLINT error category: %s' % category)
 
 
 def ResetNolintSuppressions():

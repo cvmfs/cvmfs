@@ -282,20 +282,20 @@ bool CatalogTestTool::Init() {
     return false;
   }
 
-  manifest_ = CreateRepository(temp_dir_, spooler_);
+  manifest_ = CreateRepository(temp_dir_, spooler_.weak_ref());
 
   if (!manifest_.IsValid()) {
     return false;
   }
 
   shash::Any history_hash(shash::kSha1);
-  CreateHistory(stratum0_, manifest_, &history_hash);
+  CreateHistory(stratum0_, manifest_.weak_ref(), &history_hash);
 
   manifest_->set_certificate(hash_cert);
   manifest_->set_history(history_hash);
   manifest_->set_repository_name("keys.cern.ch");
   manifest_->set_publish_timestamp(time(NULL));
-  CreateManifest(stratum0_, manifest_);
+  CreateManifest(stratum0_, manifest_.weak_ref());
 
 
   history_.clear();
@@ -305,7 +305,7 @@ bool CatalogTestTool::Init() {
 }
 
 void CatalogTestTool::UpdateManifest() {
-  CreateManifest(stratum0_, manifest_);
+  CreateManifest(stratum0_, manifest_.weak_ref());
 }
 
 // Note: we always apply the dir spec to the revision corresponding to the
@@ -315,7 +315,7 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   statistics_ = new perf::Statistics();
   catalog_mgr_ =
     CreateCatalogMgr(history_.front().second, "file://" + stratum0_,
-                     temp_dir_, spooler_, download_manager(),
+                     temp_dir_, spooler_.weak_ref(), download_manager(),
                      statistics_.weak_ref());
   if (!catalog_mgr_.IsValid()) {
     return false;
@@ -339,7 +339,7 @@ bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   }
 
 
-  if (!catalog_mgr_->Commit(false, 0, manifest_)) {
+  if (!catalog_mgr_->Commit(false, 0, manifest_.weak_ref())) {
     return false;
   }
 
@@ -354,7 +354,8 @@ bool CatalogTestTool::ApplyAtRootHash(
 ) {
   statistics_ = new perf::Statistics();
   catalog_mgr_ =
-    CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
+    CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
+                     spooler_.weak_ref(),
                      download_manager(), statistics_.weak_ref());
   if (!catalog_mgr_.IsValid()) {
     return false;
@@ -377,7 +378,7 @@ bool CatalogTestTool::ApplyAtRootHash(
     catalog_mgr_->CreateNestedCatalog(*it);
   }
 
-  if (!catalog_mgr_->Commit(false, 0, manifest_)) {
+  if (!catalog_mgr_->Commit(false, 0, manifest_.weak_ref())) {
     return false;
   }
 
@@ -391,8 +392,8 @@ bool CatalogTestTool::LookupNestedCatalogHash(
 ) {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
-      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
-                       download_manager(), &stats));
+      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
+                       spooler_.weak_ref(), download_manager(), &stats));
   if (!catalog_mgr.IsValid()) {
     return false;
   }
@@ -429,8 +430,8 @@ bool CatalogTestTool::FindEntry(
 ) {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
-      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
-                       download_manager(), &stats));
+      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
+                       spooler_.weak_ref(), download_manager(), &stats));
   if (!catalog_mgr.IsValid()) {
     return false;
   }
@@ -449,8 +450,8 @@ bool CatalogTestTool::DirSpecAtRootHash(const shash::Any& root_hash,
                                         DirSpec* spec) {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
-      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_, spooler_,
-                       download_manager(), &stats));
+      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
+                       spooler_.weak_ref(), download_manager(), &stats));
 
   if (!catalog_mgr.IsValid()) {
     return false;
