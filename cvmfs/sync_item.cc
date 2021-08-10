@@ -123,6 +123,12 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   whiteout_ = true;
   filename_ = actual_filename;
 
+  std::string whiteout_prefix = ".wh.";
+  std::string::size_type ii = filename_.find(whiteout_prefix);
+  if (ii != std::string::npos) {
+    filename_.erase(ii, whiteout_prefix.length());
+  }
+
   // Find the entry in the repository
   StatRdOnly(true);  // <== refreshing the stat (filename might have changed)
 

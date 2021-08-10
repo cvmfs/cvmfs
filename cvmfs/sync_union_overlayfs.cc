@@ -237,15 +237,21 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
    * There seem to be two versions of overlayfs out there and in production:
    * 1. whiteouts are 'character device' files
    * 2. whiteouts are symlinks pointing to '(overlay-whiteout)'
+   * 3. whiteouts are marked as .wh. (as in aufs)
    */
+
   bool is_chardev_whiteout = entry->IsCharacterDevice() &&
                              entry->GetRdevMajor() == 0 &&
                              entry->GetRdevMinor() == 0;
 
+  std::string whiteout_prefix_ = ".wh.";
+  bool has_wh_prefix = entry->filename().substr(0, whiteout_prefix_.length()) ==
+         whiteout_prefix_;
+
   bool is_symlink_whiteout =
       entry->IsSymlink() && IsWhiteoutSymlinkPath(entry->GetScratchPath());
 
-  return is_chardev_whiteout || is_symlink_whiteout;
+  return is_chardev_whiteout || is_symlink_whiteout || has_wh_prefix;
 }
 
 bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
