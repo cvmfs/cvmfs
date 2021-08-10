@@ -36,6 +36,7 @@
 #include <set>
 #include <string>
 
+#include "bundle.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
 #include "file_chunk.h"
@@ -123,6 +124,9 @@ class WritableCatalogManager : public SimpleCatalogManager {
                         const std::string &parent_directory,
                         const FileChunkList &file_chunks);
   void ShrinkHardlinkGroup(const std::string &remove_path);
+
+  // bundle handling
+  void AddBundle(BundleEntry bundle_entry);
 
   // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);

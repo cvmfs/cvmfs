@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <string>
 
+#include "bundle.h"
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
 #include "logging.h"
@@ -738,6 +739,24 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
       TouchEntry(entry, xattrs, entry_path);
   }
 
+  SyncUnlock();
+}
+
+
+/**
+ * Add bundle to the catalog
+ */
+void WritableCatalogManager::AddBundle(BundleEntry bundle_entry) {
+  std::string parent_path = "";  // root of the repository
+
+  SyncLock();
+  WritableCatalog *catalog;
+  if (!FindCatalog(parent_path, &catalog)) {
+    PANIC(kLogStderr, "catalog for bundle '%s' cannot be found",
+          bundle_entry.name);
+  }
+
+  catalog->AddBundle(bundle_entry);
   SyncUnlock();
 }
 

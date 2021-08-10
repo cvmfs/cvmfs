@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include "bundle.h"
 #include "catalog.h"
 #include "util/posix.h"
 
@@ -76,6 +77,8 @@ class WritableCatalog : public Catalog {
   void IncLinkcount(const std::string &path_within_group, const int delta);
   void AddFileChunk(const std::string &entry_path, const FileChunk &chunk);
   void RemoveFileChunks(const std::string &entry_path);
+
+  void AddBundle(BundleEntry bundle_entry);
 
   // Creation and removal of catalogs
   void Partition(WritableCatalog *new_nested_catalog);
@@ -157,6 +160,7 @@ class WritableCatalog : public Catalog {
   SqlChunksCount      *sql_chunks_count_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;
+  SqlBundleInsert     *sql_bundle_insert_;
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 

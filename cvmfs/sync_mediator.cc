@@ -138,7 +138,11 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
       }
 
       ObjectPackProducer op_producer((*op).weak_ref());
-      op_producer.ProduceNext(bundle_size, buffer.weak_ref());
+      unsigned int produced_bytes = op_producer.ProduceNext(
+          bundle_size, buffer.weak_ref());
+
+      bundles_list_.push_back(BundleEntry());
+      bundles_list_[i].size = produced_bytes;
 
       IngestionSource *source = new MemoryIngestionSource(bundle_path,
           buffer.weak_ref(), bundle_size);
@@ -849,6 +853,12 @@ void SyncMediator::PublishBundlesCallback(const upload::SpoolerResult &result) {
     PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
           result.return_code);
   }
+
+  int64_t bundle_index = String2Int64(result.local_path);
+  bundles_list_[bundle_index].hash = result.content_hash;
+
+  // add to catalog
+  catalog_manager_->AddBundle(bundles_list_[bundle_index]);
 }
 
 void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
