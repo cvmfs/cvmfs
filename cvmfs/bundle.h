@@ -60,4 +60,11 @@ class Bundle {
       std::string bundle_spec_path);
 };
 
+struct BundleEntry {
+  int64_t id;
+  std::string name;
+  shash::Any hash;
+  int64_t size;
+};
+
 #endif  // CVMFS_BUNDLE_H_
