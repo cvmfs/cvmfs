@@ -4,6 +4,7 @@ from flask import request
 import argparse
 import pprint
 import os
+import time
 
 app = Flask(__name__)
 
@@ -48,6 +49,9 @@ def publish_message(notifications_file, action, image):
                 os.rename(notifications_file, new_notifications_file)
                 with open(new_notifications_file, 'a+') as f:
                     f.write(f'xx|file rotation|xx\n')
+                with open(notifications_file, 'a+') as f:
+                    pass
+                time.sleep(1)
                 with open(notifications_file, 'a+') as f:
                     message = f'{str(current_id)}|{action}|{image}'
                     f.write(f'{message}\n')
