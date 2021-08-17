@@ -195,11 +195,9 @@ cvmfs_setup() {
   local nouser
   local nocfgmod
   local nostart
-  local noautofs
   nouser=0
   nocfgmod=0
   nostart=0
-  noautofs=0
 
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
 
