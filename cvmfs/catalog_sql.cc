@@ -1406,7 +1406,7 @@ XattrList SqlLookupXattrs::GetXattrs() {
 //------------------------------------------------------------------------------
 
 
-SqlLookupFileBundleId::SqlLookupFileBundleId(const CatalogDatabase &database){
+SqlLookupFileBundleId::SqlLookupFileBundleId(const CatalogDatabase &database) {
   DeferredInit(database.sqlite_db(),
   "SELECT bundleid FROM catalog "
   "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
@@ -1424,7 +1424,7 @@ int64_t SqlLookupFileBundleId::GetBundleId() {
 //------------------------------------------------------------------------------
 
 
-SqlLookupBundle::SqlLookupBundle(const CatalogDatabase &database){
+SqlLookupBundle::SqlLookupBundle(const CatalogDatabase &database) {
   DeferredInit(database.sqlite_db(),
   "SELECT * FROM bundles "
   "WHERE (id = :id) ");

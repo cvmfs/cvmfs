@@ -890,7 +890,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  if(dirent.IsRegular()) {
+  if (dirent.IsRegular()) {
     shash::Md5 file_hash = (dirent.checksum()).CastToMd5();
     int64_t *file_bundle_id = new int64_t(0);
     int fd = -1;

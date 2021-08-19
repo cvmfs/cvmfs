@@ -604,11 +604,8 @@ class SqlLookupXattrs : public SqlCatalog {
 class SqlLookupFileBundleId : public SqlCatalog {
  public:
   explicit SqlLookupFileBundleId(const CatalogDatabase &database);
-
   bool BindPathHash(const shash::Md5 &hash);
-
   int64_t GetBundleId();
-
 };
 
 
