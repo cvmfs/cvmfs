@@ -33,6 +33,7 @@ set (CVMFS_CLIENT_SOURCES
   authz/authz_fetch.cc
   authz/authz_session.cc
   backoff.cc
+  bundle.cc
   cache.cc
   cache.pb.cc cache.pb.h
   cache_extern.cc

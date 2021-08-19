@@ -78,6 +78,7 @@ Catalog::Catalog(const PathString &mountpoint,
   sql_all_chunks_ = NULL;
   sql_chunks_listing_ = NULL;
   sql_lookup_xattrs_ = NULL;
+  sql_lookup_file_bundleid_ = NULL;
 }
 
 
@@ -104,6 +105,7 @@ void Catalog::InitPreparedStatements() {
   sql_all_chunks_       = new SqlAllChunks(database());
   sql_chunks_listing_   = new SqlChunksListing(database());
   sql_lookup_xattrs_    = new SqlLookupXattrs(database());
+  sql_lookup_file_bundleid_ = new SqlLookupFileBundleId(database());
 }
 
 
@@ -116,6 +118,7 @@ void Catalog::FinalizePreparedStatements() {
   delete sql_lookup_nested_;
   delete sql_list_nested_;
   delete sql_own_list_nested_;
+  delete sql_lookup_file_bundleid_;
 }
 
 
@@ -454,6 +457,18 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
   }
   sql_chunks_listing_->Reset();
 
+  return true;
+}
+
+
+/**
+ * Lookup for a bundle id associated with a file
+ */
+bool Catalog::LookupBundleId(const shash::Md5 &hash, int64_t *bundleid) {
+  MutexLockGuard m(lock_);
+  sql_lookup_file_bundleid_->BindPathHash(hash);
+  *bundleid = sql_lookup_file_bundleid_->GetBundleId();
+  sql_lookup_file_bundleid_->Reset();
   return true;
 }
 

@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "bundle.h"
 #include "catalog.h"
 #include "globals.h"
 #include "logging.h"
@@ -1399,6 +1400,24 @@ XattrList SqlLookupXattrs::GetXattrs() {
     return XattrList();
   }
   return *xattrs;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlLookupFileBundleId::SqlLookupFileBundleId(const CatalogDatabase &database){
+  DeferredInit(database.sqlite_db(),
+  "SELECT bundleid FROM catalog "
+  "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
+}
+
+bool SqlLookupFileBundleId::BindPathHash(const shash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+int64_t SqlLookupFileBundleId::GetBundleId() {
+  return RetrieveInt64(0);
 }
 
 }  // namespace catalog

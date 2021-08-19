@@ -659,6 +659,18 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
   return counters;
 }
 
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::LookupBundleId(const shash::Md5 &hash,
+                                        int64_t *bundleid) {
+  bool result;
+  ReadLock();
+  PathString path("", 0);
+  CatalogT *best_fit = FindCatalog(path);
+  CatalogT *catalog = best_fit;
+  result = catalog->LookupBundleId(hash, bundleid);
+  Unlock();
+  return result;
+}
 
 template <class CatalogT>
 uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
