@@ -890,6 +890,17 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
+  if(dirent.IsRegular()) {
+    shash::Md5 file_hash = (dirent.checksum()).CastToMd5();
+    int64_t *file_bundle_id = new int64_t(0);
+    if(catalog_mgr->LookupBundleId(file_hash, file_bundle_id)) {
+      if(*file_bundle_id > 0) {
+
+      }
+    }
+    delete file_bundle_id;
+  }
+
   if (!CheckVoms(*fuse_ctx)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EACCES);
