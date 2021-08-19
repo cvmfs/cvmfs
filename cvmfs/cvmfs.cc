@@ -893,12 +893,31 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   if(dirent.IsRegular()) {
     shash::Md5 file_hash = (dirent.checksum()).CastToMd5();
     int64_t *file_bundle_id = new int64_t(0);
-    if(catalog_mgr->LookupBundleId(file_hash, file_bundle_id)) {
-      if(*file_bundle_id > 0) {
+    int fd = -1;
 
+    if (catalog_mgr->LookupBundleId(file_hash, file_bundle_id)) {
+      int64_t bundle_id = *file_bundle_id;
+      if (bundle_id > 0) {
+        BundleEntry *bundle_entry = new BundleEntry;
+        if (catalog_mgr->LookupBundleEntry(bundle_id, bundle_entry)) {
+          Fetcher *this_fetcher = mount_point_->external_fetcher();
+          fd = this_fetcher->Fetch(
+            bundle_entry->hash,
+            bundle_entry->size,
+            bundle_entry->name,
+            zlib::kNoCompression,
+            CacheManager::kTypeRegular);
+        }
       }
     }
-    delete file_bundle_id;
+
+    if (fd >= 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "Bundle fetched: %s (fd: %d)",
+               (bundle_entry->name).c_str(), fd);
+      delete file_bundle_id;
+      delete bundle_entry;
+      return;
+    }
   }
 
   if (!CheckVoms(*fuse_ctx)) {
