@@ -152,6 +152,7 @@ class Catalog : SingleCopy {
   }
 
   bool LookupBundleId(const shash::Md5 &hash, int64_t *bundleid);
+  bool LookupBundleEntry(const int bundleid, BundleEntry *bundle_entry);
 
   CatalogList GetChildren() const;
   Catalog* FindSubtree(const PathString &path) const;
@@ -336,6 +337,7 @@ class Catalog : SingleCopy {
   SqlChunksListing            *sql_chunks_listing_;
   SqlLookupXattrs             *sql_lookup_xattrs_;
   SqlLookupFileBundleId       *sql_lookup_file_bundleid_;
+  SqlLookupBundle             *sql_lookup_bundle_;
 
   mutable HashVector        referenced_hashes_;
 };  // class Catalog

@@ -611,6 +611,20 @@ class SqlLookupFileBundleId : public SqlCatalog {
 
 };
 
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Looks up a bundle in the bundles table
+ */
+class SqlLookupBundle : public SqlCatalog {
+ public:
+  explicit SqlLookupBundle(const CatalogDatabase &database);
+  bool BindBundleId(int64_t bundle_id);
+  BundleEntry GetBundleEntry();
+};
+
 }  // namespace catalog
 
 #endif  // CVMFS_CATALOG_SQL_H_

@@ -1420,4 +1420,27 @@ int64_t SqlLookupFileBundleId::GetBundleId() {
   return RetrieveInt64(0);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+SqlLookupBundle::SqlLookupBundle(const CatalogDatabase &database){
+  DeferredInit(database.sqlite_db(),
+  "SELECT * FROM bundles "
+  "WHERE (id = :id) ");
+}
+
+bool SqlLookupBundle::BindBundleId(int64_t bundle_id) {
+  return BindInt64(1, bundle_id);
+}
+
+BundleEntry SqlLookupBundle::GetBundleEntry() {
+  BundleEntry bundle_entry;
+  bundle_entry.id = RetrieveInt64(0);
+  bundle_entry.hash = RetrieveHashBlob(1, shash::kAny);
+  bundle_entry.size = RetrieveInt64(2);
+
+  return bundle_entry;
+}
+
 }  // namespace catalog

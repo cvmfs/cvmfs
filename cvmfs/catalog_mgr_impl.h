@@ -673,6 +673,19 @@ bool AbstractCatalogManager<CatalogT>::LookupBundleId(const shash::Md5 &hash,
 }
 
 template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::LookupBundleEntry(const int bundleid,
+                                        BundleEntry *bundle_entry) {
+  bool result;
+  ReadLock();
+  PathString path("", 0);
+  CatalogT *best_fit = FindCatalog(path);
+  CatalogT *catalog = best_fit;
+  result = catalog->LookupBundleEntry(bundleid, bundle_entry);
+  Unlock();
+  return result;
+}
+
+template <class CatalogT>
 uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   ReadLock();
   const uint64_t revision = revision_cache_;
