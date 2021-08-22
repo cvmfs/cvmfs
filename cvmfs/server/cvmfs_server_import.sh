@@ -66,10 +66,11 @@ cvmfs_server_import() {
   local configure_apache=1
   local recreate_repo_key=0
   local require_masterkeycard=0
+  local proxy_url
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:rptR" option; do
+  while getopts "w:o:c:u:k:lsmgf:rptRx:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -113,6 +114,9 @@ cvmfs_server_import() {
       R)
         recreate_whitelist=1
         require_masterkeycard=1
+      ;;
+      x)
+        proxy_url=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -222,7 +226,8 @@ cvmfs_server_import() {
                                          "default"           \
                                          "false"             \
                                          ""                  \
-                                         "" || die "fail!"
+                                         ""                  \
+                                         "$proxy_url" || die "fail!"
   echo "done"
 
   # import the old repository security keys

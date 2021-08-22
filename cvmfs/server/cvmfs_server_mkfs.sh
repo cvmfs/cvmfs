@@ -103,10 +103,11 @@ cvmfs_server_mkfs() {
 
   local configure_apache=1
   local voms_authz=""
+  local proxy_url
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:" option; do
+  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:x:" option; do
     case $option in
       X)
         external_data=true
@@ -158,6 +159,9 @@ cvmfs_server_mkfs() {
       ;;
       V)
         voms_authz=$OPTARG
+      ;;
+      x)
+        proxy_url=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -276,7 +280,8 @@ cvmfs_server_mkfs() {
                                          "$compression_alg"     \
                                          "$external_data"       \
                                          "$voms_authz"          \
-                                         "$auto_tag_timespan" || die "fail"
+                                         "$auto_tag_timespan"   \
+                                         "$proxy_url" || die "fail"
   echo "done"
 
   # create or import security keys and certificates

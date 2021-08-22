@@ -1259,8 +1259,7 @@ bool MountPoint::CreateCatalogManager() {
 bool MountPoint::CreateDownloadManagers() {
   string optarg;
   download_mgr_ = new download::DownloadManager();
-  const bool use_system_proxy = false;
-  download_mgr_->Init(kDefaultNumConnections, use_system_proxy,
+  download_mgr_->Init(kDefaultNumConnections,
                       perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 

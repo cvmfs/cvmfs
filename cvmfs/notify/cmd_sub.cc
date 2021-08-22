@@ -24,7 +24,6 @@ const LogFacilities& kLogInfo = DefaultLogging::info;
 const LogFacilities& kLogError = DefaultLogging::error;
 
 const int kMaxPoolHandles = 1;
-const bool kUseSystemProxy = true;
 
 class SwissknifeSubscriber : public notify::SubscriberSSE {
  public:
@@ -54,7 +53,7 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
       return false;
     }
 
-    dl_mgr_->Init(kMaxPoolHandles, kUseSystemProxy,
+    dl_mgr_->Init(kMaxPoolHandles,
                   perf::StatisticsTemplate("download", &stats_));
 
     std::string arg;

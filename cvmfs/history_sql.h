@@ -209,9 +209,6 @@ class SqlInsertBranch : public SqlHistory {
  */
 template <class MixinT, int offset = 0>
 class SqlRollback : public MixinT {
- protected:
-  static const std::string rollback_condition;
-
  public:
   bool BindTargetTag(const History::Tag &target_tag) {
     return MixinT::BindInt64(offset + 1, target_tag.revision) &&
@@ -219,12 +216,6 @@ class SqlRollback : public MixinT {
            MixinT::BindInt64(offset + 3, target_tag.channel);
   }
 };
-
-template <class MixinT, int offset>
-const std::string SqlRollback<MixinT, offset>::rollback_condition =
-                                             "(revision > :target_rev  OR "
-                                             " name     = :target_name)   "
-                                             "AND channel  = :target_chan ";
 
 
 class SqlRollbackTag : public SqlRollback<SqlHistory> {

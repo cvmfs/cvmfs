@@ -37,10 +37,6 @@ class Setting {
     return *this;
   }
 
-  operator const T& () const {
-    return value_;
-  }
-
   const T& operator()() const {
     return value_;
   }
@@ -94,13 +90,13 @@ class SettingsSpoolArea {
   // directory.  Does not take care of the union mount point.
   void EnsureDirectories();
 
-  std::string workspace() const { return workspace_; }
-  std::string tmp_dir() const { return tmp_dir_; }
+  std::string workspace() const { return workspace_(); }
+  std::string tmp_dir() const { return tmp_dir_(); }
   std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
   std::string readonly_talk_socket() const {
      return workspace_() + "/cvmfs_io";
   }
-  std::string union_mnt() const { return union_mnt_; }
+  std::string union_mnt() const { return union_mnt_(); }
   std::string scratch_base() const { return workspace_() + "/scratch"; }
   std::string scratch_dir() const { return scratch_base() + "/current"; }
   std::string scratch_wastebin() const { return scratch_base() + "/wastebin"; }
@@ -121,7 +117,7 @@ class SettingsSpoolArea {
   std::string publishing_lock() const {
     return workspace_() + "/is_publishing.lock";
   }
-  EUnionMountRepairMode repair_mode() const { return repair_mode_; }
+  EUnionMountRepairMode repair_mode() const { return repair_mode_(); }
 
  private:
   Setting<std::string> workspace_;
@@ -189,34 +185,34 @@ class SettingsTransaction {
    */
   int GetTimeoutS() const;
 
-  unsigned layout_revision() const { return layout_revision_; }
-  bool in_enter_session() const { return in_enter_session_; }
-  shash::Any base_hash() const { return base_hash_; }
-  shash::Algorithms hash_algorithm() const { return hash_algorithm_; }
+  unsigned layout_revision() const { return layout_revision_(); }
+  bool in_enter_session() const { return in_enter_session_(); }
+  shash::Any base_hash() const { return base_hash_(); }
+  shash::Algorithms hash_algorithm() const { return hash_algorithm_(); }
   zlib::Algorithms compression_algorithm() const {
-    return compression_algorithm_;
+    return compression_algorithm_();
   }
-  uint32_t ttl_second() const { return ttl_second_; }
-  bool is_garbage_collectable() const { return is_garbage_collectable_; }
-  bool is_volatile() const { return is_volatile_; }
-  bool enforce_limits() const { return enforce_limits_; }
+  uint32_t ttl_second() const { return ttl_second_(); }
+  bool is_garbage_collectable() const { return is_garbage_collectable_(); }
+  bool is_volatile() const { return is_volatile_(); }
+  bool enforce_limits() const { return enforce_limits_(); }
   unsigned limit_nested_catalog_kentries() const {
-    return limit_nested_catalog_kentries_;
+    return limit_nested_catalog_kentries_();
   }
   unsigned limit_root_catalog_kentries() const {
-    return limit_root_catalog_kentries_;
+    return limit_root_catalog_kentries_();
   }
-  unsigned limit_file_size_mb() const { return limit_file_size_mb_; }
-  bool use_catalog_autobalance() const { return use_catalog_autobalance_; }
-  unsigned autobalance_max_weight() const { return autobalance_max_weight_; }
-  unsigned autobalance_min_weight() const { return autobalance_min_weight_; }
-  bool print_changeset() const { return print_changeset_; }
-  bool dry_run() const { return dry_run_; }
-  std::string voms_authz() const { return voms_authz_; }
-  UnionFsType union_fs() const { return union_fs_; }
-  std::string lease_path() const { return lease_path_; }
-  std::string template_from() const { return template_from_; }
-  std::string template_to() const { return template_to_; }
+  unsigned limit_file_size_mb() const { return limit_file_size_mb_(); }
+  bool use_catalog_autobalance() const { return use_catalog_autobalance_(); }
+  unsigned autobalance_max_weight() const { return autobalance_max_weight_(); }
+  unsigned autobalance_min_weight() const { return autobalance_min_weight_(); }
+  bool print_changeset() const { return print_changeset_(); }
+  bool dry_run() const { return dry_run_(); }
+  std::string voms_authz() const { return voms_authz_(); }
+  UnionFsType union_fs() const { return union_fs_(); }
+  std::string lease_path() const { return lease_path_(); }
+  std::string template_from() const { return template_from_(); }
+  std::string template_to() const { return template_to_(); }
 
   const SettingsSpoolArea &spool_area() const { return spool_area_; }
   SettingsSpoolArea *GetSpoolArea() { return &spool_area_; }
@@ -295,8 +291,8 @@ class SettingsStorage {
   void MakeGateway(const std::string &host, unsigned port,
                    const std::string &tmp_dir);
 
-  upload::SpoolerDefinition::DriverType type() const { return type_; }
-  std::string endpoint() const { return endpoint_; }
+  upload::SpoolerDefinition::DriverType type() const { return type_(); }
+  std::string endpoint() const { return endpoint_(); }
 
  private:
   Setting<std::string> fqrn_;
@@ -326,14 +322,16 @@ class SettingsKeychain {
   bool HasRepositoryKeys() const;
   bool HasGatewayKey() const;
 
-  std::string keychain_dir() const { return keychain_dir_; }
+  std::string keychain_dir() const { return keychain_dir_(); }
   std::string master_private_key_path() const {
-    return master_private_key_path_;
+    return master_private_key_path_();
   }
-  std::string master_public_key_path() const { return master_public_key_path_; }
-  std::string private_key_path() const { return private_key_path_; }
-  std::string certificate_path() const { return certificate_path_; }
-  std::string gw_key_path() const { return gw_key_path_; }
+  std::string master_public_key_path() const {
+    return master_public_key_path_();
+  }
+  std::string private_key_path() const { return private_key_path_(); }
+  std::string certificate_path() const { return certificate_path_(); }
+  std::string gw_key_path() const { return gw_key_path_(); }
 
  private:
   Setting<std::string> fqrn_;
@@ -356,19 +354,22 @@ class SettingsRepository {
   explicit SettingsRepository(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn_())
+    , proxy_("")
     , tmp_dir_("/tmp")
     , keychain_(fqrn)
   {}
   explicit SettingsRepository(const SettingsPublisher &settings_publisher);
 
   void SetUrl(const std::string &url);
+  void SetProxy(const std::string &proxy);
   void SetTmpDir(const std::string &tmp_dir);
   void SetCertBundle(const std::string &cert_bundle);
 
-  std::string fqrn() const { return fqrn_; }
-  std::string url() const { return url_; }
-  std::string tmp_dir() const { return tmp_dir_; }
-  std::string cert_bundle() const { return cert_bundle_; }
+  std::string fqrn() const { return fqrn_(); }
+  std::string url() const { return url_(); }
+  std::string proxy() const { return proxy_(); }
+  std::string tmp_dir() const { return tmp_dir_(); }
+  std::string cert_bundle() const { return cert_bundle_(); }
 
   const SettingsKeychain &keychain() const { return keychain_; }
   SettingsKeychain *GetKeychain() { return &keychain_; }
@@ -376,6 +377,7 @@ class SettingsRepository {
  private:
   Setting<std::string> fqrn_;
   Setting<std::string> url_;
+  Setting<std::string> proxy_;
   Setting<std::string> tmp_dir_;
   // Currently only used for testing, steered by X509_CERT_BUNDLE
   // in /etc/cvmfs/server.local
@@ -395,18 +397,20 @@ class SettingsPublisher {
   explicit SettingsPublisher(const std::string &fqrn)
     : fqrn_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + fqrn)
+    , proxy_("")
     , owner_uid_(0)
     , owner_gid_(0)
     , whitelist_validity_days_(kDefaultWhitelistValidity)
     , is_silent_(false)
     , is_managed_(false)
-    , storage_(fqrn_)
-    , transaction_(fqrn_)
-    , keychain_(fqrn_)
+    , storage_(fqrn_())
+    , transaction_(fqrn_())
+    , keychain_(fqrn_())
   { }
   explicit SettingsPublisher(const SettingsRepository &settings_repository);
 
   void SetUrl(const std::string &url);
+  void SetProxy(const std::string &proxy);
   void SetOwner(const std::string &user_name);
   void SetOwner(uid_t uid, gid_t gid);
   void SetIsSilent(bool value);
@@ -414,13 +418,16 @@ class SettingsPublisher {
 
   std::string GetReadOnlyXAttr(const std::string &attr);
 
-  std::string fqrn() const { return fqrn_; }
-  std::string url() const { return url_; }
-  unsigned whitelist_validity_days() const { return whitelist_validity_days_; }
-  uid_t owner_uid() const { return owner_uid_; }
-  uid_t owner_gid() const { return owner_gid_; }
-  bool is_silent() const { return is_silent_; }
-  bool is_managed() const { return is_managed_; }
+  std::string fqrn() const { return fqrn_(); }
+  std::string url() const { return url_(); }
+  std::string proxy() const { return proxy_(); }
+  unsigned whitelist_validity_days() const {
+    return whitelist_validity_days_();
+  }
+  uid_t owner_uid() const { return owner_uid_(); }
+  uid_t owner_gid() const { return owner_gid_(); }
+  bool is_silent() const { return is_silent_(); }
+  bool is_managed() const { return is_managed_(); }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
@@ -432,6 +439,7 @@ class SettingsPublisher {
  private:
   Setting<std::string> fqrn_;
   Setting<std::string> url_;
+  Setting<std::string> proxy_;
   Setting<uid_t> owner_uid_;
   Setting<gid_t> owner_gid_;
   Setting<unsigned> whitelist_validity_days_;
@@ -476,7 +484,7 @@ class SettingsBuilder : SingleCopy {
   /**
    * Used in unit tests.
    */
-  explicit SettingsBuilder(const std::string c) : config_path_(c) {}
+  explicit SettingsBuilder(const std::string &c) : config_path_(c) {}
 
   /**
    * If ident is a url, creates a generic settings object inferring the fqrn

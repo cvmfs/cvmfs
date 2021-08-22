@@ -59,12 +59,12 @@ class S3Uploader : public AbstractUploader {
    */
   virtual void DoUpload(const std::string &remote_path,
                         IngestionSource *source,
-                        const CallbackTN *callback = NULL);
+                        const CallbackTN *callback);
 
   virtual UploadStreamHandle *InitStreamedUpload(
     const CallbackTN *callback = NULL);
   virtual void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,
-                              const CallbackTN *callback = NULL);
+                              const CallbackTN *callback);
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
                                       const shash::Any &content_hash);
 
@@ -131,6 +131,7 @@ class S3Uploader : public AbstractUploader {
   s3fanout::AuthzMethods authz_method_;
   bool peek_before_put_;
   bool use_https_;
+  std::string proxy_;
 
   const std::string temporary_path_;
   mutable atomic_int32 io_errors_;

@@ -88,7 +88,7 @@ struct SyncParameters {
   bool external_data;
   bool direct_io;
   bool voms_authz;
-  unsigned virtual_dir_actions;  // bit field
+  int virtual_dir_actions;  // bit field
   bool ignore_special_files;
   bool branched_catalog;
   zlib::Algorithms compression_alg;
@@ -315,6 +315,7 @@ class CommandSync : public Command {
 
     r.push_back(Parameter::Optional('P', "session_token_file"));
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
+    r.push_back(Parameter::Optional('@', "proxy URL"));
 
     return r;
   }

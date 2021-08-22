@@ -39,6 +39,7 @@ static void InsertCommonParameters(ParameterList *r) {
       Parameter::Optional('e', "hash algorithm to use (default SHA1)"));
   r->push_back(Parameter::Switch('L', "follow HTTP redirects"));
   r->push_back(Parameter::Optional('P', "session_token_file"));
+  r->push_back(Parameter::Optional('@', "proxy url"));
 }
 
 CommandTag::Environment *CommandTag::InitializeEnvironment(
@@ -120,7 +121,9 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // initialize the (swissknife global) download manager
   const bool follow_redirects = (args.count('L') > 0);
-  if (!this->InitDownloadManager(follow_redirects)) {
+  const std::string &proxy = (args.count('@') > 0) ?
+                              *args.find('@')->second : "";
+  if (!this->InitDownloadManager(follow_redirects, proxy)) {
     return NULL;
   }
 

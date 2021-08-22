@@ -27,7 +27,7 @@ class SyncItemTar : public SyncItem {
   virtual void MakePlaceholderDirectory() const { rdonly_type_ = kItemDir; }
   virtual SyncItemType GetScratchFiletype() const;
   virtual bool IsType(const SyncItemType expected_type) const;
-  virtual void StatScratch(const bool refresh = false) const;
+  virtual void StatScratch(const bool refresh) const;
 
  protected:
   SyncItemTar(const std::string &relative_parent_path,

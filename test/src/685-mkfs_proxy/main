@@ -1,0 +1,69 @@
+cvmfs_test_name="Create repository with a server-side proxy"
+cvmfs_test_autofs_on_startup=false
+
+cleanup() {
+  echo "running cleanup"
+
+  echo "remove proxy"
+  local apache_config_file="$(get_apache_config_filename mkfs_proxy)"
+  remove_apache_config_file "$apache_config_file"
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  local reponame=test.repo.org
+  local repodir=/cvmfs/${reponame}
+  local repoconf=/etc/cvmfs/repositories.d/${reponame}/server.conf
+
+  echo "register cleanup trap"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create proxy"
+  local apache_config_file="$(get_apache_config_filename mkfs_proxy)"
+  create_apache_config_file $apache_config_file << 'EOF'
+# Created by test case 685.  Don't touch.
+Listen 127.0.0.1:8081
+<VirtualHost 127.0.0.1:8081>
+  ProxyRequests On
+  <Proxy "*">
+  </Proxy>
+</VirtualHost>
+EOF
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+
+  echo "create repository"
+  create_repo ${reponame} $(whoami) ${logfile} -x http://127.0.0.1:8081 || return 10
+
+  echo "start transaction"
+  cvmfs_server transaction ${reponame} || return 21
+
+  echo "create test files"
+  echo "hello world" > ${repodir}/hw.txt
+
+  echo "publish and check"
+  cvmfs_server publish -v ${reponame} || return 22
+  cvmfs_server check -i ${reponame} || return 23
+
+  echo "break proxy"
+  create_apache_config_file $apache_config_file << 'EOF'
+# Created by test case 685.  Don't touch.
+Listen 127.0.0.1:8081
+<VirtualHost 127.0.0.1:8081>
+  ProxyRequests On
+  <Proxy "*">
+    Require all denied
+  </Proxy>
+</VirtualHost>
+EOF
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+
+  echo "attempt transaction via broken proxy"
+  cvmfs_server transaction ${reponame} && return 31
+
+  return 0
+}
