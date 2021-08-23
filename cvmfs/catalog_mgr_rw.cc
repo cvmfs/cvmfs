@@ -758,6 +758,22 @@ void WritableCatalogManager::AddBundle(BundleEntry bundle_entry) {
 
   catalog->AddBundle(bundle_entry);
   SyncUnlock();
+
+  catalog = NULL;
+  FilepathSet file_paths = bundle_entry.filepath_set;
+  for(FilepathSet::iterator it = file_paths.begin();
+      it != file_paths.end(); it++) {
+    const string file_path = *it;
+    const string parent_path = GetParentPath(file_path);
+
+    SyncLock();
+    if (!FindCatalog(parent_path, &catalog)) {
+      PANIC(kLogStderr, "catalog for file '%s' cannot be found",
+            file_path.c_str());
+    }
+    catalog->UpdateFileBundleId(bundle_entry.id, GetFileName(file_path));
+    SyncUnlock();
+  }
 }
 
 

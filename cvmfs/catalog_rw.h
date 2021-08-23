@@ -79,6 +79,7 @@ class WritableCatalog : public Catalog {
   void RemoveFileChunks(const std::string &entry_path);
 
   void AddBundle(BundleEntry bundle_entry);
+  void UpdateFileBundleId(int64_t bundle_id, std::string file_name);
 
   // Creation and removal of catalogs
   void Partition(WritableCatalog *new_nested_catalog);
@@ -161,6 +162,7 @@ class WritableCatalog : public Catalog {
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;
   SqlBundleInsert     *sql_bundle_insert_;
+  SqlFileBundleIdUpdate * sql_file_bundle_id_update;
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 

@@ -65,6 +65,7 @@ struct BundleEntry {
   std::string name;
   shash::Any hash;
   int64_t size;
+  FilepathSet filepath_set;
 };
 
 #endif  // CVMFS_BUNDLE_H_

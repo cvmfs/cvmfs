@@ -143,6 +143,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
       bundles_list_.push_back(BundleEntry());
       bundles_list_[i].size = produced_bytes;
+      bundles_list_[i].filepath_set = (*(*all_filepaths))[i];
 
       IngestionSource *source = new MemoryIngestionSource(bundle_path,
           buffer.weak_ref(), bundle_size);

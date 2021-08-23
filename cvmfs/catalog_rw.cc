@@ -42,6 +42,7 @@ WritableCatalog::WritableCatalog(const string      &path,
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
   sql_bundle_insert_(NULL),
+  sql_file_bundle_id_update(NULL),
   dirty_(false)
 {
   atomic_init32(&dirty_children_);
@@ -103,6 +104,7 @@ void WritableCatalog::InitPreparedStatements() {
   sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
   sql_inc_linkcount_ = new SqlIncLinkcount     (database());
   sql_bundle_insert_ = new SqlBundleInsert     (database());
+  sql_file_bundle_id_update = new SqlFileBundleIdUpdate(database());
 }
 
 
@@ -119,6 +121,7 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
   delete sql_bundle_insert_;
+  delete sql_file_bundle_id_update;
 }
 
 
@@ -325,6 +328,18 @@ void WritableCatalog::AddBundle(BundleEntry bundle_entry) {
     sql_bundle_insert_->Execute();
   assert(retval);
   sql_bundle_insert_->Reset();
+}
+
+
+void WritableCatalog::UpdateFileBundleId(int64_t bundle_id, std::string file_name) {
+  SetDirty();
+
+  bool retval =
+    sql_file_bundle_id_update->BindBundleId(bundle_id) &&
+    sql_file_bundle_id_update->BindFileName(file_name) &&
+    sql_file_bundle_id_update->Execute();
+  assert(retval);
+  sql_file_bundle_id_update->Reset();
 }
 
 
