@@ -49,6 +49,7 @@ ParameterList CommandInfo::GetParams() const {
   r.push_back(Parameter::Mandatory('r', "repository directory / url"));
   r.push_back(Parameter::Optional('u', "repository mount point"));
   r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
+  r.push_back(Parameter::Optional('@', "proxy url"));
   r.push_back(Parameter::Switch('c', "show root catalog hash"));
   r.push_back(Parameter::Switch('C', "show mounted root catalog hash"));
   r.push_back(Parameter::Switch('n', "show fully qualified repository name"));
@@ -96,7 +97,9 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 
   if (IsRemote(repository)) {
     const bool follow_redirects = args.count('L') > 0;
-    if (!this->InitDownloadManager(follow_redirects)) {
+    const string proxy =
+      (args.find('@') != args.end()) ? *args.find('@')->second : "";
+    if (!this->InitDownloadManager(follow_redirects, proxy)) {
       return 1;
     }
   }

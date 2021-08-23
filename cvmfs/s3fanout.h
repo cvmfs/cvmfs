@@ -206,6 +206,7 @@ class S3FanoutManager : SingleCopy {
     unsigned opt_max_retries;
     unsigned opt_backoff_init_ms;
     unsigned opt_backoff_max_ms;
+    std::string proxy;
   };
 
   static void DetectThrottleIndicator(const std::string &header, JobInfo *info);

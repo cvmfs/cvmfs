@@ -10,12 +10,12 @@
 #include "smalloc.h"
 
 Pathspec::Pathspec(const std::string &spec) :
-  regex_compiled_(false),
   regex_(NULL),
-  relaxed_regex_compiled_(false),
   relaxed_regex_(NULL),
-  prefix_regex_compiled_(false),
   prefix_regex_(NULL),
+  regex_compiled_(false),
+  relaxed_regex_compiled_(false),
+  prefix_regex_compiled_(false),
   glob_string_compiled_(false),
   glob_string_sequence_compiled_(false),
   valid_(true),
@@ -35,18 +35,20 @@ Pathspec::Pathspec(const std::string &spec) :
   }
 }
 
+// Compiled regex structure cannot be duplicated and needs to be re-compiled
+// Note: the copy-constructed object will perform a lazy evaluation again
 Pathspec::Pathspec(const Pathspec &other) :
   patterns_(other.patterns_),
-  regex_compiled_(false),          // compiled regex structure cannot be
-  regex_(NULL),                    // duplicated and needs to be re-compiled
-  relaxed_regex_compiled_(false),  // Note: the copy-constructed object will
-  relaxed_regex_(NULL),            //       perform a lazy evaluation again
-  prefix_regex_compiled_(false),
+  regex_(NULL),
+  relaxed_regex_(NULL),
   prefix_regex_(NULL),
-  glob_string_compiled_(other.glob_string_compiled_),
   glob_string_(other.glob_string_),
-  glob_string_sequence_compiled_(other.glob_string_sequence_compiled_),
   glob_string_sequence_(other.glob_string_sequence_),
+  regex_compiled_(false),
+  relaxed_regex_compiled_(false),
+  prefix_regex_compiled_(false),
+  glob_string_compiled_(other.glob_string_compiled_),
+  glob_string_sequence_compiled_(other.glob_string_sequence_compiled_),
   valid_(other.valid_),
   absolute_(other.absolute_) {}
 

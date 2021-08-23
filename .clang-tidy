@@ -2,6 +2,7 @@
 Checks: -*,
   ,bugprone-*,
   ,cert-*,
+  ,-cert-err34-c,
   ,-cert-dcl50-cpp,
   ,-cert-dcl03-c,
   ,-cert-str34-c,
@@ -15,7 +16,7 @@ Checks: -*,
   ,-performance-inefficient-string-concatenation,
   ,portability-*,
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*h$'
+HeaderFilterRegex: '/cvmfs/.*\.h$'
 CheckOptions:
   - key:    google-readability-braces-around-statements.ShortStatementLines
     value:  '2'

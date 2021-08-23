@@ -48,8 +48,6 @@ namespace manifest {
 class Manifest;
 }
 
-struct Counters;
-
 namespace publish {
 
 class SyncDiffReporter : public DiffListener {
@@ -96,11 +94,11 @@ class SyncDiffReporter : public DiffListener {
  * Assertion: linkcount == HardlinkGroup::hardlinks.size() at the end
  */
 struct HardlinkGroup {
-  explicit HardlinkGroup(SharedPtr<SyncItem> item) : master(item) {
+  explicit HardlinkGroup(const SharedPtr<SyncItem> &item) : master(item) {
     hardlinks[master->GetRelativePath()] = item;
   }
 
-  void AddHardlink(SharedPtr<SyncItem> entry) {
+  void AddHardlink(const SharedPtr<SyncItem> &entry) {
     hardlinks[entry->GetRelativePath()] = entry;
   }
 

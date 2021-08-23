@@ -42,6 +42,7 @@ class CommandPull : public Command {
     r.push_back(Parameter::Optional('a', "number of retries"));
     r.push_back(Parameter::Optional('d', "directory for path specification"));
     r.push_back(Parameter::Optional('Z', "pull revisions younger than <Z>"));
+    r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Switch('p', "pull catalog history, too"));
     r.push_back(Parameter::Switch('i', "mark as an 'initial snapshot'"));
     r.push_back(Parameter::Switch('c', "preload cache instead of stratum 1"));

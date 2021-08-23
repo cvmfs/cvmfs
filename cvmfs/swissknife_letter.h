@@ -32,6 +32,7 @@ class CommandLetter : public Command {
     r.push_back(Parameter::Optional('r', "repository url"));
     r.push_back(Parameter::Switch('e', "Erlang mode (stay active)"));
     r.push_back(Parameter::Optional('t', "text to sign or verify"));
+    r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Mandatory('f', "fully qualified repository name"));
     return r;
   }

@@ -147,7 +147,7 @@ __check_repair_reflog() {
   if $user_shell "$(__swissknife_cmd) peek -d .cvmfsreflog -r $CVMFS_UPSTREAM_STORAGE" >/dev/null; then
     has_reflog=1
     local url="$repository_url/.cvmfsreflog"
-    local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $url \
+    local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $(get_curl_proxy) $url \
       | cvmfs_publish hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
     computed_checksum="$($user_shell "$rehash_cmd")"
     echo "Info: found $url with content hash $computed_checksum"

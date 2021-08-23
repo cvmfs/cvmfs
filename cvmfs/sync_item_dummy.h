@@ -53,7 +53,7 @@ class SyncItemDummyCatalog : public SyncItem {
     return new StringIngestionSource("", GetUnionPath());
   }
 
-  void StatScratch(const bool refresh) const { return; }
+  void StatScratch(const bool /* refresh */) const { return; }
 
   SyncItemType GetScratchFiletype() const { return kItemFile; }
 

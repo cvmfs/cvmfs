@@ -377,7 +377,7 @@ class LocalObjectFetcher :
 
   Failures Fetch(const std::string &relative_path,
                  const bool         decompress,
-                 const bool         nocache,
+                 const bool         /* nocache */,
                        std::string *file_path) {
     assert(file_path != NULL);
     file_path->clear();

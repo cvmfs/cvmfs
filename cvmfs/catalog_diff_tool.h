@@ -60,7 +60,7 @@ class CatalogDiffTool {
    * into paths that will not be of interest (e.g. paths that are
    * neither above nor within the lease path, when using a gateway).
    */
-  virtual bool IsIgnoredPath(const PathString& path) { return false; }
+  virtual bool IsIgnoredPath(const PathString& /* path */) { return false; }
 
   /**
    * Check if a difference found on a path should be reported via
@@ -85,7 +85,7 @@ class CatalogDiffTool {
    * /foo/bar/thing   <-  not ignored      reportable
    * /foo/baz         <-      ignored (and therefore not reportable)
    */
-  virtual bool IsReportablePath(const PathString& path) { return true; }
+  virtual bool IsReportablePath(const PathString& /* path */) { return true; }
 
   virtual void ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,

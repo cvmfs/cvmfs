@@ -128,10 +128,11 @@ class BigVector {
       buf[i].~Item();
 
     if (buf) {
-      if (large)
+      if (large) {
         smunmap(buf);
-      else
+      } else {
         free(buf);
+      }
     }
   }
 

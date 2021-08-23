@@ -96,7 +96,7 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 
 
 SyncItemType SyncItemNative::GetScratchFiletype() const {
-  StatScratch();
+  StatScratch(/* refresh= */ false);
   if (scratch_stat_.error_code != 0) {
     PANIC(kLogStderr, "[WARNING] Failed to stat() '%s' in scratch. (errno: %s)",
           GetRelativePath().c_str(), scratch_stat_.error_code);
@@ -122,7 +122,7 @@ bool SyncItemNative::IsType(const SyncItemType expected_type) const {
 }
 
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
-  StatScratch(true);
+  StatScratch(/* refresh= */ true);
   // Mark the file as whiteout entry and strip the whiteout prefix
   whiteout_ = true;
   filename_ = actual_filename;
@@ -178,7 +178,7 @@ uint64_t SyncItem::GetUnionInode() const {
 }
 
 uint64_t SyncItem::GetScratchSize() const {
-  StatScratch();
+  StatScratch(/* refresh= */ false);
   return scratch_stat_.stat.st_size;
 }
 

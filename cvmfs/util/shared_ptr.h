@@ -48,7 +48,7 @@ class SharedPtr {
   }
 
   template <class Y>
-  SharedPtr(SharedPtr<Y> const& r)
+  explicit SharedPtr(SharedPtr<Y> const& r)
       : value_(r.value_), count_(r.count_) {  // never throws
     if (count_) {
       atomic_inc64(count_);
@@ -56,6 +56,9 @@ class SharedPtr {
   }
 
   SharedPtr& operator=(SharedPtr const& r) {  // never throws
+    if (this == &r)
+      return *this;
+
     Reset();
     value_ = r.value_;
     count_ = r.count_;
@@ -114,10 +117,6 @@ class SharedPtr {
 
   int64_t UseCount() const {  // never throws
     return count_ ? atomic_read64(count_) : -1;
-  }
-
-  operator void*() const {  // never throws
-    return static_cast<void*>(value_);
   }
 
  private:

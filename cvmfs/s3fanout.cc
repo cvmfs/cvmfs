@@ -1002,6 +1002,9 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   string url = MkUrl(info->object_key);
   retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   assert(retval == CURLE_OK);
+
+  retval = curl_easy_setopt(curl_handle, CURLOPT_PROXY, config_.proxy.c_str());
+  assert(retval == CURLE_OK);
 }
 
 
