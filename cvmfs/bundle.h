@@ -13,7 +13,9 @@
 #include "pack.h"
 #include "util/pointer.h"
 
-typedef std::set<std::string> FilepathSet;
+using namespace std;
+
+typedef set<string> FilepathSet;
 
 /**
  * A bundle has the binary format of object packs used as
@@ -56,13 +58,13 @@ class Bundle {
    *    ...
    *  ]
    */
-  static UniquePtr<std::vector<FilepathSet>> *ParseBundleSpecFile(
-      std::string bundle_spec_path);
+  static UniquePtr<vector<FilepathSet>> *ParseBundleSpecFile(
+    string bundle_spec_path);
 };
 
 struct BundleEntry {
   int64_t id;
-  std::string name;
+  string name;
   shash::Any hash;
   int64_t size;
   FilepathSet filepath_set;

@@ -17,6 +17,8 @@
 #include "util/posix.h"
 #include "util/string.h"
 
+using namespace std;
+
 UniquePtr<ObjectPack> * Bundle::CreateBundle(
     const FilepathSet &filepaths) {
   // create an ObjectPack
@@ -27,7 +29,7 @@ UniquePtr<ObjectPack> * Bundle::CreateBundle(
 
   for (FilepathSet::iterator it = filepaths.begin();
       it != filepaths.end(); it++) {
-    std::string path = *it;
+    string path = *it;
 
     // open the file for reading
     int fd = open(path.c_str(), O_RDONLY);
@@ -66,8 +68,8 @@ UniquePtr<ObjectPack> * Bundle::CreateBundle(
   return op;
 }
 
-UniquePtr<std::vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
-    std::string bundle_spec_path) {
+UniquePtr<vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
+    string bundle_spec_path) {
   // open the bundle specification file for reading
   int fd = open(bundle_spec_path.c_str(), O_RDONLY);
   if (fd < 0) {
@@ -76,7 +78,7 @@ UniquePtr<std::vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
   }
 
   // copy JSON contents to the string
-  std::string json_string;
+  string json_string;
   if (!SafeReadToString(fd, &json_string)) {
     PANIC(kLogStderr, "Could not read contents of file: %s",
           bundle_spec_path.c_str());
@@ -85,8 +87,8 @@ UniquePtr<std::vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
   // create JsonDocument from the JSON string
   UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
 
-  UniquePtr<std::vector<FilepathSet>> *all_filepaths =
-      new UniquePtr<std::vector<FilepathSet>>(new std::vector<FilepathSet>());
+  UniquePtr<vector<FilepathSet>> *all_filepaths =
+      new UniquePtr<vector<FilepathSet>>(new vector<FilepathSet>());
 
   // parse the array of bundle spec JSON objects
   const JSON *value = json->root();
@@ -112,22 +114,22 @@ UniquePtr<std::vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
 
     // bundle name
     p = p->first_child;
-    if (std::string(p->name) != "bundle_name") {
+    if (string(p->name) != "bundle_name") {
       PANIC(kLogStderr, "Malformed bundle specification: no bundle name found");
     }
-    std::string bundle_name = std::string(p->string_value);
+    string bundle_name = string(p->string_value);
 
     // filepaths
     p = p->next_sibling;
-    if (std::string(p->name) != "filepaths") {
+    if (string(p->name) != "filepaths") {
       PANIC(kLogStderr, "Malformed bundle specification: "
             "no filepaths array found");
     }
     if (p->first_child) {
       p = p->first_child;
-      std::string filepath;
+      string filepath;
       do {
-        filepath = std::string(p->string_value);
+        filepath = string(p->string_value);
 
         // if the file size exceeds kMaxFileSize then the file is skipped
         int64_t currentFileSize = GetFileSize(filepath);
@@ -138,8 +140,8 @@ UniquePtr<std::vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
           if (filepath_set.find(filepath) != filepath_set.end()) {
             PANIC(kLogStderr, "Duplicate filepath found: %s", filepath.c_str());
           }
-          for (std::vector<FilepathSet>::iterator it =
-              (*all_filepaths)->begin(); it != (*all_filepaths)->end(); it++) {
+          for (vector<FilepathSet>::iterator it = (*all_filepaths)->begin();
+               it != (*all_filepaths)->end(); it++) {
             if (it->find(filepath) != it->end()) {
               PANIC(kLogStderr, "Duplicate filepath found: %s already exists in"
                     " %s", filepath.c_str(), bundle_name.c_str());
