@@ -1419,4 +1419,25 @@ bool SqlBundleInsert::BindBundle(BundleEntry bundle_entry) {
          BindInt64(3, bundle_entry.size);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+SqlFileBundleIdUpdate::SqlFileBundleIdUpdate(const CatalogDatabase &database) {
+  DeferredInit(database.sqlite_db(),
+  "UPDATE catalog "
+  "SET bundleid = :bundleid"
+  //                  1
+  "WHERE (name = :name);");
+  //               2
+}
+
+bool SqlFileBundleIdUpdate::BindBundleId(int64_t bundle_id) {
+  return BindInt64(1, bundle_id);
+}
+
+bool SqlFileBundleIdUpdate::BindFileName(std::string file_name) {
+  return BindText(2, file_name);
+}
+
 }  // namespace catalog

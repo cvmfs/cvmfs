@@ -607,6 +607,20 @@ class SqlBundleInsert : public SqlCatalog {
   bool BindBundle(BundleEntry bundle_entry);
 };
 
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Update the bundle id for a file that belongs to the bundle
+ */
+class SqlFileBundleIdUpdate : public SqlCatalog {
+ public:
+  explicit SqlFileBundleIdUpdate(const CatalogDatabase &database);
+  bool BindBundleId(int64_t bundle_id);
+  bool BindFileName(std::string file_name);
+};
+
 }  // namespace catalog
 
 #endif  // CVMFS_CATALOG_SQL_H_
