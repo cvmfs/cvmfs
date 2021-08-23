@@ -217,8 +217,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       // libcurl will handle this because of CURLOPT_FOLLOWLOCATION
       return num_bytes;
     } else {
-      LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
-               header_line.c_str());
+      LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s [%d]",
+               header_line.c_str(), info->http_code);
       if (((info->http_code / 100) == 5) ||
           (info->http_code == 400) || (info->http_code == 404))
       {
