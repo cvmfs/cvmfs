@@ -34,7 +34,7 @@ class Bundle {
    * Returns a UniquePtr to the created ObjectPack on success, an invalid
    * UniquePtr otherwise
    */
-  UniquePtr<ObjectPack> *CreateBundle(const std::set<std::string> &filepaths);
+  UniquePtr<ObjectPack> *CreateBundle(const FilepathSet &filepaths);
 
   /**
    * Parses a bundle specification file

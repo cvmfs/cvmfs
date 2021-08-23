@@ -18,14 +18,14 @@
 #include "util/string.h"
 
 UniquePtr<ObjectPack> * Bundle::CreateBundle(
-    const std::set<std::string> &filepaths) {
+    const FilepathSet &filepaths) {
   // create an ObjectPack
   UniquePtr<ObjectPack> *op = new UniquePtr<ObjectPack>(new ObjectPack());
   if (!op->IsValid()) {
     PANIC(kLogStderr, "Insufficient memory");
   }
 
-  for (std::set<std::string>::iterator it = filepaths.begin();
+  for (FilepathSet::iterator it = filepaths.begin();
       it != filepaths.end(); it++) {
     std::string path = *it;
 

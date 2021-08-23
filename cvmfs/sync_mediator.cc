@@ -118,7 +118,7 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
             " directory of the repository. Found in %s", parent_path.c_str());
     }
 
-    UniquePtr<vector<set<string>>> *all_filepaths =
+    UniquePtr<vector<FilepathSet>> *all_filepaths =
             Bundle::ParseBundleSpecFile(entry->GetUnionPath());
 
     params_->spooler->UnregisterListeners();
