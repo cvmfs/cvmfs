@@ -14,7 +14,7 @@
 #include "pack.h"
 #include "util/pointer.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 typedef set<string> FilepathSet;
 

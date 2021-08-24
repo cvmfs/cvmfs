@@ -18,7 +18,7 @@
 #include "util/posix.h"
 #include "util/string.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 UniquePtr<ObjectPack> * Bundle::CreateBundle(
     const FilepathSet &filepaths) {

@@ -331,7 +331,8 @@ void WritableCatalog::AddBundle(BundleEntry bundle_entry) {
 }
 
 
-void WritableCatalog::UpdateFileBundleId(int64_t bundle_id, std::string file_name) {
+void WritableCatalog::UpdateFileBundleId(int64_t bundle_id,
+                                         std::string file_name) {
   SetDirty();
 
   bool retval =
