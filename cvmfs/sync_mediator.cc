@@ -118,15 +118,16 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
             " directory of the repository. Found in %s", parent_path.c_str());
     }
 
-    UniquePtr<vector<FilepathSet>> *all_filepaths =
+    UniquePtr<vector<pair<string, FilepathSet>>> *all_filepaths =
             Bundle::ParseBundleSpecFile(entry->GetUnionPath());
 
     params_->spooler->UnregisterListeners();
     params_->spooler->RegisterListener(&SyncMediator::PublishBundlesCallback,
                                       this);
-    for (unsigned int i = 0; i < ((*all_filepaths)->size()); i++) {
+    for (unsigned int i = 0; i < (*(*all_filepaths)).size(); i++) {
       Bundle bundle;
-      UniquePtr<ObjectPack> *op = bundle.CreateBundle((*(*all_filepaths))[i]);
+      UniquePtr<ObjectPack> *op =
+          bundle.CreateBundle(((*(*all_filepaths))[i]).second);
 
       // bundle path is simply the index of the set of filepaths in the vector
       std::string bundle_path = StringifyInt(i);
@@ -143,7 +144,8 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
       bundles_list_.push_back(BundleEntry());
       bundles_list_[i].size = produced_bytes;
-      bundles_list_[i].filepath_set = (*(*all_filepaths))[i];
+      bundles_list_[i].filepath_set = ((*(*all_filepaths))[i]).second;
+      bundles_list_[i].name = ((*(*all_filepaths))[i]).first;
 
       IngestionSource *source = new MemoryIngestionSource(bundle_path,
           buffer.weak_ref(), bundle_size);

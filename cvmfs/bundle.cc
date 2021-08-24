@@ -68,7 +68,7 @@ UniquePtr<ObjectPack> * Bundle::CreateBundle(
   return op;
 }
 
-UniquePtr<vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
+UniquePtr<vector<pair<string, FilepathSet>>> *Bundle::ParseBundleSpecFile(
     string bundle_spec_path) {
   // open the bundle specification file for reading
   int fd = open(bundle_spec_path.c_str(), O_RDONLY);
@@ -87,8 +87,9 @@ UniquePtr<vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
   // create JsonDocument from the JSON string
   UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
 
-  UniquePtr<vector<FilepathSet>> *all_filepaths =
-      new UniquePtr<vector<FilepathSet>>(new vector<FilepathSet>());
+  UniquePtr<vector<pair<string, FilepathSet>>> *all_filepaths =
+      new UniquePtr<vector<pair<string, FilepathSet>>>(
+          new vector<pair<string, FilepathSet>>());
 
   // parse the array of bundle spec JSON objects
   const JSON *value = json->root();
@@ -140,9 +141,10 @@ UniquePtr<vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
           if (filepath_set.find(filepath) != filepath_set.end()) {
             PANIC(kLogStderr, "Duplicate filepath found: %s", filepath.c_str());
           }
-          for (vector<FilepathSet>::iterator it = (*all_filepaths)->begin();
-               it != (*all_filepaths)->end(); it++) {
-            if (it->find(filepath) != it->end()) {
+          for (vector<pair<string, FilepathSet>>::iterator it =
+               (*(*all_filepaths)).begin();
+               it != (*(*all_filepaths)).end(); it++) {
+            if ((it->second).find(filepath) != (it->second).end()) {
               PANIC(kLogStderr, "Duplicate filepath found: %s already exists in"
                     " %s", filepath.c_str(), bundle_name.c_str());
             }
@@ -157,7 +159,7 @@ UniquePtr<vector<FilepathSet>> *Bundle::ParseBundleSpecFile(
     if (filepath_set.size() == 0) {
       PrintWarning("Empty bundle: " + bundle_name + " will not be created");
     } else {
-      (*all_filepaths)->push_back(filepath_set);
+      (*(*all_filepaths)).push_back(make_pair(bundle_name, filepath_set));
     }
 
     value = value->next_sibling;

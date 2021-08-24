@@ -14,6 +14,8 @@
 
 #include "bundle.h"
 
+using namespace std;  // NOLINT
+
 TEST(T_Bundle, CreateBundle) {
   std::string filepath1, filepath2;
   FILE *file1 = CreateTempFile("cvmfstest", 0600, "w+", &filepath1);
@@ -46,8 +48,9 @@ TEST(T_Bundle, CreateBundle) {
 }
 
 TEST(T_Bundle, ParseBundleSpecFile) {
+  string bundle_name = "abc";
   std::string json_string = "[{"
-    "\"bundle_name\":\"abc\","
+    "\"bundle_name\":\"" + bundle_name + "\","
     "\"filepaths\":["
     "\"/cvmfs/test.cern.ch/file1.txt\","
     "\"/cvmfs/test.cern.ch/file2.txt\","
@@ -62,14 +65,14 @@ TEST(T_Bundle, ParseBundleSpecFile) {
 
   fclose(spec_file);
 
-  std::vector<FilepathSet> exp_result;
+  std::vector<pair<string, FilepathSet>> exp_result;
   FilepathSet fs;
   fs.insert("/cvmfs/test.cern.ch/file1.txt");
   fs.insert("/cvmfs/test.cern.ch/file2.txt");
   fs.insert("/cvmfs/test.cern.ch/file3.txt");
-  exp_result.push_back(fs);
+  exp_result.push_back(make_pair(bundle_name, fs));
 
-  UniquePtr<std::vector<FilepathSet>> *result = Bundle::ParseBundleSpecFile(
+  UniquePtr<std::vector<pair<string, FilepathSet>>> *result = Bundle::ParseBundleSpecFile(
       bundle_spec_path);
   EXPECT_TRUE(*(*result) == exp_result);
 

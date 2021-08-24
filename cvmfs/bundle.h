@@ -58,7 +58,7 @@ class Bundle {
    *    ...
    *  ]
    */
-  static UniquePtr<vector<FilepathSet>> *ParseBundleSpecFile(
+  static UniquePtr<vector<pair<string, FilepathSet>>> *ParseBundleSpecFile(
     string bundle_spec_path);
 };
 
