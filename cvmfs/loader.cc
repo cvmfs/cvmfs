@@ -795,7 +795,7 @@ int FuseMain(int argc, char *argv[]) {
   loader_exports_->foreground = foreground_;
   loader_exports_->repository_name = *repository_name_;
   loader_exports_->mount_point = *mount_point_;
-  loader_exports_->device_id = "0:0"; // initially unknown, set after mount
+  loader_exports_->device_id = "0:0";  // initially unknown, set after mount
   loader_exports_->disable_watchdog = disable_watchdog_;
   loader_exports_->simple_options_parsing = simple_options_parsing_;
   if (config_files_)
