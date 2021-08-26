@@ -711,7 +711,7 @@ systemctl daemon-reload
 %endif
 
 %changelog
-* Fri Jul 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+* Wed Aug 25 2021 Jakob Blomer <jblomer@cern.ch> - 2.8.2
 - Add lsof dependency for cvmfs package due to new cvmfs_config fuser command
 * Fri May 7 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Add gateway sub package

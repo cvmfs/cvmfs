@@ -150,7 +150,7 @@ typedef std::vector<LoadEvent *> EventList;
  * CernVM-FS 2.2.0 --> Version 3
  * CernVM-FS 2.4.0 --> Version 4
  * CernVM-FS 2.7.0 --> Version 4, fuse_channel --> fuse_channel_or_session
- * CernVM-FS 2.9.0 --> Version 5, add device_id
+ * CernVM-FS 2.8.2 --> Version 5, add device_id
  */
 struct LoaderExports {
   LoaderExports() :
