@@ -1,4 +1,6 @@
 2.8.2:
+  * Add `cvmfs_config fuser` command (CVM-2004)
+  * Add 'device id' command to cvmfs_talk (CVM-2004)
   * Add Debian 11 "bullseye" platform (CVM-2020)
   * Fix authz session identifiers with namespaces (CVM-2011)
   * Improve error handling when parsing config files
