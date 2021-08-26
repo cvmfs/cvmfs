@@ -1,4 +1,5 @@
 2.8.2:
+  * Add Debian 11 "bullseye" platform (CVM-2020)
   * Fix authz session identifiers with namespaces (CVM-2011)
   * Improve error handling when parsing config files
   * [preloader] make network timeout and retries configurable (CVM-1992)
