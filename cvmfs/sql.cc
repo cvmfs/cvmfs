@@ -18,7 +18,8 @@ Sql::Sql(sqlite3 *sqlite_db, const std::string &statement)
   , query_string_(NULL)
   , last_error_code_(0)
 {
-  Init(sqlite_db, statement);
+  const bool success = Init(sqlite_db, statement);
+  assert(success);
 }
 
 

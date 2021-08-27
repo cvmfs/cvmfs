@@ -14,6 +14,7 @@
 #include "mountpoint.h"
 #include "quota.h"
 #include "signature.h"
+#include "util/string.h"
 
 MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
                                      bool hide_magic_xattrs)
@@ -32,6 +33,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.ndownload", new NDownloadMagicXattr());
   Register("user.nioerr", new NIOErrMagicXattr());
   Register("user.nopen", new NOpenMagicXattr());
+  Register("user.hitrate", new HitrateMagicXattr());
   Register("user.proxy", new ProxyMagicXattr());
   Register("user.pubkeys", new PubkeysMagicXattr());
   Register("user.repo_counters", new RepoCountersMagicXattr());
@@ -53,6 +55,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.chunk_list", new ChunkListMagicXattr());
   Register("user.chunks", new ChunksMagicXattr());
   Register("user.compression", new CompressionMagicXattr());
+  Register("user.direct_io", new DirectIoMagicXattr());
   Register("user.external_file", new ExternalFileMagicXattr());
 
   Register("user.rawlink", new RawlinkMagicXattr());
@@ -96,7 +99,7 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
   return result;
 }
 
-MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
+BaseMagicXattr* MagicXattrManager::GetLocked(const std::string &name,
                                              PathString path,
                                              catalog::DirectoryEntry *d)
 {
@@ -104,10 +107,12 @@ MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
   if (xattr_list_.count(name) > 0) {
     result = xattr_list_[name];
   } else {
-    return MagicXattrRAIIWrapper();
+    return NULL;
   }
 
-  return MagicXattrRAIIWrapper(result, path, d);
+  result->Lock(path, d);
+
+  return result;
 }
 
 void MagicXattrManager::Register(const std::string &name,
@@ -213,6 +218,14 @@ bool CompressionMagicXattr::PrepareValueFenced() {
 
 std::string CompressionMagicXattr::GetValue() {
   return zlib::AlgorithmName(dirent_->compression_algorithm());
+}
+
+bool DirectIoMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular();
+}
+
+std::string DirectIoMagicXattr::GetValue() {
+  return dirent_->IsDirectIo() ? "1" : "0";
 }
 
 bool ExternalFileMagicXattr::PrepareValueFenced() {
@@ -337,7 +350,7 @@ std::string NDirOpenMagicXattr::GetValue() {
 }
 
 std::string NDownloadMagicXattr::GetValue() {
-  return  mount_point_->statistics()->Lookup("fetch.n_downloads")->Print();
+  return mount_point_->statistics()->Lookup("fetch.n_downloads")->Print();
 }
 
 std::string NIOErrMagicXattr::GetValue() {
@@ -346,6 +359,19 @@ std::string NIOErrMagicXattr::GetValue() {
 
 std::string NOpenMagicXattr::GetValue() {
   return mount_point_->file_system()->n_fs_open()->ToString();
+}
+
+std::string HitrateMagicXattr::GetValue() {
+  int64_t n_invocations =
+    mount_point_->statistics()->Lookup("fetch.n_invocations")->Get();
+  if (n_invocations == 0)
+    return "n/a";
+
+  int64_t n_downloads =
+    mount_point_->statistics()->Lookup("fetch.n_downloads")->Get();
+  float hitrate = 100. * (1. -
+    (static_cast<float>(n_downloads) / static_cast<float>(n_invocations)));
+  return StringifyDouble(hitrate);
 }
 
 std::string ProxyMagicXattr::GetValue() {

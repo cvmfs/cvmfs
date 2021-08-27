@@ -7,9 +7,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
-#ifdef _POSIX_PRIORITY_SCHEDULING
-#include <sched.h>
-#endif
 #include <unistd.h>
 
 #include <string>
@@ -41,13 +38,14 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   , timeout_sec_(kDefaultTimeoutSec)
   , authz_method_(s3fanout::kAuthzAwsV2)
   , peek_before_put_(true)
+  , use_https_(false)
+  , proxy_("")
   , temporary_path_(spooler_definition.temporary_path)
 {
   assert(spooler_definition.IsValid() &&
          spooler_definition.driver_type == SpoolerDefinition::S3);
 
   atomic_init32(&io_errors_);
-  atomic_init32(&terminate_);
 
   if (!ParseSpoolerDefinition(spooler_definition)) {
     PANIC(kLogStderr, "Error in parsing the spooler definition");
@@ -67,6 +65,12 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3config.opt_max_retries = num_retries_;
   s3config.opt_backoff_init_ms = kDefaultBackoffInitMs;
   s3config.opt_backoff_max_ms = kDefaultBackoffMaxMs;
+  if (use_https_) {
+    s3config.protocol = "https";
+  } else {
+    s3config.protocol = "http";
+  }
+  s3config.proxy = proxy_;
 
   s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
   s3fanout_mgr_->Spawn();
@@ -78,7 +82,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
 
 
 S3Uploader::~S3Uploader() {
-  atomic_inc32(&terminate_);
+  // Signal termination to our own worker thread
+  s3fanout_mgr_->PushCompletedJob(NULL);
   pthread_join(thread_collect_results_, NULL);
 }
 
@@ -117,12 +122,6 @@ bool S3Uploader::ParseSpoolerDefinition(
              config_path.c_str());
     return false;
   }
-  if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
-    host_name_port_ = host_name_ + ":" + parameter;
-  } else {
-    host_name_port_ = host_name_ + ":" + StringifyInt(kDefaultPort);
-  }
-
   if (!options_manager.GetValue("CVMFS_S3_ACCESS_KEY", &access_key_)) {
     LogCvmfs(kLogUploadS3, kLogStderr,
              "Failed to parse CVMFS_S3_ACCESS_KEY from '%s'.",
@@ -167,6 +166,19 @@ bool S3Uploader::ParseSpoolerDefinition(
   }
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
     peek_before_put_ = options_manager.IsOn(parameter);
+  }
+  if (options_manager.GetValue("CVMFS_S3_USE_HTTPS", &parameter)) {
+    use_https_ = options_manager.IsOn(parameter);
+  }
+
+  if (options_manager.GetValue("CVMFS_S3_PORT", &parameter)) {
+    host_name_port_ = host_name_ + ":" + parameter;
+  } else {
+    host_name_port_ = host_name_;
+  }
+
+  if (options_manager.IsDefined("CVMFS_S3_PROXY")) {
+    options_manager.GetValue("CVMFS_S3_PROXY", &proxy_);
   }
 
   return true;
@@ -220,55 +232,48 @@ void *S3Uploader::MainCollectResults(void *data) {
   LogCvmfs(kLogUploadS3, kLogDebug, "Upload_S3 WorkerThread started.");
   S3Uploader *uploader = reinterpret_cast<S3Uploader *>(data);
 
-  std::vector<s3fanout::JobInfo *> jobs;
-  while (atomic_read32(&uploader->terminate_) == 0) {
-    jobs.clear();
-    uploader->s3fanout_mgr_->PopCompletedJobs(&jobs);
-    for (unsigned i = 0; i < jobs.size(); ++i) {
-      // Report completed job
-      s3fanout::JobInfo *info = jobs[i];
-      int reply_code = 0;
-      if (info->error_code != s3fanout::kFailOk) {
-        if ((info->request != s3fanout::JobInfo::kReqHeadOnly) ||
-            (info->error_code != s3fanout::kFailNotFound))
-        {
-          LogCvmfs(kLogUploadS3, kLogStderr,
-                   "Upload job for '%s' failed. (error code: %d - %s)",
-                   info->object_key.c_str(),
-                   info->error_code,
-                   s3fanout::Code2Ascii(info->error_code));
-          reply_code = 99;
-          atomic_inc32(&uploader->io_errors_);
-        }
+  while (true) {
+    s3fanout::JobInfo *info = uploader->s3fanout_mgr_->PopCompletedJob();
+    if (!info)
+      break;
+    // Report completed job
+    int reply_code = 0;
+    if (info->error_code != s3fanout::kFailOk) {
+      if ((info->request != s3fanout::JobInfo::kReqHeadOnly) ||
+          (info->error_code != s3fanout::kFailNotFound)) {
+        LogCvmfs(kLogUploadS3, kLogStderr,
+                 "Upload job for '%s' failed. (error code: %d - %s)",
+                 info->object_key.c_str(),
+                 info->error_code,
+                 s3fanout::Code2Ascii(info->error_code));
+        reply_code = 99;
+        atomic_inc32(&uploader->io_errors_);
       }
-      if (info->request == s3fanout::JobInfo::kReqDelete) {
-        uploader->Respond(NULL, UploaderResults());
-      } else if (info->request == s3fanout::JobInfo::kReqHeadOnly) {
-        if (info->error_code == s3fanout::kFailNotFound) reply_code = 1;
-        uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                          UploaderResults(UploaderResults::kLookup,
-                                          reply_code));
-      } else {
-        if (info->request == s3fanout::JobInfo::kReqHeadPut) {
-          // The HEAD request was not transformed into a PUT request, thus this
-          // was a duplicate
-          // Uploaded catalogs are always unique ->
-          // assume this was a regular file and decrease appropriate counters
-          uploader->CountDuplicates();
-          uploader->DecUploadedChunks();
-          uploader->CountUploadedBytes(-(info->payload_size));
-        }
-        uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                          UploaderResults(UploaderResults::kChunkCommit,
-                                          reply_code));
-
-        assert(!info->origin.IsValid());
-      }
-      delete info;
     }
-#ifdef _POSIX_PRIORITY_SCHEDULING
-    sched_yield();
-#endif
+    if (info->request == s3fanout::JobInfo::kReqDelete) {
+      uploader->Respond(NULL, UploaderResults());
+    } else if (info->request == s3fanout::JobInfo::kReqHeadOnly) {
+      if (info->error_code == s3fanout::kFailNotFound) reply_code = 1;
+      uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                        UploaderResults(UploaderResults::kLookup,
+                                        reply_code));
+    } else {
+      if (info->request == s3fanout::JobInfo::kReqHeadPut) {
+        // The HEAD request was not transformed into a PUT request, thus this
+        // was a duplicate
+        // Uploaded catalogs are always unique ->
+        // assume this was a regular file and decrease appropriate counters
+        uploader->CountDuplicates();
+        uploader->DecUploadedChunks();
+        uploader->CountUploadedBytes(-(info->payload_size));
+      }
+      uploader->Respond(static_cast<CallbackTN*>(info->callback),
+                        UploaderResults(UploaderResults::kChunkCommit,
+                                        reply_code));
+
+      assert(!info->origin.IsValid());
+    }
+    delete info;
   }
 
   LogCvmfs(kLogUploadS3, kLogDebug, "Upload_S3 WorkerThread finished.");

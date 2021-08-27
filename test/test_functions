@@ -190,6 +190,10 @@ elif which apache2 >/dev/null 2>&1; then # Debian based
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN=$(which apache2)
+elif which /usr/sbin/apache2 >/dev/null 2>&1; then # newer Ubuntu
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=/usr/sbin/apache2
 else
   APACHE_SERVICE="httpd" # EL based
   APACHE_CONF=${APACHE_SERVICE}
@@ -482,14 +486,17 @@ cvmfs_mount() {
   sudo sh -c "echo \"CVMFS_HTTP_PROXY=\\\"${CVMFS_TEST_PROXY}\\\"\" >> /etc/cvmfs/default.local" || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
-  sudo sh -c 'echo "CVMFS_SERVER_URL=http://cvmfs-atlas-nightlies.cern.ch/cvmfs/atlas-nightlies.cern.ch" > /etc/cvmfs/config.d/atlas-nightlies.cern.ch.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
   sudo sh -c "echo CVMFS_REPOSITORY_TAG=TESTING > /etc/cvmfs/config.d/cvmfs-config.cern.ch.local" || return 100
 
   # add additional parameters
+  local proberunner
   while [ $# -gt 0 ]; do
     local param="$1"
-    sudo sh -c "echo \"$1\" >> /etc/cvmfs/default.local" || return 100
+    if [ "$param" = "CVMFS_SUID=yes" ]; then
+      proberunner="sudo"
+    fi
+    sudo sh -c "echo \"$param\" >> /etc/cvmfs/default.local" || return 100
     shift 1
   done
 
@@ -500,8 +507,11 @@ cvmfs_mount() {
   if running_on_osx; then
     cvmfs_mount_direct $repositories
   fi
+  if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ]; then
+    cvmfs_mount_direct $repositories
+  fi
 
-  cvmfs_config probe > /dev/null 2>&1 || return 101
+  $proberunner cvmfs_config probe > /dev/null 2>&1 || return 101
 
   return 0
 }
@@ -510,7 +520,7 @@ cvmfs_mount() {
 _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
-  mkdir -p "/cvmfs/$repository" || sudo mkdir -p "/cvmfs/$repository"
+  mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
   sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
 }
 
@@ -599,6 +609,7 @@ CVMFS_GENERAL_WARNING_FLAG=0
 CVMFS_MEMORY_WARNING=254
 CVMFS_TIME_WARNING=253
 CVMFS_GENERAL_WARNING=252
+CVMFS_TEST_RETVAL_TIMEOUT=251
 mangle_test_retval() {
   local prior_retval=$1
 
@@ -1529,6 +1540,15 @@ get_apache_config_filename() {
   echo "${repo_name}.conf"
 }
 
+get_backend_spooler() {
+  if [ -n "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE}" ] ; then
+    # A gateway test is running: access the backend storage directly
+    echo "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE}"
+  else
+    echo "${CVMFS_UPSTREAM_STORAGE}"
+  fi
+}
+
 
 cleanup_legacy_repo_leftovers() {
   local legacy_repo_name="$1"
@@ -1656,7 +1676,7 @@ peek_backend_raw() {
   local remote_path="$2"
 
   load_repo_config $repo_name
-  cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
+  cvmfs_swissknife peek -d $remote_path -r $(get_backend_spooler)
 }
 
 
@@ -1697,7 +1717,7 @@ delete_from_backend() {
   local remote_path="$2"
 
   load_repo_config $repo_name
-  cvmfs_swissknife remove -o $remote_path -r $CVMFS_UPSTREAM_STORAGE
+  cvmfs_swissknife remove -o $remote_path -r $(get_backend_spooler)
 }
 
 
@@ -1713,12 +1733,13 @@ upload_into_backend() {
 
   load_repo_config $repo_name
 
-  if [ x"$(echo "$CVMFS_UPSTREAM_STORAGE" | cut -f1 -d',')" = x"S3" ]; then
+  local spooler=$(get_backend_spooler)
+  if [ x"$(echo "$spooler" | cut -f1 -d',')" = x"S3" ]; then
     delete_from_backend $repo_name $remote_path # S3 does a lazy upload
   fi
   cvmfs_swissknife upload -i $file_path              \
                           -o $remote_path            \
-                          -r $CVMFS_UPSTREAM_STORAGE \
+                          -r $spooler                \
                           -a $CVMFS_HASH_ALGORITHM
 }
 
@@ -2244,7 +2265,7 @@ xunit_preamble() {
   cat > $xml_file << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
-  <testsuite name="$CVMFS_TEST_SUITE_NAME" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
+  <testsuite hostname="$CVMFS_PLATFORM_NAME" name="$CVMFS_TEST_SUITE_NAME" timestamp="$CVMFS_TIMESTAMP" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
 EOF
 }
 

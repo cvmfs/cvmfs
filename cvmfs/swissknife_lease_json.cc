@@ -17,7 +17,7 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
   }
 
   const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply || !reply->IsValid()) {
+  if (!reply.IsValid() || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
@@ -64,7 +64,7 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
   }
 
   const UniquePtr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply || !reply->IsValid()) {
+  if (!reply.IsValid() || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 

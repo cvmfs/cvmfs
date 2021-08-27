@@ -1,5 +1,8 @@
 #!/bin/sh
 
+export CVMFS_PLATFORM_NAME="macos"
+export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 export PATH=/usr/local/bin:$PATH
 
 # source the common platform independent functionality and option parsing
@@ -40,6 +43,8 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/083-suid                                 \
                                    src/084-premounted                           \
                                    src/089-external_cache_plugin                \
+                                   src/094-attachmount                          \
+                                   src/095-fuser                                \
                                    --                                           \
                                    src/0*
 

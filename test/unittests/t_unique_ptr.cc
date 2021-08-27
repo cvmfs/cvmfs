@@ -57,7 +57,6 @@ class T_UniquePtr : public ::testing::Test {
 TEST_F(T_UniquePtr, NullInitialisation) {
   {
     UniquePtr<Foo> foo;
-    EXPECT_FALSE(foo);
     EXPECT_FALSE(foo.IsValid());
     EXPECT_EQ(0u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -66,7 +65,6 @@ TEST_F(T_UniquePtr, NullInitialisation) {
     EXPECT_EQ(1u, object->local_constructor_calls);
 
     foo = object;
-    EXPECT_TRUE(foo);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -80,7 +78,6 @@ TEST_F(T_UniquePtr, NullInitialisation) {
 TEST_F(T_UniquePtr, DirectInitialisation) {
   {
     UniquePtr<Foo> foo(new Foo(1337));
-    EXPECT_TRUE(foo);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -94,14 +91,12 @@ TEST_F(T_UniquePtr, DirectInitialisation) {
 TEST_F(T_UniquePtr, WeakReference) {
   {
     UniquePtr<Foo> foo;
-    EXPECT_FALSE(foo);
     EXPECT_FALSE(foo.IsValid());
     EXPECT_EQ(0u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
 
     Foo *object = new Foo(27);
     foo = object;
-    EXPECT_TRUE(foo);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -124,7 +119,6 @@ TEST_F(T_UniquePtr, PointerDereference) {
     EXPECT_EQ(1u, object->local_constructor_calls);
 
     UniquePtr<Foo> foo(object);
-    EXPECT_TRUE(foo);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -151,7 +145,6 @@ TEST_F(T_UniquePtr, PointerDereferenceAndMethodCall) {
     EXPECT_EQ(1u, object->local_constructor_calls);
 
     UniquePtr<Foo> foo(object);
-    EXPECT_TRUE(foo);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -178,14 +171,12 @@ TEST_F(T_UniquePtr, ReleaseOwnership) {
     EXPECT_EQ(1u, object->local_constructor_calls);
 
     UniquePtr<Foo> foo(object);
-    EXPECT_TRUE(foo);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
 
     weak_foo = foo.Release();
     EXPECT_EQ(object, weak_foo);
-    EXPECT_FALSE(foo);
     EXPECT_FALSE(foo.IsValid());
   }
 

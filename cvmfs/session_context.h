@@ -52,7 +52,7 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
                 const std::string& new_root_hash,
                 const RepositoryTag& tag);
 
-  void WaitForUpload();
+  void WaitForUpload() {}
 
   ObjectPack::BucketHandle NewBucket();
 
@@ -81,8 +81,6 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
   std::string key_id_;
   std::string secret_;
 
-  FifoChannel<bool> queue_was_flushed_;
-
  private:
   void Dispatch();
 
@@ -96,6 +94,8 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
   mutable atomic_int64 objects_dispatched_;
   uint64_t bytes_committed_;
   uint64_t bytes_dispatched_;
+
+  bool initialized_;
 };
 
 class SessionContext : public SessionContextBase {
@@ -123,12 +123,11 @@ class SessionContext : public SessionContextBase {
  private:
   static void* UploadLoop(void* data);
 
-  bool ShouldTerminate();
-
   UniquePtr<FifoChannel<UploadJob*> > upload_jobs_;
 
-  atomic_int32 worker_terminate_;
   pthread_t worker_;
+
+  static UploadJob terminator_;
 };
 
 }  // namespace upload

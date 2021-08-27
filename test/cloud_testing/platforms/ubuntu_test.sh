@@ -1,4 +1,6 @@
 
+export CVMFS_PLATFORM_NAME="ubuntu$(. /etc/os-release && echo "$VERSION_ID")-$(uname -m)"
+export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
@@ -13,13 +15,29 @@ run_unittests --gtest_shuffle \
 
 CVMFS_EXCLUDE=
 
+ubuntu_release="$(lsb_release -cs)"
+if [ "x$ubuntu_release" == "xxenial" ]; then
+   # This test has shown to occasionally hang in the GDB attach on Ubuntu 16
+   CVMFS_EXCLUDE="$CVMFS_EXCLUDE 015-rebuild_on_crash"
+fi
+
 # Kernel sources too old for gcc, TODO
-CVMFS_EXCLUDE="src/006-buildkernel"
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/006-buildkernel"
 # Expected failure, see test case
 CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
 # Hardlinks do not work with overlayfs
 CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+
+if [ "x$ubuntu_release" = "xxenial" ]; then
+  # Ubuntu 16.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+fi
+
+if [ "x$ubuntu_release" = "xbionic" ]; then
+  # Ubuntu 18.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+fi
 
 export CVMFS_TEST_UNIONFS=overlayfs
 
@@ -32,6 +50,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
                                  src/084-premounted                           \
+                                 src/094-attachmount                          \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \
@@ -46,6 +65,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/600-securecvmfs                          \
                                    src/647-bearercvmfs                          \
                                    src/673-acl                                  \
+                                   src/684-https_s3                             \
                                    $CVMFS_EXCLUDE                               \
                                    --                                           \
                                    src/5*                                       \

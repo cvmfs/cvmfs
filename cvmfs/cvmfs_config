@@ -58,7 +58,7 @@ case $sys_arch in
 
   Darwin )
     fuser="/usr/bin/fuser"
-    fuse_fs_type="osxfuse"
+    fuse_fs_type="macfuse"
     ;;
 
   * )
@@ -143,6 +143,7 @@ cvmfs_config_usage() {
   echo "  status"
   echo "  probe [<repository list>]"
   echo "  fsck [<cvmfs_fsck options>]"
+  echo "  fuser <repository>"
   echo "  reload [-c | <repository>]"
   echo "  umount"
   echo "  wipecache"
@@ -461,8 +462,8 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/osxfuse.fs ]; then
-    echo "Error: OSXFUSE is missing."
+  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/macfuse.fs ]; then
+    echo "Error: macFUSE is missing."
     num_errors=$(($num_errors+1))
   fi
   check_dev_fuse
@@ -971,7 +972,7 @@ cvmfs_stat() {
   get_attr nopen; nopen=$attr_value
   get_attr ndiropen; ndiropen=$attr_value
   get_attr ndownload; ndownload=$attr_value
-  hitrate=`echo "$nopen $ndownload" | awk '{if ($1 == 0) print "n/a"; else print 100.0-($2*100.0/$1)}'` || exit 35
+  get_attr hitrate; hitrate=$attr_value
   get_attr rx; rx=$attr_value
   get_attr speed; speed=$attr_value
 
@@ -1013,10 +1014,23 @@ cvmfs_status() {
   mounted_repos=`list_mounts | awk '{print $3}'`
   for mountpoint in $mounted_repos
   do
+    local fqrn=
+    local pid=
     cd $mountpoint
+    if [ $? -ne 0 ]; then
+      echo "mountpoint $mountpoint inaccessible"
+      RETVAL=1
+      continue
+    fi
     get_attr fqrn; fqrn=$attr_value
     get_attr pid; pid=$attr_value
-    echo "$fqrn mounted on $mountpoint with pid $pid"
+    echo -n "$fqrn mounted on $mountpoint with pid $pid"
+    if [ -z "$fqrn" -o -z "$pid" ]; then
+      echo " - mountpoint unhealthy!"
+      RETVAL=1
+    else
+      echo
+    fi
   done
 
   return $RETVAL
@@ -1127,7 +1141,7 @@ cvmfs_reload() {
   local m
   for m in $mount_list
   do
-    if [ x"$m" = x"${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" ]; then
+    if [ x"$m" = x"$(canonicalize_path ${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY})" ]; then
       # We need to finish pausing the other repositories first because they
       # might try to load the blacklist from the config repository as part of
       # their reload
@@ -1142,15 +1156,14 @@ cvmfs_reload() {
     for guard_file in $(cat "${CVMFS_RELOAD_SOCKETS}/guard_files"); do
       _cvmfs_reload_waitfor "$guard_file"
     done
-
-    if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
-      # If we have a config repository, now is the time to pause it at the very end
-      _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
-        _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
-    fi
-
-    rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
   fi
+
+  if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
+    # If we have a config repository, now is the time to pause it at the very end
+    _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
+      _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
+  fi
+  rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
 
   if [ $clean_cache -eq 1 ]; then
     for dir in $cache_directories; do
@@ -1247,6 +1260,27 @@ cvmfs_config_fsck() {
   return $retval
 }
 
+
+cvmfs_config_fuser() {
+  if [ "$sys_arch" = "Darwin" ]; then
+    echo "The fuser command is unsupported on macOS"
+    return 1
+  fi
+
+  local retval=0
+  [ $# -eq 1 ] || die "one repository name required"
+  local fqrn="$1"
+
+  local deviceid
+  deviceid="$(cvmfs_talk -i $fqrn device id)"
+  local retval=$?
+  if [ $retval != 0 ]; then
+    return $retval
+  fi
+  [ -n "$deviceid" ] || die "Could not obtain device id for $fqrn"
+
+  lsof | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
+}
 
 cvmfs_umount() {
   local silent=$1
@@ -1693,7 +1727,7 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      charDevice=/dev/osxfuse0 ;;
+      charDevice=/dev/macfuse0 ;;
 
     * )
      echo "Architecture $sys_arch is not supported"
@@ -1708,7 +1742,7 @@ check_dev_fuse() {
       return_code=$(($return_code+1))
     elif [ x"$sys_arch" = x"Darwin" ]; then
       echo -n "Warning: character device $charDevice does not exist. "
-      echo "Please make sure that OSXFUSE is installed."
+      echo "Please make sure that macFUSE is installed."
     fi
   else
     if ! runascvmfsuser "test -r $charDevice"; then
@@ -2012,6 +2046,19 @@ base64_nowrap() {
   esac
 }
 
+canonicalize_path() {
+  local path_name="$1"
+
+  case $(uname) in
+    Linux )
+      echo $(readlink -f "$path_name")
+      ;;
+    Darwin )
+      echo $(/usr/local/bin/greadlink -f "$path_name")
+      ;;
+  esac
+}
+
 
 __usrlocal_migrate_clean_legacy_binaries() {
   echo "cleaning up legacy binaries..."
@@ -2186,6 +2233,16 @@ case "$1" in
   fsck)
     shift 1
     cvmfs_config_fsck $@
+    RETVAL=$?
+    ;;
+
+  fuser)
+    if [ `id -u` -ne 0 ]; then
+      echo "root privileges required"
+      exit 1
+    fi
+    shift 1
+    cvmfs_config_fuser $@
     RETVAL=$?
     ;;
 

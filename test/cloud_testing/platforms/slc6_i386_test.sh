@@ -1,5 +1,8 @@
 #!/bin/sh
 
+export CVMFS_PLATFORM_NAME="slc6-i386"
+export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh

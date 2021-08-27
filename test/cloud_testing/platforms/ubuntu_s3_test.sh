@@ -1,4 +1,6 @@
 
+export CVMFS_PLATFORM_NAME="ubuntu$(. /etc/os-release && echo "$VERSION_ID")-$(uname -m)_S3"
+export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
@@ -11,6 +13,7 @@ run_unittests --gtest_shuffle \
              --gtest_death_test_use_fork || retval=1
 
 
+ubuntu_release="$(lsb_release -cs)"
 CVMFS_EXCLUDE=
 
 # Kernel sources too old for gcc, TODO
@@ -20,6 +23,16 @@ CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 
 # Hardlinks do not work with overlayfs
 CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
+
+if [ "x$ubuntu_release" = "xxenial" ]; then
+  # Ubuntu 16.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+fi
+
+if [ "x$ubuntu_release" = "xbionic" ]; then
+  # Ubuntu 18.04 has no fuse-overlayfs
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+fi
 
 export CVMFS_TEST_UNIONFS=overlayfs
 
@@ -75,6 +88,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/670-listreflog                           \
                                src/672-publish_stats_hardlinks              \
                                src/673-acl                                  \
+                               $CVMFS_EXCLUDE                               \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

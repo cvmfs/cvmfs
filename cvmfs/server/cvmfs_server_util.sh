@@ -117,16 +117,16 @@ check_overlayfs() {
 
 
 # check if at least one of the supported union file systems is available
-# currently AUFS get preference over OverlayFS if both are available
+# currently OverlayFS get preference over AUFS if both are available
 #
 # @return   0 if at least one was found (name through stdout); abort otherwise
 get_available_union_fs() {
-  if check_aufs; then
-    echo "aufs"
-  elif check_overlayfs; then
+  if check_overlayfs; then
     echo "overlayfs"
+  elif check_aufs; then
+    echo "aufs"
   else
-    die "neither AUFS nor OverlayFS detected on the system!"
+    die "neither OverlayFS nor AUFS detected on the system!"
   fi
 }
 
@@ -460,7 +460,7 @@ cvmfs_version_string() {
 
 # Tracks changes to the organization of files and directories.
 # Stored in CVMFS_CREATOR_VERSION.  Started with 137.
-cvmfs_layout_revision() { echo "142"; }
+cvmfs_layout_revision() { echo "143"; }
 
 version_major() { echo $1 | cut --delimiter=. --fields=1 | grep -oe '^[0-9]\+'; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2 | grep -oe '^[0-9]\+'; }
@@ -806,7 +806,7 @@ If you go for production, backup your masterkey from /etc/cvmfs/keys/!"
 
 get_fd_modes() {
   local path=$1
-  $LSOF_BIN -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
+  $LSOF_BIN -Fan +f -- $path 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
 }
 
 # gets the number of open read-only file descriptors beneath a given path
@@ -1071,9 +1071,9 @@ cvmfs_server_update_geodb() {
 # @return   0 if the command was recognized
 is_subcommand() {
   local subcommand="$1"
-  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs    \
-    resign list info tag list-tags lstags check transaction abort snapshot           \
-    skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown \
+  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs   \
+    resign list info tag list-tags lstags check transaction enter abort snapshot    \
+    skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
     mount fix-permissions masterkeycard ingest merge-stats print-stats"
 
@@ -1125,6 +1125,7 @@ Supported Commands:
                   [-k path to existing keychain] [-p no apache config]
                   [-R require masterkeycard key ]
                   [-V VOMS authorization] [-X (external data)]
+                  [-x proxy url]
                   <fully qualified repository name>
                   Creates a new repository with a given name
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
@@ -1139,6 +1140,7 @@ Supported Commands:
                   [-k path to keys] [-g chown backend] [-r recreate whitelist]
                   [-p no apache config] [-t recreate repo key and certificate]
                   [ -R recreate whitelist and require masterkeycard ]
+                  [-x proxy url]
                   <fully qualified repository name>
                   Imports an old CernVM-FS repository into a fresh repo
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
@@ -1211,9 +1213,6 @@ Supported Commands:
                   <fully qualified name>
                   Checks if the repository is sane
   transaction     [-r (retry if unable to acquire lease]
-                  [-i INT (initial retry delay seconds)]
-                  [-m INT (max retry delay seconds)]
-                  [-n INT (max number of retries)]
                   [-T /template-from=/template-to]
                   <fully qualified name>
                   Start to edit a repository

@@ -56,7 +56,7 @@ class Lockable : SingleCopy {
  *
  * TODO: eventually replace this by C++11 typed enum
  */
-struct _RAII_Polymorphism {
+struct RAII_Polymorphism {
   enum T {
     None,
     ReadLock,
@@ -73,7 +73,7 @@ struct _RAII_Polymorphism {
  *
  * Note: Resource Acquisition Is Initialization (Bjarne Stroustrup)
  */
-template <typename T, _RAII_Polymorphism::T P = _RAII_Polymorphism::None>
+template <typename T, RAII_Polymorphism::T P = RAII_Polymorphism::None>
 class RAII : SingleCopy {
  public:
   inline explicit RAII(T &object) : ref_(object)  { Enter(); }
@@ -116,26 +116,26 @@ typedef RAII<pthread_mutex_t> MutexLockGuard;
 
 template <>
 inline void RAII<pthread_rwlock_t,
-                 _RAII_Polymorphism::ReadLock>::Enter() {
+                 RAII_Polymorphism::ReadLock>::Enter() {
   pthread_rwlock_rdlock(&ref_);
 }
 template <>
 inline void RAII<pthread_rwlock_t,
-                 _RAII_Polymorphism::ReadLock>::Leave() {
+                 RAII_Polymorphism::ReadLock>::Leave() {
   pthread_rwlock_unlock(&ref_);
 }
 template <>
 inline void RAII<pthread_rwlock_t,
-                 _RAII_Polymorphism::WriteLock>::Enter() {
+                 RAII_Polymorphism::WriteLock>::Enter() {
   pthread_rwlock_wrlock(&ref_);
 }
 template <>
 inline void RAII<pthread_rwlock_t,
-                 _RAII_Polymorphism::WriteLock>::Leave() {
+                 RAII_Polymorphism::WriteLock>::Leave() {
   pthread_rwlock_unlock(&ref_);
 }
-typedef RAII<pthread_rwlock_t, _RAII_Polymorphism::ReadLock>  ReadLockGuard;
-typedef RAII<pthread_rwlock_t, _RAII_Polymorphism::WriteLock> WriteLockGuard;
+typedef RAII<pthread_rwlock_t, RAII_Polymorphism::ReadLock>  ReadLockGuard;
+typedef RAII<pthread_rwlock_t, RAII_Polymorphism::WriteLock> WriteLockGuard;
 
 
 //
@@ -245,12 +245,12 @@ class SynchronizingCounter : SingleCopy {
   bool HasMaximalValue() const { return maximal_value_ != T(0); }
   T      maximal_value() const { return maximal_value_;         }
 
-  T operator++()    { return Increment();        }
-  T operator++(int) { return Increment() - T(1); }
-  T operator--()    { return Decrement();        }
-  T operator--(int) { return Decrement() + T(1); }
+  T operator++()          { return Increment();        }
+  const T operator++(int) { return Increment() - T(1); }
+  T operator--()          { return Decrement();        }
+  const T operator--(int) { return Decrement() + T(1); }
 
-  operator T() const {
+  T Get() const {
     MutexLockGuard l(mutex_);
     return value_;
   }

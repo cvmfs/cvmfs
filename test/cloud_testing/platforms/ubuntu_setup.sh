@@ -25,9 +25,27 @@ while sudo echo "foo" 2>&1 | grep -q "unable to resolve host"; do
 done
 echo "done"
 
+echo -n "wait for name resolution to work properly... "
+timeout=1800
+while ! ping -c2 ecsft.cern.ch 2>&1; do
+  sleep 1
+  timeout=$(( $timeout - 1 ))
+  if [ $timeout -le 0 ]; then
+    echo "FAIL!"
+    exit 1
+  fi
+done
+echo "done"
+
 # update package manager cache
 echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"
+echo "done"
+
+# Be gentle with the resolver
+echo -n "nscd... "
+install_from_repo nscd || die "fail (nscd)"
+sudo systemctl start nscd || die "cannot start nscd"
 echo "done"
 
 # install latest version of libc to make sure it has the symbols from the build machine
@@ -49,6 +67,7 @@ install_deb $SERVER_PACKAGE
 install_deb $DEVEL_PACKAGE
 install_deb $UNITTEST_PACKAGE
 install_deb $SHRINKWRAP_PACKAGE
+install_deb $GATEWAY_PACKAGE
 
 # installing WSGI apache module
 echo "installing apache2 and python WSGI module..."
@@ -100,8 +119,8 @@ install_test_s3 || die "fail (installing test S3)"
 # install 'jq'
 install_from_repo jq || die "fail (installing jq)"
 
-# On Ubuntu 16.04 install backported autofs
 if [ "x$ubuntu_release" = "xxenial" ]; then
+  # On Ubuntu 16.04 install backported autofs
   install_from_repo wget || die "fail (installing wget)"
   wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release_2.0-3_all.deb
   sudo dpkg -i cvmfs-release_2.0-3_all.deb || die "fail (installing cvmfs-release)"
@@ -109,24 +128,12 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
   sudo apt-get install autofs || die "fail installing backported autofs"
   sudo cvmfs_config setup || die "re-running cvmfs setup"
   dpkg -s autofs
-elif [ "x$ubuntu_release" = "xfocal" ]; then
+else
   sudo apt-get install autofs || die "fail (installing autofs on 20.04)"
-fi
 
-# On Ubuntu 16.04+ 64bit install the repository gateway
-if [ "x$(uname -m)" = "xx86_64" ]; then
-  package_map=""
-  if [ "x$ubuntu_release" = "xxenial" ]; then
-    package_map="pkgmap.ubuntu1604_x86_64"
-  elif [ "x$ubuntu_release" = "xbionic" ]; then
-    package_map="pkgmap.ubuntu1804_x86_64"
-  elif [ "x$ubuntu_release" = "xfocal" ]; then
-    package_map="pkgmap.ubuntu2004_x86_64"
-  fi
-
-  if [ "x$package_map" != "x" ]; then
-    echo "Installing repository gateway"
-    install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
+  # fuse-overlayfs requires Ubuntu 20.04+
+  if [ "x$ubuntu_release" != "xbionic" ]; then
+    install_from_repo fuse-overlayfs || die "fail (installing fuse-overlayfs)"
   fi
 fi
 

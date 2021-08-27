@@ -1,5 +1,8 @@
 #!/bin/sh
 
+export CVMFS_PLATFORM_NAME="centos7-x86_64_FUSE3"
+export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
@@ -13,6 +16,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
+                                 src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

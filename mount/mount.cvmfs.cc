@@ -7,12 +7,14 @@
 
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
 #ifdef __APPLE__
 #include <sys/sysctl.h>
 #endif
+#include <sys/un.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -71,20 +73,13 @@ static bool CheckFuse() {
   string fuse_device;
   int retval;
 #ifdef __APPLE__
-  if (FileExists("/Library/Filesystems/osxfuse.fs/Contents/Resources/"
-                 "load_osxfuse"))
-  {
-    // OS X Fuse 3
-    retval = system("/Library/Filesystems/osxfuse.fs/Contents/Resources/"
-                    "load_osxfuse");
-  } else {
-    retval = system("/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs");
-  }
+  retval = system("/Library/Filesystems/macfuse.fs/Contents/Resources/"
+                  "load_macfuse");
   if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed loading OSX Fuse");
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed loading macFUSE");
     return false;
   }
-  fuse_device = "/dev/osxfuse0";
+  fuse_device = "/dev/macfuse0";
 #else
   fuse_device = "/dev/fuse";
 #endif
@@ -158,6 +153,60 @@ static bool CheckConcurrentMount(const string &fqrn,
   *mountpointp = mountpoint;
   close(socket_fd);
   return true;
+}
+
+static int GetExistingFuseFd(
+  const string &fqrn, const string &workspace, uid_t cvmfs_uid)
+{
+  // Try connecting to cvmfs_io socket
+  int talk_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
+  if (talk_fd < 0)
+    return -1;
+
+  // Create temporary socket
+  std::string recv_sock_dir = CreateTempDir(workspace + "/fusefd");
+  if (recv_sock_dir.empty() || (chmod(recv_sock_dir.c_str(), 0755) != 0)) {
+    close(talk_fd);
+    return -1;
+  }
+  std::string recv_sock_path = recv_sock_dir + "/sock";
+  int recv_sock_fd = MakeSocket(recv_sock_path, 0660);
+  if ((recv_sock_fd < 0) ||
+      (chown(recv_sock_path.c_str(), cvmfs_uid, getegid()) != 0))
+  {
+    if (recv_sock_fd >= 0)
+      close(recv_sock_fd);
+    close(talk_fd);
+    unlink(recv_sock_path.c_str());
+    rmdir(recv_sock_dir.c_str());
+    return -1;
+  }
+  listen(recv_sock_fd, 1);
+
+  // Trigger fd transfer
+  SendMsg2Socket(talk_fd, "send mount fd " + recv_sock_path);
+  string result;
+  char buf;
+  while (read(talk_fd, &buf, 1) == 1) {
+    if (buf != '\n')
+      result.push_back(buf);
+  }
+  close(talk_fd);
+
+  int fuse_fd = -1;
+  if (result == "OK") {
+    struct sockaddr_un addr;
+    unsigned int len = sizeof(addr);
+    int con_fd =
+      accept(recv_sock_fd, reinterpret_cast<struct sockaddr *>(&addr), &len);
+    fuse_fd = RecvFdFromSocket(con_fd);
+    close(con_fd);
+  }
+  close(recv_sock_fd);
+  unlink(recv_sock_path.c_str());
+  rmdir(recv_sock_dir.c_str());
+
+  return fuse_fd;
 }
 
 
@@ -269,6 +318,39 @@ static std::string GetCvmfsBinary() {
   return result;
 }
 
+static int AttachMount(const std::string &mountpoint, const std::string &fqrn,
+                       int fuse_fd)
+{
+#ifdef __APPLE__
+  (void) mountpoint;
+  (void) fqrn;
+  (void) fuse_fd;
+  return 1;
+#else
+  platform_stat64 info;
+  int retval = platform_stat(mountpoint.c_str(), &info);
+  if (retval != 0)
+    return 1;
+
+  char mntopt[100];
+  snprintf(mntopt, sizeof(mntopt),
+           "ro,fd=%i,rootmode=%o,user_id=%d,group_id=%d",
+           fuse_fd, info.st_mode & S_IFMT, geteuid(), getegid());
+  // TODO(jblomer): remove NOSUID according to options
+  retval = mount("cvmfs2", mountpoint.c_str(), "fuse",
+                 MS_NODEV | MS_RDONLY | MS_NOSUID, mntopt);
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Cannot attach to existing fuse module (%d)", errno);
+    return 1;
+  }
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslog,
+           "CernVM-FS: linking %s to repository %s (attaching)",
+           mountpoint.c_str(), fqrn.c_str());
+  return 0;
+#endif
+}
+
 
 int main(int argc, char **argv) {
   bool dry_run = false;
@@ -349,29 +431,6 @@ int main(int argc, char **argv) {
   if (!retval) return 1;
   retval = CheckProxy();
   if (!retval) return 1;
-  // This is not a sure thing.  When the CVMFS_CACHE_BASE parameter is changed
-  // two repositories can get mounted concurrently (but that should not hurt).
-  // If the same repository is mounted multiple times at the same time, there
-  // is a race here.  Eventually, only one repository will be mounted while the
-  // other cvmfs processes block on a file lock in the cache.
-  string prev_mountpoint;
-  retval = CheckConcurrentMount(fqrn, workspace, &prev_mountpoint);
-  if (retval) {
-    if (remount && (mountpoint == prev_mountpoint)) {
-      // Actually remounting is too hard, but pretend that it worked
-      return 0;
-    }
-    LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is already mounted on %s",
-             fqrn.c_str(), prev_mountpoint.c_str());
-    return 1;
-  } else {
-    // No double mount
-    if (remount) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is not mounted on %s",
-               fqrn.c_str(), mountpoint.c_str());
-      return 1;
-    }
-  }
 
   // Retrieve cvmfs uid/gid and fuse gid if exists
   uid_t uid_cvmfs;
@@ -385,6 +444,43 @@ int main(int argc, char **argv) {
     return 1;
   }
   has_fuse_group = GetGidOf("fuse", &gid_fuse);
+
+  // This is not a sure thing.  When the CVMFS_CACHE_BASE parameter is changed
+  // two repositories can get mounted concurrently (but that should not hurt).
+  // If the same repository is mounted multiple times at the same time, there
+  // is a race here.  Eventually, only one repository will be mounted while the
+  // other cvmfs processes block on a file lock in the cache.
+  string prev_mountpoint;
+  retval = CheckConcurrentMount(fqrn, workspace, &prev_mountpoint);
+  if (retval) {
+    if (remount && (mountpoint == prev_mountpoint)) {
+      // Actually remounting is too hard, but pretend that it worked
+      return 0;
+    }
+    // Identify zombie fuse processes that are held open by other mount
+    // namespaces
+    if ((mountpoint == prev_mountpoint) && !IsMountPoint(mountpoint)) {
+      // Allow for group access to the socket receiving the fuse fd
+      umask(007);
+      int fuse_fd = GetExistingFuseFd(fqrn, workspace, uid_cvmfs);
+      if (fuse_fd < 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Cannot connect to existing fuse module");
+        return 1;
+      }
+      return AttachMount(mountpoint, fqrn, fuse_fd);
+    }
+    LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is already mounted on %s",
+             fqrn.c_str(), prev_mountpoint.c_str());
+    return 1;
+  } else {
+    // No double mount
+    if (remount) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is not mounted on %s",
+               fqrn.c_str(), mountpoint.c_str());
+      return 1;
+    }
+  }
 
   // Prepare workspace and cache directory
   retval = MkdirDeep(workspace, 0755, false);
@@ -551,7 +647,7 @@ int main(int argc, char **argv) {
         break;
     } while (true);
     char buf;
-    int num_bytes;
+    ssize_t num_bytes;
     if (FD_ISSET(fd_stdout, &readfds)) {
       num_bytes = read(fd_stdout, &buf, 1);
       switch (num_bytes) {

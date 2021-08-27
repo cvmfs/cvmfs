@@ -34,8 +34,10 @@ SyncItem::SyncItem() :
   valid_graft_(false),
   graft_marker_present_(false),
   external_data_(false),
+  direct_io_(false),
   graft_chunklist_(NULL),
-  compression_algorithm_(zlib::kZlibDefault) {}
+  compression_algorithm_(zlib::kZlibDefault),
+  has_compression_algorithm_(false) {}
 
 SyncItem::SyncItem(const std::string  &relative_parent_path,
                    const std::string  &filename,
@@ -53,9 +55,11 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   valid_graft_(false),
   graft_marker_present_(false),
   external_data_(false),
+  direct_io_(false),
   relative_parent_path_(relative_parent_path),
   graft_chunklist_(NULL),
-  compression_algorithm_(zlib::kZlibDefault) {
+  compression_algorithm_(zlib::kZlibDefault),
+  has_compression_algorithm_(false) {
   content_hash_.algorithm = shash::kAny;
 }
 
@@ -92,7 +96,7 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
 
 
 SyncItemType SyncItemNative::GetScratchFiletype() const {
-  StatScratch();
+  StatScratch(/* refresh= */ false);
   if (scratch_stat_.error_code != 0) {
     PANIC(kLogStderr, "[WARNING] Failed to stat() '%s' in scratch. (errno: %s)",
           GetRelativePath().c_str(), scratch_stat_.error_code);
@@ -118,7 +122,7 @@ bool SyncItemNative::IsType(const SyncItemType expected_type) const {
 }
 
 void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
-  StatScratch(true);
+  StatScratch(/* refresh= */ true);
   // Mark the file as whiteout entry and strip the whiteout prefix
   whiteout_ = true;
   filename_ = actual_filename;
@@ -138,8 +142,8 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
     // should not happen (actually AUFS prevents users from creating whiteouts)
     // but can be provoked through an AUFS 'bug' (see test 593 or CVM-880).
     // --> Warn the user, continue with kItemUnknown and cross your fingers!
-    PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not "
-                 "found in repository.");
+    PrintWarning("'" + GetRelativePath() +
+                 "' should be deleted, but was not found in repository.");
   }
 }
 
@@ -174,7 +178,7 @@ uint64_t SyncItem::GetUnionInode() const {
 }
 
 uint64_t SyncItem::GetScratchSize() const {
-  StatScratch();
+  StatScratch(/* refresh= */ false);
   return scratch_stat_.stat.st_size;
 }
 
@@ -207,14 +211,15 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   // (i.e. on setups using OverlayFS)
   dirent.linkcount_      = HasHardlinks() ? this->GetUnionStat().st_nlink : 1;
 
-  dirent.mode_           = this->GetUnionStat().st_mode;
-  dirent.uid_            = this->GetUnionStat().st_uid;
-  dirent.gid_            = this->GetUnionStat().st_gid;
-  dirent.size_           = graft_size_ > -1 ? graft_size_ :
-                           this->GetUnionStat().st_size;
-  dirent.mtime_          = this->GetUnionStat().st_mtime;
-  dirent.checksum_       = this->GetContentHash();
+  dirent.mode_             = this->GetUnionStat().st_mode;
+  dirent.uid_              = this->GetUnionStat().st_uid;
+  dirent.gid_              = this->GetUnionStat().st_gid;
+  dirent.size_             = graft_size_ > -1 ? graft_size_ :
+                             this->GetUnionStat().st_size;
+  dirent.mtime_            = this->GetUnionStat().st_mtime;
+  dirent.checksum_         = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
+  dirent.is_direct_io_     = this->IsDirectIo();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
 
   dirent.name_.Assign(filename().data(), filename().length());
@@ -377,6 +382,8 @@ void SyncItem::CheckGraft() {
           break;
         }
       }
+    } else if (info[0] == "compression") {
+      SetCompressionAlgorithm(zlib::ParseCompressionAlgorithm(info[1]));
     }
   }
   if (!feof(fp)) {

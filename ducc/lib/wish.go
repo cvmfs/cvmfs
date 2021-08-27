@@ -2,7 +2,9 @@ package lib
 
 import (
 	"fmt"
+	"sync"
 
+	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,8 +25,8 @@ type WishFriendly struct {
 	UserOutput             string
 	InputImage             *Image
 	OutputImage            *Image
-	ExpandedTagImagesLayer <-chan *Image
-	ExpandedTagImagesFlat  <-chan *Image
+	ExpandedTagImagesLayer []*Image
+	ExpandedTagImagesFlat  []*Image
 }
 
 func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string) (wish WishFriendly, err error) {
@@ -60,14 +62,32 @@ func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string
 		err = errI
 		return
 	}
-	expandedTagImagesLayer, expandedTagImagesFlat, errEx := iImage.ExpandWildcard()
+	r1, r2, errEx := iImage.ExpandWildcard()
 	if errEx != nil {
 		err = errEx
-		LogE(err).WithFields(log.Fields{
+		l.LogE(err).WithFields(log.Fields{
 			"input image": inputImage}).
 			Error("Error in retrieving all the tags from the image")
 		return
 	}
+	var expandedTagImagesLayer, expandedTagImagesFlat []*Image
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for img := range r1 {
+			expandedTagImagesLayer = append(expandedTagImagesLayer, img)
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for img := range r2 {
+			expandedTagImagesFlat = append(expandedTagImagesFlat, img)
+		}
+	}()
+	wg.Wait()
+
 	wish.ExpandedTagImagesLayer = expandedTagImagesLayer
 	wish.ExpandedTagImagesFlat = expandedTagImagesFlat
 

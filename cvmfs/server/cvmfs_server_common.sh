@@ -332,7 +332,7 @@ set_ro_root_hash() {
 get_repo_info_from_url() {
   local url="$1"
   shift 1
-  __swissknife info $(get_follow_http_redirects_flag) -r "$url" $@ 2>/dev/null
+  __swissknife info $(get_follow_http_redirects_flag) $(get_swissknife_proxy) -r "$url" $@ 2>/dev/null
 }
 
 
@@ -503,19 +503,15 @@ is_due_auto_garbage_collection() {
 # download a given file from the backend storage
 # @param name  the name of the repository to download from
 # @param url   the url to download from
-# @param noproxy  (optional)
 get_item() {
   local name="$1"
   local url="$2"
-  local noproxy="$3"
 
   load_repo_config $name
 
-  if [ x"$noproxy" != x"" ]; then
-    unset http_proxy && curl -f $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
-  else
-    curl -f $(get_follow_http_redirects_flag) "$url" 2>/dev/null | tr -d '\0'
-  fi
+  curl -f -H "Cache-Control: max-age=0" $(get_curl_proxy) \
+       $(get_x509_cert_settings) $(get_follow_http_redirects_flag) \
+       "$url" 2>/dev/null | tr -d '\0'
 }
 
 # read an item from local or backend repository storage to stdout
@@ -532,9 +528,9 @@ read_repo_item() {
   if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
     cat $(get_upstream_config $CVMFS_UPSTREAM_STORAGE)/"$item" 2>/dev/null
   elif is_stratum0 $name; then
-    get_item $name $CVMFS_STRATUM0/"$item" noproxy
+    get_item $name $CVMFS_STRATUM0/"$item"
   else
-    get_item $name $CVMFS_STRATUM1/"$item" noproxy
+    get_item $name $CVMFS_STRATUM1/"$item"
   fi
 }
 
@@ -546,6 +542,27 @@ get_follow_http_redirects_flag() {
   fi
 }
 
+
+# Parse special CA path settings for curl invocation
+get_x509_cert_settings() {
+  if [ x"$X509_CERT_BUNDLE" != "x" ]; then
+      echo "--cacert $X509_CERT_BUNDLE"
+  fi
+}
+
+# Parse proxy server for curl command
+get_curl_proxy() {
+  if [ x"$CVMFS_SERVER_PROXY" != x"" ]; then
+    echo "-x $CVMFS_SERVER_PROXY"
+  fi
+}
+
+# Parse proxy server for cvmfs_swissknife command
+get_swissknife_proxy() {
+  if [ x"$CVMFS_SERVER_PROXY" != x"" ]; then
+    echo "-@ $CVMFS_SERVER_PROXY"
+  fi
+}
 
 get_expiry_from_string() {
   local whitelist="$1"
@@ -577,7 +594,7 @@ get_expiry_from_string() {
 get_expiry() {
   local name=$1
   local stratum0=$2
-  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist 'noproxy')"
+  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist)"
 }
 
 
@@ -647,6 +664,7 @@ sign_manifest() {
           -u $CVMFS_STRATUM0                   \
           -m $unsigned_manifest                \
           -t ${CVMFS_SPOOL_DIR}/tmp            \
+          $(get_swissknife_proxy)              \
           -r $CVMFS_UPSTREAM_STORAGE $return_early"
 
   if [ x"$metainfo_file" != x"" ]; then
@@ -902,6 +920,7 @@ create_config_files_for_new_repository() {
   local external_data=${11}
   local voms_authz=${12}
   local auto_tag_timespan="${13}"
+  local proxy_url=${14}
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -941,6 +960,7 @@ CVMFS_ASYNC_SCRATCH_CLEANUP=true
 CVMFS_PRINT_STATISTICS=false
 CVMFS_UPLOAD_STATS_DB=false
 CVMFS_UPLOAD_STATS_PLOTS=false
+CVMFS_IGNORE_XDIR_HARDLINKS=true
 EOF
 
   if [ x"$voms_authz" != x"" ]; then
@@ -953,6 +973,10 @@ EOF
     cat >> $server_conf << EOF
 CVMFS_AUTO_GC=true
 EOF
+  fi
+
+  if [ x"$proxy_url" != x"" ]; then
+    echo "CVMFS_SERVER_PROXY=$proxy_url" >> $server_conf
   fi
 
   if [ $configure_apache -eq 1 ] && is_local_upstream $upstream; then
@@ -970,7 +994,7 @@ CVMFS_RELOAD_SOCKETS=$cache_dir
 CVMFS_QUOTA_LIMIT=4000
 CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_SERVER_URL=$stratum0
-CVMFS_HTTP_PROXY=DIRECT
+CVMFS_HTTP_PROXY=${proxy_url:-DIRECT}
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
 CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
 CVMFS_CHECK_PERMISSIONS=yes
@@ -983,7 +1007,14 @@ CVMFS_SERVER_CACHE_MODE=yes
 CVMFS_NFILES=65536
 CVMFS_TALK_SOCKET=/var/spool/cvmfs/${name}/cvmfs_io
 CVMFS_TALK_OWNER=$cvmfs_user
+CVMFS_USE_SSL_SYSTEM_CA=true
 EOF
+
+  if [ "x$X509_CERT_BUNDLE" != "x" ]; then
+    cat >> $client_conf << EOF
+X509_CERT_BUNDLE=$X509_CERT_BUNDLE
+EOF
+  fi
 }
 
 
@@ -1128,9 +1159,11 @@ EOF
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
 
-  # avoid racing against apache
+  # avoid racing against apache; we can safely ignore the certificate validation
+  # at this step, we only want to check that the endpoint is up.
+  # NB: Normally, we are anyway dealing with HTTP URLs at this point.
   local waiting=0
-  while ! curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
+  while ! curl $(get_curl_proxy) --insecure -sIf ${CVMFS_STRATUM0}/.cvmfspublished > /dev/null && \
         [ $http_timeout -gt 0 ]; do
     [ $waiting -eq 1 ] || echo -n "waiting for apache... "
     waiting=1

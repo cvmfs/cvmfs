@@ -207,7 +207,7 @@ void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
     LogCvmfs(kLogCvmfs, kLogStdout, "History: %s",
              current_hash.ToString().c_str());
 
-    bool cancel = WalkCatalogsInHistory(current_history);
+    bool cancel = WalkCatalogsInHistory(current_history.weak_ref());
     const bool success = reflog_->AddHistory(current_hash);
     assert(success);
 

@@ -195,6 +195,8 @@ class OptionsManager {
   };
 
   std::string TrimParameter(const std::string &parameter);
+  std::string SanitizeParameterAssignment(std::string *line,
+                                          std::vector <std::string> *tokens);
   void PopulateParameter(const std::string &param, const ConfigValue val);
   void ParseValue(const std::string param, ConfigValue *val);
   void UpdateEnvironment(
@@ -211,7 +213,8 @@ class OptionsManager {
   bool taint_environment_;
 
  private:
-  OptionsManager & operator= (const OptionsManager & other) {
+  // NOLINTNEXTLINE(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+  OptionsManager & operator= (const OptionsManager & /* other */) {
     assert(false);
   }
 };  // class OptionManager

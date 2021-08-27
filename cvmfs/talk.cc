@@ -12,11 +12,17 @@
  * The talk module runs in a separate thread.
  */
 
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include "cvmfs_config.h"
 #include "talk.h"
 
 #include <errno.h>
+#include <inttypes.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -283,6 +289,23 @@ void *TalkManager::MainResponder(void *data) {
       }
     } else if (line == "mountpoint") {
       talk_mgr->Answer(con_fd, cvmfs::loader_exports_->mount_point + "\n");
+    } else if (line == "device id") {
+      if (cvmfs::loader_exports_->version >= 5)
+        talk_mgr->Answer(con_fd, cvmfs::loader_exports_->device_id + "\n");
+      else
+        talk_mgr->Answer(con_fd, "0:0\n");
+    } else if (line.substr(0, 13) == "send mount fd") {
+      // Hidden command intended to be used only by the cvmfs mount helper
+      if (line.length() < 15) {
+        talk_mgr->Answer(con_fd, "EINVAL\n");
+      } else {
+        std::string socket_path = line.substr(14);
+        bool retval = cvmfs::SendFuseFd(socket_path);
+        talk_mgr->Answer(con_fd, retval ? "OK\n" : "Failed\n");
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+                 "Transfer fuse connection to new mount (via %s): %s",
+                 socket_path.c_str(), retval ? "success" : "failure");
+      }
     } else if (line.substr(0, 7) == "remount") {
       FuseRemounter::Status status;
       if (line == "remount sync")
@@ -749,11 +772,11 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
   for (unsigned int j = 0; j < hist.size(); j++) {
     Log2Histogram *h = hist[j];
     unsigned int format_index =
-        snprintf(buffer, bufSize, "\"%s\",\"%s\",%ld,\"%s\"", repo.c_str(),
-                 names[j].c_str(), h->N(), "nanoseconds");
+      snprintf(buffer, bufSize, "\"%s\",\"%s\",%" PRIu64 ",\"nanoseconds\"",
+               repo.c_str(), names[j].c_str(), h->N());
     for (unsigned int i = 0; i < qs.size(); i++) {
       format_index += snprintf(buffer + format_index, bufSize - format_index,
-                               ",%d", h->GetQuantile(qs[i]));
+                               ",%u", h->GetQuantile(qs[i]));
     }
     format_index +=
         snprintf(buffer + format_index, bufSize - format_index, "\n");

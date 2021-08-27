@@ -1,0 +1,34 @@
+cvmfs_test_name="Repository gateway moving from directory to symlink with catalog"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+# ref to https://sft.its.cern.ch/jira/browse/CVM-1927
+
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
+
+    ## Transaction 1, create directory with catalog inside
+    echo "***  Starting transaction 1"
+    cvmfs_server transaction test.repo.org || return 10
+
+    mkdir -p /cvmfs/test.repo.org/foo/bar || return 11
+    mkdir -p /cvmfs/test.repo.org/foo/miao || return 12
+    touch /cvmfs/test.repo.org/foo/bar/.cvmfscatalog || return 13
+
+    echo "  Publishing changes 1"
+    cvmfs_server publish test.repo.org || return 14
+    cvmfs_server check -i test.repo.org || return 15
+
+    ## Transaction 2, move from dir to symlink
+    echo "***  Starting transaction 2"
+    cvmfs_server transaction test.repo.org || return 20
+    rm -rf /cvmfs/test.repo.org/foo/bar || return 21
+    ln -s /cvmfs/test.repo.org/foo/miao /cvmfs/test.repo.org/foo/bar || return 22
+
+    echo "  Publishing changes 2"
+    cvmfs_server publish test.repo.org || return 23
+    cvmfs_server check -i test.repo.org || return 24
+    cvmfs_server check -c test.repo.org || return 25
+
+    return 0
+}

@@ -84,9 +84,10 @@ class BaseMagicXattr {
  * This wrapper ensures that the attribute instance "ptr_" is
  * released after the user finishes using it (on wrapper destruction).
  */
-class MagicXattrRAIIWrapper {
+class MagicXattrRAIIWrapper: public SingleCopy {
  public:
   inline MagicXattrRAIIWrapper() : ptr_(NULL) { }
+
   inline explicit MagicXattrRAIIWrapper(
     BaseMagicXattr *ptr,
     PathString path,
@@ -95,9 +96,18 @@ class MagicXattrRAIIWrapper {
   {
     if (ptr_ != NULL) ptr_->Lock(path, d);
   }
+  /// Wraps around a BaseMagicXattr* tha is already locked (or NULL)
+  inline explicit MagicXattrRAIIWrapper(BaseMagicXattr *ptr) : ptr_(ptr) { }
+
   inline ~MagicXattrRAIIWrapper() { if (ptr_ != NULL) ptr_->Release(); }
+
   inline BaseMagicXattr* operator->() const { return ptr_; }
   inline bool IsNull() const { return ptr_ == NULL; }
+  inline BaseMagicXattr* Move() {
+    BaseMagicXattr* ret = ptr_;
+    ptr_ = NULL;
+    return ret;
+  }
 
  protected:
   BaseMagicXattr *ptr_;
@@ -131,7 +141,9 @@ class SymlinkMagicXattr : public BaseMagicXattr {
 class MagicXattrManager : public SingleCopy {
  public:
   MagicXattrManager(MountPoint *mountpoint, bool hide_magic_xattrs);
-  MagicXattrRAIIWrapper Get(const std::string &name, PathString path,
+  /// The returned BaseMagicXattr* is supposed to be wrapped by a
+  /// MagicXattrRAIIWrapper
+  BaseMagicXattr* GetLocked(const std::string &name, PathString path,
                             catalog::DirectoryEntry *d);
   std::string GetListString(catalog::DirectoryEntry *dirent);
   void Register(const std::string &name, BaseMagicXattr *magic_xattr);
@@ -173,6 +185,11 @@ class ChunksMagicXattr : public RegularMagicXattr {
 };
 
 class CompressionMagicXattr : public RegularMagicXattr {
+  virtual bool PrepareValueFenced();
+  virtual std::string GetValue();
+};
+
+class DirectIoMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
@@ -236,6 +253,10 @@ class NIOErrMagicXattr : public BaseMagicXattr {
 };
 
 class NOpenMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue();
+};
+
+class HitrateMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 

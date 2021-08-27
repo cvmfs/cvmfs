@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>CernVM-FS repository statistics - $REPO_NAME</title>
-  <script src="https://root.cern/js/latest/scripts/JSRootCore.min.js" type="text/javascript"></script>
+  <script src="https://root.cern/js/latest/scripts/JSRoot.core.min.js" type="text/javascript"></script>
   <script type='text/javascript'>
     var filename = "stats.root";
 
@@ -23,13 +23,16 @@
                 "uploaded_speed_daily", "uploaded_speed_weekly",
                 "volume_speed_daily", "volume_speed_weekly"];
 
-    JSROOT.OpenFile(filename, function(file) {
-      plots.forEach(function(plot) {
-        file.ReadObject(plot, function(obj) {
-         JSROOT.draw(plot, obj);
-        });
-      });
-   });
+    async function readAndDrawAsync() {
+      let file = await JSROOT.openFile(filename);
+
+      for (let i = 0; i < plots.length; i++) {
+        let obj = await file.readObject(plots[i]);
+        await JSROOT.draw(plots[i], obj);
+        console.log("drawing ".concat(plots[i]));
+      }
+    }
+    readAndDrawAsync();
   </script>
 </head>
 <body>

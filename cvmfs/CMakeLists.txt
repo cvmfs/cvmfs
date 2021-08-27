@@ -77,6 +77,7 @@ set (CVMFS_CLIENT_SOURCES
   sql.cc
   sqlitemem.cc
   sqlitevfs.cc
+  ssl.cc
   statistics.cc
   tracer.cc
   uuid.cc
@@ -244,6 +245,7 @@ set (CVMFS_SHRINKWRAP_SOURCES
 
 # TODO(jblomer) Rename to cvmfs_server
 set (CVMFS_PUBLISH_SOURCES
+  backoff.cc
   compression.cc
   directory_entry.cc
   dns.cc
@@ -252,6 +254,7 @@ set (CVMFS_PUBLISH_SOURCES
   logging.cc
   manifest.cc
   options.cc
+  publish/cmd_abort.cc
   publish/cmd_diff.cc
   publish/cmd_enter.cc
   publish/cmd_hash.cc
@@ -267,6 +270,7 @@ set (CVMFS_PUBLISH_SOURCES
   publish/settings.cc
   sanitizer.cc
   signature.cc
+  ssl.cc
   statistics.cc
   upload_spooler_definition.cc
   util/algorithm.cc
@@ -314,6 +318,8 @@ set (LIBCVMFS_SERVER_SOURCES
   pack.cc
   publish/except.cc
   publish/repository.cc
+  publish/repository_abort.cc
+  publish/repository_env.cc
   publish/repository_diff.cc
   publish/repository_managed.cc
   publish/repository_session.cc
@@ -329,6 +335,7 @@ set (LIBCVMFS_SERVER_SOURCES
   signature.cc
   sql.cc
   sqlitemem.cc
+  ssl.cc
   statistics.cc
   swissknife_assistant.cc
   swissknife_lease_curl.cc
@@ -418,6 +425,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   signing_tool.cc
   sql.cc
   sqlitemem.cc
+  ssl.cc
   statistics_database.cc
   statistics.cc
   supervisor.cc
@@ -521,6 +529,7 @@ set (CVMFS_PRELOADER_SOURCES
   signature.cc
   sql.cc
   sqlitemem.cc
+  ssl.cc
   statistics.cc
   swissknife.cc
   swissknife_lease_curl.cc
@@ -602,6 +611,7 @@ if(BUILD_RECEIVER)
     session_context.cc
     signature.cc
     signing_tool.cc
+    ssl.cc
     statistics.cc
     statistics_database.cc
     swissknife.cc
@@ -945,8 +955,8 @@ if(NOT BUILD_SERVER)
 endif(NOT BUILD_SERVER)
 
 if (BUILD_SERVER)
-  set (CVMFS_PUBLISH_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
-  set (LIBCVMFS_SERVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -fexceptions")
+  set (CVMFS_PUBLISH_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
+  set (LIBCVMFS_SERVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
 
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
@@ -1138,6 +1148,15 @@ if (BUILD_RECEIVER)
     RUNTIME
     DESTINATION bin
     )
+
+  if (BUILD_RECEIVER_DEBUG)
+    install (
+      TARGETS     cvmfs_receiver_debug
+      RUNTIME
+      DESTINATION   bin
+    )
+  endif (BUILD_RECEIVER_DEBUG)
+
 endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)

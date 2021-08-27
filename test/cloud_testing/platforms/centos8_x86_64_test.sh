@@ -1,5 +1,8 @@
 #!/bin/sh
 
+export CVMFS_PLATFORM_NAME="centos8-x86_64"
+export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
@@ -29,6 +32,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/056-lowspeedlimit                        \
                                  src/084-premounted                           \
+                                 src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
@@ -43,6 +47,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
+                                 src/684-https_s3                             \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \

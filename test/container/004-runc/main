@@ -29,7 +29,7 @@ cvmfs_run_test() {
     $CVMFS_TEST_004_MOUNTPOINT || return 10
   trap cleanup EXIT HUP INT TERM || return $?
 
-  runc spec --rootless || return 20
+  # runc spec --rootless || return 20
   # TODO(jblomer): mount rootfs with fuse-overlayfs
 
   return 0

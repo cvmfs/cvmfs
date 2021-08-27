@@ -134,14 +134,14 @@ int64_t FileBackedBuffer::Data(void **ptr, int64_t len, uint64_t pos) {
 }
 
 int64_t FileBackedBuffer::Read(void *ptr, int64_t len) {
-  uint64_t bytes_read = ReadP(ptr, len, pos_);
+  int64_t bytes_read = ReadP(ptr, len, pos_);
   pos_ += bytes_read;
   return bytes_read;
 }
 
 int64_t FileBackedBuffer::ReadP(void *ptr, int64_t len, uint64_t pos) {
   void *source;
-  uint64_t bytes_read = Data(&source, len, pos);
+  int64_t bytes_read = Data(&source, len, pos);
   memcpy(ptr, source, bytes_read);
   return bytes_read;
 }

@@ -19,7 +19,12 @@ export DH_VERBOSE=1
 
 Makefile:
 	dh_testdir
-	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_SHRINKWRAP=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no -DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr
+	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes \
+		-DBUILD_RECEIVER=yes -DBUILD_RECEIVER_DEBUG=yes -DBUILD_SHRINKWRAP=yes \
+		-DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no \
+		-DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes \
+		-DBUILD_GATEWAY=$(shell if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi) \
+		-DCMAKE_INSTALL_PREFIX:PATH=/usr
 
 build: build-stamp
 build-stamp: Makefile
@@ -39,7 +44,7 @@ clean:
 debian/%.install: debian/%.install.in
 	sed "s/@CVMFS_VERSION@/$(shell dpkg-parsechangelog | sed -n -e 's/^Version: \([0-9]\.[0-9]\.[0-9][0-9]*\).*/\1/p')/g" $< > $@
 
-install: build debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-unittests.install debian/cvmfs-fuse3.install
+install: build debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-unittests.install debian/cvmfs-fuse3.install debian/cvmfs-gateway.install
 	dh_testdir
 	dh_testroot
 	dh_prep

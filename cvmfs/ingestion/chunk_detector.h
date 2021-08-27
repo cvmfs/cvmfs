@@ -43,7 +43,7 @@ class ChunkDetector {
    * Same as DoCut() but if no cut mark has been found in the given buffer in
    * FindNextCutMark()
    */
-  virtual uint64_t NoCut(uint64_t offset) { return 0; }
+  virtual uint64_t NoCut(uint64_t /* offset */) { return 0; }
 
   uint64_t last_cut() const { return last_cut_; }
   uint64_t offset() const { return offset_; }

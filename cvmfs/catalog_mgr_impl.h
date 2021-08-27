@@ -713,7 +713,7 @@ int AbstractCatalogManager<CatalogT>::GetNumCatalogs() const {
 template <class CatalogT>
 string AbstractCatalogManager<CatalogT>::PrintHierarchy() const {
   ReadLock();
-  const string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
+  string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
   Unlock();
   return output;
 }
@@ -897,6 +897,29 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
   }
 
   return attached_catalog;
+}
+
+
+/**
+ * Load a catalog file as a freestanding Catalog object.
+ * Loading of catalogs is implemented by derived classes.
+ */
+template <class CatalogT>
+CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
+                                            const PathString     &mountpoint,
+                                            const shash::Any     &hash)
+{
+  string new_path;
+  shash::Any check_hash;
+  const LoadError load_error = LoadCatalog(mountpoint, hash, &new_path,
+                                           &check_hash);
+  if (load_error != kLoadNew)
+    return NULL;
+  assert(hash == check_hash);
+  CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
+                                             new_path, hash);
+  catalog->TakeDatabaseFileOwnership();
+  return catalog;
 }
 
 

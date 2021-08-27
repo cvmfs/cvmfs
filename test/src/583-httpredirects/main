@@ -23,10 +23,12 @@ EOF
   sudo sh -c "cat > /etc/cvmfs/config.d/$test_repo1.local" << EOF || return 1
 CVMFS_SERVER_URL="$redirect_url1"
 CVMFS_HTTP_PROXY=DIRECT
+CVMFS_FALLBACK_PROXY=
 EOF
   sudo sh -c "cat > /etc/cvmfs/config.d/$test_repo2.local" << EOF
 CVMFS_SERVER_URL="$redirect_url2;http://cvmfs-stratum-one.cern.ch:8000/cvmfs/$test_repo2"
 CVMFS_HTTP_PROXY=DIRECT
+CVMFS_FALLBACK_PROXY=
 CVMFS_FOLLOW_REDIRECTS=yes
 EOF
 

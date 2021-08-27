@@ -1,7 +1,78 @@
+2.9.0:
+  * Add support for explicit server-side proxy, removing support for
+    server-side system proxy; new parameters CVMFS_SERVER_PROXY and
+    CVMFS_S3_PROXY
+  * Fix potential activation of corruption stratum 1 snapshot
+  * Add `cvmfs_config fuser` command
+  * Add support for HTTPS S3 endpoints
+  * Fix union mountpoint handling on Fedora >= 34
+  * Add support for attaching mount to an existing fuse module
+  * Add support for "direct I/O" files (CVM-2001)
+  * Add 'device id' command to cvmfs_talk (CVM-2004)
+  * Fix potential crash when accessing extended attributes (CVM-2014)
+  * [gw] Fix publishing empty uncompressed files (CVM-2012)
+  * Fix building Doxygen documentation
+  * Add support for setting "compression" key in graft files
+  * Remove spinlock in S3 uploader
+  * Remove spinlock in gateway uploader
+  * Reduce time spent in lsof during publishing
+  * [gw] Fast merging of nested catalogs (CVM-1998)
+  * [gw] Accommodate cvmfs-gateway Go sources (CVM-1871)
+  * Install cvmfs_receiver_debug (CVM-1988)
+  * Register redundant bulk hashes in filestats db
+  * Add support for SLES15 (CVM-1656)
+  * Do not include an explicit default port number within S3 upload URI
+    (see also libcurl issue #6769)
+  * Do not escape '@' in URI strings
+  * [ducc] Fix version string
+  * [ducc] Ingest images using "sneaky layers" and template transactions
+
+2.8.2:
+  * Add `cvmfs_config fuser` command (CVM-2004)
+  * Add 'device id' command to cvmfs_talk (CVM-2004)
+  * Add Debian 11 "bullseye" platform (CVM-2020)
+  * Fix authz session identifiers with namespaces (CVM-2011)
+  * Improve error handling when parsing config files
+  * [preloader] make network timeout and retries configurable (CVM-1992)
+
+2.8.1:
+  * Gracefully handle template transaction failures (CVM-1964)
+  * [shrinkwrap] fix parsing of spec file (CVM-1708)
+  * Fix client cache hitrate reporting (CVM-1965)
+  * Fix server statistics display for JSROOT 6 (CVM-1970)
+  * Get repository host from read-only layer in enter shell (CVM-1969)
+  * Fix `cvmfs_server diff --worktree` on managed publishers (CVM-1972)
+  * Set CVMFS_USE_CDN=yes in service container
+
 2.8.0:
+  * [gw] fix catalog corruption when a nested catalog turns into a symlink
+    (CVM-1930)
+  * Update maxminddb to version 1.5.4
+  * Fix committing publications with gateway >= 1.2
+  * Fix cvmfs_config status for broken mountpoints (CVM-1959)
+  * Improve network error handling during GC (CVM-1957)
+  * [macOS] fix reload on macOS >= 10.15
+  * Fix reload if only config repository is mounted
+  * Log when geosort ends up switching a proxy (CVM-1920)
+  * [server] fix stuck Apache processes with disabled geo API (CVM-1956)
+  * [ducc] add support for podman image store meta-data
+  * Add experimental `cvmfs_server diff --worktree` command (CVM-1869)
+  * New defaults overlayfs over aufs and CVMFS_IGNORE_XDIR_HARDLINKS (CVM-1909)
+  * [macOS] update to macFUSE 4 (CVM-1960)
+  * [ducc] preserve timestamp of extracted files (CVM-1950)
+  * [libcvmfs] implement cvmfs_remount(), add cvmfs_get_revision() (CVM-1958)
+  * Fix reflog repair when there is a zombie hash in the manifest (CVM-1919)
+  * [server] add `enter` command to open an ephemeral environment that gives
+    writable access to a repository (CVM-1924)
+  * [ducc] add support for pulling Docker images with authenticated user
+    using CVMFS_DOCKERHUB_[USER|PASS] environment variables
+  * [gc] show progress during sweep phase (CVM-1929)
+  * [server] add support for wait & retry on opening transactions (CVM-1937)
+  * [server] let return code of transaction indicate the error (CVM-1873)
+  * Fix ingestion of hardlinked catalog markers (CVM-1931)
   * Add `cvmfs_talk chroot <hash>` command
   * Add CVMFS_TALK_SOCKET and CVMFS_TALK_OWNER client parameters
-  * Add `cvmfs_server transaction -T /foo=/bar` template transactions
+  * Add `cvmfs_server transaction -T /foo=/bar` template transactions (CVM-1801)
   * Refuse non-regular .cvmfscatalog files during publish (CVM-1868)
   * Replace `swissknife hash` by `publish hash` including MD5 support
   * Add experimental support for WSL2
@@ -14,12 +85,13 @@
   * Update sqlite to version 3.32.2
   * Fix ingest into root directory
   * Spawn watchdog for `swissknife sync` command
-  * Add 'chunk_list' magic extended attribute
+  * Add 'chunk_list' magic extended attribute (CVM-1875)
   * Remove perl as a package dependency
   * [libcvmfs] add cvmfs_options_parse_default()
   * [libcvmfs] add cvmfs_listdir_stat()
   * [libcvmfs] add catalog counters to struct cvmfs_nc_attr
   * Parallelize catalog traversal in garbage collection
+  * [gw] publish files without writing temporaries to disk (CVM-1793)
   * Improve performance of uploading small objects to S3
   * Fix double counting in swissknife filestats command
   * [ducc] Parallelize check if images are up to date
@@ -47,6 +119,7 @@
   * Manage DUCC daemon with systemd units
 
 2.7.6:
+  * Improve reporting of .cvmfsdirtab errors
 
 2.7.5:
   * Fix crash when kernel meta-data caches close to 4G get evicted (CVM-1918)

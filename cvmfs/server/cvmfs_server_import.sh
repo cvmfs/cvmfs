@@ -66,10 +66,11 @@ cvmfs_server_import() {
   local configure_apache=1
   local recreate_repo_key=0
   local require_masterkeycard=0
+  local proxy_url
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:rptR" option; do
+  while getopts "w:o:c:u:k:lsmgf:rptRx:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -114,6 +115,9 @@ cvmfs_server_import() {
         recreate_whitelist=1
         require_masterkeycard=1
       ;;
+      x)
+        proxy_url=$OPTARG
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command import: Unrecognized option: $1"
@@ -152,11 +156,7 @@ cvmfs_server_import() {
   fi
   [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"
 
-  if [ $unionfs = "overlayfs" ]; then
-    local msg
-    msg="`check_overlayfs_version`" || die "$msg"
-    echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
-  else
+  if [ $unionfs = "aufs" ]; then
     check_aufs                      || die "aufs kernel module missing"
   fi
 
@@ -230,7 +230,8 @@ cvmfs_server_import() {
                                          "default"           \
                                          "false"             \
                                          ""                  \
-                                         "" || die "fail!"
+                                         ""                  \
+                                         "$proxy_url" || die "fail!"
   echo "done"
 
   # import the old repository security keys

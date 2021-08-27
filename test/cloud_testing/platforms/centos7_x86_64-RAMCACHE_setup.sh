@@ -37,6 +37,9 @@ install_from_repo wget
 # traffic shaping
 install_from_repo trickle
 
+# For 006 kernel compile
+install_from_repo openssl-devel
+
 # Migration test needs lsb_release
 echo "install lsb_release..."
 install_from_repo redhat-lsb-core

@@ -11,7 +11,7 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 Package: cvmfs
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: cvmfs-config-default | cvmfs-config, gawk, psmisc, autofs, fuse, curl, attr, libfuse2, zlib1g, gdb, uuid-dev, uuid, adduser, ${misc:Depends}
+Depends: cvmfs-config-default | cvmfs-config, gawk, psmisc, lsof, autofs, fuse, curl, attr, libfuse2, zlib1g, gdb, uuid-dev, uuid, adduser, ${misc:Depends}
 Recommends: autofs (>= 5.1.2)
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
@@ -66,3 +66,14 @@ Homepage: http://cernvm.cern.ch
 Description: CernVM File System fuse3 libraries
  Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 #FUSE3-END
+
+#GATEWAY-BEGIN
+Package: cvmfs-gateway
+Architecture: i386 amd64 armhf arm64
+#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
+Depends: ${misc:Depends}
+#Multi-Arch: same   (preparation for multiarch support)
+Homepage: http://cernvm.cern.ch
+Description: CernVM-FS Repository Gateway
+ The CernVM-FS repository gateway service enables multiple remote publishers to write to the same repository.
+#GATEWAY-END

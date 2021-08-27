@@ -25,8 +25,8 @@ class UnlinkGuard : SingleCopy {
   enum InitialState { kEnabled, kDisabled };
 
   inline UnlinkGuard() : enabled_(false) {}
-  inline UnlinkGuard(const std::string &path,
-                     const InitialState state = kEnabled)
+  inline explicit UnlinkGuard(const std::string &path,
+                              const InitialState state = kEnabled)
             : path_(path)
             , enabled_(state == kEnabled) {}
   inline ~UnlinkGuard() { if (IsEnabled()) unlink(path_.c_str()); }

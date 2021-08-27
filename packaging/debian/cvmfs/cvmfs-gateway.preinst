@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+#DEBHELPER#
+
+if $(systemctl is-active --quiet cvmfs-gateway); then
+  systemctl stop cvmfs-gateway
+fi
+if $(systemctl is-active --quiet cvmfs-gateway@*); then
+  systemctl stop cvmfs-gateway@*
+fi
+
+exit 0

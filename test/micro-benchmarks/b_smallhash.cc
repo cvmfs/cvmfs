@@ -12,7 +12,7 @@
 #include "bm_util.h"
 #include "directory_entry.h"
 #include "hash.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "prng.h"
 #include "shortstring.h"
 #include "smallhash.h"
