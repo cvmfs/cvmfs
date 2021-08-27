@@ -193,7 +193,7 @@ void PayloadProcessor::OnUploadJobComplete(
 }
 
 void PayloadProcessor::SetStatistics(perf::Statistics *st) {
-  statistics_ = new perf::StatisticsTemplate("Publish", st);
+  statistics_ = new perf::StatisticsTemplate("publish", st);
 }
 
 PayloadProcessor::Result PayloadProcessor::Initialize() {
@@ -222,7 +222,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
 
     // configure the uploader environment
   uploader_ = upload::AbstractUploader::Construct(definition);
-  if (!uploader_) {
+  if (!uploader_.IsValid()) {
     LogCvmfs(kLogSpooler, kLogWarning,
              "Failed to initialize backend upload "
              "facility in PayloadProcessor.");
@@ -230,7 +230,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   }
 
   if (statistics_.IsValid()) {
-    uploader_->InitCounters(statistics_);
+    uploader_->InitCounters(statistics_.weak_ref());
   }
 
   return kSuccess;

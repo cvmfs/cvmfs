@@ -66,15 +66,18 @@ TEST(T_Json, SearchInObject) {
 
 TEST(T_Json, GenerateValidJsonString) {
   JsonStringGenerator input;
-  input.AddQuoted("f1", "v1");
-  input.AddQuoted("f2", "v2");
-  input.AddQuoted("f3", "v3");
-  input.AddUnquoted("integer", "12");
+  input.Add("f1", "v1");
+  input.Add("f2", "v2");
+  input.Add("f3", "v3");
+  input.Add("f4", "v\n4");
+  input.Add("integer", 12);
 
   std::string output = input.GenerateString();
 
-  ASSERT_EQ("{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\",\"integer\":12}",
-            output);
+  ASSERT_EQ(
+      "{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\","
+      "\"f4\":\"v\\n4\",\"integer\":12}",
+      output);
 
   UniquePtr<JsonDocument> json(JsonDocument::Create(output));
   ASSERT_TRUE(json.IsValid());

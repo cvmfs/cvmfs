@@ -17,13 +17,15 @@ cvmfs_server_publish() {
   local authz_file=""
   local force_external=0
   local force_native=0
+  local force_direct_io=0
   local force_compression_algorithm=""
   local external_option=""
+  local direct_io_option=""
   local open_fd_dialog=1
 
   # optional parameter handling
   OPTIND=1
-  while getopts "F:NXZ:pa:c:m:vn:fe" option
+  while getopts "F:NXZ:pa:c:m:vn:fed" option
   do
     case $option in
       p)
@@ -55,6 +57,9 @@ cvmfs_server_publish() {
       ;;
       F)
         authz_file="-F $OPTARG"
+      ;;
+      d)
+        force_direct_io=1
       ;;
       f)
         open_fd_dialog=0
@@ -98,7 +103,8 @@ cvmfs_server_publish() {
     if [ x"$upstream_type" = xgw ]; then
         health_check -g -r $name
     else
-        health_check -r $name
+        # TODO(jblomer): switch me back to `health_check -r $name`
+        health_check -g -r $name
     fi
 
     # get repository information
@@ -116,6 +122,9 @@ cvmfs_server_publish() {
       if [ $force_native -eq 0 ]; then
         external_option="-Y"
       fi
+    fi
+    if [ $force_direct_io -eq 1 ]; then
+      direct_io_option="-W"
     fi
 
     # more sanity checks
@@ -196,8 +205,9 @@ cvmfs_server_publish() {
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
         $(get_follow_http_redirects_flag)              \
+        $(get_swissknife_proxy)                        \
         $authz_file                                    \
-        $log_level $tweaks_option $external_option $verbosity"
+        $log_level $tweaks_option $external_option $direct_io_option $verbosity"
 
     if [ ! -z "$tag_name" ]; then
       sync_command="$sync_command -D $tag_name"
@@ -300,6 +310,7 @@ cvmfs_server_publish() {
       -p /etc/cvmfs/keys/${name}.pub                    \
       -f $name                                          \
       -e $hash_algorithm                                \
+      $(get_swissknife_proxy)                           \
       $(get_follow_http_redirects_flag)"
     if ! is_checked_out $name; then
       # enables magic undo tag handling
@@ -357,7 +368,7 @@ cvmfs_server_publish() {
     fi
 
     if [ x"$upstream_type" = xgw ]; then
-        # TODO(jpriessn): implement publication counters upload to gateway        
+        # TODO(jpriessn): implement publication counters upload to gateway
         close_transaction  $name $use_fd_fallback
         publish_after_hook $name
         publish_succeeded $name
@@ -448,7 +459,7 @@ cvmfs_server_publish() {
 
     # remount the repository
     if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
-      /usr/share/cvmfs-server/upload_stats_plots.sh $name  
+      /usr/share/cvmfs-server/upload_stats_plots.sh $name
     fi
     close_transaction  $name $use_fd_fallback
     publish_after_hook $name

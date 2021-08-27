@@ -149,6 +149,44 @@ LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
   return load_error;
 }
 
+/**
+ * Remounts to the given hash
+ */
+template <class CatalogT>
+LoadError AbstractCatalogManager<CatalogT>::ChangeRoot(
+  const shash::Any &root_hash)
+{
+  LogCvmfs(kLogCatalog, kLogDebug,
+           "switching to root hash %s", root_hash.ToString().c_str());
+
+  WriteLock();
+
+  string     catalog_path;
+  shash::Any catalog_hash;
+  const LoadError load_error = LoadCatalog(PathString("", 0),
+                                           root_hash,
+                                           &catalog_path,
+                                           &catalog_hash);
+  if (load_error == kLoadNew) {
+    inode_t old_inode_gauge = inode_gauge_;
+    DetachAll();
+    inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
+
+    CatalogT *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
+    assert(new_root);
+    bool retval = AttachCatalog(catalog_path, new_root);
+    assert(retval);
+
+    if (inode_annotation_) {
+      inode_annotation_->IncGeneration(old_inode_gauge);
+    }
+  }
+  CheckInodeWatermark();
+  Unlock();
+
+  return load_error;
+}
+
 
 /**
  * Detaches everything except the root catalog
@@ -675,7 +713,7 @@ int AbstractCatalogManager<CatalogT>::GetNumCatalogs() const {
 template <class CatalogT>
 string AbstractCatalogManager<CatalogT>::PrintHierarchy() const {
   ReadLock();
-  const string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
+  string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
   Unlock();
   return output;
 }
@@ -859,6 +897,29 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
   }
 
   return attached_catalog;
+}
+
+
+/**
+ * Load a catalog file as a freestanding Catalog object.
+ * Loading of catalogs is implemented by derived classes.
+ */
+template <class CatalogT>
+CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
+                                            const PathString     &mountpoint,
+                                            const shash::Any     &hash)
+{
+  string new_path;
+  shash::Any check_hash;
+  const LoadError load_error = LoadCatalog(mountpoint, hash, &new_path,
+                                           &check_hash);
+  if (load_error != kLoadNew)
+    return NULL;
+  assert(hash == check_hash);
+  CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
+                                             new_path, hash);
+  catalog->TakeDatabaseFileOwnership();
+  return catalog;
 }
 
 

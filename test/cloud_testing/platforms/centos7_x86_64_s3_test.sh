@@ -1,5 +1,8 @@
 #!/bin/sh
 
+export CVMFS_PLATFORM_NAME="centos7-x86_64_S3"
+export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
@@ -27,6 +30,9 @@ s3_retval=0
 test_s3_pid=$(start_test_s3 $TEST_S3_LOGFILE) || { s3_retval=1; retval=1; echo "fail"; }
 echo "done ($test_s3_pid)"
 create_test_s3_bucket
+
+# Exclusions
+# 682-enter: missing fuse-overlayfs
 
 if [ $s3_retval -eq 0 ]; then
   echo "running CernVM-FS server test cases against the test S3 provider..."
@@ -71,6 +77,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/670-listreflog                           \
                                src/672-publish_stats_hardlinks              \
                                src/673-acl                                  \
+                               src/682-enter                                \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

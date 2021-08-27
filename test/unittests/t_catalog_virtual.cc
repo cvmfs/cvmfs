@@ -19,7 +19,7 @@ class T_VirtualCatalog : public ::testing::Test {
 
 
 TEST_F(T_VirtualCatalog, ParseActions) {
-  unsigned actions;
+  int actions;
   EXPECT_TRUE(VirtualCatalog::ParseActions("", &actions));
   EXPECT_EQ(VirtualCatalog::kActionNone, actions);
   EXPECT_FALSE(VirtualCatalog::ParseActions("abc", &actions));

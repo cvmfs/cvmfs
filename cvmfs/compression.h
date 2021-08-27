@@ -60,7 +60,7 @@ enum Algorithms {
  */
 class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
  public:
-  explicit Compressor(const Algorithms &alg) { }
+  explicit Compressor(const Algorithms & /* alg */) { }
   virtual ~Compressor() { }
   /**
    * Deflate function.  The arguments and returns closely match the input and
@@ -98,7 +98,7 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
 class ZlibCompressor: public Compressor {
  public:
   explicit ZlibCompressor(const Algorithms &alg);
-  explicit ZlibCompressor(const ZlibCompressor &other);
+  ZlibCompressor(const ZlibCompressor &other);
   ~ZlibCompressor();
 
   bool Deflate(const bool flush,

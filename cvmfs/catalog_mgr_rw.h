@@ -128,6 +128,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint,
                            const bool merge = true);
+  void SwapNestedCatalog(const string &mountpoint, const shash::Any &new_hash,
+                         const uint64_t new_size);
   bool IsTransitionPoint(const std::string &mountpoint);
   WritableCatalog *GetHostingCatalog(const std::string &path);
 

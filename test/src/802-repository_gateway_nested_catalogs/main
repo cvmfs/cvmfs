@@ -5,16 +5,6 @@ cvmfs_test_suites="quick"
 # This test covers the creation and deletion of nested catalogs when the repository
 # upstream is of type GW
 
-clean_up() {
-    echo "Cleaning up"
-
-    echo "  Removing output directories"
-    rm -rvf /tmp/cvmfs_out_{1,2,3}
-}
-
-check_status() {
-    echo $(( $1 || 0 ))
-}
 
 compare_file_checksum() {
     local file_name=$1
@@ -27,174 +17,167 @@ compare_file_checksum() {
     fi
 }
 
-save_repo_contents() {
-    local dest=$1
-    rm -rf $dest
-    mkdir -p $dest
-    cp -r /cvmfs/test.repo.org/* $dest/
-}
-
-run_transactions() {
-    set_up_repository_gateway
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
 
     echo "Checking transaction + publish"
 
     ## Transaction 1
     echo "  Starting transaction 1 (Creating a deep directory tree which is assigned to a sub-catalog)"
-    cvmfs_server transaction test.repo.org
+    cvmfs_server transaction test.repo.org || return 10
 
     echo "  Create a deep directory hierarchy"
-    mkdir -p /cvmfs/test.repo.org/a
-    echo "New file" > /cvmfs/test.repo.org/a/b
-    touch /cvmfs/test.repo.org/a/.cvmfscatalog
+    mkdir -p /cvmfs/test.repo.org/a || return 11
+    echo "New file" > /cvmfs/test.repo.org/a/b || return 12
+    touch /cvmfs/test.repo.org/a/.cvmfscatalog || return 13
 
     echo "  Publishing changes 1"
-    cvmfs_server publish -v test.repo.org
-    cvmfs_server check test.repo.org
-
-    echo "  Copy the contents of the repository"
-    save_repo_contents /tmp/cvmfs_out_1
+    cvmfs_server publish -v test.repo.org || return 14
+    cvmfs_server check -i test.repo.org || return 15
 
     echo "  Checking results 1"
-    compare_file_checksum /tmp/cvmfs_out_1/a/b f1885b1a57c71cacbd923fc5e9aefef3
+    compare_file_checksum /cvmfs/test.repo.org/a/b f1885b1a57c71cacbd923fc5e9aefef3 || return 16
     if [ x"$(cvmfs_server check test.repo.org | grep /a)" = x"" ]; then
         echo "Nested catalog not created at /a"
-        return 1
+        return 17
     else
         echo "Nested catalog was successfully created at /a"
     fi
 
     ## Transaction 2
     echo "  Starting transaction 2 (Replace a file with a directory tree, which is assigned to a sub-catalog)"
-    cvmfs_server transaction test.repo.org
+    cvmfs_server transaction test.repo.org || return 20
 
     echo "  Create a deep directory hierarchy"
-    rm -v /cvmfs/test.repo.org/a/b
-    mkdir -p /cvmfs/test.repo.org/a/b
-    echo "New file" > /cvmfs/test.repo.org/a/b/new_file.txt
-    touch /cvmfs/test.repo.org/a/b/.cvmfscatalog
+    rm -v /cvmfs/test.repo.org/a/b || return 21
+    mkdir -p /cvmfs/test.repo.org/a/b || return 22
+    echo "New file" > /cvmfs/test.repo.org/a/b/new_file.txt || return 23
+    touch /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 24
 
     echo "  Publishing changes 2"
-    cvmfs_server publish -v test.repo.org
-    cvmfs_server check test.repo.org
-
-    echo "  Copy the contents of the repository"
-    save_repo_contents /tmp/cvmfs_out_2
+    cvmfs_server publish -v test.repo.org || return 25
+    cvmfs_server check -i test.repo.org || return 26
 
     echo "  Checking results 2"
-    compare_file_checksum /tmp/cvmfs_out_2/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
+    compare_file_checksum /cvmfs/test.repo.org/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 27
     if [ x"$(cvmfs_server check test.repo.org | grep /a/b)" = x"" ]; then
         echo "Nested catalog not created at /a/b"
-        return 1
+        return 28
     else
         echo "Nested catalog was successfully created at /a/b"
     fi
 
+    ## Transaction 2a
+    echo "  Starting transaction 2a (add files within nested catalogs)"
+    cvmfs_server transaction test.repo.org || return 30
+
+    echo "  Create new files"
+    echo "New file in top-level nested catalog" > /cvmfs/test.repo.org/a/new_file_top.txt || return 31
+    echo "New file in sub-level nested catalog" > /cvmfs/test.repo.org/a/b/new_file_sub.txt || return 32
+
+    echo "  Publishing changes 2a"
+    cvmfs_server publish -v test.repo.org || return 33
+    cvmfs_server check -i test.repo.org || return 34
+
+    echo "  Checking results 2a"
+    compare_file_checksum /cvmfs/test.repo.org/a/new_file_top.txt \
+        e85971ec6b62a6de7f4091ef265e53ac || return 35
+    compare_file_checksum /cvmfs/test.repo.org/a/b/new_file_sub.txt \
+        1d136477561f9aa5ee6a42707148c786 || return 36
+
     ## Transaction 3
     echo "  Starting transaction 3 (Remove nested catalogs)"
-    cvmfs_server transaction test.repo.org
+    cvmfs_server transaction test.repo.org || return 40
 
     echo "  Remove all the nested catalogs and have their contents merged into the root catalog"
-    rm -v /cvmfs/test.repo.org/a/.cvmfscatalog
-    rm -v /cvmfs/test.repo.org/a/b/.cvmfscatalog
+    rm -v /cvmfs/test.repo.org/a/.cvmfscatalog || return 41
+    rm -v /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 42
 
     echo "  Publishing changes 3"
-    cvmfs_server publish -v test.repo.org
-    cvmfs_server check test.repo.org
-
-    echo "  Copy the contents of the repository"
-    save_repo_contents /tmp/cvmfs_out_3
+    cvmfs_server publish -v test.repo.org || return 43
+    cvmfs_server check -i test.repo.org || return 44
 
     echo "  Checking results 3"
-    compare_file_checksum /tmp/cvmfs_out_1/a/b f1885b1a57c71cacbd923fc5e9aefef3
-    compare_file_checksum /tmp/cvmfs_out_2/a/b/new_file.txt f1885b1a57c71cacbd923fc5e9aefef3
+    compare_file_checksum /cvmfs/test.repo.org/a/new_file_top.txt \
+        e85971ec6b62a6de7f4091ef265e53ac || return 45
+    compare_file_checksum /cvmfs/test.repo.org/a/b/new_file_sub.txt \
+        1d136477561f9aa5ee6a42707148c786 || return 46
     if [ x"$(cvmfs_server check test.repo.org | grep /a)" != x"" ]; then
         echo "Nested catalog at /a should have been removed"
-        return 1
+        return 47
     else
         echo "Nested catalog at /a was successfully removed"
     fi
     if [ x"$(cvmfs_server check test.repo.org | grep /a/b)" != x"" ]; then
         echo "Nested catalog at /a/b should have been removed"
-        return 1
+        return 48
     else
         echo "Nested catalog at /a/b was successfully removed"
     fi
 
     ## Transaction 4
     echo "  Starting transaction 4 (Create nested catalogs with .cvmfsdirtab)"
-    cvmfs_server transaction test.repo.org
+    cvmfs_server transaction test.repo.org || return 50
 
     echo "  Add .cvmfsdirtab file"
-    echo "/dir1" >> /cvmfs/test.repo.org/.cvmfsdirtab
-    echo "/dir2" >> /cvmfs/test.repo.org/.cvmfsdirtab
+    echo "/dir1" >> /cvmfs/test.repo.org/.cvmfsdirtab || return 51
+    echo "/dir2" >> /cvmfs/test.repo.org/.cvmfsdirtab || return 52
 
     echo "  Creating some files in the repository"
-    mkdir -p /cvmfs/test.repo.org/dir{1,2}
-    echo "New file" > /cvmfs/test.repo.org/dir1/a.txt
-    echo "New file" > /cvmfs/test.repo.org/dir2/b.txt
+    mkdir -p /cvmfs/test.repo.org/dir{1,2} || return 53
+    echo "New file" > /cvmfs/test.repo.org/dir1/a.txt || return 54
+    echo "New file" > /cvmfs/test.repo.org/dir2/b.txt || return 55
 
     echo "  Publishing changes 4"
-    cvmfs_server publish test.repo.org
-    cvmfs_server check test.repo.org
+    cvmfs_server publish test.repo.org || return 56
+    cvmfs_server check -i test.repo.org || return 57
 
     echo "  Checking results 4"
     if [ x"$(cvmfs_server check test.repo.org | grep /dir1)" = x"" ]; then
         echo "Nested catalog at /dir1 should have been created from .cvmfsdirtab"
-        return 1
+        return 58
     else
         echo "Nested catalog at /dir1 was successfully created from .cvmfsdirtab"
     fi
     if [ x"$(cvmfs_server check test.repo.org | grep /dir2)" = x"" ]; then
         echo "Nested catalog at /dir2 should have been created from .cvmfsdirtab"
-        return 1
+        return 59
     else
         echo "Nested catalog at /dir2 was successfully created from .cvmfsdirtab"
     fi
 
-    check_repo_integrity test.repo.org
+    check_repo_integrity test.repo.org || return 60
 
     ## Transaction 5
     echo "  Starting transaction 5 (Remove .cvmfsdirtab)"
-    cvmfs_server transaction test.repo.org
+    cvmfs_server transaction test.repo.org || return 61
 
     echo "  Remove .cvmfsdirtab and .cvmfscatalog files"
-    rm -f /cvmfs/test.repo.org/.cvmfsdirtab
-    rm -f /cvmfs/test.repo.org/dir1/.cvmfscatalog
-    rm -f /cvmfs/test.repo.org/dir2/.cvmfscatalog
+    rm -f /cvmfs/test.repo.org/.cvmfsdirtab || return 62
+    rm -f /cvmfs/test.repo.org/dir1/.cvmfscatalog || return 63
+    rm -f /cvmfs/test.repo.org/dir2/.cvmfscatalog || return 64
 
     echo "  Publishing changes 5"
-    cvmfs_server publish test.repo.org
-    cvmfs_server check test.repo.org
+    cvmfs_server publish test.repo.org || return 65
+    cvmfs_server check -i test.repo.org || return 66
 
     echo "  Checking results 5"
-    compare_file_checksum /cvmfs/test.repo.org/dir1/a.txt f1885b1a57c71cacbd923fc5e9aefef3
-    compare_file_checksum /cvmfs/test.repo.org/dir2/b.txt f1885b1a57c71cacbd923fc5e9aefef3
+    compare_file_checksum /cvmfs/test.repo.org/dir1/a.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 67
+    compare_file_checksum /cvmfs/test.repo.org/dir2/b.txt f1885b1a57c71cacbd923fc5e9aefef3 || return 68
     if [ x"$(cvmfs_server check test.repo.org | grep /dir1)" != x"" ]; then
         echo "Nested catalog at /dir1 should have been removed"
-        return 1
+        return 69
     else
         echo "Nested catalog at /dir1 was successfully removed"
     fi
     if [ x"$(cvmfs_server check test.repo.org | grep /dir2)" != x"" ]; then
         echo "Nested catalog at /dir2 should have been removed"
-        return 1
+        return 70
     else
         echo "Nested catalog at /dir2 was successfully removed"
     fi
 
-    check_repo_integrity test.repo.org || return 1
+    check_repo_integrity test.repo.org || return 80
 
-    clean_up
+    return 0
 }
-
-cvmfs_run_test() {
-    trap clean_up EXIT HUP INT TERM || return $?
-
-    run_transactions
-    local status=$?
-
-    return $(check_status $status)
-}
-
-

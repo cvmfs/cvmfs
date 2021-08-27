@@ -5,17 +5,24 @@ cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount grid.cern.ch || return 1
+
+  echo "Test listing magic extended attributes"
+
   local attributes_err=$(list_xattrs /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
   local attributes=$(list_xattrs /cvmfs/grid.cern.ch)
   if [ "x$attributes" = "x" ] || [ "x$attributes_err" != "x" ]; then
     return 2
   fi
 
-  local repo_counters_err=$(get_xattr repo_counters /cvmfs/grid.cern.ch 2>&1 1>/dev/null)  
+  echo "Test 'repo_counters' magic extended attribute"
+
+  local repo_counters_err=$(get_xattr repo_counters /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
   local repo_counters=$(get_xattr repo_counters /cvmfs/grid.cern.ch)
   if [ "x$repo_counters" = "x" ] || [ "x$repo_counters_err" != "x" ]; then
     return 3
   fi
+
+  echo "Test 'catalog_counters' magic extended attribute"
 
   # test nested catalog counters (test can break if grid.cern.ch repo changes)
   local catalog_counters_nested_err=$(get_xattr catalog_counters /cvmfs/grid.cern.ch/etc 2>&1 1>/dev/null)
@@ -27,6 +34,33 @@ cvmfs_run_test() {
   if [[ $catalog_counters_nested != *"catalog_mountpoint: /etc"* ]]; then
     return 5
   fi
+
+  echo "Test 'chunk_list' and 'chunks' magic extended attributes"
+  # test can break if grid.cern.ch repo changes
+  runc_chunks=$(get_xattr chunks /cvmfs/grid.cern.ch/vc/containers/runc)
+  runc_chunk_list=$(get_xattr chunk_list /cvmfs/grid.cern.ch/vc/containers/runc)
+  [ "x$runc_chunks" = "x2" ] || return 6
+  runc_chunk_list_n=$(echo $runc_chunk_list | wc -w | awk '{print $1}')
+  [ "x$runc_chunk_list_n" = "x3" ] || return 7
+  runc_chunk_list_header=$(echo $runc_chunk_list | cut -d" " -f1)
+  [ "x$runc_chunk_list_header" = "xhash,offset,size" ] || return 8
+  # test a short non-chunked file
+  readme_chunks=$(get_xattr chunks /cvmfs/grid.cern.ch/README)
+  readme_chunk_list=$(get_xattr chunk_list /cvmfs/grid.cern.ch/README)
+  [ "x$readme_chunks" = "x1" ] || return 9
+  readme_chunk_list_1=$(echo $readme_chunk_list | cut -d" " -f2)
+  readme_chunk_hash=$(echo $readme_chunk_list_1 | cut -d"," -f1)
+  readme_chunk_offset=$(echo $readme_chunk_list_1 | cut -d"," -f2)
+  readme_chunk_size=$(echo $readme_chunk_list_1 | cut -d"," -f3)
+  readme_hash=$(get_xattr hash /cvmfs/grid.cern.ch/README)
+  if running_on_osx; then
+    readme_size=$(gstat -c%s /cvmfs/grid.cern.ch/README)
+  else
+    readme_size=$(stat -c%s /cvmfs/grid.cern.ch/README)
+  fi
+  [ "x$readme_chunk_hash" = "x$readme_hash" ] || return 10
+  [ "x$readme_chunk_offset" = "x0" ] || return 11
+  [ "x$readme_chunk_size" = "x$readme_size" ] || return 12
 
   return 0
 }

@@ -186,4 +186,28 @@ void SetInConfig(const std::string &path,
     throw EPublish("cannot rewrite configuration file " + path);
 }
 
+
+std::string SendTalkCommand(const std::string &socket, const std::string &cmd) {
+  int fd = ConnectSocket(socket);
+  if (fd < 0) {
+    if (errno == ENOENT)
+      throw EPublish("Socket " + socket + " not found");
+    throw EPublish("Socket " + socket + " inaccessible");
+  }
+
+  WritePipe(fd, cmd.data(), cmd.size());
+
+  std::string result;
+  char buf;
+  int retval;
+  while ((retval = read(fd, &buf, 1)) == 1) {
+    result.push_back(buf);
+  }
+  close(fd);
+  if (retval != 0)
+    throw EPublish("Broken socket: " + socket);
+
+  return result;
+}
+
 }  // namespace publish

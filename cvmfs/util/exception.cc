@@ -38,8 +38,10 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
   }
   // From now on we deal only with `msg`
 
-  // Either throw the exception of log + abort
-#ifdef LIBCVMFS_SERVER
+  // Either throw the exception or log + abort
+#ifdef CVMFS_RAISE_EXCEPTIONS
+  (void) source;
+  (void) mask;
   throw ECvmfsException(msg);
 #else
   LogCvmfs(source, mask, msg);

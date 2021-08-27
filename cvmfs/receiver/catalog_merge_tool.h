@@ -89,16 +89,20 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
 
   virtual ~CatalogMergeTool() {}
 
-  bool Run(const Params& params, std::string* new_manifest_path);
+  bool Run(const Params& params, std::string* new_manifest_path,
+           uint64_t *final_rev);
 
  protected:
+  virtual bool IsIgnoredPath(const PathString& path);
+  virtual bool IsReportablePath(const PathString& path);
+
   virtual void ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& xattrs,
                               const FileChunkList& chunks);
   virtual void ReportRemoval(const PathString& path,
                              const catalog::DirectoryEntry& entry);
-  virtual void ReportModification(const PathString& path,
+  virtual bool ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry,
                                   const XattrList& xattrs,

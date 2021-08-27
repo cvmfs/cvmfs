@@ -31,11 +31,12 @@ class CommitProcessor {
   virtual ~CommitProcessor();
 
   Result Process(const std::string& lease_path, const shash::Any& old_root_hash,
-                 const shash::Any& new_root_hash, const RepositoryTag& tag);
+                 const shash::Any& new_root_hash, const RepositoryTag& tag,
+                 uint64_t *final_revision);
 
   int GetNumErrors() const { return num_errors_; }
 
-  void SetStatistics(perf::Statistics *st, std::string start_time);
+  void SetStatistics(perf::Statistics *st, const std::string &start_time);
 
  private:
   int num_errors_;

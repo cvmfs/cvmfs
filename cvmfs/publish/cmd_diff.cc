@@ -23,6 +23,7 @@
 #include "publish/repository.h"
 #include "publish/settings.h"
 #include "sanitizer.h"
+#include "util/pointer.h"
 #include "util/string.h"
 
 namespace {
@@ -176,6 +177,8 @@ class DiffReporter : public publish::DiffListener {
       result_list.push_back(machine_readable_ ? "B" : "bind-mountpoint");
     if (diff & catalog::DirectoryEntryBase::Difference::kHiddenFlag)
       result_list.push_back(machine_readable_ ? "H" : "hidden");
+    if (diff & catalog::DirectoryEntryBase::Difference::kDirectIoFlag)
+      result_list.push_back(machine_readable_ ? "D" : "direct-io");
 
     return machine_readable_ ? ("[" + JoinStrings(result_list, "") + "]")
                              : (" [" + JoinStrings(result_list, ", ") + "]");
@@ -201,6 +204,18 @@ namespace publish {
 
 int CmdDiff::Main(const Options &options) {
   SettingsBuilder builder;
+
+  if (options.Has("worktree")) {
+    UniquePtr<SettingsPublisher> settings(builder.CreateSettingsPublisher(
+      options.plain_args().empty() ? "" : options.plain_args()[0].value_str));
+    settings->SetIsSilent(true);
+    settings->GetTransaction()->SetDryRun(true);
+    settings->GetTransaction()->SetPrintChangeset(true);
+    Publisher publisher(*settings);
+    publisher.Sync();
+    return 0;
+  }
+
   SettingsRepository settings = builder.CreateSettingsRepository(
     options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
 

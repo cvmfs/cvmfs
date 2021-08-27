@@ -24,7 +24,8 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 class Prng {
  public:
-  Prng() {
+  // Cannot throw an exception
+  Prng() throw() {
     state_ = 0;
   }
 
@@ -47,7 +48,7 @@ class Prng {
     double scaled_val =
       static_cast<double>(state_) * static_cast<double>(boundary) /
       static_cast<double>(18446744073709551616.0);
-    return (uint32_t)scaled_val % boundary;
+    return static_cast<uint32_t>(static_cast<uint64_t>(scaled_val) % boundary);
   }
 
   /**

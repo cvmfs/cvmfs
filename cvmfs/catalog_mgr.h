@@ -126,6 +126,7 @@ class AbstractCatalogManager : public SingleCopy {
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
   LoadError Remount(const bool dry_run);
+  LoadError ChangeRoot(const shash::Any &root_hash);
   void DetachNested();
 
   bool LookupPath(const PathString &path, const LookupOptions options,
@@ -235,6 +236,9 @@ class AbstractCatalogManager : public SingleCopy {
                     const CatalogT *entry_point,
                     bool can_listing,
                     CatalogT **leaf_catalog);
+
+  CatalogT *LoadFreeCatalog(const PathString &mountpoint,
+                            const shash::Any &hash);
 
   bool AttachCatalog(const std::string &db_path, CatalogT *new_catalog);
   void DetachCatalog(CatalogT *catalog);

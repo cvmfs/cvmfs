@@ -19,7 +19,7 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
-CVMFS_CONFIG_PACKAGE="cvmfs-config-default_1.8-1_all.deb"
+CVMFS_CONFIG_PACKAGE="cvmfs-config-default_2.0-1_all.deb"
 
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
@@ -58,19 +58,28 @@ echo "Debian release: $(lsb_release -sc)"
 if [ x"$(lsb_release -sc)" = x"bionic" ]; then
   sed -i -e "s/insserv, initscripts, //g" debian/control
 fi
-# Fuse3 is only available as of Debian 10 "buster"
-if [ x"$(lsb_release -sc)" = x"buster" ]; then
+# Fuse3 is only available as of Debian 10 "buster" and Ubuntu 20.04
+if [ x"$(lsb_release -sc)" = x"bullseye" -o \
+     x"$(lsb_release -sc)" = x"buster" -o \
+     x"$(lsb_release -sc)" = x"focal" ]; then
   sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control
   sed -i -e "s/^Recommends:/Recommends: cvmfs-fuse3,/g" debian/control
 else
   cat debian/control | awk '/#FUSE3-BEGIN/{flag=1;next}/#FUSE3-END/{flag=0;next}!flag' > debian/control.tmp
   mv debian/control.tmp debian/control
 fi
+# The cvmfs-gateway requires a go compiler
+if ! go version >/dev/null 2>&1; then
+  cat debian/control | awk '/#GATEWAY-BEGIN/{flag=1;next}/#GATEWAY-END/{flag=0;next}!flag' > debian/control.tmp
+  mv debian/control.tmp debian/control
+fi
 
 cpu_cores=$(get_number_of_cpu_cores)
 echo "do the build (with $cpu_cores cores)..."
 dch -v $cvmfs_version -M "bumped upstream version number"
-DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild -us -uc  # -us -uc == skip signing
+# -us -uc == skip signing
+DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild --prepend-path=/usr/local/go/bin \
+  -us -uc
 cd ${CVMFS_RESULT_LOCATION}
 
 # generating package map section for specific platform
@@ -83,7 +92,9 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
                        "$(basename $(find . -name 'cvmfs-unittests*.deb'))" \
                        "$CVMFS_CONFIG_PACKAGE"                              \
                        "$(basename $(find . -name 'cvmfs-shrinkwrap*.deb'))"\
-                       "$(basename $(find . -name 'cvmfs-fuse3*.deb'))"
+                       ""                                                   \
+                       "$(basename $(find . -name 'cvmfs-fuse3*.deb'))"     \
+                       "$(basename $(find . -name 'cvmfs-gateway*.deb'))"
 fi
 
 # clean up the source tree

@@ -182,4 +182,25 @@ TEST(T_Statistics, GenerateCorrectJsonEvenWithoutInput) {
   ASSERT_TRUE(json.IsValid());
 }
 
+TEST(T_Statistics, GenerateJSONStatisticsTemplates) {
+  Statistics stats;
+  StatisticsTemplate stat_template1("template1", &stats);
+  StatisticsTemplate stat_template2("template2", &stats);
+  StatisticsTemplate stat_template_empty("emptytemplate", &stats);
+
+  Counter *cnt1 = stat_template1.RegisterTemplated("valueA", "test counter A");
+  Counter *cnt2 = stat_template1.RegisterTemplated("valueB", "test counter B");
+  Counter *cnt3 = stat_template2.RegisterTemplated("valueC", "test counter C");
+  cnt1->Set(420);
+  cnt2->Set(0);
+  cnt3->Set(-42);
+
+  std::string json_observed = stats.PrintJSON();
+  std::string json_expected =
+    "{\"template1\":{\"valueA\":420,\"valueB\":0},"
+    "\"template2\":{\"valueC\":-42}}";
+
+  EXPECT_EQ(json_expected, json_observed);
+}
+
 }  // namespace perf

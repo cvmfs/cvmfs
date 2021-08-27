@@ -74,6 +74,7 @@ cleanup() {
   if [ ! -z "$TEST647_PRIVATE_MOUNT" ]; then
     sudo umount $TEST647_PRIVATE_MOUNT
     sudo rmdir $TEST647_PRIVATE_MOUNT
+    sudo rm -rf ${TEST647_PRIVATE_MOUNT}c
   fi
   [ -z "$TEST647_SELINUX_DISABLED"             ] || sudo setenforce 1
 }
@@ -163,45 +164,45 @@ cvmfs_run_test() {
   # change the default URL.
   if [ -f "$TEST647_HTTPS_CONFIG" ]; then
     sudo rm -f $TEST647_HTTPS_CONFIG
-    echo "restarting apache"
+    echo "*** restarting apache {1}"
     apache_switch off
     apache_switch on
   fi
 
-  echo "set a trap for system directory cleanup"
+  echo "*** set a trap for system directory cleanup"
   trap cleanup EXIT HUP INT TERM
 
-  echo "setting a dummy host name"
+  echo "*** setting a dummy host name"
   TEST647_HOSTNAME='test-647-dummyhost'
   echo "127.0.0.1 $TEST647_HOSTNAME" | sudo tee --append /etc/hosts
   echo "==== new /etc/hosts: ===="
   cat /etc/hosts
 
   if has_selinux; then
-    echo "make sure that SELinux does not interfere"
+    echo "*** make sure that SELinux does not interfere"
     TEST647_SELINUX_DISABLED=1
     sudo setenforce 0 || return 1
   fi
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-  echo "mount grid.cern.ch"
+  echo "*** mount grid.cern.ch"
   mount_cvmfs_grid $TEST647_GRID_MOUNTPOINT $TEST647_GRID_CACHE
   ls $TEST647_GRID_MOUNTPOINT
 
-  echo "Generating certificates"
+  echo "*** Generating certificates"
   generate_certs $script_location || return 4
 
-  echo "make '$TEST647_GRID_SECURITY_DIR' available as /etc/grid-security"
+  echo "*** make '$TEST647_GRID_SECURITY_DIR' available as /etc/grid-security"
   sudo mkdir -p /etc/grid-security                                || return 20
   sudo mount --bind $TEST647_GRID_SECURITY_DIR /etc/grid-security      || return 21
   TEST647_GRID_SECURITY_TAINTED="yes"
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER /tmp/cvmfs.secure.log -V "scitoken%cvmfs:/cvmfs" || return $?
-  echo "Make sure we don't lock out ourselves when publishing"
+  echo "*** Make sure we don't lock out ourselves when publishing"
   echo "CVMFS_AUTHZ_HELPER=/usr/libexec/cvmfs/authz/cvmfs_allow_helper" | \
     sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
   cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO
@@ -209,12 +210,12 @@ cvmfs_run_test() {
   cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO
   cvmfs_suid_helper rw_mount $CVMFS_TEST_REPO
 
-  echo "gather information about the just created repo"
+  echo "*** gather information about the just created repo"
   load_repo_config $CVMFS_TEST_REPO
   local spool_dir="$CVMFS_SPOOL_DIR"
   local cache_base="$CVMFS_CACHE_BASE"
 
-  echo "put some stuff into $CVMFS_TEST_REPO"
+  echo "*** put some stuff into $CVMFS_TEST_REPO"
   start_transaction $CVMFS_TEST_REPO                           || return $?
   echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world     || return 3
   echo "Hello World v2" > /cvmfs/$CVMFS_TEST_REPO/hello_world2 || return 3
@@ -223,7 +224,7 @@ cvmfs_run_test() {
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   # requires mod_gridsite from the gridsite package
-  echo "Setting up apache configuration"
+  echo "*** Setting up apache configuration"
   sudo cp $script_location/test647.cvmfs.secure.conf $TEST647_HTTPS_CONFIG             || return 60
   sudo sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST647_HTTPS_CONFIG                   || return 61
   sudo sed -i "s,@GRIDSECURITYDIR@,$TEST647_GRID_SECURITY_DIR," $TEST647_HTTPS_CONFIG  || return 62
@@ -241,7 +242,7 @@ cvmfs_run_test() {
     sudo systemctl daemon-reload
   fi
 
-  echo "restarting apache"
+  echo "*** restarting apache {2}"
   apache_switch off
   apache_switch on
 
@@ -265,17 +266,17 @@ cvmfs_run_test() {
   mkdir $TEST647_CRED_DIR
   echo "abcd1234" > $TEST647_CRED_DIR/scitoken.use
 
-  echo "This should work"
+  echo "*** This should work"
   sudo -u nobody /bin/sh -c "export _CONDOR_CREDS=${TEST647_CRED_DIR}; cat ${mntpnt}/hello_world" > /dev/null || return 30
 
-  echo "This should work because the above and below are in the same session id."
+  echo "*** This should work because the above and below are in the same session id."
   sudo -u nobody /bin/sh -c "cat ${mntpnt}/hello_world" || return 31
 
-  echo "This should not work"
+  echo "*** This should not work"
   sudo -u nobody setsid /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 32
 
 
-  echo "Check authz attr"
+  echo "*** Check authz attr"
   local authz_attr=
   authz_attr="$(attr -qg authz $mntpnt)" || return 41
   [ x"$authz_attr" = x"scitoken%cvmfs:/cvmfs" ]   || return 42

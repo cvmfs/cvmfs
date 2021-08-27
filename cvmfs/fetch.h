@@ -161,6 +161,7 @@ class Fetcher : SingleCopy {
   download::DownloadManager *download_mgr_;
   BackoffThrottle *backoff_throttle_;
   perf::Counter *n_downloads;
+  perf::Counter *n_invocations;
 };
 
 }  // namespace cvmfs

@@ -634,7 +634,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
 
   if (settings.is_managed) {
-    if (!SetupPosixQuotaMgr(settings, cache_mgr))
+    if (!SetupPosixQuotaMgr(settings, cache_mgr.weak_ref()))
       return NULL;
   }
   return cache_mgr.Release();
@@ -1165,7 +1165,8 @@ MountPoint *MountPoint::Create(
 
   mountpoint->ReEvaluateAuthz();
   mountpoint->CreateTables();
-  mountpoint->SetupBehavior();
+  if (!mountpoint->SetupBehavior())
+    return mountpoint.Release();
 
   mountpoint->boot_status_ = loader::kFailOk;
   return mountpoint.Release();
@@ -1258,8 +1259,7 @@ bool MountPoint::CreateCatalogManager() {
 bool MountPoint::CreateDownloadManagers() {
   string optarg;
   download_mgr_ = new download::DownloadManager();
-  const bool use_system_proxy = false;
-  download_mgr_->Init(kDefaultNumConnections, use_system_proxy,
+  download_mgr_->Init(kDefaultNumConnections,
                       perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
@@ -1308,6 +1308,12 @@ bool MountPoint::CreateDownloadManagers() {
       download_mgr_->SetHostChain(host_chain);
     }
   }
+
+  if (options_mgr_->GetValue("CVMFS_USE_SSL_SYSTEM_CA", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+    download_mgr_->UseSystemCertificatePath();
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 
@@ -1506,7 +1512,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   UnlinkGuard history_file(history_path);
   UniquePtr<history::History> tag_db(
     history::SqliteHistory::Open(history_path));
-  if (!tag_db) {
+  if (!tag_db.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "failed to open history database (%s)", history_path.c_str());
     boot_error_ = "failed to open history database";
@@ -1647,9 +1653,11 @@ MountPoint::MountPoint(
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
-  , hide_magic_xattrs_(false)
   , enforce_acls_(false)
   , has_membership_req_(false)
+  , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
+  , talk_socket_uid_(0)
+  , talk_socket_gid_(0)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
@@ -1715,7 +1723,7 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
 }
 
 
-void MountPoint::SetupBehavior() {
+bool MountPoint::SetupBehavior() {
   string optarg;
 
   if (options_mgr_->GetValue("CVMFS_MAX_TTL", &optarg))
@@ -1729,17 +1737,34 @@ void MountPoint::SetupBehavior() {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
 
+  bool hide_magic_xattrs = false;
   if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
       && options_mgr_->IsOn(optarg))
   {
-    hide_magic_xattrs_ = true;
+    hide_magic_xattrs = true;
   }
+  magic_xattr_mgr_ = new MagicXattrManager(this, hide_magic_xattrs);
+
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)
       && options_mgr_->IsOn(optarg))
   {
     enforce_acls_ = true;
   }
+
+  if (options_mgr_->GetValue("CVMFS_TALK_SOCKET", &optarg)) {
+    talk_socket_path_ = optarg;
+  }
+  if (options_mgr_->GetValue("CVMFS_TALK_OWNER", &optarg)) {
+    bool retval = GetUidOf(optarg, &talk_socket_uid_, &talk_socket_gid_);
+    if (!retval) {
+      boot_error_ = "unknown owner of cvmfs_talk socket: " + optarg;
+      boot_status_ = loader::kFailOptions;
+      return false;
+    }
+  }
+
+  return true;
 }
 
 

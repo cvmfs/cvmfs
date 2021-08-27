@@ -161,16 +161,23 @@ void CommandFileStats::ProcessCatalog(string db_path) {
     int num_bytes = catalog_list->RetrieveBytes(0);
     int64_t size = catalog_list->RetrieveInt64(1);
     int flags = catalog_list->RetrieveInt(2);
-    if ((flags & catalog::SqlDirent::kFlagFile) ==
-         catalog::SqlDirent::kFlagFile &&
-        (flags & catalog::SqlDirent::kFlagFileChunk) !=
-         catalog::SqlDirent::kFlagFileChunk) {
-      int object_id = db_->StoreObject(hash, num_bytes, size);
-      db_->StoreFile(cur_catalog_id, object_id);
-    } else if ((flags & catalog::SqlDirent::kFlagLink) ==
+    if ((flags & catalog::SqlDirent::kFlagLink) ==
                 catalog::SqlDirent::kFlagLink) {
       int symlink_length = catalog_list->RetrieveBytes(3);
       db_->StoreSymlink(symlink_length);
+    } else if ((flags & catalog::SqlDirent::kFlagFile) ==
+               catalog::SqlDirent::kFlagFile)
+    {
+      if ((flags & catalog::SqlDirent::kFlagFileChunk) !=
+           catalog::SqlDirent::kFlagFileChunk)
+      {
+        int object_id = db_->StoreObject(hash, num_bytes, size);
+        db_->StoreFile(cur_catalog_id, object_id);
+      } else {
+        // Bulk hashes in addition to chunks
+        if (hash != NULL)
+          db_->StoreObject(hash, num_bytes, size);
+      }
     }
   }
 

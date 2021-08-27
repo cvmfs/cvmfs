@@ -1,0 +1,134 @@
+
+cvmfs_test_name="Ingest tarball in a repository root"
+cvmfs_test_autofs_on_startup=false
+
+produce_tarball() {
+  local tarball_name=$1
+
+  mkdir tarball_foo
+  mkdir -p tarball_foo/a/b/c
+  mkdir -p tarball_foo/d/e/f
+
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/3.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/3.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/3.txt
+
+  dd bs=1024 count=5 2>/dev/null  </dev/urandom >tarball_foo/d/e/f/foo.txt
+
+  echo "*** Generating a tarball in $tarball_name"
+  tar -cvf $tarball_name tarball_foo/
+
+  rm -rf tarball_foo
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local tarfile=$scratch_dir/tarball.tar
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+
+  # ============================================================================
+
+  echo "*** generating a tarball $tarfile"
+  produce_tarball $tarfile
+
+
+  echo "*** ingesting the tarball in the root of the repository"
+  cvmfs_server ingest --base_dir / --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  if [ ! -d $repo_dir/tarball_foo ]; then
+    return 1
+  fi
+
+  for d in a a/b a/b/c; do
+    if [ ! -d $repo_dir/tarball_foo/$d ]; then
+      echo "*** Error not found directory: $repo_dir/tarball_foo/$d"
+      return 1
+    else
+      echo "*** Ingested directory: $repo_dir/tarball_foo/$d"
+
+      for f in 1 2 3; do
+        file=$repo_dir/tarball_foo/$d/$f.txt
+        if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+          echo "*** Error not found file: $file"
+          return 1
+        else
+          echo "*** Ingested file of size 2048 bytes: $file"
+        fi
+      done
+
+    fi
+  done
+
+  file=$repo_dir/tarball_foo/d/e/f/foo.txt
+  file_size=$(wc -c <$file)
+  if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
+    echo "*** Error not found file of size 5120: $file"
+    return 1
+  else
+    echo "*** Ingested file of size $file_size bytes: $file"
+  fi
+
+  if [ $file_size -eq 5120 ]; then
+    echo "*** It compare well"
+  fi
+  
+  echo "*** ingesting the tarball in the root of the repository asking to create a catalog"
+  cat $tarfile | cvmfs_server ingest --catalog --base_dir / --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  if [ ! -d $repo_dir/tarball_foo ]; then
+    return 1
+  fi
+
+  for d in a a/b a/b/c; do
+    if [ ! -d $repo_dir/tarball_foo/$d ]; then
+      echo "*** Error not found directory: $repo_dir/tarball_foo/$d"
+      return 1
+    else
+      echo "*** Ingested directory: $repo_dir/tarball_foo/$d"
+
+      for f in 1 2 3; do
+        file=$repo_dir/tarball_foo/$d/$f.txt
+        if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+          echo "*** Error not found file: $file"
+          return 1
+        else
+          echo "*** Ingested file of size 2048 bytes: $file"
+        fi
+      done
+
+    fi
+  done
+
+  file=$repo_dir/tarball_foo/d/e/f/foo.txt
+  file_size=$(wc -c <$file)
+  if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
+    echo "*** Error not found file of size 5120: $file"
+    return 1
+  else
+    echo "*** Ingested file of size $file_size bytes: $file"
+  fi
+
+  if [ $file_size -eq 5120 ]; then
+    echo "*** It compare well"
+  fi
+
+
+  return 0
+}
+

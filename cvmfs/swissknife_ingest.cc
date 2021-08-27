@@ -87,7 +87,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   const bool upload_statsdb = (args.count('I') > 0);
 
-  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
+  perf::StatisticsTemplate publish_statistics("publish", this->statistics());
   StatisticsDatabase *stats_db =
     StatisticsDatabase::OpenStandardDB(params.repo_name);
 
@@ -141,20 +141,22 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
                                      params.base_hash);
     }
   }
-  if (!manifest) {
+  if (!manifest.IsValid()) {
     return 3;
   }
 
   const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
   catalog::WritableCatalogManager catalog_manager(
-      params.base_hash, params.stratum0, params.dir_temp, spooler_catalogs,
+      params.base_hash, params.stratum0, params.dir_temp,
+      spooler_catalogs.weak_ref(),
       download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
       params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
+  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 
   publish::SyncUnion *sync;
 
@@ -206,7 +208,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
-  perf::Counter *revision_counter = statistics()->Register("Publish.revision",
+  perf::Counter *revision_counter = statistics()->Register("publish.revision",
                                                   "Published revision number");
   revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 

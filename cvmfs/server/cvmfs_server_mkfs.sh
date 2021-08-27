@@ -105,10 +105,11 @@ cvmfs_server_mkfs() {
 
   local configure_apache=1
   local voms_authz=""
+  local proxy_url
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:" option; do
+  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:x:" option; do
     case $option in
       X)
         external_data=true
@@ -161,6 +162,9 @@ cvmfs_server_mkfs() {
       V)
         voms_authz=$OPTARG
       ;;
+      x)
+        proxy_url=$OPTARG
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command mkfs: Unrecognized option: $1"
@@ -202,11 +206,7 @@ cvmfs_server_mkfs() {
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
   check_upstream_validity $upstream
-  if [ $unionfs = "overlayfs" ]; then
-    local msg
-    msg="`check_overlayfs_version`" || die "$msg"
-    echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
-  else
+  if [ $unionfs = "aufs" ]; then
     check_aufs                      || die "aufs kernel module missing"
   fi
   check_cvmfs2_client               || die "cvmfs client missing"
@@ -282,7 +282,8 @@ cvmfs_server_mkfs() {
                                          "$compression_alg"     \
                                          "$external_data"       \
                                          "$voms_authz"          \
-                                         "$auto_tag_timespan" || die "fail"
+                                         "$auto_tag_timespan"   \
+                                         "$proxy_url" || die "fail"
   echo "done"
 
   # create or import security keys and certificates

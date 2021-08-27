@@ -1,0 +1,42 @@
+cvmfs_test_name="check that the .cvmfscatalog file is a regular file"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** Create a new repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+  echo "*** Start a transaction"
+  start_transaction $CVMFS_TEST_REPO || return 2
+  echo "*** Create the folder /nested"
+  mkdir /cvmfs/$CVMFS_TEST_REPO/nested || return 3
+  echo "*** Create non-regular .cvmfscatalog file (fifo file)"
+  mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 4
+  echo "*** A non-regular file should not pass"
+  publish_repo $CVMFS_TEST_REPO && return 5
+
+  echo "*** Remove .cvmfscatalog fifo file"
+  rm /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 6
+  echo "*** Create non-regular .cvmfscatalog file (directory)"
+  mkdir /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 7
+  echo "*** A non-regular file should not pass"
+  publish_repo $CVMFS_TEST_REPO && return 8
+
+  echo "*** Remove .cvmfscatalog directory"
+  rmdir /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 9
+  echo "*** Create non-regular .cvmfscatalog file (symbolic link)"
+  ln -s /dev/null /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 10
+  echo "*** A non-regular file should not pass"
+  publish_repo $CVMFS_TEST_REPO && return 11
+  
+  echo "*** Remove .cvmfscatalog symbolic link"
+  rm /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 12
+  echo "*** Creaye a regular .cvmfscatalog file"
+  touch /cvmfs/$CVMFS_TEST_REPO/nested/.cvmfscatalog || return 13
+  echo "*** A regular file should pass"
+  publish_repo $CVMFS_TEST_REPO || return 14
+
+  return 0
+}
+

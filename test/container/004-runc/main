@@ -1,0 +1,36 @@
+cvmfs_test_name="Start image from runc"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_004_MOUNTPOINT=""
+
+cleanup() {
+  echo "running cleanup()"
+
+  if [ ! -z "$CVMFS_TEST_004_MOUNTPOINT" ]; then
+    echo "unmounting $CVMFS_TEST_004_MOUNTPOINT"
+    sudo umount $CVMFS_TEST_004_MOUNTPOINT
+  fi
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../container_common.sh
+
+  cvmfs_mount unpacked.cern.ch || return 1
+  mkdir -p container/rootfs    || return 2
+  cd container                 || return 3
+
+  CVMFS_TEST_004_MOUNTPOINT=$PWD/rootfs
+  # TODO(jblomer): bind mount in user namespace
+  sudo mount --bind \
+    /cvmfs/unpacked.cern.ch/registry.hub.docker.com/library/centos\:centos7 \
+    $CVMFS_TEST_004_MOUNTPOINT || return 10
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  # runc spec --rootless || return 20
+  # TODO(jblomer): mount rootfs with fuse-overlayfs
+
+  return 0
+}

@@ -18,12 +18,15 @@
 #include "swissknife.h"
 #include "swissknife_pull.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "uuid.h"
 
 
 using namespace std;  // NOLINT
 
 const char *kVersion = VERSION;
+const int kDefaultPreloaderTimeout = 10;
+const int kDefaultPreloaderRetries = 2;
 
 namespace swissknife {
 download::DownloadManager *g_download_manager;
@@ -38,20 +41,12 @@ void Usage() {
     "              [-k <public key>]\n"
     "              [-m <fully qualified repository name>]\n"
     "              [-n <num of parallel download threads>]\n"
-    "              [-x <directory for temporary files>]\n\n", kVersion);
+    "              [-t <timeout in seconds (default %d)>]\n"
+    "              [-a <number of retries (default %d)>]\n"
+    "              [-x <directory for temporary files>]\n\n",
+    kVersion, kDefaultPreloaderTimeout, kDefaultPreloaderRetries);
 }
 }  // namespace swissknife
-
-const char gCernPublicKey[] =
-  "-----BEGIN PUBLIC KEY-----\n"
-  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAukBusmYyFW8KJxVMmeCj\n"
-  "N7vcU1mERMpDhPTa5PgFROSViiwbUsbtpP9CvfxB/KU1gggdbtWOTZVTQqA3b+p8\n"
-  "g5Vve3/rdnN5ZEquxeEfIG6iEZta9Zei5mZMeuK+DPdyjtvN1wP0982ppbZzKRBu\n"
-  "BbzR4YdrwwWXXNZH65zZuUISDJB4my4XRoVclrN5aGVz4PjmIZFlOJ+ytKsMlegW\n"
-  "SNDwZO9z/YtBFil/Ca8FJhRPFMKdvxK+ezgq+OQWAerVNX7fArMC+4Ya5pF3ASr6\n"
-  "3mlvIsBpejCUBygV4N2pxIcPJu/ZDaikmVvdPTNOTZlIFMf4zIP/YHegQSJmOyVp\n"
-  "HQIDAQAB\n"
-  "-----END PUBLIC KEY-----\n";
 
 const char gCernIt1PublicKey[] =
   "-----BEGIN PUBLIC KEY-----\n"
@@ -120,7 +115,7 @@ int main(int argc, char *argv[]) {
   swissknife::ArgumentList args;
   args['n'].Reset(new string("4"));
 
-  string option_string = "u:r:k:m:x:d:n:vh";
+  string option_string = "u:r:k:m:x:d:n:t:a:vh";
   int c;
   while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
     if ((c == 'v') || (c == 'h')) {
@@ -156,8 +151,10 @@ int main(int argc, char *argv[]) {
   const string dirtab_in_cache = cache_directory + "/dirtab." + fqrn;
 
   // Default network parameters: 5 seconds timeout, 2 retries
-  args['t'].Reset(new string("5"));
-  args['a'].Reset(new string("2"));
+  if (args.find('t') == args.end())
+    args['t'].Reset(new string(StringifyInt(kDefaultPreloaderTimeout)));
+  if (args.find('a') == args.end())
+    args['a'].Reset(new string(StringifyInt(kDefaultPreloaderRetries)));
 
   // first create the alien cache
   const string& alien_cache_dir = *(args['r']);
@@ -176,15 +173,12 @@ int main(int argc, char *argv[]) {
   // if there is no specified public key file we dump the cern.ch public key in
   // the temporary directory
   string cern_pk_base_path = *args['x'];
-  string cern_pk_path      = cern_pk_base_path + "/cern.ch.pub";
   string cern_pk_it1_path  = cern_pk_base_path + "/cern-it1.cern.ch.pub";
   string cern_pk_it4_path  = cern_pk_base_path + "/cern-it4.cern.ch.pub";
   string cern_pk_it5_path  = cern_pk_base_path + "/cern-it5.cern.ch.pub";
   bool keys_created = false;
   if (args.find('k') == args.end()) {
     keys_created = true;
-    assert(CopyMem2Path(reinterpret_cast<const unsigned char*>(gCernPublicKey),
-      sizeof(gCernPublicKey), cern_pk_path));
     assert(CopyMem2Path(
       reinterpret_cast<const unsigned char*>(gCernIt1PublicKey),
       sizeof(gCernIt1PublicKey), cern_pk_it1_path));
@@ -195,8 +189,7 @@ int main(int argc, char *argv[]) {
       reinterpret_cast<const unsigned char*>(gCernIt5PublicKey),
       sizeof(gCernIt5PublicKey), cern_pk_it5_path));
     char path_separator = ':';
-    args['k'].Reset(new string(cern_pk_path     + path_separator +
-                           cern_pk_it1_path + path_separator +
+    args['k'].Reset(new string(cern_pk_it1_path + path_separator +
                            cern_pk_it4_path + path_separator +
                            cern_pk_it5_path));
   }
@@ -228,7 +221,6 @@ int main(int argc, char *argv[]) {
   delete uuid;
 
   if (keys_created) {
-    unlink(cern_pk_path.c_str());
     unlink(cern_pk_it1_path.c_str());
     unlink(cern_pk_it4_path.c_str());
     unlink(cern_pk_it5_path.c_str());

@@ -14,12 +14,14 @@
 #include "json_document_write.h"
 #include "swissknife_lease_curl.h"
 #include "util/exception.h"
+#include "util/pointer.h"
 #include "util/string.h"
 
 namespace {
 // Maximum number of jobs during a session. No limit, for practical
-// purposes.
-const uint64_t kMaxNumJobs = std::numeric_limits<uint64_t>::max();
+// purposes. Note that we use uint32_t so that the FifoChannel code works
+// correctly with this limit on 32bit systems.
+const uint32_t kMaxNumJobs = std::numeric_limits<uint32_t>::max();
 }
 
 namespace upload {
@@ -77,14 +79,14 @@ SessionContextBase::SessionContextBase()
       session_token_(),
       key_id_(),
       secret_(),
-      queue_was_flushed_(1, 1),
       max_pack_size_(ObjectPack::kDefaultLimit),
       active_handles_(),
       current_pack_(NULL),
       current_pack_mtx_(),
       objects_dispatched_(0),
       bytes_committed_(0),
-      bytes_dispatched_(0) {}
+      bytes_dispatched_(0),
+      initialized_(false) {}
 
 SessionContextBase::~SessionContextBase() {}
 
@@ -121,9 +123,6 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   // Ensure that the upload job and result queues are empty
   upload_results_.Drop();
 
-  queue_was_flushed_.Drop();
-  queue_was_flushed_.Enqueue(true);
-
   // Ensure that there are not open object packs
   if (current_pack_) {
     LogCvmfs(
@@ -134,6 +133,8 @@ bool SessionContextBase::Initialize(const std::string& api_url,
 
   ret = InitializeDerived(max_queue_size) && ret;
 
+  initialized_ = true;
+
   return ret;
 }
 
@@ -141,6 +142,11 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
                                   const std::string& new_root_hash,
                                   const RepositoryTag& tag) {
   assert(active_handles_.empty());
+  if (!initialized_) {
+    assert(!commit);
+    return true;
+  }
+
   {
     MutexLockGuard lock(current_pack_mtx_);
 
@@ -167,6 +173,9 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
     if (!commit_result) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "SessionContext: could not commit session. Aborting.");
+      FinalizeDerived();
+      pthread_mutex_destroy(&current_pack_mtx_);
+      initialized_ = false;
       return false;
     }
   }
@@ -174,13 +183,10 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
   results &= FinalizeDerived() && (bytes_committed_ == bytes_dispatched_);
 
   pthread_mutex_destroy(&current_pack_mtx_);
-  return results;
-}
 
-void SessionContextBase::WaitForUpload() {
-  if (!upload_results_.IsEmpty()) {
-    queue_was_flushed_.Dequeue();
-  }
+  initialized_ = false;
+
+  return results;
 }
 
 ObjectPack::BucketHandle SessionContextBase::NewBucket() {
@@ -262,13 +268,12 @@ void SessionContextBase::Dispatch() {
 SessionContext::SessionContext()
     : SessionContextBase(),
       upload_jobs_(),
-      worker_terminate_(),
-      worker_() {}
+      worker_()
+{
+}
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
-  atomic_init32(&worker_terminate_);
-
   upload_jobs_ = new FifoChannel<UploadJob*>(max_queue_size, max_queue_size);
   upload_jobs_->Drop();
 
@@ -279,8 +284,15 @@ bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
 }
 
 bool SessionContext::FinalizeDerived() {
-  atomic_write32(&worker_terminate_, 1);
-
+  // Note: in FinalizedDerived, we know that the worker is running.  The
+  // SessionContext is called only from GatewayUploader::FinalizeSession(),
+  // which in turn is from Spooler::FinalizeSession().  The Spooler ensures
+  // that GatewayUploader::Initialize() is called on construction.
+  //
+  // TODO(jblomer): Refactor SessionContext (and Uploader*) classes to
+  // use a factory method for construction.
+  //
+  upload_jobs_->Enqueue(&terminator_);
   pthread_join(worker_, NULL);
 
   return true;
@@ -290,11 +302,11 @@ bool SessionContext::Commit(const std::string& old_root_hash,
                             const std::string& new_root_hash,
                             const RepositoryTag& tag) {
   JsonStringGenerator request_input;
-  request_input.AddQuoted("old_root_hash", old_root_hash);
-  request_input.AddQuoted("new_root_hash", new_root_hash);
-  request_input.AddQuoted("tag_name", tag.name_);
-  request_input.AddQuoted("tag_channel", tag.channel_);
-  request_input.AddQuoted("tag_description", tag.description_);
+  request_input.Add("old_root_hash", old_root_hash);
+  request_input.Add("new_root_hash", new_root_hash);
+  request_input.Add("tag_name", tag.name_);
+  request_input.Add("tag_channel", tag.channel_);
+  request_input.Add("tag_description", tag.description_);
   std::string request = request_input.GenerateString();
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
@@ -371,7 +383,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
              ret);
   }
 
-  JsonDocument *reply_json = JsonDocument::Create(reply);
+  UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply));
   const JSON *reply_status =
     JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
   const bool ok = (reply_status != NULL &&
@@ -390,30 +402,22 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
 void* SessionContext::UploadLoop(void* data) {
   SessionContext* ctx = reinterpret_cast<SessionContext*>(data);
+  UploadJob *job;
 
-  int64_t jobs_processed = 0;
-  while (!ctx->ShouldTerminate()) {
-    while (jobs_processed < ctx->NumJobsSubmitted()) {
-      UploadJob* job = ctx->upload_jobs_->Dequeue();
-      if (!ctx->DoUpload(job)) {
-        PANIC(kLogStderr,
-              "SessionContext: could not submit payload. Aborting.");
-      }
-      job->result->Set(true);
-      delete job->pack;
-      delete job;
-      jobs_processed++;
+  while (true) {
+    job = ctx->upload_jobs_->Dequeue();
+    if (job == &terminator_)
+      return NULL;
+    if (!ctx->DoUpload(job)) {
+      PANIC(kLogStderr,
+            "SessionContext: could not submit payload. Aborting.");
     }
-    if (ctx->queue_was_flushed_.IsEmpty()) {
-      ctx->queue_was_flushed_.Enqueue(true);
-    }
+    job->result->Set(true);
+    delete job->pack;
+    delete job;
   }
-
-  return NULL;
 }
 
-bool SessionContext::ShouldTerminate() {
-  return atomic_read32(&worker_terminate_);
-}
+SessionContext::UploadJob SessionContext::terminator_;
 
 }  // namespace upload

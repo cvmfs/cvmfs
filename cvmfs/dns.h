@@ -336,7 +336,7 @@ class HostfileResolver : public Resolver {
   static HostfileResolver *Create(const std::string &path, bool ipv4_only);
   virtual ~HostfileResolver();
 
-  virtual bool SetResolvers(const std::vector<std::string> &resolvers) {
+  virtual bool SetResolvers(const std::vector<std::string> & /* resolvers */) {
     return true;
   }
   virtual bool SetSearchDomains(const std::vector<std::string> &domains);

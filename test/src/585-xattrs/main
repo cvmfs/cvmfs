@@ -10,7 +10,6 @@ verify_xattrs() {
   # local attr2=$(attr -qg x /cvmfs/$CVMFS_TEST_REPO/link)
   local attr3=$(attr -qg foo2 /cvmfs/$CVMFS_TEST_REPO/dir/xattr)
   local attr4=$(attr -qg baz /cvmfs/$CVMFS_TEST_REPO/dir)
-  local cap=$(getcap /cvmfs/$CVMFS_TEST_REPO/dir/capabilities)
   if [ "x$attr1" != "xbar" ]; then
     return 20
   fi
@@ -23,9 +22,7 @@ verify_xattrs() {
   if [ "x$attr4" != "xBAZ" ]; then
     return 23
   fi
-  if [ "x$cap" != "x/cvmfs/$CVMFS_TEST_REPO/dir/capabilities = cap_chown+ep" ]; then
-    return 24
-  fi
+  setcap -q -v "cap_chown=ep" /cvmfs/$CVMFS_TEST_REPO/dir/capabilities || return 24
 
   return 0
 }

@@ -36,7 +36,7 @@
 #include <string>
 #include <vector>
 
-#ifndef CVMFS_LIBCVMFS
+#if defined(CVMFS_FUSE_MODULE)
 #include "cvmfs.h"
 #endif
 #include "logging.h"
@@ -47,7 +47,7 @@
 #include "util/string.h"
 
 // Used for address offset calculation
-#ifndef CVMFS_LIBCVMFS
+#if defined(CVMFS_FUSE_MODULE)
 extern loader::CvmfsExports *g_cvmfs_exports;
 #endif
 
@@ -67,7 +67,7 @@ Watchdog *Watchdog::Create(const string &crash_dump_path) {
  * Uses an external shell and gdb to create a full stack trace of the dying
  * process. The same shell is used to force-quit the client afterwards.
  */
-string Watchdog::GenerateStackTrace(const string &exe_path, pid_t pid) {
+string Watchdog::GenerateStackTrace(pid_t pid) {
   int retval;
   string result = "";
 
@@ -82,13 +82,7 @@ string Watchdog::GenerateStackTrace(const string &exe_path, pid_t pid) {
   int fd_stdout;
   int fd_stderr;
   vector<string> argv;
-#ifndef __APPLE__
-  argv.push_back("-q");
-  argv.push_back("-n");
-  argv.push_back(exe_path);
-#else
   argv.push_back("-p");
-#endif
   argv.push_back(StringifyInt(pid));
   pid_t gdb_pid = 0;
   const bool double_fork = false;
@@ -131,6 +125,15 @@ string Watchdog::GenerateStackTrace(const string &exe_path, pid_t pid) {
 #endif
   result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
 
+  // Check for output on stderr
+  string result_err;
+  Block2Nonblock(fd_stderr);
+  char cbuf;
+  while (read(fd_stderr, &cbuf, 1) == 1)
+    result_err.push_back(cbuf);
+  if (!result_err.empty())
+    result += "\nError output:\n" + result_err + "\n";
+
   // Close the connection to the terminated gdb process
   close(fd_stderr);
   close(fd_stdout);
@@ -164,7 +167,6 @@ pid_t Watchdog::GetPid() {
   return getpid();
 }
 
-
 /**
  * Log a string to syslog and into the crash dump file.
  * We expect ideally nothing to be logged, so that file is created on demand.
@@ -177,9 +179,12 @@ void Watchdog::LogEmergency(string msg) {
     if (fp) {
       time_t now = time(NULL);
       msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
-      if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length())
-        msg += " (failed to report into crash dump file "
-               + crash_dump_path_ + ")";
+      if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length()) {
+        msg +=
+            " (failed to report into crash dump file " + crash_dump_path_ + ")";
+      } else {
+        msg += "\n Crash logged also on file: " + crash_dump_path_ + "\n";
+      }
       fclose(fp);
     } else {
       msg += " (failed to open crash dump file " + crash_dump_path_ + ")";
@@ -187,7 +192,6 @@ void Watchdog::LogEmergency(string msg) {
   }
   LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
 }
-
 
 /**
  * Reads from the file descriptor until the specific gdb prompt is reached or
@@ -256,7 +260,7 @@ string Watchdog::ReportStacktrace() {
   debug += ", PID: "     + StringifyInt(crash_data.pid) + "\n";
   debug += "Executable path: " + exe_path_ + "\n";
 
-  debug += GenerateStackTrace(exe_path_, crash_data.pid);
+  debug += GenerateStackTrace(crash_data.pid);
 
   // Give the dying process the finishing stroke
   if (kill(crash_data.pid, SIGKILL) != 0) {
@@ -315,7 +319,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
     if (++counter == 300) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
       // Last attempt to log something useful
-#ifndef CVMFS_LIBCVMFS
+#if defined(CVMFS_FUSE_MODULE)
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
                sig, send_errno);
       void *addr[kMaxBacktrace];

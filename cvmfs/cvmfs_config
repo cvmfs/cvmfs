@@ -58,7 +58,7 @@ case $sys_arch in
 
   Darwin )
     fuser="/usr/bin/fuser"
-    fuse_fs_type="osxfuse"
+    fuse_fs_type="macfuse"
     ;;
 
   * )
@@ -82,7 +82,8 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_IPFAMILY_PREFER CVMFS_DNS_RETRIES CVMFS_DNS_TIMEOUT \
           CVMFS_AUTHZ_HELPER CVMFS_AUTHZ_SEARCH_PATH CVMFS_WORKSPACE \
           CVMFS_EXTERNAL_SERVER_URL CVMFS_EXTERNAL_TIMEOUT CVMFS_EXTERNAL_TIMEOUT_DIRECT \
-          CVMFS_EXTERNAL_HTTP_PROXY CVMFS_EXTERNAL_FALLBACK_PROXY CVMFS_CACHE_PRIMARY"
+          CVMFS_EXTERNAL_HTTP_PROXY CVMFS_EXTERNAL_FALLBACK_PROXY CVMFS_CACHE_PRIMARY \
+          CVMFS_CLIENT_PROFILE CVMFS_USE_CDN"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI CVMFS_CLAIM_OWNERSHIP \
@@ -129,27 +130,65 @@ compare_versions() {
 }
 
 cvmfs_config_usage() {
- echo "Common configuration tasks for CernVM-FS"
- echo "Usage: $0 <command>"
- echo "Commands are"
- echo "  setup [nouser] [nocfgmod] [nostart]"
- echo "  chksetup"
- echo "  showconfig [-s(hort output, only non-empty parameters)] [<repository>]"
- echo "  stat [-v | <repository>]"
- echo "  status"
- echo "  probe [<repository list>]"
- echo "  fsck [<cvmfs_fsck options>]"
- echo "  reload [-c | <repository>]"
- echo "  umount"
- echo "  wipecache"
- echo "  killall"
- echo "  bugreport"
+  echo "Common configuration tasks for CernVM-FS"
+  echo "Usage: $0 <command>"
+  echo "Commands are"
+  echo "  setup [nouser] [nocfgmod] [nostart]"
+  if is_wsl2; then
+    echo "  wsl2_start"
+  fi
+  echo "  chksetup"
+  echo "  showconfig [-s(hort output, only non-empty parameters)] [<repository>]"
+  echo "  stat [-v | <repository>]"
+  echo "  status"
+  echo "  probe [<repository list>]"
+  echo "  fsck [<cvmfs_fsck options>]"
+  echo "  fuser <repository>"
+  echo "  reload [-c | <repository>]"
+  echo "  umount"
+  echo "  wipecache"
+  echo "  killall"
+  echo "  bugreport"
 }
 
 has_selinux() {
   which getenforce > /dev/null 2>&1 && \
   which semodule   > /dev/null 2>&1 && \
   getenforce | grep -qi "enforc" || return 1
+}
+
+is_wsl2() {
+  # Another possibility is looking for the /run/WSL directory
+  grep -q microsoft-standard /proc/version 2>/dev/null
+}
+
+cvmfs_wsl2_start() {
+  is_wsl2 || die "WSL2 not detected, exiting"
+  [ $(id -u) -eq 0 ] || die "root privileges required"
+  if $pidof automount >/dev/null; then
+    echo "[WSL2] automounter already running"
+    exit 0
+  fi
+
+  local automounter="/usr/sbin/automount"
+  local automount_config=
+  if [ -f /etc/sysconfig/autofs ]; then
+    automount_config=/etc/sysconfig/autofs
+  elif [ -f /etc/default/autofs ]; then
+    automount_config=/etc/default/autofs
+  fi
+
+  local automounter=/usr/sbin/automount
+  echo "[WSL2] starting automounter"
+  $(
+    if [ -n $automount_config ]; then
+      . $automount_config
+    fi
+    $automounter $OPTIONS --pid-file /var/run/autofs.pid
+  )
+
+  # return value: process found
+  $pidof automount >/dev/null
 }
 
 cvmfs_setup() {
@@ -399,7 +438,7 @@ cvmfs_chksetup() {
     fi
 
     # Check autofs' kill mode when systemd managed
-    if [ -e /usr/bin/systemctl ]; then
+    if [ -e /usr/bin/systemctl -a ! is_wsl2 ]; then
       if ! /usr/bin/systemctl show -p KillMode autofs.service | grep -q process;
       then
         echo "Warning: autofs kill mode is not 'process', busy CernVM-FS mount points are likely to be forcefully killed when autofs is restarted"
@@ -423,8 +462,8 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/osxfuse.fs ]; then
-    echo "Error: OSXFUSE is missing."
+  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/macfuse.fs ]; then
+    echo "Error: macFUSE is missing."
     num_errors=$(($num_errors+1))
   fi
   check_dev_fuse
@@ -933,7 +972,7 @@ cvmfs_stat() {
   get_attr nopen; nopen=$attr_value
   get_attr ndiropen; ndiropen=$attr_value
   get_attr ndownload; ndownload=$attr_value
-  hitrate=`echo "$nopen $ndownload" | awk '{if ($1 == 0) print "n/a"; else print 100.0-($2*100.0/$1)}'` || exit 35
+  get_attr hitrate; hitrate=$attr_value
   get_attr rx; rx=$attr_value
   get_attr speed; speed=$attr_value
 
@@ -975,10 +1014,23 @@ cvmfs_status() {
   mounted_repos=`list_mounts | awk '{print $3}'`
   for mountpoint in $mounted_repos
   do
+    local fqrn=
+    local pid=
     cd $mountpoint
+    if [ $? -ne 0 ]; then
+      echo "mountpoint $mountpoint inaccessible"
+      RETVAL=1
+      continue
+    fi
     get_attr fqrn; fqrn=$attr_value
     get_attr pid; pid=$attr_value
-    echo "$fqrn mounted on $mountpoint with pid $pid"
+    echo -n "$fqrn mounted on $mountpoint with pid $pid"
+    if [ -z "$fqrn" -o -z "$pid" ]; then
+      echo " - mountpoint unhealthy!"
+      RETVAL=1
+    else
+      echo
+    fi
   done
 
   return $RETVAL
@@ -1089,7 +1141,7 @@ cvmfs_reload() {
   local m
   for m in $mount_list
   do
-    if [ x"$m" = x"${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" ]; then
+    if [ x"$m" = x"$(canonicalize_path ${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY})" ]; then
       # We need to finish pausing the other repositories first because they
       # might try to load the blacklist from the config repository as part of
       # their reload
@@ -1104,15 +1156,14 @@ cvmfs_reload() {
     for guard_file in $(cat "${CVMFS_RELOAD_SOCKETS}/guard_files"); do
       _cvmfs_reload_waitfor "$guard_file"
     done
-
-    if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
-      # If we have a config repository, now is the time to pause it at the very end
-      _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
-        _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
-    fi
-
-    rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
   fi
+
+  if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
+    # If we have a config repository, now is the time to pause it at the very end
+    _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
+      _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
+  fi
+  rm -f "${CVMFS_RELOAD_SOCKETS}/guard_files"
 
   if [ $clean_cache -eq 1 ]; then
     for dir in $cache_directories; do
@@ -1209,6 +1260,27 @@ cvmfs_config_fsck() {
   return $retval
 }
 
+
+cvmfs_config_fuser() {
+  if [ "$sys_arch" = "Darwin" ]; then
+    echo "The fuser command is unsupported on macOS"
+    return 1
+  fi
+
+  local retval=0
+  [ $# -eq 1 ] || die "one repository name required"
+  local fqrn="$1"
+
+  local deviceid
+  deviceid="$(cvmfs_talk -i $fqrn device id)"
+  local retval=$?
+  if [ $retval != 0 ]; then
+    return $retval
+  fi
+  [ -n "$deviceid" ] || die "Could not obtain device id for $fqrn"
+
+  lsof | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
+}
 
 cvmfs_umount() {
   local silent=$1
@@ -1350,7 +1422,6 @@ cvmfs_bugreport() {
                  'ls -lR /var/run/cvmfs' 'grep cvmfs /var/log/messages' 'grep cvmfs /var/log/syslog' \
                  'journalctl -alm /usr/bin/cvmfs2' \
                  'journalctl -alm /usr/libexec/cvmfs/cache/cvmfs_cache_ram' \
-                 'journalctl -alm /usr/libexec/cvmfs/cache/cvmfs_cache_posix' \
                  "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
                  'cvmfs_config probe' 'mount' 'df -h' 'ps -ef' \
                  'cvmfs_config status' 'cvmfs_config showconfig' \
@@ -1656,7 +1727,7 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      charDevice=/dev/osxfuse0 ;;
+      charDevice=/dev/macfuse0 ;;
 
     * )
      echo "Architecture $sys_arch is not supported"
@@ -1671,7 +1742,7 @@ check_dev_fuse() {
       return_code=$(($return_code+1))
     elif [ x"$sys_arch" = x"Darwin" ]; then
       echo -n "Warning: character device $charDevice does not exist. "
-      echo "Please make sure that OSXFUSE is installed."
+      echo "Please make sure that macFUSE is installed."
     fi
   else
     if ! runascvmfsuser "test -r $charDevice"; then
@@ -1712,6 +1783,12 @@ activate_service() {
 
   case $sys_arch in
     Linux )
+      if is_wsl2; then
+        echo "[WSL2] skipping activation of $1"
+	echo "[WSL2] start CernVM-FS with 'sudo cvmfs_config wsl2_start'"
+        exit 0
+      fi
+
       if [ -e /usr/bin/systemctl ]; then
         /usr/bin/systemctl start -q ${svc}.service
         /usr/bin/systemctl enable -q ${svc}.service
@@ -1753,6 +1830,14 @@ reload_service() {
 
   case $sys_arch in
     Linux )
+      if is_wsl2; then
+        [ "$svc" == "autofs" ] || die "[WSL2] internal error, expected autofs service ('$svc')"
+	echo -n "WSL2 automounter "
+	local autofs_pid=$(cat /var/run/autofs.pid)
+	/usr/bin/kill -HUP $autofs_pid
+	return 0
+      fi
+
       if [ -e /usr/bin/systemctl ]; then
         /usr/bin/systemctl reload -q ${svc}.service
       elif [ -e /sbin/service -o -e /usr/sbin/service ]; then
@@ -1799,7 +1884,7 @@ configure_autofs() {
         fi
       done
       # Fix 'systemctl restart autofs' on CentOS 7 (CVM-1200)
-      if [ -e /usr/bin/systemctl ]; then
+      if [ -e /usr/bin/systemctl -a ! is_wsl2 ]; then
         if /usr/bin/systemctl show -p KillMode autofs.service | \
            grep -q control-group;
         then
@@ -1957,6 +2042,19 @@ base64_nowrap() {
       ;;
     Darwin )
       base64 -b0
+      ;;
+  esac
+}
+
+canonicalize_path() {
+  local path_name="$1"
+
+  case $(uname) in
+    Linux )
+      echo $(readlink -f "$path_name")
+      ;;
+    Darwin )
+      echo $(/usr/local/bin/greadlink -f "$path_name")
       ;;
   esac
 }
@@ -2138,6 +2236,16 @@ case "$1" in
     RETVAL=$?
     ;;
 
+  fuser)
+    if [ `id -u` -ne 0 ]; then
+      echo "root privileges required"
+      exit 1
+    fi
+    shift 1
+    cvmfs_config_fuser $@
+    RETVAL=$?
+    ;;
+
   umount)
     if [ `id -u` -ne 0 ]; then
       echo "root privileges required"
@@ -2174,6 +2282,12 @@ case "$1" in
      fi
      shift 1
      cvmfs_bugreport $@
+     RETVAL=$?
+     ;;
+
+   wsl2_start)
+     shift 1
+     cvmfs_wsl2_start $@
      RETVAL=$?
      ;;
 

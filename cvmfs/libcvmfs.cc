@@ -567,6 +567,12 @@ char *cvmfs_statistics_format(cvmfs_context *ctx) {
 
 
 int cvmfs_remount(LibContext *ctx) {
-  // not implemented
-  return -1;
+  assert(ctx != NULL);
+  return ctx->Remount();
+}
+
+
+uint64_t cvmfs_get_revision(LibContext *ctx) {
+  assert(ctx != NULL);
+  return ctx->GetRevision();
 }

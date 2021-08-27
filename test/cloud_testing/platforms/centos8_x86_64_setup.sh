@@ -28,12 +28,13 @@ install_rpm $SERVER_PACKAGE
 install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 install_rpm $SHRINKWRAP_PACKAGE
+install_rpm $GATEWAY_PACKAGE
 install_rpm $DUCC_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."
-install_from_repo mod_wsgi   || die "fail (installing mod_wsgi)"
-sudo systemctl restart httpd || die "fail (restarting apache)"
+install_from_repo python3-mod_wsgi || die "fail (installing mod_wsgi)"
+sudo systemctl restart httpd       || die "fail (restarting apache)"
 
 echo "installing mod_ssl for Apache"
 install_from_repo mod_ssl || die "fail (installing mod_ssl)"
@@ -56,6 +57,7 @@ install_from_repo wget
 install_from_repo java-1.8.0-openjdk
 install_from_repo redhat-lsb-core
 install_from_repo tree
+install_from_repo fuse-overlayfs
 
 # traffic shaping
 # install_from_repo trickle
@@ -65,6 +67,7 @@ install_from_repo tree
 # Install test dependency for 647
 install_from_repo python2-pip
 sudo pip2 install flask                      || die "fail (installing python-flask)"
+install_from_repo python3-flask
 
 # Install the test S3 provider
 install_test_s3
@@ -100,11 +103,8 @@ echo "done"
 
 disable_systemd_rate_limit
 
+# Allow for proxying pass-through repositories
+sudo setsebool -P httpd_can_network_connect on
+
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"
-
-# Install repository gateway
-echo "Installing repository gateway"
-# TODO: change to cc8 once we start building gateway for cc8
-package_map=pkgmap.cc7_x86_64
-install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"

@@ -1,0 +1,104 @@
+cvmfs_test_name="provide cvmfs to k8s pods"
+cvmfs_test_suites="quick"
+
+# Taking https://github.com/sfiligoi/prp-osg-cvmfs as a blueprint
+
+cleanup() {
+  echo "running cleanup()"
+
+  k8s_destroy
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../container_common.sh
+
+  echo "*** start k8s cluster"
+  k8s_create v1.18.0 || return 10
+  trap cleanup EXIT HUP INT TERM || return $?
+  k8s_kubectl get po -A || return 11
+
+  echo "*** add cvmfs service container image"
+  # Planted by the platform setup script
+  local service_container=/tmp/cvmfs-service-container/docker.tar.gz
+  cat $service_container | docker load || return 15
+  docker images                        || return 16
+  local image_id=$(docker images -q cvmfs/service)
+  echo "*** Image ID: $image_id"
+  local image_name=$(docker inspect $image_id | jq -r .[0].RepoTags[0])
+  echo "*** Image name: $image_name"
+
+  echo "*** deploy cvmfs k8s area"
+  k8s_kubectl apply -f ${script_location}/deploy/namespace-cvmfs.yaml || return 20
+  k8s_kubectl apply -f ${script_location}/deploy/account-cvmfs.yaml   || return 21
+
+  echo "*** deploy cvmfs 'workspace' persistent volume"
+  k8s_kubectl apply -f ${script_location}/deploy/pv-cvmfs-noderoot.yaml || return 22
+
+  k8s_kubectl get storageclass
+  k8s_kubectl get persistentvolume
+  k8s_kubectl get -A persistentvolumeclaim
+
+  echo "*** deploy nodeplugin daemonset (cvmfs service container)"
+  cat ${script_location}/deploy/daemonset-cvmfs-nodeplugin.yaml.in |\
+    sed -e s,@IMAGE@,$image_name, |
+    sed -e "s~@PROXY@~${CVMFS_TEST_PROXY}~" >\
+    daemonset-cvmfs-nodeplugin.yaml || return 30
+  cat daemonset-cvmfs-nodeplugin.yaml
+  k8s_kubectl apply -f daemonset-cvmfs-nodeplugin.yaml || return 31
+
+  echo "*** waiting for daemonset to become available..."
+  local retries=30
+  local nready=0
+  while [ $retries -ge 0 ]; do
+    sleep 3
+    nready=$(k8s_kubectl get --namespace cvmfs daemonset cvmfs-nodeplugin -o jsonpath="{.status.numberReady}")
+    if [ $nready -eq 1 ]; then
+      break
+    fi
+    retries=$((retries-1))
+    echo "   ... still waiting"
+  done
+  echo "*** retries: $retries"
+
+  k8s_kubectl describe --namespace cvmfs daemonset cvmfs-nodeplugin  || return 31
+  k8s_kubectl get pods --namespace cvmfs || return 32
+  local cvmfs_pods=$(k8s_kubectl get pods --namespace cvmfs --output=jsonpath='{.items[*].metadata.name}')
+  k8s_kubectl logs --namespace cvmfs $cvmfs_pods
+
+  echo "*** provide individual cvmfs repositories as volumes"
+  k8s_kubectl apply -f ${script_location}/deploy/pv-cvmfs-alice.yaml || return 40
+  k8s_kubectl get persistentvolumeclaim
+
+  echo "*** run demo job that accesses /cvmfs"
+  k8s_kubectl apply -f ${script_location}/deploy/job-test.yaml   || return 80
+
+  # wait for completion as background process - capture PID
+  k8s_kubectl wait --for=condition=complete job/list-cvmfs &
+  local completion_pid=$!
+  # wait for failure as background process - capture PID
+  k8s_kubectl wait --for=condition=failed job/list-cvmfs && exit 1 &
+  local failure_pid=$!
+  # capture exit code of the first subprocess to exit
+  wait -n $completion_pid $failure_pid
+  local job_status=$?
+  kill $completion_pid
+  kill $failure_pid
+
+  local job_pods=$(k8s_kubectl get pods --selector=job-name=list-cvmfs --output=jsonpath='{.items[*].metadata.name}')
+  echo "*** pods: $job_pods"
+  k8s_kubectl logs $job_pods
+
+  if [ $job_status -ne 0 ]; then
+    echo "Listing cvmfs failed"
+    return 80
+  fi
+
+  echo "*** Adding a new node"
+  # TODO
+  # minikube node add
+
+  return 0
+}

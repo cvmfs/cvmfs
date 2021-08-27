@@ -3,93 +3,73 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 
-clean_up() {
-    echo "Cleaning up"
-
-    echo "  Removing output directories"
-    rm -rvf /tmp/cvmfs_out_*
-}
-
-check_status() {
-    echo $(( $1 || 0 ))
-}
-
-
 produce_tarball() {
   local tarball_name=$1
 
-  mkdir tarball_foo
-  mkdir -p tarball_foo/a/b/c
-  mkdir -p tarball_foo/d/e/f
+  mkdir tarball_foo || return 1
+  mkdir -p tarball_foo/a/b/c || return 1
+  mkdir -p tarball_foo/d/e/f || return 1
 
-  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/1.txt
-  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/2.txt
-  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/3.txt
-  touch tarball_foo/a/.cvmfscatalog
-  touch tarball_foo/empty_file.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/1.txt || return 2
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/2.txt || return 2
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/3.txt || return 2
+  touch tarball_foo/a/.cvmfscatalog || return 3
+  touch tarball_foo/empty_file.txt || return 3
 
   echo "*** Generating a tarball in $tarball_name"
-  tar -cvf $tarball_name tarball_foo/
+  tar -cvf $tarball_name tarball_foo/ || return 4
 
-  rm -rf tarball_foo
+  rm -rf tarball_foo || return 5
+
+  return 0
 }
 
 
-run_transactions() {
-    set_up_repository_gateway
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
 
     local scratch_dir=$(pwd)
     local tarfile=$scratch_dir/tarball.tar
     local dir=tar_dir
 
-    produce_tarball $tarfile
+    produce_tarball $tarfile || return 10
 
     echo "Test happy path of ingestion"
-    cvmfs_server ingest --tar_file $tarfile --base_dir foo test.repo.org
-    res=$?
-    if [ $res -ne 0 ]; then
-        echo "*** Error during ingestion"
-        return 1
-    fi
+    cvmfs_server ingest --tar_file $tarfile --base_dir foo test.repo.org || return 20
 
     echo "Testing if possible to open a transaction after an ingestion"
     cvmfs_server transaction test.repo.org ||
         {
             echo "*** Error, not possible to open a transaction after the ingestion"
-            return 2
+            return 30
         }
-    cvmfs_server abort -f test.repo.org
+    cvmfs_server abort -f test.repo.org || return 31
 
 
     echo "Ingest not possible during a transaction"
-    cvmfs_server transaction test.repo.org
-    cvmfs_server ingest --tar_file $tarfile --base_dir foo test.repo.org
-    res=$?
-    if [ $res -eq 0 ]; then
-        echo "*** Error, Ingestion succeed during a transaction"
-        return 3
-    fi
-    cvmfs_server abort -f test.repo.org
+    cvmfs_server transaction test.repo.org || return 40
+    cvmfs_server ingest --tar_file $tarfile --base_dir foo test.repo.org && return 41
+    cvmfs_server abort -f test.repo.org || return 42
 
     local result_dir="/cvmfs/test.repo.org/foo/tarball_foo"
     for n in 1 2 3; do
         file=$result_dir/a/$n.txt
         if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
             echo "*** Error not found file of the right size: $file"
-            return 4
+            return 50
         fi
     done
 
     file=$result_dir/empty_file.txt
     if [ ! -f $file ] || [ $(wc -c <$file) -ne 0 ]; then
         echo "*** Error not found empty file of size 0: $file"
-        return 5
+        return 60
     fi
 
     cvmfs_server list-catalogs -x test.repo.org | grep "foo/tarball_foo/a" ||
         {
             echo "*** Error, catalog not found in foo/tarball_foo/a";
-            return 6;
+            return 70
         }
 
     echo "Ingesting deletion of folders"
@@ -97,20 +77,11 @@ run_transactions() {
 
     if [ -d "/cvmfs/test.repo.org/foo" ]; then
         echo "*** Error, delete directory is still present: "
-        return 7
+        return 80
     fi
 
-    check_repo_integrity test.repo.org || return 8
+    cvmfs_server check -i test.repo.org || return 90
+    check_repo_integrity test.repo.org || return 91
 
-    clean_up
+    return 0
 }
-
-cvmfs_run_test() {
-    trap clean_up EXIT HUP INT TERM || return $?
-
-    run_transactions
-    local status=$?
-
-    return $(check_status $status)
-}
-

@@ -22,6 +22,7 @@ bool Pin(const std::string &path);
 void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode);
 std::string PrintInodeGeneration();
 void UnregisterQuotaListener();
+bool SendFuseFd(const std::string &socket_path);
 
 }  // namespace cvmfs
 

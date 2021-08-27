@@ -5,6 +5,7 @@
  */
 
 #ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 #endif
 
@@ -52,8 +53,9 @@
 #include "fs_traversal.h"
 #include "logging.h"
 #include "platform.h"
-
+#include "util/algorithm.h"
 #include "util/exception.h"
+#include "util/string.h"
 #include "util_concurrency.h"
 
 //using namespace std;  // NOLINT
@@ -94,10 +96,11 @@ static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
 std::string MakeCanonicalPath(const std::string &path) {
   if (path.length() == 0) return path;
 
-  if (path[path.length()-1] == '/')
+  if (path[path.length()-1] == '/') {
     return path.substr(0, path.length()-1);
-  else
+  } else {
     return path;
+  }
 }
 
 
@@ -127,10 +130,11 @@ void SplitPath(
  */
 std::string GetParentPath(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
-  if (idx != std::string::npos)
+  if (idx != std::string::npos) {
     return path.substr(0, idx);
-  else
+  } else {
     return "";
+  }
 }
 
 
@@ -138,7 +142,7 @@ std::string GetParentPath(const std::string &path) {
  * Gets the file name part of a path.
  */
 PathString GetParentPath(const PathString &path) {
-  unsigned length = path.GetLength();
+  int length = static_cast<int>(path.GetLength());
   if (length == 0)
     return path;
   const char *chars  = path.GetChars();
@@ -157,16 +161,17 @@ PathString GetParentPath(const PathString &path) {
  */
 std::string GetFileName(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
-  if (idx != std::string::npos)
+  if (idx != std::string::npos) {
     return path.substr(idx+1);
-  else
+  } else {
     return path;
+  }
 }
 
 
 NameString GetFileName(const PathString &path) {
   NameString name;
-  int length = path.GetLength();
+  int length = static_cast<int>(path.GetLength());
   const char *chars  = path.GetChars();
 
   int i;
@@ -201,10 +206,10 @@ bool IsHttpUrl(const std::string &path) {
     return false;
   }
 
-  std::string prefix = path.substr(0, 7);
+  std::string prefix = path.substr(0, 8);
   std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
 
-  return prefix == "http://";
+  return prefix.substr(0, 7) == "http://" || prefix == "https://";
 }
 
 
@@ -245,6 +250,18 @@ FileSystemInfo GetFileSystemInfo(const std::string &path) {
 
 
   return result;
+}
+
+
+std::string ReadSymlink(const std::string &path) {
+  // TODO(jblomer): avoid PATH_MAX
+  char buf[PATH_MAX + 1];
+  ssize_t nchars = readlink(path.c_str(), buf, PATH_MAX);
+  if (nchars >= 0) {
+    buf[nchars] = '\0';
+    return std::string(buf);
+  }
+  return "";
 }
 
 
@@ -368,12 +385,12 @@ int MakeSocket(const std::string &path, const int mode) {
     goto make_socket_failure;
 #endif
 
-  if (bind(socket_fd, (struct sockaddr *)&sock_addr,
+  if (bind(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
            sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
     if ((errno == EADDRINUSE) && (unlink(path.c_str()) == 0)) {
       // Second try, perhaps the file was left over
-      if (bind(socket_fd, (struct sockaddr *)&sock_addr,
+      if (bind(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
                sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
       {
         LogCvmfs(kLogCvmfs, kLogDebug, "binding socket failed (%d)", errno);
@@ -424,7 +441,7 @@ int MakeTcpEndpoint(const std::string &ipv4_address, int portno) {
   }
   endpoint_addr.sin_port = htons(portno);
 
-  retval = bind(socket_fd, (struct sockaddr *)&endpoint_addr,
+  retval = bind(socket_fd, reinterpret_cast<struct sockaddr *>(&endpoint_addr),
                 sizeof(endpoint_addr));
   if (retval < 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "binding TCP endpoint failed (%d)", errno);
@@ -457,7 +474,7 @@ int ConnectSocket(const std::string &path) {
   assert(socket_fd != -1);
 
   int retval =
-    connect(socket_fd, (struct sockaddr *)&sock_addr,
+    connect(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
             sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
   if (short_path != path)
     RemoveShortSocketLink(short_path);
@@ -489,8 +506,9 @@ int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
   }
   endpoint_addr.sin_port = htons(portno);
 
-  retval = connect(socket_fd, (struct sockaddr *)&endpoint_addr,
-                   sizeof(endpoint_addr));
+  retval =
+  connect(socket_fd, reinterpret_cast<struct sockaddr *>(&endpoint_addr),
+          sizeof(endpoint_addr));
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "failed to connect to TCP endpoint (%d)",
              errno);
@@ -514,7 +532,7 @@ void MakePipe(int pipe_fd[2]) {
  * Writes to a pipe should always succeed.
  */
 void WritePipe(int fd, const void *buf, size_t nbyte) {
-  int num_bytes;
+  ssize_t num_bytes;
   do {
     num_bytes = write(fd, buf, nbyte);
   } while ((num_bytes < 0) && (errno == EINTR));
@@ -526,7 +544,7 @@ void WritePipe(int fd, const void *buf, size_t nbyte) {
  * Reads from a pipe should always succeed.
  */
 void ReadPipe(int fd, void *buf, size_t nbyte) {
-  int num_bytes;
+  ssize_t num_bytes;
   do {
     num_bytes = read(fd, buf, nbyte);
   } while ((num_bytes < 0) && (errno == EINTR));
@@ -538,7 +556,7 @@ void ReadPipe(int fd, void *buf, size_t nbyte) {
  * Reads from a pipe where writer's end is not yet necessarily connected
  */
 void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
-  int num_bytes;
+  ssize_t num_bytes;
   unsigned i = 0;
   unsigned backoff_ms = 1;
   const unsigned max_backoff_ms = 256;
@@ -673,6 +691,92 @@ void Block2Nonblock(int filedes) {
  */
 void SendMsg2Socket(const int fd, const std::string &msg) {
   (void)send(fd, &msg[0], msg.length(), MSG_NOSIGNAL);
+}
+
+/**
+ * Sends the file descriptor passing_fd to the socket socket_fd. Can be used
+ * to transfer an open file descriptor from one process to another. Use
+ * ConnectSocket() to get the socket_fd.
+ */
+bool SendFd2Socket(int socket_fd, int passing_fd) {
+  union {
+    // Make sure that ctrl_msg is properly aligned.
+    struct cmsghdr align;
+    // Buffer large enough to store the file descriptor (ancillary data)
+    unsigned char buf[CMSG_SPACE(sizeof(int))];
+  } ctrl_msg;
+
+  memset(ctrl_msg.buf, 0, sizeof(ctrl_msg.buf));
+
+  struct msghdr msgh;
+  msgh.msg_name = NULL;
+  msgh.msg_namelen = 0;
+
+  unsigned char dummy = 0;
+  struct iovec iov;
+  iov.iov_base = &dummy;
+  iov.iov_len = 1;
+  msgh.msg_iov = &iov;
+  msgh.msg_iovlen = 1;
+
+  msgh.msg_control = ctrl_msg.buf;
+  msgh.msg_controllen = sizeof(ctrl_msg.buf);
+  struct cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
+  cmsgp->cmsg_len = CMSG_LEN(sizeof(int));
+  cmsgp->cmsg_level = SOL_SOCKET;
+  cmsgp->cmsg_type = SCM_RIGHTS;
+  memcpy(CMSG_DATA(cmsgp), &passing_fd, sizeof(int));
+
+  ssize_t retval = sendmsg(socket_fd, &msgh, 0);
+  return (retval != -1);
+}
+
+
+/**
+ * Returns the file descriptor that has been sent with SendFd2Socket. The
+ * msg_fd file descriptor needs to come from a call to accept() on the socket
+ * where the passing file descriptor has been sent to.
+ * Returns -errno on error.
+ */
+int RecvFdFromSocket(int msg_fd) {
+  union {
+    // Make sure that ctrl_msg is properly aligned.
+    struct cmsghdr align;
+    // Buffer large enough to store the file descriptor (ancillary data)
+    unsigned char buf[CMSG_SPACE(sizeof(int))];
+  } ctrl_msg;
+
+  memset(ctrl_msg.buf, 0, sizeof(ctrl_msg.buf));
+
+  struct msghdr msgh;
+  msgh.msg_name = NULL;
+  msgh.msg_namelen = 0;
+
+  unsigned char dummy;
+  struct iovec iov;
+  iov.iov_base = &dummy;
+  iov.iov_len = 1;
+  msgh.msg_iov = &iov;
+  msgh.msg_iovlen = 1;
+
+  msgh.msg_control = ctrl_msg.buf;
+  msgh.msg_controllen = sizeof(ctrl_msg.buf);
+
+  ssize_t retval = recvmsg(msg_fd, &msgh, 0);
+  if (retval == -1)
+    return -errno;
+
+  struct cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
+  assert(cmsgp != NULL);
+  if (cmsgp->cmsg_len != CMSG_LEN(sizeof(int)))
+    return -ERANGE;
+  assert(cmsgp->cmsg_level == SOL_SOCKET);
+  assert(cmsgp->cmsg_type == SCM_RIGHTS);
+
+  int passing_fd;
+  memcpy(&passing_fd, CMSG_DATA(cmsgp), sizeof(int));
+  assert(passing_fd >= 0);
+  return passing_fd;
 }
 
 
@@ -1025,6 +1129,7 @@ bool RemoveTree(const std::string &path) {
   FileSystemTraversal<RemoveTreeHelper> traversal(remove_tree_helper, "",
                                                   true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_character_dev = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_socket = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_fifo = &RemoveTreeHelper::RemoveFile;
@@ -1122,6 +1227,83 @@ std::vector<std::string> FindDirectories(const std::string &parent_dir) {
 }
 
 
+/**
+ * Finds all files and direct subdirectories under directory (except ., ..).
+ */
+bool ListDirectory(const std::string &directory,
+                   std::vector<std::string> *names,
+                   std::vector<mode_t> *modes)
+{
+  DIR *dirp = opendir(directory.c_str());
+  if (!dirp)
+    return false;
+
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const std::string name(dirent->d_name);
+    if ((name == ".") || (name == ".."))
+      continue;
+    const std::string path = directory + "/" + name;
+
+    platform_stat64 info;
+    int retval = platform_lstat(path.c_str(), &info);
+    if (retval != 0) {
+      closedir(dirp);
+      return false;
+    }
+
+    names->push_back(name);
+    modes->push_back(info.st_mode);
+  }
+  closedir(dirp);
+
+  SortTeam(names, modes);
+  return true;
+}
+
+
+/**
+ * Looks whether exe is an executable file.  If exe is not an absolute path,
+ * searches the PATH environment.
+ */
+std::string FindExecutable(const std::string &exe) {
+  if (exe.empty())
+    return "";
+
+  std::vector<std::string> search_paths;
+  if (exe[0] == '/') {
+    search_paths.push_back(GetParentPath(exe));
+  } else {
+    char *path_env = getenv("PATH");
+    if (path_env) {
+      search_paths = SplitString(path_env, ':');
+    }
+  }
+
+  for (unsigned i = 0; i < search_paths.size(); ++i) {
+    if (search_paths[i].empty())
+      continue;
+    if (search_paths[i][0] != '/')
+      continue;
+
+    std::string path = search_paths[i] + "/" + GetFileName(exe);
+    platform_stat64 info;
+    int retval = platform_stat(path.c_str(), &info);
+    if (retval != 0)
+      continue;
+    if (!S_ISREG(info.st_mode))
+      continue;
+    retval = access(path.c_str(), X_OK);
+    if (retval != 0)
+      continue;
+
+    return path;
+  }
+
+  return "";
+}
+
+
 std::string GetUserName() {
   struct passwd pwd;
   struct passwd *result = NULL;
@@ -1157,6 +1339,29 @@ std::string GetShell() {
   free(buf);
   return shell;
 }
+
+/**
+ * UID -> Name from passwd database
+ */
+bool GetUserNameOf(uid_t uid, std::string *username) {
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  int bufsize = 16 * 1024;
+  char *buf = static_cast<char *>(smalloc(bufsize));
+  while (getpwuid_r(uid, &pwd, buf, bufsize, &result) == ERANGE) {
+    bufsize *= 2;
+    buf = static_cast<char *>(srealloc(buf, bufsize));
+  }
+  if (result == NULL) {
+    free(buf);
+    return false;
+  }
+  if (username)
+    *username = result->pw_name;
+  free(buf);
+  return true;
+}
+
 
 /**
  * Name -> UID from passwd database
@@ -1303,6 +1508,68 @@ void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit) {
 #else
   *hard_limit = rpl.rlim_max;
 #endif
+}
+
+
+std::vector<LsofEntry> Lsof(const std::string &path) {
+  std::vector<LsofEntry> result;
+
+  std::vector<std::string> proc_names;
+  std::vector<mode_t> proc_modes;
+  ListDirectory("/proc", &proc_names, &proc_modes);
+
+  for (unsigned i = 0; i < proc_names.size(); ++i) {
+    if (!S_ISDIR(proc_modes[i]))
+      continue;
+    if (proc_names[i].find_first_not_of("1234567890") != std::string::npos)
+      continue;
+
+    std::vector<std::string> fd_names;
+    std::vector<mode_t> fd_modes;
+    std::string proc_dir = "/proc/" + proc_names[i];
+    std::string fd_dir   = proc_dir + "/fd";
+    bool rvb = ListDirectory(fd_dir, &fd_names, &fd_modes);
+    uid_t proc_uid = 0;
+
+    // The working directory of the process requires special handling
+    if (rvb) {
+      platform_stat64 info;
+      platform_stat(proc_dir.c_str(), &info);
+      proc_uid = info.st_uid;
+
+      std::string cwd = ReadSymlink(proc_dir + "/cwd");
+      if (HasPrefix(cwd + "/", path + "/", false /* ignore_case */)) {
+        LsofEntry entry;
+        entry.pid = static_cast<pid_t>(String2Uint64(proc_names[i]));
+        entry.owner = proc_uid;
+        entry.read_only = true;  // A bit sloppy but good enough for the moment
+        entry.executable = ReadSymlink(proc_dir + "/exe");
+        entry.path = cwd;
+        result.push_back(entry);
+      }
+    }
+
+    for (unsigned j = 0; j < fd_names.size(); ++j) {
+      if (!S_ISLNK(fd_modes[j]))
+        continue;
+      if (fd_names[j].find_first_not_of("1234567890") != std::string::npos)
+        continue;
+
+      std::string target = ReadSymlink(fd_dir + "/" + fd_names[j]);
+      if (!HasPrefix(target + "/", path + "/", false /* ignore_case */))
+        continue;
+
+      LsofEntry entry;
+      entry.pid = static_cast<pid_t>(String2Uint64(proc_names[i]));
+      entry.owner = proc_uid;
+      entry.read_only = !((fd_modes[j] & S_IWUSR) == S_IWUSR);
+      entry.executable = ReadSymlink(proc_dir + "/exe");
+      entry.path = target;
+      result.push_back(entry);
+    }
+  }
+
+  return result;
 }
 
 
@@ -1554,7 +1821,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     }
 
     // Child, close file descriptors
-    max_fd = sysconf(_SC_OPEN_MAX);
+    max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
     if (max_fd < 0) {
       failed = ForkFailures::kFailGetMaxFd;
       goto fork_failure;
@@ -1594,7 +1861,8 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     // retrieve the PID of the new (grand) child process and send it to the
     // grand father
     pid_grand_child = getpid();
-    pipe_fork.Write(ForkFailures::kSendPid);
+    failed = ForkFailures::kSendPid;
+    pipe_fork.Write(&failed, sizeof(failed));
     pipe_fork.Write(pid_grand_child);
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
@@ -1602,7 +1870,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     failed = ForkFailures::kFailExec;
 
    fork_failure:
-    pipe_fork.Write(failed);
+    pipe_fork.Write(&failed, sizeof(failed));
     _exit(1);
   }
   if (double_fork) {
@@ -1614,7 +1882,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
   // Either the PID or a return value is sent
   ForkFailures::Names status_code;
-  bool retcode = pipe_fork.Read(&status_code);
+  bool retcode = pipe_fork.Read(&status_code, sizeof(status_code));
   assert(retcode);
   if (status_code != ForkFailures::kSendPid) {
     close(pipe_fork.read_end);
@@ -1678,7 +1946,8 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
   unsigned iov_idx = 0;
 
   while (nbytes) {
-    ssize_t retval = writev(fd, &iov[iov_idx], iovcnt - iov_idx);
+    ssize_t retval =
+      writev(fd, &iov[iov_idx], static_cast<int>(iovcnt - iov_idx));
     if (retval < 0) {
       if (errno == EINTR)
         continue;

@@ -1,0 +1,13 @@
+[Unit]
+Description=cvmfs snapshotter
+After=network.target
+Before=containerd.service
+
+[Service]
+Environment=HOME=/root
+ExecStart=/usr/local/bin/cvmfs_snapshotter --log-level=debug --config=/etc/containerd-cvmfs-grpc/config.toml
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

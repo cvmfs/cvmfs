@@ -145,7 +145,7 @@ void SyncUnionTarball::Traverse() {
       }
 
       case ARCHIVE_EOF: {
-        if (create_catalog_on_root_) {
+        if (create_catalog_on_root_ && (base_directory_ != "/")) {
           SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
               new SyncItemDummyCatalog(base_directory_, this));
           ProcessFile(catalog);
@@ -191,11 +191,14 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   archive_file_path = SanitizePath(archive_file_path);
 
   std::string complete_path =
-      MakeCanonicalPath(base_directory_ + "/" + archive_file_path);
+      base_directory_ != "/"
+          ? MakeCanonicalPath(base_directory_ + "/" + archive_file_path)
+          : MakeCanonicalPath(archive_file_path);
 
   std::string parent_path;
   std::string filename;
   SplitPath(complete_path, &parent_path, &filename);
+  if (parent_path == ".") parent_path.clear();
 
   CreateDirectories(parent_path);
 
@@ -203,8 +206,11 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
       parent_path, filename, src, entry, read_archive_signal_, this));
 
   if (NULL != archive_entry_hardlink(entry)) {
-    const std::string hardlink =
-        base_directory_ + "/" + std::string(archive_entry_hardlink(entry));
+    const std::string hardlink_name(
+        SanitizePath(archive_entry_hardlink(entry)));
+    const std::string hardlink = base_directory_ != "/"
+                                     ? base_directory_ + "/" + hardlink_name
+                                     : hardlink_name;
 
     if (hardlinks_.find(hardlink) != hardlinks_.end()) {
       hardlinks_.find(hardlink)->second.push_back(complete_path);
@@ -212,6 +218,10 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
       std::list<std::string> to_hardlink;
       to_hardlink.push_back(complete_path);
       hardlinks_[hardlink] = to_hardlink;
+    }
+    if (filename == ".cvmfscatalog") {
+      // the file is created in the PostUpload phase
+      to_create_catalog_dirs_.insert(parent_path);
     }
     read_archive_signal_->Wakeup();
     return;
@@ -266,9 +276,12 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 std::string SyncUnionTarball::SanitizePath(const std::string &path) {
   if (path.length() >= 2) {
     if (path[0] == '.' && path[1] == '/') {
-      std::string to_return(path);
-      to_return.erase(0, 2);
-      return to_return;
+      return path.substr(2);
+    }
+  }
+  if (path.length() >= 1) {
+    if (path[0] == '/') {
+      return path.substr(1);
     }
   }
   return path;

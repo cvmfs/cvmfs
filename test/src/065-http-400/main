@@ -32,20 +32,20 @@ cvmfs_run_test() {
   if [ $? -ne 0 ]; then return 9; fi
 
   echo "wait that $faulty_port (PID $CVMFS_TEST_065_FAULTY_PID) actually returns HTTP 400"
-  sleep 1
   local timeout=10
   while ! faulty_server_running $CVMFS_TEST_065_FAULTY_PID $faulty_port && \
         [ $timeout -gt 0 ]; do
     timeout=$(( $timeout - 1 ))
+    sleep 1
   done
   [ $timeout -gt 0 ] || return 50
 
-  sudo tee /etc/cvmfs/config.d/grid.cern.ch.conf << EOF
+  sudo tee /etc/cvmfs/config.d/grid.cern.ch.local << EOF
 CVMFS_SERVER_URL="http://localhost:${faulty_port}/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch"
 CVMFS_USE_GEOAPI=no
 EOF
   cvmfs_mount grid.cern.ch \
-    "CVMFS_HTTP_PROXY='DIRECT;DIRECT'" || return 1
+    CVMFS_CLIENT_PROFILE=custom "CVMFS_HTTP_PROXY='DIRECT;DIRECT'" || return 1
 
   no_host_failover="$(get_internal_value grid.cern.ch download.n_host_failover)"
   no_proxy_failover="$(get_internal_value grid.cern.ch download.n_proxy_failover)"

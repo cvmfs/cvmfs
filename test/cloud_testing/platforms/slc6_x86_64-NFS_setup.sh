@@ -4,16 +4,6 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
-echo -n "creating additional disk partitions... "
-disk_to_partition=/dev/vda
-free_disk_space=$(get_unpartitioned_space $disk_to_partition)
-cache_partition_size=16106127360 # 15 GiB
-if [ $free_disk_space -lt $cache_partition_size ]; then
-  die "fail (not enough unpartitioned disk space - $free_disk_space bytes)"
-fi
-create_partition $disk_to_partition $cache_partition_size || die "fail (creating partition)"
-echo "done"
-
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"

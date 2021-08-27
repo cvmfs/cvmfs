@@ -338,7 +338,8 @@ ObjectPackBuild::State ObjectPackConsumer::ConsumeNext(
 ObjectPackBuild::State ObjectPackConsumer::ConsumePayload(
     const unsigned buf_size, const unsigned char *buf) {
   uint64_t pos_in_buf = 0;
-  while ((pos_in_buf < buf_size) && (idx_ < index_.size())) {
+  while ((idx_ < index_.size()) &&
+         ((pos_in_buf < buf_size) || (index_[idx_].size == 0))) {
     // Fill the accumulator or process next small object
     uint64_t nbytes;  // How many bytes are consumed in this iteration
     const uint64_t remaining_in_buf = buf_size - pos_in_buf;

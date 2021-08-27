@@ -219,7 +219,7 @@ class AbstractUploader
    * @return           a pointer to the initialized UploadStreamHandle
    */
   virtual UploadStreamHandle *InitStreamedUpload(
-      const CallbackTN *callback = NULL) = 0;
+      const CallbackTN *callback) = 0;
 
   /**
    * This method schedules a buffer to be uploaded in the context of the
@@ -301,7 +301,7 @@ class AbstractUploader
 
   /**
    * Make directory in upstream storage. Noop if directory already present.
-   * 
+   *
    * @param path relative directory path in the upstream storage
    * @return true if the directory was successfully created or already present
    */
@@ -345,7 +345,7 @@ class AbstractUploader
    */
   virtual void DoUpload(const std::string &remote_path,
                         IngestionSource *source,
-                        const CallbackTN *callback = NULL) = 0;
+                        const CallbackTN *callback) = 0;
 
   /**
    * Implementation of a streamed upload step. See public interface for details.

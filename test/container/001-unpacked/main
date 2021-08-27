@@ -1,0 +1,14 @@
+cvmfs_test_name="Check availability of /cvmfs/unpacked.cern.ch"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../container_common.sh
+
+  cvmfs_mount unpacked.cern.ch || return 1
+  ls /cvmfs/unpacked.cern.ch || return 2
+
+  return 0
+}

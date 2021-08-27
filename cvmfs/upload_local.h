@@ -57,9 +57,9 @@ class LocalUploader : public AbstractUploader {
    */
   void DoUpload(const std::string &remote_path,
                 IngestionSource *source,
-                const CallbackTN *callback = NULL);
+                const CallbackTN *callback);
 
-  UploadStreamHandle *InitStreamedUpload(const CallbackTN *callback = NULL);
+  UploadStreamHandle *InitStreamedUpload(const CallbackTN *callback);
   void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,
                       const CallbackTN *callback = NULL);
   void FinalizeStreamedUpload(UploadStreamHandle *handle,

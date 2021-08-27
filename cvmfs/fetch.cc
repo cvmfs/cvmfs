@@ -90,6 +90,8 @@ int Fetcher::Fetch(
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
 
+  perf::Inc(n_invocations);
+
   // Try to open from local cache
   if ((fd_return = OpenSelect(id, name, object_type)) >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit: %s", name.c_str());
@@ -220,6 +222,8 @@ Fetcher::Fetcher(
   assert(retval == 0);
   n_downloads = statistics.RegisterTemplated("n_downloads",
     "overall number of downloaded files (incl. catalogs, chunks)");
+  n_invocations = statistics.RegisterTemplated("n_invocations",
+    "overall number of object requests (incl. catalogs, chunks)");
 }
 
 

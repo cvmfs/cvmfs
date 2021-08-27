@@ -317,7 +317,7 @@ TEST_F(T_SQLite_Wrapper, PropertyWithoutReopen) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE(static_cast<DummyDatabase*>(NULL), db1);
 
-  EXPECT_TRUE(db1->SetProperty("foo",   "bar"));
+  EXPECT_TRUE(db1->SetProperty("foo",   std::string("bar")));
   EXPECT_TRUE(db1->SetProperty("file",  dbp));
   EXPECT_TRUE(db1->SetProperty("int",   1337));
   EXPECT_TRUE(db1->SetProperty("float", 13.37));
@@ -349,7 +349,7 @@ TEST_F(T_SQLite_Wrapper, GetDefaultPropertyWithoutReopen) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE(static_cast<DummyDatabase*>(NULL), db1);
 
-  EXPECT_TRUE(db1->SetProperty("foo",   "bar"));
+  EXPECT_TRUE(db1->SetProperty("foo",   std::string("bar")));
   EXPECT_TRUE(db1->SetProperty("file",  dbp));
   EXPECT_TRUE(db1->SetProperty("int",   1337));
   EXPECT_TRUE(db1->SetProperty("float", 13.37));
@@ -381,7 +381,7 @@ TEST_F(T_SQLite_Wrapper, PropertyWithReadOnlyReopen) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE(static_cast<DummyDatabase*>(NULL), db1);
 
-  EXPECT_TRUE(db1->SetProperty("foo",   "bar"));
+  EXPECT_TRUE(db1->SetProperty("foo",   std::string("bar")));
   EXPECT_TRUE(db1->SetProperty("file",  dbp));
   EXPECT_TRUE(db1->SetProperty("int",   1337));
   EXPECT_TRUE(db1->SetProperty("float", 13.37));
@@ -419,7 +419,7 @@ TEST_F(T_SQLite_Wrapper, PropertyWithReadWriteReopen) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE(static_cast<DummyDatabase*>(NULL), db1);
 
-  EXPECT_TRUE(db1->SetProperty("foo",   "bar"));
+  EXPECT_TRUE(db1->SetProperty("foo",   std::string("bar")));
   EXPECT_TRUE(db1->SetProperty("file",  dbp));
   EXPECT_TRUE(db1->SetProperty("int",   1337));
   EXPECT_TRUE(db1->SetProperty("float", 13.37));

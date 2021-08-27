@@ -19,6 +19,7 @@ namespace catalog {
 class DeltaCounters;
 class DirectoryEntry;
 class SimpleCatalogManager;
+class WritableCatalogManager;
 }
 namespace download {
 class DownloadManager;
@@ -32,10 +33,12 @@ class Reflog;
 }
 namespace perf {
 class Statistics;
+class StatisticsTemplate;
 }
 namespace signature {
 class SignatureManager;
 }
+class SyncParameters;
 namespace upload {
 class Spooler;
 }
@@ -44,6 +47,9 @@ class Whitelist;
 }
 
 namespace publish {
+
+class SyncMediator;
+class SyncUnion;
 
 /**
  * Users create derived instances to react on repository diffs
@@ -61,6 +67,24 @@ class __attribute__((visibility("default"))) DiffListener {
   virtual void OnModify(const std::string &path,
                         const catalog::DirectoryEntry &entry_from,
                         const catalog::DirectoryEntry &entry_to) = 0;
+};
+
+
+class __attribute__((visibility("default"))) Env {
+ public:
+  /**
+   * Depending on the desired course of action, the permitted capabilites of the
+   * binary (cap_dac_read_search, cap_sys_admin) needs to be dropped or gained.
+   * Dropped for creating user namespaces in `enter`, gained for walking through
+   * overlayfs.
+   */
+  static void DropCapabilities();
+
+  /**
+   * If in an ephemeral writable shell, return the session directory.
+   * Otherwise return the empty string.
+   */
+  static std::string GetEnterSessionDir();
 };
 
 
@@ -95,7 +119,6 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   const signature::SignatureManager *signature_mgr() const {
     return signature_mgr_;
   }
-  const upload::Spooler *spooler() const { return spooler_; }
   const whitelist::Whitelist *whitelist() const { return whitelist_; }
   const manifest::Manifest *manifest() const { return manifest_; }
   // Inheritance of History and SqliteHistory unknown in the header
@@ -119,7 +142,6 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
    * The read-only catalog manager, loaded on demand
    */
   catalog::SimpleCatalogManager *simple_catalog_mgr_;
-  upload::Spooler *spooler_;
   whitelist::Whitelist *whitelist_;
   manifest::Reflog *reflog_;
   manifest::Manifest *manifest_;
@@ -162,6 +184,19 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      * Re-mount /cvmfs/$fqrn read-only
      */
     void Lock();
+    /**
+     * Regular unmount of the read-write and the read-only layer and, if this
+     * does not work, a forced unmount
+     */
+    void Unmount();
+    /**
+     * Mounts the read-only layer followed by the union layer
+     */
+    void Mount();
+    /**
+     * Move scratch space to waste bin and clear it out asynchonously
+     */
+    void ClearScratch();
 
    private:
     /**
@@ -170,11 +205,15 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      */
     enum EMountpointAlterations {
       kAlterUnionUnmount,
+      kAlterUnionLazyUnmount,
       kAlterRdOnlyUnmount,
+      kAlterRdOnlyKillUnmount,
+      kAlterRdOnlyLazyUnmount,
       kAlterUnionMount,
       kAlterRdOnlyMount,
       kAlterUnionOpen,
       kAlterUnionLock,
+      kAlterScratchWipe,
     };
 
     void AlterMountpoint(EMountpointAlterations how, int log_level);
@@ -201,16 +240,40 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
       int llvl;
     };
 
-    static Session *Create(const Settings &settings_session);
-    static Session *Create(const SettingsPublisher &settings_publisher,
-                           int llvl = 0);
-    ~Session();
-   private:
+    /**
+     * For non-gateway nodes, we have an implicit lease for the entire
+     * repository
+     */
+    Session() : keep_alive_(false), has_lease_(true) {}
     explicit Session(const Settings &settings_session);
+    explicit Session(const SettingsPublisher &settings_publisher, int llvl = 0);
+    /**
+     * Drops the lease unless keep_alive_ is set
+     */
+    ~Session();
+
     void Acquire();
+    void Drop();
+    void SetKeepAlive(bool value);
+
+    bool has_lease() const { return has_lease_; }
+
+   private:
     Settings settings_;
+    /**
+     * If set to true, the session is not closed on destruction, i.e. the
+     * lease is not dropped and the lease token is not removed. A newly created
+     * Session object will pick up an existing lease token and not re-acquire
+     * it.
+     */
+    bool keep_alive_;
+    bool has_lease_;
   };  // class Session
 
+  /**
+   * The directory layout of the publisher node must be of matching revision
+   */
+  static const unsigned kRequiredLayoutRevision = 143;
 
   static Publisher *Create(const SettingsPublisher &settings);
 
@@ -218,7 +281,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   virtual ~Publisher();
 
   void UpdateMetaInfo();
-  void Transaction();
+  void Transaction() { TransactionRetry(); }
   void Abort();
   void Publish();
   void Ingest();
@@ -242,7 +305,10 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   const SettingsPublisher &settings() const { return settings_; }
   bool in_transaction() const { return in_transaction_; }
-  ManagedNode *managed_node() const { return managed_node_.weak_ref(); }
+  bool is_publishing() const { return is_publishing_; }
+  Session *session() const { return session_.weak_ref(); }
+  const upload::Spooler *spooler_files() const { return spooler_files_; }
+  const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
 
  private:
   Publisher();  ///< Used by Create
@@ -250,7 +316,13 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   /**
    * Used just before a spooler is required, e.g. in Create()
    */
-  void ConstructSpooler();
+  void ConstructSpoolers();
+  /**
+   * Initializes the spooler, the writable catalog manager, and the sync
+   * mediator
+   */
+  void ConstructSyncManagers();
+  void WipeScratchArea();
 
   void CreateKeychain();
   void CreateStorage();
@@ -277,14 +349,37 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   void CheckTagName(const std::string &name);
 
+  void TransactionRetry();
+  void TransactionImpl();
+  void CheckTransactionStatus();
+
+  void SyncImpl();
+
   SettingsPublisher settings_;
+  UniquePtr<perf::StatisticsTemplate> statistics_publish_;
   /**
    * The log level, set to kLogNone if settings_.is_silent() == true
    */
   int llvl_;
   bool in_transaction_;
+  bool is_publishing_;
   gateway::GatewayKey gw_key_;
+  /**
+   * Only really used gateway mode when a transaction is opened. The session
+   * takes an existing session token if it exists and drops the lease in abort.
+   * TODO(jblomer): that is not yet done.  Once publish, tag, etc. are
+   * implemented, the lease should be dropped after the last successful write
+   * operation.
+   */
+  UniquePtr<Session> session_;
   UniquePtr<ManagedNode> managed_node_;
+
+  upload::Spooler *spooler_files_;
+  upload::Spooler *spooler_catalogs_;
+  catalog::WritableCatalogManager *catalog_mgr_;
+  SyncParameters *sync_parameters_;
+  SyncMediator *sync_mediator_;
+  publish::SyncUnion *sync_union_;
 };
 
 class __attribute__((visibility("default"))) Replica : public Repository {

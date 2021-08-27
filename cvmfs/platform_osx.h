@@ -75,6 +75,12 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
   return retval == 0;
 }
 
+
+inline int platform_umount_lazy(const char *mountpoint) {
+  int retval = unmount(mountpoint, MNT_FORCE);
+  return retval == 0;
+}
+
 /**
  * Spinlocks on OS X are not in pthread but in OS X specific APIs.
  */
@@ -222,12 +228,12 @@ inline void platform_disable_kcache(int filedes) {
 }
 
 inline void platform_invalidate_kcache(const int fd, const off_t offset,
-                                       const size_t length) {
+                                       const off_t length) {
   // NOOP
   // TODO(rmeusel): implement
 }
 
-inline int platform_readahead(int filedes) {
+inline ssize_t platform_readahead(int filedes) {
   // TODO(jblomer): is there a readahead equivalent?
   return 0;
 }

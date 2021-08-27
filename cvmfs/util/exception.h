@@ -14,16 +14,16 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-class ECvmfsException : std::runtime_error {
+class ECvmfsException : public std::runtime_error {
  public:
   explicit ECvmfsException(const std::string& what_arg)
       : std::runtime_error(what_arg) {}
 };
 
-#define __CVMFS_S1(x) #x
-#define __CVMFS_S2(x) __CVMFS_S1(x)
-#define __LOCATION__ "PANIC: " __FILE__ " : " __CVMFS_S2(__LINE__)
-#define PANIC(...) Panic(__LOCATION__, kLogCvmfs, __VA_ARGS__);
+#define CVMFS_S1(x) #x
+#define CVMFS_S2(x) CVMFS_S1(x)
+#define CVMFS_SOURCE_LOCATION "PANIC: " __FILE__ " : " CVMFS_S2(__LINE__)
+#define PANIC(...) Panic(CVMFS_SOURCE_LOCATION, kLogCvmfs, __VA_ARGS__);
 
 __attribute__((noreturn))
 void Panic(const char *coordinates, const LogSource source, const int mask,

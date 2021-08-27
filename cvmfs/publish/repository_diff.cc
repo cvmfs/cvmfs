@@ -70,13 +70,14 @@ class DiffForwarder : public CatalogDiffTool<catalog::SimpleCatalogManager> {
     listener_->OnRemove(path.ToString(), entry);
   }
 
-  virtual void ReportModification(const PathString& path,
+  virtual bool ReportModification(const PathString& path,
                                   const catalog::DirectoryEntry& old_entry,
                                   const catalog::DirectoryEntry& new_entry,
                                   const XattrList& /*xattrs */,
                                   const FileChunkList& /* chunks */)
   {
     listener_->OnModify(path.ToString(), old_entry, new_entry);
+    return true;
   }
 };  // class DiffForwarder
 

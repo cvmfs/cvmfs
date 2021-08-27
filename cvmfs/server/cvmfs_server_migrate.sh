@@ -480,6 +480,62 @@ _migrate_141() {
 }
 
 
+_migrate_142() {
+  local name=$1
+  local destination_version="142"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  local client_conf="/etc/cvmfs/repositories.d/${name}/client.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  # only called when this is a stratum 0
+  if [ -f $client_conf ]; then
+    echo "--> updating client.conf"
+    if ! grep -q "CVMFS_TALK_SOCKET" $client_conf; then
+      echo "CVMFS_TALK_SOCKET=/var/spool/cvmfs/${name}/cvmfs_io" >> $client_conf
+    fi
+    if ! grep -q "CVMFS_TALK_OWNER" $client_conf; then
+      local cvmfs_user="$(grep ^CVMFS_USER= $server_conf | cut -d= -f2)"
+      echo "CVMFS_TALK_OWNER=$cvmfs_user" >> $client_conf
+    fi
+  else
+    echo "--> skipping client configuration on stratum 1"
+  fi
+
+  echo "--> updating server.conf"
+  if ! grep -q "^CVMFS_IGNORE_XDIR_HARDLINKS=" $server_conf; then
+      echo "CVMFS_IGNORE_XDIR_HARDLINKS=true" >> $server_conf
+  fi
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
+
+_migrate_143() {
+  local name=$1
+  local destination_version="143"
+  local client_conf="/etc/cvmfs/repositories.d/${name}/client.conf"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  echo "--> updating client.conf"
+  if ! grep -q "CVMFS_USE_SSL_SYSTEM_CA" $client_conf; then
+    echo "CVMFS_USE_SSL_SYSTEM_CA=true" >> $client_conf
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -610,6 +666,16 @@ cvmfs_server_migrate() {
 
     if [ "$creator" -lt 141 ] && is_stratum0 $name; then
       _migrate_141 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" -lt 142 ] && is_stratum0 $name; then
+      _migrate_142 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" -lt 143 ] && is_stratum0 $name; then
+      _migrate_143 $name
       creator="$(repository_creator_version $name)"
     fi
 

@@ -70,7 +70,7 @@ class Watchdog {
   void Supervise();
   void LogEmergency(std::string msg);
   std::string ReportStacktrace();
-  std::string GenerateStackTrace(const std::string &exe_path, pid_t pid);
+  std::string GenerateStackTrace(pid_t pid);
   std::string ReadUntilGdbPrompt(int fd_pipe);
 
   bool spawned_;

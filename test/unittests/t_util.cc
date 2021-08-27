@@ -143,6 +143,13 @@ TEST_F(T_Util, GetShell) {
 }
 
 
+TEST_F(T_Util, GetUserNameOf) {
+  std::string name;
+  EXPECT_TRUE(GetUserNameOf(0, &name));
+  EXPECT_EQ("root", name);
+}
+
+
 TEST_F(T_Util, GetUidOf) {
   uid_t uid;
   gid_t gid;
@@ -316,15 +323,23 @@ TEST_F(T_Util, String2Uint64) {
 
 TEST_F(T_Util, IsHttpUrl) {
   EXPECT_TRUE(IsHttpUrl("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
+  EXPECT_TRUE(IsHttpUrl("https://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
   EXPECT_TRUE(IsHttpUrl("http://"));
+  EXPECT_TRUE(IsHttpUrl("https://"));
   EXPECT_TRUE(IsHttpUrl("http://foobar"));
+  EXPECT_TRUE(IsHttpUrl("https://foobar"));
   EXPECT_TRUE(IsHttpUrl("HTTP://www.google.com"));
+  EXPECT_TRUE(IsHttpUrl("HTTPS://www.google.com"));
   EXPECT_TRUE(IsHttpUrl("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
+  EXPECT_TRUE(IsHttpUrl("HTtPs://cvmfs-stratum-zero.cern.ch/ot/atlas"));
   EXPECT_FALSE(IsHttpUrl("http:/foobar"));
+  EXPECT_FALSE(IsHttpUrl("https:/foobar"));
   EXPECT_FALSE(IsHttpUrl("http"));
+  EXPECT_FALSE(IsHttpUrl("https"));
   EXPECT_FALSE(IsHttpUrl("/srv/cvmfs/cms.cern.ch"));
   EXPECT_FALSE(IsHttpUrl("srv/cvmfs/cms.cern.ch"));
   EXPECT_FALSE(IsHttpUrl("http//foobar"));
+  EXPECT_FALSE(IsHttpUrl("https//foobar"));
 }
 
 TEST_F(T_Util, MakeCannonicalPath) {
@@ -372,6 +387,13 @@ TEST_F(T_Util, GetFileSystemInfo) {
   EXPECT_EQ(kFsTypeProc, fs_info.type);
   fs_info = GetFileSystemInfo("/");
   EXPECT_EQ(kFsTypeUnknown, fs_info.type);
+}
+
+
+TEST_F(T_Util, ReadSymlink) {
+  EXPECT_TRUE(ReadSymlink(".").empty());
+  EXPECT_EQ(0, symlink(".", "cvmfs_read_symlink_test"));
+  EXPECT_EQ(".", ReadSymlink("cvmfs_read_symlink_test"));
 }
 
 
@@ -532,7 +554,8 @@ TEST_F(T_Util, ClosePipe) {
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
-  ASSERT_DEATH(ReadPipe(fd[0], buffer_output, to_write.length()), ".*");
+  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.weak_ref(), to_write.length()),
+               ".*");
 }
 
 
@@ -732,6 +755,46 @@ TEST_F(T_Util, SendMes2Socket) {
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
+}
+
+
+TEST_F(T_Util, SendRecvFd) {
+  int fd_server = MakeSocket(socket_address, 0700);
+  ASSERT_LE(0, fd_server);
+  FdGuard fd_guard_server(fd_server);
+  listen(fd_server, 1);
+
+  pid_t pid = fork();
+  switch (pid) {
+    case -1:
+      ASSERT_TRUE(false);
+    case 0:
+      struct sockaddr_un client_addr;
+      unsigned int client_length = sizeof(client_addr);
+      int fd_conn = accept(fd_server, (struct sockaddr *) &client_addr,
+                           &client_length);
+      if (fd_conn < 0)
+        _exit(1);
+      int fd_recv = RecvFdFromSocket(fd_conn);
+      if (fd_recv < 0)
+        _exit(10 - fd_recv);
+      char zero = 42;
+      int retval = read(fd_recv, &zero, 1);
+      if (retval != 1)
+        _exit(3);
+      if (zero != 0)
+        _exit(4);
+      _exit(0);
+  }
+
+  int fd_client = ConnectSocket(socket_address);
+  ASSERT_LE(0, fd_client);
+  FdGuard fd_guard_client(fd_client);
+
+  int fd_pass = open("/dev/zero", O_RDONLY);
+  ASSERT_LE(0, fd_pass);
+  EXPECT_TRUE(SendFd2Socket(fd_client, fd_pass));
+  EXPECT_EQ(0, WaitForChild(pid));
 }
 
 
@@ -1053,6 +1116,48 @@ TEST_F(T_Util, FindDirectories) {
   EXPECT_EQ(parent + "/dir1", result[0]);
   EXPECT_EQ(parent + "/dir2", result[1]);
   EXPECT_EQ(parent + "/dirX", result[2]);
+}
+
+
+TEST_F(T_Util, ListDirectory) {
+  std::vector<std::string> names;
+  std::vector<mode_t> modes;
+
+  EXPECT_FALSE(ListDirectory("/no/such/dir", &names, &modes));
+  string dir = sandbox + "/test-listdir";
+  ASSERT_TRUE(MkdirDeep(dir, 0700));
+
+  EXPECT_TRUE(ListDirectory(dir, &names, &modes));
+  EXPECT_TRUE(names.empty());
+  EXPECT_TRUE(modes.empty());
+
+  ASSERT_TRUE(MkdirDeep(dir + "/dir1/sub", 0700));
+  ASSERT_TRUE(MkdirDeep(dir + "/dir2", 0700));
+  EXPECT_TRUE(SymlinkForced(dir + "/dir1", dir + "/dirX"));
+  string temp_file = CreateTempPath(dir + "/tempfile", 0600);
+  ASSERT_FALSE(temp_file.empty());
+
+  EXPECT_TRUE(ListDirectory(dir, &names, &modes));
+  ASSERT_EQ(4U, names.size());
+  EXPECT_EQ("dir1", names[0]);
+  EXPECT_EQ("dir2", names[1]);
+  EXPECT_EQ("dirX", names[2]);
+  EXPECT_EQ(GetFileName(temp_file), names[3]);
+  EXPECT_TRUE(S_ISDIR(modes[0]));
+  EXPECT_TRUE(S_ISDIR(modes[1]));
+  EXPECT_TRUE(S_ISLNK(modes[2]));
+  EXPECT_TRUE(S_ISREG(modes[3]));
+}
+
+
+TEST_F(T_Util, FindExecutable) {
+  std::string ls = FindExecutable("ls");
+  ASSERT_FALSE(ls.empty());
+  EXPECT_EQ('/', ls[0]);
+  std::string ls_abs = FindExecutable(ls);
+  EXPECT_EQ(ls, ls_abs);
+  std::string fail = FindExecutable("no-such-exe");
+  EXPECT_TRUE(fail.empty());
 }
 
 
@@ -1601,7 +1706,7 @@ TEST_F(T_Util, ManagedExecCommandLine) {
                         &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
-  ssize_t bytes_read = read(fd_stdout[0], buffer, message.length());
+  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
   string result(reinterpret_cast<char *>(buffer.weak_ref()));
   ASSERT_EQ(message, result);
@@ -1633,7 +1738,7 @@ TEST_F(T_Util, ManagedExecClearEnv) {
                         &pid);
   close(fd_stdout[1]);
   ASSERT_TRUE(success);
-  ssize_t bytes_read = read(fd_stdout[0], buffer, 64);
+  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), 64);
   EXPECT_EQ(bytes_read, 0);
   close(fd_stdout[0]);
 }
@@ -1845,6 +1950,51 @@ TEST_F(T_Util, GetLimitNoFile) {
   EXPECT_LT(0U, soft_limit);
   EXPECT_LE(soft_limit, hard_limit);
   EXPECT_LT(hard_limit, 10000000U);
+}
+
+
+TEST_F(T_Util, Lsof) {
+  std::vector<LsofEntry> list;
+  CreateFile("cvmfs_test_lsof", 0600, false /* ignore_failure */);
+  int fd = open("cvmfs_test_lsof", O_RDWR);
+  EXPECT_GE(fd, 0);
+  list = Lsof(GetCurrentWorkingDirectory());
+  close(fd);
+#ifndef __APPLE__
+  EXPECT_GT(list.size(), 0U);
+
+  bool found = false;
+  for (unsigned i = 0; i < list.size(); ++i) {
+    if (list[i].pid != getpid())
+      continue;
+    if (list[i].path != GetCurrentWorkingDirectory())
+      continue;
+
+    found = true;
+    EXPECT_EQ(geteuid(), list[i].owner);
+    EXPECT_EQ(ReadSymlink("/proc/self/exe"), list[i].executable);
+    EXPECT_TRUE(list[i].read_only);
+    break;
+  }
+  EXPECT_TRUE(found);
+
+  found = false;
+  for (unsigned i = 0; i < list.size(); ++i) {
+    if (list[i].pid != getpid())
+      continue;
+    if (list[i].path != GetCurrentWorkingDirectory() + "/cvmfs_test_lsof")
+      continue;
+
+    found = true;
+    EXPECT_EQ(geteuid(), list[i].owner);
+    EXPECT_EQ(ReadSymlink("/proc/self/exe"), list[i].executable);
+    EXPECT_FALSE(list[i].read_only);
+    break;
+  }
+  EXPECT_TRUE(found);
+#else
+  EXPECT_TRUE(list.empty());
+#endif
 }
 
 

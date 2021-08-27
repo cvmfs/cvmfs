@@ -24,15 +24,16 @@ manifest::Reflog *ServerTool::FetchReflog(ObjectFetcherT *object_fetcher,
 
     case ObjectFetcherT::kFailNotFound:
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "reflog for '%s' not found but reflog.chksum is present; "
-               "remove reflog.chksum to recreate the reflog",
+               "reflog for '%s' not found but reflog checksum is present "
+               "(either in the manifest key 'Y' or in the reflog.chksum file); "
+               "run `cvmfs_server check -r` to fix.",
                repo_name.c_str());
       return NULL;
 
     case ObjectFetcherT::kFailBadData:
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "data corruption in .cvmfsreflog for %s, remove for automatic "
-               "recreation or verify reflog.chksum file",
+               "data corruption in .cvmfsreflog for %s, run "
+               "`cvmfs_server check -r` to fix",
                repo_name.c_str());
       return NULL;
 

@@ -6,6 +6,7 @@
 #include "namespace.h"
 
 #include <fcntl.h>
+#include <signal.h>
 #ifndef __APPLE__
 #include <sched.h>
 #include <sys/mount.h>
@@ -54,26 +55,42 @@ int CheckNamespaceFeatures() {
 }
 
 
-bool CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
+NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
 #ifdef CVMFS_HAS_UNSHARE
   std::string uid_str = StringifyInt(geteuid());
-  std::string gid_str = StringifyInt(geteuid());
+  std::string gid_str = StringifyInt(getegid());
 
   int rvi = unshare(CLONE_NEWUSER);
-  if (rvi != 0) return false;
+  if (rvi != 0) return kFailNsUnshare;
 
-  bool rvb = SafeWriteToFile(StringifyInt(map_uid_to) + " " + uid_str + " 1",
-                             "/proc/self/uid_map", kDefaultFileMode);
-  if (!rvb) return false;
-  rvb = SafeWriteToFile("deny", "/proc/self/setgroups", kDefaultFileMode);
-  if (!rvb) return false;
-  rvb = SafeWriteToFile(StringifyInt(map_gid_to) + " " + gid_str + " 1",
-                        "/proc/self/gid_map", kDefaultFileMode);
-  if (!rvb) return false;
+  std::string uid_map = StringifyInt(map_uid_to) + " " + uid_str + " 1";
+  std::string gid_map = StringifyInt(map_gid_to) + " " + gid_str + " 1";
 
-  return true;
+  int fd;
+  ssize_t nbytes;
+  fd = open("/proc/self/setgroups", O_WRONLY);
+  if (fd < 0) return kFailNsSetgroupsOpen;
+  nbytes = write(fd, "deny", 4);
+  close(fd);
+  if (nbytes != 4) return kFailNsSetgroupsWrite;
+
+  fd = open("/proc/self/uid_map", O_WRONLY);
+  if (fd < 0) return kFailNsMapUidOpen;
+  nbytes = write(fd, uid_map.data(), uid_map.length());
+  close(fd);
+  if (nbytes != static_cast<ssize_t>(uid_map.length()))
+    return kFailNsMapUidWrite;
+
+  fd = open("/proc/self/gid_map", O_WRONLY);
+  if (fd < 0) return kFailNsMapGidOpen;
+  nbytes = write(fd, gid_map.data(), gid_map.length());
+  close(fd);
+  if (nbytes != static_cast<ssize_t>(gid_map.length()))
+    return kFailNsMapGidWrite;
+
+  return kFailNsOk;
 #else
-  return false;
+  return kFailNsUnsuppored;
 #endif
 }
 
@@ -83,6 +100,16 @@ bool BindMount(const std::string &from, const std::string &to) {
   return false;
 #else
   int rvi = mount(from.c_str(), to.c_str(), "", MS_BIND | MS_REC, NULL);
+  return rvi == 0;
+#endif
+}
+
+
+bool ProcMount(const std::string &to) {
+#ifdef __APPLE__
+  return false;
+#else
+  int rvi = mount("proc", to.c_str(), "proc", 0, NULL);
   return rvi == 0;
 #endif
 }
@@ -103,10 +130,23 @@ bool CreateMountNamespace() {
 }
 
 
+namespace {
+
+static void Reaper(int /*sig*/, siginfo_t * /*siginfo*/, void * /*context*/) {
+  while (true) {
+    pid_t retval = waitpid(-1, NULL, WNOHANG);
+    if (retval <= 0)
+      return;
+  }
+}
+
+}  // anonymous namespace
+
+
 /**
  * The fd_parent file descriptor, if passed, is the read end of a pipe whose
  * write end is connected to the parent process.  This gives the namespace's
- * init process a means to detect when the parent process is terminated.
+ * init process a means to know its pid in the context of the parent namespace.
  */
 bool CreatePidNamespace(int *fd_parent) {
 #ifdef CVMFS_HAS_UNSHARE
@@ -129,14 +169,15 @@ bool CreatePidNamespace(int *fd_parent) {
       // Parent, wait for the namespace to exit
 
       // Close all file descriptors
-      max_fd = sysconf(_SC_OPEN_MAX);
+      max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
       for (int fd = 0; fd < max_fd; fd++) {
         if (fd != pipe_parent[1])
           close(fd);
       }
 
-      char c = 'x';
-      SafeWrite(pipe_parent[1], &c, 1);
+      pid_t parent_pid = getpid();
+      SafeWrite(pipe_parent[1], &parent_pid, sizeof(parent_pid));
+      SafeWrite(pipe_parent[1], &pid, sizeof(pid));
 
       rvi = waitpid(pid, &status, 0);
       if (rvi >= 0) {
@@ -151,6 +192,13 @@ bool CreatePidNamespace(int *fd_parent) {
 
   // Note: only signals for which signal handlers are established can be sent
   // by other processes of this pid namespace to the init process
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = Reaper;
+  sa.sa_flags = SA_SIGINFO;
+  sigfillset(&sa.sa_mask);
+  rvi = sigaction(SIGCHLD, &sa, NULL);
+  assert(rvi == 0);
 
   rvi = mount("", "/proc", "proc", 0, NULL);
   return rvi == 0;

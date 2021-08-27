@@ -1,9 +1,17 @@
-
 %{?suse_version:%define dist .suse%suse_version}
 %if 0%{?suse_version} == 1315
 %define sle12 1
 %define dist .sle12
 %endif
+%if 0%{?suse_version} == 1500
+%define sle15 1
+%define dist .sle15
+%endif
+%if 0%{?dist:1}
+%else
+  %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
+%endif
+
 %if 0%{?rhel} >= 6 || 0%{?fedora}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
@@ -11,33 +19,48 @@
 %if 0%{?rhel} >= 7 || 0%{?fedora}
 %define selinux_cvmfs_server 1
 %endif
+
 %if 0%{?rhel} >= 7 || 0%{?fedora} >= 29
   %if "%{?_arch}" != "aarch64"
+    %define build_gateway 1
     %define build_ducc 1
   %endif
 %endif
-%if 0%{?dist:1}
-%else
-  %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
-  %if 0%{?redhat_major} == 4
-    %define el4 1
-    %define dist .el4
-  %endif
+%if 0%{?sle15}
+  %define build_gateway 1
+  %define build_ducc 1
 %endif
 
+
 # List of platforms that require systemd/autofs fix as described in CVM-1200
-%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
 %define systemd_autofs_patch 1
 %endif
 
-# fuse3 is in epel starting with epel6
+# fuse3 is in epel starting with epel6;
+# the fuse3 libraries are available in SLES 15, too, but the devel package is missing
 %if 0%{?fedora} >= 29 || 0%{?rhel} >= 6
 %define build_fuse3 1
 %endif
 
 %define cvmfs_python python
+%define cvmfs_python_devel python-devel
+%define cvmfs_python_setuptools python-setuptools
 %if 0%{?el8} || 0%{?fedora} >= 31
 %define cvmfs_python python2
+%define cvmfs_python_devel python2-devel
+%define cvmfs_python_setuptools python2-setuptools
+%endif
+# On SLES15, we need the python2 interpreter but python3 devel and setuptools
+# TODO(jblomer): upgrade all python components to Python3
+%if 0%{?sle15}
+%define cvmfs_python_devel python3-devel
+%define cvmfs_python_setuptools python3-setuptools
+%endif
+
+%define cvmfs_go golang
+%if 0%{?sle15}
+%define cvmfs_go go
 %endif
 
 %define hardlink /usr/sbin/hardlink
@@ -53,8 +76,9 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.8.0
+Version: 2.9.0
 Release: 1%{?dist}
+URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
 Source1: cvmfs.te
@@ -90,16 +114,20 @@ BuildRequires: libattr-devel
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig
-BuildRequires: %{cvmfs_python}-devel
+BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
+BuildRequires: zlib-devel
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
+BuildRequires: systemd
+%endif
 
 Requires: bash
 Requires: coreutils
 Requires: grep
 Requires: gawk
 Requires: sed
-Requires: perl
 Requires: psmisc
+Requires: lsof
 Requires: autofs
 Requires: fuse
 Requires: curl
@@ -111,7 +139,9 @@ Requires: gdb
 Requires: aaa_base
 Requires: libfuse2
 Requires: glibc
+  %if 0%{?suse_version} < 1500
 Requires: pwdutils
+  %endif
   %if 0%{?suse_version} < 1200
 Requires: sysvinit
   %else
@@ -138,10 +168,6 @@ Requires: util-linux-ng
 Requires: util-linux
     %endif
   %endif
-%endif
-%if 0%{?fedora}
-# For cvmfs_talk, does not necessarily come with Fedora >= 25
-Requires: perl-Getopt-Long
 %endif
 Requires: cvmfs-config
 
@@ -184,12 +210,16 @@ CernVM-FS static client library for pure user-space use
 %package server
 Summary: CernVM-FS server tools
 Group: Application/System
-BuildRequires: %{cvmfs_python}-devel
+BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
 BuildRequires: unzip
-BuildRequires: %{cvmfs_python}-setuptools
+BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}
+  %if 0%{?suse_version} < 1500
 Requires: insserv
+  %else
+Requires: libcap-progs
+  %endif
 %else
 Requires: initscripts
 %endif
@@ -203,7 +233,11 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
+%if 0%{?sle15}
+Requires: libcap2
+%else
 Requires: libcap
+%endif
 Requires: lsof
 Requires: rsync
 Requires: usbutils
@@ -234,12 +268,22 @@ Group: Application/System
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
+%if 0%{?build_gateway}
+%package gateway
+Summary: CernVM-FS Repository Gateway
+Group: Application/System
+BuildRequires: %{cvmfs_go} >= 1.11.4
+Requires: cvmfs-server = %{version}
+%description gateway
+The CernVM-FS repository gateway service enables multiple remote publishers
+to write to the same repository.
+%endif
+
 %if 0%{?build_ducc}
 %package ducc
 Summary: ducc: Daemon Unpacking Containers in CVMFS
 Group: Application/System
-BuildRequires: golang >= 1.11.4
-Requires: singularity >= 3.5
+BuildRequires: %{cvmfs_go} >= 1.11.4
 %description ducc
 Daemon to automatically unpack and expose containers images into CernVM-FS
 %endif
@@ -270,6 +314,10 @@ export CFLAGS="$CFLAGS -O0"
 export CXXFLAGS="$CXXFLAGS -O0"
 %endif
 
+BUILD_GATEWAY=no
+%if 0%{?build_gateway}
+BUILD_GATEWAY=yes
+%endif
 BUILD_DUCC=no
 %if 0%{?build_ducc}
 BUILD_DUCC=yes
@@ -279,10 +327,13 @@ BUILD_DUCC=yes
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
   -DBUILD_SERVER_DEBUG=yes \
+  -DBUILD_RECEIVER=yes \
+  -DBUILD_RECEIVER_DEBUG=yes \
   -DBUILD_LIBCVMFS=yes \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
   -DBUILD_UNITTESTS=yes \
+  -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DINSTALL_UNITTESTS=yes \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
@@ -294,10 +345,13 @@ EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
 %cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
   -DBUILD_SERVER_DEBUG=yes \
+  -DBUILD_RECEIVER=yes \
+  -DBUILD_RECEIVER_DEBUG=yes \
   -DBUILD_LIBCVMFS=yes \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
   -DBUILD_UNITTESTS=yes \
+  -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
 %endif
@@ -365,6 +419,16 @@ if [ $? -ne 0 ]; then
   /usr/sbin/usermod -aG fuse cvmfs > /dev/null 2>&1 || :
 fi
 
+%if 0%{?build_gateway}
+%pre gateway
+if $(systemctl is-active --quiet cvmfs-gateway); then
+  systemctl stop cvmfs-gateway
+fi
+if $(systemctl is-active --quiet cvmfs-gateway@*); then
+  systemctl stop cvmfs-gateway@*
+fi
+%endif
+
 %install
 export DONT_STRIP=1
 rm -rf $RPM_BUILD_ROOT
@@ -379,6 +443,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/cvmfs-server
 
 # Keys and configs are in cvmfs-config
 rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
+rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/README
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
@@ -423,6 +488,10 @@ KillMode=process
 EOF
 %endif
 
+%if 0%{?build_gateway}
+mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs-gateway
+%endif
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -462,6 +531,12 @@ fi
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
+/sbin/ldconfig
+
+%if 0%{?build_gateway}
+%post gateway
+systemctl daemon-reload
+%endif
 
 %preun
 if [ $1 = 0 ] ; then
@@ -473,6 +548,18 @@ if [ $1 = 0 ] ; then
 
   /usr/bin/cvmfs_config umount
 fi
+
+%if 0%{?build_gateway}
+%preun gateway
+if [ $1 = 0 ]; then
+  if $(systemctl is-active --quiet cvmfs-gateway); then
+    systemctl stop cvmfs-gateway
+  fi
+  if $(systemctl is-active --quiet cvmfs-gateway@*); then
+    systemctl stop cvmfs-gateway@*
+  fi
+fi
+%endif
 
 %postun
 if [ $1 -eq 0 ]; then
@@ -496,12 +583,19 @@ if [ $1 -eq 0 ]; then
     done
 fi
 %endif
+/sbin/ldconfig
 
 %postun server
 %if 0%{?selinux_cvmfs_server}
 if [ $1 -eq 0 ]; then
   /usr/sbin/semanage port -d -t http_port_t -p tcp 8000 2>/dev/null || :
 fi
+%endif
+/sbin/ldconfig
+
+%if 0%{?build_gateway}
+%postun gateway
+systemctl daemon-reload
 %endif
 
 
@@ -567,6 +661,7 @@ fi
 %{_bindir}/cvmfs_publish
 %{_bindir}/cvmfs_publish_debug
 %{_bindir}/cvmfs_receiver
+%{_bindir}/cvmfs_receiver_debug
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
@@ -580,9 +675,6 @@ fi
 %dir %{_sysconfdir}/cvmfs/repositories.d
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
-/usr/share/cvmfs-server/generate_stats_plots.C
-/usr/share/cvmfs-server/stats_index.html.tpl
-/usr/share/cvmfs-server/upload_stats_plots.sh
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
@@ -601,6 +693,17 @@ fi
 %{_bindir}/cvmfs_test_publish
 %doc COPYING AUTHORS README.md ChangeLog
 
+%if 0%{?build_gateway}
+%files gateway
+%{_bindir}/cvmfs_gateway
+/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+%{_unitdir}/cvmfs-gateway.service
+%{_unitdir}/cvmfs-gateway@.service
+%dir /var/lib/cvmfs-gateway
+%config(noreplace) %{_sysconfdir}/cvmfs/gateway/repo.json
+%config(noreplace) %{_sysconfdir}/cvmfs/gateway/user.json
+%endif
+
 %if 0%{?build_ducc}
 %files ducc
 %{_bindir}/cvmfs_ducc
@@ -608,6 +711,14 @@ fi
 %endif
 
 %changelog
+* Wed Aug 25 2021 Jakob Blomer <jblomer@cern.ch> - 2.8.2
+- Add lsof dependency for cvmfs package due to new cvmfs_config fuser command
+* Fri May 7 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Add gateway sub package
+* Tue Apr 27 2021 Michael Brown <mbrown@fensystems.co.uk> - 2.9.0
+- Add cvmfs_receiver_debug binary
+* Mon Apr 19 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Add SLES15 support
 * Tue Apr 14 2020 Jan Priessnitz <jan.priessnitz@cern.ch> - 2.7.2
 - Fix python2-devel dependency for Fedora >=31
 - Change to /usr/bin/hardlink for Fedora >=31

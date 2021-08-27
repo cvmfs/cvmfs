@@ -20,6 +20,7 @@
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "loader.h"
+#include "magic_xattr.h"
 #include "util/algorithm.h"
 #include "util/pointer.h"
 
@@ -419,8 +420,8 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string fqrn() const { return fqrn_; }
   cvmfs::Fetcher *external_fetcher() { return external_fetcher_; }
   FileSystem *file_system() { return file_system_; }
+  MagicXattrManager *magic_xattr_mgr() { return magic_xattr_mgr_; }
   bool has_membership_req() { return has_membership_req_; }
-  bool hide_magic_xattrs() { return hide_magic_xattrs_; }
   bool enforce_acls() { return enforce_acls_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
@@ -436,6 +437,9 @@ class MountPoint : SingleCopy, public BootFactory {
   SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
   perf::Statistics *statistics() { return statistics_; }
   signature::SignatureManager *signature_mgr() { return signature_mgr_; }
+  uid_t talk_socket_uid() { return talk_socket_uid_; }
+  gid_t talk_socket_gid() { return talk_socket_gid_; }
+  std::string talk_socket_path() { return talk_socket_path_; }
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
 
@@ -499,7 +503,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool CreateCatalogManager();
   void CreateTables();
   bool CreateTracer();
-  void SetupBehavior();
+  bool SetupBehavior();
   void SetupDnsTuning(download::DownloadManager *manager);
   void SetupHttpTuning();
   bool SetupExternalDownloadMgr(bool dogeosort);
@@ -541,6 +545,7 @@ class MountPoint : SingleCopy, public BootFactory {
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
   glue::NentryTracker *nentry_tracker_;
+  MagicXattrManager *magic_xattr_mgr_;
 
   file_watcher::FileWatcher* resolv_conf_watcher_;
 
@@ -548,7 +553,6 @@ class MountPoint : SingleCopy, public BootFactory {
   pthread_mutex_t lock_max_ttl_;
   double kcache_timeout_sec_;
   bool fixed_catalog_;
-  bool hide_magic_xattrs_;
   bool enforce_acls_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
@@ -556,6 +560,10 @@ class MountPoint : SingleCopy, public BootFactory {
   // TODO(jblomer): this should go in the catalog manager
   std::string membership_req_;
   bool has_membership_req_;
+
+  std::string talk_socket_path_;
+  uid_t talk_socket_uid_;
+  gid_t talk_socket_gid_;
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_

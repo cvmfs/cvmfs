@@ -886,6 +886,118 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
 
 
 /**
+ * Swap in a new nested catalog
+ *
+ * The old nested catalog must not have been already attached to the
+ * catalog tree.  This method will not attach the new nested catalog
+ * to the catalog tree.
+ *
+ * @param mountpoint - the path of the nested catalog to be removed
+ * @param new_hash - the hash of the new nested catalog
+ * @param new_size - the size of the new nested catalog
+ */
+void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
+                                               const shash::Any &new_hash,
+                                               const uint64_t new_size) {
+  const string nested_root_path = MakeRelativePath(mountpoint);
+  const string parent_path = GetParentPath(nested_root_path);
+  const PathString nested_root_ps = PathString(nested_root_path);
+
+  SyncLock();
+
+  // Find the immediate parent catalog
+  WritableCatalog *parent = NULL;
+  if (!FindCatalog(parent_path, &parent)) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': could not find parent '%s'",
+          nested_root_path.c_str(), parent_path.c_str());
+  }
+
+  // Get old nested catalog counters
+  Catalog *old_attached_catalog = parent->FindChild(nested_root_ps);
+  Counters old_counters;
+  if (old_attached_catalog) {
+    // Old catalog was already attached (e.g. as a child catalog
+    // attached by a prior call to CreateNestedCatalog()).  Ensure
+    // that it has not been modified, get counters, and detach it.
+    WritableCatalogList list;
+    if (GetModifiedCatalogLeafsRecursively(old_attached_catalog, &list)) {
+      PANIC(kLogStderr,
+            "failed to swap nested catalog '%s': already modified",
+            nested_root_path.c_str());
+    }
+    old_counters = old_attached_catalog->GetCounters();
+    DetachSubtree(old_attached_catalog);
+
+  } else {
+    // Old catalog was not attached.  Download a freely attached
+    // version and get counters.
+    shash::Any old_hash;
+    uint64_t old_size;
+    const bool old_found = parent->FindNested(nested_root_ps, &old_hash,
+                                              &old_size);
+    if (!old_found) {
+      PANIC(kLogStderr,
+            "failed to swap nested catalog '%s': not found in parent",
+            nested_root_path.c_str());
+    }
+    UniquePtr<Catalog> old_free_catalog(
+      LoadFreeCatalog(nested_root_ps, old_hash));
+    if (!old_free_catalog.IsValid()) {
+      PANIC(kLogStderr,
+            "failed to swap nested catalog '%s': failed to load old catalog",
+            nested_root_path.c_str());
+    }
+    old_counters = old_free_catalog->GetCounters();
+  }
+
+  // Load freely attached new catalog
+  UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
+  if (!new_catalog.IsValid()) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': failed to load new catalog",
+          nested_root_path.c_str());
+  }
+
+  // Get new catalog root directory entry
+  DirectoryEntry dirent;
+  XattrList xattrs;
+  const bool dirent_found = new_catalog->LookupPath(nested_root_ps, &dirent);
+  if (!dirent_found) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': missing dirent in new catalog",
+          nested_root_path.c_str());
+  }
+  if (dirent.HasXattrs()) {
+    const bool xattrs_found = new_catalog->LookupXattrsPath(nested_root_ps,
+                                                            &xattrs);
+    if (!xattrs_found) {
+      PANIC(kLogStderr,
+            "failed to swap nested catalog '%s': missing xattrs in new catalog",
+            nested_root_path.c_str());
+    }
+  }
+
+  // Swap catalogs
+  parent->RemoveNestedCatalog(nested_root_path, NULL);
+  parent->InsertNestedCatalog(nested_root_path, NULL, new_hash, new_size);
+
+  // Update parent directory entry
+  dirent.set_is_nested_catalog_mountpoint(true);
+  dirent.set_is_nested_catalog_root(false);
+  parent->UpdateEntry(dirent, nested_root_path);
+  parent->TouchEntry(dirent, xattrs, nested_root_path);
+
+  // Update counters
+  DeltaCounters delta = Counters::Diff(old_counters,
+                                       new_catalog->GetCounters());
+  delta.PopulateToParent(&parent->delta_counters_);
+
+  SyncUnlock();
+}
+
+
+/**
  * Checks if a nested catalog starts at this path.  The path must be valid.
  */
 bool WritableCatalogManager::IsTransitionPoint(const string &mountpoint) {

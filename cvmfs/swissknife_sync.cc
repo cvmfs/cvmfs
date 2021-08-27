@@ -16,8 +16,9 @@
  * to allow Apache to follow the symlinks.
  */
 
+// NOLINTNEXTLINE
 #define _FILE_OFFSET_BITS 64
-
+// NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 
 #include "swissknife_sync.h"
@@ -41,6 +42,7 @@
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
+#include "monitor.h"
 #include "path_filters/dirtab.h"
 #include "platform.h"
 #include "reflog.h"
@@ -139,7 +141,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   UniquePtr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
-          dir_temp, volatile_content, voms_authz, spooler));
+          dir_temp, volatile_content, voms_authz, spooler.weak_ref()));
   if (!manifest.IsValid()) {
     PrintError("Failed to create new repository");
     return 1;
@@ -412,6 +414,12 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     // check if path points to a directory
     platform_stat64 candidate_info;
     const int lstat_retval = platform_lstat(candidate.c_str(), &candidate_info);
+    if (lstat_retval != 0) {
+      LogCvmfs(kLogCatalog, kLogDebug | kLogStderr | kLogSyslogErr,
+               "Error in processing .cvmfsdirtab: cannot access %s (%d)",
+               candidate.c_str(), errno);
+      abort();
+    }
     assert(lstat_retval == 0);
     if (!S_ISDIR(candidate_info.st_mode)) {
       // The GLOB_ONLYDIR flag is only a hint, non-directories can still be
@@ -545,10 +553,11 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 
     if (arg != args.end()) {
       size_t arg_value = static_cast<size_t>(String2Uint64(*arg->second));
-      if (arg_value > 0)
+      if (arg_value > 0) {
         *i->save_to = arg_value;
-      else
+      } else {
         return false;
+      }
     }
   }
 
@@ -558,6 +567,18 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   string start_time = GetGMTimestamp();
+
+  // Spawn monitoring process (watchdog)
+  std::string watchdog_dir = "/tmp";
+  char watchdog_path[PATH_MAX];
+  std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
+  int path_size = snprintf(watchdog_path, sizeof(watchdog_path),
+                           "%s/cvmfs-swissknife-sync-stacktrace.%s.%d",
+                           watchdog_dir.c_str(), timestamp.c_str(), getpid());
+  assert(path_size > 0);
+  assert(path_size < PATH_MAX);
+  UniquePtr<Watchdog> watchdog(Watchdog::Create(std::string(watchdog_path)));
+  watchdog->Spawn();
 
   SyncParameters params;
 
@@ -589,6 +610,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
   if (args.find('Y') != args.end()) params.external_data = true;
+  if (args.find('W') != args.end()) params.direct_io = true;
   if (args.find('S') != args.end()) {
     bool retval = catalog::VirtualCatalog::ParseActions(
         *args.find('S')->second, &params.virtual_dir_actions);
@@ -710,7 +732,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
 
-  perf::StatisticsTemplate publish_statistics("Publish", this->statistics());
+  perf::StatisticsTemplate publish_statistics("publish", this->statistics());
 
   // Start spooler
   upload::SpoolerDefinition spooler_definition(
@@ -736,7 +758,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs.IsValid()) return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
-  if (!InitDownloadManager(follow_redirects)) {
+  const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
+  if (!InitDownloadManager(follow_redirects, proxy)) {
     return 3;
   }
 
@@ -745,16 +768,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  bool with_gateway =
-      spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
   /*
    * Note: If the upstream is of type gateway, due to the possibility of
-   * concurrent
-   *       release managers, it's possible to have a different local and remote
-   * root
-   *       hashes. We proceed by loading the remote manifest but we give an
-   * empty base
-   *       hash.
+   * concurrent release managers, it's possible to have a different local and
+   * remote root hashes. We proceed by loading the remote manifest but we give
+   * an empty base hash.
    */
   UniquePtr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
@@ -765,15 +783,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     manifest = this->OpenLocalManifest(params.manifest_path);
     params.base_hash = manifest->catalog_hash();
   } else {
-    if (with_gateway) {
-      manifest =
-          FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any());
-    } else {
-      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                     params.base_hash);
-    }
+    // TODO(jblomer): revert to params.base_hash if spooler driver type is not
+    // upload::SpoolerDefinition::Gateway
+    manifest =
+      FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any());
   }
-  if (!manifest) {
+  if (!manifest.IsValid()) {
     return 3;
   }
 
@@ -783,13 +798,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
   catalog::WritableCatalogManager catalog_manager(
-      params.base_hash, params.stratum0, params.dir_temp, spooler_catalogs,
+      params.base_hash, params.stratum0, params.dir_temp,
+      spooler_catalogs.weak_ref(),
       download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
       params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
       params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
+  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 
   // Should be before the syncronization starts to avoid race of GetTTL with
   // other sqlite operations
@@ -869,9 +886,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
-  perf::Counter *revision_counter = statistics()->Register("Publish.revision",
+  perf::Counter *revision_counter = statistics()->Register("publish.revision",
                                                   "Published revision number");
-  revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
+  revision_counter->Set(static_cast<int64_t>(
+    catalog_manager.GetRootCatalog()->revision()));
 
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");

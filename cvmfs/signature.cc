@@ -41,7 +41,7 @@ using namespace std;  // NOLINT
 
 namespace signature {
 
-const char *kDefaultPublicKey = "/etc/cvmfs/keys/cern.ch.pub";
+const char *kDefaultPublicKey = "/etc/cvmfs/keys/cern.ch/cern-it4.pub";
 
 
 static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {

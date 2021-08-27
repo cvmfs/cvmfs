@@ -19,7 +19,7 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
-CVMFS_CONFIG_PACKAGE="cvmfs-config-default-1.7-1.noarch.rpm"
+CVMFS_CONFIG_PACKAGE="cvmfs-config-default-2.0-1.noarch.rpm"
 
 rpm_infra_dirs="BUILD RPMS SOURCES SRPMS TMP"
 rpm_src_dir="${CVMFS_SOURCE_LOCATION}/packaging/rpm"
@@ -85,5 +85,6 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
     "$CVMFS_CONFIG_PACKAGE"                                                   \
     "$(basename $(find . -regex '.*cvmfs-shrinkwrap-[0-9].*\.rpm'))"          \
     "$(basename $(find . -regex '.*cvmfs-ducc-[0-9].*\.rpm'))"                \
-    "$(basename $(find . -regex '.*cvmfs-fuse3-[0-9].*\.rpm'))"
+    "$(basename $(find . -regex '.*cvmfs-fuse3-[0-9].*\.rpm'))"               \
+    "$(basename $(find . -regex '.*cvmfs-gateway-[0-9].*\.rpm'))"
 fi

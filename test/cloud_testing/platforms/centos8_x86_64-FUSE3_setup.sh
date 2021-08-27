@@ -32,6 +32,9 @@ install_from_repo wget
 
 install_from_repo python2
 
+# For 006 kernel compile
+install_from_repo openssl-devel
+
 # traffic shaping
 # install_from_repo trickle
 # TODO: uncomment once trickle is available for Centos 8

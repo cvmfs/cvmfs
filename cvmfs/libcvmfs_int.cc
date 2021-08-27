@@ -61,7 +61,7 @@
 #include "libcvmfs.h"
 #include "logging.h"
 #include "lru_md.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "platform.h"
 #include "quota.h"
 #include "shortstring.h"
@@ -756,4 +756,32 @@ int LibContext::Close(int fd) {
     file_system()->cache_mgr()->Close(fd);
   }
   return 0;
+}
+
+int LibContext::Remount() {
+  LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
+  catalog::LoadError retval =
+    mount_point_->catalog_mgr()->Remount(true /* dry_run */);
+  switch (retval) {
+    case catalog::kLoadUp2Date:
+      LogCvmfs(kLogCvmfs, kLogDebug, "catalog up to date");
+      return 0;
+
+    case catalog::kLoadNew:
+      retval = mount_point_->catalog_mgr()->Remount(false /* dry_run */);
+      if (retval != catalog::kLoadNew)
+        return -1;
+      mount_point_->ReEvaluateAuthz();
+      LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %d",
+               mount_point_->catalog_mgr()->GetRevision());
+      return 0;
+
+    default:
+      return -1;
+  }
+}
+
+
+uint64_t LibContext::GetRevision() {
+  return mount_point_->catalog_mgr()->GetRevision();
 }

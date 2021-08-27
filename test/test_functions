@@ -59,7 +59,6 @@ if [ ! -z "$CVMFS_TEST_GEO_LICENSE_KEY" ]; then
   echo "CVMFS_GEO_LICENSE_KEY=$CVMFS_TEST_GEO_LICENSE_KEY" | sudo tee /etc/cvmfs/server.local > /dev/null
 fi
 
-
 if [ -f /.dockerinit ]; then
   CVMFS_TEST_DOCKER=yes
 else
@@ -191,6 +190,10 @@ elif which apache2 >/dev/null 2>&1; then # Debian based
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN=$(which apache2)
+elif which /usr/sbin/apache2 >/dev/null 2>&1; then # newer Ubuntu
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=/usr/sbin/apache2
 else
   APACHE_SERVICE="httpd" # EL based
   APACHE_CONF=${APACHE_SERVICE}
@@ -395,6 +398,27 @@ uses_overlayfs() {
 }
 
 
+is_linux() {
+  [ x"$(uname)" = x"Linux" ]
+}
+
+
+is_macos() {
+  [ x"$(uname)" = x"Darwin" ]
+}
+
+
+get_number_of_cpu_cores() {
+  if is_linux; then
+    cat /proc/cpuinfo | grep -e '^processor' | wc -l
+  elif is_macos; then
+    sysctl -n hw.ncpu
+  else
+    echo "1"
+  fi
+}
+
+
 break_hardlink() {
   local path="$1"
   local tmp_file="$(mktemp)"
@@ -422,8 +446,8 @@ cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null                   || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                   || return 101
   sudo rm -f /etc/cvmfs/default.local                    || return 102
-  sudo sh -c "rm -f /etc/cvmfs/config.d/*"               || return 103
-  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 104
+  sudo sh -c "rm -f /etc/cvmfs/config.d/*.local"         || return 104
+  sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 105
 
   wait_for_umount || return 99
 
@@ -462,13 +486,17 @@ cvmfs_mount() {
   sudo sh -c "echo \"CVMFS_HTTP_PROXY=\\\"${CVMFS_TEST_PROXY}\\\"\" >> /etc/cvmfs/default.local" || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
-  sudo sh -c 'echo "CVMFS_SERVER_URL=http://cvmfs-atlas-nightlies.cern.ch/cvmfs/atlas-nightlies.cern.ch" > /etc/cvmfs/config.d/atlas-nightlies.cern.ch.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
+  sudo sh -c "echo CVMFS_REPOSITORY_TAG=TESTING > /etc/cvmfs/config.d/cvmfs-config.cern.ch.local" || return 100
 
   # add additional parameters
+  local proberunner
   while [ $# -gt 0 ]; do
     local param="$1"
-    sudo sh -c "echo \"$1\" >> /etc/cvmfs/default.local" || return 100
+    if [ "$param" = "CVMFS_SUID=yes" ]; then
+      proberunner="sudo"
+    fi
+    sudo sh -c "echo \"$param\" >> /etc/cvmfs/default.local" || return 100
     shift 1
   done
 
@@ -479,8 +507,11 @@ cvmfs_mount() {
   if running_on_osx; then
     cvmfs_mount_direct $repositories
   fi
+  if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ]; then
+    cvmfs_mount_direct $repositories
+  fi
 
-  cvmfs_config probe > /dev/null 2>&1 || return 101
+  $proberunner cvmfs_config probe > /dev/null 2>&1 || return 101
 
   return 0
 }
@@ -489,7 +520,7 @@ cvmfs_mount() {
 _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
-  mkdir -p "/cvmfs/$repository" || sudo mkdir -p "/cvmfs/$repository"
+  mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
   sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
 }
 
@@ -578,6 +609,7 @@ CVMFS_GENERAL_WARNING_FLAG=0
 CVMFS_MEMORY_WARNING=254
 CVMFS_TIME_WARNING=253
 CVMFS_GENERAL_WARNING=252
+CVMFS_TEST_RETVAL_TIMEOUT=251
 mangle_test_retval() {
   local prior_retval=$1
 
@@ -684,7 +716,7 @@ destroy_repo() {
 
 has_repo() {
   local repo=$1
-  cvmfs_server list 2>/dev/null | grep -q "^$repo "
+  cvmfs_server list 2>/dev/null | grep "^$repo " | grep -q -F "$repo"
 }
 
 
@@ -1194,8 +1226,9 @@ check_repo_integrity() {
 # @param repo    the repository you want to start the transaction for
 start_transaction() {
   local repo=$1
+  shift
 
-  cvmfs_server transaction $repo || return 100
+  cvmfs_server transaction $@ $repo || return 100
   return 0
 }
 
@@ -1507,6 +1540,15 @@ get_apache_config_filename() {
   echo "${repo_name}.conf"
 }
 
+get_backend_spooler() {
+  if [ -n "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE}" ] ; then
+    # A gateway test is running: access the backend storage directly
+    echo "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE}"
+  else
+    echo "${CVMFS_UPSTREAM_STORAGE}"
+  fi
+}
+
 
 cleanup_legacy_repo_leftovers() {
   local legacy_repo_name="$1"
@@ -1548,9 +1590,9 @@ _resign_legacy_repository() {
   echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$repo_name" >> ${whitelist}.unsigned
   openssl x509 -in /etc/cvmfs/keys/${repo_name}.crt -outform der | \
-    cvmfs_swissknife hash -a sha1 -f >> ${whitelist}.unsigned || return 2
+    cvmfs_publish hash -a sha1 -f >> ${whitelist}.unsigned || return 2
   local hash;
-  hash=`cat ${whitelist}.unsigned | cvmfs_swissknife hash -a sha1`
+  hash=`cat ${whitelist}.unsigned | cvmfs_publish hash -a sha1`
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
@@ -1634,7 +1676,7 @@ peek_backend_raw() {
   local remote_path="$2"
 
   load_repo_config $repo_name
-  cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
+  cvmfs_swissknife peek -d $remote_path -r $(get_backend_spooler)
 }
 
 
@@ -1675,7 +1717,7 @@ delete_from_backend() {
   local remote_path="$2"
 
   load_repo_config $repo_name
-  cvmfs_swissknife remove -o $remote_path -r $CVMFS_UPSTREAM_STORAGE
+  cvmfs_swissknife remove -o $remote_path -r $(get_backend_spooler)
 }
 
 
@@ -1691,12 +1733,13 @@ upload_into_backend() {
 
   load_repo_config $repo_name
 
-  if [ x"$(echo "$CVMFS_UPSTREAM_STORAGE" | cut -f1 -d',')" = x"S3" ]; then
+  local spooler=$(get_backend_spooler)
+  if [ x"$(echo "$spooler" | cut -f1 -d',')" = x"S3" ]; then
     delete_from_backend $repo_name $remote_path # S3 does a lazy upload
   fi
   cvmfs_swissknife upload -i $file_path              \
                           -o $remote_path            \
-                          -r $CVMFS_UPSTREAM_STORAGE \
+                          -r $spooler                \
                           -a $CVMFS_HASH_ALGORITHM
 }
 
@@ -2222,7 +2265,7 @@ xunit_preamble() {
   cat > $xml_file << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
-  <testsuite name="$CVMFS_TEST_SUITE_NAME" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
+  <testsuite hostname="$CVMFS_PLATFORM_NAME" name="$CVMFS_TEST_SUITE_NAME" timestamp="$CVMFS_TIMESTAMP" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
 EOF
 }
 
@@ -2383,9 +2426,9 @@ try_automount() {
 #
 # @param optional  a list of files that should be appended to stdout
 cat_syslog() {
+  sync
+  sleep 1
   if running_on_osx; then
-    sync
-    sleep 1
     log show --style syslog --info --last 4h
   else
     local syslog_file=""
@@ -2454,8 +2497,10 @@ find_or_build_cvmfs_preload() {
         -DBUILD_UNITTESTS=no       \
         -DBUILD_UNITTESTS_DEBUG=no \
         -DBUILD_LIBCVMFS=no        \
+        -DBUILD_LIBCVMFS_CACHE=no  \
         -DINSTALL_MOUNT_SCRIPTS=no \
         -DBUILD_DOCUMENTATION=no   \
+        -DBUILD_RECEIVER=no        \
         $cvmfs_source_dir > $cvmfs_preload_build_log 2>&1 || return 4
   make -j $(nproc)        > $cvmfs_preload_build_log 2>&1 || return 5
 

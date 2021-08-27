@@ -9,7 +9,7 @@
 
 namespace receiver {
 
-bool IsPathInLease(const PathString& lease, const PathString& path);
+bool IsSubPath(const PathString& parent, const PathString& path);
 
 }
 

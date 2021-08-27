@@ -1,77 +1,62 @@
 #
 # Test for the cvmfs_server transaction command returns codes
-# 
+#
 # This sets up a repository with gateway and simulates the case
-# when another release manager has already taken the lock for 
+# when another release manager has already taken the lock for
 # the path we want.
 
 cvmfs_test_name="Lease contention with repository gateway"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-clean_up() {
-    echo "Cleaning up"
 
-    echo "  Removing output directories"
-    rm -rvf /tmp/cvmfs_out_*
-}
-
-
-run_transactions() {
-    set_up_repository_gateway
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
 
     ## Transaction 1 (Creating a new deep directory sub-tree in place of a former file)
-    echo "  Starting transaction 1"
+    echo "  *** Starting transaction 1"
+    cvmfs_server transaction test.repo.org || return 10
+    mkdir -p /cvmfs/test.repo.org/new/c/d || return 11
+    echo "New file" > /cvmfs/test.repo.org/new/c/d/new_file.txt || return 12
+
+    echo "  *** Checking that we cannot open a transaction again"
     cvmfs_server transaction test.repo.org
-    if [ $? -ne 0 ]; then
-        echo "Did not manage to  start transaction"
+    if [ $? -ne 17 ]; then
+        echo "cvmfs_server transaction should tell us that we have a transaction already"
         return 20
     fi
 
-    mkdir -p /cvmfs/test.repo.org/new/c/d
-    echo "New file" > /cvmfs/test.repo.org/new/c/d/new_file.txt
-
-    echo "  Checking that we cannot open a transaction again"
-    cvmfs_server transaction test.repo.org
-    retcode=$?
-    if [ $retcode -ne 17 ]; then
-        echo "cvmfs_server transaction should tell us that we have a transaction already"
-        return 21
-    fi
-
-    echo "  Publishing the transaction 1"
-    cvmfs_server publish test.repo.org
-    if [ $? -ne 0 ]; then
-        echo "Did not manage to publish the transaction 1"
-        return 22
-    fi
+    echo "  *** Publishing the transaction 1"
+    cvmfs_server publish test.repo.org || return 30
 
     # Simulating another release manager taking the lease
-    echo "  Simulating another node taking a lock on the path we want"
+    echo "  *** Simulating another node taking a lock on the path we want"
     # session token saved in  /var/spool/cvmfs/test.repo.org/session_token
-    cvmfs_swissknife  lease  -u http://localhost:4929/api/v1 -a acquire -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/new/c
-    if [ $? -ne 0 ]; then
-        echo "Could not acquire lease on directory"
-        return 23
-    fi
+    cvmfs_swissknife lease -u http://localhost:4929/api/v1 -a acquire \
+        -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/new/c \
+        || return 40
+    # We need to remove the token, otherwise it's just taken by the transaction
+    mv /var/spool/cvmfs/test.repo.org/session_token \
+      /var/spool/cvmfs/test.repo.org/session_token.save || return 41
 
-    echo "  Checking that the lease is taken and that cvmfs_transaction fails"
+    echo "  *** Checking that the lease is taken and that cvmfs_transaction fails"
     cvmfs_server transaction test.repo.org/new/c
     retcode=$?
     if [ $retcode -ne 16 ]; then
         echo "Return code should be 16 EBUSY instead of ${retcode}"
-        return 24
+        return 50
     fi
 
+    echo "  *** Checking that the repository is still in a sane state"
+    mv /var/spool/cvmfs/test.repo.org/session_token.save \
+      /var/spool/cvmfs/test.repo.org/session_token || return 60
+    cvmfs_swissknife lease -u http://localhost:4929/api/v1 -a drop \
+      -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/new/c || return 61
+    ls /var/spool/cvmfs/test.repo.org/session_token && return 62
+
+    cvmfs_server transaction test.repo.org/new/c || return 70
+    cvmfs_server abort -f test.repo.org || return 71
+
     return 0
-}
-
-cvmfs_run_test() {
-    trap clean_up EXIT HUP INT TERM || return $?
-
-    run_transactions
-    local status=$?
-
-    return $status
 }
 

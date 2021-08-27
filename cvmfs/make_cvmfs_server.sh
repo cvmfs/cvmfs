@@ -35,6 +35,7 @@ COMPONENTS="\
     server/cvmfs_server_common.sh
     server/cvmfs_server_health_check.sh
     server/cvmfs_server_compat.sh
+    server/cvmfs_server_enter.sh
     server/cvmfs_server_transaction.sh
     server/cvmfs_server_abort.sh
     server/cvmfs_server_publish.sh
@@ -64,6 +65,7 @@ COMPONENTS="\
     server/cvmfs_server_mount.sh
     server/cvmfs_server_skeleton.sh
     server/cvmfs_server_fix_permissions.sh
+    server/cvmfs_server_fix_stats.sh
     server/cvmfs_server_ingest.sh
     server/cvmfs_server_print_stats.sh
     server/cvmfs_server_merge_stats.sh

@@ -40,7 +40,8 @@ CommandMigrate::CommandMigrate() :
 ParameterList CommandMigrate::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v',
-    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink | bulkhash )"));
+    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink | bulkhash | "
+    "stats)"));
   r.push_back(Parameter::Mandatory('r',
     "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Mandatory('u', "upstream definition string"));
@@ -137,7 +138,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   temporary_directory_ = tmp_dir;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
   spooler_ = upload::Spooler::Construct(spooler_definition);
-  if (!spooler_) {
+  if (!spooler_.IsValid()) {
     Error("Failed to create upstream Spooler.");
     return 5;
   }
@@ -233,6 +234,11 @@ int CommandMigrate::Main(const ArgumentList &args) {
     migration_succeeded =
       DoMigrationAndCommit<BulkhashRemovalMigrationWorker>(manifest_path,
                                                            &context);
+  } else if (migration_base == "stats") {
+    StatsMigrationWorker::worker_context context(
+      temporary_directory_, collect_catalog_statistics);
+    migration_succeeded =
+      DoMigrationAndCommit<StatsMigrationWorker>(manifest_path, &context);
   } else {
     const std::string err_msg = "Unknown migration base: " + migration_base;
     Error(err_msg);
@@ -852,7 +858,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 5;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 6;
 
 
 template<class DerivedT>
@@ -862,6 +868,9 @@ CommandMigrate::AbstractMigrationWorker<DerivedT>::GetWritable(
   return dynamic_cast<catalog::WritableCatalog*>(const_cast<catalog::Catalog*>(
     catalog));
 }
+
+
+//------------------------------------------------------------------------------
 
 
 CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
@@ -2028,6 +2037,156 @@ bool CommandMigrate::BulkhashRemovalMigrationWorker::RemoveRedundantBulkHashes(
   bulkhash_removal_sql.Execute();
 
   return db.CommitTransaction();
+}
+
+
+//------------------------------------------------------------------------------
+
+
+CommandMigrate::StatsMigrationWorker::StatsMigrationWorker(
+  const worker_context *context)
+  : AbstractMigrationWorker<StatsMigrationWorker>(context)
+{ }
+
+
+bool CommandMigrate::StatsMigrationWorker::RunMigration(PendingCatalog *data)
+  const
+{
+  return CheckDatabaseSchemaCompatibility(data) &&
+         StartDatabaseTransaction(data) &&
+         RepairStatisticsCounters(data) &&
+         CommitDatabaseTransaction(data);
+}
+
+
+bool CommandMigrate::StatsMigrationWorker::CheckDatabaseSchemaCompatibility(
+  PendingCatalog *data) const
+{
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &clg = data->old_catalog->database();
+  if (clg.schema_version() < 2.5 - catalog::CatalogDatabase::kSchemaEpsilon) {
+    Error("Given catalog schema is < 2.5.", data);
+    return false;
+  }
+
+  if (clg.schema_revision() < 5) {
+    Error("Given catalog revision is < 5", data);
+    return false;
+  }
+
+  return true;
+}
+
+
+bool CommandMigrate::StatsMigrationWorker::StartDatabaseTransaction(
+  PendingCatalog *data) const
+{
+  assert(!data->HasNew());
+  GetWritable(data->old_catalog)->Transaction();
+  return true;
+}
+
+
+bool CommandMigrate::StatsMigrationWorker::RepairStatisticsCounters(
+  PendingCatalog *data) const
+{
+  assert(!data->HasNew());
+  bool retval = false;
+  const catalog::CatalogDatabase &writable =
+    GetWritable(data->old_catalog)->database();
+
+  // Aggregated the statistics counters of all nested catalogs
+  // Note: we might need to wait until nested catalogs are sucessfully processed
+  catalog::DeltaCounters stats_counters;
+  PendingCatalogList::const_iterator i = data->nested_catalogs.begin();
+  PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
+  for (; i != iend; ++i) {
+    const PendingCatalog *nested_catalog = *i;
+    const catalog::DeltaCounters &s = nested_catalog->nested_statistics.Get();
+    s.PopulateToParent(&stats_counters);
+  }
+
+  // Count various directory entry types in the catalog to fill up the catalog
+  // statistics counters introduced in the current catalog schema
+  catalog::SqlCatalog count_regular(writable,
+    std::string("SELECT count(*), sum(size) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFile) +
+    " AND NOT flags & " + StringifyInt(catalog::SqlDirent::kFlagLink) +
+    " AND NOT flags & " + StringifyInt(catalog::SqlDirent::kFlagFileSpecial) +
+    ";");
+  catalog::SqlCatalog count_external(writable,
+    std::string("SELECT count(*), sum(size) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileExternal) +
+    ";");
+  catalog::SqlCatalog count_symlink(writable,
+    std::string("SELECT count(*) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagLink) + ";");
+  catalog::SqlCatalog count_special(writable,
+    std::string("SELECT count(*) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileSpecial) +
+    ";");
+  catalog::SqlCatalog count_xattr(writable,
+    std::string("SELECT count(*) FROM catalog ") +
+    "WHERE xattr IS NOT NULL;");
+  catalog::SqlCatalog count_chunk(writable,
+    std::string("SELECT count(*), sum(size) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagFileChunk) + ";");
+  catalog::SqlCatalog count_dir(writable,
+    std::string("SELECT count(*) FROM catalog ") +
+    "WHERE flags & " + StringifyInt(catalog::SqlDirent::kFlagDir) + ";");
+  catalog::SqlCatalog count_chunk_blobs(writable,
+    "SELECT count(*) FROM chunks;");
+
+  retval = count_regular.FetchRow() &&
+           count_external.FetchRow() &&
+           count_symlink.FetchRow() &&
+           count_special.FetchRow() &&
+           count_xattr.FetchRow() &&
+           count_chunk.FetchRow() &&
+           count_dir.FetchRow() &&
+           count_chunk_blobs.FetchRow();
+  if (!retval) {
+    Error("Failed to collect catalog statistics", data);
+    return false;
+  }
+
+  stats_counters.self.regular_files       = count_regular.RetrieveInt64(0);
+  stats_counters.self.symlinks            = count_symlink.RetrieveInt64(0);
+  stats_counters.self.specials            = count_special.RetrieveInt64(0);
+  stats_counters.self.directories         = count_dir.RetrieveInt64(0);
+  stats_counters.self.nested_catalogs     = data->nested_catalogs.size();
+  stats_counters.self.chunked_files       = count_chunk.RetrieveInt64(0);
+  stats_counters.self.file_chunks         = count_chunk_blobs.RetrieveInt64(0);
+  stats_counters.self.file_size           = count_regular.RetrieveInt64(1);
+  stats_counters.self.chunked_file_size   = count_chunk.RetrieveInt64(1);
+  stats_counters.self.xattrs              = count_xattr.RetrieveInt64(0);
+  stats_counters.self.externals           = count_external.RetrieveInt64(0);
+  stats_counters.self.external_file_size  = count_external.RetrieveInt64(1);
+
+  // Write back the generated statistics counters into the catalog database
+  catalog::Counters counters;
+  counters.ApplyDelta(stats_counters);
+  retval = counters.InsertIntoDatabase(writable);
+  if (!retval) {
+    Error("Failed to write new statistics counters to database", data);
+    return false;
+  }
+
+  // Push the generated statistics counters up to the parent catalog
+  data->nested_statistics.Set(stats_counters);
+
+  return true;
+}
+
+
+bool CommandMigrate::StatsMigrationWorker::CommitDatabaseTransaction(
+  PendingCatalog *data) const
+{
+  assert(!data->HasNew());
+  GetWritable(data->old_catalog)->Commit();
+  return true;
 }
 
 }  // namespace swissknife

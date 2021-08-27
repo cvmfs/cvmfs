@@ -1,0 +1,55 @@
+#
+# Make the node's root file system available to the daemonset
+#
+apiVersion: storage.k8s.io/v1
+# The storage class allows for dynamic provisioning of the following persistent volume
+kind: StorageClass
+metadata:
+  name: cvmfs-noderoot
+# Local storage does not need a provisioner
+provisioner: kubernetes.io/no-provisioner
+# Give it out as-is
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cvmfs-noderoot
+spec:
+  capacity:
+    # Default cvmfs cache size plus wiggle room
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+  # Exclusice access to a single pod (the cvmfs daemonset)
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: cvmfs-noderoot
+  # Access the node's root file system.
+  # The cvmfs mounts will be created under the /cvmfs-k8s/mounts directory
+  # and the cache will be on /cvmfs-k8s/cache.  Both directories are created
+  # by the daemonset init script.
+  local:
+    path: /
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: NotIn
+          values:
+          - fake
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cvmfs-noderoot
+  namespace: cvmfs
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: cvmfs-noderoot

@@ -2,15 +2,19 @@
 
 curl_ssl_config="--with-ssl"
 FIX_COMP=""
+LIBS=""
 if [ x"$(uname)" = x"Darwin" ]; then
     curl_ssl_config="--with-ssl=$EXTERNALS_INSTALL_LOCATION"
   FIX_COMP="CC=/usr/bin/clang CXX=/usr/bin/clang++"
+  # On macOS, c-ares >= 1.16.1 uses libresolv for finding name servers
+  LIBS="-lresolv"
 fi
 
 sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   LDFLAGS="$LDFLAGS -rdynamic" \
+  LIBS="$LIBS" \
   CFLAGS="$CFLAGS $CVMFS_BASE_C_FLAGS -fvisibility=hidden -fPIC" \
-  $CVMFS_ZLIB --enable-warnings \
+  --enable-warnings \
   --prefix=$EXTERNALS_INSTALL_LOCATION \
   --enable-ares=$EXTERNALS_INSTALL_LOCATION \
   --disable-shared \

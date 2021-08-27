@@ -35,7 +35,8 @@ class Reactor {
     kCheckToken,
     kSubmitPayload,
     kCommit,
-    kError
+    kError,
+    kTestCrash  // use to test the gateway
   };
 
   static Request ReadRequest(int fd, std::string* data);

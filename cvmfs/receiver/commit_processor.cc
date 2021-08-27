@@ -46,7 +46,8 @@ PathString RemoveRepoName(const PathString& lease_path) {
 bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
                   const receiver::Params& params, const std::string& temp_dir,
                   const std::string& manifest_path,
-                  const std::string& public_key_path) {
+                  const std::string& public_key_path,
+                  const std::string& proxy) {
   swissknife::ArgumentList args;
   args['r'].Reset(new std::string(params.spooler_configuration));
   args['w'].Reset(new std::string(params.stratum0));
@@ -59,6 +60,7 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
   args['c'].Reset(new std::string(repo_tag.channel_));
   args['D'].Reset(new std::string(repo_tag.description_));
   args['x'].Reset(new std::string());
+  args['@'].Reset(new std::string(proxy));
 
   UniquePtr<swissknife::CommandEditTag> edit_cmd(
       new swissknife::CommandEditTag());
@@ -99,7 +101,8 @@ CommitProcessor::~CommitProcessor() {}
  */
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
-    const shash::Any& new_root_hash, const RepositoryTag& tag) {
+    const shash::Any& new_root_hash, const RepositoryTag& tag,
+    uint64_t *final_revision) {
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
   if (HasPrefix(final_tag.name_, "generic-", false)) {
@@ -107,7 +110,8 @@ CommitProcessor::Result CommitProcessor::Process(
     // note the millisecond accurracy
     uint64_t nanoseconds_timestamp = platform_realtime_ns();
 
-    time_t seconds = nanoseconds_timestamp / 1000000000;  // 1E9
+    time_t seconds = static_cast<time_t>(
+      nanoseconds_timestamp / 1000000000);  // 1E9
     struct tm timestamp;
     gmtime_r(&seconds, &timestamp);
     char seconds_buffer[32];
@@ -117,7 +121,8 @@ CommitProcessor::Result CommitProcessor::Process(
     // first we get the raw nanoseconds from the timestamp using the module
     // and then we divide to extract the millisecond.
     // the division truncate the number brutally, it should be enough.
-    time_t milliseconds = (nanoseconds_timestamp % 1000000000) / 1000000;
+    time_t milliseconds = static_cast<time_t>(
+      (nanoseconds_timestamp % 1000000000) / 1000000);
     char millis_buffer[48];
     snprintf(millis_buffer, sizeof(millis_buffer), "%s.%03ldZ", seconds_buffer,
              milliseconds);
@@ -147,7 +152,7 @@ CommitProcessor::Result CommitProcessor::Process(
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
 
-  if (!server_tool->InitDownloadManager(true)) {
+  if (!server_tool->InitDownloadManager(true, params.proxy)) {
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "CommitProcessor - error: Could not initialize the download manager");
@@ -206,7 +211,7 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   std::string new_manifest_path;
-  if (!merge_tool.Run(params, &new_manifest_path)) {
+  if (!merge_tool.Run(params, &new_manifest_path, final_revision)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Catalog merge failed");
     return kMergeFailure;
@@ -218,7 +223,7 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
   if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
-                    public_key)) {
+                    public_key, params.proxy)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
              final_tag.name_.c_str());
     return kError;
@@ -241,7 +246,7 @@ CommitProcessor::Result CommitProcessor::Process(
   SigningTool::Result res = signing_tool.Run(
       new_manifest_path, params.stratum0, params.spooler_configuration,
       temp_dir, certificate, private_key, repo_name, "", "",
-      "/var/spool/cvmfs/" + repo_name + "/reflog.chksum",
+      "/var/spool/cvmfs/" + repo_name + "/reflog.chksum", params.proxy,
       params.garbage_collection, false, false, reflog_catalogs);
   switch (res) {
     case SigningTool::kReflogChecksumMissing:
@@ -266,7 +271,7 @@ CommitProcessor::Result CommitProcessor::Process(
   {
     UniquePtr<ServerTool> server_tool(new ServerTool());
 
-    if (!server_tool->InitDownloadManager(true)) {
+    if (!server_tool->InitDownloadManager(true, params.proxy)) {
       LogCvmfs(
           kLogReceiver, kLogSyslogErr,
           "CommitProcessor - error: Could not initialize the download manager");
@@ -328,10 +333,10 @@ CommitProcessor::Result CommitProcessor::Process(
 }
 
 void CommitProcessor::SetStatistics(perf::Statistics *st,
-                                    std::string start_time)
+                                    const std::string &start_time)
 {
   statistics_ = st;
-  statistics_->Register("Publish.revision", "");
+  statistics_->Register("publish.revision", "");
   start_time_ = start_time;
 }
 

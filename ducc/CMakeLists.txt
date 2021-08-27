@@ -24,7 +24,6 @@ install (
   DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
 )
 
-
 # we first generate the services file, replacing the installation directory in the template file
 configure_file (
   ${CMAKE_CURRENT_SOURCE_DIR}/unitfiles/cvmfs_ducc.service.in
@@ -36,4 +35,8 @@ configure_file (
 install (
   FILES ${CMAKE_BINARY_DIR}/cvmfs_ducc.service
   DESTINATION /usr/lib/systemd/system
+)
+
+install(
+	CODE "execute_process(COMMAND setcap \"cap_dac_override=ep cap_dac_read_search=ep cap_fowner=ep cap_chown=ep cap_sys_admin=ep cap_mknod=ep\" ${CMAKE_INSTALL_PREFIX}/bin/cvmfs_ducc)"
 )

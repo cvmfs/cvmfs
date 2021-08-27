@@ -751,3 +751,72 @@ TEST_F(T_Libcvmfs, ListStat) {
   cvmfs_fini();
   cvmfs_options_fini(opts);
 }
+
+
+TEST_F(T_Libcvmfs, Remount) {
+  // Initialize options
+  cvmfs_option_map *opts = cvmfs_options_init();
+
+  // Create and initialize repository
+  CatalogTestTool tester("remount");
+  EXPECT_TRUE(tester.Init());
+
+  // Set CVMFS options to reflect created repository
+  cvmfs_options_set(opts, "CVMFS_SERVER_URL",
+                        ("file://" + tester.repo_name()).c_str());
+  cvmfs_options_set(opts, "CVMFS_HTTP_PROXY", "DIRECT");
+  cvmfs_options_set(opts, "CVMFS_PUBLIC_KEY",
+                        tester.public_key().c_str());
+  cvmfs_options_set(opts, "CVMFS_CACHE_DIR",
+                        (tester.repo_name()+"/data/txn").c_str());
+  cvmfs_options_set(opts, "CVMFS_MOUNT_DIR",
+                        ("/cvmfs" + tester.repo_name()).c_str());
+
+  // libcvmfs changes the sqlite global state, so we have to call it in another
+  // process in order to change the catalog along the way.
+  int pipe_send[2];
+  int pipe_recv[2];
+  MakePipe(pipe_send);
+  MakePipe(pipe_recv);
+  pid_t pid;
+  if ((pid = fork()) == 0) {
+    // Initialize client repo based on options
+    ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+
+    // Attach to client repo
+    cvmfs_context *ctx;
+    EXPECT_EQ(LIBCVMFS_ERR_OK,
+              cvmfs_attach_repo_v2("keys.cern.ch", opts, &ctx));
+
+    EXPECT_EQ(0u, cvmfs_get_revision(ctx));
+    EXPECT_EQ(0, cvmfs_remount(ctx));
+    EXPECT_EQ(0u, cvmfs_get_revision(ctx));
+
+    char c = '1';
+    WritePipe(pipe_send[1], &c, 1);
+    ReadPipe(pipe_recv[0], &c, 1);
+
+    EXPECT_EQ(0, cvmfs_remount(ctx));
+    EXPECT_EQ(1u, cvmfs_get_revision(ctx));
+
+    // Finalize and close repo and options
+    cvmfs_detach_repo(ctx);
+    cvmfs_fini();
+    exit(HasFailure() ? 1 : 0);
+  }
+
+  char c;
+  ReadPipe(pipe_send[0], &c, 1);
+  DirSpec spec1 = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+  tester.UpdateManifest();
+  tester.DestroyCatalogManager();
+  WritePipe(pipe_recv[1], &c, 1);
+
+  int retcode = WaitForChild(pid);
+  EXPECT_EQ(0, retcode);
+
+  ClosePipe(pipe_send);
+  ClosePipe(pipe_recv);
+  cvmfs_options_fini(opts);
+}

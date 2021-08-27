@@ -22,7 +22,6 @@ PKGROOT_DEFAULT="$CVMFS_SOURCE_LOCATION/packaging/aps/cvmfs-config-default"
 PKGROOT_NONE="$CVMFS_SOURCE_LOCATION/packaging/aps/cvmfs-config-none"
 
 echo "copying the files to be packaged in place..."
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern.ch.pub $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it1.cern.ch.pub $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it2.cern.ch.pub $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it3.cern.ch.pub $PKGROOT_DEFAULT
@@ -33,7 +32,6 @@ cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/egi.eu.conf $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/opensciencegrid.org.conf \
   $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/50-cern.conf $PKGROOT_DEFAULT
-cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/60-egi.conf $PKGROOT_DEFAULT
 cp ${CVMFS_SOURCE_LOCATION}/mount/config.d/*.cern.ch.conf $PKGROOT_DEFAULT
 
 echo "switching into the package root directory for config-default..."

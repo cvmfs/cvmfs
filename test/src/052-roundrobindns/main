@@ -18,6 +18,7 @@ run_dns_test() {
     "HOST_ALIASES=${PWD}/host_tests" \
     "CVMFS_MAX_IPADDR_PER_PROXY=100" \
     "CVMFS_HTTP_PROXY='DIRECT;http://round-robin.localdomain:3128;http://no-such-host.localdomain:3128'" \
+    "CVMFS_CLIENT_PROFILE=custom" \
     "CVMFS_PROXY_RESET_AFTER=84600" || return 2
   ls /cvmfs/aleph.cern.ch
   sudo cvmfs_talk -i aleph.cern.ch proxy info | grep round-robin.localdomain | grep 127.0.0.2 | grep 127.0.0.3 || return 3
@@ -186,7 +187,7 @@ cvmfs_run_test() {
   run_dns_test
   retval=$?
   cleanup_dns_test
-  if [ timesync_stopped -eq 0 ]; then
+  if [ $timesync_stopped -eq 0 ]; then
     sudo systemctl start systemd-timesyncd
   fi
 

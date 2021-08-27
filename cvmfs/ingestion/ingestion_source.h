@@ -127,7 +127,7 @@ class MemoryIngestionSource : public IngestionSource {
     size_t size = std::min(remaining, nbyte);
     if (size > 0) memcpy(buffer, data_ + pos_, size);
     pos_ += size;
-    return size;
+    return static_cast<ssize_t>(size);
   }
   virtual bool Close() { return true; }
   virtual bool GetSize(uint64_t* size) { *size = size_; return true; }
@@ -171,7 +171,7 @@ class StringIngestionSource : public IngestionSource {
 
 class TarIngestionSource : public IngestionSource {
  public:
-  TarIngestionSource(const std::string path, struct archive* archive,
+  TarIngestionSource(const std::string &path, struct archive* archive,
                      struct archive_entry* entry, Signal* read_archive_signal)
       : path_(path),
         archive_(archive),

@@ -15,7 +15,7 @@ class CmdMkfs : public Command {
  public:
   virtual std::string GetName() const { return "mkfs"; }
   virtual std::string GetBrief() const {
-    return "Creates a new, empty repository";
+    return "Create a new, empty repository";
   }
   virtual ParameterList GetParams() const {
     ParameterList p;

@@ -57,39 +57,39 @@ struct PublishStats {
 
   explicit PublishStats(const perf::Statistics *statistics):
     revision(statistics->
-                    Lookup("Publish.revision")->ToString()),
+                    Lookup("publish.revision")->ToString()),
     files_added(statistics->
-                    Lookup("Publish.n_files_added")->ToString()),
+                    Lookup("publish.n_files_added")->ToString()),
     files_removed(statistics->
-                    Lookup("Publish.n_files_removed")->ToString()),
+                    Lookup("publish.n_files_removed")->ToString()),
     files_changed(statistics->
-                    Lookup("Publish.n_files_changed")->ToString()),
+                    Lookup("publish.n_files_changed")->ToString()),
     chunks_added(statistics->
-                    Lookup("Publish.n_chunks_added")->ToString()),
+                    Lookup("publish.n_chunks_added")->ToString()),
     chunks_duplicated(statistics->
-                    Lookup("Publish.n_chunks_duplicated")->ToString()),
+                    Lookup("publish.n_chunks_duplicated")->ToString()),
     catalogs_added(statistics->
-                    Lookup("Publish.n_catalogs_added")->ToString()),
+                    Lookup("publish.n_catalogs_added")->ToString()),
     dirs_added(statistics->
-                    Lookup("Publish.n_directories_added")->ToString()),
+                    Lookup("publish.n_directories_added")->ToString()),
     dirs_removed(statistics->
-                    Lookup("Publish.n_directories_removed")->ToString()),
+                    Lookup("publish.n_directories_removed")->ToString()),
     dirs_changed(statistics->
-                    Lookup("Publish.n_directories_changed")->ToString()),
+                    Lookup("publish.n_directories_changed")->ToString()),
     symlinks_added(statistics->
-                    Lookup("Publish.n_symlinks_added")->ToString()),
+                    Lookup("publish.n_symlinks_added")->ToString()),
     symlinks_removed(statistics->
-                    Lookup("Publish.n_symlinks_removed")->ToString()),
+                    Lookup("publish.n_symlinks_removed")->ToString()),
     symlinks_changed(statistics->
-                    Lookup("Publish.n_symlinks_changed")->ToString()),
+                    Lookup("publish.n_symlinks_changed")->ToString()),
     bytes_added(statistics->
-                    Lookup("Publish.sz_added_bytes")->ToString()),
+                    Lookup("publish.sz_added_bytes")->ToString()),
     bytes_removed(statistics->
-                    Lookup("Publish.sz_removed_bytes")->ToString()),
+                    Lookup("publish.sz_removed_bytes")->ToString()),
     bytes_uploaded(statistics->
-                    Lookup("Publish.sz_uploaded_bytes")->ToString()),
+                    Lookup("publish.sz_uploaded_bytes")->ToString()),
     catalog_bytes_uploaded(statistics->
-                    Lookup("Publish.sz_uploaded_catalog_bytes")->ToString()) {
+                    Lookup("publish.sz_uploaded_catalog_bytes")->ToString()) {
   }
 };
 
@@ -100,15 +100,16 @@ struct GcStats {
   std::string n_condemned_objects;
   std::string sz_condemned_bytes;
 
-  explicit GcStats(const perf::Statistics *statistics):
-    n_preserved_catalogs(statistics->
-                    Lookup("gc.n_preserved_catalogs")->ToString()),
-    n_condemned_catalogs(statistics->
-                    Lookup("gc.n_condemned_catalogs")->ToString()),
-    n_condemned_objects(statistics->
-                    Lookup("gc.n_condemned_objects")->ToString()),
-    sz_condemned_bytes(statistics->
-                    Lookup("gc.sz_condemned_bytes")->ToString()) {
+  explicit GcStats(const perf::Statistics *statistics) {
+    perf::Counter *c = NULL;
+    c = statistics->Lookup("gc.n_preserved_catalogs");
+    n_preserved_catalogs = c ? c->ToString() : "0";
+    c = statistics->Lookup("gc.n_condemned_catalogs");
+    n_condemned_catalogs = c ? c->ToString() : "0";
+    c = statistics->Lookup("gc.n_condemned_objects");
+    n_condemned_objects = c ? c->ToString() : "0";
+    c = statistics->Lookup("gc.sz_condemned_bytes");
+    sz_condemned_bytes = c ? c->ToString() : "0";
   }
 };
 

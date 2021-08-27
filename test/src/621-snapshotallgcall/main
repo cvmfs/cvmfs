@@ -71,13 +71,21 @@ cvmfs_run_test() {
   cvmfs_server snapshot -an || return 10
 
   echo "*** download manifests of stratum 0 and replica 0, 1 and 5"
-  curl -so mr0 "$(get_repo_url ${replica_name}-0)/.cvmfspublished" || return 11
+  if running_on_s3; then
+    echo "skipping pass-through test"
+  else
+    curl -so mr0 "$(get_repo_url ${replica_name}-0)/.cvmfspublished" || return 11
+  fi
   curl -so mr1 "$(get_repo_url ${replica_name}-1)/.cvmfspublished" || return 12
   curl -so mr5 "$(get_repo_url ${replica_name}-5)/.cvmfspublished" || return 13
   curl -so ms0 "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"  || return 14
 
   echo "*** checking if snapshot worked on replicas 0, 1 and 5"
-  cmp ms0 mr0 || return 15
+  if running_on_s3; then
+    echo "skipping pass-through test"
+  else
+    cmp ms0 mr0 || return 15
+  fi
   cmp ms0 mr1 || return 16
   cmp ms0 mr5 || return 17
 
@@ -132,11 +140,15 @@ cvmfs_run_test() {
   curl -f -s "$(get_repo_url ${replica_name}-2)/.cvmfs_status.json"|grep last_gc && return 53
   curl -f -s "$(get_repo_url ${replica_name}-3)/.cvmfs_status.json"|grep last_gc && return 54
 
-  echo "*** checking if (only) replica 0 is marked as pass-through"
-  curl -f -s "$(get_local_repo_url info)/v1/repositories.json" | \
-    jq ".replicas[] | select(.alias == \"${replica_name}-0\")" | grep pass-through || return 55
-  curl -f -s "$(get_local_repo_url info)/v1/repositories.json" | \
-    jq ".replicas[] | select(.alias == \"${replica_name}-1\")" | grep pass-through && return 56
+  if ! running_on_s3; then
+    echo "*** checking if (only) replica 0 is marked as pass-through"
+    curl -f -s "$(get_local_repo_url info)/v1/repositories.json" | \
+      jq ".replicas[] | select(.alias == \"${replica_name}-0\")" | grep pass-through || return 55
+    curl -f -s "$(get_local_repo_url info)/v1/repositories.json" | \
+      jq ".replicas[] | select(.alias == \"${replica_name}-1\")" | grep pass-through && return 56
+  else
+    echo "skipping pass-through test"
+  fi
 
   return 0
 }

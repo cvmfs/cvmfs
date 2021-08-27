@@ -143,6 +143,30 @@ cvmfs_run_test() {
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
 
+  echo "Try adding repository meta-data"
+  local json_file="test_json_file.json"
+  cat >> $json_file << EOF
+{
+  "administrator" : "The Incredible Hulk",
+  "email"         : "thehulk@cern.ch",
+  "organisation"  : "CERN",
+  "description"   : "This is just a test repository"
+}
+EOF
+
+  start_transaction $CVMFS_TEST_REPO || return 63
+  publish_repo $CVMFS_TEST_REPO || return 62
+
+  echo "update repo info on Stratum 0"
+  cvmfs_server update-repoinfo -f $json_file $CVMFS_TEST_REPO || return 60
+
+  start_transaction $CVMFS_TEST_REPO || return 64
+  publish_repo $CVMFS_TEST_REPO || return 65
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return 61
+
+
   # ============================================================================
 
   echo "removing repository again"

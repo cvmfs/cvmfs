@@ -119,6 +119,9 @@ class LibContext : SingleCopy {
   int GetNestedCatalogAttr(const char *c_path, struct cvmfs_nc_attr *nc_attr);
   int ListNestedCatalogs(const char *path, char ***buf, size_t *buflen);
 
+  int Remount();
+  uint64_t GetRevision();
+
   MountPoint *mount_point() { return mount_point_; }
   void set_options_mgr(OptionsManager *value) { options_mgr_ = value; }
 
