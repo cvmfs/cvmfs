@@ -67,7 +67,9 @@ cvmfs_server_alterfs() {
   elif ! is_master_replica $name && [ $master_replica -eq 1 ]; then
     echo -n "Allowing Replication of this Repository... "
     local master_replica="${temp_dir}/.cvmfs_master_replica"
-    touch $master_replica
+    # Azurite does not like direct empty file uploads;
+    # touch $master_replica
+    head -c 10 /dev/random > $master_replica
     __swissknife upload -i $master_replica -o $(basename $master_replica) -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
     if [ $success -ne 1 ]; then
       echo "fail!"
