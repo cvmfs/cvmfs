@@ -216,6 +216,11 @@ cvmfs_setup() {
          shift 1
          nostart=1
       ;;
+      noautofs)
+         shift 1
+         nocfgmod=1
+         nostart=1
+      ;;
       *)
         echo "Bad option: $1"
         return 1
