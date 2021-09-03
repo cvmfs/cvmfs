@@ -629,7 +629,7 @@ func AlreadyConverted(manifestPath, reference string) ConversionResult {
 }
 
 func GetPassword() (string, error) {
-	envVar := "DUCC_DOCKER_REGISTRY_PASS"
+	envVar := "DUCC_OUTPUT_REGISTRY_PASS"
 	pass := os.Getenv(envVar)
 	if pass == "" {
 		err := fmt.Errorf(

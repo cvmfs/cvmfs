@@ -328,6 +328,7 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 	configFilePath := filepath.Join(rootPath, imageMetadataDir, imageID, fname)
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
 		user := img.User
+		fmt.Printf("CreateConfigFile/podman %s", user);
 		pass, err := GetPassword()
 		if err != nil {
 			l.LogE(err).Warning("Unable to get the credential for downloading the configuration blob, trying anonymously")

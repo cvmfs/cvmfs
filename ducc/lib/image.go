@@ -157,6 +157,7 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 	}
 
 	user := img.User
+	fmt.Printf("GetOCIImage %s\n", user)
 	pass, err := GetPassword()
 	if err != nil {
 		l.LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
@@ -264,6 +265,7 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	var tagsList struct {
 		Tags []string
 	}
+	fmt.Printf("ExpandWildcard %s\n", img.User)
 	pass, err := GetPassword()
 	if err != nil {
 		l.LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
@@ -369,6 +371,7 @@ func (i *Image) GetPublicSymlinkPath() string {
 }
 
 func (img *Image) getByteManifest() ([]byte, error) {
+	fmt.Printf("getByteManifest %s\n", img.User);
 	pass, err := GetPassword()
 	if err != nil {
 		l.LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
@@ -425,6 +428,7 @@ type Credentials struct {
 }
 
 func getCredentialsFromEnv(user, pass string) (Credentials, error) {
+	fmt.Printf("getCredentialsFromEnv %s %s\n", user, pass);
 	u := os.Getenv(user)
 	p := os.Getenv(pass)
 	c := Credentials{u, p}
@@ -437,23 +441,30 @@ func getCredentialsFromEnv(user, pass string) (Credentials, error) {
 }
 
 func getDockerHubCredentials() (Credentials, error) {
+	fmt.Printf("getDockerHubCredentials\n")
 	return getCredentialsFromEnv("DUCC_DOCKERHUB_USER", "DUCC_DOCKERHUB_PASS")
 }
 
 func getGitlabContainersCredentials() (Credentials, error) {
+	fmt.Printf("getGitlabContainersCredentials\n")
 	return getCredentialsFromEnv("DUCC_GITLAB_REGISTRY_USER", "DUCC_GITLAB_REGISTRY_PASS")
 }
 
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
-	docker, err := getDockerHubCredentials()
-	if err == nil {
-		credentials = append(credentials, docker)
+	if strings.Contains(url, "gitlab-registry.cern.ch") {
+		gitlab, err := getGitlabContainersCredentials()
+		if err == nil {
+			credentials = []Credentials{gitlab}
+		}
 	}
-	gitlab, err := getGitlabContainersCredentials()
-	if err == nil {
-		credentials = append(credentials, gitlab)
+	if strings.Contains(url, "registry.hub.docker.com") {
+		docker, err := getDockerHubCredentials()
+		if err == nil {
+			credentials = []Credentials{docker}
+		}
 	}
 	for _, c := range credentials {
+		fmt.Printf("Tryeing internal request with %s %s: %s\n", c.username, c.password, url)
 		token, err = firstRequestForAuth_internal(url, c.username, c.password)
 		if err == nil {
 			return token, err
@@ -501,6 +512,7 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 		// happy path
 		return token, nil
 	}
+	fmt.Printf("We failed with authentication and we now go without for %s\n", url)
 	// some error, we should retry without auth
 	if user != "" || pass != "" {
 		token, err = requestAuthToken(WwwAuthenticate, "", "")
@@ -664,6 +676,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 
 func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloadedLayer, err error) {
 	user := img.User
+	fmt.Printf("downloadLayer %s\n", user);
 	pass, err := GetPassword()
 	if err != nil {
 		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
@@ -813,6 +826,7 @@ func (ld *LayerDownloader) getToken() (token string, err error) {
 		return
 	}
 	user := ld.image.User
+	fmt.Printf("getToken %s\n", user);
 	pass, err := GetPassword()
 	if err != nil {
 		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
