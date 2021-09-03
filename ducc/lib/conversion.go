@@ -633,7 +633,7 @@ func GetPassword() (string, error) {
 	pass := os.Getenv(envVar)
 	if pass == "" {
 		err := fmt.Errorf(
-			"Env variable (%s) storing the password to access the docker registry is not set", envVar)
+			"Env variable (%s) storing the password to push thin images is not set", envVar)
 		return "", err
 	}
 	return pass, nil

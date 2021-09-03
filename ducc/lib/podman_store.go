@@ -327,19 +327,10 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 	imageID := strings.Split(manifest.Config.Digest, ":")[1]
 	configFilePath := filepath.Join(rootPath, imageMetadataDir, imageID, fname)
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
-		user := img.User
-		fmt.Printf("CreateConfigFile/podman %s", user);
-		pass, err := GetPassword()
-		if err != nil {
-			l.LogE(err).Warning("Unable to get the credential for downloading the configuration blob, trying anonymously")
-			user = ""
-			pass = ""
-		}
-
 		configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
 			img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
 
-		token, err := firstRequestForAuth(configUrl, user, pass)
+		token, err := firstRequestForAuth(configUrl)
 		if err != nil {
 			l.LogE(err).Warning("Unable to retrieve the token for downloading config file")
 			return err
