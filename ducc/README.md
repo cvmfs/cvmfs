@@ -16,7 +16,7 @@ common examples are:
 
 **Repository** This specifies a class of images, each image will be indexed,
 then by tag or digest. Common examples are:
- 
+
     * library/redis
     * library/ubuntu
 
@@ -101,7 +101,7 @@ input:
 **version**: indicate what version of recipe we are using, at the moment only
 `1` is supported.
 **user**: the user that will push the thin docker images into the registry,
-the password must be stored in the `DUCC_DOCKER_REGISTRY_PASS`
+the password must be stored in the `DUCC_OUTPUT_REGISTRY_PASS`
 environment variable.
 **cvmfs_repo**: in which CVMFS repository store the layers and the singularity
 images.
@@ -176,7 +176,7 @@ This section explains how this utility is intended to be used.
 
 Internally this utility invokes `cvmfs_server`, `docker` and `singularity`
 commands, so it is necessary to use it in a stratum0 that also have docker
-installed. 
+installed.
 
 The conversion is quite straightforward, we first download the input image, we
 store each layer on the cvmfs repository, we create the output image and unpack
@@ -186,7 +186,7 @@ It does not support dowloading images that are not public.
 
 In order to publish images to a registry is necessary to sign up in the
 docker hub. It will use the user from the recipe, while it will read the
-password from the `DUCC_DOCKER_REGISTRY_PASS` environment variable.
+password from the `DUCC_OUTPUT_REGISTRY_PASS` environment variable.
 
 ## Run as daemon
 
@@ -196,12 +196,12 @@ daemon DUCC will run the `loop` command.
 Environmental variables are used in order to provide input for DUCC. Two
 variables need to be set:
 1. `$DUCC_RECIPE_FILE`
-2. `$DUCC_DOCKER_REGISTRY_PASS`
+2. `$DUCC_OUTPUT_REGISTRY_PASS`
 
 The `$RECIPE_FILE` variable need to point to the recipe.yaml file that you want
 to convert.
 
-The `$DUCC_DOCKER_REGISTRY_PASS` is the variable described
+The `$DUCC_OUTPUT_REGISTRY_PASS` is the variable described
 above. It needs to be set to the password of the docker registry that DUCC will
 use to publish the docker images.
 
@@ -214,5 +214,5 @@ And then edit like the following:
 ```unit
 [Service]
 Environment="DUCC_RECIPE_FILE=UPDATE-ME.yaml"
-Environment="DUCC_DOCKER_REGISTRY_PASS=UPDATE-ME"
+Environment="DUCC_OUTPUT_REGISTRY_PASS=UPDATE-ME"
 ```
