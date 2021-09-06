@@ -162,6 +162,15 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.GetValue("CVMFS_S3_FLAVOR", &flavor_)) {
     if (flavor_ == "azure") {
       authz_method_ = s3fanout::kAuthzAzure;
+    } else if (flavor_ == "awsv2") {
+      authz_method_ = s3fanout::kAuthzAwsV2;
+    } else if (flavor_ == "awsv4") {
+      authz_method_ = s3fanout::kAuthzAwsV4;
+    } else {
+    LogCvmfs(kLogUploadS3, kLogStderr,
+             "Failed to parse CVMFS_S3_FLAVOR from '%s', valid options are azure, awsv2 or awsv4",
+             config_path.c_str());
+    return false;
     }
   }
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
