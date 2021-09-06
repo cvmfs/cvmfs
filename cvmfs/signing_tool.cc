@@ -189,13 +189,8 @@ SigningTool::Result SigningTool::Run(
                spooler->GetNumberOfErrors());
       return kError;
     }
+    // remove assert, since chksum file may not be there during import
     //assert(!reflog_chksum_path.empty());
-    if (reflog_chksum_path != "") {
-      if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum");
-        return kReflogChecksumMissing;
-      }
-    }
     manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
   }
 
