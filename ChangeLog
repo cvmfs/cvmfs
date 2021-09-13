@@ -1,3 +1,5 @@
+2.8.3:
+
 2.8.2:
   * Add `cvmfs_config fuser` command (CVM-2004)
   * Add 'device id' command to cvmfs_talk (CVM-2004)
