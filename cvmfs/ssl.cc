@@ -77,6 +77,10 @@ void SslCertificateStore::UseSystemCertificatePath() {
 
   for (unsigned i = 0; i < candidates.size(); ++i) {
     if (HasCertificates(candidates[i])) {
+      const std::string bundle_candidate = candidates[i] + "/ca-bundle.crt";
+      if (FileExists(bundle_candidate) || SymlinkExists(bundle_candidate)) {
+        ca_bundle_ = bundle_candidate;
+      }
       ca_path_ = candidates[i];
       return;
     }
