@@ -500,7 +500,7 @@ class SettingsBuilder : SingleCopy {
   bool IsManagedRepository() const { return options_mgr_ != NULL; }
 
   void ApplyOptionsFromServerPath(SettingsPublisher &settings_publisher,
-                                  OptionsManager &options_mgr_);
+                                  const OptionsManager &options_mgr_);
 
   std::string config_path_;
 
