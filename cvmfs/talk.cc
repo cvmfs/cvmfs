@@ -102,6 +102,9 @@ string TalkManager::FormatHostInfo(download::DownloadManager *download_mgr) {
   unsigned active_host;
 
   download_mgr->GetHostInfo(&host_chain, &rtt, &active_host);
+  if (host_chain.size() == 0)
+    return "No hosts defined\n";
+
   string host_str;
   for (unsigned i = 0; i < host_chain.size(); ++i) {
     host_str += "  [" + StringifyInt(i) + "] " + host_chain[i] + " (";
