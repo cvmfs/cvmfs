@@ -505,10 +505,11 @@ class SettingsBuilder : SingleCopy {
   void ApplyOptionsFromServerPath(const OptionsManager &options_mgr_,
                                   SettingsPublisher &settings_publisher);
 
-  std::string setconfig_path(std::string config_path) { return config_path_ = config_path; }
+  std::string setconfig_path(std::string config_path) {
+    return config_path_ = config_path;
+  }
 
  private:
-
  /**
   * For non locally managed repositories, a configuration file should be
   * provided in order to publish from the ephemeral shell through the gateway

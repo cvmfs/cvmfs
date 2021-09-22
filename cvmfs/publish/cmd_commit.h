@@ -45,7 +45,6 @@ class CmdCommit : public Command {
   }
 
   virtual int Main(const Options &options);
-
 };
 
 }  // namespace publish

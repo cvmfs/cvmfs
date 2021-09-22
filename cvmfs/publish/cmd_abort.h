@@ -40,7 +40,6 @@ class CmdAbort : public Command {
   }
 
   virtual int Main(const Options &options);
-
 };  // class CmdAbort
 
 }  // namespace publish
