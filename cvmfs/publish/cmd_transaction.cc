@@ -47,14 +47,12 @@ int CmdTransaction::Main(const Options &options) {
     }
     throw;
   }
-
   if (settings->transaction().in_enter_session()) {
     throw EPublish(
       "opening a transaction is unsupported within the ephemeral "
       "writable shell",
       EPublish::kFailInvocation);
   }
-
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
   }

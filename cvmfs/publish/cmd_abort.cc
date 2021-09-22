@@ -77,7 +77,7 @@ int CmdAbort::Main(const Options &options) {
   }
 
   std::vector<LsofEntry> lsof_entries =
-      Lsof(settings->transaction().spool_area().union_mnt());
+    Lsof(settings->transaction().spool_area().union_mnt());
   if (!lsof_entries.empty()) {
     if (options.Has("force")) {
       LogCvmfs(kLogCvmfs, kLogStdout,
@@ -143,7 +143,8 @@ int CmdAbort::Main(const Options &options) {
 
   rvi = CallServerHook("abort_after_hook", settings->fqrn());
   if (rvi != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "post abort hook failed");
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "post abort hook failed");
     return rvi;
   }
 
