@@ -497,8 +497,8 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
 }
 
 void SettingsBuilder::ApplyOptionsFromServerPath(
-    SettingsPublisher &settings_publisher,
-    OptionsManager &options_mgr_) {
+    const OptionsManager &options_mgr_,
+    SettingsPublisher &settings_publisher) {
   std::string arg;
   if (options_mgr_.GetValue("CVMFS_CREATOR_VERSION", &arg)) {
     settings_publisher.GetTransaction()->SetLayoutRevision(String2Uint64(arg));
@@ -538,20 +538,7 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
     settings_publisher.GetTransaction()->SetUseCatalogAutobalance(
         options_mgr_.IsOn(arg));
   }
-  if (options_mgr_.GetValue("CVMFS_AUTOCATALOGS_MAX_WEIGHT", &arg)) {
-    settings_publisher.GetTransaction()->SetAutobalanceMaxWeight(
-        String2Uint64(arg));
-  }
-  if (options_mgr_.GetValue("CVMFS_AUTOCATALOGS_MIN_WEIGHT", &arg)) {
-    settings_publisher.GetTransaction()->SetAutobalanceMinWeight(
-        String2Uint64(arg));
-  }
-  if (options_mgr_.GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
-    if (!options_mgr_.IsOn(arg)) {
-      settings_publisher.GetTransaction()->GetSpoolArea()->SetRepairMode(
-          kUnionMountRepairNever);
-    }
-  }
+
   return;
 }
 
@@ -577,7 +564,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
       options_mgr_ = new BashOptionsManager();
       options_mgr_->set_taint_environment(false);
       options_mgr_->ParsePath(server_path, false /* external */);
-      ApplyOptionsFromServerPath(*settings_publisher, *options_mgr_);
+      ApplyOptionsFromServerPath(*options_mgr_, *settings_publisher);
     }
     return settings_publisher;
   }
@@ -615,7 +602,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   settings_publisher->GetStorage()->SetLocator(
     options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
 
-  ApplyOptionsFromServerPath(*settings_publisher, *options_mgr_);
+  ApplyOptionsFromServerPath(*options_mgr_, *settings_publisher);
 
   // TODO(jblomer): process other parameters
   return settings_publisher.Release();

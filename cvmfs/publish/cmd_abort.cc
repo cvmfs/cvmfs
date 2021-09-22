@@ -29,7 +29,7 @@ int CmdAbort::Main(const Options &options) {
     std::string config;
     int fd_config = open(config_tmp.c_str(), O_RDONLY);
     SafeReadToString(fd_config, &config);
-    builder.config_path_ = config;
+    builder.setconfig_path(config);
   }
 
   UniquePtr<SettingsPublisher> settings;
@@ -49,14 +49,16 @@ int CmdAbort::Main(const Options &options) {
   }
 
     if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
-                           false /* temporarily */)) {
+                           false /* temporarily */))
+    {
       throw EPublish("No write permission to repository",
                      EPublish::kFailPermission);
     }
 
     if (HasPrefix(GetCurrentWorkingDirectory() + "/",
                   settings->transaction().spool_area().union_mnt() + "/",
-                  false /* ignore_case */)) {
+                  false /* ignore_case */))
+    {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "Current working directory is in %s.  Please release, "
                "e.g. by 'cd $HOME'.",
@@ -65,14 +67,13 @@ int CmdAbort::Main(const Options &options) {
     }
 
     if (!options.Has("force")) {
-      LogCvmfs(
-          kLogCvmfs, kLogStdout | kLogNoLinebreak,
-          "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION "
-          "for %s!  Are you sure (y/N)? ",
-          settings->fqrn().c_str());
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+               "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION "
+               "for %s!  Are you sure (y/N)? ", settings->fqrn().c_str());
       char answer[] = {0, 0, 0};
       char *rv_charp = fgets(answer, 3, stdin);
-      if (rv_charp && (answer[0] != 'Y') && (answer[0] != 'y')) return EINTR;
+      if (rv_charp && (answer[0] != 'Y') && (answer[0] != 'y')) 
+        return EINTR;
     }
 
     std::vector<LsofEntry> lsof_entries =
@@ -84,8 +85,7 @@ int CmdAbort::Main(const Options &options) {
                  "\nThe following lsof report might show the culprit:\n",
                  settings->transaction().spool_area().union_mnt().c_str());
       } else {
-        LogCvmfs(
-            kLogCvmfs, kLogStdout,
+        LogCvmfs(kLogCvmfs, kLogStdout,
             "\nWARNING! There are open read-only file descriptors in %s\n"
             "  --> This is potentially harmful and might cause problems "
             "later on.\n"
@@ -103,8 +103,10 @@ int CmdAbort::Main(const Options &options) {
         std::string owner_name;
         GetUserNameOf(lsof_entries[i].owner, &owner_name);
         LogCvmfs(kLogCvmfs, kLogStdout, "%s %d %s %s",
-                 lsof_entries[i].executable.c_str(), lsof_entries[i].pid,
-                 owner_name.c_str(), lsof_entries[i].path.c_str());
+                 lsof_entries[i].executable.c_str(),
+                 lsof_entries[i].pid,
+                 owner_name.c_str(),
+                 lsof_entries[i].path.c_str());
       }
 
       if (!options.Has("force")) {
@@ -112,7 +114,8 @@ int CmdAbort::Main(const Options &options) {
                  "\n      Do you want to proceed anyway? (y/N) ");
         char answer[] = {0, 0, 0};
         char *rv_charp = fgets(answer, 3, stdin);
-        if (rv_charp && (answer[0] != 'Y') && (answer[0] != 'y')) return EINTR;
+        if (rv_charp && (answer[0] != 'Y') && (answer[0] != 'y'))
+          return EINTR;
       }
     }
 

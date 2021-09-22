@@ -26,14 +26,11 @@ int CmdCommit::Main(const Options &options) {
   // Repository name and lease path are submitted as a single argument
   // for historical reasons
   std::string fqrn;
-  std::string lease_path;
 
   if (!options.plain_args().empty()) {
     std::vector<std::string> tokens =
       SplitString(options.plain_args()[0].value_str, '/', 2);
     fqrn = tokens[0];
-    if (tokens.size() == 2)
-      lease_path = MakeCanonicalPath(tokens[1]);
   }
 
   std::string session_dir = Env::GetEnterSessionDir();
@@ -43,7 +40,7 @@ int CmdCommit::Main(const Options &options) {
   SafeReadToString(fd_config, &config);
 
   SettingsBuilder builder;
-  builder.config_path_ = config;
+  builder.setconfig_path(config);
 
   UniquePtr<SettingsPublisher> settings;
   try {
@@ -66,8 +63,6 @@ int CmdCommit::Main(const Options &options) {
   FileSystemInfo fs_info = GetFileSystemInfo("/cvmfs");
   if (fs_info.type == kFsTypeAutofs)
     throw EPublish("Autofs on /cvmfs has to be disabled");
-
-  settings->GetTransaction()->SetLeasePath(lease_path);
 
   UniquePtr<Publisher> publisher;
   try {

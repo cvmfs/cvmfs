@@ -41,7 +41,6 @@ class CmdAbort : public Command {
 
   virtual int Main(const Options &options);
 
-  std::string repo_config_;
 };  // class CmdAbort
 
 }  // namespace publish

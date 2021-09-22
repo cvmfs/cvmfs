@@ -46,7 +46,7 @@ class CmdEnter : public Command {
       "Open a transaction within the ephemeral shell"));
     p.push_back(Parameter::Optional(
         "repo-config", 'x', "repository configuration",
-        "Path to the configuration of the repository gateway"));
+        "Path to the configuration of the repository as in /etc/cvmfs/repositories.d"));
     return p;
   }
   virtual unsigned GetMinPlainArgs() const { return 1; }

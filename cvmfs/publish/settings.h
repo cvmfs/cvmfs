@@ -499,17 +499,28 @@ class SettingsBuilder : SingleCopy {
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }
 
-  void ApplyOptionsFromServerPath(SettingsPublisher &settings_publisher,
-                                  OptionsManager &options_mgr_);
+  /**
+  * Get the values from the server configuration and set them to the publisher settings.
+  */
+  void ApplyOptionsFromServerPath(const OptionsManager &options_mgr_,
+                                  SettingsPublisher &settings_publisher);
 
-  std::string config_path_;
+  std::string setconfig_path(std::string config_path) { return config_path_ = config_path; }
 
  private:
+
+ /**
+  * For non locally managed repositories, a configuration file should be
+  * provided in order to publish from the ephemeral shell through the gateway
+  */
+  std::string config_path_;
+
   /**
    * For locally managed repositories, the options manager is non NULL and
    * contains the configuration after a call to CreateSettingsRepository()
    */
   OptionsManager *options_mgr_;
+  // TODO(avalenzu): options_mgr_ should become a unique pointer.
 
   /**
    * Returns the name of the one and only repository under kConfigPath

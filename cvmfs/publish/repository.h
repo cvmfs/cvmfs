@@ -286,6 +286,13 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Publish();
   void Ingest();
   void Sync();
+
+  /**
+   * Automatically exit the ephemeral shell after abort or commit.
+   * TODO(avalenzu): Most of the logic of the enter shell is in the CmdEnter UI class. 
+   * We should move at least the core functionality to libcvmfs_server and this includes
+   * the ExitShell() method.
+   */
   void ExitShell();
 
   /**

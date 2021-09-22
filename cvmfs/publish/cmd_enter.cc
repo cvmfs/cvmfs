@@ -594,7 +594,7 @@ int CmdEnter::Main(const Options &options) {
                  repo_config_.c_str());
 
         SafeWriteToFile(repo_config_, session_dir_ + "/tmp.conf", 0600);
-        builder.config_path_ = repo_config_;
+        builder.setconfig_path(repo_config_);
       }
 
       SettingsPublisher *settings_publisher =
@@ -642,7 +642,7 @@ int CmdEnter::Main(const Options &options) {
                       false /* drop_credentials */, false /* clear_env */,
                       false /* double_fork */,
                       &pid_child);
-    std::string s = std::to_string(pid_child);
+    std::string s = StringifyInt(pid_child);
     SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
     exit_code = WaitForChild(pid_child);
 

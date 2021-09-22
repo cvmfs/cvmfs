@@ -373,7 +373,7 @@ bool OptionsManager::IsDefined(const std::string &key) {
 }
 
 
-bool OptionsManager::GetValue(const string &key, string *value) {
+bool OptionsManager::GetValue(const string &key, string *value) const {
   map<string, ConfigValue>::const_iterator iter = config_.find(key);
   if (iter != config_.end()) {
     *value = iter->second.value;
@@ -406,7 +406,7 @@ bool OptionsManager::GetSource(const string &key, string *value) {
 }
 
 
-bool OptionsManager::IsOn(const std::string &param_value) {
+bool OptionsManager::IsOn(const std::string &param_value) const {
   const string uppercase = ToUpper(param_value);
   return ((uppercase == "YES") || (uppercase == "ON") || (uppercase == "1") ||
           (uppercase == "TRUE"));

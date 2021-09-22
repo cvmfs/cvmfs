@@ -110,7 +110,7 @@ class OptionsManager {
    * @param  value container of the received value, if it exists
    * @return true if there was a value stored in the map for key
    */
-  bool GetValue(const std::string &key, std::string *value);
+  bool GetValue(const std::string &key, std::string *value) const;
 
   /**
    * Gets the stored value for a concrete variable. Panics if the value is
@@ -137,7 +137,7 @@ class OptionsManager {
    * @param   param_value variable to be accessed in the map
    * @return  true if param has as value "YES", "ON" or "1". False otherwise
    */
-  bool IsOn(const std::string &param_value);
+  bool IsOn(const std::string &param_value) const;
 
   /**
    * Retrieves a vector containing all stored keys

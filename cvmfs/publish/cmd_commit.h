@@ -46,7 +46,6 @@ class CmdCommit : public Command {
 
   virtual int Main(const Options &options);
 
-  std::string repo_config_;
 };
 
 }  // namespace publish
