@@ -246,7 +246,8 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   if (is_chardev_whiteout) return true;
 
   std::string whiteout_prefix_ = ".wh.";
-  bool has_wh_prefix = HasPrefix(entry->filename().c_str(), whiteout_prefix_, true);
+  bool has_wh_prefix =
+      HasPrefix(entry->filename().c_str(), whiteout_prefix_, true);
   if (has_wh_prefix) return true;
 
   bool is_symlink_whiteout =
