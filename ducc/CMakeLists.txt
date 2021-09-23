@@ -40,3 +40,9 @@ install (
 install(
 	CODE "execute_process(COMMAND setcap \"cap_dac_override=ep cap_dac_read_search=ep cap_fowner=ep cap_chown=ep cap_sys_admin=ep cap_mknod=ep\" ${CMAKE_INSTALL_PREFIX}/bin/cvmfs_ducc)"
 )
+
+install (
+    FILES ducc/webhook/registry-webhook.py
+    DESTINATION ${CVMFS_LIBEXEC_DIR}/ducc
+    PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+)
