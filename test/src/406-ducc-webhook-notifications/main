@@ -56,7 +56,7 @@ cvmfs_run_test() {
     rm -f $notifications_file
     touch $notifications_file
 
-    (python3 /root/cvmfs/ducc/webhook/registry-webhook.py -f $notifications_file -h 127.0.0.1 -p 8080 -r 5 &) || return 1
+    (python3 /usr/libexec/cvmfs/ducc/registry-webhook.py -f $notifications_file -h 127.0.0.1 -p 8080 -r 5 &) || return 1
 
     if check_port;
     then
@@ -73,12 +73,16 @@ cvmfs_run_test() {
         send_harbor_push || return 7
         check_id_action '5' 'push' || return $?
 
+	# The first notifications received are saved in 0-5notifications.txt and the new ones are appended to
+	# a fresh new notifications.txt file. We create a temporary copy of the first notifications received
+	# (notifications_tmp.txt) before the actual rotation to later check that the rotation notifications.txt
+	# --> 0-5notifications.txt has been successful.
         tmp_notifications_file="${notifications_file%".txt"}"
         tmp_notifications_file="${tmp_notifications_file}_tmp.txt"
         cp $notifications_file $tmp_notifications_file || return 10
 
         send_harbor_push || return 8
-        check_id_action '6' 'pull' || return $?
+        check_id_action '6' 'push' || return $?
         send_harbor_push || return 9
         check_id_action '7' 'push' || return $?
 
