@@ -8,12 +8,10 @@ cleanup() {
 }
 
 check_port() {
-    if nc -zv 127.0.0.1 8080 2>&1;
-    then
-        return 0
-    else
-        check_port
-    fi
+    until nc -zv 127.0.0.1 8080 2>&1
+    do
+	sleep 1
+    done
 }
 
 check_id_action() {
@@ -25,12 +23,12 @@ check_id_action() {
 
     if [ ${id[0]} != ${expected_id} ]
     then
-        echo 'The action id is not correct' && return 10
+        echo "The action id is not correct: expected ${expected_id} but got ${id[0]}" && return 10
     fi
 
     if [ ${id[1]} != ${expected_action} ]
     then
-        echo 'The action type is not correct' && return 20
+        echo "The action type is not correct: expected ${expected_action} but got ${id[1]}" && return 20
     fi
 }
 
@@ -51,12 +49,11 @@ send_docker_push() {
 }
 
 cvmfs_run_test() {
-
-    trap cleanup EXIT
+    trap cleanup EXIT HUP INT TERM
 
     notifications_file="notifications.txt"
 
-    yes | rm $notifications_file
+    rm -f $notifications_file
     touch $notifications_file
 
     (python3 /root/cvmfs/ducc/webhook/registry-webhook.py -f $notifications_file -h 127.0.0.1 -p 8080 -r 5 &) || return 1
@@ -76,12 +73,12 @@ cvmfs_run_test() {
         send_harbor_push || return 7
         check_id_action '5' 'push' || return $?
 
-        tmp_notifications_file="${notifications_file%".txt"}" || return 8
-        tmp_notifications_file="${tmp_notifications_file}_tmp.txt" || return 9
-        cp $notifications_file $tmp_notifications_file || return 11
+        tmp_notifications_file="${notifications_file%".txt"}"
+        tmp_notifications_file="${tmp_notifications_file}_tmp.txt"
+        cp $notifications_file $tmp_notifications_file || return 10
 
         send_harbor_push || return 8
-        check_id_action '6' 'push' || return $?
+        check_id_action '6' 'pull' || return $?
         send_harbor_push || return 9
         check_id_action '7' 'push' || return $?
 
