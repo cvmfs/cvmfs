@@ -205,11 +205,6 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
     return;
   }
 
-  if (entry->IsWhiteout()) {
-    RemoveFile(entry);
-    return;
-  }
-
   PrintWarning("'" + entry->GetRelativePath() +
                "' cannot be deleted. Unrecognized file type.");
 }

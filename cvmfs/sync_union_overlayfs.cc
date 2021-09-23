@@ -243,15 +243,17 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   bool is_chardev_whiteout = entry->IsCharacterDevice() &&
                              entry->GetRdevMajor() == 0 &&
                              entry->GetRdevMinor() == 0;
+  if (is_chardev_whiteout) return true;
 
   std::string whiteout_prefix_ = ".wh.";
-  bool has_wh_prefix = entry->filename().substr(0, whiteout_prefix_.length()) ==
-         whiteout_prefix_;
+  bool has_wh_prefix = HasPrefix(entry->filename().c_str(), whiteout_prefix_, true);
+  if (has_wh_prefix) return true;
 
   bool is_symlink_whiteout =
       entry->IsSymlink() && IsWhiteoutSymlinkPath(entry->GetScratchPath());
+  if (is_symlink_whiteout) return true;
 
-  return is_chardev_whiteout || is_symlink_whiteout || has_wh_prefix;
+  return false;
 }
 
 bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
@@ -285,6 +287,7 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(
     SharedPtr<SyncItem> entry) const {
-  return entry->filename();
+  std::string whiteout_prefix_ = ".wh.";
+  return entry->filename().substr(whiteout_prefix_.length());
 }
 }  // namespace publish
