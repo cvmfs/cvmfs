@@ -39,8 +39,8 @@ class CmdCommit : public Command {
   virtual std::vector<std::string> GetExamples() const {
     std::vector<std::string> e;
     e.push_back(
-        "-c"
-        "commit example");
+        "commit myrepo.cvmfs.io "
+        "# commit changes to myrepo.cvmfs.io");
     return e;
   }
 

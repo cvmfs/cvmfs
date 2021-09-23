@@ -34,7 +34,7 @@ int CmdCommit::Main(const Options &options) {
   }
 
   std::string session_dir = Env::GetEnterSessionDir();
-  std::string config_tmp = session_dir + "/tmp.conf";
+  std::string config_tmp = session_dir + "/repo_config.conf";
   std::string config;
   int fd_config = open(config_tmp.c_str(), O_RDONLY);
   SafeReadToString(fd_config, &config);

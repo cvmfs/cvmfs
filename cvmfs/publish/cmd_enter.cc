@@ -456,7 +456,7 @@ void CmdEnter::CleanupSession(
 
   rvb = RemoveTree(settings_spool_area_.log_dir());
   RemoveSingle(session_dir_ + "/session_pid");
-  RemoveSingle(session_dir_ + "/tmp.conf");
+  RemoveSingle(session_dir_ + "/repo_config.conf");
   RemoveSingle(session_dir_ + "/session_token");
   RemoveSingle(session_dir_ + "/in_transaction.lock");
   RemoveSingle(session_dir_ + "/shellaction.marker");
@@ -593,7 +593,7 @@ int CmdEnter::Main(const Options &options) {
                  "Parsing the external configuration for the repository at %s",
                  repo_config_.c_str());
 
-        SafeWriteToFile(repo_config_, session_dir_ + "/tmp.conf", 0600);
+        SafeWriteToFile(repo_config_, session_dir_ + "/repo_config.conf", 0600);
         builder.setconfig_path(repo_config_);
       }
 
