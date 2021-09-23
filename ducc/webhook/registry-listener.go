@@ -7,6 +7,8 @@ import (
   "os"
   "log"
   "time"
+  "flag"
+  "strings"
 )
 
 func ReadChanges(file *os.File) chan string {
@@ -31,16 +33,26 @@ func ReadChanges(file *os.File) chan string {
 
 func main() {
 
-    file_name := "notifications.txt"
-    file, err := os.OpenFile(file_name, os.O_RDONLY, 0755)
+    file_name := flag.String("notifications_file", "notifications.txt", "Notification file")
+    repository_name := flag.String("repository_name", "test-unpacked.cern.ch", "Repository")
+    flag.Parse()
+
+    fmt.Println("Repository name:", *repository_name)
+
+    file, err := os.OpenFile(*file_name, os.O_RDONLY, 0755)
     if err != nil {
-        log.Fatalf("openFile: %s", err)
+        log.Fatalf("OpenFile: %s", err)
         }
 
     changes := ReadChanges(file)
 
     for {
         msg := <-changes
+
+        msg_split := strings.Split(msg, "|")
+        image := msg_split[len(msg_split)-1]
+        fmt.Println("Image:", image)
+
 	if msg == "xx|file rotation|xx" {
 	    main()
 	}
