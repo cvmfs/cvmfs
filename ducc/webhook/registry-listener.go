@@ -9,6 +9,7 @@ import (
   "time"
   "flag"
   "strings"
+  "os/exec"
 )
 
 func ReadChanges(file *os.File) chan string {
@@ -37,7 +38,7 @@ func main() {
     repository_name := flag.String("repository_name", "test-unpacked.cern.ch", "Repository")
     flag.Parse()
 
-    fmt.Println("Repository name:", *repository_name)
+    //fmt.Println("Repository name:", *repository_name)
 
     file, err := os.OpenFile(*file_name, os.O_RDONLY, 0755)
     if err != nil {
@@ -51,7 +52,18 @@ func main() {
 
         msg_split := strings.Split(msg, "|")
         image := msg_split[len(msg_split)-1]
-        fmt.Println("Image:", image)
+	image2 := strings.ReplaceAll(image, "https://", "")
+        //fmt.Println("Image:", image2)
+
+	out, err := exec.Command("cvmfs_ducc", "convert-single-image", "-p", image2, *repository_name).Output()
+	//err := cmd.Start()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("[OUTPUT]: %s\n", out)
 
 	if msg == "xx|file rotation|xx" {
 	    main()
