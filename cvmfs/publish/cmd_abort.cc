@@ -149,8 +149,8 @@ int CmdAbort::Main(const Options &options) {
   }
 
   if (settings->transaction().in_enter_session()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Changes discarded!");
-
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Discarding changes and closing current transaction...");
     SafeWriteToFile("abort", session_dir + "/shellaction.marker", 0600);
     publisher->ExitShell();
   }

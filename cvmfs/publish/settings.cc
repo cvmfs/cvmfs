@@ -538,8 +538,20 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
     settings_publisher.GetTransaction()->SetUseCatalogAutobalance(
         options_mgr_.IsOn(arg));
   }
-
-  return;
+  if (options_mgr_.GetValue("CVMFS_AUTOCATALOGS_MAX_WEIGHT", &arg)) {
+    settings_publisher.GetTransaction()->SetAutobalanceMaxWeight(
+        String2Uint64(arg));
+  }
+  if (options_mgr_.GetValue("CVMFS_AUTOCATALOGS_MIN_WEIGHT", &arg)) {
+    settings_publisher.GetTransaction()->SetAutobalanceMinWeight(
+        String2Uint64(arg));
+  }
+  if (options_mgr_.GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
+    if (!options_mgr_.IsOn(arg)) {
+      settings_publisher.GetTransaction()->GetSpoolArea()->SetRepairMode(
+          kUnionMountRepairNever);
+    }
+  }
 }
 
 SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(

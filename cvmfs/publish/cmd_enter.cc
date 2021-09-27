@@ -593,8 +593,14 @@ int CmdEnter::Main(const Options &options) {
                  "Parsing the external configuration for the repository at %s",
                  repo_config_.c_str());
 
-        SafeWriteToFile(repo_config_, session_dir_ + "/repo_config.conf", 0600);
-        builder.setconfig_path(repo_config_);
+        std::string config;
+        std::string config_file = repo_config_  + "/server.conf";
+        std::string session_config_file = session_dir_ + "/repo_config.conf";
+        int fd_config = open(config_file.c_str(), O_RDONLY);
+        SafeReadToString(fd_config, &config);
+        SafeWriteToFile(config, session_config_file, 0600);
+
+        builder.setconfig_path(session_config_file);
       }
 
       SettingsPublisher *settings_publisher =
@@ -646,7 +652,8 @@ int CmdEnter::Main(const Options &options) {
     SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
     exit_code = WaitForChild(pid_child);
 
-    if (!FileExists(session_dir_ + "/shellaction.marker")) {
+    if (options.Has("transaction") &&
+        !FileExists(session_dir_ + "/shellaction.marker")) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Closing current transaction...");
       publisher->session()->SetKeepAlive(false);
     }
