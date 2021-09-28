@@ -170,7 +170,7 @@ cvmfs_server_import() {
 
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
-  if [ x"$(is_local_upstream $upstream)" != "x" ]; then
+  if is_local_upstream $upstream; then
     local needed_items="${storage_location}                 \
                         ${storage_location}/.cvmfspublished \
                         ${storage_location}/data            \
