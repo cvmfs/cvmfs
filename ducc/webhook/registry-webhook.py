@@ -32,31 +32,31 @@ def catch_all(p):
     return "ko", 500
 
 def publish_message(notifications_file, action, image):
-    with open(notifications_file, 'a+') as f:
+    with open(notifications_file, "a+") as f:
         if os.stat(notifications_file).st_size == 0:
             current_id = 0
         else:
             f.seek(0)
             lines = f.readlines()
             first_line = lines[0]
-            first_line_id = int(first_line.split('|')[0])
+            first_line_id = int(first_line.split("|")[0])
             last_line = lines[-1]
-            last_line_id = int(last_line.split('|')[0])
+            last_line_id = int(last_line.split("|")[0])
             current_id = last_line_id + 1
             if (last_line_id % int(args_dic["rotation"]) == 0 and last_line_id != 0):
                 new_notifications_file = str(first_line_id)+"-"+str(last_line_id)+notifications_file.split("/")[-1]
                 os.rename(notifications_file, new_notifications_file)
-                with open(new_notifications_file, 'a+') as f:
-                    f.write(f'xx|file rotation|xx\n')
-                with open(notifications_file, 'a+') as f:
-                    message = f'{str(current_id)}|{action}|{image}'
-                    f.write(f'{message}\n')
+                with open(new_notifications_file, "a+") as f:
+                    f.write(f"xx|file rotation|xx\n")
+                with open(notifications_file, "a+") as f:
+                    message = f"{str(current_id)}|{action}|{image}"
+                    f.write(f"{message}\n")
                     return
 
-        message = f'{str(current_id)}|{action}|{image}'
-        f.write(f'{message}\n')
+        message = f"{str(current_id)}|{action}|{image}"
+        f.write(f"{message}\n")
 
-    print(f'{action}|{image}')
+    print(f"{action}|{image}")
 
 
 def handle_dockerhub(rjson, notifications_file):
