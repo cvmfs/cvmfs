@@ -46,6 +46,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/585-xattrs                               \
                                  src/673-acl                                  \
                                  src/682-enter                                \
+				 src/686-azureblob_s3			      \
                                  src/700-overlayfs_validation                 \
                                  --                                           \
                                  src/5*                                       \

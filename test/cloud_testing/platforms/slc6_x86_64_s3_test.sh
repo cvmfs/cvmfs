@@ -80,6 +80,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/670-listreflog                           \
                                src/673-acl                                  \
                                src/682-enter                                \
+			       src/686-azureblob_s3			    \
                                --                                           \
                                src/5*                                       \
                                src/6*                                       \

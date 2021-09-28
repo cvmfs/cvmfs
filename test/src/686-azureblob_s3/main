@@ -74,7 +74,6 @@ cvmfs_run_test() {
   echo "*** setup azurite"
   start_azurite || return 20
 
-
   echo "*** create repository"
   sudo cvmfs_server mkfs \
     -o root \
