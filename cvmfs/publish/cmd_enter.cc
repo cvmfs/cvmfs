@@ -595,7 +595,7 @@ int CmdEnter::Main(const Options &options) {
                  repo_config_.c_str());
 
         std::string config;
-        std::string config_file = repo_config_  + fqrn_ + "/server.conf";
+        std::string config_file = repo_config_ + "/" + fqrn_ + "/server.conf";
         std::string folderpath = session_dir_ + "/" + fqrn_;
         MkdirDeep(folderpath.c_str(), 0600, true /* veryfy_writable */);
 
@@ -604,7 +604,7 @@ int CmdEnter::Main(const Options &options) {
         SafeReadToString(fd_config, &config);
         SafeWriteToFile(config, session_config_file, 0600);
 
-        builder.set_config_path(session_dir_);
+        builder.SetConfigPath(session_dir_);
       }
 
       SettingsPublisher *settings_publisher =

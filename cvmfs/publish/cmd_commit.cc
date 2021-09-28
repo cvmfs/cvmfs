@@ -35,7 +35,7 @@ int CmdCommit::Main(const Options &options) {
 
   SettingsBuilder builder;
   std::string session_dir = Env::GetEnterSessionDir();
-  builder.set_config_path(session_dir);
+  builder.SetConfigPath(session_dir);
 
   UniquePtr<SettingsPublisher> settings;
   try {

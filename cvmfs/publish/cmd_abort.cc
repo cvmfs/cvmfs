@@ -25,7 +25,7 @@ int CmdAbort::Main(const Options &options) {
   std::string session_dir = Env::GetEnterSessionDir();
 
   if (!session_dir.empty()) {
-    builder.set_config_path(session_dir);
+    builder.SetConfigPath(session_dir);
   }
 
   UniquePtr<SettingsPublisher> settings;

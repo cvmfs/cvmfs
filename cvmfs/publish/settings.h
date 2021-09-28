@@ -505,8 +505,8 @@ class SettingsBuilder : SingleCopy {
   void ApplyOptionsFromServerPath(const OptionsManager &options_mgr_,
                                   SettingsPublisher &settings_publisher);
 
-  std::string set_config_path(std::string config_path) {
-    return config_path_ = config_path;
+  void SetConfigPath(const std::string &config_path) {
+    config_path_ = config_path;
   }
 
  private:
