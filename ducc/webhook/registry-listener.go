@@ -38,8 +38,6 @@ func main() {
     repository_name := flag.String("repository_name", "test-unpacked.cern.ch", "Repository")
     flag.Parse()
 
-    //fmt.Println("Repository name:", *repository_name)
-
     file, err := os.OpenFile(*file_name, os.O_RDONLY, 0755)
     if err != nil {
         log.Fatalf("OpenFile: %s", err)
@@ -52,14 +50,9 @@ func main() {
 
         msg_split := strings.Split(msg, "|")
         image := msg_split[len(msg_split)-1]
-	image2 := strings.ReplaceAll(image, "https://", "")
-        //fmt.Println("Image:", image2)
+	image = strings.ReplaceAll(image, "https://", "")
 
-	out, err := exec.Command("cvmfs_ducc", "convert-single-image", "-p", image2, *repository_name).Output()
-	//err := cmd.Start()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	out, err := exec.Command("cvmfs_ducc", "convert-single-image", "-p", image, *repository_name).Output()
 	if err != nil {
 		log.Fatal(err)
 	}
