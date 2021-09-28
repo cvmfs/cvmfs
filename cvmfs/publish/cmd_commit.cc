@@ -33,14 +33,9 @@ int CmdCommit::Main(const Options &options) {
     fqrn = tokens[0];
   }
 
-  std::string session_dir = Env::GetEnterSessionDir();
-  std::string config_tmp = session_dir + "/repo_config.conf";
-  std::string config;
-  int fd_config = open(config_tmp.c_str(), O_RDONLY);
-  SafeReadToString(fd_config, &config);
-
   SettingsBuilder builder;
-  builder.setconfig_path(config);
+  std::string session_dir = Env::GetEnterSessionDir();
+  builder.set_config_path(session_dir);
 
   UniquePtr<SettingsPublisher> settings;
   try {

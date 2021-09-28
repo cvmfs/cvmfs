@@ -456,7 +456,8 @@ void CmdEnter::CleanupSession(
 
   rvb = RemoveTree(settings_spool_area_.log_dir());
   RemoveSingle(session_dir_ + "/session_pid");
-  RemoveSingle(session_dir_ + "/repo_config.conf");
+  RemoveSingle(session_dir_ + "/" + fqrn_ + "/server.conf");
+  RemoveSingle(session_dir_ + "/" + fqrn_);
   RemoveSingle(session_dir_ + "/session_token");
   RemoveSingle(session_dir_ + "/in_transaction.lock");
   RemoveSingle(session_dir_ + "/shellaction.marker");
@@ -594,13 +595,16 @@ int CmdEnter::Main(const Options &options) {
                  repo_config_.c_str());
 
         std::string config;
-        std::string config_file = repo_config_  + "/server.conf";
-        std::string session_config_file = session_dir_ + "/repo_config.conf";
+        std::string config_file = repo_config_  + fqrn_ + "/server.conf";
+        std::string folderpath = session_dir_ + "/" + fqrn_;
+        MkdirDeep(folderpath.c_str(), 0600, true /* veryfy_writable */);
+
+        std::string session_config_file = folderpath + "/server.conf";
         int fd_config = open(config_file.c_str(), O_RDONLY);
         SafeReadToString(fd_config, &config);
         SafeWriteToFile(config, session_config_file, 0600);
 
-        builder.setconfig_path(session_config_file);
+        builder.set_config_path(session_dir_);
       }
 
       SettingsPublisher *settings_publisher =

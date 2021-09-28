@@ -809,7 +809,7 @@ void Publisher::ExitShell() {
   std::string session_pid_tmp = session_dir + "/session_pid";
   std::string session_pid;
   int fd_session_pid = open(session_pid_tmp.c_str(), O_RDONLY);
-  if (fd_session_pid < 0) throw EPublish("session pid cannot be retrieved");
+  if (fd_session_pid < 0) throw EPublish("Session pid cannot be retrieved");
   SafeReadToString(fd_session_pid, &session_pid);
 
   pid_t pid_child = String2Uint64(session_pid);

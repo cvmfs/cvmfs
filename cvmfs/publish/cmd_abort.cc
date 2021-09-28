@@ -25,11 +25,7 @@ int CmdAbort::Main(const Options &options) {
   std::string session_dir = Env::GetEnterSessionDir();
 
   if (!session_dir.empty()) {
-    std::string config_tmp = session_dir + "/repo_config.conf";
-    std::string config;
-    int fd_config = open(config_tmp.c_str(), O_RDONLY);
-    SafeReadToString(fd_config, &config);
-    builder.setconfig_path(config);
+    builder.set_config_path(session_dir);
   }
 
   UniquePtr<SettingsPublisher> settings;
