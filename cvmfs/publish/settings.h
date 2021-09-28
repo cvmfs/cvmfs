@@ -503,7 +503,7 @@ class SettingsBuilder : SingleCopy {
   * Get the values from the server configuration and set them to the publisher settings.
   */
   void ApplyOptionsFromServerPath(const OptionsManager &options_mgr_,
-                                  SettingsPublisher &settings_publisher);
+                                  SettingsPublisher* settings_publisher);
 
   void SetConfigPath(const std::string &config_path) {
     config_path_ = config_path;
