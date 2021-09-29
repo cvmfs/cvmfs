@@ -52,7 +52,7 @@ func main() {
         image := msg_split[len(msg_split)-1]
 	image = strings.ReplaceAll(image, "https://", "")
 
-	out, err := exec.Command("cvmfs_ducc", "convert-single-image", "-p", image, *repository_name).Output()
+	out, err := exec.Command("cvmfs_ducc", "convert-single-image", "-p", image, *repository_name, "--skip-thin-image", "--skip-podman").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
