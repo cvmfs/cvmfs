@@ -168,7 +168,8 @@ bool S3Uploader::ParseSpoolerDefinition(
       authz_method_ = s3fanout::kAuthzAwsV4;
     } else {
     LogCvmfs(kLogUploadS3, kLogStderr,
-             "Failed to parse CVMFS_S3_FLAVOR from '%s', valid options are azure, awsv2 or awsv4",
+             "Failed to parse CVMFS_S3_FLAVOR from '%s', "
+             "valid options are azure, awsv2 or awsv4",
              config_path.c_str());
     return false;
     }
