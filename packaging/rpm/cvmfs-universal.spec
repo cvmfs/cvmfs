@@ -176,7 +176,7 @@ Requires: cvmfs-config
 %if 0%{?selinux_cvmfs}
 %{!?_selinux_policy_version: %global _selinux_policy_version %(sed -e 's,.*selinux-policy-\\([^/]*\\)/.*,\\1,' /usr/share/selinux/devel/policyhelp 2>/dev/null)}
 %if "%{_selinux_policy_version}" != ""
-Requires:      selinux-policy >= %{_selinux_policy_version}
+Requires:      selinux-policy
 %endif
 BuildRequires:  checkpolicy selinux-policy-devel hardlink selinux-policy-targeted
 Requires(post):         /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
@@ -692,6 +692,8 @@ systemctl daemon-reload
 %endif
 
 %changelog
+* Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Remove version requirement from selinux-policy dependency
 * Wed Sep 22 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Fix cmake invocation for FC34
 * Wed Aug 25 2021 Jakob Blomer <jblomer@cern.ch> - 2.8.2
