@@ -139,8 +139,8 @@ fi
 
 # Install azure-cli
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash || die "fail (installing azure-cli)"
+curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
 install_from_repo nodejs || die "fail (installing nodejs)"
-install_from_repo npm || die "fail (installing npm)"
 sudo npm install -g azurite
 
 disable_systemd_rate_limit
