@@ -137,6 +137,12 @@ else
   fi
 fi
 
+# Install azure-cli
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash || die "fail (installing azure-cli)"
+install_from_repo nodejs || die "fail (installing nodejs)"
+install_from_repo npm || die "fail (installing npm)"
+sudo npm install -g azurite
+
 disable_systemd_rate_limit
 
 # setting up the AUFS kernel module
