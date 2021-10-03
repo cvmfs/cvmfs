@@ -139,7 +139,10 @@ fi
 
 # Install azure-cli
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash || die "fail (installing azure-cli)"
-curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+curl -fsSL https://deb.nodesource.com/setup_16.x | sudo bash -
+# Fix up sources list
+sudo sed -i -e 's/https/http/' /etc/apt/sources.list.d/nodesource.list
+sudo apt-get update
 install_from_repo nodejs || die "fail (installing nodejs)"
 sudo npm install -g azurite
 
