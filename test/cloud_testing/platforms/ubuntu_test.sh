@@ -17,8 +17,10 @@ CVMFS_EXCLUDE=
 
 ubuntu_release="$(lsb_release -cs)"
 if [ "x$ubuntu_release" == "xxenial" ]; then
-   # This test has shown to occasionally hang in the GDB attach on Ubuntu 16
-   CVMFS_EXCLUDE="$CVMFS_EXCLUDE 015-rebuild_on_crash"
+  # This test has shown to occasionally hang in the GDB attach on Ubuntu 16
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE 015-rebuild_on_crash"
+  # Killing the sudo process group in 095 is buggy on Ubuntu 16
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE 095-fuser"
 fi
 
 # Kernel sources too old for gcc, TODO
