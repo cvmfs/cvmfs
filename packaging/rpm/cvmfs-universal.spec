@@ -689,9 +689,7 @@ systemctl daemon-reload
 %files ducc
 %{_bindir}/cvmfs_ducc
 %{_unitdir}/cvmfs_ducc.service
-/usr/libexec/cvmfs/ducc/registry-webhook.py
-/usr/libexec/cvmfs/ducc/registry-webhook.pyc
-/usr/libexec/cvmfs/ducc/registry-webhook.pyo
+/usr/libexec/cvmfs/ducc/registry-webhook.py*
 %endif
 
 %changelog
