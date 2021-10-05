@@ -5,7 +5,7 @@ Requires=dockerd.service
 
 [Service]
 Environment="DUCC_RECIPE_FILE=UPDATE-ME.yaml"
-Environment="DUCC_DOCKER_REGISTRY_PASS=UPDATE-ME"
+Environment="DUCC_OUTPUT_REGISTRY_PASS=UPDATE-ME"
 
 ExecStart=@CMAKE_INSTALL_PREFIX@/bin/cvmfs_ducc loop $RECIPE_FILE
 

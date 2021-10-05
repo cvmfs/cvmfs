@@ -2,7 +2,7 @@
 # Test for running CVMFS against an Azure S3 implementation
 #
 # In this test we create our own Azurite blob service.
-# require az-cli and azurite to be installed, see install_azurite()
+# require az-cli and azurite to be installed, see $platform_setup.sh
 # keys are hard-coded dev keys in azurite, so safe to have in code
 
 cvmfs_test_name="Azure blob on azurite"
@@ -28,20 +28,6 @@ CVMFS_S3_FLAVOR=azure
 EOF
 }
 
-install_azurite() {
-  sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-  echo -e "[azure-cli]
-name=Azure CLI
-baseurl=https://packages.microsoft.com/yumrepos/azure-cli
-enabled=1
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc" | sudo tee /etc/yum.repos.d/azure-cli.repo
-  sudo yum install -y azure-cli
-
-  curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
-  sudo yum install -y nodejs
-  sudo npm install -g azurite
-}
 
 start_azurite() {
   echo "*** create azurite configuration"
@@ -73,7 +59,6 @@ cvmfs_run_test() {
 
   echo "*** setup azurite"
   start_azurite || return 20
-
 
   echo "*** create repository"
   sudo cvmfs_server mkfs \

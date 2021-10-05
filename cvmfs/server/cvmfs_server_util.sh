@@ -1212,7 +1212,7 @@ Supported Commands:
                   [-r repair reflog problems]
                   <fully qualified name>
                   Checks if the repository is sane
-  transaction     [-r (retry if unable to acquire lease]
+  transaction     [-t (timeout in seconds for waiting if the repository is busy, 0=infinite)]
                   [-T /template-from=/template-to]
                   <fully qualified name>
                   Start to edit a repository

@@ -1,4 +1,8 @@
 2.9.0:
+  * [rpm] Remove version requirement from selinux-policy dependency
+  * Fix cvmfs_talk host info for empty host chain (CVM-2023)
+  * [ducc] Fix access to authenticated registries
+  * Add 'cvmfs_config setup noautofs' option (CVM-1983)
   * Add support for explicit server-side proxy, removing support for
     server-side system proxy; new parameters CVMFS_SERVER_PROXY and
     CVMFS_S3_PROXY

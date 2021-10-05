@@ -68,8 +68,7 @@ cvmfs_server_alterfs() {
     echo -n "Allowing Replication of this Repository... "
     local master_replica="${temp_dir}/.cvmfs_master_replica"
     # Azurite does not like direct empty file uploads;
-    # touch $master_replica
-    head -c 10 /dev/random > $master_replica
+    echo "This file marks the repository as replicatable to stratum 1 servers" > $master_replica
     __swissknife upload -i $master_replica -o $(basename $master_replica) -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
     if [ $success -ne 1 ]; then
       echo "fail!"

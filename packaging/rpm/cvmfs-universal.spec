@@ -176,7 +176,7 @@ Requires: cvmfs-config
 %if 0%{?selinux_cvmfs}
 %{!?_selinux_policy_version: %global _selinux_policy_version %(sed -e 's,.*selinux-policy-\\([^/]*\\)/.*,\\1,' /usr/share/selinux/devel/policyhelp 2>/dev/null)}
 %if "%{_selinux_policy_version}" != ""
-Requires:      selinux-policy >= %{_selinux_policy_version}
+Requires:      selinux-policy
 %endif
 BuildRequires:  checkpolicy selinux-policy-devel hardlink selinux-policy-targeted
 Requires(post):         /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
@@ -323,7 +323,6 @@ BUILD_DUCC=no
 BUILD_DUCC=yes
 %endif
 
-%if 0%{?suse_version}
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
   -DBUILD_SERVER_DEBUG=yes \
@@ -337,24 +336,6 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DINSTALL_UNITTESTS=yes \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
-%else
-EXTRA_CMAKE_OPTS=""
-%if 0%{?el5} || 0%{?el4}
-EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
-%endif
-%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
-  -DBUILD_SERVER=yes \
-  -DBUILD_SERVER_DEBUG=yes \
-  -DBUILD_RECEIVER=yes \
-  -DBUILD_RECEIVER_DEBUG=yes \
-  -DBUILD_LIBCVMFS=yes \
-  -DBUILD_LIBCVMFS_CACHE=yes \
-  -DBUILD_SHRINKWRAP=yes \
-  -DBUILD_UNITTESTS=yes \
-  -DBUILD_GATEWAY=$BUILD_GATEWAY \
-  -DBUILD_DUCC=$BUILD_DUCC \
-  -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
-%endif
 
 make %{?_smp_mflags}
 
@@ -711,6 +692,10 @@ systemctl daemon-reload
 %endif
 
 %changelog
+* Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Remove version requirement from selinux-policy dependency
+* Wed Sep 22 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Fix cmake invocation for FC34
 * Wed Aug 25 2021 Jakob Blomer <jblomer@cern.ch> - 2.8.2
 - Add lsof dependency for cvmfs package due to new cvmfs_config fuser command
 * Fri May 7 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0

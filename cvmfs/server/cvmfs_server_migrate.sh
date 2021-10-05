@@ -528,6 +528,18 @@ _migrate_143() {
     echo "CVMFS_USE_SSL_SYSTEM_CA=true" >> $client_conf
   fi
 
+  if is_stratum0 $name; then
+    echo "--> adjusting /etc/fstab"
+    sed -i -e "s|\(.*\)allow_other,\(.*# added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}\)|\1allow_other,fsname=${CVMFS_REPOSITORY_NAME},\2|" /etc/fstab
+
+    # Make sure the systemd mount unit exists
+    if is_systemd; then
+      /usr/lib/systemd/system-generators/systemd-fstab-generator \
+        /run/systemd/generator '' '' 2>/dev/null || true
+      systemctl daemon-reload
+    fi
+  fi
+
   echo "--> updating server.conf"
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
