@@ -190,7 +190,7 @@ SigningTool::Result SigningTool::Run(
       return kError;
     }
     // remove assert, since chksum file may not be there during import
-    //assert(!reflog_chksum_path.empty());
+    // assert(!reflog_chksum_path.empty());
     manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
   }
 
