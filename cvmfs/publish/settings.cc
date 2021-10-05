@@ -614,7 +614,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   settings_publisher->GetStorage()->SetLocator(
     options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
 
-  ApplyOptionsFromServerPath(*options_mgr_, settings_publisher);
+  ApplyOptionsFromServerPath(*options_mgr_, &*settings_publisher);
 
   // TODO(jblomer): process other parameters
   return settings_publisher.Release();
