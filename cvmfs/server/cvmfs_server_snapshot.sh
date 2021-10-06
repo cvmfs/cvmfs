@@ -120,7 +120,7 @@ __do_snapshot() {
 
     # put a magic file in the repository root to signal a snapshot in progress
     local snapshotting_tmp="${spool_dir}/tmp/snapshotting"
-    $user_shell "date > $snapshotting_tmp"
+    $user_shell "date --utc > $snapshotting_tmp"
     $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
       -i $snapshotting_tmp                                 \
       -o .cvmfs_is_snapshotting"
