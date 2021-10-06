@@ -1,4 +1,5 @@
 2.9.0:
+  * Use UTC timestamp for .cvmfs_is_snapshotting (CVM-1986)
   * [rpm] Remove version requirement from selinux-policy dependency
   * Fix cvmfs_talk host info for empty host chain (CVM-2023)
   * [ducc] Fix access to authenticated registries
