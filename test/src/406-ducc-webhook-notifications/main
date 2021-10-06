@@ -1,6 +1,6 @@
 cvmfs_test_name="Webhook notifications test"
 cvmfs_test_autofs_on_startup=false
-cvmfs_test_suites="ducc"
+cvmfs_test_suites="quick"
 
 cleanup() {
   pid=$(ps aux | grep 'registry-webhook.py' | awk -F' ' '{print $2}' )
