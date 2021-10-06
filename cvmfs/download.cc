@@ -261,6 +261,17 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   } else if (HasPrefix(header_line, "LOCATION:", true)) {
     // This comes along with redirects
     LogCvmfs(kLogDownload, kLogDebug, "%s", header_line.c_str());
+  } else if (HasPrefix(header_line, "X-SQUID-ERROR:", true)) {
+    // Reinterpret host error as proxy error
+    if (info->error_code == kFailHostHttp) {
+      info->error_code = kFailProxyHttp;
+    }
+  } else if (HasPrefix(header_line, "PROXY-STATUS:", true)) {
+    // Reinterpret host error as proxy error if applicable
+    if ((info->error_code == kFailHostHttp) &&
+        (header_line.find("error=") != string::npos)) {
+      info->error_code = kFailProxyHttp;
+    }
   }
 
   return num_bytes;
