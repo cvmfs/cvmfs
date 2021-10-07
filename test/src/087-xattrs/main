@@ -4,7 +4,7 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount grid.cern.ch || return 1
+  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no" || return 1
 
   echo "Test listing magic extended attributes"
 
