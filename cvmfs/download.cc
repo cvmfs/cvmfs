@@ -217,8 +217,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       // libcurl will handle this because of CURLOPT_FOLLOWLOCATION
       return num_bytes;
     } else {
-      LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
-               header_line.c_str());
+      LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s [%d]",
+               header_line.c_str(), info->http_code);
       if (((info->http_code / 100) == 5) ||
           (info->http_code == 400) || (info->http_code == 404))
       {
@@ -261,6 +261,17 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   } else if (HasPrefix(header_line, "LOCATION:", true)) {
     // This comes along with redirects
     LogCvmfs(kLogDownload, kLogDebug, "%s", header_line.c_str());
+  } else if (HasPrefix(header_line, "X-SQUID-ERROR:", true)) {
+    // Reinterpret host error as proxy error
+    if (info->error_code == kFailHostHttp) {
+      info->error_code = kFailProxyHttp;
+    }
+  } else if (HasPrefix(header_line, "PROXY-STATUS:", true)) {
+    // Reinterpret host error as proxy error if applicable
+    if ((info->error_code == kFailHostHttp) &&
+        (header_line.find("error=") != string::npos)) {
+      info->error_code = kFailProxyHttp;
+    }
   }
 
   return num_bytes;
