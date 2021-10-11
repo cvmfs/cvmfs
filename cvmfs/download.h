@@ -466,6 +466,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
                         std::vector<uint64_t> *reply_vals);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
+  void SetRandomProxyUnlocked();
   void RebalanceProxiesUnlocked();
   CURL *AcquireCurlHandle();
   void ReleaseCurlHandle(CURL *handle);

@@ -2013,11 +2013,7 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
     swap((*group)[0], (*group)[group_size - opt_proxy_groups_current_burned_]);
 
     // Select new one
-    unsigned select =
-      prng_.Next(group_size - opt_proxy_groups_current_burned_);
-
-    // Move selected proxy to front
-    swap((*group)[0], (*group)[select]);
+    SetRandomProxyUnlocked();
 
     if (opt_proxy_groups_reset_after_ > 0) {
       if (opt_timestamp_failover_proxies_ == 0)
@@ -2566,11 +2562,7 @@ void DownloadManager::SetProxyChain(
   // Select random start proxy from the first group.
   if (opt_proxy_groups_->size() > 0) {
     // Select random start proxy from the first group.
-    vector<ProxyInfo> *group = current_proxy_group();
-    if (group->size() > 1) {
-      unsigned random_index = prng_.Next(group->size());
-      swap((*group)[0], (*group)[random_index]);
-    }
+    SetRandomProxyUnlocked();
   }
 }
 
@@ -2615,6 +2607,16 @@ string DownloadManager::GetFallbackProxyList() {
 }
 
 /**
+ * Selects a new random non-burned proxy in the current load-balancing group
+ */
+void DownloadManager::SetRandomProxyUnlocked() {
+  vector<ProxyInfo> *group = current_proxy_group();
+  unsigned select =
+    prng_.Next(group->size() - opt_proxy_groups_current_burned_);
+  swap((*group)[select], (*group)[0]);
+}
+
+/**
  * Selects a new random proxy in the current load-balancing group.  Resets the
  * "burned" counter.
  */
@@ -2624,9 +2626,7 @@ void DownloadManager::RebalanceProxiesUnlocked() {
 
   opt_timestamp_failover_proxies_ = 0;
   opt_proxy_groups_current_burned_ = 0;
-  vector<ProxyInfo> *group = current_proxy_group();
-  unsigned select = prng_.Next(group->size());
-  swap((*group)[select], (*group)[0]);
+  SetRandomProxyUnlocked();
 }
 
 
