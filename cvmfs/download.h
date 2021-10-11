@@ -483,6 +483,16 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void FiniHeaders();
   void CloneProxyConfig(DownloadManager *clone);
 
+  inline std::vector<ProxyInfo> *current_proxy_group() const {
+    return (opt_proxy_groups_ ?
+            &((*opt_proxy_groups_)[opt_proxy_groups_current_]) : NULL);
+  }
+
+  inline ProxyInfo *current_proxy() const {
+    return (opt_proxy_groups_ ?
+            &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]) : NULL);
+  }
+
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
