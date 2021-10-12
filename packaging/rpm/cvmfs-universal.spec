@@ -372,28 +372,14 @@ exit 0
 %endif
 
 %pre
-%if 0%{?suse_version}
-  /usr/bin/getent group cvmfs >/dev/null
-  if [ $? -ne 0 ]; then
-    /usr/sbin/groupadd -r cvmfs
-  fi
-  /usr/bin/getent passwd cvmfs >/dev/null
-  if [ $? -ne 0 ]; then
-    /usr/sbin/useradd -r -g cvmfs -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
-  fi
-%else
-  /usr/bin/getent passwd cvmfs >/dev/null
-  if [ $? -ne 0 ]; then
-     /usr/sbin/useradd -r -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
-  fi
-
-  # The useradd command will add a cvmfs group too - but we're in trouble if
-  # the sysadmin has the cvmfs user, but not the group, pre-created.
-  /usr/bin/getent group cvmfs >/dev/null
-  if [ $? -ne 0 ]; then
-    /usr/sbin/groupadd -r cvmfs
-  fi
-%endif
+/usr/bin/getent group cvmfs >/dev/null
+if [ $? -ne 0 ]; then
+  /usr/sbin/groupadd -r cvmfs
+fi
+/usr/bin/getent passwd cvmfs >/dev/null
+if [ $? -ne 0 ]; then
+  /usr/sbin/useradd -r -g cvmfs -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
+fi
 
 /usr/bin/getent group fuse | grep -q cvmfs
 if [ $? -ne 0 ]; then
