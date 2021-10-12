@@ -14,7 +14,7 @@ import (
 var Version = "development"
 
 func main() {
-	fmt.Println("CernVM-FS Gateway Service Version:\t", Version, "\n")
+	fmt.Println("CernVM-FS Gateway Service Version:\t", Version)
 	gw.InitLogging(os.Stderr)
 	cfg, err := gw.ReadConfig()
 	if err != nil {
