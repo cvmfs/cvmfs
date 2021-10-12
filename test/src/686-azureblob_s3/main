@@ -49,8 +49,7 @@ start_azurite() {
 }
 
 cvmfs_run_test() {
-  # lets run this test only in the S3 suite
-  if [ x"$CVMFS_TEST_S3_CONFIG" == x"" ]; then
+  if ! running_on_s3; then
     echo "not running, since s3 tests are blocked"
     return 1
   fi

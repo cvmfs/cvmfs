@@ -28,21 +28,6 @@ CVMFS_S3_FLAVOR=azure
 EOF
 }
 
-install_azurite() {
-  sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-  echo -e "[azure-cli]
-name=Azure CLI
-baseurl=https://packages.microsoft.com/yumrepos/azure-cli
-enabled=1
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc" | sudo tee /etc/yum.repos.d/azure-cli.repo
-  sudo yum install -y azure-cli
-
-  curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
-  sudo yum install -y nodejs
-  sudo npm install -g azurite
-}
-
 start_azurite() {
   echo "*** create azurite configuration"
   create_azurite_config || return 20
@@ -63,9 +48,8 @@ start_azurite() {
 }
 
 cvmfs_run_test() {
-  # lets run this test only in the S3 suite
-  if [ x"$CVMFS_TEST_S3_CONFIG" == x"" ]; then
-    echo "not running, since s3 tests are blocked, export CVMFS_TEST_S3_CONFIG=true to allow running"
+  if ! running_on_s3; then
+    echo "not running, since s3 tests are blocked"
     return 1
   fi
 
@@ -74,7 +58,6 @@ cvmfs_run_test() {
   echo "*** setup azurite"
   start_azurite || return 20
 
-
   echo "*** create repository"
   sudo cvmfs_server mkfs \
     -o root \
@@ -82,17 +65,15 @@ cvmfs_run_test() {
     -w http://127.0.0.1:10000/devstoreaccount1/test  \
     azurite.cvmfs.io || return 40
 
-  echo "*** poke around the new repository: transaction"
+  echo "*** create test content in the repository"
   sudo cvmfs_server transaction azurite.cvmfs.io || return 50
-  echo "*** poke around the new repository: touch file"
   sudo touch /cvmfs/azurite.cvmfs.io/miaomiao || return 51
-  echo "*** poke around the new repository: publish"
   sudo cvmfs_server publish azurite.cvmfs.io || return 52
-  echo "*** poke around the new repository: verify file"
-  sudo ls -l /cvmfs/azurite.cvmfs.io/miaomiao || return 53
+
   echo "*** remove and preserve repository"
-  sudo cvmfs_server rmfs -f -p azurite.cvmfs.io || return 54
-  
+  sudo cvmfs_server rmfs -f -p azurite.cvmfs.io || return 53
+  cvmfs_server list | grep azurite.cvmfs.io && return 54
+
   echo "*** import repository"
   sudo cvmfs_server import \
     -o root \
