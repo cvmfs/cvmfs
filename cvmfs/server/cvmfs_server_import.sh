@@ -147,7 +147,6 @@ cvmfs_server_import() {
   check_upstream_validity $upstream
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
-  # is_local_upstream $upstream       || die "Import only works locally for the moment"
   ensure_swissknife_suid $unionfs   || die "Need CAP_SYS_ADMIN for cvmfs_swissknife"
   lower_hardlink_restrictions
   if [ $configure_apache -eq 1 ]; then
