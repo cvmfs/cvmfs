@@ -101,7 +101,6 @@ SigningTool::Result SigningTool::Run(
   }
 
   // From here on things are potentially put in backend storage
-  // LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
 
   // Register callback for retrieving the certificate hash
   upload::Spooler::CallbackPtr callback =
