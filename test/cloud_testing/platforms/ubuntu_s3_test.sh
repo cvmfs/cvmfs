@@ -28,7 +28,7 @@ if [ "x$ubuntu_release" = "xxenial" ]; then
   # Ubuntu 16.04 has no fuse-overlayfs
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
   # Azurite doesn't install on 16.04
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/686-azureblob_s3"
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/686-azureblob_s3 src/687-import_s3"
 fi
 
 if [ "x$ubuntu_release" = "xbionic" ]; then
