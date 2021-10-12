@@ -188,9 +188,8 @@ SigningTool::Result SigningTool::Run(
                spooler->GetNumberOfErrors());
       return kError;
     }
-    // remove assert, since chksum file may not be there during import
-    // assert(!reflog_chksum_path.empty());
-    manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
+    if (!reflog_chksum_path.empty())
+      manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
   }
 
   // Don't activate new manifest, just make sure all its references are uploaded
