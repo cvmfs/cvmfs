@@ -1,5 +1,3 @@
-//go:build integration
-
 package receiver
 
 import (
@@ -18,12 +16,23 @@ func getReceiverPath() string {
 	return receiverPath
 }
 
-func TestReceiverCycle(t *testing.T) {
+func createReceiver(t *testing.T) Receiver {
 	st := stats.NewStatisticsMgr()
-	receiver, err := NewReceiver(context.TODO(), getReceiverPath(), false, st)
+	receiver, err := NewReceiver(context.TODO(), getReceiverPath(), false, st, "-w \"\"")
 	if err != nil {
 		t.Fatalf("could not start receiver: %v", err)
 	}
+	return receiver
+}
+
+func TestMain(m *testing.M) {
+	if os.Getenv("INTEGRATION_TESTS") == "ON" {
+		os.Exit(m.Run())
+	}
+}
+
+func TestReceiverCycle(t *testing.T) {
+	receiver := createReceiver(t)
 	if err := receiver.Echo(); err != nil {
 		t.Fatalf("echo request failed: %v", err)
 
@@ -34,25 +43,17 @@ func TestReceiverCycle(t *testing.T) {
 }
 
 func TestReceiverOnCrashWeReturnError(t *testing.T) {
-	receiver, err := NewReceiver(context.TODO(), getReceiverPath(), false, stats.NewStatisticsMgr())
-	if err != nil {
-		t.Fatalf("could not start receiver: %v", err)
-	}
+	receiver := createReceiver(t)
 	if err := receiver.Echo(); err != nil {
 		t.Fatalf("echo request failed: %v", err)
 	}
-	err = receiver.TestCrash()
-	// note how we check the err being equal (==) and not different (!=) to nil
-	if err == nil {
+	if err := receiver.TestCrash(); err == nil {
 		t.Fatalf("crash request failed: %v", err)
 	}
 }
 
 func TestReceiverAfterCrashWeCanStillCallCommandAndTheyWillReturnAnError(t *testing.T) {
-	receiver, err := NewReceiver(context.TODO(), getReceiverPath(), false, stats.NewStatisticsMgr())
-	if err != nil {
-		t.Fatalf("could not start receiver: %v", err)
-	}
+	receiver := createReceiver(t)
 	if err := receiver.Echo(); err != nil {
 		t.Fatalf("echo request failed: %v", err)
 	}
@@ -71,10 +72,7 @@ func TestReceiverAfterCrashWeCanStillCallCommandAndTheyWillReturnAnError(t *test
 // reduntat test, but it mimic a problem we found in production.
 // after a crash the .Quit() was hanging
 func TestReceiverAfterCrashQuitDoesNotHang(t *testing.T) {
-	receiver, err := NewReceiver(context.TODO(), getReceiverPath(), false, stats.NewStatisticsMgr())
-	if err != nil {
-		t.Fatalf("could not start receiver: %v", err)
-	}
+	receiver := createReceiver(t)
 
 	receiver.TestCrash()
 
