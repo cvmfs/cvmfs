@@ -2,6 +2,8 @@
 
 usage() {
   echo "$0 <logfile> [-o xUnit XML output] [-s suite labels] [-x <exclusion list> --] [test list]"
+  echo "  -- or --"
+  echo "$0 <logfile> -s3 <S3 storage path>"
 }
 
 export LC_ALL=C
@@ -15,6 +17,63 @@ fi
 if ! echo "$logfile" | grep -q ^/; then
   logfile=$(pwd)/$(basename $logfile)
 fi
+
+if [ "x$2" = "x-s3" ]; then
+  s3_storage=$3
+  if [ "x$s3_storage" = "x" ]; then
+    usage
+    exit 1
+  fi
+  if [ -d $s3_storage ]; then
+    echo "$s3_storage already exists, remove before starting S3 server"
+    exit 1
+  fi
+  echo "Starting S3 test server" > $logfile
+  mkdir -p $s3_storage/{config,mc_config,data}
+
+  s3_config=$s3_storage/test_s3.conf
+  tee $s3_config >> $logfile << EOF
+CVMFS_S3_HOST=localhost
+CVMFS_S3_PORT=13337
+CVMFS_S3_ACCESS_KEY=not
+CVMFS_S3_SECRET_KEY=important
+CVMFS_S3_BUCKETS_PER_ACCOUNT=1
+CVMFS_S3_DNS_BUCKETS=false
+CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10
+CVMFS_S3_BUCKET=testbucket
+EOF
+  tee $s3_storage/config/config.json >> $logfile << EOF
+{
+	"version": "23",
+	"credential": {
+		"accessKey": "not",
+		"secretKey": "important"
+	}
+}
+EOF
+  tee $s3_storage/mc_config/config.json >> $logfile << EOF
+{
+	"version": "9",
+	"hosts": {
+		"cvmfs": {
+			"url": "http://localhost:13337",
+			"accessKey": "not",
+			"secretKey": "important",
+			"api": "S3v4",
+			"lookup": "auto"
+		}
+	}
+}
+EOF
+  echo "********** Environment for starting S3 integration tests **************"
+  echo "export CVMFS_TEST_S3_CONFIG=$s3_config"
+  echo "export CVMFS_TEST_HTTP_BASE=http://localhost:13337/testbucket"
+  echo "export CVMFS_TEST_S3_STORAGE=$s3_storage/data/testbucket"
+  echo "***********************************************************************"
+  /usr/local/bin/minio server --address :13337 --config-dir $s3_storage/config $s3_storage/data
+  exit 0
+fi
+
 echo "Start test suite for cvmfs $(cvmfs2 --version)" > $logfile
 date >> $logfile
 

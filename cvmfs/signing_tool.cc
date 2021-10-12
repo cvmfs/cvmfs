@@ -101,7 +101,6 @@ SigningTool::Result SigningTool::Run(
   }
 
   // From here on things are potentially put in backend storage
-  // LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
 
   // Register callback for retrieving the certificate hash
   upload::Spooler::CallbackPtr callback =
@@ -189,8 +188,8 @@ SigningTool::Result SigningTool::Run(
                spooler->GetNumberOfErrors());
       return kError;
     }
-    assert(!reflog_chksum_path.empty());
-    manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
+    if (!reflog_chksum_path.empty())
+      manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
   }
 
   // Don't activate new manifest, just make sure all its references are uploaded

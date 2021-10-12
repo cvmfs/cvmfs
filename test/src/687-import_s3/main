@@ -2,10 +2,10 @@
 # Test for running CVMFS against an Azure S3 implementation
 #
 # In this test we create our own Azurite blob service.
-# require az-cli and azurite to be installed, see $platform_setup.sh
+# require az-cli and azurite to be installed, see install_azurite()
 # keys are hard-coded dev keys in azurite, so safe to have in code
 
-cvmfs_test_name="Azure blob on azurite"
+cvmfs_test_name="Import S3 backed cvmfs on Azure blob through azurite"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
@@ -27,7 +27,6 @@ CVMFS_S3_DNS_BUCKETS=false
 CVMFS_S3_FLAVOR=azure
 EOF
 }
-
 
 start_azurite() {
   echo "*** create azurite configuration"
@@ -66,11 +65,31 @@ cvmfs_run_test() {
     -w http://127.0.0.1:10000/devstoreaccount1/test  \
     azurite.cvmfs.io || return 40
 
-  echo "*** poke around the new repository"
+  echo "*** create test content in the repository"
   sudo cvmfs_server transaction azurite.cvmfs.io || return 50
   sudo touch /cvmfs/azurite.cvmfs.io/miaomiao || return 51
   sudo cvmfs_server publish azurite.cvmfs.io || return 52
-  sudo ls /cvmfs/azurite.cvmfs.io/miaomiao || return 53
+
+  echo "*** remove and preserve repository"
+  sudo cvmfs_server rmfs -f -p azurite.cvmfs.io || return 53
+  cvmfs_server list | grep azurite.cvmfs.io && return 54
+
+  echo "*** import repository"
+  sudo cvmfs_server import \
+    -o root \
+    -w http://127.0.0.1:10000/devstoreaccount1/test/azurite.cvmfs.io \
+    -u S3,/var/spool/cvmfs/azurite.cvmfs.io/tmp,azurite.cvmfs.io@cvmfs_azurite.conf \
+    -p -k /etc/cvmfs/keys/ \
+    -r azurite.cvmfs.io || return 55
+
+  echo "*** poke around the imported repository: transaction"
+  sudo cvmfs_server transaction azurite.cvmfs.io || return 56
+  echo "*** poke around the imported repository: touch file"
+  sudo touch /cvmfs/azurite.cvmfs.io/miaomiao2 || return 57
+  echo "*** poke around the imported repository: publish"
+  sudo cvmfs_server publish azurite.cvmfs.io || return 58
+  echo "*** poke around the imported repository: verify file"
+  sudo ls -l /cvmfs/azurite.cvmfs.io/miaomiao* || return 59
 
   return 0
 }
