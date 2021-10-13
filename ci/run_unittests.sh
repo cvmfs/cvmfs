@@ -127,7 +127,7 @@ fi
 if [ $CVMFS_TEST_GATEWAY = 1 ] && can_build_gateway; then
   echo "running gateway unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
   pushd ${SCRIPT_LOCATION}/../gateway > /dev/null
-  go test -v -mod=vendor internal/... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway
+  go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway
   popd > /dev/null
 fi
 
