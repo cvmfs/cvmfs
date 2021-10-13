@@ -651,8 +651,6 @@ Publisher::Publisher(const SettingsPublisher &settings)
   rvb =
     signature_mgr_->LoadCertificatePath(settings.keychain().certificate_path());
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Keychain: %s",
-           settings.keychain().certificate_path().c_str());
   if (!rvb) {
     check_keys_match = false;
     LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
