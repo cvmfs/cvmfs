@@ -61,7 +61,7 @@ type ReceiverReply struct {
 // NewReceiver is the factory method for Receiver types
 func NewReceiver(ctx context.Context, execPath string, mock bool, statsMgr *stats.StatisticsMgr, args ...string) (Receiver, error) {
 	if mock {
-		return NewMockReceiver(ctx, execPath, append(args, "-w ''")...)
+		return NewMockReceiver(ctx)
 	}
 
 	return NewCvmfsReceiver(ctx, execPath, statsMgr, args...)
@@ -121,12 +121,6 @@ func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.Stat
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "could not start worker process")
 	}
-
-	// it is necessary to close this two files, otherwise, if the receiver crash,
-	// a read on the `workerOutRead` / `workerCmdOut` will hang forever.
-	// details: https://web.archive.org/web/20200429092830/https://redbeardlab.com/2020/04/29/on-linux-pipes-fork-and-passing-file-descriptors-to-other-process/
-	workerInRead.Close()
-	workerOutWrite.Close()
 
 	gw.LogC(ctx, "receiver", gw.LogDebug).
 		Str("command", "start").
@@ -216,6 +210,7 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "submit payload").
+		Str("lease_path", leasePath).
 		Msgf("result: %v", result)
 
 	if result == nil {
@@ -254,13 +249,18 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("command", "commit").
+		Str("lease_path", leasePath).
 		Msgf("result: %v", result)
 
 	return parsedReply.FinalRevision, result
 }
 
 func (r *CvmfsReceiver) Interrupt() error {
-	return r.worker.Process.Signal(os.Interrupt)
+	err := r.worker.Process.Signal(os.Interrupt)
+	gw.LogC(r.ctx, "receiver", gw.LogDebug).
+		Str("command", "interrupt").
+		Msgf("result (err): %v", err)
+	return err
 }
 
 // Method used only in testing, we provide an empty implementation here
@@ -323,7 +323,7 @@ func (r *CvmfsReceiver) reply() ([]byte, error) {
 func parseReceiverReply(reply []byte) (*ReceiverReply, error) {
 	res := &ReceiverReply{}
 	if err := json.Unmarshal(reply, res); err != nil {
-		return nil, errors.Wrap(err, "could not decode receiver reply '" + string(reply[:]) + "'")
+		return nil, errors.Wrap(err, "could not decode receiver reply '"+string(reply[:])+"'")
 	}
 	if res.Status != "ok" {
 		return res, Error(res.Reason)
