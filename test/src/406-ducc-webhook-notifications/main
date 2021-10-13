@@ -1,0 +1,97 @@
+cvmfs_test_name="Webhook notifications test"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cleanup() {
+  pid=$(ps aux | grep 'registry-webhook.py' | awk -F' ' '{print $2}' )
+  kill $pid
+}
+
+check_port() {
+    until nc -zv 127.0.0.1 8080 2>&1
+    do
+	sleep 1
+    done
+}
+
+check_id_action() {
+    expected_id=$1
+    expected_action=$2
+
+    notification=$( tail -n 1 $notifications_file )
+    id=(${notification//|/ })
+
+    if [ ${id[0]} != ${expected_id} ]
+    then
+        echo "The action id is not correct: expected ${expected_id} but got ${id[0]}" && return 10
+    fi
+
+    if [ ${id[1]} != ${expected_action} ]
+    then
+        echo "The action type is not correct: expected ${expected_action} but got ${id[1]}" && return 20
+    fi
+}
+
+send_harbor_push() {
+    curl -X POST http://127.0.0.1:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"PUSH_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}"
+}
+
+send_harbor_delete() {
+    curl -X POST http://127.0.0.1:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"DELETE_ARTIFACT\", \"event_data\": {\"resources\": [{\"resource_url\": \"registry.cern.ch/unpacked-dev/image:tag\"}]}}"
+}
+
+send_harbor_replication() {
+    curl -X POST http://127.0.0.1:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"type\": \"REPLICATION\", \"event_data\": {\"replication\": { \"dest_resource\": {\"endpoint\": \"https://registry.cern.ch\", \"namespace\": \"unpacked-dev\"}, \"src_resource\": {\"endpoint\": \"https://hub.docker.com\", \"namespace\": \"unpacked-dev\"}, \"successful_artifact\": [{\"type\": \"image\", \"status\": \"Success\", \"name_tag\": \"image:tag\"}]}}}"
+}
+
+send_docker_push() {
+    curl -X POST http://127.0.0.1:8080/webhooks/test-cvmfs-ingestion -H "Content-Type: application/json" -d "{\"events\": [{\"action\": \"push\", \"target\": {\"repository\": \"unpacked.cern.ch\", \"url\": \"http://hub.docker.com\", \"tag\": \"latest\"}, \"request\": {\"host\": \"hub.docker.com\"}}]}"
+}
+
+cvmfs_run_test() {
+    trap cleanup EXIT HUP INT TERM
+
+    notifications_file="notifications.txt"
+
+    rm -f $notifications_file
+    touch $notifications_file
+
+    (python3 /usr/libexec/cvmfs/ducc/registry-webhook.py -f $notifications_file -h 127.0.0.1 -p 8080 -r 5 &) || return 1
+
+    if check_port;
+    then
+        send_harbor_push || return 2
+        check_id_action '0' 'push' || return $?
+        send_harbor_delete || return 3
+        check_id_action '1' 'delete' || return $?
+        send_harbor_replication || return 4
+        check_id_action '2' 'replication' || return $?
+        send_docker_push || return 5
+        check_id_action '3' 'push' || return $?
+        send_harbor_push || return 6
+        check_id_action '4' 'push' || return $?
+        send_harbor_push || return 7
+        check_id_action '5' 'push' || return $?
+
+	# The first notifications received are saved in 0-5notifications.txt and the new ones are appended to
+	# a fresh new notifications.txt file. We create a temporary copy of the first notifications received
+	# (notifications_tmp.txt) before the actual rotation to later check that the rotation notifications.txt
+	# --> 0-5notifications.txt has been successful.
+        tmp_notifications_file="${notifications_file%".txt"}"
+        tmp_notifications_file="${tmp_notifications_file}_tmp.txt"
+        cp $notifications_file $tmp_notifications_file || return 10
+
+        send_harbor_push || return 8
+        check_id_action '6' 'push' || return $?
+        send_harbor_push || return 9
+        check_id_action '7' 'push' || return $?
+
+        echo "xx|file rotation|xx" >> $tmp_notifications_file
+        if !(diff -q $tmp_notifications_file "0-5notifications.txt");
+        then
+            echo 'File rotation failed' && return 30
+        fi
+     fi
+
+    return 0
+}

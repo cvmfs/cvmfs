@@ -689,11 +689,14 @@ systemctl daemon-reload
 %files ducc
 %{_bindir}/cvmfs_ducc
 %{_unitdir}/cvmfs_ducc.service
+/usr/libexec/cvmfs/ducc/registry-webhook.py*
 %endif
 
 %changelog
 * Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Remove version requirement from selinux-policy dependency
+* Wed Sep 29 2021 Andrea Valenzuela <andrea.valenzuela.ramirez@cern.ch> - 2.9.0
+- Add registry-webhook.py app
 * Wed Sep 22 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Fix cmake invocation for FC34
 * Wed Aug 25 2021 Jakob Blomer <jblomer@cern.ch> - 2.8.2
