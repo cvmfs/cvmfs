@@ -62,8 +62,9 @@ install_from_repo tree
 install_from_repo trickle
 
 # Install test dependency for 647
-install_from_repo python-flask          || die "fail (installing python-flask)"
-
+#install_from_repo python-flask          || die "fail (installing python-flask)"
+sudo yum install -y python-pip2
+sudo pip2 install -y flask
 # Install the test S3 provider
 install_test_s3
 
