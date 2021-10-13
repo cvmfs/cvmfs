@@ -49,11 +49,11 @@ def publish_message(notifications_file, action, image):
                 with open(new_notifications_file, 'a+') as f:
                     f.write('xx|file rotation|xx\n')
                 with open(notifications_file, 'a+') as f:
-                    message = '{}|{}|{}'.format(current_id, action, image)
+                    message = '{}|{}|{}\n'.format(current_id, action, image)
                     f.write('{}'.format(message))
                     return
 
-        message = '{}|{}|{}'.format(current_id, action, image)
+        message = '{}|{}|{}\n'.format(current_id, action, image)
         f.write('{}'.format(message))
 
     print('{}|{}'.format(action, image))
