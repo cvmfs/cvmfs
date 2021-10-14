@@ -839,7 +839,7 @@ void Publisher::SyncImpl() {
     settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
     // TODO(jblomer): think about how to deal with the scratch area at
     // this point
-    //WipeScratchArea();
+    // WipeScratchArea();
   }
 
   delete sync_union_;
