@@ -650,7 +650,6 @@ Publisher::Publisher(const SettingsPublisher &settings)
   int rvb;
   rvb =
     signature_mgr_->LoadCertificatePath(settings.keychain().certificate_path());
-
   if (!rvb) {
     check_keys_match = false;
     LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
@@ -840,7 +839,7 @@ void Publisher::SyncImpl() {
     settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());
     // TODO(jblomer): think about how to deal with the scratch area at
     // this point
-    WipeScratchArea();
+    //WipeScratchArea();
   }
 
   delete sync_union_;
