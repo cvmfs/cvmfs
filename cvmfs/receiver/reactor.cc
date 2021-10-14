@@ -143,15 +143,15 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
   }
 
   const JSON *n_chunks_added = JsonDocument::SearchInObject(
-    publish_ctrs, "n_chunks_added", JSON_STRING);
+    publish_ctrs, "n_chunks_added", JSON_INT);
   const JSON *n_chunks_duplicated = JsonDocument::SearchInObject(
-    publish_ctrs, "n_chunks_duplicated", JSON_STRING);
+    publish_ctrs, "n_chunks_duplicated", JSON_INT);
   const JSON *n_catalogs_added = JsonDocument::SearchInObject(
-    publish_ctrs, "n_catalogs_added", JSON_STRING);
+    publish_ctrs, "n_catalogs_added", JSON_INT);
   const JSON *sz_uploaded_bytes = JsonDocument::SearchInObject(
-    publish_ctrs, "sz_uploaded_bytes", JSON_STRING);
+    publish_ctrs, "sz_uploaded_bytes", JSON_INT);
   const JSON *sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
-    publish_ctrs, "sz_uploaded_catalog_bytes", JSON_STRING);
+    publish_ctrs, "sz_uploaded_catalog_bytes", JSON_INT);
 
   const JSON *start_time_json = JsonDocument::SearchInObject(
     statistics, "start_time", JSON_STRING);
@@ -162,16 +162,11 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
     return false;
   }
 
-  perf::Xadd(counters.n_chunks_added,
-             String2Int64(n_chunks_added->string_value));
-  perf::Xadd(counters.n_chunks_duplicated,
-             String2Int64(n_chunks_duplicated->string_value));
-  perf::Xadd(counters.n_catalogs_added,
-             String2Int64(n_catalogs_added->string_value));
-  perf::Xadd(counters.sz_uploaded_bytes,
-             String2Int64(sz_uploaded_bytes->string_value));
-  perf::Xadd(counters.sz_uploaded_catalog_bytes,
-             String2Int64(sz_uploaded_catalog_bytes->string_value));
+  perf::Xadd(counters.n_chunks_added, n_chunks_added->int_value);
+  perf::Xadd(counters.n_chunks_duplicated, n_chunks_duplicated->int_value);
+  perf::Xadd(counters.n_catalogs_added, n_catalogs_added->int_value);
+  perf::Xadd(counters.sz_uploaded_bytes, sz_uploaded_bytes->int_value);
+  perf::Xadd(counters.sz_uploaded_catalog_bytes, sz_uploaded_catalog_bytes->int_value);
 
   *start_time = start_time_json->string_value;
 
