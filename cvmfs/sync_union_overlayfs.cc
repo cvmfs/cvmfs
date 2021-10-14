@@ -289,6 +289,11 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(
     SharedPtr<SyncItem> entry) const {
   std::string whiteout_prefix_ = ".wh.";
-  return entry->filename().substr(whiteout_prefix_.length());
+
+  if (HasPrefix(entry->filename().c_str(), whiteout_prefix_, true)) {
+    return entry->filename().substr(whiteout_prefix_.length());
+  } else {
+    return entry->filename();
+  }
 }
 }  // namespace publish
