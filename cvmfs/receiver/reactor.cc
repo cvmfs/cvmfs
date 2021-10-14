@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <unistd.h>
+
 #include <cstdlib>
 #include <cstring>
 #include <utility>
@@ -118,23 +119,21 @@ bool Reactor::WriteReply(int fd, const std::string& data) {
   return SafeWrite(fd, &buffer[0], total_size);
 }
 
-bool Reactor::ExtractStatsFromReq(JsonDocument *req,
-                                  perf::Statistics *stats,
-                                  std::string *start_time)
-{
+bool Reactor::ExtractStatsFromReq(JsonDocument* req, perf::Statistics* stats,
+                                  std::string* start_time) {
   perf::StatisticsTemplate stats_tmpl("publish", stats);
   upload::UploadCounters counters(stats_tmpl);
 
-  const JSON* statistics = JsonDocument::SearchInObject(
-    req->root(), "statistics", JSON_OBJECT);
+  const JSON* statistics =
+      JsonDocument::SearchInObject(req->root(), "statistics", JSON_OBJECT);
   if (statistics == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Could not find 'statistics' field in request");
     return false;
   }
 
-  const JSON* publish_ctrs = JsonDocument::SearchInObject(
-    statistics, "publish", JSON_OBJECT);
+  const JSON* publish_ctrs =
+      JsonDocument::SearchInObject(statistics, "publish", JSON_OBJECT);
 
   if (publish_ctrs == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -142,19 +141,19 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
     return false;
   }
 
-  const JSON *n_chunks_added = JsonDocument::SearchInObject(
-    publish_ctrs, "n_chunks_added", JSON_INT);
-  const JSON *n_chunks_duplicated = JsonDocument::SearchInObject(
-    publish_ctrs, "n_chunks_duplicated", JSON_INT);
-  const JSON *n_catalogs_added = JsonDocument::SearchInObject(
-    publish_ctrs, "n_catalogs_added", JSON_INT);
-  const JSON *sz_uploaded_bytes = JsonDocument::SearchInObject(
-    publish_ctrs, "sz_uploaded_bytes", JSON_INT);
-  const JSON *sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
-    publish_ctrs, "sz_uploaded_catalog_bytes", JSON_INT);
+  const JSON* n_chunks_added =
+      JsonDocument::SearchInObject(publish_ctrs, "n_chunks_added", JSON_INT);
+  const JSON* n_chunks_duplicated = JsonDocument::SearchInObject(
+      publish_ctrs, "n_chunks_duplicated", JSON_INT);
+  const JSON* n_catalogs_added =
+      JsonDocument::SearchInObject(publish_ctrs, "n_catalogs_added", JSON_INT);
+  const JSON* sz_uploaded_bytes =
+      JsonDocument::SearchInObject(publish_ctrs, "sz_uploaded_bytes", JSON_INT);
+  const JSON* sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
+      publish_ctrs, "sz_uploaded_catalog_bytes", JSON_INT);
 
-  const JSON *start_time_json = JsonDocument::SearchInObject(
-    statistics, "start_time", JSON_STRING);
+  const JSON* start_time_json =
+      JsonDocument::SearchInObject(statistics, "start_time", JSON_STRING);
 
   if (n_chunks_added == NULL || n_chunks_duplicated == NULL ||
       n_catalogs_added == NULL || sz_uploaded_bytes == NULL ||
@@ -166,13 +165,13 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req,
   perf::Xadd(counters.n_chunks_duplicated, n_chunks_duplicated->int_value);
   perf::Xadd(counters.n_catalogs_added, n_catalogs_added->int_value);
   perf::Xadd(counters.sz_uploaded_bytes, sz_uploaded_bytes->int_value);
-  perf::Xadd(counters.sz_uploaded_catalog_bytes, sz_uploaded_catalog_bytes->int_value);
+  perf::Xadd(counters.sz_uploaded_catalog_bytes,
+             sz_uploaded_catalog_bytes->int_value);
 
   *start_time = start_time_json->string_value;
 
   return true;
 }
-
 
 Reactor::Reactor(int fdin, int fdout) : fdin_(fdin), fdout_(fdout) {}
 
@@ -387,7 +386,6 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   return true;
 }
 
-
 bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   if (!reply) {
     PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
@@ -406,12 +404,12 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       req_json->root(), "old_root_hash", JSON_STRING);
   const JSON* new_root_hash_json = JsonDocument::SearchInObject(
       req_json->root(), "new_root_hash", JSON_STRING);
-  const JSON* tag_name_json = JsonDocument::SearchInObject(
-      req_json->root(), "tag_name", JSON_STRING);
+  const JSON* tag_name_json =
+      JsonDocument::SearchInObject(req_json->root(), "tag_name", JSON_STRING);
   const JSON* tag_channel_json = JsonDocument::SearchInObject(
-    req_json->root(), "tag_channel", JSON_STRING);
+      req_json->root(), "tag_channel", JSON_STRING);
   const JSON* tag_description_json = JsonDocument::SearchInObject(
-    req_json->root(), "tag_description", JSON_STRING);
+      req_json->root(), "tag_description", JSON_STRING);
 
   if (lease_path_json == NULL || old_root_hash_json == NULL ||
       new_root_hash_json == NULL) {
@@ -422,11 +420,11 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
 
   perf::Statistics statistics;
   std::string start_time;
-  if (!Reactor::ExtractStatsFromReq(req_json.weak_ref(),
-                                    &statistics, &start_time))
-  {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-      "HandleCommit: Could not extract statistics counters from request");
+  if (!Reactor::ExtractStatsFromReq(req_json.weak_ref(), &statistics,
+                                    &start_time)) {
+    LogCvmfs(
+        kLogReceiver, kLogSyslogErr,
+        "HandleCommit: Could not extract statistics counters from request");
   }
   uint64_t final_revision;
 
@@ -440,9 +438,9 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   RepositoryTag repo_tag(tag_name_json->string_value,
                          tag_channel_json->string_value,
                          tag_description_json->string_value);
-  CommitProcessor::Result res = proc->Process(lease_path_json->string_value,
-                                              old_root_hash, new_root_hash,
-                                              repo_tag, &final_revision);
+  CommitProcessor::Result res =
+      proc->Process(lease_path_json->string_value, old_root_hash, new_root_hash,
+                    repo_tag, &final_revision);
 
   JsonStringGenerator reply_input;
   switch (res) {
@@ -526,7 +524,7 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       default:
         break;
     }
-  } catch (const ECvmfsException &e) {
+  } catch (const ECvmfsException& e) {
     reply.clear();
 
     std::string error("runtime error: ");
