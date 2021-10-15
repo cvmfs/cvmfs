@@ -273,7 +273,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 Summary: CernVM-FS Repository Gateway
 Group: Application/System
 BuildRequires: %{cvmfs_go} >= 1.11.4
-Requires: cvmfs-server = %{version}
+Requires: cvmfs-server = %{version}, psmisc
 %description gateway
 The CernVM-FS repository gateway service enables multiple remote publishers
 to write to the same repository.
