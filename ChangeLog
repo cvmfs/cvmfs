@@ -1,4 +1,5 @@
 2.9.0:
+  * Clean up receiver processes when stopping the gateway (CVM-1989)
   * Add support for importing repositories on S3
   * [gw] Increase file descriptor limit for receiver (CVM-1997)
   * Classify HTTP errors with X-Squid-Error or Proxy-Status headers
