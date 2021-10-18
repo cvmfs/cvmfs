@@ -1,4 +1,5 @@
 2.9.0:
+  * [ducc] Add support for publish triggered by registry webhooks (CVM-2000)
   * [rpm] Cleanup creation of cvmfs system user and group (CVM-2017)
   * Clean up receiver processes when stopping the gateway (CVM-1989)
   * Add support for importing repositories on S3
