@@ -37,6 +37,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
                                  src/094-attachmount                          \
+                                 src/095-fuser                                \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \
