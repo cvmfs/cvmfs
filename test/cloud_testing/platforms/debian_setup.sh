@@ -117,11 +117,6 @@ install_from_repo fuse-overlayfs || die "fail (installing fuse-overlayfs)"
 
 disable_systemd_rate_limit
 
-# setting up the AUFS kernel module
-echo -n "loading AUFS kernel module..."
-sudo modprobe aufs || die "fail"
-echo "done"
-
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
