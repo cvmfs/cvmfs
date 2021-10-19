@@ -62,6 +62,11 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 
 func formatOutputImage(OutputFormat string, inputImage Image) string {
 
+	if (OutputFormat == "") {
+		OutputFormat = "$(scheme)://$(registry)/$(repository)_thin:$(tag)"
+		l.Log().Info("Using default output image name ", OutputFormat)
+	}
+
 	s := strings.Replace(OutputFormat, "$(scheme)", inputImage.Scheme, 5)
 	s = strings.Replace(s, "$(registry)", inputImage.Registry, 5)
 	s = strings.Replace(s, "$(repository)", inputImage.Repository, 5)
