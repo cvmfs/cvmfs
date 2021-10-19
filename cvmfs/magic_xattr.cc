@@ -34,6 +34,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.nioerr", new NIOErrMagicXattr());
   Register("user.nopen", new NOpenMagicXattr());
   Register("user.hitrate", new HitrateMagicXattr());
+  Register("user.logbuffer", new LogBufferXattr());
   Register("user.proxy", new ProxyMagicXattr());
   Register("user.pubkeys", new PubkeysMagicXattr());
   Register("user.repo_counters", new RepoCountersMagicXattr());
@@ -321,6 +322,18 @@ std::string LHashMagicXattr::GetValue() {
       result = hash.ToString();
     mount_point_->file_system()->cache_mgr()->Close(fd);
   }
+  return result;
+}
+
+LogBufferXattr::LogBufferXattr() : BaseMagicXattr(), throttle_(1, 500, 2000) { }
+
+std::string LogBufferXattr::GetValue() {
+  throttle_.Throttle();
+  std::vector<LogBufferEntry> buffer = GetLogBuffer();
+  std::string result;
+  for (unsigned i = 0; i < buffer.size(); ++i)
+    result += "[" + StringifyTime(buffer[i].timestamp, true /* UTC */) +
+              " UTC] " + buffer[i].message + "\n";
   return result;
 }
 

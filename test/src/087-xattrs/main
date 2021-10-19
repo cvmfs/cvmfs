@@ -62,5 +62,10 @@ cvmfs_run_test() {
   [ "x$readme_chunk_offset" = "x0" ] || return 11
   [ "x$readme_chunk_size" = "x$readme_size" ] || return 12
 
+  echo "*** Test log buffer (quite basic)"
+  local logbuffer=$(get_xattr logbuffer /cvmfs/grid.cern.ch/)
+  get_xattr logbuffer /cvmfs/grid.cern.ch/
+  [ "x$logbuffer" != "x" ] || return 20
+
   return 0
 }
