@@ -8,7 +8,9 @@
 #define CVMFS_LOGGING_INTERNAL_H_
 
 #include <cstdarg>
+#include <ctime>
 #include <string>
+#include <vector>
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -107,6 +109,16 @@ enum LogSource {
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;
 
+struct LogBufferEntry {
+  LogBufferEntry(LogSource s, int m, const std::string &msg)
+    : timestamp(time(NULL)), source(s), mask(m), message(msg) { }
+
+  time_t timestamp;
+  LogSource source;
+  int mask;
+  std::string message;
+};
+
 void SetLogSyslogLevel(const int level);
 int GetLogSyslogLevel();
 void SetLogSyslogFacility(const int facility);
@@ -129,6 +141,8 @@ std::string GetLogDebugFile();
 
 void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
                               const char *msg));
+
+std::vector<LogBufferEntry> GetLogBuffer();
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

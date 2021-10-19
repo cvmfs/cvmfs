@@ -25,10 +25,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <vector>
 
 #include "platform.h"
 #include "smalloc.h"
+#include "util/mutex.h"
 #include "util/posix.h"
+#include "util/single_copy.h"
 
 using namespace std;  // NOLINT
 
@@ -88,6 +91,41 @@ pthread_mutex_t customlog_locks[] = {
 LogLevels min_log_level = kLogNormal;
 static void (*alt_log_func)(const LogSource source, const int mask,
                             const char *msg) = NULL;
+
+/**
+ * Circular buffer of the last $n$ calls to LogCvmfs(). Thread-safe class.
+ */
+class LogBuffer : SingleCopy {
+ public:
+  LogBuffer() : next_id_(0) {
+    int retval = pthread_mutex_init(&lock_, NULL);
+    assert(retval == 0);
+  }
+
+  ~LogBuffer() {
+    pthread_mutex_destroy(&lock_);
+  }
+
+  void Append(const LogBufferEntry &entry) {
+    MutexLockGuard lock_guard(lock_);
+    size_t idx = next_id_++ % kBufferSize;
+    if (idx > buffer_.size())
+      buffer_.push_back(entry);
+    else
+      buffer_[idx] = entry;
+  }
+
+  std::vector<LogBufferEntry> GetBuffer() {
+    MutexLockGuard lock_guard(lock_);
+    return buffer_;
+  }
+
+ private:
+  static const unsigned kBufferSize = 64;
+  pthread_mutex_t lock_;
+  int next_id_;
+  std::vector<LogBufferEntry> buffer_;
+};
 
 }  // namespace
 
