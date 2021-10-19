@@ -53,6 +53,9 @@ cvmfs_run_test() {
   echo "*** checking once more, where it should be completely unmounted"
   ! sudo cvmfs_config fuser grid.cern.ch || return 21
 
+  # Bring back repository in a clean state in case anything failed
+  sudo cvmfs_config killall
+
   return 0
 }
 
