@@ -109,15 +109,27 @@ class LogBuffer : SingleCopy {
   void Append(const LogBufferEntry &entry) {
     MutexLockGuard lock_guard(lock_);
     size_t idx = next_id_++ % kBufferSize;
-    if (idx > buffer_.size())
+    if (idx >= buffer_.size())
       buffer_.push_back(entry);
     else
       buffer_[idx] = entry;
   }
 
   std::vector<LogBufferEntry> GetBuffer() {
+    // Return a buffer sorted from newest to oldest buffer
+    std::vector<LogBufferEntry> sorted_buffer;
     MutexLockGuard lock_guard(lock_);
-    return buffer_;
+    for (unsigned i = 1; i <= buffer_.size(); ++i) {
+      unsigned idx = (next_id_ - i) % kBufferSize;
+      sorted_buffer.push_back(buffer_[idx]);
+    }
+    return sorted_buffer;
+  }
+
+  void Clear() {
+    MutexLockGuard lock_guard(lock_);
+    next_id_ = 0;
+    buffer_.clear();
   }
 
  private:
@@ -126,6 +138,8 @@ class LogBuffer : SingleCopy {
   int next_id_;
   std::vector<LogBufferEntry> buffer_;
 };
+
+LogBuffer g_log_buffer;
 
 }  // namespace
 
@@ -497,7 +511,21 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     if (mask & kLogCustom2) LogCustom(2, fmt_msg);
   }
 
+  // The log buffer can be read via extended attributes from cvmfs, therefore
+  // we provide an option to hide entries from the buffer if they contain
+  // sensitive information
+  if (!(mask & kLogSensitive))
+    g_log_buffer.Append(LogBufferEntry(source, mask, msg));
+
   free(msg);
+}
+
+std::vector<LogBufferEntry> GetLogBuffer() {
+  return g_log_buffer.GetBuffer();
+}
+
+void ClearLogBuffer() {
+  g_log_buffer.Clear();
 }
 
 void PrintError(const string &message) {

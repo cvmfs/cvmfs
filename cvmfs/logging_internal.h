@@ -55,15 +55,16 @@ struct DefaultLogging {
 
 enum LogFlags {
   kLogNoLinebreak = 0x200,
-  kLogShowSource = 0x400,
+  kLogShowSource  = 0x400,
+  kLogSensitive   = 0x800,  ///< Don't add the line to the memory log buffer
 };
 
 enum LogLevels {
-  kLogLevel0 = 0x800,
-  kLogVerbose = 0x1000,
-  kLogNormal = 0x2000,
-  kLogDiscrete = 0x4000,
-  kLogNone = 0x8000,
+  kLogLevel0   = 0x01000,
+  kLogVerbose  = 0x02000,
+  kLogNormal   = 0x04000,
+  kLogDiscrete = 0x08000,
+  kLogNone     = 0x10000,
 };
 
 /**
@@ -143,6 +144,7 @@ void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
                               const char *msg));
 
 std::vector<LogBufferEntry> GetLogBuffer();
+void ClearLogBuffer();
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

@@ -18,7 +18,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...);
 // Ensure that pure debug messages are not compiled except in DEBUGMSG mode
 #ifndef DEBUGMSG
 #define LogCvmfs(source, mask, ...) \
-  (((mask) == kLogDebug) ? ((void)0) : LogCvmfs(source, mask, __VA_ARGS__))
+  (((mask) == int(kLogDebug)) ? ((void)0) : LogCvmfs(source, mask, __VA_ARGS__))
 #endif
 
 void PrintWarning(const std::string &message);
