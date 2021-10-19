@@ -32,7 +32,7 @@ func ReadChanges(file *os.File) chan string {
     return changes
 }
 
-func ducc(file_name string, repository_name string) {
+func NotifyDucc(file_name string, repository_name string) {
 
     file, err := os.OpenFile(file_name, os.O_RDONLY, 0755)
     if err != nil {
@@ -45,8 +45,7 @@ func ducc(file_name string, repository_name string) {
         msg := <-changes
 
         if msg == "xx|file rotation|xx" {
-		fmt.Printf("[rotation]")
-                ducc(file_name, repository_name)
+                NotifyDucc(file_name, repository_name)
         }
 
 
@@ -74,5 +73,5 @@ func main() {
     name := *file_name
     repo := *repository_name
 
-    ducc(name, repo)
+    NotifyDucc(name, repo)
 }
