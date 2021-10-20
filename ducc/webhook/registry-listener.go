@@ -25,7 +25,7 @@ func ReadChanges(file *os.File) chan string {
             if len(line) != 0 {
                 changes <- string(line)
             } else if err == io.EOF {
-                time.Sleep(1 * time.Millisecond)
+                time.Sleep(1 * time.Second)
             }
         }
     }()
@@ -45,9 +45,9 @@ func NotifyDucc(file_name string, repository_name string) {
         msg := <-changes
 
         if msg == "xx|file rotation|xx" {
+		file.Close()
                 NotifyDucc(file_name, repository_name)
         }
-
 
         msg_split := strings.Split(msg, "|")
         image := msg_split[len(msg_split)-1]
@@ -70,8 +70,8 @@ func main() {
     repository_name := flag.String("repository_name", "test-unpacked.cern.ch", "Repository")
     flag.Parse()
 
-    name := *file_name
-    repo := *repository_name
+    fname := *file_name
+    rname := *repository_name
 
-    NotifyDucc(name, repo)
+    NotifyDucc(fname, rname)
 }
