@@ -376,8 +376,8 @@ cvmfs_chksetup() {
 
   # Check that if CVMFS_USYSLOG is set, the path is writable.
   if [ x"$CVMFS_USYSLOG" != x"" ]; then
-    if runascvmfsuser "test -w $CVMFS_USYSLOG"; then
-        echo "Error: $CVMFS_USYSLOG (CVMFS_USYSLOG) is not writable by cvmfs user"
+    if runascvmfsuser "test -w $(dirname $CVMFS_USYSLOG)"; then
+        echo "Error: $(dirname $CVMFS_USYSLOG) (CVMFS_USYSLOG) is not writable by cvmfs user"
         num_errors=$(($num_errors+1))
     fi
   fi
