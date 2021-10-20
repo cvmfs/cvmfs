@@ -40,7 +40,7 @@ func ProcessRequest(file_name string, repository_name string, rotation int) {
         }
 
     if rotation == 1 {
-	// To make sure, we haven't miss any image during rotation
+	// To make sure we haven't miss any image during rotation
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
