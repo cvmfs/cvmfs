@@ -46,7 +46,7 @@ func NotifyDucc(file_name string, repository_name string) {
 
         if msg == "xx|file rotation|xx" {
 		file.Close()
-                NotifyDucc(file_name, repository_name)
+		NotifyDucc(file_name, repository_name)
         }
 
         msg_split := strings.Split(msg, "|")
