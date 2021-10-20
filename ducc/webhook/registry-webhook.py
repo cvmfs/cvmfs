@@ -50,7 +50,6 @@ def publish_message(notifications_file, action, image):
                 open(notifications_file, 'a').close()
                 with open(new_notifications_file, 'a+') as f:
                     f.write('xx|file rotation|xx\n')
-                time.sleep(1)
                 with open(notifications_file, 'a+') as f:
                     message = '{}|{}|{}\n'.format(current_id, action, image)
                     f.write('{}'.format(message))
