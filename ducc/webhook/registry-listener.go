@@ -40,7 +40,7 @@ func ProcessRequest(file_name string, repository_name string, rotation int) {
         }
 
     if rotation == 1 {
-	// To make sure we haven't miss any image during rotation
+	// To make sure we haven't missed any image during rotation
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
@@ -70,15 +70,19 @@ func ExecDucc(msg string, repository_name string) {
     msg_split := strings.Split(msg, "|")
     image := msg_split[len(msg_split)-1]
     image = strings.ReplaceAll(image, "https://", "")
+    action := msg_split[len(msg_split)-2]
 
-    fmt.Printf("DUCC ingestion for %s started...\n", image)
+    if action == "push" {
 
-    _, err := exec.Command("cvmfs_ducc", "convert-single-image", "-p", image, repository_name, "--skip-thin-image", "--skip-podman").Output()
-    if err != nil {
-        log.Fatal(err)
+        fmt.Printf("DUCC ingestion for %s started...\n", image)
+
+        _, err := exec.Command("cvmfs_ducc", "convert-single-image", "-p", image, repository_name, "--skip-thin-image", "--skip-podman").Output()
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        fmt.Printf("[done]\n")
     }
-
-    fmt.Printf("[done]\n")
 }
 
 func main() {
