@@ -10,46 +10,13 @@
 # - cvmfs_server_common.sh
 
 
-cvmfs_server_check() {
+__do_check() {
   local name
   local upstream
   local storage_dir
   local url
-  local check_chunks=1
-  local check_integrity=0
-  local subtree_path=""
-  local tag=
-  local repair_reflog=0
-
-  # optional parameter handling
-  OPTIND=1
-  while getopts "cit:s:r" option
-  do
-    case $option in
-      c)
-        check_chunks=0
-      ;;
-      i)
-        check_integrity=1
-      ;;
-      t)
-        tag="-n $OPTARG"
-      ;;
-      s)
-        subtree_path="$OPTARG"
-      ;;
-      r)
-        repair_reflog=1
-      ;;
-      ?)
-        shift $(($OPTIND-2))
-        usage "Command check: Unrecognized option: $1"
-      ;;
-    esac
-  done
 
   # get repository name
-  shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
   name=$(get_or_guess_repository_name $1)
 
@@ -123,6 +90,8 @@ cvmfs_server_check() {
                      $with_reflog                      \
                      -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
   $user_shell "$check_cmd"
+
+  update_repo_status $name last_check "`date --utc`"
 }
 
 # Checks for mismatch between the reflog and the checksum and tries to fix them,
@@ -197,3 +166,142 @@ __check_repair_reflog() {
   fi
 }
 
+__do_all_checks() {
+  local log
+  local repo
+  local repos
+
+  if [ ! -d /var/log/cvmfs ]; then
+    if ! mkdir /var/log/cvmfs 2>/dev/null; then
+      die "/var/log/cvmfs does not exist and could not create it"
+    fi
+  fi
+  [ -w /var/log/cvmfs ] || die "cannot write to /var/log/cvmfs"
+
+  local check_lock=/var/spool/cvmfs/is_checking_all
+  if ! acquire_lock $check_lock; then
+    to_syslog "skipping start of cvmfs_server check because $check_lock held by active process"
+    return 1
+  fi
+
+  log=/var/log/cvmfs/checks.log
+
+  # Sort the active repositories on local storage by last check time
+  repos="$((
+    set -- '*'
+    check_parameter_count_for_multiple_repositories $#
+    names=$(get_or_guess_multiple_repository_names "$@")
+    check_multiple_repository_existence "$names"
+
+    for name in $names; do 
+      # note that is_inactive_replica also does load_repo_config
+      if is_inactive_replica $name; then
+        continue
+      fi
+
+      local upstream=$CVMFS_UPSTREAM_STORAGE
+      if ! is_local_upstream $upstream; then
+        continue
+      fi
+
+      local check_status="$(read_repo_item $name .cvmfs_status.json)"
+      local last_check="$(get_json_field "$check_status" last_check)"
+      local check_time=0
+      if [ -n "$last_check" ]; then
+        check_time="$(date --date "$last_check" +%s)"
+        local min_secs num_secs
+        let min_secs="${CVMFS_CHECK_ALL_MIN_DAYS:-30}*60*60*24" 1
+        let num_secs="$(date +%s)-$check_time" 1
+        if [ "$num_secs" -lt "$min_secs" ]; then
+          # less than $CVMFS_CHECK_ALL_MIN_DAYS has elapsed since last check
+          continue
+        fi
+      fi
+
+      echo "${check_time}:${name}"
+
+    done)|sort -n|cut -d: -f2)"
+
+  for repo in $repos; do
+    (
+    to_syslog_for_repo $repo "started check"
+    echo
+    echo "Starting $repo at `date`"
+    # Work around the errexit (that is, set -e) misfeature of being
+    #  disabled whenever the exit code is to be checked.
+    # See https://lists.gnu.org/archive/html/bug-bash/2012-12/msg00093.html
+    set +e
+    (set -e
+    __do_check $repo
+    )
+    if [ $? != 0 ]; then
+      to_syslog_for_repo $repo "check failed"
+      echo "ERROR from cvmfs_server check!" >&2
+    else
+      to_syslog_for_repo $repo "sucessfully completed check"
+    fi
+    echo "Finished $repo at `date`"
+    ) >> $log 2>&1
+
+  done
+}
+
+cvmfs_server_check() {
+  local retcode=0
+  local do_all=0
+  local check_chunks=1
+  local check_integrity=0
+  local subtree_path=""
+  local tag=
+  local repair_reflog=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "acit:s:r" option
+  do
+    case $option in
+      a)
+        do_all=1
+      ;;
+      c)
+        check_chunks=0
+      ;;
+      i)
+        check_integrity=1
+      ;;
+      t)
+        tag="-n $OPTARG"
+      ;;
+      s)
+        subtree_path="$OPTARG"
+      ;;
+      r)
+        repair_reflog=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command check: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  if [ $do_all -eq 1 ]; then
+    [ $# -eq 0 ] || die "no non-option parameters expected with -a"
+
+    __do_all_checks
+
+    # Always return success because this is used from cron and we
+    #  don't want cron sending an email every time something fails.
+    # Errors will be in the log.
+
+  else
+    __do_check "$@"
+    retcode=$?
+  fi
+
+  release_lock $check_lock
+
+  return $retcode
+
+}
