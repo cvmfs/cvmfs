@@ -1,4 +1,5 @@
 2.9.0:
+  * Add check for usyslog writability in cvmfs_config (CVM-1946)
   * [ducc] make output_format line in wish list optional (CVM-1786)
   * [gw] Fix lease statistics extraction during commit (CVM-1939)
   * [ducc] Add support for publish triggered by registry webhooks (CVM-2000)
