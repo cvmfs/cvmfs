@@ -138,7 +138,7 @@ TEST_F(T_Logging, Buffer) {
     LogCvmfs(kLogCvmfs, 0, "%d", i);
 
   buffer = GetLogBuffer();
-  EXPECT_EQ(64U, buffer.size());  // see LogBuffer::kBufferSize
+  EXPECT_EQ(10U, buffer.size());  // see LogBuffer::kBufferSize
   for (unsigned i = 0; i < buffer.size(); ++i) {
     EXPECT_EQ(4999 - i, String2Int64(buffer[i].message));
   }

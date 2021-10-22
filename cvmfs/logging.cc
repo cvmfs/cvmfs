@@ -133,7 +133,7 @@ class LogBuffer : SingleCopy {
   }
 
  private:
-  static const unsigned kBufferSize = 64;
+  static const unsigned kBufferSize = 10;
   pthread_mutex_t lock_;
   int next_id_;
   std::vector<LogBufferEntry> buffer_;
