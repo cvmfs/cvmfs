@@ -662,11 +662,7 @@ int CmdEnter::Main(const Options &options) {
       publisher->session()->SetKeepAlive(false);
     }
 
-    if (exit_code == -1) {
-      return 0;
-    } else {
-      return exit_code;
-    }
+    return exit_code;
   }
 
   exit_code = WaitForChild(pid);
