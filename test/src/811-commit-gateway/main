@@ -16,8 +16,8 @@ cvmfs_run_test() {
     echo "*** checking that enter, commit and exit succeed"
     cvmfs_server enter test.repo.org -- false && return 50
     cvmfs_server enter test.repo.org --transaction --repo-config /etc/cvmfs/repositories.d -- false && return 60
-    cvmfs_server enter test.repo.org --transaction --repo-config /etc/cvmfs/repositories.d -- cvmfs_server abort -f test.repo.org && return 70
-    cvmfs_server enter test.repo.org --transaction --repo-config /etc/cvmfs/repositories.d -- cvmfs_publish commit test.repo.org && return 80
+    cvmfs_server enter test.repo.org --transaction --repo-config /etc/cvmfs/repositories.d -- cvmfs_server abort -f test.repo.org || return 70
+    cvmfs_server enter test.repo.org --transaction --repo-config /etc/cvmfs/repositories.d -- cvmfs_publish commit test.repo.org || return 80
 
     return 0
 }

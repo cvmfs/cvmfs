@@ -661,7 +661,12 @@ int CmdEnter::Main(const Options &options) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Closing current transaction...");
       publisher->session()->SetKeepAlive(false);
     }
-    return exit_code;
+
+    if (exit_code == -1) {
+      return 0;
+    } else {
+      return exit_code;
+    }
   }
 
   exit_code = WaitForChild(pid);
