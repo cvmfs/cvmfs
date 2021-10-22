@@ -6,7 +6,7 @@ cvmfs_run_test() {
     set_up_repository_gateway || return 1
 
     echo "*** prepare config file"
-    touch /etc/cvmfs/config.d/test.repo.org.conf
+    sudo touch /etc/cvmfs/config.d/test.repo.org.conf
     if !(grep -q "CVMFS_SERVER_URL" /etc/cvmfs/config.d/test.repo.org.conf); then
         sudo bash -c "echo CVMFS_SERVER_URL=http://localhost/cvmfs/test.repo.org >> /etc/cvmfs/config.d/test.repo.org.conf"
     fi
