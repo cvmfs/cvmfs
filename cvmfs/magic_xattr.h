@@ -344,6 +344,10 @@ class TimeoutDirectMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
+class TimestampLastIOErrMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue();
+};
+
 class UsedFdMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };

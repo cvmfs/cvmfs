@@ -46,6 +46,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.tag", new TagMagicXattr());
   Register("user.timeout", new TimeoutMagicXattr());
   Register("user.timeout_direct", new TimeoutDirectMagicXattr());
+  Register("user.timestamp_last_ioerr", new TimestampLastIOErrMagicXattr());
   Register("user.usedfd", new UsedFdMagicXattr());
   Register("user.useddirp", new UsedDirPMagicXattr());
   Register("user.version", new VersionMagicXattr());
@@ -367,7 +368,7 @@ std::string NDownloadMagicXattr::GetValue() {
 }
 
 std::string NIOErrMagicXattr::GetValue() {
-  return mount_point_->file_system()->n_io_error()->ToString();;
+  return StringifyInt(mount_point_->file_system()->io_error_info().count());
 }
 
 std::string NOpenMagicXattr::GetValue() {
@@ -521,6 +522,11 @@ std::string TimeoutDirectMagicXattr::GetValue() {
   unsigned seconds, seconds_direct;
   mount_point_->download_mgr()->GetTimeout(&seconds, &seconds_direct);
   return StringifyUint(seconds_direct);
+}
+
+std::string TimestampLastIOErrMagicXattr::GetValue() {
+  return StringifyInt(
+    mount_point_->file_system()->io_error_info().timestamp_last());
 }
 
 std::string UsedFdMagicXattr::GetValue() {
