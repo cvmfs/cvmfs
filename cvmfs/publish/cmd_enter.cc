@@ -656,7 +656,7 @@ int CmdEnter::Main(const Options &options) {
     SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
 
     std::vector<int> sigs;
-    sigs.push_back(SIGKILL);
+    sigs.push_back(SIGUSR1);
     exit_code = WaitForChild(pid_child, sigs);
 
     if (options.Has("transaction") &&

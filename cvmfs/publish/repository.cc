@@ -810,7 +810,7 @@ void Publisher::ExitShell() {
   SafeReadToString(fd_session_pid, &session_pid);
 
   pid_t pid_child = String2Uint64(session_pid);
-  kill(pid_child, SIGKILL);
+  kill(pid_child, SIGUSR1);
 }
 
 void Publisher::SyncImpl() {
