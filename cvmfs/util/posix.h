@@ -11,6 +11,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
+#include <initializer_list>
 #include <cassert>
 #include <cstddef>
 #include <map>
