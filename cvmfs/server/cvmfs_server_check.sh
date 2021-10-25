@@ -90,8 +90,6 @@ __do_check() {
                      $with_reflog                      \
                      -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
   $user_shell "$check_cmd"
-
-  update_repo_status $name last_check "`date --utc`"
 }
 
 # Checks for mismatch between the reflog and the checksum and tries to fix them,
@@ -200,7 +198,7 @@ __do_all_checks() {
       fi
 
       local upstream=$CVMFS_UPSTREAM_STORAGE
-      if ! is_local_upstream $upstream; then
+      if [ x$(get_upstream_type $upstream_storage) = "xgw" ]; then
         continue
       fi
 
@@ -234,12 +232,18 @@ __do_all_checks() {
     (set -e
     __do_check $repo
     )
-    if [ $? != 0 ]; then
+    local ret=$?
+    update_repo_status $repo last_check "`date --utc`"
+    local check_status
+    if [ $ret != 0 ]; then
+      check_status=failed
       to_syslog_for_repo $repo "check failed"
       echo "ERROR from cvmfs_server check!" >&2
     else
+      check_status=succeeded
       to_syslog_for_repo $repo "sucessfully completed check"
     fi
+    update_repo_status $repo check_status $check_status
     echo "Finished $repo at `date`"
     ) >> $log 2>&1
 
@@ -303,5 +307,4 @@ cvmfs_server_check() {
   release_lock $check_lock
 
   return $retcode
-
 }
