@@ -14,7 +14,7 @@
 #include <string>
 
 
-void CountSubtree(const std::string &path, unsigned int &count) {
+void CountSubtree(const std::string &path, unsigned int *count) {
   struct stat info;
   int retval = lstat(path.c_str(), &info);
   if (retval != 0) {
@@ -46,7 +46,7 @@ void CountSubtree(const std::string &path, unsigned int &count) {
     std::string name = d->d_name;
     if (name == "." || name == "..")
       continue;
-    count++;
+    (*count)++;
     CountSubtree(path + "/" + name, count);
   }
   closedir(dirp);
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
       continue;
     unsigned int count = 0;
     std::string path = base + "/" + name;
-    CountSubtree(path, count);
+    CountSubtree(path, &count);
     if (count)
       printf("%10u   %s\n", count, path.c_str());
     self++;
