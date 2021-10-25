@@ -109,10 +109,11 @@ class LogBuffer : SingleCopy {
   void Append(const LogBufferEntry &entry) {
     MutexLockGuard lock_guard(lock_);
     size_t idx = next_id_++ % kBufferSize;
-    if (idx >= buffer_.size())
+    if (idx >= buffer_.size()) {
       buffer_.push_back(entry);
-    else
+    } else {
       buffer_[idx] = entry;
+    }
   }
 
   std::vector<LogBufferEntry> GetBuffer() {
