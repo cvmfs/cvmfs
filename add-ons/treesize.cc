@@ -1,3 +1,12 @@
+/**
+ * This file is part of the CernVM File System.
+ *
+ * Utility to analyze the size of subtrees of a single catalog. The utility
+ * subtree traversal stops at .cvmfscatalog files. The utility can be used
+ * by repository administrators to identify run-away subtrees that are missing
+ * a .cvmfscatalog marker.
+ */
+
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -28,7 +37,7 @@ void CountSubtree(const std::string &path, unsigned int &count) {
     if (name == ".cvmfscatalog") {
       closedir(dirp);
       return;
-    }      
+    }
   }
 
   rewinddir(dirp);
