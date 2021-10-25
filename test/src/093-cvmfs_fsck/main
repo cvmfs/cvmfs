@@ -1,0 +1,17 @@
+cvmfs_test_name="Rename across directories in the cache space"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local repo="atlas.cern.ch"
+
+  echo "Mount repository"
+  cvmfs_mount ${repo} || return 1
+  echo "Create file in cache"
+  sudo touch /var/lib/cvmfs/shared/02/txn.hash.XXXXXX || return 2
+  echo "Run cvmfs_fsck"
+  cvmfs_fsck -v /var/lib/cvmfs/shared || return 3 
+
+  return 0
+}

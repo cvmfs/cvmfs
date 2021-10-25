@@ -53,9 +53,8 @@ class PosixCacheManager : public CacheManager {
   };
 
   enum RenameWorkarounds {
-    kRenameNormal = 0,
-    kRenameLink,
-    kRenameSamedir
+    kRenameSamedir = 0,
+    kRenameLink
   };
 
   /**
@@ -71,7 +70,7 @@ class PosixCacheManager : public CacheManager {
   static PosixCacheManager *Create(
     const std::string &cache_path,
     const bool alien_cache,
-    const RenameWorkarounds rename_workaround = kRenameNormal);
+    const RenameWorkarounds rename_workaround = kRenameSamedir);
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
@@ -137,7 +136,7 @@ class PosixCacheManager : public CacheManager {
     : cache_path_(cache_path)
     , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
     , alien_cache_(alien_cache)
-    , rename_workaround_(kRenameNormal)
+    , rename_workaround_(kRenameSamedir)
     , cache_mode_(kCacheReadWrite)
     , reports_correct_filesize_(true)
   {
