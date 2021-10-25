@@ -369,7 +369,7 @@ std::string NDownloadMagicXattr::GetValue() {
 }
 
 std::string NIOErrMagicXattr::GetValue() {
-  return StringifyInt(mount_point_->file_system()->io_error_info().count());
+  return StringifyInt(mount_point_->file_system()->io_error_info()->count());
 }
 
 std::string NOpenMagicXattr::GetValue() {
@@ -527,7 +527,7 @@ std::string TimeoutDirectMagicXattr::GetValue() {
 
 std::string TimestampLastIOErrMagicXattr::GetValue() {
   return StringifyInt(
-    mount_point_->file_system()->io_error_info().timestamp_last());
+    mount_point_->file_system()->io_error_info()->timestamp_last());
 }
 
 std::string UsedFdMagicXattr::GetValue() {

@@ -617,7 +617,7 @@ int LibContext::Open(const char *c_path) {
     {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "file %s is marked as "
                "'chunked', but no chunks found.", path.c_str());
-      file_system()->io_error_info().AddIoError();
+      file_system()->io_error_info()->AddIoError();
       delete chunks;
       return -EIO;
     }
@@ -652,7 +652,7 @@ int LibContext::Open(const char *c_path) {
     }
   }
 
-  file_system()->io_error_info().AddIoError();
+  file_system()->io_error_info()->AddIoError();
   return fd;
 }
 

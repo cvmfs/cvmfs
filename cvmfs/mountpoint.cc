@@ -80,7 +80,7 @@ const char *FileSystem::kDefaultCacheBase = "/var/lib/cvmfs";
 const char *FileSystem::kDefaultCacheMgrInstance = "default";
 
 
-FileSystem::IoErrorInfo::IoErrorInfo() : counter_(NULL), timestamp_last_(0) {}
+FileSystem::IoErrorInfo::IoErrorInfo() : counter_(NULL), timestamp_last_(0) { }
 
 void FileSystem::IoErrorInfo::Reset() {
   counter_->Set(0);

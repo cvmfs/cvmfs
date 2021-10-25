@@ -263,7 +263,7 @@ void FuseRemounter::SetOfflineMode(bool value) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
              "warning, could not apply updated catalog revision, "
              "entering offline mode");
-    mountpoint_->file_system()->io_error_info().AddIoError();
+    mountpoint_->file_system()->io_error_info()->AddIoError();
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "recovered from offline mode");
   }

@@ -1051,7 +1051,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   mount_point_->backoff_throttle()->Throttle();
 
-  mount_point_->file_system()->io_error_info().AddIoError();
+  mount_point_->file_system()->io_error_info()->AddIoError();
   fuse_reply_err(req, -fd);
 }
 
