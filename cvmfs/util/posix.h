@@ -11,7 +11,6 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
-#include <initializer_list>
 #include <cassert>
 #include <cstddef>
 #include <map>
@@ -149,7 +148,7 @@ std::vector<LsofEntry> Lsof(const std::string &path);
 bool ProcessExists(pid_t pid);
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
-int WaitForChild(pid_t pid, std::initializer_list<int> sig_ok = {});
+int WaitForChild(pid_t pid, std::vector<int> sig_ok = {});
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ExecuteBinary(int *fd_stdin,
