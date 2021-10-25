@@ -654,7 +654,10 @@ int CmdEnter::Main(const Options &options) {
                       &pid_child);
     std::string s = StringifyInt(pid_child);
     SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
-    exit_code = WaitForChild(pid_child, {SIGKILL});
+
+    std::vector<int> sigs;
+    sigs.push_back(SIGKILL);
+    exit_code = WaitForChild(pid_child, sigs);
 
     if (options.Has("transaction") &&
         !FileExists(session_dir_ + "/shellaction.marker")) {

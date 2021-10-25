@@ -1538,8 +1538,8 @@ int WaitForChild(pid_t pid, std::vector<int> sig_ok) {
   }
   if (WIFEXITED(statloc))
     return WEXITSTATUS(statloc);
-  if (WIFSIGNALED(statloc)
-      && (std::find(sig_ok.begin(), sig_ok.end(), WTERMSIG(statloc)) != sig_ok.end()))
+  if (WIFSIGNALED(statloc) && (std::find(sig_ok.begin(), sig_ok.end(),
+                                         WTERMSIG(statloc)) != sig_ok.end()))
     return 0;
   return -1;
 }
