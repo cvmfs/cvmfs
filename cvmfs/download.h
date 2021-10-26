@@ -473,7 +473,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void ReleaseCredential(JobInfo *info);
   void InitializeRequest(JobInfo *info, CURL *handle);
   void SetUrlOptions(JobInfo *info);
-  void ValidateProxyIpsUnlocked(const std::string &url, const dns::Host &host);
+  bool ValidateProxyIpsUnlocked(const std::string &url, const dns::Host &host);
   void UpdateStatistics(CURL *handle);
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);

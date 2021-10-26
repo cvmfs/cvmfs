@@ -970,9 +970,10 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     // parameters directly
     std::string purl = proxy->url;
     dns::Host phost = proxy->host;
-    ValidateProxyIpsUnlocked(purl, phost);
+    const bool changed = ValidateProxyIpsUnlocked(purl, phost);
     // Current proxy may have changed
-    proxy = current_proxy();
+    if (changed)
+      proxy = current_proxy();
     info->proxy = proxy->url;
     if (proxy->host.status() == dns::kFailOk) {
       curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
@@ -1073,13 +1074,15 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
  * changed, gather new set of resolved IPs and, if different, exchange them in
  * the load-balance group on the fly.  In the latter case, also rebalance the
  * proxies.  The options mutex needs to be open.
+ *
+ * Returns true if proxies may have changed.
  */
-void DownloadManager::ValidateProxyIpsUnlocked(
+bool DownloadManager::ValidateProxyIpsUnlocked(
   const string &url,
   const dns::Host &host)
 {
   if (!host.IsExpired())
-    return;
+    return false;
   LogCvmfs(kLogDownload, kLogDebug, "validate DNS entry for %s",
            host.name().c_str());
 
@@ -1103,7 +1106,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
       if ((*opt_proxy_groups_)[group_idx][i].host.id() == host.id())
         (*opt_proxy_groups_)[group_idx][i].host = new_host;
     }
-    return;
+    return false;
   }
 
   assert(new_host.status() == dns::kFailOk);
@@ -1131,6 +1134,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
   opt_num_proxies_ += new_infos.size();
 
   RebalanceProxiesUnlocked();
+  return true;
 }
 
 
