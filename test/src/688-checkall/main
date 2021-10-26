@@ -56,7 +56,7 @@ cvmfs_run_test() {
   rm -f /var/log/cvmfs/checks.log
 
   echo "*** corrupting replica 4"
-  rm -f /srv/cvmfs/${replica_name}-4/.cvmfswhitelist
+  delete_from_backend ${replica_name}-4 ".cvmfswhitelist"
 
   echo "*** running cvmfs_server check -a"
   sudo cvmfs_server check -a || return 10
