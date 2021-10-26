@@ -466,8 +466,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
                         std::vector<uint64_t> *reply_vals);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
-  void SetRandomProxyUnlocked();
-  void RebalanceProxiesUnlocked();
+  ProxyInfo *ChooseProxyUnlocked(const shash::Any *hash);
+  void UpdateProxiesUnlocked(const std::string &reason);
+  void RebalanceProxiesUnlocked(const std::string &reason);
   CURL *AcquireCurlHandle();
   void ReleaseCurlHandle(CURL *handle);
   void ReleaseCredential(JobInfo *info);
@@ -487,11 +488,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   inline std::vector<ProxyInfo> *current_proxy_group() const {
     return (opt_proxy_groups_ ?
             &((*opt_proxy_groups_)[opt_proxy_groups_current_]) : NULL);
-  }
-
-  inline ProxyInfo *current_proxy() const {
-    return (opt_proxy_groups_ ?
-            &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]) : NULL);
   }
 
   Prng prng_;
