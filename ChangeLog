@@ -1,4 +1,6 @@
 2.9.0:
+  * Add timestamp_last_error magic extended attribute (CVM-2003)
+  * Add logbuffer magic extended attribute
   * Add check for usyslog writability in cvmfs_config (CVM-1946)
   * [ducc] make output_format line in wish list optional (CVM-1786)
   * [gw] Fix lease statistics extraction during commit (CVM-1939)
