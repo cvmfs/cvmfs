@@ -9,7 +9,9 @@ cvmfs_run_test() {
 
   echo "*** mounting cvmfs, expecting no errors"
   local n_io_err=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+  local ts_io_err=$(get_xattr timestamp_last_ioerr /cvmfs/cvmfs-config.cern.ch)
   [ x"$n_io_err" = x0 ] || return 1
+  [ x"$ts_io_err" = x0 ] || return 50
   local n_offline_msg_before=$(cat_syslog | grep "entering offline mode" | wc -l)
   local n_recovery_msg_before=$(cat_syslog | grep "recovered from offline mode" | wc -l)
   echo "*** number of offline syslog messages: $n_offline_msg_before/$n_recovery_msg_before"
@@ -22,7 +24,9 @@ cvmfs_run_test() {
   sudo cvmfs_talk -i cvmfs-config.cern.ch host set http://127.0.0.1
   sudo cvmfs_talk -i cvmfs-config.cern.ch remount sync
   n_io_err=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+  ts_io_err=$(get_xattr timestamp_last_ioerr /cvmfs/cvmfs-config.cern.ch)
   [ $n_io_err -eq 1 ] || return 10
+  [ $ts_io_err -gt 0 ] || return 51
   n_offline_msg=$(cat_syslog | grep "entering offline mode" | wc -l)
   [ $n_offline_msg -eq $(($n_offline_msg_before + 1)) ] || return 11
 

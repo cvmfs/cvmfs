@@ -8,6 +8,7 @@
 #include <map>
 #include <string>
 
+#include "backoff.h"
 #include "catalog_counters.h"
 #include "directory_entry.h"
 #include "shortstring.h"
@@ -229,6 +230,19 @@ class LHashMagicXattr : public WithHashMagicXattr {
   virtual std::string GetValue();
 };
 
+class LogBufferXattr : public BaseMagicXattr {
+ public:
+  LogBufferXattr();
+
+ private:
+  // Generating the log buffer report involves 64 string copies. To mitigate
+  // memory fragmentation and performance loss, throttle the use of this
+  // attribute a little.
+  BackoffThrottle throttle_;
+
+  virtual std::string GetValue();
+};
+
 class NCleanup24MagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
@@ -327,6 +341,10 @@ class TimeoutMagicXattr : public BaseMagicXattr {
 };
 
 class TimeoutDirectMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue();
+};
+
+class TimestampLastIOErrMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 

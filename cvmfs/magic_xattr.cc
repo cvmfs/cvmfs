@@ -34,6 +34,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.nioerr", new NIOErrMagicXattr());
   Register("user.nopen", new NOpenMagicXattr());
   Register("user.hitrate", new HitrateMagicXattr());
+  Register("user.logbuffer", new LogBufferXattr());
   Register("user.proxy", new ProxyMagicXattr());
   Register("user.pubkeys", new PubkeysMagicXattr());
   Register("user.repo_counters", new RepoCountersMagicXattr());
@@ -45,6 +46,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.tag", new TagMagicXattr());
   Register("user.timeout", new TimeoutMagicXattr());
   Register("user.timeout_direct", new TimeoutDirectMagicXattr());
+  Register("user.timestamp_last_ioerr", new TimestampLastIOErrMagicXattr());
   Register("user.usedfd", new UsedFdMagicXattr());
   Register("user.useddirp", new UsedDirPMagicXattr());
   Register("user.version", new VersionMagicXattr());
@@ -324,6 +326,19 @@ std::string LHashMagicXattr::GetValue() {
   return result;
 }
 
+LogBufferXattr::LogBufferXattr() : BaseMagicXattr(), throttle_(1, 500, 2000) { }
+
+std::string LogBufferXattr::GetValue() {
+  throttle_.Throttle();
+  std::vector<LogBufferEntry> buffer = GetLogBuffer();
+  std::string result;
+  for (unsigned i = 0; i < buffer.size(); ++i) {
+    result += "[" + StringifyTime(buffer[i].timestamp, true /* UTC */) +
+              " UTC] " + buffer[i].message + "\n";
+  }
+  return result;
+}
+
 std::string NCleanup24MagicXattr::GetValue() {
   QuotaManager *quota_mgr =
     mount_point_->file_system()->cache_mgr()->quota_mgr();
@@ -354,7 +369,7 @@ std::string NDownloadMagicXattr::GetValue() {
 }
 
 std::string NIOErrMagicXattr::GetValue() {
-  return mount_point_->file_system()->n_io_error()->ToString();;
+  return StringifyInt(mount_point_->file_system()->io_error_info()->count());
 }
 
 std::string NOpenMagicXattr::GetValue() {
@@ -508,6 +523,11 @@ std::string TimeoutDirectMagicXattr::GetValue() {
   unsigned seconds, seconds_direct;
   mount_point_->download_mgr()->GetTimeout(&seconds, &seconds_direct);
   return StringifyUint(seconds_direct);
+}
+
+std::string TimestampLastIOErrMagicXattr::GetValue() {
+  return StringifyInt(
+    mount_point_->file_system()->io_error_info()->timestamp_last());
 }
 
 std::string UsedFdMagicXattr::GetValue() {
