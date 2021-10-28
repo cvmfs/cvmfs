@@ -164,6 +164,42 @@ __check_repair_reflog() {
   fi
 }
 
+# This is a separate function because dash segfaults if it is inline :-(
+__get_checks_repo_times() {
+  set -- '*'
+  check_parameter_count_for_multiple_repositories $#
+  names=$(get_or_guess_multiple_repository_names "$@")
+  check_multiple_repository_existence "$names"
+
+  for name in $names; do 
+    # note that is_inactive_replica also does load_repo_config
+    if is_inactive_replica $name; then
+      continue
+    fi
+
+    local upstream=$CVMFS_UPSTREAM_STORAGE
+    if [ x$(get_upstream_type $upstream_storage) = "xgw" ]; then
+      continue
+    fi
+
+    local check_status="$(read_repo_item $name .cvmfs_status.json)"
+    local last_check="$(get_json_field "$check_status" last_check)"
+    local check_time=0
+    if [ -n "$last_check" ]; then
+      check_time="$(date --date "$last_check" +%s)"
+      local min_secs num_secs
+      min_secs="$((${CVMFS_CHECK_ALL_MIN_DAYS:-30}*60*60*24))"
+      num_secs="$(($(date +%s)-$check_time))"
+      if [ "$num_secs" -lt "$min_secs" ]; then
+        # less than $CVMFS_CHECK_ALL_MIN_DAYS has elapsed since last check
+        continue
+      fi
+    fi
+
+    echo "${check_time}:${name}"
+  done
+}
+
 __do_all_checks() {
   local log
   local repo
@@ -185,40 +221,7 @@ __do_all_checks() {
   log=/var/log/cvmfs/checks.log
 
   # Sort the active repositories on local storage by last check time
-  repos="$((
-    set -- '*'
-    check_parameter_count_for_multiple_repositories $#
-    names=$(get_or_guess_multiple_repository_names "$@")
-    check_multiple_repository_existence "$names"
-
-    for name in $names; do 
-      # note that is_inactive_replica also does load_repo_config
-      if is_inactive_replica $name; then
-        continue
-      fi
-
-      local upstream=$CVMFS_UPSTREAM_STORAGE
-      if [ x$(get_upstream_type $upstream_storage) = "xgw" ]; then
-        continue
-      fi
-
-      local check_status="$(read_repo_item $name .cvmfs_status.json)"
-      local last_check="$(get_json_field "$check_status" last_check)"
-      local check_time=0
-      if [ -n "$last_check" ]; then
-        check_time="$(date --date "$last_check" +%s)"
-        local min_secs num_secs
-        let min_secs="${CVMFS_CHECK_ALL_MIN_DAYS:-30}*60*60*24" 1
-        let num_secs="$(date +%s)-$check_time" 1
-        if [ "$num_secs" -lt "$min_secs" ]; then
-          # less than $CVMFS_CHECK_ALL_MIN_DAYS has elapsed since last check
-          continue
-        fi
-      fi
-
-      echo "${check_time}:${name}"
-
-    done)|sort -n|cut -d: -f2)"
+  repos="$(__get_checks_repo_times|sort -n|cut -d: -f2)"
 
   for repo in $repos; do
     (
