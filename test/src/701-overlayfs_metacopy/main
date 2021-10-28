@@ -1,0 +1,59 @@
+cvmfs_test_name="Overlay FS Metacopy"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # Enable the metacopy feature for the overlayfs mount
+  cvmfs_umount $CVMFS_TEST_REPO
+  sudo sed -i -e "s/overlay upperdir/overlay metacopy=on,upperdir/g" /etc/fstab
+  cvmfs_mount $CVMFS_TEST_REPO
+
+  # Single metadata operation chmod
+  cvmfs_server transaction $CVMFS_TEST_REPO
+
+  chmod 777 /cvmfs/$CVMFS_TEST_REPO/new_repository
+
+  cvmfs_server publish $CVMFS_TEST_REPO
+
+  [ "$(stat -c '%a' /cvmfs/$CVMFS_TEST_REPO/new_repository)" = "777" ] || return $?
+
+  # Metadata, then data operation in the same transaction
+  cvmfs_server transaction $CVMFS_TEST_REPO
+
+  chmod 770 /cvmfs/$CVMFS_TEST_REPO/new_repository
+
+  echo "hello?" >> /cvmfs/$CVMFS_TEST_REPO/new_repository
+
+  cvmfs_server publish $CVMFS_TEST_REPO
+
+  [ "$(stat -c '%a' /cvmfs/$CVMFS_TEST_REPO/new_repository)" = "770" ] || return $?
+  grep "hello?" /cvmfs/$CVMFS_TEST_REPO/new_repository || return $?
+
+  # Data, then metadata operation in the same transaction
+  cvmfs_server transaction $CVMFS_TEST_REPO
+
+  echo "is it me you're looking for?" >> /cvmfs/$CVMFS_TEST_REPO/new_repository
+
+  chmod 775 /cvmfs/$CVMFS_TEST_REPO/new_repository
+
+  cvmfs_server publish $CVMFS_TEST_REPO
+
+  [ "$(stat -c '%a' /cvmfs/$CVMFS_TEST_REPO/new_repository)" = "775" ] || return $?
+  grep "is it me you're looking for?" /cvmfs/$CVMFS_TEST_REPO/new_repository || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  return 0
+}
+
