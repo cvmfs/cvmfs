@@ -1210,6 +1210,8 @@ Supported Commands:
                   [-t tag (check given tag instead of trunk)]
                   [-s path to nested catalog subtree to check]
                   [-r repair reflog problems]
+                  [-a check all active local repos, log to checks.log |
+                    <fully qualified name> ]
                   <fully qualified name>
                   Checks if the repository is sane
   transaction     [-t (timeout in seconds for waiting if the repository is busy, 0=infinite)]
