@@ -62,7 +62,7 @@ echo "done"
 # Enable OverlayFS metacopy
 sudo bash -c 'echo "options overlay metacopy=on" > /etc/modprobe.d/overlay.conf'
 sudo modprobe overlay metacopy=on
-sudo echo Y | sudo tee /sys/module/overlay/parameters/metacopy
+echo Y | sudo tee /sys/module/overlay/parameters/metacopy
 
 # install deb packages
 echo "installing DEB packages... "
