@@ -885,6 +885,10 @@ void Publisher::Resign() {}
 void Publisher::Rollback() {}
 void Publisher::UpdateMetaInfo() {}
 
+void Publisher::Transaction() {
+  TransactionRetry();
+  session()->SetKeepAlive(true);
+}
 
 //------------------------------------------------------------------------------
 
