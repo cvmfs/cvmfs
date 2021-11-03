@@ -12,6 +12,7 @@
 #ifndef CVMFS_HASH_H_
 #define CVMFS_HASH_H_
 
+#include <arpa/inet.h>
 #include <stdint.h>
 
 #include <cassert>
@@ -384,6 +385,14 @@ struct Digest {
         return false;
     }
     return true;
+  }
+
+  /**
+   * Get a partial digest for use when only 32 bits are required
+   */
+  uint32_t Partial32() const {
+    const uint32_t *partial = (const uint32_t *)digest;
+    return ntohl(*partial);
   }
 
 
