@@ -610,7 +610,6 @@ int CmdEnter::Main(const Options &options) {
       SettingsPublisher *settings_publisher =
           builder.CreateSettingsPublisher(fqrn_, false);
       publisher = new Publisher(*settings_publisher);
-      publisher->session()->SetKeepAlive(true);
       publisher->Transaction();
     }
 
