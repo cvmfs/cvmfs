@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -390,6 +391,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   static const unsigned kDnsDefaultRetries = 1;
   static const unsigned kDnsDefaultTimeoutMs = 3000;
+  static const unsigned kProxyMapScale = 16;
 
   DownloadManager();
   ~DownloadManager();
@@ -559,6 +561,18 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * The original proxy fallback list provided to SetProxyChain.
    */
   std::string opt_proxy_fallback_list_;
+  /**
+   * Load-balancing map of currently active proxies
+   */
+  std::map<uint32_t, ProxyInfo *> opt_proxy_map_;
+  /**
+   * Sorted list of currently active proxy URLs (for log messages)
+   */
+  std::vector<std::string> opt_proxy_urls_;
+  /**
+   * Shard requests across multiple proxies via consistent hashing
+   */
+  bool opt_proxy_shard_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).

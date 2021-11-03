@@ -46,6 +46,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <set>
 
 #include "atomic.h"
@@ -1537,6 +1538,7 @@ DownloadManager::DownloadManager() {
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 0;
   opt_num_proxies_ = 0;
+  opt_proxy_shard_ = false;
   opt_max_retries_ = 0;
   opt_backoff_init_ms_ = 0;
   opt_backoff_max_ms_ = 0;
@@ -1612,6 +1614,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 0;
   opt_num_proxies_ = 0;
+  opt_proxy_shard_ = false;
   opt_host_chain_current_ = 0;
   opt_ip_preference_ = dns::kIpPreferSystem;
 
@@ -1678,6 +1681,7 @@ void DownloadManager::Fini() {
 
   delete opt_host_chain_;
   delete opt_host_chain_rtt_;
+  opt_proxy_map_.clear();
   delete opt_proxy_groups_;
   opt_host_chain_ = NULL;
   opt_host_chain_rtt_ = NULL;
@@ -2289,6 +2293,7 @@ bool DownloadManager::ProbeGeo() {
     }
   }
 
+  opt_proxy_map_.clear();
   delete opt_proxy_groups_;
   opt_proxy_groups_ = proxy_groups;
   // In pathological cases, opt_proxy_groups_current_ can be larger now when
@@ -2436,6 +2441,7 @@ void DownloadManager::SetProxyChain(
   // From this point on, use set_proxy_list and set_fallback_proxy_list as
   // effective proxy lists!
 
+  opt_proxy_map_.clear();
   delete opt_proxy_groups_;
   if ((set_proxy_list == "") && (set_proxy_fallback_list == "")) {
     opt_proxy_groups_ = NULL;
@@ -2588,8 +2594,11 @@ DownloadManager::ChooseProxyUnlocked(const shash::Any *hash) {
   if (!opt_proxy_groups_)
     return NULL;
 
-  vector<ProxyInfo> *group = current_proxy_group();
-  return &((*group)[0]);
+  uint32_t key = (hash ? hash->Partial32() : 0);
+  map<uint32_t, ProxyInfo *>::iterator it = opt_proxy_map_.lower_bound(key);
+  ProxyInfo *proxy = it->second;
+
+  return proxy;
 }
 
 /**
@@ -2599,13 +2608,45 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
   if (!opt_proxy_groups_)
     return;
 
+  // Identify number of non-burned proxies within the current group
   vector<ProxyInfo> *group = current_proxy_group();
-  string old_proxy = (*group)[0].url;
-  unsigned select =
-    prng_.Next(group->size() - opt_proxy_groups_current_burned_);
-  swap((*group)[select], (*group)[0]);
-  string new_proxy = (*group)[0].url;
+  unsigned num_alive = (group->size() - opt_proxy_groups_current_burned_);
+  string old_proxy = JoinStrings(opt_proxy_urls_, "|");
 
+  // Rebuild proxy map and URL list
+  opt_proxy_map_.clear();
+  opt_proxy_urls_.clear();
+  const uint32_t max_key = 0xffffffffUL;
+  if (opt_proxy_shard_) {
+    // Build a consistent map with multiple entries for each proxy
+    for (unsigned i = 0; i < num_alive; ++i) {
+      ProxyInfo *proxy = &(*group)[i];
+      shash::Any proxy_hash(shash::kSha1);
+      HashString(proxy->url, &proxy_hash);
+      Prng prng;
+      prng.InitSeed(proxy_hash.Partial32());
+      for (unsigned j = 0; j < kProxyMapScale; ++j) {
+        const std::pair<uint32_t, ProxyInfo *> entry(prng.Next(max_key), proxy);
+        opt_proxy_map_.insert(entry);
+      }
+      opt_proxy_urls_.push_back(proxy->url);
+    }
+    // Ensure lower_bound() finds a value for all keys
+    ProxyInfo *first_proxy = opt_proxy_map_.begin()->second;
+    const std::pair<uint32_t, ProxyInfo *> last_entry(max_key, first_proxy);
+    opt_proxy_map_.insert(last_entry);
+  } else {
+    // Build a map with a single entry for one randomly selected proxy
+    unsigned select = prng_.Next(num_alive);
+    ProxyInfo *proxy = &(*group)[select];
+    const std::pair<uint32_t, ProxyInfo *> entry(max_key, proxy);
+    opt_proxy_map_.insert(entry);
+    opt_proxy_urls_.push_back(proxy->url);
+  }
+  sort(opt_proxy_urls_.begin(), opt_proxy_urls_.end());
+
+  // Report any change in proxy usage
+  string new_proxy = JoinStrings(opt_proxy_urls_, "|");
   if (new_proxy != old_proxy) {
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
              "switching proxy from %s to %s (%s)",
@@ -2757,6 +2798,7 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
   clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
   clone->opt_num_proxies_ = opt_num_proxies_;
+  clone->opt_proxy_shard_ = opt_proxy_shard_;
   clone->opt_proxy_list_ = opt_proxy_list_;
   clone->opt_proxy_fallback_list_ = opt_proxy_fallback_list_;
   if (opt_proxy_groups_ == NULL)
