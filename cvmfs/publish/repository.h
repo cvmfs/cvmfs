@@ -281,7 +281,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   virtual ~Publisher();
 
   void UpdateMetaInfo();
-  void Transaction() { TransactionRetry(); }
+  void Transaction();
   void Abort();
   void Publish();
   void Ingest();
