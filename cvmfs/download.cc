@@ -2657,6 +2657,14 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 }
 
 /**
+ * Enable proxy sharding
+ */
+void DownloadManager::ShardProxies() {
+  opt_proxy_shard_ = true;
+  RebalanceProxiesUnlocked("enable sharding");
+}
+
+/**
  * Selects a new random proxy in the current load-balancing group.  Resets the
  * "burned" counter.
  */

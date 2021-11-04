@@ -435,6 +435,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
                     unsigned *fallback_group);
   std::string GetProxyList();
   std::string GetFallbackProxyList();
+  void ShardProxies();
   void RebalanceProxies();
   void SwitchProxyGroup();
   void SetProxyGroupResetDelay(const unsigned seconds);
