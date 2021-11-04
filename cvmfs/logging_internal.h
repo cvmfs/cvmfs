@@ -61,9 +61,9 @@ enum LogFlags {
 
 enum LogLevels {
   kLogLevel0   = 0x01000,
-  kLogVerbose  = 0x02000,
-  kLogNormal   = 0x04000,
-  kLogDiscrete = 0x08000,
+  kLogNormal   = 0x02000,
+  kLogInform   = 0x04000,
+  kLogVerbose  = 0x08000,
   kLogNone     = 0x10000,
 };
 
@@ -107,8 +107,9 @@ enum LogSource {
   kLogKvStore,
 };
 
-const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;
+const int kLogInfoMsg = kLogStdout | kLogShowSource | kLogInform;
+const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 
 struct LogBufferEntry {
   LogBufferEntry(LogSource s, int m, const std::string &msg)
@@ -129,7 +130,7 @@ void SetLogMicroSyslog(const std::string &filename);
 std::string GetLogMicroSyslog();
 void SetLogSyslogPrefix(const std::string &prefix);
 void SetLogSyslogShowPID(bool flag);
-void SetLogVerbosity(const LogLevels min_level);
+void SetLogVerbosity(const LogLevels max_level);
 void LogShutdown();
 
 #ifdef DEBUGMSG

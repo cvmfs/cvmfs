@@ -52,6 +52,8 @@ __do_check() {
     fi
   fi
 
+  local log_level_param=""
+  local check_chunks_param=""
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
@@ -303,7 +305,12 @@ cvmfs_server_check() {
     # Errors will be in the log.
 
   else
-    __do_check "$@"
+    if [ x"$CVMFS_LOG_LEVEL" = x ]; then
+      # increase log from default "Warning" to "Info" level
+      CVMFS_LOG_LEVEL=2 __do_check "$@"
+    else
+      __do_check "$@"
+    fi
     retcode=$?
   fi
 

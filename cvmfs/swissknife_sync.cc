@@ -111,7 +111,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   const string reflog_chksum_path = *args.find('R')->second;
   if (args.find('l') != args.end()) {
     unsigned log_level =
-        1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+      kLogLevel0 << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
