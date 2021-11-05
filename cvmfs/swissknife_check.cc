@@ -737,7 +737,7 @@ bool CommandCheck::InspectTree(const string                  &path,
                                const catalog::DirectoryEntry *transition_point,
                                catalog::DeltaCounters        *computed_counters)
 {
-  LogCvmfs(kLogCvmfs, kLogInfoMsg, "[inspecting catalog] %s at %s",
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
   const catalog::Catalog *catalog = FetchCatalog(path,
