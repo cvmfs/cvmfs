@@ -4,6 +4,8 @@
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
+# 1.12 - 05.11.2021
+#    - Add -p parameter for I/O error retention period
 # 1.11 - 16.03.2021
 #    - Customize max fill ration (contributed by NIKHEF)
 # 1.10 - 19.06.2017
@@ -24,7 +26,7 @@
 #    - return immediately if transport endpoint is not connected
 #    - start of ChangeLog
 
-VERSION=1.11
+VERSION=1.12
 
 STATUS_OK=0
 STATUS_WARNING=1     # Check timed out or CernVM-FS resource consumption high or
@@ -37,10 +39,10 @@ RETURN_STATUS=$STATUS_OK
 
 MAX_FILL_RATIO=95
 TIMEOUT_SECONDS=120
-
+IO_ERROR_PERIOD=180 # By default, ignore I/O errors older than 3 hours
 
 usage() {
-   /bin/echo "Usage:   $0 [-t <seconds>][-m] [-n] [-f fill_ratio] [-i] <repository name> [expected cvmfs version]"
+   /bin/echo "Usage:   $0 [-t <seconds>][-m] [-n] [-f fill_ratio] [-i] [-p minutes] <repository name> [expected cvmfs version]"
    /bin/echo "Example: $0 -t 60 -m -n atlas.cern.ch 2.0.4"
    /bin/echo "Options:"
    /bin/echo "  -t  second after which the check times out with a warning (default: ${TIMEOUT_SECONDS})"
@@ -50,6 +52,9 @@ usage() {
    /bin/echo "  -f  set max fill ratio warning level (default 95)"
    /bin/echo "  -i  check if inodes exceed 32bit which can break 32bit programs"
    /bin/echo "      that use the non-64bit glibc file system interface"
+   /bin/echo "  -p  ignore I/O errors older than the given number of minutes"
+   /bin/echo "       (default: $IO_ERROR_PERIOD, set to zero to always report I/O errors)"
+   /bin/echo "       the parameter has no effect on CernVM-FS < 2.9"
 }
 
 version() {
@@ -113,7 +118,7 @@ try_get_xattr() {
 OPT_NETWORK_CHECK=0
 OPT_MEMORY_CHECK=0
 OPT_INODE_CHECK=0
-while getopts "hVvt:nmf:i" opt; do
+while getopts "hVvt:nmf:ip:" opt; do
   case $opt in
     h)
       help
@@ -144,6 +149,9 @@ while getopts "hVvt:nmf:i" opt; do
     ;;
     i)
       OPT_INODE_CHECK=1
+    ;;
+    p)
+       IO_ERROR_PERIOD="$OPTARG"
     ;;
     *)
       /bin/echo "SERVICE STATUS: Invalid option: $1"
@@ -217,6 +225,9 @@ do_check() {
   # The extended attribute was added in cvmfs 2.4.  The -1 value means that
   # querying for the cleanup rate is not supported
   try_get_xattr ncleanup24 -1; NCLEANUP24=$XATTR_VALUE
+  # The timestamp_last_ioerr extended attribute was added in cvmfs 2.9.
+  # A value of zero
+  try_get_xattr timestamp_last_ioerr 0; TIMESTAMP_LAST_IOERR=$XATTR_VALUE
 
   # Network settings;  TODO: currently configured values required
   if [ $OPT_NETWORK_CHECK -eq 1 ]; then
@@ -258,8 +269,18 @@ do_check() {
 
   # Check for previously detected I/O errors
   if [ $NIOERR -gt 0 ]; then
-    append_info "$NIOERR I/O errors detected"
-    RETURN_STATUS=$STATUS_WARNING
+    REPORT_IOERR=1
+    if [ $TIMESTAMP_LAST_IOERR -gt 0 -a $IO_ERROR_PERIOD -gt 0 ]; then
+      NOW=$(date +%s)
+      if [ $(( (NOW - TIMESTAMP_LAST_IOERR) / 60 )) -gt $IO_ERROR_PERIOD ]; then
+        REPORT_IOERR=0
+      fi
+    fi
+
+    if [ $REPORT_IOERR -eq 1 ]; then
+      append_info "$NIOERR I/O errors detected"
+      RETURN_STATUS=$STATUS_WARNING
+    fi
   fi
 
   # Check for number of open file descriptors
