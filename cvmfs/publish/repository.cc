@@ -670,7 +670,11 @@ Publisher::Publisher(const SettingsPublisher &settings)
       throw EPublish("cannot read gateway key: " +
                      settings.keychain().gw_key_path());
     }
-  } else {
+  }
+
+  if ((settings.storage().type() != upload::SpoolerDefinition::Gateway) ||
+      !settings.transaction().is_in_enter_session())
+  {
     int rvb = signature_mgr_->LoadCertificatePath(
       settings.keychain().certificate_path());
     if (!rvb)
