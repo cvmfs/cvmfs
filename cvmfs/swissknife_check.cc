@@ -737,7 +737,7 @@ bool CommandCheck::InspectTree(const string                  &path,
                                const catalog::DirectoryEntry *transition_point,
                                catalog::DeltaCounters        *computed_counters)
 {
-  LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
   const catalog::Catalog *catalog = FetchCatalog(path,
@@ -902,7 +902,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     check_chunks_ = true;
   if (args.find('l') != args.end()) {
     unsigned log_level =
-      1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+      kLogLevel0 << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;

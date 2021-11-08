@@ -507,7 +507,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     preload_cache = true;
   if (args.find('l') != args.end()) {
     unsigned log_level =
-    1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+      kLogLevel0 << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;

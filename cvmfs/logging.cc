@@ -88,7 +88,7 @@ pthread_mutex_t customlog_locks[] = {
   PTHREAD_MUTEX_INITIALIZER,
   PTHREAD_MUTEX_INITIALIZER};
 
-LogLevels min_log_level = kLogNormal;
+LogLevels max_log_level = kLogNormal;
 static void (*alt_log_func)(const LogSource source, const int mask,
                             const char *msg) = NULL;
 
@@ -255,9 +255,9 @@ void SetLogSyslogShowPID(bool flag) {
 }
 
 /**
- * Set the minimum verbosity level.  By default kLogNormal.
+ * Set the maximum verbosity level.  By default kLogNormal.
  */
-void SetLogVerbosity(const LogLevels min_level) { min_log_level = min_level; }
+void SetLogVerbosity(const LogLevels max_level) { max_log_level = max_level; }
 
 
 /**
@@ -423,7 +423,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   int log_level = mask & ((2 * kLogNone - 1) ^ (kLogLevel0 - 1));
   if (!log_level) log_level = kLogNormal;
   if (log_level == kLogNone) return;
-  if (log_level < min_log_level) return;
+  if (log_level > max_log_level) return;
 #endif
 
   // Format the message string
