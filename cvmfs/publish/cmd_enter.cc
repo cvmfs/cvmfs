@@ -597,7 +597,7 @@ int CmdEnter::Main(const Options &options) {
         std::string config;
         std::string config_file = repo_config_ + "/" + fqrn_ + "/server.conf";
         std::string folderpath = session_dir_ + "/" + fqrn_;
-        MkdirDeep(folderpath.c_str(), 0600, true /* veryfy_writable */);
+        MkdirDeep(folderpath.c_str(), 0700, true /* veryfy_writable */);
 
         std::string session_config_file = folderpath + "/server.conf";
         int fd_config = open(config_file.c_str(), O_RDONLY);
