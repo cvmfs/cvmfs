@@ -672,7 +672,7 @@ Publisher::Publisher(const SettingsPublisher &settings)
     }
   }
 
-  if ((settings.storage().type() != upload::SpoolerDefinition::Gateway) ||
+  if ((settings.storage().type() != upload::SpoolerDefinition::Gateway) &&
       !settings.transaction().is_in_enter_session())
   {
     int rvb = signature_mgr_->LoadCertificatePath(
