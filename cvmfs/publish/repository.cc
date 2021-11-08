@@ -660,31 +660,6 @@ Publisher::Publisher(const SettingsPublisher &settings)
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
 
-  bool check_keys_match = true;
-  int rvb;
-  rvb =
-    signature_mgr_->LoadCertificatePath(settings.keychain().certificate_path());
-  if (!rvb) {
-    check_keys_match = false;
-    LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
-             "Warning: cannot load certificate, thus cannot commit changes");
-  }
-  rvb = signature_mgr_->LoadPrivateKeyPath(
-    settings.keychain().private_key_path(), "");
-  if (!rvb) {
-    check_keys_match = false;
-    LogCvmfs(kLogCvmfs, kLogStdout | llvl_,
-             "Warning: cannot load private key, thus cannot commit changes");
-  }
-  // The private master key might be on a key card instead
-  if (FileExists(settings.keychain().master_private_key_path())) {
-    rvb = signature_mgr_->LoadPrivateMasterKeyPath(
-      settings.keychain().master_private_key_path());
-    if (!rvb) throw EPublish("cannot load private master key");
-  }
-  if (check_keys_match && !signature_mgr_->KeysMatch())
-    throw EPublish("corrupted keychain");
-
   if (settings.storage().type() == upload::SpoolerDefinition::Gateway) {
     if (!settings.keychain().HasGatewayKey()) {
       throw EPublish("gateway key missing: " +
@@ -695,6 +670,23 @@ Publisher::Publisher(const SettingsPublisher &settings)
       throw EPublish("cannot read gateway key: " +
                      settings.keychain().gw_key_path());
     }
+  } else {
+    int rvb = signature_mgr_->LoadCertificatePath(
+      settings.keychain().certificate_path());
+    if (!rvb)
+      throw EPublish("cannot load certificate, thus cannot commit changes");
+    rvb = signature_mgr_->LoadPrivateKeyPath(
+      settings.keychain().private_key_path(), "");
+    if (!rvb)
+      throw EPublish("cannot load private key, thus cannot commit changes");
+    // The private master key might be on a key card instead
+    if (FileExists(settings.keychain().master_private_key_path())) {
+      rvb = signature_mgr_->LoadPrivateMasterKeyPath(
+        settings.keychain().master_private_key_path());
+      if (!rvb) throw EPublish("cannot load private master key");
+    }
+    if (!signature_mgr_->KeysMatch())
+      throw EPublish("corrupted keychain");
   }
 
   if (settings.is_managed())
