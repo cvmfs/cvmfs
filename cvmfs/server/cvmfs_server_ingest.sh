@@ -65,6 +65,11 @@ cvmfs_server_ingest() {
     die "Please set the base directory where to extract the tarball, use -b \$BASE_DIR or --base_dir \$BASE_DIR or don't provide the base directory to simply delete entities from the repository"
   fi
 
+  load_repo_config $name
+
+  upstream=$CVMFS_UPSTREAM_STORAGE
+  upstream_type=$(get_upstream_type $upstream)
+
   if [ x"$upstream_type" = xgw ]; then
 
     if [ $multiple_delete -eq 1 ]; then
@@ -81,10 +86,6 @@ cvmfs_server_ingest() {
     cvmfs_server_transaction $name || die "Impossible to start a transaction"
   fi
 
-  load_repo_config $name
-
-  upstream=$CVMFS_UPSTREAM_STORAGE
-  upstream_type=$(get_upstream_type $upstream)
   spool_dir=$CVMFS_SPOOL_DIR
   scratch_dir="${spool_dir}/scratch/current"
   stratum0=$CVMFS_STRATUM0
