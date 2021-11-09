@@ -5,6 +5,7 @@
  */
 
 #ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 #endif
 
@@ -95,10 +96,11 @@ static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
 std::string MakeCanonicalPath(const std::string &path) {
   if (path.length() == 0) return path;
 
-  if (path[path.length()-1] == '/')
+  if (path[path.length()-1] == '/') {
     return path.substr(0, path.length()-1);
-  else
+  } else {
     return path;
+  }
 }
 
 
@@ -128,10 +130,11 @@ void SplitPath(
  */
 std::string GetParentPath(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
-  if (idx != std::string::npos)
+  if (idx != std::string::npos) {
     return path.substr(0, idx);
-  else
+  } else {
     return "";
+  }
 }
 
 
@@ -139,7 +142,7 @@ std::string GetParentPath(const std::string &path) {
  * Gets the file name part of a path.
  */
 PathString GetParentPath(const PathString &path) {
-  unsigned length = path.GetLength();
+  int length = static_cast<int>(path.GetLength());
   if (length == 0)
     return path;
   const char *chars  = path.GetChars();
@@ -158,16 +161,17 @@ PathString GetParentPath(const PathString &path) {
  */
 std::string GetFileName(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
-  if (idx != std::string::npos)
+  if (idx != std::string::npos) {
     return path.substr(idx+1);
-  else
+  } else {
     return path;
+  }
 }
 
 
 NameString GetFileName(const PathString &path) {
   NameString name;
-  int length = path.GetLength();
+  int length = static_cast<int>(path.GetLength());
   const char *chars  = path.GetChars();
 
   int i;
@@ -202,10 +206,10 @@ bool IsHttpUrl(const std::string &path) {
     return false;
   }
 
-  std::string prefix = path.substr(0, 7);
+  std::string prefix = path.substr(0, 8);
   std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
 
-  return prefix == "http://";
+  return prefix.substr(0, 7) == "http://" || prefix == "https://";
 }
 
 
@@ -381,12 +385,12 @@ int MakeSocket(const std::string &path, const int mode) {
     goto make_socket_failure;
 #endif
 
-  if (bind(socket_fd, (struct sockaddr *)&sock_addr,
+  if (bind(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
            sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
     if ((errno == EADDRINUSE) && (unlink(path.c_str()) == 0)) {
       // Second try, perhaps the file was left over
-      if (bind(socket_fd, (struct sockaddr *)&sock_addr,
+      if (bind(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
                sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
       {
         LogCvmfs(kLogCvmfs, kLogDebug, "binding socket failed (%d)", errno);
@@ -437,7 +441,7 @@ int MakeTcpEndpoint(const std::string &ipv4_address, int portno) {
   }
   endpoint_addr.sin_port = htons(portno);
 
-  retval = bind(socket_fd, (struct sockaddr *)&endpoint_addr,
+  retval = bind(socket_fd, reinterpret_cast<struct sockaddr *>(&endpoint_addr),
                 sizeof(endpoint_addr));
   if (retval < 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "binding TCP endpoint failed (%d)", errno);
@@ -470,7 +474,7 @@ int ConnectSocket(const std::string &path) {
   assert(socket_fd != -1);
 
   int retval =
-    connect(socket_fd, (struct sockaddr *)&sock_addr,
+    connect(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
             sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
   if (short_path != path)
     RemoveShortSocketLink(short_path);
@@ -502,8 +506,9 @@ int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
   }
   endpoint_addr.sin_port = htons(portno);
 
-  retval = connect(socket_fd, (struct sockaddr *)&endpoint_addr,
-                   sizeof(endpoint_addr));
+  retval =
+  connect(socket_fd, reinterpret_cast<struct sockaddr *>(&endpoint_addr),
+          sizeof(endpoint_addr));
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "failed to connect to TCP endpoint (%d)",
              errno);
@@ -527,7 +532,7 @@ void MakePipe(int pipe_fd[2]) {
  * Writes to a pipe should always succeed.
  */
 void WritePipe(int fd, const void *buf, size_t nbyte) {
-  int num_bytes;
+  ssize_t num_bytes;
   do {
     num_bytes = write(fd, buf, nbyte);
   } while ((num_bytes < 0) && (errno == EINTR));
@@ -539,7 +544,7 @@ void WritePipe(int fd, const void *buf, size_t nbyte) {
  * Reads from a pipe should always succeed.
  */
 void ReadPipe(int fd, void *buf, size_t nbyte) {
-  int num_bytes;
+  ssize_t num_bytes;
   do {
     num_bytes = read(fd, buf, nbyte);
   } while ((num_bytes < 0) && (errno == EINTR));
@@ -551,7 +556,7 @@ void ReadPipe(int fd, void *buf, size_t nbyte) {
  * Reads from a pipe where writer's end is not yet necessarily connected
  */
 void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
-  int num_bytes;
+  ssize_t num_bytes;
   unsigned i = 0;
   unsigned backoff_ms = 1;
   const unsigned max_backoff_ms = 256;
@@ -686,6 +691,92 @@ void Block2Nonblock(int filedes) {
  */
 void SendMsg2Socket(const int fd, const std::string &msg) {
   (void)send(fd, &msg[0], msg.length(), MSG_NOSIGNAL);
+}
+
+/**
+ * Sends the file descriptor passing_fd to the socket socket_fd. Can be used
+ * to transfer an open file descriptor from one process to another. Use
+ * ConnectSocket() to get the socket_fd.
+ */
+bool SendFd2Socket(int socket_fd, int passing_fd) {
+  union {
+    // Make sure that ctrl_msg is properly aligned.
+    struct cmsghdr align;
+    // Buffer large enough to store the file descriptor (ancillary data)
+    unsigned char buf[CMSG_SPACE(sizeof(int))];
+  } ctrl_msg;
+
+  memset(ctrl_msg.buf, 0, sizeof(ctrl_msg.buf));
+
+  struct msghdr msgh;
+  msgh.msg_name = NULL;
+  msgh.msg_namelen = 0;
+
+  unsigned char dummy = 0;
+  struct iovec iov;
+  iov.iov_base = &dummy;
+  iov.iov_len = 1;
+  msgh.msg_iov = &iov;
+  msgh.msg_iovlen = 1;
+
+  msgh.msg_control = ctrl_msg.buf;
+  msgh.msg_controllen = sizeof(ctrl_msg.buf);
+  struct cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
+  cmsgp->cmsg_len = CMSG_LEN(sizeof(int));
+  cmsgp->cmsg_level = SOL_SOCKET;
+  cmsgp->cmsg_type = SCM_RIGHTS;
+  memcpy(CMSG_DATA(cmsgp), &passing_fd, sizeof(int));
+
+  ssize_t retval = sendmsg(socket_fd, &msgh, 0);
+  return (retval != -1);
+}
+
+
+/**
+ * Returns the file descriptor that has been sent with SendFd2Socket. The
+ * msg_fd file descriptor needs to come from a call to accept() on the socket
+ * where the passing file descriptor has been sent to.
+ * Returns -errno on error.
+ */
+int RecvFdFromSocket(int msg_fd) {
+  union {
+    // Make sure that ctrl_msg is properly aligned.
+    struct cmsghdr align;
+    // Buffer large enough to store the file descriptor (ancillary data)
+    unsigned char buf[CMSG_SPACE(sizeof(int))];
+  } ctrl_msg;
+
+  memset(ctrl_msg.buf, 0, sizeof(ctrl_msg.buf));
+
+  struct msghdr msgh;
+  msgh.msg_name = NULL;
+  msgh.msg_namelen = 0;
+
+  unsigned char dummy;
+  struct iovec iov;
+  iov.iov_base = &dummy;
+  iov.iov_len = 1;
+  msgh.msg_iov = &iov;
+  msgh.msg_iovlen = 1;
+
+  msgh.msg_control = ctrl_msg.buf;
+  msgh.msg_controllen = sizeof(ctrl_msg.buf);
+
+  ssize_t retval = recvmsg(msg_fd, &msgh, 0);
+  if (retval == -1)
+    return -errno;
+
+  struct cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
+  assert(cmsgp != NULL);
+  if (cmsgp->cmsg_len != CMSG_LEN(sizeof(int)))
+    return -ERANGE;
+  assert(cmsgp->cmsg_level == SOL_SOCKET);
+  assert(cmsgp->cmsg_type == SCM_RIGHTS);
+
+  int passing_fd;
+  memcpy(&passing_fd, CMSG_DATA(cmsgp), sizeof(int));
+  assert(passing_fd >= 0);
+  return passing_fd;
 }
 
 
@@ -1449,7 +1540,7 @@ std::vector<LsofEntry> Lsof(const std::string &path) {
       std::string cwd = ReadSymlink(proc_dir + "/cwd");
       if (HasPrefix(cwd + "/", path + "/", false /* ignore_case */)) {
         LsofEntry entry;
-        entry.pid = String2Uint64(proc_names[i]);
+        entry.pid = static_cast<pid_t>(String2Uint64(proc_names[i]));
         entry.owner = proc_uid;
         entry.read_only = true;  // A bit sloppy but good enough for the moment
         entry.executable = ReadSymlink(proc_dir + "/exe");
@@ -1469,7 +1560,7 @@ std::vector<LsofEntry> Lsof(const std::string &path) {
         continue;
 
       LsofEntry entry;
-      entry.pid = String2Uint64(proc_names[i]);
+      entry.pid = static_cast<pid_t>(String2Uint64(proc_names[i]));
       entry.owner = proc_uid;
       entry.read_only = !((fd_modes[j] & S_IWUSR) == S_IWUSR);
       entry.executable = ReadSymlink(proc_dir + "/exe");
@@ -1735,7 +1826,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     }
 
     // Child, close file descriptors
-    max_fd = sysconf(_SC_OPEN_MAX);
+    max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
     if (max_fd < 0) {
       failed = ForkFailures::kFailGetMaxFd;
       goto fork_failure;
@@ -1860,7 +1951,8 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
   unsigned iov_idx = 0;
 
   while (nbytes) {
-    ssize_t retval = writev(fd, &iov[iov_idx], iovcnt - iov_idx);
+    ssize_t retval =
+      writev(fd, &iov[iov_idx], static_cast<int>(iovcnt - iov_idx));
     if (retval < 0) {
       if (errno == EINTR)
         continue;

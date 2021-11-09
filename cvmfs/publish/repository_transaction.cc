@@ -40,7 +40,7 @@ void Publisher::CheckTransactionStatus() {
 
 
 void Publisher::TransactionRetry() {
-  if (managed_node_) {
+  if (managed_node_.IsValid()) {
     int rvi = managed_node_->Check(false /* is_quiet */);
     if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
   }
@@ -80,7 +80,7 @@ void Publisher::TransactionRetry() {
     }  // try-catch
   }  // while (true)
 
-  if (managed_node_)
+  if (managed_node_.IsValid())
     managed_node_->Open();
 }
 

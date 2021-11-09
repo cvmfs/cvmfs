@@ -1,4 +1,38 @@
 2.9.0:
+  * [gw] Fix spurious keychain warning on transaction (CVM-1982)
+  * Add `cvmfs_server check -a` command (CVM-1524)
+  * Add timestamp_last_error magic extended attribute (CVM-2003)
+  * Add logbuffer magic extended attribute
+  * Add check for usyslog writability in cvmfs_config (CVM-1946)
+  * [ducc] make output_format line in wish list optional (CVM-1786)
+  * [gw] Fix lease statistics extraction during commit (CVM-1939)
+  * [ducc] Add support for publish triggered by registry webhooks (CVM-2000)
+  * [rpm] Cleanup creation of cvmfs system user and group (CVM-2017)
+  * Clean up receiver processes when stopping the gateway (CVM-1989)
+  * Add support for importing repositories on S3
+  * [gw] Increase file descriptor limit for receiver (CVM-1997)
+  * Classify HTTP errors with X-Squid-Error or Proxy-Status headers
+    as proxy errors
+  * Use UTC timestamp for .cvmfs_is_snapshotting (CVM-1986)
+  * [rpm] Remove version requirement from selinux-policy dependency
+  * Fix cvmfs_talk host info for empty host chain (CVM-2023)
+  * [ducc] Fix access to authenticated registries
+  * Add 'cvmfs_config setup noautofs' option (CVM-1983)
+  * Add support for explicit server-side proxy, removing support for
+    server-side system proxy; new parameters CVMFS_SERVER_PROXY and
+    CVMFS_S3_PROXY
+  * Fix potential activation of corruption stratum 1 snapshot
+  * Add `cvmfs_config fuser` command
+  * Add support for HTTPS S3 endpoints
+  * Fix union mountpoint handling on Fedora >= 34
+  * Add support for attaching mount to an existing fuse module
+  * Add support for "direct I/O" files (CVM-2001)
+  * Add 'device id' command to cvmfs_talk (CVM-2004)
+  * Fix potential crash when accessing extended attributes (CVM-2014)
+  * [gw] Fix publishing empty uncompressed files (CVM-2012)
+  * Fix building Doxygen documentation
+  * Add support for setting "compression" key in graft files
+  * Remove spinlock in S3 uploader
   * Remove spinlock in gateway uploader
   * Reduce time spent in lsof during publishing
   * [gw] Fast merging of nested catalogs (CVM-1998)
@@ -13,6 +47,10 @@
   * [ducc] Ingest images using "sneaky layers" and template transactions
 
 2.8.2:
+  * Add `cvmfs_config fuser` command (CVM-2004)
+  * Add 'device id' command to cvmfs_talk (CVM-2004)
+  * Add Debian 11 "bullseye" platform (CVM-2020)
+  * Fix authz session identifiers with namespaces (CVM-2011)
   * Improve error handling when parsing config files
   * [preloader] make network timeout and retries configurable (CVM-1992)
 

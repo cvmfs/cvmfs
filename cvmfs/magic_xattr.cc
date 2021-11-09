@@ -34,6 +34,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.nioerr", new NIOErrMagicXattr());
   Register("user.nopen", new NOpenMagicXattr());
   Register("user.hitrate", new HitrateMagicXattr());
+  Register("user.logbuffer", new LogBufferXattr());
   Register("user.proxy", new ProxyMagicXattr());
   Register("user.pubkeys", new PubkeysMagicXattr());
   Register("user.repo_counters", new RepoCountersMagicXattr());
@@ -45,6 +46,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.tag", new TagMagicXattr());
   Register("user.timeout", new TimeoutMagicXattr());
   Register("user.timeout_direct", new TimeoutDirectMagicXattr());
+  Register("user.timestamp_last_ioerr", new TimestampLastIOErrMagicXattr());
   Register("user.usedfd", new UsedFdMagicXattr());
   Register("user.useddirp", new UsedDirPMagicXattr());
   Register("user.version", new VersionMagicXattr());
@@ -55,6 +57,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.chunk_list", new ChunkListMagicXattr());
   Register("user.chunks", new ChunksMagicXattr());
   Register("user.compression", new CompressionMagicXattr());
+  Register("user.direct_io", new DirectIoMagicXattr());
   Register("user.external_file", new ExternalFileMagicXattr());
 
   Register("user.rawlink", new RawlinkMagicXattr());
@@ -98,7 +101,7 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
   return result;
 }
 
-MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
+BaseMagicXattr* MagicXattrManager::GetLocked(const std::string &name,
                                              PathString path,
                                              catalog::DirectoryEntry *d)
 {
@@ -106,10 +109,12 @@ MagicXattrRAIIWrapper MagicXattrManager::Get(const std::string &name,
   if (xattr_list_.count(name) > 0) {
     result = xattr_list_[name];
   } else {
-    return MagicXattrRAIIWrapper();
+    return NULL;
   }
 
-  return MagicXattrRAIIWrapper(result, path, d);
+  result->Lock(path, d);
+
+  return result;
 }
 
 void MagicXattrManager::Register(const std::string &name,
@@ -217,6 +222,14 @@ std::string CompressionMagicXattr::GetValue() {
   return zlib::AlgorithmName(dirent_->compression_algorithm());
 }
 
+bool DirectIoMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular();
+}
+
+std::string DirectIoMagicXattr::GetValue() {
+  return dirent_->IsDirectIo() ? "1" : "0";
+}
+
 bool ExternalFileMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular();
 }
@@ -313,6 +326,19 @@ std::string LHashMagicXattr::GetValue() {
   return result;
 }
 
+LogBufferXattr::LogBufferXattr() : BaseMagicXattr(), throttle_(1, 500, 2000) { }
+
+std::string LogBufferXattr::GetValue() {
+  throttle_.Throttle();
+  std::vector<LogBufferEntry> buffer = GetLogBuffer();
+  std::string result;
+  for (unsigned i = 0; i < buffer.size(); ++i) {
+    result += "[" + StringifyTime(buffer[i].timestamp, true /* UTC */) +
+              " UTC] " + buffer[i].message + "\n";
+  }
+  return result;
+}
+
 std::string NCleanup24MagicXattr::GetValue() {
   QuotaManager *quota_mgr =
     mount_point_->file_system()->cache_mgr()->quota_mgr();
@@ -343,7 +369,7 @@ std::string NDownloadMagicXattr::GetValue() {
 }
 
 std::string NIOErrMagicXattr::GetValue() {
-  return mount_point_->file_system()->n_io_error()->ToString();;
+  return StringifyInt(mount_point_->file_system()->io_error_info()->count());
 }
 
 std::string NOpenMagicXattr::GetValue() {
@@ -497,6 +523,11 @@ std::string TimeoutDirectMagicXattr::GetValue() {
   unsigned seconds, seconds_direct;
   mount_point_->download_mgr()->GetTimeout(&seconds, &seconds_direct);
   return StringifyUint(seconds_direct);
+}
+
+std::string TimestampLastIOErrMagicXattr::GetValue() {
+  return StringifyInt(
+    mount_point_->file_system()->io_error_info()->timestamp_last());
 }
 
 std::string UsedFdMagicXattr::GetValue() {

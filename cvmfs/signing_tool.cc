@@ -30,6 +30,7 @@ SigningTool::Result SigningTool::Run(
     const std::string &certificate, const std::string &priv_key,
     const std::string &repo_name, const std::string &pwd,
     const std::string &meta_info, const std::string &reflog_chksum_path,
+    const std::string &proxy,
     const bool garbage_collectable, const bool bootstrap_shortcuts,
     const bool return_early, const std::vector<shash::Any> reflog_catalogs) {
   shash::Any reflog_hash;
@@ -50,7 +51,7 @@ SigningTool::Result SigningTool::Run(
 
   // prepare global manager modules
   const bool follow_redirects = false;
-  if (!server_tool_->InitDownloadManager(follow_redirects) ||
+  if (!server_tool_->InitDownloadManager(follow_redirects, proxy) ||
       !server_tool_->InitSigningSignatureManager(certificate, priv_key, pwd)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return kInitError;
@@ -100,7 +101,6 @@ SigningTool::Result SigningTool::Run(
   }
 
   // From here on things are potentially put in backend storage
-  // LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
 
   // Register callback for retrieving the certificate hash
   upload::Spooler::CallbackPtr callback =
@@ -188,8 +188,8 @@ SigningTool::Result SigningTool::Run(
                spooler->GetNumberOfErrors());
       return kError;
     }
-    assert(!reflog_chksum_path.empty());
-    manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
+    if (!reflog_chksum_path.empty())
+      manifest::Reflog::WriteChecksum(reflog_chksum_path, reflog_hash);
   }
 
   // Don't activate new manifest, just make sure all its references are uploaded

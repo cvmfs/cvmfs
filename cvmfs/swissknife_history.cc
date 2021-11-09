@@ -39,6 +39,7 @@ static void InsertCommonParameters(ParameterList *r) {
       Parameter::Optional('e', "hash algorithm to use (default SHA1)"));
   r->push_back(Parameter::Switch('L', "follow HTTP redirects"));
   r->push_back(Parameter::Optional('P', "session_token_file"));
+  r->push_back(Parameter::Optional('@', "proxy url"));
 }
 
 CommandTag::Environment *CommandTag::InitializeEnvironment(
@@ -120,7 +121,9 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // initialize the (swissknife global) download manager
   const bool follow_redirects = (args.count('L') > 0);
-  if (!this->InitDownloadManager(follow_redirects)) {
+  const std::string &proxy = (args.count('@') > 0) ?
+                              *args.find('@')->second : "";
+  if (!this->InitDownloadManager(follow_redirects, proxy)) {
     return NULL;
   }
 
@@ -137,7 +140,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
           ? OpenLocalManifest(env->manifest_path.path())
           : FetchRemoteManifest(env->repository_url, repo_name, base_hash);
 
-  if (!env->manifest) {
+  if (!env->manifest.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file");
     return NULL;
   }
@@ -146,7 +149,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   if (read_write && env->manifest->history().IsNull() && !base_hash.IsNull()) {
     env->previous_manifest =
         FetchRemoteManifest(env->repository_url, repo_name, base_hash);
-    if (!env->previous_manifest) {
+    if (!env->previous_manifest.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load previous manifest");
       return NULL;
     }
@@ -164,7 +167,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   // download the history database referenced in the manifest
   env->history = GetHistory(env->manifest.weak_ref(), env->repository_url,
                             env->history_path.path(), read_write);
-  if (!env->history) {
+  if (!env->history.IsValid()) {
     return NULL;
   }
 
@@ -180,7 +183,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
                                        use_file_chunking, 0, 0, 0,
                                        session_token_file);
     env->spooler = upload::Spooler::Construct(sd);
-    if (!env->spooler) {
+    if (!env->spooler.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize upload spooler");
       return NULL;
     }
@@ -460,7 +463,7 @@ int CommandEditTag::Main(const ArgumentList &args) {
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
   UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
-  if (!env) {
+  if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -525,7 +528,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   const bool catalog_read_write = false;
   const UniquePtr<catalog::Catalog> catalog(GetCatalog(
       env->repository_url, root_hash, catalog_path.path(), catalog_read_write));
-  if (!catalog) {
+  if (!catalog.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog with hash '%s' does not exist",
              root_hash.ToString().c_str());
     return 1;
@@ -921,7 +924,7 @@ int CommandListTags::Main(const ArgumentList &args) {
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
   UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
-  if (!env) {
+  if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1012,7 +1015,7 @@ int CommandInfoTag::Main(const ArgumentList &args) {
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
   UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
-  if (!env) {
+  if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1052,7 +1055,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
   UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
-  if (!env) {
+  if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1103,7 +1106,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
       dynamic_cast<catalog::WritableCatalog *>(
           GetCatalog(env->repository_url, target_tag.root_hash,
                      catalog_path.path(), catalog_read_write)));
-  if (!catalog) {
+  if (!catalog.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog with hash '%s'",
              target_tag.root_hash.ToString().c_str());
     return 1;
@@ -1192,7 +1195,7 @@ int CommandEmptyRecycleBin::Main(const ArgumentList &args) {
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
   UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
-  if (!env) {
+  if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }

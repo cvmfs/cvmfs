@@ -1,0 +1,119 @@
+cvmfs_test_name="Repository gateway convoluted setups"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+verify_sha1sum() {
+  local filename=$1
+  local expected=$2
+  local actual=$(sha1sum ${filename} | cut -d' ' -f1)
+  if [ "${actual}" != "${expected}" ]; then
+    echo "Checksum mismatch for ${filename}: expected ${expected} actual ${actual}"
+    return 101
+  fi
+}
+
+cvmfs_run_test() {
+  local reponame=test.repo.org
+  local repodir=/cvmfs/${reponame}
+
+  echo "set up gateway"
+  set_up_repository_gateway || return 1
+
+  echo "start transaction 1"
+  cvmfs_server transaction ${reponame} || return 11
+
+  echo "create nested catalog structure"
+  for tree in tree1 tree2 tree3 ; do
+    mkdir ${repodir}/${tree}
+    touch ${repodir}/${tree}/.cvmfscatalog
+    for branch in branch1 branch2 branch3 ; do
+      mkdir ${repodir}/${tree}/${branch}
+      touch ${repodir}/${tree}/${branch}/.cvmfscatalog
+      for leaf in leaf1 leaf2 leaf3 ; do
+        mkdir ${repodir}/${tree}/${branch}/${leaf}
+        touch ${repodir}/${tree}/${branch}/${leaf}/.cvmfscatalog
+        echo "Hello world" > ${repodir}/${tree}/${branch}/hw.txt
+      done
+    done
+  done
+
+  echo "publish and check 1"
+  cvmfs_server publish -v ${reponame} || return 12
+  cvmfs_server check -i ${reponame} || return 13
+
+  echo "verify nested catalog count"
+  [ $(get_catalog_count ${reponame}) -eq 40 ] || return 14
+
+  echo "start transaction 2"
+  cvmfs_server transaction ${reponame}/tree1/branch1 || return 21
+
+  echo "create file in deeply nested catalog"
+  echo "Very nested" > ${repodir}/tree1/branch1/leaf1/nested.txt
+
+  echo "publish and check 2"
+  cvmfs_server publish -v ${reponame} || return 22
+  cvmfs_server check -i ${reponame} || return 23
+
+  echo "verify files"
+  verify_sha1sum ${repodir}/tree1/branch1/leaf1/nested.txt 0f5117db205e0f5e7314de1db0b1f07d64ba16a0 || return 24
+
+  echo "start transaction 3"
+  cvmfs_server transaction ${reponame} || return 31
+
+  echo "remove a containing nested catalog"
+  rm ${repodir}/tree2/.cvmfscatalog
+
+  echo "publish and check 3"
+  cvmfs_server publish -v ${reponame} || return 32
+  cvmfs_server check -i ${reponame} || return 33
+
+  echo "verify nested catalog count"
+  [ $(get_catalog_count ${reponame}) -eq 39 ] || return 34
+
+  echo "start transaction 4"
+  cvmfs_server transaction ${reponame} || return 41
+
+  echo "recreate containing nested catalog and modify subcatalog"
+  touch ${repodir}/tree2/.cvmfscatalog
+  echo "Modified in subcatalog of newly created catalog" > ${repodir}/tree2/branch1/test.txt
+
+  echo "publish and check 4"
+  cvmfs_server publish -v ${reponame} || return 42
+  cvmfs_server check -i ${reponame} || return 43
+
+  echo "verify nested catalog count"
+  [ $(get_catalog_count ${reponame}) -eq 40 ] || return 44
+
+  echo "verify files"
+  verify_sha1sum ${repodir}/tree2/branch1/test.txt d231feb3b7963bd26a6b12db5fa5c4fb93beff04 || return 45
+
+  echo "start transaction 5"
+  cvmfs_server transaction ${reponame}/tree2/branch3 || return 51
+
+  echo "modify files above lease path"
+  echo "Above lease path" > ${repodir}/above.txt
+  echo "Above lease path" > ${repodir}/tree2/above.txt
+
+  echo "modify files within lease path"
+  echo "Within lease path" > ${repodir}/tree2/branch3/within.txt
+
+  echo "modify files outside lease path"
+  echo "Outside lease path" > ${repodir}/tree1/branch1/outside.txt
+  echo "Outside lease path" > ${repodir}/tree2/branch2/outside.txt
+
+  echo "publish and check 5"
+  cvmfs_server publish -v ${reponame} || return 52
+  cvmfs_server check -i ${reponame} || return 53
+
+  echo "verify nested catalog count"
+  [ $(get_catalog_count ${reponame}) -eq 40 ] || return 54
+
+  echo "verify files"
+  [ -e ${repodir}/above.txt ] && return 55
+  [ -e ${repodir}/tree2/above.txt ] && return 56
+  verify_sha1sum ${repodir}/tree2/branch3/within.txt 5c0427c65ae080a35f780a6d78db3db7fad8079e || return 57
+  [ -e ${repodir}/tree1/branch1/outside.txt ] && return 58
+  [ -e ${repodir}/tree1/branch1/outside.txt ] && return 59
+
+  return 0
+}

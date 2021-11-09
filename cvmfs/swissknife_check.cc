@@ -413,6 +413,13 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Checks depending of entry type
+    if (!entries[i].IsRegular()) {
+      if (entries[i].IsDirectIo()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "invalid direct i/o flag found: %s",
+                 full_path.c_str());
+        retval = false;
+      }
+    }
     if (entries[i].IsDirectory()) {
       computed_counters->self.directories++;
       num_subdirs++;
@@ -730,7 +737,7 @@ bool CommandCheck::InspectTree(const string                  &path,
                                const catalog::DirectoryEntry *transition_point,
                                catalog::DeltaCounters        *computed_counters)
 {
-  LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
   const catalog::Catalog *catalog = FetchCatalog(path,
@@ -895,7 +902,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     check_chunks_ = true;
   if (args.find('l') != args.end()) {
     unsigned log_level =
-      1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
+      kLogLevel0 << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
@@ -918,7 +925,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     reflog_chksum_path = *args.find('R')->second;
 
   // Repository can be HTTP address or on local file system
-  is_remote_ = (repo_base_path_.substr(0, 7) == "http://");
+  is_remote_ = IsHttpUrl(repo_base_path_);
 
   // initialize the (swissknife global) download and signature managers
   if (is_remote_) {
@@ -975,7 +982,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                ".cvmfsreflog present but no checksum provided, aborting");
       return 1;
     }
-    bool retval = InspectReflog(reflog_hash, manifest);
+    bool retval = InspectReflog(reflog_hash, manifest.weak_ref());
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");
       return 1;
@@ -1013,7 +1020,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
     tag_db->TakeDatabaseFileOwnership();
-    successful = InspectHistory(tag_db) && successful;
+    successful = InspectHistory(tag_db.weak_ref()) && successful;
   }
 
   if (manifest->has_alt_catalog_path()) {

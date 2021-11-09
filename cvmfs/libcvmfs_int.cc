@@ -61,7 +61,7 @@
 #include "libcvmfs.h"
 #include "logging.h"
 #include "lru_md.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "platform.h"
 #include "quota.h"
 #include "shortstring.h"
@@ -617,7 +617,7 @@ int LibContext::Open(const char *c_path) {
     {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "file %s is marked as "
                "'chunked', but no chunks found.", path.c_str());
-      perf::Inc(file_system()->n_io_error());
+      file_system()->io_error_info()->AddIoError();
       delete chunks;
       return -EIO;
     }
@@ -652,7 +652,7 @@ int LibContext::Open(const char *c_path) {
     }
   }
 
-  perf::Inc(file_system()->n_io_error());
+  file_system()->io_error_info()->AddIoError();
   return fd;
 }
 

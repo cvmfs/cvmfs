@@ -127,6 +127,7 @@ Requires: grep
 Requires: gawk
 Requires: sed
 Requires: psmisc
+Requires: lsof
 Requires: autofs
 Requires: fuse
 Requires: curl
@@ -175,7 +176,7 @@ Requires: cvmfs-config
 %if 0%{?selinux_cvmfs}
 %{!?_selinux_policy_version: %global _selinux_policy_version %(sed -e 's,.*selinux-policy-\\([^/]*\\)/.*,\\1,' /usr/share/selinux/devel/policyhelp 2>/dev/null)}
 %if "%{_selinux_policy_version}" != ""
-Requires:      selinux-policy >= %{_selinux_policy_version}
+Requires:      selinux-policy
 %endif
 BuildRequires:  checkpolicy selinux-policy-devel hardlink selinux-policy-targeted
 Requires(post):         /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
@@ -272,7 +273,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 Summary: CernVM-FS Repository Gateway
 Group: Application/System
 BuildRequires: %{cvmfs_go} >= 1.11.4
-Requires: cvmfs-server = %{version}
+Requires: cvmfs-server = %{version}, psmisc
 %description gateway
 The CernVM-FS repository gateway service enables multiple remote publishers
 to write to the same repository.
@@ -322,7 +323,6 @@ BUILD_DUCC=no
 BUILD_DUCC=yes
 %endif
 
-%if 0%{?suse_version}
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
   -DBUILD_SERVER_DEBUG=yes \
@@ -336,24 +336,6 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DINSTALL_UNITTESTS=yes \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
-%else
-EXTRA_CMAKE_OPTS=""
-%if 0%{?el5} || 0%{?el4}
-EXTRA_CMAKE_OPTS="-DBUILD_GEOAPI=no"
-%endif
-%cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
-  -DBUILD_SERVER=yes \
-  -DBUILD_SERVER_DEBUG=yes \
-  -DBUILD_RECEIVER=yes \
-  -DBUILD_RECEIVER_DEBUG=yes \
-  -DBUILD_LIBCVMFS=yes \
-  -DBUILD_LIBCVMFS_CACHE=yes \
-  -DBUILD_SHRINKWRAP=yes \
-  -DBUILD_UNITTESTS=yes \
-  -DBUILD_GATEWAY=$BUILD_GATEWAY \
-  -DBUILD_DUCC=$BUILD_DUCC \
-  -DINSTALL_UNITTESTS=yes $EXTRA_CMAKE_OPTS .
-%endif
 
 make %{?_smp_mflags}
 
@@ -390,28 +372,14 @@ exit 0
 %endif
 
 %pre
-%if 0%{?suse_version}
-  /usr/bin/getent group cvmfs >/dev/null
-  if [ $? -ne 0 ]; then
-    /usr/sbin/groupadd -r cvmfs
-  fi
-  /usr/bin/getent passwd cvmfs >/dev/null
-  if [ $? -ne 0 ]; then
-    /usr/sbin/useradd -r -g cvmfs -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
-  fi
-%else
-  /usr/bin/getent passwd cvmfs >/dev/null
-  if [ $? -ne 0 ]; then
-     /usr/sbin/useradd -r -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
-  fi
-
-  # The useradd command will add a cvmfs group too - but we're in trouble if
-  # the sysadmin has the cvmfs user, but not the group, pre-created.
-  /usr/bin/getent group cvmfs >/dev/null
-  if [ $? -ne 0 ]; then
-    /usr/sbin/groupadd -r cvmfs
-  fi
-%endif
+/usr/bin/getent group cvmfs >/dev/null
+if [ $? -ne 0 ]; then
+  /usr/sbin/groupadd -r cvmfs
+fi
+/usr/bin/getent passwd cvmfs >/dev/null
+if [ $? -ne 0 ]; then
+  /usr/sbin/useradd -r -g cvmfs -d /var/lib/cvmfs -s /sbin/nologin -c "CernVM-FS service account" cvmfs
+fi
 
 /usr/bin/getent group fuse | grep -q cvmfs
 if [ $? -ne 0 ]; then
@@ -707,9 +675,18 @@ systemctl daemon-reload
 %files ducc
 %{_bindir}/cvmfs_ducc
 %{_unitdir}/cvmfs_ducc.service
+/usr/libexec/cvmfs/ducc/registry-webhook.py*
 %endif
 
 %changelog
+* Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Remove version requirement from selinux-policy dependency
+* Wed Sep 29 2021 Andrea Valenzuela <andrea.valenzuela.ramirez@cern.ch> - 2.9.0
+- Add registry-webhook.py app
+* Wed Sep 22 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
+- Fix cmake invocation for FC34
+* Wed Aug 25 2021 Jakob Blomer <jblomer@cern.ch> - 2.8.2
+- Add lsof dependency for cvmfs package due to new cvmfs_config fuser command
 * Fri May 7 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Add gateway sub package
 * Tue Apr 27 2021 Michael Brown <mbrown@fensystems.co.uk> - 2.9.0

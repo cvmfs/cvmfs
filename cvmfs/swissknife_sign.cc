@@ -51,6 +51,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('s') != args.end()) pwd = *args.find('s')->second;
   string meta_info = "";
   if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
+  string proxy = "";
+  if (args.find('@') != args.end()) proxy = *args.find('@')->second;
   const bool garbage_collectable = (args.count('g') > 0);
   const bool bootstrap_shortcuts = (args.count('A') > 0);
   const bool return_early = (args.count('e') > 0);
@@ -64,6 +66,6 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   SigningTool signing_tool(this);
   return signing_tool.Run(manifest_path, repo_url, spooler_definition, temp_dir,
                           certificate, priv_key, repo_name, pwd, meta_info,
-                          reflog_chksum_path, garbage_collectable,
+                          reflog_chksum_path, proxy, garbage_collectable,
                           bootstrap_shortcuts, return_early);
 }

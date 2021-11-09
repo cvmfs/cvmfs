@@ -34,6 +34,7 @@ class CommandSign : public Command {
     r.push_back(Parameter::Optional('s', "password for the private key"));
     r.push_back(Parameter::Optional('n', "repository name"));
     r.push_back(Parameter::Optional('M', "repository meta info file"));
+    r.push_back(Parameter::Optional('@', "proxy URL"));
     r.push_back(Parameter::Switch('b',
                                   "generate symlinks for VOMS-secured "
                                   "repo backends"));

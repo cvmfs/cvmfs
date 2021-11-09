@@ -213,7 +213,7 @@ bool Database<DerivedT>::FileReadAhead() {
                filename().c_str(), errno);
       return false;
     }
-    const int retval = platform_readahead(fd_readahead);
+    const ssize_t retval = platform_readahead(fd_readahead);
     close(fd_readahead);
     if (retval != 0) {
       LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
@@ -239,8 +239,11 @@ bool Database<DerivedT>::PrepareCommonQueries() {
                                     "WHERE key = :key;");
   set_property_       = new Sql(db, "INSERT OR REPLACE INTO properties "
                                     "(key, value) VALUES (:key, :value);");
-  return (begin_transaction_ && commit_transaction_ &&
-          has_property_ && get_property_ && set_property_);
+  return (begin_transaction_.IsValid() &&
+          commit_transaction_.IsValid() &&
+          has_property_.IsValid() &&
+          get_property_.IsValid() &&
+          set_property_.IsValid());
 }
 
 
@@ -286,7 +289,7 @@ bool Database<DerivedT>::CreatePropertiesTable() {
 
 template <class DerivedT>
 bool Database<DerivedT>::HasProperty(const std::string &key) const {
-  assert(has_property_);
+  assert(has_property_.IsValid());
   const bool retval = has_property_->BindText(1, key) &&
                       has_property_->FetchRow();
   assert(retval);
@@ -298,7 +301,7 @@ bool Database<DerivedT>::HasProperty(const std::string &key) const {
 template <class DerivedT>
 template <typename T>
 T Database<DerivedT>::GetProperty(const std::string &key) const {
-  assert(get_property_);
+  assert(get_property_.IsValid());
   const bool retval = get_property_->BindText(1, key) &&
                       get_property_->FetchRow();
   assert(retval);
@@ -319,7 +322,7 @@ template <class DerivedT>
 template <typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key,
                                      const T            value) {
-  assert(set_property_);
+  assert(set_property_.IsValid());
   return set_property_->BindText(1, key) &&
          set_property_->Bind(2, value)   &&
          set_property_->Execute()        &&
@@ -328,7 +331,7 @@ bool Database<DerivedT>::SetProperty(const std::string &key,
 
 template <class DerivedT>
 std::string Database<DerivedT>::GetLastErrorMsg() const {
-  const std::string msg = sqlite3_errmsg(sqlite_db());
+  std::string msg = sqlite3_errmsg(sqlite_db());
   return msg;
 }
 
@@ -431,9 +434,9 @@ void Database<DerivedT>::PrintSqlError(const std::string &error_msg) {
 template <class DerivedT>
 const float Database<DerivedT>::kSchemaEpsilon = 0.0005;
 template <class DerivedT>
-const std::string Database<DerivedT>::kSchemaVersionKey = "schema";
+const char *Database<DerivedT>::kSchemaVersionKey = "schema";
 template <class DerivedT>
-const std::string Database<DerivedT>::kSchemaRevisionKey = "schema_revision";
+const char *Database<DerivedT>::kSchemaRevisionKey = "schema_revision";
 
 
 //
@@ -442,49 +445,44 @@ const std::string Database<DerivedT>::kSchemaRevisionKey = "schema_revision";
 
 
 template <>
-inline bool Sql::Bind(const int index, const int value) {
+inline bool Sql::Bind(const int index, const int &value) {
   return this->BindInt64(index, value);
 }
 
 template <>
-inline bool Sql::Bind(const int index, const unsigned int value) {
+inline bool Sql::Bind(const int index, const unsigned int &value) {
   return this->BindInt64(index, static_cast<int>(value));
 }
 
 template <>
-inline bool Sql::Bind(const int index, const uint64_t value) {
+inline bool Sql::Bind(const int index, const uint64_t &value) {
+  return this->BindInt64(index, static_cast<int64_t>(value));
+}
+
+template <>
+inline bool Sql::Bind(const int index, const sqlite3_int64 &value) {
   return this->BindInt64(index, value);
 }
 
 template <>
-inline bool Sql::Bind(const int index, const sqlite3_int64 value) {
-  return this->BindInt64(index, value);
-}
-
-template <>
-inline bool Sql::Bind(const int index, const std::string value) {
+inline bool Sql::Bind(const int index, const std::string &value) {
   return this->BindTextTransient(index, value);
 }
 
 template <>
-inline bool Sql::Bind(const int index, const char *value) {
-  return this->BindTextTransient(index, value, strlen(value));
-}
-
-template <>
-inline bool Sql::Bind(const int index, const float value) {
+inline bool Sql::Bind(const int index, const float &value) {
   return this->BindDouble(index, value);
 }
 
 template <>
-inline bool Sql::Bind(const int index, const double value) {
+inline bool Sql::Bind(const int index, const double &value) {
   return this->BindDouble(index, value);
 }
 
 
 template <>
 inline int Sql::Retrieve(const int index) {
-  return this->RetrieveInt64(index);
+  return static_cast<int>(this->RetrieveInt64(index));
 }
 
 template <>
@@ -509,7 +507,7 @@ inline std::string Sql::Retrieve(const int index) {
 
 template <>
 inline float Sql::Retrieve(const int index) {
-  return this->RetrieveDouble(index);
+  return static_cast<float>(this->RetrieveDouble(index));
 }
 
 template <>

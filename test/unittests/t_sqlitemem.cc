@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "malloc_arena.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "prng.h"
 #include "sqlitemem.h"
 #include "util/algorithm.h"

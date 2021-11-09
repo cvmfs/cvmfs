@@ -34,6 +34,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
                                  src/084-premounted                           \
+                                 src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
@@ -49,6 +50,9 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
                                  src/682-enter                                \
+                                 src/684-https_s3                             \
+                                 src/686-azureblob_s3                         \
+                                 src/687-import_s3                            \
                                  src/811-commit-gateway                       \
                                  --                                           \
                                  src/5*                                       \
@@ -77,7 +81,9 @@ CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
 echo "running DUCC test cases..."
 CVMFS_TEST_CLASS_NAME=DUCCTests                                         \
 ./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   src/4*                               \
-                                || retval=1
+                           -x src/406-ducc-webhook-notifications        \
+                              --                                        \
+                              src/4*                                    \
+                           || retval=1
 
 exit $retval

@@ -5,6 +5,7 @@
  */
 
 #ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 #endif
 
@@ -39,7 +40,7 @@ const char b64_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
 /**
  * Decode Base64 and Base64Url
  */
-const signed char db64_table[] = {
+const int8_t db64_table[] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, 62, -1, 62, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60,
@@ -206,12 +207,12 @@ time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
 
   struct tm tm_wl;
   memset(&tm_wl, 0, sizeof(struct tm));
-  tm_wl.tm_year = String2Int64(iso8601.substr(0, 4)) - 1900;
-  tm_wl.tm_mon = String2Int64(iso8601.substr(5, 2)) - 1;
-  tm_wl.tm_mday = String2Int64(iso8601.substr(8, 2));
-  tm_wl.tm_hour = String2Int64(iso8601.substr(11, 2));
-  tm_wl.tm_min = String2Int64(iso8601.substr(14, 2));
-  tm_wl.tm_sec = String2Int64(iso8601.substr(17, 2));
+  tm_wl.tm_year = static_cast<int>(String2Int64(iso8601.substr(0, 4))) - 1900;
+  tm_wl.tm_mon = static_cast<int>(String2Int64(iso8601.substr(5, 2))) - 1;
+  tm_wl.tm_mday = static_cast<int>(String2Int64(iso8601.substr(8, 2)));
+  tm_wl.tm_hour = static_cast<int>(String2Int64(iso8601.substr(11, 2)));
+  tm_wl.tm_min = static_cast<int>(String2Int64(iso8601.substr(14, 2)));
+  tm_wl.tm_sec = static_cast<int>(String2Int64(iso8601.substr(17, 2)));
   utc_time = timegm(&tm_wl);
   if (utc_time < 0) return 0;
 
@@ -360,7 +361,7 @@ bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
   if (fd < 0) return false;
 
   unsigned char buffer[4096];
-  int num_bytes = read(fd, buffer, sizeof(buffer));
+  ssize_t num_bytes = read(fd, buffer, sizeof(buffer));
   close(fd);
 
   if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer))) return false;
@@ -386,7 +387,7 @@ bool GetLineFile(FILE *f, std::string *line) {
     } else if (retval == EOF) {
       break;
     }
-    char c = retval;
+    char c = static_cast<char>(retval);
     if (c == '\n') break;
     line->push_back(c);
   }
@@ -394,7 +395,7 @@ bool GetLineFile(FILE *f, std::string *line) {
 }
 
 bool GetLineFd(const int fd, std::string *line) {
-  int retval;
+  ssize_t retval;
   char c;
   line->clear();
   while (true) {
@@ -445,7 +446,7 @@ string Trim(const string &raw, bool trim_newline) {
 string ToUpper(const string &mixed_case) {
   string result(mixed_case);
   for (unsigned i = 0, l = result.length(); i < l; ++i) {
-    result[i] = toupper(result[i]);
+    result[i] = static_cast<char>(toupper(result[i]));
   }
   return result;
 }
@@ -504,16 +505,17 @@ string Base64(const string &data) {
 string Base64Url(const string &data) {
   string base64 = Base64(data);
   for (unsigned i = 0, l = base64.length(); i < l; ++i) {
-    if (base64[i] == '+')
+    if (base64[i] == '+') {
       base64[i] = '-';
-    else if (base64[i] == '/')
+    } else if (base64[i] == '/') {
       base64[i] = '_';
+    }
   }
   return base64;
 }
 
-static bool Debase64Block(const unsigned char input[4],
-                          const signed char *d_table, unsigned char output[3]) {
+static bool Debase64Block(const unsigned char input[4], unsigned char output[3])
+{
   int32_t dec[4];
   for (int i = 0; i < 4; ++i) {
     dec[i] = db64_table[input[i]];
@@ -541,7 +543,7 @@ bool Debase64(const string &data, string *decoded) {
 
   while (pos < length) {
     unsigned char decoded_block[3];
-    bool retval = Debase64Block(data_ptr + pos, db64_table, decoded_block);
+    bool retval = Debase64Block(data_ptr + pos, decoded_block);
     if (!retval) return false;
     decoded->append(reinterpret_cast<char *>(decoded_block), 3);
     pos += 4;
@@ -560,7 +562,7 @@ bool Debase64(const string &data, string *decoded) {
 string Tail(const string &source, unsigned num_lines) {
   if (source.empty() || (num_lines == 0)) return "";
 
-  unsigned l = source.length();
+  int l = static_cast<int>(source.length());
   int i = l - 1;
   for (; i >= 0; --i) {
     char c = source.data()[i];
@@ -580,7 +582,7 @@ string Tail(const string &source, unsigned num_lines) {
   * @param format format if timestamp (YYYY-MM-DD HH:MM:SS by default)
   * @return a timestamp string on success, empty string on failure
   */
-std::string GetGMTimestamp(std::string format) {
+std::string GetGMTimestamp(const std::string &format) {
   struct tm time_ptr;
   char date_and_time[100];
   time_t t = time(NULL);

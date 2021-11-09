@@ -66,10 +66,11 @@ cvmfs_server_import() {
   local configure_apache=1
   local recreate_repo_key=0
   local require_masterkeycard=0
+  local proxy_url
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:rptR" option; do
+  while getopts "w:o:c:u:k:lsmgf:rptRx:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -114,6 +115,9 @@ cvmfs_server_import() {
         recreate_whitelist=1
         require_masterkeycard=1
       ;;
+      x)
+        proxy_url=$OPTARG
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command import: Unrecognized option: $1"
@@ -143,11 +147,12 @@ cvmfs_server_import() {
   check_upstream_validity $upstream
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
-  check_apache                      || die "Apache must be installed and running"
-  is_local_upstream $upstream       || die "Import only works locally for the moment"
   ensure_swissknife_suid $unionfs   || die "Need CAP_SYS_ADMIN for cvmfs_swissknife"
   lower_hardlink_restrictions
-  ensure_enabled_apache_modules
+  if [ $configure_apache -eq 1 ]; then
+    check_apache                      || die "Apache must be installed and running"
+    ensure_enabled_apache_modules
+  fi
   [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"
 
   if [ $unionfs = "aufs" ]; then
@@ -164,19 +169,21 @@ cvmfs_server_import() {
 
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
-  local needed_items="${storage_location}                 \
-                      ${storage_location}/.cvmfspublished \
-                      ${storage_location}/data            \
-                      ${storage_location}/data/txn"
-  local i=0
-  while [ $i -lt 256 ]; do
-    needed_items="$needed_items ${storage_location}/data/$(printf "%02x" $i)"
-    i=$(($i+1))
-  done
-  for item in $needed_items; do
-    [ -e $item ] || die "$item missing"
-    [ $chown_backend -ne 0 ] || [ x"$cvmfs_user" = x"$(stat -c%U $item)" ] || die "$item not owned by $cvmfs_user"
-  done
+  if is_local_upstream $upstream; then
+    local needed_items="${storage_location}                 \
+                        ${storage_location}/.cvmfspublished \
+                        ${storage_location}/data            \
+                        ${storage_location}/data/txn"
+    local i=0
+    while [ $i -lt 256 ]; do
+      needed_items="$needed_items ${storage_location}/data/$(printf "%02x" $i)"
+      i=$(($i+1))
+    done
+    for item in $needed_items; do
+      [ -e $item ] || die "$item missing"
+      [ $chown_backend -ne 0 ] || [ x"$cvmfs_user" = x"$(stat -c%U $item)" ] || die "$item not owned by $cvmfs_user"
+    done
+  fi
 
   # check availability of repository signing key and certificate
   local keys="$public_key"
@@ -222,7 +229,8 @@ cvmfs_server_import() {
                                          "default"           \
                                          "false"             \
                                          ""                  \
-                                         "" || die "fail!"
+                                         ""                  \
+                                         "$proxy_url" || die "fail!"
   echo "done"
 
   # import the old repository security keys

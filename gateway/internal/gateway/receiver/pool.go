@@ -130,14 +130,6 @@ func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootH
 	return 0, result
 }
 
-// this is private, it is not enough to just make it private but it is a good start
-func (p *Pool) testCrash(ctx context.Context) error {
-	reply := make(chan error)
-	p.tasks <- testCrashTask{ctx, reply}
-	result := <-reply
-	return result
-}
-
 func worker(tasks <-chan task, pool *Pool, workerIdx int) {
 	gw.Log("worker_pool", gw.LogDebug).
 		Int("worker_id", workerIdx).

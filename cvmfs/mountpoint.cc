@@ -80,6 +80,26 @@ const char *FileSystem::kDefaultCacheBase = "/var/lib/cvmfs";
 const char *FileSystem::kDefaultCacheMgrInstance = "default";
 
 
+FileSystem::IoErrorInfo::IoErrorInfo() : counter_(NULL), timestamp_last_(0) { }
+
+void FileSystem::IoErrorInfo::Reset() {
+  counter_->Set(0);
+  timestamp_last_ = 0;
+}
+
+void FileSystem::IoErrorInfo::AddIoError() {
+  perf::Inc(counter_);
+  timestamp_last_ = time(NULL);
+}
+
+void FileSystem::IoErrorInfo::SetCounter(perf::Counter *c) { counter_ = c; }
+
+int64_t FileSystem::IoErrorInfo::count() { return counter_->Get(); }
+
+time_t FileSystem::IoErrorInfo::timestamp_last() { return timestamp_last_; }
+
+
+
 /**
  * A cache instance name is part of a bash parameter and can only contain
  * certain characters.
@@ -209,12 +229,12 @@ void FileSystem::CreateStatistics() {
                                          "Number of links read");
   n_fs_forget_ = statistics_->Register("cvmfs.n_fs_forget",
                                        "Number of inode forgets");
-  n_io_error_ = statistics_->Register("cvmfs.n_io_error",
-                                      "Number of I/O errors");
   no_open_files_ = statistics_->Register("cvmfs.no_open_files",
                                          "Number of currently opened files");
   no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
                   "Number of currently opened directories");
+  io_error_info_.SetCounter(statistics_->Register("cvmfs.n_io_error",
+                                                  "Number of I/O errors"));
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -355,7 +375,6 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_fs_read_(NULL)
   , n_fs_readlink_(NULL)
   , n_fs_forget_(NULL)
-  , n_io_error_(NULL)
   , no_open_files_(NULL)
   , no_open_dirs_(NULL)
   , statistics_(NULL)
@@ -531,7 +550,7 @@ string FileSystem::MkCacheParm(
 
 
 void FileSystem::ResetErrorCounters() {
-  n_io_error_->Set(0);
+  io_error_info_.Reset();
 }
 
 
@@ -634,7 +653,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
 
   if (settings.is_managed) {
-    if (!SetupPosixQuotaMgr(settings, cache_mgr))
+    if (!SetupPosixQuotaMgr(settings, cache_mgr.weak_ref()))
       return NULL;
   }
   return cache_mgr.Release();
@@ -1259,8 +1278,7 @@ bool MountPoint::CreateCatalogManager() {
 bool MountPoint::CreateDownloadManagers() {
   string optarg;
   download_mgr_ = new download::DownloadManager();
-  const bool use_system_proxy = false;
-  download_mgr_->Init(kDefaultNumConnections, use_system_proxy,
+  download_mgr_->Init(kDefaultNumConnections,
                       perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
@@ -1309,6 +1327,12 @@ bool MountPoint::CreateDownloadManagers() {
       download_mgr_->SetHostChain(host_chain);
     }
   }
+
+  if (options_mgr_->GetValue("CVMFS_USE_SSL_SYSTEM_CA", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+    download_mgr_->UseSystemCertificatePath();
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 
@@ -1507,7 +1531,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   UnlinkGuard history_file(history_path);
   UniquePtr<history::History> tag_db(
     history::SqliteHistory::Open(history_path));
-  if (!tag_db) {
+  if (!tag_db.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "failed to open history database (%s)", history_path.c_str());
     boot_error_ = "failed to open history database";

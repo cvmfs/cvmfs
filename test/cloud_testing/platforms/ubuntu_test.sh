@@ -17,8 +17,10 @@ CVMFS_EXCLUDE=
 
 ubuntu_release="$(lsb_release -cs)"
 if [ "x$ubuntu_release" == "xxenial" ]; then
-   # This test has shown to occasionally hang in the GDB attach on Ubuntu 16
-   CVMFS_EXCLUDE="$CVMFS_EXCLUDE 015-rebuild_on_crash"
+  # This test has shown to occasionally hang in the GDB attach on Ubuntu 16
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE 015-rebuild_on_crash"
+  # Killing the sudo process group in 095 is buggy on Ubuntu 16
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE 095-fuser"
 fi
 
 # Kernel sources too old for gcc, TODO
@@ -50,6 +52,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
                                  src/084-premounted                           \
+                                 src/094-attachmount                          \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \
@@ -64,6 +67,9 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/600-securecvmfs                          \
                                    src/647-bearercvmfs                          \
                                    src/673-acl                                  \
+                                   src/684-https_s3                             \
+                                   src/686-azureblob_s3                         \
+                                   src/687-import_s3                            \
                                    $CVMFS_EXCLUDE                               \
                                    --                                           \
                                    src/5*                                       \

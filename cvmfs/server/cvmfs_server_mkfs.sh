@@ -67,7 +67,8 @@ cvmfs_server_alterfs() {
   elif ! is_master_replica $name && [ $master_replica -eq 1 ]; then
     echo -n "Allowing Replication of this Repository... "
     local master_replica="${temp_dir}/.cvmfs_master_replica"
-    touch $master_replica
+    # Azurite does not like direct empty file uploads;
+    echo "This file marks the repository as replicatable to stratum 1 servers" > $master_replica
     __swissknife upload -i $master_replica -o $(basename $master_replica) -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
     if [ $success -ne 1 ]; then
       echo "fail!"
@@ -103,10 +104,11 @@ cvmfs_server_mkfs() {
 
   local configure_apache=1
   local voms_authz=""
+  local proxy_url
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:" option; do
+  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:x:" option; do
     case $option in
       X)
         external_data=true
@@ -158,6 +160,9 @@ cvmfs_server_mkfs() {
       ;;
       V)
         voms_authz=$OPTARG
+      ;;
+      x)
+        proxy_url=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -276,7 +281,8 @@ cvmfs_server_mkfs() {
                                          "$compression_alg"     \
                                          "$external_data"       \
                                          "$voms_authz"          \
-                                         "$auto_tag_timespan" || die "fail"
+                                         "$auto_tag_timespan"   \
+                                         "$proxy_url" || die "fail"
   echo "done"
 
   # create or import security keys and certificates

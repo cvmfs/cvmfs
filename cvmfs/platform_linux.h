@@ -9,9 +9,6 @@
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
 #include <sys/xattr.h>
-#ifdef HAVE_ATTR_XATTR_H
-#include <attr/xattr.h>  // NOLINT(build/include_alpha)
-#endif
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -128,7 +125,9 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     if (retval != 0) return false;
     // Best effort
     retval = chmod(_PATH_MOUNTED, mtab_info.st_mode);
+    (void) retval;
     retval = chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
+    (void) retval;
     // We pickup these values only to silent warnings
   }
 
@@ -227,9 +226,9 @@ inline int platform_fstat(int filedes, platform_stat64 *buf) {
 // TODO(jblomer): the translation from C to C++ should be done elsewhere
 inline bool platform_getxattr(const std::string &path, const std::string &name,
                               std::string *value) {
-  int size = 0;
+  ssize_t size = 0;
   void *buffer = NULL;
-  int retval;
+  ssize_t retval;
   retval = getxattr(path.c_str(), name.c_str(), buffer, size);
   if (retval > 1) {
     size = retval;
@@ -277,7 +276,7 @@ inline void platform_disable_kcache(int filedes) {
   (void)posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
 
-inline int platform_readahead(int filedes) {
+inline ssize_t platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
 }
 
@@ -305,7 +304,7 @@ inline int platform_readahead(int filedes) {
  * @param length  number of bytes to be evicted
  */
 inline int platform_invalidate_kcache(const int fd, const off_t offset,
-                                      const size_t length) {
+                                      const off_t length) {
   return posix_fadvise(fd, offset, length, POSIX_FADV_DONTNEED);
 }
 
@@ -315,7 +314,7 @@ inline std::string platform_libname(const std::string &base_name) {
 
 inline std::string platform_getexepath() {
   char buf[PATH_MAX + 1];
-  int ret = readlink("/proc/self/exe", buf, PATH_MAX);
+  ssize_t ret = readlink("/proc/self/exe", buf, PATH_MAX);
   if (ret > 0) {
     buf[ret] = '\0';
     return std::string(buf);
@@ -323,7 +322,7 @@ inline std::string platform_getexepath() {
   return "";
 }
 
-inline struct timespec _time_with_clock(int clock) {
+inline struct timespec platform_time_with_clock(int clock) {
   struct timespec tp;
   int retval = clock_gettime(clock, &tp);
   assert(retval == 0);
@@ -332,21 +331,23 @@ inline struct timespec _time_with_clock(int clock) {
 
 inline uint64_t platform_monotonic_time() {
 #ifdef CLOCK_MONOTONIC_COARSE
-  struct timespec tp = _time_with_clock(CLOCK_MONOTONIC_COARSE);
+  struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC_COARSE);
 #else
-  struct timespec tp = _time_with_clock(CLOCK_MONOTONIC);
+  struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC);
 #endif
   return tp.tv_sec + (tp.tv_nsec >= 500000000);
 }
 
 inline uint64_t platform_monotonic_time_ns() {
-  struct timespec tp = _time_with_clock(CLOCK_MONOTONIC);
-  return static_cast<uint64_t>(tp.tv_sec * 1e9 + tp.tv_nsec);
+  struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC);
+  return static_cast<uint64_t>(static_cast<double>(tp.tv_sec) * 1e9 +
+                               static_cast<double>(tp.tv_nsec));
 }
 
 inline uint64_t platform_realtime_ns() {
-  struct timespec tp = _time_with_clock(CLOCK_REALTIME);
-  return static_cast<uint64_t>(tp.tv_sec * 1e9 + tp.tv_nsec);
+  struct timespec tp = platform_time_with_clock(CLOCK_REALTIME);
+  return static_cast<uint64_t>(static_cast<double>(tp.tv_sec) * 1e9 +
+                               static_cast<double>(tp.tv_nsec));
 }
 
 inline uint64_t platform_memsize() {

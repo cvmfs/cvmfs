@@ -514,6 +514,40 @@ _migrate_142() {
 }
 
 
+_migrate_143() {
+  local name=$1
+  local destination_version="143"
+  local client_conf="/etc/cvmfs/repositories.d/${name}/client.conf"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  echo "--> updating client.conf"
+  if ! grep -q "CVMFS_USE_SSL_SYSTEM_CA" $client_conf; then
+    echo "CVMFS_USE_SSL_SYSTEM_CA=true" >> $client_conf
+  fi
+
+  if is_stratum0 $name; then
+    echo "--> adjusting /etc/fstab"
+    sed -i -e "s|\(.*\)allow_other,\(.*# added by CernVM-FS for ${CVMFS_REPOSITORY_NAME}\)|\1allow_other,fsname=${CVMFS_REPOSITORY_NAME},\2|" /etc/fstab
+
+    # Make sure the systemd mount unit exists
+    if is_systemd; then
+      /usr/lib/systemd/system-generators/systemd-fstab-generator \
+        /run/systemd/generator '' '' 2>/dev/null || true
+      systemctl daemon-reload
+    fi
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -649,6 +683,11 @@ cvmfs_server_migrate() {
 
     if [ "$creator" -lt 142 ] && is_stratum0 $name; then
       _migrate_142 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" -lt 143 ] && is_stratum0 $name; then
+      _migrate_143 $name
       creator="$(repository_creator_version $name)"
     fi
 

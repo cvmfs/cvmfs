@@ -8,7 +8,9 @@
 #define CVMFS_LOGGING_INTERNAL_H_
 
 #include <cstdarg>
+#include <ctime>
 #include <string>
+#include <vector>
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -53,15 +55,16 @@ struct DefaultLogging {
 
 enum LogFlags {
   kLogNoLinebreak = 0x200,
-  kLogShowSource = 0x400,
+  kLogShowSource  = 0x400,
+  kLogSensitive   = 0x800,  ///< Don't add the line to the memory log buffer
 };
 
 enum LogLevels {
-  kLogLevel0 = 0x800,
-  kLogVerbose = 0x1000,
-  kLogNormal = 0x2000,
-  kLogDiscrete = 0x4000,
-  kLogNone = 0x8000,
+  kLogLevel0   = 0x01000,
+  kLogNormal   = 0x02000,
+  kLogInform   = 0x04000,
+  kLogVerbose  = 0x08000,
+  kLogNone     = 0x10000,
 };
 
 /**
@@ -104,8 +107,19 @@ enum LogSource {
   kLogKvStore,
 };
 
-const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;
+const int kLogInfoMsg = kLogStdout | kLogShowSource | kLogInform;
+const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
+
+struct LogBufferEntry {
+  LogBufferEntry(LogSource s, int m, const std::string &msg)
+    : timestamp(time(NULL)), source(s), mask(m), message(msg) { }
+
+  time_t timestamp;
+  LogSource source;
+  int mask;
+  std::string message;
+};
 
 void SetLogSyslogLevel(const int level);
 int GetLogSyslogLevel();
@@ -116,7 +130,7 @@ void SetLogMicroSyslog(const std::string &filename);
 std::string GetLogMicroSyslog();
 void SetLogSyslogPrefix(const std::string &prefix);
 void SetLogSyslogShowPID(bool flag);
-void SetLogVerbosity(const LogLevels min_level);
+void SetLogVerbosity(const LogLevels max_level);
 void LogShutdown();
 
 #ifdef DEBUGMSG
@@ -129,6 +143,9 @@ std::string GetLogDebugFile();
 
 void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
                               const char *msg));
+
+std::vector<LogBufferEntry> GetLogBuffer();
+void ClearLogBuffer();
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

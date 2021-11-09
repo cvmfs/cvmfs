@@ -70,7 +70,7 @@ class T_Fetcher : public ::testing::Test {
     ASSERT_TRUE(cache_mgr_ != NULL);
 
     download_mgr_ = new download::DownloadManager();
-    download_mgr_->Init(8, false, /* use_system_proxy */
+    download_mgr_->Init(8,
       perf::StatisticsTemplate("test", &statistics_));
     download_mgr_->SetHostChain("file://" + tmp_path_);
 

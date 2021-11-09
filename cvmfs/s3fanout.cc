@@ -31,6 +31,7 @@ const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
 const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
 const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
+const unsigned S3FanoutManager::kDefaultHTTPSPort = 443;
 
 
 /**
@@ -161,12 +162,12 @@ static size_t CallbackCurlBody(
 int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                         void *userp, void *socketp) {
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(userp);
-  const int ajobs = *s3fanout_mgr->available_jobs_;
   LogCvmfs(kLogS3Fanout, kLogDebug, "CallbackCurlSocket called with easy "
            "handle %p, socket %d, action %d, up %d, "
            "sp %d, fds_inuse %d, jobs %d",
            easy, s, action, userp,
-           socketp, s3fanout_mgr->watch_fds_inuse_, ajobs);
+           socketp, s3fanout_mgr->watch_fds_inuse_,
+           s3fanout_mgr->available_jobs_->Get());
   if (action == CURL_POLL_NONE)
     return 0;
 
@@ -355,8 +356,8 @@ void *S3FanoutManager::MainUpload(void *data) {
         s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
         s3fanout_mgr->available_jobs_->Decrement();
 
-        MutexLockGuard m(s3fanout_mgr->jobs_completed_lock_);
-        s3fanout_mgr->jobs_completed_.push_back(info);
+        // Add to list of completed jobs
+        s3fanout_mgr->PushCompletedJob(info);
       }
     }
   }
@@ -557,7 +558,11 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   vector<string> tokens = SplitString(complete_hostname_, ':');
   assert(tokens.size() <= 2);
   string canonical_hostname = tokens[0];
-  if (tokens.size() == 2 && String2Uint64(tokens[1]) != kDefaultHTTPPort)
+
+  // if we could split the hostname in two and if the port is *NOT* a default
+  // one
+  if (tokens.size() == 2 && !((String2Uint64(tokens[1]) == kDefaultHTTPPort) ||
+                              (String2Uint64(tokens[1]) == kDefaultHTTPSPort)))
     canonical_hostname += ":" + tokens[1];
 
   string signed_headers;
@@ -611,7 +616,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
 
 /**
  * The Azure Blob authorization header according to
- * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key 
+ * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key
  */
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   const
@@ -683,9 +688,9 @@ int S3FanoutManager::InitializeDnsSettings(
     return 0;
   }
 
-  // Remove port number if such exists
-  if (!HasPrefix(host_with_port, "http://", false /*ignore_case*/))
-    host_with_port = "http://" + host_with_port;
+  // Add protocol information for extraction of fields for DNS
+  if (!IsHttpUrl(host_with_port))
+    host_with_port = config_.protocol + "://" + host_with_port;
   std::string remote_host = dns::ExtractHost(host_with_port);
   std::string remote_port = dns::ExtractPort(host_with_port);
 
@@ -956,6 +961,18 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   retval = curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
   assert(retval == CURLE_OK);
 
+  retval = curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, info->errorbuffer);
+  assert(retval == CURLE_OK);
+
+  if (config_.protocol == "https") {
+    retval = curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 1L);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_PROXY_SSL_VERIFYPEER, 1L);
+    assert(retval == CURLE_OK);
+    bool add_cert = ssl_certificate_store_.ApplySslCertificatePath(handle);
+    assert(add_cert);
+  }
+
   return kFailOk;
 }
 
@@ -984,6 +1001,9 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
 
   string url = MkUrl(info->object_key);
   retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
+  assert(retval == CURLE_OK);
+
+  retval = curl_easy_setopt(curl_handle, CURLOPT_PROXY, config_.proxy.c_str());
   assert(retval == CURLE_OK);
 }
 
@@ -1097,8 +1117,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       break;
     default:
       LogCvmfs(kLogS3Fanout, kLogStderr | kLogSyslogErr,
-               "unexpected curl error (%d) while trying to upload %s",
-               curl_error, info->object_key.c_str());
+               "unexpected curl error (%d) while trying to upload %s: %s",
+               curl_error, info->object_key.c_str(), info->errorbuffer);
       info->error_code = kFailOther;
       break;
   }
@@ -1165,12 +1185,9 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   atomic_init32(&multi_threaded_);
   MakePipe(pipe_terminate_);
   MakePipe(pipe_jobs_);
+  MakePipe(pipe_completed_);
 
-  jobs_completed_lock_ =
-      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval;
-  retval = pthread_mutex_init(jobs_completed_lock_, NULL);
-  assert(retval == 0);
   jobs_todo_lock_ =
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(jobs_todo_lock_, NULL);
@@ -1229,11 +1246,11 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   watch_fds_ = static_cast<struct pollfd *>(smalloc(4 * sizeof(struct pollfd)));
   watch_fds_size_ = 4;
   watch_fds_inuse_ = 0;
+
+  ssl_certificate_store_.UseSystemCertificatePath();
 }
 
 S3FanoutManager::~S3FanoutManager() {
-  pthread_mutex_destroy(jobs_completed_lock_);
-  free(jobs_completed_lock_);
   pthread_mutex_destroy(jobs_todo_lock_);
   free(jobs_todo_lock_);
   pthread_mutex_destroy(curl_handle_lock_);
@@ -1247,6 +1264,7 @@ S3FanoutManager::~S3FanoutManager() {
   }
   ClosePipe(pipe_terminate_);
   ClosePipe(pipe_jobs_);
+  ClosePipe(pipe_completed_);
 
   set<CURL *>::iterator             i    = pool_handles_idle_->begin();
   const set<CURL *>::const_iterator iEnd = pool_handles_idle_->end();
@@ -1297,26 +1315,27 @@ const Statistics &S3FanoutManager::GetStatistics() {
 }
 
 /**
- * Get completed jobs, so they can be cleaned and deleted properly.
- */
-int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
-  MutexLockGuard m(jobs_completed_lock_);
-  std::vector<JobInfo*>::iterator             it    = jobs_completed_.begin();
-  const std::vector<JobInfo*>::const_iterator itend = jobs_completed_.end();
-  for (; it != itend; ++it) {
-    jobs->push_back(*it);
-  }
-  jobs_completed_.clear();
-
-  return 0;
-}
-
-/**
  * Push new job to be uploaded to the S3 cloud storage.
  */
 void S3FanoutManager::PushNewJob(JobInfo *info) {
   available_jobs_->Increment();
   WritePipe(pipe_jobs_[1], &info, sizeof(info));
+}
+
+/**
+ * Push completed job to list of completed jobs
+ */
+void S3FanoutManager::PushCompletedJob(JobInfo *info) {
+  WritePipe(pipe_completed_[1], &info, sizeof(info));
+}
+
+/**
+ * Pop completed job
+ */
+JobInfo *S3FanoutManager::PopCompletedJob() {
+  JobInfo *info;
+  ReadPipe(pipe_completed_[0], &info, sizeof(info));
+  return info;
 }
 
 //------------------------------------------------------------------------------

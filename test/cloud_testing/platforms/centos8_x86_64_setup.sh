@@ -69,6 +69,10 @@ install_from_repo python2-pip
 sudo pip2 install flask                      || die "fail (installing python-flask)"
 install_from_repo python3-flask
 
+# Install test dependency for 604
+install_from_repo python3
+install_from_repo netcat
+
 # Install the test S3 provider
 install_test_s3
 

@@ -59,12 +59,12 @@ class S3Uploader : public AbstractUploader {
    */
   virtual void DoUpload(const std::string &remote_path,
                         IngestionSource *source,
-                        const CallbackTN *callback = NULL);
+                        const CallbackTN *callback);
 
   virtual UploadStreamHandle *InitStreamedUpload(
     const CallbackTN *callback = NULL);
   virtual void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,
-                              const CallbackTN *callback = NULL);
+                              const CallbackTN *callback);
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
                                       const shash::Any &content_hash);
 
@@ -77,10 +77,13 @@ class S3Uploader : public AbstractUploader {
   int64_t DoGetObjectSize(const std::string &file_name);
 
   // Only for testing
-  s3fanout::S3FanoutManager *GetS3FanoutManager() { return s3fanout_mgr_; }
+  s3fanout::S3FanoutManager *GetS3FanoutManager() {
+    return s3fanout_mgr_.weak_ref();
+  }
 
  private:
   static const unsigned kDefaultPort = 80;
+  static const unsigned kHttpsPort = 443;
   static const unsigned kDefaultNumParallelUploads = 16;
   static const unsigned kDefaultNumRetries = 3;
   static const unsigned kDefaultTimeoutSec = 60;
@@ -127,13 +130,11 @@ class S3Uploader : public AbstractUploader {
   std::string secret_key_;
   s3fanout::AuthzMethods authz_method_;
   bool peek_before_put_;
+  bool use_https_;
+  std::string proxy_;
 
   const std::string temporary_path_;
   mutable atomic_int32 io_errors_;
-  /**
-   * Signals the CollectResults thread to quit
-   */
-  atomic_int32 terminate_;
   pthread_t thread_collect_results_;
 };  // S3Uploader
 

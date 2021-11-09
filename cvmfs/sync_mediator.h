@@ -48,8 +48,6 @@ namespace manifest {
 class Manifest;
 }
 
-struct Counters;
-
 namespace publish {
 
 class SyncDiffReporter : public DiffListener {
@@ -96,11 +94,11 @@ class SyncDiffReporter : public DiffListener {
  * Assertion: linkcount == HardlinkGroup::hardlinks.size() at the end
  */
 struct HardlinkGroup {
-  explicit HardlinkGroup(SharedPtr<SyncItem> item) : master(item) {
+  explicit HardlinkGroup(const SharedPtr<SyncItem> &item) : master(item) {
     hardlinks[master->GetRelativePath()] = item;
   }
 
-  void AddHardlink(SharedPtr<SyncItem> entry) {
+  void AddHardlink(const SharedPtr<SyncItem> &entry) {
     hardlinks[entry->GetRelativePath()] = entry;
   }
 
@@ -129,6 +127,7 @@ class AbstractSyncMediator {
   virtual bool Commit(manifest::Manifest *manifest) = 0;
 
   virtual bool IsExternalData() const = 0;
+  virtual bool IsDirectIo() const = 0;
   virtual zlib::Algorithms GetCompressionAlgorithm() const = 0;
 };
 
@@ -173,6 +172,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   // The sync union engine uses this information to create properly initialized
   // sync items
   bool IsExternalData() const { return params_->external_data; }
+  bool IsDirectIo() const { return params_->direct_io; }
   zlib::Algorithms GetCompressionAlgorithm() const {
     return params_->compression_alg;
   }

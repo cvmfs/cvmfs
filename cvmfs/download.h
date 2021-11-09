@@ -24,6 +24,7 @@
 #include "hash.h"
 #include "prng.h"
 #include "sink.h"
+#include "ssl.h"
 #include "statistics.h"
 
 
@@ -343,8 +344,9 @@ class CredentialsAttachment {
 
 /**
  * Note when adding new fields: Clone() probably needs to be adjusted, too.
+ * TODO(jblomer): improve ordering of members
  */
-class DownloadManager {
+class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
 
@@ -395,11 +397,10 @@ class DownloadManager {
   static int ParseHttpCode(const char digits[3]);
 
   void Init(const unsigned max_pool_handles,
-            const bool use_system_proxy,
-            perf::StatisticsTemplate statistics);
+            const perf::StatisticsTemplate &statistics);
   void Fini();
   void Spawn();
-  DownloadManager *Clone(perf::StatisticsTemplate statistics);
+  DownloadManager *Clone(const perf::StatisticsTemplate &statistics);
   Failures Fetch(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);
@@ -443,6 +444,7 @@ class DownloadManager {
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnableRedirects();
+  void UseSystemCertificatePath();
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -464,6 +466,7 @@ class DownloadManager {
                         std::vector<uint64_t> *reply_vals);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
+  void SetRandomProxyUnlocked();
   void RebalanceProxiesUnlocked();
   CURL *AcquireCurlHandle();
   void ReleaseCurlHandle(CURL *handle);
@@ -480,6 +483,16 @@ class DownloadManager {
   void InitHeaders();
   void FiniHeaders();
   void CloneProxyConfig(DownloadManager *clone);
+
+  inline std::vector<ProxyInfo> *current_proxy_group() const {
+    return (opt_proxy_groups_ ?
+            &((*opt_proxy_groups_)[opt_proxy_groups_current_]) : NULL);
+  }
+
+  inline ProxyInfo *current_proxy() const {
+    return (opt_proxy_groups_ ?
+            &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]) : NULL);
+  }
 
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
@@ -512,7 +525,6 @@ class DownloadManager {
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
-  bool use_system_proxy_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;
@@ -595,9 +607,16 @@ class DownloadManager {
 
   CredentialsAttachment *credentials_attachment_;
 
-  // Writes and reads should be atomic because reading happens in a different
-  // thread than writing.
+  /**
+   * Writes and reads should be atomic because reading happens in a different
+   * thread than writing.
+   */
   Counters *counters_;
+
+  /**
+   * Carries the path settings for SSL certificates
+   */
+  SslCertificateStore ssl_certificate_store_;
 };  // DownloadManager
 
 }  // namespace download

@@ -1,0 +1,79 @@
+cvmfs_test_name="cvmfs_server check -a"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_688_REPO_NAMES=
+
+cleanup() {
+  if [ -n "$CVMFS_TEST_688_REPO_NAMES" ]; then
+    for repo in $CVMFS_TEST_688_REPO_NAMES; do
+      sudo cvmfs_server rmfs -f $repo
+    done
+  fi
+}
+
+has_jq() {
+  which jq >/dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo -n "*** checking for curl... "
+  which curl > /dev/null 2>&1 || { echo "fail"; return 1; }
+  echo "done"
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  CVMFS_TEST_688_REPO_NAMES="${replica_name}-1 ${replica_name}-2 ${replica_name}-3 ${replica_name}-4"
+  echo "*** install a cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** create 4 Stratum1 replicas on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+
+  for num in 1 2 3 4; do
+    create_stratum1 ${replica_name}-$num                   \
+                    $CVMFS_TEST_USER                       \
+                    $CVMFS_STRATUM0                        \
+                    /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                    || return $num
+    sudo cvmfs_server snapshot ${replica_name}-$num
+  done
+
+  echo "*** disabling snapshots to second replica"
+  sudo $SHELL -c "echo "CVMFS_REPLICA_ACTIVE=no" >> /etc/cvmfs/repositories.d/${replica_name}-2/replica.conf"
+
+  echo "*** making /var/log/cvmfs user-writable"
+  sudo mkdir -p /var/log/cvmfs
+  sudo chown -R $CVMFS_TEST_USER /var/log/cvmfs
+  echo "*** removing old checks.log"
+  rm -f /var/log/cvmfs/checks.log
+
+  echo "*** corrupting replica 4"
+  delete_from_backend ${replica_name}-4 ".cvmfswhitelist"
+
+  echo "*** running cvmfs_server check -a"
+  sudo cvmfs_server check -a || return 10
+
+  echo "*** contents of checks.log"
+  cat /var/log/cvmfs/checks.log
+
+  echo "*** checking if check worked on test repo and replicas 1 and 3"
+  curl -f -s "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfs_status.json"  | grep check_status.*succeeded || return 50
+  curl -f -s "$(get_repo_url ${replica_name}-1)/.cvmfs_status.json" | grep check_status.*succeeded || return 51
+  curl -f -s "$(get_repo_url ${replica_name}-3)/.cvmfs_status.json" | grep check_status.*succeeded || return 52
+
+  echo "*** verifying check did not run on replica 2"
+  curl -f -s "$(get_repo_url ${replica_name}-2)/.cvmfs_status.json" | grep last_check && return 53
+
+  echo "*** verifying check failed on replica 4"
+  curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json" | grep check_status.*failed || return 54
+
+  return 0
+}

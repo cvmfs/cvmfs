@@ -67,7 +67,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     spooler = upload::Spooler::Construct(definition, &stats_tmpl);
     const std::string temp_dir = raii_temp_dir->dir();
     output_catalog_mgr_ = new RwCatalogMgr(
-        manifest_->catalog_hash(), repo_path_, temp_dir, spooler,
+        manifest_->catalog_hash(), repo_path_, temp_dir, spooler.weak_ref(),
         download_manager_, params.enforce_limits, params.nested_kcatalog_limit,
         params.root_kcatalog_limit, params.file_mbyte_limit, statistics_,
         params.use_autocatalogs, params.max_weight, params.min_weight);
@@ -86,20 +86,31 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::IsIgnoredPath(
+    const PathString& path) {
+  const PathString rel_path = MakeRelative(path);
+
+  // Ignore any paths that are not either within the lease path or
+  // above the lease path
+  return !(IsSubPath(lease_path_, rel_path) ||
+           IsSubPath(rel_path, lease_path_));
+}
+
+template <typename RwCatalogMgr, typename RoCatalogMgr>
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::IsReportablePath(
+    const PathString& path) {
+  const PathString rel_path = MakeRelative(path);
+
+  // Do not report any changes occurring outside the lease path (which
+  // will be due to other concurrent writers)
+  return IsSubPath(lease_path_, rel_path);
+}
+
+template <typename RwCatalogMgr, typename RoCatalogMgr>
 void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
     const XattrList& xattrs, const FileChunkList& chunks) {
   const PathString rel_path = MakeRelative(path);
-
-  /*
-   * Note: If the addition of a file or directory outside of the lease
-   *       path is encountered here, this means that the item was deleted
-   *       by another writer running concurrently.
-   *       The correct course of action is to ignore this change here.
-   * */
-  if (!IsPathInLease(lease_path_, rel_path)) {
-    return;
-  }
 
   const std::string parent_path =
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
@@ -122,11 +133,12 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     } else {
       output_catalog_mgr_->AddFile(*base_entry, xattrs, parent_path);
     }
-    if (entry.IsLink())
+    if (entry.IsLink()) {
       perf::Inc(counters_->n_symlinks_added);
-    else
+    } else {
       perf::Inc(counters_->n_files_added);
-    perf::Xadd(counters_->sz_added_bytes, entry.size());
+    }
+    perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry.size()));
   }
 }
 
@@ -134,16 +146,6 @@ template <typename RwCatalogMgr, typename RoCatalogMgr>
 void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
     const PathString& path, const catalog::DirectoryEntry& entry) {
   const PathString rel_path = MakeRelative(path);
-
-  /*
-   * Note: If the removal of a file or directory outside of the lease
-   *       path is encountered here, this means that the item was created
-   *       by another writer running concurrently.
-   *       The correct course of action is to ignore this change here.
-   * */
-  if (!IsPathInLease(lease_path_, rel_path)) {
-    return;
-  }
 
   if (entry.IsDirectory()) {
     if (entry.IsNestedCatalogMountpoint()) {
@@ -157,12 +159,13 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportRemoval(
     AbortIfHardlinked(entry);
     output_catalog_mgr_->RemoveFile(rel_path.c_str());
 
-    if (entry.IsLink())
+    if (entry.IsLink()) {
       perf::Inc(counters_->n_symlinks_removed);
-    else
+    } else {
       perf::Inc(counters_->n_files_removed);
+    }
 
-    perf::Xadd(counters_->sz_removed_bytes, entry.size());
+    perf::Xadd(counters_->sz_removed_bytes, static_cast<int64_t>(entry.size()));
   }
 }
 
@@ -172,18 +175,6 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     const catalog::DirectoryEntry& entry2, const XattrList& xattrs,
     const FileChunkList& chunks) {
   const PathString rel_path = MakeRelative(path);
-
-  /*
-   * Note: If the modification of a file or directory outside of the lease
-   *       path is encountered here, this means that the item was modified
-   *       by another writer running concurrently.
-   *       The correct course of action is to ignore this change here.
-   * */
-  if (!IsPathInLease(lease_path_, rel_path)) {
-    // All child paths will similarly be outside of the lease path,
-    // and so there is no need to recurse any further.
-    return false;
-  }
 
   const std::string parent_path =
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
@@ -205,7 +196,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     }
     output_catalog_mgr_->SwapNestedCatalog(rel_path.ToString(), new_hash,
                                            new_size);
-    return false; // skip recursion into nested catalog mountpoints
+    return false;  // skip recursion into nested catalog mountpoints
   } else if (entry1.IsDirectory() && entry2.IsDirectory()) {
     // From directory to directory
     const catalog::DirectoryEntryBase* base_entry =
@@ -227,11 +218,13 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     if (entry2.IsNestedCatalogMountpoint()) {
       output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
     }
-    if (entry1.IsLink())
+    if (entry1.IsLink()) {
       perf::Inc(counters_->n_symlinks_removed);
-    else
+    } else {
       perf::Inc(counters_->n_files_removed);
-    perf::Xadd(counters_->sz_removed_bytes, entry1.size());
+    }
+    perf::Xadd(counters_->sz_removed_bytes,
+               static_cast<int64_t>(entry1.size()));
     perf::Inc(counters_->n_directories_added);
 
   } else if (entry1.IsDirectory() && (entry2.IsRegular() || entry2.IsLink())) {
@@ -259,11 +252,12 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     }
 
     perf::Inc(counters_->n_directories_removed);
-    if (entry2.IsLink())
+    if (entry2.IsLink()) {
       perf::Inc(counters_->n_symlinks_added);
-    else
+    } else {
       perf::Inc(counters_->n_files_added);
-    perf::Xadd(counters_->sz_added_bytes, entry2.size());
+    }
+    perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry2.size()));
 
   } else if ((entry1.IsRegular() || entry1.IsLink()) &&
              (entry2.IsRegular() || entry2.IsLink())) {
@@ -293,8 +287,9 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportModification(
     } else {
       perf::Inc(counters_->n_symlinks_changed);
     }
-    perf::Xadd(counters_->sz_removed_bytes, entry1.size());
-    perf::Xadd(counters_->sz_added_bytes, entry2.size());
+    perf::Xadd(counters_->sz_removed_bytes,
+               static_cast<int64_t>(entry1.size()));
+    perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry2.size()));
   }
   return true;
 }

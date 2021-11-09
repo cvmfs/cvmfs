@@ -13,7 +13,7 @@
 
 #include "authz/authz.h"
 #include "gtest/gtest_prod.h"
-#include "murmur.h"
+#include "murmur.hxx"
 #include "smallhash.h"
 #include "statistics.h"
 #include "util/single_copy.h"

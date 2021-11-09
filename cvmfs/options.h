@@ -213,7 +213,8 @@ class OptionsManager {
   bool taint_environment_;
 
  private:
-  OptionsManager & operator= (const OptionsManager & other) {
+  // NOLINTNEXTLINE(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+  OptionsManager & operator= (const OptionsManager & /* other */) {
     assert(false);
   }
 };  // class OptionManager

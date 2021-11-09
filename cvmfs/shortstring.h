@@ -53,13 +53,13 @@ class ShortString {
   void Assign(const char *chars, const unsigned length) {
     delete long_string_;
     long_string_ = NULL;
+    this->length_ = length;
     if (length > StackSize) {
       atomic_inc64(&num_overflows_);
       long_string_ = new std::string(chars, length);
     } else {
       if (length)
         memcpy(stack_, chars, length);
-      this->length_ = length;
     }
   }
 
@@ -94,10 +94,11 @@ class ShortString {
   }
 
   const char *GetChars() const {
-    if (long_string_)
+    if (long_string_) {
       return long_string_->data();
-    else
+    } else {
       return stack_;
+    }
   }
 
   unsigned GetLength() const {

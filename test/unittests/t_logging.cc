@@ -117,3 +117,29 @@ TEST_F(T_Logging, Custom) {
   LogShutdown();
   EXPECT_DEATH(LogCvmfs(kLogCvmfs, kLogCustom0, "Line"), ".*");
 }
+
+
+TEST_F(T_Logging, Buffer) {
+  std::vector<LogBufferEntry> buffer;
+
+  ClearLogBuffer();
+  buffer = GetLogBuffer();
+  EXPECT_TRUE(buffer.empty());
+
+  LogCvmfs(kLogCvmfs, kLogSensitive, "test line");
+  buffer = GetLogBuffer();
+  EXPECT_TRUE(buffer.empty());
+  LogCvmfs(kLogCvmfs, 0, "test line");
+  buffer = GetLogBuffer();
+  EXPECT_EQ(1U, buffer.size());
+  EXPECT_EQ("test line", buffer[0].message);
+
+  for (unsigned i = 0; i < 5000; ++i)
+    LogCvmfs(kLogCvmfs, 0, "%d", i);
+
+  buffer = GetLogBuffer();
+  EXPECT_EQ(10U, buffer.size());  // see LogBuffer::kBufferSize
+  for (unsigned i = 0; i < buffer.size(); ++i) {
+    EXPECT_EQ(4999 - i, String2Int64(buffer[i].message));
+  }
+}

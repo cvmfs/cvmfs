@@ -16,6 +16,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -42,14 +43,23 @@ const (
 )
 
 var (
-	address    = flag.String("address", defaultAddress, "address for the snapshotter's GRPC server")
-	configPath = flag.String("config", "", "path to the configuration file")
-	logLevel   = flag.String("log-level", defaultLogLevel.String(), "set the logging level [trace, debug, info, warn, error, fatal, panic]")
-	rootDir    = flag.String("root", defaultRootDir, "path to the root directory for this snapshotter")
+	address      = flag.String("address", defaultAddress, "address for the snapshotter's GRPC server")
+	configPath   = flag.String("config", "", "path to the configuration file")
+	logLevel     = flag.String("log-level", defaultLogLevel.String(), "set the logging level [trace, debug, info, warn, error, fatal, panic]")
+	rootDir      = flag.String("root", defaultRootDir, "path to the root directory for this snapshotter")
+	printVersion = flag.Bool("version", false, "print the version number")
 )
+
+var Version = "development"
 
 func main() {
 	flag.Parse()
+
+	if *printVersion {
+		fmt.Println("CernvVM-FS Containerd Snapshotter:\t", Version)
+		os.Exit(0)
+	}
+
 	lvl, err := logrus.ParseLevel(*logLevel)
 	if err != nil {
 		log.L.WithError(err).Fatal("failed to prepare logger")

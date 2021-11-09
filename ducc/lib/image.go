@@ -156,14 +156,6 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 		return *img.OCIImage, nil
 	}
 
-	user := img.User
-	pass, err := GetPassword()
-	if err != nil {
-		l.LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
-		user = ""
-		pass = ""
-	}
-
 	manifest, err := img.GetManifest()
 	if err != nil {
 		l.LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
@@ -171,7 +163,7 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 	}
 	configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
 		img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
-	token, err := firstRequestForAuth(configUrl, user, pass)
+	token, err := firstRequestForAuth(configUrl)
 	if err != nil {
 		l.LogE(err).Warning("Impossible to retrieve the token for getting the changes from the repository, not changes set")
 		return
@@ -264,14 +256,8 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	var tagsList struct {
 		Tags []string
 	}
-	pass, err := GetPassword()
-	if err != nil {
-		l.LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
-		pass = ""
-	}
-	user := img.User
 	url := img.GetTagListUrl()
-	token, err := firstRequestForAuth(url, user, pass)
+	token, err := firstRequestForAuth(url)
 	if err != nil {
 		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
 		l.LogE(err).Error(errF)
@@ -369,27 +355,9 @@ func (i *Image) GetPublicSymlinkPath() string {
 }
 
 func (img *Image) getByteManifest() ([]byte, error) {
-	pass, err := GetPassword()
-	if err != nil {
-		l.LogE(err).Warning("Unable to retrieve the password, trying to get the manifest anonymously.")
-		return img.getAnonymousManifest()
-	}
-	return img.getManifestWithPassword(pass)
-}
-
-func (img *Image) getAnonymousManifest() ([]byte, error) {
-	return getManifestWithUsernameAndPassword(img, "", "")
-}
-
-func (img *Image) getManifestWithPassword(password string) ([]byte, error) {
-	return getManifestWithUsernameAndPassword(img, img.User, password)
-}
-
-func getManifestWithUsernameAndPassword(img *Image, user, pass string) ([]byte, error) {
-
 	url := img.GetManifestUrl()
 
-	token, err := firstRequestForAuth(url, user, pass)
+	token, err := firstRequestForAuth(url)
 	if err != nil {
 		l.LogE(err).Error("Error in getting the authentication token")
 		return nil, err
@@ -424,47 +392,35 @@ type Credentials struct {
 	password string
 }
 
-func getCredentialsFromEnv(user, pass string) (Credentials, error) {
-	u := os.Getenv(user)
-	p := os.Getenv(pass)
-	c := Credentials{u, p}
-	err := error(nil)
-	if user == "" || pass == "" {
-		err = fmt.Errorf("missing either username ($%s) or password ($%s) or both for accessing the docker registry", user, pass)
-	}
-	return c, err
-
-}
-
-func getDockerHubCredentials() (Credentials, error) {
-	return getCredentialsFromEnv("DUCC_DOCKERHUB_USER", "DUCC_DOCKERHUB_PASS")
-}
-
-func getGitlabContainersCredentials() (Credentials, error) {
-	return getCredentialsFromEnv("DUCC_GITLAB_REGISTRY_USER", "DUCC_GITLAB_REGISTRY_PASS")
-}
-
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
-	docker, err := getDockerHubCredentials()
-	if err == nil {
-		credentials = append(credentials, docker)
-	}
-	gitlab, err := getGitlabContainersCredentials()
-	if err == nil {
-		credentials = append(credentials, gitlab)
-	}
-	for _, c := range credentials {
-		token, err = firstRequestForAuth_internal(url, c.username, c.password)
-		if err == nil {
-			return token, err
+	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
+	for _, r := range strings.Split(regs, ",") {
+		if r == "" {
+			continue
 		}
+
+		iEnv := "DUCC_" + r + "_IDENT"
+		uEnv := "DUCC_" + r + "_USER"
+		uPass := "DUCC_" + r + "_PASS"
+		ident := os.Getenv(iEnv)
+		user := os.Getenv(uEnv)
+		pass := os.Getenv(uPass)
+		if user == "" || pass == "" || ident == "" {
+			err = fmt.Errorf("missing either $%s or $%s or $%s", uEnv, uPass, iEnv)
+			return "", err;
+		}
+
+		if (!strings.Contains(url, ident)) {
+			continue
+		}
+
+		return firstRequestForAuth_internal(url, user, pass)
 	}
-	return token, err
+	return firstRequestForAuth_internal(url, "", "")
 }
 
-func firstRequestForAuth(url, user, pass string) (token string, err error) {
-	c := Credentials{user, pass}
-	credentials := []Credentials{c}
+func firstRequestForAuth(url string) (token string, err error) {
+	credentials := []Credentials{}
 	return GetAuthToken(url, credentials)
 }
 
@@ -501,6 +457,7 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 		// happy path
 		return token, nil
 	}
+	fmt.Printf("We failed with authentication and we now go without for %s\n", url)
 	// some error, we should retry without auth
 	if user != "" || pass != "" {
 		token, err = requestAuthToken(WwwAuthenticate, "", "")
@@ -663,16 +620,9 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 }
 
 func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloadedLayer, err error) {
-	user := img.User
-	pass, err := GetPassword()
-	if err != nil {
-		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
-		user = ""
-		pass = ""
-	}
 	layerUrl := getLayerUrl(img, layer.Digest)
 	if token == "" {
-		token, err = firstRequestForAuth(layerUrl, user, pass)
+		token, err = firstRequestForAuth(layerUrl)
 		if err != nil {
 			return
 		}
@@ -710,7 +660,7 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			l.LogE(err).Warning("Received status code ", resp.StatusCode)
 			if resp.StatusCode == 401 {
 				// try to get the token again
-				newToken, errToken := firstRequestForAuth(layerUrl, user, pass)
+				newToken, errToken := firstRequestForAuth(layerUrl)
 				if errToken != nil {
 					l.LogE(errToken).Warning("Error in refreshing the token")
 				} else {
@@ -812,17 +762,10 @@ func (ld *LayerDownloader) getToken() (token string, err error) {
 	if err != nil {
 		return
 	}
-	user := ld.image.User
-	pass, err := GetPassword()
-	if err != nil {
-		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
-		user = ""
-		pass = ""
-	}
 
 	firstLayer := manifest.Layers[0]
 	layerUrl := getLayerUrl(ld.image, firstLayer.Digest)
-	token, err = firstRequestForAuth(layerUrl, user, pass)
+	token, err = firstRequestForAuth(layerUrl)
 	if err != nil {
 		return
 	}

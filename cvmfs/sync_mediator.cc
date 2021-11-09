@@ -19,6 +19,7 @@
 #include "directory_entry.h"
 #include "fs_traversal.h"
 #include "hash.h"
+#include "json_document.h"
 #include "publish/repository.h"
 #include "smalloc.h"
 #include "sync_union.h"
@@ -91,6 +92,41 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
 
   if (entry->IsDirectory()) {
     AddDirectoryRecursively(entry);
+    return;
+  }
+
+  // .cvmfsbundles file type
+  if (entry->IsBundleSpec()) {
+    PrintWarning(".cvmfsbundles file encountered. "
+                 "Bundles is currently an experimental feature.");
+
+    if (!entry->IsRegularFile()) {
+      PANIC(kLogStderr, "Error: .cvmfsbundles file must be a regular file");
+    }
+    if (entry->HasHardlinks()) {
+      PANIC(kLogStderr, "Error: .cvmfsbundles file must not be a hard link");
+    }
+
+    std::string parent_path = GetParentPath(entry->GetUnionPath());
+    if (parent_path != union_engine_->union_path()) {
+      PANIC(kLogStderr, "Error: .cvmfsbundles file must be in the root"
+            " directory of the repository. Found in %s", parent_path.c_str());
+    }
+
+    std::string json_string;
+
+    int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
+    if (fd < 0) {
+      PANIC(kLogStderr, "Could not open file: %s",
+            entry->GetUnionPath().c_str());
+    }
+    if (!SafeReadToString(fd, &json_string)) {
+      PANIC(kLogStderr, "Could not read contents of file: %s",
+            entry->GetUnionPath().c_str());
+    }
+    UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
+
+    AddFile(entry);
     return;
   }
 
@@ -196,6 +232,12 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
 
   if (entry->WasDirectory()) {
     RemoveDirectoryRecursively(entry);
+    return;
+  }
+
+  if (entry->WasBundleSpec()) {
+    // for now remove using RemoveFile()
+    RemoveFile(entry);
     return;
   }
 
@@ -972,6 +1014,12 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
+  if (entry->IsBundleSpec()) {
+    PANIC(kLogStderr, "Illegal directory name: .cvmfsbundles (%s). "
+          ".cvmfsbundles is reserved for bundles specification files",
+          entry->GetUnionPath().c_str());
+  }
+
   reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   perf::Inc(counters_->n_directories_added);

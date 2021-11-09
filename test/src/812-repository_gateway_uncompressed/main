@@ -1,0 +1,44 @@
+cvmfs_test_name="Uncompressed files via gateway"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+verify_compression() {
+  local filename=$1
+  local expected=$2
+  local actual=$(attr -qg compression ${filename})
+  if [ "${actual}" != "${expected}" ] ; then
+    echo "Compression mismatch for ${filename}: expected ${expected} actual ${actual}"
+    return 101
+  fi
+}
+
+cvmfs_run_test() {
+  local reponame=test.repo.org
+  local repodir=/cvmfs/${reponame}
+
+  echo "set up gateway"
+  set_up_repository_gateway || return 1
+
+  echo "parse configuration"
+  load_repo_config ${reponame}
+  local spooldir=${CVMFS_SPOOL_DIR}
+
+  echo "start transaction"
+  cvmfs_server transaction ${reponame} || return 11
+
+  echo "create test files"
+  echo "Hello world!" > ${repodir}/file1
+  touch ${repodir}/file2
+
+  echo "publish (uncompressed) and check"
+  cvmfs_server publish -Z none ${reponame} || return 12
+  cvmfs_server check -i ${reponame} || return 13
+
+  echo "verify files"
+  [ -f ${repodir}/file1 -a -s ${repodir}/file1 ] || return 14
+  [ -f ${repodir}/file2 -a ! -s ${repodir}/file2 ] || return 15
+  verify_compression ${spooldir}/rdonly/file1 none || return $?
+  verify_compression ${spooldir}/rdonly/file2 none || return $?
+
+  return 0
+}

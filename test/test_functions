@@ -507,6 +507,9 @@ cvmfs_mount() {
   if running_on_osx; then
     cvmfs_mount_direct $repositories
   fi
+  if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ]; then
+    cvmfs_mount_direct $repositories
+  fi
 
   $proberunner cvmfs_config probe > /dev/null 2>&1 || return 101
 
@@ -517,7 +520,7 @@ cvmfs_mount() {
 _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
-  mkdir -p "/cvmfs/$repository" || sudo mkdir -p "/cvmfs/$repository"
+  mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
   sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
 }
 
@@ -1537,6 +1540,15 @@ get_apache_config_filename() {
   echo "${repo_name}.conf"
 }
 
+get_backend_spooler() {
+  if [ -n "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE}" ] ; then
+    # A gateway test is running: access the backend storage directly
+    echo "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE}"
+  else
+    echo "${CVMFS_UPSTREAM_STORAGE}"
+  fi
+}
+
 
 cleanup_legacy_repo_leftovers() {
   local legacy_repo_name="$1"
@@ -1664,7 +1676,7 @@ peek_backend_raw() {
   local remote_path="$2"
 
   load_repo_config $repo_name
-  cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
+  cvmfs_swissknife peek -d $remote_path -r $(get_backend_spooler)
 }
 
 
@@ -1705,7 +1717,7 @@ delete_from_backend() {
   local remote_path="$2"
 
   load_repo_config $repo_name
-  cvmfs_swissknife remove -o $remote_path -r $CVMFS_UPSTREAM_STORAGE
+  cvmfs_swissknife remove -o $remote_path -r $(get_backend_spooler)
 }
 
 
@@ -1721,12 +1733,13 @@ upload_into_backend() {
 
   load_repo_config $repo_name
 
-  if [ x"$(echo "$CVMFS_UPSTREAM_STORAGE" | cut -f1 -d',')" = x"S3" ]; then
+  local spooler=$(get_backend_spooler)
+  if [ x"$(echo "$spooler" | cut -f1 -d',')" = x"S3" ]; then
     delete_from_backend $repo_name $remote_path # S3 does a lazy upload
   fi
   cvmfs_swissknife upload -i $file_path              \
                           -o $remote_path            \
-                          -r $CVMFS_UPSTREAM_STORAGE \
+                          -r $spooler                \
                           -a $CVMFS_HASH_ALGORITHM
 }
 

@@ -77,6 +77,7 @@ set (CVMFS_CLIENT_SOURCES
   sql.cc
   sqlitemem.cc
   sqlitevfs.cc
+  ssl.cc
   statistics.cc
   tracer.cc
   uuid.cc
@@ -270,6 +271,7 @@ set (CVMFS_PUBLISH_SOURCES
   publish/settings.cc
   sanitizer.cc
   signature.cc
+  ssl.cc
   statistics.cc
   upload_spooler_definition.cc
   util/algorithm.cc
@@ -334,6 +336,7 @@ set (LIBCVMFS_SERVER_SOURCES
   signature.cc
   sql.cc
   sqlitemem.cc
+  ssl.cc
   statistics.cc
   swissknife_assistant.cc
   swissknife_lease_curl.cc
@@ -423,6 +426,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   signing_tool.cc
   sql.cc
   sqlitemem.cc
+  ssl.cc
   statistics_database.cc
   statistics.cc
   supervisor.cc
@@ -526,6 +530,7 @@ set (CVMFS_PRELOADER_SOURCES
   signature.cc
   sql.cc
   sqlitemem.cc
+  ssl.cc
   statistics.cc
   swissknife.cc
   swissknife_lease_curl.cc
@@ -607,6 +612,7 @@ if(BUILD_RECEIVER)
     session_context.cc
     signature.cc
     signing_tool.cc
+    ssl.cc
     statistics.cc
     statistics_database.cc
     swissknife.cc
@@ -1226,6 +1232,12 @@ if (BUILD_SERVER)
 
   install(
     FILES      server/upload_stats_plots.sh
+    DESTINATION    "/usr/share/cvmfs-server"
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+
+  install(
+    FILES      server/fix_stats_db.sh
     DESTINATION    "/usr/share/cvmfs-server"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )

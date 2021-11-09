@@ -25,10 +25,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <vector>
 
 #include "platform.h"
 #include "smalloc.h"
+#include "util/mutex.h"
 #include "util/posix.h"
+#include "util/single_copy.h"
 
 using namespace std;  // NOLINT
 
@@ -85,9 +88,59 @@ pthread_mutex_t customlog_locks[] = {
   PTHREAD_MUTEX_INITIALIZER,
   PTHREAD_MUTEX_INITIALIZER};
 
-LogLevels min_log_level = kLogNormal;
+LogLevels max_log_level = kLogNormal;
 static void (*alt_log_func)(const LogSource source, const int mask,
                             const char *msg) = NULL;
+
+/**
+ * Circular buffer of the last $n$ calls to LogCvmfs(). Thread-safe class.
+ */
+class LogBuffer : SingleCopy {
+ public:
+  LogBuffer() : next_id_(0) {
+    int retval = pthread_mutex_init(&lock_, NULL);
+    assert(retval == 0);
+  }
+
+  ~LogBuffer() {
+    pthread_mutex_destroy(&lock_);
+  }
+
+  void Append(const LogBufferEntry &entry) {
+    MutexLockGuard lock_guard(lock_);
+    size_t idx = next_id_++ % kBufferSize;
+    if (idx >= buffer_.size()) {
+      buffer_.push_back(entry);
+    } else {
+      buffer_[idx] = entry;
+    }
+  }
+
+  std::vector<LogBufferEntry> GetBuffer() {
+    // Return a buffer sorted from newest to oldest buffer
+    std::vector<LogBufferEntry> sorted_buffer;
+    MutexLockGuard lock_guard(lock_);
+    for (unsigned i = 1; i <= buffer_.size(); ++i) {
+      unsigned idx = (next_id_ - i) % kBufferSize;
+      sorted_buffer.push_back(buffer_[idx]);
+    }
+    return sorted_buffer;
+  }
+
+  void Clear() {
+    MutexLockGuard lock_guard(lock_);
+    next_id_ = 0;
+    buffer_.clear();
+  }
+
+ private:
+  static const unsigned kBufferSize = 10;
+  pthread_mutex_t lock_;
+  int next_id_;
+  std::vector<LogBufferEntry> buffer_;
+};
+
+LogBuffer g_log_buffer;
 
 }  // namespace
 
@@ -202,9 +255,9 @@ void SetLogSyslogShowPID(bool flag) {
 }
 
 /**
- * Set the minimum verbosity level.  By default kLogNormal.
+ * Set the maximum verbosity level.  By default kLogNormal.
  */
-void SetLogVerbosity(const LogLevels min_level) { min_log_level = min_level; }
+void SetLogVerbosity(const LogLevels max_level) { max_log_level = max_level; }
 
 
 /**
@@ -370,7 +423,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   int log_level = mask & ((2 * kLogNone - 1) ^ (kLogLevel0 - 1));
   if (!log_level) log_level = kLogNormal;
   if (log_level == kLogNone) return;
-  if (log_level < min_log_level) return;
+  if (log_level > max_log_level) return;
 #endif
 
   // Format the message string
@@ -459,7 +512,21 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     if (mask & kLogCustom2) LogCustom(2, fmt_msg);
   }
 
+  // The log buffer can be read via extended attributes from cvmfs, therefore
+  // we provide an option to hide entries from the buffer if they contain
+  // sensitive information
+  if (!(mask & kLogSensitive))
+    g_log_buffer.Append(LogBufferEntry(source, mask, msg));
+
   free(msg);
+}
+
+std::vector<LogBufferEntry> GetLogBuffer() {
+  return g_log_buffer.GetBuffer();
+}
+
+void ClearLogBuffer() {
+  g_log_buffer.Clear();
 }
 
 void PrintError(const string &message) {

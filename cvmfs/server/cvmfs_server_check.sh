@@ -10,46 +10,13 @@
 # - cvmfs_server_common.sh
 
 
-cvmfs_server_check() {
+__do_check() {
   local name
   local upstream
   local storage_dir
   local url
-  local check_chunks=1
-  local check_integrity=0
-  local subtree_path=""
-  local tag=
-  local repair_reflog=0
-
-  # optional parameter handling
-  OPTIND=1
-  while getopts "cit:s:r" option
-  do
-    case $option in
-      c)
-        check_chunks=0
-      ;;
-      i)
-        check_integrity=1
-      ;;
-      t)
-        tag="-n $OPTARG"
-      ;;
-      s)
-        subtree_path="$OPTARG"
-      ;;
-      r)
-        repair_reflog=1
-      ;;
-      ?)
-        shift $(($OPTIND-2))
-        usage "Command check: Unrecognized option: $1"
-      ;;
-    esac
-  done
 
   # get repository name
-  shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
   name=$(get_or_guess_repository_name $1)
 
@@ -85,6 +52,8 @@ cvmfs_server_check() {
     fi
   fi
 
+  local log_level_param=""
+  local check_chunks_param=""
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
@@ -147,7 +116,7 @@ __check_repair_reflog() {
   if $user_shell "$(__swissknife_cmd) peek -d .cvmfsreflog -r $CVMFS_UPSTREAM_STORAGE" >/dev/null; then
     has_reflog=1
     local url="$repository_url/.cvmfsreflog"
-    local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $url \
+    local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $(get_curl_proxy) $url \
       | cvmfs_publish hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
     computed_checksum="$($user_shell "$rehash_cmd")"
     echo "Info: found $url with content hash $computed_checksum"
@@ -197,3 +166,155 @@ __check_repair_reflog() {
   fi
 }
 
+# This is a separate function because dash segfaults if it is inline :-(
+__get_checks_repo_times() {
+  set -- '*'
+  check_parameter_count_for_multiple_repositories $#
+  names=$(get_or_guess_multiple_repository_names "$@")
+  check_multiple_repository_existence "$names"
+
+  for name in $names; do 
+    # note that is_inactive_replica also does load_repo_config
+    if is_inactive_replica $name; then
+      continue
+    fi
+
+    local upstream=$CVMFS_UPSTREAM_STORAGE
+    if [ x$(get_upstream_type $upstream_storage) = "xgw" ]; then
+      continue
+    fi
+
+    local check_status="$(read_repo_item $name .cvmfs_status.json)"
+    local last_check="$(get_json_field "$check_status" last_check)"
+    local check_time=0
+    if [ -n "$last_check" ]; then
+      check_time="$(date --date "$last_check" +%s)"
+      local min_secs num_secs
+      min_secs="$((${CVMFS_CHECK_ALL_MIN_DAYS:-30}*60*60*24))"
+      num_secs="$(($(date +%s)-$check_time))"
+      if [ "$num_secs" -lt "$min_secs" ]; then
+        # less than $CVMFS_CHECK_ALL_MIN_DAYS has elapsed since last check
+        continue
+      fi
+    fi
+
+    echo "${check_time}:${name}"
+  done
+}
+
+__do_all_checks() {
+  local log
+  local repo
+  local repos
+
+  if [ ! -d /var/log/cvmfs ]; then
+    if ! mkdir /var/log/cvmfs 2>/dev/null; then
+      die "/var/log/cvmfs does not exist and could not create it"
+    fi
+  fi
+  [ -w /var/log/cvmfs ] || die "cannot write to /var/log/cvmfs"
+
+  local check_lock=/var/spool/cvmfs/is_checking_all
+  if ! acquire_lock $check_lock; then
+    to_syslog "skipping start of cvmfs_server check because $check_lock held by active process"
+    return 1
+  fi
+
+  log=/var/log/cvmfs/checks.log
+
+  # Sort the active repositories on local storage by last check time
+  repos="$(__get_checks_repo_times|sort -n|cut -d: -f2)"
+
+  for repo in $repos; do
+    (
+    to_syslog_for_repo $repo "started check"
+    echo
+    echo "Starting $repo at `date`"
+    # Work around the errexit (that is, set -e) misfeature of being
+    #  disabled whenever the exit code is to be checked.
+    # See https://lists.gnu.org/archive/html/bug-bash/2012-12/msg00093.html
+    set +e
+    (set -e
+    __do_check $repo
+    )
+    local ret=$?
+    update_repo_status $repo last_check "`date --utc`"
+    local check_status
+    if [ $ret != 0 ]; then
+      check_status=failed
+      to_syslog_for_repo $repo "check failed"
+      echo "ERROR from cvmfs_server check!" >&2
+    else
+      check_status=succeeded
+      to_syslog_for_repo $repo "sucessfully completed check"
+    fi
+    update_repo_status $repo check_status $check_status
+    echo "Finished $repo at `date`"
+    ) >> $log 2>&1
+
+  done
+}
+
+cvmfs_server_check() {
+  local retcode=0
+  local do_all=0
+  local check_chunks=1
+  local check_integrity=0
+  local subtree_path=""
+  local tag=
+  local repair_reflog=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "acit:s:r" option
+  do
+    case $option in
+      a)
+        do_all=1
+      ;;
+      c)
+        check_chunks=0
+      ;;
+      i)
+        check_integrity=1
+      ;;
+      t)
+        tag="-n $OPTARG"
+      ;;
+      s)
+        subtree_path="$OPTARG"
+      ;;
+      r)
+        repair_reflog=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command check: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  if [ $do_all -eq 1 ]; then
+    [ $# -eq 0 ] || die "no non-option parameters expected with -a"
+
+    __do_all_checks
+
+    # Always return success because this is used from cron and we
+    #  don't want cron sending an email every time something fails.
+    # Errors will be in the log.
+
+  else
+    if [ x"$CVMFS_LOG_LEVEL" = x ]; then
+      # increase log from default "Warning" to "Info" level
+      CVMFS_LOG_LEVEL=2 __do_check "$@"
+    else
+      __do_check "$@"
+    fi
+    retcode=$?
+  fi
+
+  release_lock $check_lock
+
+  return $retcode
+}

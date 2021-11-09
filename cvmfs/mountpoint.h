@@ -150,6 +150,26 @@ class FileSystem : SingleCopy, public BootFactory {
   };
 
   /**
+   * Keeps information about I/O errors, e.g. writing local files, permanent
+   * network errors, etc. It counts the number of errors and the timestamp
+   * of the latest errors for consumption by monitoring tools such as Nagios
+   */
+  class IoErrorInfo {
+   public:
+    IoErrorInfo();
+
+    void Reset();
+    void AddIoError();
+    void SetCounter(perf::Counter *c);
+    int64_t count();
+    time_t timestamp_last();
+
+   private:
+    perf::Counter *counter_;
+    time_t timestamp_last_;
+  };
+
+  /**
    * No NFS maps.
    */
   static const unsigned kNfsNone = 0x00;
@@ -195,7 +215,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_read() { return n_fs_read_; }
   perf::Counter *n_fs_readlink() { return n_fs_readlink_; }
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
-  perf::Counter *n_io_error() { return n_io_error_; }
+  IoErrorInfo *io_error_info() { return &io_error_info_; }
   std::string name() { return name_; }
   NfsMaps *nfs_maps() { return nfs_maps_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
@@ -291,9 +311,9 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_read_;
   perf::Counter *n_fs_readlink_;
   perf::Counter *n_fs_forget_;
-  perf::Counter *n_io_error_;
   perf::Counter *no_open_files_;
   perf::Counter *no_open_dirs_;
+  IoErrorInfo io_error_info_;
   perf::Statistics *statistics_;
 
   Log2Histogram *hist_fs_lookup_;

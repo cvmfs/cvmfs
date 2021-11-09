@@ -36,6 +36,7 @@ struct SyncParameters {
         stop_for_catalog_tweaks(false),
         include_xattrs(false),
         external_data(false),
+        direct_io(false),
         voms_authz(false),
         virtual_dir_actions(0),
         ignore_special_files(false),
@@ -85,8 +86,9 @@ struct SyncParameters {
   bool stop_for_catalog_tweaks;
   bool include_xattrs;
   bool external_data;
+  bool direct_io;
   bool voms_authz;
-  unsigned virtual_dir_actions;  // bit field
+  int virtual_dir_actions;  // bit field
   bool ignore_special_files;
   bool branched_catalog;
   zlib::Algorithms compression_alg;
@@ -307,11 +309,13 @@ class CommandSync : public Command {
                                   "Publish format compatible with "
                                   "authenticated repos"));
     r.push_back(Parameter::Switch('Y', "enable external data"));
+    r.push_back(Parameter::Switch('W', "set direct I/O for regular files"));
     r.push_back(Parameter::Switch('B', "branched catalog (no manifest)"));
     r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
 
     r.push_back(Parameter::Optional('P', "session_token_file"));
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
+    r.push_back(Parameter::Optional('@', "proxy URL"));
 
     return r;
   }

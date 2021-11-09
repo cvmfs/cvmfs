@@ -4,7 +4,7 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount grid.cern.ch || return 1
+  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no" || return 1
 
   echo "Test listing magic extended attributes"
 
@@ -61,6 +61,11 @@ cvmfs_run_test() {
   [ "x$readme_chunk_hash" = "x$readme_hash" ] || return 10
   [ "x$readme_chunk_offset" = "x0" ] || return 11
   [ "x$readme_chunk_size" = "x$readme_size" ] || return 12
+
+  echo "*** Test log buffer (quite basic)"
+  local logbuffer=$(get_xattr logbuffer /cvmfs/grid.cern.ch/)
+  get_xattr logbuffer /cvmfs/grid.cern.ch/
+  [ "x$logbuffer" != "x" ] || return 20
 
   return 0
 }
