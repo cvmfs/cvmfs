@@ -1,4 +1,5 @@
 2.9.0:
+  * [gw] Fix spurious keychain warning on transaction (CVM-1982)
   * Add `cvmfs_server check -a` command (CVM-1524)
   * Add timestamp_last_error magic extended attribute (CVM-2003)
   * Add logbuffer magic extended attribute
