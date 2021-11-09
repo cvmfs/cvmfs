@@ -281,11 +281,19 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   virtual ~Publisher();
 
   void UpdateMetaInfo();
-  void Transaction() { TransactionRetry(); }
+  void Transaction();
   void Abort();
   void Publish();
   void Ingest();
   void Sync();
+
+  /**
+   * Automatically exit the ephemeral shell after abort or commit.
+   * TODO(avalenzu): Most of the logic of the enter shell is in the CmdEnter UI class. 
+   * We should move at least the core functionality to libcvmfs_server and this includes
+   * the ExitShell() method.
+   */
+  void ExitShell();
 
   /**
    * Must not edit magic tags 'trunk' and 'trunk-previous'.

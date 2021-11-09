@@ -455,6 +455,12 @@ void CmdEnter::CleanupSession(
   }
 
   rvb = RemoveTree(settings_spool_area_.log_dir());
+  RemoveSingle(session_dir_ + "/session_pid");
+  RemoveSingle(session_dir_ + "/" + fqrn_ + "/server.conf");
+  RemoveSingle(session_dir_ + "/" + fqrn_);
+  RemoveSingle(session_dir_ + "/session_token");
+  RemoveSingle(session_dir_ + "/in_transaction.lock");
+  RemoveSingle(session_dir_ + "/shellaction.marker");
   RemoveSingle(session_dir_);
   LogCvmfs(kLogCvmfs, kLogStdout, "[done]");
 }
@@ -574,6 +580,39 @@ int CmdEnter::Main(const Options &options) {
     if (rvi != 0)
       throw EPublish("cannot chroot to " + rootfs_dir_);
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
+
+    SettingsBuilder builder;
+    UniquePtr<Publisher> publisher;
+
+    if (options.Has("transaction")) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Starting a transaction inside the enter shell");
+
+      if (options.Has("repo-config")) {
+        repo_config_ = options.GetString("repo-config");
+        LogCvmfs(kLogCvmfs, kLogStdout,
+                 "Parsing the external configuration for the repository at %s",
+                 repo_config_.c_str());
+
+        std::string config;
+        std::string config_file = repo_config_ + "/" + fqrn_ + "/server.conf";
+        std::string folderpath = session_dir_ + "/" + fqrn_;
+        MkdirDeep(folderpath.c_str(), 0700, true /* veryfy_writable */);
+
+        std::string session_config_file = folderpath + "/server.conf";
+        int fd_config = open(config_file.c_str(), O_RDONLY);
+        SafeReadToString(fd_config, &config);
+        SafeWriteToFile(config, session_config_file, 0600);
+
+        builder.SetConfigPath(session_dir_);
+      }
+
+      SettingsPublisher *settings_publisher =
+          builder.CreateSettingsPublisher(fqrn_, false);
+      publisher = new Publisher(*settings_publisher);
+      publisher->Transaction();
+    }
+
     // May fail if the working directory was invalid to begin with
     rvi = chdir(cwd.c_str());
     if (rvi != 0) {
@@ -612,10 +651,23 @@ int CmdEnter::Main(const Options &options) {
                       false /* drop_credentials */, false /* clear_env */,
                       false /* double_fork */,
                       &pid_child);
-    return WaitForChild(pid_child);
-  }
-  exit_code = WaitForChild(pid);
+    std::string s = StringifyInt(pid_child);
+    SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
 
+    std::vector<int> sigs;
+    sigs.push_back(SIGUSR1);
+    exit_code = WaitForChild(pid_child, sigs);
+
+    if (options.Has("transaction") &&
+        !FileExists(session_dir_ + "/shellaction.marker")) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Closing current transaction...");
+      publisher->session()->SetKeepAlive(false);
+    }
+
+    return exit_code;
+  }
+
+  exit_code = WaitForChild(pid);
   LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
 
   if (!options.Has("keep-session"))

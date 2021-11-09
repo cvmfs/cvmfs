@@ -1610,9 +1610,11 @@ void WaitForSignal(int signum) {
 
 
 /**
- * Returns -1 of the child crashed or the exit code otherwise
+ * Returns -1 if the child crashed or the exit code otherwise.
+ * @param pid Process identifier.
+ * @param sig_ok List of signals that are still considered a sucessful termination.
  */
-int WaitForChild(pid_t pid) {
+int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
   assert(pid > 0);
   int statloc;
   while (true) {
@@ -1627,6 +1629,9 @@ int WaitForChild(pid_t pid) {
   }
   if (WIFEXITED(statloc))
     return WEXITSTATUS(statloc);
+  if (WIFSIGNALED(statloc) && (std::find(sig_ok.begin(), sig_ok.end(),
+                                         WTERMSIG(statloc)) != sig_ok.end()))
+    return 0;
   return -1;
 }
 

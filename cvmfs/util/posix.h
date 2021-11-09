@@ -150,7 +150,8 @@ std::vector<LsofEntry> Lsof(const std::string &path);
 bool ProcessExists(pid_t pid);
 void BlockSignal(int signum);
 void WaitForSignal(int signum);
-int WaitForChild(pid_t pid);
+int WaitForChild(pid_t pid,
+                 const std::vector<int> &sig_ok = std::vector<int>());
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 bool ExecuteBinary(int *fd_stdin,

@@ -26,14 +26,14 @@ CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
 
 if [ "x$ubuntu_release" = "xxenial" ]; then
   # Ubuntu 16.04 has no fuse-overlayfs
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter src/811-commit-gateway"
   # Azurite doesn't install on 16.04
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/686-azureblob_s3 src/687-import_s3"
 fi
 
 if [ "x$ubuntu_release" = "xbionic" ]; then
   # Ubuntu 18.04 has no fuse-overlayfs
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter"
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter src/811-commit-gateway"
 fi
 
 export CVMFS_TEST_UNIONFS=overlayfs

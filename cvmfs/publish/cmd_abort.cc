@@ -22,6 +22,12 @@ namespace publish {
 
 int CmdAbort::Main(const Options &options) {
   SettingsBuilder builder;
+  std::string session_dir = Env::GetEnterSessionDir();
+
+  if (!session_dir.empty()) {
+    builder.SetConfigPath(session_dir);
+  }
+
   UniquePtr<SettingsPublisher> settings;
   try {
     settings = builder.CreateSettingsPublisher(
@@ -36,13 +42,6 @@ int CmdAbort::Main(const Options &options) {
       return 1;
     }
     throw;
-  }
-
-  if (settings->transaction().in_enter_session()) {
-    throw EPublish(
-      "aborting a transaction is unsupported within the ephemeral "
-      "writable shell",
-      EPublish::kFailInvocation);
   }
 
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
@@ -143,6 +142,13 @@ int CmdAbort::Main(const Options &options) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "post abort hook failed");
     return rvi;
+  }
+
+  if (settings->transaction().in_enter_session()) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Discarding changes and closing current transaction...");
+    SafeWriteToFile("abort", session_dir + "/shellaction.marker", 0600);
+    publisher->ExitShell();
   }
 
   return 0;
