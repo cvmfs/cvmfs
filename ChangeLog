@@ -1,5 +1,5 @@
 2.9.0:
-  * Added initial implementation of cvmfs_publish commit
+  * Add initial implementation of cvmfs_publish commit (CVM-2029)
   * [libcvmfs_server] Require repo key & certificate only on non-gw publishers
   * [gw] Fix spurious keychain warning on transaction (CVM-1982)
   * Add `cvmfs_server check -a` command (CVM-1524)
