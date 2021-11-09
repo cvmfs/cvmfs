@@ -49,6 +49,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
                                  src/682-enter                                \
+                                 src/811-commit-gateway                       \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
