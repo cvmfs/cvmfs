@@ -238,7 +238,6 @@ cvmfs_run_test() {
   cat $check_log_7 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly"                                || return 37
   cat $check_log_7 | grep -e "/cvmfs/${CVMFS_TEST_REPO} is not mounted"                                   || return 38
   cat $check_log_7 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"                                  || return 39
-  cat $check_log_7 | grep -e "is in a transaction .* /cvmfs/${CVMFS_TEST_REPO} .* not mounted read/write" || return 40
   cat $check_log_7 | grep -e "Trying to remount /cvmfs/${CVMFS_TEST_REPO} read/write"                     || return 41
 
   echo "check that repository is not in a transaction"
@@ -335,8 +334,8 @@ cvmfs_run_test() {
 
   echo "check error and warning messages"
   cat $check_log_11 | grep -e "${CVMFS_TEST_REPO} .* not based on .* published revision"         || return 61
-  cat $check_log_11 | grep -e "Trying to umount /cvmfs/${CVMFS_TEST_REPO}"                       || return 62
-  cat $check_log_11 | grep -e "Trying to umount .*${CVMFS_TEST_REPO}/rdonly"                     || return 163
+  cat $check_log_11 | grep -e "Trying to unmount /cvmfs/${CVMFS_TEST_REPO}"                      || return 62
+  cat $check_log_11 | grep -e "Trying to unmount .*${CVMFS_TEST_REPO}/rdonly"                    || return 163
   cat $check_log_11 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly"                      || return 164
   cat $check_log_11 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"                        || return 165
   cat $check_log_11 | grep -e "${CVMFS_TEST_REPO} .* in a transaction .* not mounted read/write" || return 63
