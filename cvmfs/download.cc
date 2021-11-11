@@ -965,7 +965,12 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     info->proxy = "DIRECT";
     curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "");
   } else {
-    ValidateProxyIpsUnlocked(proxy->url, proxy->host);
+    // Note: inside ValidateProxyIpsUnlocked() we may change the proxy data
+    // structure, so we must not pass proxy->... (== current_proxy())
+    // parameters directly
+    std::string purl = proxy->url;
+    dns::Host phost = proxy->host;
+    ValidateProxyIpsUnlocked(purl, phost);
     // Current proxy may have changed
     proxy = current_proxy();
     info->proxy = proxy->url;
