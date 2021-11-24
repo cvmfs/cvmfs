@@ -1333,6 +1333,11 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->UseSystemCertificatePath();
   }
 
+  if (options_mgr_->GetValue("CVMFS_PROXY_SHARD", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+    download_mgr_->ShardProxies();
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 

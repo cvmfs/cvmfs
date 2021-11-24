@@ -46,6 +46,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <set>
 
 #include "atomic.h"
@@ -911,19 +912,9 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
         static_cast<int64_t>(opt_timestamp_backup_proxies_ +
                              opt_proxy_groups_reset_after_))
     {
-      string old_proxy;
-      if (opt_proxy_groups_)
-        old_proxy = current_proxy()->url;
-
       opt_proxy_groups_current_ = 0;
-      RebalanceProxiesUnlocked();
       opt_timestamp_backup_proxies_ = 0;
-
-      if (opt_proxy_groups_) {
-        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                 "switching proxy from %s to %s (reset proxy group)",
-                 old_proxy.c_str(), current_proxy()->url.c_str());
-      }
+      RebalanceProxiesUnlocked("reset proxy group");
     }
   }
   // Check if load-balanced proxies within the group need to be reset
@@ -933,15 +924,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
         static_cast<int64_t>(opt_timestamp_failover_proxies_ +
                              opt_proxy_groups_reset_after_))
     {
-      string old_proxy;
-      if (opt_proxy_groups_)
-        old_proxy = current_proxy()->url;
-      RebalanceProxiesUnlocked();
-      if (opt_proxy_groups_ && (old_proxy != current_proxy()->url)) {
-        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                 "switching proxy from %s to %s (reset load-balanced proxies)",
-                 old_proxy.c_str(), current_proxy()->url.c_str());
-      }
+      RebalanceProxiesUnlocked("reset load-balanced proxies");
     }
   }
   // Check if host needs to be reset
@@ -960,7 +943,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     }
   }
 
-  ProxyInfo *proxy = current_proxy();
+  ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash);
   if (!proxy || (proxy->url == "DIRECT")) {
     info->proxy = "DIRECT";
     curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "");
@@ -970,9 +953,10 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     // parameters directly
     std::string purl = proxy->url;
     dns::Host phost = proxy->host;
-    ValidateProxyIpsUnlocked(purl, phost);
+    const bool changed = ValidateProxyIpsUnlocked(purl, phost);
     // Current proxy may have changed
-    proxy = current_proxy();
+    if (changed)
+      proxy = ChooseProxyUnlocked(info->expected_hash);
     info->proxy = proxy->url;
     if (proxy->host.status() == dns::kFailOk) {
       curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
@@ -1046,7 +1030,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
         curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "");
         replacement = proxy_template_direct_;
       } else {
-        replacement = current_proxy()->host.name();
+        replacement = ChooseProxyUnlocked(info->expected_hash)->host.name();
       }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
@@ -1073,13 +1057,15 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
  * changed, gather new set of resolved IPs and, if different, exchange them in
  * the load-balance group on the fly.  In the latter case, also rebalance the
  * proxies.  The options mutex needs to be open.
+ *
+ * Returns true if proxies may have changed.
  */
-void DownloadManager::ValidateProxyIpsUnlocked(
+bool DownloadManager::ValidateProxyIpsUnlocked(
   const string &url,
   const dns::Host &host)
 {
   if (!host.IsExpired())
-    return;
+    return false;
   LogCvmfs(kLogDownload, kLogDebug, "validate DNS entry for %s",
            host.name().c_str());
 
@@ -1103,7 +1089,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
       if ((*opt_proxy_groups_)[group_idx][i].host.id() == host.id())
         (*opt_proxy_groups_)[group_idx][i].host = new_host;
     }
-    return;
+    return false;
   }
 
   assert(new_host.status() == dns::kFailOk);
@@ -1130,7 +1116,8 @@ void DownloadManager::ValidateProxyIpsUnlocked(
   group->insert(group->end(), new_infos.begin(), new_infos.end());
   opt_num_proxies_ += new_infos.size();
 
-  RebalanceProxiesUnlocked();
+  RebalanceProxiesUnlocked("DNS change");
+  return true;
 }
 
 
@@ -1389,16 +1376,9 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
             if ((opt_proxy_groups_current_ > 0) ||
                 (opt_proxy_groups_current_burned_ > 0))
             {
-              string old_proxy = current_proxy()->url;
               opt_proxy_groups_current_ = 0;
-              RebalanceProxiesUnlocked();
               opt_timestamp_backup_proxies_ = 0;
-              if (opt_proxy_groups_) {
-                LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                         "switching proxy from %s to %s "
-                         "(reset proxies for host failover)",
-                         old_proxy.c_str(), current_proxy()->url.c_str());
-              }
+              RebalanceProxiesUnlocked("reset proxies for host failover");
             }
           }
 
@@ -1558,6 +1538,7 @@ DownloadManager::DownloadManager() {
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 0;
   opt_num_proxies_ = 0;
+  opt_proxy_shard_ = false;
   opt_max_retries_ = 0;
   opt_backoff_init_ms_ = 0;
   opt_backoff_max_ms_ = 0;
@@ -1633,6 +1614,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 0;
   opt_num_proxies_ = 0;
+  opt_proxy_shard_ = false;
   opt_host_chain_current_ = 0;
   opt_ip_preference_ = dns::kIpPreferSystem;
 
@@ -1699,6 +1681,7 @@ void DownloadManager::Fini() {
 
   delete opt_host_chain_;
   delete opt_host_chain_rtt_;
+  opt_proxy_map_.clear();
   delete opt_proxy_groups_;
   opt_host_chain_ = NULL;
   opt_host_chain_rtt_ = NULL;
@@ -1970,8 +1953,9 @@ void DownloadManager::GetHostInfo(vector<string> *host_chain, vector<int> *rtt,
  * Jumps to the next proxy in the ring of forward proxy servers.
  * Selects one randomly from a load-balancing group.
  *
- * If info is set, switch only if the current proxy is identical to the one used
- * by info, otherwise another transfer has already done the switch.
+ * Allow for the fact that the proxy may have already been failed by
+ * another transfer, or that the proxy may no longer be part of the
+ * current load-balancing group.
  */
 void DownloadManager::SwitchProxy(JobInfo *info) {
   MutexLockGuard m(lock_options_);
@@ -1979,17 +1963,29 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
   if (!opt_proxy_groups_) {
     return;
   }
-  if (info && (current_proxy()->url != info->proxy)) {
-    return;
+
+  // Fail any matching proxies within the current load-balancing group
+  vector<ProxyInfo> *group = current_proxy_group();
+  const unsigned group_size = group->size();
+  unsigned failed = 0;
+  for (unsigned i = 0; i < group_size - opt_proxy_groups_current_burned_; ++i) {
+    if (info && (info->proxy == (*group)[i].url)) {
+      // Move to list of failed proxies
+      opt_proxy_groups_current_burned_++;
+      swap((*group)[i],
+           (*group)[group_size - opt_proxy_groups_current_burned_]);
+      perf::Inc(counters_->n_proxy_failover);
+      failed++;
+    }
   }
 
-  opt_proxy_groups_current_burned_++;
-  perf::Inc(counters_->n_proxy_failover);
-  string old_proxy = current_proxy()->url;
+  // Do nothing more unless at least one proxy was marked as failed
+  if (!failed)
+    return;
 
   // If all proxies from the current load-balancing group are burned, switch to
   // another group
-  if (opt_proxy_groups_current_burned_ == current_proxy_group()->size()) {
+  if (opt_proxy_groups_current_burned_ == group->size()) {
     opt_proxy_groups_current_burned_ = 0;
     if (opt_proxy_groups_->size() > 1) {
       opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1) %
@@ -2010,25 +2006,14 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
       }
     }
   } else {
-    // failover within the same group
-    vector<ProxyInfo> *group = current_proxy_group();
-    const unsigned group_size = group->size();
-
-    // Move active proxy to the back
-    swap((*group)[0], (*group)[group_size - opt_proxy_groups_current_burned_]);
-
-    // Select new one
-    SetRandomProxyUnlocked();
-
+    // Record failover time
     if (opt_proxy_groups_reset_after_ > 0) {
       if (opt_timestamp_failover_proxies_ == 0)
         opt_timestamp_failover_proxies_ = time(NULL);
     }
   }
 
-  LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-           "switching proxy from %s to %s",
-           old_proxy.c_str(), current_proxy()->url.c_str());
+  UpdateProxiesUnlocked("failed proxy");
   LogCvmfs(kLogDownload, kLogDebug, "%d proxies remain in group",
            current_proxy_group()->size() - opt_proxy_groups_current_burned_);
 }
@@ -2274,10 +2259,6 @@ bool DownloadManager::ProbeGeo() {
   delete opt_host_chain_;
   opt_num_proxies_ = 0;
   opt_host_chain_ = new vector<string>(host_chain.size());
-  string old_proxy;
-  if (opt_proxy_groups_ != NULL) {
-    old_proxy = current_proxy()->url;
-  }
 
   // It's possible that opt_proxy_groups_fallback_ might have changed while
   // the lock wasn't held
@@ -2312,6 +2293,7 @@ bool DownloadManager::ProbeGeo() {
     }
   }
 
+  opt_proxy_map_.clear();
   delete opt_proxy_groups_;
   opt_proxy_groups_ = proxy_groups;
   // In pathological cases, opt_proxy_groups_current_ can be larger now when
@@ -2325,15 +2307,7 @@ bool DownloadManager::ProbeGeo() {
     opt_proxy_groups_current_burned_ = 0;
   }
 
-  string new_proxy;
-  if (opt_proxy_groups_ != NULL) {
-    new_proxy = current_proxy()->url;
-  }
-  if (old_proxy != new_proxy) {
-    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-             "switching proxy from %s to %s (geosort)",
-             old_proxy.c_str(), new_proxy.c_str());
-  }
+  UpdateProxiesUnlocked("geosort");
 
   delete opt_host_chain_rtt_;
   opt_host_chain_rtt_ = new vector<int>(host_chain.size(), kProbeGeo);
@@ -2467,6 +2441,7 @@ void DownloadManager::SetProxyChain(
   // From this point on, use set_proxy_list and set_fallback_proxy_list as
   // effective proxy lists!
 
+  opt_proxy_map_.clear();
   delete opt_proxy_groups_;
   if ((set_proxy_list == "") && (set_proxy_fallback_list == "")) {
     opt_proxy_groups_ = NULL;
@@ -2567,7 +2542,7 @@ void DownloadManager::SetProxyChain(
   // Select random start proxy from the first group.
   if (opt_proxy_groups_->size() > 0) {
     // Select random start proxy from the first group.
-    SetRandomProxyUnlocked();
+    UpdateProxiesUnlocked("set proxies");
   }
 }
 
@@ -2612,32 +2587,100 @@ string DownloadManager::GetFallbackProxyList() {
 }
 
 /**
- * Selects a new random non-burned proxy in the current load-balancing group
+ * Choose proxy
  */
-void DownloadManager::SetRandomProxyUnlocked() {
+DownloadManager::ProxyInfo *
+DownloadManager::ChooseProxyUnlocked(const shash::Any *hash) {
+  if (!opt_proxy_groups_)
+    return NULL;
+
+  uint32_t key = (hash ? hash->Partial32() : 0);
+  map<uint32_t, ProxyInfo *>::iterator it = opt_proxy_map_.lower_bound(key);
+  ProxyInfo *proxy = it->second;
+
+  return proxy;
+}
+
+/**
+ * Update currently selected proxy
+ */
+void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
+  if (!opt_proxy_groups_)
+    return;
+
+  // Identify number of non-burned proxies within the current group
   vector<ProxyInfo> *group = current_proxy_group();
-  unsigned select =
-    prng_.Next(group->size() - opt_proxy_groups_current_burned_);
-  swap((*group)[select], (*group)[0]);
+  unsigned num_alive = (group->size() - opt_proxy_groups_current_burned_);
+  string old_proxy = JoinStrings(opt_proxy_urls_, "|");
+
+  // Rebuild proxy map and URL list
+  opt_proxy_map_.clear();
+  opt_proxy_urls_.clear();
+  const uint32_t max_key = 0xffffffffUL;
+  if (opt_proxy_shard_) {
+    // Build a consistent map with multiple entries for each proxy
+    for (unsigned i = 0; i < num_alive; ++i) {
+      ProxyInfo *proxy = &(*group)[i];
+      shash::Any proxy_hash(shash::kSha1);
+      HashString(proxy->url, &proxy_hash);
+      Prng prng;
+      prng.InitSeed(proxy_hash.Partial32());
+      for (unsigned j = 0; j < kProxyMapScale; ++j) {
+        const std::pair<uint32_t, ProxyInfo *> entry(prng.Next(max_key), proxy);
+        opt_proxy_map_.insert(entry);
+      }
+      opt_proxy_urls_.push_back(proxy->url);
+    }
+    // Ensure lower_bound() finds a value for all keys
+    ProxyInfo *first_proxy = opt_proxy_map_.begin()->second;
+    const std::pair<uint32_t, ProxyInfo *> last_entry(max_key, first_proxy);
+    opt_proxy_map_.insert(last_entry);
+  } else {
+    // Build a map with a single entry for one randomly selected proxy
+    unsigned select = prng_.Next(num_alive);
+    ProxyInfo *proxy = &(*group)[select];
+    const std::pair<uint32_t, ProxyInfo *> entry(max_key, proxy);
+    opt_proxy_map_.insert(entry);
+    opt_proxy_urls_.push_back(proxy->url);
+  }
+  sort(opt_proxy_urls_.begin(), opt_proxy_urls_.end());
+
+  // Report any change in proxy usage
+  string new_proxy = JoinStrings(opt_proxy_urls_, "|");
+  if (new_proxy != old_proxy) {
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+             "switching proxy from %s to %s (%s)",
+             (old_proxy.empty() ? "(none)" : old_proxy.c_str()),
+             (new_proxy.empty() ? "(none)" : new_proxy.c_str()),
+             reason.c_str());
+  }
+}
+
+/**
+ * Enable proxy sharding
+ */
+void DownloadManager::ShardProxies() {
+  opt_proxy_shard_ = true;
+  RebalanceProxiesUnlocked("enable sharding");
 }
 
 /**
  * Selects a new random proxy in the current load-balancing group.  Resets the
  * "burned" counter.
  */
-void DownloadManager::RebalanceProxiesUnlocked() {
+void DownloadManager::RebalanceProxiesUnlocked(const string &reason) {
   if (!opt_proxy_groups_)
     return;
 
   opt_timestamp_failover_proxies_ = 0;
   opt_proxy_groups_current_burned_ = 0;
-  SetRandomProxyUnlocked();
+  UpdateProxiesUnlocked(reason);
 }
 
 
 void DownloadManager::RebalanceProxies() {
   MutexLockGuard m(lock_options_);
-  RebalanceProxiesUnlocked();
+  RebalanceProxiesUnlocked("rebalance");
 }
 
 
@@ -2653,9 +2696,8 @@ void DownloadManager::SwitchProxyGroup() {
 
   opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1) %
   opt_proxy_groups_->size();
-  opt_proxy_groups_current_burned_ = 0;
   opt_timestamp_backup_proxies_ = time(NULL);
-  opt_timestamp_failover_proxies_ = 0;
+  RebalanceProxiesUnlocked("switch proxy group");
 }
 
 
@@ -2764,6 +2806,7 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
   clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
   clone->opt_num_proxies_ = opt_num_proxies_;
+  clone->opt_proxy_shard_ = opt_proxy_shard_;
   clone->opt_proxy_list_ = opt_proxy_list_;
   clone->opt_proxy_fallback_list_ = opt_proxy_fallback_list_;
   if (opt_proxy_groups_ == NULL)
@@ -2771,6 +2814,7 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
 
   clone->opt_proxy_groups_ = new vector< vector<ProxyInfo> >(
     *opt_proxy_groups_);
+  clone->UpdateProxiesUnlocked("cloned");
 }
 
 }  // namespace download

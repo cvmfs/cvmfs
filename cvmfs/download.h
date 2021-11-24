@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -390,6 +391,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   static const unsigned kDnsDefaultRetries = 1;
   static const unsigned kDnsDefaultTimeoutMs = 3000;
+  static const unsigned kProxyMapScale = 16;
 
   DownloadManager();
   ~DownloadManager();
@@ -433,6 +435,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
                     unsigned *fallback_group);
   std::string GetProxyList();
   std::string GetFallbackProxyList();
+  void ShardProxies();
   void RebalanceProxies();
   void SwitchProxyGroup();
   void SetProxyGroupResetDelay(const unsigned seconds);
@@ -466,14 +469,15 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
                         std::vector<uint64_t> *reply_vals);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
-  void SetRandomProxyUnlocked();
-  void RebalanceProxiesUnlocked();
+  ProxyInfo *ChooseProxyUnlocked(const shash::Any *hash);
+  void UpdateProxiesUnlocked(const std::string &reason);
+  void RebalanceProxiesUnlocked(const std::string &reason);
   CURL *AcquireCurlHandle();
   void ReleaseCurlHandle(CURL *handle);
   void ReleaseCredential(JobInfo *info);
   void InitializeRequest(JobInfo *info, CURL *handle);
   void SetUrlOptions(JobInfo *info);
-  void ValidateProxyIpsUnlocked(const std::string &url, const dns::Host &host);
+  bool ValidateProxyIpsUnlocked(const std::string &url, const dns::Host &host);
   void UpdateStatistics(CURL *handle);
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
@@ -487,11 +491,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   inline std::vector<ProxyInfo> *current_proxy_group() const {
     return (opt_proxy_groups_ ?
             &((*opt_proxy_groups_)[opt_proxy_groups_current_]) : NULL);
-  }
-
-  inline ProxyInfo *current_proxy() const {
-    return (opt_proxy_groups_ ?
-            &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]) : NULL);
   }
 
   Prng prng_;
@@ -563,6 +562,18 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * The original proxy fallback list provided to SetProxyChain.
    */
   std::string opt_proxy_fallback_list_;
+  /**
+   * Load-balancing map of currently active proxies
+   */
+  std::map<uint32_t, ProxyInfo *> opt_proxy_map_;
+  /**
+   * Sorted list of currently active proxy URLs (for log messages)
+   */
+  std::vector<std::string> opt_proxy_urls_;
+  /**
+   * Shard requests across multiple proxies via consistent hashing
+   */
+  bool opt_proxy_shard_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).

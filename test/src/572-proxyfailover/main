@@ -164,6 +164,18 @@ cvmfs_run_test() {
   [ $i -eq $num_proxies ] || return 8
   sleep 1
 
+  echo "run tests in single-proxy configuration"
+  run_proxy_test no || return $?
+
+  echo "run tests in sharded configuration"
+  run_proxy_test yes || return $?
+
+  return 0
+}
+
+run_proxy_test() {
+  local shard=$1
+
   echo "define proxy group:"
   proxies="$(get_proxy 0)|$(get_proxy 1);$(get_proxy 2)|$(get_proxy 3)"
   echo $proxies
@@ -182,6 +194,7 @@ CVMFS_SERVER_URL=$http_url/cvmfs/${CVMFS_TEST_REPO}
 CVMFS_HTTP_PROXY='$proxies'
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
 CVMFS_TIMEOUT=5
+CVMFS_PROXY_SHARD=$shard
 EOF
 
   echo "mount CVMFS with the full setup working"
@@ -288,6 +301,13 @@ EOF
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 40
   echo "took $(msec_to_sec $mount_time) seconds"
   check_active_proxy_group $mnt_pipe 1 || return 41
+
+  echo "reset the proxies"
+  reset_proxies
+
+  echo "switch proxy group back to original proxies"
+  switch_proxy_group $mnt_pipe         || return 42
+  check_active_proxy_group $mnt_pipe 0 || return 43
 
   return 0
 }
