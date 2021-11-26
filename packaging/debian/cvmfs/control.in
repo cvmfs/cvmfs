@@ -69,7 +69,7 @@ Description: CernVM File System fuse3 libraries
 
 #GATEWAY-BEGIN
 Package: cvmfs-gateway
-Architecture: i386 amd64 armhf arm64
+Architecture: i386 amd64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
 Depends: psmisc, cvmfs-server, ${misc:Depends}
 #Multi-Arch: same   (preparation for multiarch support)
