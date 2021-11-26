@@ -47,8 +47,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
-#include <pair>
 #include <set>
+#include <utility>
 
 #include "atomic.h"
 #include "compression.h"
