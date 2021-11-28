@@ -48,6 +48,7 @@
 #include <cstring>
 #include <map>
 #include <set>
+#include <utility>
 
 #include "atomic.h"
 #include "compression.h"
