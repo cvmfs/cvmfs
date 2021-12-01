@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export CVMFS_PLATFORM_NAME="centos7-aarch64"
+export CVMFS_PLATFORM_NAME="centos8-aarch64"
 export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # source the common platform independent functionality and option parsing
@@ -23,9 +23,6 @@ echo "OK"
 run_unittests --gtest_shuffle \
               --gtest_death_test_use_fork || retval=1
 
-# Exclusions
-# 682-enter: missing fuse-overlayfs
-
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
@@ -33,6 +30,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
+                                 src/056-lowspeedlimit                        \
                                  src/084-premounted                           \
                                  src/094-attachmount                          \
                                  --                                           \
@@ -49,11 +47,9 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
-                                 src/682-enter                                \
                                  src/684-https_s3                             \
                                  src/686-azureblob_s3                         \
                                  src/687-import_s3                            \
-                                 src/811-commit-gateway                       \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
@@ -81,9 +77,7 @@ CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
 echo "running DUCC test cases..."
 CVMFS_TEST_CLASS_NAME=DUCCTests                                         \
 ./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                           -x src/406-ducc-webhook-notifications        \
-                              --                                        \
-                              src/4*                                    \
-                           || retval=1
+                                   src/4*                               \
+                                || retval=1
 
 exit $retval

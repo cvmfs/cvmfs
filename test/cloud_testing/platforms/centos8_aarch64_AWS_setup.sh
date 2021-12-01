@@ -33,8 +33,8 @@ install_rpm $DUCC_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."
-install_from_repo mod_wsgi   || die "fail (installing mod_wsgi)"
-sudo systemctl restart httpd || die "fail (restarting apache)"
+install_from_repo python3-mod_wsgi || die "fail (installing mod_wsgi)"
+sudo systemctl restart httpd       || die "fail (restarting apache)"
 
 echo "installing mod_ssl for Apache"
 install_from_repo mod_ssl || die "fail (installing mod_ssl)"
@@ -57,28 +57,24 @@ install_from_repo wget
 install_from_repo java-1.8.0-openjdk
 install_from_repo redhat-lsb-core
 install_from_repo tree
+install_from_repo fuse-overlayfs
 
 # traffic shaping
-install_from_repo trickle
+# install_from_repo trickle
+# TODO: uncomment once trickle is available for Centos 8
+#       and enable test 056-lowspeedlimit
 
 # Install test dependency for 647
-install_from_repo python-flask          || die "fail (installing python-flask)"
+install_from_repo python2-pip
+sudo pip2 install flask                      || die "fail (installing python-flask)"
+install_from_repo python3-flask
+
+# Install test dependency for 604
+install_from_repo python3
+install_from_repo netcat
 
 # Install the test S3 provider
 install_test_s3
-
-# Install azurite
-sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-echo -e "[azure-cli]
-name=Azure CLI
-baseurl=https://packages.microsoft.com/yumrepos/azure-cli
-enabled=1
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc" | sudo tee /etc/yum.repos.d/azure-cli.repo
-sudo yum install -y azure-cli
-curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
-sudo yum install -y nodejs
-sudo npm install -g azurite
 
 # building preloader
 install_from_repo cmake
@@ -86,7 +82,7 @@ install_from_repo zlib-devel
 install_from_repo libattr-devel
 install_from_repo openssl-devel
 install_from_repo libuuid-devel
-install_from_repo python-devel
+install_from_repo python2-devel
 install_from_repo unzip
 install_from_repo bzip2
 install_from_repo acl
@@ -94,7 +90,11 @@ install_from_repo acl
 # install docker for testing DUCC
 sudo yum install -y yum-utils
 sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-sudo yum install docker-ce docker-ce-cli containerd.io
+# Docker is not yet supported on RHEL8 (firewalld issues). Need to do a workaround.
+sudo yum install -y --nobest docker-ce
+sudo firewall-cmd --zone=public --add-masquerade --permanent
+sudo firewall-cmd --reload
+sudo systemctl restart docker
 
 # Migration test needs lsb_release
 echo "install lsb_release..."
@@ -106,6 +106,9 @@ set_nofile_limit 65536 || die "fail"
 echo "done"
 
 disable_systemd_rate_limit
+
+# Allow for proxying pass-through repositories
+sudo setsebool -P httpd_can_network_connect on
 
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"
