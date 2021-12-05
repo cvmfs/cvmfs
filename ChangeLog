@@ -1,3 +1,5 @@
+2.9.1:
+
 2.9.0:
   * Added initial implementation of cvmfs_publish commit
   * [libcvmfs_server] Require repo key & certificate only on non-gw publishers
