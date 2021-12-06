@@ -103,7 +103,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   // Sanitize base_directory, removing any leading or trailing slashes
   // from non-root (!= "/") paths
-  params.base_directory = TrimPath(params.base_directory, "/", kTrimAll);
+  params.base_directory = TrimString(params.base_directory, "/", kTrimAll);
 
   upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
