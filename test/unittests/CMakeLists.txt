@@ -119,6 +119,7 @@ set(CVMFS_UNITTEST_FILES
   t_raii_temp_dir.cc
   t_test_utils.cc
   t_tracer.cc
+  t_trim_string.cc
   t_tube.cc
   t_uid_map.cc
   t_unique_ptr.cc

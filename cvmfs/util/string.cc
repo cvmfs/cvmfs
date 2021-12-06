@@ -440,6 +440,29 @@ string Trim(const string &raw, bool trim_newline) {
   return raw.substr(start_pos, end_pos - start_pos + 1);
 }
 
+std::string TrimString(
+  const std::string& path,
+  const std::string& toTrim,
+  const int trimMode)
+{
+  std::string trimmed = path;
+  if (trimmed != toTrim) {
+    while ((trimMode & kTrimLeading) &&
+           HasPrefix(trimmed, toTrim, true) &&
+           (trimmed.size() > toTrim.size()))
+    {
+      trimmed = trimmed.substr(toTrim.size());
+    }
+    while ((trimMode & kTrimTrailing) &&
+           HasSuffix(trimmed, toTrim, true) &&
+           (trimmed.size() > toTrim.size()))
+    {
+      trimmed = trimmed.substr(0, trimmed.size() - toTrim.size());
+    }
+  }
+  return trimmed;
+}
+
 /**
  * Converts all characters to upper case
  */

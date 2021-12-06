@@ -101,6 +101,10 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
         params.max_concurrent_write_jobs;
   }
 
+  // Sanitize base_directory, removing any leading or trailing slashes
+  // from non-root (!= "/") paths
+  params.base_directory = TrimString(params.base_directory, "/", kTrimAll);
+
   upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
@@ -158,11 +162,10 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 
-  publish::SyncUnion *sync;
+  publish::SyncUnion *sync = new publish::SyncUnionTarball(
+    &mediator, params.dir_rdonly, params.tar_file,
+    params.base_directory, params.to_delete, create_catalog);
 
-  sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
-                                       params.tar_file, params.base_directory,
-                                       params.to_delete, create_catalog);
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "Initialization of the synchronisation "

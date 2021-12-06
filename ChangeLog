@@ -2,6 +2,7 @@
   * Proxy sharding support (PR #2812)
 
 2.9.1:
+  * Fix bug where trailing slash in base dir crashes tarball ingest (CVM-2044)
 
 2.9.0:
   * Add initial implementation of cvmfs_publish commit (CVM-2029)
