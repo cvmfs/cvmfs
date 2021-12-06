@@ -101,9 +101,19 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
         params.max_concurrent_write_jobs;
   }
 
-  // Sanitize base_directory, removing any trailing slashes
-  if ((params.base_directory.length() > 1) && HasSuffix(params.base_directory, "/", false)) {
-    params.base_directory.resize(params.base_directory.length() - 1);
+  // Sanitize base_directory, removing any leading or trailing slashes
+  // from non-root (!= "/") paths
+  {
+    std::string base_dir = params.base_directory;
+    if (base_dir != "/") {
+      while (HasPrefix(base_dir, "/", false) && base_dir.size() > 1) {
+        base_dir = base_dir.substr(1);
+      }
+      while (HasSuffix(base_dir, "/", false) && base_dir.size() > 1) {
+        base_dir = base_dir.substr(0, base_dir.size() - 1);
+      }
+    }
+    params.base_directory = base_dir;
   }
 
   upload::SpoolerDefinition spooler_definition_catalogs(
