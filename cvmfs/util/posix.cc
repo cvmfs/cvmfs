@@ -103,7 +103,6 @@ std::string MakeCanonicalPath(const std::string &path) {
   }
 }
 
-
 /**
  * Return both the file and directory name for a given path.
  *

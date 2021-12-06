@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Ingest tarball with leading slashes in a repository"
+cvmfs_test_name="Ingest tarball to various subdirectories in the repository"
 cvmfs_test_autofs_on_startup=false
 
 produce_tarball() {
@@ -45,6 +45,54 @@ cvmfs_run_test() {
 
   echo "*** ingesting the tarball in the directory $dir"
   cat $tarfile | cvmfs_server ingest --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return $?
+  local created_path=$repo_dir/$dir$(pwd)
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  if [ ! -d $repo_dir/$dir/$(pwd)/tarball_foo ]; then
+    return 1
+  fi
+
+  for d in a a/b a/b/c; do
+    if [ ! -d $created_path/tarball_foo/$d ]; then
+      echo "*** Error not found directory: $repo_dir/$dir/tarball_foo/$d"
+      return 1
+    else
+      echo "*** Ingested directory: $repo_dir/$dir/tarball_foo/$d"
+
+      for f in 1 2 3; do
+        file=$created_path/tarball_foo/$d/$f.txt
+        if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+          echo "*** Error not found file: $file"
+          return 1
+        else
+          echo "*** Ingested file of size 2048 bytes: $file"
+        fi
+      done
+
+    fi
+  done
+
+  file=$created_path/tarball_foo/d/e/f/foo.txt
+  file_size=$(wc -c <$file)
+  if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
+    echo "*** Error not found file of size 5120: $file"
+    return 1
+  else
+    echo "*** Ingested file of size $file_size bytes: $file"
+  fi
+
+  if [ $file_size -eq 5120 ]; then
+    echo "*** It compare well"
+  fi
+
+  ### We ingest the file into a subdir which contains leading and trailing slashes
+  ### which should be removed by the sanitizer
+  dir="to_be_sanitized"
+
+  echo "*** ingesting the tarball in the directory $dir"
+  cat $tarfile | cvmfs_server ingest --base_dir "///$dir///" --tar_file - $CVMFS_TEST_REPO || return $?
   local created_path=$repo_dir/$dir$(pwd)
 
   echo "*** check catalog and data integrity"
