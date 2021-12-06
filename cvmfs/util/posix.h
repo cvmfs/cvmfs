@@ -46,6 +46,11 @@ enum EFileSystemTypes {
   kFsTypeBeeGFS = 0x19830326
 };
 
+const int kTrimNone = 0;
+const int kTrimLeading = 1 << 0;
+const int kTrimTrailing = 1 << 1;
+const int kTrimAll = kTrimLeading | kTrimTrailing;
+
 struct FileSystemInfo {
   FileSystemInfo() : type(kFsTypeUnknown), is_rdonly(false) {}
   EFileSystemTypes type;
@@ -63,6 +68,9 @@ struct LsofEntry {
 };
 
 std::string MakeCanonicalPath(const std::string &path);
+std::string TrimPath(const std::string& path,
+                     const std::string& toTrim,
+                     const int trimMode = kTrimAll);
 std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);

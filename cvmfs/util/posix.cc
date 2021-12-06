@@ -103,6 +103,28 @@ std::string MakeCanonicalPath(const std::string &path) {
   }
 }
 
+std::string TrimPath(
+  const std::string& path,
+  const std::string& toTrim,
+  const int trimMode)
+{
+  std::string trimmed = path;
+  if (trimmed != toTrim) {
+    while ((trimMode & kTrimLeading) &&
+           HasPrefix(trimmed, toTrim, true) &&
+           (trimmed.size() > toTrim.size()))
+    {
+      trimmed = trimmed.substr(toTrim.size());
+    }
+    while ((trimMode & kTrimTrailing) &&
+           HasSuffix(trimmed, toTrim, true) &&
+           (trimmed.size() > toTrim.size()))
+    {
+      trimmed = trimmed.substr(0, trimmed.size() - toTrim.size());
+    }
+  }
+  return trimmed;
+}
 
 /**
  * Return both the file and directory name for a given path.

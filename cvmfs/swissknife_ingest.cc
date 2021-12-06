@@ -103,18 +103,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   // Sanitize base_directory, removing any leading or trailing slashes
   // from non-root (!= "/") paths
-  {
-    std::string base_dir = params.base_directory;
-    if (base_dir != "/") {
-      while (HasPrefix(base_dir, "/", false) && base_dir.size() > 1) {
-        base_dir = base_dir.substr(1);
-      }
-      while (HasSuffix(base_dir, "/", false) && base_dir.size() > 1) {
-        base_dir = base_dir.substr(0, base_dir.size() - 1);
-      }
-    }
-    params.base_directory = base_dir;
-  }
+  params.base_directory = TrimPath(params.base_directory, "/", kTrimAll);
 
   upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
