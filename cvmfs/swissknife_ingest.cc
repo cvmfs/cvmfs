@@ -173,9 +173,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 
-  publish::SyncUnion *sync = new publish::SyncUnionTarball(&mediator, params.dir_rdonly,
-                                       params.tar_file, params.base_directory,
-                                       params.to_delete, create_catalog);
+  publish::SyncUnion *sync = new publish::SyncUnionTarball(
+    &mediator, params.dir_rdonly, params.tar_file,
+    params.base_directory, params.to_delete, create_catalog);
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
