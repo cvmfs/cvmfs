@@ -9,14 +9,14 @@ def bad_request(start_response, reason):
     start_response('400 Bad Request',
                   [('Cache-control', 'max-age=' + str(negative_expire_secs)),
                    ('Content-Length', str(len(response_body)))])
-    return [response_body]
+    return [response_body.encode('utf-8')]
 
 def good_request(start_response, response_body):
     start_response('200 OK',
                   [('Content-Type', 'text/plain'),
                    ('Cache-control', 'max-age=' + str(positive_expire_secs)),
                    ('Content-Length', str(len(response_body)))])
-    return [response_body]
+    return [response_body.encode('utf-8')]
 
 def dispatch(api_func, path_info, repo_name, version, start_response, environ):
     if api_func == 'geo':

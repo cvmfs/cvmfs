@@ -1,5 +1,6 @@
+from __future__ import print_function
+
 import math
-import string
 import os
 import re
 import bisect
@@ -56,7 +57,7 @@ def lookup_geoinfo(now, addr):
                     #  acquire the lock for every lookup.
                     oldgireader.close()
                     oldgireader = None
-                    print 'cvmfs_geo: closed old ' + gidb
+                    print('cvmfs_geo: closed old ' + gidb)
                 gichecktime = now
                 modtime = os.stat(gidb).st_mtime
                 if modtime != gimodtime:
@@ -64,7 +65,7 @@ def lookup_geoinfo(now, addr):
                     oldgireader = gireader
                     gireader = open_geodb(gidb)
                     gimodtime = modtime
-                    print 'cvmfs_geo: opened ' + gidb
+                    print('cvmfs_geo: opened ' + gidb)
         finally:
             gilock.release()
 
@@ -212,11 +213,11 @@ def geosort_servers(now, gir_rem, servers, trycdn=False):
                                           gir_rem['longitude'],
                                           gir_server['latitude'],
                                           gir_server['longitude'])
-            #print "distance between " + \
+            #print("distance between " + \
             #    str(gir_rem['latitude']) + ',' + str(gir_rem['longitude']) \
             #    + " and " + \
             #    server + ' (' + str(gir_server['latitude']) + ',' + str(gir_server['longitude']) + ')' + \
-            #    " is " + str(arc)
+            #    " is " + str(arc))
 
         i = bisect.bisect(arcs, arc)
         arcs[i:i] = [arc]
@@ -249,7 +250,7 @@ def api(path_info, repo_name, version, start_response, environ):
         return cvmfs_api.bad_request(start_response, 'no slash in geo path')
 
     caching_string = path_info[0:slash]
-    servers = string.split(path_info[slash+1:], ",")
+    servers = path_info[slash+1:].split(',')
 
     if caching_string == "_namelookups_":
         # this is a special debugging URL
@@ -278,9 +279,9 @@ def api(path_info, repo_name, version, start_response, environ):
             # Try the last IP, in case there's a reverse proxy squid
             #  in front of the web server.
             forwarded_for = environ['HTTP_X_FORWARDED_FOR']
-            start = string.rfind(forwarded_for, ' ') + 1
+            start = forwarded_for.rfind(' ') + 1
             if (start == 0):
-                start = string.rfind(forwarded_for, ',') + 1
+                start = forwarded_for.rfind(',') + 1
             gir_rem = addr_geoinfo(now, forwarded_for[start:])
         if gir_rem is None and 'REMOTE_ADDR' in environ:
             # IP address connecting to web server
@@ -315,7 +316,7 @@ def api(path_info, repo_name, version, start_response, environ):
         # return a bad request only if all the server names were bad
         return cvmfs_api.bad_request(start_response, 'no server addr found in database')
 
-    response_body = string.join((str(i+1) for i in indexes), ',') + '\n'
+    response_body = ','.join(str(i+1) for i in indexes) + '\n'
 
     return cvmfs_api.good_request(start_response, response_body)
 
