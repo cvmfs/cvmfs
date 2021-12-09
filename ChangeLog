@@ -1,4 +1,5 @@
 2.10.0:
+  * cvmfs-release: use 20.04 fallback packages on Ubuntu >= 20.04 (PR #2828)
   * Proxy sharding support (PR #2812)
 
 2.9.1:
