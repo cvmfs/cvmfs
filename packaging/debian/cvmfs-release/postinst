@@ -28,7 +28,10 @@ case "$1" in
 	else
 		version_major=$(lsb_release -sr | cut -d. -f1)
 		fallback_release=
-		if [ $version_major -ge 18 ]; then
+		if [ $version_major -ge 20 ]; then
+			echo "Warning: this distribution is not supported. Using Ubuntu 20.04 packages as fallback."
+			fallback_release=focal
+		elif [ $version_major -ge 18 ]; then
 			echo "Warning: this distribution is not supported. Using Ubuntu 18.04 packages as fallback."
 			fallback_release=bionic
 		else
