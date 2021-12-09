@@ -26,6 +26,7 @@ ParameterList CommandListReflog::GetParams() const {
   r.push_back(Parameter::Optional('k', "repository master key(s) / dir"));
   r.push_back(Parameter::Optional('t', "temporary directory"));
   r.push_back(Parameter::Optional('o', "output file"));
+  r.push_back(Parameter::Optional('@', "proxy url"));
   return r;
 }
 
@@ -52,7 +53,8 @@ int CommandListReflog::Main(const ArgumentList &args) {
   }
 
   const bool follow_redirects = false;
-  if (!this->InitDownloadManager(follow_redirects) ||
+  const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
+  if (!this->InitDownloadManager(follow_redirects, proxy) ||
       !this->InitVerifyingSignatureManager(repo_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return 1;

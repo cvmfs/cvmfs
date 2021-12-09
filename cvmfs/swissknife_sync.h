@@ -216,6 +216,7 @@ class CommandApplyDirtab : public Command {
     r.push_back(Parameter::Mandatory('b', "base hash"));
     r.push_back(Parameter::Mandatory('w', "stratum 0 base url"));
     r.push_back(Parameter::Mandatory('t', "directory for temporary storage"));
+    r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Switch('x', "verbose mode"));
     return r;
   }

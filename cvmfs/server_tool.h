@@ -20,7 +20,7 @@ class ServerTool {
   virtual ~ServerTool();
 
   bool InitDownloadManager(const bool follow_redirects,
-                           const std::string &proxy = "",
+                           const std::string &proxy,
                            const unsigned max_pool_handles = 1);
   bool InitVerifyingSignatureManager(const std::string &pubkey_path,
                                      const std::string &trusted_certs = "");

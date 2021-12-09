@@ -930,7 +930,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   // initialize the (swissknife global) download and signature managers
   if (is_remote_) {
     const bool follow_redirects = (args.count('L') > 0);
-    if (!this->InitDownloadManager(follow_redirects)) {
+    const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
+    if (!this->InitDownloadManager(follow_redirects, proxy)) {
       return 1;
     }
 

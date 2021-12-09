@@ -105,7 +105,7 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_TRUE(tester.Apply("second", spec2));
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
-  EXPECT_TRUE(server_tool->InitDownloadManager(true));
+  EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
   receiver::Params params = MakeMergeToolParams("test");
 
@@ -191,7 +191,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   EXPECT_TRUE(tester.Apply("second", update));
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
-  EXPECT_TRUE(server_tool->InitDownloadManager(true));
+  EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
   receiver::Params params = MakeMergeToolParams("test_symlink");
 

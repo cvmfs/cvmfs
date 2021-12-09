@@ -66,6 +66,7 @@ ParameterList CommandReconstructReflog::GetParams() const {
   r.push_back(Parameter::Mandatory('t', "temporary directory"));
   r.push_back(Parameter::Mandatory('k', "repository keychain"));
   r.push_back(Parameter::Mandatory('R', "path to reflog.chksum file"));
+  r.push_back(Parameter::Optional('@', "proxy url"));
   return r;
 }
 
@@ -79,7 +80,9 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   const std::string &reflog_chksum_path = *args.find('R')->second;
 
   const bool follow_redirects = false;
-  if (!this->InitDownloadManager(follow_redirects) ||
+  const std::string proxy = ((args.count('@') > 0) ?
+                             *args.find('@')->second : "");
+  if (!this->InitDownloadManager(follow_redirects, proxy) ||
       !this->InitVerifyingSignatureManager(repo_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return 1;
