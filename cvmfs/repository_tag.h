@@ -8,7 +8,6 @@
 #include <string>
 
 class RepositoryTag {
-
  public:
   RepositoryTag() : name_(""), channel_(""), description_("") {}
   RepositoryTag(const std::string& name,
