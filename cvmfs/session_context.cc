@@ -304,9 +304,9 @@ bool SessionContext::Commit(const std::string& old_root_hash,
   JsonStringGenerator request_input;
   request_input.Add("old_root_hash", old_root_hash);
   request_input.Add("new_root_hash", new_root_hash);
-  request_input.Add("tag_name", tag.name_);
-  request_input.Add("tag_channel", tag.channel_);
-  request_input.Add("tag_description", tag.description_);
+  request_input.Add("tag_name", tag.name());
+  request_input.Add("tag_channel", tag.channel());
+  request_input.Add("tag_description", tag.description());
   std::string request = request_input.GenerateString();
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
