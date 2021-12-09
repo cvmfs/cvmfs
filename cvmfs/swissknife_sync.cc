@@ -715,15 +715,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('D') != args.end()) {
-    params.repo_tag.name_ = *args.find('D')->second;
+    params.repo_tag.SetName(*args.find('D')->second);
   }
 
   if (args.find('G') != args.end()) {
-    params.repo_tag.channel_ = *args.find('G')->second;
+    params.repo_tag.SetChannel(*args.find('G')->second);
   }
 
   if (args.find('J') != args.end()) {
-    params.repo_tag.description_ = *args.find('J')->second;
+    params.repo_tag.SetDescription(*args.find('J')->second);
   }
 
   const bool upload_statsdb = (args.count('I') > 0);

@@ -56,9 +56,9 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
   args['p'].Reset(new std::string(public_key_path));
   args['f'].Reset(new std::string(repo_name));
   args['e'].Reset(new std::string(params.hash_alg_str));
-  args['a'].Reset(new std::string(repo_tag.name_));
-  args['c'].Reset(new std::string(repo_tag.channel_));
-  args['D'].Reset(new std::string(repo_tag.description_));
+  args['a'].Reset(new std::string(repo_tag.name()));
+  args['c'].Reset(new std::string(repo_tag.channel()));
+  args['D'].Reset(new std::string(repo_tag.description()));
   args['x'].Reset(new std::string());
   args['@'].Reset(new std::string(proxy));
 
@@ -68,7 +68,7 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
 
   if (ret) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret,
-             repo_tag.name_.c_str());
+             repo_tag.name().c_str());
     return false;
   }
 
@@ -105,37 +105,16 @@ CommitProcessor::Result CommitProcessor::Process(
     uint64_t *final_revision) {
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
-  if (HasPrefix(final_tag.name_, "generic-", false)) {
-    // format time following the ISO 8601 YYYY-MM-DDThh:mm:ss.sssZ
-    // note the millisecond accurracy
-    uint64_t nanoseconds_timestamp = platform_realtime_ns();
-
-    time_t seconds = static_cast<time_t>(
-      nanoseconds_timestamp / 1000000000);  // 1E9
-    struct tm timestamp;
-    gmtime_r(&seconds, &timestamp);
-    char seconds_buffer[32];
-    strftime(seconds_buffer, sizeof(seconds_buffer),
-             "generic-%Y-%m-%dT%H:%M:%S", &timestamp);
-
-    // first we get the raw nanoseconds from the timestamp using the module
-    // and then we divide to extract the millisecond.
-    // the division truncate the number brutally, it should be enough.
-    time_t milliseconds = static_cast<time_t>(
-      (nanoseconds_timestamp % 1000000000) / 1000000);
-    char millis_buffer[48];
-    snprintf(millis_buffer, sizeof(millis_buffer), "%s.%03ldZ", seconds_buffer,
-             milliseconds);
-
-    final_tag.name_ = std::string(millis_buffer);
+  if (final_tag.HasGenericName()) {
+    final_tag.SetGenericName();
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s, "
            "tag_name: %s, tag_channel: %s, tag_description: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
-           new_root_hash.ToString(true).c_str(), final_tag.name_.c_str(),
-           final_tag.channel_.c_str(), final_tag.description_.c_str());
+           new_root_hash.ToString(true).c_str(), final_tag.name().c_str(),
+           final_tag.channel().c_str(), final_tag.description().c_str());
 
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
@@ -225,7 +204,7 @@ CommitProcessor::Result CommitProcessor::Process(
   if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
                     public_key, params.proxy)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
-             final_tag.name_.c_str());
+             final_tag.name().c_str());
     return kError;
   }
 
