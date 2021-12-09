@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# The above is just to make rpmbuild happy; mod_wsgi ignores it
 
 import os, sys, re
 import cvmfs_api
