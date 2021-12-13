@@ -181,6 +181,7 @@ cvmfs_server_publish() {
       -d /cvmfs/${name}/.cvmfsdirtab                     \
       -b $base_hash                                      \
       -w $stratum0                                       \
+      $(get_swissknife_proxy)                            \
       -t ${spool_dir}/tmp                                \
       -u /cvmfs/${name}                                  \
       -s ${scratch_dir}                                  \
@@ -339,6 +340,7 @@ cvmfs_server_publish() {
       -p /etc/cvmfs/keys/${name}.pub                              \
       -f $name                                                    \
       -e $hash_algorithm                                          \
+      $(get_swissknife_proxy)                                     \
       $(get_follow_http_redirects_flag)                           \
       -x"
 
@@ -392,6 +394,7 @@ cvmfs_server_publish() {
           -f $name                                            \
           -b $base_hash                                       \
           -e $hash_algorithm                                  \
+          $(get_swissknife_proxy)                             \
           $(get_follow_http_redirects_flag)                   \
           -d \\\"$REPLY\\\""
         echo $user_shell \"${tag_cleanup_command}\" >> $tag_remove_cmd_file
@@ -498,6 +501,7 @@ filter_auto_tags() {
     -t ${CVMFS_SPOOL_DIR}/tmp                  \
     -p /etc/cvmfs/keys/${repository_name}.pub  \
     -f $repository_name                        \
+    $(get_swissknife_proxy)                    \
     -x $(get_follow_http_redirects_flag)       | \
     grep -E \
     '^generic(_[[:digit:]]+)?-[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}T[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}Z' | \

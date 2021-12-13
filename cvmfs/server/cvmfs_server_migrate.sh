@@ -121,6 +121,7 @@ _migrate_2_1_7() {
   __swissknife migrate                                 \
     -v "2.1.7"                                         \
     -r ${CVMFS_STRATUM0}                               \
+    $(get_swissknife_proxy)                            \
     -n $name                                           \
     -u ${CVMFS_UPSTREAM_STORAGE}                       \
     -t $temp_dir                                       \

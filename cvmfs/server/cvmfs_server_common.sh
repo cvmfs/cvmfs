@@ -210,6 +210,7 @@ get_tag_hash() {
     -t ${CVMFS_SPOOL_DIR}/tmp                 \
     -p /etc/cvmfs/keys/${repository_name}.pub \
     -f $repository_name                       \
+    $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
     -n "$tag" 2>/dev/null | cut -d" " -f2
 }
@@ -230,6 +231,7 @@ get_tag_branch() {
     -t ${CVMFS_SPOOL_DIR}/tmp                 \
     -p /etc/cvmfs/keys/${repository_name}.pub \
     -f $repository_name                       \
+    $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
     -n "$tag" 2>/dev/null | cut -d" " -f7)
   if [ "x$branch" = "x(default)" ]; then
@@ -268,6 +270,7 @@ get_head_of() {
     -t ${CVMFS_SPOOL_DIR}/tmp                 \
     -p /etc/cvmfs/keys/${repository_name}.pub \
     -f $repository_name                       \
+    $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
     | cut -d" " -f1,2,7 | grep " $branch\$" | head -n 1
 }

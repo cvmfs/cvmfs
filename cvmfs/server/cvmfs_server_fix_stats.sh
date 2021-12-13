@@ -54,6 +54,7 @@ cvmfs_server_fix_stats() {
   local migrate_command="$(__swissknife_cmd dbg) migrate     \
                               -v 'stats'                     \
                               -r $CVMFS_STRATUM0             \
+                              $(get_swissknife_proxy)        \
                               -n $name                       \
                               -u $CVMFS_UPSTREAM_STORAGE     \
                               -k $CVMFS_PUBLIC_KEY           \

@@ -88,6 +88,7 @@ __do_check() {
                      -t ${CVMFS_SPOOL_DIR}/tmp         \
                      -k ${CVMFS_PUBLIC_KEY}            \
                      -N ${CVMFS_REPOSITORY_NAME}       \
+                     $(get_swissknife_proxy)           \
                      $(get_follow_http_redirects_flag) \
                      $with_reflog                      \
                      -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
@@ -153,6 +154,7 @@ __check_repair_reflog() {
 
     local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
                                                   -r $repository_url             \
+                                                  $(get_swissknife_proxy)        \
                                                   -u $CVMFS_UPSTREAM_STORAGE     \
                                                   -n $CVMFS_REPOSITORY_NAME      \
                                                   -t ${CVMFS_SPOOL_DIR}/tmp/     \
