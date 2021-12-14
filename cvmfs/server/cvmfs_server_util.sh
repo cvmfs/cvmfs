@@ -924,7 +924,6 @@ _to_syslog_for_geoip() {
 
 _update_geodb_install() {
   local retcode=0
-  local datname="$2"
   local dburl="${CVMFS_UPDATEGEO_URLBASE}?edition_id=${CVMFS_UPDATEGEO_DB%.*}&suffix=tar.gz&license_key=$CVMFS_GEO_LICENSE_KEY"
   local dbfile="${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_DB}"
   local download_target=${dbfile}.tgz
