@@ -145,6 +145,7 @@ cvmfs_server_ingest() {
     -d /cvmfs/${name}/.cvmfsdirtab                     \
     -b $base_hash                                      \
     -w $stratum0                                       \
+    $(get_swissknife_proxy)                            \
     -t ${spool_dir}/tmp                                \
     -u /cvmfs/${name}                                  \
     -s ${scratch_dir}                                  \
@@ -164,6 +165,7 @@ cvmfs_server_ingest() {
     -p /etc/cvmfs/keys/${name}.pub                    \
     -f $name                                          \
     -e $hash_algorithm                                \
+    $(get_swissknife_proxy)                           \
     $(get_follow_http_redirects_flag)"
   if ! is_checked_out $name; then
     # enables magic undo tag handling
@@ -192,6 +194,7 @@ cvmfs_server_ingest() {
     -p /etc/cvmfs/keys/${name}.pub                              \
     -f $name                                                    \
     -e $hash_algorithm                                          \
+    $(get_swissknife_proxy)                                     \
     $(get_follow_http_redirects_flag)                           \
     -x"
 
@@ -204,6 +207,7 @@ cvmfs_server_ingest() {
     -b $base_hash                               \
     -r ${upstream}                              \
     -w $stratum0                                \
+    $(get_swissknife_proxy)                     \
     -o $manifest                                \
     -K $CVMFS_PUBLIC_KEY                        \
     -N $name                                    \
@@ -294,6 +298,7 @@ cvmfs_server_ingest() {
         -f $name                                            \
         -b $base_hash                                       \
         -e $hash_algorithm                                  \
+        $(get_swissknife_proxy)                             \
         $(get_follow_http_redirects_flag)                   \
         -d \\\"$REPLY\\\""
       echo $user_shell \"${tag_cleanup_command}\" >> $tag_remove_cmd_file

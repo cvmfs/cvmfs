@@ -57,6 +57,7 @@ ParameterList CommandMigrate::GetParams() const {
   r.push_back(Parameter::Optional('k', "repository master key(s)"));
   r.push_back(Parameter::Optional('i', "UID map for chown"));
   r.push_back(Parameter::Optional('j', "GID map for chown"));
+  r.push_back(Parameter::Optional('@', "proxy url"));
   r.push_back(Parameter::Switch('f', "fix nested catalog transition points"));
   r.push_back(Parameter::Switch('l', "disable linkcount analysis of files"));
   r.push_back(Parameter::Switch('s',
@@ -153,7 +154,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
     typedef HttpObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
 
     const bool follow_redirects = false;
-    if (!this->InitDownloadManager(follow_redirects) ||
+    const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
+    if (!this->InitDownloadManager(follow_redirects, proxy) ||
         !this->InitVerifyingSignatureManager(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to init repo connection");
       return 1;

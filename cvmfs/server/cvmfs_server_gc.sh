@@ -342,6 +342,7 @@ __run_gc() {
     to_syslog_for_repo $name "reference log reconstruction started"
     local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
                                                   -r $repository_url             \
+                                                  $(get_swissknife_proxy)        \
                                                   -u $CVMFS_UPSTREAM_STORAGE     \
                                                   -n $CVMFS_REPOSITORY_NAME      \
                                                   -t ${CVMFS_SPOOL_DIR}/tmp/     \
@@ -357,6 +358,7 @@ __run_gc() {
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
   local gc_command="$(__swissknife_cmd dbg) gc                              \
                                             -r $repository_url              \
+                                            $(get_swissknife_proxy)         \
                                             -u $CVMFS_UPSTREAM_STORAGE      \
                                             -n $CVMFS_REPOSITORY_NAME       \
                                             -k $CVMFS_PUBLIC_KEY            \

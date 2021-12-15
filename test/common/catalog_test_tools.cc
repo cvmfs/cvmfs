@@ -262,7 +262,7 @@ CatalogTestTool::CatalogTestTool(const std::string& name)
     : name_(name), manifest_(), spooler_(), history_() {}
 
 bool CatalogTestTool::Init() {
-  if (!InitDownloadManager(true)) {
+  if (!InitDownloadManager(true, "")) {
     return false;
   }
 

@@ -94,6 +94,7 @@ cvmfs_server_rollback() {
 
   local rollback_command="$(__swissknife_cmd dbg) tag_rollback \
     -w $stratum0                                               \
+    $(get_swissknife_proxy)                                    \
     -t ${spool_dir}/tmp                                        \
     -p /etc/cvmfs/keys/${name}.pub                             \
     -z /etc/cvmfs/repositories.d/${name}/trusted_certs         \

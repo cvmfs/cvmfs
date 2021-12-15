@@ -55,6 +55,7 @@ cvmfs_server_eliminate_bulk_hashes() {
   local migrate_command="$(__swissknife_cmd dbg) migrate     \
                               -v 'bulkhash'                  \
                               -r $CVMFS_STRATUM0             \
+                              $(get_swissknife_proxy)        \
                               -n $name                       \
                               -u $CVMFS_UPSTREAM_STORAGE     \
                               -k $CVMFS_PUBLIC_KEY           \

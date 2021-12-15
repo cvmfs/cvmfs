@@ -288,7 +288,8 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   // initialize catalog infrastructure
   const bool auto_manage_catalog_files = true;
   const bool follow_redirects = (args.count('L') > 0);
-  if (!InitDownloadManager(follow_redirects)) {
+  const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
+  if (!InitDownloadManager(follow_redirects, proxy)) {
     return 1;
   }
   catalog::SimpleCatalogManager catalog_manager(

@@ -99,6 +99,7 @@ cvmfs_server_tag() {
   if [ $action_list_tags -eq 1 ] || [ $action_list_branches -eq 1 ] || [ $actions -eq 0 ]; then
     local tag_list_command="$(__swissknife_cmd dbg) tag_list \
       -w $CVMFS_STRATUM0                                     \
+      $(get_swissknife_proxy)                                \
       -t ${CVMFS_SPOOL_DIR}/tmp                              \
       -p /etc/cvmfs/keys/${name}.pub                         \
       -z /etc/cvmfs/repositories.d/${name}/trusted_certs     \
@@ -117,6 +118,7 @@ cvmfs_server_tag() {
   if [ $action_inspect -eq 1 ]; then
     local tag_inspect_command="$(__swissknife_cmd dbg) tag_info \
       -w $CVMFS_STRATUM0                                        \
+      $(get_swissknife_proxy)                                   \
       -t ${CVMFS_SPOOL_DIR}/tmp                                 \
       -p /etc/cvmfs/keys/${name}.pub                            \
       -z /etc/cvmfs/repositories.d/${name}/trusted_certs        \
@@ -157,6 +159,7 @@ cvmfs_server_tag() {
       -C /etc/cvmfs/repositories.d/${name}/trusted_certs \
       -N $name                                           \
       -K $CVMFS_PUBLIC_KEY                               \
+      $(get_swissknife_proxy)                            \
       $(get_follow_http_redirects_flag) $log_level -S snapshots"
   local tag_command_undo_tags="$(__swissknife_cmd dbg) tag_edit \
       -r $CVMFS_UPSTREAM_STORAGE                        \
@@ -166,6 +169,7 @@ cvmfs_server_tag() {
       -p /etc/cvmfs/keys/${name}.pub                    \
       -f $name                                          \
       -e $hash_algorithm                                \
+      $(get_swissknife_proxy)                           \
       $(get_follow_http_redirects_flag)                 \
       -x"
 
@@ -181,6 +185,7 @@ cvmfs_server_tag() {
       -m $new_manifest                                           \
       -b $base_hash                                              \
       -e $hash_algorithm                                         \
+      $(get_swissknife_proxy)                                    \
       $(get_follow_http_redirects_flag)                          \
       -a $tag_name"
     if [ ! -z "$add_tag_channel" ]; then
@@ -212,6 +217,7 @@ cvmfs_server_tag() {
 
     $user_shell "$(__swissknife_cmd dbg) tag_edit        \
       -w $CVMFS_STRATUM0                                 \
+      $(get_swissknife_proxy)                            \
       -t ${CVMFS_SPOOL_DIR}/tmp                          \
       -p /etc/cvmfs/keys/${name}.pub                     \
       -z /etc/cvmfs/repositories.d/${name}/trusted_certs \

@@ -56,6 +56,7 @@ cvmfs_server_eliminate_hardlinks() {
   local migrate_command="$(__swissknife_cmd dbg) migrate     \
                               -v 'hardlink'                  \
                               -r $CVMFS_STRATUM0             \
+                              $(get_swissknife_proxy)        \
                               -n $name                       \
                               -u $CVMFS_UPSTREAM_STORAGE     \
                               -k $CVMFS_PUBLIC_KEY           \

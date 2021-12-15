@@ -312,6 +312,7 @@ cvmfs_server_import() {
     __swissknife migrate               \
       -v "2.0.x"                       \
       -r $storage_location             \
+      $(get_swissknife_proxy)          \
       -n $name                         \
       -u $upstream                     \
       -t $temp_dir                     \

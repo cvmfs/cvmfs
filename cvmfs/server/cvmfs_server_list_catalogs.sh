@@ -64,6 +64,7 @@ cvmfs_server_list_catalogs() {
   local lsrepo_cmd
   lsrepo_cmd="$(__swissknife_cmd dbg) lsrepo     \
                        -r $CVMFS_STRATUM0        \
+                       $(get_swissknife_proxy)   \
                        -n $CVMFS_REPOSITORY_NAME \
                        -k $CVMFS_PUBLIC_KEY      \
                        -l ${CVMFS_SPOOL_DIR}/tmp \

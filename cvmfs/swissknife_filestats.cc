@@ -24,6 +24,7 @@ ParameterList CommandFileStats::GetParams() const {
   r.push_back(Parameter::Optional('k', "repository master key(s) / dir"));
   r.push_back(Parameter::Optional('l', "temporary directory"));
   r.push_back(Parameter::Optional('h', "root hash (other than trunk)"));
+  r.push_back(Parameter::Optional('@', "proxy url"));
   return r;
 }
 
@@ -50,7 +51,8 @@ int CommandFileStats::Main(const ArgumentList &args) {
   bool success = false;
   if (IsHttpUrl(repo_url)) {
     const bool follow_redirects = false;
-    if (!this->InitDownloadManager(follow_redirects) ||
+    const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
+    if (!this->InitDownloadManager(follow_redirects, proxy) ||
         !this->InitVerifyingSignatureManager(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to init remote connection");
       return 1;
