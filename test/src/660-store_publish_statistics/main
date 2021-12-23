@@ -104,7 +104,7 @@ cvmfs_run_test() {
   # echo "*** Activate the statistics by writing in server.conf file CVMFS_PRINT_STATISTICS=true"
   # cat /etc/cvmfs/repositories.d/$repo_name/server.conf | grep CVMFS_PRINT_STATISTICS
   # if [ $? -eq 0 ]; then   # just change the value
-  #   echo "*** Found CVMFS_PRINT_STATISTICS variable, value overwritten with true."
+  #   echo "*** Found CVMFS_PRINT_STATISTICS variable, value overridden with true."
   #   sed -i 's/CVMFS_PRINT_STATISTICS=.*/CVMFS_PRINT_STATISTICS=true/' /etc/cvmfs/repositories.d/$repo_name/server.conf
   # else
   #   echo "*** CVMFS_PRINT_STATISTICS not found, append CVMFS_PRINT_STATISTICS=true in server.conf"

@@ -416,7 +416,7 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/serverorder.sh
 
-# Don't install coincidentially built libfuse3 libraries
+# Don't install coincidentally built libfuse3 libraries
 %if ! 0%{?build_fuse3}
 rm -f $RPM_BUILD_ROOT%{_libdir}/libcvmfs_fuse3*
 %endif
@@ -734,7 +734,7 @@ systemctl daemon-reload
 * Thu Jun 30 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.1
 - Fix SLES12 dist tag
 * Tue May 03 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
-- No optimiziation on EL5/i686 to prevent faulty atomics
+- No optimization on EL5/i686 to prevent faulty atomics
 * Fri Apr 29 2016 Jakob Blomer <jblomer@cern.ch> - 2.3.0
 - voms-devel not necessary anymore
 * Mon Apr 11 2016 Rene Meusel <rene.meusel@cern.ch> - 2.3.0
@@ -809,7 +809,7 @@ systemctl daemon-reload
 * Thu Feb 16 2012 Jakob Blomer <jblomer@cern.ch>
 - SuSE compatibility, disabled SELinux for SuSE
 * Wed Feb 15 2012 Jakob Blomer <jblomer@cern.ch>
-- Small adjustments to run with continueous integration
+- Small adjustments to run with continuous integration
 * Thu Jan 12 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 2.0.13
 - Addition of SELinux support.
 

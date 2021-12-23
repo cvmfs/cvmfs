@@ -112,7 +112,7 @@ TEST_F(T_MallocArena, Basic) {
   do {
     ptrs.push_back(M.Malloc(8192));
   } while (ptrs.back() != NULL);
-  // More than 90% utiliziation
+  // More than 90% utilization
   unsigned num = ptrs.size();
   EXPECT_GE(num, (kSmallArena / 8192) * 90 / 100);
   EXPECT_FALSE(M.IsEmpty());

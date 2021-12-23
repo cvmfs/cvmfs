@@ -83,7 +83,7 @@ struct SpoolerDefinition {
   unsigned int number_of_concurrent_uploads;
 
   /**
-   * Number of threads used for I/O write calls. Effectively this paramater
+   * Number of threads used for I/O write calls. Effectively this parameter
    * sets the I/O depth.
    */
   unsigned int num_upload_tasks;

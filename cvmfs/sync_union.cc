@@ -74,7 +74,7 @@ bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
     // is added later by the SyncMediator
     return false;
   } else {                             // directory already existed...
-    if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
+    if (entry->IsOpaqueDirectory()) {  // was directory completely overridden?
       mediator_->Replace(entry);
       return false;  // <-- replace does not need any further recursion
     } else {  // directory was just changed internally... only touch needed

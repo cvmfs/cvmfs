@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  *
  * This module forks a watchdog process that listens on
- * a pipe and prints a stackstrace into syslog, when cvmfs
+ * a pipe and prints a stacktrace into syslog, when cvmfs
  * fails.
  *
  * Also, it handles getting and setting the maximum number of file descriptors.
@@ -212,7 +212,7 @@ string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
   int           chars_io;
   unsigned int  ring_buffer_pos = 0;
 
-  // read from stdout of gdb until gdb prompt occures --> (gdb)
+  // read from stdout of gdb until gdb prompt occurs --> (gdb)
   while (1) {
     chars_io = read(fd_pipe, &mini_buffer, 1);
 
@@ -221,7 +221,7 @@ string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
 
     result += mini_buffer;
 
-    // find the gdb_promt in the stdout data
+    // find the gdb_prompt in the stdout data
     if (mini_buffer == gdb_prompt[ring_buffer_pos]) {
       ++ring_buffer_pos;
       if (ring_buffer_pos == gdb_prompt.size()) {

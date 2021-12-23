@@ -817,7 +817,7 @@ int FuseMain(int argc, char *argv[]) {
   if (options_manager->GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
     SetLogSyslogFacility(String2Int64(parameter));
   SetLogSyslogPrefix(*repository_name_);
-  // Deferr setting usyslog until credentials are dropped
+  // Defer setting usyslog until credentials are dropped
 
   // Permissions check
   if (options_manager->GetValue("CVMFS_CHECK_PERMISSIONS", &parameter)) {

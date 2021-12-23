@@ -83,7 +83,7 @@ type LeaseDB interface {
 	GetRepositoryEnabled(ctx context.Context, repository string) bool
 }
 
-// OpenLeaseDB opens or creats a new LeaseDB object of the specified type
+// OpenLeaseDB opens or creates a new LeaseDB object of the specified type
 // (either "embedded" or "etcd").
 func OpenLeaseDB(dbType string, config *gw.Config) (LeaseDB, error) {
 	switch dbType {

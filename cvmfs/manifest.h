@@ -156,7 +156,7 @@ class Manifest {
   bool garbage_collectable_;
 
   /**
-   * The root catalog and the certifacte might be available as .cvmfscatalog and
+   * The root catalog and the certificate might be available as .cvmfscatalog and
    * .cvmfscertificate.  That is helpful if the data subdirectory is protected
    * on the web server.
    */

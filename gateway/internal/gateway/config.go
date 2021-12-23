@@ -34,7 +34,7 @@ type Config struct {
 	MockReceiver bool `mapstructure:"mock_receiver"`
 }
 
-// ReadConfig reads configuration files and commandline flags, and populates a Config object
+// ReadConfig reads configuration files and command-line flags, and populates a Config object
 func ReadConfig() (*Config, error) {
 	var configFile string
 	pflag.StringVar(&configFile, "user_config_file", "/etc/cvmfs/gateway/user.json", "config file with user modifiable settings")

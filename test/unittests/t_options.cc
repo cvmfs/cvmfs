@@ -54,7 +54,7 @@ class T_Options : public ::testing::Test {
   }
 
  protected:
-  // type-based overlaoded instantiation of History object wrapper
+  // type-based overloaded instantiation of History object wrapper
   // Inspired from here:
   //   http://stackoverflow.com/questions/5512910/
   //          explicit-specialization-of-template-class-member-function

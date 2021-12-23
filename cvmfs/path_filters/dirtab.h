@@ -12,7 +12,7 @@
 
 namespace catalog {
 
-// TODO(jblomer): Dirtab and RelaxedPathFilter can use static inhertiance.  It
+// TODO(jblomer): Dirtab and RelaxedPathFilter can use static inheritance.  It
 // is clear at compile time which one should be used.  They are not on a
 // critical path though.
 
@@ -20,7 +20,7 @@ namespace catalog {
  * A Dirtab is handling the parsing and processing of the .cvmfsdirtab file.
  * The .cvmfsdirtab contains a list of Pathspecs that define where CernVM-FS
  * should automatically create nested catalogs. Furthermore it can contain neg-
- * ative rules to omit the automatic creation of nested catalogs in certain
+ * native rules to omit the automatic creation of nested catalogs in certain
  * directories.
  *
  * Example (adding a space in front of * - silence compiler warning):

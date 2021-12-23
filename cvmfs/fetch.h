@@ -26,7 +26,7 @@ class Statistics;
 namespace cvmfs {
 
 /**
- * TransacionSink uses an open transaction in a cache manager as a sink.  It
+ * TransactionSink uses an open transaction in a cache manager as a sink.  It
  * allows the download manager to write data without knowing about the cache
  * manager.
  */

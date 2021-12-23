@@ -9,10 +9,10 @@
 #include <string>
 
 /**
- * The functions in this file handle the managment of the .data directory
+ * The functions in this file handle the management of the .data directory
  * structure in the POSIX File System Traversal interface.
  * 
- * The .data directory structure contains (meta)content-adressable links to all
+ * The .data directory structure contains (meta)content-addressable links to all
  * inodes of the exported file system. This is used for deduplication.
  */
 

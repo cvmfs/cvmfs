@@ -143,7 +143,7 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 
 
 /**
- * Checks for existance of a file either locally or via HTTP head
+ * Checks for existence of a file either locally or via HTTP head
  */
 bool CommandCheck::Exists(const string &file)
 {

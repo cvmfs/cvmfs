@@ -746,7 +746,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::
     "INSERT OR REPLACE INTO nested_catalogs (path,   sha1,  size) "
     "                VALUES                 (:path, :sha1, :size);");
 
-  // go through all nested catalogs and update their references (we are curently
+  // go through all nested catalogs and update their references (we are currently
   // in their parent catalog)
   // Note: we might need to wait for the nested catalog to be fully processed.
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
@@ -1178,7 +1178,7 @@ bool CommandMigrate::MigrationWorker_20x::AnalyzeFileLinkcounts(
   bool retval;
 
   // Analyze the hardlink relationships in the old catalog
-  //   inodes used to be assigned at publishing time, implicitly constituating
+  //   inodes used to be assigned at publishing time, implicitly constituting
   //   those relationships. We now need them explicitly in the file catalogs
   // This looks for directory entries with matching inodes but differing path-
   // hashes and saves the results in a temporary table called 'hl_scratch'
@@ -1408,7 +1408,7 @@ bool CommandMigrate::MigrationWorker_20x::FixNestedCatalogTransitionPoints(
       update_directory_entry.Reset();
 
       // Fixing of this mountpoint went well... inform the user that this minor
-      // issue occured
+      // issue occurred
       LogCvmfs(kLogCatalog, kLogStdout,
                "NOTE: fixed incompatible nested catalog transition point at: "
                "'%s' ", nested_root_path.c_str());
@@ -1559,7 +1559,7 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   const catalog::CatalogDatabase &writable = data->new_catalog->database();
 
   // Aggregated the statistics counters of all nested catalogs
-  // Note: we might need to wait until nested catalogs are sucessfully processed
+  // Note: we might need to wait until nested catalogs are successfully processed
   catalog::DeltaCounters stats_counters;
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
@@ -1743,7 +1743,7 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
     GetWritable(data->old_catalog)->database();
 
   // Aggregated the statistics counters of all nested catalogs
-  // Note: we might need to wait until nested catalogs are sucessfully processed
+  // Note: we might need to wait until nested catalogs are successfully processed
   catalog::DeltaCounters stats_counters;
   PendingCatalogList::const_iterator i = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
@@ -2098,7 +2098,7 @@ bool CommandMigrate::StatsMigrationWorker::RepairStatisticsCounters(
     GetWritable(data->old_catalog)->database();
 
   // Aggregated the statistics counters of all nested catalogs
-  // Note: we might need to wait until nested catalogs are sucessfully processed
+  // Note: we might need to wait until nested catalogs are successfully processed
   catalog::DeltaCounters stats_counters;
   PendingCatalogList::const_iterator i = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();

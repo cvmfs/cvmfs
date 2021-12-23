@@ -100,7 +100,7 @@ generate_certs() {
   elif is_el6; then
     voms_path="${TEST600_GRID_MOUNTPOINT}/emi-ui-2.10.4-1_sl5v1"
     # TODO(rmeusel): use that once the world stopped burning...
-    #                removes a couple of compat* depedencies
+    #                removes a couple of compat* dependencies
     # voms_path="${TEST600_GRID_MOUNTPOINT}/emi-ui-3.17.1-1_sl6v1"
   else
     echo "didn't find voms path for this platform"

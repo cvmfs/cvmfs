@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// GCOptions represents the different options supplied for a garbace collection run
+// GCOptions represents the different options supplied for a garbage collection run
 type GCOptions struct {
 	Repository   string    `json:"repo"`
 	NumRevisions int       `json:"num_revisions"`

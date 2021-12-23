@@ -150,7 +150,7 @@ class LibContext : SingleCopy {
                            struct cvmfs_attr *attr);
 
   /**
-   * Only non-NULL if cvmfs_attache_repo is used for initialization.  In this
+   * Only non-NULL if cvmfs_attach_repo is used for initialization.  In this
    * case, the options manager needs to be cleaned up by cvmfs_fini.
    */
   OptionsManager *options_mgr_;

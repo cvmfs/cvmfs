@@ -15,7 +15,7 @@
  *      -> generate a content hash of the compression result
  *
  *   2. Upload files
- *      -> pluggable to support different upload pathes (local, S3, ...)
+ *      -> pluggable to support different upload paths (local, S3, ...)
  *
  * There are a number of different entities involved in this process. Namely:
  *   -> Spooler            - general steering tasks ( + common interface )
@@ -81,7 +81,7 @@
  *                 *********************
  *
  *
- * TODO(rmeusel): special purpose ::Process...() methods should (opionally?)
+ * TODO(rmeusel): special purpose ::Process...() methods should (optionally?)
  *                return Future<> instead of relying on the callbacks. Those are
  *                somewhat one-shot calls and require a rather fishy idiom when
  *                using callbacks, like:
@@ -152,7 +152,7 @@ class Spooler : public Observable<SpoolerResult> {
   std::string backend_name() const;
 
   /**
-   * Calls the concrete uploder to create a new repository area
+   * Calls the concrete uploader to create a new repository area
    */
   bool Create();
 

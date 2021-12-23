@@ -52,7 +52,7 @@ func ParseImage(image string) (img Image, err error) {
 		return Image{}, fmt.Errorf("Impossible to parse the string into an image, too many `:` in : %s", image)
 	}
 	// the colon `:` is used also as separator in the digest between sha256
-	// and the actuall digest, a len(pathSplitted) == 2 could either means
+	// and the actual digest, a len(pathSplitted) == 2 could either means
 	// a repository and a tag or a repository and an hash, in the case of
 	// the hash however the split will be more complex.  Now we split for
 	// the at `@` which separate the digest from everything else. If this

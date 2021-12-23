@@ -73,7 +73,7 @@ class __attribute__((visibility("default"))) DiffListener {
 class __attribute__((visibility("default"))) Env {
  public:
   /**
-   * Depending on the desired course of action, the permitted capabilites of the
+   * Depending on the desired course of action, the permitted capabilities of the
    * binary (cap_dac_read_search, cap_sys_admin) needs to be dropped or gained.
    * Dropped for creating user namespaces in `enter`, gained for walking through
    * overlayfs.
@@ -105,7 +105,7 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   void List();
 
   /**
-   * From and to are either tag names or catalog root hashes preceeded by
+   * From and to are either tag names or catalog root hashes preceded by
    * a '@'.
    */
   void Diff(const std::string &from, const std::string &to,
@@ -194,7 +194,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      */
     void Mount();
     /**
-     * Move scratch space to waste bin and clear it out asynchonously
+     * Move scratch space to waste bin and clear it out asynchronously
      */
     void ClearScratch();
 

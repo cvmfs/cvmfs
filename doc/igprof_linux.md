@@ -16,7 +16,7 @@ Some more notes:
   - Make sure libunwind and libigprof are also in /usr/lib64
   - Memory profiling needs to use the debug library for proper stack traces
 
-The following code runned as superuser would sum up what was explained before:
+The following code ran as superuser would sum up what was explained before:
 
 ``` bash
 mv /etc/mtab /etc/mtab.disabled

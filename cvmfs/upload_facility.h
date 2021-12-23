@@ -151,7 +151,7 @@ class AbstractUploader
   /**
    * Concrete uploaders might want to use a customized setting for multi-stream
    * writing, for instance one per disk.  Note that the S3 backend uses one task
-   * but this one task uses internally mutliple HTTP streams through curl async
+   * but this one task uses internally multiple HTTP streams through curl async
    * I/O.
    */
   virtual unsigned GetNumTasks() const { return num_upload_tasks_; }
@@ -320,7 +320,7 @@ class AbstractUploader
   /**
    * Waits until the current upload queue is empty.
    *
-   * Note: This does NOT necessarily mean, that all files are actuall uploaded.
+   * Note: This does NOT necessarily mean, that all files are actually uploaded.
    *       If new jobs are concurrently scheduled the behavior of this method is
    *       not defined (it returns also on intermediately empty queues)
    */
@@ -351,7 +351,7 @@ class AbstractUploader
    * Implementation of a streamed upload step. See public interface for details.
    * Public interface: AbstractUploader::ScheduleUpload()
    *
-   * @param handle     decendant of UploadStreamHandle specifying the stream
+   * @param handle     descendant of UploadStreamHandle specifying the stream
    * @param buffer     the CharBuffer to be uploaded to the stream
    * @param callback   callback to be called on completion
    */
@@ -360,10 +360,10 @@ class AbstractUploader
                               const CallbackTN *callback) = 0;
 
   /**
-   * Implemetation of streamed upload commit
+   * Implementation of streamed upload commit
    * Public interface: AbstractUploader::ScheduleUpload()
    *
-   * @param handle        decendant of UploadStreamHandle specifying the stream
+   * @param handle        descendant of UploadStreamHandle specifying the stream
    * @param content_hash  the computed content hash of the streamed object
    */
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
@@ -428,7 +428,7 @@ class AbstractUploader
   const SpoolerDefinition spooler_definition_;
 
   /**
-   * Number of threads used for I/O write calls. Effectively this paramater
+   * Number of threads used for I/O write calls. Effectively this parameter
    * sets the I/O depth. Defaults to 1.
    */
   unsigned num_upload_tasks_;

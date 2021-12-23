@@ -122,7 +122,7 @@ func (db *SqliteLeaseDB) Close() error {
 	return nil
 }
 
-// NewLease attemps to acquire a new lease for the given path
+// NewLease attempts to acquire a new lease for the given path
 func (db *SqliteLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error {
 	t0 := time.Now()
 

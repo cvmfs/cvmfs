@@ -95,7 +95,7 @@ struct fs_traversal {
    * @note(steuber): The content checksum only needs to be calculated if this
    * is a source file system!
    * 
-   * For correnct behaviour the following fields must be set
+   * For correct behaviour the following fields must be set
    * (and may not be NULL):
    * - version
    * - size
@@ -139,7 +139,7 @@ struct fs_traversal {
    * This assumes that other information is the same, and
    * only updates the metadata. Used only on directories.
    *
-   * @param[in] ctx The file systme traverssal context
+   * @param[in] ctx The file system traversal context
    * @param[in] path The path of the object to be updated
    * @param[in] stat The stat structure that determines the new values
    * @returns 0 on success, -1 otherwise

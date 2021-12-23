@@ -227,7 +227,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   assert(ftmp);
   int retval;
   if (compress) {
-    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unsused
+    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unused
     retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
   } else {
     retval = CopyMem2File(buffer, size, ftmp);
@@ -764,7 +764,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
     LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
              historic_tags.size());
-    // TODO(jblomer): We should repliacte the previous history dbs, too,
+    // TODO(jblomer): We should replicate the previous history dbs, too,
     // in order to avoid races on fail-over between non-synchronized stratum 1s
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading history database");
     Store(history_path, history_hash);

@@ -92,7 +92,7 @@ class Statistics {
 
 /**
  * Allows multiple instance of the same class to use the same Statistics
- * instance.  The "name_major" part is used to contruct counter names in the
+ * instance.  The "name_major" part is used to construct counter names in the
  * form name_major.<provided name>
  */
 class StatisticsTemplate {
@@ -191,12 +191,12 @@ class Recorder {
  private:
   /**
    * Records number of ticks (events) per unit of resolution.  A ring buffer.
-   * Entries older than capacity_s get overwritten by new events.
+   * Entries older than capacity_s get overridden by new events.
    */
   std::vector<uint32_t> bins_;
 
   /**
-   * When the most recent tick occured.
+   * When the most recent tick occurred.
    */
   uint64_t last_timestamp_;
 
@@ -218,7 +218,7 @@ class Recorder {
 
 
 /**
- * Writes to multiple recorders.  Recorders with coarsed-grained resolution and
+ * Writes to multiple recorders.  Recorders with coarse resolution and
  * a large capacity are combined with precise recorders with shorter capacity.
  * Preferred recorders should be added first because GetNoTicks will use the
  * first recorder with a capacity >= retrospect_s (or the last recorder).

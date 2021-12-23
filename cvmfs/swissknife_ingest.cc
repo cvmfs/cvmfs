@@ -23,7 +23,7 @@
  * Many of the options possible to set in the ArgumentList are not actually used
  * by the ingest command since they are not part of its interface, hence those
  * unused options cannot be set by the shell script. Of course if there is the
- * necessitty those paramenters can be added and managed.
+ * necessity those parameters can be added and managed.
  * At the moment this approach worked fine and didn't add much complexity,
  * however if yet another command will need to use a similar approach it would
  * be good to consider creating different options handler for each command.

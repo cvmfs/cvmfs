@@ -4699,7 +4699,7 @@ def _GetTextInside(text, start_pattern):
   # TODO(unknown): Audit cpplint.py to see what places could be profitably
   # rewritten to use _GetTextInside (and use inferior regexp matching today).
 
-  # Give opening punctuations to get the matching close-punctuations.
+  # Give opening punctuation to get the matching close-punctuation.
   matching_punctuation = {'(': ')', '{': '}', '[': ']'}
   closing_punctuation = set(matching_punctuation.itervalues())
 
@@ -4713,14 +4713,14 @@ def _GetTextInside(text, start_pattern):
       'start_pattern must ends with an opening punctuation.')
   assert text[start_position - 1] in matching_punctuation, (
       'start_pattern must ends with an opening punctuation.')
-  # Stack of closing punctuations we expect to have in text after position.
+  # Stack of closing punctuation we expect to have in text after position.
   punctuation_stack = [matching_punctuation[text[start_position - 1]]]
   position = start_position
   while punctuation_stack and position < len(text):
     if text[position] == punctuation_stack[-1]:
       punctuation_stack.pop()
     elif text[position] in closing_punctuation:
-      # A closing punctuation without matching opening punctuations.
+      # A closing punctuation without matching opening punctuation.
       return None
     elif text[position] in matching_punctuation:
       punctuation_stack.append(matching_punctuation[text[position]])

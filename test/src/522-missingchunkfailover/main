@@ -30,7 +30,7 @@ cvmfs_run_test() {
   cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 3; }
 
   echo "delete all file data chunks in the Stratum0 repository"
-  # go through the repo backend storage and search for data chunk pathes
+  # go through the repo backend storage and search for data chunk paths
   # that do not end with a capital letter (catalog, history, certificate) except
   # a capital P (big file data chunks) and delete them
   for f in $(find /srv/cvmfs/$CVMFS_TEST_REPO/data/ | \

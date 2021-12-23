@@ -124,7 +124,7 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
 
  private:
   /**
-   * After 5 seconds of unresponsiveness, helper prcesses may be killed.
+   * After 5 seconds of unresponsiveness, helper processes may be killed.
    */
   static const unsigned kChildTimeout = 5;
 
@@ -190,7 +190,7 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   pid_t pid_;
 
   /**
-   * If the external helper behaves unexectely, enter fail state and stop
+   * If the external helper behaves unexpectedly, enter fail state and stop
    * authenticating
    */
   bool fail_state_;

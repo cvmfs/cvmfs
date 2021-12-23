@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server snapshot" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
@@ -186,7 +186,7 @@ __do_all_snapshots() {
   local skip_noninitial=0
   local snapshot_group
   local log
-  local fullog
+  local fulllog
   local repo
   local repos
 

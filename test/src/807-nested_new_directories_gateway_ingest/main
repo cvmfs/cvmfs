@@ -2,7 +2,7 @@ cvmfs_test_name="Repository gateway lease on non-existing directory"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-# This test covers the creation of subdirectories that don't yet exists when the reporitory upstream is of type GW.
+# This test covers the creation of subdirectories that don't yet exists when the repository upstream is of type GW.
 # Refers to [CVM-1696](https://sft.its.cern.ch/jira/projects/CVM/issues/CVM-1696)
 #
 # Basically it makes sure that

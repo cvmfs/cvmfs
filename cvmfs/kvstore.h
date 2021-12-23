@@ -34,7 +34,7 @@ struct AllocHeader {
 
 
 /**
- * A MmeoryBuffer is used in the staging phase of new objects until they are
+ * A MemoryBuffer is used in the staging phase of new objects until they are
  * committed.
  */
 struct MemoryBuffer {

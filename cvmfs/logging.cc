@@ -441,7 +441,7 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   if (mask & kLogDebug) {
     pthread_mutex_lock(&lock_debug);
 
-    // Set the file pointer for debuging to stderr, if necessary
+    // Set the file pointer for debugging to stderr, if necessary
     if (file_debug == NULL) file_debug = stderr;
 
     // Get timestamp

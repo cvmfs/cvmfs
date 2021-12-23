@@ -1444,7 +1444,7 @@ AliGenGeVSim* GeVSimStandard(Float_t mult, Float_t vn)
   // Mult is the number of charged particles in |eta| < 0.5
   // Vn is in (%)
   //
-  // Sigma of the Gaussian dN/deta
+  // Sigma of the Gaussian dN/delta
   Float_t sigma_eta  = 2.75;
   //
   // Maximum eta

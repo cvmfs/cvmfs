@@ -58,7 +58,7 @@ def getCatalogFilePath(catalogName, catalogDirectory):
 
 
 def downloadCatalog(repositoryUrl, catalogName, catalogDirectory, beVerbose):
-	# find out some pathes and init the zlib decompressor
+	# find out some paths and init the zlib decompressor
 	subdir = catalogName[0:2]
 	filename = catalogName[2:] + "C"
 	url = repositoryUrl + "/data/" + subdir + "/" + filename

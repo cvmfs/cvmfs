@@ -143,7 +143,7 @@ struct DirectoryListing {
 
 const loader::LoaderExports *loader_exports_ = NULL;
 OptionsManager *options_mgr_ = NULL;
-pid_t pid_ = 0;  /**< will be set after deamon() */
+pid_t pid_ = 0;  /**< will be set after daemon() */
 quota::ListenerHandle *watchdog_listener_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
 
@@ -366,7 +366,7 @@ static void inline TraceInode(const int event,
 
 /**
  * Find the inode number of a file name in a directory given by inode.
- * This or getattr is called as kind of prerequisit to every operation.
+ * This or getattr is called as kind of prerequisite to every operation.
  * We do check catalog TTL here (and reload, if necessary).
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
@@ -1936,7 +1936,7 @@ static void ShutdownMountpoint() {
   delete cvmfs::notification_client_;
   cvmfs::notification_client_ = NULL;
 
-  // The remonter has a reference to the mount point and the inode generation
+  // The remounter has a reference to the mount point and the inode generation
   delete cvmfs::fuse_remounter_;
   cvmfs::fuse_remounter_ = NULL;
 

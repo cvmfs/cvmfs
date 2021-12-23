@@ -192,7 +192,7 @@ string StringifyTimeval(const timeval value) {
 }
 
 /**
- * Parses a timstamp of the form YYYY-MM-DDTHH:MM:SSZ
+ * Parses a timestamp of the form YYYY-MM-DDTHH:MM:SSZ
  * Return 0 on error
  */
 time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
@@ -310,7 +310,7 @@ vector<string> SplitString(const string &str, const char delim,
     }
   }
 
-  // push the remainings of the string and return
+  // push the remains of the string and return
   result.push_back(str.substr(marker));
   return result;
 }

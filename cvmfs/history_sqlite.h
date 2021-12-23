@@ -134,7 +134,7 @@ class SqliteHistory : public History {
   /**
    * Provides a list of all referenced catalog hashes in this History.
    * The hashes will be ordered by their associated revision number in
-   * acending order.
+   * ascending order.
    *
    * @param hashes  pointer to the result vector to be filled
    */

@@ -82,7 +82,7 @@ cvmfs_run_test() {
     sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name || return 101
   fi
 
-  # cheate a new repository revision of the migrated catalogs
+  # create a new repository revision of the migrated catalogs
   echo "create a new repository revision"
   local big_file="${repo_dir}/dir6/bigfile"
   start_transaction $legacy_repo_name || return $?

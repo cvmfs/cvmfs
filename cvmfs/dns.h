@@ -256,7 +256,7 @@ class Resolver : SingleCopy {
 
   /**
    * Limit number of resolved IP addresses.  If throttle_ is 0 it has no effect.
-   * Otherwise, if more than thottle_ IPs are registered for a host, only
+   * Otherwise, if more than throttle_ IPs are registered for a host, only
    * throttle_ randomly picked IPs are returned.
    */
   unsigned throttle_;
@@ -287,7 +287,7 @@ class CaresResolver : public Resolver {
   /**
    * More IP addresses for a single name will be ignored.  Due to c-ares
    * exponential backoff, the number of retries should be limited to 2.
-   * That results in 2 apptempts with the given timeout and a third one with
+   * That results in 2 attempts with the given timeout and a third one with
    * the timeout doubled.
    */
   static const unsigned kMaxAddresses = 16;

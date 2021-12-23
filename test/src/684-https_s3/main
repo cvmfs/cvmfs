@@ -1,5 +1,5 @@
 #
-# Test for running CVMFS agains a HTTPS S3 implementation
+# Test for running CVMFS against a HTTPS S3 implementation
 #
 # In this test we create our own CA (certificate authority).
 # the CA will create and sign the certificates for the minio/S3 backend

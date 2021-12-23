@@ -49,7 +49,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 		nFlat.Elapsed(tFlat).AddField("action", "end_flat_conversion").Send()
 	}()
 
-	// it may happend at the very first round that this two calls return an error, let it be
+	// it may happen at the very first round that this two calls return an error, let it be
 	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
 		l.LogE(err).Error("Error in creating catalog inside `.chains` directory")
 	}
@@ -87,7 +87,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 				continue
 			}
 			// delete the old pubLink
-			// make a new Link to the privatePaht
+			// make a new Link to the privatePath
 			// after that skip and continue
 			l.Log().WithFields(log.Fields{"image": inputImage.GetSimpleName()}).Info("Updating Singularity Image")
 			err = cvmfs.CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
@@ -553,7 +553,7 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	l.Log().WithFields(log.Fields{"action": "prepared thin-image manifest"}).Info(string(b))
 	defer res.Close()
 	// here is possible to use the result of the above ReadAll to have
-	// informantion about the status of the upload.
+	// information about the status of the upload.
 	_, errReadDocker := ioutil.ReadAll(res)
 	if err != nil {
 		l.LogE(errReadDocker).Warning("Error in reading the status from docker")

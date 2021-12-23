@@ -36,7 +36,7 @@ class CallbackBase<void> {
  * functions with the following signature:
  * void <name>(ParamT <parameter>);
  *
- * TODO: One might use varidic templates once C++11 will be supported, in order
+ * TODO: One might use variadic templates once C++11 will be supported, in order
  *       to allow for more than one parameter to be passed to the callback.
  *
  * @param ParamT    the type of the parameter to be passed to the callback

@@ -178,7 +178,7 @@ inline int platform_sigwait(const int signum) {
 }
 
 /**
- * Grants a PID capabilites for ptrace() usage
+ * Grants a PID capabilities for ptrace() usage
  *
  * @param PID  the PID of the process to be granted ptrace()-access
  *             (may be ignored)

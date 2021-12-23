@@ -52,7 +52,7 @@ namespace catalog {
 //
 // 1.x (earlier - code base still in SVN)
 //     * pre-historic times
-// 0.9 (some time 2011, artifical version)
+// 0.9 (some time 2011, artificial version)
 //     * 1.0 catalogs that lack the SHA-1 value for nested catalogs
 const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)

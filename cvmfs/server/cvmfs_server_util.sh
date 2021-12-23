@@ -568,7 +568,7 @@ check_upstream_validity() {
 # @return  0 if overlayfs is installed and viable
 #          1 if it is not viable, and stdout contains a reason
 # This should probably now be called check_overlayfs_viability except
-#   that for backward compatiblity we need to keep the variable that
+#   that for backward compatibility we need to keep the variable that
 #   overrides it, CVMFS_DONT_CHECK_OVERLAYFS_VERSION, and changing the
 #   function name would make the variable name not make sense.
 check_overlayfs_version() {

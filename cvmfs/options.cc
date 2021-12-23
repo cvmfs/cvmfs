@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  *
  * Fills an internal map of key-value pairs from ASCII files in key=value
- * style.  Parameters can be overwritten.  Used to read configuration from
+ * style.  Parameters can be overridden.  Used to read configuration from
  * /etc/cvmfs/...
  */
 

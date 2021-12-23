@@ -29,7 +29,7 @@ produce_files_in() {
   echo "Die unbegreiflich hohen Werke"       > small_files/verse7
   echo "Sind herrlich wie am ersten Tag."    > small_files/verse8
 
-  # create a full poem in one file that will get concatinated later
+  # create a full poem in one file that will get concatenated later
   local bigtxtfile=small_files/heidenroeslein
   touch $bigtxtfile
   echo "Heidenröslein"                     >> $bigtxtfile
@@ -113,7 +113,7 @@ check_chunk_alignment() {
 
   # compare the chunk sizes of associated chunks in the old and the new version
   # of the updated file.
-  # the final output is the chunk difference which occured most frequently
+  # the final output is the chunk difference which occurred most frequently
   # --> in the best case this is 0 :-)
   most_common_size_difference=$(echo " \
   ATTACH '${old_catalog}' AS old; \

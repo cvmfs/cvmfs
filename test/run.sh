@@ -77,7 +77,7 @@ fi
 echo "Start test suite for cvmfs $(cvmfs2 --version)" > $logfile
 date >> $logfile
 
-# read command line paramters
+# read command line parameters
 shift
 test_exclusions=0
 xml_output=""

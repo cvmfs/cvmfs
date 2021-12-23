@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server check" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
@@ -246,7 +246,7 @@ __do_all_checks() {
       echo "ERROR from cvmfs_server check!" >&2
     else
       check_status=succeeded
-      to_syslog_for_repo $repo "sucessfully completed check"
+      to_syslog_for_repo $repo "successfully completed check"
     fi
     update_repo_status $repo check_status $check_status
     echo "Finished $repo at `date`"

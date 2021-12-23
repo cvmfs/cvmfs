@@ -30,7 +30,7 @@ if [ -f /etc/cvmfs/server.local ]; then
   fi
 fi
 
-# setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
+# setup server hooks: no-ops (overridable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
 transaction_after_hook() { :; }
 abort_before_hook() { :; }
@@ -110,7 +110,7 @@ CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
 CVMFS_SERVER_PUBLISH="/usr/bin/cvmfs_publish"
 CVMFS_SERVER_PUBLISH_DEBUG=$CVMFS_SERVER_PUBLISH
 
-# On newer Apache version, reloading is asynchonrous and not guaranteed to succeed.
+# On newer Apache version, reloading is asynchronous and not guaranteed to succeed.
 # The integration test cases set this parameter to true.
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=${CVMFS_SERVER_APACHE_RELOAD_IS_RESTART:=false}
 

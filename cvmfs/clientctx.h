@@ -18,7 +18,7 @@
  * can be figured out from the system. A client context is used to download
  * files with the credentials of the caller.
  *
- * A ClientCtx encapulates thread-local storage.  It can be set somewhere at the
+ * A ClientCtx encapsulates thread-local storage.  It can be set somewhere at the
  * beginning of a file system call and used anywhere during the processing of
  * the call.  It is a singleton.
  */

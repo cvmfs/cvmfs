@@ -53,7 +53,7 @@ class BaseMagicXattr {
   /**
    * This function needs to be called after PrepareValueFenced(),
    * which prepares the necessary data.
-   * It does the computationaly intensive part, which should not
+   * It does the computationally intensive part, which should not
    * be done inside the FuseRemounter::fence(), and returns the
    * value.
    */

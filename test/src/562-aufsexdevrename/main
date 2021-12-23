@@ -33,7 +33,7 @@ produce_files_2_in() {
   # internal copy-up of 'mallory'.
   # Assuming that 'mallory' is not yet in the cvmfs cache, it is downloaded and
   # committed into the cvmfs cache using a rename(tmp file, cache-entry) which
-  # deadlocks with the still blocking intial rename('foo/mallory', ...). Phew!
+  # deadlocks with the still blocking initial rename('foo/mallory', ...). Phew!
   mv foo bar/
 
   popdir

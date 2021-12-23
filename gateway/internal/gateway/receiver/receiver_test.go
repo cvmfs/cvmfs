@@ -69,7 +69,7 @@ func TestReceiverAfterCrashWeCanStillCallCommandAndTheyWillReturnAnError(t *test
 	}
 }
 
-// reduntat test, but it mimic a problem we found in production.
+// redundant test, but it mimic a problem we found in production.
 // after a crash the .Quit() was hanging
 func TestReceiverAfterCrashQuitDoesNotHang(t *testing.T) {
 	receiver := createReceiver(t)

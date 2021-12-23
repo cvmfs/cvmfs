@@ -64,7 +64,7 @@ class IntegerMap {
 
   /**
    * Sets a default (or fallback) value to be used if no other mapping rule fits
-   * Note: A previously defined default value is overwritten.
+   * Note: A previously defined default value is overridden.
    * @param v  the value to be used as a fallback in Map()
    */
   void SetDefault(const T v) {

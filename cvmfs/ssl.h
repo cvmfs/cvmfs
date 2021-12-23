@@ -12,10 +12,10 @@
 /**
  * Manages the location of certificates, either system certificates or
  * the ones in $X509_CERT_DIR or /etc/grid-security/certificates
- * On construction, $X509_CERT_DIR has precendence over
+ * On construction, $X509_CERT_DIR has precedence over
  * /etc/grid-security/certificates.
  * $X509_CERT_BUNDLE is checked for a bundle.
- * The path settings can later be overwritten by UseSystemCertificatePath();
+ * The path settings can later be overridden by UseSystemCertificatePath();
  * the $X509_CERT_BUNDLE settings are unaffected by UseSystemCertificatePath().
  */
 class SslCertificateStore {

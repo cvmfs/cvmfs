@@ -164,7 +164,7 @@ class History {
   virtual bool ExistsBranch(const std::string &branch_name) const = 0;
   virtual bool InsertBranch(const Branch &branch) = 0;
   /**
-   * When removing tags, branches can become abandonded. Remove abandoned
+   * When removing tags, branches can become abandoned. Remove abandoned
    * branches and redirect the parent pointer of their child branches.
    */
   virtual bool PruneBranches() = 0;
@@ -204,7 +204,7 @@ class History {
 
   /**
    * Provides a list of all referenced catalog hashes in this History.
-   * The hashes will be ordered by their timestamp in acending order.
+   * The hashes will be ordered by their timestamp in ascending order.
    *
    * @param hashes  pointer to the result vector to be filled
    */

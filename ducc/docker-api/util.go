@@ -44,7 +44,7 @@ var thinImageVersion = "1.0"
 
 // m is the manifest of the original image
 // repoLocation is where inside the repo we saved the several layers
-// origin is an ecoding fo the original referencese and original registry
+// origin is an encoding of the original references and original registry
 // I believe origin is quite useless but maybe is better to preserv it for
 // ergonomic reasons.
 func MakeThinImage(m Manifest, layersMapping map[string]string, origin string) (ThinImage, error) {
@@ -76,7 +76,7 @@ func (m Manifest) GetSingularityPath() string {
 }
 
 // please note how we use the simple digest from the layers, it is not
-// striclty correct, since we would need the digest of the uncompressed
+// strictly correct, since we would need the digest of the uncompressed
 // layer, that can be found in the Config file of the image.
 // For our purposes, however, this is good enough.
 func (m Manifest) GetChainIDs() []digest.Digest {

@@ -386,7 +386,7 @@ void *TestFetchCollapse2(void *data) {
 }
 
 TEST_F(T_Fetcher, FetchCollapse) {
-  // Test race condition: first open fails, second one succeds
+  // Test race condition: first open fails, second one succeeds
   perf::Statistics statistics;
   BuggyCacheManager bcm;
   bcm.open_2nd_try = true;

@@ -584,7 +584,7 @@ string Catalog::PrintMemStatistics() const {
 
 /**
  * Determine the actual inode of a DirectoryEntry.
- * The first used entry from a hardlink group deterimines the inode of the
+ * The first used entry from a hardlink group determines the inode of the
  * others.
  * @param row_id the row id of a read row in the sqlite database
  * @param hardlink_group the id of a possibly present hardlink group
@@ -790,7 +790,7 @@ Catalog* Catalog::FindSubtree(const PathString &path) const {
       result = FindChild(path_prefix);
 
       // If we found a child serving a part of the path we can stop searching.
-      // Remaining sub path elements are possbily served by a grand child.
+      // Remaining sub path elements are possibly served by a grand child.
       if (result != NULL)
         break;
     }
@@ -818,7 +818,7 @@ Catalog* Catalog::FindChild(const PathString &mountpoint) const {
 
 
 /**
- * For the transtion points for nested catalogs and bind mountpoints, the inode
+ * For the transition points for nested catalogs and bind mountpoints, the inode
  * is ambiguous. It has to be set to the parent inode because nested catalogs
  * are lazily loaded.
  * @param md5path the MD5 hash of the entry to check

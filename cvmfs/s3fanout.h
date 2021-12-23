@@ -328,7 +328,7 @@ class S3FanoutManager : SingleCopy {
   // thread than writing.
   Statistics *statistics_;
 
-  // Report not every occurance of throtteling but only every so often
+  // Report not every occurrence of throttling but only every so often
   uint64_t timestamp_last_throttle_report_;
 
   bool is_curl_debug_;

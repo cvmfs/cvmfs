@@ -522,7 +522,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     return 1;
   }
 
-  // open the catalog to be tagged (to check for existance and for meta info)
+  // open the catalog to be tagged (to check for existence and for meta info)
   const UnlinkGuard catalog_path(
       CreateTempPath(env->tmp_path + "/catalog", 0600));
   const bool catalog_read_write = false;

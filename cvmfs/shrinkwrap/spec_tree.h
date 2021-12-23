@@ -34,7 +34,7 @@ class SpecTreeNode {
    * ^: include flat copy from here on
    * 
    * _: passby directory
-   * -: NOT passby directory (for internal purposes, can be overwritten by _)
+   * -: NOT passby directory (for internal purposes, can be overridden by _)
    * 
    * !: Do not include this file
    */

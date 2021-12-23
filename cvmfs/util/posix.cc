@@ -1088,7 +1088,7 @@ std::string GetCurrentWorkingDirectory() {
 
 
 /**
- * Helper class that provides callback funtions for the file system traversal.
+ * Helper class that provides callback functions for the file system traversal.
  */
 class RemoveTreeHelper {
  public:
@@ -1198,7 +1198,7 @@ std::vector<std::string> FindFilesByPrefix(
 
 /**
  * Finds all direct subdirectories under parent_dir (except ., ..).  Used,
- * for instance, to parse /etc/cvmfs/repositories.d/<reponoame>
+ * for instance, to parse /etc/cvmfs/repositories.d/<reponame>
  */
 std::vector<std::string> FindDirectories(const std::string &parent_dir) {
   std::vector<std::string> result;
@@ -1611,7 +1611,7 @@ void WaitForSignal(int signum) {
 /**
  * Returns -1 if the child crashed or the exit code otherwise.
  * @param pid Process identifier.
- * @param sig_ok List of signals that are still considered a sucessful termination.
+ * @param sig_ok List of signals that are still considered a successful termination.
  */
 int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
   assert(pid > 0);

@@ -21,8 +21,8 @@ class OptionsManager;
 namespace publish {
 
 /**
- * Allows for settings that remember whether they have been explictily
- * overwritten.  Otherwise, default values can be changed to upstream repository
+ * Allows for settings that remember whether they have been explicitly
+ * overridden.  Otherwise, default values can be changed to upstream repository
  * settings.
  */
 template <class T>
@@ -69,7 +69,7 @@ enum EUnionMountRepairMode {
 
 
 // Settings from the point of construction always represent a valid
-// configuration. The constructor sets default values, which can be overwritten
+// configuration. The constructor sets default values, which can be overridden
 // by setters. The setters throw errors when invalid options are detected.
 
 class SettingsSpoolArea {
@@ -124,7 +124,7 @@ class SettingsSpoolArea {
   Setting<std::string> tmp_dir_;
   Setting<std::string> union_mnt_;
   /**
-   * How aggresively should the mount point stack be repaired
+   * How aggressively should the mount point stack be repaired
    */
   Setting<EUnionMountRepairMode> repair_mode_;
 };  // SettingsSpoolArea
@@ -490,7 +490,7 @@ class SettingsBuilder : SingleCopy {
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
    * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
-   * If alias is an empty string, the command still succeds iff there is a
+   * If alias is an empty string, the command still succeeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    */
   SettingsRepository CreateSettingsRepository(const std::string &ident);
@@ -499,7 +499,7 @@ class SettingsBuilder : SingleCopy {
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
    * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
-   * If alias is an empty string, the command still succeds iff there is a
+   * If alias is an empty string, the command still succeeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    * If needs_managed is true, remote repositories are rejected
    * In an "enter environment" (see cmd_enter), the spool area of the enter
@@ -552,7 +552,7 @@ class SettingsBuilder : SingleCopy {
   std::map<std::string, std::string> GetSessionEnvironment();
 
   /**
-   * Create settings from an ephermal writable shell
+   * Create settings from an ephemeral writable shell
    */
   SettingsPublisher* CreateSettingsPublisherFromSession();
 };  // class SettingsBuilder

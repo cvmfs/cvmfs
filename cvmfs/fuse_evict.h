@@ -27,7 +27,7 @@ class NentryTracker;
  * fuse_lowlevel_notify_inval_entry, it falls back to waiting for drainout.
  *
  * Evicting entries from the cache must be done from a separate thread to
- * avoid a deadlock in the fuse callbacks (see Fuse documenatation).
+ * avoid a deadlock in the fuse callbacks (see Fuse documentation).
  */
 class FuseInvalidator : SingleCopy {
   FRIEND_TEST(T_FuseInvalidator, StartStop);

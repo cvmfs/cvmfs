@@ -331,7 +331,7 @@ void WritableCatalogManager::Clone(const std::string destination,
 
 
 /**
- * Copies an entire directory tree from the exisitng from_dir to the
+ * Copies an entire directory tree from the existing from_dir to the
  * non-existing to_dir. The destination's parent directory must exist. On the
  * catalog level, the new entries will be identical to the old ones except
  * for their path hash fields.
@@ -634,7 +634,7 @@ void WritableCatalogManager::AddHardlinkGroup(
   }
 
   // Get a valid hardlink group id for the catalog the group will end up in
-  // TODO(unkown): Compaction
+  // TODO(unknown): Compaction
   uint32_t new_group_id = catalog->GetMaxLinkId() + 1;
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "hardlink group id %u issued",
            new_group_id);
@@ -724,7 +724,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
     LogCvmfs(kLogCatalog, kLogVerboseMsg,
              "updating transition point at %s", entry_path.c_str());
 
-    // find and mount nested catalog assciated to this transition point
+    // find and mount nested catalog associated to this transition point
     shash::Any nested_hash;
     uint64_t nested_size;
     retval = catalog->FindNested(transition_path, &nested_hash, &nested_size);
@@ -781,7 +781,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
                                                     // catalog gets VOMS authz
                                                new_root_entry);
   assert(retval);
-  // TODO(rmeusel): we need a way to attach a catalog directy from an open
+  // TODO(rmeusel): we need a way to attach a catalog directly from an open
   // database to remove this indirection
   delete new_catalog_db;
   new_catalog_db = NULL;
@@ -1086,12 +1086,12 @@ bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
 
 /**
  * Handles the snapshotting of dirty (i.e. modified) catalogs while trying to
- * parallize the compression and upload as much as possible. We use a parallel
+ * parallelize the compression and upload as much as possible. We use a parallel
  * depth first post order tree traversal based on 'continuations'.
  *
  * The idea is as follows:
  *  1. find all leaf-catalogs (i.e. dirty catalogs with no dirty children)
- *     --> these can be processed and uploaded immedately and independently
+ *     --> these can be processed and uploaded immediately and independently
  *         see WritableCatalogManager::GetModifiedCatalogLeafs()
  *  2. annotate non-leaf catalogs with their number of dirty children
  *     --> a finished child will notify it's parent and decrement this number
@@ -1108,7 +1108,7 @@ bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
  *       catalogs.
  *
  * TODO(rmeusel): since all leaf catalogs are finalized in the main thread, we
- *                sacrafice some potential concurrency for simplicity.
+ *                sacrifice some potential concurrency for simplicity.
  */
 WritableCatalogManager::CatalogInfo WritableCatalogManager::SnapshotCatalogs(
                                                    const bool stop_for_tweaks) {
@@ -1288,7 +1288,7 @@ void WritableCatalogManager::CatalogUploadCallback(
 
 /**
  * Finds dirty catalogs that can be snapshot right away and annotates all the
- * other catalogs with their number of dirty decendants.
+ * other catalogs with their number of dirty descendants.
  * Note that there is a convenience wrapper to start the recursion:
  *   WritableCatalogManager::GetModifiedCatalogLeafs()
  *

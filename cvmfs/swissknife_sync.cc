@@ -6,7 +6,7 @@
  * We take all three volumes (namely union, overlay and repository) into
  * account to sync the changes back into the repository.
  *
- * On the repository side we have a catalogs directory that mimicks the
+ * On the repository side we have a catalogs directory that mimics the
  * shadow directory structure and stores compressed and uncompressed
  * versions of all catalogs.  The raw data are stored in the data
  * subdirectory in zlib-compressed form.  They are named with their SHA-1
@@ -808,7 +808,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 
-  // Should be before the syncronization starts to avoid race of GetTTL with
+  // Should be before the synchronization starts to avoid race of GetTTL with
   // other sqlite operations
   if ((params.ttl_seconds > 0) &&
       ((params.ttl_seconds != catalog_manager.GetTTL()) ||

@@ -22,7 +22,7 @@ spec:
     storage: 5Gi
   volumeMode: Filesystem
   accessModes:
-  # Exclusice access to a single pod (the cvmfs daemonset)
+  # Exclusive access to a single pod (the cvmfs daemonset)
   - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: cvmfs-noderoot

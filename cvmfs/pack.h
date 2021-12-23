@@ -169,7 +169,7 @@ enum State {
  * "object pack", which otherwise would need special treatment.
  *
  * The serialized format has a global, human readable header which has lines of
- * character keys and string values (like the cvmfs manifest) follwed by a "--"
+ * character keys and string values (like the cvmfs manifest) followed by a "--"
  * separator line followed by the index of objects. The index contains one line
  * for each item in the pack. Each line contains the following space-separated
  * tokens:

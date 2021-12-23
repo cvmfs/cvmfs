@@ -55,7 +55,7 @@ bool Sql::Execute() {
 /**
  * Execute the prepared statement or fetch its next row.
  * This method is intended to step through the result set.
- * If it returns false this does not neccessarily mean, that the actual
+ * If it returns false this does not necessarily mean, that the actual
  * statement execution failed, but that no row was fetched.
  * @return true if a new row was fetched otherwise false
  */

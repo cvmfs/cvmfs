@@ -36,7 +36,7 @@ struct MemStatistics {
   int page_cache_hit;
   int page_cache_miss;
   int schema_used;  ///< Bytes used to store db schema
-  int stmt_used;  ///< Bytes used for prepared statmements (lookaside + heap)
+  int stmt_used;  ///< Bytes used for prepared statements (lookaside + heap)
 };
 
 class Sql;
@@ -307,7 +307,7 @@ class Database : SingleCopy {
 
 /**
  * Base class for all SQL statement classes.  It wraps a single SQL statement
- * and all neccessary calls of the sqlite3 API to deal with this statement.
+ * and all necessary calls of the sqlite3 API to deal with this statement.
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE  *

@@ -3,12 +3,12 @@ Installation Instructions
 
 The CernVM-FS build system uses cmake.  
 
-In order to corerctly build the system several dependencies are necessary.
+In order to correctly build the system several dependencies are necessary.
 The dependencies are listed inside the `packaging` directory.
 
 For debian based system you can find the dependencies inside the `control` file under `packaging/debian/cvmfs`.
 
-Similarly for CentOS you can find them inside `packagin/rpm/cvmfs-universal.spec`.
+Similarly for CentOS you can find them inside `packaging/rpm/cvmfs-universal.spec`.
 
 In order to compile and install, run from the source directory
 

@@ -57,7 +57,7 @@ func (db *BoltLeaseDB) Close() error {
 	return db.store.Close()
 }
 
-// NewLease attemps to acquire a new lease for the given path
+// NewLease attempts to acquire a new lease for the given path
 func (db *BoltLeaseDB) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int, token LeaseToken) error {
 	return db.store.Update(func(txn *bolt.Tx) error {
 		t0 := time.Now()

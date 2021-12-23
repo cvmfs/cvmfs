@@ -116,7 +116,7 @@ typedef char Suffix;
  * Holds a hash digest and provides from string / to string conversion and
  * comparison.  The kAny algorithm may not be used in functions!  The algorithm
  * has to be changed beforehand.
- * This class is not used directly, but used as base clase of Md5, Sha1, ...
+ * This class is not used directly, but used as base class of Md5, Sha1, ...
  */
 template<unsigned digest_size_, Algorithms algorithm_>
 struct Digest {
@@ -214,7 +214,7 @@ struct Digest {
    * Generates a purely random hash
    * Only used for testing purposes
    *
-   * @param seed  random number generator seed (for reproducability)
+   * @param seed  random number generator seed (for reproducibility)
    */
   void Randomize(const uint64_t seed) {
     Prng prng;
@@ -226,7 +226,7 @@ struct Digest {
    * Generates a purely random hash
    * Only used for testing purposes
    *
-   * @param prng  random number generator object (for external reproducability)
+   * @param prng  random number generator object (for external reproducibility)
    */
   void Randomize(Prng *prng) {
     const unsigned bytes = GetDigestSize();
@@ -239,7 +239,7 @@ struct Digest {
   void set_suffix(const Suffix s) { suffix = s; }
 
   /**
-   * Generates a hexified repesentation of the digest including the identifier
+   * Generates a hexified representation of the digest including the identifier
    * string for newly added hashes.
    *
    * @param with_suffix  append the hash suffix (C,H,X, ...) to the result
@@ -264,7 +264,7 @@ struct Digest {
   }
 
   /**
-   * Generates a hexified repesentation of the digest including the identifier
+   * Generates a hexified representation of the digest including the identifier
    * string for newly added hashes.  Output is in the form of
    * 'openssl x509 fingerprint', e.g. 00:AA:BB:...-SHAKE128
    *
@@ -492,7 +492,7 @@ unsigned GetContextSize(const Algorithms algorithm);
 
 /**
  * Holds an OpenSSL context, only required for hash operations.  Allows to
- * deferr the storage allocation for the context to alloca.
+ * defer the storage allocation for the context to alloca.
  */
 class ContextPtr {
  public:
@@ -533,7 +533,7 @@ inline void HmacString(const std::string &key, const std::string &content,
  * Only used for AWS4 signature.
  *
  * Adding SHA-256 to the standard hash infrastructure would generally bloat the
- * digets size to 32 bytes and require client data structure transformation
+ * digits size to 32 bytes and require client data structure transformation
  * during hotpatch.
  */
 std::string Hmac256(const std::string &key, const std::string &content,

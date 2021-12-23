@@ -289,7 +289,7 @@ SettingsRepository::SettingsRepository(
 
 
 void SettingsRepository::SetUrl(const std::string &url) {
-  // TODO(jblomer): sanitiation, check availability
+  // TODO(jblomer): sanitization, check availability
   url_ = url;
 }
 
@@ -334,7 +334,7 @@ SettingsPublisher::SettingsPublisher(
 
 
 void SettingsPublisher::SetUrl(const std::string &url) {
-  // TODO(jblomer): sanitiation, check availability
+  // TODO(jblomer): sanitization, check availability
   url_ = url;
 }
 

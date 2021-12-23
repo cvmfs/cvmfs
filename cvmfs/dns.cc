@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  *
  * The CernVM-FS name resolving uses objects that inherit from the Resolver
- * interface.  Resolvers implement a vector interface that resolves mutliple
+ * interface.  Resolvers implement a vector interface that resolves multiple
  * names in parallel.  Common cases such as IP addresses as names are handled
  * by the base class -- Resolver implementations only have to resolve real host
  * names to IPv4/6 addresses, using given search domains if necessary.
@@ -225,7 +225,7 @@ void Host::CopyFrom(const Host &other) {
 
 
 /**
- * Creates a copy of the original host with a new ID and sets a new dealine
+ * Creates a copy of the original host with a new ID and sets a new deadline
  * given in seconds from the current time.
  */
 Host Host::ExtendDeadline(const Host &original, unsigned seconds_from_now) {
@@ -275,7 +275,7 @@ bool Host::IsEquivalent(const Host &other) const {
 
 
 /**
- * Compares the TTL from a provious call to time() with the current time.
+ * Compares the TTL from a previous call to time() with the current time.
  */
 bool Host::IsExpired() const {
   time_t now = time(NULL);
@@ -364,7 +364,7 @@ Host Resolver::Resolve(const string &name) {
 
 
 /**
- * Calls the overwritten concrete resolver, verifies the sanity of the returned
+ * Calls the overridden concrete resolver, verifies the sanity of the returned
  * addresses and constructs the Host objects in the same order as the names.
  */
 void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
@@ -976,7 +976,7 @@ void CaresResolver::SetSystemSearchDomains() {
 
 /**
  * Polls on c-ares sockets and triggers call-backs execution.  Might be
- * necessary to call this repeatadly.
+ * necessary to call this repeatedly.
  */
 void CaresResolver::WaitOnCares() {
   // Adapted from libcurl
@@ -1014,7 +1014,7 @@ void CaresResolver::WaitOnCares() {
   }
 
   if (nfds == 0) {
-    // Call ares_process() unconditonally here, even if we simply timed out
+    // Call ares_process() unconditionally here, even if we simply timed out
     // above, as otherwise the ares name resolve won't timeout.
     ares_process_fd(*channel_, ARES_SOCKET_BAD, ARES_SOCKET_BAD);
   } else {

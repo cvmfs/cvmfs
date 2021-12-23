@@ -2110,7 +2110,7 @@ TYPED_TEST(T_CatalogTraversal, DepthFirstSearchFullHistoryTraversalNoRepeat) {
 
   this->CheckVisitedCatalogs(catalogs,
     DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs);
-  // disable for CatatalogTraversalParallel since the ordering is different
+  // disable for CatalogTraversalParallel since the ordering is different
   if (!TraversalIsParallel<TypeParam>()) {
     this->CheckCatalogSequence(catalogs,
       DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs);

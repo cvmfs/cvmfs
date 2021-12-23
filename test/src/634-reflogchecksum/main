@@ -37,7 +37,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   # The stratum 0 reflog checksum is now stored in the manifest but it can
-  # be overwritten by the local reflog checksum, e.g. on stratum 1.
+  # be overridden by the local reflog checksum, e.g. on stratum 1.
   # Deleting the checksum therefore means setting it to the null hash
   echo "*** check missing checksum"
   echo -n "0000000000000000000000000000000000000000" > $checksum

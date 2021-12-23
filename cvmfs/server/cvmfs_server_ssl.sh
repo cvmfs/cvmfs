@@ -5,7 +5,7 @@
 #
 # Functionality related to SSL
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_sys.sh
 # - cvmfs_server_util.sh
 # - cvmfs_server_masterkeycard.sh

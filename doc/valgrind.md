@@ -3,7 +3,7 @@
   - build with valgrind-devel
   - no autofs
   - use `-o simple_options_parsing`
-    (no qotes for CVMFS_HTTP_PROXY and CVMFS_SERVER_URL in the options)
+    (no quotes for CVMFS_HTTP_PROXY and CVMFS_SERVER_URL in the options)
   - use `-o disable_watchdog`
   - user root (`-o gid=0,uid=0`)
   - no shared cache to avoid forking the quota manager, CVMFS_QUOTA_LIMIT=-1 to disable quota sqlite handling

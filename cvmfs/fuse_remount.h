@@ -116,7 +116,7 @@ class FuseRemounter : SingleCopy {
    */
   time_t catalogs_valid_until_;
   /**
-   * In drainout mode, the fuse module sets the timeout of meta data replys to
+   * In drainout mode, the fuse module sets the timeout of meta data replies to
    * zero.  If supported by Fuse, the FuseInvalidator will evict all active
    * entries from the kernel cache.  Drainout mode is left only once the new
    * root catalog is active (after TryFinish()).

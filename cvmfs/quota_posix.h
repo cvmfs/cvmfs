@@ -186,7 +186,7 @@ class PosixQuotaManager : public QuotaManager {
 
   /**
    * Make sure that the amount of data transferred through the RPC pipe is
-   * within the OS's guarantees for atomiticity.
+   * within the OS's guarantees for atomicity.
    */
   static const unsigned kMaxDescription = 512-sizeof(LruCommand);
 

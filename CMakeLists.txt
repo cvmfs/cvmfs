@@ -271,7 +271,7 @@ if (NOT MACOSX)
   set (REQUIRED_HEADERS ${REQUIRED_HEADERS}
                         sys/statfs.h)
 
-  # As of attr-2.4.48, the attr/xattr.h header disappeard in favor of sys/xattr.h
+  # As of attr-2.4.48, the attr/xattr.h header disappeared in favor of sys/xattr.h
   #
   # Unfortunately, attr/xattr.h fails to compile without including sys/types.h
   # before including attr/xattr.h (it uses size_t and ssize_t).

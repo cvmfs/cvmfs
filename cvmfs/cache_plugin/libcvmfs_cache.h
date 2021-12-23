@@ -19,7 +19,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-// Map C++ clases to their C interface names
+// Map C++ classes to their C interface names
 typedef class SimpleOptionsParser cvmcache_option_map;
 #else
 typedef struct OptionsManager cvmcache_option_map;
@@ -65,7 +65,7 @@ enum cvmcache_capabilities {
   // A read-only cache needs to be pre-populated by other means
   CVMCACHE_CAP_WRITE       = 1,
   // Proper refcounting is implemented; for lower tier caches, this capability
-  // can be unset and reference counting can simply beomce file existence check
+  // can be unset and reference counting can simply become file existence check
   CVMCACHE_CAP_REFCOUNT    = 2,
   CVMCACHE_CAP_SHRINK      = 4,   // clients can ask the cache to shrink
   CVMCACHE_CAP_INFO        = 8,   // cache plugin knows about its fill level
@@ -163,7 +163,7 @@ struct cvmcache_callbacks {
   int (*cvmcache_info)(struct cvmcache_info *info);
   int (*cvmcache_shrink)(uint64_t shrink_to, uint64_t *used);
   /**
-   * Listing can be "approximate", e.g. if files are removed and/or addded in
+   * Listing can be "approximate", e.g. if files are removed and/or added in
    * the meantime, this may or may not be reflected.
    */
   int (*cvmcache_listing_begin)(uint64_t lst_id,
@@ -224,7 +224,7 @@ void cvmcache_wait_for(struct cvmcache_context *ctx);
 uint32_t cvmcache_max_object_size(struct cvmcache_context *ctx);
 
 /**
- * Can be used to spawn a second process that superwises the cache plugin.
+ * Can be used to spawn a second process that supervises the cache plugin.
  * The watchdog can use gdb/lldb to generate stack traces.  Must be closed by
  * a call to cvmcache_close_watchdog(), otherwise the main process will be
  * reported has having died unexpectedly.

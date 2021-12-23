@@ -7,7 +7,7 @@
 #
 
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_json.sh
 
@@ -299,7 +299,7 @@ get_published_root_hash() {
 # retrieves the current manifest without signature
 #
 # @param repository_name   the name of the repository to be checked
-# @return                  echoes the published manufest
+# @return                  echoes the published manifest
 get_raw_manifest() {
   local repository_name=$1
 
@@ -590,7 +590,7 @@ get_expiry_from_string() {
 # figures out the time to expiry of the repository's whitelist
 #
 # @param stratum0  path/URL to stratum0 storage
-# @return          number of seconds until expiry (negativ if already expired)
+# @return          number of seconds until expiry (negative if already expired)
 get_expiry() {
   local name=$1
   local stratum0=$2

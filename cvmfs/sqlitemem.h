@@ -60,7 +60,7 @@ class SqliteMemoryManager {
   static const unsigned kScratchSize = kScratchSlotSize * kScratchNoSlots;
 
   /**
-   * Empricially, the largest page cache allocation is 1296B.
+   * Empirically, the largest page cache allocation is 1296B.
    */
   static const unsigned kPageCacheSlotSize = 1300;
   /**

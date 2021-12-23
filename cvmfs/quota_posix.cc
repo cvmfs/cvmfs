@@ -488,7 +488,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       pid_t pid;
       int statloc;
       if ((pid = fork()) == 0) {
-        // TODO(jblomer): eviciting files in the cache should perhaps become a
+        // TODO(jblomer): evicting files in the cache should perhaps become a
         // thread.  This would also allow to block the chunks and prevent the
         // race with re-insertion.  Then again, a thread can block umount.
 #ifndef DEBUGMSG

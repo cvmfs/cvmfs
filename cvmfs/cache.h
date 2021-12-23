@@ -43,7 +43,7 @@ enum CacheModes {
  *
  * Writing into the cache is streamed and transactional: a file descriptor must
  * be acquired from StartTxn and the object is only visible in the cache after
- * CommitTxn.  The state of the transaction is carried in an opque transaction
+ * CommitTxn.  The state of the transaction is carried in an opaque transaction
  * object, which needs to be provided by the caller.  The size of the object is
  * returned by SizeOfTxn.  This way, users of derived classes can take care of
  * the storage allocation (e.g. on the stack), while the derived class
@@ -205,7 +205,7 @@ class CacheManager : SingleCopy {
    * When RestoreState is called, the cache has already exactly one file
    * descriptor open: the root file catalog. This file descriptor might be
    * remapped to another number. A return value of -1 means no action needs
-   * to take place. A smaller value inidicates an error.
+   * to take place. A smaller value indicates an error.
    */
   int RestoreState(const int fd_progress, void *state);
   void FreeState(const int fd_progress, void *state);
@@ -226,7 +226,7 @@ class CacheManager : SingleCopy {
  protected:
   CacheManager();
 
-  // Unless overwritten, Saving/Restoring states will crash the Fuse module
+  // Unless overridden, Saving/Restoring states will crash the Fuse module
   virtual void *DoSaveState() { return NULL; }
   virtual int DoRestoreState(void *data) { return false; }
   virtual bool DoFreeState(void *data) { return false; }

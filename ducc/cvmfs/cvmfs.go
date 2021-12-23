@@ -117,7 +117,7 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 		return err
 	}
 	// from the relativePath we remove the first part of the path.
-	// The part we remove reprensent the same directory where is the target.
+	// The part we remove represent the same directory where is the target.
 	linkChunks := strings.Split(relativePath, string(os.PathSeparator))
 	link := filepath.Join(linkChunks[1:]...)
 

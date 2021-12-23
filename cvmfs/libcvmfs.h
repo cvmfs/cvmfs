@@ -61,7 +61,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-// Map C++ clases to their C interface names
+// Map C++ classes to their C interface names
 typedef class LibContext cvmfs_context;
 typedef class SimpleOptionsParser cvmfs_option_map;
 #else

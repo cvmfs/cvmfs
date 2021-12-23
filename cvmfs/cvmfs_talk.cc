@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
 
   int c;
   // 's' for socket would have been a better option letter but we keep 'p'
-  // for backwards compatibility.  The '+' at the beginning of the option stirng
+  // for backwards compatibility.  The '+' at the beginning of the option string
   // prevents permutation of the option and non-option arguments.
   while ((c = getopt(argc, argv, "+hi:p:")) != -1) {
     switch (c) {

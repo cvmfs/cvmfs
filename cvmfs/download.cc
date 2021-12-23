@@ -1867,7 +1867,7 @@ void DownloadManager::SetIpPreference(dns::IpPreference preference) {
 
 
 /**
- * Sets two timeout values for proxied and for direct conections, respectively.
+ * Sets two timeout values for proxied and for direct connections, respectively.
  * The timeout counts for all sorts of connection phases,
  * DNS, HTTP connect, etc.
  */
@@ -1991,7 +1991,7 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
     if (opt_proxy_groups_->size() > 1) {
       opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1) %
       opt_proxy_groups_->size();
-      // Remeber the timestamp of switching to backup proxies
+      // Remember the timestamp of switching to backup proxies
       if (opt_proxy_groups_reset_after_ > 0) {
         if (opt_proxy_groups_current_ > 0) {
           if (opt_timestamp_backup_proxies_ == 0)
@@ -2075,7 +2075,7 @@ void DownloadManager::SwitchHost() {
  * Orders the hostlist according to RTT of downloading .cvmfschecksum.
  * Sets the current host to the best-responsive host.
  * If you change the host list in between by SetHostChain(), it will be
- * overwritten by this function.
+ * overridden by this function.
  */
 void DownloadManager::ProbeHosts() {
   vector<string> host_chain;
@@ -2211,7 +2211,7 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
  *   and fallback proxies (if any).
  * Tries at most three random Stratum 1s before giving up.
  * If you change the host list in between by SetHostChain() or the fallback
- *   proxy list by SetProxyChain(), they will be overwritten by this function.
+ *   proxy list by SetProxyChain(), they will be overridden by this function.
  */
 bool DownloadManager::ProbeGeo() {
   vector<string> host_chain;

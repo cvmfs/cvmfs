@@ -153,7 +153,7 @@ struct cvmcache_context *ctx;
 
 
 /**
- * Implements all the cache plugin callbacks.  Singelton.
+ * Implements all the cache plugin callbacks.  Singleton.
  */
 class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
  public:

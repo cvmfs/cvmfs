@@ -30,7 +30,7 @@
 # Variables you may define are:
 #  DOXYFILE_SOURCE_DIR - Path where the Doxygen input files are.
 #  	Defaults to the current source directory.
-#  DOXYFILE_EXTRA_SOURCES - Additional source diretories/files for Doxygen to scan.
+#  DOXYFILE_EXTRA_SOURCES - Additional source directories/files for Doxygen to scan.
 #  	The Paths should be in double quotes and separated by space. e.g.:
 #  	 "${CMAKE_CURRENT_BINARY_DIR}/foo.c" "${CMAKE_CURRENT_BINARY_DIR}/bar/"
 #

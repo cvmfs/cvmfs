@@ -531,7 +531,7 @@ cvmfs_chksetup() {
     fi
   done
 
-  # Check repository specfic settings
+  # Check repository specific settings
   local repo_list="$(list_repos)"
   local repo
   for repo in $repo_list

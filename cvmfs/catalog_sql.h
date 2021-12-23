@@ -73,7 +73,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
 
 /**
  * Base class for all SQL statement classes.  It wraps a single SQL statement
- * and all neccessary calls of the sqlite3 API to deal with this statement.
+ * and all necessary calls of the sqlite3 API to deal with this statement.
  */
 class SqlCatalog : public sqlite::Sql {
  public:
@@ -169,7 +169,7 @@ class SqlCatalog : public sqlite::Sql {
 
 
 /**
- * Common ancestor of SQL statemnts that deal with directory entries.
+ * Common ancestor of SQL statements that deal with directory entries.
  */
 class SqlDirent : public SqlCatalog {
  public:
@@ -298,7 +298,7 @@ class SqlLookup : public SqlDirent {
                            const bool expand_symlink = true) const;
 
   /**
-   * DirectoryEntrys do not contain their path hash.
+   * DirectoryEntries do not contain their path hash.
    * This method retrieves the saved path hash from the database
    * @return the MD5 path hash of a freshly performed lookup
    */
@@ -350,7 +350,7 @@ class SqlLookupInode : public SqlLookup {
  * This SQL statement is only used for legacy catalog migrations and has been
  * moved here as it needs to use a locally defined macro inside catalog_sql.cc
  *
- * Queries a single catalog and looks for DirectoryEntrys that have direct
+ * Queries a single catalog and looks for DirectoryEntries that have direct
  * children in the same catalog but are marked as 'nested catalog mountpoints'.
  * This is an inconsistent situation, since a mountpoint is supposed to be empty
  * and it's children are stored in the corresponding referenced nested catalog.
@@ -358,7 +358,7 @@ class SqlLookupInode : public SqlLookup {
  * Note: the user code needs to check if there is a corresponding nested catalog
  *       reference for the found dangling mountpoints. If so, we also have a
  *       bogus state, but it is not reliably fixable automatically. The child-
- *       DirectoryEntrys would be masked by the mounting nested catalog but it
+ *       DirectoryEntries would be masked by the mounting nested catalog but it
  *       is not clear if we can simply delete them or if this would destroy data.
  */
 class SqlLookupDanglingMountpoints : public catalog::SqlLookup {

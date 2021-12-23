@@ -88,7 +88,7 @@ cvmfs_run_test() {
   echo "check that it produces the expected catalog statistics errors"
   [ $(cat $check_log_1 | grep '^catalog statistics mismatch' | wc -l) -eq 3 ] || return 15
 
-  # cheate a new repository revision of the migrated catalogs
+  # create a new repository revision of the migrated catalogs
   echo "create a new repository revision"
   start_transaction $legacy_repo_name || return $?
   cd $repo_dir

@@ -182,7 +182,7 @@ The conversion is quite straightforward, we first download the input image, we
 store each layer on the cvmfs repository, we create the output image and unpack
 the singularity one, finally we upload the output image to the registry.
 
-It does not support dowloading images that are not public.
+It does not support downloading images that are not public.
 
 In order to publish images to a registry is necessary to sign up in the
 docker hub. It will use the user from the recipe, while it will read the

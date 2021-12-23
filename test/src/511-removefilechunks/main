@@ -29,7 +29,7 @@ produce_files_in() {
   echo "Die unbegreiflich hohen Werke"       > small_files/verse7
   echo "Sind herrlich wie am ersten Tag."    > small_files/verse8
 
-  # create a full poem in one file that will get concatinated later
+  # create a full poem in one file that will get concatenated later
   local bigtxtfile=small_files/heidenroeslein
   touch $bigtxtfile
   echo "Heidenröslein"                     >> $bigtxtfile

@@ -144,7 +144,7 @@
   * Add the cvmfs_publish transitional utility
   * Add convert-singularity-image command to DUCC
   * Enable readdir caching on fuse3 and kernel >= 4.20
-  * Add fuse forget_multi calback for fuse >= 2.9
+  * Add fuse forget_multi callback for fuse >= 2.9
   * Add POSIX external cache plugin (CVM-1823)
   * Manage DUCC daemon with systemd units
 
@@ -179,7 +179,7 @@
   * Fix packaging for Fedora 31
   * [gw] use watchdog in cvmfs_receiver (CVM-1864)
   * [gw] build debug version of cvmfs_receiver (CVM-1863)
-  * [gw] fix lease acquisiton on non-existing paths (CVM-1696)
+  * [gw] fix lease acquisition on non-existing paths (CVM-1696)
   * Optimize loading of nested catalogs (CVM-1848)
   * Fix creation of nested catalogs by ingestion command (CVM-1862)
   * [gw] fix/relax JSON parsing of success status message
@@ -412,7 +412,7 @@
   * Add RapidCheck for property based testing
   * Fix compilation on macOS 10.11+
   * Add stratum 1 agent for triggered replication
-  * Autmatically restart failed authz helper after a cool-off period
+  * Automatically restart failed authz helper after a cool-off period
   * Make `true` to be a valid boolean option
 
 2.4.5:
@@ -484,7 +484,7 @@
   * Use a repository layout revision as CVMFS_CREATOR_VERSION (CVM-1065)
   * Improve error reporting when cache hosting file system is full (CVM-1253)
   * Perform fail-over when whitelist or manifest is corrupted (CVM-837)
-  * Increase maximum repostory name from ~30 chars to 60 chars (CVM-1173)
+  * Increase maximum repository name from ~30 chars to 60 chars (CVM-1173)
   * Add cvmfs_server gc -a option (CVM-1095)
   * Fixes for OpenSSL 1.1 interface changes
   * Use rsync "perishable" feature instead of list-catalogs (CVM-1199)
@@ -562,7 +562,7 @@
   * Fixes for macOS 10.12 Sierra (CVM-1084)
 
 2.3.2:
-  * Fix error reporting when downloading replication sentinal file (CVM-1078)
+  * Fix error reporting when downloading replication sentinel file (CVM-1078)
   * Fix publishing of auto catalog markers (CVM-1079)
   * Fix segfault in debug logging of certain download failures (CVM-1076)
 
@@ -616,7 +616,7 @@
   * Call cvmfs_suid_helper with a clean environment from cvmfs_server
   * Add .cvmfsreflog for garbage collection
   * Omit S3 bucket number if only a single bucket is used
-  * Warn when forcfully remounting the file system stack on the server, new
+  * Warn when forcefully remounting the file system stack on the server, new
     parameter CVMFS_FORCE_REMOUNT_WARNING
   * Add support for default.conf in config repository (CVM-993)
 
@@ -709,7 +709,7 @@
   * Add make check target
   * Fix leak of temporary files in .cvmfsdirtab handling (CVM-818)
   * Allow geodb update for non-root users (CVM-895)
-  * Don't commit exisiting files to local storage backend in server (CVM-894)
+  * Don't commit existing files to local storage backend in server (CVM-894)
   * Fix stale lock file on server machine crash (CVM-810)
   * Fix crash for invalid spooler definition (CVM-891)
   * Fix leak of temporary files in the S3 backend (CVM-881)
@@ -785,7 +785,7 @@
     CVMFS_CLAIM_OWNERSHIP (CVM-678)
   * Add support for garbage-collected repositories (CVM-583, CVM-760)
   * Add support for automatically ordering Stratum 1 servers according to
-    geographic loations (CVM-629, CVM-630)
+    geographic locations (CVM-629, CVM-630)
   * Add 'host probe geo' command to cvmfs_talk
   * Add CVMFS_USE_GEOAPI parameter
   * Add host_list extended attribute
@@ -872,7 +872,7 @@
   * Fix automounter map on EL6.2 (CVM-601)
   * Log to syslog in addition to stderr when debug log cannot
     be opened (CVM-273)
-  * Fix false parsing of /etc/cvmfs/domaind.d/cern.ch.* on mount
+  * Fix false parsing of /etc/cvmfs/domain.d/cern.ch.* on mount
     (CVM-600)
   * Improve error logging when loading the cvmfs library (cf. CVM-595)
   * Fix crash in exclusive cache mode if unpin listener is called
@@ -960,7 +960,7 @@
   * Automatically unmount a crashed mountpoint from the watchdog
   * Connect SQlite logger to cvmfs logger
   * Switch to sqlite 3.7.17
-  * Add check for accessibiliy of /etc/nsswitch.conf to
+  * Add check for accessibility of /etc/nsswitch.conf to
     cvmfs_config chksetup
   * Add experimental support for overlayfs as an alternative to
     aufs
@@ -983,7 +983,7 @@
   * Fix various issues with reading of chunked files
   * Decrease memory consumption of the inode tracker
   * Remove trailing empty attribute in listattr callback
-  * Make repositories replicatable by default
+  * Make repositories replicable by default
   * Experimental support for repository tags (named snapshots).
     Allows to mount a specific repository version and to rollback
     and re-publish previous repository states.
@@ -999,7 +999,7 @@
 2.1.12:
   * Perform host failover after unsuccessful proxy
     failover (test all paths)
-  * Improve recovery reliabiliy after node crash
+  * Improve recovery reliability after node crash
     (force removal of cache database)
   * Fix help text of cvmfs_talk
   * Fix timeout for NFS shared maps
@@ -1193,7 +1193,7 @@
   * Create cvmfs user in cvmfs_server if necessary
   * Fixed cvmfs_fsck on xfs
   * Fixed get_origin in config.sh
-  * Speed up searach for existing mount point in mount helper
+  * Speed up search for existing mount point in mount helper
   * Log to syslog when new repository snapshot is applied
   * Fixed presentation error in cvmfs_stat
   * Added repository prefix to syslog messages
@@ -1221,7 +1221,7 @@
   * Verify decompressed size on download
   * Unlink left-over temporary file catalogs in cvmfs_fsck
   * Fixed a file descriptor leak on loading certificates
-  * Move dodgy files into a quarantaine folder in the cache
+  * Move dodgy files into a quarantine folder in the cache
   * Log proxy switches to syslog
   * Use stack buffer for streamed file I/O
   * Fixed a file descriptor leak in the catalog load code
@@ -1451,7 +1451,7 @@
   * Fixed some multi-threading bugs
   * Switched to libcurl 7.21.3
   * Include timestamp in debug log
-  * Changed failover + load-balaning proxy syntax: introduced 3rd
+  * Changed failover + load-balancing proxy syntax: introduced 3rd
     level to specify load-balance blocks first, failover later
   * Proper mapping of file catalogs and whitelists to repository
     names
@@ -1504,7 +1504,7 @@
   * add last modified timestamp when making catalog snapshot
   * fixed time comparison to work on UTC instead of
     local time
-  * use the SQlite auto_vaccum=full feature for new catalogs
+  * use the SQlite auto_vacuum=full feature for new catalogs
   * added cvmfs_unsign tool to strip a signature from a
     file catalog
   * store .cvmfscatalog as symlink into data dir

@@ -9,7 +9,7 @@ These problems can be overcome by preloading a CernVM-FS cache on the shared clu
 
   * Millions of synchronized meta-data operations per node (path lookups, in particular) will not drown the shared cluster file system but resolve locally in the parrot-cvmfs clients.
   * The file system is always consistent; applications never see half-synchronized directories.
-  * After initial preloading, only change sets need to be transfered to the shared file system.  This is much faster than `rsync`, which always has to browse the entire name space.
+  * After initial preloading, only change sets need to be transferred to the shared file system.  This is much faster than `rsync`, which always has to browse the entire name space.
   * Identical files are internally de-duplicated.  While space of the order of terabytes is usually not an issue for HPC shared file systems, file system caches benefit from deduplication. It is also possible to preload only specific parts of a repository namespace.
   * Support for extra functionality implemented by CernVM-FS such as versioning and variant symlinks (symlinks resolved according to environment variables).
 
@@ -32,12 +32,12 @@ This will preload the entire repository.  In order to preload only specific part
     /example/x86_64-2.6-gnu-4.8.3/Packages/gcc
     /example/x86_64-2.6-gnu-4.8.3/Packages/AliRoot/v5*
 
-The corresponding invokation of `cvmfs_preload` is
+The corresponding invocation of `cvmfs_preload` is
 
     cvmfs_preload -u http://hcc-cvmfs.unl.edu:8000/cvmfs/alice.cern.ch -r /shared/cache \
       -d </path/to/dirtab>
 
-The initial preloading can take several hours to a few days.  Subsequent invokations of the same command only transfer a change set and typically finish within seconds or minutes. These subsequent invokations need to be either done manually when necessary or scheduled for instance with a cron job.
+The initial preloading can take several hours to a few days.  Subsequent invocations of the same command only transfer a change set and typically finish within seconds or minutes. These subsequent invocations need to be either done manually when necessary or scheduled for instance with a cron job.
 
 The `cvmfs_preload` command can preload files from multiple repositories
 into the same cache directory.
