@@ -26,13 +26,13 @@ void Publisher::WipeScratchArea() {
 }
 
 void Publisher::Abort() {
-  if (is_publishing()) {
+  if (is_publishing_.IsLocked()) {
     throw EPublish(
       "Repository " + settings_.fqrn() + " is currently publishing "
       "(aborting abort)", EPublish::kFailTransactionState);
   }
 
-  if (!in_transaction()) {
+  if (!in_transaction_.IsLocked()) {
     if (session_->has_lease()) {
       LogCvmfs(kLogCvmfs, kLogSyslogWarn, "removing stale session token for %s",
                settings_.fqrn().c_str());
@@ -64,9 +64,7 @@ void Publisher::Abort() {
     managed_node_->Mount();
   }
 
-  ServerLockFile::Release(
-    settings_.transaction().spool_area().transaction_lock());
-  in_transaction_ = false;
+  in_transaction_.Release();
 }
 
 }  // namespace publish

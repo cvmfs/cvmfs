@@ -47,9 +47,18 @@ class CheckoutMarker {
  */
 class ServerLockFile {
  public:
-  static bool Acquire(const std::string &path, bool ignore_stale);
-  static void Release(const std::string &path);
-  static bool IsLocked(const std::string &path, bool ignore_stale);
+  ServerLockFile(const std::string &path, bool ignore_stale)
+    : path_(path), ignore_stale_(ignore_stale) {}
+
+  bool Acquire();
+  void Release();
+  bool IsLocked() const;
+
+  const std::string &path() const { return path_; }
+
+ private:
+  std::string path_;
+  bool ignore_stale_;
 };
 
 

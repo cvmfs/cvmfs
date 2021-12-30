@@ -61,43 +61,43 @@ void CheckoutMarker::SaveAs(const std::string &path) const {
 //------------------------------------------------------------------------------
 
 
-bool ServerLockFile::Acquire(const std::string &path, bool ignore_stale) {
+bool ServerLockFile::Acquire() {
   std::string tmp_path;
-  FILE *ftmp = CreateTempFile(path + ".tmp", kDefaultFileMode, "w", &tmp_path);
+  FILE *ftmp = CreateTempFile(path_ + ".tmp", kDefaultFileMode, "w", &tmp_path);
   if (ftmp == NULL)
-    throw EPublish("cannot create lock temp file " + path);
+    throw EPublish("cannot create lock temp file " + path_);
   std::string pid = StringifyInt(getpid());
   bool retval = SafeWrite(fileno(ftmp), pid.data(), pid.length());
   fclose(ftmp);
   if (!retval)
-    throw EPublish("cannot create transaction marker " + path);
+    throw EPublish("cannot create transaction marker " + path_);
 
-  if (IsLocked(path, ignore_stale)) {
+  if (IsLocked()) {
     unlink(tmp_path.c_str());
     return false;
   }
 
-  Release(path);
-  if (link(tmp_path.c_str(), path.c_str()) == 0) {
+  Release();
+  if (link(tmp_path.c_str(), path_.c_str()) == 0) {
     unlink(tmp_path.c_str());
     return true;
   }
   unlink(tmp_path.c_str());
   if (errno == EEXIST)
     return false;
-  throw EPublish("cannot commit lock file " + path);
+  throw EPublish("cannot commit lock file " + path_);
 }
 
 
-bool ServerLockFile::IsLocked(const std::string &path, bool ignore_stale) {
-  int fd = open(path.c_str(), O_RDONLY);
+bool ServerLockFile::IsLocked() const {
+  int fd = open(path_.c_str(), O_RDONLY);
   if (fd < 0) {
     if (errno == ENOENT)
       return false;
-    throw EPublish("cannot open transaction marker " + path);
+    throw EPublish("cannot open transaction marker " + path_);
   }
 
-  if (ignore_stale) {
+  if (ignore_stale_) {
     close(fd);
     return true;
   }
@@ -120,8 +120,8 @@ bool ServerLockFile::IsLocked(const std::string &path, bool ignore_stale) {
 }
 
 
-void ServerLockFile::Release(const std::string &path) {
-  unlink(path.c_str());
+void ServerLockFile::Release() {
+  unlink(path_.c_str());
 }
 
 

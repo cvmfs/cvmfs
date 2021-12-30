@@ -606,7 +606,10 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
   , settings_(settings)
   , statistics_publish_(new perf::StatisticsTemplate("publish", statistics_))
   , llvl_(settings.is_silent() ? kLogNone : kLogNormal)
-  , in_transaction_(false)
+  , in_transaction_(settings.transaction().spool_area().transaction_lock(),
+                    true)
+  , is_publishing_(settings.transaction().spool_area().publishing_lock(),
+                   false)
   , spooler_files_(NULL)
   , spooler_catalogs_(NULL)
   , catalog_mgr_(NULL)
@@ -669,8 +672,7 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
   if (settings.is_managed())
     managed_node_ = new ManagedNode(this);
   session_ = new Session(settings_, llvl_);
-  CheckTransactionStatus();
-  if (in_transaction_)
+  if (in_transaction_.IsLocked())
     ConstructSpoolers();
 }
 
@@ -772,15 +774,12 @@ void Publisher::Sync() {
     return;
   }
 
-  const std::string publishing_lock =
-    settings_.transaction().spool_area().publishing_lock();
-
-  ServerLockFile::Acquire(publishing_lock, false /* ignore_stale */);
+  is_publishing_.Acquire();
   try {
     SyncImpl();
-    ServerLockFile::Release(publishing_lock);
+    is_publishing_.Release();
   } catch (...) {
-    ServerLockFile::Release(publishing_lock);
+    is_publishing_.Release();
     throw;
   }
 }
@@ -842,11 +841,12 @@ void Publisher::SyncImpl() {
 }
 
 void Publisher::Publish() {
-  if (!in_transaction_) throw EPublish("cannot publish outside transaction");
+  if (!in_transaction_.IsLocked())
+    throw EPublish("cannot publish outside transaction");
 
   PushReflog();
   PushManifest();
-  in_transaction_ = false;
+  in_transaction_.Release();
 }
 
 

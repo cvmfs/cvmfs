@@ -69,27 +69,29 @@ TEST_F(T_Util, CheckoutMarker4) {
 
 
 TEST_F(T_Util, ServerLockFile) {
-  EXPECT_FALSE(ServerLockFile::IsLocked("foo", true));
-  EXPECT_TRUE(ServerLockFile::Acquire("foo", true));
-  EXPECT_FALSE(ServerLockFile::Acquire("foo", true));
-  EXPECT_TRUE(ServerLockFile::IsLocked("foo", true));
-  ServerLockFile::Release("foo");
-  EXPECT_FALSE(ServerLockFile::IsLocked("foo", true));
+  ServerLockFile foo_flag("foo", true);
+  ServerLockFile foo_lock("foo", false);
+  EXPECT_FALSE(foo_flag.IsLocked());
+  EXPECT_TRUE(foo_flag.Acquire());
+  EXPECT_FALSE(foo_flag.Acquire());
+  EXPECT_TRUE(foo_flag.IsLocked());
+  foo_flag.Release();
+  EXPECT_FALSE(foo_flag.IsLocked());
 
   pid_t pid_child = fork();
   ASSERT_GE(pid_child, 0);
   if (pid_child == 0) {
-    EXPECT_TRUE(ServerLockFile::Acquire("foo", true));
+    EXPECT_TRUE(foo_flag.Acquire());
     exit(0);
   }
   EXPECT_EQ(0, WaitForChild(pid_child));
 
-  EXPECT_TRUE(ServerLockFile::IsLocked("foo", true));
-  EXPECT_FALSE(ServerLockFile::IsLocked("foo", false));
-  EXPECT_FALSE(ServerLockFile::Acquire("foo", true));
-  EXPECT_TRUE(ServerLockFile::Acquire("foo", false));
-  EXPECT_TRUE(ServerLockFile::IsLocked("foo", false));
-  ServerLockFile::Release("foo");
+  EXPECT_TRUE(foo_flag.IsLocked());
+  EXPECT_FALSE(foo_lock.IsLocked());
+  EXPECT_FALSE(foo_flag.Acquire());
+  EXPECT_TRUE(foo_lock.Acquire());
+  EXPECT_TRUE(foo_lock.IsLocked());
+  foo_lock.Release();
 }
 
 
