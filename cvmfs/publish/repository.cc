@@ -772,12 +772,12 @@ void Publisher::Sync() {
     return;
   }
 
-  is_publishing_.Acquire();
+  is_publishing_.Lock();
   try {
     SyncImpl();
-    is_publishing_.Release();
+    is_publishing_.Unlock();
   } catch (...) {
-    is_publishing_.Release();
+    is_publishing_.Unlock();
     throw;
   }
 }

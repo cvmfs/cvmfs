@@ -71,16 +71,16 @@ TEST_F(T_Util, CheckoutMarker4) {
 TEST_F(T_Util, ServerLockFile) {
   ServerLockFile lock("foo.lock");
   EXPECT_FALSE(lock.IsLocked());
-  EXPECT_TRUE(lock.Acquire());
-  EXPECT_FALSE(lock.Acquire());
+  EXPECT_TRUE(lock.TryLock());
+  EXPECT_FALSE(lock.TryLock());
   EXPECT_TRUE(lock.IsLocked());
-  lock.Release();
+  lock.Unlock();
   EXPECT_FALSE(lock.IsLocked());
 
   pid_t pid_child = fork();
   ASSERT_GE(pid_child, 0);
   if (pid_child == 0) {
-    EXPECT_TRUE(lock.Acquire());
+    EXPECT_TRUE(lock.TryLock());
     EXPECT_TRUE(lock.IsLocked());
     exit(0);
   }

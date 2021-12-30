@@ -49,8 +49,9 @@ class ServerLockFile {
  public:
   explicit ServerLockFile(const std::string &path) : path_(path) {}
 
-  bool Acquire();
-  void Release();
+  void Lock();
+  bool TryLock();
+  void Unlock();
   bool IsLocked() const;
 
   const std::string &path() const { return path_; }

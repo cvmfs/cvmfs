@@ -61,7 +61,15 @@ void CheckoutMarker::SaveAs(const std::string &path) const {
 //------------------------------------------------------------------------------
 
 
-bool ServerLockFile::Acquire() {
+void ServerLockFile::Lock() {
+  if (!TryLock()) {
+    throw EPublish("Could not acquire lock " + path_,
+                   EPublish::kFailTransactionState);
+  }
+}
+
+
+bool ServerLockFile::TryLock() {
   std::string tmp_path;
   FILE *ftmp = CreateTempFile(path_ + ".tmp", kDefaultFileMode, "w", &tmp_path);
   if (ftmp == NULL)
@@ -77,7 +85,7 @@ bool ServerLockFile::Acquire() {
     return false;
   }
 
-  Release();
+  Unlock();
   if (link(tmp_path.c_str(), path_.c_str()) == 0) {
     unlink(tmp_path.c_str());
     return true;
@@ -115,7 +123,7 @@ bool ServerLockFile::IsLocked() const {
 }
 
 
-void ServerLockFile::Release() {
+void ServerLockFile::Unlock() {
   unlink(path_.c_str());
 }
 
