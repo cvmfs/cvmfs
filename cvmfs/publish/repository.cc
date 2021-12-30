@@ -766,16 +766,6 @@ void Publisher::ConstructSyncManagers() {
   }
 }
 
-void Publisher::Sync() {
-  if (settings_.transaction().dry_run()) {
-    SyncImpl();
-    return;
-  }
-
-  ServerLockFileGuard g(is_publishing_);
-  SyncImpl();
-}
-
 void Publisher::ExitShell() {
   std::string session_dir = Env::GetEnterSessionDir();
   std::string session_pid_tmp = session_dir + "/session_pid";
@@ -788,7 +778,9 @@ void Publisher::ExitShell() {
   kill(pid_child, SIGUSR1);
 }
 
-void Publisher::SyncImpl() {
+void Publisher::Sync() {
+  ServerLockFileGuard g(is_publishing_);
+
   ConstructSyncManagers();
 
   sync_union_->Traverse();

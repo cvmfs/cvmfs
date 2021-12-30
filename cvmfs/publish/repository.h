@@ -360,8 +360,6 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void TransactionRetry();
   void TransactionImpl();
 
-  void SyncImpl();
-
   SettingsPublisher settings_;
   UniquePtr<perf::StatisticsTemplate> statistics_publish_;
   /**
