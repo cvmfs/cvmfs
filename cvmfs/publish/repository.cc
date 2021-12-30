@@ -668,6 +668,7 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
 
   if (settings.is_managed())
     managed_node_ = new ManagedNode(this);
+  session_ = new Session(settings_, llvl_);
   CheckTransactionStatus();
   if (in_transaction_)
     ConstructSpoolers();

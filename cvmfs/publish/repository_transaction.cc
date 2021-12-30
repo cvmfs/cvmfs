@@ -34,8 +34,6 @@ void Publisher::CheckTransactionStatus() {
     settings_.transaction().spool_area().publishing_lock();
   is_publishing_ =
     ServerLockFile::IsLocked(publishing_lock, false /* ignore_stale */);
-
-  session_ = new Session(settings_, llvl_);
 }
 
 
