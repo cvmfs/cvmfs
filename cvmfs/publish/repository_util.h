@@ -10,6 +10,7 @@
 #include <string>
 
 #include "hash.h"
+#include "util/single_copy.h"
 
 namespace publish {
 
@@ -58,6 +59,47 @@ class ServerLockFile {
 
  private:
   std::string path_;
+};
+
+/**
+ * RAII try-lock owner for ServerLockFile
+ *
+ * TODO(mcb30): C++11 - replace by std::unique_lock<ServerLockFile>
+ * (with std::try_to_lock constructor)
+ */
+class ServerLockFileCheck : SingleCopy {
+ public:
+  explicit ServerLockFileCheck(ServerLockFile &lock) : lock_(lock) {
+    owns_lock_ = lock_.TryLock();
+  }
+  ~ServerLockFileCheck() {
+    if (owns_lock_)
+      lock_.Unlock();
+  }
+
+  const bool owns_lock() const { return owns_lock_; }
+
+ private:
+  ServerLockFile &lock_;
+  bool owns_lock_;
+};
+
+/**
+ * RAII lock owner for ServerLockFile
+ *
+ * TODO(mcb30): C++11 - replace by std::lock_guard<ServerLockFile>
+ */
+class ServerLockFileGuard : SingleCopy {
+ public:
+  explicit ServerLockFileGuard(ServerLockFile &lock) : lock_(lock) {
+    lock_.Lock();
+  }
+  ~ServerLockFileGuard() {
+    lock_.Unlock();
+  }
+
+ private:
+  ServerLockFile &lock_;
 };
 
 /**

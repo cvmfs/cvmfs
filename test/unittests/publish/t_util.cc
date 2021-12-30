@@ -70,23 +70,38 @@ TEST_F(T_Util, CheckoutMarker4) {
 
 TEST_F(T_Util, ServerLockFile) {
   ServerLockFile lock("foo.lock");
-  EXPECT_FALSE(lock.IsLocked());
+
   EXPECT_TRUE(lock.TryLock());
   EXPECT_FALSE(lock.TryLock());
-  EXPECT_TRUE(lock.IsLocked());
   lock.Unlock();
-  EXPECT_FALSE(lock.IsLocked());
+  EXPECT_TRUE(lock.TryLock());
+  lock.Unlock();
+
+  {
+    ServerLockFileCheck check1(lock);
+    EXPECT_TRUE(check1.owns_lock());
+    ServerLockFileCheck check2(lock);
+    EXPECT_FALSE(check2.owns_lock());
+  }
+
+  {
+    ServerLockFileCheck guard1(lock);
+    EXPECT_THROW(ServerLockFileGuard guard2(lock), EPublish);
+  }
 
   pid_t pid_child = fork();
   ASSERT_GE(pid_child, 0);
   if (pid_child == 0) {
-    EXPECT_TRUE(lock.TryLock());
-    EXPECT_TRUE(lock.IsLocked());
+    ServerLockFileCheck check3(lock);
+    EXPECT_TRUE(check3.owns_lock());
     exit(0);
   }
   EXPECT_EQ(0, WaitForChild(pid_child));
 
-  EXPECT_FALSE(lock.IsLocked());
+  {
+    ServerLockFileCheck check4(lock);
+    EXPECT_TRUE(check4.owns_lock());
+  }
 }
 
 TEST_F(T_Util, ServerFlagFile) {

@@ -83,6 +83,7 @@ void Publisher::ManagedNode::ClearScratch() {
 
 
 int Publisher::ManagedNode::Check(bool is_quiet) {
+  ServerLockFileCheck publish_check(publisher_->is_publishing_);
   const std::string rdonly_mnt =
     publisher_->settings_.transaction().spool_area().readonly_mnt();
   const std::string union_mnt =
@@ -175,7 +176,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
     case kUnionMountRepairAlways:
       break;
     case kUnionMountRepairSafe:
-      if (publisher_->is_publishing_.IsLocked()) {
+      if (!publish_check.owns_lock()) {
         LogCvmfs(kLogCvmfs, logFlags,
           "WARNING: The repository %s is currently publishing and should not\n"
           "be touched. If you are absolutely sure, that this is _not_ the "

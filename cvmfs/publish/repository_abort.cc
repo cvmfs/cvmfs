@@ -26,11 +26,7 @@ void Publisher::WipeScratchArea() {
 }
 
 void Publisher::Abort() {
-  if (is_publishing_.IsLocked()) {
-    throw EPublish(
-      "Repository " + settings_.fqrn() + " is currently publishing "
-      "(aborting abort)", EPublish::kFailTransactionState);
-  }
+  ServerLockFileGuard g(is_publishing_);
 
   if (!in_transaction_.IsSet()) {
     if (session_->has_lease()) {
