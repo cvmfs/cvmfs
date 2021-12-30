@@ -97,7 +97,8 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
 
   static std::string GetFqrnFromUrl(const std::string &url);
 
-  explicit Repository(const SettingsRepository &settings);
+  explicit Repository(const SettingsRepository &settings,
+                      const bool exists = true);
   virtual ~Repository();
 
   void Check();
@@ -126,7 +127,6 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   std::string meta_info() const { return meta_info_; }
 
  protected:
-  Repository();
   void DownloadRootObjects(
     const std::string &url,
     const std::string &fqrn,
@@ -277,7 +277,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   static Publisher *Create(const SettingsPublisher &settings);
 
-  explicit Publisher(const SettingsPublisher &settings);
+  explicit Publisher(const SettingsPublisher &settings,
+                     const bool exists = true);
   virtual ~Publisher();
 
   void UpdateMetaInfo();
@@ -319,8 +320,6 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
 
  private:
-  Publisher();  ///< Used by Create
-
   /**
    * Used just before a spooler is required, e.g. in Create()
    */

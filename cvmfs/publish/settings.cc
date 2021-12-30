@@ -288,6 +288,15 @@ SettingsRepository::SettingsRepository(
 }
 
 
+SettingsRepository::SettingsRepository(
+  const SettingsReplica &settings_replica)
+  : fqrn_(settings_replica.fqrn())
+  , url_(settings_replica.url())
+  , keychain_(settings_replica.fqrn())
+{
+}
+
+
 void SettingsRepository::SetUrl(const std::string &url) {
   // TODO(jblomer): sanitiation, check availability
   url_ = url;
