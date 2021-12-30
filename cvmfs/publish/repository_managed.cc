@@ -126,9 +126,9 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
     result |= kFailUnionBroken;
   } else {
     FileSystemInfo fs_info = GetFileSystemInfo(union_mnt);
-    if (publisher_->in_transaction_.IsLocked() && fs_info.is_rdonly)
+    if (publisher_->in_transaction_.IsSet() && fs_info.is_rdonly)
       result |= kFailUnionLocked;
-    if (!publisher_->in_transaction_.IsLocked() && !fs_info.is_rdonly)
+    if (!publisher_->in_transaction_.IsSet() && !fs_info.is_rdonly)
       result |= kFailUnionWritable;
   }
 
@@ -185,7 +185,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
         return result;
       }
 
-      if (publisher_->in_transaction_.IsLocked()) {
+      if (publisher_->in_transaction_.IsSet()) {
         LogCvmfs(kLogCvmfs, logFlags,
           "Repository %s is in a transaction and cannot be repaired.\n"
           "--> Run `cvmfs_server abort $name` to revert and repair.",
@@ -244,7 +244,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
   if (result & kFailUnionBroken) {
     AlterMountpoint(kAlterUnionMount, log_flags);
     // read-only mount by default
-    if (publisher_->in_transaction_.IsLocked())
+    if (publisher_->in_transaction_.IsSet())
       result |= kFailUnionLocked;
 
     result &= ~kFailUnionBroken;

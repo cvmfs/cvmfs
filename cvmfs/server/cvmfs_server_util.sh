@@ -367,11 +367,9 @@ __hc_transition() {
 #       http://rute.2038bug.com/node23.html.gz
 __is_valid_lock() {
   local path="$1"
-  local ignore_stale="$2"
 
   local lock_file="${path}.lock"
   cvmfs_sys_file_is_regular $lock_file || return 1 # lock doesn't exist
-  [ -z "$ignore_stale" ] || return 0 # lock is there (skip the stale test)
 
   local stale_pid=$(cat $lock_file 2>/dev/null)
   [ -n "$stale_pid" ] && [ $stale_pid -gt 0 ]     && \
@@ -381,7 +379,6 @@ __is_valid_lock() {
 
 acquire_lock() { # hardlink creation is guaranteed to be atomic!
   local path="$1"
-  local ignore_stale="$2"
 
   local pid="$$"
   local temp_file="${path}.${pid}"
@@ -393,7 +390,7 @@ acquire_lock() { # hardlink creation is guaranteed to be atomic!
     return 0 # lock acquired
   fi
 
-  if __is_valid_lock "$path" "$ignore_stale"; then
+  if __is_valid_lock "$path"; then
     rm -f $temp_file 2>/dev/null
     return 1 # lock couldn't be acquired and appears valid
   fi
@@ -426,8 +423,26 @@ release_lock() {
 
 check_lock() {
   local path="$1"
-  local ignore_stale="$2"
-  __is_valid_lock "${path}" "$ignore_stale"
+  __is_valid_lock "${path}"
+}
+
+
+set_flag() {
+  local path="$1"
+  local flag_file="${path}.lock"
+  touch "${flag_file}"
+}
+
+clear_flag() {
+  local path="$1"
+  local flag_file="${path}.lock"
+  rm "${flag_file}"
+}
+
+check_flag() {
+  local path="$1"
+  local flag_file="${path}.lock"
+  [ -f "${flag_file}" ]
 }
 
 

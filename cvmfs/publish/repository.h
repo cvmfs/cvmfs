@@ -314,7 +314,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Migrate();
 
   const SettingsPublisher &settings() const { return settings_; }
-  const ServerLockFile &in_transaction() const { return in_transaction_; }
+  const ServerFlagFile &in_transaction() const { return in_transaction_; }
   const ServerLockFile &is_publishing() const { return is_publishing_; }
   Session *session() const { return session_.weak_ref(); }
   const upload::Spooler *spooler_files() const { return spooler_files_; }
@@ -368,7 +368,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    * The log level, set to kLogNone if settings_.is_silent() == true
    */
   int llvl_;
-  ServerLockFile in_transaction_;
+  ServerFlagFile in_transaction_;
   ServerLockFile is_publishing_;
   gateway::GatewayKey gw_key_;
   /**

@@ -44,7 +44,7 @@ void Publisher::TransactionRetry() {
     } catch (const publish::EPublish& e) {
       if (e.failure() != EPublish::kFailTransactionState) {
         session_->Drop();
-        in_transaction_.Release();
+        in_transaction_.Clear();
       }
 
       if ((e.failure() == EPublish::kFailTransactionState) ||
@@ -68,7 +68,7 @@ void Publisher::TransactionRetry() {
 
 
 void Publisher::TransactionImpl() {
-  if (in_transaction_.IsLocked()) {
+  if (in_transaction_.IsSet()) {
     throw EPublish("another transaction is already open",
                    EPublish::kFailTransactionState);
   }
@@ -77,7 +77,7 @@ void Publisher::TransactionImpl() {
 
   // On error, Transaction() will release the transaction lock and drop
   // the session
-  in_transaction_.Acquire();
+  in_transaction_.Set();
   session_->Acquire();
 
   // We might have a valid lease for a non-existing path. Nevertheless, we run
@@ -122,7 +122,7 @@ void Publisher::TransactionImpl() {
                               settings_.transaction().template_to());
     } catch (const ECvmfsException &e) {
       std::string panic_msg = e.what();
-      in_transaction_.Release();
+      in_transaction_.Clear();
       // TODO(aandvalenzuela): release session token (gateway publishing)
       throw publish::EPublish("cannot clone directory tree. " + panic_msg,
                               publish::EPublish::kFailInput);

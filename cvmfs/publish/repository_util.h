@@ -47,8 +47,7 @@ class CheckoutMarker {
  */
 class ServerLockFile {
  public:
-  ServerLockFile(const std::string &path, bool ignore_stale)
-    : path_(path), ignore_stale_(ignore_stale) {}
+  explicit ServerLockFile(const std::string &path) : path_(path) {}
 
   bool Acquire();
   void Release();
@@ -58,9 +57,26 @@ class ServerLockFile {
 
  private:
   std::string path_;
-  bool ignore_stale_;
 };
 
+/**
+ * A server flag file is a file used to indicate a single-bit state
+ * that extends beyond the lifetime of a process, such as the
+ * indication that a transaction is open.
+ */
+class ServerFlagFile {
+ public:
+  explicit ServerFlagFile(const std::string &path) : path_(path) {}
+
+  void Set();
+  void Clear();
+  bool IsSet() const;
+
+  const std::string &path() const { return path_; }
+
+ private:
+  std::string path_;
+};
 
 /**
  * Callout to cvmfs_suid_helper $verb $fqrn

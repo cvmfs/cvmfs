@@ -35,9 +35,9 @@ TEST_F(T_Transaction, TemplateSettings) {
 
 TEST_F(T_Transaction, BasicTransaction) {
   Publisher *publisher = GetTestPublisher();
-  EXPECT_FALSE(publisher->in_transaction().IsLocked());
+  EXPECT_FALSE(publisher->in_transaction().IsSet());
   publisher->Transaction();
-  EXPECT_TRUE(publisher->in_transaction().IsLocked());
+  EXPECT_TRUE(publisher->in_transaction().IsSet());
   delete publisher;
 
   // TODO(jblomer): add more tests when publish and abort are implemented

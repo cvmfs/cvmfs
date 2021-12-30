@@ -27,7 +27,7 @@ void Publisher::CheckTagName(const std::string &name) {
 void Publisher::EditTags(const std::vector<history::History::Tag> &add_tags,
                          const std::vector<std::string> &rm_tags)
 {
-  if (!in_transaction_.IsLocked())
+  if (!in_transaction_.IsSet())
     throw EPublish("cannot edit tags outside transaction");
 
   for (unsigned i = 0; i < add_tags.size(); ++i) {

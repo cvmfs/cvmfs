@@ -69,31 +69,46 @@ TEST_F(T_Util, CheckoutMarker4) {
 
 
 TEST_F(T_Util, ServerLockFile) {
-  ServerLockFile foo_flag("foo", true);
-  ServerLockFile foo_lock("foo", false);
-  EXPECT_FALSE(foo_flag.IsLocked());
-  EXPECT_TRUE(foo_flag.Acquire());
-  EXPECT_FALSE(foo_flag.Acquire());
-  EXPECT_TRUE(foo_flag.IsLocked());
-  foo_flag.Release();
-  EXPECT_FALSE(foo_flag.IsLocked());
+  ServerLockFile lock("foo.lock");
+  EXPECT_FALSE(lock.IsLocked());
+  EXPECT_TRUE(lock.Acquire());
+  EXPECT_FALSE(lock.Acquire());
+  EXPECT_TRUE(lock.IsLocked());
+  lock.Release();
+  EXPECT_FALSE(lock.IsLocked());
 
   pid_t pid_child = fork();
   ASSERT_GE(pid_child, 0);
   if (pid_child == 0) {
-    EXPECT_TRUE(foo_flag.Acquire());
+    EXPECT_TRUE(lock.Acquire());
+    EXPECT_TRUE(lock.IsLocked());
     exit(0);
   }
   EXPECT_EQ(0, WaitForChild(pid_child));
 
-  EXPECT_TRUE(foo_flag.IsLocked());
-  EXPECT_FALSE(foo_lock.IsLocked());
-  EXPECT_FALSE(foo_flag.Acquire());
-  EXPECT_TRUE(foo_lock.Acquire());
-  EXPECT_TRUE(foo_lock.IsLocked());
-  foo_lock.Release();
+  EXPECT_FALSE(lock.IsLocked());
 }
 
+TEST_F(T_Util, ServerFlagFile) {
+  ServerFlagFile flag("foo.flag");
+  EXPECT_FALSE(flag.IsSet());
+  flag.Set();
+  EXPECT_TRUE(flag.IsSet());
+  flag.Clear();
+  EXPECT_FALSE(flag.IsSet());
+
+  pid_t pid_child = fork();
+  ASSERT_GE(pid_child, 0);
+  if (pid_child == 0) {
+    flag.Set();
+    EXPECT_TRUE(flag.IsSet());
+    exit(0);
+  }
+  EXPECT_EQ(0, WaitForChild(pid_child));
+
+  EXPECT_TRUE(flag.IsSet());
+  flag.Clear();
+}
 
 TEST_F(T_Util, SetInConfig) {
   EXPECT_THROW(SetInConfig("/no/such/file", "x", "y"), EPublish);

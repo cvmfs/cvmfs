@@ -606,10 +606,8 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
   , settings_(settings)
   , statistics_publish_(new perf::StatisticsTemplate("publish", statistics_))
   , llvl_(settings.is_silent() ? kLogNone : kLogNormal)
-  , in_transaction_(settings.transaction().spool_area().transaction_lock(),
-                    true)
-  , is_publishing_(settings.transaction().spool_area().publishing_lock(),
-                   false)
+  , in_transaction_(settings.transaction().spool_area().transaction_lock())
+  , is_publishing_(settings.transaction().spool_area().publishing_lock())
   , spooler_files_(NULL)
   , spooler_catalogs_(NULL)
   , catalog_mgr_(NULL)
@@ -672,7 +670,7 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
   if (settings.is_managed())
     managed_node_ = new ManagedNode(this);
   session_ = new Session(settings_, llvl_);
-  if (in_transaction_.IsLocked())
+  if (in_transaction_.IsSet())
     ConstructSpoolers();
 }
 
@@ -841,12 +839,12 @@ void Publisher::SyncImpl() {
 }
 
 void Publisher::Publish() {
-  if (!in_transaction_.IsLocked())
+  if (!in_transaction_.IsSet())
     throw EPublish("cannot publish outside transaction");
 
   PushReflog();
   PushManifest();
-  in_transaction_.Release();
+  in_transaction_.Clear();
 }
 
 

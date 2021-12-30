@@ -97,11 +97,6 @@ bool ServerLockFile::IsLocked() const {
     throw EPublish("cannot open transaction marker " + path_);
   }
 
-  if (ignore_stale_) {
-    close(fd);
-    return true;
-  }
-
   std::string line;
   bool retval = GetLineFd(fd, &line);
   close(fd);
@@ -123,6 +118,30 @@ bool ServerLockFile::IsLocked() const {
 void ServerLockFile::Release() {
   unlink(path_.c_str());
 }
+
+
+//------------------------------------------------------------------------------
+
+
+void ServerFlagFile::Set() {
+  int fd = open(path_.c_str(), O_CREAT | O_RDWR, 0600);
+  if (fd < 0)
+    throw EPublish("cannot create flag file " + path_);
+  close(fd);
+}
+
+
+void ServerFlagFile::Clear() {
+  unlink(path_.c_str());
+}
+
+
+bool ServerFlagFile::IsSet() const {
+  return FileExists(path_);
+}
+
+
+//------------------------------------------------------------------------------
 
 
 void RunSuidHelper(const std::string &verb, const std::string &fqrn) {
