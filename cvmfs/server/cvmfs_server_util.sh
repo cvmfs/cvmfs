@@ -362,68 +362,38 @@ __hc_transition() {
 
 ### Locking functions
 
-# Helper functions for file locking including detection of stale locks
-# Note: The implementation idea was found here:
-#       http://rute.2038bug.com/node23.html.gz
-__is_valid_lock() {
+
+acquire_lock() {
   local path="$1"
-
   local lock_file="${path}.lock"
-  cvmfs_sys_file_is_regular $lock_file || return 1 # lock doesn't exist
-
-  local stale_pid=$(cat $lock_file 2>/dev/null)
-  [ -n "$stale_pid" ] && [ $stale_pid -gt 0 ]     && \
-  kill -0 $stale_pid 2>/dev/null
-}
-
-
-acquire_lock() { # hardlink creation is guaranteed to be atomic!
-  local path="$1"
-
-  local pid="$$"
-  local temp_file="${path}.${pid}"
-  local lock_file="${path}.lock"
-  echo $pid > $temp_file || return 1 # probably no access to $path
-
-  if ln $temp_file $lock_file 2>/dev/null; then
-    rm -f $temp_file 2>/dev/null
-    return 0 # lock acquired
-  fi
-
-  if __is_valid_lock "$path"; then
-    rm -f $temp_file 2>/dev/null
-    return 1 # lock couldn't be acquired and appears valid
-  fi
-
-  rm -f $lock_file 2>/dev/null # lock was stale and can be removed
-  if ln $temp_file $lock_file; then
-    rm -f $temp_file 2>/dev/null
-    return 0 # lock acquired
-  fi
-
-  rm -f $temp_file 2>/dev/null
-  return 1 # lock couldn't be acquired after removing stale lock (lost the race)
+  exec 9<>${lock_file}
+  flock -n 9
 }
 
 
 wait_and_acquire_lock() {
   local path="$1"
-  while ! acquire_lock "$path"; do
-    sleep 5
-  done
+  local lock_file="${path}.lock"
+  exec 9<>${lock_file}
+  flock 9
 }
 
 
 release_lock() {
   local path="$1"
   local lock_file="${path}.lock"
-  rm -f $lock_file 2>/dev/null
+  rm -f $lock_file
+  exec 9<&-
 }
 
 
 check_lock() {
   local path="$1"
-  __is_valid_lock "${path}"
+  if ! acquire_lock "${path}" ; then
+    return 0
+  fi
+  release_lock "${path}"
+  return 1
 }
 
 

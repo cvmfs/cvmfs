@@ -41,24 +41,26 @@ class CheckoutMarker {
 
 
 /**
- * The server lock file is a file containing the pid of the creator, so that
- * with high probability one can determine stale locks.  This comes from the
- * cvmfs_server bash times and should at some point become a regular POSIX
- * lock file.
+ * A server lock file is a POSIX lock file used to obtain mutually
+ * exclusive access to the repository while conducting an operation
+ * that modifies the repository state.
+ *
+ * Since the lock is implemented using a POSIX lock file, the lock
+ * will automatically be released when the creating process exits.
  */
 class ServerLockFile {
  public:
-  explicit ServerLockFile(const std::string &path) : path_(path) {}
+  explicit ServerLockFile(const std::string &path) : path_(path), fd_(-1) {}
 
   void Lock();
   bool TryLock();
   void Unlock();
-  bool IsLocked() const;
 
   const std::string &path() const { return path_; }
 
  private:
   std::string path_;
+  int fd_;
 };
 
 /**

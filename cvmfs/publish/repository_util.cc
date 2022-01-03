@@ -70,61 +70,25 @@ void ServerLockFile::Lock() {
 
 
 bool ServerLockFile::TryLock() {
-  std::string tmp_path;
-  FILE *ftmp = CreateTempFile(path_ + ".tmp", kDefaultFileMode, "w", &tmp_path);
-  if (ftmp == NULL)
-    throw EPublish("cannot create lock temp file " + path_);
-  std::string pid = StringifyInt(getpid());
-  bool retval = SafeWrite(fileno(ftmp), pid.data(), pid.length());
-  fclose(ftmp);
-  if (!retval)
-    throw EPublish("cannot create transaction marker " + path_);
-
-  if (IsLocked()) {
-    unlink(tmp_path.c_str());
-    return false;
-  }
-
-  Unlock();
-  if (link(tmp_path.c_str(), path_.c_str()) == 0) {
-    unlink(tmp_path.c_str());
+  int new_fd = TryLockFile(path_);
+  if (new_fd >= 0) {
+    assert(fd_ < 0);
+    fd_ = new_fd;
     return true;
-  }
-  unlink(tmp_path.c_str());
-  if (errno == EEXIST)
-    return false;
-  throw EPublish("cannot commit lock file " + path_);
-}
-
-
-bool ServerLockFile::IsLocked() const {
-  int fd = open(path_.c_str(), O_RDONLY);
-  if (fd < 0) {
-    if (errno == ENOENT)
-      return false;
-    throw EPublish("cannot open transaction marker " + path_);
-  }
-
-  std::string line;
-  bool retval = GetLineFd(fd, &line);
-  close(fd);
-  if (!retval || line.empty()) {
-    // invalid marker, seen as stale
+  } else if (new_fd == -1) {
+    throw EPublish("Error while attempting to acquire lock " + path_);
+  } else {
     return false;
   }
-  line = Trim(line, true /* trim_newline */);
-  pid_t pid = String2Int64(line);
-  if (pid <= 0) {
-    // invalid marker, seen as stale
-    return false;
-  }
-
-  return ProcessExists(pid);
 }
 
 
 void ServerLockFile::Unlock() {
+  int old_fd = fd_;
+  assert(old_fd >= 0);
+  fd_ = -1;
   unlink(path_.c_str());
+  close(old_fd);
 }
 
 
