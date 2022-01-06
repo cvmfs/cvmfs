@@ -353,9 +353,8 @@ get_repo_info() {
 is_in_transaction() {
   local name=$1
   load_repo_config $name
-  # ignore if the lock is "stale" because the process starting
-  #  transactions goes away
-  check_lock ${CVMFS_SPOOL_DIR}/in_transaction ignore_stale
+  local tx_flag="${CVMFS_SPOOL_DIR}/in_transaction"
+  check_flag "${tx_flag}"
 }
 
 
@@ -690,12 +689,10 @@ sign_manifest() {
 open_transaction() {
   local name=$1
   load_repo_config $name
-  local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
+  local tx_flag="${CVMFS_SPOOL_DIR}/in_transaction"
 
   is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
-  # ignore if lock is "stale" because the process that created it
-  #  goes away
-  acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
+  set_flag "$tx_flag"                  || die "Failed to create transaction flag"
   run_suid_helper open $name           || die "Failed to make /cvmfs/$name writable"
 
   to_syslog_for_repo $name "opened transaction"
@@ -717,7 +714,7 @@ close_transaction() {
   is_in_transaction $name || return 0
 
   load_repo_config $name
-  local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
+  local tx_flag="${CVMFS_SPOOL_DIR}/in_transaction"
   local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local current_scratch_dir="${CVMFS_SPOOL_DIR}/scratch/current"
   local wastebin_scratch_dir="${CVMFS_SPOOL_DIR}/scratch/wastebin"
@@ -766,7 +763,7 @@ close_transaction() {
   [ ! -z "$tmp_dir" ] && find "${tmp_dir}" -mindepth 1 -not -path '*/receiver*' | xargs rm -fR
   run_suid_helper rdonly_mount $name > /dev/null
   run_suid_helper rw_mount $name
-  release_lock "$tx_lock"
+  clear_flag "$tx_flag"
 
   # Remove session_token file, used for gateway transactions, if it exists
   rm -f ${CVMFS_SPOOL_DIR}/session_token

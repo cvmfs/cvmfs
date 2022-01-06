@@ -69,29 +69,61 @@ TEST_F(T_Util, CheckoutMarker4) {
 
 
 TEST_F(T_Util, ServerLockFile) {
-  EXPECT_FALSE(ServerLockFile::IsLocked("foo", true));
-  EXPECT_TRUE(ServerLockFile::Acquire("foo", true));
-  EXPECT_FALSE(ServerLockFile::Acquire("foo", true));
-  EXPECT_TRUE(ServerLockFile::IsLocked("foo", true));
-  ServerLockFile::Release("foo");
-  EXPECT_FALSE(ServerLockFile::IsLocked("foo", true));
+  ServerLockFile lock("foo.lock");
+
+  EXPECT_TRUE(lock.TryLock());
+  EXPECT_FALSE(lock.TryLock());
+  lock.Unlock();
+  EXPECT_TRUE(lock.TryLock());
+  lock.Unlock();
+
+  {
+    ServerLockFileCheck check1(lock);
+    EXPECT_TRUE(check1.owns_lock());
+    ServerLockFileCheck check2(lock);
+    EXPECT_FALSE(check2.owns_lock());
+  }
+
+  {
+    ServerLockFileCheck guard1(lock);
+    EXPECT_THROW(ServerLockFileGuard guard2(lock), EPublish);
+  }
 
   pid_t pid_child = fork();
   ASSERT_GE(pid_child, 0);
   if (pid_child == 0) {
-    EXPECT_TRUE(ServerLockFile::Acquire("foo", true));
+    ServerLockFileCheck check3(lock);
+    EXPECT_TRUE(check3.owns_lock());
     exit(0);
   }
   EXPECT_EQ(0, WaitForChild(pid_child));
 
-  EXPECT_TRUE(ServerLockFile::IsLocked("foo", true));
-  EXPECT_FALSE(ServerLockFile::IsLocked("foo", false));
-  EXPECT_FALSE(ServerLockFile::Acquire("foo", true));
-  EXPECT_TRUE(ServerLockFile::Acquire("foo", false));
-  EXPECT_TRUE(ServerLockFile::IsLocked("foo", false));
-  ServerLockFile::Release("foo");
+  {
+    ServerLockFileCheck check4(lock);
+    EXPECT_TRUE(check4.owns_lock());
+  }
 }
 
+TEST_F(T_Util, ServerFlagFile) {
+  ServerFlagFile flag("foo.flag");
+  EXPECT_FALSE(flag.IsSet());
+  flag.Set();
+  EXPECT_TRUE(flag.IsSet());
+  flag.Clear();
+  EXPECT_FALSE(flag.IsSet());
+
+  pid_t pid_child = fork();
+  ASSERT_GE(pid_child, 0);
+  if (pid_child == 0) {
+    flag.Set();
+    EXPECT_TRUE(flag.IsSet());
+    exit(0);
+  }
+  EXPECT_EQ(0, WaitForChild(pid_child));
+
+  EXPECT_TRUE(flag.IsSet());
+  flag.Clear();
+}
 
 TEST_F(T_Util, SetInConfig) {
   EXPECT_THROW(SetInConfig("/no/such/file", "x", "y"), EPublish);

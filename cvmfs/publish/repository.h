@@ -11,6 +11,7 @@
 #include "gateway_util.h"
 #include "history.h"  // for History::Tag
 #include "publish/settings.h"
+#include "repository_util.h"
 #include "upload_spooler_result.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
@@ -97,7 +98,8 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
 
   static std::string GetFqrnFromUrl(const std::string &url);
 
-  explicit Repository(const SettingsRepository &settings);
+  explicit Repository(const SettingsRepository &settings,
+                      const bool exists = true);
   virtual ~Repository();
 
   void Check();
@@ -126,7 +128,6 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   std::string meta_info() const { return meta_info_; }
 
  protected:
-  Repository();
   void DownloadRootObjects(
     const std::string &url,
     const std::string &fqrn,
@@ -277,7 +278,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   static Publisher *Create(const SettingsPublisher &settings);
 
-  explicit Publisher(const SettingsPublisher &settings);
+  explicit Publisher(const SettingsPublisher &settings,
+                     const bool exists = true);
   virtual ~Publisher();
 
   void UpdateMetaInfo();
@@ -312,15 +314,13 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void Migrate();
 
   const SettingsPublisher &settings() const { return settings_; }
-  bool in_transaction() const { return in_transaction_; }
-  bool is_publishing() const { return is_publishing_; }
+  const ServerFlagFile &in_transaction() const { return in_transaction_; }
+  const ServerLockFile &is_publishing() const { return is_publishing_; }
   Session *session() const { return session_.weak_ref(); }
   const upload::Spooler *spooler_files() const { return spooler_files_; }
   const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
 
  private:
-  Publisher();  ///< Used by Create
-
   /**
    * Used just before a spooler is required, e.g. in Create()
    */
@@ -359,9 +359,6 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   void TransactionRetry();
   void TransactionImpl();
-  void CheckTransactionStatus();
-
-  void SyncImpl();
 
   SettingsPublisher settings_;
   UniquePtr<perf::StatisticsTemplate> statistics_publish_;
@@ -369,8 +366,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    * The log level, set to kLogNone if settings_.is_silent() == true
    */
   int llvl_;
-  bool in_transaction_;
-  bool is_publishing_;
+  ServerFlagFile in_transaction_;
+  ServerLockFile is_publishing_;
   gateway::GatewayKey gw_key_;
   /**
    * Only really used gateway mode when a transaction is opened. The session

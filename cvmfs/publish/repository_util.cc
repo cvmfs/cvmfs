@@ -61,68 +61,59 @@ void CheckoutMarker::SaveAs(const std::string &path) const {
 //------------------------------------------------------------------------------
 
 
-bool ServerLockFile::Acquire(const std::string &path, bool ignore_stale) {
-  std::string tmp_path;
-  FILE *ftmp = CreateTempFile(path + ".tmp", kDefaultFileMode, "w", &tmp_path);
-  if (ftmp == NULL)
-    throw EPublish("cannot create lock temp file " + path);
-  std::string pid = StringifyInt(getpid());
-  bool retval = SafeWrite(fileno(ftmp), pid.data(), pid.length());
-  fclose(ftmp);
-  if (!retval)
-    throw EPublish("cannot create transaction marker " + path);
-
-  if (IsLocked(path, ignore_stale)) {
-    unlink(tmp_path.c_str());
-    return false;
+void ServerLockFile::Lock() {
+  if (!TryLock()) {
+    throw EPublish("Could not acquire lock " + path_,
+                   EPublish::kFailTransactionState);
   }
-
-  Release(path);
-  if (link(tmp_path.c_str(), path.c_str()) == 0) {
-    unlink(tmp_path.c_str());
-    return true;
-  }
-  unlink(tmp_path.c_str());
-  if (errno == EEXIST)
-    return false;
-  throw EPublish("cannot commit lock file " + path);
 }
 
 
-bool ServerLockFile::IsLocked(const std::string &path, bool ignore_stale) {
-  int fd = open(path.c_str(), O_RDONLY);
-  if (fd < 0) {
-    if (errno == ENOENT)
-      return false;
-    throw EPublish("cannot open transaction marker " + path);
-  }
-
-  if (ignore_stale) {
-    close(fd);
+bool ServerLockFile::TryLock() {
+  int new_fd = TryLockFile(path_);
+  if (new_fd >= 0) {
+    assert(fd_ < 0);
+    fd_ = new_fd;
     return true;
+  } else if (new_fd == -1) {
+    throw EPublish("Error while attempting to acquire lock " + path_);
+  } else {
+    return false;
   }
+}
 
-  std::string line;
-  bool retval = GetLineFd(fd, &line);
+
+void ServerLockFile::Unlock() {
+  int old_fd = fd_;
+  assert(old_fd >= 0);
+  fd_ = -1;
+  unlink(path_.c_str());
+  close(old_fd);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+void ServerFlagFile::Set() {
+  int fd = open(path_.c_str(), O_CREAT | O_RDWR, 0600);
+  if (fd < 0)
+    throw EPublish("cannot create flag file " + path_);
   close(fd);
-  if (!retval || line.empty()) {
-    // invalid marker, seen as stale
-    return false;
-  }
-  line = Trim(line, true /* trim_newline */);
-  pid_t pid = String2Int64(line);
-  if (pid <= 0) {
-    // invalid marker, seen as stale
-    return false;
-  }
-
-  return ProcessExists(pid);
 }
 
 
-void ServerLockFile::Release(const std::string &path) {
-  unlink(path.c_str());
+void ServerFlagFile::Clear() {
+  unlink(path_.c_str());
 }
+
+
+bool ServerFlagFile::IsSet() const {
+  return FileExists(path_);
+}
+
+
+//------------------------------------------------------------------------------
 
 
 void RunSuidHelper(const std::string &verb, const std::string &fqrn) {

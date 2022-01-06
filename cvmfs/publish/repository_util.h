@@ -10,6 +10,7 @@
 #include <string>
 
 #include "hash.h"
+#include "util/single_copy.h"
 
 namespace publish {
 
@@ -40,18 +41,87 @@ class CheckoutMarker {
 
 
 /**
- * The server lock file is a file containing the pid of the creator, so that
- * with high probability one can determine stale locks.  This comes from the
- * cvmfs_server bash times and should at some point become a regular POSIX
- * lock file.
+ * A server lock file is a POSIX lock file used to obtain mutually
+ * exclusive access to the repository while conducting an operation
+ * that modifies the repository state.
+ *
+ * Since the lock is implemented using a POSIX lock file, the lock
+ * will automatically be released when the creating process exits.
  */
 class ServerLockFile {
  public:
-  static bool Acquire(const std::string &path, bool ignore_stale);
-  static void Release(const std::string &path);
-  static bool IsLocked(const std::string &path, bool ignore_stale);
+  explicit ServerLockFile(const std::string &path) : path_(path), fd_(-1) {}
+
+  void Lock();
+  bool TryLock();
+  void Unlock();
+
+  const std::string &path() const { return path_; }
+
+ private:
+  std::string path_;
+  int fd_;
 };
 
+/**
+ * RAII try-lock owner for ServerLockFile
+ *
+ * TODO(mcb30): C++11 - replace by std::unique_lock<ServerLockFile>
+ * (with std::try_to_lock constructor)
+ */
+class ServerLockFileCheck : SingleCopy {
+ public:
+  explicit ServerLockFileCheck(ServerLockFile &lock) : lock_(lock) {
+    owns_lock_ = lock_.TryLock();
+  }
+  ~ServerLockFileCheck() {
+    if (owns_lock_)
+      lock_.Unlock();
+  }
+
+  const bool owns_lock() const { return owns_lock_; }
+
+ private:
+  ServerLockFile &lock_;
+  bool owns_lock_;
+};
+
+/**
+ * RAII lock owner for ServerLockFile
+ *
+ * TODO(mcb30): C++11 - replace by std::lock_guard<ServerLockFile>
+ */
+class ServerLockFileGuard : SingleCopy {
+ public:
+  explicit ServerLockFileGuard(ServerLockFile &lock) : lock_(lock) {
+    lock_.Lock();
+  }
+  ~ServerLockFileGuard() {
+    lock_.Unlock();
+  }
+
+ private:
+  ServerLockFile &lock_;
+};
+
+/**
+ * A server flag file is a file used to indicate a single-bit state
+ * that extends beyond the lifetime of a process, such as the
+ * indication that a transaction is open.
+ */
+class ServerFlagFile {
+ public:
+  explicit ServerFlagFile(const std::string &path) : path_(path) {}
+
+  void Set();
+  void Clear();
+  bool IsSet() const;
+
+  const std::string &path() const { return path_; }
+
+ private:
+  std::string path_;
+};
 
 /**
  * Callout to cvmfs_suid_helper $verb $fqrn

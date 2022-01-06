@@ -83,12 +83,11 @@ void Publisher::ManagedNode::ClearScratch() {
 
 
 int Publisher::ManagedNode::Check(bool is_quiet) {
+  ServerLockFileCheck publish_check(publisher_->is_publishing_);
   const std::string rdonly_mnt =
     publisher_->settings_.transaction().spool_area().readonly_mnt();
   const std::string union_mnt =
     publisher_->settings_.transaction().spool_area().union_mnt();
-  const std::string publishing_lock =
-    publisher_->settings_.transaction().spool_area().publishing_lock();
   const std::string fqrn = publisher_->settings_.fqrn();
   EUnionMountRepairMode repair_mode =
     publisher_->settings_.transaction().spool_area().repair_mode();
@@ -128,9 +127,9 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
     result |= kFailUnionBroken;
   } else {
     FileSystemInfo fs_info = GetFileSystemInfo(union_mnt);
-    if (publisher_->in_transaction_ && fs_info.is_rdonly)
+    if (publisher_->in_transaction_.IsSet() && fs_info.is_rdonly)
       result |= kFailUnionLocked;
-    if (!publisher_->in_transaction_ && !fs_info.is_rdonly)
+    if (!publisher_->in_transaction_.IsSet() && !fs_info.is_rdonly)
       result |= kFailUnionWritable;
   }
 
@@ -177,17 +176,17 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
     case kUnionMountRepairAlways:
       break;
     case kUnionMountRepairSafe:
-      if (publisher_->is_publishing()) {
+      if (!publish_check.owns_lock()) {
         LogCvmfs(kLogCvmfs, logFlags,
           "WARNING: The repository %s is currently publishing and should not\n"
           "be touched. If you are absolutely sure, that this is _not_ the "
           "case,\nplease run the following command and retry:\n\n"
           "    rm -fR %s\n",
-          fqrn.c_str(), publishing_lock.c_str());
+          fqrn.c_str(), publisher_->is_publishing_.path().c_str());
         return result;
       }
 
-      if (publisher_->in_transaction_) {
+      if (publisher_->in_transaction_.IsSet()) {
         LogCvmfs(kLogCvmfs, logFlags,
           "Repository %s is in a transaction and cannot be repaired.\n"
           "--> Run `cvmfs_server abort $name` to revert and repair.",
@@ -246,7 +245,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
   if (result & kFailUnionBroken) {
     AlterMountpoint(kAlterUnionMount, log_flags);
     // read-only mount by default
-    if (publisher_->in_transaction_)
+    if (publisher_->in_transaction_.IsSet())
       result |= kFailUnionLocked;
 
     result &= ~kFailUnionBroken;

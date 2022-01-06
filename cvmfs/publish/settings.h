@@ -345,6 +345,7 @@ class SettingsKeychain {
 
 
 class SettingsPublisher;
+class SettingsReplica;
 
 /**
  * Description of a read-only repository
@@ -359,6 +360,7 @@ class SettingsRepository {
     , keychain_(fqrn)
   {}
   explicit SettingsRepository(const SettingsPublisher &settings_publisher);
+  explicit SettingsRepository(const SettingsReplica &settings_replica);
 
   void SetUrl(const std::string &url);
   void SetProxy(const std::string &proxy);
@@ -462,6 +464,9 @@ class SettingsReplica {
     , alias_(fqrn)
     , url_(std::string("http://localhost/cvmfs/") + alias_())
   {}
+
+  std::string fqrn() const { return fqrn_(); }
+  std::string url() const { return url_(); }
 
  private:
   Setting<std::string> fqrn_;

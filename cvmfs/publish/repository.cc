@@ -46,21 +46,7 @@ const std::string CommandTag::kPreviousHeadTag = "trunk-previous";
 
 namespace publish {
 
-Repository::Repository()
-  : settings_("")
-  , statistics_(new perf::Statistics())
-  , signature_mgr_(new signature::SignatureManager())
-  , download_mgr_(NULL)
-  , simple_catalog_mgr_(NULL)
-  , whitelist_(NULL)
-  , reflog_(NULL)
-  , manifest_(NULL)
-  , history_(NULL)
-{
-  signature_mgr_->Init();
-}
-
-Repository::Repository(const SettingsRepository &settings)
+Repository::Repository(const SettingsRepository &settings, const bool exists)
   : settings_(settings)
   , statistics_(new perf::Statistics())
   , signature_mgr_(new signature::SignatureManager())
@@ -73,15 +59,17 @@ Repository::Repository(const SettingsRepository &settings)
 {
   signature_mgr_->Init();
 
-  int rvb;
-  std::string keys = JoinStrings(FindFilesBySuffix(
-    settings.keychain().keychain_dir(), ".pub"), ":");
-  rvb = signature_mgr_->LoadPublicRsaKeys(keys);
-  if (!rvb) {
-    signature_mgr_->Fini();
-    delete signature_mgr_;
-    delete statistics_;
-    throw EPublish("cannot load public rsa key");
+  if (exists) {
+    int rvb;
+    std::string keys = JoinStrings(FindFilesBySuffix(
+      settings.keychain().keychain_dir(), ".pub"), ":");
+    rvb = signature_mgr_->LoadPublicRsaKeys(keys);
+    if (!rvb) {
+      signature_mgr_->Fini();
+      delete signature_mgr_;
+      delete statistics_;
+      throw EPublish("cannot load public rsa key");
+    }
   }
 
   if (!settings.cert_bundle().empty()) {
@@ -100,15 +88,17 @@ Repository::Repository(const SettingsRepository &settings)
                                  download::DownloadManager::kSetProxyBoth);
   }
 
-  try {
-    DownloadRootObjects(settings.url(), settings.fqrn(), settings.tmp_dir());
-  } catch (const EPublish& e) {
-    signature_mgr_->Fini();
-    download_mgr_->Fini();
-    delete signature_mgr_;
-    delete download_mgr_;
-    delete statistics_;
-    throw;
+  if (exists) {
+    try {
+      DownloadRootObjects(settings.url(), settings.fqrn(), settings.tmp_dir());
+    } catch (const EPublish& e) {
+      signature_mgr_->Fini();
+      download_mgr_->Fini();
+      delete signature_mgr_;
+      delete download_mgr_;
+      delete statistics_;
+      throw;
+    }
   }
 }
 
@@ -471,13 +461,7 @@ void Publisher::PushWhitelist() {
 
 
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
-  UniquePtr<Publisher> publisher(new Publisher());
-
-  publisher->settings_ = settings;
-  if (settings.is_silent())
-    publisher->llvl_ = kLogNone;
-  publisher->signature_mgr_ = new signature::SignatureManager();
-  publisher->signature_mgr_->Init();
+  UniquePtr<Publisher> publisher(new Publisher(settings, false));
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Key Chain... ");
@@ -617,26 +601,13 @@ void Publisher::InitSpoolArea() {
   }
 }
 
-Publisher::Publisher()
-  : settings_("invalid.cvmfs.io")
-  , statistics_publish_(new perf::StatisticsTemplate("publish", statistics_))
-  , llvl_(kLogNormal)
-  , in_transaction_(false)
-  , spooler_files_(NULL)
-  , spooler_catalogs_(NULL)
-  , catalog_mgr_(NULL)
-  , sync_parameters_(NULL)
-  , sync_mediator_(NULL)
-  , sync_union_(NULL)
-{
-}
-
-Publisher::Publisher(const SettingsPublisher &settings)
-  : Repository(SettingsRepository(settings))
+Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
+  : Repository(SettingsRepository(settings), exists)
   , settings_(settings)
   , statistics_publish_(new perf::StatisticsTemplate("publish", statistics_))
   , llvl_(settings.is_silent() ? kLogNone : kLogNormal)
-  , in_transaction_(false)
+  , in_transaction_(settings.transaction().spool_area().transaction_lock())
+  , is_publishing_(settings.transaction().spool_area().publishing_lock())
   , spooler_files_(NULL)
   , spooler_catalogs_(NULL)
   , catalog_mgr_(NULL)
@@ -656,6 +627,9 @@ Publisher::Publisher(const SettingsPublisher &settings)
       "proceeding.",
       EPublish::kFailLayoutRevision);
   }
+
+  if (!exists)
+    return;
 
   CreateDirectoryAsOwner(settings_.transaction().spool_area().tmp_dir(),
                          kPrivateDirMode);
@@ -695,8 +669,8 @@ Publisher::Publisher(const SettingsPublisher &settings)
 
   if (settings.is_managed())
     managed_node_ = new ManagedNode(this);
-  CheckTransactionStatus();
-  if (in_transaction_)
+  session_ = new Session(settings_, llvl_);
+  if (in_transaction_.IsSet())
     ConstructSpoolers();
 }
 
@@ -792,25 +766,6 @@ void Publisher::ConstructSyncManagers() {
   }
 }
 
-void Publisher::Sync() {
-  if (settings_.transaction().dry_run()) {
-    SyncImpl();
-    return;
-  }
-
-  const std::string publishing_lock =
-    settings_.transaction().spool_area().publishing_lock();
-
-  ServerLockFile::Acquire(publishing_lock, false /* ignore_stale */);
-  try {
-    SyncImpl();
-    ServerLockFile::Release(publishing_lock);
-  } catch (...) {
-    ServerLockFile::Release(publishing_lock);
-    throw;
-  }
-}
-
 void Publisher::ExitShell() {
   std::string session_dir = Env::GetEnterSessionDir();
   std::string session_pid_tmp = session_dir + "/session_pid";
@@ -823,7 +778,9 @@ void Publisher::ExitShell() {
   kill(pid_child, SIGUSR1);
 }
 
-void Publisher::SyncImpl() {
+void Publisher::Sync() {
+  ServerLockFileGuard g(is_publishing_);
+
   ConstructSyncManagers();
 
   sync_union_->Traverse();
@@ -868,11 +825,12 @@ void Publisher::SyncImpl() {
 }
 
 void Publisher::Publish() {
-  if (!in_transaction_) throw EPublish("cannot publish outside transaction");
+  if (!in_transaction_.IsSet())
+    throw EPublish("cannot publish outside transaction");
 
   PushReflog();
   PushManifest();
-  in_transaction_ = false;
+  in_transaction_.Clear();
 }
 
 
@@ -903,7 +861,9 @@ void Publisher::Transaction() {
 //------------------------------------------------------------------------------
 
 
-Replica::Replica(const SettingsReplica &settings) {
+Replica::Replica(const SettingsReplica &settings)
+  : Repository(SettingsRepository(settings))
+{
 }
 
 
