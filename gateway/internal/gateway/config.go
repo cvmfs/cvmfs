@@ -1,9 +1,9 @@
 package gateway
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -58,7 +58,7 @@ func ReadConfig() (*Config, error) {
 
 	var conf Config
 	if err := viper.Unmarshal(&conf); err != nil {
-		return nil, errors.Wrap(err, "could not populate configuration object")
+		return nil, fmt.Errorf("could not populate configuration object: %w", err)
 	}
 
 	// max_lease_time is given in seconds in the config file or at the command line
@@ -76,7 +76,7 @@ func ReadConfig() (*Config, error) {
 	v1 := viper.Sub("receiver_config")
 	if v1 != nil {
 		if err := v1.Unmarshal(&sc1); err != nil {
-			return nil, errors.Wrap(err, "could not load receiver config")
+			return nil, fmt.Errorf("could not load receiver config: %w", err)
 		}
 		if !pflag.CommandLine.Changed("num_receivers") {
 			conf.NumReceivers = sc1.Size
@@ -89,7 +89,7 @@ func ReadConfig() (*Config, error) {
 	v2 := viper.Sub("receiver_worker_config")
 	if v2 != nil {
 		if err := v2.Unmarshal(&sc2); err != nil {
-			return nil, errors.Wrap(err, "could not load receiver config")
+			return nil, fmt.Errorf("could not load receiver config: %w", err)
 		}
 		if !pflag.CommandLine.Changed("receiver_path") {
 			conf.ReceiverPath = sc2.Executable

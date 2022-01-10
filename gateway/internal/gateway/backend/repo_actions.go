@@ -35,18 +35,18 @@ func (s *Services) SetRepoEnabled(ctx context.Context, repository string, enable
 	return s.Leases.SetRepositoryEnabled(ctx, repository, enable)
 }
 
-func (s *Services) checkBusy(ctx context.Context, repository string) (bool, error) {
-	leases, err := s.GetLeases(ctx)
-	if err != nil {
-		return false, err
-	}
-	busy := false
-	for n := range leases {
-		if n == repository {
-			busy = true
-			break
-		}
-	}
+// func (s *Services) checkBusy(ctx context.Context, repository string) (bool, error) {
+// 	leases, err := s.GetLeases(ctx)
+// 	if err != nil {
+// 		return false, err
+// 	}
+// 	busy := false
+// 	for n := range leases {
+// 		if n == repository {
+// 			busy = true
+// 			break
+// 		}
+// 	}
 
-	return busy, nil
-}
+// 	return busy, nil
+// }

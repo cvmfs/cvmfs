@@ -2,19 +2,19 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/cvmfs/gateway/internal/gateway/receiver"
 	stats "github.com/cvmfs/gateway/internal/gateway/statistics"
-	"github.com/pkg/errors"
 )
 
 // Services is a container for the various
 // backend services
 type Services struct {
 	Access        AccessConfig
-	Leases        LeaseDB
+	Leases        *LeaseDB
 	Pool          *receiver.Pool
 	Notifications *NotificationSystem
 	Config        gw.Config
@@ -35,7 +35,7 @@ type ActionController interface {
 	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 	RunGC(ctx context.Context, options GCOptions) (string, error)
-	PublishManifest(ctx context.Context, repository string, message []byte) error
+	PublishManifest(ctx context.Context, repository string, message NotificationMessage)
 	SubscribeToNotifications(ctx context.Context, repository string) SubscriberHandle
 	UnsubscribeFromNotifications(ctx context.Context, repository string, handle SubscriberHandle) error
 }
@@ -49,25 +49,24 @@ func (s *Services) GetKey(ctx context.Context, keyID string) *KeyConfig {
 func StartBackend(cfg *gw.Config) (*Services, error) {
 	ac, err := NewAccessConfig(cfg.AccessConfigFile)
 	if err != nil {
-		return nil, errors.Wrap(
-			err, "loading repository access configuration failed")
+		return nil, fmt.Errorf("loading repository access configuration failed: %w", err)
 	}
 
 	ldb, err := OpenLeaseDB(cfg.LeaseDB, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create lease DB")
+		return nil, fmt.Errorf("could not create lease DB: %w", err)
 	}
 
 	smgr := stats.NewStatisticsMgr()
 
 	pool, err := receiver.StartPool(cfg.ReceiverPath, cfg.NumReceivers, cfg.MockReceiver, smgr)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not start receiver pool")
+		return nil, fmt.Errorf("could not start receiver pool: %w", err)
 	}
 
 	ns, err := NewNotificationSystem(cfg.WorkDir)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not initialize notification system")
+		return nil, fmt.Errorf("could not initialize notification system: %w", err)
 	}
 
 	return &Services{Access: *ac, Leases: ldb, Pool: pool, Notifications: ns, Config: *cfg, StatsMgr: smgr}, nil
@@ -76,7 +75,7 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 // Stop all the backend services
 func (s *Services) Stop() error {
 	if err := s.Leases.Close(); err != nil {
-		return errors.Wrap(err, "could not close lease database")
+		return fmt.Errorf("could not close lease database: %w", err)
 	}
 	return nil
 }

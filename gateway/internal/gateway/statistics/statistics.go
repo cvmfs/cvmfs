@@ -5,8 +5,6 @@ import (
 	"os/exec"
 	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type PublishCounters struct {
@@ -35,7 +33,7 @@ func (m *StatisticsMgr) CreateLease(leasePath string) error {
 	m.readLock.Lock()
 	defer m.readLock.Unlock()
 	if _, ex := m.leaseStatistics[leasePath]; ex {
-		return fmt.Errorf("Could not create statistics entry for lease %s, entry already exists", leasePath)
+		return fmt.Errorf("could not create statistics entry for lease %s, entry already exists", leasePath)
 	}
 	m.leaseStatistics[leasePath] = Statistics{StartTime: time.Now().Format("2006-01-02 15:04:05")}
 	return nil
@@ -46,7 +44,7 @@ func (m *StatisticsMgr) PopLease(leasePath string) (Statistics, error) {
 	defer m.readLock.Unlock()
 	res, prs := m.leaseStatistics[leasePath]
 	if !prs {
-		return Statistics{}, fmt.Errorf("No statistics counters for lease %s", leasePath)
+		return Statistics{}, fmt.Errorf("no statistics counters for lease %s", leasePath)
 	}
 	delete(m.leaseStatistics, leasePath)
 	return res, nil
@@ -57,7 +55,7 @@ func (m *StatisticsMgr) MergeIntoLeaseStatistics(leasePath string, other *Statis
 	defer m.readLock.Unlock()
 	c, prs := m.leaseStatistics[leasePath]
 	if !prs {
-		return fmt.Errorf("Statistics counters not found for lease %s", leasePath)
+		return fmt.Errorf("statistics counters not found for lease %s", leasePath)
 	}
 	c.Publish.ChunksAdded += other.Publish.ChunksAdded
 	c.Publish.ChunksDuplicated += other.Publish.ChunksDuplicated
@@ -73,7 +71,7 @@ func (m *StatisticsMgr) UploadStatsPlots(repoName string) error {
 	cmd := exec.Command(scriptPath, repoName)
 	err := cmd.Run()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("statistics plots upload failed."))
+		return fmt.Errorf("statistics plots upload failed: %w", err)
 	}
 	return nil
 }

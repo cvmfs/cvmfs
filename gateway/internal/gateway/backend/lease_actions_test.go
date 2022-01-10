@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path"
 	"testing"
@@ -68,8 +69,8 @@ func TestLeaseActionsNewLease(t *testing.T) {
 		leasePath := "test2.repo.org/some/path"
 		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
 		if err == nil {
-			t.Fatalf("invalid key was accepted")
 			backend.CancelLease(context.TODO(), token1)
+			t.Fatalf("invalid key was accepted")
 		}
 	})
 	t.Run("new lease invalid repo", func(t *testing.T) {
@@ -78,8 +79,8 @@ func TestLeaseActionsNewLease(t *testing.T) {
 		leasePath := "testNO.repo.org/some/path"
 		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
 		if err == nil {
-			t.Fatalf("invalid repo for key was accepted")
 			backend.CancelLease(context.TODO(), token1)
+			t.Fatalf("invalid repo for key was accepted")
 		}
 	})
 	t.Run("new lease invalid path", func(t *testing.T) {
@@ -88,8 +89,8 @@ func TestLeaseActionsNewLease(t *testing.T) {
 		leasePath := "test2.repo.org/NO"
 		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
 		if err == nil {
-			t.Fatalf("invalid path for key was accepted")
 			backend.CancelLease(context.TODO(), token1)
+			t.Fatalf("invalid path for key was accepted")
 		}
 	})
 }
@@ -217,7 +218,7 @@ func TestLeaseActionsGetLease(t *testing.T) {
 		if err == nil {
 			t.Fatalf("query should not succeed with invalid token: %v", err)
 		}
-		if _, ok := err.(InvalidLeaseError); !ok {
+		if !errors.As(err, &InvalidLeaseError{}) {
 			t.Fatalf("query should have returned an InvalidLeaseError. Instead: %v", err)
 		}
 	})

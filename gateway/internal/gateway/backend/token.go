@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
+	jwt "github.com/golang-jwt/jwt"
 )
 
 const (
@@ -66,7 +65,7 @@ func NewLeaseToken(repoPath string, maxLeaseDuration time.Duration) (*LeaseToken
 
 	tokenStr, err := token.SignedString(secret)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not sign token")
+		return nil, fmt.Errorf("could not sign token: %w", err)
 	}
 
 	return &LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: expiration}, nil
