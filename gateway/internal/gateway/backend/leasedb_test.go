@@ -3,6 +3,7 @@ package backend
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -186,7 +187,7 @@ func TestLeaseDBConflicts(t *testing.T) {
 		}
 
 		err = db.NewLease(context.TODO(), keyID, leasePath2, lastProtocolVersion, *token2)
-		if _, ok := err.(PathBusyError); !ok {
+		if !errors.As(err, &PathBusyError{}) {
 			t.Fatalf("conflicting lease was added for path: %v", leasePath2)
 		}
 
@@ -197,7 +198,7 @@ func TestLeaseDBConflicts(t *testing.T) {
 		}
 
 		err = db.NewLease(context.TODO(), keyID, leasePath3, lastProtocolVersion, *token3)
-		if _, ok := err.(PathBusyError); !ok {
+		if !errors.As(err, &PathBusyError{}) {
 			t.Fatalf("conflicting lease was added for path: %v", leasePath3)
 		}
 	}
