@@ -6,19 +6,13 @@ import (
 )
 
 // PublishManifest publishes a repository manifest to the notification system
-func (s *Services) PublishManifest(ctx context.Context, repository string, message []byte) error {
+func (s *Services) PublishManifest(ctx context.Context, repository string, message NotificationMessage) {
 	t0 := time.Now()
 
 	outcome := "success"
 	defer logAction(ctx, "publish_manifest", &outcome, t0)
 
-	err := s.Notifications.Publish(ctx, repository, message)
-
-	if err != nil {
-		outcome = err.Error()
-	}
-
-	return err
+	s.Notifications.Publish(ctx, repository, message)
 }
 
 // SubscribeToNotifications for a repository
