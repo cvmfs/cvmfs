@@ -54,8 +54,8 @@ func (b *mockBackend) NewLease(ctx context.Context, keyID, leasePath string, pro
 	return "lease_token_string", nil
 }
 
-func (b *mockBackend) GetLeases(ctx context.Context) (map[string]be.LeaseReturn, error) {
-	return map[string]be.LeaseReturn{
+func (b *mockBackend) GetLeases(ctx context.Context) (map[string]be.LeaseDTO, error) {
+	return map[string]be.LeaseDTO{
 		"test2.repo.org/some/path/one": {
 			KeyID:   "keyid1",
 			Expires: time.Now().Add(60 * time.Second).String(),
@@ -67,8 +67,8 @@ func (b *mockBackend) GetLeases(ctx context.Context) (map[string]be.LeaseReturn,
 	}, nil
 }
 
-func (b *mockBackend) GetLease(ctx context.Context, tokenStr string) (*be.LeaseReturn, error) {
-	return &be.LeaseReturn{
+func (b *mockBackend) GetLease(ctx context.Context, tokenStr string) (*be.LeaseDTO, error) {
+	return &be.LeaseDTO{
 		KeyID:     "keyid1",
 		LeasePath: "test2.repo.org/some/path/one",
 		Expires:   time.Now().Add(60 * time.Second).String(),

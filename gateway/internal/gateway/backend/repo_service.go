@@ -9,7 +9,7 @@ import (
 func (s *Services) GetRepo(ctx context.Context, repoName string) *RepositoryConfig {
 	repo := s.Access.GetRepo(repoName)
 	if repo != nil {
-		repo.Enabled = s.Leases.GetRepositoryEnabled(ctx, repoName)
+		repo.Enabled = GetRepositoryEnabled(ctx, s.DB, repoName)
 	}
 	return repo
 }
@@ -18,7 +18,7 @@ func (s *Services) GetRepo(ctx context.Context, repoName string) *RepositoryConf
 func (s *Services) GetRepos(ctx context.Context) map[string]RepositoryConfig {
 	repos := s.Access.GetRepos()
 	for repoName, cfg := range repos {
-		cfg.Enabled = s.Leases.GetRepositoryEnabled(ctx, repoName)
+		cfg.Enabled = GetRepositoryEnabled(ctx, s.DB, repoName)
 		repos[repoName] = cfg
 	}
 	return repos
@@ -32,7 +32,7 @@ func (s *Services) SetRepoEnabled(ctx context.Context, repository string, enable
 	outcome := "success"
 	defer logAction(ctx, "set_repo_enabled", &outcome, t0)
 
-	return s.Leases.SetRepositoryEnabled(ctx, repository, enable)
+	return SetRepositoryEnabled(ctx, s.DB, repository, enable)
 }
 
 // func (s *Services) checkBusy(ctx context.Context, repository string) (bool, error) {

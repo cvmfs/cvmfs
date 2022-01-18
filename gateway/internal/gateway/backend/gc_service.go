@@ -39,7 +39,7 @@ func (s *Services) RunGC(ctx context.Context, options GCOptions) (string, error)
 
 	var output string
 	args := append(baseArgs, options.Repository)
-	if err := s.Leases.WithLock(ctx, options.Repository, func() error {
+	if err := s.DB.WithLock(ctx, options.Repository, func() error {
 		cmd := exec.Command("cvmfs_server", args...)
 		out, err := cmd.CombinedOutput()
 		if err != nil {

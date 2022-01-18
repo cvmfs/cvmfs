@@ -13,7 +13,7 @@ func (s *Services) SubmitPayload(ctx context.Context, token string, payload io.R
 	outcome := "success"
 	defer logAction(ctx, "submit_payload", &outcome, t0)
 
-	leasePath, lease, err := s.Leases.GetLease(ctx, token)
+	leasePath, lease, err := GetLease(ctx, s.DB, token)
 	if err != nil {
 		outcome = err.Error()
 		return err

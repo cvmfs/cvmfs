@@ -11,7 +11,7 @@ import (
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
 
-func TestLeaseActionsNewLease(t *testing.T) {
+func TestLeaseServiceNewLease(t *testing.T) {
 	lastProtocolVersion := 3
 	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
 	defer func() {
@@ -95,7 +95,7 @@ func TestLeaseActionsNewLease(t *testing.T) {
 	})
 }
 
-func TestLeaseActionsCancelLease(t *testing.T) {
+func TestLeaseServiceCancelLease(t *testing.T) {
 	lastProtocolVersion := 3
 	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
 	defer func() {
@@ -132,7 +132,7 @@ func TestLeaseActionsCancelLease(t *testing.T) {
 	})
 }
 
-func TestLeaseActionsCancelLeaseByPath(t *testing.T) {
+func TestLeaseServiceCancelLeaseByPath(t *testing.T) {
 	lastProtocolVersion := 3
 	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
 	defer func() {
@@ -160,7 +160,7 @@ func TestLeaseActionsCancelLeaseByPath(t *testing.T) {
 	}
 }
 
-func TestLeaseActionsGetLease(t *testing.T) {
+func TestLeaseServiceGetLease(t *testing.T) {
 	lastProtocolVersion := 3
 	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
 	defer func() {
@@ -224,7 +224,7 @@ func TestLeaseActionsGetLease(t *testing.T) {
 	})
 }
 
-func TestLeaseActionsCommitLease(t *testing.T) {
+func TestLeaseServiceCommitLease(t *testing.T) {
 	lastProtocolVersion := 3
 	backend, tmp := StartTestBackend("lease_actions_test", 1*time.Second)
 	defer func() {

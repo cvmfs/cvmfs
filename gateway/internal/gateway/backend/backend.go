@@ -13,11 +13,11 @@ import (
 // Services is a container for the various
 // backend services
 type Services struct {
+	Config        gw.Config
 	Access        AccessConfig
-	Leases        *LeaseDB
+	DB            *DB
 	Pool          *receiver.Pool
 	Notifications *NotificationSystem
-	Config        gw.Config
 	StatsMgr      *stats.StatisticsMgr
 }
 
@@ -28,8 +28,8 @@ type ActionController interface {
 	GetRepos(ctx context.Context) map[string]RepositoryConfig
 	SetRepoEnabled(ctx context.Context, repository string, enabled bool) error
 	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error)
-	GetLeases(ctx context.Context) (map[string]LeaseReturn, error)
-	GetLease(ctx context.Context, tokenStr string) (*LeaseReturn, error)
+	GetLeases(ctx context.Context) (map[string]LeaseDTO, error)
+	GetLease(ctx context.Context, tokenStr string) (*LeaseDTO, error)
 	CancelLeases(ctx context.Context, repoPath string) error
 	CancelLease(ctx context.Context, tokenStr string) error
 	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
@@ -46,13 +46,13 @@ func (s *Services) GetKey(ctx context.Context, keyID string) *KeyConfig {
 }
 
 // StartBackend initializes the various backend services
-func StartBackend(cfg *gw.Config) (*Services, error) {
+func StartBackend(cfg gw.Config) (*Services, error) {
 	ac, err := NewAccessConfig(cfg.AccessConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("loading repository access configuration failed: %w", err)
 	}
 
-	ldb, err := OpenLeaseDB(cfg.LeaseDB, cfg)
+	db, err := OpenDB(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not create lease DB: %w", err)
 	}
@@ -69,13 +69,13 @@ func StartBackend(cfg *gw.Config) (*Services, error) {
 		return nil, fmt.Errorf("could not initialize notification system: %w", err)
 	}
 
-	return &Services{Access: *ac, Leases: ldb, Pool: pool, Notifications: ns, Config: *cfg, StatsMgr: smgr}, nil
+	return &Services{Config: cfg, Access: *ac, DB: db, Pool: pool, Notifications: ns, StatsMgr: smgr}, nil
 }
 
 // Stop all the backend services
 func (s *Services) Stop() error {
-	if err := s.Leases.Close(); err != nil {
-		return fmt.Errorf("could not close lease database: %w", err)
+	if err := s.DB.Close(); err != nil {
+		return fmt.Errorf("could not close database: %w", err)
 	}
 	return nil
 }

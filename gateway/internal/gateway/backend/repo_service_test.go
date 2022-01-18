@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestRepoActionsToggleRepo(t *testing.T) {
+func TestRepoServiceToggleRepo(t *testing.T) {
 	backend, tmp := StartTestBackend("repo_actions_toggle_test", 1*time.Second)
 	defer func() {
 		backend.Stop()

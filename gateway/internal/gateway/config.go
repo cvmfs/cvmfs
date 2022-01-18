@@ -14,10 +14,6 @@ type Config struct {
 	Port int `mapstructure:"port"`
 	// MaxLeaseTime is the maximum lease duration in seconds
 	MaxLeaseTime time.Duration `mapstructure:"max_lease_time"`
-	// LeaseDB backend boltdb, sqlite, or etcd
-	LeaseDB string `mapstructure:"lease_db"`
-	// EtcdEndpoints is a list of etcd endpoint URLs
-	EtcdEndpoints []string `mapstructure:"etcd_endpoints"`
 	// LogLevel sets the logging level
 	LogLevel string `mapstructure:"log_level"`
 	// LogTimestamps enables timestamps in the logging output
@@ -41,9 +37,6 @@ func ReadConfig() (*Config, error) {
 	pflag.String("access_config_file", "/etc/cvmfs/gateway/repo.json", "repository access configuration file")
 	pflag.Int("port", 4929, "HTTP frontend port")
 	pflag.Int("max_lease_time", 7200, "maximum lease time in seconds")
-	pflag.String("lease_db", "boltdb", "lease DB backend to use: boltdb, sqlite, or etcd (default boltdb)")
-	pflag.Bool("use_etcd", false, "use etcd as a consistent data store for lease information (for gateway clustering)")
-	pflag.StringSlice("etcd_endpoints", []string{}, "etcd cluster endpoints (for gateway clustering)")
 	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
 	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")
 	pflag.Int("num_receivers", 1, "number of parallel cvmfs_receiver processes to run")

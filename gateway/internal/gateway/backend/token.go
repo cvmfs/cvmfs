@@ -1,93 +1,103 @@
 package backend
 
 import (
-	"crypto/rand"
-	"fmt"
+	"encoding/base64"
+	"math/rand"
 	"time"
-
-	jwt "github.com/golang-jwt/jwt"
 )
 
-const (
-	tokenSecretLength = 32
-)
+var rng *rand.Rand
 
-// LeaseToken holds the signed token string, the secret used to sign the token and
-// the expiration of the token
-type LeaseToken struct {
-	TokenStr   string
-	Secret     []byte
-	Expiration time.Time
+func init() {
+	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
-// LeaseClaims encode the parameters of the lease (expiration time, repository path)
-type LeaseClaims struct {
-	jwt.StandardClaims
-	Path string `json:"path"`
+func NewLeaseToken() string {
+	tokenBytes := make([]byte, 32)
+	rng.Read(tokenBytes)
+	return base64.StdEncoding.EncodeToString(tokenBytes)
 }
 
-// ExpiredTokenError is returned by the CheckToken function for an expired token
-type ExpiredTokenError struct{}
+// const (
+// 	tokenSecretLength = 32
+// )
 
-func (e ExpiredTokenError) Error() string {
-	return "token expired"
-}
+// // LeaseToken holds the signed token string, the secret used to sign the token and
+// // the expiration of the token
+// type LeaseToken struct {
+// 	TokenStr   string
+// 	Secret     []byte
+// 	Expiration time.Time
+// }
 
-// InvalidTokenError is returned by the CheckToken function when the token cannot be
-// parsed or the signature is invalid
-type InvalidTokenError struct{}
+// // LeaseClaims encode the parameters of the lease (expiration time, repository path)
+// type LeaseClaims struct {
+// 	jwt.StandardClaims
+// 	Path string `json:"path"`
+// }
 
-func (e InvalidTokenError) Error() string {
-	return "invalid token"
-}
+// // ExpiredTokenError is returned by the CheckToken function for an expired token
+// type ExpiredTokenError struct{}
 
-// NewLeaseToken generates a new lease token for the given repository
-// path, valid for maxLeaseTime. Returns the signed encoded token string, the secret
-// used to sign the token and the expiration time of the token
-func NewLeaseToken(repoPath string, maxLeaseDuration time.Duration) (*LeaseToken, error) {
-	if repoPath == "" {
-		return nil, fmt.Errorf("repository path should not be empty")
-	}
+// func (e ExpiredTokenError) Error() string {
+// 	return "token expired"
+// }
 
-	secret := make([]byte, tokenSecretLength)
-	if n, err := rand.Read(secret); n != tokenSecretLength || err != nil {
-		return nil, fmt.Errorf("could not generate token secret")
-	}
+// // InvalidTokenError is returned by the CheckToken function when the token cannot be
+// // parsed or the signature is invalid
+// type InvalidTokenError struct{}
 
-	expiration := time.Now().Add(maxLeaseDuration)
+// func (e InvalidTokenError) Error() string {
+// 	return "invalid token"
+// }
 
-	claims := LeaseClaims{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expiration.UnixNano()},
-		Path: repoPath}
+// // NewLeaseToken generates a new lease token for the given repository
+// // path, valid for maxLeaseTime. Returns the signed encoded token string, the secret
+// // used to sign the token and the expiration time of the token
+// func NewLeaseToken(repoPath string, maxLeaseDuration time.Duration) (*LeaseToken, error) {
+// 	if repoPath == "" {
+// 		return nil, fmt.Errorf("repository path should not be empty")
+// 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+// 	secret := make([]byte, tokenSecretLength)
+// 	if n, err := rand.Read(secret); n != tokenSecretLength || err != nil {
+// 		return nil, fmt.Errorf("could not generate token secret")
+// 	}
 
-	tokenStr, err := token.SignedString(secret)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign token: %w", err)
-	}
+// 	expiration := time.Now().Add(maxLeaseDuration)
 
-	return &LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: expiration}, nil
-}
+// 	claims := LeaseClaims{
+// 		StandardClaims: jwt.StandardClaims{
+// 			ExpiresAt: expiration.UnixNano()},
+// 		Path: repoPath}
 
-// CheckToken with the given secret. Return ExpiredError if the token is
-// expired, or InvalidTokenError if the token cannot be validated
-func CheckToken(tokenStr string, secret []byte) error {
-	token, err := jwt.ParseWithClaims(
-		tokenStr, &LeaseClaims{}, func(t *jwt.Token) (interface{}, error) {
-			return secret, nil
-		})
-	if err != nil {
-		return InvalidTokenError{}
-	}
+// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	if claims, ok := token.Claims.(*LeaseClaims); ok {
-		if claims.ExpiresAt <= time.Now().UnixNano() {
-			return ExpiredTokenError{}
-		}
-		return nil
-	}
+// 	tokenStr, err := token.SignedString(secret)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("could not sign token: %w", err)
+// 	}
 
-	return InvalidTokenError{}
-}
+// 	return &LeaseToken{TokenStr: tokenStr, Secret: secret, Expiration: expiration}, nil
+// }
+
+// // CheckToken with the given secret. Return ExpiredError if the token is
+// // expired, or InvalidTokenError if the token cannot be validated
+// func CheckToken(tokenStr string, secret []byte) error {
+// 	token, err := jwt.ParseWithClaims(
+// 		tokenStr, &LeaseClaims{}, func(t *jwt.Token) (interface{}, error) {
+// 			return secret, nil
+// 		})
+// 	if err != nil {
+// 		return InvalidTokenError{}
+// 	}
+
+// 	if claims, ok := token.Claims.(*LeaseClaims); ok {
+// 		if claims.ExpiresAt <= time.Now().UnixNano() {
+// 			return ExpiredTokenError{}
+// 		}
+// 		return nil
+// 	}
+
+// 	return InvalidTokenError{}
+// }
