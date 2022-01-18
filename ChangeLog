@@ -4,6 +4,7 @@
   * Proxy sharding support (PR #2812)
 
 2.9.1:
+  * Fix for GeoAPI and Python3 (CVM-2052)
   * Fix initialization of upstream type in cvmfs_server ingest (#2816)
   * Fix bug where trailing slash in base dir crashes tarball ingest (CVM-2044)
 
