@@ -341,14 +341,6 @@ SqlListTags::SqlListTags(const HistoryDatabase *database) {
 //------------------------------------------------------------------------------
 
 
-SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
-  MAKE_STATEMENTS("SELECT @DB_FIELDS@, MAX(revision) AS max_rev "
-                  "FROM tags "
-                  "WHERE branch = '' "
-                  "GROUP BY channel;");
-  DEFERRED_INITS(database);
-}
-
 SqlGetHashes::SqlGetHashes(const HistoryDatabase *database) {
   DeferredInit(database->sqlite_db(), "SELECT DISTINCT hash FROM tags "
                                       "ORDER BY timestamp, revision ASC");

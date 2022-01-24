@@ -170,12 +170,6 @@ class SqlListTags : public SqlRetrieveTag<SqlHistory> {
 };
 
 
-class SqlGetChannelTips : public SqlRetrieveTag<SqlHistory> {
- public:
-  explicit SqlGetChannelTips(const HistoryDatabase *database);
-};
-
-
 class SqlGetHashes : public SqlHistory {
  public:
   explicit SqlGetHashes(const HistoryDatabase *database);

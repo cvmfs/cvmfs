@@ -689,7 +689,6 @@ class MockHistory : public history::History,
   bool GetByName(const std::string &name, Tag *tag) const;
   bool GetByDate(const time_t timestamp, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
-  bool Tips(std::vector<Tag> *channel_tips) const;
 
   bool GetBranchHead(const std::string &branch_name, Tag *tag) const;
   bool InsertBranch(const Branch &branch);
