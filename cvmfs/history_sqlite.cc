@@ -392,7 +392,6 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   }
 
   // sanity checks
-  assert(old_target_tag.channel     == updated_target_tag.channel);
   assert(old_target_tag.description == updated_target_tag.description);
 
   // rollback the history to the target tag
@@ -401,9 +400,8 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
             rollback_tag_->Execute()                     &&
             rollback_tag_->Reset();
   if (!success || Exists(old_target_tag.name)) {
-    LogCvmfs(kLogHistory, kLogDebug, "failed to remove intermediate tags in "
-                                     "channel '%d' until '%s' - '%d'",
-                                     old_target_tag.channel,
+    LogCvmfs(kLogHistory, kLogDebug, "failed to remove intermediate tags "
+                                     "until '%s' - '%d'",
                                      old_target_tag.name.c_str(),
                                      old_target_tag.revision);
     return false;

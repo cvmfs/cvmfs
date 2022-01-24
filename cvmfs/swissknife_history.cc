@@ -316,7 +316,6 @@ bool CommandTag::UpdateUndoTags(
     if (!undo_rollback) {
       current_old_head = current_head;
       current_old_head.name = CommandTag::kPreviousHeadTag;
-      current_old_head.channel = history::History::kChannelTrunk;
       current_old_head.description = CommandTag::kPreviousHeadTagDescription;
       if (!env->history->Insert(current_old_head)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to set previous HEAD tag");
@@ -328,7 +327,6 @@ bool CommandTag::UpdateUndoTags(
   // set the current HEAD to the catalog provided by the template HEAD
   current_head = current_head_template;
   current_head.name = CommandTag::kHeadTag;
-  current_head.channel = history::History::kChannelTrunk;
   current_head.description = CommandTag::kHeadTagDescription;
   if (!env->history->Insert(current_head)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to set new current HEAD");
@@ -485,12 +483,10 @@ int CommandEditTag::Main(const ArgumentList &args) {
 }
 
 int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
-  typedef history::History::UpdateChannel TagChannel;
   const std::string tag_name =
       (args.find('a') != args.end()) ? *args.find('a')->second : "";
   const std::string tag_description =
       (args.find('D') != args.end()) ? *args.find('D')->second : "";
-  const TagChannel tag_channel = history::History::kChannelTrunk;
   const bool undo_tags = (args.find('x') != args.end());
   const std::string root_hash_string =
       (args.find('h') != args.end()) ? *args.find('h')->second : "";
@@ -547,7 +543,6 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   tag_template.revision = catalog->GetRevision();
   tag_template.timestamp = catalog->GetLastModified();
   tag_template.branch = branch_name;
-  tag_template.channel = tag_channel;
   tag_template.description = tag_description;
 
   // manipulate the tag database by creating a new tag or moving an existing one
@@ -644,13 +639,6 @@ bool CommandEditTag::MoveTag(Environment *env,
   if (old_tag.root_hash == new_tag.root_hash) {
     LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' already points to '%s'",
              tag_name.c_str(), old_tag.root_hash.ToString().c_str());
-    return false;
-  }
-
-  // check that tag is not moved to another channel
-  if (new_tag.channel != old_tag.channel) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "cannot move tag '%s' to another channel",
-             tag_name.c_str());
     return false;
   }
 

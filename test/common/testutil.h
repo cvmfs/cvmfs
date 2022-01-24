@@ -747,8 +747,7 @@ class MockHistory : public history::History,
       , inverse_(inverse)
     { }
     bool operator()(const Tag &tag) const {
-      const bool p = (tag.revision > tag_.revision || tag.name == tag_.name) &&
-                      tag.channel == tag_.channel;
+      const bool p = (tag.revision > tag_.revision || tag.name == tag_.name);
       return inverse_ ^ p;
     }
     const Tag  &tag_;

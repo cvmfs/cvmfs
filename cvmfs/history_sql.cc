@@ -203,7 +203,6 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_3() {
                         ":description, :size, :branch"
 #define ROLLBACK_COND   "(revision > :target_rev  OR " \
                         " name = :target_name) " \
-                        "AND channel = :target_chan " \
                         "AND branch = ''"
 
 #define MAKE_STATEMENT(STMT_TMPL, REV)       \
@@ -245,7 +244,10 @@ bool SqlInsertTag::BindTag(const History::Tag &tag) {
     BindTextTransient(2, tag.root_hash.ToString()) &&  // temporary (ToString)
     BindInt64(3, tag.revision) &&
     BindInt64(4, tag.timestamp) &&
-    BindInt64(5, tag.channel) &&
+    // Channels are no longer supported: store 0 (i.e. kChannelTrunk)
+    // for backwards compatibility with existing databases
+    //
+    BindInt64(5, 0) &&
     BindText(6, tag.description) &&
     BindInt64(7, tag.size) &&
     BindText(8, tag.branch);
