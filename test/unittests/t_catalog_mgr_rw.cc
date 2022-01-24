@@ -211,12 +211,13 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalogFailSlow) {
                                               sub1_hash, sub1_size),
                "not found in parent");
 
-  // Fail for nested catalog that is already attached
+  // Fail for nested catalog that is already attached and modified
   EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
                                         &path, &sub1_hash, &sub1_size));
+  catalog_mgr->RemoveFile("dir/dir/dir/sub1/file1");
   EXPECT_DEATH(catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1",
                                               sub1_hash, sub1_size),
-               "already attached");
+               "already modified");
 
   // Fail for non-existent catalog
   catalog_mgr->DetachNested();
