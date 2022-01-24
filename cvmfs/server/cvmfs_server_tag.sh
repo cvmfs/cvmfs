@@ -13,7 +13,6 @@ cvmfs_server_tag() {
   local name
   local tag_name=""
   local action_add=0
-  local add_tag_channel
   local add_tag_description
   local add_tag_root_hash
   local action_remove=0
@@ -34,9 +33,6 @@ cvmfs_server_tag() {
         tag_name="$OPTARG"
         action_add=1
       ;;
-      c)
-        add_tag_channel=$OPTARG
-        ;;
       m)
         add_tag_description="$OPTARG"
         ;;
@@ -188,9 +184,6 @@ cvmfs_server_tag() {
       $(get_swissknife_proxy)                                    \
       $(get_follow_http_redirects_flag)                          \
       -a $tag_name"
-    if [ ! -z "$add_tag_channel" ]; then
-      tag_create_command="$tag_create_command -c $add_tag_channel"
-    fi
     if [ ! -z "$add_tag_description" ]; then
       tag_create_command="$tag_create_command -D \"$add_tag_description\""
     fi

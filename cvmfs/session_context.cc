@@ -305,7 +305,10 @@ bool SessionContext::Commit(const std::string& old_root_hash,
   request_input.Add("old_root_hash", old_root_hash);
   request_input.Add("new_root_hash", new_root_hash);
   request_input.Add("tag_name", tag.name());
-  request_input.Add("tag_channel", tag.channel());
+  // Channels are no longer supported: send 0 (i.e. kChannelTrunk) for
+  // backwards compatibility with existing gateways
+  //
+  request_input.Add("tag_channel", 0);
   request_input.Add("tag_description", tag.description());
   std::string request = request_input.GenerateString();
   CurlBuffer buffer;
