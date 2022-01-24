@@ -725,16 +725,6 @@ class MockHistory : public history::History,
     return tag.root_hash;
   }
 
-  static bool gt_channel_revision(const Tag &lhs, const Tag &rhs) {
-    return (lhs.channel == rhs.channel)
-              ? lhs.revision > rhs.revision
-              : lhs.channel > rhs.channel;
-  }
-
-  static bool eq_channel(const Tag &lhs, const Tag &rhs) {
-    return lhs.channel == rhs.channel;
-  }
-
   static bool gt_hashes(const Tag &lhs, const Tag &rhs) {
     return lhs.root_hash > rhs.root_hash;
   }
