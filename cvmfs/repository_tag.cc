@@ -8,10 +8,8 @@
 #include "util/string.h"
 
 RepositoryTag::RepositoryTag(const std::string& name,
-                             const std::string& channel,
                              const std::string& description)
     : name_(name),
-      channel_(channel),
       description_(description) {
 }
 

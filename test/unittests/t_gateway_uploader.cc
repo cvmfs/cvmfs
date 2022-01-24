@@ -93,7 +93,7 @@ TEST_F(T_GatewayUploader, Construct) {
   GatewayUploaderMocked uploader(definition);
   EXPECT_TRUE(uploader.Initialize());
   EXPECT_TRUE(uploader.FinalizeSession(false, "", "",
-                                       RepositoryTag("new_tag", "trunk", "")));
+                                       RepositoryTag("new_tag", "")));
   uploader.TearDown();
 }
 

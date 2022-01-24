@@ -434,7 +434,6 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(new_root_hash_json->string_value));
   RepositoryTag repo_tag(tag_name_json->string_value,
-                         "",
                          tag_description_json->string_value);
   CommitProcessor::Result res =
       proc->Process(lease_path_json->string_value, old_root_hash, new_root_hash,
