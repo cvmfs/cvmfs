@@ -1,7 +1,7 @@
 2.10.0:
   * Updating GeoAPI to Python 3 (PR #2829)
-  * cvmfs-release: use 20.04 fallback packages on Ubuntu >= 20.04 (PR #2828)
-  * Proxy sharding support (PR #2812)
+  * Add support for sharding proxies support with new client option 
+    CVMFS_PROXY_SHARD={yes|no} (PR #2812)
 
 2.9.1:
   * Fix integrity check for external chunked files (CVM-2050)
