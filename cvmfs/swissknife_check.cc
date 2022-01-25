@@ -564,7 +564,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         aggregated_file_size += this_chunk.size();
 
         // are all data chunks in the data store?
-        if (check_chunks_) {
+        if (check_chunks_ && !entries[i].IsExternalFile()) {
           const shash::Any &chunk_hash = this_chunk.content_hash();
           const string chunk_path = "data/" + chunk_hash.MakePath();
           if (!Exists(chunk_path)) {
