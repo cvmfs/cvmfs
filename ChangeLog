@@ -1,4 +1,5 @@
 2.9.1:
+  * Fix integrity check for external chunked files (CVM-2050)
   * Fix for GeoAPI and Python3 (CVM-2052)
   * Fix initialization of upstream type in cvmfs_server ingest (#2816)
   * Fix bug where trailing slash in base dir crashes tarball ingest (CVM-2044)
