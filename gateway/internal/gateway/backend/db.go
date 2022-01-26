@@ -94,12 +94,14 @@ create table if not exists Lease (
 	Repository string not null,
 	Path string not null,
 	KeyID string not null,
-	Expiration integer not null
+	Expiration integer not null,
+	ProtocolVersion integer not null
 );
 create index lease_repository_path_idx ON Lease(Repository,Path);
-create table if not exists DisabledRepo (
+create table if not exists Repository (
 	Name string not null unique primary key,
-	State bool not null
+	Manifest string,
+	Enabled bool not null
 );
 `,
 		latestSchemaVersion)

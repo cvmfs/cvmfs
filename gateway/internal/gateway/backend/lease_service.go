@@ -34,7 +34,14 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 	}
 	defer tx.Rollback()
 
-	if !GetRepositoryEnabled(ctx, s.DB, repo) {
+	repoConfig, err := s.GetRepo(ctx, repo)
+	if err != nil {
+		return "", fmt.Errorf("could not retrieve repository information: %w", err)
+	}
+	if repoConfig == nil {
+		return "", fmt.Errorf("repository not found: %w", err)
+	}
+	if !repoConfig.Enabled {
 		return "", ErrRepoDisabled
 	}
 
@@ -67,11 +74,12 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 
 	// Generate a new token for the lease
 	lease := Lease{
-		Token:      NewLeaseToken(),
-		Repository: repo,
-		Path:       path,
-		KeyID:      keyID,
-		Expiration: time.Now().Add(s.Config.MaxLeaseTime),
+		Token:           NewLeaseToken(),
+		Repository:      repo,
+		Path:            path,
+		KeyID:           keyID,
+		Expiration:      time.Now().Add(s.Config.MaxLeaseTime),
+		ProtocolVersion: protocolVersion,
 	}
 
 	if err := CreateLease(ctx, tx, lease); err != nil {
@@ -97,7 +105,7 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 	}
 
 	outcome = fmt.Sprintf("success: %v", lease.Token)
-	return lease.Token, err
+	return lease.Token, nil
 }
 
 // GetLeases returns all active and valid leases

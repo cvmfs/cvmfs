@@ -198,8 +198,8 @@ func TestLeaseServiceGetLease(t *testing.T) {
 		if err == nil {
 			t.Fatalf("query should not succeed for expired leases: %v", err)
 		}
-		if _, ok := err.(ExpiredTokenError); !ok {
-			t.Fatalf("query should have returned an ExpiredTokenError. Instead: %v", err)
+		if !errors.As(err, &InvalidLeaseError{}) {
+			t.Fatalf("query should have returned an InvalidLeaseError. Instead: %v", err)
 		}
 	})
 	t.Run("get invalid lease", func(t *testing.T) {
@@ -210,11 +210,11 @@ func TestLeaseServiceGetLease(t *testing.T) {
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
-		token2, err := NewLeaseToken(leasePath, time.Second)
+		token2 := NewLeaseToken()
 		if err != nil {
 			t.Fatalf("could not generate second token")
 		}
-		_, err = backend.GetLease(context.TODO(), token2.TokenStr)
+		_, err = backend.GetLease(context.TODO(), token2)
 		if err == nil {
 			t.Fatalf("query should not succeed with invalid token: %v", err)
 		}
@@ -253,13 +253,9 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 	})
 	t.Run("commit invalid lease", func(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
-		leasePath := "test2.repo.org/some/path"
-		token, err := NewLeaseToken(leasePath, backend.Config.MaxLeaseTime)
-		if err != nil {
-			t.Fatalf("could not obtain new lease token: %v", err)
-		}
+		token := NewLeaseToken()
 		if _, err := backend.CommitLease(
-			context.TODO(), token.TokenStr, "old_hash", "new_hash",
+			context.TODO(), token, "old_hash", "new_hash",
 			gw.RepositoryTag{
 				Name:        "mytag",
 				Channel:     "mychannel",

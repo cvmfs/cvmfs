@@ -1,9 +1,10 @@
 package backend
 
 import (
-	"bytes"
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -27,6 +28,22 @@ func TestLeaseDBOpen(t *testing.T) {
 	defer db.Close()
 }
 
+func withTx(ctx context.Context, db *sql.DB, t *testing.T, test func(ctx context.Context, tx *sql.Tx) error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("could not begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	if err := test(ctx, tx); err != nil {
+		t.Fatalf("test failed: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("could not commit transaction: %v", err)
+	}
+}
+
 func TestLeaseDBCRUD(t *testing.T) {
 	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_lease_db")
@@ -42,98 +59,137 @@ func TestLeaseDBCRUD(t *testing.T) {
 	}
 	defer db.Close()
 
+	ctx := context.Background()
+
 	keyID1 := "key1"
 	leasePath1 := "test.repo.org/path/one"
 	token1 := NewLeaseToken()
 	t.Run("new lease", func(t *testing.T) {
-		if err != nil {
-			t.Fatalf("could not generate session token: %v", err)
-		}
+		withTx(ctx, db.SQL, t, func(ctx context.Context, tx *sql.Tx) error {
+			lease := Lease{
+				Token:           token1,
+				Repository:      "test.repo.org",
+				Path:            "path/one",
+				KeyID:           keyID1,
+				Expiration:      time.Now().Add(TestMaxLeaseTime),
+				ProtocolVersion: lastProtocolVersion,
+			}
 
-		if err := NewLease(context.TODO(), db, keyID1, leasePath1, lastProtocolVersion, *token1); err != nil {
-			t.Fatalf("could not add new lease: %v", err)
-		}
+			if err := CreateLease(ctx, tx, lease); err != nil {
+				return err
+			}
+
+			return nil
+		})
 	})
 	t.Run("get leases", func(t *testing.T) {
-		leases, err := GetLeases(context.TODO(), db)
-		if err != nil {
-			t.Fatalf("could not retrieve leases: %v", err)
-		}
-		if len(leases) != 1 {
-			t.Fatalf("expected 1 lease")
-		}
-		_, present := leases[leasePath1]
-		if !present {
-			t.Fatalf("missing lease for %v", leasePath1)
-		}
+		withTx(ctx, db.SQL, t, func(ctx context.Context, tx *sql.Tx) error {
+			leases, err := FindAllActiveLeases(ctx, tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve leases: %w", err)
+			}
+			if len(leases) != 1 {
+				return fmt.Errorf("expected 1 lease")
+			}
+			if leases[0].CombinedLeasePath() != leasePath1 {
+				return fmt.Errorf("missing lease for %v", leasePath1)
+			}
+
+			return nil
+		})
 	})
 	t.Run("get lease for token", func(t *testing.T) {
-		_, lease, err := GetLease(context.TODO(), db, token1.TokenStr)
-		if err != nil {
-			t.Fatalf("could not retrieve leases: %v", err)
-		}
-		if lease.KeyID != keyID1 ||
-			lease.Token != token1 ||
-			!bytes.Equal(lease.Token.Secret, token1.Secret) {
-			t.Fatalf("invalid lease returned: %v", lease)
-		}
+		withTx(ctx, db.SQL, t, func(ctx context.Context, tx *sql.Tx) error {
+			_, err := FindLeaseByToken(ctx, tx, token1)
+			if err != nil {
+				return fmt.Errorf("could not retrieve leases: %w", err)
+			}
+
+			return nil
+		})
 	})
 	t.Run("cancel leases", func(t *testing.T) {
-		leasePath1 := "test.repo.org/path/two"
-		token1, err := NewLeaseToken(leasePath1, TestMaxLeaseTime)
-		if err != nil {
-			t.Fatalf("could not generate session token: %v", err)
-		}
-		if err := NewLease(context.TODO(), db, keyID1, leasePath1, lastProtocolVersion, *token1); err != nil {
-			t.Fatalf("could not add new lease: %v", err)
-		}
-		leasePath2 := "test.repo.org/another/path"
-		token2, err := NewLeaseToken(leasePath2, TestMaxLeaseTime)
-		if err != nil {
-			t.Fatalf("could not generate session token: %v", err)
-		}
-		if err := NewLease(context.TODO(), db, keyID1, leasePath2, lastProtocolVersion, *token2); err != nil {
-			t.Fatalf("could not add new lease: %v", err)
-		}
+		withTx(ctx, db.SQL, t, func(ctx context.Context, tx *sql.Tx) error {
+			repo := "test.repo.org"
+			path1 := "path/two"
+			token1 := NewLeaseToken()
+			lease1 := Lease{
+				Token:           token1,
+				Repository:      repo,
+				Path:            path1,
+				KeyID:           keyID1,
+				Expiration:      time.Now().Add(TestMaxLeaseTime),
+				ProtocolVersion: lastProtocolVersion,
+			}
+			if err := CreateLease(ctx, tx, lease1); err != nil {
+				return fmt.Errorf("could not add new lease: %w", err)
+			}
+			path2 := "another/path"
+			token2 := NewLeaseToken()
+			lease2 := Lease{
+				Token:           token2,
+				Repository:      repo,
+				Path:            path2,
+				KeyID:           keyID1,
+				Expiration:      time.Now().Add(TestMaxLeaseTime),
+				ProtocolVersion: lastProtocolVersion,
+			}
+			if err := CreateLease(ctx, tx, lease2); err != nil {
+				return fmt.Errorf("could not add new lease: %w", err)
+			}
 
-		if err := CancelLeases(context.TODO(), db, "test.repo.org/path"); err != nil {
-			t.Fatalf("could not cancel all leases: %v", err)
-		}
+			if err := DeleteAllLeasesByRepositoryAndPathPrefix(ctx, tx, repo, "path"); err != nil {
+				return fmt.Errorf("could not cancel all leases: %w", err)
+			}
 
-		leases, err := GetLeases(context.TODO(), db)
-		if err != nil {
-			t.Fatalf("could not retrieve leases: %v", err)
-		}
-		if len(leases) > 1 {
-			t.Fatalf("remaining leases after cancellation")
-		}
+			leases, err := FindAllLeases(ctx, tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve leases: %w", err)
+			}
+			if len(leases) > 1 {
+				return fmt.Errorf("remaining leases after cancellation")
+			}
 
-		if err := CancelLeases(context.TODO(), db, "test.repo.org/"); err != nil {
-			t.Fatalf("could not cancel all leases: %v", err)
-		}
+			if err := DeleteAllLeasesByRepositoryAndPathPrefix(ctx, tx, repo, "/"); err != nil {
+				return fmt.Errorf("could not cancel all leases: %w", err)
+			}
+
+			return nil
+		})
 	})
 	t.Run("clear lease for token", func(t *testing.T) {
-		leasePath := "test.repo.org/path/three"
-		token, err := NewLeaseToken(leasePath, TestMaxLeaseTime)
-		if err != nil {
-			t.Fatalf("could not generate session token: %v", err)
-		}
+		withTx(ctx, db.SQL, t, func(ctx context.Context, tx *sql.Tx) error {
+			repo := "test.repo.org"
+			path := "path/three"
+			token := NewLeaseToken()
 
-		if err := NewLease(context.TODO(), db, keyID1, leasePath, lastProtocolVersion, *token); err != nil {
-			t.Fatalf("could not add new lease: %v", err)
-		}
+			lease := Lease{
+				Token:           token,
+				Repository:      repo,
+				Path:            path,
+				KeyID:           keyID1,
+				Expiration:      time.Now().Add(TestMaxLeaseTime),
+				ProtocolVersion: lastProtocolVersion,
+			}
 
-		if err := CancelLease(context.TODO(), db, token.TokenStr); err != nil {
-			t.Fatalf("could not clear lease for token")
-		}
+			if err := CreateLease(ctx, tx, lease); err != nil {
+				return fmt.Errorf("could not add new lease: %w", err)
+			}
 
-		leases, err := GetLeases(context.TODO(), db)
-		if err != nil {
-			t.Fatalf("could not retrieve leases: %v", err)
-		}
-		if len(leases) > 0 {
-			t.Fatalf("remaining leases after cancellation")
-		}
+			if err := DeleteLeaseByToken(ctx, tx, token); err != nil {
+				return fmt.Errorf("could not clear lease for token")
+			}
+
+			leases, err := FindAllLeases(ctx, tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve leases: %w", err)
+			}
+			if len(leases) > 0 {
+				return fmt.Errorf("remaining leases after cancellation")
+			}
+
+			return nil
+		})
 	})
 }
 
@@ -153,37 +209,62 @@ func TestLeaseDBConflicts(t *testing.T) {
 	defer db.Close()
 
 	keyID := "key1"
-	leasePath1 := "test.repo.org/path/one"
-	token1, err := NewLeaseToken(leasePath1, TestMaxLeaseTime)
-	if err != nil {
-		t.Fatalf("could not generate session token: %v", err)
-	}
+	repo := "test.repo.org"
+	path1 := "path/one"
 
-	if err := NewLease(context.TODO(), db, keyID, leasePath1, lastProtocolVersion, *token1); err != nil {
-		t.Fatalf("could not add new lease: %v", err)
-	}
+	withTx(context.Background(), db.SQL, t, func(ctx context.Context, tx *sql.Tx) error {
+		token1 := NewLeaseToken()
 
-	leasePath2 := "test.repo.org/path"
-	token2, err := NewLeaseToken(leasePath2, TestMaxLeaseTime)
-	if err != nil {
-		t.Fatalf("could not generate session token: %v", err)
-	}
+		lease1 := Lease{
+			Token:           token1,
+			Repository:      repo,
+			Path:            path1,
+			KeyID:           keyID,
+			Expiration:      time.Now().Add(TestMaxLeaseTime),
+			ProtocolVersion: lastProtocolVersion,
+		}
 
-	err = NewLease(context.TODO(), db, keyID, leasePath2, lastProtocolVersion, *token2)
-	if !errors.As(err, &PathBusyError{}) {
-		t.Fatalf("conflicting lease was added for path: %v", leasePath2)
-	}
+		if err := CreateLease(ctx, tx, lease1); err != nil {
+			return fmt.Errorf("could not add new lease: %w", err)
+		}
 
-	leasePath3 := "test.repo.org/path/one/below"
-	token3, err := NewLeaseToken(leasePath3, TestMaxLeaseTime)
-	if err != nil {
-		t.Fatalf("could not generate session token: %v", err)
-	}
+		path2 := "path"
+		token2 := NewLeaseToken()
 
-	err = NewLease(context.TODO(), db, keyID, leasePath3, lastProtocolVersion, *token3)
-	if !errors.As(err, &PathBusyError{}) {
-		t.Fatalf("conflicting lease was added for path: %v", leasePath3)
-	}
+		lease2 := Lease{
+			Token:           token2,
+			Repository:      repo,
+			Path:            path2,
+			KeyID:           keyID,
+			Expiration:      time.Now().Add(TestMaxLeaseTime),
+			ProtocolVersion: lastProtocolVersion,
+		}
+
+		err = CreateLease(ctx, tx, lease2)
+		if !errors.As(err, &PathBusyError{}) {
+			return fmt.Errorf("conflicting lease was added for path: %v", path2)
+		}
+
+		path3 := "path/one/below"
+		token3 := NewLeaseToken()
+
+		lease3 := Lease{
+			Token:           token3,
+			Repository:      repo,
+			Path:            path3,
+			KeyID:           keyID,
+			Expiration:      time.Now().Add(TestMaxLeaseTime),
+			ProtocolVersion: lastProtocolVersion,
+		}
+
+		err = CreateLease(ctx, tx, lease3)
+		if !errors.As(err, &PathBusyError{}) {
+			return fmt.Errorf("conflicting lease was added for path: %v", path3)
+		}
+
+		return nil
+	})
+
 }
 
 func TestLeaseDBExpired(t *testing.T) {
@@ -204,24 +285,40 @@ func TestLeaseDBExpired(t *testing.T) {
 	defer db.Close()
 
 	keyID := "key1"
-	leasePath := "test.repo.org/path/one"
-	token1, err := NewLeaseToken(leasePath, shortLeaseTime)
-	if err != nil {
-		t.Fatalf("could not generate session token: %v", err)
-	}
+	repo := "test.repo.org"
+	path := "path/one"
 
-	if err := NewLease(context.TODO(), db, keyID, leasePath, lastProtocolVersion, *token1); err != nil {
-		t.Fatalf("could not add new lease: %v", err)
-	}
+	withTx(context.Background(), db.SQL, t, func(ctx context.Context, tx *sql.Tx) error {
+		token1 := NewLeaseToken()
 
-	time.Sleep(2 * shortLeaseTime)
+		lease1 := Lease{
+			Token:           token1,
+			Repository:      repo,
+			Path:            path,
+			KeyID:           keyID,
+			Expiration:      time.Now().Add(shortLeaseTime),
+			ProtocolVersion: lastProtocolVersion,
+		}
+		if err := CreateLease(ctx, tx, lease1); err != nil {
+			return fmt.Errorf("could not add new lease: %w", err)
+		}
 
-	token2, err := NewLeaseToken(leasePath, shortLeaseTime)
-	if err != nil {
-		t.Fatalf("could not generate session token: %v", err)
-	}
+		time.Sleep(2 * shortLeaseTime)
 
-	if err := NewLease(context.TODO(), db, keyID, leasePath, lastProtocolVersion, *token2); err != nil {
-		t.Fatalf("could not add new lease in place of expired one")
-	}
+		token2 := NewLeaseToken()
+		lease2 := Lease{
+			Token:           token2,
+			Repository:      repo,
+			Path:            path,
+			KeyID:           keyID,
+			Expiration:      time.Now().Add(shortLeaseTime),
+			ProtocolVersion: lastProtocolVersion,
+		}
+
+		if err := CreateLease(ctx, tx, lease2); err != nil {
+			return fmt.Errorf("could not add new lease in place of expired one")
+		}
+
+		return nil
+	})
 }

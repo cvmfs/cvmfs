@@ -37,11 +37,12 @@ func (e InvalidLeaseError) Error() string {
 // Lease describes an exclusive lease to a subpath inside the repository:
 // keyID and token ()
 type Lease struct {
-	Token      string
-	Repository string
-	Path       string
-	KeyID      string
-	Expiration time.Time
+	Token           string
+	Repository      string
+	Path            string
+	KeyID           string
+	Expiration      time.Time
+	ProtocolVersion int
 }
 
 func (l Lease) CombinedLeasePath() string {
@@ -52,8 +53,8 @@ func CreateLease(ctx context.Context, tx *sql.Tx, lease Lease) error {
 	t0 := time.Now()
 
 	res, err := tx.ExecContext(ctx,
-		"insert into Lease (Token, Repository, Path, KeyID, Expiration) values (?, ?, ?, ?, ?);",
-		lease.Token, lease.Repository, lease.Path, lease.KeyID, lease.Expiration.UnixNano())
+		"insert into Lease (Token, Repository, Path, KeyID, Expiration, ProtocolVersion) values (?, ?, ?, ?, ?, ?);",
+		lease.Token, lease.Repository, lease.Path, lease.KeyID, lease.Expiration.UnixNano(), lease.ProtocolVersion)
 	if err != nil {
 		return fmt.Errorf("could not insert new lease: %w", err)
 	}
@@ -64,7 +65,7 @@ func CreateLease(ctx context.Context, tx *sql.Tx, lease Lease) error {
 	}
 
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
-		Str("operation", "create_lease").
+		Str("operation", "create").
 		Dur("task_dt", time.Since(t0)).
 		Msgf("key: %v, repo: %v, path: %v", lease.KeyID, lease.Repository, lease.Path)
 
@@ -90,7 +91,7 @@ func FindAllLeases(ctx context.Context, tx *sql.Tx) ([]Lease, error) {
 	}
 
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
-		Str("operation", "find_all_leases").
+		Str("operation", "find_all").
 		Dur("task_dt", time.Since(t0)).
 		Msgf("found %v leases", len(leases))
 
@@ -116,7 +117,7 @@ func FindAllActiveLeases(ctx context.Context, tx *sql.Tx) ([]Lease, error) {
 	}
 
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
-		Str("operation", "find_all_active_leases").
+		Str("operation", "find_all_active").
 		Dur("task_dt", time.Since(t0)).
 		Msgf("found %v leases", len(leases))
 
@@ -144,7 +145,7 @@ func FindAllLeasesByRepositoryAndOverlappingPath(ctx context.Context, tx *sql.Tx
 	}
 
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
-		Str("operation", "find_all_leases_by_repository_and_overlapping_path").
+		Str("operation", "find_all_by_repository_and_overlapping_path").
 		Dur("task_dt", time.Since(t0)).
 		Msgf("found %v leases", len(leases))
 
@@ -172,7 +173,7 @@ func FindLeaseByToken(ctx context.Context, tx *sql.Tx, token string) (*Lease, er
 	}
 
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
-		Str("operation", "find_lease_by_token").
+		Str("operation", "find_by_token").
 		Dur("task_dt", time.Since(t0)).
 		Msgf("success")
 
@@ -189,7 +190,7 @@ func DeleteAllExpiredLeases(ctx context.Context, tx *sql.Tx) error {
 	numDeleted, _ := res.RowsAffected()
 
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
-		Str("operation", "delete_all_expired_leases").
+		Str("operation", "delete_all_expired").
 		Dur("task_dt", time.Since(t0)).
 		Msgf("deleted %v leases", numDeleted)
 
@@ -206,7 +207,7 @@ func DeleteAllLeasesByRepositoryAndPathPrefix(ctx context.Context, tx *sql.Tx, r
 	numDeleted, _ := res.RowsAffected()
 
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
-		Str("operation", "delete_all_leases_by_repository").
+		Str("operation", "delete_all_by_repository").
 		Dur("task_dt", time.Since(t0)).
 		Msgf("deleted %v leases", numDeleted)
 
@@ -223,7 +224,7 @@ func DeleteLeaseByToken(ctx context.Context, tx *sql.Tx, token string) error {
 	numDeleted, _ := res.RowsAffected()
 
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
-		Str("operation", "delete_lease_by_token").
+		Str("operation", "delete_by_token").
 		Dur("task_dt", time.Since(t0)).
 		Msgf("deleted %v leases", numDeleted)
 
@@ -236,7 +237,8 @@ func scanLease(rows *sql.Rows, lease *Lease) error {
 		&lease.Repository,
 		&lease.Path,
 		&lease.KeyID,
-		&lease.Expiration); err != nil {
+		&lease.Expiration,
+		&lease.ProtocolVersion); err != nil {
 		return err
 	}
 

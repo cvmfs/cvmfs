@@ -24,8 +24,8 @@ type Services struct {
 // ActionController contains the various actions that can be performed with the backend
 type ActionController interface {
 	GetKey(ctx context.Context, keyID string) *KeyConfig
-	GetRepo(ctx context.Context, repoName string) *RepositoryConfig
-	GetRepos(ctx context.Context) map[string]RepositoryConfig
+	GetRepo(ctx context.Context, repoName string) (*RepositoryConfig, error)
+	GetRepos(ctx context.Context) (map[string]RepositoryConfig, error)
 	SetRepoEnabled(ctx context.Context, repository string, enabled bool) error
 	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error)
 	GetLeases(ctx context.Context) (map[string]LeaseDTO, error)
@@ -69,7 +69,13 @@ func StartBackend(cfg gw.Config) (*Services, error) {
 		return nil, fmt.Errorf("could not initialize notification system: %w", err)
 	}
 
-	return &Services{Config: cfg, Access: *ac, DB: db, Pool: pool, Notifications: ns, StatsMgr: smgr}, nil
+	services := Services{Config: cfg, Access: *ac, DB: db, Pool: pool, Notifications: ns, StatsMgr: smgr}
+
+	if err := populateRepositories(&services); err != nil {
+		return nil, fmt.Errorf("could not populate repository table: %w", err)
+	}
+
+	return &services, nil
 }
 
 // Stop all the backend services
@@ -77,5 +83,22 @@ func (s *Services) Stop() error {
 	if err := s.DB.Close(); err != nil {
 		return fmt.Errorf("could not close database: %w", err)
 	}
+	return nil
+}
+
+func populateRepositories(s *Services) error {
+	ctx := context.Background()
+	for name := range s.Access.Repositories {
+		repo, err := s.GetRepo(ctx, name)
+		if err != nil {
+			return err
+		}
+		if repo == nil {
+			if err := s.NewRepo(context.Background(), name, true); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }

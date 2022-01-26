@@ -29,13 +29,11 @@ func (b *mockBackend) GetKey(ctx context.Context, keyID string) *be.KeyConfig {
 	return &be.KeyConfig{Secret: "big_secret", Admin: admin}
 }
 
-func (b *mockBackend) GetRepo(ctx context.Context, repoName string) *be.RepositoryConfig {
-	return &be.RepositoryConfig{
-		Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
-	}
+func (b *mockBackend) GetRepo(ctx context.Context, repoName string) (*be.RepositoryConfig, error) {
+	return &be.RepositoryConfig{Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"}}, nil
 }
 
-func (b *mockBackend) GetRepos(ctx context.Context) map[string]be.RepositoryConfig {
+func (b *mockBackend) GetRepos(ctx context.Context) (map[string]be.RepositoryConfig, error) {
 	return map[string]be.RepositoryConfig{
 		"test1.repo.org": {
 			Keys: be.KeyPaths{"keyid123": "/"},
@@ -43,7 +41,7 @@ func (b *mockBackend) GetRepos(ctx context.Context) map[string]be.RepositoryConf
 		"test2.repo.org": {
 			Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
 		},
-	}
+	}, nil
 }
 
 func (b *mockBackend) SetRepoEnabled(ctx context.Context, repository string, enabled bool) error {
