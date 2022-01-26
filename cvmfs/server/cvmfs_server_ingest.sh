@@ -179,9 +179,6 @@ cvmfs_server_ingest() {
   if [ ! -z "$tag_name" ]; then
     tag_command="$tag_command -a $tag_name"
   fi
-  if [ ! -z "$tag_channel" ]; then
-    tag_command="$tag_command -c $tag_channel"
-  fi
   if [ ! -z "$tag_description" ]; then
     tag_command="$tag_command -D \"$tag_description\""
   fi

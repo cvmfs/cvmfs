@@ -1128,7 +1128,7 @@ Supported Commands:
                   <fully qualified repository name>
                   Imports an old CernVM-FS repository into a fresh repo
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                  [-a tag name] [-c tag channel] [-m tag description]
+                  [-a tag name] [-m tag description]
                   [-X (force external data) | -N (force native data)]
                   [-Z compression algorithm] [-F authz info file]
                   [-f use force remount if necessary]
@@ -1180,7 +1180,7 @@ Supported Commands:
   info            <fully qualified name>
                   Print summary about the repository
   tag             Create and manage named snapshots
-                  [-a create tag <name>] [-c channel] [-m message] [-h hash]
+                  [-a create tag <name>] [-m message] [-h hash]
                   [-r remove tag <name>] [-f don't ask again]
                   [-i inspect tag <name>] [-x machine readable]
                   [-b list branch hierarchy] [-x machine readable]

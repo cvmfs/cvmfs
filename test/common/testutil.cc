@@ -659,20 +659,6 @@ bool MockHistory::List(std::vector<Tag> *tags) const {
   return true;
 }
 
-bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
-  // extract tags from TagMap
-  GetTags(channel_tips);
-
-  // find hash duplicates
-  std::sort(channel_tips->begin(), channel_tips->end(),
-            MockHistory::gt_channel_revision);
-  std::vector<Tag>::iterator last = std::unique(channel_tips->begin(),
-                                                channel_tips->end(),
-                                                MockHistory::eq_channel);
-  channel_tips->erase(last, channel_tips->end());
-  return true;
-}
-
 bool MockHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
   std::vector<Tag> all_tags;
   GetTags(&all_tags);

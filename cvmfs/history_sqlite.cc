@@ -106,7 +106,6 @@ void SqliteHistory::PrepareQueries() {
   find_tag_by_date_   = new SqlFindTagByDate    (database_.weak_ref());
   count_tags_         = new SqlCountTags        (database_.weak_ref());
   list_tags_          = new SqlListTags         (database_.weak_ref());
-  channel_tips_       = new SqlGetChannelTips   (database_.weak_ref());
   get_hashes_         = new SqlGetHashes        (database_.weak_ref());
   list_rollback_tags_ = new SqlListRollbackTags (database_.weak_ref());
   list_branches_      = new SqlListBranches     (database_.weak_ref());
@@ -236,10 +235,6 @@ bool SqliteHistory::List(std::vector<Tag> *tags) const {
   return RunListing(tags, list_tags_.weak_ref());
 }
 
-bool SqliteHistory::Tips(std::vector<Tag> *channel_tips) const {
-  assert(channel_tips_.IsValid());
-  return RunListing(channel_tips, channel_tips_.weak_ref());
-}
 
 template <class SqlListingT>
 bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
@@ -397,7 +392,6 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   }
 
   // sanity checks
-  assert(old_target_tag.channel     == updated_target_tag.channel);
   assert(old_target_tag.description == updated_target_tag.description);
 
   // rollback the history to the target tag
@@ -406,9 +400,8 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
             rollback_tag_->Execute()                     &&
             rollback_tag_->Reset();
   if (!success || Exists(old_target_tag.name)) {
-    LogCvmfs(kLogHistory, kLogDebug, "failed to remove intermediate tags in "
-                                     "channel '%d' until '%s' - '%d'",
-                                     old_target_tag.channel,
+    LogCvmfs(kLogHistory, kLogDebug, "failed to remove intermediate tags "
+                                     "until '%s' - '%d'",
                                      old_target_tag.name.c_str(),
                                      old_target_tag.revision);
     return false;

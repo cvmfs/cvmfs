@@ -231,7 +231,6 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 		"old_root_hash":   oldRootHash,
 		"new_root_hash":   newRootHash,
 		"tag_name":        tag.Name,
-		"tag_channel":     tag.Channel,
 		"tag_description": tag.Description,
 		"statistics":      stats,
 	}

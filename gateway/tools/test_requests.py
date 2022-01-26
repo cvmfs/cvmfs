@@ -61,7 +61,6 @@ def commit_lease(args):
     req = {'old_root_hash': args.old_hash,
            'new_root_hash': args.new_hash,
            'tag_name': 'mytag',
-           'tag_channel': 'mychan',
            'tag_description': 'mydescription'}
     rep = requests.post(args.gw_url + '/leases/' + token,
                         json=req, headers=headers)

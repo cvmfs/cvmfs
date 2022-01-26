@@ -336,8 +336,7 @@ void Publisher::CreateRootObjects() {
   history::History::Tag tag_trunk(
     "trunk",
     manifest_->catalog_hash(), manifest_->catalog_size(), manifest_->revision(),
-    manifest_->publish_timestamp(), history::History::kChannelTrunk,
-    "empty repository", "" /* branch */);
+    manifest_->publish_timestamp(), "empty repository", "" /* branch */);
   history_->Insert(tag_trunk);
 
   // Meta information, TODO(jblomer)

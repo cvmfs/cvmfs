@@ -719,10 +719,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.repo_tag.SetName(*args.find('D')->second);
   }
 
-  if (args.find('G') != args.end()) {
-    params.repo_tag.SetChannel(*args.find('G')->second);
-  }
-
   if (args.find('J') != args.end()) {
     params.repo_tag.SetDescription(*args.find('J')->second);
   }
