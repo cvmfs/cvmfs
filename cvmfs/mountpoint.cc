@@ -1768,6 +1768,21 @@ bool MountPoint::SetupBehavior() {
   {
     xattr_visibility = MagicXattrManager::kVisibilityNever;
   }
+  if (options_mgr_->GetValue("CVMFS_MAGIC_XATTRS_VISIBILITY", &optarg)) {
+    // If the new option is present, change the built-in default
+    xattr_visibility = MagicXattrManager::kVisibilityRootOnly;
+    if (ToUpper(optarg) == "ROOTONLY") {
+      // nothing to do, already the default
+    } else if (ToUpper(optarg) == "NEVER") {
+      xattr_visibility = MagicXattrManager::kVisibilityNever;
+    } else if (ToUpper(optarg) == "ALWAYS") {
+      xattr_visibility = MagicXattrManager::kVisibilityAlways;
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "unsupported setting: CVMFS_MAGIC_XATTRS_VISIBILITY=%s",
+               optarg.c_str());
+    }
+  }
   magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility);
 
 
