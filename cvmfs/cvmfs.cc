@@ -1410,9 +1410,9 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   ino = catalog_mgr->MangleInode(ino);
   TraceInode(Tracer::kEventListAttr, ino, "listxattr()");
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_listxattr on inode: %" PRIu64 ", size %u [hide xattrs %d]",
+           "cvmfs_listxattr on inode: %" PRIu64 ", size %u [visibility %d]",
            uint64_t(ino), size,
-           mount_point_->magic_xattr_mgr()->hide_magic_xattrs());
+           mount_point_->magic_xattr_mgr()->visibility());
 
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
