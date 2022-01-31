@@ -27,5 +27,21 @@ cvmfs_run_test() {
     return 30
   fi
 
+  # CVMFS_MAGIC_XATTRS_VISIBILITY should have precedence over CVMFS_HIDE_MAGIC_XATTRS
+  cvmfs_umount grid.cern.ch || return 40
+  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=yes" \
+    "CVMFS_MAGIC_XATTRS_VISIBILITY=rootonly" || return 41
+  attributes=$(list_xattrs /cvmfs/grid.cern.ch)
+  if [ "x$attributes" = "x" ]; then
+    echo "Expected extended attributes on root node"
+    return 42
+  fi
+  local afile=$(find /cvmfs/grid.cern.ch -type f | head -1)
+  attributes=$(list_xattrs $afile)
+  if [ "x$attributes" != "x" ]; then
+    echo "Extended attributes (none expected for $afile): $attributes"
+    return 43
+  fi
+
   return 0
 }
