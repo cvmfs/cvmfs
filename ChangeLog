@@ -1,4 +1,6 @@
 2.10.0:
+  * More fine-grained control for magic xattrs with
+    CVMFS_MAGIC_XATTRS_VISIBILITY (CVM-2058)
   * Add support for sharding proxies support with new client option 
     CVMFS_PROXY_SHARD={yes|no} (CVM-2060)
 
