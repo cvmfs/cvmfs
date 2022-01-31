@@ -17,9 +17,9 @@
 #include "util/string.h"
 
 MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
-                                     bool hide_magic_xattrs)
+                                     EVisibility visibility)
   : mount_point_(mountpoint),
-    hide_magic_xattrs_(hide_magic_xattrs)
+    visibility_(visibility)
 {
   Register("user.catalog_counters", new CatalogCountersMagicXattr());
   Register("user.external_host", new ExternalHostMagicXattr());
@@ -67,7 +67,11 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
-  if (hide_magic_xattrs()) {
+  if (visibility() == kVisibilityNever) {
+    return "";
+  }
+  // Only the root entry has an empty name
+  if (visibility() == kVisibilityRootOnly && !dirent->name().IsEmpty()) {
     return "";
   }
 
