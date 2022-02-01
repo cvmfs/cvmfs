@@ -1762,17 +1762,15 @@ bool MountPoint::SetupBehavior() {
            static_cast<int>(kcache_timeout_sec_));
 
   MagicXattrManager::EVisibility xattr_visibility =
-    MagicXattrManager::kVisibilityAlways;
+    MagicXattrManager::kVisibilityRootOnly;
   if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
       && options_mgr_->IsOn(optarg))
   {
     xattr_visibility = MagicXattrManager::kVisibilityNever;
   }
   if (options_mgr_->GetValue("CVMFS_MAGIC_XATTRS_VISIBILITY", &optarg)) {
-    // If the new option is present, change the built-in default
-    xattr_visibility = MagicXattrManager::kVisibilityRootOnly;
     if (ToUpper(optarg) == "ROOTONLY") {
-      // nothing to do, already the default
+      xattr_visibility = MagicXattrManager::kVisibilityRootOnly;
     } else if (ToUpper(optarg) == "NEVER") {
       xattr_visibility = MagicXattrManager::kVisibilityNever;
     } else if (ToUpper(optarg) == "ALWAYS") {
