@@ -1763,10 +1763,11 @@ bool MountPoint::SetupBehavior() {
 
   MagicXattrManager::EVisibility xattr_visibility =
     MagicXattrManager::kVisibilityRootOnly;
-  if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
-    xattr_visibility = MagicXattrManager::kVisibilityNever;
+  if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)) {
+    if (options_mgr_->IsOn(optarg))
+      xattr_visibility = MagicXattrManager::kVisibilityNever;
+    else if (options_mgr_->IsOff(optarg))
+      xattr_visibility = MagicXattrManager::kVisibilityAlways;
   }
   if (options_mgr_->GetValue("CVMFS_MAGIC_XATTRS_VISIBILITY", &optarg)) {
     if (ToUpper(optarg) == "ROOTONLY") {
