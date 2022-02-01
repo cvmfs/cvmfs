@@ -1,4 +1,5 @@
 2.9.1:
+  * New option to list magic xattrs on root node only (CVM-2058)
   * Fix integrity check for external chunked files (CVM-2050)
   * Fix for GeoAPI and Python3 (CVM-2052)
   * Fix initialization of upstream type in cvmfs_server ingest (#2816)
