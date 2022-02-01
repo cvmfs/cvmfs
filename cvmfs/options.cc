@@ -413,6 +413,13 @@ bool OptionsManager::IsOn(const std::string &param_value) const {
 }
 
 
+bool OptionsManager::IsOff(const std::string &param_value) const {
+  const string uppercase = ToUpper(param_value);
+  return ((uppercase == "NO") || (uppercase == "OFF") || (uppercase == "0") ||
+          (uppercase == "FALSE"));
+}
+
+
 vector<string> OptionsManager::GetAllKeys() {
   vector<string> result;
   for (map<string, ConfigValue>::const_iterator i = config_.begin(),

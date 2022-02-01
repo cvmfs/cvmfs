@@ -140,6 +140,14 @@ class OptionsManager {
   bool IsOn(const std::string &param_value) const;
 
   /**
+   * Checks if a variable contains a boolean value
+   *
+   * @param   param_value variable to be accessed in the map
+   * @return  true if param has as value "NO", "OFF", "0", or "FALSE".
+   */
+  bool IsOff(const std::string &param_value) const;
+
+  /**
    * Retrieves a vector containing all stored keys
    *
    * @return a vector with all keys contained in the map
