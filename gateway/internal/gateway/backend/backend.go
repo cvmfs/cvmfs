@@ -88,15 +88,12 @@ func (s *Services) Stop() error {
 
 func populateRepositories(s *Services) error {
 	ctx := context.Background()
+	if err := s.DeleteAllRepositories(ctx); err != nil {
+		return err
+	}
 	for name := range s.Access.Repositories {
-		repo, err := s.GetRepo(ctx, name)
-		if err != nil {
+		if err := s.NewRepo(context.Background(), name, true); err != nil {
 			return err
-		}
-		if repo == nil {
-			if err := s.NewRepo(context.Background(), name, true); err != nil {
-				return err
-			}
 		}
 	}
 

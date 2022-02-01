@@ -48,10 +48,6 @@ func OpenDB(config gw.Config) (*DB, error) {
 		return nil, fmt.Errorf("invalid schema version: %w", err)
 	}
 
-	if err := clearDisabledRepos(sqlDB); err != nil {
-		return nil, fmt.Errorf("could not enable repositories: %w", err)
-	}
-
 	gw.Log("leasedb", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", config.WorkDir)
 
@@ -125,23 +121,4 @@ func checkSchemaVersion(db *sql.DB) (int, error) {
 	}
 
 	return version, nil
-}
-
-func clearDisabledRepos(db *sql.DB) error {
-	// Enable all repos
-	txn, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("could not begin transaction: %w", err)
-	}
-	defer txn.Rollback()
-
-	if _, err := txn.Exec("delete from DisabledRepos;"); err != nil {
-		return fmt.Errorf("could not clear DisabledRepos table: %w", err)
-	}
-
-	if err := txn.Commit(); err != nil {
-		return fmt.Errorf("transaction commit failed: %w", err)
-	}
-
-	return nil
 }

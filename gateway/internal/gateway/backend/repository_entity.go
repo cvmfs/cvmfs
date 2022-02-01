@@ -121,6 +121,22 @@ func FindRepositoryByName(ctx context.Context, tx *sql.Tx, name string) (*Reposi
 	return &repo, nil
 }
 
+func DeleteAllRepositories(ctx context.Context, tx *sql.Tx) error {
+	t0 := time.Now()
+
+	_, err := tx.ExecContext(ctx, "delete from Repository;")
+	if err != nil {
+		return fmt.Errorf("could not update repository: %w", err)
+	}
+
+	gw.LogC(ctx, "repository_entity", gw.LogDebug).
+		Str("operation", "delete_all").
+		Dur("task_dt", time.Since(t0)).
+		Msgf("success")
+
+	return nil
+}
+
 func scanRepository(rows *sql.Rows, repo *Repository) error {
 	if err := rows.Scan(
 		&repo.Name,

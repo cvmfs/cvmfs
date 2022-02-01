@@ -13,7 +13,7 @@ import (
 	"github.com/cvmfs/gateway/internal/gateway"
 )
 
-func TestLeaseDBOpen(t *testing.T) {
+func TestLeaseOpen(t *testing.T) {
 	tmp, err := ioutil.TempDir("", "test_lease_db")
 	if err != nil {
 		t.Fatalf("could not create temp dir for test case")
@@ -44,7 +44,7 @@ func withTx(ctx context.Context, db *sql.DB, t *testing.T, test func(ctx context
 	}
 }
 
-func TestLeaseDBCRUD(t *testing.T) {
+func TestLeaseCRUD(t *testing.T) {
 	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_lease_db")
 	if err != nil {
@@ -89,7 +89,7 @@ func TestLeaseDBCRUD(t *testing.T) {
 				return fmt.Errorf("could not retrieve leases: %w", err)
 			}
 			if len(leases) != 1 {
-				return fmt.Errorf("expected 1 lease")
+				return fmt.Errorf("expected 1 lease, found: %v", len(leases))
 			}
 			if leases[0].CombinedLeasePath() != leasePath1 {
 				return fmt.Errorf("missing lease for %v", leasePath1)
@@ -193,7 +193,7 @@ func TestLeaseDBCRUD(t *testing.T) {
 	})
 }
 
-func TestLeaseDBConflicts(t *testing.T) {
+func TestLeaseConflicts(t *testing.T) {
 	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_lease_db")
 	if err != nil {
@@ -267,7 +267,7 @@ func TestLeaseDBConflicts(t *testing.T) {
 
 }
 
-func TestLeaseDBExpired(t *testing.T) {
+func TestLeaseExpired(t *testing.T) {
 	lastProtocolVersion := 3
 	tmp, err := ioutil.TempDir("", "test_lease_db")
 	if err != nil {

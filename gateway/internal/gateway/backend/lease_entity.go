@@ -101,7 +101,7 @@ func FindAllLeases(ctx context.Context, tx *sql.Tx) ([]Lease, error) {
 func FindAllActiveLeases(ctx context.Context, tx *sql.Tx) ([]Lease, error) {
 	t0 := time.Now()
 
-	rows, err := tx.QueryContext(ctx, "select * from Lease where Expiration >= datetime(?);", t0.UnixNano())
+	rows, err := tx.QueryContext(ctx, "select * from Lease where Expiration >= ?;", t0.UnixNano())
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
@@ -183,7 +183,7 @@ func FindLeaseByToken(ctx context.Context, tx *sql.Tx, token string) (*Lease, er
 func DeleteAllExpiredLeases(ctx context.Context, tx *sql.Tx) error {
 	t0 := time.Now()
 
-	res, err := tx.ExecContext(ctx, "delete from Lease where Expiration < datetime(?)", t0.UnixNano())
+	res, err := tx.ExecContext(ctx, "delete from Lease where Expiration < ?", t0.UnixNano())
 	if err != nil {
 		return fmt.Errorf("delete statement failed: %w", err)
 	}
