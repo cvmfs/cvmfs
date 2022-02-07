@@ -129,7 +129,7 @@ func FindAllLeasesByRepositoryAndOverlappingPath(ctx context.Context, tx *sql.Tx
 
 	rows, err := tx.QueryContext(
 		ctx,
-		"select * from Lease where Repository = ? and (? like Path || '%' or Path like '?%');", repository, path)
+		"select * from Lease where Repository = ? and (? like Path || '%' or Path like ? || '%');", repository, path, path)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
@@ -200,7 +200,24 @@ func DeleteAllExpiredLeases(ctx context.Context, tx *sql.Tx) error {
 func DeleteAllLeasesByRepositoryAndPathPrefix(ctx context.Context, tx *sql.Tx, repo, path string) error {
 	t0 := time.Now()
 
-	res, err := tx.ExecContext(ctx, "delete from Lease where Repository = ? and Path like '?%'", repo, path)
+	res, err := tx.ExecContext(ctx, "delete from Lease where Repository = ? and Path like ? || '%'", repo, path)
+	if err != nil {
+		return fmt.Errorf("delete statement failed: %w", err)
+	}
+	numDeleted, _ := res.RowsAffected()
+
+	gw.LogC(ctx, "lease_entity", gw.LogDebug).
+		Str("operation", "delete_all_by_repository_and_path_prefix").
+		Dur("task_dt", time.Since(t0)).
+		Msgf("deleted %v leases", numDeleted)
+
+	return nil
+}
+
+func DeleteAllLeasesByRepository(ctx context.Context, tx *sql.Tx, repo string) error {
+	t0 := time.Now()
+
+	res, err := tx.ExecContext(ctx, "delete from Lease where Repository = ?", repo)
 	if err != nil {
 		return fmt.Errorf("delete statement failed: %w", err)
 	}

@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -109,8 +108,8 @@ func TestLeaseCRUD(t *testing.T) {
 		})
 	})
 	t.Run("cancel leases", func(t *testing.T) {
+		repo := "test.repo.org"
 		withTx(ctx, db.SQL, t, func(ctx context.Context, tx *sql.Tx) error {
-			repo := "test.repo.org"
 			path1 := "path/two"
 			token1 := NewLeaseToken()
 			lease1 := Lease{
@@ -150,7 +149,7 @@ func TestLeaseCRUD(t *testing.T) {
 				return fmt.Errorf("remaining leases after cancellation")
 			}
 
-			if err := DeleteAllLeasesByRepositoryAndPathPrefix(ctx, tx, repo, "/"); err != nil {
+			if err := DeleteAllLeasesByRepository(ctx, tx, repo); err != nil {
 				return fmt.Errorf("could not cancel all leases: %w", err)
 			}
 
@@ -240,9 +239,8 @@ func TestLeaseConflicts(t *testing.T) {
 			ProtocolVersion: lastProtocolVersion,
 		}
 
-		err = CreateLease(ctx, tx, lease2)
-		if !errors.As(err, &PathBusyError{}) {
-			return fmt.Errorf("conflicting lease was added for path: %v", path2)
+		if err := CreateLease(ctx, tx, lease2); err != nil {
+			return fmt.Errorf("could not add new lease: %w", err)
 		}
 
 		path3 := "path/one/below"
@@ -257,9 +255,17 @@ func TestLeaseConflicts(t *testing.T) {
 			ProtocolVersion: lastProtocolVersion,
 		}
 
-		err = CreateLease(ctx, tx, lease3)
-		if !errors.As(err, &PathBusyError{}) {
-			return fmt.Errorf("conflicting lease was added for path: %v", path3)
+		if err := CreateLease(ctx, tx, lease3); err != nil {
+			return fmt.Errorf("could not add new lease: %w", err)
+		}
+
+		leases, err := FindAllLeasesByRepositoryAndOverlappingPath(ctx, tx, repo, path1)
+		if err != nil {
+			return fmt.Errorf("could not retrieve leases: %w", err)
+		}
+
+		if len(leases) != 3 {
+			return fmt.Errorf("conflicting leases not found: %w", err)
 		}
 
 		return nil
