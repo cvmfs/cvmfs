@@ -93,9 +93,9 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 	// then, the lease path must be free.
 	// We remove it, no matter what.
 	// We don't check the error because it return an error if the lease does not exist, the standard case.
-	s.StatsMgr.PopLease(leasePath)
+	s.StatsMgr.PopLease(lease.CombinedLeasePath())
 
-	if err := s.StatsMgr.CreateLease(leasePath); err != nil {
+	if err := s.StatsMgr.CreateLease(lease.CombinedLeasePath()); err != nil {
 		outcome = err.Error()
 		return "", err
 	}
@@ -158,12 +158,10 @@ func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error
 		return nil, err
 	}
 
-	if lease != nil {
-		if lease.Expiration.Before(time.Now()) {
-			err := InvalidLeaseError{}
-			outcome = err.Error()
-			return nil, err
-		}
+	if lease == nil || lease.Expiration.Before(time.Now()) {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return nil, err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -228,6 +226,12 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 		return err
 	}
 
+	if lease == nil {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return err
+	}
+
 	if err := DeleteLeaseByToken(ctx, tx, token); err != nil {
 		outcome = err.Error()
 		return err
@@ -260,6 +264,12 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 
 	lease, err := FindLeaseByToken(ctx, tx, token)
 	if err != nil {
+		outcome = err.Error()
+		return 0, err
+	}
+
+	if lease == nil || lease.Expiration.Before(time.Now()) {
+		err := InvalidLeaseError{}
 		outcome = err.Error()
 		return 0, err
 	}

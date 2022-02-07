@@ -71,7 +71,7 @@ func StartBackend(cfg gw.Config) (*Services, error) {
 
 	services := Services{Config: cfg, Access: *ac, DB: db, Pool: pool, Notifications: ns, StatsMgr: smgr}
 
-	if err := populateRepositories(&services); err != nil {
+	if err := PopulateRepositories(&services); err != nil {
 		return nil, fmt.Errorf("could not populate repository table: %w", err)
 	}
 
@@ -86,7 +86,7 @@ func (s *Services) Stop() error {
 	return nil
 }
 
-func populateRepositories(s *Services) error {
+func PopulateRepositories(s *Services) error {
 	ctx := context.Background()
 	if err := s.DeleteAllRepositories(ctx); err != nil {
 		return err

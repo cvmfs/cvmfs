@@ -26,6 +26,12 @@ func (s *Services) SubmitPayload(ctx context.Context, token string, payload io.R
 		return err
 	}
 
+	if lease == nil || lease.Expiration.Before(time.Now()) {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("could not commit transaction: %w", err)
 	}
