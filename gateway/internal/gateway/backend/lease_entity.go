@@ -54,7 +54,7 @@ func CreateLease(ctx context.Context, tx *sql.Tx, lease Lease) error {
 
 	res, err := tx.ExecContext(ctx,
 		"insert into Lease (Token, Repository, Path, KeyID, Expiration, ProtocolVersion) values (?, ?, ?, ?, ?, ?);",
-		lease.Token, lease.Repository, lease.Path, lease.KeyID, lease.Expiration.UnixNano(), lease.ProtocolVersion)
+		lease.Token, lease.Repository, lease.Path, lease.KeyID, lease.Expiration.Unix(), lease.ProtocolVersion)
 	if err != nil {
 		return fmt.Errorf("could not insert new lease: %w", err)
 	}
@@ -101,7 +101,7 @@ func FindAllLeases(ctx context.Context, tx *sql.Tx) ([]Lease, error) {
 func FindAllActiveLeases(ctx context.Context, tx *sql.Tx) ([]Lease, error) {
 	t0 := time.Now()
 
-	rows, err := tx.QueryContext(ctx, "select * from Lease where Expiration >= ?;", t0.UnixNano())
+	rows, err := tx.QueryContext(ctx, "select * from Lease where Expiration >= ?;", t0.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
@@ -183,7 +183,7 @@ func FindLeaseByToken(ctx context.Context, tx *sql.Tx, token string) (*Lease, er
 func DeleteAllExpiredLeases(ctx context.Context, tx *sql.Tx) error {
 	t0 := time.Now()
 
-	res, err := tx.ExecContext(ctx, "delete from Lease where Expiration < ?", t0.UnixNano())
+	res, err := tx.ExecContext(ctx, "delete from Lease where Expiration < ?", t0.Unix())
 	if err != nil {
 		return fmt.Errorf("delete statement failed: %w", err)
 	}
@@ -232,15 +232,18 @@ func DeleteLeaseByToken(ctx context.Context, tx *sql.Tx, token string) error {
 }
 
 func scanLease(rows *sql.Rows, lease *Lease) error {
+	var expSeconds int64
 	if err := rows.Scan(
 		&lease.Token,
 		&lease.Repository,
 		&lease.Path,
 		&lease.KeyID,
-		&lease.Expiration,
+		&expSeconds,
 		&lease.ProtocolVersion); err != nil {
 		return err
 	}
+
+	lease.Expiration = time.Unix(expSeconds, 0)
 
 	return nil
 }
