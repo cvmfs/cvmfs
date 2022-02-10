@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"encoding/base64"
+	"encoding/base32"
 	"math/rand"
 	"time"
 )
@@ -15,5 +15,5 @@ func init() {
 func NewLeaseToken() string {
 	tokenBytes := make([]byte, 32)
 	rng.Read(tokenBytes)
-	return base64.StdEncoding.EncodeToString(tokenBytes)
+	return base32.StdEncoding.EncodeToString(tokenBytes)
 }
