@@ -41,11 +41,13 @@ int CmdAbort::Main(const Options &options) {
 
   UniquePtr<SettingsPublisher> settings;
   try {
-    // Legacy behaviour is that trailing paths after the repository name should be ignored, e.g.
-    // cvmfs_server abort repo.cern.ch/some/path is equivalent to cvmfs_server abort repo.cern.ch
+    // Legacy behaviour is that trailing paths after the repository name should
+    // be ignored, e.g. cvmfs_server abort repo.cern.ch/some/path is equivalent
+    // to cvmfs_server abort repo.cern.ch
     std::string repository_ident = StripTrailingPath(
       options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
-    settings = builder.CreateSettingsPublisher(repository_ident, true /* needs_managed */);
+    settings = builder.CreateSettingsPublisher(
+      repository_ident, true /* needs_managed */);
   } catch (const EPublish &e) {
     if ((e.failure() == EPublish::kFailRepositoryNotFound) ||
         (e.failure() == EPublish::kFailRepositoryType))
