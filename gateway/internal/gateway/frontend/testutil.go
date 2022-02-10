@@ -29,21 +29,19 @@ func (b *mockBackend) GetKey(ctx context.Context, keyID string) *be.KeyConfig {
 	return &be.KeyConfig{Secret: "big_secret", Admin: admin}
 }
 
-func (b *mockBackend) GetRepo(ctx context.Context, repoName string) *be.RepositoryConfig {
-	return &be.RepositoryConfig{
-		Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
-	}
+func (b *mockBackend) GetRepo(ctx context.Context, repoName string) (*be.RepositoryConfig, error) {
+	return &be.RepositoryConfig{Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"}}, nil
 }
 
-func (b *mockBackend) GetRepos(ctx context.Context) map[string]be.RepositoryConfig {
+func (b *mockBackend) GetRepos(ctx context.Context) (map[string]be.RepositoryConfig, error) {
 	return map[string]be.RepositoryConfig{
-		"test1.repo.org": be.RepositoryConfig{
+		"test1.repo.org": {
 			Keys: be.KeyPaths{"keyid123": "/"},
 		},
-		"test2.repo.org": be.RepositoryConfig{
+		"test2.repo.org": {
 			Keys: be.KeyPaths{"keyid1": "/", "keyid2": "/restricted/to/subdir"},
 		},
-	}
+	}, nil
 }
 
 func (b *mockBackend) SetRepoEnabled(ctx context.Context, repository string, enabled bool) error {
@@ -54,21 +52,21 @@ func (b *mockBackend) NewLease(ctx context.Context, keyID, leasePath string, pro
 	return "lease_token_string", nil
 }
 
-func (b *mockBackend) GetLeases(ctx context.Context) (map[string]be.LeaseReturn, error) {
-	return map[string]be.LeaseReturn{
-		"test2.repo.org/some/path/one": be.LeaseReturn{
+func (b *mockBackend) GetLeases(ctx context.Context) (map[string]be.LeaseDTO, error) {
+	return map[string]be.LeaseDTO{
+		"test2.repo.org/some/path/one": {
 			KeyID:   "keyid1",
 			Expires: time.Now().Add(60 * time.Second).String(),
 		},
-		"test2.repo.org/some/path/two": be.LeaseReturn{
+		"test2.repo.org/some/path/two": {
 			KeyID:   "keyid1",
 			Expires: time.Now().Add(120 * time.Second).String(),
 		},
 	}, nil
 }
 
-func (b *mockBackend) GetLease(ctx context.Context, tokenStr string) (*be.LeaseReturn, error) {
-	return &be.LeaseReturn{
+func (b *mockBackend) GetLease(ctx context.Context, tokenStr string) (*be.LeaseDTO, error) {
+	return &be.LeaseDTO{
 		KeyID:     "keyid1",
 		LeasePath: "test2.repo.org/some/path/one",
 		Expires:   time.Now().Add(60 * time.Second).String(),
@@ -95,8 +93,7 @@ func (b *mockBackend) RunGC(ctx context.Context, options be.GCOptions) (string, 
 	return "", nil
 }
 
-func (b *mockBackend) PublishManifest(ctx context.Context, repository string, message []byte) error {
-	return nil
+func (b *mockBackend) PublishManifest(ctx context.Context, repository string, message be.NotificationMessage) {
 }
 
 func (b *mockBackend) SubscribeToNotifications(ctx context.Context, repository string) be.SubscriberHandle {
