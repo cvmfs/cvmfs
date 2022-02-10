@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,7 +13,6 @@ import (
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	stats "github.com/cvmfs/gateway/internal/gateway/statistics"
-	"github.com/pkg/errors"
 )
 
 // Error is returned by the various receiver commands in case of error
@@ -81,7 +81,7 @@ type CvmfsReceiver struct {
 // NewCvmfsReceiver will spawn an external cvmfs_receiver worker process and wait for a command
 func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.StatisticsMgr, args ...string) (*CvmfsReceiver, error) {
 	if _, err := os.Stat(execPath); os.IsNotExist(err) {
-		return nil, errors.Wrap(err, "worker process executable not found")
+		return nil, fmt.Errorf("worker process executable not found: %w", err)
 	}
 
 	cmdLine := []string{"-i", "3", "-o", "4"}
@@ -90,11 +90,11 @@ func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.Stat
 
 	workerInRead, workerInWrite, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create worker input pipe")
+		return nil, fmt.Errorf("could not create worker input pipe: %w", err)
 	}
 	workerOutRead, workerOutWrite, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create worker output pipe")
+		return nil, fmt.Errorf("could not create worker output pipe: %w", err)
 	}
 
 	// it is necessary to close this two files, otherwise, if the receiver crash,
@@ -111,15 +111,15 @@ func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.Stat
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create worker stderr pipe")
+		return nil, fmt.Errorf("could not create worker stderr pipe: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create worker stdout pipe")
+		return nil, fmt.Errorf("could not create worker stdout pipe: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, errors.Wrap(err, "could not start worker process")
+		return nil, fmt.Errorf("could not start worker process: %w", err)
 	}
 
 	gw.LogC(ctx, "receiver", gw.LogDebug).
@@ -143,12 +143,12 @@ func (r *CvmfsReceiver) Quit() error {
 	}()
 
 	if _, err := r.call(receiverQuit, []byte{}, nil); err != nil {
-		return errors.Wrap(err, "worker 'quit' call failed")
+		return fmt.Errorf("worker 'quit' call failed: %w", err)
 	}
 
 	var buf1 []byte
 	if _, err := io.ReadFull(r.workerStderr, buf1); err != nil {
-		return errors.Wrap(err, "could not retrieve worker stderr")
+		return fmt.Errorf("could not retrieve worker stderr: %w", err)
 	}
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("pipe", "stderr").
@@ -156,7 +156,7 @@ func (r *CvmfsReceiver) Quit() error {
 
 	var buf2 []byte
 	if _, err := io.ReadFull(r.workerStdout, buf2); err != nil {
-		return errors.Wrap(err, "could not retrieve worker stdout")
+		return fmt.Errorf("could not retrieve worker stdout: %w", err)
 	}
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
 		Str("pipe", "stdout").
@@ -165,7 +165,7 @@ func (r *CvmfsReceiver) Quit() error {
 	err := r.worker.Wait()
 	needToWait = false
 	if err != nil {
-		return errors.Wrap(err, "waiting for worker process failed")
+		return fmt.Errorf("waiting for worker process failed: %w", err)
 	}
 
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
@@ -179,7 +179,7 @@ func (r *CvmfsReceiver) Quit() error {
 func (r *CvmfsReceiver) Echo() error {
 	rep, err := r.call(receiverEcho, []byte("Ping"), nil)
 	if err != nil {
-		return errors.Wrap(err, "worker 'echo' call failed")
+		return fmt.Errorf("worker 'echo' call failed: %w", err)
 	}
 	reply := string(rep)
 
@@ -199,11 +199,11 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 	req := map[string]interface{}{"path": leasePath, "digest": digest, "header_size": headerSize}
 	buf, err := json.Marshal(&req)
 	if err != nil {
-		return errors.Wrap(err, "request encoding failed")
+		return fmt.Errorf("request encoding failed: %w", err)
 	}
 	reply, err := r.call(receiverSubmitPayload, buf, payload)
 	if err != nil {
-		return errors.Wrap(err, "worker 'payload submission' call failed")
+		return fmt.Errorf("worker 'payload submission' call failed: %w", err)
 	}
 
 	parsedReply, result := parseReceiverReply(reply)
@@ -224,7 +224,7 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	stats, err := r.statsMgr.PopLease(leasePath)
 	if err != nil {
-		return 0, errors.Wrap(err, "could not obtain statistics counters")
+		return 0, fmt.Errorf("could not obtain statistics counters: %w", err)
 	}
 	req := map[string]interface{}{
 		"lease_path":      leasePath,
@@ -237,12 +237,12 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 	}
 	buf, err := json.Marshal(&req)
 	if err != nil {
-		return 0, errors.Wrap(err, "request encoding failed")
+		return 0, fmt.Errorf("request encoding failed: %w", err)
 	}
 
 	reply, err := r.call(receiverCommit, buf, nil)
 	if err != nil {
-		return 0, errors.Wrap(err, "worker 'commit' call failed")
+		return 0, fmt.Errorf("worker 'commit' call failed: %w", err)
 	}
 
 	parsedReply, result := parseReceiverReply(reply)
@@ -288,12 +288,12 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader)
 	copy(buf[8:], msg)
 
 	if _, err := r.workerCmdIn.Write(buf); err != nil {
-		return errors.Wrap(err, "could not write request")
+		return fmt.Errorf("could not write request: %w", err)
 	}
 	if payload != nil {
 		if _, err := io.Copy(r.workerCmdIn, payload); err != nil {
 			r.Interrupt()
-			return errors.Wrap(err, "could not write request payload")
+			return fmt.Errorf("could not write request payload: %w", err)
 		}
 	}
 	return nil
@@ -302,19 +302,19 @@ func (r *CvmfsReceiver) request(reqID receiverOp, msg []byte, payload io.Reader)
 func (r *CvmfsReceiver) reply() ([]byte, error) {
 	buf := make([]byte, 4)
 	if _, err := io.ReadFull(r.workerCmdOut, buf); err != nil {
-		if (err == io.EOF) || (err == io.ErrUnexpectedEOF) {
-			return nil, errors.Wrap(err, "possible that the receiver crashed")
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, fmt.Errorf("possible that the receiver crashed: %w", err)
 		}
-		return nil, errors.Wrap(err, "could not read reply size")
+		return nil, fmt.Errorf("could not read reply size: %w", err)
 	}
 	repSize := int32(binary.LittleEndian.Uint32(buf))
 
 	reply := make([]byte, repSize)
 	if _, err := io.ReadFull(r.workerCmdOut, reply); err != nil {
-		if (err == io.EOF) || (err == io.ErrUnexpectedEOF) {
-			return nil, errors.Wrap(err, "possible that the receiver crashed")
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, fmt.Errorf("possible that the receiver crashed: %w", err)
 		}
-		return nil, errors.Wrap(err, "could not read reply body")
+		return nil, fmt.Errorf("could not read reply body: %w", err)
 	}
 
 	return reply, nil
@@ -323,7 +323,7 @@ func (r *CvmfsReceiver) reply() ([]byte, error) {
 func parseReceiverReply(reply []byte) (*ReceiverReply, error) {
 	res := &ReceiverReply{}
 	if err := json.Unmarshal(reply, res); err != nil {
-		return nil, errors.Wrap(err, "could not decode receiver reply '"+string(reply[:])+"'")
+		return nil, fmt.Errorf("could not decode receiver reply '"+string(reply[:])+"': %w", err)
 	}
 	if res.Status != "ok" {
 		return res, Error(res.Reason)

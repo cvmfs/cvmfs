@@ -148,12 +148,7 @@ func handleCancelLease(services be.ActionController, token string, w http.Respon
 
 	if err := services.CancelLease(ctx, token); err != nil {
 		msg["status"] = "error"
-		if _, ok := err.(be.InvalidTokenError); ok {
-			msg["reason"] = "invalid_token"
-		} else {
-			msg["reason"] = err.Error()
-		}
-
+		msg["reason"] = err.Error()
 	} else {
 		msg["status"] = "ok"
 	}

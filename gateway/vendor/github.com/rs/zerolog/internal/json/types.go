@@ -1,7 +1,6 @@
 package json
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"net"
@@ -350,7 +349,7 @@ func (Encoder) AppendFloats64(dst []byte, vals []float64) []byte {
 		return append(dst, '[', ']')
 	}
 	dst = append(dst, '[')
-	dst = appendFloat(dst, vals[0], 32)
+	dst = appendFloat(dst, vals[0], 64)
 	if len(vals) > 1 {
 		for _, val := range vals[1:] {
 			dst = appendFloat(append(dst, ','), val, 64)
@@ -363,7 +362,7 @@ func (Encoder) AppendFloats64(dst []byte, vals []float64) []byte {
 // AppendInterface marshals the input interface to a string and
 // appends the encoded string to the input byte slice.
 func (e Encoder) AppendInterface(dst []byte, i interface{}) []byte {
-	marshaled, err := json.Marshal(i)
+	marshaled, err := JSONMarshalFunc(i)
 	if err != nil {
 		return e.AppendString(dst, fmt.Sprintf("marshaling error: %v", err))
 	}
@@ -373,12 +372,16 @@ func (e Encoder) AppendInterface(dst []byte, i interface{}) []byte {
 // AppendObjectData takes in an object that is already in a byte array
 // and adds it to the dst.
 func (Encoder) AppendObjectData(dst []byte, o []byte) []byte {
-	// Two conditions we want to put a ',' between existing content and
-	// new content:
-	// 1. new content starts with '{' - which shd be dropped   OR
-	// 2. existing content has already other fields
+	// Three conditions apply here:
+	// 1. new content starts with '{' - which should be dropped   OR
+	// 2. new content starts with '{' - which should be replaced with ','
+	//    to separate with existing content OR
+	// 3. existing content has already other fields
 	if o[0] == '{' {
-		o[0] = ','
+		if len(dst) > 1 {
+			dst = append(dst, ',')
+		}
+		o = o[1:]
 	} else if len(dst) > 1 {
 		dst = append(dst, ',')
 	}

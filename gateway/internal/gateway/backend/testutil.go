@@ -89,7 +89,7 @@ const accessConfigV2NoKeys = `
 `
 
 const (
-	maxLeaseTime time.Duration = 100 * time.Second
+	TestMaxLeaseTime time.Duration = 100 * time.Second
 )
 
 // mockKeyImporter is used by tests, returns a predefined (id, secret) pair
@@ -106,11 +106,10 @@ func mockKeyImporter(ks KeySpec) (string, string, string, bool, error) {
 }
 
 // testConfig is a set of backend configuration values for use in tests
-func testConfig(workDir string) *gw.Config {
-	return &gw.Config{
+func testConfig(workDir string) gw.Config {
+	return gw.Config{
 		Port:          4929,
 		MaxLeaseTime:  50 * time.Millisecond, // use 50ms leases by default in testing mode
-		LeaseDB:       "boltdb",
 		LogLevel:      "info",
 		LogTimestamps: false,
 		NumReceivers:  1,
@@ -136,7 +135,7 @@ func StartTestBackend(name string, maxLeaseTime time.Duration) (*Services, strin
 		os.Exit(2)
 	}
 
-	ldb, err := OpenLeaseDB(cfg.LeaseDB, cfg)
+	db, err := OpenDB(cfg)
 	if err != nil {
 		os.Exit(3)
 	}
@@ -148,5 +147,11 @@ func StartTestBackend(name string, maxLeaseTime time.Duration) (*Services, strin
 		os.Exit(4)
 	}
 
-	return &Services{Access: ac, Leases: ldb, Pool: pool, Config: *cfg, StatsMgr: smgr}, tmp
+	services := Services{Config: cfg, Access: ac, DB: db, Pool: pool, StatsMgr: smgr}
+
+	if err := PopulateRepositories(&services); err != nil {
+		os.Exit(5)
+	}
+
+	return &services, tmp
 }

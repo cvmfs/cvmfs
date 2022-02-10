@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"io/ioutil"
 	"os"
@@ -27,19 +26,19 @@ func TestNotificationSystem(t *testing.T) {
 
 	ns.Subscribe(ctx, repo, hd)
 
-	ns.Publish(ctx, repo, []byte("msg1"))
-	ns.Publish(ctx, repo, []byte("msg2"))
+	ns.Publish(ctx, repo, NotificationMessage("msg1"))
+	ns.Publish(ctx, repo, NotificationMessage("msg2"))
 
 	ns.Unsubscribe(ctx, repo, hd)
 
-	ns.Publish(ctx, repo, []byte("msg3"))
+	ns.Publish(ctx, repo, NotificationMessage("msg3"))
 
-	messages := make([][]byte, 0)
+	messages := make([]NotificationMessage, 0)
 	for m := range hd {
-		messages = append(messages, []byte(m))
+		messages = append(messages, m)
 	}
 
-	if len(messages) != 2 || !bytes.Equal(messages[0], []byte("msg1")) || !bytes.Equal(messages[1], []byte("msg2")) {
+	if len(messages) != 2 || messages[0] != "msg1" || messages[1] != "msg2" {
 		t.Fatalf("Unexpected received message pattern: %v", messages)
 	}
 }
@@ -61,18 +60,18 @@ func TestNotificationSystemLateSubscription(t *testing.T) {
 	ctx := context.TODO()
 	repo := "test.repo.org"
 
-	ns.Publish(ctx, repo, []byte("msg1"))
-	ns.Publish(ctx, repo, []byte("msg2"))
+	ns.Publish(ctx, repo, NotificationMessage("msg1"))
+	ns.Publish(ctx, repo, NotificationMessage("msg2"))
 
 	ns.Subscribe(ctx, repo, hd)
 	ns.Unsubscribe(ctx, repo, hd)
 
-	messages := make([][]byte, 0)
+	messages := make([]NotificationMessage, 0)
 	for m := range hd {
-		messages = append(messages, []byte(m))
+		messages = append(messages, m)
 	}
 
-	if len(messages) != 1 || !bytes.Equal(messages[0], []byte("msg2")) {
+	if len(messages) != 1 || messages[0] != "msg2" {
 		t.Fatalf("Unexpected received message pattern: %v", messages)
 	}
 }
