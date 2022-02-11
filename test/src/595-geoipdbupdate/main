@@ -176,7 +176,11 @@ cvmfs_run_test() {
   sudo -E cvmfs_server update-geodb > $update_4_log 2>&1 || return 14
 
   echo "check output logs for the expected status messages"
-  cat $update_4_log | grep "Updating GeoIP Database" || return 16
+  cat $update_4_log | grep "Updating GeoIP Database" || return 15
+
+  echo "check repositories.json for geodb update UTC date"
+  local rj=/srv/cvmfs/info/v1/repositories.json
+  [[ "$(jq .last_geodb_update <$rj)" == *UTC* ]] || return 16
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 

@@ -82,7 +82,15 @@ _render_repos() {
 
 _render_info_file() {
   echo '{'
-  echo '  "schema"       : '$LATEST_JSON_INFO_SCHEMA','
+  echo '  "schema" : '$LATEST_JSON_INFO_SCHEMA','
+
+  local dbfile="${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_DB}"
+  if [ -f "$dbfile" ]; then
+    local modtime
+    modtime="$(date --utc --date @$(stat -c %Y $dbfile))"
+    echo '  "last_geodb_update" : "'$modtime'",'
+  fi
+
   echo '  "repositories" : ['
 
   _render_repos $(_available_repos "stratum0")
