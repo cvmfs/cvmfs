@@ -84,7 +84,7 @@ __do_snapshot() {
 
     # do it!
 
-    if is_local_upstream $upstream; then
+    if is_local_upstream $upstream && [ x"$CVMFS_GEO_AUTO_UPDATE" = x"true" ]; then
         # try to update the geodb, but continue if it doesn't work
         _update_geodb -l || true
     fi

@@ -960,6 +960,11 @@ _update_geodb_install() {
     return 3
   fi
 
+  if [ -w "$(get_global_info_v1_path)" ]; then
+    # update repositories.json for the new geodb timestamp, if possible
+    update_global_repository_info || die "fail (update global repository info)"
+  fi
+
   # get rid of other files in the untar
   rm -rf $untar_dir
 
