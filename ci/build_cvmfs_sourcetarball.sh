@@ -4,7 +4,7 @@
 # This script creates the source tarball of CernVM-FS.
 #
 
-set -e
+set -ex
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/common.sh
