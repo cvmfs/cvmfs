@@ -1,4 +1,6 @@
 2.9.1:
+  * Running cvmfs_server check -a and gc -a is now mutually exclusive
+    (CVM-2043)
   * Enable external monitoring of geodb updates, add the CVMFS_GEO_AUTO_UPDATE
     option (CVM-1857)
   * Ignore trailing path after repo name in `cvmfs_server abort` (CVM-2055)
