@@ -71,11 +71,12 @@ __do_check() {
   local with_reflog=
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
 
-  if is_garbage_collectable $name; then
-    if [ "x$tag" = "x" ]; then
-      echo "Warning: if garbage collection runs in parallel, "
-      echo "         missing data chunks can be falsely reported"
-    fi
+  if [ "x$tag" = "x" ] && is_garbage_collectable $name; then
+    # acquire gc lock
+    # waits for gc on the same repository to finish
+    # and prevents a gc from starting
+    acquire_gc_lock $name check || die "Failed to acquire gc lock for $name"
+    trap "release_gc_lock $name" EXIT HUP INT TERM
   fi
 
   local user_shell="$(get_user_shell $name)"
@@ -255,6 +256,8 @@ __do_all_checks() {
     ) >> $log 2>&1
 
   done
+
+  release_lock $check_lock
 }
 
 cvmfs_server_check() {
@@ -315,8 +318,6 @@ cvmfs_server_check() {
     fi
     retcode=$?
   fi
-
-  release_lock $check_lock
 
   return $retcode
 }
