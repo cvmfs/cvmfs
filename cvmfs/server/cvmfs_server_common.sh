@@ -7,7 +7,7 @@
 #
 
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_json.sh
 
@@ -828,6 +828,55 @@ acquire_update_lock()
     if ! wait_and_acquire_lock $update_lock; then
       echo "failed to acquire update lock"
       to_syslog_for_repo $name "did not $update_type (locking issues)"
+      return 1
+    fi
+  fi
+
+  # The lock is now acquired
+}
+
+
+# Release a gc lock
+#
+# @param name             the repository to release
+
+release_gc_lock() {
+  local name=$1
+
+  load_repo_config $name
+  release_lock ${CVMFS_SPOOL_DIR}/is_collecting || echo "Warning: failed to release gc lock"
+}
+
+# Acquire a gc lock for a repository.  Always pair with a call to
+#   release_gc_lock if returns successful. 
+#
+# @param name               the repository to lock
+# @param check_type         check type, either check or gc
+# @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
+#                           Default 0. 
+# @return                   0 if lock successfully acquired
+
+acquire_gc_lock()
+{
+  local name=$1
+  local check_type=$2
+  local abort_on_conflict=${3:-0}
+
+  load_repo_config $name
+  local gc_lock=${CVMFS_SPOOL_DIR}/is_collecting
+
+  # look for another check or gc in progress
+  if ! acquire_lock $gc_lock; then
+    if [ $abort_on_conflict -eq 1 ]; then
+      echo "A check or other gc on $name is in progress... aborting"
+      to_syslog_for_repo $name "did not $check_type (check or gc in progress)"
+      return 1
+    fi
+
+    echo "Waiting for gc on $name to finish..."
+    if ! wait_and_acquire_lock $gc_lock; then
+      echo "failed to acquire gc lock"
+      to_syslog_for_repo $name "did not $check_type (locking issues)"
       return 1
     fi
   fi
