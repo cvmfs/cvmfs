@@ -1,0 +1,35 @@
+cvmfs_test_name="Gateway expired lease"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+expire_lease() {
+    sudo sqlite3 /var/lib/cvmfs-gateway/gw.db "update Lease set Expiration = $(date +%s);"
+}
+
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
+
+    printf "\nStart first transaction (should succeed)\n"
+    cvmfs_server transaction test.repo.org || return 2
+
+    printf "\nExpire the lease\n"
+    expire_lease
+
+    printf "\nTry to abort the expired lease (should succeed)\n"
+    cvmfs_server abort -f test.repo.org || return 3
+
+    printf "\nStart a new transaction (should succeed)\n"
+    cvmfs_server transaction test.repo.org || return 4
+
+    printf "\nExpire the lease\n"
+    expire_lease
+
+    printf "\nAttempt to publish (should fail)\n"
+    cvmfs_server publish test.repo.org && return 5
+
+    printf "\nTransaction locks should be cleared. Starting a new transaction should be possible\n"
+    cvmfs_server transaction test.repo.org || return 6
+
+    return 0
+}
+

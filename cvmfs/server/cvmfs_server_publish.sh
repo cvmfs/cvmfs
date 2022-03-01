@@ -531,8 +531,10 @@ publish_failed() {
   local name=$1
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  local transaction_lock="${CVMFS_SPOOL_DIR}/in_transaction"
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
+  release_lock $transaction_lock
   run_suid_helper open $name
   to_syslog_for_repo $name "failed to publish"
 }
