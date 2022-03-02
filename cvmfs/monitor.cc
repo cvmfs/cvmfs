@@ -498,7 +498,9 @@ void *Watchdog::MainWatchdogListener(void *data) {
           (watch_fds[0].revents & POLLNVAL))
       {
         LogCvmfs(kLogMonitor, kLogDebug | kLogSyslogErr,
-                 "watchdog disappeared, disabling stack trace reporting");
+                 "watchdog disappeared, disabling stack trace reporting "
+                 "(revents: %d / %d|%d|%d)",
+                 watch_fds[0].revents, POLLERR, POLLHUP, POLLNVAL);
         watchdog->SetSignalHandlers(watchdog->old_signal_handlers_);
         PANIC(kLogDebug | kLogSyslogErr, "watchdog disappeared, aborting");
       }
