@@ -667,10 +667,16 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
     return NULL;
   }
 
+  int64_t catalog_file_size = GetFileSize(tmp_file);
+  if (catalog_file_size <= 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+      "invalid temp file size, %" PRIu64
+      ", last error %s", catalog_file_size, strerror(errno));
+  }
+  assert(catalog_file_size > 0);
+
   catalog::Catalog *catalog =
                    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
-  int64_t catalog_file_size = GetFileSize(tmp_file);
-  assert(catalog_file_size > 0);
   unlink(tmp_file.c_str());
 
   if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
