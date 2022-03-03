@@ -63,7 +63,8 @@ class Watchdog {
   static Watchdog *instance_;
   static Watchdog *Me() { return instance_; }
 
-  static void ReportSignal(int sig, siginfo_t *siginfo, void *context);
+  static void ReportSignalAndTerminate(int sig, siginfo_t *siginfo,
+                                       void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
   explicit Watchdog(const std::string &crash_dump_path);
