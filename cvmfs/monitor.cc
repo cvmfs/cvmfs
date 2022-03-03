@@ -543,17 +543,17 @@ void Watchdog::Supervise() {
   SigactionMap signal_handlers;
   signal_handlers[SIGHUP]  = sa;
   signal_handlers[SIGINT]  = sa;
-  signal_handlers[SIGTERM] = sa;
   signal_handlers[SIGQUIT] = sa;
   signal_handlers[SIGILL]  = sa;
   signal_handlers[SIGABRT] = sa;
-  signal_handlers[SIGFPE]  = sa;
-  signal_handlers[SIGSEGV] = sa;
   signal_handlers[SIGBUS]  = sa;
-  signal_handlers[SIGXFSZ] = sa;
+  signal_handlers[SIGFPE]  = sa;
   signal_handlers[SIGUSR1] = sa;
-  signal_handlers[SIGUSR2] = sa;
   signal_handlers[SIGSEGV] = sa;
+  signal_handlers[SIGUSR2] = sa;
+  signal_handlers[SIGTERM] = sa;
+  signal_handlers[SIGXCPU] = sa;
+  signal_handlers[SIGXFSZ] = sa;
   SetSignalHandlers(signal_handlers);
 
   ControlFlow::Flags control_flow;
