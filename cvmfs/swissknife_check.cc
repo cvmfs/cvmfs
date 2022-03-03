@@ -656,10 +656,11 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
                                              const shash::Any  &catalog_hash,
                                              const uint64_t     catalog_size) {
   string tmp_file;
-  if (!is_remote_)
-    tmp_file = DecompressPiece(catalog_hash);
-  else
+  if (is_remote_) {
     tmp_file = DownloadPiece(catalog_hash);
+  } else {
+    tmp_file = DecompressPiece(catalog_hash);
+  }
 
   if (tmp_file == "") {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load catalog %s",
@@ -671,7 +672,7 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
   if (catalog_file_size <= 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
       "invalid temp file size, %" PRIi64
-      ", last error %s", catalog_file_size, strerror(errno));
+      ", last error: %s, is remote: %d", catalog_file_size, strerror(errno), is_remote_);
   }
   assert(catalog_file_size > 0);
 
