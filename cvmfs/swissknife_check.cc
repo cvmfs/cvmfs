@@ -670,7 +670,7 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
   int64_t catalog_file_size = GetFileSize(tmp_file);
   if (catalog_file_size <= 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-      "invalid temp file size, %" PRIu64
+      "invalid temp file size, %" PRIi64
       ", last error %s", catalog_file_size, strerror(errno));
   }
   assert(catalog_file_size > 0);
