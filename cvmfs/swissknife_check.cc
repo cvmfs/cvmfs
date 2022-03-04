@@ -696,8 +696,7 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
   typedef vector<string> Tokens;
   const Tokens path_tokens = SplitString(subtree_path, '/');
 
-  string      current_path = "";
-  bool        found        = false;
+  string current_path = "";
 
   Tokens::const_iterator i    = path_tokens.begin();
   Tokens::const_iterator iend = path_tokens.end();
@@ -718,12 +717,11 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
           break;
         }
       } else {
-        found = true;
+        return true;
       }
     }
   }
-
-  return found;
+  return false;
 }
 
 
