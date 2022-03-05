@@ -4,6 +4,7 @@
     CVMFS_PROXY_SHARD={yes|no} (CVM-2060)
 
 2.9.1:
+  * Improved error reporting in watchdog process (#2859)
   * Fixing potential use-after-free error in swissknife check (#2860)
   * Fixing conflict in commandline arguments of cvmfs_ducc (#2853)
   * Running cvmfs_server check -a and gc -a is now mutually exclusive
