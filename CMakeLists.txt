@@ -412,13 +412,19 @@ if (BUILD_CVMFS)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OSXFUSE_INCLUDE_DIR})
     set (FUSE_LIBRARIES ${OSXFUSE_LIBRARIES}) # just abstract the difference here... they are compatible
   else (MACOSX)
-    find_package (FUSE REQUIRED)
-    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
+    find_package (FUSE2)
+    if (FUSE2_FOUND)
+      set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
+    endif ()
+
     find_package (FUSE3)
     if (FUSE3_FOUND)
       set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE3_INCLUDE_DIR})
-      add_definitions(-DHAS_FUSE3)
     endif ()
+
+    if (!FUSE2_FOUND AND !FUSE3_FOUND)
+      message(FATAL_ERROR "Neither fuse2 nor fuse3 headers found, aborting")
+    endif()
   endif (MACOSX)
 endif (BUILD_CVMFS)
 

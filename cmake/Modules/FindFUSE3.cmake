@@ -34,7 +34,7 @@ ENDIF ()
 # let world know the results
 IF (FUSE3_FOUND)
         IF (NOT FUSE3_FIND_QUIETLY)
-                MESSAGE(STATUS "Found FUSE3: ${FUSE3_LIBRARY}")
+                MESSAGE(STATUS "Found FUSE version 3: ${FUSE3_LIBRARY}")
         ENDIF ()
 
         # Check the cache_readdir field in fuse_file_info (libfuse >= 3.5)
@@ -48,7 +48,7 @@ IF (FUSE3_FOUND)
 ELSE (FUSE3_FOUND)
         IF (FUSE3_FIND_REQUIRED)
                 MESSAGE(STATUS "Looked for FUSE3 libraries named ${FUSE3_NAMES}.")
-                MESSAGE(FATAL_ERROR "Could NOT find FUSE3 library")
+                MESSAGE(FATAL_ERROR "Could NOT find FUSE version 3 library")
         ENDIF ()
 ENDIF (FUSE3_FOUND)
 
