@@ -64,7 +64,7 @@
 %endif
 
 %define hardlink /usr/sbin/hardlink
-%if 0%{?fedora} >= 31
+%if 0%{?fedora} >= 31 || 0%{?rhel} >= 9
 %define hardlink /usr/bin/hardlink
 %endif
 
