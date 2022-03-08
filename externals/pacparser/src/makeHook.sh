@@ -11,7 +11,11 @@ fi
 
 FIX_PYTHON=""
 if ! python -V >/dev/null 2>&1; then
-  FIX_PYTHON="PYTHON=python2"
+  if ! python3 -V >/dev/null 2>&1; then
+    FIX_PYTHON="PYTHON=python2"
+  else
+    FIX_PYTHON="PYTHON=python3"
+  fi
 fi
 
 echo "make clean && make for libpacparser (omitting test execution)..."
