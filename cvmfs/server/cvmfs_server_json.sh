@@ -91,6 +91,11 @@ _render_info_file() {
     echo '  "last_geodb_update" : "'$modtime'",'
   fi
 
+  if [ "x${PUBLISH_VERSIONS_IN_META_FILE}" == "xtrue" ]; then
+    echo '  "cvmfs_version" : "$(cvmfs_version_string)",'
+    echo '  "os_version" : "' $(lsb_release -d | cut -f2) '", '
+  fi
+
   echo '  "repositories" : ['
 
   _render_repos $(_available_repos "stratum0")
@@ -101,6 +106,7 @@ _render_info_file() {
   _render_repos $(_available_repos "stratum1")
 
   echo '  ]'
+
   echo '}'
 }
 
