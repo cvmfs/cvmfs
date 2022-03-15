@@ -91,7 +91,7 @@ _render_info_file() {
     echo '  "last_geodb_update" : "'$modtime'",'
   fi
 
-  if [ "x${PUBLISH_VERSIONS_IN_META_FILE}" == "xtrue" ]; then
+  if [ "x${CVMFS_PUBLISH_VERSIONS_IN_META_FILE}" == "xtrue" ]; then
     echo '  "cvmfs_version" : "$(cvmfs_version_string)",'
     echo '  "os_version" : "' $(lsb_release -d | cut -f2) '", '
   fi
