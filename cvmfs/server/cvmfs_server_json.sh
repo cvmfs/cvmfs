@@ -106,7 +106,6 @@ _render_info_file() {
   _render_repos $(_available_repos "stratum1")
 
   echo '  ]'
-
   echo '}'
 }
 
