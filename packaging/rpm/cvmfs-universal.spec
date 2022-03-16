@@ -118,7 +118,9 @@ Requires: sysvinit
 Requires: sysvinit-tools
   %endif
 %else
+%if 0%{?el7}%{?el8}%{?suse_version}
 Requires: chkconfig
+%endif
 Requires: fuse-libs
 Requires: glibc-common
 Requires: which
