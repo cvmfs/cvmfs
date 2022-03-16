@@ -92,7 +92,7 @@ _render_info_file() {
   fi
 
   if [ "x${CVMFS_PUBLISH_VERSIONS_IN_META_FILE}" == "xtrue" ]; then
-    echo '  "cvmfs_version" : "$(cvmfs_version_string)",'
+    echo '  "cvmfs_version" : "'$(cvmfs_version_string)'",'
     echo '  "os_id" : "'$(_os_id)'", '
     echo '  "os_version_id" : "'$(_os_version_id)'", '
     echo '  "os_pretty_name" : "'$(_os_pretty_name)'", '
