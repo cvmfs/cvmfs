@@ -756,7 +756,7 @@ _os_set_etc_release_filename() {
 _os_etc_release_get_field() {
 	_os_set_etc_release_filename
 
-	fieldname=$1
+	local fieldname=$1
 	if [ "x${fieldname}" == "x" ]; then
 		die "Internal error: _os_etc_release_get_field expects a field name to search for!"
 	fi
