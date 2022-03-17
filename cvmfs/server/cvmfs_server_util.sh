@@ -765,7 +765,7 @@ _os_etc_release_get_field() {
 		# If we are unable to find a proper /etc/os-release file return nothing.
 		:
 	else
-		grep "^${fieldname}=" ${_CVMFS_OS_RELEASE_FILENAME} | cut -f2 -d'"'
+    sed -n "s/\"//g;s/^${fieldname}=//p" ${_CVMFS_OS_RELEASE_FILENAME}
 	fi
 }
 
