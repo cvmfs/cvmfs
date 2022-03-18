@@ -1,11 +1,4 @@
 
-find_program(GO_COMPILER go)
-if(NOT GO_COMPILER)
-  message(FATAL_ERROR "go compiler not found")
-else()
-  message("found go compiler: ${GO_COMPILER}")
-endif()
-
 add_custom_target(
   cvmfs_ducc_target ALL
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_ducc
