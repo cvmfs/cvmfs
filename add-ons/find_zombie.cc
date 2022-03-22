@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#include <errno.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -11,7 +12,7 @@
 #include <set>
 #include <string>
 
-const char *kVersion = "1.0";
+const char *kVersion = "1.1";
 const unsigned int kSymlinkBufSize = 512;
 
 static std::string GetMntNamespace(const std::string &pid) {
@@ -80,6 +81,10 @@ int main(int argc, char **argv) {
   printf("Current mount namespace is %s\n", system_mnt_ns.c_str());
 
   DIR *dirp = opendir("/proc");
+  if (!dirp) {
+    fprintf(stderr, "[ERR] cannot open /proc (%d)\n", errno);
+    return 1;
+  }
   dirent64 *dit;
   while ((dit = readdir64(dirp))) {
     const std::string name = dit->d_name;
@@ -115,6 +120,8 @@ int main(int argc, char **argv) {
     if (!repo.empty())
       active_repositories.insert(repo);
     DIR *dirp_fd = opendir((path + "/fd").c_str());
+    if (!dirp_fd)  // The process may have disappeared meanwhile
+      continue;
     dirent64 *dit_fd;
     while ((dit_fd = readdir64(dirp_fd))) {
       std::string path_fd = path + "/fd/" + dit_fd->d_name;
