@@ -38,7 +38,6 @@ func TestSessionValid(t *testing.T) {
 	if _, err := backend.CommitLease(ctx, token, "old_hash", "new_hash",
 		gw.RepositoryTag{
 			Name:        "mytag",
-			Channel:     "mychannel",
 			Description: "this is a tag",
 		}); err != nil {
 		t.Fatalf("could not commit existing lease: %v", err)
@@ -140,7 +139,6 @@ func TestSessionCommitWithInvalidToken(t *testing.T) {
 	if _, err := backend.CommitLease(ctx, token2, "old_hash", "new_hash",
 		gw.RepositoryTag{
 			Name:        "mytag",
-			Channel:     "mychannel",
 			Description: "this is a tag",
 		}); err == nil {
 		t.Fatalf("invalid token was not rejected during commit action")
@@ -178,7 +176,6 @@ func TestSessionCommitWithExpiredToken(t *testing.T) {
 	if _, err := backend.CommitLease(ctx, token, "old_hash", "new_hash",
 		gw.RepositoryTag{
 			Name:        "mytag",
-			Channel:     "mychannel",
 			Description: "this is a tag",
 		}); err == nil {
 		t.Fatalf("expired token was not rejected during commit action")
@@ -231,7 +228,6 @@ func TestSessionTwoConcurrentValid(t *testing.T) {
 	if _, err := backend.CommitLease(ctx, token1, "old_hash", "new_hash1",
 		gw.RepositoryTag{
 			Name:        "mytag",
-			Channel:     "mychannel",
 			Description: "this is a tag",
 		}); err != nil {
 		t.Fatalf("could not commit existing lease: %v", err)
@@ -240,7 +236,6 @@ func TestSessionTwoConcurrentValid(t *testing.T) {
 	if _, err := backend.CommitLease(ctx, token2, "old_hash", "new_hash2",
 		gw.RepositoryTag{
 			Name:        "mytag",
-			Channel:     "mychannel",
 			Description: "this is a tag",
 		}); err != nil {
 		t.Fatalf("could not commit existing lease: %v", err)

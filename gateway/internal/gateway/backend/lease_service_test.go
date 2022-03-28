@@ -244,7 +244,6 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 			context.TODO(), token, "old_hash", "new_hash",
 			gw.RepositoryTag{
 				Name:        "mytag",
-				Channel:     "mychannel",
 				Description: "this is a tag",
 			}); err != nil {
 			t.Fatalf("could not commit existing lease: %v", err)
@@ -258,7 +257,6 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 			context.TODO(), token, "old_hash", "new_hash",
 			gw.RepositoryTag{
 				Name:        "mytag",
-				Channel:     "mychannel",
 				Description: "this is a tag",
 			}); err == nil {
 			t.Fatalf("invalid lease should not have been accepted for commit")
@@ -277,7 +275,6 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 			context.TODO(), token, "old_hash", "new_hash",
 			gw.RepositoryTag{
 				Name:        "mytag",
-				Channel:     "mychannel",
 				Description: "this is a tag",
 			}); err == nil {
 			t.Fatalf("expired lease should not have been accepted for commit")
