@@ -737,12 +737,12 @@ has_selinux() {
 # Used in cvmfs_server_json.sh to populate meta.json.
 # Fails gracefully if no os-release file is found (values become empty strings)
 _os_set_etc_release_filename() {
-	_CVMFS_OS_RELEASE_FILENAME=''
-	if test -e "/etc/os-release"; then
-		_CVMFS_OS_RELEASE_FILENAME="/etc/os-release";
-	elif test -e "/usr/lib/os-release"; then
-		_CVMFS_OS_RELEASE_FILENAME="/usr/lib/os-release";
-	fi
+  _CVMFS_OS_RELEASE_FILENAME=''
+  if test -e "/etc/os-release"; then
+    _CVMFS_OS_RELEASE_FILENAME="/etc/os-release";
+  elif test -e "/usr/lib/os-release"; then
+    _CVMFS_OS_RELEASE_FILENAME="/usr/lib/os-release";
+  fi
 }
 
 # Pick a specific field from the os-release file and return it. 
@@ -754,31 +754,31 @@ _os_set_etc_release_filename() {
 # 4. If we grep fails to find anything, return nothing. We may want to check against known
 #    keys from https://www.freedesktop.org/software/systemd/man/os-release.html?
 _os_etc_release_get_field() {
-	_os_set_etc_release_filename
+  _os_set_etc_release_filename
 
-	local fieldname=$1
-	if [ "x${fieldname}" == "x" ]; then
-		die "Internal error: _os_etc_release_get_field expects a field name to search for!"
-	fi
+  local fieldname=$1
+  if [ "x${fieldname}" == "x" ]; then
+    die "Internal error: _os_etc_release_get_field expects a field name to search for!"
+  fi
 
-	if [ "x${_CVMFS_OS_RELEASE_FILENAME}" == "x" ]; then
-		# If we are unable to find a proper /etc/os-release file return nothing.
-		:
-	else
+  if [ "x${_CVMFS_OS_RELEASE_FILENAME}" == "x" ]; then
+    # If we are unable to find a proper /etc/os-release file return nothing.
+    :
+  else
     sed -n "s/\"//g;s/^${fieldname}=//p" ${_CVMFS_OS_RELEASE_FILENAME}
-	fi
+  fi
 }
 
 _os_id() {
-	_os_etc_release_get_field 'ID'
+  _os_etc_release_get_field 'ID'
 }
 
 _os_version_id() {
-	_os_etc_release_get_field 'VERSION_ID'
+  _os_etc_release_get_field 'VERSION_ID'
 }
 
 _os_pretty_name() {
-	_os_etc_release_get_field 'PRETTY_NAME'
+  _os_etc_release_get_field 'PRETTY_NAME'
 }
 
 
