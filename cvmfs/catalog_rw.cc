@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "bundle.h"
 #include "logging.h"
 #include "util/exception.h"
 #include "util_concurrency.h"
@@ -40,6 +41,8 @@ WritableCatalog::WritableCatalog(const string      &path,
   sql_chunks_count_(NULL),
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
+  sql_bundle_insert_(NULL),
+  sql_file_bundle_id_update(NULL),
   dirty_(false)
 {
   atomic_init32(&dirty_children_);
@@ -100,6 +103,8 @@ void WritableCatalog::InitPreparedStatements() {
   sql_chunks_count_  = new SqlChunksCount      (database());
   sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
   sql_inc_linkcount_ = new SqlIncLinkcount     (database());
+  sql_bundle_insert_ = new SqlBundleInsert     (database());
+  sql_file_bundle_id_update = new SqlFileBundleIdUpdate(database());
 }
 
 
@@ -115,6 +120,8 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_chunks_count_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
+  delete sql_bundle_insert_;
+  delete sql_file_bundle_id_update;
 }
 
 
@@ -307,6 +314,33 @@ void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
     sql_chunks_remove_->Execute();
   assert(retval);
   sql_chunks_remove_->Reset();
+}
+
+
+void WritableCatalog::AddBundle(BundleEntry bundle_entry) {
+  SetDirty();
+
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding bundle '%s' of size %d bytes",
+          (bundle_entry.name).c_str(), bundle_entry.size);
+
+  bool retval =
+    sql_bundle_insert_->BindBundle(bundle_entry) &&
+    sql_bundle_insert_->Execute();
+  assert(retval);
+  sql_bundle_insert_->Reset();
+}
+
+
+void WritableCatalog::UpdateFileBundleId(int64_t bundle_id,
+                                         std::string file_name) {
+  SetDirty();
+
+  bool retval =
+    sql_file_bundle_id_update->BindBundleId(bundle_id) &&
+    sql_file_bundle_id_update->BindFileName(file_name) &&
+    sql_file_bundle_id_update->Execute();
+  assert(retval);
+  sql_file_bundle_id_update->Reset();
 }
 
 

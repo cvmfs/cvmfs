@@ -13,18 +13,24 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <set>
+#include <utility>
+#include <vector>
 
+#include "bundle.h"
 #include "catalog_virtual.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "fs_traversal.h"
 #include "hash.h"
 #include "json_document.h"
+#include "pack.h"
 #include "publish/repository.h"
 #include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
 #include "util/exception.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
@@ -113,18 +119,49 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
             " directory of the repository. Found in %s", parent_path.c_str());
     }
 
-    std::string json_string;
+    UniquePtr<vector<pair<string, FilepathSet>>> *all_filepaths =
+            Bundle::ParseBundleSpecFile(entry->GetUnionPath());
 
-    int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
-    if (fd < 0) {
-      PANIC(kLogStderr, "Could not open file: %s",
-            entry->GetUnionPath().c_str());
+    params_->spooler->UnregisterListeners();
+    params_->spooler->RegisterListener(&SyncMediator::PublishBundlesCallback,
+                                      this);
+    for (unsigned int i = 0; i < (*(*all_filepaths)).size(); i++) {
+      Bundle bundle;
+      UniquePtr<ObjectPack> *op =
+          bundle.CreateBundle(((*(*all_filepaths))[i]).second);
+
+      // bundle path is simply the index of the set of filepaths in the vector
+      std::string bundle_path = StringifyInt(i);
+
+      uint64_t bundle_size = (*op)->size();
+      UniquePtr<unsigned char> buffer(new unsigned char[bundle_size]);
+      if (!buffer.IsValid()) {
+        PANIC(kLogStderr, "Insufficient memory");
+      }
+
+      ObjectPackProducer op_producer((*op).weak_ref());
+      unsigned int produced_bytes = op_producer.ProduceNext(
+          bundle_size, buffer.weak_ref());
+
+      bundles_list_.push_back(BundleEntry());
+      bundles_list_[i].size = produced_bytes;
+      bundles_list_[i].filepath_set = ((*(*all_filepaths))[i]).second;
+      bundles_list_[i].name = ((*(*all_filepaths))[i]).first;
+
+      IngestionSource *source = new MemoryIngestionSource(bundle_path,
+          buffer.weak_ref(), bundle_size);
+      params_->spooler->Process(source);
+
+      params_->spooler->WaitForUpload();
+      buffer.Release();
+      op->Release();
     }
-    if (!SafeReadToString(fd, &json_string)) {
-      PANIC(kLogStderr, "Could not read contents of file: %s",
-            entry->GetUnionPath().c_str());
-    }
-    UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
+
+    all_filepaths->Release();
+
+    params_->spooler->UnregisterListeners();
+    params_->spooler->RegisterListener(&SyncMediator::PublishFilesCallback,
+                                      this);
 
     AddFile(entry);
     return;
@@ -809,6 +846,24 @@ void SyncMediator::PublishHardlinksCallback(
   assert(found);
 }
 
+void SyncMediator::PublishBundlesCallback(const upload::SpoolerResult &result) {
+  LogCvmfs(kLogPublish, kLogVerboseMsg,
+           "Spooler callback for %s, digest %s, produced %d chunks, retval %d",
+           result.local_path.c_str(),
+           result.content_hash.ToString().c_str(),
+           result.file_chunks.size(),
+           result.return_code);
+  if (result.return_code != 0) {
+    PANIC(kLogStderr, "Spool failure for %s (%d)", result.local_path.c_str(),
+          result.return_code);
+  }
+
+  int64_t bundle_index = String2Int64(result.local_path);
+  bundles_list_[bundle_index].hash = result.content_hash;
+
+  // add to catalog
+  catalog_manager_->AddBundle(bundles_list_[bundle_index]);
+}
 
 void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
   const std::string notice = "Nested catalog at " + directory->GetUnionPath();

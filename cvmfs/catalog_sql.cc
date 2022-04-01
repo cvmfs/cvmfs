@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "bundle.h"
 #include "catalog.h"
 #include "globals.h"
 #include "logging.h"
@@ -1399,6 +1400,44 @@ XattrList SqlLookupXattrs::GetXattrs() {
     return XattrList();
   }
   return *xattrs;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlBundleInsert::SqlBundleInsert(const CatalogDatabase &database) {
+  DeferredInit(database.sqlite_db(),
+  "INSERT INTO bundles (bundleid, hash, size) "
+  //                       1       2     3
+  "VALUES (:bundleid, :hash, :size);");
+}
+
+bool SqlBundleInsert::BindBundle(BundleEntry bundle_entry) {
+  return BindInt64(1, bundle_entry.id) &&
+         BindHashBlob(2, bundle_entry.hash) &&
+         BindInt64(3, bundle_entry.size);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlFileBundleIdUpdate::SqlFileBundleIdUpdate(const CatalogDatabase &database) {
+  DeferredInit(database.sqlite_db(),
+  "UPDATE catalog "
+  "SET bundleid = :bundleid"
+  //                  1
+  "WHERE (name = :name);");
+  //               2
+}
+
+bool SqlFileBundleIdUpdate::BindBundleId(int64_t bundle_id) {
+  return BindInt64(1, bundle_id);
+}
+
+bool SqlFileBundleIdUpdate::BindFileName(std::string file_name) {
+  return BindText(2, file_name);
 }
 
 }  // namespace catalog

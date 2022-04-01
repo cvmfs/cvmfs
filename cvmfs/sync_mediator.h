@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "bundle.h"
 #include "catalog_mgr_rw.h"
 #include "compression.h"
 #include "file_chunk.h"
@@ -245,6 +246,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
+  void PublishBundlesCallback(const upload::SpoolerResult &result);
 
   // Hardlink handling
   void CompleteHardlinks(SharedPtr<SyncItem> entry);
@@ -301,6 +303,12 @@ class SyncMediator : public virtual AbstractSyncMediator {
   UniquePtr<perf::FsCounters> counters_;
 
   UniquePtr<SyncDiffReporter> reporter_;
+
+  /**
+   * Stores Bundle entries to be added to the catalog, once the bundles are
+   * processed
+   */
+  vector<BundleEntry> bundles_list_;
 };  // class SyncMediator
 
 }  // namespace publish

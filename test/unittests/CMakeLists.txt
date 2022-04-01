@@ -31,6 +31,7 @@ set(CVMFS_UNITTEST_FILES
   t_bigqueue.cc
   t_bigvector.cc
   t_blocking_counter.cc
+  t_bundle.cc
   t_cache.cc
   t_cache_extern.cc
   t_cache_ram.cc
@@ -149,6 +150,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc
   ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
   ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/bundle.cc
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/cache_extern.cc
   ${CVMFS_SOURCE_DIR}/cache_posix.cc
@@ -465,6 +467,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
   ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/bundle.cc
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
