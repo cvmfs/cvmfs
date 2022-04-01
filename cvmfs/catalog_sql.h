@@ -24,6 +24,7 @@
 
 #include <string>
 
+#include "bundle.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
@@ -591,6 +592,34 @@ class SqlLookupXattrs : public SqlCatalog {
   explicit SqlLookupXattrs(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   XattrList GetXattrs();
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Looks up for the bundle id for a file in the catalog table
+ */
+class SqlLookupFileBundleId : public SqlCatalog {
+ public:
+  explicit SqlLookupFileBundleId(const CatalogDatabase &database);
+  bool BindPathHash(const shash::Md5 &hash);
+  int64_t GetBundleId();
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Looks up a bundle in the bundles table
+ */
+class SqlLookupBundle : public SqlCatalog {
+ public:
+  explicit SqlLookupBundle(const CatalogDatabase &database);
+  bool BindBundleId(int64_t bundle_id);
+  BundleEntry GetBundleEntry();
 };
 
 }  // namespace catalog

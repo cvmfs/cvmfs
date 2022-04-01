@@ -144,6 +144,10 @@ class AbstractCatalogManager : public SingleCopy {
                     PathString *mountpoint,
                     shash::Any *hash,
                     uint64_t *size);
+
+  bool LookupBundleId(const shash::Md5 &hash, int64_t *bundleid);
+  bool LookupBundleEntry(const int bundleid, BundleEntry *bundle_entry);
+
   bool ListCatalogSkein(const PathString &path,
                         std::vector<PathString> *result_list);
 

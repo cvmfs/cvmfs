@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "bundle.h"
 #include "catalog.h"
 #include "globals.h"
 #include "logging.h"
@@ -1399,6 +1400,47 @@ XattrList SqlLookupXattrs::GetXattrs() {
     return XattrList();
   }
   return *xattrs;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlLookupFileBundleId::SqlLookupFileBundleId(const CatalogDatabase &database) {
+  DeferredInit(database.sqlite_db(),
+  "SELECT bundleid FROM catalog "
+  "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
+}
+
+bool SqlLookupFileBundleId::BindPathHash(const shash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+int64_t SqlLookupFileBundleId::GetBundleId() {
+  return RetrieveInt64(0);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlLookupBundle::SqlLookupBundle(const CatalogDatabase &database) {
+  DeferredInit(database.sqlite_db(),
+  "SELECT * FROM bundles "
+  "WHERE (id = :id) ");
+}
+
+bool SqlLookupBundle::BindBundleId(int64_t bundle_id) {
+  return BindInt64(1, bundle_id);
+}
+
+BundleEntry SqlLookupBundle::GetBundleEntry() {
+  BundleEntry bundle_entry;
+  bundle_entry.id = RetrieveInt64(0);
+  bundle_entry.hash = RetrieveHashBlob(1, shash::kAny);
+  bundle_entry.size = RetrieveInt64(2);
+
+  return bundle_entry;
 }
 
 }  // namespace catalog
