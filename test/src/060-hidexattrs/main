@@ -5,7 +5,7 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no" || return 1
+  cvmfs_mount grid.cern.ch "CVMFS_MAGIC_XATTRS_VISIBILITY=always" || return 1
   local attributes=$(list_xattrs /cvmfs/grid.cern.ch)
   echo "Extended attributes: $attributes"
   if [ "x$attributes" = "x" ]; then
@@ -13,7 +13,7 @@ cvmfs_run_test() {
   fi
 
   cvmfs_umount grid.cern.ch || return 2
-  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=yes" || return 3
+  cvmfs_mount grid.cern.ch "CVMFS_MAGIC_XATTRS_VISIBILITY=never" || return 3
   attributes=$(list_xattrs /cvmfs/grid.cern.ch)
   if [ "x$attributes" != "x" ]; then
     echo "Extended attributes (none expected): $attributes"
