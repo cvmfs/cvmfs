@@ -7,7 +7,6 @@
   * GO 1.18 is bundled as an external depedency, facilitating building on
     older platforms (#2867)
 
-
 2.9.1:
   * Fix build for CentOS Stream 9 (#2862)
   * Improve error reporting in watchdog process (#2859)
