@@ -197,4 +197,59 @@ TEST_F(T_GlueBuffer, StringHeap) {
   }
 }
 
+TEST_F(T_GlueBuffer, PageCacheTrackerOff) {
+  PageCacheTracker tracker(false);
+  PageCacheTracker::OpenDirectives directives;
+  directives = tracker.Open(1, shash::Any());
+  EXPECT_EQ(false, directives.keep_cache);
+  EXPECT_EQ(false, directives.direct_io);
+  // Don't crash on unknown inode
+  tracker.Close(2);
+}
+
+TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
+  PageCacheTracker tracker(true);
+  PageCacheTracker::OpenDirectives directives;
+
+  shash::Any hashA(shash::kShake128);
+  shash::Any hashB(shash::kShake128);
+  shash::HashString("A", &hashA);
+  shash::HashString("B", &hashB);
+
+  directives = tracker.Open(1, hashA);
+  EXPECT_EQ(true, directives.keep_cache);
+  EXPECT_EQ(false, directives.direct_io);
+
+  directives = tracker.Open(1, hashA);
+  EXPECT_EQ(true, directives.keep_cache);
+  EXPECT_EQ(false, directives.direct_io);
+
+  directives = tracker.Open(1, hashB);
+  EXPECT_EQ(false, directives.keep_cache);
+  EXPECT_EQ(true, directives.direct_io);
+
+  EXPECT_DEATH(tracker.Close(2), ".*");
+  tracker.Close(1);
+  tracker.Close(1);
+  EXPECT_DEATH(tracker.Close(1), ".*");
+
+  directives = tracker.Open(1, hashB);
+  EXPECT_EQ(false, directives.keep_cache);
+  EXPECT_EQ(false, directives.direct_io);
+
+  directives = tracker.Open(1, hashB);
+  EXPECT_EQ(false, directives.keep_cache);
+  EXPECT_EQ(false, directives.direct_io);
+
+  tracker.Close(1);
+
+  directives = tracker.Open(1, hashB);
+  EXPECT_EQ(true, directives.keep_cache);
+  EXPECT_EQ(false, directives.direct_io);
+
+  tracker.Close(1);
+  tracker.Close(1);
+}
+
+
 }  // namespace glue

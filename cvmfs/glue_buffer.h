@@ -742,6 +742,96 @@ class NentryTracker {
   pthread_t thread_cleaner_;
 };  // class NentryTracker
 
+/**
+ * Tracks the content hash associated to inodes of regular files whose content
+ * may be in the page cache. It is used in cvmfs_open() and cvmfs_close().
+ */
+class PageCacheTracker {
+ private:
+  struct Entry {
+    Entry() : nopen(0) {}
+    Entry(int32_t n, const shash::Any &h) : nopen(n), hash(h) {}
+    /**
+     * Reference counter for currently open files with a given inode. If the
+     * sign bit is set, the entry is in the transition phase from one hash to
+     * another. The sign will be cleared on Close() in this case.
+     */
+    int32_t nopen;
+    /**
+     * The content hash of the data stored in the page cache. For chunked files,
+     * hash contains an artificial hash over all the chunk hash values.
+     */
+    shash::Any hash;
+  };
+
+ public:
+  /**
+   * Instruct cvmfs_open() on how to handle the page cache.
+   */
+  struct OpenDirectives {
+    /**
+     * Flush the page cache; logically, the flush takes place some time between
+     * cvmfs_open() and cvmfs_close().  That's important in case we have two
+     * open() calls on stale page cache data.
+     */
+    bool keep_cache;
+    /**
+     * Don't use the page cache at all (neither write nor read). If this is set
+     * on cvmfs_open(), don't call Close() on cvmfs_close().
+     * Direct I/O prevents shared mmap on the file. Private mmap, however,
+     * which includes loading binaries, still works.
+     */
+    bool direct_io;
+
+    // Defaults to the old (pre v2.10) behavior: always flush the cache, never
+    // use direct I/O.
+    OpenDirectives() : keep_cache(false), direct_io(false) {}
+  };
+
+  // Cannot be moved to the statistics manager because it has to survive
+  // reloads.  Added manually in the fuse module initialization and in talk.cc.
+  struct Statistics {
+    Statistics() : ninsert(0), nremove(0) {}
+    uint64_t ninsert;
+    uint64_t nremove;
+  };
+  Statistics GetStatistics() { return statistics_; }
+
+  explicit PageCacheTracker(bool is_active);
+  explicit PageCacheTracker(const PageCacheTracker &other);
+  PageCacheTracker &operator= (const PageCacheTracker &other);
+  ~PageCacheTracker();
+
+  OpenDirectives Open(std::uint64_t inode, const shash::Any &hash);
+  void Close(std::uint64_t inode);
+
+ private:
+  static const unsigned kVersion = 0;
+
+  void CopyFrom(const PageCacheTracker &other);
+
+  void InitLock();
+  inline void Lock() const {
+    int retval = pthread_mutex_lock(lock_);
+    assert(retval == 0);
+  }
+  inline void Unlock() const {
+    int retval = pthread_mutex_unlock(lock_);
+    assert(retval == 0);
+  }
+
+  pthread_mutex_t *lock_;
+  unsigned version_;
+  /**
+   * The page cache tracker only works correctly if it is used from the start
+   * of the mount. If the instance is hot-patched from a previous version, the
+   * page cache tracker remains turned off.
+   */
+  bool is_active_;
+  Statistics statistics_;
+  SmallHashDynamic<uint64_t, Entry> map_;
+};
+
 
 }  // namespace glue
 

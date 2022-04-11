@@ -21,6 +21,7 @@
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/mutex.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -256,6 +257,139 @@ bool NentryTracker::NextEntry(Cursor *cursor,
 
 void NentryTracker::EndEnumerate(Cursor *cursor) {
   Unlock();
+}
+
+
+//------------------------------------------------------------------------------
+
+
+PageCacheTracker::PageCacheTracker(bool is_active)
+  : version_(kVersion)
+  , is_active_(is_active)
+{
+  map_.Init(16, 0, hasher_inode);
+  InitLock();
+}
+
+
+PageCacheTracker::~PageCacheTracker() {
+  pthread_mutex_destroy(lock_);
+  free(lock_);
+}
+
+
+PageCacheTracker::PageCacheTracker(const PageCacheTracker &other) {
+  CopyFrom(other);
+  InitLock();
+}
+
+
+PageCacheTracker &PageCacheTracker::operator= (const PageCacheTracker &other) {
+  if (&other == this)
+    return *this;
+
+  Lock();
+  CopyFrom(other);
+  Unlock();
+  return *this;
+}
+
+
+void PageCacheTracker::CopyFrom(const PageCacheTracker &other) {
+  assert(other.version_ == kVersion);
+
+  version_ = kVersion;
+  is_active_ = other.is_active_;
+  statistics_ = other.statistics_;
+  map_ = other.map_;
+}
+
+
+void PageCacheTracker::InitLock() {
+  lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_, NULL);
+  assert(retval == 0);
+}
+
+PageCacheTracker::OpenDirectives PageCacheTracker::Open(
+  std::uint64_t inode, const shash::Any &hash)
+{
+  OpenDirectives open_directives;
+  // Old behavior: always flush page cache on open
+  if (!is_active_)
+    return open_directives;
+
+  MutexLockGuard guard(lock_);
+
+  Entry entry;
+  bool retval = map_.Lookup(inode, &entry);
+  if (!retval) {
+    open_directives.keep_cache = true;
+    open_directives.direct_io = false;
+    statistics_.ninsert++;
+
+    entry.hash = hash;
+    entry.nopen = 1;
+    map_.Insert(inode, entry);
+    return open_directives;
+  }
+
+  if (entry.hash == hash) {
+    open_directives.direct_io = false;
+    if (entry.nopen < 0) {
+      // The page cache is still in the transition phase and may contain old
+      // content.  So trigger a flush of the cache in any case.
+      open_directives.keep_cache = false;
+      entry.nopen--;
+      map_.Insert(inode, entry);
+      return open_directives;
+    } else {
+      open_directives.keep_cache = true;
+      entry.nopen++;
+      map_.Insert(inode, entry);
+      return open_directives;
+    }
+  }
+
+  open_directives.keep_cache = false;
+
+  // Page cache mismatch and old data has still open file attached to it,
+  // circumvent the page cache entirely and use direct I/O.  In this case,
+  // cvmfs_close() will _not_ call Close().
+  if (entry.nopen != 0) {
+    open_directives.direct_io = true;
+    return open_directives;
+  }
+
+  // Stale data in the page cache, start the transition phase in which newly
+  // opened files flush the page cache and re-populate it with the new hash.
+  // The first file to reach Close() will finish the transition phase and
+  // mark the new hash as committed.
+  open_directives.direct_io = false;
+  entry.hash = hash;
+  entry.nopen = -1;
+  map_.Insert(inode, entry);
+  return open_directives;
+}
+
+void PageCacheTracker::Close(std::uint64_t inode) {
+  if (!is_active_)
+    return;
+
+  MutexLockGuard guard(lock_);
+  Entry entry;
+  bool retval = map_.Lookup(inode, &entry);
+  assert(retval);
+  assert(entry.nopen != 0);
+  if (entry.nopen < 0) {
+    // At this point we know that any stale data has been flushed from the
+    // cache and only data related to the currently booked content hash
+    // can be present. So clear the transition bit (sign bit).
+    entry.nopen = -entry.nopen;
+  }
+  entry.nopen--;
+  map_.Insert(inode, entry);
 }
 
 }  // namespace glue
