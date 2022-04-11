@@ -2047,6 +2047,15 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_nentry_tracker->state = saved_nentry_cache;
   saved_states->push_back(state_nentry_tracker);
 
+  msg_progress = "Saving page cache entry tracker\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  glue::PageCacheTracker *saved_page_cache_tracker =
+    new glue::PageCacheTracker(*cvmfs::mount_point_->page_cache_tracker());
+  loader::SavedState *state_page_cache_tracker = new loader::SavedState();
+  state_page_cache_tracker->state_id = loader::kStatePageCacheTracker;
+  state_page_cache_tracker->state = saved_page_cache_tracker;
+  saved_states->push_back(state_page_cache_tracker);
+
   msg_progress = "Saving chunk tables\n";
   SendMsg2Socket(fd_progress, msg_progress);
   ChunkTables *saved_chunk_tables = new ChunkTables(
@@ -2091,6 +2100,11 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
 static bool RestoreState(const int fd_progress,
                          const loader::StateList &saved_states)
 {
+  // If we have no saved version of the page cache tracker, it is unsafe
+  // to start using it.  The page cache tracker has to run for the entire
+  // lifetime of the mountpoint or not at all.
+  cvmfs::mount_point_->page_cache_tracker()->Disable();
+
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     if (saved_states[i]->state_id == loader::kStateOpenDirs) {
       SendMsg2Socket(fd_progress, "Restoring open directory handles... ");
@@ -2155,6 +2169,16 @@ static bool RestoreState(const int fd_progress,
         (glue::NentryTracker *)saved_states[i]->state;
       new (cvmfs::mount_point_->nentry_tracker())
         glue::NentryTracker(*saved_nentry_tracker);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStatePageCacheTracker) {
+      SendMsg2Socket(fd_progress, "Restoring page cache entry tracker... ");
+      cvmfs::mount_point_->page_cache_tracker()->~PageCacheTracker();
+      glue::PageCacheTracker *saved_page_cache_tracker =
+        (glue::PageCacheTracker *)saved_states[i]->state;
+      new (cvmfs::mount_point_->page_cache_tracker())
+        glue::PageCacheTracker(*saved_page_cache_tracker);
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2274,6 +2298,10 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateNentryTracker:
         SendMsg2Socket(fd_progress, "Releasing saved negative entry cache\n");
         delete static_cast<glue::NentryTracker *>(saved_states[i]->state);
+        break;
+      case loader::kStatePageCacheTracker:
+        SendMsg2Socket(fd_progress, "Releasing saved page cache entry cache\n");
+        delete static_cast<glue::PageCacheTracker *>(saved_states[i]->state);
         break;
       case loader::kStateOpenChunks:
         SendMsg2Socket(fd_progress, "Releasing chunk tables (version 1)\n");

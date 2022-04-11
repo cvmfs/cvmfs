@@ -198,17 +198,19 @@ TEST_F(T_GlueBuffer, StringHeap) {
 }
 
 TEST_F(T_GlueBuffer, PageCacheTrackerOff) {
-  PageCacheTracker tracker(false);
+  PageCacheTracker tracker;
+  tracker.Disable();
   PageCacheTracker::OpenDirectives directives;
   directives = tracker.Open(1, shash::Any());
   EXPECT_EQ(false, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
   // Don't crash on unknown inode
   tracker.Close(2);
+  tracker.Evict(3);
 }
 
 TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
-  PageCacheTracker tracker(true);
+  PageCacheTracker tracker;
   PageCacheTracker::OpenDirectives directives;
 
   shash::Any hashA(shash::kShake128);

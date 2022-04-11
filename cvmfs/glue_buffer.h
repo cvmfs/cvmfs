@@ -797,7 +797,7 @@ class PageCacheTracker {
   };
   Statistics GetStatistics() { return statistics_; }
 
-  explicit PageCacheTracker(bool is_active);
+  PageCacheTracker();
   explicit PageCacheTracker(const PageCacheTracker &other);
   PageCacheTracker &operator= (const PageCacheTracker &other);
   ~PageCacheTracker();
@@ -806,20 +806,15 @@ class PageCacheTracker {
   void Close(uint64_t inode);
   void Evict(uint64_t inode);
 
+  // Used in RestoreState to prevent using the page cache tracker from a
+  // previous version after hotpatch
+  void Disable() { is_active_ = false; }
+
  private:
   static const unsigned kVersion = 0;
 
-  void CopyFrom(const PageCacheTracker &other);
-
   void InitLock();
-  inline void Lock() const {
-    int retval = pthread_mutex_lock(lock_);
-    assert(retval == 0);
-  }
-  inline void Unlock() const {
-    int retval = pthread_mutex_unlock(lock_);
-    assert(retval == 0);
-  }
+  void CopyFrom(const PageCacheTracker &other);
 
   pthread_mutex_t *lock_;
   unsigned version_;

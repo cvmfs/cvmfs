@@ -263,10 +263,7 @@ void NentryTracker::EndEnumerate(Cursor *cursor) {
 //------------------------------------------------------------------------------
 
 
-PageCacheTracker::PageCacheTracker(bool is_active)
-  : version_(kVersion)
-  , is_active_(is_active)
-{
+PageCacheTracker::PageCacheTracker() : version_(kVersion), is_active_(true) {
   map_.Init(16, 0, hasher_inode);
   InitLock();
 }
@@ -288,9 +285,8 @@ PageCacheTracker &PageCacheTracker::operator= (const PageCacheTracker &other) {
   if (&other == this)
     return *this;
 
-  Lock();
+  MutexLockGuard guard(lock_);
   CopyFrom(other);
-  Unlock();
   return *this;
 }
 
@@ -301,6 +297,8 @@ void PageCacheTracker::CopyFrom(const PageCacheTracker &other) {
   version_ = kVersion;
   is_active_ = other.is_active_;
   statistics_ = other.statistics_;
+
+  map_.Init(16, 0, hasher_inode);
   map_ = other.map_;
 }
 
