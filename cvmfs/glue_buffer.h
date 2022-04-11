@@ -802,8 +802,9 @@ class PageCacheTracker {
   PageCacheTracker &operator= (const PageCacheTracker &other);
   ~PageCacheTracker();
 
-  OpenDirectives Open(std::uint64_t inode, const shash::Any &hash);
-  void Close(std::uint64_t inode);
+  OpenDirectives Open(uint64_t inode, const shash::Any &hash);
+  void Close(uint64_t inode);
+  void Evict(uint64_t inode);
 
  private:
   static const unsigned kVersion = 0;

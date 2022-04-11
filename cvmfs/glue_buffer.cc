@@ -313,7 +313,7 @@ void PageCacheTracker::InitLock() {
 }
 
 PageCacheTracker::OpenDirectives PageCacheTracker::Open(
-  std::uint64_t inode, const shash::Any &hash)
+  uint64_t inode, const shash::Any &hash)
 {
   OpenDirectives open_directives;
   // Old behavior: always flush page cache on open
@@ -373,7 +373,7 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   return open_directives;
 }
 
-void PageCacheTracker::Close(std::uint64_t inode) {
+void PageCacheTracker::Close(uint64_t inode) {
   if (!is_active_)
     return;
 
@@ -390,6 +390,14 @@ void PageCacheTracker::Close(std::uint64_t inode) {
   }
   entry.nopen--;
   map_.Insert(inode, entry);
+}
+
+void PageCacheTracker::Evict(uint64_t inode) {
+  if (!is_active_)
+    return;
+
+  MutexLockGuard guard(lock_);
+  map_.Erase(inode);
 }
 
 }  // namespace glue

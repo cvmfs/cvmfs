@@ -249,6 +249,11 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
 
   tracker.Close(1);
   tracker.Close(1);
+
+  tracker.Evict(1);
+  directives = tracker.Open(1, hashA);
+  EXPECT_EQ(true, directives.keep_cache);
+  EXPECT_EQ(false, directives.direct_io);
 }
 
 
