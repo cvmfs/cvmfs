@@ -325,7 +325,7 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   if (!retval) {
     open_directives.keep_cache = true;
     open_directives.direct_io = false;
-    statistics_.ninsert++;
+    statistics_.n_insert++;
 
     entry.hash = hash;
     entry.nopen = 1;
@@ -394,6 +394,7 @@ void PageCacheTracker::Evict(uint64_t inode) {
   if (!is_active_)
     return;
 
+  statistics_.n_remove++;
   MutexLockGuard guard(lock_);
   map_.Erase(inode);
 }

@@ -107,6 +107,7 @@
 #include "statistics.h"
 #include "talk.h"
 #include "tracer.h"
+#include "util/algorithm.h"
 #include "util/exception.h"
 #include "util_concurrency.h"
 #include "uuid.h"
@@ -494,8 +495,11 @@ static void cvmfs_forget(
   LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
            uint64_t(ino), nlookup);
 #endif
-  if (!file_system_->IsNfsSource())
-    mount_point_->inode_tracker()->VfsPut(ino, nlookup);
+  if (!file_system_->IsNfsSource()) {
+    bool removed = mount_point_->inode_tracker()->VfsPut(ino, nlookup);
+    if (removed)
+      mount_point_->page_cache_tracker()->Evict(ino);
+  }
   fuse_remounter_->fence()->Leave();
   fuse_reply_none(req);
 }
@@ -525,7 +529,10 @@ static void cvmfs_forget_multi(
     LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
              ino, forgets[i].nlookup);
 
-    mount_point_->inode_tracker()->VfsPut(ino, forgets[i].nlookup);
+    bool removed =
+      mount_point_->inode_tracker()->VfsPut(ino, forgets[i].nlookup);
+    if (removed)
+      mount_point_->page_cache_tracker()->Evict(ino);
   }
   fuse_remounter_->fence()->Leave();
 
@@ -853,6 +860,16 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   fuse_reply_err(req, EINVAL);
 }
 
+static void FillOpenFlags(const glue::PageCacheTracker::OpenDirectives od,
+                          struct fuse_file_info *fi)
+{
+  assert(!TestBit(glue::PageCacheTracker::kBitDirectIo, fi->fh));
+  fi->keep_cache = od.keep_cache;
+  fi->direct_io = od.direct_io;
+  if (fi->direct_io)
+    SetBit(glue::PageCacheTracker::kBitDirectIo, &fi->fh);
+}
+
 
 /**
  * Open a file from cache.  If necessary, file is downloaded first.
@@ -918,7 +935,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
 
+  glue::PageCacheTracker::OpenDirectives open_directives;
   if (!dirent.IsChunkedFile()) {
+    open_directives =
+      mount_point_->page_cache_tracker()->Open(ino, dirent.checksum());
     fuse_remounter_->fence()->Leave();
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug,
@@ -996,10 +1016,19 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     chunk_tables->handle2fd.Insert(chunk_tables->next_handle, ChunkFd());
     chunk_tables->handle2uniqino.Insert(chunk_tables->next_handle,
                                         unique_inode);
-    // The same inode can refer to different revisions of a path.  Don't cache.
-    fi->keep_cache = 0;
-    fi->direct_io = dirent.IsDirectIo();
+
+    // Generate artificial content hash as hash over chunk hashes
+    // TODO(jblomer): we may want to cache the result in the chunk tables
+    FileChunkReflist chunk_reflist;
+    bool retval =
+        chunk_tables->inode2chunks.Lookup(unique_inode, &chunk_reflist);
+    assert(retval);
+
     fi->fh = static_cast<uint64_t>(-chunk_tables->next_handle);
+    // TODO: hash over chunk hashes
+    open_directives = mount_point_->page_cache_tracker()->Open(
+      ino, chunk_reflist.HashChunkList());
+    FillOpenFlags(open_directives, fi);
     ++chunk_tables->next_handle;
     chunk_tables->Unlock();
 
@@ -1024,10 +1053,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      // The same inode can refer to different revisions of a path. Don't cache.
-      fi->keep_cache = 0;
-      fi->direct_io = dirent.IsDirectIo();
       fi->fh = fd;
+      FillOpenFlags(open_directives, fi);
       fuse_reply_open(req, fi);
       return;
     } else {
@@ -1074,13 +1101,15 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   char *data = static_cast<char *>(alloca(size));
   unsigned int overall_bytes_fetched = 0;
 
+  int64_t fd = fi->fh;
+  ClearBit(glue::PageCacheTracker::kBitDirectIo, &fd);
+
   // Do we have a a chunked file?
-  if (static_cast<int64_t>(fi->fh) < 0) {
+  if (fd < 0) {
     const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
     ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
 
-    const uint64_t chunk_handle =
-      static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
+    const uint64_t chunk_handle = static_cast<uint64_t>(-fd);
     uint64_t unique_inode;
     ChunkFd chunk_fd;
     FileChunkReflist chunks;
@@ -1185,7 +1214,6 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
              chunk_fd.fd);
   } else {
-    const int64_t fd = fi->fh;
     int64_t nbytes = file_system_->cache_mgr()->Pread(fd, data, size, off);
     if (nbytes < 0) {
       fuse_reply_err(req, -nbytes);
@@ -1212,12 +1240,14 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %" PRIu64,
            uint64_t(ino));
-  const int64_t fd = fi->fh;
+  int64_t fd = fi->fh;
+  if (!TestBit(glue::PageCacheTracker::kBitDirectIo, fd))
+    mount_point_->page_cache_tracker()->Close(ino);
+  ClearBit(glue::PageCacheTracker::kBitDirectIo, &fd);
 
   // do we have a chunked file?
-  if (static_cast<int64_t>(fi->fh) < 0) {
-    const uint64_t chunk_handle =
-      static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
+  if (fd < 0) {
+    const uint64_t chunk_handle = static_cast<uint64_t>(-fd);
     LogCvmfs(kLogCvmfs, kLogDebug, "releasing chunk handle %" PRIu64,
              chunk_handle);
     uint64_t unique_inode;

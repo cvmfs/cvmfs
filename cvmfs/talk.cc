@@ -525,6 +525,8 @@ void *TalkManager::MainResponder(void *data) {
         mount_point->inode_tracker()->GetStatistics();
       glue::NentryTracker::Statistics nentry_stats =
         mount_point->nentry_tracker()->GetStatistics();
+      glue::PageCacheTracker::Statistics page_cache_stats =
+        mount_point->page_cache_tracker()->GetStatistics();
       mount_point->statistics()->Lookup("inode_tracker.n_insert")->Set(
         atomic_read64(&inode_stats.num_inserts));
       mount_point->statistics()->Lookup("inode_tracker.n_remove")->Set(
@@ -543,6 +545,10 @@ void *TalkManager::MainResponder(void *data) {
         nentry_stats.num_remove);
       mount_point->statistics()->Lookup("nentry_tracker.n_prune")->Set(
         nentry_stats.num_prune);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_insert")->Set(
+        page_cache_stats.n_insert);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_remove")->Set(
+        page_cache_stats.n_remove);
 
       if (file_system->cache_mgr()->id() == kPosixCacheManager) {
         PosixCacheManager *cache_mgr =

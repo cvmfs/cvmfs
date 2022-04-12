@@ -537,7 +537,7 @@ class InodeTracker {
     VfsGetBy(inode, 1, path);
   }
 
-  void VfsPut(const uint64_t inode, const uint32_t by) {
+  bool VfsPut(const uint64_t inode, const uint32_t by) {
     Lock();
     bool removed = inode_references_.Put(inode, by);
     if (removed) {
@@ -551,6 +551,7 @@ class InodeTracker {
     }
     Unlock();
     atomic_xadd64(&statistics_.num_references, -int32_t(by));
+    return removed;
   }
 
   bool FindPath(const uint64_t inode, PathString *path) {
@@ -766,6 +767,13 @@ class PageCacheTracker {
 
  public:
   /**
+   * In the fuse file handle, use bit 62 to indicate that the file was opened
+   * with a direct I/O setting and cvmfs_release() should not call Close().
+   * Note that the sign bit (bit 63) indicates chunked files.
+   */
+  static const unsigned int kBitDirectIo = 62;
+
+  /**
    * Instruct cvmfs_open() on how to handle the page cache.
    */
   struct OpenDirectives {
@@ -791,9 +799,9 @@ class PageCacheTracker {
   // Cannot be moved to the statistics manager because it has to survive
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
-    Statistics() : ninsert(0), nremove(0) {}
-    uint64_t ninsert;
-    uint64_t nremove;
+    Statistics() : n_insert(0), n_remove(0) {}
+    uint64_t n_insert;
+    uint64_t n_remove;
   };
   Statistics GetStatistics() { return statistics_; }
 

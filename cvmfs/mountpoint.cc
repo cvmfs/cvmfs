@@ -1480,6 +1480,8 @@ void MountPoint::CreateTables() {
   inode_tracker_ = new glue::InodeTracker();
   nentry_tracker_ = new glue::NentryTracker();
   page_cache_tracker_ = new glue::PageCacheTracker();
+  if (file_system_->IsNfsSource())
+    page_cache_tracker_->Disable();
 }
 
 /**
