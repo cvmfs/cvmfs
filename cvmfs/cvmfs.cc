@@ -1025,7 +1025,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     assert(retval);
 
     fi->fh = static_cast<uint64_t>(-chunk_tables->next_handle);
-    // TODO: hash over chunk hashes
+    // TODO(jblomer): hash over chunk hashes
     open_directives = mount_point_->page_cache_tracker()->Open(
       ino, chunk_reflist.HashChunkList());
     FillOpenFlags(open_directives, fi);
