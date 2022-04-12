@@ -25,6 +25,22 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 double DiffTimeSeconds(struct timeval start, struct timeval end);
 
+// Bitfield manipulation for different integer types T
+template <typename T>
+inline void SetBit(unsigned int bit, T *field) {
+  *field |= static_cast<T>(1) << bit;
+}
+
+template <typename T>
+inline void ClearBit(unsigned int bit, T *field) {
+  *field &= ~(static_cast<T>(1) << bit);
+}
+
+template <typename T>
+inline bool TestBit(unsigned int bit, const T field) {
+  return field & (static_cast<T>(1) << bit);
+}
+
 
 /**
  * Knuth's random shuffle algorithm.

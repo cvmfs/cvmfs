@@ -2017,6 +2017,35 @@ TEST_F(T_Util, DiffTree) {
   EXPECT_FALSE(DiffTree(".", "/"));
 }
 
+TEST_F(T_Util, Bitfields) {
+  int field = 0;
+
+  SetBit(0, &field);
+  EXPECT_EQ(1, field);
+  EXPECT_TRUE(TestBit(0, field));
+  ClearBit(0, &field);
+  EXPECT_EQ(0, field);
+  EXPECT_FALSE(TestBit(0, field));
+
+  SetBit(1, &field);
+  SetBit(2, &field);
+  EXPECT_EQ(6, field);
+  EXPECT_TRUE(TestBit(2, field));
+  EXPECT_FALSE(TestBit(3, field));
+  ClearBit(3, &field);
+  EXPECT_EQ(6, field);
+  ClearBit(1, &field);
+  EXPECT_EQ(4, field);
+
+  int64_t long_field = 0;
+  SetBit(63, &long_field);
+  EXPECT_LT(long_field, static_cast<int64_t>(0));
+  EXPECT_TRUE(TestBit(63, long_field));
+  EXPECT_FALSE(TestBit(62, long_field));
+  ClearBit(63, &long_field);
+  EXPECT_EQ(0, long_field);
+}
+
 TEST(Log2Histogram, 2BinEmpty) {
   Log2Histogram log2hist(2);
   log2hist.Add(10);
