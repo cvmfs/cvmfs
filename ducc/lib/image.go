@@ -46,6 +46,64 @@ type Image struct {
 	OCIImage    *image.Image
 }
 
+type Credentials struct {
+	username string
+	password string
+}
+
+type RegistryConfig struct {
+	baseUrl string
+	proxy   string
+	creds   Credentials
+}
+
+var inputRegistries []RegistryConfig
+
+func init() {
+	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
+	for _, r := range strings.Split(regs, ",") {
+		if r == "" {
+			continue
+		}
+
+		iEnv := "DUCC_" + r + "_IDENT"
+		uEnv := "DUCC_" + r + "_USER"
+		uPass := "DUCC_" + r + "_PASS"
+		proxyEnv := "DUCC_" + r + "_PROXY"
+		ident := os.Getenv(iEnv)
+		user := os.Getenv(uEnv)
+		pass := os.Getenv(uPass)
+		proxy := os.Getenv(proxyEnv)
+
+		if user == "" || pass == "" || ident == "" {
+			log.Fatalf("missing either $%s, $%s or $%s for %s", uEnv, uPass, iEnv, r)
+		}
+
+		inputRegistries = append(inputRegistries, RegistryConfig{
+			ident,
+			proxy,
+			Credentials{user, pass},
+		})
+	}
+}
+
+func getRegistryForUrl(url string) *RegistryConfig {
+	for _, reg := range inputRegistries {
+		if strings.Contains(url, reg.baseUrl) {
+			return &reg
+		}
+	}
+	return nil
+}
+
+func proxyUrl(url string) string {
+	reg := getRegistryForUrl(url)
+	if reg != nil && reg.proxy != "" {
+		return strings.Replace(url, reg.baseUrl, reg.proxy, 1)
+	}
+	return url
+}
+
 func (i *Image) GetSimpleName() string {
 	name := fmt.Sprintf("%s/%s", i.Registry, i.Repository)
 	if i.Tag == "" {
@@ -67,7 +125,7 @@ func (i *Image) WholeName() string {
 }
 
 func (i *Image) GetManifestUrl() string {
-	url := fmt.Sprintf("%s://%s/v2/%s/manifests/", i.Scheme, i.Registry, i.Repository)
+	url := proxyUrl(fmt.Sprintf("%s://%s/v2/%s/manifests/", i.Scheme, i.Registry, i.Repository))
 	if i.Digest != "" {
 		url = fmt.Sprintf("%s%s", url, i.Digest)
 	} else {
@@ -145,7 +203,7 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 		return manifest, err
 	}
 	if reflect.DeepEqual(da.Manifest{}, manifest) {
-		return manifest, fmt.Errorf("Got empty manifest")
+		return manifest, fmt.Errorf("got empty manifest")
 	}
 	img.Manifest = &manifest
 	return manifest, nil
@@ -178,6 +236,10 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 
 	resp, err := client.Do(req)
+	if err != nil {
+		l.LogE(err).Warning("error making HTTP request")
+		return
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -218,7 +280,7 @@ func (img *Image) GetChanges() (changes []string, err error) {
 	cmd := config.Config.Cmd
 
 	if len(cmd) > 0 {
-		command := fmt.Sprintf("CMD")
+		command := "CMD"
 		for _, c := range cmd {
 			command = fmt.Sprintf("%s %s", command, c)
 		}
@@ -233,7 +295,7 @@ func (img *Image) GetSingularityLocation() string {
 }
 
 func (img *Image) GetTagListUrl() string {
-	return fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository)
+	return proxyUrl(fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository))
 }
 
 func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
@@ -259,7 +321,7 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	url := img.GetTagListUrl()
 	token, err := firstRequestForAuth(url)
 	if err != nil {
-		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
+		errF := fmt.Errorf("error in authenticating for retrieving the tags: %s", err)
 		l.LogE(err).Error(errF)
 		return r1, r2, errF
 	}
@@ -270,18 +332,18 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		errF := fmt.Errorf("Error in making the request for retrieving the tags: %s", err)
+		errF := fmt.Errorf("error making the request for retrieving the tags: %s", err)
 		l.LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
 		return r1, r2, errF
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		errF := fmt.Errorf("Got error status code (%d) trying to retrieve the tags", resp.StatusCode)
+		errF := fmt.Errorf("error status code (%d) trying to retrieve the tags", resp.StatusCode)
 		l.LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
 		return r1, r2, errF
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
-		errF := fmt.Errorf("Error in decoding the tags from the server: %s", err)
+		errF := fmt.Errorf("error in decoding the tags from the server: %s", err)
 		l.LogE(err).Error(errF)
 		return r1, r2, errF
 	}
@@ -387,36 +449,14 @@ func (img *Image) getByteManifest() ([]byte, error) {
 	return body, nil
 }
 
-type Credentials struct {
-	username string
-	password string
-}
-
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
-	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
-	for _, r := range strings.Split(regs, ",") {
-		if r == "" {
-			continue
-		}
-
-		iEnv := "DUCC_" + r + "_IDENT"
-		uEnv := "DUCC_" + r + "_USER"
-		uPass := "DUCC_" + r + "_PASS"
-		ident := os.Getenv(iEnv)
-		user := os.Getenv(uEnv)
-		pass := os.Getenv(uPass)
-		if user == "" || pass == "" || ident == "" {
-			err = fmt.Errorf("missing either $%s or $%s or $%s", uEnv, uPass, iEnv)
-			return "", err;
-		}
-
-		if (!strings.Contains(url, ident)) {
-			continue
-		}
-
-		return firstRequestForAuth_internal(url, user, pass)
+	reg := getRegistryForUrl(url)
+	if reg != nil && reg.proxy == "" {
+		return firstRequestForAuth_internal(url, reg.creds.username, reg.creds.password)
 	}
-	return firstRequestForAuth_internal(url, "", "")
+
+	proxied := proxyUrl(url)
+	return firstRequestForAuth_internal(proxied, "", "")
 }
 
 func firstRequestForAuth(url string) (token string, err error) {
@@ -471,8 +511,8 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 }
 
 func getLayerUrl(img *Image, layerDigest string) string {
-	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, layerDigest)
+	return proxyUrl(fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
+		img.Scheme, img.Registry, img.Repository, layerDigest))
 }
 
 type downloadedLayer struct {
@@ -556,7 +596,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 		case <-killKiller:
 			return
 		case <-stopGettingLayers:
-			err := fmt.Errorf("Detect errors, stop getting layer")
+			err := fmt.Errorf("detect errors, stop getting layer")
 			errorChannel <- err
 			l.LogE(err).Error("Detect error, stop getting layers")
 			cancel()
@@ -656,7 +696,7 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			toSend = newDownloadedLayer(layer.Digest, path)
 			return toSend, nil
 		} else {
-			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
+			err = fmt.Errorf("layer not received, status code: %d", resp.StatusCode)
 			l.LogE(err).Warning("Received status code ", resp.StatusCode)
 			if resp.StatusCode == 401 {
 				// try to get the token again
@@ -680,7 +720,7 @@ func parseBearerToken(token string) (realm string, options map[string]string, er
 	for _, kv := range keyValue {
 		splitted := strings.Split(kv, "=")
 		if len(splitted) != 2 {
-			err = fmt.Errorf("Wrong formatting of the token")
+			err = fmt.Errorf("wrong formatting of the token")
 			return
 		}
 		splitted[1] = strings.Trim(splitted[1], `"`)
@@ -716,13 +756,13 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		err = fmt.Errorf("Error in getting the token, http request failed %s", err)
+		err = fmt.Errorf("error in getting the token, http request failed %s", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		err = fmt.Errorf("Authorization error %s", resp.Status)
+		err = fmt.Errorf("authorization error %s", resp.Status)
 		return
 	}
 
@@ -735,7 +775,7 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	if ok {
 		authToken = "Bearer " + authTokenInterface.(string)
 	} else {
-		err = fmt.Errorf("Didn't get the token key from the server")
+		err = fmt.Errorf("didn't get the token key from the server")
 		return
 	}
 	return
