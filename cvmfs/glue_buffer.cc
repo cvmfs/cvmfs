@@ -395,13 +395,25 @@ void PageCacheTracker::Close(uint64_t inode) {
   map_.Insert(inode, entry);
 }
 
-void PageCacheTracker::Evict(uint64_t inode) {
-  if (!is_active_)
+PageCacheTracker::EvictRaii::EvictRaii(PageCacheTracker *t)
+  : tracker_(t)
+{
+  int retval = pthread_mutex_lock(tracker_->lock_);
+  assert(retval == 0);
+}
+
+PageCacheTracker::EvictRaii::~EvictRaii() {
+  int retval = pthread_mutex_unlock(tracker_->lock_);
+  assert(retval == 0);
+}
+
+void PageCacheTracker::EvictRaii::Evict(uint64_t inode) {
+  if (!tracker_->is_active_)
     return;
 
-  statistics_.n_remove++;
-  MutexLockGuard guard(lock_);
-  map_.Erase(inode);
+  bool contained_inode = tracker_->map_.Erase(inode);
+  if (contained_inode)
+    tracker_->statistics_.n_remove++;
 }
 
 }  // namespace glue

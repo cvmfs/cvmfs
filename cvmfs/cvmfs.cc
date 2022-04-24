@@ -496,9 +496,10 @@ static void cvmfs_forget(
            uint64_t(ino), nlookup);
 #endif
   if (!file_system_->IsNfsSource()) {
-    bool removed = mount_point_->inode_tracker()->VfsPut(ino, nlookup);
+    bool removed =
+      mount_point_->inode_tracker()->GetVfsPutRaii().VfsPut(ino, nlookup);
     if (removed)
-      mount_point_->page_cache_tracker()->Evict(ino);
+      mount_point_->page_cache_tracker()->GetEvictRaii().Evict(ino);
   }
   fuse_remounter_->fence()->Leave();
   fuse_reply_none(req);
@@ -520,19 +521,24 @@ static void cvmfs_forget_multi(
   }
 
   fuse_remounter_->fence()->Enter();
-  for (size_t i = 0; i < count; ++i) {
-    if (forgets[i].ino == FUSE_ROOT_ID) {
-      continue;
+  {
+    glue::InodeTracker::VfsPutRaii vfs_put_raii =
+      mount_point_->inode_tracker()->GetVfsPutRaii();
+    glue::PageCacheTracker::EvictRaii evict_raii =
+      mount_point_->page_cache_tracker()->GetEvictRaii();
+    for (size_t i = 0; i < count; ++i) {
+      if (forgets[i].ino == FUSE_ROOT_ID) {
+        continue;
+      }
+
+      uint64_t ino = mount_point_->catalog_mgr()->MangleInode(forgets[i].ino);
+      LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
+               ino, forgets[i].nlookup);
+
+      bool removed = vfs_put_raii.VfsPut(ino, forgets[i].nlookup);
+      if (removed)
+        evict_raii.Evict(ino);
     }
-
-    uint64_t ino = mount_point_->catalog_mgr()->MangleInode(forgets[i].ino);
-    LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
-             ino, forgets[i].nlookup);
-
-    bool removed =
-      mount_point_->inode_tracker()->VfsPut(ino, forgets[i].nlookup);
-    if (removed)
-      mount_point_->page_cache_tracker()->Evict(ino);
   }
   fuse_remounter_->fence()->Leave();
 

@@ -487,6 +487,38 @@ class InodeTracker {
     InodeReferences::Cursor csr_inos;
   };
 
+  /**
+   * To avoid taking the InodeTracker mutex multiple times, the fuse
+   * forget_multi callback releases inodes references through this RAII object.
+   * Copy and assign operator should be deleted but that would require
+   * all compilers to use RVO. TODO(jblomer): fix with C++11
+   */
+  class VfsPutRaii {
+   public:
+    explicit VfsPutRaii(InodeTracker *t) : tracker_(t) {
+      tracker_->Lock();
+    }
+    ~VfsPutRaii() { tracker_->Unlock(); }
+
+    bool VfsPut(const uint64_t inode, const uint32_t by) {
+      bool removed = tracker_->inode_references_.Put(inode, by);
+      if (removed) {
+        // TODO(jblomer): pop operation (Lookup+Erase)
+        shash::Md5 md5path;
+        bool found = tracker_->inode_map_.LookupMd5Path(inode, &md5path);
+        assert(found);
+        tracker_->inode_map_.Erase(inode);
+        tracker_->path_map_.Erase(md5path);
+        atomic_inc64(&tracker_->statistics_.num_removes);
+      }
+      atomic_xadd64(&tracker_->statistics_.num_references, -int32_t(by));
+      return removed;
+    }
+
+   private:
+    InodeTracker *tracker_;
+  };
+
   // Cannot be moved to the statistics manager because it has to survive
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
@@ -537,22 +569,7 @@ class InodeTracker {
     VfsGetBy(inode, 1, path);
   }
 
-  bool VfsPut(const uint64_t inode, const uint32_t by) {
-    Lock();
-    bool removed = inode_references_.Put(inode, by);
-    if (removed) {
-      // TODO(jblomer): pop operation (Lookup+Erase)
-      shash::Md5 md5path;
-      bool found = inode_map_.LookupMd5Path(inode, &md5path);
-      assert(found);
-      inode_map_.Erase(inode);
-      path_map_.Erase(md5path);
-      atomic_inc64(&statistics_.num_removes);
-    }
-    Unlock();
-    atomic_xadd64(&statistics_.num_references, -int32_t(by));
-    return removed;
-  }
+  VfsPutRaii GetVfsPutRaii() { return VfsPutRaii(this); }
 
   bool FindPath(const uint64_t inode, PathString *path) {
     Lock();
@@ -796,6 +813,22 @@ class PageCacheTracker {
     OpenDirectives() : keep_cache(false), direct_io(false) {}
   };
 
+  /**
+   * To avoid taking the PageCacheTracker mutex multiple times, the
+   * fuse forget_multi callback evicts inodes through this RAII object.
+   * Copy and assign operator should be deleted but that would require
+   * all compilers to use RVO. TODO(jblomer): fix with C++11
+   */
+  class EvictRaii {
+   public:
+    explicit EvictRaii(PageCacheTracker *t);
+    ~EvictRaii();
+    void Evict(uint64_t inode);
+
+   private:
+    PageCacheTracker *tracker_;
+  };
+
   // Cannot be moved to the statistics manager because it has to survive
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
@@ -821,7 +854,8 @@ class PageCacheTracker {
 
   OpenDirectives Open(uint64_t inode, const shash::Any &hash);
   void Close(uint64_t inode);
-  void Evict(uint64_t inode);
+
+  EvictRaii GetEvictRaii() { return EvictRaii(this); }
 
   // Used in RestoreState to prevent using the page cache tracker from a
   // previous version after hotpatch
