@@ -1447,6 +1447,12 @@ void MountPoint::CreateStatistics() {
                         "overall number of added page cache entries");
   statistics_->Register("page_cache_tracker.n_remove",
                         "overall number of evicted page cache entries");
+  statistics_->Register("page_cache_tracker.n_open_direct",
+                        "overall number of direct I/O open calls");
+  statistics_->Register("page_cache_tracker.n_open_flush",
+    "overall number of open calls where the file's page cache gets flushed");
+  statistics_->Register("page_cache_tracker.n_open_cached",
+    "overall number of open calls where the file's page cache is reused");
 }
 
 

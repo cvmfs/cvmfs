@@ -549,6 +549,12 @@ void *TalkManager::MainResponder(void *data) {
         page_cache_stats.n_insert);
       mount_point->statistics()->Lookup("page_cache_tracker.n_remove")->Set(
         page_cache_stats.n_remove);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_open_direct")->
+        Set(page_cache_stats.n_open_direct);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_open_flush")->
+        Set(page_cache_stats.n_open_flush);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_open_cached")->
+        Set(page_cache_stats.n_open_cached);
 
       if (file_system->cache_mgr()->id() == kPosixCacheManager) {
         PosixCacheManager *cache_mgr =

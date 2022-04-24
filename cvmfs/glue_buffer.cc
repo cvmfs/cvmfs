@@ -326,6 +326,7 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
     open_directives.keep_cache = true;
     open_directives.direct_io = false;
     statistics_.n_insert++;
+    statistics_.n_open_cached++;
 
     entry.hash = hash;
     entry.nopen = 1;
@@ -339,24 +340,26 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
       // The page cache is still in the transition phase and may contain old
       // content.  So trigger a flush of the cache in any case.
       open_directives.keep_cache = false;
+      statistics_.n_open_flush++;
       entry.nopen--;
       map_.Insert(inode, entry);
       return open_directives;
     } else {
       open_directives.keep_cache = true;
+      statistics_.n_open_cached++;
       entry.nopen++;
       map_.Insert(inode, entry);
       return open_directives;
     }
   }
 
-  open_directives.keep_cache = false;
-
   // Page cache mismatch and old data has still open file attached to it,
   // circumvent the page cache entirely and use direct I/O.  In this case,
   // cvmfs_close() will _not_ call Close().
   if (entry.nopen != 0) {
+    open_directives.keep_cache = true;
     open_directives.direct_io = true;
+    statistics_.n_open_direct++;
     return open_directives;
   }
 
@@ -365,6 +368,8 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   // The first file to reach Close() will finish the transition phase and
   // mark the new hash as committed.
   open_directives.direct_io = false;
+  open_directives.keep_cache = false;
+  statistics_.n_open_flush++;
   entry.hash = hash;
   entry.nopen = -1;
   map_.Insert(inode, entry);

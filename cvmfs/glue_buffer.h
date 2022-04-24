@@ -799,9 +799,18 @@ class PageCacheTracker {
   // Cannot be moved to the statistics manager because it has to survive
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
-    Statistics() : n_insert(0), n_remove(0) {}
+    Statistics()
+      : n_insert(0)
+      , n_remove(0)
+      , n_open_direct(0)
+      , n_open_flush(0)
+      , n_open_cached(0)
+    {}
     uint64_t n_insert;
     uint64_t n_remove;
+    uint64_t n_open_direct;
+    uint64_t n_open_flush;
+    uint64_t n_open_cached;
   };
   Statistics GetStatistics() { return statistics_; }
 
