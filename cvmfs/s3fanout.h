@@ -191,6 +191,7 @@ class S3FanoutManager : SingleCopy {
       opt_max_retries = 3;
       opt_backoff_init_ms = 100;
       opt_backoff_max_ms = 2000;
+      x_amz_acl = "public-read";
     }
     std::string access_key;
     std::string secret_key;
@@ -207,6 +208,7 @@ class S3FanoutManager : SingleCopy {
     unsigned opt_backoff_init_ms;
     unsigned opt_backoff_max_ms;
     std::string proxy;
+    std::string x_amz_acl;
   };
 
   static void DetectThrottleIndicator(const std::string &header, JobInfo *info);

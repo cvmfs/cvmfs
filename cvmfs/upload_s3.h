@@ -122,6 +122,7 @@ class S3Uploader : public AbstractUploader {
   std::string region_;
   std::string flavor_;
   std::string bucket_;
+  std::string x_amz_acl_;
   bool dns_buckets_;
   int num_parallel_uploads_;
   unsigned num_retries_;
@@ -136,7 +137,22 @@ class S3Uploader : public AbstractUploader {
   const std::string temporary_path_;
   mutable atomic_int32 io_errors_;
   pthread_t thread_collect_results_;
+
 };  // S3Uploader
+
+/**
+ *    * Allowed values of x-amz-acl according to S3 API
+ *       */
+  static std::string const  x_amz_acl_allowed_values_[7] = {
+    "private",
+    "public-read",
+    "public-write",
+    "authenticated-read",
+    "aws-exec-read",
+    "bucket-owner-read",
+    "bucket-owner-full-control",
+  };
+
 
 }  // namespace upload
 
