@@ -19,8 +19,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-const unsigned char kDefaultMaxName = 25;
-const unsigned char kDefaultMaxLink = 25;
+const unsigned char kDefaultMaxName = 80;
+const unsigned char kDefaultMaxLink = 80;
 const unsigned char kDefaultMaxPath = 200;
 
 template<unsigned char StackSize, char Type>
