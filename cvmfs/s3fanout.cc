@@ -1027,7 +1027,8 @@ bool S3FanoutManager::CanRetry(const JobInfo *info) {
       (info->error_code == kFailHostConnection ||
        info->error_code == kFailHostResolve ||
        info->error_code == kFailServiceUnavailable ||
-       info->error_code == kFailRetry) &&
+       info->error_code == kFailRetry ||
+       info->error_code == kFailOther) &&
       (info->num_retries < config_.opt_max_retries);
 }
 
