@@ -118,8 +118,12 @@ template <class CatalogT>
 LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remounting repositories (dry run %d)", dry_run);
-  if (dry_run)
-    return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
+  if (dry_run) {
+    WriteLock();
+    LoadError err = LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
+    Unlock();
+    return err;
+  }
 
   WriteLock();
 
