@@ -121,12 +121,19 @@ void IngestionPipeline::Process(
   bool allow_chunking,
   shash::Suffix hash_suffix)
 {
+  // always enable compression for anything that has a suffix
+  // (i.e. catalogs, certificates, histories)
+  zlib::Algorithms compression_algorithm = compression_algorithm_;
+  if (hash_suffix != shash::kSuffixNone) {
+      compression_algorithm = zlib::kZlibDefault;
+  }
+
   FileItem *file_item = new FileItem(
     source,
     minimal_chunk_size_,
     average_chunk_size_,
     maximal_chunk_size_,
-    compression_algorithm_,
+    compression_algorithm,
     hash_algorithm_,
     hash_suffix,
     allow_chunking && chunking_enabled_,
