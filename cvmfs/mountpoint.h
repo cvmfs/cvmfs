@@ -220,6 +220,7 @@ class FileSystem : SingleCopy, public BootFactory {
   NfsMaps *nfs_maps() { return nfs_maps_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
   perf::Counter *no_open_files() { return no_open_files_; }
+  perf::Counter *start_time() { return start_time_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
@@ -314,6 +315,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *no_open_files_;
   perf::Counter *no_open_dirs_;
   IoErrorInfo io_error_info_;
+  perf::Counter *start_time_;
   perf::Statistics *statistics_;
 
   Log2Histogram *hist_fs_lookup_;

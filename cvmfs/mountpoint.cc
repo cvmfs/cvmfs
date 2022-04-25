@@ -235,6 +235,9 @@ void FileSystem::CreateStatistics() {
                   "Number of currently opened directories");
   io_error_info_.SetCounter(statistics_->Register("cvmfs.n_io_error",
                                                   "Number of I/O errors"));
+  start_time_ = statistics_->Register("cvmfs.start_time",
+                  "Epoch time that mount was started");
+  start_time_->Set( time(NULL) );
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
