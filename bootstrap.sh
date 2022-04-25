@@ -17,6 +17,7 @@ MAXMINDDB_VERSION=1.5.4
 PROTOBUF_VERSION=2.6.1
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
+GO_VERSION=1.18
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -73,6 +74,23 @@ do_extract() {
     tar xvfz "$library_dir/$library_archive"
   fi
   mv $library_decompressed_dir $dest_dir
+  cd $cdir
+  cp -r $library_dir/src/* $dest_dir
+}
+
+do_extract_go() {
+  local library_name="$1"
+  local library_archive="$2"
+
+  local library_dir="$externals_lib_dir/$library_name"
+  local dest_dir=$(get_destination_dir $library_name)
+  local cdir=$(pwd)
+
+  print_hint "Extracting $library_archive"
+
+  cd $externals_build_dir
+  tar xvf "$library_dir/$library_archive"
+  mv go $dest_dir
   cd $cdir
   cp -r $library_dir/src/* $dest_dir
 }
@@ -239,6 +257,12 @@ build_lib() {
       do_extract "libarchive" "libarchive-${LIBARCHIVE_VERSION}.tar.gz"
       do_build "libarchive"
       ;;
+    go)
+      if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
+        do_extract_go "go" "go${GO_VERSION}.src.tar.gz"
+        do_build "go"
+      fi
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -249,12 +273,14 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
+
 missing_libs="libcurl pacparser sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive"
 if [ "$BUILD_ZLIB_NG" == "ON" ]; then
   missing_libs="zlib-ng $missing_libs"
 else
   missing_libs="zlib $missing_libs"
 fi
+
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi

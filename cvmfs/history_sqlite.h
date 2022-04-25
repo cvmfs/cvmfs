@@ -95,7 +95,6 @@ class SqliteHistory : public History {
   bool GetByName(const std::string &name, Tag *tag) const;
   bool GetByDate(const time_t timestamp, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
-  bool Tips(std::vector<Tag> *channel_tips) const;
 
   virtual bool GetBranchHead(const std::string &branch_name, Tag *tag) const;
   virtual bool ExistsBranch(const std::string &branch_name) const;
@@ -168,7 +167,6 @@ class SqliteHistory : public History {
   UniquePtr<SqlFindTagByDate>       find_tag_by_date_;
   UniquePtr<SqlCountTags>           count_tags_;
   UniquePtr<SqlListTags>            list_tags_;
-  UniquePtr<SqlGetChannelTips>      channel_tips_;
   UniquePtr<SqlGetHashes>           get_hashes_;
   UniquePtr<SqlRollbackTag>         rollback_tag_;
   UniquePtr<SqlListRollbackTags>    list_rollback_tags_;

@@ -64,7 +64,7 @@
 %endif
 
 %define hardlink /usr/sbin/hardlink
-%if 0%{?fedora} >= 31
+%if 0%{?fedora} >= 31 || 0%{?rhel} >= 9
 %define hardlink /usr/bin/hardlink
 %endif
 
@@ -148,7 +148,9 @@ Requires: sysvinit
 Requires: sysvinit-tools
   %endif
 %else
+%if 0%{?el7}%{?el8}%{?suse_version}
 Requires: chkconfig
+%endif
 Requires: fuse-libs
 Requires: glibc-common
 Requires: which

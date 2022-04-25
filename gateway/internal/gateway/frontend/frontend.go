@@ -8,7 +8,6 @@ import (
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 // NewFrontend builds and configures a new HTTP server, but does not start it
@@ -75,7 +74,7 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration) 
 func Start(services *be.Services, port int, timeout time.Duration) error {
 	srv := NewFrontend(services, port, timeout)
 	if err := srv.ListenAndServe(); err != nil {
-		return errors.Wrap(err, "could not run HTTP front-end")
+		return fmt.Errorf("could not run HTTP front-end: %w", err)
 	}
 
 	return nil

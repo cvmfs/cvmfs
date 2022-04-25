@@ -1761,13 +1761,28 @@ bool MountPoint::SetupBehavior() {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
 
-  bool hide_magic_xattrs = false;
-  if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
-    hide_magic_xattrs = true;
+  MagicXattrManager::EVisibility xattr_visibility =
+    MagicXattrManager::kVisibilityRootOnly;
+  if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)) {
+    if (options_mgr_->IsOn(optarg))
+      xattr_visibility = MagicXattrManager::kVisibilityNever;
+    else if (options_mgr_->IsOff(optarg))
+      xattr_visibility = MagicXattrManager::kVisibilityAlways;
   }
-  magic_xattr_mgr_ = new MagicXattrManager(this, hide_magic_xattrs);
+  if (options_mgr_->GetValue("CVMFS_MAGIC_XATTRS_VISIBILITY", &optarg)) {
+    if (ToUpper(optarg) == "ROOTONLY") {
+      xattr_visibility = MagicXattrManager::kVisibilityRootOnly;
+    } else if (ToUpper(optarg) == "NEVER") {
+      xattr_visibility = MagicXattrManager::kVisibilityNever;
+    } else if (ToUpper(optarg) == "ALWAYS") {
+      xattr_visibility = MagicXattrManager::kVisibilityAlways;
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "unsupported setting: CVMFS_MAGIC_XATTRS_VISIBILITY=%s",
+               optarg.c_str());
+    }
+  }
+  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility);
 
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)

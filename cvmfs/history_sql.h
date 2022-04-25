@@ -109,8 +109,6 @@ class SqlRetrieveTag : public MixinT {
                            shash::kSuffixCatalog);
     result.revision    = MixinT::RetrieveInt64(2);
     result.timestamp   = MixinT::RetrieveInt64(3);
-    result.channel     = static_cast<History::UpdateChannel>(
-                           MixinT::RetrieveInt64(4));
     result.description = MixinT::RetrieveString(5);
     result.size        = MixinT::RetrieveInt64(6);
     result.branch      = MixinT::RetrieveString(7);
@@ -170,12 +168,6 @@ class SqlListTags : public SqlRetrieveTag<SqlHistory> {
 };
 
 
-class SqlGetChannelTips : public SqlRetrieveTag<SqlHistory> {
- public:
-  explicit SqlGetChannelTips(const HistoryDatabase *database);
-};
-
-
 class SqlGetHashes : public SqlHistory {
  public:
   explicit SqlGetHashes(const HistoryDatabase *database);
@@ -212,8 +204,7 @@ class SqlRollback : public MixinT {
  public:
   bool BindTargetTag(const History::Tag &target_tag) {
     return MixinT::BindInt64(offset + 1, target_tag.revision) &&
-           MixinT::BindText(offset + 2, target_tag.name) &&
-           MixinT::BindInt64(offset + 3, target_tag.channel);
+           MixinT::BindText(offset + 2, target_tag.name);
   }
 };
 

@@ -94,7 +94,7 @@ install_from_repo acl
 # install docker for testing DUCC
 sudo yum install -y yum-utils
 sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-sudo yum install docker-ce docker-ce-cli containerd.io
+sudo yum install -y docker-ce docker-ce-cli containerd.io
 
 # Migration test needs lsb_release
 echo "install lsb_release..."

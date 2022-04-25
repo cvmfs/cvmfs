@@ -13,7 +13,7 @@ usage() {
   echo "Usage: $0 [-q only quick tests] [-s shrinkwrap test binary]\\"
   echo "          [-c cache plugin binary] [-g GeoAPI sources] \\"
   echo "          [-d run the ducc unittests] \\"
-  echo "          [-G run the gateway unittests] \\"
+  echo "          [-G run the gateway unittests (deprecated, always run)] \\"
   echo "          [-p run the publish unit tests] \\"
   echo "          <unittests binary> <XML output location>"
   echo "This script runs the CernVM-FS unit tests"
@@ -25,7 +25,6 @@ CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
 CVMFS_TEST_DUCC=0
-CVMFS_TEST_GATEWAY=0
 CVMFS_TEST_PUBLISH=0
 
 while getopts "qc:g:s:l:Gdp" option; do
@@ -46,14 +45,14 @@ while getopts "qc:g:s:l:Gdp" option; do
       # Preloading a library now unused
       :
     ;;
-    G)
-      CVMFS_TEST_GATEWAY=1
-    ;;
     d)
       CVMFS_TEST_DUCC=1
     ;;
     p)
       CVMFS_TEST_PUBLISH=1
+    ;;
+    G)
+      # Deprecated; Gateway unit tests are now always run when the gateway code can be built
     ;;
     ?)
       usage
@@ -124,7 +123,7 @@ if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
     --gtest_filter=$test_filter
 fi
 
-if [ $CVMFS_TEST_GATEWAY = 1 ] && can_build_gateway; then
+if can_build_gateway; then
   echo "running gateway unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
   pushd ${SCRIPT_LOCATION}/../gateway > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway

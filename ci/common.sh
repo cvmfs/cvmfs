@@ -100,6 +100,7 @@ create_cvmfs_source_tarball() {
         ${source_directory}/test               \
         ${source_directory}/ducc               \
         $tar_name
+  rm -r $tar_name/test/benchmarks
   tar czf $destination_path $tar_name || true
   local retval=$?
   cd ..

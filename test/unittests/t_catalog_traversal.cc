@@ -296,15 +296,15 @@ class T_CatalogTraversal : public ::testing::Test {
     history->BeginTransaction();
     EXPECT_TRUE(history->Insert(history::History::Tag(
       "Revision2", root_catalogs[2].catalog_hash, 1337,
-      2, root_catalogs[2].timestamp, history::History::kChannelProd,
+      2, root_catalogs[2].timestamp,
       "this is revision 2", "")));
     EXPECT_TRUE(history->Insert(history::History::Tag(
       "Revision5", root_catalogs[5].catalog_hash, 42,
-      5, root_catalogs[5].timestamp, history::History::kChannelProd,
+      5, root_catalogs[5].timestamp,
       "this is revision 5", "")));
     EXPECT_TRUE(history->Insert(history::History::Tag(
       "Revision6", root_catalogs[6].catalog_hash, 7,
-      6, root_catalogs[6].timestamp, history::History::kChannelTrunk,
+      6, root_catalogs[6].timestamp,
       "this is revision 6 - the newest!", "")));
     history->CommitTransaction();
   }

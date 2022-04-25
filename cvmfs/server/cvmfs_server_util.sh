@@ -960,6 +960,11 @@ _update_geodb_install() {
     return 3
   fi
 
+  if [ -w "$(get_global_info_v1_path)" ]; then
+    # update repositories.json for the new geodb timestamp, if possible
+    update_global_repository_info || die "fail (update global repository info)"
+  fi
+
   # get rid of other files in the untar
   rm -rf $untar_dir
 
@@ -1128,7 +1133,7 @@ Supported Commands:
                   <fully qualified repository name>
                   Imports an old CernVM-FS repository into a fresh repo
   publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                  [-a tag name] [-c tag channel] [-m tag description]
+                  [-a tag name] [-m tag description]
                   [-X (force external data) | -N (force native data)]
                   [-Z compression algorithm] [-F authz info file]
                   [-f use force remount if necessary]
@@ -1180,7 +1185,7 @@ Supported Commands:
   info            <fully qualified name>
                   Print summary about the repository
   tag             Create and manage named snapshots
-                  [-a create tag <name>] [-c channel] [-m message] [-h hash]
+                  [-a create tag <name>] [-m message] [-h hash]
                   [-r remove tag <name>] [-f don't ask again]
                   [-i inspect tag <name>] [-x machine readable]
                   [-b list branch hierarchy] [-x machine readable]

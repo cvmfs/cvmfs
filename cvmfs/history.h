@@ -21,8 +21,8 @@ namespace history {
  *
  * Each tag contains meta information (i.e. description, date) and points to
  * one specific catalog revision (revision, root catalog hash). Furthermore
- * tags are associated with _one_ update channel. This can be used in clients
- * to selectively apply file system snapshots of a specific update channel.
+ * tags are associated with _one_ branch. This can be used in clients
+ * to selectively apply file system snapshots of a specific branch.
  *
  * Note: The public interface of the History class is virtual, in order to over-
  *       write it in a testing environment. As we are dealing with an SQLite
@@ -32,20 +32,6 @@ namespace history {
  */
 class History {
  public:
-  /**
-   * Available update channels
-   *   o Trunk (the default)
-   *   o Development
-   *   o Testing
-   *   o Production
-   */
-  enum UpdateChannel {
-    kChannelTrunk = 0,
-    kChannelDevel = 4,
-    kChannelTest = 16,
-    kChannelProd = 64,
-  };
-
   struct Branch {
     Branch() : initial_revision(0) { }
     Branch(const std::string &b, const std::string &p, unsigned r)
@@ -75,23 +61,13 @@ class History {
    */
   struct Tag {
     Tag() :
-      size(0), revision(0), timestamp(0), channel(kChannelTrunk) {}
+      size(0), revision(0), timestamp(0) {}
 
     Tag(const std::string &n, const shash::Any &h, const uint64_t s,
-        const unsigned r, const time_t t, const UpdateChannel c,
-        const std::string &d, const std::string &b) :
-      name(n), root_hash(h), size(s), revision(r), timestamp(t), channel(c),
+        const unsigned r, const time_t t, const std::string &d,
+        const std::string &b) :
+      name(n), root_hash(h), size(s), revision(r), timestamp(t),
       description(d), branch(b) {}
-
-    inline const char* GetChannelName() const {
-      switch (channel) {
-        case kChannelTrunk: return "trunk";
-        case kChannelDevel: return "development";
-        case kChannelTest:  return "testing";
-        case kChannelProd:  return "production";
-        default: assert(false && "unknown channel id");
-      }
-    }
 
     bool operator ==(const Tag &other) const {
       return (this->branch == other.branch) &&
@@ -115,7 +91,6 @@ class History {
     uint64_t       size;
     unsigned       revision;
     time_t         timestamp;
-    UpdateChannel  channel;
     std::string    description;
     /**
      * The default branch is the empty string.
@@ -157,7 +132,6 @@ class History {
   virtual bool GetByName(const std::string &name, Tag *tag) const    = 0;
   virtual bool GetByDate(const time_t timestamp, Tag *tag) const     = 0;
   virtual bool List(std::vector<Tag> *tags) const                    = 0;
-  virtual bool Tips(std::vector<Tag> *channel_tips) const            = 0;
 
   virtual bool GetBranchHead(const std::string &branch_name, Tag *tag)
     const = 0;
@@ -179,7 +153,7 @@ class History {
 
   /**
    * Rolls back the history to the provided target tag and deletes all tags
-   * of the containing channel in between.  Works on the default branch only.
+   * in between.  Works on the default branch only.
    *
    * Note: this assumes that the provided target tag was already updated with
    *       the republished root catalog information.

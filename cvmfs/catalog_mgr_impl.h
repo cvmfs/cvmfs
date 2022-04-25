@@ -1116,7 +1116,7 @@ void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {
     static_cast<char *>(pthread_getspecific(pkey_sqlitemem_));
   if (mem_enforced == NULL) {
     sqlite3_soft_heap_limit(kSqliteMemPerThread);
-    pthread_setspecific(pkey_sqlitemem_, reinterpret_cast<char *>(1));
+    pthread_setspecific(pkey_sqlitemem_, this);
   }
 }
 
