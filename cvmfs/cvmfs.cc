@@ -943,8 +943,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   glue::PageCacheTracker::OpenDirectives open_directives;
   if (!dirent.IsChunkedFile()) {
-    open_directives =
-      mount_point_->page_cache_tracker()->Open(ino, dirent.checksum());
+    if (dirent.IsDirectIo()) {
+      open_directives = mount_point_->page_cache_tracker()->OpenDirect();
+    } else {
+      open_directives =
+        mount_point_->page_cache_tracker()->Open(ino, dirent.checksum());
+    }
     fuse_remounter_->fence()->Leave();
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug,
@@ -1031,9 +1035,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     assert(retval);
 
     fi->fh = static_cast<uint64_t>(-chunk_tables->next_handle);
-    // TODO(jblomer): hash over chunk hashes
-    open_directives = mount_point_->page_cache_tracker()->Open(
-      ino, chunk_reflist.HashChunkList());
+    if (dirent.IsDirectIo()) {
+      open_directives = mount_point_->page_cache_tracker()->OpenDirect();
+    } else {
+      open_directives = mount_point_->page_cache_tracker()->Open(
+        ino, chunk_reflist.HashChunkList());
+    }
     FillOpenFlags(open_directives, fi);
     ++chunk_tables->next_handle;
     chunk_tables->Unlock();

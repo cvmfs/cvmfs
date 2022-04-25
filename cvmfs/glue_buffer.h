@@ -811,6 +811,8 @@ class PageCacheTracker {
     // Defaults to the old (pre v2.10) behavior: always flush the cache, never
     // use direct I/O.
     OpenDirectives() : keep_cache(false), direct_io(false) {}
+
+    OpenDirectives(bool k, bool d) : keep_cache(k), direct_io(d) {}
   };
 
   /**
@@ -853,6 +855,11 @@ class PageCacheTracker {
   ~PageCacheTracker();
 
   OpenDirectives Open(uint64_t inode, const shash::Any &hash);
+  /**
+   * Forced direct I/O open. Used when the corresponding flag is set in the
+   * file catalogs. In this case, we don't need to track the inode.
+   */
+  OpenDirectives OpenDirect() { return OpenDirectives(true, true); }
   void Close(uint64_t inode);
 
   EvictRaii GetEvictRaii() { return EvictRaii(this); }
