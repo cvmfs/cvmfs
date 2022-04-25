@@ -85,6 +85,10 @@ if (ENABLE_ASAN)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 endif (ENABLE_ASAN)
 
+if (ENABLE_SYSTEMD_MOUNT)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_SYSTEMD_MOUNT=1")
+endif (ENABLE_SYSTEMD_MOUNT)
+
 # Check for old Linux version that don't have a complete inotify implementation
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   try_compile(HAS_INOTIFY_INIT1 ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/cmake/check_inotify_init1.c)
