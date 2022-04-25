@@ -1054,7 +1054,14 @@ cvmfs_status() {
 _cvmfs_reload_pause() {
   # Helper function to put a particular repository in sleep mode
   local mountpoint="$1"
+ 
+  if [ "${CVMFS_DEBUGLOG:-unset}" != "unset" ]; then
+    DEBUG_FLAG="--debug"
+  else
+    DEBUG_FLAG=""
+  fi
 
+    return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
   cd "$mountpoint" 2>/dev/null || return
   get_attr fqrn ${mountpoint}; fqrn=$attr_value
   get_attr pid ${mountpoint}; pid=$attr_value
@@ -1066,7 +1073,7 @@ _cvmfs_reload_pause() {
   echo "Pausing ${fqrn} on ${mountpoint}"
   cd "$mountpoint" &&
     rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$mountpoint" | base64_nowrap) && \
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go $DEBUG_FLAG | \
     awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
   cd /
   echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
@@ -1102,9 +1109,15 @@ cvmfs_reload() {
     shift
     cache_directories=$(list_cache_directories)
   elif [ "x$1" != "x" ]; then
+    if [ "${CVMFS_DEBUGLOG:-unset}" != "unset" ]; then
+      DEBUG_FLAG="--debug"
+    else
+      DEBUG_FLAG=""
+    fi
+
     org=$1
     fqrn=$(cvmfs_mkfqrn $org)
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn $DEBUG_FLAG
     return $?
   fi
 

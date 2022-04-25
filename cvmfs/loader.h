@@ -242,6 +242,7 @@ struct CvmfsExports {
 };
 
 Failures Reload(const int fd_progress, const bool stop_and_go);
+Failures Reload(const int fd_progress, const bool stop_and_go, const bool debug);
 
 }  // namespace loader
 

@@ -65,14 +65,15 @@ static void *MainTalk(void *data __attribute__((unused))) {
 
     char command;
     if (recv(con_fd, &command, 1, 0) > 0) {
-      if ((command != 'R') && (command != 'S')) {
+      if ((command != 'R') && (command != 'S') && (command != 'r') && (command != 's')) {
         SendMsg2Socket(con_fd, "unknown command\n");
         continue;
       }
 
       SetLogMicroSyslog(*usyslog_path_);
-      LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module");
-      int retval = Reload(con_fd, command == 'S');
+      bool debug = (command == 'S' || command == 'R');
+      LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module. Debug=%d", debug );
+      int retval = Reload(con_fd, (command == 'S' || command == 's'), debug ); 
       SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
       if (retval != kFailOk) {
@@ -111,7 +112,7 @@ void Fini() {
 /**
  * Connects to a loader socket and triggers the reload
  */
-int MainReload(const std::string &socket_path, const bool stop_and_go) {
+int MainReload(const std::string &socket_path, const bool stop_and_go, const bool debug) {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Connecting to CernVM-FS loader... ");
   int socket_fd = ConnectSocket(socket_path);
@@ -121,7 +122,9 @@ int MainReload(const std::string &socket_path, const bool stop_and_go) {
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-  const char command = stop_and_go ? 'S' : 'R';
+  //S,R if debug=true, s,r if debug=false
+  char command = debug ? (stop_and_go ? 'S' : 'R') : (stop_and_go ? 's' : 'r');
+
   WritePipe(socket_fd, &command, 1);
   char buf;
   int retval;

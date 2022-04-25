@@ -499,7 +499,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   library_name = platform_libname(library_name);
   string error_messages;
 
-  static vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
+  vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
   if (library_paths.empty()) {
     library_paths.push_back(local_lib_path + library_name);
     library_paths.push_back("/usr/lib/"   + library_name);
@@ -546,7 +546,13 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 
 
 Failures Reload(const int fd_progress, const bool stop_and_go) {
+  return Reload( fd_progress, stop_and_go, debug_mode_ );
+}
+ 
+Failures Reload(const int fd_progress, const bool stop_and_go, const bool debug_mode) {
   int retval;
+
+  debug_mode_ = debug_mode;
 
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
   if (!retval)
@@ -669,6 +675,8 @@ int FuseMain(int argc, char *argv[]) {
 
   int retval;
 
+  debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;
+
   // Jump into alternative process flavors (e.g. shared cache manager)
   // We are here due to a fork+execve (ManagedExec in util.cc) or due to
   // utility calls of cvmfs2
@@ -679,7 +687,12 @@ int FuseMain(int argc, char *argv[]) {
       bool stop_and_go = false;
       if ((argc > 3) && (string(argv[3]) == "stop_and_go"))
         stop_and_go = true;
-      retval = loader_talk::MainReload(argv[2], stop_and_go);
+
+      if( !strcmp("--debug", argv[argc-1]) ) {
+        debug_mode_ = true;
+      }
+      retval = loader_talk::MainReload(argv[2], stop_and_go, debug_mode_);
+
       if ((retval != 0) && (stop_and_go)) {
         CreateFile(string(argv[2]) + ".paused.crashed", 0600);
       }
@@ -723,7 +736,6 @@ int FuseMain(int argc, char *argv[]) {
       return 0;
     }
 
-    debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;
     cvmfs_exports_ = LoadLibrary(debug_mode_, NULL);
     if (!cvmfs_exports_)
       return kFailLoadLibrary;
