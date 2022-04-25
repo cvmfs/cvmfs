@@ -815,9 +815,10 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
                      GetRootCatalog() : const_cast<CatalogT *>(entry_point);
   assert(path.StartsWith(parent->mountpoint()));
 
+  unsigned path_len = path.GetLength();
+  unsigned mountpoint_len;
+
   // Try to find path as a super string of nested catalog mount points
-  PathString path_slash(path);
-  path_slash.Append("/", 1);
   perf::Inc(statistics_.n_nested_listing);
   typedef typename CatalogT::NestedCatalogList NestedCatalogList;
   const NestedCatalogList& nested_catalogs =
@@ -826,11 +827,18 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
-    PathString nested_path_slash(i->mountpoint);
-    nested_path_slash.Append("/", 1);
-    if (path_slash.StartsWith(nested_path_slash)) {
+    if (path.StartsWith(i->mountpoint)) {
+      // in this case the path doesn't start with the mountpoint in a file path sense
+      // (e.g. path is /a/bc and mountpoint is /a/b), and will be ignored
+      //
+      // checking it this way allows us to avoid the overhead of constructing more
+      // PathString
+      mountpoint_len = i->mountpoint.GetLength();
+      if (path_len > mountpoint_len && path.GetChars()[mountpoint_len] != '/')
+        continue;
+
       // Found a nested catalog transition point
-      if (!is_listable && (path_slash == nested_path_slash))
+      if (!is_listable && (path_len == mountpoint_len))
         break;
 
       if (leaf_catalog == NULL)
