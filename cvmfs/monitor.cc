@@ -500,7 +500,9 @@ void *Watchdog::MainWatchdogListener(void *data) {
         LogCvmfs(kLogMonitor, kLogDebug | kLogSyslogErr,
                  "watchdog disappeared, disabling stack trace reporting");
         watchdog->SetSignalHandlers(watchdog->old_signal_handlers_);
-        PANIC(kLogDebug | kLogSyslogErr, "watchdog disappeared, aborting");
+        // break out of while(), and end thread, rather than panicking and 
+        // aborting the whole mount process
+        break;
       }
       PANIC(NULL);
     }
@@ -561,6 +563,9 @@ Watchdog::Watchdog(const string &crash_dump_path)
 
 
 Watchdog::~Watchdog() {
+  // prevent a process termination if the watchdog process is dead
+  signal(SIGPIPE, SIG_IGN); 
+
   if (spawned_) {
     // Reset signal handlers
     signal(SIGQUIT, SIG_DFL);
@@ -569,7 +574,6 @@ Watchdog::~Watchdog() {
     signal(SIGFPE, SIG_DFL);
     signal(SIGSEGV, SIG_DFL);
     signal(SIGBUS, SIG_DFL);
-    signal(SIGPIPE, SIG_DFL);
     signal(SIGXFSZ, SIG_DFL);
     free(sighandler_stack_.ss_sp);
     sighandler_stack_.ss_size = 0;
