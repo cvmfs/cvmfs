@@ -443,6 +443,7 @@ class MountPoint : SingleCopy, public BootFactory {
   MagicXattrManager *magic_xattr_mgr() { return magic_xattr_mgr_; }
   bool has_membership_req() { return has_membership_req_; }
   bool enforce_acls() { return enforce_acls_; }
+  std::set<unsigned long>privileged_xattr_gid() { return privileged_xattr_gid_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
@@ -576,6 +577,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool enforce_acls_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
+  std::set<unsigned long>privileged_xattr_gid_;
 
   // TODO(jblomer): this should go in the catalog manager
   std::string membership_req_;

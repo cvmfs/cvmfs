@@ -9,6 +9,8 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <grp.h>
 
 #include <algorithm>
 #include <cassert>
@@ -1685,6 +1687,7 @@ MountPoint::MountPoint(
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
+  privileged_xattr_gid_.insert(0); // root is always permitted
 }
 
 
@@ -1787,6 +1790,24 @@ bool MountPoint::SetupBehavior() {
       return false;
     }
   }
+
+  if (options_mgr_->GetValue("CVMFS_PRIVILEGED_XATTR_GID", &optarg)) {
+    char *buf = strdup(optarg.c_str());
+    const char *token = std::strtok( buf, "," );
+    while(token) {
+      struct group *g = getgrnam( token );
+      if(g) { 
+        unsigned long ii =  g->gr_gid;
+        privileged_xattr_gid_.insert( ii );
+        LogCvmfs(kLogCvmfs, kLogDebug, "Group' %s' / %lu will be allowed to read sensitive xattrs", token, ii );
+      } else {
+        LogCvmfs(kLogCvmfs, kLogDebug, "Group '%s' does not resolve", token );
+      }
+      token = std::strtok( NULL, "," );
+    }
+    free(buf);
+  }
+
 
   return true;
 }

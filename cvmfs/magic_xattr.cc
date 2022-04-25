@@ -129,7 +129,7 @@ void MagicXattrManager::Register(const std::string &name,
   xattr_list_[name] = magic_xattr;
 }
 
-bool AuthzMagicXattr::PrepareValueFenced() {
+bool AuthzMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   return mount_point_->has_membership_req();
 }
 
@@ -141,7 +141,7 @@ MagicXattrFlavor AuthzMagicXattr::GetXattrFlavor() {
   return kXattrAuthz;
 }
 
-bool CatalogCountersMagicXattr::PrepareValueFenced() {
+bool CatalogCountersMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   counters_ =
     mount_point_->catalog_mgr()->LookupCounters(path_, &subcatalog_path_);
   return true;
@@ -154,7 +154,7 @@ std::string CatalogCountersMagicXattr::GetValue() {
   return res;
 }
 
-bool ChunkListMagicXattr::PrepareValueFenced() {
+bool ChunkListMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   chunk_list_ = "hash,offset,size\n";
   if (!dirent_->IsRegular()) {
     return false;
@@ -187,7 +187,7 @@ std::string ChunkListMagicXattr::GetValue() {
   return chunk_list_;
 }
 
-bool ChunksMagicXattr::PrepareValueFenced() {
+bool ChunksMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   if (!dirent_->IsRegular()) {
     return false;
   }
@@ -214,7 +214,7 @@ std::string ChunksMagicXattr::GetValue() {
   return StringifyUint(n_chunks_);
 }
 
-bool CompressionMagicXattr::PrepareValueFenced() {
+bool CompressionMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   return dirent_->IsRegular();
 }
 
@@ -222,7 +222,7 @@ std::string CompressionMagicXattr::GetValue() {
   return zlib::AlgorithmName(dirent_->compression_algorithm());
 }
 
-bool DirectIoMagicXattr::PrepareValueFenced() {
+bool DirectIoMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   return dirent_->IsRegular();
 }
 
@@ -230,12 +230,16 @@ std::string DirectIoMagicXattr::GetValue() {
   return dirent_->IsDirectIo() ? "1" : "0";
 }
 
-bool ExternalFileMagicXattr::PrepareValueFenced() {
+bool ExternalFileMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   return dirent_->IsRegular();
 }
 
 std::string ExternalFileMagicXattr::GetValue() {
   return dirent_->IsExternalFile() ? "1" : "0";
+}
+
+bool ExternalHostMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
+  return (mount_point_->privileged_xattr_gid().count(gid) > 0 );
 }
 
 std::string ExternalHostMagicXattr::GetValue() {
@@ -261,12 +265,16 @@ std::string FqrnMagicXattr::GetValue() {
   return mount_point_->fqrn();
 }
 
-bool HashMagicXattr::PrepareValueFenced() {
+bool HashMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   return !dirent_->checksum().IsNull();
 }
 
 std::string HashMagicXattr::GetValue() {
   return dirent_->checksum().ToString();
+}
+
+bool HostMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
+  return (mount_point_->privileged_xattr_gid().count(gid) > 0 );
 }
 
 std::string HostMagicXattr::GetValue() {
@@ -279,6 +287,10 @@ std::string HostMagicXattr::GetValue() {
   } else {
     return "internal error: no hosts defined";
   }
+}
+
+bool HostListMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
+  return (mount_point_->privileged_xattr_gid().count(gid) > 0 );
 }
 
 std::string HostListMagicXattr::GetValue() {
@@ -299,7 +311,7 @@ std::string HostListMagicXattr::GetValue() {
   return result;
 }
 
-bool LHashMagicXattr::PrepareValueFenced() {
+bool LHashMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   return !dirent_->checksum().IsNull();
 }
 
@@ -351,7 +363,7 @@ std::string NCleanup24MagicXattr::GetValue() {
   }
 }
 
-bool NClgMagicXattr::PrepareValueFenced() {
+bool NClgMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   n_catalogs_ = mount_point_->catalog_mgr()->GetNumCatalogs();
   return true;
 }
@@ -389,6 +401,10 @@ std::string HitrateMagicXattr::GetValue() {
   return StringifyDouble(hitrate);
 }
 
+bool ProxyMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
+  return (mount_point_->privileged_xattr_gid().count(gid) > 0 );
+}
+
 std::string ProxyMagicXattr::GetValue() {
   vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
   unsigned current_group;
@@ -401,7 +417,7 @@ std::string ProxyMagicXattr::GetValue() {
   }
 }
 
-bool PubkeysMagicXattr::PrepareValueFenced() {
+bool PubkeysMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   pubkeys_ = mount_point_->signature_mgr()->GetActivePubkeys();
   return true;
 }
@@ -410,7 +426,7 @@ std::string PubkeysMagicXattr::GetValue() {
   return pubkeys_;
 }
 
-bool RawlinkMagicXattr::PrepareValueFenced() {
+bool RawlinkMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   return dirent_->IsLink();
 }
 
@@ -418,7 +434,7 @@ std::string RawlinkMagicXattr::GetValue() {
   return dirent_->symlink().ToString();
 }
 
-bool RepoCountersMagicXattr::PrepareValueFenced() {
+bool RepoCountersMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   counters_ = mount_point_->catalog_mgr()->GetRootCatalog()->GetCounters();
   return true;
 }
@@ -429,7 +445,7 @@ std::string RepoCountersMagicXattr::GetValue() {
 
 uint64_t RepoMetainfoMagicXattr::kMaxMetainfoLength = 65536;
 
-bool RepoMetainfoMagicXattr::PrepareValueFenced() {
+bool RepoMetainfoMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   if (!mount_point_->catalog_mgr()->manifest()) {
     error_reason_ = "manifest not available";
     return true;
@@ -470,7 +486,7 @@ std::string RepoMetainfoMagicXattr::GetValue() {
   return string(buffer, buffer + bytes_read);
 }
 
-bool RevisionMagicXattr::PrepareValueFenced() {
+bool RevisionMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   revision_ = mount_point_->catalog_mgr()->GetRevision();
   return true;
 }
@@ -479,7 +495,7 @@ std::string RevisionMagicXattr::GetValue() {
   return StringifyUint(revision_);
 }
 
-bool RootHashMagicXattr::PrepareValueFenced() {
+bool RootHashMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   root_hash_ = mount_point_->catalog_mgr()->GetRootHash();
   return true;
 }
@@ -504,7 +520,7 @@ std::string SpeedMagicXattr::GetValue() {
     return StringifyInt((1000 * (rx/1024))/time);
 }
 
-bool TagMagicXattr::PrepareValueFenced() {
+bool TagMagicXattr::PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
   tag_ = mount_point_->repository_tag();
   return true;
 }

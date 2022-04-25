@@ -49,7 +49,7 @@ class BaseMagicXattr {
   * This function is used to obtain the necessary information while
   * inside FuseRemounter::fence(), which should prevent data races.
   */
-  virtual bool PrepareValueFenced() { return true; }
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) { return true; }
   /**
    * This function needs to be called after PrepareValueFenced(),
    * which prepares the necessary data.
@@ -158,7 +158,7 @@ class MagicXattrManager : public SingleCopy {
 };
 
 class AuthzMagicXattr : public BaseMagicXattr {
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
   virtual MagicXattrFlavor GetXattrFlavor();
 };
@@ -167,40 +167,41 @@ class CatalogCountersMagicXattr : public BaseMagicXattr {
   std::string subcatalog_path_;
   catalog::Counters counters_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class ChunkListMagicXattr : public RegularMagicXattr {
   std::string chunk_list_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class ChunksMagicXattr : public RegularMagicXattr {
   uint64_t n_chunks_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class CompressionMagicXattr : public RegularMagicXattr {
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class DirectIoMagicXattr : public RegularMagicXattr {
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class ExternalFileMagicXattr : public RegularMagicXattr {
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class ExternalHostMagicXattr : public BaseMagicXattr {
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
@@ -213,20 +214,22 @@ class FqrnMagicXattr : public BaseMagicXattr {
 };
 
 class HashMagicXattr : public WithHashMagicXattr {
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class HostMagicXattr : public BaseMagicXattr {
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class HostListMagicXattr : public BaseMagicXattr {
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class LHashMagicXattr : public WithHashMagicXattr {
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
@@ -250,7 +253,7 @@ class NCleanup24MagicXattr : public BaseMagicXattr {
 class NClgMagicXattr : public BaseMagicXattr {
   int n_catalogs_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
@@ -275,25 +278,26 @@ class HitrateMagicXattr : public BaseMagicXattr {
 };
 
 class ProxyMagicXattr : public BaseMagicXattr {
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class PubkeysMagicXattr : public BaseMagicXattr {
   std::string pubkeys_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class RawlinkMagicXattr : public SymlinkMagicXattr {
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class RepoCountersMagicXattr : public BaseMagicXattr {
   catalog::Counters counters_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
@@ -303,21 +307,21 @@ class RepoMetainfoMagicXattr : public BaseMagicXattr {
   shash::Any metainfo_hash_;
   std::string error_reason_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class RevisionMagicXattr : public BaseMagicXattr {
   uint64_t revision_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
 class RootHashMagicXattr : public BaseMagicXattr {
   shash::Any root_hash_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 
@@ -332,7 +336,7 @@ class SpeedMagicXattr : public BaseMagicXattr {
 class TagMagicXattr : public BaseMagicXattr {
   std::string tag_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid );
   virtual std::string GetValue();
 };
 

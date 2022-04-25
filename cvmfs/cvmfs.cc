@@ -1365,7 +1365,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   MagicXattrRAIIWrapper magic_xattr(mount_point_->magic_xattr_mgr()->GetLocked(
     attr, path, &d));
   if (!magic_xattr.IsNull()) {
-    magic_xattr_success = magic_xattr->PrepareValueFenced();
+    magic_xattr_success = magic_xattr->PrepareValueFenced(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   }
 
   fuse_remounter_->fence()->Leave();
@@ -1639,7 +1639,7 @@ loader::CvmfsExports *g_cvmfs_exports = NULL;
 class ExpiresMagicXattr : public BaseMagicXattr {
   time_t catalogs_valid_until_;
 
-  virtual bool PrepareValueFenced() {
+  virtual bool PrepareValueFenced( uid_t uid, gid_t gid, pid_t pid ) {
     catalogs_valid_until_ = cvmfs::fuse_remounter_->catalogs_valid_until();
     return true;
   }
