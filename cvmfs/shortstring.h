@@ -87,6 +87,15 @@ class ShortString {
     this->length_ = new_length;
   }
 
+  void Truncate(unsigned char new_length) {
+    assert(new_length <= this->GetLength());
+    if (long_string_) {
+      long_string_->erase(new_length);
+      return;
+    }
+    this->length_ = new_length;
+  }
+
   void Clear() {
     delete long_string_;
     long_string_ = NULL;
