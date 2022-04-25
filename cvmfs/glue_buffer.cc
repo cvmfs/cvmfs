@@ -376,6 +376,17 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   return open_directives;
 }
 
+PageCacheTracker::OpenDirectives PageCacheTracker::OpenDirect() {
+  OpenDirectives open_directives(true, true);
+  // Old behavior: always flush page cache on open
+  if (!is_active_)
+    return open_directives;
+
+  MutexLockGuard guard(lock_);
+  statistics_.n_open_direct++;
+  return open_directives;
+}
+
 void PageCacheTracker::Close(uint64_t inode) {
   if (!is_active_)
     return;

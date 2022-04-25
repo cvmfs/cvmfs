@@ -859,7 +859,7 @@ class PageCacheTracker {
    * Forced direct I/O open. Used when the corresponding flag is set in the
    * file catalogs. In this case, we don't need to track the inode.
    */
-  OpenDirectives OpenDirect() { return OpenDirectives(true, true); }
+  OpenDirectives OpenDirect();
   void Close(uint64_t inode);
 
   EvictRaii GetEvictRaii() { return EvictRaii(this); }
