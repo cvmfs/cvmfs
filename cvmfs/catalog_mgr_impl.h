@@ -828,11 +828,12 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
   {
     // Next nesting level
     if (path.StartsWith(i->mountpoint)) {
-      // in this case the path doesn't start with the mountpoint in a file path sense
+      // in this case the path doesn't start with 
+      // the mountpoint in a file path sense
       // (e.g. path is /a/bc and mountpoint is /a/b), and will be ignored
       //
-      // checking it this way allows us to avoid the overhead of constructing more
-      // PathString
+      // checking it this way allows us to avoid the 
+      // overhead of constructing more PathString
       mountpoint_len = i->mountpoint.GetLength();
       if (path_len > mountpoint_len && path.GetChars()[mountpoint_len] != '/')
         continue;
