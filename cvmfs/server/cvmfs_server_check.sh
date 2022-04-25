@@ -48,7 +48,7 @@ __do_check() {
       echo
       echo "Checking storage integrity of $name ... (may take a while)"
       storage_dir=$(get_upstream_config $upstream)
-      __swissknife scrub -r ${storage_dir}/data || die "FAIL!"
+      __swissknife scrub -r ${storage_dir}/data $(get_swissknife_proxy) || die "FAIL!"
     fi
   fi
 
@@ -114,7 +114,7 @@ __check_repair_reflog() {
 
   local has_reflog=0
   local computed_checksum=
-  if $user_shell "$(__swissknife_cmd) peek -d .cvmfsreflog -r $CVMFS_UPSTREAM_STORAGE" >/dev/null; then
+  if $user_shell "$(__swissknife_cmd) peek -d .cvmfsreflog  $(get_swissknife_proxy) -r $CVMFS_UPSTREAM_STORAGE" >/dev/null; then
     has_reflog=1
     local url="$repository_url/.cvmfsreflog"
     local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $(get_curl_proxy) $url \

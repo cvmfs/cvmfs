@@ -57,7 +57,7 @@ cvmfs_server_alterfs() {
   local success=1
   if is_master_replica $name && [ $master_replica -eq 0 ]; then
     echo -n "Disallowing Replication of this Repository... "
-    __swissknife remove -o ".cvmfs_master_replica" -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
+    __swissknife remove -o ".cvmfs_master_replica" $(get_swissknife_proxy)  -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
     if [ $success -ne 1 ]; then
       echo "fail!"
       return 1
@@ -69,7 +69,7 @@ cvmfs_server_alterfs() {
     local master_replica="${temp_dir}/.cvmfs_master_replica"
     # Azurite does not like direct empty file uploads;
     echo "This file marks the repository as replicatable to stratum 1 servers" > $master_replica
-    __swissknife upload -i $master_replica -o $(basename $master_replica) -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
+    __swissknife upload -i $master_replica -o $(basename $master_replica) $(get_swissknife_proxy) -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
     if [ $success -ne 1 ]; then
       echo "fail!"
       return 1
@@ -343,6 +343,7 @@ cvmfs_server_mkfs() {
       -n $name                                    \
       -a $hash_algo $volatile_opt                 \
       -o ${temp_dir}/new_manifest                 \
+      $(get_swissknife_proxy)                     \
       -R $(get_reflog_checksum $name)"
       if $garbage_collectable; then
           create_cmd="$create_cmd -z"

@@ -17,6 +17,7 @@ __snapshot_cleanup() {
   local user_shell="$(get_user_shell $alias_name)"
   $user_shell "$(__swissknife_cmd) remove     \
                  -r ${CVMFS_UPSTREAM_STORAGE} \
+                 $(get_swissknife_proxy)      \
                  -o .cvmfs_is_snapshotting"       || echo "Warning: failed to remove .cvmfs_is_snapshotting"
 
   release_update_lock $alias_name
@@ -107,7 +108,7 @@ __do_snapshot() {
 
     local initial_snapshot=0
     local initial_snapshot_flag=""
-    if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
+    if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot  $(get_swissknife_proxy) -r ${upstream}" | grep -v -q "available"; then
       initial_snapshot=1
       initial_snapshot_flag="-i"
     fi
@@ -123,6 +124,7 @@ __do_snapshot() {
     $user_shell "date --utc > $snapshotting_tmp"
     $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
       -i $snapshotting_tmp                                 \
+      $(get_swissknife_proxy)                              \
       -o .cvmfs_is_snapshotting"
     $user_shell "rm -f $snapshotting_tmp"
 
@@ -138,6 +140,7 @@ __do_snapshot() {
     is_stratum0_garbage_collectable $alias_name &&
       timestamp_threshold="-Z $gc_timespan"
     $user_shell "$(__swissknife_cmd dbg) pull -m $name \
+        $(get_swissknife_proxy)                        \
         -u $stratum0                                   \
         -w $stratum1                                   \
         -r ${upstream}                                 \
@@ -155,6 +158,7 @@ __do_snapshot() {
     $user_shell "date --utc > $last_snapshot_tmp"
     $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
       -i $last_snapshot_tmp                                \
+      $(get_swissknife_proxy)                              \
       -o .cvmfs_last_snapshot"
     $user_shell "rm -f $last_snapshot_tmp"
     syncfs cautious
@@ -282,7 +286,7 @@ EOF
         continue
       fi
     elif [ $skip_noninitial -eq 1 ]; then
-      if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
+      if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot  $(get_swissknife_proxy) -r ${upstream}" | grep -v -q "available"; then
         continue
       fi
     fi
