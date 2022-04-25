@@ -177,7 +177,11 @@ void CompressInit(z_stream *strm) {
   strm->opaque = Z_NULL;
   strm->next_in = Z_NULL;
   strm->avail_in = 0;
+#if ENABLE_ZLIB_BEST_SPEED==1
+  int retval = deflateInit(strm, Z_BEST_SPEED);
+#else
   int retval = deflateInit(strm, Z_DEFAULT_COMPRESSION);
+#endif
   assert(retval == 0);
 }
 
@@ -877,7 +881,11 @@ ZlibCompressor::ZlibCompressor(const Algorithms &alg)
   stream_.opaque   = Z_NULL;
   stream_.next_in  = Z_NULL;
   stream_.avail_in = 0;
+#if ENABLE_ZLIB_BEST_SPEED==1
+  const int zlib_retval = deflateInit(&stream_, Z_BEST_SPEED);
+#else
   const int zlib_retval = deflateInit(&stream_, Z_DEFAULT_COMPRESSION);
+#endif
   assert(zlib_retval == 0);
 }
 

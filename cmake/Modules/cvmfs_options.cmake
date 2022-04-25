@@ -45,6 +45,9 @@ option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler > 1.11.5
 
 option (BUILD_SNAPSHOTTER       "Build cvmfs_snapshotter, it requires a go compiler > 1.11.5"      OFF)
 
+
+option (ENABLE_ZLIB_BEST_SPEED   "Zlib compression level ON- Best speed: OFF: Default compression" OFF)
+
 if (BUILD_ALL)
   set (BUILD_CVMFS ON)
   set (BUILD_UNITTESTS ON)
