@@ -6,7 +6,9 @@ SSL_VERSION=3.1.2
 CARES_VERSION=1.16.1
 CURL_VERSION=7.71.1
 PACPARSER_VERSION=1.3.5
+ZLIB_NG_VERSION=ng-2.0.6
 ZLIB_VERSION=1.2.8
+
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
 GOOGLETEST_VERSION=1.8.0
@@ -157,10 +159,17 @@ build_lib() {
                                    "fix_python.patch"
       do_build "pacparser"
       ;;
+
     zlib)
       do_extract "zlib"         "zlib-${ZLIB_VERSION}.tar.gz"
       do_build "zlib"
       ;;
+
+    zlib-ng)
+      do_extract "zlib-ng"         "zlib-${ZLIB_NG_VERSION}.tar.gz"
+      do_build "zlib-ng"
+      ;;
+
     sparsehash)
       do_extract "sparsehash"   "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
       patch_external "sparsehash"  "fix_sl4_compilation.patch"          \
@@ -240,7 +249,12 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive"
+missing_libs="libcurl pacparser sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive"
+if [ "$BUILD_ZLIB_NG" == "ON" ]; then
+  missing_libs="zlib-ng $missing_libs"
+else
+  missing_libs="zlib $missing_libs"
+fi
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi

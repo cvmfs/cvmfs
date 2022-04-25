@@ -40,6 +40,8 @@ option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* comman
 # libraries are picked up from the system
 option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party libraries"               ON)
 
+option (BUILD_ZLIB_NG           "Use vendored zlib-ng in place of zlib 1.2.8"                      OFF)
+
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler > 1.11.5"               OFF)
 option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler > 1.11.5"                  OFF)
 
