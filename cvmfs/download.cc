@@ -1238,12 +1238,16 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         shash::Any match_hash;
         shash::Final(info->hash_context, &match_hash);
         if (match_hash != *(info->expected_hash)) {
-          LogCvmfs(kLogDownload, kLogDebug,
-                   "hash verification of %s failed (expected %s, got %s)",
+          if(getenv("CVMFS_IGNORE_SIGNATURE") && !strcmp(getenv("CVMFS_IGNORE_SIGNATURE"), "yes" ) ) {
+            LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "CVMFS: Download hash verification of %s failed, but continuing as CVMFS_IGNORE_SIGNATURE is set", info->url->c_str() );
+          } else {
+            LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
+                   "CVMFS: Download failed: hash verification of %s failed (expected %s, got %s)",
                    info->url->c_str(), info->expected_hash->ToString().c_str(),
                    match_hash.ToString().c_str());
-          info->error_code = kFailBadData;
-          break;
+            info->error_code = kFailBadData;
+            break;
+          }
         }
       }
 
