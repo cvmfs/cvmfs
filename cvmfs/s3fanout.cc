@@ -97,6 +97,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
           return num_bytes;
         case 503:
         case 502:  // Can happen if the S3 gateway-backend connection breaks
+        case 500:  // sometimes see this as a transient error from S3
           info->error_code = kFailServiceUnavailable;
           break;
         case 501:
