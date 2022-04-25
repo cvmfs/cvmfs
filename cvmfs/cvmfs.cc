@@ -248,7 +248,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (ino == catalog_mgr->GetRootInode()) {
     bool retval =
       catalog_mgr->LookupPath(PathString(), catalog::kLookupSole, dirent);
-    assert(retval);
+    if(!retval) {return false;}
     dirent->set_inode(ino);
     mount_point_->inode_cache()->Insert(ino, *dirent);
     return true;
@@ -337,7 +337,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
 
   LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - looking in inode tracker", ino);
   bool retval = mount_point_->inode_tracker()->FindPath(ino, path);
-  assert(retval);
+  if( !retval ){ return false}
   mount_point_->path_cache()->Insert(ino, *path);
   return true;
 }
@@ -1358,7 +1358,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
   if (d.HasXattrs()) {
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
-    assert(retval);
+    if(!retval) { found = false; }
   }
 
   bool magic_xattr_success = true;
@@ -1420,9 +1420,9 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   if (d.HasXattrs()) {
     PathString path;
     bool retval = GetPathForInode(ino, &path);
-    assert(retval);
+    if(!retval) { found=false; }
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
-    assert(retval);
+    if(!retval) { found=false; }
   }
   fuse_remounter_->fence()->Leave();
 
