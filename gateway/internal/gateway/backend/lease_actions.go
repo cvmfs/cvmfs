@@ -206,5 +206,10 @@ func (s *Services) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRo
 		return finalRev, err
 	}
 
+	rr := s.GetRepo(ctx, repository)
+	InvalidateHTTPCaches(ctx, rr, finalRev, newRootHash)
+	SendNotification(ctx, repository, rr, leasePath, newRootHash, tag, finalRev)
+	SendToTelegraf(ctx, rr, repository, finalRev)
+
 	return finalRev, nil
 }

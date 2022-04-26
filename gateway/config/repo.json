@@ -1,5 +1,12 @@
 {
     "version": 2,
+    "keys" : [
+        {
+            "type" : "plain_text",
+            "id" : "example_key",
+            "secret" : "SECRET"
+        }
+    ],
     "repos" : [
         {
             "domain" : "example_repo.domain.org",
@@ -8,14 +15,24 @@
                     "id": "example_key",
                     "path": "/"
                 }
-            ]
-        }
-    ],
-    "keys" : [
-        {
-            "type" : "plain_text",
-            "id" : "example_key",
-            "secret" : "SECRET"
+            ],
+            "events" : {
+                    "broker": [ "server1", "server2", "server3" ],
+                    "username": "kafka-username",
+                    "password": "kafka-password",
+                    "topic":    "kafka-topic"
+             },
+             "http-proxy" : {
+                    "url": "http://proxy-url/",
+                    "proxy_lookup": "http://proxy-lookup-url/",
+                    "username": "proxy-basic-auth-username",
+                    "password": "proxy-basic-auth-password"
+             },
+             "telegraf" : {
+                    "host": "telegraf-host",
+                    "line": "cvmfs_publication,repository=REPOSITORY,revision=REVISION published=1 TIME",
+                    "port": 8092
+             }
         }
     ]
 }

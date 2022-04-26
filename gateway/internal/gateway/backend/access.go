@@ -14,11 +14,37 @@ import (
 // KeyPaths maps from key ID to repository subpath
 type KeyPaths map[string]string
 
+// Kafka config for publishing repo update notifications
+type Events struct {
+	Broker   []string `json:"broker"`
+	Topic    string   `json:"topic"`
+	Username string   `json:"username"`
+	Password string   `json:"password"`
+}
+
+// HTTP Proxy info, for cache invalidation.
+type HTTPProxy struct {
+	URL         string `json:"url"`          // URL to invalidate
+	ProxyLookup string `json:"proxy_lookup"` // genders api lookup to list all DMs, which run varnish proxies
+	Username    string `json:"username"`     // Authn for the vanrish proxies
+	Password    string `json:"password"`     //
+}
+
+type Telegraf struct {
+	Host string `json:"host"`
+	Port int    `json:"port"`
+	Line string `json:"line"`
+}
+
+
 // RepositoryConfig contains the access configuration (registered keys and
 // enabled status) for a repository
 type RepositoryConfig struct {
 	Keys    KeyPaths `json:"keys"`
 	Enabled bool     `json:"enabled"`
+	Events    Events    `json:"events"`
+	HTTPProxy HTTPProxy `json:"http-proxy"`
+	Telegraf  Telegraf  `json:"telegraf"`
 }
 
 // KeyConfig contains the secret part and the enabled status of a key
@@ -47,6 +73,9 @@ type RepositorySpecV2 struct {
 		Admin bool   `json:"admin"`
 		Path  string `json:"path"`
 	} `json:"keys"`
+	Events    Events    `json:"events"`
+	HTTPProxy HTTPProxy `json:"http-proxy"`
+	Telegraf  Telegraf  `json:"telegraf"`
 }
 
 // KeySpec is a gateway key specification from the configuration file
@@ -245,7 +274,10 @@ func (c *AccessConfig) loadV2(cfg rawConfig, importer KeyImportFun) error {
 					ks[k.ID] = k.Path
 				}
 				c.Repositories[spec.Name] = RepositoryConfig{
-					Keys: ks,
+					Keys:      ks,
+					Events:    spec.Events,
+					HTTPProxy: spec.HTTPProxy,
+					Telegraf:  spec.Telegraf,
 				}
 			}
 		}
