@@ -2,10 +2,12 @@ package lib
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -156,6 +158,14 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 		return *img.OCIImage, nil
 	}
 
+	user := img.User
+	pass, err := GetPassword()
+	if err != nil {
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
+		user = ""
+		pass = ""
+	}
+
 	manifest, err := img.GetManifest()
 	if err != nil {
 		l.LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
@@ -163,7 +173,7 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 	}
 	configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
 		img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
-	token, err := firstRequestForAuth(configUrl)
+	token, err := firstRequestForAuth(configUrl, user, pass)
 	if err != nil {
 		l.LogE(err).Warning("Impossible to retrieve the token for getting the changes from the repository, not changes set")
 		return
@@ -174,7 +184,9 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 		l.LogE(err).Warning("Impossible to create a request for getting the changes no chnages set.")
 		return
 	}
-	req.Header.Set("Authorization", token)
+	if token != nil {
+		req.Header.Set("Authorization", *token)
+	}
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 
 	resp, err := client.Do(req)
@@ -257,7 +269,16 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 		Tags []string
 	}
 	url := img.GetTagListUrl()
-	token, err := firstRequestForAuth(url)
+
+	user := img.User
+	pass, err := GetPassword()
+	if err != nil {
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
+		user = ""
+		pass = ""
+	}
+
+	token, err := firstRequestForAuth(url, user, pass)
 	if err != nil {
 		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
 		l.LogE(err).Error(errF)
@@ -266,7 +287,9 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 
 	client := http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", token)
+	if token != nil {
+		req.Header.Set("Authorization", *token)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -357,7 +380,15 @@ func (i *Image) GetPublicSymlinkPath() string {
 func (img *Image) getByteManifest() ([]byte, error) {
 	url := img.GetManifestUrl()
 
-	token, err := firstRequestForAuth(url)
+	user := img.User
+	pass, err := GetPassword()
+	if err != nil {
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
+		user = ""
+		pass = ""
+	}
+
+	token, err := firstRequestForAuth(url, user, pass)
 	if err != nil {
 		l.LogE(err).Error("Error in getting the authentication token")
 		return nil, err
@@ -370,7 +401,9 @@ func (img *Image) getByteManifest() ([]byte, error) {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", token)
+	if token != nil {
+		req.Header.Set("Authorization", *token)
+	}
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 
 	resp, err := client.Do(req)
@@ -387,55 +420,18 @@ func (img *Image) getByteManifest() ([]byte, error) {
 	return body, nil
 }
 
-type Credentials struct {
-	username string
-	password string
-}
-
-func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
-	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
-	for _, r := range strings.Split(regs, ",") {
-		if r == "" {
-			continue
-		}
-
-		iEnv := "DUCC_" + r + "_IDENT"
-		uEnv := "DUCC_" + r + "_USER"
-		uPass := "DUCC_" + r + "_PASS"
-		ident := os.Getenv(iEnv)
-		user := os.Getenv(uEnv)
-		pass := os.Getenv(uPass)
-		if user == "" || pass == "" || ident == "" {
-			err = fmt.Errorf("missing either $%s or $%s or $%s", uEnv, uPass, iEnv)
-			return "", err;
-		}
-
-		if (!strings.Contains(url, ident)) {
-			continue
-		}
-
-		return firstRequestForAuth_internal(url, user, pass)
-	}
-	return firstRequestForAuth_internal(url, "", "")
-}
-
-func firstRequestForAuth(url string) (token string, err error) {
-	credentials := []Credentials{}
-	return GetAuthToken(url, credentials)
-}
-
-func firstRequestForAuth_internal(url, user, pass string) (token string, err error) {
+func firstRequestForAuth(url, user, pass string) (token *string, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		l.LogE(err).Error("Error in making the first request for auth")
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 300 && resp.StatusCode >= 200 {
 		log.WithFields(log.Fields{
 			"status code": resp.StatusCode,
 		}).Info("Return valid response, token not necessary.")
-		return
+		return nil, err
 	}
 	if resp.StatusCode != 401 {
 		log.WithFields(log.Fields{
@@ -446,28 +442,28 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 			l.LogE(err).Error("Error in reading the first http response")
 		}
 		fmt.Println(string(body))
-		return "", err
+		return nil, err
 	}
 	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
 	// we first try to get the token with the authentication
 	// if we fail, and we might since the docker hub might not have our user
 	// we try again without authentication
-	token, err = requestAuthToken(WwwAuthenticate, user, pass)
+	stoken, err := requestAuthToken(WwwAuthenticate, user, pass)
 	if err == nil {
 		// happy path
-		return token, nil
+		return &stoken, nil
 	}
 	fmt.Printf("We failed with authentication and we now go without for %s\n", url)
 	// some error, we should retry without auth
 	if user != "" || pass != "" {
-		token, err = requestAuthToken(WwwAuthenticate, "", "")
+		stoken, err := requestAuthToken(WwwAuthenticate, "", "")
 		if err == nil {
 			// happy path without auth
-			return token, nil
+			return &stoken, nil
 		}
 	}
 	l.LogE(err).Error("Error in getting the authentication token")
-	return "", err
+	return nil, err
 }
 
 func getLayerUrl(img *Image, layerDigest string) string {
@@ -533,7 +529,15 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	defer close(manifestChan)
 
 	layerDownloader := NewLayerDownloader(img)
-	_, err := layerDownloader.getToken()
+
+	user := img.User
+	pass, err := GetPassword()
+	if err != nil {
+		l.LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
+		user = ""
+		pass = ""
+	}
+	_, err = layerDownloader.getToken(user, pass)
 	if err != nil {
 		return err
 	}
@@ -619,14 +623,65 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	}
 }
 
-func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloadedLayer, err error) {
+func (img *Image) downloadLayer(layer da.Layer, token *string) (toSend downloadedLayer, err error) {
 	layerUrl := getLayerUrl(img, layer.Digest)
-	if token == "" {
-		token, err = firstRequestForAuth(layerUrl)
+
+	user := img.User
+	pass, err := GetPassword()
+	if err != nil {
+		l.LogE(err).Warning("Unable to retrieve the password, trying to get the layers anonymously.")
+		user = ""
+		pass = ""
+	}
+
+	if token != nil && *token == "" {
+		token, err = firstRequestForAuth(layerUrl, user, pass)
 		if err != nil {
 			return
 		}
 	}
+
+	contentLength := 0
+	acceptRanges := false
+
+	for i := 0; i <= 5; i++ {
+		var resp *http.Response
+		var req *http.Request
+		err = nil
+		client := &http.Client{}
+		req, err = http.NewRequest("HEAD", layerUrl, nil)
+		if err != nil {
+			l.LogE(err).Error("Impossible to create the HTTP request.")
+			break
+		}
+		if token != nil {
+			req.Header.Set("Authorization", *token)
+		}
+		resp, err = client.Do(req)
+
+		resp.Body.Close()
+
+		if 200 <= resp.StatusCode && resp.StatusCode < 300 {
+			acceptRanges = resp.Header.Get("Accept-Ranges") == "bytes"
+			if resp.ContentLength > int64((^uint(0))>>1) {
+				err = fmt.Errorf("Layer too big: %v bytes", resp.ContentLength)
+				return
+			}
+
+			contentLength = int(resp.ContentLength)
+			break
+		} else {
+			err = fmt.Errorf("Layer header not received, status code: %d", resp.StatusCode)
+		}
+	}
+
+	if err != nil {
+		return
+	}
+
+	setRange := acceptRanges && (contentLength >= 0)
+	layerData := []byte{}
+
 	for i := 0; i <= 5; i++ {
 		err = nil
 		client := &http.Client{}
@@ -636,39 +691,58 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			err = errR
 			break
 		}
-		req.Header.Set("Authorization", token)
+		if token != nil {
+			req.Header.Set("Authorization", *token)
+		}
+		if setRange {
+			req.Header.Set("Range", fmt.Sprintf("bytes=%v-%v", len(layerData), contentLength-1))
+		}
 		resp, errReq := client.Do(req)
 		l.Log().WithFields(
-			log.Fields{"layer": layer.Digest, "size in MB": (layer.Size / 1e6)}).
+			log.Fields{"layer": layer.Digest, "try": i, "size in MB": (layer.Size / 1e6)}).
 			Info("Make request for layer")
 		if errReq != nil {
 			err = errReq
-			break
+			l.LogE(err).Warn("GET request failed: retrying")
+			resp.Body.Close()
+			continue
 		}
 		if 200 <= resp.StatusCode && resp.StatusCode < 300 {
-			gread, errG := gzip.NewReader(resp.Body)
-			if errG != nil {
-				err = errG
-				l.LogE(err).Warning("Error in creating the zip to unzip the layer")
+			read, err := ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				if err != io.ErrUnexpectedEOF {
+					l.LogE(err).Warn("read body: retrying due to error")
+				} else {
+					l.LogE(err).Warn("read body: unexpected EOF: retrying")
+					if setRange {
+						layerData = append(layerData, read...)
+					}
+				}
+
 				continue
 			}
+
+			layerData = append(layerData, read...)
+
+			if (contentLength >= 0) && (len(layerData) != contentLength) {
+				layerData = nil
+				continue
+			}
+
+			gread, err := gzip.NewReader(bytes.NewReader(layerData))
+			if err != nil {
+				l.LogE(err).Warning("error in creating the zip to unzip the layer: retryin")
+				continue
+			}
+
 			path := NewReadAndHash(gread)
 			toSend = newDownloadedLayer(layer.Digest, path)
 			return toSend, nil
-		} else {
-			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
-			l.LogE(err).Warning("Received status code ", resp.StatusCode)
-			if resp.StatusCode == 401 {
-				// try to get the token again
-				newToken, errToken := firstRequestForAuth(layerUrl)
-				if errToken != nil {
-					l.LogE(errToken).Warning("Error in refreshing the token")
-				} else {
-					token = newToken
-				}
-			}
 		}
+		err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
 	}
+
 	l.LogE(err).Warning("return from error path")
 	return
 }
@@ -752,11 +826,11 @@ func NewLayerDownloader(image *Image) LayerDownloader {
 	return LayerDownloader{image: image, token: "", attempts: make(map[string]int)}
 }
 
-func (ld *LayerDownloader) getToken() (token string, err error) {
+func (ld *LayerDownloader) getToken(user string, pass string) (token *string, err error) {
 	ld.lock.Lock()
 	defer ld.lock.Unlock()
 	if ld.token != "" {
-		return ld.token, nil
+		return &(ld.token), nil
 	}
 	manifest, err := ld.image.GetManifest()
 	if err != nil {
@@ -765,16 +839,23 @@ func (ld *LayerDownloader) getToken() (token string, err error) {
 
 	firstLayer := manifest.Layers[0]
 	layerUrl := getLayerUrl(ld.image, firstLayer.Digest)
-	token, err = firstRequestForAuth(layerUrl)
+	token, err = firstRequestForAuth(layerUrl, user, pass)
 	if err != nil {
 		return
 	}
-	ld.token = token
+	ld.token = *token
 	return
 }
 
 func (ld *LayerDownloader) DownloadLayer(layer da.Layer) (downloadedLayer, error) {
-	token, err := ld.getToken()
+	user := ld.image.User
+	pass, err := GetPassword()
+	if err != nil {
+		l.LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
+		user = ""
+		pass = ""
+	}
+	token, err := ld.getToken(user, pass)
 	if err != nil {
 		return downloadedLayer{}, err
 	}
