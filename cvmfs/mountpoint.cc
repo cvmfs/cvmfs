@@ -235,6 +235,15 @@ void FileSystem::CreateStatistics() {
                   "Number of currently opened directories");
   io_error_info_.SetCounter(statistics_->Register("cvmfs.n_io_error",
                                                   "Number of I/O errors"));
+  n_eio_total_ =  statistics_->Register("eio.total", "EIO returned to calling process. Sum of individual eio counters");
+  n_eio_01_ =  statistics_->Register("eio.01", "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
+  n_eio_02_ =  statistics_->Register("eio.02", "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
+  n_eio_03_ =  statistics_->Register("eio.03", "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
+  n_eio_04_ =  statistics_->Register("eio.04", "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_05_ =  statistics_->Register("eio.05", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_06_ =  statistics_->Register("eio.06", "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_07_ =  statistics_->Register("eio.07", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_08_ =  statistics_->Register("eio.08", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -377,6 +386,15 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_fs_forget_(NULL)
   , no_open_files_(NULL)
   , no_open_dirs_(NULL)
+  , n_eio_total_(NULL)
+  , n_eio_01_(NULL)
+  , n_eio_02_(NULL)
+  , n_eio_03_(NULL)
+  , n_eio_04_(NULL)
+  , n_eio_05_(NULL)
+  , n_eio_06_(NULL)
+  , n_eio_07_(NULL)
+  , n_eio_08_(NULL)
   , statistics_(NULL)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
@@ -551,6 +569,15 @@ string FileSystem::MkCacheParm(
 
 void FileSystem::ResetErrorCounters() {
   io_error_info_.Reset();
+  n_eio_total_->Set(0);
+  n_eio_01_->Set(0);
+  n_eio_02_->Set(0);
+  n_eio_03_->Set(0);
+  n_eio_04_->Set(0);
+  n_eio_05_->Set(0);
+  n_eio_06_->Set(0);
+  n_eio_07_->Set(0);
+  n_eio_08_->Set(0);
 }
 
 
