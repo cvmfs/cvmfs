@@ -131,6 +131,7 @@ set (CVMFS_FUSE_SOURCES
   nfs_maps_leveldb.cc
   nfs_maps_sqlite.cc
   notification_client.cc
+  kafka_notification_client.cc
   notify/messages.cc
   notify/subscriber_supervisor.cc
   notify/subscriber_sse.cc
@@ -642,7 +643,7 @@ if(BUILD_RECEIVER)
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
   target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                        ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
+                        ${RDKAFKA_LIBRARY} ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
                         ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
 
@@ -652,7 +653,7 @@ if(BUILD_RECEIVER)
   if(BUILD_RECEIVER_DEBUG)
     add_executable(cvmfs_receiver_debug ${CVMFS_RECEIVER_SOURCES})
     target_link_libraries(cvmfs_receiver_debug
-                          ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                          ${RDKAFKA_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                           ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
                           ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
                           ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
@@ -761,7 +762,8 @@ if (BUILD_CVMFS)
                                         ${PROTOBUF_LITE_LIBRARY}
                                         ${VJSON_LIBRARIES}
                                         ${RT_LIBRARY}
-                                        ${UUID_LIBRARIES})
+                                        ${UUID_LIBRARIES}
+                                        ${RDKAFKA_LIBRARY})
   list (APPEND CVMFS_FUSE_LINK_LIBRARIES pthread dl)
 
   target_link_libraries(cvmfs2 pthread dl)
@@ -907,7 +909,7 @@ if (BUILD_LIBCVMFS)
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
   add_dependencies(test_libcvmfs libcvmfs)
 
-  list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
+  list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${RDKAFKA_LIBRARY}
                                  ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES}
                                  ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
 
@@ -923,7 +925,7 @@ if (BUILD_LIBCVMFS)
                           ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                           ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                           ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                          ${PROTOBUF_LITE_LIBRARY}
+                          ${PROTOBUF_LITE_LIBRARY} ${RDKAFKA_LIBRARY}
                           ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl
                           )
 
@@ -941,7 +943,7 @@ if (BUILD_SHRINKWRAP)
                         ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                         ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
                         ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                        ${PROTOBUF_LITE_LIBRARY}
+                        ${PROTOBUF_LITE_LIBRARY} ${RDKAFKA_LIBRARY}
                         ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
 
   set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
@@ -983,6 +985,7 @@ if (BUILD_SERVER)
                                              ${CAP_LIBRARIES}
                                              ${LibArchive_LIBRARY}
                                              ${RT_LIBRARY}
+                                             ${RDKAFKA_LIBRARY}
                                              pthread dl)
   target_link_libraries (cvmfs_swissknife
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
@@ -996,7 +999,7 @@ if (BUILD_SERVER)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_SOURCES})
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS} -DDEBUGMSG -g -O0" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
     target_link_libraries (cvmfs_swissknife_debug
-                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
+                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${RDKAFKA_LIBRARY}
                            ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${ZLIB_LIBRARIES}
                            ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                            ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
@@ -1023,7 +1026,7 @@ if (BUILD_PRELOADER)
                         ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${RT_LIBRARY}
                         ${UUID_LIBRARIES} ${VJSON_LIBRARIES} ${SHA3_LIBRARIES}
-                        pthread dl)
+                        ${RDKAFKA_LIBRARY} pthread dl)
 endif (BUILD_PRELOADER)
 
 #

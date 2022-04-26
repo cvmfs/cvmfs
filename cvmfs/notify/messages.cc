@@ -42,6 +42,24 @@ void Activity::ToJSONString(std::string* s) {
        repository_ + "\", \"manifest\" : \"" + Base64(manifest_) + "\"}";
 }
 
+bool Activity::FromJSONStringKafka( const std::string& s ) {
+  const UniquePtr<JsonDocument> m(JsonDocument::Create(s));
+  if (!m.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogError, "Could not create JSON document.");
+    return false;
+  }
+  if (!GetFromJSON(m->root(), "repository", &repository_)) {
+    LogCvmfs(kLogCvmfs, kLogError, "Could not read repository.");
+    return false;
+  }
+
+  if (!GetFromJSON(m->root(), "revision", &version_)) {
+    LogCvmfs(kLogCvmfs, kLogError, "Could not read revision.");
+    return false;
+  }
+	return true;
+}
+
 bool Activity::FromJSONString(const std::string& s) {
   const UniquePtr<JsonDocument> m(JsonDocument::Create(s));
   if (!m.IsValid()) {

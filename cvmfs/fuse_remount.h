@@ -55,6 +55,7 @@ class FuseRemounter : SingleCopy {
   Status Check();
   Status CheckSynchronously();
   Status ChangeRoot(const shash::Any &root_hash);
+  int GetRevision(void);
   void TryFinish(const shash::Any &root_hash = shash::Any());
   void EnterMaintenanceMode();
   bool IsCaching() {

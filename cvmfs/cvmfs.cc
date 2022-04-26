@@ -95,6 +95,7 @@
 #include "mountpoint.h"
 #include "nfs_maps.h"
 #include "notification_client.h"
+#include "kafka_notification_client.h"
 #include "options.h"
 #include "platform.h"
 #include "quota_listener.h"
@@ -121,6 +122,7 @@ FileSystem *file_system_ = NULL;
 MountPoint *mount_point_ = NULL;
 TalkManager *talk_mgr_ = NULL;
 NotificationClient *notification_client_ = NULL;
+KafkaNotificationClient *kafka_notification_client_ = NULL;
 Watchdog *watchdog_ = NULL;
 FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
@@ -1863,6 +1865,35 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
 
+  // Kafka notification system client
+{
+    OptionsManager* options = cvmfs::file_system_->options_mgr();
+    if ( options->IsDefined("CVMFS_KAFKA_BROKER")
+			&&  options->IsDefined("CVMFS_KAFKA_USERNAME")
+			&&  options->IsDefined("CVMFS_KAFKA_PASSWORD")
+			&&  options->IsDefined("CVMFS_KAFKA_TOPIC")
+		) {
+      std::string broker;
+      options->GetValue("CVMFS_KAFKA_BROKER", &broker );
+      std::string username;
+      options->GetValue("CVMFS_KAFKA_USERNAME", &username );
+      std::string password;
+      options->GetValue("CVMFS_KAFKA_PASSWORD", &password );
+      std::string topic;
+      options->GetValue("CVMFS_KAFKA_TOPIC", &topic );
+
+      const std::string repo_name = cvmfs::mount_point_->fqrn();
+      cvmfs::kafka_notification_client_ =
+          new KafkaNotificationClient( broker, username, password, topic, repo_name, cvmfs::fuse_remounter_,
+                                 cvmfs::mount_point_->download_mgr(),
+                                 cvmfs::mount_point_->signature_mgr());
+        LogCvmfs(kLogCvmfs, kLogDebug, "Listening for kafka notifications");
+    } else {
+        LogCvmfs(kLogCvmfs, kLogDebug, "Not listening for kafka notifications");
+    }
+  }
+
+
 
   auto_umount::SetMountpoint(loader_exports->mount_point);
 
@@ -1910,6 +1941,10 @@ static void Spawn() {
     cvmfs::notification_client_->Spawn();
   }
 
+  if (cvmfs::kafka_notification_client_ != NULL) {
+    cvmfs::kafka_notification_client_->Spawn();
+  }
+
   if (cvmfs::file_system_->nfs_maps() != NULL)
     cvmfs::file_system_->nfs_maps()->Spawn();
 
@@ -1935,6 +1970,9 @@ static void ShutdownMountpoint() {
 
   delete cvmfs::notification_client_;
   cvmfs::notification_client_ = NULL;
+
+  delete cvmfs::kafka_notification_client_;
+  cvmfs::kafka_notification_client_ = NULL;
 
   // The remonter has a reference to the mount point and the inode generation
   delete cvmfs::fuse_remounter_;

@@ -23,6 +23,7 @@ class Message {
  public:
   virtual void ToJSONString(std::string* s) = 0;
   virtual bool FromJSONString(const std::string& s) = 0;
+  virtual bool FromJSONStringKafka(const std::string& s) = 0;
 
   virtual ~Message() {}
 };
@@ -42,6 +43,7 @@ class Activity : public Message {
 
   virtual void ToJSONString(std::string* s);
   virtual bool FromJSONString(const std::string& s);
+  virtual bool FromJSONStringKafka(const std::string& s);
 
   int version_;
   std::string timestamp_;

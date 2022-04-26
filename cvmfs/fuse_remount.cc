@@ -357,3 +357,5 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
 
   LeaveCriticalSection();
 }
+
+int FuseRemounter::GetRevision(void) { return mountpoint_->catalog_mgr()->GetRevision(); }

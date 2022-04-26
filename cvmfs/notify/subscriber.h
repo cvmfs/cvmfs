@@ -18,6 +18,7 @@ class Subscriber {
     kContinue,
     kFinish,
     kError,
+    kNothingToDo,
   };
 
   Subscriber() {}
