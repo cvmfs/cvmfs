@@ -437,6 +437,13 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
       goto lookup_reply_error;
   }
 
+  if(dirent.IsLink()) {
+    // read the link. If it's a symlink off the CVMFS FS, then set the attribute cache time to 0
+    if( dirent.symlink().c_str()[0]=='/' ) {
+      result.entry_timeout = 0;
+    }
+  }
+
  lookup_reply_positive:
   if (!file_system_->IsNfsSource())
     mount_point_->inode_tracker()->VfsGet(dirent.inode(), path);
