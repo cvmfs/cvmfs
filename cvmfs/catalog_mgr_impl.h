@@ -665,6 +665,7 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   ReadLock();
   const uint64_t revision = revision_cache_;
   Unlock();
+  statistics_.catalog_revision->Set( revision );
   return revision;
 }
 

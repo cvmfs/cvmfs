@@ -8,10 +8,15 @@
 #include <cassert>
 
 #include "json_document_write.h"
+#include "options.h"
 #include "platform.h"
 #include "smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h> 
 
 using namespace std;  // NOLINT
 
@@ -150,8 +155,63 @@ Statistics::Statistics() {
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
+  send_stats_thread_ = NULL;
+  shutdown_ = false;
+
 }
 
+void Statistics::Spawn( std::string fqrn, OptionsManager *options_mgr_ ) {
+  int params=0;
+
+  repo_name_ = fqrn;
+  if (options_mgr_->GetValue("CVMFS_TELEGRAF_HOST", &telegraf_host_)) {
+      params++;
+  }
+
+  std::string opt;
+  if (options_mgr_->GetValue("CVMFS_TELEGRAF_PORT", &opt)) {
+      telegraf_port_ = atoi( opt.c_str() );
+      if(telegraf_port_>0 && telegraf_port_<65536) {
+        params++;
+      } else {
+        LogCvmfs(kLogCvmfs, kLogDebug, "Invalid value for CVMFS_TELEGRAF_PORT [%s]", opt.c_str() );
+      }
+  }
+
+  if (options_mgr_->GetValue("CVMFS_TELEGRAF_METRIC_NAME", &telegraf_metric_name_)) {
+      params++;
+  }
+
+  if(!options_mgr_->GetValue("CVMFS_TELEGRAF_EXTRA", &telegraf_extra_)) {
+    telegraf_extra_="";
+  }
+
+
+  if(params==3) {
+    LogCvmfs( kLogCvmfs, kLogDebug, "Enabling telegraf metrics. Send to [%s:%d] metric [%s]. Extra [%s]", telegraf_host_.c_str(), telegraf_port_, telegraf_metric_name_.c_str(), telegraf_extra_.c_str() );
+
+    send_stats_thread_ = (pthread_t*) smalloc(sizeof(pthread_t));
+    pthread_create(send_stats_thread_,  NULL, Statistics::Run, this );
+  } else {
+    send_stats_thread_ = NULL;
+    LogCvmfs( kLogCvmfs, kLogDebug, "Not enabling telegraf metrics. Not all variables set");
+  }
+}
+
+void* Statistics::Run(void* data) {
+  Statistics* cl = static_cast<Statistics*>(data);
+  int ctr=0;
+  const int SEND_INTERVAL = 10; // 10 seconds between sends
+  while(!cl->shutdown_) {
+    if(!(ctr % SEND_INTERVAL) ) {
+       cl->SendToTelegraf();
+
+    }
+    ctr++;
+    sleep(1);
+  }
+  return NULL;
+}
 
 Statistics::~Statistics() {
   for (map<string, CounterInfo *>::iterator i = counters_.begin(),
@@ -163,7 +223,91 @@ Statistics::~Statistics() {
   }
   pthread_mutex_destroy(lock_);
   free(lock_);
+
+  if(send_stats_thread_) {
+    shutdown_ = true;
+    pthread_join( *send_stats_thread_, NULL );
+    send_stats_thread_=NULL;
+  }
 }
+
+int Statistics::SendToTelegraf( void ) {
+
+    const char * hostname = telegraf_host_.c_str();
+    int    port     = telegraf_port_;
+
+    struct addrinfo hints, *res;
+    struct sockaddr_in *s=NULL;
+    int err;
+
+    memset (&hints, 0, sizeof (hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    err = getaddrinfo (telegraf_host_.c_str(), NULL, &hints, &res);
+    if (err!=0 || res==NULL) {
+       LogCvmfs(kLogCvmfs, kLogDebug, "Failed to resolve telegraf server [%s]. errno=%d", hostname, errno );
+       return 1;
+    }
+
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0)  {
+       LogCvmfs(kLogCvmfs, kLogDebug, "Failed to open socket");
+       freeaddrinfo(res);
+       return 2;
+    }
+
+    s = (struct sockaddr_in *) res->ai_addr;
+    s->sin_port = htons(port);
+
+    std::string payload = MakePayload();
+    int n = sendto(sockfd, payload.c_str(), strlen(payload.c_str()), 0, (struct sockaddr*)s, sizeof(struct sockaddr_in) );
+
+    if (n < 0)  {
+      close(sockfd);
+      freeaddrinfo(res);
+      LogCvmfs(kLogCvmfs, kLogDebug, "Failed to send to telegraf. errno=%d", errno );
+      return 3;
+    }
+
+    close(sockfd);
+    freeaddrinfo(res);
+
+    LogCvmfs(kLogCvmfs, kLogDebug, "TELEGRAF: POSTING [%s]", payload.c_str() );
+    return 0;
+}
+
+std::string Statistics::MakePayload(void) {
+  char buf[100];
+
+  MutexLockGuard lock_guard(lock_);
+
+  uint64_t revision = counters_["catalog_revision"]->counter.Get();
+  sprintf( buf, "%lu", revision);
+  std::string ret= "" + telegraf_metric_name_ + ",repo=" + repo_name_ + " ";
+
+  std::string tok= "";
+  for(map<string,CounterInfo*>::const_iterator it = counters_.begin(), iEnd = counters_.end(); it!=iEnd; it++ ) {
+    int64_t value = it->second->counter.Get();
+    if ( value != 0 ) {
+      sprintf(buf, "%ld", value );
+      if( it->first == "catalog_revision" ) {
+        ret += tok + it->first + "=" + std::string(buf);
+      } else {
+        ret += tok + it->first + "_delta=" + std::string(buf);
+        it->second->counter.Xadd(-value);
+      }
+      tok=",";
+    }
+  }
+  if ( telegraf_extra_ != "" ) {
+    ret+= tok+telegraf_extra_;
+  }
+  return ret;
+
+}
+
+
 
 
 //------------------------------------------------------------------------------

@@ -1914,6 +1914,10 @@ static void Spawn() {
     cvmfs::file_system_->nfs_maps()->Spawn();
 
   cvmfs::file_system_->cache_mgr()->Spawn();
+
+  cvmfs::mount_point_->statistics()->Spawn( 
+       cvmfs::mount_point_->fqrn(), 
+       cvmfs::mount_point_->file_system()->options_mgr());
 }
 
 

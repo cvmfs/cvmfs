@@ -110,8 +110,9 @@ FuseRemounter::Status FuseRemounter::Check() {
       return (retval == catalog::kLoadFail) ?
              kStatusFailGeneral : kStatusFailNoSpace;
     case catalog::kLoadUp2Date: {
+      uint64_t revision = mountpoint_->catalog_mgr()->GetRevision();
       LogCvmfs(kLogCvmfs, kLogDebug,
-               "catalog up to date (could be offline mode)");
+               "catalog up to date (could be offline mode) at revision %lu", revision);
       SetOfflineMode(mountpoint_->catalog_mgr()->offline_mode());
       unsigned ttl = offline_mode_ ?
         MountPoint::kShortTermTTL : mountpoint_->GetEffectiveTtlSec();

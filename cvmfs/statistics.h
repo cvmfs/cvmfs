@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "atomic.h"
+#include "options.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -72,6 +73,9 @@ class Statistics {
   std::string LookupDesc(const std::string &name);
   std::string PrintList(const PrintOptions print_options);
   std::string PrintJSON();
+  int SendToTelegraf(void);
+  void Spawn( std::string fqrn, OptionsManager *options_mgr );
+  static void* Run(void* instance);
 
  private:
   Statistics(const Statistics &other);
@@ -87,6 +91,15 @@ class Statistics {
   };
   std::map<std::string, CounterInfo *> counters_;
   mutable pthread_mutex_t *lock_;
+  std::string MakePayload(void);
+
+  std::string telegraf_host_;
+  int         telegraf_port_;
+  std::string telegraf_metric_name_;
+  std::string telegraf_extra_;
+  std::string repo_name_;
+  pthread_t *send_stats_thread_;
+  bool shutdown_;
 };
 
 
