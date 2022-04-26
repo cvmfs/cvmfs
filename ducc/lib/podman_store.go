@@ -329,8 +329,14 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
 		configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
 			img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
-
-		token, err := firstRequestForAuth(configUrl)
+		user := img.User
+		pass, err := GetPassword()
+		if err != nil {
+			l.LogE(err).Warning("Unable to get the credential for downloading the configuration blog, trying anonymously")
+			user = ""
+			pass = ""
+		}
+		token, err := firstRequestForAuth(configUrl, user, pass)
 		if err != nil {
 			l.LogE(err).Warning("Unable to retrieve the token for downloading config file")
 			return err
@@ -342,7 +348,9 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 			l.LogE(err).Warning("Unable to create a request for getting config file.")
 			return err
 		}
-		req.Header.Set("Authorization", token)
+		if token != nil {
+			req.Header.Set("Authorization", *token)
+		}
 		req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 
 		resp, err := client.Do(req)
