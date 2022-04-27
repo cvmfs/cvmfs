@@ -1556,6 +1556,22 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
           "libfuse, aborting");
 #endif
   }
+
+  if ( mount_point_->cache_symlinks() ) {
+#if FUSE_VERSION >= 310
+    if( (conn->capable & FUSE_CAP_CACHE_SYMLINK) == 0 ) {
+      PANIC(kLogDebug | kLogSyslogErr,
+           "Symlink caching requested but missing fuse kernel support, "
+           "aborting");
+    }
+    conn->want |= FUSE_CAP_CACHE_SYMLINK;
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "enabling symlink caching");
+#else
+    PANIC(kLogDebug | kLogSyslogErr,
+           "Symlink caching requested but libfuse too old (>=3.10.0 required)" );
+#endif
+  }
+
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {

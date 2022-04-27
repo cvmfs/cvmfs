@@ -1678,6 +1678,7 @@ MountPoint::MountPoint(
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
   , enforce_acls_(false)
+  , cache_symlinks_(false)
   , has_membership_req_(false)
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
   , talk_socket_uid_(0)
@@ -1775,6 +1776,14 @@ bool MountPoint::SetupBehavior() {
   {
     enforce_acls_ = true;
   }
+
+  if (options_mgr_->GetValue("CVMFS_CACHE_SYMLINKS", &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    cache_symlinks_ = true;
+  }
+
+
 
   if (options_mgr_->GetValue("CVMFS_TALK_SOCKET", &optarg)) {
     talk_socket_path_ = optarg;

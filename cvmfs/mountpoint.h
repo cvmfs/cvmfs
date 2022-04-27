@@ -443,6 +443,7 @@ class MountPoint : SingleCopy, public BootFactory {
   MagicXattrManager *magic_xattr_mgr() { return magic_xattr_mgr_; }
   bool has_membership_req() { return has_membership_req_; }
   bool enforce_acls() { return enforce_acls_; }
+  bool cache_symlinks() { return cache_symlinks_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
@@ -574,6 +575,7 @@ class MountPoint : SingleCopy, public BootFactory {
   double kcache_timeout_sec_;
   bool fixed_catalog_;
   bool enforce_acls_;
+  bool cache_symlinks_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
 
