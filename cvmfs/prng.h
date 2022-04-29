@@ -11,7 +11,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-#include <limits>
+#include <limits> // NOLINT
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
