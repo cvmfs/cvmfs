@@ -5,7 +5,7 @@ set -e
 SSL_VERSION=3.1.2
 CARES_VERSION=1.16.1
 CURL_VERSION=7.71.1
-PACPARSER_VERSION=1.3.5
+PACPARSER_VERSION=1.4.0
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
@@ -169,10 +169,8 @@ build_lib() {
       do_build "libcurl"
       ;;
     pacparser)
-      do_extract "pacparser"    "pacparser-${PACPARSER_VERSION}.tar.gz"
-      patch_external "pacparser"   "fix_find_proxy_ex.patch" \
-                                   "fix_cflags.patch"        \
-                                   "fix_python.patch"
+      do_extract "pacparser"     "pacparser-${PACPARSER_VERSION}.tar.gz"
+      patch_external "pacparser" "fix_cflags.patch"
       do_build "pacparser"
       ;;
     zlib)
