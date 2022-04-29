@@ -27,6 +27,23 @@ type Manifest struct {
 	Layers        []Layer
 }
 
+type ManifestList struct {
+	SchemaVersion int
+	MediaType     string
+	Manifests     []ManifestListItem
+}
+
+type ManifestListItem struct {
+	MediaType string
+	Size      int
+	Digest    string
+	Platform  struct {
+		Architecture string
+		OS           string
+		Variant      *string
+	}
+}
+
 type ThinImageLayer struct {
 	Digest string `json:"digest"`
 	Url    string `json:"url,omitempty"`

@@ -189,24 +189,89 @@ func (img *Image) PrintImage(machineFriendly, csv_header bool) {
 	}
 }
 
+func (img *Image) fetchManifest() (*da.Manifest, error) {
+	bytes, err := img.getByteManifest(nil)
+	if err != nil {
+		return nil, err
+	}
+	l.Log().Infof("RADU Manifest response: %v\n", string(bytes))
+
+	var manifest da.Manifest
+	err = json.Unmarshal(bytes, &manifest)
+	if err != nil {
+		return nil, err
+	}
+	if reflect.DeepEqual(da.Manifest{}, manifest) {
+		return nil, fmt.Errorf("got empty manifest")
+	}
+
+	img.Manifest = &manifest
+	return &manifest, nil
+}
+
+func (img *Image) fetchManifestList() (*da.Manifest, error) {
+	bytes1, err := img.getByteManifestList()
+	if err != nil {
+		return nil, err
+	}
+
+	var manifestList da.ManifestList
+	err = json.Unmarshal(bytes1, &manifestList)
+	if err != nil {
+		return nil, err
+	}
+	if reflect.DeepEqual(da.ManifestList{}, manifestList) {
+		return nil, fmt.Errorf("got empty manifest list")
+	}
+
+	var manifestReference string
+	if len(manifestList.Manifests) == 1 {
+		manifestReference = manifestList.Manifests[0].Digest
+	} else {
+		// TODO: In case of a manifest list with multiple architectures, default to amd64
+		// TODO: Support multi-arch images
+		for _, v := range manifestList.Manifests {
+			if v.Platform.Architecture == "amd64" {
+				manifestReference = v.Digest
+			}
+		}
+	}
+
+	bytes2, err := img.getByteManifest(&manifestReference)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest da.Manifest
+	err = json.Unmarshal(bytes2, &manifest)
+	if err != nil {
+		return nil, err
+	}
+	if reflect.DeepEqual(da.Manifest{}, manifest) {
+		return nil, fmt.Errorf("got empty manifest")
+	}
+
+	img.Manifest = &manifest
+	return &manifest, nil
+}
+
 func (img *Image) GetManifest() (da.Manifest, error) {
 	if img.Manifest != nil {
 		return *img.Manifest, nil
 	}
-	bytes, err := img.getByteManifest()
+
+	// First try to fetch a simple manifest
+	manifest, err := img.fetchManifest()
 	if err != nil {
-		return da.Manifest{}, err
+		// If the first fetch fails, try to fetch from a manifest list
+		manifest, err := img.fetchManifestList()
+		if err != nil {
+			return da.Manifest{}, fmt.Errorf("could not retrieve manifest")
+		}
+		return *manifest, nil
 	}
-	var manifest da.Manifest
-	err = json.Unmarshal(bytes, &manifest)
-	if err != nil {
-		return manifest, err
-	}
-	if reflect.DeepEqual(da.Manifest{}, manifest) {
-		return manifest, fmt.Errorf("got empty manifest")
-	}
-	img.Manifest = &manifest
-	return manifest, nil
+
+	return *manifest, nil
 }
 
 func (img *Image) GetOCIImage() (config image.Image, err error) {
@@ -416,37 +481,17 @@ func (i *Image) GetPublicSymlinkPath() string {
 	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
 
-func (img *Image) getByteManifest() ([]byte, error) {
+func (img *Image) getByteManifestList() ([]byte, error) {
 	url := img.GetManifestUrl()
+	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.list.v2+json"})
+}
 
-	token, err := firstRequestForAuth(url)
-	if err != nil {
-		l.LogE(err).Error("Error in getting the authentication token")
-		return nil, err
+func (img *Image) getByteManifest(reference *string) ([]byte, error) {
+	url := img.GetManifestUrl()
+	if reference != nil {
+		url = strings.Join([]string{url, *reference}, "/")
 	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		l.LogE(err).Error("Impossible to create a HTTP request")
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", token)
-	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		l.LogE(err).Error("Error in making the HTTP request")
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		l.LogE(err).Error("Error in reading the second http response")
-		return nil, err
-	}
-	return body, nil
+	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.v2+json"})
 }
 
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
@@ -985,4 +1030,40 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		}
 	}
 	return
+}
+
+func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
+	token, err := firstRequestForAuth(url)
+	if err != nil {
+		l.LogE(err).Error("Error in getting the authentication token")
+		return nil, err
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		l.LogE(err).Error("Impossible to create a HTTP request")
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", token)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		l.LogE(err).Error("Error in making the HTTP request")
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		l.LogE(err).Error("Error in reading the second http response")
+		return nil, err
+	}
+
+	l.Log().Infof("RADU: URL: %v, Response: %v\n", url, string(body))
+
+	return body, nil
 }
