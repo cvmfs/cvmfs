@@ -632,6 +632,7 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info, vector<string> *headers)
   string string_to_sign;
   if ((info.request == JobInfo::kReqHeadOnly) ||
      (info.request == JobInfo::kReqHeadPut) ||
+     (info.request == JobInfo::kReqAfterPutHeadCheck) ||
      (info.request == JobInfo::kReqDelete)) {
     string_to_sign =
       GetRequestString(info) +
@@ -760,6 +761,7 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info, string *hex_hash)
 {
   if ((info.request == JobInfo::kReqHeadOnly) ||
       (info.request == JobInfo::kReqHeadPut) ||
+      (info.request == JobInfo::kReqAfterPutHeadCheck) ||
       (info.request == JobInfo::kReqDelete))
   {
     switch (config_.authz_method) {
@@ -814,6 +816,7 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
   switch (info.request) {
     case JobInfo::kReqHeadOnly:
     case JobInfo::kReqHeadPut:
+    case JobInfo::kReqAfterPutHeadCheck:
       return "HEAD";
     case JobInfo::kReqPutCas:
     case JobInfo::kReqPutDotCvmfs:
@@ -832,6 +835,7 @@ string S3FanoutManager::GetContentType(const JobInfo &info) const {
   switch (info.request) {
     case JobInfo::kReqHeadOnly:
     case JobInfo::kReqHeadPut:
+    case JobInfo::kReqAfterPutHeadCheck:
     case JobInfo::kReqDelete:
       return "";
     case JobInfo::kReqPutCas:
@@ -871,6 +875,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   CURLcode retval;
   if ((info->request == JobInfo::kReqHeadOnly) ||
       (info->request == JobInfo::kReqHeadPut) ||
+      (info->request == JobInfo::kReqAfterPutHeadCheck) ||
       (info->request == JobInfo::kReqDelete))
   {
     retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 0);
@@ -1146,6 +1151,32 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->origin->Rewind();
     return true;  // Again, Put
   }
+
+  // Transform PUT into HEAD check
+  if ((info->error_code == kFailOk) &&
+      (info->request == JobInfo::kReqPutCas) &&
+      info->peek_after_put )
+  {
+    LogCvmfs(kLogS3Fanout, kLogDebug, "uploaded: %s, checking existence",
+             info->object_key.c_str());
+    info->request = JobInfo::kReqAfterPutHeadCheck;
+    curl_slist_free_all(info->http_headers);
+    info->http_headers = NULL;
+    s3fanout::Failures init_failure = InitializeRequest(info,
+                                                        info->curl_handle);
+
+    if (init_failure != s3fanout::kFailOk) {
+      PANIC(kLogStderr,
+            "Failed to initialize CURL handle "
+            "(error: %d - %s | errno: %d)",
+            init_failure, Code2Ascii(init_failure), errno);
+    }
+    SetUrlOptions(info);
+    // Reset origin
+    info->origin->Rewind();
+    return true;  // Again, HEAD
+  }
+
 
   // Determination if failed request should be repeated
   bool try_again = false;

@@ -103,6 +103,7 @@ struct JobInfo : SingleCopy {
     kReqPutHtml,  // HTML file - display instead of downloading
     kReqPutBucket,  // bucket creation
     kReqDelete,
+    kReqAfterPutHeadCheck, // optional check of object after upload
   };
 
   const std::string object_key;
@@ -133,6 +134,7 @@ struct JobInfo : SingleCopy {
     throttle_timestamp = 0;
     errorbuffer =
         reinterpret_cast<char *>(smalloc(sizeof(char) * CURL_ERROR_SIZE));
+    peek_after_put = false;
   }
   ~JobInfo() {
     free(errorbuffer);
@@ -153,6 +155,7 @@ struct JobInfo : SingleCopy {
   // Remember when the 429 reply came in to only throttle if still necessary
   uint64_t throttle_timestamp;
   char *errorbuffer;
+  bool peek_after_put;
 };  // JobInfo
 
 struct S3FanOutDnsEntry {

@@ -130,6 +130,7 @@ class S3Uploader : public AbstractUploader {
   std::string secret_key_;
   s3fanout::AuthzMethods authz_method_;
   bool peek_before_put_;
+  bool peek_after_put_;
   bool use_https_;
   std::string proxy_;
 
