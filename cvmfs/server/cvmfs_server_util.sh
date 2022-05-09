@@ -733,6 +733,54 @@ has_selinux() {
   $GETENFORCE_BIN | grep -qi "enforc" || return 1
 }
 
+# Functions to retrieve information about the operating system.
+# Used in cvmfs_server_json.sh to populate meta.json.
+# Fails gracefully if no os-release file is found (values become empty strings)
+_os_set_etc_release_filename() {
+  _CVMFS_OS_RELEASE_FILENAME=''
+  if test -e "/etc/os-release"; then
+    _CVMFS_OS_RELEASE_FILENAME="/etc/os-release";
+  elif test -e "/usr/lib/os-release"; then
+    _CVMFS_OS_RELEASE_FILENAME="/usr/lib/os-release";
+  fi
+}
+
+# Pick a specific field from the os-release file and return it. 
+# 1. _os_set_etc_release_filename is called on every check, this is probably overkill,
+#    but the question would be where to call this once and for all. In theory one could
+#    call it right after the declaration above?
+# 2. If a fieldname isn't provided, die due to wrongful usage of the (internal) function.
+# 3. If we couldn't find an os-release file, return nothing.
+# 4. If we grep fails to find anything, return nothing. We may want to check against known
+#    keys from https://www.freedesktop.org/software/systemd/man/os-release.html?
+_os_etc_release_get_field() {
+  _os_set_etc_release_filename
+
+  local fieldname=$1
+  if [ "x${fieldname}" == "x" ]; then
+    die "Internal error: _os_etc_release_get_field expects a field name to search for!"
+  fi
+
+  if [ "x${_CVMFS_OS_RELEASE_FILENAME}" == "x" ]; then
+    # If we are unable to find a proper /etc/os-release file return nothing.
+    :
+  else
+    sed -n "s/\"//g;s/^${fieldname}=//p" ${_CVMFS_OS_RELEASE_FILENAME}
+  fi
+}
+
+_os_id() {
+  _os_etc_release_get_field 'ID'
+}
+
+_os_version_id() {
+  _os_etc_release_get_field 'VERSION_ID'
+}
+
+_os_pretty_name() {
+  _os_etc_release_get_field 'PRETTY_NAME'
+}
+
 
 set_selinux_httpd_context_if_needed() {
   local directory="$1"

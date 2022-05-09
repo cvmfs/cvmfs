@@ -23,6 +23,10 @@ DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 
 LATEST_JSON_INFO_SCHEMA=1
 
+# Should we publish CVMFS and OS versions in meta.json?
+# Set to any non-true string to turn off this feature.
+CVMFS_PUBLISH_VERSIONS_IN_META_FILE=true
+
 if [ -f /etc/cvmfs/server.local ]; then
   if [ -r /etc/cvmfs/server.local ]; then
     . /etc/cvmfs/server.local
