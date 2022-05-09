@@ -1181,7 +1181,12 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   // Determination if failed request should be repeated
   bool try_again = false;
   if (info->error_code != kFailOk) {
-    try_again = CanRetry(info);
+    if( info->request == JobInfo::kReqAfterPutHeadCheck ) {
+      info->request = JobInfo::kReqPutCas;
+      try_again = true;
+    } else {
+      try_again = CanRetry(info);
+    }
   }
   if (try_again) {
     if (info->request == JobInfo::kReqPutCas ||
