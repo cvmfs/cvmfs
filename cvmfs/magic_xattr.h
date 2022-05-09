@@ -173,6 +173,10 @@ class CatalogCountersMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
+class CatalogHashMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue();
+};
+
 class ChunkListMagicXattr : public RegularMagicXattr {
   std::string chunk_list_;
 

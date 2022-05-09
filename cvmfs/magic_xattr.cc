@@ -22,6 +22,7 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
     visibility_(visibility)
 {
   Register("user.catalog_counters", new CatalogCountersMagicXattr());
+  Register("user.catalog_hash", new CatalogHashMagicXattr());
   Register("user.external_host", new ExternalHostMagicXattr());
   Register("user.external_timeout", new ExternalTimeoutMagicXattr());
   Register("user.fqrn", new FqrnMagicXattr());
@@ -156,6 +157,10 @@ std::string CatalogCountersMagicXattr::GetValue() {
   res = "catalog_mountpoint: " + subcatalog_path_ + "\n";
   res += counters_.GetCsvMap();
   return res;
+}
+
+std::string CatalogHashMagicXattr::GetValue() {
+  return mount_point_->catalog_mgr()->GetCatalogHashForPath( path_ ).ToString();
 }
 
 bool ChunkListMagicXattr::PrepareValueFenced() {

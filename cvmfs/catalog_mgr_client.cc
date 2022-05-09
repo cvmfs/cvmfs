@@ -75,6 +75,9 @@ Catalog *ClientCatalogManager::CreateCatalog(
   return new Catalog(mountpoint, catalog_hash, parent_catalog);
 }
 
+shash::Any ClientCatalogManager::GetCatalogHashForPath( const PathString &path ) {
+  return mounted_catalogs_[path];
+}
 
 shash::Any ClientCatalogManager::GetRootHash() {
   ReadLock();
