@@ -494,9 +494,11 @@ fi
 
 %post server
 /usr/bin/cvmfs_server fix-permissions || :
+mkdir -p /var/log/cvmfs
 %if 0%{?selinux_cvmfs_server}
 # Port 8000 is also assigned to soundd (CVM-1308)
 /usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
+restorecon -R /var/log/cvmfs
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
@@ -642,6 +644,7 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_server_debug.so.%{version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
+%dir /var/log/cvmfs
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
 /var/lib/cvmfs-server/
