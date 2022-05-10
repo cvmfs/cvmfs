@@ -1,6 +1,6 @@
---- src/Makefile.orig	2022-03-25 19:57:50.000000000 +0100
-+++ src/Makefile	2022-03-28 10:43:14.542832549 +0200
-@@ -39,7 +39,7 @@
+--- src/Makefile.orig	2022-05-10 16:34:39.000000000 +0200
++++ src/Makefile	2022-05-10 16:36:15.000000000 +0200
+@@ -40,7 +40,7 @@
  MKSHLIB = $(CC) -shared
  LIB_OPTS = -Wl,-soname=$(LIBRARY) -Wl,-exclude-libs=libjs.a
  SHFLAGS = -fPIC
@@ -8,8 +8,8 @@
 +SMCFLAGS = $(CVMFS_BASE_C_FLAGS) -DHAVE_VA_COPY -DVA_COPY=__va_copy
 
  ifeq ($(OS_ARCH),Darwin)
-   PREFIX ?= /usr/local
-@@ -54,13 +54,13 @@
+   PREFIX = /usr/local
+@@ -55,7 +55,7 @@
      MAC_MINOR_VERSION := $(shell sw_vers -productVersion | cut -d. -f2)
      MAC_GT_10_5 := $(shell [ $(MAC_MINOR_VERSION) -le 5 ] && echo false)
      ifeq ($(MAC_GT_10_5),false)
@@ -19,9 +19,3 @@
    endif
  endif
 
- PREFIX ?= /usr
--CFLAGS = -g -DXP_UNIX -Wall -DVERSION=$(VERSION)
-+CFLAGS = $(CVMFS_BASE_C_FLAGS) -g -DXP_UNIX -Wall -DVERSION=$(VERSION)
-
- ifndef PYTHON
-   PYTHON = python
