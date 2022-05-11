@@ -107,6 +107,7 @@
 #include "statistics.h"
 #include "talk.h"
 #include "tracer.h"
+#include "util/algorithm.h"
 #include "util/exception.h"
 #include "util_concurrency.h"
 #include "uuid.h"
@@ -494,8 +495,12 @@ static void cvmfs_forget(
   LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
            uint64_t(ino), nlookup);
 #endif
-  if (!file_system_->IsNfsSource())
-    mount_point_->inode_tracker()->VfsPut(ino, nlookup);
+  if (!file_system_->IsNfsSource()) {
+    bool removed =
+      mount_point_->inode_tracker()->GetVfsPutRaii().VfsPut(ino, nlookup);
+    if (removed)
+      mount_point_->page_cache_tracker()->GetEvictRaii().Evict(ino);
+  }
   fuse_remounter_->fence()->Leave();
   fuse_reply_none(req);
 }
@@ -516,16 +521,24 @@ static void cvmfs_forget_multi(
   }
 
   fuse_remounter_->fence()->Enter();
-  for (size_t i = 0; i < count; ++i) {
-    if (forgets[i].ino == FUSE_ROOT_ID) {
-      continue;
+  {
+    glue::InodeTracker::VfsPutRaii vfs_put_raii =
+      mount_point_->inode_tracker()->GetVfsPutRaii();
+    glue::PageCacheTracker::EvictRaii evict_raii =
+      mount_point_->page_cache_tracker()->GetEvictRaii();
+    for (size_t i = 0; i < count; ++i) {
+      if (forgets[i].ino == FUSE_ROOT_ID) {
+        continue;
+      }
+
+      uint64_t ino = mount_point_->catalog_mgr()->MangleInode(forgets[i].ino);
+      LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
+               ino, forgets[i].nlookup);
+
+      bool removed = vfs_put_raii.VfsPut(ino, forgets[i].nlookup);
+      if (removed)
+        evict_raii.Evict(ino);
     }
-
-    uint64_t ino = mount_point_->catalog_mgr()->MangleInode(forgets[i].ino);
-    LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
-             ino, forgets[i].nlookup);
-
-    mount_point_->inode_tracker()->VfsPut(ino, forgets[i].nlookup);
   }
   fuse_remounter_->fence()->Leave();
 
@@ -853,6 +866,16 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   fuse_reply_err(req, EINVAL);
 }
 
+static void FillOpenFlags(const glue::PageCacheTracker::OpenDirectives od,
+                          struct fuse_file_info *fi)
+{
+  assert(!TestBit(glue::PageCacheTracker::kBitDirectIo, fi->fh));
+  fi->keep_cache = od.keep_cache;
+  fi->direct_io = od.direct_io;
+  if (fi->direct_io)
+    SetBit(glue::PageCacheTracker::kBitDirectIo, &fi->fh);
+}
+
 
 /**
  * Open a file from cache.  If necessary, file is downloaded first.
@@ -918,7 +941,14 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
 
+  glue::PageCacheTracker::OpenDirectives open_directives;
   if (!dirent.IsChunkedFile()) {
+    if (dirent.IsDirectIo()) {
+      open_directives = mount_point_->page_cache_tracker()->OpenDirect();
+    } else {
+      open_directives =
+        mount_point_->page_cache_tracker()->Open(ino, dirent.checksum());
+    }
     fuse_remounter_->fence()->Leave();
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug,
@@ -996,10 +1026,23 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     chunk_tables->handle2fd.Insert(chunk_tables->next_handle, ChunkFd());
     chunk_tables->handle2uniqino.Insert(chunk_tables->next_handle,
                                         unique_inode);
-    // The same inode can refer to different revisions of a path.  Don't cache.
-    fi->keep_cache = 0;
-    fi->direct_io = dirent.IsDirectIo();
-    fi->fh = static_cast<uint64_t>(-chunk_tables->next_handle);
+
+    // Generate artificial content hash as hash over chunk hashes
+    // TODO(jblomer): we may want to cache the result in the chunk tables
+    FileChunkReflist chunk_reflist;
+    bool retval =
+        chunk_tables->inode2chunks.Lookup(unique_inode, &chunk_reflist);
+    assert(retval);
+
+    fi->fh = chunk_tables->next_handle;
+    if (dirent.IsDirectIo()) {
+      open_directives = mount_point_->page_cache_tracker()->OpenDirect();
+    } else {
+      open_directives = mount_point_->page_cache_tracker()->Open(
+        ino, chunk_reflist.HashChunkList());
+    }
+    FillOpenFlags(open_directives, fi);
+    fi->fh = static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
     ++chunk_tables->next_handle;
     chunk_tables->Unlock();
 
@@ -1024,10 +1067,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
-      // The same inode can refer to different revisions of a path. Don't cache.
-      fi->keep_cache = 0;
-      fi->direct_io = dirent.IsDirectIo();
       fi->fh = fd;
+      FillOpenFlags(open_directives, fi);
       fuse_reply_open(req, fi);
       return;
     } else {
@@ -1074,13 +1115,16 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   char *data = static_cast<char *>(alloca(size));
   unsigned int overall_bytes_fetched = 0;
 
+  int64_t fd = static_cast<int64_t>(fi->fh);
+  uint64_t abs_fd = (fd < 0) ? -fd : fd;
+  ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
+
   // Do we have a a chunked file?
-  if (static_cast<int64_t>(fi->fh) < 0) {
+  if (fd < 0) {
     const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
     ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
 
-    const uint64_t chunk_handle =
-      static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
+    const uint64_t chunk_handle = abs_fd;
     uint64_t unique_inode;
     ChunkFd chunk_fd;
     FileChunkReflist chunks;
@@ -1185,8 +1229,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
              chunk_fd.fd);
   } else {
-    const int64_t fd = fi->fh;
-    int64_t nbytes = file_system_->cache_mgr()->Pread(fd, data, size, off);
+    int64_t nbytes = file_system_->cache_mgr()->Pread(abs_fd, data, size, off);
     if (nbytes < 0) {
       fuse_reply_err(req, -nbytes);
       return;
@@ -1212,12 +1255,15 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %" PRIu64,
            uint64_t(ino));
-  const int64_t fd = fi->fh;
+  int64_t fd = static_cast<int64_t>(fi->fh);
+  uint64_t abs_fd = (fd < 0) ? -fd : fd;
+  if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd))
+    mount_point_->page_cache_tracker()->Close(ino);
+  ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
 
   // do we have a chunked file?
-  if (static_cast<int64_t>(fi->fh) < 0) {
-    const uint64_t chunk_handle =
-      static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
+  if (fd < 0) {
+    const uint64_t chunk_handle = abs_fd;
     LogCvmfs(kLogCvmfs, kLogDebug, "releasing chunk handle %" PRIu64,
              chunk_handle);
     uint64_t unique_inode;
@@ -1260,7 +1306,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
       file_system_->cache_mgr()->Close(chunk_fd.fd);
     perf::Dec(file_system_->no_open_files());
   } else {
-    if (file_system_->cache_mgr()->Close(fd) == 0) {
+    if (file_system_->cache_mgr()->Close(abs_fd) == 0) {
       perf::Dec(file_system_->no_open_files());
     }
   }
@@ -2047,6 +2093,15 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_nentry_tracker->state = saved_nentry_cache;
   saved_states->push_back(state_nentry_tracker);
 
+  msg_progress = "Saving page cache entry tracker\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  glue::PageCacheTracker *saved_page_cache_tracker =
+    new glue::PageCacheTracker(*cvmfs::mount_point_->page_cache_tracker());
+  loader::SavedState *state_page_cache_tracker = new loader::SavedState();
+  state_page_cache_tracker->state_id = loader::kStatePageCacheTracker;
+  state_page_cache_tracker->state = saved_page_cache_tracker;
+  saved_states->push_back(state_page_cache_tracker);
+
   msg_progress = "Saving chunk tables\n";
   SendMsg2Socket(fd_progress, msg_progress);
   ChunkTables *saved_chunk_tables = new ChunkTables(
@@ -2091,6 +2146,11 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
 static bool RestoreState(const int fd_progress,
                          const loader::StateList &saved_states)
 {
+  // If we have no saved version of the page cache tracker, it is unsafe
+  // to start using it.  The page cache tracker has to run for the entire
+  // lifetime of the mountpoint or not at all.
+  cvmfs::mount_point_->page_cache_tracker()->Disable();
+
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     if (saved_states[i]->state_id == loader::kStateOpenDirs) {
       SendMsg2Socket(fd_progress, "Restoring open directory handles... ");
@@ -2155,6 +2215,16 @@ static bool RestoreState(const int fd_progress,
         (glue::NentryTracker *)saved_states[i]->state;
       new (cvmfs::mount_point_->nentry_tracker())
         glue::NentryTracker(*saved_nentry_tracker);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStatePageCacheTracker) {
+      SendMsg2Socket(fd_progress, "Restoring page cache entry tracker... ");
+      cvmfs::mount_point_->page_cache_tracker()->~PageCacheTracker();
+      glue::PageCacheTracker *saved_page_cache_tracker =
+        (glue::PageCacheTracker *)saved_states[i]->state;
+      new (cvmfs::mount_point_->page_cache_tracker())
+        glue::PageCacheTracker(*saved_page_cache_tracker);
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2274,6 +2344,10 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateNentryTracker:
         SendMsg2Socket(fd_progress, "Releasing saved negative entry cache\n");
         delete static_cast<glue::NentryTracker *>(saved_states[i]->state);
+        break;
+      case loader::kStatePageCacheTracker:
+        SendMsg2Socket(fd_progress, "Releasing saved page cache entry cache\n");
+        delete static_cast<glue::PageCacheTracker *>(saved_states[i]->state);
         break;
       case loader::kStateOpenChunks:
         SendMsg2Socket(fd_progress, "Releasing chunk tables (version 1)\n");

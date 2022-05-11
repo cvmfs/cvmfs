@@ -102,7 +102,8 @@ enum StateId {
   kStateOpenChunksV3,       // >= 2.2.0
   kStateOpenChunksV4,       // >= 2.2.3
   kStateOpenFiles,          // >= 2.4
-  kStateNentryTracker       // >= 2.7
+  kStateNentryTracker,      // >= 2.7
+  kStatePageCacheTracker    // >= 2.10
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };

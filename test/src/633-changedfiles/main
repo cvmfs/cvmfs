@@ -22,6 +22,16 @@ private_unmount() {
   TEST633_PRIVATE_MOUNT=
 }
 
+get_internal_counter() {
+  local name="$1"
+
+  sudo cvmfs_talk -p \
+    ${TEST633_PRIVATE_MOUNT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+    internal affairs | \
+    grep ^$name | \
+    cut -d \| -f2
+}
+
 cleanup() {
   echo "running cleanup()..."
   if [ "x$TEST633_TAIL_SMALL" != "x" ]; then
@@ -63,17 +73,6 @@ cvmfs_run_test() {
      | awk '{print $1}')                                          || return 3
   publish_repo $CVMFS_TEST_REPO -v                                || return $?
 
-  local directio=$(get_xattr direct_io /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/dir/small)
-  echo "*** directio: $directio"
-  [ "x$directio" = "x0" ]                 || return 70
-  start_transaction $CVMFS_TEST_REPO      || return $?
-  touch /cvmfs/$CVMFS_TEST_REPO/dir/small || return 71
-  touch /cvmfs/$CVMFS_TEST_REPO/dir/large || return 71
-  publish_repo $CVMFS_TEST_REPO -d        || return 72
-  directio=$(get_xattr direct_io /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/dir/small)
-  echo "*** directio: $directio"
-  [ "x$directio" = "x1" ]                 || return 73
-
   local mntpnt="${scratch_dir}/private_mnt"
   echo "*** mount private mount point"
   private_mount $mntpnt || return 20
@@ -85,36 +84,103 @@ cvmfs_run_test() {
   local no_chunks=$(get_xattr chunks ${mntpnt}/dir/large) || return 21
   [ $no_chunks -gt 1 ] || return 22
 
+  echo "*** regular file opens (cached)"
+  cat ${mntpnt}/dir/small > /dev/null
+  cat ${mntpnt}/dir/large > /dev/null
+  cat ${mntpnt}/dir/small > /dev/null
+  cat ${mntpnt}/dir/large > /dev/null
+
+  echo "*** check that those first opens were cached"
+  local ncached=$(get_internal_counter page_cache_tracker.n_open_cached)
+  echo "*** number of cached opens: $ncached"
+  [ $ncached -eq 4 ] || return 81
+
+  echo "*** add contents to files in repository (1st change)"
+  ls -lisa ${mntpnt}/dir/*
+  start_transaction $CVMFS_TEST_REPO                      || return $?
+  echo "1st change" >> /cvmfs/$CVMFS_TEST_REPO/dir/small  || return 85
+  echo "1st change" >> /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 86
+  publish_repo $CVMFS_TEST_REPO -v                        || return $?
+  ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
+
+  echo "*** remount private mount point"
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 87
+  local revision_2nd=$(get_xattr revision ${mntpnt}) || return 88
+  echo "revision is now $revision_2nd"
+  [ $revision_2nd -gt $revision_old ] || return 89
+
+  echo "*** new open()s should flush the cache, the reuse it"
+  cat ${mntpnt}/dir/small > /dev/null
+  cat ${mntpnt}/dir/large > /dev/null
+  cat ${mntpnt}/dir/small > /dev/null
+  cat ${mntpnt}/dir/large > /dev/null
+  nflush=$(get_internal_counter page_cache_tracker.n_open_flush)
+  ncached=$(get_internal_counter page_cache_tracker.n_open_cached)
+  echo "*** number of flushed opens: $nflush"
+  echo "*** number of cached opens: $ncached"
+  [ $nflush -eq 2 ]  || return 91
+  [ $ncached -eq 6 ] || return 90
+
   echo "*** open file descriptors"
   tail -f ${mntpnt}/dir/small > tail_small.log &
   TEST633_TAIL_SMALL=$!
   tail -f ${mntpnt}/dir/large > tail_large.log &
   TEST633_TAIL_LARGE=$!
 
-  echo "*** add contents to files in repository"
+  echo "*** add contents to files in repository (2nd change)"
   ls -lisa ${mntpnt}/dir/*
-  start_transaction $CVMFS_TEST_REPO                    || return $?
-  echo "modified" >> /cvmfs/$CVMFS_TEST_REPO/dir/small  || return 30
-  echo "modified" >> /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 30
-  publish_repo $CVMFS_TEST_REPO -v                      || return $?
+  start_transaction $CVMFS_TEST_REPO                      || return $?
+  echo "2nd change" >> /cvmfs/$CVMFS_TEST_REPO/dir/small  || return 30
+  echo "2nd change" >> /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 30
+  publish_repo $CVMFS_TEST_REPO -v                        || return $?
   ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
 
   echo "*** remount private mount point"
   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 40
-  local revision_new=$(get_xattr revision ${mntpnt}) || return 41
-  echo "revision is now $revision_new"
-  [ $revision_new -gt $revision_old ] || return 42
+  local revision_3rd=$(get_xattr revision ${mntpnt}) || return 41
+  echo "revision is now $revision_3rd"
+  [ $revision_3rd -gt $revision_2nd ] || return 42
 
   echo "*** verify new content"
   ls -lisa ${mntpnt}/dir/*
-  [ "x$(tail -n 1 ${mntpnt}/dir/small)" = "xmodified" ] || return 50
-  [ "x$(tail -n 1 ${mntpnt}/dir/large)" = "xmodified" ] || return 51
+  [ "x$(tail -n 1 ${mntpnt}/dir/small)" = "x2nd change" ] || return 50
+  [ "x$(tail -n 1 ${mntpnt}/dir/large)" = "x2nd change" ] || return 51
+
+  echo "*** check that these files where opened in direct I/O mode"
+  local ndirect=$(get_internal_counter page_cache_tracker.n_open_direct)
+  echo "*** number of direct i/o opens: $ndirect"
+  [ $ndirect -eq 2 ]  || return 52
 
   echo "*** verify that our open tail processes did acutally run"
   /bin/kill -TERM $TEST633_TAIL_SMALL || return 60
   TEST633_TAIL_SMALL=
   /bin/kill -TERM $TEST633_TAIL_LARGE || return 61
   TEST633_TAIL_LARGE=
+
+  echo "*** Forced direct I/O"
+
+  local directio=$(get_xattr direct_io /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/dir/small)
+  echo "*** directio: $directio"
+  [ "x$directio" = "x0" ]                 || return 70
+  start_transaction $CVMFS_TEST_REPO      || return $?
+  touch /cvmfs/$CVMFS_TEST_REPO/dir/small || return 71
+  touch /cvmfs/$CVMFS_TEST_REPO/dir/large || return 71
+  publish_repo $CVMFS_TEST_REPO -d        || return 72
+  directio=$(get_xattr direct_io /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/dir/small)
+  echo "*** directio: $directio"
+  [ "x$directio" = "x1" ]                 || return 73
+
+  echo "*** remount private mount point"
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 74
+  local revision_4th=$(get_xattr revision ${mntpnt}) || return 75
+  echo "revision is now $revision_4th"
+  [ $revision_4th -gt $revision_3rd ] || return 76
+
+  cat ${mntpnt}/dir/small > /dev/null
+  cat ${mntpnt}/dir/large > /dev/null
+  ndirect=$(get_internal_counter page_cache_tracker.n_open_direct)
+  echo "*** number of direct i/o opens: $ndirect"
+  [ $ndirect -eq 4 ]  || return 77
 
   return 0
 }

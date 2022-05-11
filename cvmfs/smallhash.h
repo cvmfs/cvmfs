@@ -92,7 +92,7 @@ class SmallHashBase {
     size_ += !overwritten;  // size + 1 if the key was not yet in the map
   }
 
-  void Erase(const Key &key) {
+  bool Erase(const Key &key) {
     uint32_t bucket;
     uint32_t collisions;
     const bool found = DoLookup(key, &bucket, &collisions);
@@ -108,6 +108,7 @@ class SmallHashBase {
       }
       static_cast<Derived *>(this)->Shrink();  // No-op if fixed-size
     }
+    return found;
   }
 
   void Clear() {

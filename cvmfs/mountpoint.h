@@ -44,6 +44,7 @@ class DownloadManager;
 namespace glue {
 class InodeTracker;
 class NentryTracker;
+class PageCacheTracker;
 }
 namespace lru {
 class InodeCache;
@@ -452,6 +453,7 @@ class MountPoint : SingleCopy, public BootFactory {
   lru::Md5PathCache *md5path_cache() { return md5path_cache_; }
   std::string membership_req() { return membership_req_; }
   glue::NentryTracker *nentry_tracker() { return nentry_tracker_; }
+  glue::PageCacheTracker *page_cache_tracker() { return page_cache_tracker_; }
   lru::PathCache *path_cache() { return path_cache_; }
   std::string repository_tag() { return repository_tag_; }
   SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
@@ -565,6 +567,7 @@ class MountPoint : SingleCopy, public BootFactory {
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
   glue::NentryTracker *nentry_tracker_;
+  glue::PageCacheTracker *page_cache_tracker_;
   MagicXattrManager *magic_xattr_mgr_;
 
   file_watcher::FileWatcher* resolv_conf_watcher_;

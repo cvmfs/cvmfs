@@ -1442,6 +1442,17 @@ void MountPoint::CreateStatistics() {
                         "overall number of evicted negative cache entries");
   statistics_->Register("nentry_tracker.n_prune",
                         "overall number of prune calls");
+
+  statistics_->Register("page_cache_tracker.n_insert",
+                        "overall number of added page cache entries");
+  statistics_->Register("page_cache_tracker.n_remove",
+                        "overall number of evicted page cache entries");
+  statistics_->Register("page_cache_tracker.n_open_direct",
+                        "overall number of direct I/O open calls");
+  statistics_->Register("page_cache_tracker.n_open_flush",
+    "overall number of open calls where the file's page cache gets flushed");
+  statistics_->Register("page_cache_tracker.n_open_cached",
+    "overall number of open calls where the file's page cache is reused");
 }
 
 
@@ -1474,6 +1485,9 @@ void MountPoint::CreateTables() {
 
   inode_tracker_ = new glue::InodeTracker();
   nentry_tracker_ = new glue::NentryTracker();
+  page_cache_tracker_ = new glue::PageCacheTracker();
+  if (file_system_->IsNfsSource())
+    page_cache_tracker_->Disable();
 }
 
 /**
@@ -1673,6 +1687,7 @@ MountPoint::MountPoint(
   , tracer_(NULL)
   , inode_tracker_(NULL)
   , nentry_tracker_(NULL)
+  , page_cache_tracker_(NULL)
   , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
@@ -1691,6 +1706,7 @@ MountPoint::MountPoint(
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
+  delete page_cache_tracker_;
   delete nentry_tracker_;
   delete inode_tracker_;
   delete tracer_;
