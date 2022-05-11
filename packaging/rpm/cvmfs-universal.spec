@@ -409,6 +409,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
 mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
 mkdir -p $RPM_BUILD_ROOT/usr/share/cvmfs-server
+mkdir -p $RPM_BUILD_ROOT/var/log/cvmfs
 
 # Keys and configs are in cvmfs-config
 rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -494,7 +495,6 @@ fi
 
 %post server
 /usr/bin/cvmfs_server fix-permissions || :
-mkdir -p /var/log/cvmfs
 %if 0%{?selinux_cvmfs_server}
 # Port 8000 is also assigned to soundd (CVM-1308)
 /usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
