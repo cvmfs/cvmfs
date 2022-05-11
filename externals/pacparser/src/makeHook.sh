@@ -9,13 +9,9 @@ if [ x"$(uname)" = x"Darwin" ]; then
   FIX_COMP="CC=/usr/bin/clang CXX=/usr/bin/clang++"
 fi
 
-FIX_PYTHON=""
-if ! python -V >/dev/null 2>&1; then
-  if ! python3 -V >/dev/null 2>&1; then
-    FIX_PYTHON="PYTHON=python2"
-  else
-    FIX_PYTHON="PYTHON=python3"
-  fi
+FIX_PYTHON="PYTHON=python3"
+if ! python3 -V >/dev/null 2>&1; then
+  FIX_PYTHON="PYTHON=python"
 fi
 
 echo "make clean && make for libpacparser (omitting test execution)..."

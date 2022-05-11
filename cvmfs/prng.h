@@ -11,9 +11,12 @@
 #include <stdint.h>
 #include <sys/time.h>
 
+#include <limits> // NOLINT
+
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
