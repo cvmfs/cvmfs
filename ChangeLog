@@ -1,4 +1,5 @@
 2.10.0:
+  * Updated Pacparser to version 1.3.8 and fixes for macOS > 10.15 (#2963)
   * Add OS version to meta.json (PR #2863)
   * Change default magic xattr visibility to "rootonly"
   * Add support for sharding proxies support with new client option
