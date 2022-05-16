@@ -131,15 +131,14 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
   LogCvmfs(kLogSql, kLogDebug, "opening database file %s",
            filename().c_str());
   int retval = sqlite3_open_v2(filename().c_str(),
-                               &database_.sqlite_db, flags, NULL);
+                               &database_.sqlite_db,
+                               flags | SQLITE_OPEN_EXRESCODE,
+                               NULL);
   if (retval != SQLITE_OK) {
     LogCvmfs(kLogSql, kLogDebug, "cannot open database file %s (%d - %d)",
              filename().c_str(), retval, errno);
     return false;
   }
-
-  retval = sqlite3_extended_result_codes(sqlite_db(), 1);
-  assert(SQLITE_OK == retval);
 
   return true;
 }
