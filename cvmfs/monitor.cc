@@ -250,7 +250,7 @@ string Watchdog::ReportStacktrace() {
   SetLogMicroSyslog(GetLogMicroSyslog());
 
   CrashData crash_data;
-  if (!pipe_watchdog_->Read(&crash_data)) {
+  if (!pipe_watchdog_->TryRead(&crash_data)) {
     return "failed to read crash data (" + StringifyInt(errno) + ")";
   }
 
@@ -494,7 +494,7 @@ void *Watchdog::MainWatchdogListener(void *data) {
 
   struct pollfd watch_fds[2];
   watch_fds[0].fd = watchdog->pipe_listener_->read_end;
-  watch_fds[0].events = POLLIN | POLLPRI;
+  watch_fds[0].events = 0;  // Only check for POLL[ERR,HUP,NVAL] in revents
   watch_fds[0].revents = 0;
   watch_fds[1].fd = watchdog->pipe_terminate_->read_end;
   watch_fds[1].events = POLLIN | POLLPRI;
@@ -559,9 +559,9 @@ void Watchdog::Supervise() {
   signal_handlers[SIGXFSZ] = sa;
   SetSignalHandlers(signal_handlers);
 
-  ControlFlow::Flags control_flow;
+  ControlFlow::Flags control_flow = ControlFlow::kUnknown;
 
-  if (!pipe_watchdog_->Read(&control_flow)) {
+  if (!pipe_watchdog_->TryRead(&control_flow)) {
     // Re-activate µSyslog, if necessary
     SetLogMicroSyslog(GetLogMicroSyslog());
     LogEmergency("watchdog: unexpected termination (" +
