@@ -415,7 +415,10 @@ void Watchdog::Spawn() {
           // Gracefully close the syslog before closing all fds. The next call
           // to syslog will reopen it.
           closelog();
-          for (int fd = 0; fd < max_fd; fd++) {
+          // Let's keep stdin, stdout, stderr open at /dev/null (daemonized)
+          // in order to prevent accidental outputs from messing with another
+          // file descriptor
+          for (int fd = 3; fd < max_fd; fd++) {
             if (fd == pipe_watchdog_->read_end)
               continue;
             if (fd == pipe_listener_->write_end)
