@@ -409,6 +409,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
 mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
 mkdir -p $RPM_BUILD_ROOT/usr/share/cvmfs-server
+mkdir -p $RPM_BUILD_ROOT/var/log/cvmfs
 
 # Keys and configs are in cvmfs-config
 rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -497,6 +498,7 @@ fi
 %if 0%{?selinux_cvmfs_server}
 # Port 8000 is also assigned to soundd (CVM-1308)
 /usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
+restorecon -R /var/log/cvmfs
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
@@ -642,6 +644,7 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_server_debug.so.%{version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
+%dir /var/log/cvmfs
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
 /var/lib/cvmfs-server/
@@ -681,6 +684,8 @@ systemctl daemon-reload
 %endif
 
 %changelog
+* Mon May 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.10.0
+- Add /var/log/cvmfs to cvmfs-server package, set its SElinux label
 * Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Remove version requirement from selinux-policy dependency
 * Wed Sep 29 2021 Andrea Valenzuela <andrea.valenzuela.ramirez@cern.ch> - 2.9.0
