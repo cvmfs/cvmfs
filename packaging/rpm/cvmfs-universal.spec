@@ -684,6 +684,8 @@ systemctl daemon-reload
 %endif
 
 %changelog
+* Mon May 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.10.0
+- Add /var/log/cvmfs to cvmfs-server package, set its SElinux label
 * Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Remove version requirement from selinux-policy dependency
 * Wed Sep 29 2021 Andrea Valenzuela <andrea.valenzuela.ramirez@cern.ch> - 2.9.0
