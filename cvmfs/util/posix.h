@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <cerrno>
 #include <cstddef>
 #include <map>
 #include <set>
@@ -205,10 +206,19 @@ struct Pipe : public SingleCopy {
   }
 
   template<typename T>
-  bool Read(T *data) {
+  bool TryRead(T *data) {
     assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
-    int num_bytes = read(read_end, data, sizeof(T));
+    ssize_t num_bytes;
+    do {
+      num_bytes = read(read_end, data, sizeof(T));
+    } while ((num_bytes < 0) && (errno == EINTR));
     return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
+  }
+
+  template<typename T>
+  void Read(T *data) {
+    assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
+    ReadPipe(read_end, data, sizeof(T));
   }
 
   bool Write(const void *buf, size_t nbyte) {

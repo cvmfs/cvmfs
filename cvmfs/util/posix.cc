@@ -1898,8 +1898,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
   // read the PID of the spawned process if requested
   // (the actual read needs to be done in any case!)
   pid_t buf_child_pid = 0;
-  retcode = pipe_fork.Read(&buf_child_pid);
-  assert(retcode);
+  pipe_fork.Read(&buf_child_pid);
   if (child_pid != NULL)
     *child_pid = buf_child_pid;
   close(pipe_fork.read_end);
