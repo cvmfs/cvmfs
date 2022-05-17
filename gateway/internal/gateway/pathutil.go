@@ -57,10 +57,6 @@ func SplitLeasePath(leasePath string) (string, string, error) {
 	}
 	repoName := tokens[0]
 
-	if strings.Count(repoName, ".") < 2 {
-		return "", "", fmt.Errorf("input does not start with a FQDN")
-	}
-
 	subPath := strings.TrimPrefix(leasePath, repoName)
 
 	return repoName, subPath, nil
