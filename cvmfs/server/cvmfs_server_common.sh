@@ -848,12 +848,12 @@ release_gc_lock() {
 }
 
 # Acquire a gc lock for a repository.  Always pair with a call to
-#   release_gc_lock if returns successful. 
+#   release_gc_lock if returns successful.
 #
 # @param name               the repository to lock
 # @param check_type         check type, either check or gc
 # @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
-#                           Default 0. 
+#                           Default 0.
 # @return                   0 if lock successfully acquired
 
 acquire_gc_lock()
