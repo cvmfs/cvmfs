@@ -16,13 +16,33 @@ has_jq() {
   which jq >/dev/null 2>&1
 }
 
+create_fake_gc_lock_until_contention() {
+  local name=$1
+
+  load_repo_config $name
+  local lockfile=${CVMFS_SPOOL_DIR}/is_collecting.lock
+  echo "*** creating fake gc lock $lockfile and look for contention in checks.log"
+  exec 8<>${lockfile}
+  flock -n 8
+
+  while ! grep -q "Waiting for gc on $name" /var/log/cvmfs/checks.log 2>/dev/null; do
+    sleep 1
+  done
+
+  echo "*** removing $lockfile"
+  rm -f $lockfile
+  exec 8<&-
+  echo "*** ... unlocked $lockfile"
+}
+
 create_fake_gc_lock() {
   local name=$1
 
   load_repo_config $name
   local lockfile=${CVMFS_SPOOL_DIR}/is_collecting.lock
   echo "*** creating fake gc lock $lockfile"
-  echo "$$" >$lockfile
+  exec 8<>${lockfile}
+  flock -n 8
 }
 
 remove_fake_gc_lock() {
@@ -32,6 +52,8 @@ remove_fake_gc_lock() {
   local lockfile=${CVMFS_SPOOL_DIR}/is_collecting.lock
   echo "*** removing $lockfile"
   rm -f $lockfile
+  exec 8<&-
+  echo "*** ... unlocked $lockfile"
 }
 
 cvmfs_run_test() {
@@ -77,10 +99,7 @@ cvmfs_run_test() {
   echo "*** corrupting replica 4"
   delete_from_backend ${replica_name}-4 ".cvmfswhitelist"
 
-  create_fake_gc_lock ${replica_name}-1
-
-  echo "*** set up to remove fake lock in 5 seconds"
-  (sleep 5; remove_fake_gc_lock ${replica_name-1}) &
+  create_fake_gc_lock_until_contention ${replica_name}-1 &
 
   echo "*** running cvmfs_server check -a"
   sudo cvmfs_server check -a || return 10
@@ -98,9 +117,6 @@ cvmfs_run_test() {
 
   echo "*** verifying check failed on replica 4"
   curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json" | grep check_status.*failed || return 54
-
-  echo "*** verify check was delayed on replica 1"
-  grep "Waiting for gc on ${replica_name}-1" /var/log/cvmfs/checks.log || return 55
 
   create_fake_gc_lock ${replica_name}-1
   echo "*** verify that fake gc lock prevents gc"
