@@ -873,7 +873,7 @@ is_master_replica() {
   local name=$1
   local is_master_replica
 
-  if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
+  if [ $(echo $name | cut --bytes=1-7) = "http://" -o $(echo $name | cut --bytes=1-8) = "https://" ]; then
     is_master_replica=$(get_repo_info_from_url $name -m -L)
   else
     load_repo_config $name
