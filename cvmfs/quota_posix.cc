@@ -953,10 +953,6 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   int retval;
 
-  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
-  assert(watchdog.IsValid());
-  watchdog->Spawn();
-
   PosixQuotaManager shared_manager(0, 0, "");
   shared_manager.shared_ = true;
   shared_manager.spawned_ = true;
@@ -984,6 +980,10 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
 
   if (!foreground)
     Daemonize();
+
+  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
+  assert(watchdog.IsValid());
+  watchdog->Spawn();
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo =
