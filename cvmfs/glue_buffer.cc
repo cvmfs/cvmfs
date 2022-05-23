@@ -122,6 +122,8 @@ NentryTracker::~NentryTracker() {
     pthread_join(thread_cleaner_, NULL);
     ClosePipe(pipe_terminate_);
   }
+  pthread_mutex_destroy(lock_);
+  free(lock_);
 }
 
 
