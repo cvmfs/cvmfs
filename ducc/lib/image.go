@@ -124,9 +124,11 @@ func (i *Image) WholeName() string {
 	return root
 }
 
-func (i *Image) GetManifestUrl() string {
+func (i *Image) GetManifestUrl(reference string) string {
 	url := proxyUrl(fmt.Sprintf("%s://%s/v2/%s/manifests/", i.Scheme, i.Registry, i.Repository))
-	if i.Digest != "" {
+	if reference != "" {
+		url = fmt.Sprintf("%s%s", url, reference)
+	} else if i.Digest != "" {
 		url = fmt.Sprintf("%s%s", url, i.Digest)
 	} else {
 		url = fmt.Sprintf("%s%s", url, i.Tag)
@@ -190,12 +192,10 @@ func (img *Image) PrintImage(machineFriendly, csv_header bool) {
 }
 
 func (img *Image) fetchManifest() (*da.Manifest, error) {
-	bytes, err := img.getByteManifest(nil)
+	bytes, err := img.getByteManifest("")
 	if err != nil {
 		return nil, err
 	}
-	l.Log().Infof("RADU Manifest response: %v\n", string(bytes))
-
 	var manifest da.Manifest
 	err = json.Unmarshal(bytes, &manifest)
 	if err != nil {
@@ -237,7 +237,7 @@ func (img *Image) fetchManifestList() (*da.Manifest, error) {
 		}
 	}
 
-	bytes2, err := img.getByteManifest(&manifestReference)
+	bytes2, err := img.getByteManifest(manifestReference)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +262,7 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 
 	// First try to fetch a simple manifest
 	manifest, err := img.fetchManifest()
-	if err != nil {
+	if err != nil || manifest.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" {
 		// If the first fetch fails, try to fetch from a manifest list
 		manifest, err := img.fetchManifestList()
 		if err != nil {
@@ -482,15 +482,12 @@ func (i *Image) GetPublicSymlinkPath() string {
 }
 
 func (img *Image) getByteManifestList() ([]byte, error) {
-	url := img.GetManifestUrl()
+	url := img.GetManifestUrl("")
 	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.list.v2+json"})
 }
 
-func (img *Image) getByteManifest(reference *string) ([]byte, error) {
-	url := img.GetManifestUrl()
-	if reference != nil {
-		url = strings.Join([]string{url, *reference}, "/")
-	}
+func (img *Image) getByteManifest(reference string) ([]byte, error) {
+	url := img.GetManifestUrl(reference)
 	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.v2+json"})
 }
 
@@ -1062,8 +1059,6 @@ func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
 		l.LogE(err).Error("Error in reading the second http response")
 		return nil, err
 	}
-
-	l.Log().Infof("RADU: URL: %v, Response: %v\n", url, string(body))
 
 	return body, nil
 }
