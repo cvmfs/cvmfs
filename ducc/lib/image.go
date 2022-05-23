@@ -59,7 +59,7 @@ type RegistryConfig struct {
 
 var inputRegistries []RegistryConfig
 
-func init() {
+func SetupRegistries() {
 	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
 	for _, r := range strings.Split(regs, ",") {
 		if r == "" {

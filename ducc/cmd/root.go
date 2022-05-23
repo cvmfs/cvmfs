@@ -24,6 +24,7 @@ var rootCmd = &cobra.Command{
 	Short: "Show the several commands available.",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		lib.SetupNotification()
+		lib.SetupRegistries()
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
