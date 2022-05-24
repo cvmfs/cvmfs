@@ -87,23 +87,6 @@ func SetupRegistries() {
 	}
 }
 
-func getRegistryForUrl(url string) *RegistryConfig {
-	for _, reg := range inputRegistries {
-		if strings.Contains(url, reg.baseUrl) {
-			return &reg
-		}
-	}
-	return nil
-}
-
-func proxyUrl(url string) string {
-	reg := getRegistryForUrl(url)
-	if reg != nil && reg.proxy != "" {
-		return strings.Replace(url, reg.baseUrl, reg.proxy, 1)
-	}
-	return url
-}
-
 func (i *Image) GetSimpleName() string {
 	name := fmt.Sprintf("%s/%s", i.Registry, i.Repository)
 	if i.Tag == "" {
@@ -125,7 +108,7 @@ func (i *Image) WholeName() string {
 }
 
 func (i *Image) GetManifestUrl(reference string) string {
-	url := proxyUrl(fmt.Sprintf("%s://%s/v2/%s/manifests/", i.Scheme, i.Registry, i.Repository))
+	url := i.baseUrl() + "manifests/"
 	if reference != "" {
 		url = fmt.Sprintf("%s%s", url, reference)
 	} else if i.Digest != "" {
@@ -360,7 +343,7 @@ func (img *Image) GetSingularityLocation() string {
 }
 
 func (img *Image) GetTagListUrl() string {
-	return proxyUrl(fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository))
+	return img.baseUrl() + "tags/list"
 }
 
 func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
@@ -492,13 +475,11 @@ func (img *Image) getByteManifest(reference string) ([]byte, error) {
 }
 
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
-	reg := getRegistryForUrl(url)
+	reg := getRegistry(url)
 	if reg != nil && reg.proxy == "" {
 		return firstRequestForAuth_internal(url, reg.creds.username, reg.creds.password)
 	}
-
-	proxied := proxyUrl(url)
-	return firstRequestForAuth_internal(proxied, "", "")
+	return firstRequestForAuth_internal(url, "", "")
 }
 
 func firstRequestForAuth(url string) (token string, err error) {
@@ -553,8 +534,7 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 }
 
 func getLayerUrl(img *Image, layerDigest string) string {
-	return proxyUrl(fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, layerDigest))
+	return fmt.Sprintf("%s/blobs/%s", img.baseUrl(), layerDigest)
 }
 
 type downloadedLayer struct {
@@ -1027,6 +1007,31 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		}
 	}
 	return
+}
+
+func getRegistry(url string) *RegistryConfig {
+	for _, reg := range inputRegistries {
+		if strings.Contains(url, reg.baseUrl) {
+			return &reg
+		}
+	}
+	return nil
+}
+
+func (i *Image) baseUrl() string {
+	var url string
+	reg := getRegistry(i.Registry)
+	if reg != nil && reg.proxy != "" {
+		proxyHost, proxyPath, found := strings.Cut(reg.proxy, "/")
+		if found {
+			url = fmt.Sprintf("%s://%s/v2/%s/%s/", i.Scheme, proxyHost, proxyPath, i.Repository)
+		} else {
+			url = fmt.Sprintf("%s://%s/v2/%s/", i.Scheme, proxyHost, i.Repository)
+		}
+	} else {
+		url = fmt.Sprintf("%s://%s/v2/%s/", i.Scheme, i.Registry, i.Repository)
+	}
+	return url
 }
 
 func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
