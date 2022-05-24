@@ -13,4 +13,5 @@ sh configure $FIX_COMP LDFLAGS="$LDFLAGS -rdynamic" \
              CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
              CFLAGS="$CFLAGS $CVMFS_BASE_C_FLAGS -fPIC" \
              --enable-shared=no \
+	     --enable-tests=no \
              --prefix=$EXTERNALS_INSTALL_LOCATION
