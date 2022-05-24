@@ -1,4 +1,5 @@
 2.9.3:
+  * Improve robustness of link between watchdog and fuse module (#2971)
 
 2.9.2:
   * GO 1.18 is bundled as an external depedency, facilitating building on
