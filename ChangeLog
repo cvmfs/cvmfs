@@ -1,5 +1,4 @@
 2.10.0:
-  * Improve robustness of link between watchdog and fuse module (#2971)
   * Fix minor memory leak during reload (#2976)
   * Fix race in the startup of the shared cache manager in debug mode (#2910)
   * Fix creation of stratum 1 from https stratum 0 (#2974)
@@ -11,6 +10,9 @@
   * Change default magic xattr visibility to "rootonly"
   * Add support for sharding proxies support with new client option
     CVMFS_PROXY_SHARD={yes|no} (CVM-2060)
+
+2.9.3:
+  * Improve robustness of link between watchdog and fuse module (#2971)
 
 2.9.2:
   * GO 1.18 is bundled as an external depedency, facilitating building on
