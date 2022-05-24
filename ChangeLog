@@ -1,4 +1,5 @@
 2.10.0:
+  * Fix minor memory leak during reload (#2976)
   * Fix race in the startup of the shared cache manager in debug mode (#2910)
   * Fix creation of stratum 1 from https stratum 0 (#2974)
   * Update sqlite to version 3.38.2
