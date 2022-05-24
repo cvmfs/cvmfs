@@ -1,3 +1,5 @@
+2.9.3:
+
 2.9.2:
   * GO 1.18 is bundled as an external depedency, facilitating building on
     older platforms (#2867)
