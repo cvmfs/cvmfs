@@ -1,4 +1,5 @@
 2.10.0:
+  * Update c-ares to version 1.18.1 (#2977)
   * [gw] Remove too strict repository name check (#2973)
   * Fix minor memory leak during reload (#2976)
   * Fix race in the startup of the shared cache manager in debug mode (#2910)
