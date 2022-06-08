@@ -150,5 +150,10 @@ cvmfs_run_test() {
     echo "skipping pass-through test"
   fi
 
+  echo "*** checking if updating and gc locks have been removed on test repo"
+  load_repo_config $CVMFS_TEST_REPO
+  test -f ${CVMFS_SPOOL_DIR}/is_updating.lock && return 60
+  test -f ${CVMFS_SPOOL_DIR}/is_collecting.lock && return 61
+
   return 0
 }

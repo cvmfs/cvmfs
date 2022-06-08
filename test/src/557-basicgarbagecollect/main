@@ -300,11 +300,15 @@ cvmfs_run_test() {
 
   # ============================================================================
 
+  echo "check if the repository's garbage collection lock is gone"
+  load_repo_config $CVMFS_TEST_REPO
+  test -f ${CVMFS_SPOOL_DIR}/is_collecting.lock && return 16
+
   echo "check if the repository is still sane"
-  check_repository $CVMFS_TEST_REPO -i || return 16
+  check_repository $CVMFS_TEST_REPO -i || return 17
 
   echo "check if the repository's previous revision is still sane"
-  check_repository $CVMFS_TEST_REPO -i -t trunk-previous || return 17
+  check_repository $CVMFS_TEST_REPO -i -t trunk-previous || return 18
 
   echo "check that the temporary scratch directory is empty"
   [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
