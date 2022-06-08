@@ -14,6 +14,7 @@
     CVMFS_PROXY_SHARD={yes|no} (CVM-2060)
 
 2.9.3:
+  * Fix releasing of GC lock (#2982)
   * Improve robustness of link between watchdog and fuse module (#2971)
 
 2.9.2:
