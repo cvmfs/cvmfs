@@ -28,6 +28,7 @@
 #include "ssl.h"
 #include "statistics.h"
 
+class InterruptCue;
 
 namespace download {
 
@@ -159,6 +160,7 @@ struct JobInfo {
   uid_t uid;
   gid_t gid;
   void *cred_data;  // Per-transfer credential data
+  InterruptCue *interrupt_cue;
   Destination destination;
   struct {
     size_t size;
@@ -187,6 +189,7 @@ struct JobInfo {
     uid = -1;
     gid = -1;
     cred_data = NULL;
+    interrupt_cue = NULL;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;

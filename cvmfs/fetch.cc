@@ -156,11 +156,10 @@ int Fetcher::Fetch(
   tls->download_job.extra_info = &name;
   ClientCtx *ctx = ClientCtx::GetInstance();
   if (ctx->IsSet()) {
-    InterruptCue *ic;
     ctx->Get(&tls->download_job.uid,
              &tls->download_job.gid,
              &tls->download_job.pid,
-             &ic);
+             &tls->download_job.interrupt_cue);
   }
   tls->download_job.compressed = (compression_algorithm == zlib::kZlibDefault);
   tls->download_job.range_offset = range_offset;
