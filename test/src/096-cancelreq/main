@@ -1,0 +1,49 @@
+
+cvmfs_test_name="Cancel file system request"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_096_SILENT_PID=
+cleanup() {
+  echo "*** running cleanup()"
+  [ -z $CVMFS_TEST_096_SILENT_PID ] || sudo kill $CVMFS_TEST_096_SILENT_PID
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local http_port=8019
+
+  echo "*** install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** mount repository"
+  cvmfs_mount cvmfs-config.cern.ch \
+    "CVMFS_TIMEOUT=10" \
+    "CVMFS_TIMEOUT_DIRECT=10" \
+    "CVMFS_MAX_RETRIES=0" || return 2
+
+  echo "*** run a silent HTTP server"
+  CVMFS_TEST_096_SILENT_PID=$(open_silent_port TCP $http_port $logfile)
+  [ $? -eq 0 ] || return 3
+  echo "silent server started with PID $CVMFS_TEST_096_SILENT_PID"
+
+  echo "*** prefix host list with unresponsive server"
+  sudo cvmfs_talk -i cvmfs-config.cern.ch host set \
+    "http://127.0.0.1:${http_port}/cvmfs/@fqrn@;http://cvmfs-stratum-one.cern.ch/fqrn/@fqrn@" || retval=10
+
+  # TODO(jblomer): fix this brittle test
+  local afile=$(find /cvmfs/cvmfs-config.cern.ch -type f | head -n1)
+  echo "*** read $afile, should block"
+  md5sum $afile &
+  local pid=$!
+
+  echo "*** killing $pid after 5 seconds"
+  sleep 5
+  kill $pid
+
+  sleep 10
+  cat_syslog | grep cvmfs-config.cern.ch | grep "request canceled" || return 20
+
+  return 0
+}
+
