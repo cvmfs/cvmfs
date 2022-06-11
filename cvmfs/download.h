@@ -57,6 +57,7 @@ enum Failures {
   kFailHostTooSlow,
   kFailProxyShortTransfer,
   kFailHostShortTransfer,
+  kFailCanceled,
 
   kFailNumEntries
 };  // Failures
@@ -106,7 +107,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[15] = "host serving data too slowly";
   texts[16] = "proxy data transfer cut short";
   texts[17] = "host data transfer cut short";
-  texts[18] = "no text";
+  texts[18] = "request canceled";
+  texts[19] = "no text";
   return texts[error];
 }
 
