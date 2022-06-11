@@ -86,6 +86,7 @@
 #include "glue_buffer.h"
 #include "hash.h"
 #include "history_sqlite.h"
+#include "interrupt.h"
 #include "loader.h"
 #include "logging.h"
 #include "lru_md.h"
@@ -161,6 +162,16 @@ unsigned max_open_files_; /**< maximum allowed number of open files */
  * Number of reserved file descriptors for internal use
  */
 const int kNumReservedFd = 512;
+
+
+class FuseInterruptCue : public InterruptCue {
+ public:
+  explicit FuseInterruptCue(fuse_req_t *r) : req_ptr_(r) { }
+  virtual ~FuseInterruptCue() { }
+  virtual bool IsCanceled() { return fuse_req_interrupted(*req_ptr_); }
+ private:
+  fuse_req_t *req_ptr_;
+};
 
 
 static inline double GetKcacheTimeout() {
@@ -375,7 +386,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
   perf::Inc(file_system_->n_fs_lookup());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
@@ -573,7 +585,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
 
   perf::Inc(file_system_->n_fs_stat());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
@@ -610,7 +623,8 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 
   perf::Inc(file_system_->n_fs_readlink());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
   fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
@@ -669,7 +683,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   HighPrecisionTimer guard_timer(file_system_->hist_fs_opendir());
 
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
@@ -889,7 +904,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   HighPrecisionTimer guard_timer(file_system_->hist_fs_open());
 
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
@@ -1122,7 +1138,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   // Do we have a a chunked file?
   if (fd < 0) {
     const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-    ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+    FuseInterruptCue ic(&req);
+    ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
     const uint64_t chunk_handle = abs_fd;
     uint64_t unique_inode;
@@ -1370,7 +1387,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 #endif
 {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
@@ -1449,7 +1467,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();

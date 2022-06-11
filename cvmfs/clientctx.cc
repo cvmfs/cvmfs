@@ -6,6 +6,7 @@
 
 #include <cassert>
 
+#include "interrupt.h"
 #include "smalloc.h"
 #include "util_concurrency.h"
 
@@ -53,17 +54,19 @@ ClientCtx *ClientCtx::GetInstance() {
 }
 
 
-void ClientCtx::Get(uid_t *uid, gid_t *gid, pid_t *pid) {
+void ClientCtx::Get(uid_t *uid, gid_t *gid, pid_t *pid, InterruptCue **ic) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
     pthread_getspecific(thread_local_storage_));
   if ((tls == NULL) || !tls->is_set) {
     *uid = -1;
     *gid = -1;
     *pid = -1;
+    *ic = NULL;
   } else {
     *uid = tls->uid;
     *gid = tls->gid;
     *pid = tls->pid;
+    *ic = tls->interrupt_cue;
   }
 }
 
@@ -78,12 +81,12 @@ bool ClientCtx::IsSet() {
 }
 
 
-void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid) {
+void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
     pthread_getspecific(thread_local_storage_));
 
   if (tls == NULL) {
-    tls = new ThreadLocalStorage(uid, gid, pid);
+    tls = new ThreadLocalStorage(uid, gid, pid, ic);
     int retval = pthread_setspecific(thread_local_storage_, tls);
     assert(retval == 0);
     MutexLockGuard lock_guard(lock_tls_blocks_);
@@ -92,6 +95,7 @@ void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid) {
     tls->uid = uid;
     tls->gid = gid;
     tls->pid = pid;
+    tls->interrupt_cue = ic;
     tls->is_set = true;
   }
 }
@@ -123,5 +127,6 @@ void ClientCtx::Unset() {
     tls->uid = -1;
     tls->gid = -1;
     tls->pid = -1;
+    tls->interrupt_cue = NULL;
   }
 }
