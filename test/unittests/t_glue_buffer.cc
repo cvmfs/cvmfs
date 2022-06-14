@@ -9,6 +9,7 @@
 #include "glue_buffer.h"
 #include "platform.h"
 #include "shortstring.h"
+#include "smallhash.h"
 #include "util/posix.h"
 
 namespace glue {
@@ -289,6 +290,18 @@ TEST_F(T_GlueBuffer, InodeEx) {
   EXPECT_EQ(largest_inode, inode_ex.GetInode());
   EXPECT_EQ(InodeEx::kBulkDev, inode_ex.GetFileType());
   EXPECT_EQ(hasher_inode(largest_inode), hasher_inode_ex(inode_ex));
+
+  SmallHashDynamic<InodeEx, char> map;
+  map.Init(16, InodeEx(), hasher_inode_ex);
+  map.Insert(InodeEx(42, InodeEx::kRegular), 0);
+  EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kRegular)));
+  EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kSymlink)));
+  EXPECT_FALSE(map.Contains(InodeEx(43, InodeEx::kRegular)));
+
+  map.Insert(InodeEx(42, InodeEx::kSymlink), 0);
+  EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kRegular)));
+  EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kSymlink)));
+  EXPECT_FALSE(map.Contains(InodeEx(43, InodeEx::kRegular)));
 }
 
 }  // namespace glue

@@ -40,7 +40,7 @@ namespace glue {
  * of the 64 bit unsigned integer representing the inode.  That makes the class
  * compatible with a pure 64bit inode used in previous cvmfs versions in the
  * inode tracker.
- * Note that InodeEx used as a hash table key hashes only over the inode part.
+ * Note that InodeEx, used as a hash table key, hashes only over the inode part.
  */
 class InodeEx {
  public:
@@ -55,6 +55,7 @@ class InodeEx {
     kBulkDev,
   };
 
+  InodeEx() : inode_ex_(0) { }
   InodeEx(uint64_t inode, EFileType type)
     : inode_ex_(inode | (static_cast<uint64_t>(type) << 61))
   { }
@@ -62,6 +63,13 @@ class InodeEx {
   inline uint64_t GetInode() const { return inode_ex_ & ~(uint64_t(7) << 61); }
   inline EFileType GetFileType() const {
     return static_cast<EFileType>(inode_ex_ >> 61);
+  }
+
+  inline bool operator==(const InodeEx &other) const {
+    return GetInode() == other.GetInode();
+  }
+  inline bool operator!=(const InodeEx &other) const {
+    return GetInode() != other.GetInode();
   }
 
  private:
