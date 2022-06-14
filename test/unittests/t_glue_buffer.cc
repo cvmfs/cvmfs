@@ -273,11 +273,11 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
 }
 
 TEST_F(T_GlueBuffer, InodeEx) {
-  InodeEx inode_ex(0, InodeEx::kUnset);
+  InodeEx inode_ex(0, InodeEx::kUnknownType);
   EXPECT_EQ(sizeof(std::uint64_t), sizeof(inode_ex));
 
   EXPECT_EQ(0U, inode_ex.GetInode());
-  EXPECT_EQ(InodeEx::kUnset, inode_ex.GetFileType());
+  EXPECT_EQ(InodeEx::kUnknownType, inode_ex.GetFileType());
   EXPECT_EQ(hasher_inode(0), hasher_inode_ex(inode_ex));
 
   inode_ex = InodeEx(1, InodeEx::kRegular);
@@ -293,15 +293,37 @@ TEST_F(T_GlueBuffer, InodeEx) {
 
   SmallHashDynamic<InodeEx, char> map;
   map.Init(16, InodeEx(), hasher_inode_ex);
-  map.Insert(InodeEx(42, InodeEx::kRegular), 0);
+  map.Insert(InodeEx(42, InodeEx::kRegular), 1);
   EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kRegular)));
   EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kSymlink)));
   EXPECT_FALSE(map.Contains(InodeEx(43, InodeEx::kRegular)));
+  InodeEx key(43, InodeEx::kUnknownType);
+  char value = 0;
+  EXPECT_FALSE(map.LookupEx(&key, &value));
+  key = InodeEx(42, InodeEx::kUnknownType);
+  EXPECT_TRUE(map.LookupEx(&key, &value));
+  EXPECT_EQ(1, value);
+  EXPECT_EQ(42U, key.GetInode());
+  EXPECT_EQ(InodeEx::kRegular, key.GetFileType());
 
-  map.Insert(InodeEx(42, InodeEx::kSymlink), 0);
+  map.Insert(InodeEx(42, InodeEx::kSymlink), 2);
   EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kRegular)));
   EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kSymlink)));
   EXPECT_FALSE(map.Contains(InodeEx(43, InodeEx::kRegular)));
+  EXPECT_TRUE(map.LookupEx(&key, &value));
+  EXPECT_EQ(2, value);
+  EXPECT_EQ(42U, key.GetInode());
+  EXPECT_EQ(InodeEx::kSymlink, key.GetFileType());
+
+  // Check that the original key survives map resizings
+  for (unsigned i = 100; i < 1000; ++i) {
+    map.Insert(InodeEx(i, InodeEx::kRegular), 0);
+  }
+  key = InodeEx(42, InodeEx::kUnknownType);
+  EXPECT_TRUE(map.LookupEx(&key, &value));
+  EXPECT_EQ(2, value);
+  EXPECT_EQ(42U, key.GetInode());
+  EXPECT_EQ(InodeEx::kSymlink, key.GetFileType());
 }
 
 }  // namespace glue

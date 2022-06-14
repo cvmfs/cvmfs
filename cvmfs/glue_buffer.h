@@ -45,7 +45,7 @@ namespace glue {
 class InodeEx {
  public:
   enum EFileType {
-    kUnset = 0,
+    kUnknownType = 0,
     kRegular,
     kSymlink,
     kDirectory,
