@@ -271,5 +271,24 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   EXPECT_EQ(false, directives.direct_io);
 }
 
+TEST_F(T_GlueBuffer, InodeEx) {
+  InodeEx inode_ex(0, InodeEx::kUnset);
+  EXPECT_EQ(sizeof(std::uint64_t), sizeof(inode_ex));
+
+  EXPECT_EQ(0U, inode_ex.GetInode());
+  EXPECT_EQ(InodeEx::kUnset, inode_ex.GetFileType());
+  EXPECT_EQ(hasher_inode(0), hasher_inode_ex(inode_ex));
+
+  inode_ex = InodeEx(1, InodeEx::kRegular);
+  EXPECT_EQ(1U, inode_ex.GetInode());
+  EXPECT_EQ(InodeEx::kRegular, inode_ex.GetFileType());
+  EXPECT_EQ(hasher_inode(1), hasher_inode_ex(inode_ex));
+
+  uint64_t largest_inode = (uint64_t(1) << 61) - 1;
+  inode_ex = InodeEx(largest_inode, InodeEx::kBulkDev);
+  EXPECT_EQ(largest_inode, inode_ex.GetInode());
+  EXPECT_EQ(InodeEx::kBulkDev, inode_ex.GetFileType());
+  EXPECT_EQ(hasher_inode(largest_inode), hasher_inode_ex(inode_ex));
+}
 
 }  // namespace glue

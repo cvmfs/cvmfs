@@ -35,14 +35,50 @@
 
 namespace glue {
 
+/**
+ * Inode + file type. Stores the file type in the 3 most significant bits
+ * of the 64 bit unsigned integer representing the inode.  That makes the class
+ * compatible with a pure 64bit inode used in previous cvmfs versions in the
+ * inode tracker.
+ * Note that InodeEx used as a hash table key hashes only over the inode part.
+ */
+class InodeEx {
+ public:
+  enum EFileType {
+    kUnset = 0,
+    kRegular,
+    kSymlink,
+    kDirectory,
+    kFifo,
+    kSocket,
+    kCharDev,
+    kBulkDev,
+  };
+
+  InodeEx(uint64_t inode, EFileType type)
+    : inode_ex_(inode | (static_cast<uint64_t>(type) << 61))
+  { }
+
+  inline uint64_t GetInode() const { return inode_ex_ & ~(uint64_t(7) << 61); }
+  inline EFileType GetFileType() const {
+    return static_cast<EFileType>(inode_ex_ >> 61);
+  }
+
+ private:
+  uint64_t inode_ex_;
+};
+
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
   return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
-
 static inline uint32_t hasher_inode(const uint64_t &inode) {
   return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
+}
+
+static inline uint32_t hasher_inode_ex(const InodeEx &inode_ex) {
+  return hasher_inode(inode_ex.GetInode());
 }
 
 
