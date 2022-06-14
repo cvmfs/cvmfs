@@ -230,7 +230,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return true;
 
   // Look in the catalogs in 2 steps: lookup inode->path, lookup path
-  catalog::DirectoryEntry dirent_negative =
+  static catalog::DirectoryEntry dirent_negative =
     catalog::DirectoryEntry(catalog::kDirentNegative);
   // Reset directory entry.  If the function returns false and dirent is no
   // the kDirentNegative, it was an I/O error
