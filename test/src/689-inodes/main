@@ -1,0 +1,55 @@
+cvmfs_test_name="Corner cases for inode handling"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_689_MOUNTPOINT=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_689_MOUNTPOINT ]; then
+    sudo umount $CVMFS_TEST_689_MOUNTPOINT
+    rmdir $CVMFS_TEST_689_MOUNTPOINT
+  fi
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** create repository structure"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir /cvmfs/$CVMFS_TEST_REPO/foo || return 1
+  ln -s foo /cvmfs/$CVMFS_TEST_REPO/bar || return 2
+  touch /cvmfs/$CVMFS_TEST_REPO/bar/symlink || return 3
+  publish_repo $CVMFS_TEST_REPO || return 4
+  check_repository $CVMFS_TEST_REPO -i || return 5
+
+  echo "*** setup cleanup handler"
+  trap cleanup EXIT HUP INT TERM || return 10
+
+  echo "*** create pure cvmfs mountpoint of the new repository"
+  mkdir mnt
+  CVMFS_TEST_689_MOUNTPOINT="$(pwd)/mnt"
+  local mntpnt="$CVMFS_TEST_689_MOUNTPOINT"
+  do_local_mount "$mntpnt" \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_DEBUGLOG=$(pwd)/debug.log" || return 11
+
+  echo "*** change cwd to /foo/bar on cvmfs"
+  ls -lah $mntpnt/bar/symlink || return 20
+
+  echo "*** remove parent of current cwd"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  rm -f /cvmfs/$CVMFS_TEST_REPO/bar || return 20
+  mkdir /cvmfs/$CVMFS_TEST_REPO/bar || return 21
+  touch /cvmfs/$CVMFS_TEST_REPO/bar/realdir || return 22
+  publish_repo $CVMFS_TEST_REPO || return 23
+
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 22
+  ls -lah ${mntpnt}/bar/realdir || return 30
+
+  return 0
+}
