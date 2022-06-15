@@ -288,7 +288,7 @@ TEST_F(T_GlueBuffer, InodeEx) {
   EXPECT_EQ(InodeEx::kRegular, inode_ex.GetFileType());
   EXPECT_EQ(hasher_inode(1), hasher_inode_ex(inode_ex));
 
-  uint64_t largest_inode = (uint64_t(1) << 61) - 1;
+  uint64_t largest_inode = (uint64_t(1) << 60) - 1;
   inode_ex = InodeEx(largest_inode, InodeEx::kBulkDev);
   EXPECT_EQ(largest_inode, inode_ex.GetInode());
   EXPECT_EQ(InodeEx::kBulkDev, inode_ex.GetFileType());
@@ -327,6 +327,24 @@ TEST_F(T_GlueBuffer, InodeEx) {
   EXPECT_EQ(2, value);
   EXPECT_EQ(42U, key.GetInode());
   EXPECT_EQ(InodeEx::kSymlink, key.GetFileType());
+}
+
+TEST_F(T_GlueBuffer, InodeExMode) {
+  platform_stat64 info;
+  EXPECT_EQ(0, platform_stat(".", &info));
+  InodeEx inode_ex(42, info.st_mode);
+  EXPECT_EQ(InodeEx::kDirectory, inode_ex.GetFileType());
+  EXPECT_EQ(42U, inode_ex.GetInode());
+
+  EXPECT_EQ(0, platform_stat("/", &info));
+  EXPECT_TRUE(inode_ex.IsCompatibleFileType(info.st_mode));
+  CreateFile("regular", 0644);
+
+  EXPECT_EQ(0, platform_stat("regular", &info));
+  EXPECT_FALSE(inode_ex.IsCompatibleFileType(info.st_mode));
+
+  inode_ex = InodeEx(42, InodeEx::kUnknownType);
+  EXPECT_TRUE(inode_ex.IsCompatibleFileType(info.st_mode));
 }
 
 }  // namespace glue

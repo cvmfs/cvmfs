@@ -36,33 +36,42 @@
 namespace glue {
 
 /**
- * Inode + file type. Stores the file type in the 3 most significant bits
+ * Inode + file type. Stores the file type in the 4 most significant bits
  * of the 64 bit unsigned integer representing the inode.  That makes the class
  * compatible with a pure 64bit inode used in previous cvmfs versions in the
- * inode tracker.
+ * inode tracker.  The file type is stored using the POSIX representation in
+ * the inode's mode field.
  * Note that InodeEx, used as a hash table key, hashes only over the inode part.
  */
 class InodeEx {
+ private:
+  // Extracts the file type bits from the POSIX mode field and shifts them to
+  // the right so that they align with EFileType constants.
+  static inline uint64_t ShiftMode(int mode) { return (mode >> 12) & 017; }
+
  public:
   enum EFileType {
     kUnknownType = 0,
-    kRegular,
-    kSymlink,
-    kDirectory,
-    kFifo,
-    kSocket,
-    kCharDev,
-    kBulkDev,
+    kRegular     = 010,
+    kSymlink     = 012,
+    kDirectory   = 004,
+    kFifo        = 001,
+    kSocket      = 014,
+    kCharDev     = 002,
+    kBulkDev     = 006,
   };
 
   InodeEx() : inode_ex_(0) { }
   InodeEx(uint64_t inode, EFileType type)
-    : inode_ex_(inode | (static_cast<uint64_t>(type) << 61))
+    : inode_ex_(inode | (static_cast<uint64_t>(type) << 60))
+  { }
+  InodeEx(uint64_t inode, int mode)
+    : inode_ex_(inode | (ShiftMode(mode) << 60))
   { }
 
-  inline uint64_t GetInode() const { return inode_ex_ & ~(uint64_t(7) << 61); }
+  inline uint64_t GetInode() const { return inode_ex_ & ~(uint64_t(15) << 60); }
   inline EFileType GetFileType() const {
-    return static_cast<EFileType>(inode_ex_ >> 61);
+    return static_cast<EFileType>(inode_ex_ >> 60);
   }
 
   inline bool operator==(const InodeEx &other) const {
@@ -70,6 +79,11 @@ class InodeEx {
   }
   inline bool operator!=(const InodeEx &other) const {
     return GetInode() != other.GetInode();
+  }
+
+  inline bool IsCompatibleFileType(int mode) const {
+    return (static_cast<uint64_t>(GetFileType()) == ShiftMode(mode)) ||
+           (GetFileType() == kUnknownType);
   }
 
  private:
