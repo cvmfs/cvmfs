@@ -455,7 +455,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
  lookup_reply_positive:
   if (!file_system_->IsNfsSource()) {
     mount_point_->inode_tracker()->VfsGet(
-      glue::InodeEx(dirent.inode(), glue::InodeEx::kUnknownType), path);
+      glue::InodeEx(dirent.inode(), dirent.mode()), path);
   }
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
