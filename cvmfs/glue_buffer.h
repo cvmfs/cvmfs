@@ -597,8 +597,10 @@ class InodeTracker {
   InodeTracker &operator= (const InodeTracker &other);
   ~InodeTracker();
 
-  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
+  void VfsGetBy(const InodeEx inode_ex, const uint32_t by,
+                const PathString &path)
   {
+    uint64_t inode = inode_ex.GetInode();
     Lock();
     bool new_inode = inode_references_.Get(inode, by);
     shash::Md5 md5path = path_map_.Insert(path, inode);
@@ -609,16 +611,16 @@ class InodeTracker {
     if (new_inode) atomic_inc64(&statistics_.num_inserts);
   }
 
-  void VfsGet(const uint64_t inode, const PathString &path) {
-    VfsGetBy(inode, 1, path);
+  void VfsGet(const InodeEx inode_ex, const PathString &path) {
+    VfsGetBy(inode_ex, 1, path);
   }
 
   VfsPutRaii GetVfsPutRaii() { return VfsPutRaii(this); }
 
-  bool FindPath(const uint64_t inode, PathString *path) {
+  bool FindPath(const InodeEx *inode_ex, PathString *path) {
     Lock();
     shash::Md5 md5path;
-    bool found = inode_map_.LookupMd5Path(inode, &md5path);
+    bool found = inode_map_.LookupMd5Path(inode_ex->GetInode(), &md5path);
     if (found) {
       found = path_map_.LookupPath(md5path, path);
       assert(found);

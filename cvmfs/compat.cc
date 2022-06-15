@@ -89,7 +89,8 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
     uint32_t references = i->second.references;
     PathString path;
     old_tracker->inode2path_.ConstructPath(inode, &path);
-    new_tracker->VfsGetBy(inode, references, path);
+    new_tracker->VfsGetBy(
+      glue::InodeEx(inode, glue::InodeEx::kUnknownType), references, path);
   }
 }
 
@@ -123,7 +124,8 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
     PathString path;
     bool retval = old_tracker->FindPath(inode, &path);
     assert(retval);
-    new_tracker->VfsGetBy(inode, references, path);
+    new_tracker->VfsGetBy(
+      glue::InodeEx(inode, glue::InodeEx::kUnknownType), references, path);
   }
 }
 
@@ -158,7 +160,8 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
     PathString path;
     bool retval = old_tracker->FindPath(inode, &path);
     assert(retval);
-    new_tracker->VfsGetBy(inode, references, path);
+    new_tracker->VfsGetBy(
+      glue::InodeEx(inode, glue::InodeEx::kUnknownType), references, path);
   }
 }
 

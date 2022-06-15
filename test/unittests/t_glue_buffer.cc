@@ -34,9 +34,12 @@ TEST_F(T_GlueBuffer, InodeTracker) {
   EXPECT_FALSE(inode_tracker_.NextInode(&cursor, &inode));
   inode_tracker_.EndEnumerate(&cursor);
 
-  inode_tracker_.VfsGet(1, PathString(""));
-  inode_tracker_.VfsGet(2, PathString("/foo"));
-  inode_tracker_.VfsGet(4, PathString("/foo/bar"));
+  inode_tracker_.VfsGet(glue::InodeEx(1, glue::InodeEx::kDirectory),
+                        PathString(""));
+  inode_tracker_.VfsGet(glue::InodeEx(2, glue::InodeEx::kDirectory),
+                        PathString("/foo"));
+  inode_tracker_.VfsGet(glue::InodeEx(4, glue::InodeEx::kRegular),
+                        PathString("/foo/bar"));
   cursor = inode_tracker_.BeginEnumerate();
   int bitset_entry = 0;
   int bitset_inode = 0;

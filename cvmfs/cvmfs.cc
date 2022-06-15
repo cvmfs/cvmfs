@@ -266,7 +266,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return true;
   }
 
-  bool retval = mount_point_->inode_tracker()->FindPath(ino, &path);
+  glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
+  bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, &path);
   if (!retval) {
     // Can this ever happen?
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -348,7 +349,8 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     return true;
 
   LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - looking in inode tracker", ino);
-  bool retval = mount_point_->inode_tracker()->FindPath(ino, path);
+  glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
+  bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
   assert(retval);
   mount_point_->path_cache()->Insert(ino, *path);
   return true;
@@ -451,8 +453,10 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   }
 
  lookup_reply_positive:
-  if (!file_system_->IsNfsSource())
-    mount_point_->inode_tracker()->VfsGet(dirent.inode(), path);
+  if (!file_system_->IsNfsSource()) {
+    mount_point_->inode_tracker()->VfsGet(
+      glue::InodeEx(dirent.inode(), glue::InodeEx::kUnknownType), path);
+  }
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();

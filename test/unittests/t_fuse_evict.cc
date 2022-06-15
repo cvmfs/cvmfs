@@ -61,9 +61,11 @@ TEST_F(T_FuseInvalidator, InvalidateTimeout) {
 
 TEST_F(T_FuseInvalidator, InvalidateOps) {
   invalidator_->fuse_channel_or_session_ = reinterpret_cast<void **>(this);
-  inode_tracker_.VfsGet(1, PathString(""));
+  inode_tracker_.VfsGet(
+    glue::InodeEx(1, glue::InodeEx::kDirectory), PathString(""));
   for (unsigned i = 2; i <= 1024; ++i) {
-    inode_tracker_.VfsGet(i, PathString("/" + StringifyInt(i)));
+    inode_tracker_.VfsGet(glue::InodeEx(i, glue::InodeEx::kRegular),
+                          PathString("/" + StringifyInt(i)));
   }
   for (unsigned i = 0; i < 1024; ++i) {
     nentry_tracker_.Add(i, "404", 100000);
