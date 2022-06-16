@@ -245,16 +245,16 @@ DentryTracker::Cursor DentryTracker::BeginEnumerate() {
 bool DentryTracker::NextEntry(Cursor *cursor,
   uint64_t *inode_parent, NameString *name)
 {
-    if (cursor->head == NULL)
-      return false;
-    if (cursor->pos >= entries_.size())
-      return false;
-    Entry *e = cursor->head + cursor->pos;
-    *inode_parent = e->inode_parent;
-    *name = e->name;
-    cursor->pos++;
-    return true;
-  }
+  if (cursor->head == NULL)
+    return false;
+  if (cursor->pos >= entries_.size())
+    return false;
+  Entry *e = cursor->head + cursor->pos;
+  *inode_parent = e->inode_parent;
+  *name = e->name;
+  cursor->pos++;
+  return true;
+}
 
 
 void DentryTracker::EndEnumerate(Cursor *cursor) {
