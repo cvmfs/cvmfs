@@ -9,7 +9,6 @@
 #include "glue_buffer.h"
 #include "platform.h"
 #include "shortstring.h"
-#include "smallhash.h"
 #include "util/posix.h"
 
 namespace glue {
