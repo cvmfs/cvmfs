@@ -73,7 +73,7 @@ void InodeTracker::CopyFrom(const InodeTracker &other) {
   assert(other.version_ == kVersion);
   version_ = kVersion;
   path_map_ = other.path_map_;
-  inode_ex_map_ = other.inode_ex_map_;
+  inode_map_ = other.inode_map_;
   inode_references_ = other.inode_references_;
   statistics_ = other.statistics_;
 }

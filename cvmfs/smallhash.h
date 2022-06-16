@@ -79,26 +79,6 @@ class SmallHashBase {
     return found;
   }
 
-  /**
-   * Returns both the key and the value. That is useful if Key's equality
-   * operator implements an equivalence relation on Key. In this case, LookupEx
-   * returns the key representing the equivalance class that has been used
-   * during Insert().
-   * Used to return a glue::InodeEx element when looking for an inode.
-   */
-  bool LookupEx(Key *key, Value *value) const {
-    uint32_t bucket = ScaleHash(*key);
-    while (!(keys_[bucket] == empty_key_)) {
-      if (keys_[bucket] == *key) {
-        *key = keys_[bucket];
-        *value = values_[bucket];
-        return true;
-      }
-      bucket = (bucket + 1) % capacity_;
-    }
-    return false;
-  }
-
   bool Contains(const Key &key) const {
     uint32_t bucket;
     uint32_t collisions;
