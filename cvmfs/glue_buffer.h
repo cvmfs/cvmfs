@@ -430,29 +430,33 @@ class PathMap {
 //------------------------------------------------------------------------------
 
 
-class InodeMap {
+/**
+ * This class has the same memory layout than the previous "InodeMap" class,
+ * therefore there is no data structure migration during reload required.
+ */
+class InodeExMap {
  public:
-  InodeMap() {
-    map_.Init(16, 0, hasher_inode);
+  InodeExMap() {
+    map_.Init(16, InodeEx(), hasher_inode_ex);
   }
 
-  bool LookupMd5Path(const uint64_t inode, shash::Md5 *md5path) {
-    bool found = map_.Lookup(inode, md5path);
+  bool LookupMd5Path(InodeEx *inode_ex, shash::Md5 *md5path) {
+    bool found = map_.LookupEx(inode_ex, md5path);
     return found;
   }
 
-  void Insert(const uint64_t inode, const shash::Md5 &md5path) {
-    map_.Insert(inode, md5path);
+  void Insert(const InodeEx inode_ex, const shash::Md5 &md5path) {
+    map_.Insert(inode_ex, md5path);
   }
 
   void Erase(const uint64_t inode) {
-    map_.Erase(inode);
+    map_.Erase(InodeEx(inode, InodeEx::kUnknownType));
   }
 
   void Clear() { map_.Clear(); }
 
  private:
-  SmallHashDynamic<uint64_t, shash::Md5> map_;
+  SmallHashDynamic<InodeEx, shash::Md5> map_;
 };
 
 
@@ -563,9 +567,10 @@ class InodeTracker {
       if (removed) {
         // TODO(jblomer): pop operation (Lookup+Erase)
         shash::Md5 md5path;
-        bool found = tracker_->inode_map_.LookupMd5Path(inode, &md5path);
+        InodeEx inode_ex(inode, InodeEx::kUnknownType);
+        bool found = tracker_->inode_ex_map_.LookupMd5Path(&inode_ex, &md5path);
         assert(found);
-        tracker_->inode_map_.Erase(inode);
+        tracker_->inode_ex_map_.Erase(inode);
         tracker_->path_map_.Erase(md5path);
         atomic_inc64(&tracker_->statistics_.num_removes);
       }
@@ -616,13 +621,13 @@ class InodeTracker {
   {
     uint64_t inode = inode_ex.GetInode();
     Lock();
-    bool new_inode = inode_references_.Get(inode, by);
+    bool is_new_inode = inode_references_.Get(inode, by);
     shash::Md5 md5path = path_map_.Insert(path, inode);
-    inode_map_.Insert(inode, md5path);
+    inode_ex_map_.Insert(inode_ex, md5path);
     Unlock();
 
     atomic_xadd64(&statistics_.num_references, by);
-    if (new_inode) atomic_inc64(&statistics_.num_inserts);
+    if (is_new_inode) atomic_inc64(&statistics_.num_inserts);
   }
 
   void VfsGet(const InodeEx inode_ex, const PathString &path) {
@@ -631,10 +636,10 @@ class InodeTracker {
 
   VfsPutRaii GetVfsPutRaii() { return VfsPutRaii(this); }
 
-  bool FindPath(const InodeEx *inode_ex, PathString *path) {
+  bool FindPath(InodeEx *inode_ex, PathString *path) {
     Lock();
     shash::Md5 md5path;
-    bool found = inode_map_.LookupMd5Path(inode_ex->GetInode(), &md5path);
+    bool found = inode_ex_map_.LookupMd5Path(inode_ex, &md5path);
     if (found) {
       found = path_map_.LookupPath(md5path, path);
       assert(found);
@@ -703,7 +708,7 @@ class InodeTracker {
   unsigned version_;
   pthread_mutex_t *lock_;
   PathMap path_map_;
-  InodeMap inode_map_;
+  InodeExMap inode_ex_map_;
   InodeReferences inode_references_;
   Statistics statistics_;
 };  // class InodeTracker
