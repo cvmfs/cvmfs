@@ -715,10 +715,11 @@ class InodeTracker {
 
 
 /**
- * Tracks fuse negative cache replies for active cache eviction
+ * Tracks fuse name lookup replies for active cache eviction.
+ * Class renamed from previous name NentryTracker
  */
-class NentryTracker {
-  FRIEND_TEST(T_GlueBuffer, NentryTracker);
+class DentryTracker {
+  FRIEND_TEST(T_GlueBuffer, DentryTracker);
 
  private:
   struct Entry {
@@ -752,15 +753,15 @@ class NentryTracker {
 
   static void *MainCleaner(void *data);
 
-  NentryTracker();
-  explicit NentryTracker(const NentryTracker &other);
-  NentryTracker &operator= (const NentryTracker &other);
-  ~NentryTracker();
+  DentryTracker();
+  explicit DentryTracker(const DentryTracker &other);
+  DentryTracker &operator= (const DentryTracker &other);
+  ~DentryTracker();
 
   /**
    * Lock object during copy
    */
-  NentryTracker *Move();
+  DentryTracker *Move();
 
   void Add(const uint64_t inode_parent, const char *name, uint64_t timeout_s) {
     if (!is_active_) return;
@@ -791,7 +792,7 @@ class NentryTracker {
  private:
   static const unsigned kVersion = 0;
 
-  void CopyFrom(const NentryTracker &other);
+  void CopyFrom(const DentryTracker &other);
 
   void InitLock();
   inline void Lock() const {
@@ -823,7 +824,7 @@ class NentryTracker {
   int pipe_terminate_[2];
   int cleaning_interval_ms_;
   pthread_t thread_cleaner_;
-};  // class NentryTracker
+};  // class DentryTracker
 
 /**
  * Tracks the content hash associated to inodes of regular files whose content

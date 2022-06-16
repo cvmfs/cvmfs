@@ -1436,11 +1436,11 @@ void MountPoint::CreateStatistics() {
   statistics_->Register("inode_tracker.n_miss_path",
                         "overall number of unsuccessful path lookups");
 
-  statistics_->Register("nentry_tracker.n_insert",
+  statistics_->Register("dentry_tracker.n_insert",
                         "overall number of added negative cache entries");
-  statistics_->Register("nentry_tracker.n_remove",
+  statistics_->Register("dentry_tracker.n_remove",
                         "overall number of evicted negative cache entries");
-  statistics_->Register("nentry_tracker.n_prune",
+  statistics_->Register("dentry_tracker.n_prune",
                         "overall number of prune calls");
 
   statistics_->Register("page_cache_tracker.n_insert",
@@ -1484,7 +1484,7 @@ void MountPoint::CreateTables() {
                                          statistics_);
 
   inode_tracker_ = new glue::InodeTracker();
-  nentry_tracker_ = new glue::NentryTracker();
+  dentry_tracker_ = new glue::DentryTracker();
   page_cache_tracker_ = new glue::PageCacheTracker();
   if (file_system_->IsNfsSource())
     page_cache_tracker_->Disable();
@@ -1686,7 +1686,7 @@ MountPoint::MountPoint(
   , md5path_cache_(NULL)
   , tracer_(NULL)
   , inode_tracker_(NULL)
-  , nentry_tracker_(NULL)
+  , dentry_tracker_(NULL)
   , page_cache_tracker_(NULL)
   , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
@@ -1707,7 +1707,7 @@ MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
   delete page_cache_tracker_;
-  delete nentry_tracker_;
+  delete dentry_tracker_;
   delete inode_tracker_;
   delete tracer_;
   delete md5path_cache_;

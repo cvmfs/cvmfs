@@ -17,7 +17,7 @@
 
 namespace glue {
 class InodeTracker;
-class NentryTracker;
+class DentryTracker;
 }
 
 /**
@@ -62,7 +62,7 @@ class FuseInvalidator : SingleCopy {
   };
 
   FuseInvalidator(glue::InodeTracker *inode_tracker,
-                  glue::NentryTracker *nentry_tracker,
+                  glue::DentryTracker *dentry_tracker,
                   void **fuse_channel_or_session,
                   bool fuse_notify_invalidation);
   ~FuseInvalidator();
@@ -87,7 +87,7 @@ class FuseInvalidator : SingleCopy {
   static void *MainInvalidator(void *data);
 
   glue::InodeTracker *inode_tracker_;
-  glue::NentryTracker *nentry_tracker_;
+  glue::DentryTracker *dentry_tracker_;
   /**
    * libfuse2 uses struct fuse_chan, libfuse3 uses struct fuse_session
    */

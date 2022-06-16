@@ -84,13 +84,13 @@ TEST_F(T_GlueBuffer, InodeTracker) {
 }
 
 
-TEST_F(T_GlueBuffer, NentryTracker) {
-  NentryTracker tracker;
+TEST_F(T_GlueBuffer, DentryTracker) {
+  DentryTracker tracker;
   const unsigned kTimeoutNever = 100000;
 
   uint64_t parent_inode = 0;
   NameString name;
-  NentryTracker::Cursor cursor = tracker.BeginEnumerate();
+  DentryTracker::Cursor cursor = tracker.BeginEnumerate();
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
 
@@ -125,17 +125,17 @@ TEST_F(T_GlueBuffer, NentryTracker) {
 }
 
 
-TEST_F(T_GlueBuffer, NentryMove) {
-  NentryTracker tracker;
+TEST_F(T_GlueBuffer, DentryMove) {
+  DentryTracker tracker;
   const unsigned kTimeoutNever = 100000;
 
   tracker.Add(1, "one", kTimeoutNever);
 
-  NentryTracker *dst = tracker.Move();
+  DentryTracker *dst = tracker.Move();
 
   uint64_t parent_inode = 0;
   NameString name;
-  NentryTracker::Cursor cursor = tracker.BeginEnumerate();
+  DentryTracker::Cursor cursor = tracker.BeginEnumerate();
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
 
@@ -148,8 +148,8 @@ TEST_F(T_GlueBuffer, NentryMove) {
 }
 
 
-TEST_F(T_GlueBuffer, NentryCleanerSlow) {
-  NentryTracker tracker;
+TEST_F(T_GlueBuffer, DentryCleanerSlow) {
+  DentryTracker tracker;
   tracker.Prune();  // Don't crash when tracker is empty
 
   tracker.Add(0, "one", 1);
@@ -162,7 +162,7 @@ TEST_F(T_GlueBuffer, NentryCleanerSlow) {
 
   uint64_t parent_inode = 0;
   NameString name;
-  NentryTracker::Cursor cursor = tracker.BeginEnumerate();
+  DentryTracker::Cursor cursor = tracker.BeginEnumerate();
   EXPECT_FALSE(tracker.NextEntry(&cursor, &parent_inode, &name));
   tracker.EndEnumerate(&cursor);
 }

@@ -108,14 +108,14 @@ InodeTracker::~InodeTracker() {
 
 //------------------------------------------------------------------------------
 
-NentryTracker::NentryTracker() : version_(kVersion), is_active_(true) {
+DentryTracker::DentryTracker() : version_(kVersion), is_active_(true) {
   pipe_terminate_[0] = pipe_terminate_[1] = -1;
   cleaning_interval_ms_ = -1;
   InitLock();
 }
 
 
-NentryTracker::~NentryTracker() {
+DentryTracker::~DentryTracker() {
   if (pipe_terminate_[1] >= 0) {
     char t = 'T';
     WritePipe(pipe_terminate_[1], &t, 1);
@@ -127,7 +127,7 @@ NentryTracker::~NentryTracker() {
 }
 
 
-NentryTracker::NentryTracker(const NentryTracker &other) {
+DentryTracker::DentryTracker(const DentryTracker &other) {
   CopyFrom(other);
   pipe_terminate_[0] = pipe_terminate_[1] = -1;
   cleaning_interval_ms_ = -1;
@@ -135,7 +135,7 @@ NentryTracker::NentryTracker(const NentryTracker &other) {
 }
 
 
-NentryTracker &NentryTracker::operator= (const NentryTracker &other) {
+DentryTracker &DentryTracker::operator= (const DentryTracker &other) {
   if (&other == this)
     return *this;
 
@@ -146,7 +146,7 @@ NentryTracker &NentryTracker::operator= (const NentryTracker &other) {
 }
 
 
-void NentryTracker::CopyFrom(const NentryTracker &other) {
+void DentryTracker::CopyFrom(const DentryTracker &other) {
   assert(other.version_ == kVersion);
 
   version_ = kVersion;
@@ -156,9 +156,9 @@ void NentryTracker::CopyFrom(const NentryTracker &other) {
 }
 
 
-NentryTracker *NentryTracker::Move() {
+DentryTracker *DentryTracker::Move() {
   Lock();
-  NentryTracker *new_tracker = new NentryTracker(*this);
+  DentryTracker *new_tracker = new DentryTracker(*this);
   statistics_.num_remove += entries_.size();
   entries_.Clear();
   Unlock();
@@ -166,7 +166,7 @@ NentryTracker *NentryTracker::Move() {
 }
 
 
-void NentryTracker::SpawnCleaner(unsigned interval_s) {
+void DentryTracker::SpawnCleaner(unsigned interval_s) {
   assert(pipe_terminate_[0] == -1);
   cleaning_interval_ms_ = interval_s * 1000;
   if (cleaning_interval_ms_ == 0) cleaning_interval_ms_ = -1;
@@ -176,8 +176,8 @@ void NentryTracker::SpawnCleaner(unsigned interval_s) {
 }
 
 
-void *NentryTracker::MainCleaner(void *data) {
-  NentryTracker *tracker = reinterpret_cast<NentryTracker *>(data);
+void *DentryTracker::MainCleaner(void *data) {
+  DentryTracker *tracker = reinterpret_cast<DentryTracker *>(data);
   LogCvmfs(kLogCvmfs, kLogDebug, "starting negative entry cache cleaner");
 
   struct pollfd watch_term;
@@ -219,7 +219,7 @@ void *NentryTracker::MainCleaner(void *data) {
 }
 
 
-void NentryTracker::InitLock() {
+void DentryTracker::InitLock() {
   lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
@@ -227,14 +227,14 @@ void NentryTracker::InitLock() {
 }
 
 
-void NentryTracker::Prune() {
+void DentryTracker::Prune() {
   Lock();
   DoPrune(platform_monotonic_time());
   Unlock();
 }
 
 
-NentryTracker::Cursor NentryTracker::BeginEnumerate() {
+DentryTracker::Cursor DentryTracker::BeginEnumerate() {
   Entry *head = NULL;
   Lock();
   entries_.Peek(&head);
@@ -242,7 +242,7 @@ NentryTracker::Cursor NentryTracker::BeginEnumerate() {
 }
 
 
-bool NentryTracker::NextEntry(Cursor *cursor,
+bool DentryTracker::NextEntry(Cursor *cursor,
   uint64_t *inode_parent, NameString *name)
 {
     if (cursor->head == NULL)
@@ -257,7 +257,7 @@ bool NentryTracker::NextEntry(Cursor *cursor,
   }
 
 
-void NentryTracker::EndEnumerate(Cursor *cursor) {
+void DentryTracker::EndEnumerate(Cursor *cursor) {
   Unlock();
 }
 
