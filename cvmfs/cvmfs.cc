@@ -265,7 +265,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return true;
   }
 
-  bool retval = mount_point_->inode_tracker()->FindPath(ino, &path);
+  glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
+  bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, &path);
   if (!retval) {
     // Can this ever happen?
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -274,6 +275,13 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return false;
   }
   if (catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent)) {
+    if (!inode_ex.IsCompatibleFileType(dirent->mode())) {
+      // This should not happen provided that dentry caches are cleared between
+      // catalog reloads
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+               "Warning: inode %" PRId64 " (%s) changed file type",
+               ino, path.c_str());
+    }
     // Fix inodes
     dirent->set_inode(ino);
     mount_point_->inode_cache()->Insert(ino, *dirent);
@@ -347,7 +355,8 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     return true;
 
   LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - looking in inode tracker", ino);
-  bool retval = mount_point_->inode_tracker()->FindPath(ino, path);
+  glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
+  bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
   assert(retval);
   mount_point_->path_cache()->Insert(ino, *path);
   return true;
@@ -451,7 +460,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
  lookup_reply_positive:
   if (!file_system_->IsNfsSource()) {
-    mount_point_->inode_tracker()->VfsGet(dirent.inode(), path);
+    mount_point_->inode_tracker()->VfsGet(
+      glue::InodeEx(dirent.inode(), dirent.mode()), path);
   }
   // Will be a no-op if there is no fuse cache eviction
   mount_point_->dentry_tracker()->Add(parent_fuse, name, timeout);

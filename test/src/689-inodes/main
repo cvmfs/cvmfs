@@ -41,7 +41,7 @@ cvmfs_run_test() {
   echo "*** change cwd to /foo/bar on cvmfs"
   ls -lah $mntpnt/bar/symlink || return 20
 
-  echo "*** change /bar from symlink to directory"
+  echo "*** remove parent of current cwd"
   start_transaction $CVMFS_TEST_REPO || return $?
   rm -f /cvmfs/$CVMFS_TEST_REPO/bar || return 20
   mkdir /cvmfs/$CVMFS_TEST_REPO/bar || return 21
@@ -50,15 +50,6 @@ cvmfs_run_test() {
 
   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 22
   ls -lah ${mntpnt}/bar/realdir || return 30
-
-  echo "*** change /bar back from directory to symlink"
-  start_transaction $CVMFS_TEST_REPO || return $?
-  rm -rf /cvmfs/$CVMFS_TEST_REPO/bar || return 40
-  ln -s foo /cvmfs/$CVMFS_TEST_REPO/bar || return 41
-  publish_repo $CVMFS_TEST_REPO || return 43
-
-  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 45
-  ls -lah ${mntpnt}/bar/symlink || return 46
 
   return 0
 }

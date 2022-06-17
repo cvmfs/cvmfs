@@ -34,9 +34,12 @@ TEST_F(T_GlueBuffer, InodeTracker) {
   EXPECT_FALSE(inode_tracker_.NextInode(&cursor, &inode));
   inode_tracker_.EndEnumerate(&cursor);
 
-  inode_tracker_.VfsGet(1, PathString(""));
-  inode_tracker_.VfsGet(2, PathString("/foo"));
-  inode_tracker_.VfsGet(4, PathString("/foo/bar"));
+  inode_tracker_.VfsGet(glue::InodeEx(1, glue::InodeEx::kDirectory),
+                        PathString(""));
+  inode_tracker_.VfsGet(glue::InodeEx(2, glue::InodeEx::kDirectory),
+                        PathString("/foo"));
+  inode_tracker_.VfsGet(glue::InodeEx(4, glue::InodeEx::kRegular),
+                        PathString("/foo/bar"));
   cursor = inode_tracker_.BeginEnumerate();
   int bitset_entry = 0;
   int bitset_inode = 0;
@@ -270,6 +273,78 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   directives = tracker.Open(1, hashA);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
+}
+
+TEST_F(T_GlueBuffer, InodeEx) {
+  InodeEx inode_ex(0, InodeEx::kUnknownType);
+  EXPECT_EQ(sizeof(std::uint64_t), sizeof(inode_ex));
+
+  EXPECT_EQ(0U, inode_ex.GetInode());
+  EXPECT_EQ(InodeEx::kUnknownType, inode_ex.GetFileType());
+  EXPECT_EQ(hasher_inode(0), hasher_inode_ex(inode_ex));
+
+  inode_ex = InodeEx(1, InodeEx::kRegular);
+  EXPECT_EQ(1U, inode_ex.GetInode());
+  EXPECT_EQ(InodeEx::kRegular, inode_ex.GetFileType());
+  EXPECT_EQ(hasher_inode(1), hasher_inode_ex(inode_ex));
+
+  uint64_t largest_inode = (uint64_t(1) << 60) - 1;
+  inode_ex = InodeEx(largest_inode, InodeEx::kBulkDev);
+  EXPECT_EQ(largest_inode, inode_ex.GetInode());
+  EXPECT_EQ(InodeEx::kBulkDev, inode_ex.GetFileType());
+  EXPECT_EQ(hasher_inode(largest_inode), hasher_inode_ex(inode_ex));
+
+  SmallHashDynamic<InodeEx, char> map;
+  map.Init(16, InodeEx(), hasher_inode_ex);
+  map.Insert(InodeEx(42, InodeEx::kRegular), 1);
+  EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kRegular)));
+  EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kSymlink)));
+  EXPECT_FALSE(map.Contains(InodeEx(43, InodeEx::kRegular)));
+  InodeEx key(43, InodeEx::kUnknownType);
+  char value = 0;
+  EXPECT_FALSE(map.LookupEx(&key, &value));
+  key = InodeEx(42, InodeEx::kUnknownType);
+  EXPECT_TRUE(map.LookupEx(&key, &value));
+  EXPECT_EQ(1, value);
+  EXPECT_EQ(42U, key.GetInode());
+  EXPECT_EQ(InodeEx::kRegular, key.GetFileType());
+
+  map.Insert(InodeEx(42, InodeEx::kSymlink), 2);
+  EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kRegular)));
+  EXPECT_TRUE(map.Contains(InodeEx(42, InodeEx::kSymlink)));
+  EXPECT_FALSE(map.Contains(InodeEx(43, InodeEx::kRegular)));
+  EXPECT_TRUE(map.LookupEx(&key, &value));
+  EXPECT_EQ(2, value);
+  EXPECT_EQ(42U, key.GetInode());
+  EXPECT_EQ(InodeEx::kSymlink, key.GetFileType());
+
+  // Check that the original key survives map resizings
+  for (unsigned i = 100; i < 1000; ++i) {
+    map.Insert(InodeEx(i, InodeEx::kRegular), 0);
+  }
+  key = InodeEx(42, InodeEx::kUnknownType);
+  EXPECT_TRUE(map.LookupEx(&key, &value));
+  EXPECT_EQ(2, value);
+  EXPECT_EQ(42U, key.GetInode());
+  EXPECT_EQ(InodeEx::kSymlink, key.GetFileType());
+}
+
+TEST_F(T_GlueBuffer, InodeExMode) {
+  platform_stat64 info;
+  EXPECT_EQ(0, platform_stat(".", &info));
+  InodeEx inode_ex(42, info.st_mode);
+  EXPECT_EQ(InodeEx::kDirectory, inode_ex.GetFileType());
+  EXPECT_EQ(42U, inode_ex.GetInode());
+
+  EXPECT_EQ(0, platform_stat("/", &info));
+  EXPECT_TRUE(inode_ex.IsCompatibleFileType(info.st_mode));
+  CreateFile("regular", 0644);
+
+  EXPECT_EQ(0, platform_stat("regular", &info));
+  EXPECT_FALSE(inode_ex.IsCompatibleFileType(info.st_mode));
+
+  inode_ex = InodeEx(42, InodeEx::kUnknownType);
+  EXPECT_TRUE(inode_ex.IsCompatibleFileType(info.st_mode));
 }
 
 }  // namespace glue
