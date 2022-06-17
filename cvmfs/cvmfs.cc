@@ -463,8 +463,9 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
     mount_point_->inode_tracker()->VfsGet(
       glue::InodeEx(dirent.inode(), dirent.mode()), path);
   }
-  // Will be a no-op if there is no fuse cache eviction
-  mount_point_->dentry_tracker()->Add(parent_fuse, name, timeout);
+  // We do _not_ track (and evict) positive replies; among other things, test
+  // 076 fails with the following line uncommented
+  // mount_point_->dentry_tracker()->Add(parent_fuse, name, timeout);
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
