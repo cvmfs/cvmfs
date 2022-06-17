@@ -276,11 +276,11 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   }
   if (catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent)) {
     if (!inode_ex.IsCompatibleFileType(dirent->mode())) {
-      // This should not happen provided that dentry caches are cleared between
-      // catalog reloads
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+      LogCvmfs(kLogCvmfs, kLogDebug,
                "Warning: inode %" PRId64 " (%s) changed file type",
                ino, path.c_str());
+      // TODO(jblomer): we detect this issue but let it continue unhandled.
+      // Fix me.
     }
     // Fix inodes
     dirent->set_inode(ino);
