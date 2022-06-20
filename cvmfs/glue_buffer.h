@@ -25,6 +25,7 @@
 #include "shortstring.h"
 #include "smallhash.h"
 #include "util/atomic.h"
+#include "util/mutex.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
@@ -413,6 +414,10 @@ class PathMap {
     }
   }
 
+  void Replace(const shash::Md5 &md5path, uint64_t new_inode) {
+    map_.Insert(md5path, new_inode);
+  }
+
   void Clear() {
     map_.Clear();
     path_store_.Clear();
@@ -489,7 +494,12 @@ class InodeReferences {
   bool Put(const uint64_t inode, const uint32_t by) {
     uint32_t refcounter;
     bool found = map_.Lookup(inode, &refcounter);
-    assert(found);
+    if (!found) {
+      // May happen if a retired inode is cleared, i.e. if a file with
+      // outdated content is closed
+      return false;
+    }
+
     assert(refcounter >= by);
     if (refcounter == by) {
       map_.Erase(inode);
@@ -498,6 +508,14 @@ class InodeReferences {
     refcounter -= by;
     map_.Insert(inode, refcounter);
     return false;
+  }
+
+  void Replace(const uint64_t old_inode, const uint64_t new_inode) {
+    uint32_t refcounter;
+    bool found = map_.Lookup(old_inode, &refcounter);
+    assert(found);
+    map_.Erase(old_inode);
+    map_.Insert(new_inode, refcounter);
   }
 
   void Clear() {
@@ -660,6 +678,20 @@ class InodeTracker {
     Unlock();
     atomic_inc64(&statistics_.num_hits_inode);
     return inode;
+  }
+
+  void ReplaceInode(uint64_t old_inode, const InodeEx &new_inode) {
+    shash::Md5 md5path;
+    InodeEx old_inode_ex(old_inode, InodeEx::kUnknownType);
+    Lock();
+    bool found = inode_ex_map_.LookupMd5Path(&old_inode_ex, &md5path);
+    if (found) {
+      inode_references_.Replace(old_inode, new_inode.GetInode());
+      path_map_.Replace(md5path, new_inode.GetInode());
+      inode_ex_map_.Erase(old_inode);
+      inode_ex_map_.Insert(new_inode, md5path);
+    }
+    Unlock();
   }
 
   Cursor BeginEnumerate() {
@@ -927,6 +959,17 @@ class PageCacheTracker {
    */
   OpenDirectives OpenDirect();
   void Close(uint64_t inode);
+
+  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash) {
+    MutexLockGuard guard(lock_);
+    Entry entry;
+    bool retval = map_.Lookup(inode, &entry);
+    if (retval && (entry.nopen != 0)) {
+      *hash = entry.hash;
+      return true;
+    }
+    return false;
+  }
 
   EvictRaii GetEvictRaii() { return EvictRaii(this); }
 

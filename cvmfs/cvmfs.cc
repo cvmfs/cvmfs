@@ -220,6 +220,42 @@ static bool CheckVoms(const fuse_ctx &fctx) {
   return mount_point_->authz_session_mgr()->IsMemberOf(fctx.pid, mreq);
 }
 
+/**
+ * When we lookup an inode (cvmfs_lookup(), cvmfs_opendir()), we usually provide
+ * the live inode, i.e. the one in the inode tracker.  However, if the inode
+ * refers to an open file that has a different content then the one from the
+ * current catalogs, we will replace the live inode in the tracker by the one
+ * from the current generation.
+ *
+ * To still access the old inode, e.g. for fstat() on the open file, the stat
+ * structure connected to this inode is taken from the page cache tracker.
+ */
+static bool FixupOpenInode(const PathString &path,
+                           catalog::DirectoryEntry *dirent)
+{
+  if (!dirent->IsRegular())
+    return false;
+  if (dirent->inode() >= mount_point_->catalog_mgr()->GetRootInode())
+    return false;
+
+  shash::Any hash_open;
+  bool is_open = mount_point_->page_cache_tracker()->GetInfoIfOpen(
+    dirent->inode(), &hash_open);
+  if (!is_open)
+    return false;
+  // TODO(jblomer): fix for chunked files
+  if (hash_open == dirent->checksum())
+    return false;
+
+  // Overwrite dirent with inode from current generation
+  bool found = mount_point_->catalog_mgr()->LookupPath(
+      path, catalog::kLookupSole, dirent);
+  assert(found);
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "INODE CHANGE!");
+  return true;
+}
+
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
@@ -267,8 +303,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
   bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, &path);
   if (!retval) {
-    // Can this ever happen?
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+    // This may be a retired inode whose stat information is only available
+    // in the page cache tracker because there is still an open file
+    LogCvmfs(kLogCvmfs, kLogDebug,
              "GetDirentForInode inode lookup failure %" PRId64, ino);
     *dirent = dirent_negative;
     return false;
@@ -304,6 +341,8 @@ static bool GetDirentForPath(const PathString &path,
   if (mount_point_->md5path_cache()->Lookup(md5path, dirent)) {
     if (dirent->GetSpecial() == catalog::kDirentNegative)
       return false;
+    // We may have initially stored the entry with an old inode in the
+    // md5path cache and now should update it with the new one.
     if (!file_system_->IsNfsSource() && (live_inode != 0))
       dirent->set_inode(live_inode);
     return true;
@@ -316,11 +355,14 @@ static bool GetDirentForPath(const PathString &path,
   retval = catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent);
   if (retval) {
     if (file_system_->IsNfsSource()) {
-      // Fix inode
       dirent->set_inode(file_system_->nfs_maps()->GetInode(path));
     } else {
-      if (live_inode != 0)
+      if (live_inode != 0) {
         dirent->set_inode(live_inode);
+        if (FixupOpenInode(path, dirent))
+          mount_point_->inode_tracker()->ReplaceInode(
+            live_inode, glue::InodeEx(dirent->inode(), dirent->mode()));
+      }
     }
     mount_point_->md5path_cache()->Insert(md5path, *dirent);
     return true;
