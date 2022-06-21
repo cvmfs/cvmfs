@@ -116,12 +116,12 @@ TEST_F(T_BigVector, Replace) {
 }
 
 TEST_F(T_BigVector, GrowShrink) {
-  unsigned N = kNumSmall;
+  unsigned N = kNumBig;
   for (unsigned i = 0; i < N; ++i) {
     vec_->PushBack(i);
   }
   size_t old_capacity = vec_->capacity();
-  vec_->SetSize(kNumSmall - 1);
+  vec_->SetSize(kNumBig - 1);
   vec_->ShrinkIfOversized();
   EXPECT_EQ(old_capacity, vec_->capacity());
 

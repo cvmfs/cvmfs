@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <set>
 #include <string>
 
 #include "glue_buffer.h"
@@ -11,6 +12,7 @@
 #include "smallhash.h"
 #include "util/platform.h"
 #include "util/posix.h"
+#include "util/prng.h"
 
 namespace glue {
 
@@ -212,6 +214,40 @@ TEST_F(T_GlueBuffer, StringHeap) {
   } else {
     printf("Skipping 64bit allocation test\n");
   }
+}
+
+TEST_F(T_GlueBuffer, StatStore) {
+  StatStore store;
+  struct stat info;
+  info.st_ino = 42;
+  EXPECT_EQ(0, store.Add(info));
+  EXPECT_EQ(42u, store.Remove(0));
+
+  std::vector<int32_t> indexes;
+  for (int i = 0; i < 1000; ++i) {
+    info.st_ino = i;
+    indexes.push_back(store.Add(info));
+    EXPECT_EQ(i, indexes.back());
+  }
+
+  Prng prng;
+  prng.InitLocaltime();
+  std::set<uint64_t> inodes;
+  for (int i = 0; i < 1000; ++i) {
+    int32_t index = prng.Next(1000 - i);
+    info = store.Get(index);
+    inodes.insert(info.st_ino);
+
+    uint64_t inode = store.Remove(index);
+    EXPECT_LE(0U, inode);
+    EXPECT_LT(inode, 1000U);
+
+    if (index < (1000 - (i + 1))) {
+      info = store.Get(index);
+      EXPECT_EQ(inode, info.st_ino);
+    }
+  }
+  EXPECT_EQ(1000U, inodes.size());
 }
 
 TEST_F(T_GlueBuffer, PageCacheTrackerOff) {

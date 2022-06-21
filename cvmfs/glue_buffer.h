@@ -386,6 +386,8 @@ class StatStore {
     return index;
   }
 
+  // Note that if the last element is removed, the returned inode cannot be
+  // used anymore.
   uint64_t Remove(int32_t index) {
     struct stat info_back = store_.At(store_.size() - 1);
     store_.Replace(index, info_back);
