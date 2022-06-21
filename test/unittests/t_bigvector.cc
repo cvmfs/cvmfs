@@ -6,7 +6,7 @@
 
 #include "bigvector.h"
 
-class T_Bigvector : public ::testing::Test {
+class T_BigVector : public ::testing::Test {
  protected:
   virtual void SetUp() {
     vec_ = new BigVector<unsigned>();
@@ -20,7 +20,7 @@ class T_Bigvector : public ::testing::Test {
 };
 
 
-TEST_F(T_Bigvector, SmallCycle) {
+TEST_F(T_BigVector, SmallCycle) {
   unsigned N = kNumSmall;
   for (unsigned i = 0; i < N; ++i) {
     vec_->PushBack(i);
@@ -39,7 +39,7 @@ TEST_F(T_Bigvector, SmallCycle) {
 }
 
 
-TEST_F(T_Bigvector, BigCycle) {
+TEST_F(T_BigVector, BigCycle) {
   unsigned N = kNumBig;
   for (unsigned i = 0; i < N; ++i) {
     vec_->PushBack(i);
@@ -58,7 +58,7 @@ TEST_F(T_Bigvector, BigCycle) {
 }
 
 
-TEST_F(T_Bigvector, ShareBuffer) {
+TEST_F(T_BigVector, ShareBuffer) {
   unsigned N = kNumBig;
   for (unsigned i = 0; i < N; ++i) {
     vec_->PushBack(i);
@@ -77,7 +77,7 @@ TEST_F(T_Bigvector, ShareBuffer) {
   }
 }
 
-TEST_F(T_Bigvector, Copy) {
+TEST_F(T_BigVector, Copy) {
   unsigned N = kNumBig;
   for (unsigned i = 0; i < N; ++i) {
     vec_->PushBack(i);
@@ -94,6 +94,42 @@ TEST_F(T_Bigvector, Copy) {
   new_vector = *vec_;
   for (unsigned i = 0; i < N; ++i) {
     unsigned value = new_vector.At(i);
+    EXPECT_EQ(value, i);
+  }
+}
+
+TEST_F(T_BigVector, Replace) {
+  unsigned N = kNumSmall;
+  for (unsigned i = 0; i < N; ++i) {
+    vec_->PushBack(i);
+  }
+  for (unsigned i = 0; i < N; ++i) {
+    vec_->Replace(i, 2*i);
+  }
+  EXPECT_EQ(vec_->size(), N);
+  EXPECT_GE(vec_->capacity(), vec_->size());
+
+  for (unsigned i = 0; i < N; ++i) {
+    unsigned value = vec_->At(i);
+    EXPECT_EQ(value, 2 * i);
+  }
+}
+
+TEST_F(T_BigVector, GrowShrink) {
+  unsigned N = kNumSmall;
+  for (unsigned i = 0; i < N; ++i) {
+    vec_->PushBack(i);
+  }
+  size_t old_capacity = vec_->capacity();
+  vec_->SetSize(kNumSmall - 1);
+  vec_->ShrinkIfOversized();
+  EXPECT_EQ(old_capacity, vec_->capacity());
+
+  vec_->SetSize(100);
+  vec_->ShrinkIfOversized();
+  EXPECT_LT(vec_->capacity(), old_capacity);
+  for (unsigned i = 0; i < 100; ++i) {
+    unsigned value = vec_->At(i);
     EXPECT_EQ(value, i);
   }
 }

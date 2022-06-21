@@ -97,6 +97,8 @@ class BigVector {
   }
 
   void ShrinkIfOversized() {
+    assert(!shared_buffer_);
+
     if (size_ <= kNumInit)
       return;
     if (float(size_) >= (0.25 * float(capacity_)))
