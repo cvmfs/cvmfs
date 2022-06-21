@@ -254,6 +254,7 @@ TEST_F(T_GlueBuffer, PageCacheTrackerOff) {
   PageCacheTracker tracker;
   tracker.Disable();
   struct stat info;
+  info.st_ino = 1;
   PageCacheTracker::OpenDirectives directives;
   directives = tracker.Open(1, shash::Any(), info);
   EXPECT_EQ(false, directives.keep_cache);
@@ -267,6 +268,7 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   PageCacheTracker tracker;
   PageCacheTracker::OpenDirectives directives;
   struct stat info;
+  info.st_ino = 1;
 
   shash::Any hashA(shash::kShake128);
   shash::Any hashB(shash::kShake128);
@@ -311,6 +313,30 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   directives = tracker.Open(1, hashA, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
+}
+
+TEST_F(T_GlueBuffer, PageCacheTrackerStat) {
+  PageCacheTracker tracker;
+  struct stat info;
+  info.st_ino = 42;
+
+  shash::Any hash(shash::kShake128);
+  shash::HashString("X", &hash);
+  struct stat ress;
+  shash::Any resh;
+
+  tracker.Open(42, hash, info);
+  EXPECT_TRUE(tracker.GetInfoIfOpen(42, &resh, &ress));
+  EXPECT_EQ(42U, ress.st_ino);
+  EXPECT_EQ(hash, resh);
+
+  tracker.Open(42, hash, info);
+  EXPECT_EQ(42U, ress.st_ino);
+  EXPECT_EQ(hash, resh);
+
+  tracker.Close(42);
+  tracker.Close(42);
+  EXPECT_FALSE(tracker.GetInfoIfOpen(42, &resh, &ress));
 }
 
 TEST_F(T_GlueBuffer, InodeEx) {

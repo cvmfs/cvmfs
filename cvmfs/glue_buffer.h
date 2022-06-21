@@ -1000,12 +1000,16 @@ class PageCacheTracker {
   OpenDirectives OpenDirect();
   void Close(uint64_t inode);
 
-  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash) {
+  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash, struct stat *info = NULL)
+  {
     MutexLockGuard guard(lock_);
     Entry entry;
     bool retval = map_.Lookup(inode, &entry);
     if (retval && (entry.nopen != 0)) {
+      assert(entry.idx_stat >= 0);
       *hash = entry.hash;
+      if (info != NULL)
+        *info = stat_store_.Get(entry.idx_stat);
       return true;
     }
     return false;
