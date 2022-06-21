@@ -221,7 +221,7 @@ TEST_F(T_GlueBuffer, StatStore) {
   struct stat info;
   info.st_ino = 42;
   EXPECT_EQ(0, store.Add(info));
-  EXPECT_EQ(42u, store.Remove(0));
+  EXPECT_EQ(42u, store.Erase(0));
 
   std::vector<int32_t> indexes;
   for (int i = 0; i < 1000; ++i) {
@@ -238,7 +238,7 @@ TEST_F(T_GlueBuffer, StatStore) {
     info = store.Get(index);
     inodes.insert(info.st_ino);
 
-    uint64_t inode = store.Remove(index);
+    uint64_t inode = store.Erase(index);
     EXPECT_LE(0U, inode);
     EXPECT_LT(inode, 1000U);
 

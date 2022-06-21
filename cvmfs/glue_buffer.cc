@@ -351,7 +351,8 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
     } else {
       open_directives.keep_cache = true;
       statistics_.n_open_cached++;
-      entry.nopen++;
+      if (entry.nopen++ == 0)
+        entry.idx_stat = stat_store_.Add(info);
       map_.Insert(inode, entry);
       return open_directives;
     }
@@ -375,6 +376,7 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   open_directives.keep_cache = false;
   statistics_.n_open_flush++;
   entry.hash = hash;
+  entry.idx_stat = stat_store_.Add(info);
   entry.nopen = -1;
   map_.Insert(inode, entry);
   return open_directives;
@@ -409,7 +411,8 @@ void PageCacheTracker::Close(uint64_t inode) {
   entry.nopen--;
   if (entry.nopen == 0) {
     // File closed, remove struct stat information
-    uint64_t inode_update = stat_store_.Remove(entry.idx_stat);
+    assert(entry.idx_stat >= 0);
+    uint64_t inode_update = stat_store_.Erase(entry.idx_stat);
     Entry entry_update;
     retval = map_.Lookup(inode_update, &entry_update);
     assert(retval);

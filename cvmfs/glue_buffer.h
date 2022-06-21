@@ -386,9 +386,8 @@ class StatStore {
     return index;
   }
 
-  // Note that if the last element is removed, the returned inode cannot be
-  // used anymore.
-  uint64_t Remove(int32_t index) {
+  // Note that that if the last element is removed, no swap has taken place
+  uint64_t Erase(int32_t index) {
     struct stat info_back = store_.At(store_.size() - 1);
     store_.Replace(index, info_back);
     store_.SetSize(store_.size() - 1);
