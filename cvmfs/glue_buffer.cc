@@ -313,7 +313,7 @@ void PageCacheTracker::InitLock() {
 }
 
 PageCacheTracker::OpenDirectives PageCacheTracker::Open(
-  uint64_t inode, const shash::Any &hash)
+  uint64_t inode, const shash::Any &hash, const struct stat &info)
 {
   OpenDirectives open_directives;
   // Old behavior: always flush page cache on open

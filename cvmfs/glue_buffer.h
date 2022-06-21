@@ -952,7 +952,8 @@ class PageCacheTracker {
   PageCacheTracker &operator= (const PageCacheTracker &other);
   ~PageCacheTracker();
 
-  OpenDirectives Open(uint64_t inode, const shash::Any &hash);
+  OpenDirectives Open(uint64_t inode, const shash::Any &hash,
+                      const struct stat &info);
   /**
    * Forced direct I/O open. Used when the corresponding flag is set in the
    * file catalogs. In this case, we don't need to track the inode.

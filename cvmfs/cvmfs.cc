@@ -1017,7 +1017,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       open_directives = mount_point_->page_cache_tracker()->OpenDirect();
     } else {
       open_directives =
-        mount_point_->page_cache_tracker()->Open(ino, dirent.checksum());
+        mount_point_->page_cache_tracker()->Open(
+          ino, dirent.checksum(), dirent.GetStatStructure());
     }
     fuse_remounter_->fence()->Leave();
   } else {
@@ -1036,6 +1037,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     }
 
     // Figure out unique inode from annotated catalog
+    // TODO(jblomer): we only need to lookup if the inode is not from the
+    // current generation
     catalog::DirectoryEntry dirent_origin;
     if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent_origin)) {
       fuse_remounter_->fence()->Leave();
@@ -1109,7 +1112,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       open_directives = mount_point_->page_cache_tracker()->OpenDirect();
     } else {
       open_directives = mount_point_->page_cache_tracker()->Open(
-        ino, chunk_reflist.HashChunkList());
+        ino, chunk_reflist.HashChunkList(), dirent.GetStatStructure());
     }
     FillOpenFlags(open_directives, fi);
     fi->fh = static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));

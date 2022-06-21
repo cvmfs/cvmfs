@@ -217,8 +217,9 @@ TEST_F(T_GlueBuffer, StringHeap) {
 TEST_F(T_GlueBuffer, PageCacheTrackerOff) {
   PageCacheTracker tracker;
   tracker.Disable();
+  struct stat info;
   PageCacheTracker::OpenDirectives directives;
-  directives = tracker.Open(1, shash::Any());
+  directives = tracker.Open(1, shash::Any(), info);
   EXPECT_EQ(false, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
   // Don't crash on unknown inode
@@ -229,21 +230,22 @@ TEST_F(T_GlueBuffer, PageCacheTrackerOff) {
 TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   PageCacheTracker tracker;
   PageCacheTracker::OpenDirectives directives;
+  struct stat info;
 
   shash::Any hashA(shash::kShake128);
   shash::Any hashB(shash::kShake128);
   shash::HashString("A", &hashA);
   shash::HashString("B", &hashB);
 
-  directives = tracker.Open(1, hashA);
+  directives = tracker.Open(1, hashA, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
-  directives = tracker.Open(1, hashA);
+  directives = tracker.Open(1, hashA, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
-  directives = tracker.Open(1, hashB);
+  directives = tracker.Open(1, hashB, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(true, directives.direct_io);
 
@@ -252,17 +254,17 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   tracker.Close(1);
   EXPECT_DEATH(tracker.Close(1), ".*");
 
-  directives = tracker.Open(1, hashB);
+  directives = tracker.Open(1, hashB, info);
   EXPECT_EQ(false, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
-  directives = tracker.Open(1, hashB);
+  directives = tracker.Open(1, hashB, info);
   EXPECT_EQ(false, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
   tracker.Close(1);
 
-  directives = tracker.Open(1, hashB);
+  directives = tracker.Open(1, hashB, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
@@ -270,7 +272,7 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   tracker.Close(1);
 
   tracker.GetEvictRaii().Evict(1);
-  directives = tracker.Open(1, hashA);
+  directives = tracker.Open(1, hashA, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 }
