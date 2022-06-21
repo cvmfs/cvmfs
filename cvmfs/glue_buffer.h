@@ -371,6 +371,39 @@ class PathStore {
 //------------------------------------------------------------------------------
 
 
+/**
+ * A vector of stat structs. When removing items, the empty slot is swapped
+ * with the last element so that there are no gaps in the vector.  The memory
+ * allocation of the vector grows and shrinks with the size.
+ * Removal of items returns the inode of the element swapped with the gap so
+ * that the page entry tracker can update its index.
+ */
+class StatStore {
+ public:
+  int32_t Add(const struct stat &info) {
+    int32_t index = store_.size();
+    store_.PushBack(info);
+    return index;
+  }
+
+  uint64_t Remove(int32_t index) {
+    struct stat info_back = store_.At(store_.size() - 1);
+    store_.Replace(index, info_back);
+    store_.SetSize(store_.size() - 1);
+    store_.ShrinkIfOversized();
+    return info_back.st_ino;
+  }
+
+  struct stat Get(int32_t index) const { return store_.At(index); }
+
+ private:
+  BigVector<struct stat> store_;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class PathMap {
  public:
   PathMap() {
@@ -865,14 +898,19 @@ class DentryTracker {
 class PageCacheTracker {
  private:
   struct Entry {
-    Entry() : nopen(0) {}
-    Entry(int32_t n, const shash::Any &h) : nopen(n), hash(h) {}
+    Entry() : nopen(0), idx_stat(-1) {}
+    Entry(int32_t n, int32_t i, const shash::Any &h)
+      : nopen(n), idx_stat(i), hash(h) {}
     /**
      * Reference counter for currently open files with a given inode. If the
      * sign bit is set, the entry is in the transition phase from one hash to
      * another. The sign will be cleared on Close() in this case.
      */
     int32_t nopen;
+    /**
+     * Points into the list of stat structs; >= 0 only for open files.
+     */
+    int32_t idx_stat;
     /**
      * The content hash of the data stored in the page cache. For chunked files,
      * hash contains an artificial hash over all the chunk hash values.
@@ -994,6 +1032,7 @@ class PageCacheTracker {
   bool is_active_;
   Statistics statistics_;
   SmallHashDynamic<uint64_t, Entry> map_;
+  StatStore stat_store_;
 };
 
 
