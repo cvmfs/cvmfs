@@ -252,7 +252,6 @@ static bool FixupOpenInode(const PathString &path,
       path, catalog::kLookupSole, dirent);
   assert(found);
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "INODE CHANGE!");
   return true;
 }
 
@@ -308,6 +307,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     LogCvmfs(kLogCvmfs, kLogDebug,
              "GetDirentForInode inode lookup failure %" PRId64, ino);
     *dirent = dirent_negative;
+    // Indicate that the inode was not found in the tracker rather than not
+    // found in the catalog
+    dirent->set_inode(ino);
     return false;
   }
   if (catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent)) {
@@ -356,12 +358,15 @@ static bool GetDirentForPath(const PathString &path,
   if (retval) {
     if (file_system_->IsNfsSource()) {
       dirent->set_inode(file_system_->nfs_maps()->GetInode(path));
-    } else {
-      if (live_inode != 0) {
-        dirent->set_inode(live_inode);
-        if (FixupOpenInode(path, dirent))
-          mount_point_->inode_tracker()->ReplaceInode(
-            live_inode, glue::InodeEx(dirent->inode(), dirent->mode()));
+    } else if (live_inode != 0) {
+      dirent->set_inode(live_inode);
+      if (FixupOpenInode(path, dirent)) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+          "content of %s change, replacing inode %" PRIu64 " --> %" PRIu64,
+          path.c_str(), live_inode, dirent->inode());
+        // The new inode is put in the tracker with refcounter == 0
+        mount_point_->inode_tracker()->ReplaceInode(
+          live_inode, glue::InodeEx(dirent->inode(), dirent->mode()));
       }
     }
     mount_point_->md5path_cache()->Insert(md5path, *dirent);
@@ -654,8 +659,21 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     return;
   }
   catalog::DirectoryEntry dirent;
-  const bool found = GetDirentForInode(ino, &dirent);
+  bool found = GetDirentForInode(ino, &dirent);
   TraceInode(Tracer::kEventGetAttr, ino, "getattr()");
+  if (!found && (dirent.inode() == ino)) {
+    // Serve retired inode from page cache tracker
+    shash::Any hash;
+    struct stat info;
+    found =
+      mount_point_->page_cache_tracker()->GetInfoIfOpen(ino, &hash, &info);
+    if (found) {
+      fuse_remounter_->fence()->Leave();
+      fuse_reply_attr(req, &info, GetKcacheTimeout());
+    } else {
+      // LogCvmfs() strange place, may that happen?
+    }
+  }
   fuse_remounter_->fence()->Leave();
 
   if (!found) {

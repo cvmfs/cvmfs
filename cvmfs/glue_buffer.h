@@ -545,11 +545,8 @@ class InodeReferences {
   }
 
   void Replace(const uint64_t old_inode, const uint64_t new_inode) {
-    uint32_t refcounter;
-    bool found = map_.Lookup(old_inode, &refcounter);
-    assert(found);
     map_.Erase(old_inode);
-    map_.Insert(new_inode, refcounter);
+    map_.Insert(new_inode, 0);
   }
 
   void Clear() {
