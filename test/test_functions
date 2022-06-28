@@ -1086,6 +1086,7 @@ open_silent_port() {
   local mock
 
   mock="${CVMFS_PYTHON2} ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
+  echo "Calling $mock" >> $logfile
 
   # Do similar fifo-trick as in run_background_service() to get the PID of the
   # actual silent_socket.py process rather than just the `sudo` around it.

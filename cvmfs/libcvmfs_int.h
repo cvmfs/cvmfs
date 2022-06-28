@@ -23,6 +23,7 @@
 #include "backoff.h"
 #include "catalog_mgr.h"
 #include "file_chunk.h"
+#include "interrupt.h"
 #include "loader.h"
 #include "lru.h"
 #include "mountpoint.h"
@@ -155,6 +156,12 @@ class LibContext : SingleCopy {
    */
   OptionsManager *options_mgr_;
   MountPoint *mount_point_;
+
+  /**
+   * Used to prevent construction/destruction of an InterruptCue object in every
+   * file system operation.
+   */
+  InterruptCue default_interrupt_cue_;
 };
 
 #endif  // CVMFS_LIBCVMFS_INT_H_

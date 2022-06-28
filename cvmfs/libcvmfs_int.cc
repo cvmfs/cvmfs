@@ -58,6 +58,7 @@
 #include "fetch.h"
 #include "globals.h"
 #include "hash.h"
+#include "interrupt.h"
 #include "libcvmfs.h"
 #include "logging.h"
 #include "lru_md.h"
@@ -295,7 +296,7 @@ void LibContext::AppendStatToList(const cvmfs_stat_t   st,
 
 int LibContext::GetAttr(const char *c_path, struct stat *info) {
   perf::Inc(file_system()->n_fs_stat());
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -333,7 +334,7 @@ void LibContext::CvmfsAttrFromDirent(
 
 
 int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -384,7 +385,7 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
 int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
   perf::Inc(file_system()->n_fs_readlink());
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -416,7 +417,7 @@ int LibContext::ListDirectory(
   bool self_reference
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -471,7 +472,7 @@ int LibContext::ListDirectoryStat(
   size_t *listlen,
   size_t *buflen) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir_stat on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -511,7 +512,7 @@ int LibContext::GetNestedCatalogAttr(
   const char *c_path,
   struct cvmfs_nc_attr *nc_attr
 ) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
   LogCvmfs(kLogCvmfs, kLogDebug,
     "cvmfs_stat_nc (cvmfs_nc_attr) : %s", c_path);
 
@@ -559,7 +560,7 @@ int LibContext::ListNestedCatalogs(
   char ***buf,
   size_t *buflen
 ) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
   LogCvmfs(kLogCvmfs, kLogDebug,
     "cvmfs_list_nc on path: %s", c_path);
 
@@ -592,7 +593,7 @@ int LibContext::ListNestedCatalogs(
 
 int LibContext::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -664,7 +665,8 @@ int64_t LibContext::Pread(
   uint64_t off)
 {
   if (fd & kFdChunked) {
-    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+    ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                        &default_interrupt_cue_);
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks open_chunks =
       mount_point_->simple_chunk_tables()->Get(chunk_handle);

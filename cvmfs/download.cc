@@ -54,6 +54,7 @@
 #include "compression.h"
 #include "duplex_curl.h"
 #include "hash.h"
+#include "interrupt.h"
 #include "logging.h"
 #include "prng.h"
 #include "sanitizer.h"
@@ -1403,6 +1404,10 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->destination_mem.data = NULL;
       info->destination_mem.size = 0;
       info->destination_mem.pos = 0;
+    }
+    if (info->interrupt_cue && info->interrupt_cue->IsCanceled()) {
+      info->error_code = kFailCanceled;
+      goto verify_and_finalize_stop;
     }
     if ((info->destination == kDestinationFile) ||
         (info->destination == kDestinationPath))
