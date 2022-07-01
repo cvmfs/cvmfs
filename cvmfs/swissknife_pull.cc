@@ -711,7 +711,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
         assert(reflog != NULL);
       } else {
         LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no reflog (ignoring)");
-        if (spooler->Peek("/.cvmfsreflog")) {
+        if (spooler->Peek(".cvmfsreflog")) {
           LogCvmfs(kLogCvmfs, kLogStderr,
                    "no reflog hash specified but reflog is present");
           goto fini;
