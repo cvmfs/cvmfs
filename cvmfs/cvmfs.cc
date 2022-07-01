@@ -358,6 +358,7 @@ static bool GetDirentForPath(const PathString &path,
   if (retval) {
     if (file_system_->IsNfsSource()) {
       dirent->set_inode(file_system_->nfs_maps()->GetInode(path));
+      mount_point_->md5path_cache()->Insert(md5path, *dirent);
     } else if (live_inode != 0) {
       dirent->set_inode(live_inode);
       if (FixupOpenInode(path, dirent)) {
@@ -365,11 +366,14 @@ static bool GetDirentForPath(const PathString &path,
           "content of %s change, replacing inode %" PRIu64 " --> %" PRIu64,
           path.c_str(), live_inode, dirent->inode());
         // The new inode is put in the tracker with refcounter == 0
+        // TODO(jblomer): move the replacement to cvmfs_lookup
         mount_point_->inode_tracker()->ReplaceInode(
           live_inode, glue::InodeEx(dirent->inode(), dirent->mode()));
+        // Do not populate the md5path cache until the inode tracker is fixed
+      } else {
+        mount_point_->md5path_cache()->Insert(md5path, *dirent);
       }
     }
-    mount_point_->md5path_cache()->Insert(md5path, *dirent);
     return true;
   }
 
