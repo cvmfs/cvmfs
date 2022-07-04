@@ -1,3 +1,6 @@
+2.9.4:
+  * Fix packaging on Ubuntu 22.04
+
 2.9.3:
   * Fix releasing of GC lock (#2982)
   * Improve robustness of link between watchdog and fuse module (#2971)
