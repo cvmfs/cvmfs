@@ -1,4 +1,5 @@
 2.10.0:
+  * [server] Avoid double-slash URLs in HTTP HEAD requests (#2989)
   * Cancel network fail-over cycle when fuse request is canceled (#2983)
   * Update c-ares to version 1.18.1 (#2977)
   * [gw] Remove too strict repository name check (#2973)
