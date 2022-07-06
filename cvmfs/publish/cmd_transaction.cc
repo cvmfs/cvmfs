@@ -93,12 +93,13 @@ int CmdTransaction::Main(const Options &options) {
                      EPublish::kFailWhitelistExpired);
     }
   } catch (const EPublish &e) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
     if (e.failure() == EPublish::kFailLayoutRevision ||
         e.failure() == EPublish::kFailWhitelistExpired)
     {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
       return EINVAL;
     }
+    return EIO;
   }
 
   double whitelist_valid_s =
