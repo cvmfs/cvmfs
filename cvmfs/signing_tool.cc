@@ -93,7 +93,7 @@ SigningTool::Result SigningTool::Run(
     }
   } else {
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no reflog (ignoring)");
-    if (spooler->Peek("/.cvmfsreflog")) {
+    if (spooler->Peek(".cvmfsreflog")) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "no reflog hash specified but reflog is present");
       return kError;
