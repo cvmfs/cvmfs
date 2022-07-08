@@ -52,8 +52,6 @@ install_from_repo fuse-overlayfs
 #       and enable test 056-lowspeedlimit
 
 # Install test dependency for 647
-install_from_repo python2-pip
-sudo pip2 install flask                      || die "fail (installing python-flask)"
 install_from_repo python3-flask
 
 # Install test dependency for 604
@@ -69,7 +67,7 @@ install_from_repo zlib-devel
 install_from_repo libattr-devel
 install_from_repo openssl-devel
 install_from_repo libuuid-devel
-install_from_repo python2-devel
+install_from_repo python3-devel
 install_from_repo unzip
 install_from_repo bzip2
 install_from_repo acl
