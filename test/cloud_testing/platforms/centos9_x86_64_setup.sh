@@ -75,8 +75,8 @@ install_from_repo bzip2
 install_from_repo acl
 
 # Migration test needs lsb_release
-echo "install lsb_release..."
-install_from_repo redhat-lsb-core
+# echo "install lsb_release..."
+# install_from_repo redhat-lsb-core
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
