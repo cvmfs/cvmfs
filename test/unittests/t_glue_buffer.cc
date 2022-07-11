@@ -277,7 +277,7 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
 
 TEST_F(T_GlueBuffer, InodeEx) {
   InodeEx inode_ex(0, InodeEx::kUnknownType);
-  EXPECT_EQ(sizeof(std::uint64_t), sizeof(inode_ex));
+  EXPECT_EQ(sizeof(uint64_t), sizeof(inode_ex));
 
   EXPECT_EQ(0U, inode_ex.GetInode());
   EXPECT_EQ(InodeEx::kUnknownType, inode_ex.GetFileType());
