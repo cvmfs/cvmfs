@@ -59,12 +59,12 @@ fi
 # that go-junit-report is installed
 # and that we are on a 64bit architecture
 build_ducc="OFF"
-if [ $(can_build_ducc) -ge 1 ]; then
+if can_build_ducc; then
   build_ducc="ON"
 fi
 
 build_gateway="OFF"
-if [ $(can_build_gateway) -ge 1 ]; then
+if can_build_gateway; then
   build_gateway="ON"
 fi
 

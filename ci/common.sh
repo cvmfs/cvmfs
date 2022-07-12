@@ -234,8 +234,7 @@ expand_template() {
 can_build_ducc() {
   arch=$(go env GOARCH)
   if [ $arch != "amd64" ]; then
-    echo "0"
-    return
+    return 1
   fi
   if which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1 ; then
     go_version=$(go version)
@@ -244,24 +243,24 @@ can_build_ducc() {
     go_patch=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\3/p')
 
     if [ $go_major -gt 1 ]; then
-      echo "1"
+      return 0
     elif [ $go_major -lt 1 ]; then
-      echo "0"
+      return 1
     else
       if [ $go_minor -gt 12 ]; then
-        echo "1"
+        return 0
       elif [ $go_minor -lt 12 ]; then
-        echo "0"
+        return 1
       else
         if [ $go_patch -ge 0 ]; then
-          echo "1"
+          return 0
         else
-          echo "0"
+          return 1
         fi
       fi
     fi
   else
-    echo "0"
+    return 1
   fi
 }
 
