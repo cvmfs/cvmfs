@@ -26,6 +26,8 @@ CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
 CVMFS_TEST_PUBLISH=0
 
+RETVAL=0
+
 while getopts "qc:g:s:l:Gdp" option; do
   case $option in
     q)
@@ -87,6 +89,7 @@ if [ "x$CVMFS_GEOAPI_SOURCES" != "x" ]; then
   fi
   echo "*** Running Geo-API unit tests"
   $PYTHON_COMMAND test_cvmfs_geo.py
+  RETVAL=$(( RETVAL | $? ))
   popd
 else
   echo "*** Skipping Geo-API unit tests"
@@ -115,6 +118,7 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
       echo "cache plugin started as PID $plugin_pid"
       $CVMFS_CACHE_UNITTESTS $CVMFS_CACHE_LOCATOR \
         --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin)
+      RETVAL=$(( RETVAL | $? ))
       /bin/kill $plugin_pid
       rm -rf "/tmp/cvmfs_cache_test_dir/"
     else
@@ -129,6 +133,7 @@ if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
   $CVMFS_SHRINKWRAP_TEST_BINARY --gtest_shuffle                                     \
     --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.shrinkwrap \
     --gtest_filter=$test_filter
+  RETVAL=$(( RETVAL | $? ))
 else
   echo "*** Skipping shrinkwrap unit tests"
 fi
@@ -137,6 +142,7 @@ if can_build_gateway; then
   echo "*** Running gateway unit tests (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway)"
   pushd ${SCRIPT_LOCATION}/../gateway > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway
+  RETVAL=$(( RETVAL | $? ))
   popd > /dev/null
 else
   echo "*** Skipping gateway unit tests"
@@ -146,6 +152,7 @@ if can_build_ducc; then
   echo "*** Running container tools unit tests (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc)"
   pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc
+  RETVAL=$(( RETVAL | $? ))
   popd > /dev/null
 else
   echo "*** Skipping container tools unit tests"
@@ -157,6 +164,7 @@ if [ $CVMFS_TEST_PUBLISH = 1 ]; then
   $CVMFS_PUBLISH_UNITTESTS --gtest_shuffle                                     \
                            --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                            --gtest_filter=$test_filter
+  RETVAL=$(( RETVAL | $? ))
 else
   echo "*** Skipping publish unit tests"
 fi
@@ -166,3 +174,5 @@ echo "*** Running core unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCAT
 $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
+RETVAL=$(( RETVAL | $? ))
+exit $RETVAL
