@@ -64,6 +64,12 @@ create_whitelist() {
   local usemasterkeycard=0
   local hash_algorithm
 
+  local openssl_keyutil_cmd="rsautl"
+  local openssl_version=`openssl version | cut -d' ' -f2`
+  if compare_versions "${openssl_version}" -ge "3.0.0" ; then
+    openssl_keyutil_cmd="pkeyutl"
+  fi
+
   local whitelist
   whitelist=${temp_dir}/whitelist.$name
 
@@ -111,11 +117,11 @@ create_whitelist() {
     else
       masterkeycard_read_pubkey >${whitelist}.pub
     fi
-    local checkhash="`openssl rsautl -verify -inkey ${whitelist}.pub -pubin -in ${whitelist}.signature 2>/dev/null`"
+    local checkhash="`${openssl_keyutil_cmd} -verify -inkey ${whitelist}.pub -pubin -in ${whitelist}.signature 2>/dev/null`"
     rm -f ${whitelist}.pub
     [ "$hash" = "$checkhash" ] || die "invalid masterkeycard signature"
   else
-    openssl rsautl -inkey $masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
+    ${openssl_keyutil_cmd} -inkey $masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
   fi
   cat ${whitelist}.unsigned ${whitelist}.signature > $whitelist
   chown $user $whitelist
