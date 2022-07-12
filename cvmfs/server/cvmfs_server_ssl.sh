@@ -64,10 +64,10 @@ create_whitelist() {
   local usemasterkeycard=0
   local hash_algorithm
 
-  local openssl_keyutil_cmd="rsautl"
+  local openssl_keyutil_cmd="openssl rsautl"
   local openssl_version=`openssl version | cut -d' ' -f2`
   if compare_versions "${openssl_version}" -ge "3.0.0" ; then
-    openssl_keyutil_cmd="pkeyutl"
+    openssl_keyutil_cmd="openssl pkeyutl"
   fi
 
   local whitelist
