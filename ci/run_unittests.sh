@@ -86,6 +86,7 @@ if [ "x$CVMFS_GEOAPI_SOURCES" != "x" ]; then
       PYTHON_COMMAND="python3"
     fi
   fi
+  echo "RUNNING Geo-API UNIT TESTS"
   $PYTHON_COMMAND test_cvmfs_geo.py
   popd
 fi
@@ -106,7 +107,8 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
       i=$((i + 1))
       CVMFS_CACHE_LOCATOR=tcp=127.0.0.1:$CVMFS_CACHE_LOCATOR_PORT
       echo "CVMFS_CACHE_PLUGIN_LOCATOR=$CVMFS_CACHE_LOCATOR" >> $CVMFS_CACHE_CONFIG
-      echo "running unit tests for cache plugin $plugin on $CVMFS_CACHE_LOCATOR"
+      echo -n "RUNNING CACHE PLUGIN UNIT TESTS for cache plugin $plugin on $CVMFS_CACHE_LOCATOR"
+      echo " (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin))"
       # All our plugins take a configuration file as a parameter
       plugin_pid="$($plugin $CVMFS_CACHE_CONFIG)"
       echo "cache plugin started as PID $plugin_pid"
@@ -123,28 +125,28 @@ fi
 
 # run the shrinkwrap tests
 if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
-  echo "running shrinkwrap tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
+  echo "RUNNING SHRINKWRAP UNIT TESTS (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.shrinkwrap)..."
   $CVMFS_SHRINKWRAP_TEST_BINARY --gtest_shuffle                                     \
     --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.shrinkwrap \
     --gtest_filter=$test_filter
 fi
 
 if can_build_gateway; then
-  echo "running gateway unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  echo "RUNNING GATEWAY UNIT TESTS (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway)"
   pushd ${SCRIPT_LOCATION}/../gateway > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway
   popd > /dev/null
 fi
 
 if [ $CVMFS_TEST_DUCC = 1 ] && can_build_ducc; then
-  echo "running ducc unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  echo "RUNNING CONTAINER TOOLS UNIT TEST (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc)"
   pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc
   popd > /dev/null
 fi
 
 if [ $CVMFS_TEST_PUBLISH = 1 ]; then
-  echo "running publish unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  echo "RUNNING PUBLISH UNIT TESTS (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)"
   CVMFS_PUBLISH_UNITTESTS="$(dirname $CVMFS_UNITTESTS_BINARY)/cvmfs_test_publish"
   $CVMFS_PUBLISH_UNITTESTS --gtest_shuffle                                     \
                            --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
@@ -152,7 +154,7 @@ if [ $CVMFS_TEST_PUBLISH = 1 ]; then
 fi
 
 # run the unit tests
-echo "running unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
+echo "RUNNING CORE UNIT TESTS (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
 $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
