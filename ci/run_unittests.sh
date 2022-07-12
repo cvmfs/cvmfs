@@ -24,7 +24,6 @@ CVMFS_UNITTESTS_QUICK=0
 CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
-CVMFS_TEST_DUCC=0
 CVMFS_TEST_PUBLISH=0
 
 while getopts "qc:g:s:l:Gdp" option; do
@@ -46,7 +45,7 @@ while getopts "qc:g:s:l:Gdp" option; do
       :
     ;;
     d)
-      CVMFS_TEST_DUCC=1
+      # Deprecated; container tools unit tests are always run when the code can build
     ;;
     p)
       CVMFS_TEST_PUBLISH=1
@@ -143,7 +142,7 @@ else
   echo "*** Skipping gateway unit tests"
 fi
 
-if [ $CVMFS_TEST_DUCC = 1 ] && can_build_ducc; then
+if can_build_ducc; then
   echo "*** Running container tools unit tests (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc)"
   pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc
