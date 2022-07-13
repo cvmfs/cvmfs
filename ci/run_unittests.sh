@@ -4,8 +4,6 @@
 # This script wraps the unit test run of CernVM-FS.
 #
 
-set -e
-
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/common.sh
 
@@ -24,8 +22,9 @@ CVMFS_UNITTESTS_QUICK=0
 CVMFS_SHRINKWRAP_TEST_BINARY="$CVMFS_SHRINKWRAP_TEST_BINARY"
 CVMFS_CACHE_PLUGIN=
 CVMFS_GEOAPI_SOURCES=
-CVMFS_TEST_DUCC=0
 CVMFS_TEST_PUBLISH=0
+
+RETVAL=0
 
 while getopts "qc:g:s:l:Gdp" option; do
   case $option in
@@ -46,7 +45,7 @@ while getopts "qc:g:s:l:Gdp" option; do
       :
     ;;
     d)
-      CVMFS_TEST_DUCC=1
+      # Deprecated; container tools unit tests are always run when the code can build
     ;;
     p)
       CVMFS_TEST_PUBLISH=1
@@ -71,7 +70,7 @@ CVMFS_UNITTESTS_RESULT_LOCATION=$2
 # check if only a quick subset of the unittests should be run
 test_filter='-'
 if [ $CVMFS_UNITTESTS_QUICK = 1 ]; then
-  echo "running only quick tests (without suffix 'Slow')"
+  echo "*** Running only quick tests (without suffix 'Slow')"
   test_filter='-*Slow'
 fi
 
@@ -86,8 +85,12 @@ if [ "x$CVMFS_GEOAPI_SOURCES" != "x" ]; then
       PYTHON_COMMAND="python3"
     fi
   fi
+  echo "*** Running Geo-API unit tests"
   $PYTHON_COMMAND test_cvmfs_geo.py
+  RETVAL=$(( RETVAL | $? ))
   popd
+else
+  echo "*** Skipping Geo-API unit tests"
 fi
 
 # run the cache plugin unittests
@@ -106,12 +109,14 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
       i=$((i + 1))
       CVMFS_CACHE_LOCATOR=tcp=127.0.0.1:$CVMFS_CACHE_LOCATOR_PORT
       echo "CVMFS_CACHE_PLUGIN_LOCATOR=$CVMFS_CACHE_LOCATOR" >> $CVMFS_CACHE_CONFIG
-      echo "running unit tests for cache plugin $plugin on $CVMFS_CACHE_LOCATOR"
+      echo -n "*** Running cache plugin unit tests for cache plugin $plugin on $CVMFS_CACHE_LOCATOR"
+      echo " (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin))"
       # All our plugins take a configuration file as a parameter
       plugin_pid="$($plugin $CVMFS_CACHE_CONFIG)"
       echo "cache plugin started as PID $plugin_pid"
       $CVMFS_CACHE_UNITTESTS $CVMFS_CACHE_LOCATOR \
         --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.$(basename $plugin)
+      RETVAL=$(( RETVAL | $? ))
       /bin/kill $plugin_pid
       rm -rf "/tmp/cvmfs_cache_test_dir/"
     else
@@ -121,38 +126,51 @@ if [ "x$CVMFS_CACHE_PLUGIN" != "x" ]; then
   rm -f $CVMFS_CACHE_CONFIG
 fi
 
-# run the shrinkwrap tests
 if [ "x$CVMFS_SHRINKWRAP_TEST_BINARY" != "x" ]; then
-  echo "running shrinkwrap tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
+  echo "*** Running shrinkwrap unit tests (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.shrinkwrap)..."
   $CVMFS_SHRINKWRAP_TEST_BINARY --gtest_shuffle                                     \
     --gtest_output=xml:${CVMFS_UNITTESTS_RESULT_LOCATION}.shrinkwrap \
     --gtest_filter=$test_filter
+  RETVAL=$(( RETVAL | $? ))
+else
+  echo "*** Skipping shrinkwrap unit tests"
 fi
 
 if can_build_gateway; then
-  echo "running gateway unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  echo "*** Running gateway unit tests (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway)"
   pushd ${SCRIPT_LOCATION}/../gateway > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway
+  RETVAL=$(( RETVAL | $? ))
   popd > /dev/null
+else
+  echo "*** Skipping gateway unit tests"
 fi
 
-if [ $CVMFS_TEST_DUCC = 1 ] && [ $(can_build_ducc) -ge 1 ]; then
-  echo "running ducc unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+if can_build_ducc; then
+  echo "*** Running container tools unit tests (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc)"
   pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
   go test -v -mod=vendor ./... 2>&1 | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc
+  RETVAL=$(( RETVAL | $? ))
   popd > /dev/null
+else
+  echo "*** Skipping container tools unit tests"
 fi
 
 if [ $CVMFS_TEST_PUBLISH = 1 ]; then
-  echo "running publish unit tests into $CVMFS_UNITTESTS_RESULT_LOCATION"
+  echo "*** Running publish unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)"
   CVMFS_PUBLISH_UNITTESTS="$(dirname $CVMFS_UNITTESTS_BINARY)/cvmfs_test_publish"
   $CVMFS_PUBLISH_UNITTESTS --gtest_shuffle                                     \
                            --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                            --gtest_filter=$test_filter
+  RETVAL=$(( RETVAL | $? ))
+else
+  echo "*** Skipping publish unit tests"
 fi
 
 # run the unit tests
-echo "running unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
+echo "*** Running core unit tests (with XML output $CVMFS_UNITTESTS_RESULT_LOCATION)..."
 $CVMFS_UNITTESTS_BINARY --gtest_shuffle                                     \
                         --gtest_output=xml:$CVMFS_UNITTESTS_RESULT_LOCATION \
                         --gtest_filter=$test_filter
+RETVAL=$(( RETVAL | $? ))
+exit $RETVAL
