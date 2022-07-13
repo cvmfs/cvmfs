@@ -843,7 +843,8 @@ TEST_F(T_Libcvmfs, Remount) {
   ReadPipe(pipe_send[0], &c, 1);
   if (c != '!') {
     DirSpec spec1 = MakeBaseSpec();
-    EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+    EXPECT_TRUE(
+      tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
     tester.UpdateManifest();
     tester.DestroyCatalogManager();
     WritePipe(pipe_recv[1], &c, 1);
