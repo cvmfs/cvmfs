@@ -74,6 +74,13 @@ SignatureManager::SignatureManager() {
   x509_lookup_ = NULL;
   int retval = pthread_mutex_init(&lock_blacklist_, NULL);
   assert(retval == 0);
+
+  /*
+    Note: OpenSSL 3.0 deprecated SHA1 signatures. This env override is needed
+    on CentOS Stream 9. OpenSSL uses secure_getenv to read the environment. This
+    variable will not be read if the executable has setuid.
+   */
+  setenv("OPENSSL_ENABLE_SHA1_SIGNATURES", "1", 1);
 }
 
 
