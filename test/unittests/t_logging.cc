@@ -73,7 +73,7 @@ TEST_F(T_Logging, MicroSyslog) {
 
 TEST_F(T_Logging, MicroSyslogRotateSlow) {
   SetLogMicroSyslog(tmp_path_ + "/usyslog");
-  SetLogMicroSyslogMaxSize(4000); // 4kB
+  SetLogMicroSyslogMaxSize(4000);  // 4kB
   EXPECT_TRUE(FileExists(tmp_path_ + "/usyslog"));
   EXPECT_TRUE(FileExists(tmp_path_ + "/usyslog.1"));
 
