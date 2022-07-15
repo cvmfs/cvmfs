@@ -22,24 +22,6 @@ CVMFS_CONCURRENT_BUILD_JOBS="${3-1}"
 
 cd ${CVMFS_BUILD_LOCATION}
 
-# figure out if the standard compiler is too old and if so look for alternatives
-if [ x"$(uname)" = x"Linux" ] && which gcc > /dev/null 2>&1; then
-  gcc_major="$(gcc --version | head -n1 | sed -e 's/^.* \([0-9]\)\..*$/\1/')"
-  if [ $gcc_major -lt 4 ]; then
-    if ! which gcc4 > /dev/null 2>&1 || \
-       ! which g++4 > /dev/null; then
-      echo "we need at least GCC 4.1"
-      exit 2
-    fi
-
-    echo "using gcc4 and g++4 without optimisation as a fallback!"
-    export CC=gcc4
-    export CXX=g++4
-    export CFLAGS="$CFLAGS -O0"     # disabling any optimisation since it likely
-    export CXXFLAGS="$CXXFLAGS -O0" # breaks the binary with this old version
-  fi
-fi
-
 # if we are on Mac OS X switch off the server build
 build_server="yes"
 if [ x"$(uname)" = x"Darwin" ]; then
@@ -47,12 +29,7 @@ if [ x"$(uname)" = x"Darwin" ]; then
 fi
 build_libcvmfs="yes"
 build_shrinkwrap="yes"
-
-# We need to disable GEOAPI on CentOS < 6
 build_geoapi="ON"
-if is_redhat && [ "$(get_redhat_version)" -lt "6" ]; then
-  build_geoapi="OFF"
-fi
 
 # the function can_build_ducc is defined in ci/common.sh
 # it check a new enough version of the compiler >= 1.11.4
