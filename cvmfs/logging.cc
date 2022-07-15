@@ -51,7 +51,7 @@ void DefaultLogging::Set(LogFacilities info, LogFacilities error) {
 
 namespace {
 
-const unsigned kMicroSyslogMax = 500 * 1024;  // rotate after 500kB
+unsigned gMicroSyslogMax = 500 * 1024;  // default: rotate after 500kB
 
 pthread_mutex_t lock_stdout = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t lock_stderr = PTHREAD_MUTEX_INITIALIZER;
@@ -260,6 +260,10 @@ void SetLogSyslogShowPID(bool flag) {
 void SetLogVerbosity(const LogLevels max_level) { max_log_level = max_level; }
 
 
+void SetLogMicroSyslogMaxSize(unsigned bytes) {
+  gMicroSyslogMax = bytes;
+}
+
 /**
  * "Micro-Syslog" write kLogSyslog messages into filename.  It rotates this
  * file.  Requires for µCernVM
@@ -327,7 +331,7 @@ static void LogMicroSyslog(const std::string &message) {
   assert(retval == 0);
   usyslog_size += written;
 
-  if (usyslog_size >= kMicroSyslogMax) {
+  if (usyslog_size >= gMicroSyslogMax) {
     // Wipe out usyslog.1 file
     retval = ftruncate(usyslog_fd1, 0);
     assert(retval == 0);

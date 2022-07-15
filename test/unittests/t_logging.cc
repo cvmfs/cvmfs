@@ -73,10 +73,11 @@ TEST_F(T_Logging, MicroSyslog) {
 
 TEST_F(T_Logging, MicroSyslogRotateSlow) {
   SetLogMicroSyslog(tmp_path_ + "/usyslog");
+  SetLogMicroSyslogMaxSize(4000); // 4kB
   EXPECT_TRUE(FileExists(tmp_path_ + "/usyslog"));
   EXPECT_TRUE(FileExists(tmp_path_ + "/usyslog.1"));
 
-  for (unsigned i = 0; i < 1000000; ++i) {
+  for (unsigned i = 0; i < 1000; ++i) {
     LogCvmfs(kLogCvmfs, kLogSyslog, "Line");
   }
 
@@ -85,10 +86,10 @@ TEST_F(T_Logging, MicroSyslogRotateSlow) {
 
   int64_t sz_usyslog = GetFileSize(tmp_path_ + "/usyslog");
   EXPECT_GT(sz_usyslog, 0);
-  EXPECT_LT(sz_usyslog, 1024*1024);
+  EXPECT_LT(sz_usyslog, 4100);
   sz_usyslog = GetFileSize(tmp_path_ + "/usyslog.1");
   EXPECT_GT(sz_usyslog, 0);
-  EXPECT_LT(sz_usyslog, 1024*1024);
+  EXPECT_LT(sz_usyslog, 4100);
 }
 
 
