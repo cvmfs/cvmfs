@@ -646,7 +646,7 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
     if ((info_a.st_mode != info_b.st_mode) ||
         (info_a.st_uid != info_b.st_uid) ||
         (info_a.st_gid != info_b.st_gid) ||
-        (info_a.st_size != info_b.st_size))
+        ((info_a.st_size != info_b.st_size) && !S_ISDIR(info_a.st_mode)))
     {
       return false;
     }
