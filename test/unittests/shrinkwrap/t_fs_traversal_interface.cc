@@ -640,8 +640,16 @@ TEST_P(T_FsInterface, TransferPosixToPosix) {
 
   EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics,
                                    platform_monotonic_time()));
-  EXPECT_TRUE(DiffTree(repo_name + "/" + dest_name,
-                       repo_name + "/" + src_name));
+  std::string srcdir = repo_name + "/" + src_name;
+  std::string destdir = repo_name + "/" + dest_name;
+  bool retval = DiffTree(srcdir, destdir);
+  if (!retval) {
+    // This test is flakey; let's get some more debug information.
+    // Remove the system() calls once the test is fixed.
+    system((std::string("ls -lisaR ") + srcdir).c_str());
+    system((std::string("ls -lisaR ") + destdir).c_str());
+    EXPECT_TRUE(false);
+  }
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);
