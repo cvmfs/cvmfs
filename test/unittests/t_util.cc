@@ -1934,7 +1934,7 @@ TEST_F(T_Util, MemoryMappedFile) {
 
 
 TEST_F(T_Util, SetLimitNoFile) {
-  EXPECT_EQ(-1, SetLimitNoFile(100000000));
+  EXPECT_EQ(-1, SetLimitNoFile(3000000000U));
 
   struct rlimit rpl;
   memset(&rpl, 0, sizeof(rpl));
@@ -1949,7 +1949,7 @@ TEST_F(T_Util, GetLimitNoFile) {
   GetLimitNoFile(&soft_limit, &hard_limit);
   EXPECT_LT(0U, soft_limit);
   EXPECT_LE(soft_limit, hard_limit);
-  EXPECT_LT(hard_limit, 10000000U);
+  EXPECT_LT(hard_limit, 3000000000U);
 }
 
 

@@ -128,6 +128,7 @@ int GetLogSyslogFacility();
 void SetLogCustomFile(unsigned id, const std::string &filename);
 void SetLogMicroSyslog(const std::string &filename);
 std::string GetLogMicroSyslog();
+void SetLogMicroSyslogMaxSize(unsigned bytes);
 void SetLogSyslogPrefix(const std::string &prefix);
 void SetLogSyslogShowPID(bool flag);
 void SetLogVerbosity(const LogLevels max_level);

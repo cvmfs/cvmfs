@@ -101,7 +101,7 @@ TEST_F(T_Libcvmfs, InitFailures) {
   if (retval == LIBCVMFS_FAIL_OK)
     cvmfs_fini();
 
-  retval = cvmfs_init((opt_cache_ + ",max_open_files=100000000").c_str());
+  retval = cvmfs_init((opt_cache_ + ",max_open_files=2000000000").c_str());
   EXPECT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
   if (retval == LIBCVMFS_FAIL_OK)
     cvmfs_fini();
@@ -181,17 +181,17 @@ TEST_F(T_Libcvmfs, OptionAliases) {
   FILE *save_stderr = stderr;
 
   retval = cvmfs_init((opt_cache_ +
-    ",nofiles=100000000,max_open_files=100000000").c_str());
+    ",nofiles=2000000000,max_open_files=2000000000").c_str());
   EXPECT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
   if (retval == LIBCVMFS_FAIL_OK)
     cvmfs_fini();
 
-  retval = cvmfs_init((opt_cache_ + ",nofiles=100000000").c_str());
+  retval = cvmfs_init((opt_cache_ + ",nofiles=2000000000").c_str());
   EXPECT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
   if (retval == LIBCVMFS_FAIL_OK)
     cvmfs_fini();
 
-  retval = cvmfs_init((opt_cache_ + ",max_open_files=100000000").c_str());
+  retval = cvmfs_init((opt_cache_ + ",max_open_files=2000000000").c_str());
   EXPECT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
   if (retval == LIBCVMFS_FAIL_OK)
     cvmfs_fini();
@@ -242,7 +242,7 @@ TEST_F(T_Libcvmfs, Initv2) {
   EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
   cvmfs_fini();
 
-  cvmfs_options_set(opts, "CVMFS_NFILES", "100000000");
+  cvmfs_options_set(opts, "CVMFS_NFILES", "2000000000");
   int retval = cvmfs_init_v2(opts);
   EXPECT_EQ(LIBCVMFS_ERR_PERMISSION, retval);
   if (retval == LIBCVMFS_FAIL_OK)
