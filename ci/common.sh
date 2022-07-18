@@ -236,32 +236,7 @@ can_build_ducc() {
   if [ $arch != "amd64" ]; then
     return 1
   fi
-  if which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1 ; then
-    go_version=$(go version)
-    go_major=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\1/p')
-    go_minor=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\2/p')
-    go_patch=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\3/p')
-
-    if [ $go_major -gt 1 ]; then
-      return 0
-    elif [ $go_major -lt 1 ]; then
-      return 1
-    else
-      if [ $go_minor -gt 12 ]; then
-        return 0
-      elif [ $go_minor -lt 12 ]; then
-        return 1
-      else
-        if [ $go_patch -ge 0 ]; then
-          return 0
-        else
-          return 1
-        fi
-      fi
-    fi
-  else
-    return 1
-  fi
+  which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1
 }
 
 # The gateway services require a Go compiler
