@@ -47,7 +47,7 @@ class InodeEx {
  private:
   // Extracts the file type bits from the POSIX mode field and shifts them to
   // the right so that they align with EFileType constants.
-  static inline uint64_t ShiftMode(int mode) { return (mode >> 12) & 017; }
+  static inline uint64_t ShiftMode(unsigned mode) { return (mode >> 12) & 017; }
 
  public:
   enum EFileType {
@@ -65,7 +65,7 @@ class InodeEx {
   InodeEx(uint64_t inode, EFileType type)
     : inode_ex_(inode | (static_cast<uint64_t>(type) << 60))
   { }
-  InodeEx(uint64_t inode, int mode)
+  InodeEx(uint64_t inode, unsigned mode)
     : inode_ex_(inode | (ShiftMode(mode) << 60))
   { }
 
@@ -81,7 +81,7 @@ class InodeEx {
     return GetInode() != other.GetInode();
   }
 
-  inline bool IsCompatibleFileType(int mode) const {
+  inline bool IsCompatibleFileType(unsigned mode) const {
     return (static_cast<uint64_t>(GetFileType()) == ShiftMode(mode)) ||
            (GetFileType() == kUnknownType);
   }
@@ -745,16 +745,16 @@ class DentryTracker {
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics() : num_insert(0), num_remove(0), num_prune(0) {}
-    uint64_t num_insert;
-    uint64_t num_remove;
-    uint64_t num_prune;
+    int64_t num_insert;
+    int64_t num_remove;
+    int64_t num_prune;
   };
   Statistics GetStatistics() { return statistics_; }
 
   static void *MainCleaner(void *data);
 
   DentryTracker();
-  explicit DentryTracker(const DentryTracker &other);
+  DentryTracker(const DentryTracker &other);
   DentryTracker &operator= (const DentryTracker &other);
   ~DentryTracker();
 

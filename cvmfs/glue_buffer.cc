@@ -257,7 +257,7 @@ bool DentryTracker::NextEntry(Cursor *cursor,
 }
 
 
-void DentryTracker::EndEnumerate(Cursor *cursor) {
+void DentryTracker::EndEnumerate(Cursor * /* cursor */) {
   Unlock();
 }
 

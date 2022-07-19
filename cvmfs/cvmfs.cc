@@ -465,7 +465,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   }
   // We do _not_ track (and evict) positive replies; among other things, test
   // 076 fails with the following line uncommented
-  // mount_point_->dentry_tracker()->Add(parent_fuse, name, timeout);
+  // mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
@@ -474,7 +474,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
  lookup_reply_negative:
   // Will be a no-op if there is no fuse cache eviction
-  mount_point_->dentry_tracker()->Add(parent_fuse, name, timeout);
+  mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   fuse_remounter_->fence()->Leave();
   perf::Inc(file_system_->n_fs_lookup_negative());
   result.ino = 0;
@@ -2244,7 +2244,7 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, "Restoring dentry tracker... ");
       cvmfs::mount_point_->dentry_tracker()->~DentryTracker();
       glue::DentryTracker *saved_dentry_tracker =
-        (glue::DentryTracker *)saved_states[i]->state;
+        static_cast<glue::DentryTracker *>(saved_states[i]->state);
       new (cvmfs::mount_point_->dentry_tracker())
         glue::DentryTracker(*saved_dentry_tracker);
       SendMsg2Socket(fd_progress, " done\n");
