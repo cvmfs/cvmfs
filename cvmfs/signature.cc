@@ -775,6 +775,7 @@ bool SignatureManager::Sign(const unsigned char *buffer,
   }
 
   if (offload_signing_) {
+    LogCvmfs(kLogSignature, kLogDebug, "offloading Sign()");
     std::string s = SignOffload(kSignManifest, buffer_size, buffer);
     *signature_size = s.size();
     if (!s.empty()) {
@@ -835,6 +836,7 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
   }
 
   if (offload_signing_) {
+    LogCvmfs(kLogSignature, kLogDebug, "offloading SignRsa()");
     std::string s = SignOffload(kSignWhitelist, buffer_size, buffer);
     *signature_size = s.size();
     if (!s.empty()) {
@@ -864,13 +866,14 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
 }
 
 std::string SignatureManager::SignOffload(
-  ESignMethod method, size_t buf_size, const unsigned char *buf)
+  ESignMethod method, unsigned buf_size, const unsigned char *buf)
 {
   std::vector<std::string> cmd;
   cmd.push_back("/usr/bin/cvmfs_signing_helper");
   std::set<int> preserve_filedes;
   preserve_filedes.insert(0);
   preserve_filedes.insert(1);
+  preserve_filedes.insert(2);
 
   int pipe_input[2];
   int pipe_output[2];
@@ -885,6 +888,7 @@ std::string SignatureManager::SignOffload(
                             true /* drop_credentials */,
                             true /* clear_env */);
   if (retval) {
+    LogCvmfs(kLogSignature, kLogDebug, "offload: sending signature method");
     WritePipe(pipe_input[1], &method, sizeof(method));
     std::string key;
     if (method == kSignManifest) {
@@ -894,13 +898,16 @@ std::string SignatureManager::SignOffload(
     } else {
       assert(false);
     }
-    size_t key_size = key.size();
+    unsigned key_size = key.size();
+    LogCvmfs(kLogSignature, kLogDebug, "offload: sending key");
     WritePipe(pipe_input[1], &key_size, sizeof(key_size));
     WritePipe(pipe_input[1], key.data(), key.size());
+    LogCvmfs(kLogSignature, kLogDebug, "offload: sending buffer");
     WritePipe(pipe_input[1], &buf_size, sizeof(buf_size));
     WritePipe(pipe_input[1], buf, buf_size);
 
-    size_t size;
+    LogCvmfs(kLogSignature, kLogDebug, "offload: retrieving signature");
+    unsigned size;
     ReadPipe(pipe_output[0], &size, sizeof(size));
     result.resize(size);
     ReadPipe(pipe_output[0], result.data(), size);

@@ -81,6 +81,7 @@ bool ServerTool::InitSigningSignatureManager(
   signature_manager_ = new signature::SignatureManager();
   assert(signature_manager_.IsValid());
   signature_manager_->Init();
+  signature_manager_->SetSignOffload();
 
   // Load certificate
   if (!signature_manager_->LoadCertificatePath(certificate_path)) {

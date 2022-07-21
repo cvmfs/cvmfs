@@ -99,7 +99,7 @@ class SignatureManager {
   void InitX509Store();
 
   std::string SignOffload(ESignMethod method,
-                          size_t buf_size, const unsigned char *buf);
+                          unsigned buf_size, const unsigned char *buf);
 
   EVP_PKEY *private_key_;
   RSA *private_master_key_;
