@@ -4,26 +4,30 @@ import (
 	"testing"
 )
 
-func TestGetTags(t *testing.T) {
+func TestParseTags(t *testing.T) {
 	imageString := "https://registry.hub.docker.com/library/redis:*"
 	image, err := ParseImage(imageString)
 	if err != nil {
 		t.Errorf("Error in parsing %s", imageString)
 	}
-	tagsExpanded, _, err := image.ExpandWildcard()
-	if err != nil {
-		t.Errorf("Error in expanding the tags %s", imageString)
+	if image.Scheme != "https" {
+		t.Errorf("Image string parsing error: wrong scheme: %v", image.Scheme)
 	}
-	tagsList := make([]*Image, 0)
-	for tag := range tagsExpanded {
-		tagsList = append(tagsList, tag)
+	if image.Registry != "registry.hub.docker.com" {
+		t.Errorf("Image string parsing error: wrong registry: %v", image.Registry)
 	}
-	if len(tagsList) <= 1 {
-		t.Errorf("Tag expansions didn't work, only %d tags", len(tagsList))
+	if image.Repository != "library/redis" {
+		t.Errorf("Image string parsing error: wrong repository: %v", image.Repository)
+	}
+	if image.Tag != "*" {
+		t.Errorf("Image string parsing error: wrong tag: %v", image.Tag)
+	}
+	if !image.TagWildcard {
+		t.Errorf("Image string parsing error: no wildcard was parsed")
 	}
 }
 
-func TestGetTagsWithGlob(t *testing.T) {
+func TestParseTagsWithGlob(t *testing.T) {
 	imageString := "https://registry.hub.docker.com/vernemq/vernemq:1.9.2*"
 	// 1.9.2-1
 	// 1.9.2-1-alpine
@@ -34,21 +38,18 @@ func TestGetTagsWithGlob(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error in parsing %s", imageString)
 	}
-	tagsExpanded, _, err := image.ExpandWildcard()
-	if err != nil {
-		t.Errorf("Error in expanding the tags %s", imageString)
-	}
-	// at the moment exists
-	existingTags := []string{"1.9.2-1", "1.9.2-1-alpine", "1.9.2", "1.9.2-alpine"}
-	tags := make(map[string]bool)
-	for tag := range tagsExpanded {
-		tags[tag.Tag] = true
-	}
 
-	for _, mustBeHereTag := range existingTags {
-		if _, ok := tags[mustBeHereTag]; !ok {
-			t.Errorf("Expected tag not found. Expected: %s", mustBeHereTag)
-		}
+	if image.Scheme != "https" {
+		t.Errorf("Image string parsing error: wrong scheme: %v", image.Scheme)
+	}
+	if image.Registry != "registry.hub.docker.com" {
+		t.Errorf("Image string parsing error: wrong registry: %v", image.Registry)
+	}
+	if image.Repository != "vernemq/vernemq" {
+		t.Errorf("Image string parsing error: %v", image.Repository)
+	}
+	if image.Tag != "1.9.2*" {
+		t.Errorf("Image string parsing error: wrong tag: %v", image.Tag)
 	}
 }
 
