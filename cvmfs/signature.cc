@@ -868,6 +868,12 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
 std::string SignatureManager::SignOffload(
   ESignMethod method, unsigned buf_size, const unsigned char *buf)
 {
+  if (!FileExists("/usr/bin/cvmfs_signing_helper")) {
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+             "missing signing helper");
+    return "";
+  }
+
   std::vector<std::string> cmd;
   cmd.push_back("/usr/bin/cvmfs_signing_helper");
   std::set<int> preserve_filedes;
