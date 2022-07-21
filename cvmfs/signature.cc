@@ -910,7 +910,7 @@ std::string SignatureManager::SignOffload(
     unsigned size;
     ReadPipe(pipe_output[0], &size, sizeof(size));
     result.resize(size);
-    ReadPipe(pipe_output[0], result.data(), size);
+    ReadPipe(pipe_output[0], reinterpret_cast<void *>(result.data()), size);
   }
 
   ClosePipe(pipe_input);
