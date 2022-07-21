@@ -27,13 +27,13 @@
 #include <string>
 #include <vector>
 
-#include "compression.h"
 #include "duplex_ssl.h"
 #include "hash.h"
 #include "logging.h"
 #include "platform.h"
 #include "prng.h"
 #include "smalloc.h"
+#include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 
@@ -522,22 +522,22 @@ bool SignatureManager::LoadBlacklist(
   if (!append)
     blacklist_.clear();
 
-  char *buffer;
-  unsigned buffer_size;
-  if (!CopyPath2Mem(path_blacklist,
-                    reinterpret_cast<unsigned char **>(&buffer), &buffer_size))
-  {
+  int fd = open(path_blacklist.c_str(), O_RDONLY);
+  if (fd < 0)
     return false;
-  }
+  std::string blacklist_buffer;
+  bool retval = SafeReadToString(fd, &blacklist_buffer);
+  close(fd);
+  if (!retval)
+    return false;
 
   unsigned num_bytes = 0;
-  while (num_bytes < buffer_size) {
-    const string line = GetLineMem(buffer + num_bytes,
-                                   buffer_size - num_bytes);
+  while (num_bytes < blacklist_buffer.size()) {
+    const string line = GetLineMem(blacklist_buffer.data() + num_bytes,
+                                   blacklist_buffer.size() - num_bytes);
     blacklist_.push_back(line);
     num_bytes += line.length() + 1;
   }
-  free(buffer);
 
   return true;
 }
