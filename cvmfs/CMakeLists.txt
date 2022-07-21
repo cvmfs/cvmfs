@@ -986,7 +986,8 @@ if (BUILD_SERVER)
                            COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}")
   target_link_libraries (cvmfs_signing_helper
                          ${SHA3_LIBRARIES}
-                         ${OPENSSL_LIBRARIES})
+                         ${OPENSSL_LIBRARIES}
+                         pthread dl)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
