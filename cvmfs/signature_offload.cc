@@ -53,11 +53,13 @@ int main() {
 
   bool rv_sign = false;
   if (method == signature::SignatureManager::kSignWhitelist) {
-    rv_sign = smgr.SignRsa(reinterpret_cast<unsigned char *>(buffer.data()),
-                           buffer.size(), &signature, &signature_size);
+    rv_sign = smgr.SignRsa(
+      reinterpret_cast<unsigned char *>(const_cast<char *>(buffer.data())),
+      buffer.size(), &signature, &signature_size);
   } else if (method == signature::SignatureManager::kSignManifest) {
-    rv_sign = smgr.Sign(reinterpret_cast<unsigned char *>(buffer.data()),
-                        buffer.size(), &signature, &signature_size);
+    rv_sign = smgr.Sign(
+      reinterpret_cast<unsigned char *>(const_cast<char *>(buffer.data())),
+      buffer.size(), &signature, &signature_size);
   }
   if (!rv_sign) {
     WritePipe(1, &signature_size, sizeof(signature_size));
