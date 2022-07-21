@@ -23,7 +23,7 @@ static std::string ReadString() {
   ReadPipe(0, &size, sizeof(size));
   std::string result;
   result.resize(size);
-  ReadPipe(0, reinterpret_cast<void *>(result.data()), size);
+  ReadPipe(0, const_cast<char *>(result.data()), size);
   return result;
 }
 
