@@ -16,6 +16,8 @@
 #include <openssl/x509.h>
 
 #include <cstdio>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
