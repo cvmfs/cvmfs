@@ -172,7 +172,15 @@ bool SignatureManager::LoadPrivateMasterKeyPath(const string &file_pem)
 bool SignatureManager::LoadPrivateMasterKeyMem(const string &key)
 {
   UnloadPrivateMasterKey();
-  return false;
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  if (BIO_write(bp, key.data(), key.size()) <= 0) {
+    BIO_free(bp);
+    return false;
+  }
+  private_master_key_ = PEM_read_bio_RSAPrivateKey(bp, NULL, NULL, NULL);
+  BIO_free(bp);
+  return (private_master_key_ != NULL);
 }
 
 
@@ -200,7 +208,15 @@ bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
 bool SignatureManager::LoadPrivateKeyMem(const std::string &key)
 {
   UnloadPrivateKey();
-  return false;
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  if (BIO_write(bp, key.data(), key.size()) <= 0) {
+    BIO_free(bp);
+    return false;
+  }
+  private_key_ = PEM_read_bio_PrivateKey(bp, NULL, NULL, NULL);
+  BIO_free(bp);
+  return (private_key_ != NULL);
 }
 
 
