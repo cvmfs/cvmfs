@@ -74,6 +74,7 @@ SignatureManager::SignatureManager() {
   x509_lookup_ = NULL;
   int retval = pthread_mutex_init(&lock_blacklist_, NULL);
   assert(retval == 0);
+  offload_signing_ = false;
 
   /*
     Note: OpenSSL 3.0 deprecated SHA1 signatures. This env override is needed
@@ -168,6 +169,12 @@ bool SignatureManager::LoadPrivateMasterKeyPath(const string &file_pem)
   return (private_master_key_ != NULL);
 }
 
+bool SignatureManager::LoadPrivateMasterKeyMem(const string &key)
+{
+  UnloadPrivateMasterKey();
+  return false;
+}
+
 
 /**
  * @param[in] file_pem File name of the PEM key file
@@ -188,6 +195,12 @@ bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
   result = (private_key_ = PEM_read_PrivateKey(fp, NULL, NULL, tmp)) != NULL;
   fclose(fp);
   return result;
+}
+
+bool SignatureManager::LoadPrivateKeyMem(const std::string &key)
+{
+  UnloadPrivateKey();
+  return false;
 }
 
 
@@ -745,6 +758,18 @@ bool SignatureManager::Sign(const unsigned char *buffer,
     return false;
   }
 
+  if (offload_signing_) {
+    std::string s = SignOffload(kSignManifest, buffer_size, buffer);
+    *signature_size = s.size();
+    if (!s.empty()) {
+      *signature = reinterpret_cast<unsigned char *>(smalloc(s.size()));
+      memcpy(*signature, s.data(), s.size());
+    } else {
+      *signature = NULL;
+    }
+    return !s.empty();
+  }
+
   bool result = false;
 #ifdef OPENSSL_API_INTERFACE_V11
   EVP_MD_CTX *ctx_ptr = EVP_MD_CTX_new();
@@ -793,6 +818,18 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
     return false;
   }
 
+  if (offload_signing_) {
+    std::string s = SignOffload(kSignWhitelist, buffer_size, buffer);
+    *signature_size = s.size();
+    if (!s.empty()) {
+      *signature = reinterpret_cast<unsigned char *>(smalloc(s.size()));
+      memcpy(*signature, s.data(), s.size());
+    } else {
+      *signature = NULL;
+    }
+    return !s.empty();
+  }
+
   unsigned char *to = (unsigned char *)smalloc(RSA_size(private_master_key_));
   unsigned char *from = (unsigned char *)smalloc(buffer_size);
   memcpy(from, buffer, buffer_size);
@@ -808,6 +845,54 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
   *signature = to;
   *signature_size = size;
   return true;
+}
+
+std::string SignatureManager::SignOffload(
+  ESignMethod method, size_t buf_size, const unsigned char *buf)
+{
+  std::vector<std::string> cmd;
+  cmd.push_back("/usr/bin/cvmfs_signing_helper");
+  std::set<int> preserve_filedes;
+  preserve_filedes.insert(0);
+  preserve_filedes.insert(1);
+
+  int pipe_input[2];
+  int pipe_output[2];
+  MakePipe(pipe_input);
+  MakePipe(pipe_output);
+  std::map<int, int> map_filedes;
+  map_filedes[pipe_input[0]] = 0;
+  map_filedes[pipe_output[1]] = 1;
+
+  std::string result;
+  bool retval = ManagedExec(cmd, preserve_filedes, map_filedes,
+                            true /* drop_credentials */,
+                            true /* clear_env */);
+  if (retval) {
+    WritePipe(pipe_input[1], &method, sizeof(method));
+    std::string key;
+    if (method == kSignManifest) {
+      key = GetPrivateKey();
+    } else if (method == kSignWhitelist) {
+      key = GetPrivateMasterKey();
+    } else {
+      assert(false);
+    }
+    size_t key_size = key.size();
+    WritePipe(pipe_input[1], &key_size, sizeof(key_size));
+    WritePipe(pipe_input[1], key.data(), key.size());
+    WritePipe(pipe_input[1], &buf_size, sizeof(buf_size));
+    WritePipe(pipe_input[1], buf, buf_size);
+
+    size_t size;
+    ReadPipe(pipe_output[0], &size, sizeof(size));
+    result.resize(size);
+    ReadPipe(pipe_output[0], result.data(), size);
+  }
+
+  ClosePipe(pipe_input);
+  ClosePipe(pipe_output);
+  return result;
 }
 
 

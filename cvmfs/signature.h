@@ -25,6 +25,8 @@ namespace signature {
 
 class SignatureManager {
  public:
+  enum ESignMethod { kSignManifest, kSignWhitelist };
+
   SignatureManager();
 
   void Init();
@@ -39,6 +41,8 @@ class SignatureManager {
   bool LoadPrivateMasterKeyPath(const std::string &file_pem);
   bool LoadPrivateKeyPath(const std::string &file_pem,
                           const std::string &password);
+  bool LoadPrivateMasterKeyMem(const std::string &key);
+  bool LoadPrivateKeyMem(const std::string &key);
   bool LoadCertificatePath(const std::string &file_pem);
   bool LoadCertificateMem(const unsigned char *buffer,
                           const unsigned buffer_size);
@@ -56,6 +60,7 @@ class SignatureManager {
 
   bool LoadTrustedCaCrl(const std::string &path_list);
 
+  void SetSignOffload() { offload_signing_ = true; }
   bool Sign(const unsigned char *buffer, const unsigned buffer_size,
             unsigned char **signature, unsigned *signature_size);
   bool SignRsa(const unsigned char *buffer, const unsigned buffer_size,
@@ -93,6 +98,9 @@ class SignatureManager {
 
   void InitX509Store();
 
+  std::string SignOffload(ESignMethod method,
+                          size_t buf_size, const unsigned char *buf);
+
   EVP_PKEY *private_key_;
   RSA *private_master_key_;
   X509 *certificate_;
@@ -101,6 +109,7 @@ class SignatureManager {
   std::vector<std::string> blacklist_;
   X509_STORE *x509_store_;
   X509_LOOKUP *x509_lookup_;
+  bool offload_signing_;
 };  // class SignatureManager
 
 }  // namespace signature

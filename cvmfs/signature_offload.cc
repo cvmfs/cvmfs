@@ -10,7 +10,16 @@
  */
 
 #include "signature.h"
+#include "util/posix.h"
 
 int main() {
+  signature::SignatureManager smgr;
+  smgr.Init();
+
+  signature::SignatureManager::ESignMethod method;
+  ReadPipe(0, &method, sizeof(method));
+
+
+  smgr.Fini();
   return 0;
 }
