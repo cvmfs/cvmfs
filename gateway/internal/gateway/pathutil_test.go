@@ -87,11 +87,6 @@ func TestSplitLeasePath(t *testing.T) {
 			t.Fatalf("invalid input was not rejected")
 		}
 	})
-	t.Run("notfqdn/sub/path is invalid", func(t *testing.T) {
-		if _, _, err := SplitLeasePath("notfqdn/sub/path"); err == nil {
-			t.Fatalf("invalid input was not rejected")
-		}
-	})
 	t.Run("notfqdn is invalid", func(t *testing.T) {
 		if _, _, err := SplitLeasePath("notfqdn"); err == nil {
 			t.Fatalf("invalid input was not rejected")
