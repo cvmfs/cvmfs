@@ -334,6 +334,7 @@ SettingsPublisher::SettingsPublisher(
   , whitelist_validity_days_(kDefaultWhitelistValidity)
   , is_silent_(false)
   , is_managed_(false)
+  , offload_signing_(true)
   , storage_(fqrn_())
   , transaction_(fqrn_())
   , keychain_(fqrn_())
