@@ -1,4 +1,5 @@
 2.10.0:
+  * [client] Diagnose errors due to changing file type (#2834)
   * [server] Catch unexpected errors in transaction command (#3004)
   * [server] Avoid double-slash URLs in HTTP HEAD requests (#2989)
   * Cancel network fail-over cycle when fuse request is canceled (#2983)
