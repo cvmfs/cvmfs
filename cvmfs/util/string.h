@@ -49,7 +49,7 @@ CVMFS_EXPORT bool HasSuffix(const std::string &str, const std::string &suffix,
 
 CVMFS_EXPORT std::vector<std::string> SplitString(const std::string &str,
                                                   char delim,
-                                                  unsigned max_chunks = 0);
+                                                  char max_chunks = 0);
 CVMFS_EXPORT std::string JoinStrings(const std::vector<std::string> &strings,
                                      const std::string &joint);
 CVMFS_EXPORT void ParseKeyvalMem(const unsigned char *buffer,

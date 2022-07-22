@@ -1338,14 +1338,14 @@ TEST_F(T_Util, SplitString) {
   EXPECT_EQ("the", result[0]);
   EXPECT_EQ("string that will be cut in peaces", result[1]);
 
-  result = SplitString(str1, ';', 200u);
+  result = SplitString(str1, ';', 100u);
   EXPECT_EQ(1u, result.size());
   EXPECT_EQ(str1, result[0]);
 
-  result = SplitString(str2, ':', 200u);
+  result = SplitString(str2, ':', 100u);
   EXPECT_EQ(5u, result.size());
   EXPECT_EQ("", result[1]);
-  EXPECT_EQ(SplitString(str2, ':', 5u), SplitString(str2, ':', 5000u));
+  EXPECT_EQ(SplitString(str2, ':', 5u), SplitString(str2, ':', 100u));
 }
 
 TEST_F(T_Util, JoinStrings) {
