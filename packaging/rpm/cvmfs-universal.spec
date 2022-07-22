@@ -639,6 +639,10 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
+%{_libdir}/libcvmfs_util.so
+%{_libdir}/libcvmfs_util.so.%{version}
+%{_libdir}/libcvmfs_util_debug.so
+%{_libdir}/libcvmfs_util_debug.so.%{version}
 %{_libdir}/libcvmfs_server.so
 %{_libdir}/libcvmfs_server.so.%{version}
 %{_libdir}/libcvmfs_server_debug.so
