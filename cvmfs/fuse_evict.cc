@@ -67,11 +67,11 @@ bool FuseInvalidator::HasFuseNotifyInval() {
 
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
-  glue::NentryTracker *nentry_tracker,
+  glue::DentryTracker *dentry_tracker,
   void **fuse_channel_or_session,
   bool fuse_notify_invalidation)
   : inode_tracker_(inode_tracker)
-  , nentry_tracker_(nentry_tracker)
+  , dentry_tracker_(dentry_tracker)
   , fuse_channel_or_session_(fuse_channel_or_session)
   , spawned_(false)
 {
@@ -176,16 +176,18 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       }
     }
 
-    // Do the nentry tracker last to increase the effectiveness of pruning
-    invalidator->nentry_tracker_->Prune();
-    // Copy and empty the nentry tracker in a single atomic operation
-    glue::NentryTracker *nentries_copy = invalidator->nentry_tracker_->Move();
-    glue::NentryTracker::Cursor nentry_cursor = nentries_copy->BeginEnumerate();
+    // Do the dentry tracker last to increase the effectiveness of pruning
+    invalidator->dentry_tracker_->Prune();
+    // Copy and empty the dentry tracker in a single atomic operation
+    glue::DentryTracker *dentries_copy = invalidator->dentry_tracker_->Move();
+    glue::DentryTracker::Cursor dentry_cursor = dentries_copy->BeginEnumerate();
     uint64_t entry_parent;
     NameString entry_name;
     i = 0;
-    while (nentries_copy->NextEntry(&nentry_cursor, &entry_parent, &entry_name))
+    while (dentries_copy->NextEntry(&dentry_cursor, &entry_parent, &entry_name))
     {
+      LogCvmfs(kLogCvmfs, kLogDebug, "evicting dentry %d --> %s",
+               entry_parent, entry_name.c_str());
       // Can fail, e.g. the entry might be already evicted
 #if CVMFS_USE_LIBFUSE == 2
       fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_chan**>(
@@ -204,8 +206,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         }
       }
     }
-    nentries_copy->EndEnumerate(&nentry_cursor);
-    delete nentries_copy;
+    dentries_copy->EndEnumerate(&dentry_cursor);
+    delete dentries_copy;
 
     handle->SetDone();
     invalidator->evict_list_.Clear();

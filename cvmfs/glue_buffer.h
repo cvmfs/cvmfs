@@ -35,14 +35,72 @@
 
 namespace glue {
 
+/**
+ * Inode + file type. Stores the file type in the 4 most significant bits
+ * of the 64 bit unsigned integer representing the inode.  That makes the class
+ * compatible with a pure 64bit inode used in previous cvmfs versions in the
+ * inode tracker.  The file type is stored using the POSIX representation in
+ * the inode's mode field.
+ * Note that InodeEx, used as a hash table key, hashes only over the inode part.
+ */
+class InodeEx {
+ private:
+  // Extracts the file type bits from the POSIX mode field and shifts them to
+  // the right so that they align with EFileType constants.
+  static inline uint64_t ShiftMode(unsigned mode) { return (mode >> 12) & 017; }
+
+ public:
+  enum EFileType {
+    kUnknownType = 0,
+    kRegular     = 010,
+    kSymlink     = 012,
+    kDirectory   = 004,
+    kFifo        = 001,
+    kSocket      = 014,
+    kCharDev     = 002,
+    kBulkDev     = 006,
+  };
+
+  InodeEx() : inode_ex_(0) { }
+  InodeEx(uint64_t inode, EFileType type)
+    : inode_ex_(inode | (static_cast<uint64_t>(type) << 60))
+  { }
+  InodeEx(uint64_t inode, unsigned mode)
+    : inode_ex_(inode | (ShiftMode(mode) << 60))
+  { }
+
+  inline uint64_t GetInode() const { return inode_ex_ & ~(uint64_t(15) << 60); }
+  inline EFileType GetFileType() const {
+    return static_cast<EFileType>(inode_ex_ >> 60);
+  }
+
+  inline bool operator==(const InodeEx &other) const {
+    return GetInode() == other.GetInode();
+  }
+  inline bool operator!=(const InodeEx &other) const {
+    return GetInode() != other.GetInode();
+  }
+
+  inline bool IsCompatibleFileType(unsigned mode) const {
+    return (static_cast<uint64_t>(GetFileType()) == ShiftMode(mode)) ||
+           (GetFileType() == kUnknownType);
+  }
+
+ private:
+  uint64_t inode_ex_;
+};
+
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
   return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
-
 static inline uint32_t hasher_inode(const uint64_t &inode) {
   return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
+}
+
+static inline uint32_t hasher_inode_ex(const InodeEx &inode_ex) {
+  return hasher_inode(inode_ex.GetInode());
 }
 
 
@@ -372,29 +430,33 @@ class PathMap {
 //------------------------------------------------------------------------------
 
 
-class InodeMap {
+/**
+ * This class has the same memory layout than the previous "InodeMap" class,
+ * therefore there is no data structure migration during reload required.
+ */
+class InodeExMap {
  public:
-  InodeMap() {
-    map_.Init(16, 0, hasher_inode);
+  InodeExMap() {
+    map_.Init(16, InodeEx(), hasher_inode_ex);
   }
 
-  bool LookupMd5Path(const uint64_t inode, shash::Md5 *md5path) {
-    bool found = map_.Lookup(inode, md5path);
+  bool LookupMd5Path(InodeEx *inode_ex, shash::Md5 *md5path) {
+    bool found = map_.LookupEx(inode_ex, md5path);
     return found;
   }
 
-  void Insert(const uint64_t inode, const shash::Md5 &md5path) {
-    map_.Insert(inode, md5path);
+  void Insert(const InodeEx inode_ex, const shash::Md5 &md5path) {
+    map_.Insert(inode_ex, md5path);
   }
 
   void Erase(const uint64_t inode) {
-    map_.Erase(inode);
+    map_.Erase(InodeEx(inode, InodeEx::kUnknownType));
   }
 
   void Clear() { map_.Clear(); }
 
  private:
-  SmallHashDynamic<uint64_t, shash::Md5> map_;
+  SmallHashDynamic<InodeEx, shash::Md5> map_;
 };
 
 
@@ -505,9 +567,10 @@ class InodeTracker {
       if (removed) {
         // TODO(jblomer): pop operation (Lookup+Erase)
         shash::Md5 md5path;
-        bool found = tracker_->inode_map_.LookupMd5Path(inode, &md5path);
+        InodeEx inode_ex(inode, InodeEx::kUnknownType);
+        bool found = tracker_->inode_ex_map_.LookupMd5Path(&inode_ex, &md5path);
         assert(found);
-        tracker_->inode_map_.Erase(inode);
+        tracker_->inode_ex_map_.Erase(inode);
         tracker_->path_map_.Erase(md5path);
         atomic_inc64(&tracker_->statistics_.num_removes);
       }
@@ -553,28 +616,30 @@ class InodeTracker {
   InodeTracker &operator= (const InodeTracker &other);
   ~InodeTracker();
 
-  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
+  void VfsGetBy(const InodeEx inode_ex, const uint32_t by,
+                const PathString &path)
   {
+    uint64_t inode = inode_ex.GetInode();
     Lock();
-    bool new_inode = inode_references_.Get(inode, by);
+    bool is_new_inode = inode_references_.Get(inode, by);
     shash::Md5 md5path = path_map_.Insert(path, inode);
-    inode_map_.Insert(inode, md5path);
+    inode_ex_map_.Insert(inode_ex, md5path);
     Unlock();
 
     atomic_xadd64(&statistics_.num_references, by);
-    if (new_inode) atomic_inc64(&statistics_.num_inserts);
+    if (is_new_inode) atomic_inc64(&statistics_.num_inserts);
   }
 
-  void VfsGet(const uint64_t inode, const PathString &path) {
-    VfsGetBy(inode, 1, path);
+  void VfsGet(const InodeEx inode_ex, const PathString &path) {
+    VfsGetBy(inode_ex, 1, path);
   }
 
   VfsPutRaii GetVfsPutRaii() { return VfsPutRaii(this); }
 
-  bool FindPath(const uint64_t inode, PathString *path) {
+  bool FindPath(InodeEx *inode_ex, PathString *path) {
     Lock();
     shash::Md5 md5path;
-    bool found = inode_map_.LookupMd5Path(inode, &md5path);
+    bool found = inode_ex_map_.LookupMd5Path(inode_ex, &md5path);
     if (found) {
       found = path_map_.LookupPath(md5path, path);
       assert(found);
@@ -643,17 +708,18 @@ class InodeTracker {
   unsigned version_;
   pthread_mutex_t *lock_;
   PathMap path_map_;
-  InodeMap inode_map_;
+  InodeExMap inode_ex_map_;
   InodeReferences inode_references_;
   Statistics statistics_;
 };  // class InodeTracker
 
 
 /**
- * Tracks fuse negative cache replies for active cache eviction
+ * Tracks fuse name lookup replies for active cache eviction.
+ * Class renamed from previous name NentryTracker
  */
-class NentryTracker {
-  FRIEND_TEST(T_GlueBuffer, NentryTracker);
+class DentryTracker {
+  FRIEND_TEST(T_GlueBuffer, DentryTracker);
 
  private:
   struct Entry {
@@ -679,23 +745,23 @@ class NentryTracker {
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics() : num_insert(0), num_remove(0), num_prune(0) {}
-    uint64_t num_insert;
-    uint64_t num_remove;
-    uint64_t num_prune;
+    int64_t num_insert;
+    int64_t num_remove;
+    int64_t num_prune;
   };
   Statistics GetStatistics() { return statistics_; }
 
   static void *MainCleaner(void *data);
 
-  NentryTracker();
-  explicit NentryTracker(const NentryTracker &other);
-  NentryTracker &operator= (const NentryTracker &other);
-  ~NentryTracker();
+  DentryTracker();
+  DentryTracker(const DentryTracker &other);
+  DentryTracker &operator= (const DentryTracker &other);
+  ~DentryTracker();
 
   /**
    * Lock object during copy
    */
-  NentryTracker *Move();
+  DentryTracker *Move();
 
   void Add(const uint64_t inode_parent, const char *name, uint64_t timeout_s) {
     if (!is_active_) return;
@@ -726,7 +792,7 @@ class NentryTracker {
  private:
   static const unsigned kVersion = 0;
 
-  void CopyFrom(const NentryTracker &other);
+  void CopyFrom(const DentryTracker &other);
 
   void InitLock();
   inline void Lock() const {
@@ -758,7 +824,7 @@ class NentryTracker {
   int pipe_terminate_[2];
   int cleaning_interval_ms_;
   pthread_t thread_cleaner_;
-};  // class NentryTracker
+};  // class DentryTracker
 
 /**
  * Tracks the content hash associated to inodes of regular files whose content

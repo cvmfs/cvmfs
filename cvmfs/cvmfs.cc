@@ -221,7 +221,6 @@ static bool CheckVoms(const fuse_ctx &fctx) {
   return mount_point_->authz_session_mgr()->IsMemberOf(fctx.pid, mreq);
 }
 
-
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
@@ -230,7 +229,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return true;
 
   // Look in the catalogs in 2 steps: lookup inode->path, lookup path
-  catalog::DirectoryEntry dirent_negative =
+  static catalog::DirectoryEntry dirent_negative =
     catalog::DirectoryEntry(catalog::kDirentNegative);
   // Reset directory entry.  If the function returns false and dirent is no
   // the kDirentNegative, it was an I/O error
@@ -266,7 +265,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return true;
   }
 
-  bool retval = mount_point_->inode_tracker()->FindPath(ino, &path);
+  glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
+  bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, &path);
   if (!retval) {
     // Can this ever happen?
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -275,6 +275,13 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return false;
   }
   if (catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent)) {
+    if (!inode_ex.IsCompatibleFileType(dirent->mode())) {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Warning: inode %" PRId64 " (%s) changed file type",
+               ino, path.c_str());
+      // TODO(jblomer): we detect this issue but let it continue unhandled.
+      // Fix me.
+    }
     // Fix inodes
     dirent->set_inode(ino);
     mount_point_->inode_cache()->Insert(ino, *dirent);
@@ -348,7 +355,8 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
     return true;
 
   LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - looking in inode tracker", ino);
-  bool retval = mount_point_->inode_tracker()->FindPath(ino, path);
+  glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
+  bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
   assert(retval);
   mount_point_->path_cache()->Insert(ino, *path);
   return true;
@@ -451,8 +459,13 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   }
 
  lookup_reply_positive:
-  if (!file_system_->IsNfsSource())
-    mount_point_->inode_tracker()->VfsGet(dirent.inode(), path);
+  if (!file_system_->IsNfsSource()) {
+    mount_point_->inode_tracker()->VfsGet(
+      glue::InodeEx(dirent.inode(), dirent.mode()), path);
+  }
+  // We do _not_ track (and evict) positive replies; among other things, test
+  // 076 fails with the following line uncommented
+  // mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
@@ -461,7 +474,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
  lookup_reply_negative:
   // Will be a no-op if there is no fuse cache eviction
-  mount_point_->nentry_tracker()->Add(parent_fuse, name, timeout);
+  mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   fuse_remounter_->fence()->Leave();
   perf::Inc(file_system_->n_fs_lookup_negative());
   result.ino = 0;
@@ -1871,7 +1884,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                     &buf)) {
     if (!cvmfs::options_mgr_->IsOn(buf)) {
       fuse_notify_invalidation = false;
-      cvmfs::mount_point_->nentry_tracker()->Disable();
+      cvmfs::mount_point_->dentry_tracker()->Disable();
     }
   }
   cvmfs::fuse_remounter_ =
@@ -1948,8 +1961,8 @@ static void Spawn() {
   }
 
   cvmfs::fuse_remounter_->Spawn();
-  if (cvmfs::mount_point_->nentry_tracker()->is_active()) {
-    cvmfs::mount_point_->nentry_tracker()->SpawnCleaner(
+  if (cvmfs::mount_point_->dentry_tracker()->is_active()) {
+    cvmfs::mount_point_->dentry_tracker()->SpawnCleaner(
       cvmfs::mount_point_->kcache_timeout_sec());  // Usually every minute
   }
 
@@ -2105,12 +2118,12 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
 
   msg_progress = "Saving negative entry cache\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  glue::NentryTracker *saved_nentry_cache =
-    new glue::NentryTracker(*cvmfs::mount_point_->nentry_tracker());
-  loader::SavedState *state_nentry_tracker = new loader::SavedState();
-  state_nentry_tracker->state_id = loader::kStateNentryTracker;
-  state_nentry_tracker->state = saved_nentry_cache;
-  saved_states->push_back(state_nentry_tracker);
+  glue::DentryTracker *saved_dentry_tracker =
+    new glue::DentryTracker(*cvmfs::mount_point_->dentry_tracker());
+  loader::SavedState *state_dentry_tracker = new loader::SavedState();
+  state_dentry_tracker->state_id = loader::kStateDentryTracker;
+  state_dentry_tracker->state = saved_dentry_tracker;
+  saved_states->push_back(state_dentry_tracker);
 
   msg_progress = "Saving page cache entry tracker\n";
   SendMsg2Socket(fd_progress, msg_progress);
@@ -2227,13 +2240,13 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, " done\n");
     }
 
-    if (saved_states[i]->state_id == loader::kStateNentryTracker) {
-      SendMsg2Socket(fd_progress, "Restoring negative entry cache... ");
-      cvmfs::mount_point_->nentry_tracker()->~NentryTracker();
-      glue::NentryTracker *saved_nentry_tracker =
-        (glue::NentryTracker *)saved_states[i]->state;
-      new (cvmfs::mount_point_->nentry_tracker())
-        glue::NentryTracker(*saved_nentry_tracker);
+    if (saved_states[i]->state_id == loader::kStateDentryTracker) {
+      SendMsg2Socket(fd_progress, "Restoring dentry tracker... ");
+      cvmfs::mount_point_->dentry_tracker()->~DentryTracker();
+      glue::DentryTracker *saved_dentry_tracker =
+        static_cast<glue::DentryTracker *>(saved_states[i]->state);
+      new (cvmfs::mount_point_->dentry_tracker())
+        glue::DentryTracker(*saved_dentry_tracker);
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2360,9 +2373,9 @@ static void FreeSavedState(const int fd_progress,
         SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
         break;
-      case loader::kStateNentryTracker:
-        SendMsg2Socket(fd_progress, "Releasing saved negative entry cache\n");
-        delete static_cast<glue::NentryTracker *>(saved_states[i]->state);
+      case loader::kStateDentryTracker:
+        SendMsg2Socket(fd_progress, "Releasing saved dentry tracker\n");
+        delete static_cast<glue::DentryTracker *>(saved_states[i]->state);
         break;
       case loader::kStatePageCacheTracker:
         SendMsg2Socket(fd_progress, "Releasing saved page cache entry cache\n");
