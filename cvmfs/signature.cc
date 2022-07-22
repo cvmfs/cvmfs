@@ -27,13 +27,13 @@
 #include <string>
 #include <vector>
 
-#include "compression.h"
 #include "duplex_ssl.h"
 #include "hash.h"
 #include "logging.h"
 #include "platform.h"
 #include "prng.h"
 #include "smalloc.h"
+#include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 
@@ -74,6 +74,7 @@ SignatureManager::SignatureManager() {
   x509_lookup_ = NULL;
   int retval = pthread_mutex_init(&lock_blacklist_, NULL);
   assert(retval == 0);
+  offload_signing_ = false;
 
   /*
     Note: OpenSSL 3.0 deprecated SHA1 signatures. This env override is needed
@@ -168,6 +169,20 @@ bool SignatureManager::LoadPrivateMasterKeyPath(const string &file_pem)
   return (private_master_key_ != NULL);
 }
 
+bool SignatureManager::LoadPrivateMasterKeyMem(const string &key)
+{
+  UnloadPrivateMasterKey();
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  if (BIO_write(bp, key.data(), key.size()) <= 0) {
+    BIO_free(bp);
+    return false;
+  }
+  private_master_key_ = PEM_read_bio_RSAPrivateKey(bp, NULL, NULL, NULL);
+  BIO_free(bp);
+  return (private_master_key_ != NULL);
+}
+
 
 /**
  * @param[in] file_pem File name of the PEM key file
@@ -188,6 +203,20 @@ bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
   result = (private_key_ = PEM_read_PrivateKey(fp, NULL, NULL, tmp)) != NULL;
   fclose(fp);
   return result;
+}
+
+bool SignatureManager::LoadPrivateKeyMem(const std::string &key)
+{
+  UnloadPrivateKey();
+  BIO *bp = BIO_new(BIO_s_mem());
+  assert(bp != NULL);
+  if (BIO_write(bp, key.data(), key.size()) <= 0) {
+    BIO_free(bp);
+    return false;
+  }
+  private_key_ = PEM_read_bio_PrivateKey(bp, NULL, NULL, NULL);
+  BIO_free(bp);
+  return (private_key_ != NULL);
 }
 
 
@@ -522,22 +551,22 @@ bool SignatureManager::LoadBlacklist(
   if (!append)
     blacklist_.clear();
 
-  char *buffer;
-  unsigned buffer_size;
-  if (!CopyPath2Mem(path_blacklist,
-                    reinterpret_cast<unsigned char **>(&buffer), &buffer_size))
-  {
+  int fd = open(path_blacklist.c_str(), O_RDONLY);
+  if (fd < 0)
     return false;
-  }
+  std::string blacklist_buffer;
+  bool retval = SafeReadToString(fd, &blacklist_buffer);
+  close(fd);
+  if (!retval)
+    return false;
 
   unsigned num_bytes = 0;
-  while (num_bytes < buffer_size) {
-    const string line = GetLineMem(buffer + num_bytes,
-                                   buffer_size - num_bytes);
+  while (num_bytes < blacklist_buffer.size()) {
+    const string line = GetLineMem(blacklist_buffer.data() + num_bytes,
+                                   blacklist_buffer.size() - num_bytes);
     blacklist_.push_back(line);
     num_bytes += line.length() + 1;
   }
-  free(buffer);
 
   return true;
 }
@@ -745,6 +774,19 @@ bool SignatureManager::Sign(const unsigned char *buffer,
     return false;
   }
 
+  if (offload_signing_) {
+    LogCvmfs(kLogSignature, kLogDebug, "offloading Sign()");
+    std::string s = SignOffload(kSignManifest, buffer_size, buffer);
+    *signature_size = s.size();
+    if (!s.empty()) {
+      *signature = reinterpret_cast<unsigned char *>(smalloc(s.size()));
+      memcpy(*signature, s.data(), s.size());
+    } else {
+      *signature = NULL;
+    }
+    return !s.empty();
+  }
+
   bool result = false;
 #ifdef OPENSSL_API_INTERFACE_V11
   EVP_MD_CTX *ctx_ptr = EVP_MD_CTX_new();
@@ -793,6 +835,19 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
     return false;
   }
 
+  if (offload_signing_) {
+    LogCvmfs(kLogSignature, kLogDebug, "offloading SignRsa()");
+    std::string s = SignOffload(kSignWhitelist, buffer_size, buffer);
+    *signature_size = s.size();
+    if (!s.empty()) {
+      *signature = reinterpret_cast<unsigned char *>(smalloc(s.size()));
+      memcpy(*signature, s.data(), s.size());
+    } else {
+      *signature = NULL;
+    }
+    return !s.empty();
+  }
+
   unsigned char *to = (unsigned char *)smalloc(RSA_size(private_master_key_));
   unsigned char *from = (unsigned char *)smalloc(buffer_size);
   memcpy(from, buffer, buffer_size);
@@ -808,6 +863,65 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
   *signature = to;
   *signature_size = size;
   return true;
+}
+
+std::string SignatureManager::SignOffload(
+  ESignMethod method, unsigned buf_size, const unsigned char *buf)
+{
+  if (!FileExists("/usr/bin/cvmfs_signing_helper")) {
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+             "missing signing helper");
+    return "";
+  }
+
+  std::vector<std::string> cmd;
+  cmd.push_back("/usr/bin/cvmfs_signing_helper");
+  std::set<int> preserve_filedes;
+  preserve_filedes.insert(0);
+  preserve_filedes.insert(1);
+  preserve_filedes.insert(2);
+
+  int pipe_input[2];
+  int pipe_output[2];
+  MakePipe(pipe_input);
+  MakePipe(pipe_output);
+  std::map<int, int> map_filedes;
+  map_filedes[pipe_input[0]] = 0;
+  map_filedes[pipe_output[1]] = 1;
+
+  std::string result;
+  bool retval = ManagedExec(cmd, preserve_filedes, map_filedes,
+                            true /* drop_credentials */,
+                            true /* clear_env */);
+  if (retval) {
+    LogCvmfs(kLogSignature, kLogDebug, "offload: sending signature method");
+    WritePipe(pipe_input[1], &method, sizeof(method));
+    std::string key;
+    if (method == kSignManifest) {
+      key = GetPrivateKey();
+    } else if (method == kSignWhitelist) {
+      key = GetPrivateMasterKey();
+    } else {
+      assert(false);
+    }
+    unsigned key_size = key.size();
+    LogCvmfs(kLogSignature, kLogDebug, "offload: sending key");
+    WritePipe(pipe_input[1], &key_size, sizeof(key_size));
+    WritePipe(pipe_input[1], key.data(), key.size());
+    LogCvmfs(kLogSignature, kLogDebug, "offload: sending buffer");
+    WritePipe(pipe_input[1], &buf_size, sizeof(buf_size));
+    WritePipe(pipe_input[1], buf, buf_size);
+
+    LogCvmfs(kLogSignature, kLogDebug, "offload: retrieving signature");
+    unsigned size;
+    ReadPipe(pipe_output[0], &size, sizeof(size));
+    result.resize(size);
+    ReadPipe(pipe_output[0], const_cast<char *>(result.data()), size);
+  }
+
+  ClosePipe(pipe_input);
+  ClosePipe(pipe_output);
+  return result;
 }
 
 

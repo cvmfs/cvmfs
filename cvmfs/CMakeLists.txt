@@ -481,6 +481,17 @@ set (CVMFS_SWISSKNIFE_SOURCES
   xattr.cc
 )
 
+# TODO(jblomer): remove me
+set (CVMFS_SIGN_SOURCES
+  signature_offload.cc
+  hash.cc
+  logging.cc
+  signature.cc
+  util/exception.cc
+  util/posix.cc
+  util/string.cc
+)
+
 set (CVMFS_SUID_HELPER_SOURCES
   cvmfs_suid_helper.cc
   cvmfs_suid_util.cc
@@ -964,12 +975,19 @@ if (BUILD_SERVER)
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
   add_library (cvmfs_server SHARED ${LIBCVMFS_SERVER_SOURCES})
   add_executable (cvmfs_publish ${CVMFS_PUBLISH_SOURCES})
+  add_executable (cvmfs_signing_helper ${CVMFS_SIGN_SOURCES})
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
   set_target_properties (cvmfs_server PROPERTIES
     VERSION ${CernVM-FS_VERSION_STRING}
     COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS}")
   set_target_properties (cvmfs_publish PROPERTIES COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}" LINK_FLAGS "${CVMFS_PUBLISH_LD_FLAGS}")
+  set_target_properties (cvmfs_signing_helper PROPERTIES
+                           COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}")
+  target_link_libraries (cvmfs_signing_helper
+                         ${SHA3_LIBRARIES}
+                         ${OPENSSL_LIBRARIES}
+                         pthread dl)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
@@ -1162,7 +1180,7 @@ endif(BUILD_RECEIVER)
 
 if (BUILD_SERVER)
   install (
-    TARGETS     cvmfs_swissknife cvmfs_publish
+    TARGETS     cvmfs_swissknife cvmfs_publish cvmfs_signing_helper
     RUNTIME
     DESTINATION    bin
   )

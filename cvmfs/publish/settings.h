@@ -405,6 +405,7 @@ class SettingsPublisher {
     , whitelist_validity_days_(kDefaultWhitelistValidity)
     , is_silent_(false)
     , is_managed_(false)
+    , offload_signing_(true)
     , storage_(fqrn_())
     , transaction_(fqrn_())
     , keychain_(fqrn_())
@@ -417,6 +418,7 @@ class SettingsPublisher {
   void SetOwner(uid_t uid, gid_t gid);
   void SetIsSilent(bool value);
   void SetIsManaged(bool value);
+  void SetOffloadSigning(bool value);
 
   std::string GetReadOnlyXAttr(const std::string &attr);
 
@@ -430,6 +432,7 @@ class SettingsPublisher {
   uid_t owner_gid() const { return owner_gid_(); }
   bool is_silent() const { return is_silent_(); }
   bool is_managed() const { return is_managed_(); }
+  bool offload_signing() const { return offload_signing_(); }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
@@ -447,6 +450,7 @@ class SettingsPublisher {
   Setting<unsigned> whitelist_validity_days_;
   Setting<bool> is_silent_;
   Setting<bool> is_managed_;
+  Setting<bool> offload_signing_;
 
   SettingsStorage storage_;
   SettingsTransaction transaction_;

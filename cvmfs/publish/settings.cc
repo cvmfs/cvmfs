@@ -334,6 +334,7 @@ SettingsPublisher::SettingsPublisher(
   , whitelist_validity_days_(kDefaultWhitelistValidity)
   , is_silent_(false)
   , is_managed_(false)
+  , offload_signing_(true)
   , storage_(fqrn_())
   , transaction_(fqrn_())
   , keychain_(fqrn_())
@@ -371,6 +372,10 @@ void SettingsPublisher::SetIsSilent(bool value) {
 
 void SettingsPublisher::SetIsManaged(bool value) {
   is_managed_ = value;
+}
+
+void SettingsPublisher::SetOffloadSigning(bool value) {
+  offload_signing_ = value;
 }
 
 

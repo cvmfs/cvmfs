@@ -84,4 +84,54 @@ TEST_F(T_Signature, Export) {
   free(signature);
 }
 
+TEST_F(T_Signature, GetSetKeys) {
+  sign_mgr_.GenerateMasterKeyPair();
+  sign_mgr_.GenerateCertificate("test.cvmfs.io");
+  EXPECT_TRUE(sign_mgr_.KeysMatch());
+
+  const unsigned char *buffer = reinterpret_cast<const unsigned char *>("abc");
+  unsigned char *signature;
+  unsigned signature_size;
+  EXPECT_TRUE(sign_mgr_.SignRsa(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.VerifyRsa(buffer, 3, signature, signature_size));
+  free(signature);
+  EXPECT_TRUE(sign_mgr_.Sign(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.Verify(buffer, 3, signature, signature_size));
+  free(signature);
+
+  EXPECT_TRUE(
+    sign_mgr_.LoadPrivateMasterKeyMem(sign_mgr_.GetPrivateMasterKey()));
+  EXPECT_TRUE(sign_mgr_.LoadPrivateKeyMem(sign_mgr_.GetPrivateKey()));
+  EXPECT_TRUE(sign_mgr_.SignRsa(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.VerifyRsa(buffer, 3, signature, signature_size));
+  free(signature);
+  EXPECT_TRUE(sign_mgr_.Sign(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.Verify(buffer, 3, signature, signature_size));
+  free(signature);
+}
+
+TEST_F(T_Signature, Offload) {
+  if (!FileExists("/usr/bin/cvmfs_signing_helper")) {
+    printf("Signing helper not installed, skipping\n");
+    return;
+  }
+  sign_mgr_.SetSignOffload();
+
+  sign_mgr_.GenerateMasterKeyPair();
+  sign_mgr_.GenerateCertificate("test.cvmfs.io");
+  EXPECT_TRUE(sign_mgr_.KeysMatch());
+  const unsigned char *buffer = reinterpret_cast<const unsigned char *>("abc");
+  unsigned char *signature;
+  unsigned signature_size;
+  EXPECT_TRUE(sign_mgr_.SignRsa(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.VerifyRsa(buffer, 3, signature, signature_size));
+  free(signature);
+
+  std::string key = sign_mgr_.GetPrivateKey();
+  sign_mgr_.GenerateCertificate("new.cvmfs.io");
+  EXPECT_TRUE(sign_mgr_.KeysMatch());
+  sign_mgr_.LoadPrivateKeyMem(key);
+  EXPECT_FALSE(sign_mgr_.KeysMatch());
+}
+
 }  // namespace signature
