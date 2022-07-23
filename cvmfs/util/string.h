@@ -47,9 +47,11 @@ CVMFS_EXPORT bool HasPrefix(const std::string &str, const std::string &prefix,
 CVMFS_EXPORT bool HasSuffix(const std::string &str, const std::string &suffix,
                             const bool ignore_case);
 
+CVMFS_EXPORT std::vector<std::string> SplitStringBounded(
+  unsigned max_chunks, const std::string &str, char delim);
 CVMFS_EXPORT std::vector<std::string> SplitString(const std::string &str,
-                                                  char delim,
-                                                  char max_chunks = 0);
+                                                  char delim);
+
 CVMFS_EXPORT std::string JoinStrings(const std::vector<std::string> &strings,
                                      const std::string &joint);
 CVMFS_EXPORT void ParseKeyvalMem(const unsigned char *buffer,

@@ -29,7 +29,7 @@ int CmdCommit::Main(const Options &options) {
 
   if (!options.plain_args().empty()) {
     std::vector<std::string> tokens =
-      SplitString(options.plain_args()[0].value_str, '/', 2);
+      SplitStringBounded(2, options.plain_args()[0].value_str, '/');
     fqrn = tokens[0];
   }
 

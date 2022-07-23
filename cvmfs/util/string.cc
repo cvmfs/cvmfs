@@ -285,7 +285,13 @@ bool HasSuffix(const std::string &str, const std::string &suffix,
              : std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
 }
 
-vector<string> SplitString(const string &str, char delim, char max_chunks) {
+vector<string> SplitString(const string &str, char delim) {
+  return SplitStringBounded(0, str, delim);
+}
+
+vector<string> SplitStringBounded(
+  unsigned max_chunks, const string &str, char delim)
+{
   vector<string> result;
 
   // edge case... one chunk is always the whole string
@@ -297,7 +303,7 @@ vector<string> SplitString(const string &str, char delim, char max_chunks) {
   // split the string
   const unsigned size = str.size();
   unsigned marker = 0;
-  char chunks = 1;
+  unsigned chunks = 1;
   unsigned i;
   for (i = 0; i < size; ++i) {
     if (str[i] == delim) {
@@ -305,7 +311,7 @@ vector<string> SplitString(const string &str, char delim, char max_chunks) {
       marker = i + 1;
 
       // we got what we want... good bye
-      if (max_chunks && (++chunks == max_chunks)) break;
+      if (++chunks == max_chunks) break;
     }
   }
 
