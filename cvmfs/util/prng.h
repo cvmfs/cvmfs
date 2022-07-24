@@ -5,8 +5,8 @@
  * there is no global state like with random().
  */
 
-#ifndef CVMFS_PRNG_H_
-#define CVMFS_PRNG_H_
+#ifndef CVMFS_UTIL_PRNG_H_
+#define CVMFS_UTIL_PRNG_H_
 
 #include <stdint.h>
 #include <sys/time.h>
@@ -90,4 +90,4 @@ class Prng {
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_PRNG_H_
+#endif  // CVMFS_UTIL_PRNG_H_

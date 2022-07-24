@@ -14,9 +14,9 @@
 
 #include "malloc_heap.h"
 #include "murmur.hxx"
-#include "prng.h"
 #include "smalloc.h"
 #include "util/async.h"
+#include "util/prng.h"
 
 using namespace std;  // NOLINT
 

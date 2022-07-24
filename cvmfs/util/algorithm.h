@@ -12,10 +12,9 @@
 #include <vector>
 
 #include "murmur.hxx"
-// TODO(jblomer): should be also part of algorithm
 #include "platform.h"
-#include "prng.h"
 #include "util/atomic.h"
+#include "util/prng.h"
 #include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD

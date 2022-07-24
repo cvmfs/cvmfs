@@ -16,8 +16,8 @@
 
 #include "duplex_cares.h"
 #include "gtest/gtest_prod.h"
-#include "prng.h"
 #include "util/atomic.h"
+#include "util/prng.h"
 #include "util/single_copy.h"
 
 namespace dns {

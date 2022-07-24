@@ -11,10 +11,10 @@
 
 #include "malloc_arena.h"
 #include "murmur.hxx"
-#include "prng.h"
 #include "sqlitemem.h"
 #include "util/algorithm.h"
 #include "util/pointer.h"
+#include "util/prng.h"
 
 using namespace std;  // NOLINT
 

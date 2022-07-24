@@ -21,9 +21,9 @@
 #include <new>
 
 #include "murmur.hxx"
-#include "prng.h"
 #include "smalloc.h"
 #include "util/atomic.h"
+#include "util/prng.h"
 
 /**
  * Hash table with linear probing as collision resolution.  Works only for

@@ -18,12 +18,12 @@
 
 #include "dns.h"
 #include "duplex_curl.h"
-#include "prng.h"
 #include "smalloc.h"
 #include "ssl.h"
 #include "util/file_backed_buffer.h"
 #include "util/mmap_file.h"
 #include "util/pointer.h"
+#include "util/prng.h"
 #include "util/single_copy.h"
 #include "util_concurrency.h"
 

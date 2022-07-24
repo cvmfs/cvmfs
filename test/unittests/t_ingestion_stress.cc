@@ -17,10 +17,10 @@
 #include "hash.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
-#include "prng.h"
 #include "smalloc.h"
 #include "testutil.h"
 #include "util/atomic.h"
+#include "util/prng.h"
 #include "util/string.h"
 
 

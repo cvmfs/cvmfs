@@ -31,9 +31,9 @@
 #include "hash.h"
 #include "logging.h"
 #include "platform.h"
-#include "prng.h"
 #include "smalloc.h"
 #include "util/posix.h"
+#include "util/prng.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

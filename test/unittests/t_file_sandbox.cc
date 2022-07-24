@@ -10,7 +10,7 @@
 
 #include "c_file_sandbox.h"
 #include "hash.h"
-#include "prng.h"
+#include "util/prng.h"
 
 
 class T_FileSandbox : public FileSandbox {

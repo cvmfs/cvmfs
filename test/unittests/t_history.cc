@@ -10,8 +10,8 @@
 
 #include "compression.h"
 #include "history_sqlite.h"
-#include "prng.h"
 #include "testutil.h"
+#include "util/prng.h"
 
 using history::History;
 using history::SqliteHistory;

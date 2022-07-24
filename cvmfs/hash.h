@@ -22,8 +22,8 @@
 #include <string>
 
 #include "logging.h"
-#include "prng.h"
 #include "smalloc.h"
+#include "util/prng.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
