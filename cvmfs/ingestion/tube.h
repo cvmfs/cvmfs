@@ -11,7 +11,7 @@
 #include <cassert>
 #include <vector>
 
-#include "atomic.h"
+#include "util/atomic.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
 #include "util_concurrency.h"

@@ -14,10 +14,10 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "duplex_cares.h"
 #include "gtest/gtest_prod.h"
 #include "prng.h"
+#include "util/atomic.h"
 #include "util/single_copy.h"
 
 namespace dns {

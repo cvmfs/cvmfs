@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "bigqueue.h"
 #include "bigvector.h"
 #include "hash.h"
@@ -27,6 +26,7 @@
 #include "shortstring.h"
 #include "smallhash.h"
 #include "smalloc.h"
+#include "util/atomic.h"
 #include "util/posix.h"
 #include "util/string.h"
 

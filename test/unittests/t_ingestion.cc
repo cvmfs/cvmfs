@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "atomic.h"
 #include "c_mock_uploader.h"
 #include "compression.h"
 #include "hash.h"
@@ -26,6 +25,7 @@
 #include "smalloc.h"
 #include "testutil.h"
 #include "upload_facility.h"
+#include "util/atomic.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 

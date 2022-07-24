@@ -17,13 +17,13 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "catalog.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
 #include "logging.h"
 #include "statistics.h"
+#include "util/atomic.h"
 
 class XattrList;
 

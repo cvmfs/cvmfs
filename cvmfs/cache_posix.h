@@ -12,7 +12,6 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "backoff.h"
 #include "cache.h"
 #include "catalog_mgr.h"
@@ -22,6 +21,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "statistics.h"
+#include "util/atomic.h"
 
 namespace catalog {
 class DirectoryEntry;

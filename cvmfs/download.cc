@@ -50,7 +50,6 @@
 #include <set>
 #include <utility>
 
-#include "atomic.h"
 #include "compression.h"
 #include "duplex_curl.h"
 #include "hash.h"
@@ -61,6 +60,7 @@
 #include "smalloc.h"
 #include "ssl.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
 #include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"

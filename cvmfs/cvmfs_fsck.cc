@@ -23,12 +23,12 @@
 #include <cstring>
 #include <string>
 
-#include "atomic.h"
 #include "compression.h"
 #include "hash.h"
 #include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
+#include "util/atomic.h"
 #include "util/posix.h"
 #include "util_concurrency.h"
 

@@ -12,8 +12,8 @@
 #include <set>
 #include <vector>
 
-#include "atomic.h"
 #include "util/async.h"
+#include "util/atomic.h"
 #include "util/mutex.h"
 #include "util/single_copy.h"
 

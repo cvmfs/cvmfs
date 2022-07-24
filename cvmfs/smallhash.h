@@ -20,10 +20,10 @@
 #include <cstdlib>
 #include <new>
 
-#include "atomic.h"
 #include "murmur.hxx"
 #include "prng.h"
 #include "smalloc.h"
+#include "util/atomic.h"
 
 /**
  * Hash table with linear probing as collision resolution.  Works only for

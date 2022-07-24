@@ -10,7 +10,6 @@
 #include <map>
 #include <vector>
 
-#include "atomic.h"
 #include "cvmfs_config.h"
 #include "libcvmfs.h"
 #include "logging.h"
@@ -22,6 +21,7 @@
 #include "shrinkwrap/spec_tree.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util/atomic.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"

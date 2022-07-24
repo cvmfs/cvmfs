@@ -11,7 +11,6 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "catalog.h"
 #include "catalog_traversal.h"
 #include "hash.h"
@@ -21,6 +20,7 @@
 #include "uid_map.h"
 #include "upload.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
 #include "util/pointer.h"
 #include "util_concurrency.h"
 

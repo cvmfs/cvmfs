@@ -65,7 +65,6 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "authz/authz_session.h"
 #include "auto_umount.h"
 #include "backoff.h"
@@ -109,6 +108,7 @@
 #include "talk.h"
 #include "tracer.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
 #include "util/exception.h"
 #include "util_concurrency.h"
 #include "uuid.h"

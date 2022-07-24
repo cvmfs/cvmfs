@@ -12,12 +12,12 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "compression.h"
 #include "file_chunk.h"
 #include "hash.h"
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
+#include "util/atomic.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
 

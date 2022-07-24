@@ -49,7 +49,6 @@
 #include <map>
 #include <vector>
 
-#include "atomic.h"
 #include "directory_entry.h"
 #include "download.h"
 #include "hash.h"
@@ -62,6 +61,7 @@
 #include "signature.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util/atomic.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

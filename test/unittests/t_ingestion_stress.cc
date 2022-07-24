@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "atomic.h"
 #include "c_file_sandbox.h"
 #include "c_mock_uploader.h"
 #include "file_chunk.h"
@@ -21,6 +20,7 @@
 #include "prng.h"
 #include "smalloc.h"
 #include "testutil.h"
+#include "util/atomic.h"
 #include "util/string.h"
 
 

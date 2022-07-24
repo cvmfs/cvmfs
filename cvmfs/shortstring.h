@@ -13,7 +13,7 @@
 #include <cstring>
 #include <string>
 
-#include "atomic.h"
+#include "util/atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

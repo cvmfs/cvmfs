@@ -13,7 +13,6 @@
 
 #include <stdint.h>
 
-#include "atomic.h"
 #include "directory_entry.h"
 #include "duplex_fuse.h"
 #include "hash.h"
@@ -21,6 +20,7 @@
 #include "lru.h"
 #include "murmur.hxx"
 #include "shortstring.h"
+#include "util/atomic.h"
 
 
 namespace lru {

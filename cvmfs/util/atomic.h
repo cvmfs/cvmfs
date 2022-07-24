@@ -5,8 +5,8 @@
  * are handled by GCC.
  */
 
-#ifndef CVMFS_ATOMIC_H_
-#define CVMFS_ATOMIC_H_
+#ifndef CVMFS_UTIL_ATOMIC_H_
+#define CVMFS_UTIL_ATOMIC_H_
 
 #include <stdint.h>
 
@@ -93,4 +93,4 @@ static void inline __attribute__((used)) MemoryFence() {
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_ATOMIC_H_
+#endif  // CVMFS_UTIL_ATOMIC_H_

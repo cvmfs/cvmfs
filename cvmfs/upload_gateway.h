@@ -5,14 +5,13 @@
 #ifndef CVMFS_UPLOAD_GATEWAY_H_
 #define CVMFS_UPLOAD_GATEWAY_H_
 
-#include <atomic.h>
-
 #include <string>
 
 #include "pack.h"
 #include "repository_tag.h"
 #include "session_context.h"
 #include "upload_facility.h"
+#include "util/atomic.h"
 
 namespace upload {
 

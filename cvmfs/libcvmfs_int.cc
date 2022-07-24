@@ -46,7 +46,6 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
@@ -70,6 +69,7 @@
 #include "smalloc.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
+#include "util/atomic.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "xattr.h"

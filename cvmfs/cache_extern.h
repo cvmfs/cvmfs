@@ -16,13 +16,13 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "cache.h"
 #include "cache_transport.h"
 #include "fd_table.h"
 #include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "quota.h"
+#include "util/atomic.h"
 #include "util/single_copy.h"
 #include "util_concurrency.h"
 
