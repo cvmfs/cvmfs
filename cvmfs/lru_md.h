@@ -18,9 +18,9 @@
 #include "hash.h"
 #include "logging.h"
 #include "lru.h"
-#include "murmur.hxx"
 #include "shortstring.h"
 #include "util/atomic.h"
+#include "util/murmur.hxx"
 
 
 namespace lru {

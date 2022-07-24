@@ -20,9 +20,9 @@
 #include <cstdlib>
 #include <new>
 
-#include "murmur.hxx"
 #include "smalloc.h"
 #include "util/atomic.h"
+#include "util/murmur.hxx"
 #include "util/prng.h"
 
 /**

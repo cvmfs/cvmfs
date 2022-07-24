@@ -7,8 +7,8 @@
 
 #include <cassert>
 
-#include "murmur.hxx"
 #include "platform.h"
+#include "util/murmur.hxx"
 
 using namespace std;  // NOLINT
 

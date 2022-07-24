@@ -11,9 +11,9 @@
 #include <string>
 #include <vector>
 
-#include "murmur.hxx"
 #include "platform.h"
 #include "util/atomic.h"
+#include "util/murmur.hxx"
 #include "util/prng.h"
 #include "util/single_copy.h"
 

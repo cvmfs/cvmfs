@@ -27,10 +27,10 @@
 #include "logging.h"
 #include "lru.h"
 #include "malloc_heap.h"
-#include "murmur.hxx"
 #include "platform.h"
 #include "smallhash.h"
 #include "smalloc.h"
+#include "util/murmur.hxx"
 #include "util/string.h"
 #include "util_concurrency.h"
 

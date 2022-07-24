@@ -17,9 +17,9 @@
 #include "cache_transport.h"
 #include "hash.h"
 #include "manifest.h"
-#include "murmur.hxx"
 #include "smallhash.h"
 #include "util/atomic.h"
+#include "util/murmur.hxx"
 #include "util/single_copy.h"
 
 /**

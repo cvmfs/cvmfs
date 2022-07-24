@@ -13,8 +13,8 @@
 // 2. It will not produce the same results on little-endian and big-endian
 //    machines.
 
-#ifndef CVMFS_MURMUR_H_
-#define CVMFS_MURMUR_H_
+#ifndef CVMFS_UTIL_MURMUR_H_
+#define CVMFS_UTIL_MURMUR_H_
 
 #include <stdint.h>
 
@@ -123,4 +123,4 @@ inline uint64_t MurmurHash64A ( const void * key, int len, uint64_t seed )
   return h;
 }
 
-#endif  // CVMFS_MURMUR_H_
+#endif  // CVMFS_UTIL_MURMUR_H_
