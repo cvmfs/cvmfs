@@ -13,7 +13,7 @@
 #include <map>
 #include <string>
 
-#include "platform.h"
+#include "util/platform.h"
 
 struct Pipe;
 

@@ -11,9 +11,9 @@
 #include <cerrno>
 #include <string>
 
-#include "platform.h"
 #include "sqlitemem.h"
 #include "util/logging.h"
+#include "util/platform.h"
 
 namespace sqlite {
 

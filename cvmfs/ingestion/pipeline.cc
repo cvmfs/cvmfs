@@ -14,10 +14,10 @@
 #include "ingestion/task_read.h"
 #include "ingestion/task_register.h"
 #include "ingestion/task_write.h"
-#include "platform.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
 #include "util/exception.h"
+#include "util/platform.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

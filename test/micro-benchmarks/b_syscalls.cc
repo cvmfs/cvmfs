@@ -13,7 +13,7 @@
 #include <cassert>
 
 #include "bm_util.h"
-#include "platform.h"
+#include "util/platform.h"
 #include "util/posix.h"
 
 class BM_Syscalls : public benchmark::Fixture {

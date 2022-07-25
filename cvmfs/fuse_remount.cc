@@ -18,10 +18,10 @@
 #include "fuse_inode_gen.h"
 #include "lru_md.h"
 #include "mountpoint.h"
-#include "platform.h"
 #include "statistics.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

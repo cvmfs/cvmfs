@@ -8,7 +8,7 @@
 #include <cassert>
 
 #include "json_document_write.h"
-#include "platform.h"
+#include "util/platform.h"
 #include "util/smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"

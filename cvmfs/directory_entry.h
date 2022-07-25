@@ -18,8 +18,8 @@
 #include "bigvector.h"
 #include "compression.h"
 #include "hash.h"
-#include "platform.h"
 #include "shortstring.h"
+#include "util/platform.h"
 
 namespace publish {
 class SyncItem;

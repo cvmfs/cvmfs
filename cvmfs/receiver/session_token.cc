@@ -11,8 +11,8 @@
 #include "encrypt.h"
 #include "json.h"
 #include "json_document.h"
-#include "platform.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/string.h"
 

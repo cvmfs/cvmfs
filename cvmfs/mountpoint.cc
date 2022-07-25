@@ -56,7 +56,6 @@
 #include "nfs_maps_sqlite.h"
 #endif
 #include "options.h"
-#include "platform.h"
 #include "quota_posix.h"
 #include "resolv_conf_event_handler.h"
 #include "signature.h"
@@ -65,6 +64,7 @@
 #include "statistics.h"
 #include "tracer.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"

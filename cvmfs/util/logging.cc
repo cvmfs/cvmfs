@@ -27,8 +27,8 @@
 #include <ctime>
 #include <vector>
 
-#include "platform.h"
 #include "util/mutex.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
 #include "util/smalloc.h"

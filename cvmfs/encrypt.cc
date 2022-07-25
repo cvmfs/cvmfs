@@ -17,8 +17,8 @@
 
 #include "duplex_ssl.h"
 #include "hash.h"
-#include "platform.h"
 #include "util/exception.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/smalloc.h"
 #include "util/string.h"

@@ -23,9 +23,9 @@
 #include <vector>
 
 #include "options.h"
-#include "platform.h"
 #include "sanitizer.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 

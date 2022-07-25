@@ -16,8 +16,8 @@
 #include <string>
 
 #include "fs_traversal.h"
-#include "platform.h"
 #include "util/file_guard.h"
+#include "util/platform.h"
 #include "util/posix.h"
 
 class T_FsTraversal : public ::testing::Test {

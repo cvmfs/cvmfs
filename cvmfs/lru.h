@@ -48,10 +48,10 @@
 #include <map>
 #include <string>
 
-#include "platform.h"
 #include "smallhash.h"
 #include "statistics.h"
 #include "util/atomic.h"
+#include "util/platform.h"
 #include "util/single_copy.h"
 #include "util/smalloc.h"
 

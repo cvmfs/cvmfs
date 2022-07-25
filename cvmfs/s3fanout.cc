@@ -12,10 +12,10 @@
 #include <utility>
 
 #include "cvmfs_config.h"
-#include "platform.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
 #include "util/exception.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util_concurrency.h"

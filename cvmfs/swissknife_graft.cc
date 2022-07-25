@@ -15,7 +15,7 @@
 
 #include "fs_traversal.h"
 #include "hash.h"
-#include "platform.h"
+#include "util/platform.h"
 #include "util/posix.h"
 
 bool swissknife::CommandGraft::ChecksumFdWithChunks(

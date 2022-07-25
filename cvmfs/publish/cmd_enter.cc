@@ -28,13 +28,13 @@
 
 #include "backoff.h"
 #include "options.h"
-#include "platform.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
 #include "sanitizer.h"
 #include "util/logging.h"
 #include "util/namespace.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 

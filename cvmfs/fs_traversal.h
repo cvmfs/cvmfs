@@ -16,10 +16,10 @@
 #include <set>
 #include <string>
 
-#include "platform.h"
 #include "util/async.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/platform.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

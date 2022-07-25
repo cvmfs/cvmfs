@@ -11,7 +11,7 @@
 #include <cassert>
 #include <cstring>
 
-#include "platform.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/smalloc.h"
 #include "util/string.h"

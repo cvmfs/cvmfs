@@ -33,9 +33,9 @@
 
 #include "cache.h"
 #include "duplex_sqlite3.h"
-#include "platform.h"
 #include "statistics.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/smalloc.h"
 #include "util/string.h"
 
