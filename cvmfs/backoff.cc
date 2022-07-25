@@ -10,8 +10,8 @@
 #include <ctime>
 
 #include "logging.h"
-#include "smalloc.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

@@ -13,8 +13,8 @@
 #include <new>
 
 #include "malloc_arena.h"
-#include "smalloc.h"
 #include "util/exception.h"
+#include "util/smalloc.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT

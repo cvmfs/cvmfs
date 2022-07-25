@@ -9,7 +9,7 @@
 
 #include "json_document_write.h"
 #include "platform.h"
-#include "smalloc.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

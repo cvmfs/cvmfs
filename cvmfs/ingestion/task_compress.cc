@@ -9,7 +9,7 @@
 
 #include "compression.h"
 #include "logging.h"
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 
 /**

@@ -35,8 +35,8 @@
 #include "duplex_sqlite3.h"
 #include "logging.h"
 #include "platform.h"
-#include "smalloc.h"
 #include "statistics.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

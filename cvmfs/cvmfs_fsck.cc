@@ -27,9 +27,9 @@
 #include "hash.h"
 #include "logging.h"
 #include "platform.h"
-#include "smalloc.h"
 #include "util/atomic.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT

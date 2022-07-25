@@ -13,7 +13,7 @@
 
 #include "logging.h"
 #include "publish/except.h"
-#include "smalloc.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

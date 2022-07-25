@@ -12,7 +12,7 @@
 #include <cstring>
 #include <new>
 
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

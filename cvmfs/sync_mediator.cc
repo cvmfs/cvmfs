@@ -21,11 +21,11 @@
 #include "hash.h"
 #include "json_document.h"
 #include "publish/repository.h"
-#include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
 #include "util/exception.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

@@ -28,10 +28,10 @@
 #include <vector>
 
 #include "platform.h"
-#include "smalloc.h"
 #include "util/mutex.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

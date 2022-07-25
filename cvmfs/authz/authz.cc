@@ -6,7 +6,7 @@
 
 #include <cstring>
 
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 AuthzToken *AuthzToken::DeepCopy() {
   AuthzToken *result = new AuthzToken();

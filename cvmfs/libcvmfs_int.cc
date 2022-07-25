@@ -65,12 +65,12 @@
 #include "quota.h"
 #include "shortstring.h"
 #include "signature.h"
-#include "smalloc.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "util/atomic.h"
 #include "util/murmur.hxx"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "xattr.h"
 

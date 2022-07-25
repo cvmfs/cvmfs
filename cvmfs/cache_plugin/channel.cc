@@ -17,10 +17,10 @@
 
 #include "logging.h"
 #include "platform.h"
-#include "smalloc.h"
 #include "util/exception.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

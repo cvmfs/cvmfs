@@ -27,9 +27,9 @@
 #include "reflog.h"
 #include "signature.h"
 #include "signing_tool.h"
-#include "smalloc.h"
 #include "upload.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

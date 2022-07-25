@@ -9,9 +9,9 @@
 #include <cstring>
 
 #include "logging.h"
-#include "smalloc.h"
 #include "util/exception.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 FileBackedBuffer *FileBackedBuffer::Create(uint64_t in_memory_threshold,
                                            const std::string &tmp_dir)

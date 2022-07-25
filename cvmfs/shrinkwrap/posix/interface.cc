@@ -23,8 +23,8 @@
 #include "logging.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/util.h"
-#include "smalloc.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "xattr.h"
 

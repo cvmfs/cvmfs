@@ -59,10 +59,10 @@
 #include "quota.h"
 #include "shortstring.h"
 #include "signature.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

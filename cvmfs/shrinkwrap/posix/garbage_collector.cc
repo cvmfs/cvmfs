@@ -13,8 +13,8 @@
 #include "helpers.h"
 #include "logging.h"
 #include "shrinkwrap/fs_traversal.h"
-#include "smalloc.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 /**
  * Initializes garbage collection by setting up the corresponding hash map

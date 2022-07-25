@@ -35,12 +35,12 @@
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
 #include "signature.h"
-#include "smalloc.h"
 #include "upload.h"
 #include "util/atomic.h"
 #include "util/exception.h"
 #include "util/posix.h"
 #include "util/shared_ptr.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

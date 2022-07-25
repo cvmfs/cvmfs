@@ -11,7 +11,7 @@
 
 #include "ingestion/ingestion_source.h"
 #include "item_mem.h"
-#include "smalloc.h"
+#include "util/smalloc.h"
 #include "util_concurrency.h"
 
 FileItem::FileItem(

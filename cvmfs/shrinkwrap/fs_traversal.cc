@@ -19,10 +19,10 @@
 #include "shrinkwrap/fs_traversal_libcvmfs.h"
 #include "shrinkwrap/posix/interface.h"
 #include "shrinkwrap/spec_tree.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

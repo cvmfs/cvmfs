@@ -18,7 +18,6 @@
 
 #include "duplex_libarchive.h"
 #include "fs_traversal.h"
-#include "smalloc.h"
 #include "sync_item.h"
 #include "sync_item_dummy.h"
 #include "sync_item_tar.h"
@@ -26,6 +25,7 @@
 #include "sync_union.h"
 #include "util/exception.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util_concurrency.h"
 
 namespace publish {

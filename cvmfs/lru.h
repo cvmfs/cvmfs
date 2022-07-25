@@ -50,10 +50,10 @@
 
 #include "platform.h"
 #include "smallhash.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/single_copy.h"
+#include "util/smalloc.h"
 
 namespace lru {
 

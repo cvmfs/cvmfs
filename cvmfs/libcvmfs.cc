@@ -25,9 +25,9 @@
 
 #include "libcvmfs_int.h"
 #include "logging.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT

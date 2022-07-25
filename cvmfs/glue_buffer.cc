@@ -20,9 +20,9 @@
 
 #include "logging.h"
 #include "platform.h"
-#include "smalloc.h"
 #include "util/mutex.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

@@ -13,10 +13,10 @@
 #include <vector>
 
 #include "malloc_heap.h"
-#include "smalloc.h"
 #include "util/async.h"
 #include "util/murmur.hxx"
 #include "util/prng.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

@@ -25,9 +25,9 @@
 #include "platform.h"
 #include "shortstring.h"
 #include "smallhash.h"
-#include "smalloc.h"
 #include "util/atomic.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_

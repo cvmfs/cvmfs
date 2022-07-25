@@ -38,7 +38,7 @@
 #include <vector>
 
 #include "file_watcher_kqueue.h"
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

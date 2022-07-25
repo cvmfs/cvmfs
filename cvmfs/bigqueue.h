@@ -13,7 +13,7 @@
 #include <cstdlib>
 #include <new>
 
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 template<class Item>
 class BigQueue {

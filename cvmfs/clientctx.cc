@@ -7,7 +7,7 @@
 #include <cassert>
 
 #include "interrupt.h"
-#include "smalloc.h"
+#include "util/smalloc.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT

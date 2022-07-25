@@ -13,7 +13,7 @@
 #include "catalog_mgr.h"
 #include "logging.h"
 #include "platform.h"
-#include "smalloc.h"
+#include "util/smalloc.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT

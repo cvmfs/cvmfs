@@ -9,9 +9,9 @@
 #include <string>
 
 #include "pack.h"
-#include "smalloc.h"
 #include "util/posix.h"
 #include "util/prng.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

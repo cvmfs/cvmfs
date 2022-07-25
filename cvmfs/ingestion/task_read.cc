@@ -13,9 +13,9 @@
 #include "backoff.h"
 #include "logging.h"
 #include "platform.h"
-#include "smalloc.h"
 #include "util/exception.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 
 atomic_int64 TaskRead::tag_seq_ = 0;

@@ -29,8 +29,8 @@
 #include "malloc_heap.h"
 #include "platform.h"
 #include "smallhash.h"
-#include "smalloc.h"
 #include "util/murmur.hxx"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

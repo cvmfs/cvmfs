@@ -37,7 +37,7 @@
 #else  // CVMFS_ENABLE_INOTIFY
 #include "file_watcher.h"
 #endif  // CVMFS_ENABLE_INOTIFY
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
