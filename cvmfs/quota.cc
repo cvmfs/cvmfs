@@ -10,7 +10,7 @@
 
 #include <cstdlib>
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/smalloc.h"
 #include "util_concurrency.h"
 

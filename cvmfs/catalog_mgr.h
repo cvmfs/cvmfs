@@ -21,9 +21,9 @@
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
-#include "logging.h"
 #include "statistics.h"
 #include "util/atomic.h"
+#include "util/logging.h"
 
 class XattrList;
 

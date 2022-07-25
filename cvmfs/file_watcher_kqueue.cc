@@ -15,7 +15,7 @@
 
 #include "backoff.h"
 #include "file_watcher_kqueue.h"
-#include "logging.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 namespace file_watcher {

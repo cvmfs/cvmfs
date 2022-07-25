@@ -11,8 +11,8 @@
 #include <string>
 
 #include "helpers.h"
-#include "logging.h"
 #include "shrinkwrap/fs_traversal.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 

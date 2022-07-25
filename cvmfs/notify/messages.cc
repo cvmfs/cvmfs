@@ -9,7 +9,7 @@
 #include "json.h"
 #include "json_document.h"
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/string.h"
 

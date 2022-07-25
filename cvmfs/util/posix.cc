@@ -51,10 +51,10 @@
 #include <vector>
 
 #include "fs_traversal.h"
-#include "logging.h"
 #include "platform.h"
 #include "util/algorithm.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/string.h"
 #include "util_concurrency.h"
 

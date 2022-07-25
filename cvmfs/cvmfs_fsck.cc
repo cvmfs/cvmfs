@@ -25,9 +25,9 @@
 
 #include "compression.h"
 #include "hash.h"
-#include "logging.h"
 #include "platform.h"
 #include "util/atomic.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util_concurrency.h"

@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "publish/except.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

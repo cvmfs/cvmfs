@@ -10,8 +10,8 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "logging.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util_concurrency.h"
 #include "xattr.h"
 

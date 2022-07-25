@@ -17,7 +17,7 @@
 #include "compression.h"
 #include "directory_entry.h"
 #include "hash.h"
-#include "logging.h"
+#include "util/logging.h"
 
 
 using namespace std;  // NOLINT

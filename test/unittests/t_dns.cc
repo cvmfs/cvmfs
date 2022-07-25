@@ -14,8 +14,8 @@
 #include <vector>
 
 #include "dns.h"
-#include "logging.h"
 #include "platform.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"

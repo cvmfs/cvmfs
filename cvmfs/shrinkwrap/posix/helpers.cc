@@ -19,9 +19,9 @@
 
 #include "data_dir_mgmt.h"
 #include "garbage_collector.h"
-#include "logging.h"
 #include "platform.h"
 #include "shrinkwrap/fs_traversal_interface.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "xattr.h"
 

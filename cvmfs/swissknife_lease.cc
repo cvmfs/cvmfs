@@ -8,9 +8,9 @@
 #include <vector>
 
 #include "gateway_util.h"
-#include "logging.h"
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

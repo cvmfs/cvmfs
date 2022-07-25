@@ -16,12 +16,12 @@
 #include "backoff.h"
 #include "catalog_mgr_client.h"
 #include "fuse_inode_gen.h"
-#include "logging.h"
 #include "lru_md.h"
 #include "mountpoint.h"
 #include "platform.h"
 #include "statistics.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

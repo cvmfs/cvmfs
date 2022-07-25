@@ -15,12 +15,12 @@
 #include "catalog_traversal.h"
 #include "hash.h"
 #include "history_sqlite.h"
-#include "logging.h"
 #include "manifest.h"
 #include "uid_map.h"
 #include "upload.h"
 #include "util/algorithm.h"
 #include "util/atomic.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util_concurrency.h"
 

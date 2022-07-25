@@ -15,9 +15,9 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "shortstring.h"
 #include "statistics.h"
+#include "util/logging.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT

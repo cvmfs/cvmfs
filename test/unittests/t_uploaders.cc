@@ -13,7 +13,6 @@
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
 #include "hash.h"
-#include "logging.h"
 #include "testutil.h"
 #include "upload_facility.h"
 #include "upload_local.h"
@@ -21,6 +20,7 @@
 #include "upload_spooler_definition.h"
 #include "util/atomic.h"
 #include "util/file_guard.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

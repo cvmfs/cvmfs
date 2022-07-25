@@ -45,7 +45,6 @@
 #include "fuse_remount.h"
 #include "glue_buffer.h"
 #include "loader.h"
-#include "logging.h"
 #include "monitor.h"
 #include "mountpoint.h"
 #include "nfs_maps.h"
@@ -55,6 +54,7 @@
 #include "shortstring.h"
 #include "statistics.h"
 #include "tracer.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "wpad.h"
 

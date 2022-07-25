@@ -6,7 +6,7 @@
 
 #include <cassert>
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/smalloc.h"
 
 Pathspec::Pathspec(const std::string &spec) :

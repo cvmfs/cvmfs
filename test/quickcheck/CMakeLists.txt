@@ -59,7 +59,6 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
-  ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
@@ -87,6 +86,7 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/logging.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc

@@ -28,11 +28,11 @@ set (CVMFS_STRESS_SOURCES
 )
 
 set (CVMFS_S3_MOCK_SERVER_SOURCES
-  ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/logging.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
 )

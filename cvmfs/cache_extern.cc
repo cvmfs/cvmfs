@@ -24,9 +24,9 @@
 
 #include "cache.pb.h"
 #include "hash.h"
-#include "logging.h"
 #include "util/atomic.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #ifdef __APPLE__

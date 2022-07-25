@@ -15,8 +15,8 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "platform.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

@@ -18,11 +18,11 @@
 #include "catalog_counters.h"
 #include "directory_entry.h"
 #include "history.h"
-#include "logging.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
 #include "sanitizer.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/string.h"
 

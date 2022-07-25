@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "publish/cmd_abort.h"
 #include "publish/cmd_commit.h"
 #include "publish/cmd_diff.h"
@@ -22,6 +21,7 @@
 #include "publish/cmd_zpipe.h"
 #include "publish/command.h"
 #include "publish/except.h"
+#include "util/logging.h"
 
 using namespace std;  // NOLINT
 

@@ -11,8 +11,8 @@
 #include <cassert>
 
 #include "catalog_mgr.h"
-#include "logging.h"
 #include "platform.h"
+#include "util/logging.h"
 #include "util/smalloc.h"
 #include "util_concurrency.h"
 

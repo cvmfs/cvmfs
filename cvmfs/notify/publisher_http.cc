@@ -8,7 +8,7 @@
 
 #include "cvmfs_config.h"
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 namespace {

@@ -8,8 +8,8 @@
 #include <cstdio>
 #include <cstring>
 
-#include "logging.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 

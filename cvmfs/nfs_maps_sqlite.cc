@@ -22,9 +22,9 @@
 #include <cstddef>
 #include <cstdlib>
 
-#include "logging.h"
 #include "statistics.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/prng.h"

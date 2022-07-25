@@ -11,8 +11,8 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "logging.h"
 #include "publish/except.h"
+#include "util/logging.h"
 #include "util/smalloc.h"
 #include "util/string.h"
 

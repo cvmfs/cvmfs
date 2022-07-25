@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "whitelist.h"

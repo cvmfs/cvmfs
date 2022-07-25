@@ -21,13 +21,13 @@
 
 #include "compression.h"
 #include "hash.h"
-#include "logging.h"
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "reflog.h"
 #include "signature.h"
 #include "signing_tool.h"
 #include "upload.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 

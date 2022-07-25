@@ -47,11 +47,11 @@
 
 #include "duplex_sqlite3.h"
 #include "hash.h"
-#include "logging.h"
 #include "monitor.h"
 #include "platform.h"
 #include "statistics.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"

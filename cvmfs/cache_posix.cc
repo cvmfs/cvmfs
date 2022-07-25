@@ -52,7 +52,6 @@
 #include "directory_entry.h"
 #include "download.h"
 #include "hash.h"
-#include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "platform.h"
@@ -61,6 +60,7 @@
 #include "signature.h"
 #include "statistics.h"
 #include "util/atomic.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 

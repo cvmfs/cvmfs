@@ -8,7 +8,7 @@
 #include <string>
 
 // Shared declarations of debug and non-debug logging
-#include "logging_internal.h"
+#include "util/logging_internal.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

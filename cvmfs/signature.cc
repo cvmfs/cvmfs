@@ -29,8 +29,8 @@
 
 #include "duplex_ssl.h"
 #include "hash.h"
-#include "logging.h"
 #include "platform.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/prng.h"
 #include "util/smalloc.h"

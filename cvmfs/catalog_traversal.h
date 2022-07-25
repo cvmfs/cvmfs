@@ -15,10 +15,10 @@
 #include "catalog.h"
 #include "compression.h"
 #include "history_sqlite.h"
-#include "logging.h"
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "signature.h"
+#include "util/logging.h"
 #include "util_concurrency.h"
 
 namespace catalog {

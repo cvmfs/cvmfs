@@ -4,8 +4,8 @@
 
 // Internal use, include only logging.h!
 
-#ifndef CVMFS_LOGGING_INTERNAL_H_
-#define CVMFS_LOGGING_INTERNAL_H_
+#ifndef CVMFS_UTIL_LOGGING_INTERNAL_H_
+#define CVMFS_UTIL_LOGGING_INTERNAL_H_
 
 #include <cstdarg>
 #include <ctime>
@@ -152,4 +152,4 @@ void ClearLogBuffer();
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_LOGGING_INTERNAL_H_
+#endif  // CVMFS_UTIL_LOGGING_INTERNAL_H_

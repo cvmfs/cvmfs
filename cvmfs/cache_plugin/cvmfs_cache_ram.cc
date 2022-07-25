@@ -24,11 +24,11 @@
 #include <vector>
 
 #include "cache_plugin/libcvmfs_cache.h"
-#include "logging.h"
 #include "lru.h"
 #include "malloc_heap.h"
 #include "platform.h"
 #include "smallhash.h"
+#include "util/logging.h"
 #include "util/murmur.hxx"
 #include "util/smalloc.h"
 #include "util/string.h"

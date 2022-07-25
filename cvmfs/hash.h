@@ -21,7 +21,7 @@
 #include <cstring>
 #include <string>
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
 

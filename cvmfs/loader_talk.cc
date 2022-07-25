@@ -14,9 +14,9 @@
 #include <cstdlib>
 
 #include "loader.h"
-#include "logging.h"
 #include "platform.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

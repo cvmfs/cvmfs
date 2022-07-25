@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "sanitizer.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 /**

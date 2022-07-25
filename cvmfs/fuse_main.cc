@@ -17,8 +17,8 @@
 #include <vector>
 
 #include "fuse_main.h"
-#include "logging.h"
 #include "platform.h"
+#include "util/logging.h"
 #include "util/smalloc.h"
 #include "util/string.h"
 

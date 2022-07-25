@@ -11,9 +11,9 @@
 #include <cstring>
 
 #include "backoff.h"
-#include "logging.h"
 #include "platform.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 

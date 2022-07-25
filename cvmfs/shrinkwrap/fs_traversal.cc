@@ -12,7 +12,6 @@
 
 #include "cvmfs_config.h"
 #include "libcvmfs.h"
-#include "logging.h"
 #include "platform.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
@@ -21,6 +20,7 @@
 #include "shrinkwrap/spec_tree.h"
 #include "statistics.h"
 #include "util/atomic.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"

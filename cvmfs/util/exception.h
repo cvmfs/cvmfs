@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "logging.h"
+#include "util/logging.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

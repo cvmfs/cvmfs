@@ -18,9 +18,9 @@
 #include <cstdlib>
 #include <utility>
 
-#include "logging.h"
 #include "sanitizer.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

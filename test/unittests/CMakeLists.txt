@@ -198,7 +198,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
-  ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/magic_xattr.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
@@ -259,6 +258,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
+  ${CVMFS_SOURCE_DIR}/util/logging.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/namespace.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
@@ -316,10 +316,10 @@ set (CVMFS_TEST_CACHE_SOURCES
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
   ${CVMFS_SOURCE_DIR}/hash.cc
-  ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/logging.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
@@ -359,7 +359,6 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/kvstore.cc
-  ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/magic_xattr.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
@@ -382,6 +381,7 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/uuid.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/logging.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
@@ -492,7 +492,6 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/ingestion/task_register.cc
   ${CVMFS_SOURCE_DIR}/ingestion/task_write.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
-  ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
@@ -527,6 +526,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
+  ${CVMFS_SOURCE_DIR}/util/logging.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc

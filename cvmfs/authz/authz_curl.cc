@@ -13,7 +13,7 @@
 #include "authz/authz_session.h"
 #include "duplex_curl.h"
 #include "duplex_ssl.h"
-#include "logging.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util_concurrency.h"
 

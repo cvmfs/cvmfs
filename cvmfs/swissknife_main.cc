@@ -8,7 +8,6 @@
 
 #include <cassert>
 
-#include "logging.h"
 #include "statistics_database.h"
 #include "swissknife.h"
 
@@ -31,6 +30,7 @@
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

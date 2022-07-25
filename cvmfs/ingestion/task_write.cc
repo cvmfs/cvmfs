@@ -7,9 +7,9 @@
 
 #include <cstdlib>
 
-#include "logging.h"
 #include "upload_facility.h"
 #include "util/exception.h"
+#include "util/logging.h"
 
 
 void TaskWrite::OnBlockComplete(

@@ -10,10 +10,10 @@
 
 #include "catalog_mgr_client.h"
 #include "fetch.h"
-#include "logging.h"
 #include "mountpoint.h"
 #include "quota.h"
 #include "signature.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,

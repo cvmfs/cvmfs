@@ -11,7 +11,7 @@
  * If DEBUGMSG is undefined, pure debug messages are compiled into no-ops.
  */
 
-#include "logging_internal.h"  // NOLINT(build/include)
+#include "util/logging_internal.h"  // NOLINT(build/include)
 
 #include <errno.h>
 #include <fcntl.h>
