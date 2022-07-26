@@ -32,11 +32,6 @@
 #include <string>
 #include <vector>
 
-#ifdef CVMFS_ENABLE_INOTIFY
-#include "file_watcher_inotify.h"
-#else  // CVMFS_ENABLE_INOTIFY
-#include "file_watcher.h"
-#endif  // CVMFS_ENABLE_INOTIFY
 #include "util/smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -353,14 +348,6 @@ inline uint64_t platform_realtime_ns() {
 inline uint64_t platform_memsize() {
   return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
          static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
-}
-
-inline file_watcher::FileWatcher* platform_file_watcher() {
-#ifdef CVMFS_ENABLE_INOTIFY
-  return new file_watcher::FileWatcherInotify();
-#else  // CVMFS_ENABLE_INOTIFY
-  return NULL;
-#endif  // CVMFS_ENABLE_INOTIFY
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

@@ -49,12 +49,12 @@
 #include "mountpoint.h"
 #include "nfs_maps.h"
 #include "options.h"
-#include "platform.h"
 #include "quota.h"
 #include "shortstring.h"
 #include "statistics.h"
 #include "tracer.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "wpad.h"
 

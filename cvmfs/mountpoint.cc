@@ -1350,7 +1350,7 @@ bool MountPoint::CreateResolvConfWatcher() {
              "DNS roaming is enabled for this repository.");
     // Create a file watcher to update the DNS settings of the download
     // managers when there are changes to /etc/resolv.conf
-    resolv_conf_watcher_ = platform_file_watcher();
+    resolv_conf_watcher_ = file_watcher::FileWatcher::Create();
 
     if (resolv_conf_watcher_) {
       ResolvConfEventHandler *handler =

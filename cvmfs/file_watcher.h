@@ -65,6 +65,7 @@ class FileWatcher {
 
   FileWatcher();
   virtual ~FileWatcher();
+  static FileWatcher *Create();
 
   void RegisterHandler(const std::string& file_path,
                        EventHandler* handler);
