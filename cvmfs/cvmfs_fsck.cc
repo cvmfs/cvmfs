@@ -26,11 +26,11 @@
 #include "compression.h"
 #include "hash.h"
 #include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

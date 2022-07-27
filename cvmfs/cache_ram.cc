@@ -11,10 +11,10 @@
 #include <new>
 
 #include "kvstore.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

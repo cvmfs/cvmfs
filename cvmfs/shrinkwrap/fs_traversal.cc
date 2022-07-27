@@ -19,12 +19,12 @@
 #include "shrinkwrap/spec_tree.h"
 #include "statistics.h"
 #include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std; //NOLINT
 

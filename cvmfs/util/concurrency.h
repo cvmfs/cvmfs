@@ -770,6 +770,6 @@ class ConcurrentWorker : SingleCopy {
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#include "util_concurrency_impl.h"
+#include "util/concurrency_impl.h"
 
 #endif  // CVMFS_UTIL_CONCURRENCY_H_

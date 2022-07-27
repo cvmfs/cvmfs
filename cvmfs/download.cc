@@ -58,13 +58,13 @@
 #include "ssl.h"
 #include "util/algorithm.h"
 #include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

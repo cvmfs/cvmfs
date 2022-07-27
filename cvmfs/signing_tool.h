@@ -10,7 +10,7 @@
 
 #include "hash.h"
 #include "server_tool.h"
-#include "util_concurrency.h"
+#include "util/concurrency.h"
 
 class ServerTool;
 

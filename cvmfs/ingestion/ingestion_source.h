@@ -16,11 +16,11 @@
 #include <string>
 
 #include "duplex_libarchive.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
-#include "util_concurrency.h"
 
 /*
  * The purpose of this class is to add a common interface for object that are

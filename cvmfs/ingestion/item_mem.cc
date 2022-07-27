@@ -7,8 +7,8 @@
 #include <cassert>
 #include <cstdlib>
 
+#include "util/concurrency.h"
 #include "util/exception.h"
-#include "util_concurrency.h"
 
 atomic_int64 ItemAllocator::total_allocated_ = 0;
 

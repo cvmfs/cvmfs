@@ -14,8 +14,8 @@
 #include <algorithm>
 
 #include "util/async.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

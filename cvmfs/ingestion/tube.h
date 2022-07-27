@@ -12,9 +12,9 @@
 #include <vector>
 
 #include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
-#include "util_concurrency.h"
 
 /**
  * A thread-safe, doubly linked list of links containing pointers to ItemT.  The

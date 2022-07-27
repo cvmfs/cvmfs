@@ -29,13 +29,13 @@
 
 #include "duplex_ssl.h"
 #include "hash.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

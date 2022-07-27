@@ -23,8 +23,8 @@
 #include "hash.h"
 #include "quota.h"
 #include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/single_copy.h"
-#include "util_concurrency.h"
 
 
 class ExternalCacheManager : public CacheManager {

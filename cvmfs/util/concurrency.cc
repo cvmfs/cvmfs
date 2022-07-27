@@ -3,7 +3,7 @@
  */
 
 #include "cvmfs_config.h"
-#include "util_concurrency.h"
+#include "util/concurrency.h"
 
 #include <unistd.h>
 

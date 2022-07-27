@@ -23,10 +23,10 @@
 #include "sync_item_tar.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
-#include "util_concurrency.h"
 
 namespace publish {
 

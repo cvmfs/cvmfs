@@ -9,10 +9,10 @@
 #include "pack.h"
 #include "receiver/payload_processor.h"
 #include "receiver/reactor.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace receiver;  // NOLINT
 

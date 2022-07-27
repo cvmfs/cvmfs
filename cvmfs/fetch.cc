@@ -14,9 +14,9 @@
 #include "interrupt.h"
 #include "quota.h"
 #include "statistics.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/posix.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

@@ -16,8 +16,8 @@
 #include "compression.h"
 #include "hash.h"
 #include "swissknife_history.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

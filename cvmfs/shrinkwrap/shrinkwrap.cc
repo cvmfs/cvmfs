@@ -13,9 +13,9 @@
 #include "cvmfs_config.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 
 namespace {

@@ -83,11 +83,11 @@ set (CVMFS_CLIENT_SOURCES
   tracer.cc
   uuid.cc
   util/algorithm.cc
+  util/concurrency.cc
   util/exception.cc
   util/logging.cc
   util/posix.cc
   util/string.cc
-  util_concurrency.cc
   whitelist.cc
   wpad.cc
   xattr.cc
@@ -167,11 +167,11 @@ set (LIBCVMFS_CACHE_SOURCES
   monitor.cc
   options.cc
   sanitizer.cc
+  util/concurrency.cc
   util/exception.cc
   util/logging.cc
   util/posix.cc
   util/string.cc
-  util_concurrency.cc
 )
 
 set (CVMFS_CACHE_NULL_SOURCES
@@ -182,7 +182,7 @@ set (CVMFS_CACHE_RAM_SOURCES
   cache_plugin/cvmfs_cache_ram.cc
   malloc_heap.cc
   statistics.cc
-  util_concurrency.cc
+  util/concurrency.cc
   util/exception.cc
   util/logging.cc
   util/posix.cc
@@ -237,11 +237,11 @@ set (CVMFS_SHRINKWRAP_SOURCES
   shrinkwrap/spec_tree.cc
   shrinkwrap/util.cc
   statistics.cc
+  util/concurrency.cc
   util/exception.cc
   util/logging.cc
   util/posix.cc
   util/string.cc
-  util_concurrency.cc
   xattr.cc
 )
 
@@ -353,8 +353,8 @@ set (LIBCVMFS_SERVER_SOURCES
   upload_local.cc
   upload_s3.cc
   upload_spooler_definition.cc
-  util_concurrency.cc
   util/algorithm.cc
+  util/concurrency.cc
   util/exception.cc
   util/file_backed_buffer.cc
   util/logging.cc
@@ -469,13 +469,13 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_spooler_definition.cc
   url.cc
   util/algorithm.cc
+  util/concurrency.cc
   util/exception.cc
   util/file_backed_buffer.cc
   util/logging.cc
   util/mmap_file.cc
   util/posix.cc
   util/raii_temp_dir.cc
-  util_concurrency.cc
   whitelist.cc
   xattr.cc
 )
@@ -550,13 +550,13 @@ set (CVMFS_PRELOADER_SOURCES
   upload_s3.cc
   upload_spooler_definition.cc
   util/algorithm.cc
+  util/concurrency.cc
   util/exception.cc
   util/file_backed_buffer.cc
   util/logging.cc
   util/mmap_file.cc
   util/posix.cc
   util/string.cc
-  util_concurrency.cc
   uuid.cc
   whitelist.cc
   xattr.cc
@@ -636,13 +636,13 @@ if(BUILD_RECEIVER)
     upload_s3.cc
     upload_spooler_definition.cc
     util/algorithm.cc
+    util/concurrency.cc
     util/exception.cc
     util/file_backed_buffer.cc
     util/logging.cc
     util/mmap_file.cc
     util/posix.cc
     util/raii_temp_dir.cc
-    util_concurrency.cc
     uuid.cc
     whitelist.cc
     xattr.cc

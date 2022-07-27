@@ -23,11 +23,11 @@
 #include "publish/repository.h"
 #include "sync_union.h"
 #include "upload.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

@@ -18,8 +18,8 @@
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "signature.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
-#include "util_concurrency.h"
 
 namespace catalog {
 class Catalog;

@@ -20,9 +20,9 @@
 #include "upload.h"
 #include "util/algorithm.h"
 #include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/pointer.h"
-#include "util_concurrency.h"
 
 namespace catalog {
 class WritableCatalog;
