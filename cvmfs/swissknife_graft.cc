@@ -13,8 +13,8 @@
 #include <cstdio>
 #include <vector>
 
-#include "fs_traversal.h"
 #include "hash.h"
+#include "util/fs_traversal.h"
 #include "util/platform.h"
 #include "util/posix.h"
 

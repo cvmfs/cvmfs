@@ -7,7 +7,7 @@
 #include "swissknife_scrub.h"
 #include "cvmfs_config.h"
 
-#include "fs_traversal.h"
+#include "util/fs_traversal.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"

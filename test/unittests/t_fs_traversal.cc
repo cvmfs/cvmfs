@@ -15,8 +15,8 @@
 #include <map>
 #include <string>
 
-#include "fs_traversal.h"
 #include "util/file_guard.h"
+#include "util/fs_traversal.h"
 #include "util/platform.h"
 #include "util/posix.h"
 

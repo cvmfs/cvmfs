@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "duplex_libarchive.h"
-#include "fs_traversal.h"
 #include "sync_item.h"
 #include "sync_item_dummy.h"
 #include "sync_item_tar.h"
@@ -25,6 +24,7 @@
 #include "sync_union.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/fs_traversal.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 

@@ -5,8 +5,8 @@
  * of directories.
  */
 
-#ifndef CVMFS_FS_TRAVERSAL_H_
-#define CVMFS_FS_TRAVERSAL_H_
+#ifndef CVMFS_UTIL_FS_TRAVERSAL_H_
+#define CVMFS_UTIL_FS_TRAVERSAL_H_
 
 #include <errno.h>
 
@@ -266,4 +266,4 @@ class FileSystemTraversal {
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_FS_TRAVERSAL_H_
+#endif  // CVMFS_UTIL_FS_TRAVERSAL_H_

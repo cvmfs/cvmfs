@@ -50,10 +50,10 @@
 #include <string>
 #include <vector>
 
-#include "fs_traversal.h"
 #include "util/algorithm.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/fs_traversal.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/string.h"

@@ -15,10 +15,10 @@
 #include <map>
 #include <sstream>  // TODO(jblomer): remove me
 
-#include "fs_traversal.h"
 #include "hash.h"
 #include "manifest.h"
 #include "testutil.h"
+#include "util/fs_traversal.h"
 
 
 #ifndef __APPLE__
