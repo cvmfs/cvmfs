@@ -275,10 +275,6 @@ set (CVMFS_PUBLISH_SOURCES
   ssl.cc
   statistics.cc
   upload_spooler_definition.cc
-  util/exception.cc
-  util/logging.cc
-  util/namespace.cc
-  util/posix.cc
   whitelist.cc
 )
 
@@ -353,13 +349,6 @@ set (LIBCVMFS_SERVER_SOURCES
   upload_local.cc
   upload_s3.cc
   upload_spooler_definition.cc
-  util/concurrency.cc
-  util/exception.cc
-  util/file_backed_buffer.cc
-  util/logging.cc
-  util/mmap_file.cc
-  util/posix.cc
-  util/raii_temp_dir.cc
   whitelist.cc
   xattr.cc
 )
@@ -468,13 +457,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_s3.cc
   upload_spooler_definition.cc
   url.cc
-  util/concurrency.cc
-  util/exception.cc
-  util/file_backed_buffer.cc
-  util/logging.cc
-  util/mmap_file.cc
-  util/posix.cc
-  util/raii_temp_dir.cc
   whitelist.cc
   xattr.cc
 )
@@ -484,9 +466,6 @@ set (CVMFS_SIGN_SOURCES
   signature_offload.cc
   hash.cc
   signature.cc
-  util/exception.cc
-  util/logging.cc
-  util/posix.cc
 )
 
 set (CVMFS_SUID_HELPER_SOURCES
@@ -635,7 +614,6 @@ if(BUILD_RECEIVER)
     upload_local.cc
     upload_s3.cc
     upload_spooler_definition.cc
-    util/concurrency.cc
     util/exception.cc
     util/file_backed_buffer.cc
     util/logging.cc

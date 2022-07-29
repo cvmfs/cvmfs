@@ -8,13 +8,14 @@
 #include <stdexcept>
 #include <string>
 
+#include "util/export.h"
 #include "util/logging.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-class ECvmfsException : public std::runtime_error {
+class CVMFS_EXPORT ECvmfsException : public std::runtime_error {
  public:
   explicit ECvmfsException(const std::string& what_arg)
       : std::runtime_error(what_arg) {}
@@ -25,11 +26,13 @@ class ECvmfsException : public std::runtime_error {
 #define CVMFS_SOURCE_LOCATION "PANIC: " __FILE__ " : " CVMFS_S2(__LINE__)
 #define PANIC(...) Panic(CVMFS_SOURCE_LOCATION, kLogCvmfs, __VA_ARGS__);
 
+CVMFS_EXPORT
 __attribute__((noreturn))
 void Panic(const char *coordinates, const LogSource source, const int mask,
            const char *format, ...);
 
 // For PANIC(NULL)
+CVMFS_EXPORT
 __attribute__((noreturn))
 void Panic(const char *coordinates, const LogSource source, const char *nul);
 

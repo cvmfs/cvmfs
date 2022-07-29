@@ -27,6 +27,7 @@
 #include <ctime>
 #include <vector>
 
+#include "util/export.h"
 #include "util/mutex.h"
 #include "util/platform.h"
 #include "util/posix.h"
@@ -418,6 +419,7 @@ void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
  * @param[in] mask Bit mask of log facilities
  * @param[in] format Format string followed by arguments like printf
  */
+CVMFS_EXPORT
 void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   char *msg = NULL;
   va_list variadic_list;

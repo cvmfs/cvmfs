@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include "util/export.h"
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
@@ -43,7 +45,7 @@ enum LogFacilities {
  *
  * The default facilities are kLogStdout and kLogStderr.
  */
-struct DefaultLogging {
+struct CVMFS_EXPORT DefaultLogging {
   /**
    * Change the default logging facilities
    */
@@ -111,7 +113,7 @@ const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;
 const int kLogInfoMsg = kLogStdout | kLogShowSource | kLogInform;
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 
-struct LogBufferEntry {
+struct CVMFS_EXPORT LogBufferEntry {
   LogBufferEntry(LogSource s, int m, const std::string &msg)
     : timestamp(time(NULL)), source(s), mask(m), message(msg) { }
 
@@ -121,32 +123,36 @@ struct LogBufferEntry {
   std::string message;
 };
 
-void SetLogSyslogLevel(const int level);
-int GetLogSyslogLevel();
-void SetLogSyslogFacility(const int facility);
-int GetLogSyslogFacility();
-void SetLogCustomFile(unsigned id, const std::string &filename);
-void SetLogMicroSyslog(const std::string &filename);
-std::string GetLogMicroSyslog();
-void SetLogMicroSyslogMaxSize(unsigned bytes);
-void SetLogSyslogPrefix(const std::string &prefix);
-void SetLogSyslogShowPID(bool flag);
-void SetLogVerbosity(const LogLevels max_level);
-void LogShutdown();
+CVMFS_EXPORT void SetLogSyslogLevel(const int level);
+CVMFS_EXPORT int GetLogSyslogLevel();
+CVMFS_EXPORT void SetLogSyslogFacility(const int facility);
+CVMFS_EXPORT int GetLogSyslogFacility();
+CVMFS_EXPORT void SetLogCustomFile(unsigned id, const std::string &filename);
+CVMFS_EXPORT void SetLogMicroSyslog(const std::string &filename);
+CVMFS_EXPORT std::string GetLogMicroSyslog();
+CVMFS_EXPORT void SetLogMicroSyslogMaxSize(unsigned bytes);
+CVMFS_EXPORT void SetLogSyslogPrefix(const std::string &prefix);
+CVMFS_EXPORT void SetLogSyslogShowPID(bool flag);
+CVMFS_EXPORT void SetLogVerbosity(const LogLevels max_level);
+CVMFS_EXPORT void LogShutdown();
 
 #ifdef DEBUGMSG
-void SetLogDebugFile(const std::string &filename);
-std::string GetLogDebugFile();
+CVMFS_EXPORT void SetLogDebugFile(const std::string &filename);
+CVMFS_EXPORT std::string GetLogDebugFile();
 #else
 #define SetLogDebugFile(filename) ((void)0)
 #define GetLogDebugFile() (std::string(""))
 #endif
 
+CVMFS_EXPORT
 void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
                               const char *msg));
 
-std::vector<LogBufferEntry> GetLogBuffer();
-void ClearLogBuffer();
+CVMFS_EXPORT std::vector<LogBufferEntry> GetLogBuffer();
+CVMFS_EXPORT void ClearLogBuffer();
+
+CVMFS_EXPORT void PrintWarning(const std::string &message);
+CVMFS_EXPORT void PrintError(const std::string &message);
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

@@ -14,6 +14,7 @@
 
 #include "util/async.h"
 #include "util/atomic.h"
+#include "util/export.h"
 #include "util/mutex.h"
 #include "util/single_copy.h"
 
@@ -26,7 +27,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  * inherit from Lockable are also usable with the LockGuard template for scoped
  * locking semantics.
  */
-class Lockable : SingleCopy {
+class CVMFS_EXPORT Lockable : SingleCopy {
  public:
   inline virtual ~Lockable() {        pthread_mutex_destroy(&mutex_); }
 
@@ -315,14 +316,14 @@ class Observable : public Callbackable<ParamT>,
  *
  * @return  the number of active CPU cores in the system
  */
-unsigned int GetNumberOfCpuCores();
+CVMFS_EXPORT unsigned int GetNumberOfCpuCores();
 static const unsigned int kFallbackNumberOfCpus = 1;
 
 
 /**
  * A blocking signal for thread synchronization
  */
-class Signal : SingleCopy {
+class CVMFS_EXPORT Signal : SingleCopy {
  public:
   Signal();
   ~Signal();
