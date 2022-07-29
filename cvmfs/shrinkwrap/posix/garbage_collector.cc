@@ -5,7 +5,9 @@
 
 #include <dirent.h>
 #include <errno.h>
-#include <stdio.h>
+
+#include <cstdio>
+#include <cstring>
 
 #include <map>
 #include <string>

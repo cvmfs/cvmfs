@@ -230,6 +230,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/session_context.cc
   ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/signing_tool.cc
+  ${CVMFS_SOURCE_DIR}/shortstring.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
@@ -503,6 +504,7 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
   ${CVMFS_SOURCE_DIR}/signature.cc
+  ${CVMFS_SOURCE_DIR}/shortstring.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/ssl.cc

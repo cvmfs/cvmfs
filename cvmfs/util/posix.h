@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "shortstring.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
 
@@ -65,9 +64,7 @@ struct LsofEntry {
 
 std::string MakeCanonicalPath(const std::string &path);
 std::string GetParentPath(const std::string &path);
-PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
-NameString GetFileName(const PathString &path);
 void SplitPath(const std::string &path,
                std::string *dirname,
                std::string *filename);

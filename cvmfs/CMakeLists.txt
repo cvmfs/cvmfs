@@ -334,6 +334,7 @@ set (LIBCVMFS_SERVER_SOURCES
   sanitizer.cc
   session_context.cc
   signature.cc
+  shortstring.cc
   sql.cc
   sqlitemem.cc
   ssl.cc
@@ -423,6 +424,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   session_context.cc
   signature.cc
   signing_tool.cc
+  shortstring.cc
   sql.cc
   sqlitemem.cc
   ssl.cc
@@ -620,6 +622,7 @@ if(BUILD_RECEIVER)
     session_context.cc
     signature.cc
     signing_tool.cc
+    shortstring.cc
     ssl.cc
     statistics.cc
     statistics_database.cc
