@@ -619,7 +619,7 @@ systemctl daemon-reload
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
 
-%files
+%files libs
 %defattr(-,root,root)
 %{_libdir}/libcvmfs_util.so
 %{_libdir}/libcvmfs_util.so.%{version}
