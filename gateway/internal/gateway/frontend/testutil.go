@@ -93,6 +93,14 @@ func (b *mockBackend) RunGC(ctx context.Context, options be.GCOptions) (string, 
 	return "", nil
 }
 
+func (s *mockBackend) StopGC(ctx context.Context) error {
+	return nil
+}
+
+func (s *mockBackend) GetGCState(ctx context.Context) (*be.GCStateDTO, error) {
+	return nil, nil
+}
+
 func (b *mockBackend) PublishManifest(ctx context.Context, repository string, message be.NotificationMessage) {
 }
 

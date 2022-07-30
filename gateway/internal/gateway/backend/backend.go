@@ -35,6 +35,8 @@ type ActionController interface {
 	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 	RunGC(ctx context.Context, options GCOptions) (string, error)
+	StopGC(ctx context.Context) error
+	GetGCState(ctx context.Context) (*GCStateDTO, error)
 	PublishManifest(ctx context.Context, repository string, message NotificationMessage)
 	SubscribeToNotifications(ctx context.Context, repository string) SubscriberHandle
 	UnsubscribeFromNotifications(ctx context.Context, repository string, handle SubscriberHandle) error
