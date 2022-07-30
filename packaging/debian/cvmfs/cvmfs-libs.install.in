@@ -1,0 +1,4 @@
+usr/lib/libcvmfs_util.so.@CVMFS_VERSION@
+usr/lib/libcvmfs_util.so
+usr/lib/libcvmfs_util_debug.so.@CVMFS_VERSION@
+usr/lib/libcvmfs_util_debug.so

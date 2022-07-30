@@ -12,10 +12,6 @@ usr/lib/libcvmfs_server.so.@CVMFS_VERSION@
 usr/lib/libcvmfs_server.so
 usr/lib/libcvmfs_server_debug.so.@CVMFS_VERSION@
 usr/lib/libcvmfs_server_debug.so
-usr/lib/libcvmfs_util.so.@CVMFS_VERSION@
-usr/lib/libcvmfs_util.so
-usr/lib/libcvmfs_util_debug.so.@CVMFS_VERSION@
-usr/lib/libcvmfs_util_debug.so
 etc/cvmfs/cvmfs_server_hooks.sh.demo
 var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 usr/share/cvmfs-server/webapi/*

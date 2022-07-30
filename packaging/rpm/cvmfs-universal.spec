@@ -191,6 +191,11 @@ HTTP File System for Distributing Software to CernVM.
 See http://cernvm.cern.ch
 Copyright (c) CERN
 
+%package libs
+Summary: CernVM-FS common libraries
+%description libs
+Common utility libraries for CernVM-FS packages
+
 %if 0%{?build_fuse3}
 %package fuse3
 Summary: additional libraries to enable libfuse3 support
@@ -251,6 +256,7 @@ Requires: jq
 Requires(post): /usr/sbin/semanage
 Requires(postun): /usr/sbin/semanage
 %endif
+Requires: cvmfs-libs = %{version}
 
 Conflicts: cvmfs-server < 2.1
 
@@ -488,6 +494,9 @@ if [ -d /var/run/cvmfs ]; then
 fi
 :
 
+%post libs
+/sbin/ldconfig
+
 %if 0%{?build_fuse3}
 %post fuse3
 /sbin/ldconfig
@@ -564,6 +573,9 @@ fi
 %endif
 /sbin/ldconfig
 
+%postun libs
+/sbin/ldconfig
+
 %if 0%{?build_gateway}
 %postun gateway
 systemctl daemon-reload
@@ -607,6 +619,14 @@ systemctl daemon-reload
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
 
+%files
+%defattr(-,root,root)
+%{_libdir}/libcvmfs_util.so
+%{_libdir}/libcvmfs_util.so.%{version}
+%{_libdir}/libcvmfs_util_debug.so
+%{_libdir}/libcvmfs_util_debug.so.%{version}
+%doc COPYING AUTHORS README.md ChangeLog
+
 %if 0%{?build_fuse3}
 %files fuse3
 %defattr(-,root,root)
@@ -639,10 +659,6 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
-%{_libdir}/libcvmfs_util.so
-%{_libdir}/libcvmfs_util.so.%{version}
-%{_libdir}/libcvmfs_util_debug.so
-%{_libdir}/libcvmfs_util_debug.so.%{version}
 %{_libdir}/libcvmfs_server.so
 %{_libdir}/libcvmfs_server.so.%{version}
 %{_libdir}/libcvmfs_server_debug.so
