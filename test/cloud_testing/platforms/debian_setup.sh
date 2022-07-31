@@ -62,6 +62,7 @@ echo "done"
 # install deb packages
 echo "installing DEB packages... "
 install_deb "$CONFIG_PACKAGES"
+install_deb $LIBS_PACKAGE
 install_deb $CLIENT_PACKAGE
 install_deb $FUSE3_PACKAGE
 install_deb $SERVER_PACKAGE

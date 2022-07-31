@@ -16,6 +16,7 @@ script_location=$(portable_dirname $0)
 # After sourcing this file the following variables are set:
 #
 #  SERVER_PACKAGE        location of the CernVM-FS server package to install
+#  LIBS_PACKAGE          location of the CernVM-FS library package to install
 #  CLIENT_PACKAGE        location of the CernVM-FS client package to install
 #  FUSE3_PACKAGE         location of the libcvmfs_fuse3 package
 #  DEVEL_PACKAGE         location of the CernVM-FS devel package to install
@@ -28,6 +29,7 @@ script_location=$(portable_dirname $0)
 #  DUCC_PACKAGE          location of the DUCC package
 #
 
+LIBS_PACKAGE=""
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
 FUSE3_PACKAGE=""
@@ -62,8 +64,11 @@ usage() {
 }
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:d:k:t:g:l:w:n:p:f:D:C:" option; do
+while getopts "s:c:d:k:t:g:l:w:n:p:f:D:C:L:" option; do
   case $option in
+    L)
+      LIBS_PACKAGE=$OPTARG
+      ;;
     s)
       SERVER_PACKAGE=$OPTARG
       ;;

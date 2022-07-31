@@ -17,6 +17,7 @@ echo "done"
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
+install_rpm $LIBS_PACKAGE
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
 install_rpm $DEVEL_PACKAGE
