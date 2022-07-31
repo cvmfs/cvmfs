@@ -120,9 +120,11 @@ generate_package_map() {
   local ducc="$8"
   local fuse3="$9"
   local gateway="${10}"
+  local libs="${11}"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
+libs=$libs
 client=$client
 server=$server
 devel=$devel
