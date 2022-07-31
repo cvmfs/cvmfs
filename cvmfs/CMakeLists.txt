@@ -2,16 +2,28 @@
 # This file is part of the CernVM File System
 #
 
+#
+# Common libraries
+#
 include (util/CMakeLists.txt)
 
-# /usr/bin/cvmfs2
-set (CVMFS2_BINARY_SOURCES
-  fuse_main.cc
-  util/exception.cc
-  util/logging.cc
-  util/posix.cc
-  util/string.cc
-)
+if (BUILD_CVMFS)
+  #
+  # /usr/bin/cvmfs2
+  #
+  add_executable (cvmfs2
+                  fuse_main.cc
+                  util/exception.cc
+                  util/logging.cc
+                  util/posix.cc
+                  util/string.cc
+  )
+  set_target_properties (cvmfs2 PROPERTIES
+    COMPILE_FLAGS "-DCVMFS_NAMESPACE_GUARD=stub -DCVMFS_FUSE_MODULE"
+    LINK_FLAGS    "-ldl"
+  )
+  target_link_libraries(cvmfs2 pthread dl)
+endif (BUILD_CVMFS)
 
 # /usr/lib/libcvmfs_fuse_stub[3]
 set (CVMFS_STUB_SOURCES
@@ -653,7 +665,6 @@ endif(BUILD_RECEIVER)
 # configure some compiler flags for proper build
 #
 
-set (CVMFS2_BINARY_CFLAGS "-DCVMFS_NAMESPACE_GUARD=stub -DCVMFS_FUSE_MODULE")
 set (CVMFS_FUSE_CFLAGS "-DCVMFS_CLIENT -DCVMFS_FUSE_MODULE -DCVMFS_USE_LIBFUSE=2 -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_FUSE3_CFLAGS "-DCVMFS_CLIENT -DCVMFS_FUSE_MODULE -DCVMFS_USE_LIBFUSE=3 -D_FILE_OFFSET_BITS=64 -fexceptions")
 set (CVMFS_FUSE_DEBUG_CFLAGS "${CVMFS_FUSE_CFLAGS} -O0 -DDEBUGMSG")
@@ -670,7 +681,6 @@ set (CVMFS_SWISSKNIFE_CFLAGS "-DCVMFS_SWISSKNIFE")
 #
 # set some include and linking stuff
 #
-set (CVMFS2_BINARY_LD_FLAGS "-ldl")
 set (CVMFS_FUSE_LD_FLAGS "-ldl -lm")
 set (CVMFS_STUB_LD_FLAGS "-ldl -lm")
 include_directories (cvmfs ${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
@@ -683,7 +693,6 @@ include_directories (cvmfs ${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 #
 
 if (BUILD_CVMFS)
-  add_executable (cvmfs2 ${CVMFS2_BINARY_SOURCES})
   add_library (cvmfs_fuse_stub SHARED ${CVMFS_STUB_SOURCES})
   add_library (cvmfs_fuse_debug SHARED ${CVMFS_FUSE_SOURCES})
   add_library (cvmfs_fuse SHARED ${CVMFS_FUSE_SOURCES})
@@ -700,8 +709,6 @@ if (BUILD_CVMFS)
   add_executable (cvmfs_fsck ${CVMFS_FSCK_SOURCES})
   add_executable (cvmfs_talk ${CVMFS_TALK_SOURCES})
 
-  set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS2_BINARY_CFLAGS}"
-                                           LINK_FLAGS "${CVMFS2_BINARY_LD_FLAGS}")
   set_target_properties (cvmfs_fuse_stub PROPERTIES
                                          COMPILE_FLAGS "${CVMFS_STUB_CFLAGS}"
                                          LINK_FLAGS "${CVMFS_STUB_LD_FLAGS}")
@@ -751,7 +758,6 @@ if (BUILD_CVMFS)
                                         ${UUID_LIBRARIES})
   list (APPEND CVMFS_FUSE_LINK_LIBRARIES pthread dl)
 
-  target_link_libraries(cvmfs2 pthread dl)
   target_link_libraries (cvmfs_fuse_stub   ${OPENSSL_LIBRARIES} ${SHA3_LIBRARIES}
                                            ${FUSE_LIBRARIES} pthread dl)
   target_link_libraries (cvmfs_fuse_debug  ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES})
@@ -1053,7 +1059,7 @@ if (BUILD_CVMFS)
   install (
     TARGETS      cvmfs2 cvmfs_fsck cvmfs_talk
     RUNTIME
-    DESTINATION    bin
+    DESTINATION  bin
   )
 
   install (
