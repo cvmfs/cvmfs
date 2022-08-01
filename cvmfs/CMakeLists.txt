@@ -7,6 +7,108 @@
 #
 include (util/CMakeLists.txt)
 
+
+
+
+if (BUILD_CVMFS OR BUILD_LIBCVMFS)
+  #
+  # Protobuf generated sources
+  #
+  # First .h then .cc is important to avoid races during the build process
+  set_source_files_properties(cache.pb.h cache.pb.cc
+                              PROPERTIES GENERATED true)
+  add_custom_command(OUTPUT cache.pb.h cache.pb.cc
+                     COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
+                             ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
+                             -I${CMAKE_CURRENT_SOURCE_DIR}
+                     DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
+                             ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
+                     COMMENT "Generating protobuf sources")
+  add_custom_target(cache.pb.generated
+                    DEPENDS cache.pb.h cache.pb.cc)
+  include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
+
+
+  #
+  # /usr/lib/libcvmfs_fuse[3] and /usr/lib/libcvmfs.a
+  #
+  set (CVMFS_COMMON_CLIENT_SOURCES
+       authz/authz.cc
+       authz/authz_curl.cc
+       authz/authz_fetch.cc
+       authz/authz_session.cc
+       backoff.cc
+       cache.cc
+       cache.pb.cc cache.pb.h
+       cache_extern.cc
+       cache_posix.cc
+       cache_ram.cc
+       cache_tiered.cc
+       cache_transport.cc
+       catalog.cc
+       catalog_counters.cc
+       catalog_mgr_client.cc
+       catalog_sql.cc
+       clientctx.cc
+       compression.cc
+       directory_entry.cc
+       duplex_fuse.cc
+       dns.cc
+       download.cc
+       fetch.cc
+       file_chunk.cc
+       file_watcher.cc
+       globals.cc
+       glue_buffer.cc
+       hash.cc
+       history_sql.cc
+       history_sqlite.cc
+       json_document.cc
+       kvstore.cc
+       magic_xattr.cc
+       malloc_arena.cc
+       malloc_heap.cc
+       manifest.cc
+       manifest_fetch.cc
+       monitor.cc
+       mountpoint.cc
+       options.cc
+       quota.cc
+       quota_posix.cc
+       resolv_conf_event_handler.cc
+       sanitizer.cc
+       signature.cc
+       sql.cc
+       sqlitemem.cc
+       sqlitevfs.cc
+       ssl.cc
+       statistics.cc
+       tracer.cc
+       uuid.cc
+       util/algorithm.cc
+       util/concurrency.cc
+       util/exception.cc
+       util/logging.cc
+       util/posix.cc
+       util/string.cc
+       whitelist.cc
+       wpad.cc
+       xattr.cc
+  ) # CVMFS_COMMON_CLIENT_SOURCES
+
+  if (MACOSX)
+    list(APPEND CVMFS_COMMON_CLIENT_SOURCES file_watcher_kqueue.cc)
+  else ()
+    if (CVMFS_ENABLE_INOTIFY)
+      list (APPEND CVMFS_COMMON_CLIENT_SOURCES file_watcher_inotify.cc)
+      add_definitions (-DCVMFS_ENABLE_INOTIFY)
+    endif ()
+  endif ()
+endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
+
+
+
+
 if (BUILD_CVMFS)
   #
   # /usr/bin/cvmfs_fsck
@@ -109,6 +211,99 @@ if (BUILD_CVMFS)
   endif ()
 
 
+  #
+  # /usr/lib/libcvmfs_fuse[3]_debug
+  #
+  set (CVMFS_FUSE_SOURCES
+       ${CVMFS_COMMON_CLIENT_SOURCES}
+       auto_umount.cc
+       compat.cc
+       cvmfs.cc
+       fuse_evict.cc
+       fuse_remount.cc
+       nfs_maps_leveldb.cc
+       nfs_maps_sqlite.cc
+       notification_client.cc
+       notify/messages.cc
+       notify/subscriber_supervisor.cc
+       notify/subscriber_sse.cc
+       quota_listener.cc
+       shortstring.cc
+       supervisor.cc
+       talk.cc
+       url.cc
+  )
+  set (CVMFS_FUSE_CFLAGS "-DCVMFS_FUSE_MODULE \
+                          -D_FILE_OFFSET_BITS=64 \
+                          -fexceptions")
+  if (CVMFS_ENABLE_FUSE3_CACHE_READDIR)
+    set (CVMFS_FUSE_CFLAGS "${CVMFS_FUSE_CFLAGS} \
+                            -DCVMFS_ENABLE_FUSE3_CACHE_READDIR")
+  endif ()
+  set (CVMFS_FUSE_LDFLAGS "-ldl -lm")
+  set (CVMFS_FUSE_LINK_LIBRARIES "")
+  list(APPEND CVMFS_FUSE_LINK_LIBRARIES
+       ${CURL_LIBRARIES}
+       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+       ${OPENSSL_LIBRARIES}
+       ${PACPARSER_LIBRARIES}
+       ${SQLITE3_LIBRARY}
+       ${ZLIB_LIBRARIES}
+       ${SPARSEHASH_LIBRARIES}
+       ${LEVELDB_LIBRARIES}
+       ${SHA3_LIBRARIES}
+       ${SHA2_LIBRARIES}
+       ${PROTOBUF_LITE_LIBRARY}
+       ${VJSON_LIBRARIES}
+       ${RT_LIBRARY}
+       ${UUID_LIBRARIES}
+       pthread
+       dl
+  )
+  add_library (cvmfs_fuse SHARED ${CVMFS_FUSE_SOURCES})
+  add_library (cvmfs_fuse_debug SHARED ${CVMFS_FUSE_SOURCES})
+  add_dependencies (cvmfs_fuse cache.pb.generated)
+  add_dependencies (cvmfs_fuse_debug cache.pb.generated)
+  set_target_properties (cvmfs_fuse PROPERTIES
+    VERSION ${CernVM-FS_VERSION_STRING}
+    COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=2 ${CVMFS_FUSE_CFLAGS}"
+    LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
+  )
+  set_target_properties (cvmfs_fuse_debug PROPERTIES
+    VERSION ${CernVM-FS_VERSION_STRING}
+    COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=2 ${CVMFS_FUSE_CFLAGS} -O0 -DDEBUGMSG"
+    LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
+  )
+  target_link_libraries (cvmfs_fuse
+                         ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
+  )
+  target_link_libraries (cvmfs_fuse_debug
+                         ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
+  )
+  if (FUSE3_FOUND)
+    add_library (cvmfs_fuse3 SHARED ${CVMFS_FUSE_SOURCES})
+    add_library (cvmfs_fuse3_debug SHARED ${CVMFS_FUSE_SOURCES})
+    add_dependencies (cvmfs_fuse3 cache.pb.generated)
+    add_dependencies (cvmfs_fuse3_debug cache.pb.generated)
+    set_target_properties (cvmfs_fuse3 PROPERTIES
+      VERSION ${CernVM-FS_VERSION_STRING}
+      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=3 ${CVMFS_FUSE_CFLAGS}"
+      LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
+    )
+    set_target_properties (cvmfs_fuse3_debug PROPERTIES
+      VERSION ${CernVM-FS_VERSION_STRING}
+      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=3 ${CVMFS_FUSE_CFLAGS} -O0 -DDEBUGMSG"
+      LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
+    )
+    target_link_libraries (cvmfs_fuse3
+                           ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
+    )
+    target_link_libraries (cvmfs_fuse3_debug
+                           ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
+    )
+  endif ()
+
+
   install (
     TARGETS      cvmfs2 cvmfs_fsck cvmfs_talk
     RUNTIME
@@ -117,134 +312,80 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 
 
-# /usr/lib/libcvmfs_fuse[3] and /usr/lib/libcvmfs.a
-set (CVMFS_CLIENT_SOURCES
-  authz/authz.cc
-  authz/authz_curl.cc
-  authz/authz_fetch.cc
-  authz/authz_session.cc
-  backoff.cc
-  cache.cc
-  cache.pb.cc cache.pb.h
-  cache_extern.cc
-  cache_posix.cc
-  cache_ram.cc
-  cache_tiered.cc
-  cache_transport.cc
-  catalog.cc
-  catalog_counters.cc
-  catalog_mgr_client.cc
-  catalog_sql.cc
-  clientctx.cc
-  compression.cc
-  directory_entry.cc
-  duplex_fuse.cc
-  dns.cc
-  download.cc
-  fetch.cc
-  file_chunk.cc
-  file_watcher.cc
-  globals.cc
-  glue_buffer.cc
-  hash.cc
-  history_sql.cc
-  history_sqlite.cc
-  json_document.cc
-  kvstore.cc
-  magic_xattr.cc
-  malloc_arena.cc
-  malloc_heap.cc
-  manifest.cc
-  manifest_fetch.cc
-  monitor.cc
-  mountpoint.cc
-  options.cc
-  quota.cc
-  quota_posix.cc
-  resolv_conf_event_handler.cc
-  sanitizer.cc
-  signature.cc
-  sql.cc
-  sqlitemem.cc
-  sqlitevfs.cc
-  ssl.cc
-  statistics.cc
-  tracer.cc
-  uuid.cc
-  util/algorithm.cc
-  util/concurrency.cc
-  util/exception.cc
-  util/logging.cc
-  util/posix.cc
-  util/string.cc
-  whitelist.cc
-  wpad.cc
-  xattr.cc
+
+
+if (BUILD_LIBCVMFS)
+  add_library (cvmfs_only STATIC
+               ${CVMFS_COMMON_CLIENT_SOURCES}
+               libcvmfs.cc
+               libcvmfs_int.cc
+               libcvmfs_legacy.cc
+               libcvmfs_options.cc
   )
+  add_dependencies (cvmfs_only cache.pb.generated)
+  set_target_properties (cvmfs_only PROPERTIES
+    COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions -fPIC"
+  )
+  set (LIBCVMFS_LIBS
+       ${CARES_LIBRARIES}
+       ${CURL_LIBRARIES}
+       ${PACPARSER_LIBRARIES}
+       ${SQLITE3_LIBRARY}
+       ${ZLIB_LIBRARIES}
+       ${SPARSEHASH_LIBRARIES}
+       ${SHA3_LIBRARIES}
+       ${VJSON_LIBRARIES}
+       ${PROTOBUF_LITE_LIBRARY}
+       ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a
+  )
+  # Note: it would be a good idea to try to unify the next block for macOS and
+  #       Linux. It may be possible to use libtool on both platforms, including
+  #       the ability to hide private symbols in the library - which is
+  #       currently done by the `combine_libs` script, on Linux only.
+  if (MACOSX)
+    add_custom_command(
+        OUTPUT libcvmfs.a
+        COMMAND libtool -static -o libcvmfs.a ${LIBCVMFS_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_LIBS}
+    )
+  else (MACOSX)
+    set (LIBCVMFS_PUBLIC_SYMS "-public"
+         "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
+    add_custom_command(
+        OUTPUT libcvmfs.a
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${LIBCVMFS_LIBS}
+    )
+  endif (MACOSX)
+  # dummy target to cause merged libcvmfs to be produced
+  add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
+  add_dependencies (libcvmfs cvmfs_only)
 
-if (APPLE)
-  list(APPEND CVMFS_CLIENT_SOURCES file_watcher_kqueue.cc)
-else(APPLE)
-  if (CVMFS_ENABLE_INOTIFY)
-    list(APPEND CVMFS_CLIENT_SOURCES file_watcher_inotify.cc)
-    add_definitions(-DCVMFS_ENABLE_INOTIFY)
-  endif(CVMFS_ENABLE_INOTIFY)
-endif (APPLE)
 
-if (CVMFS_ENABLE_FUSE3_CACHE_READDIR)
-  add_definitions(-DCVMFS_ENABLE_FUSE3_CACHE_READDIR)
-endif ()
+  add_executable (test_libcvmfs test_libcvmfs.cc)
+  add_dependencies(test_libcvmfs libcvmfs)
+  list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
+                                 ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES}
+                                 ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
 
-# First .h then .cc is important to avoid races during the build process
-set_source_files_properties(cache.pb.h cache.pb.cc
-                            PROPERTIES GENERATED true)
+  target_link_libraries(test_libcvmfs
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+                        ${SQLITE3_LIBRARY}
+                        ${CURL_LIBRARIES}
+                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                        ${PACPARSER_LIBRARIES}
+                        ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES}
+                        ${RT_LIBRARY}
+                        ${UUID_LIBRARIES}
+                        pthread
+                        dl)
+endif (BUILD_LIBCVMFS)
 
-add_custom_command(OUTPUT cache.pb.h cache.pb.cc
-                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
-                           ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
-                           -I${CMAKE_CURRENT_SOURCE_DIR}
-                   DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
-                           ${CMAKE_CURRENT_SOURCE_DIR}/cache.proto
-                   COMMENT "Generating protobuf sources")
 
-add_custom_target(cache.pb.generated
-                  DEPENDS cache.pb.h cache.pb.cc)
 
-# /usr/lib/libcvmfs_fuse[3]_debug
-set (CVMFS_FUSE_SOURCES
-  ${CVMFS_CLIENT_SOURCES}
-
-  auto_umount.cc
-  compat.cc
-  cvmfs.cc
-  fuse_evict.cc
-  fuse_remount.cc
-  nfs_maps_leveldb.cc
-  nfs_maps_sqlite.cc
-  notification_client.cc
-  notify/messages.cc
-  notify/subscriber_supervisor.cc
-  notify/subscriber_sse.cc
-  quota_listener.cc
-  shortstring.cc
-  supervisor.cc
-  talk.cc
-  url.cc
-)
-
-# /usr/lib/libcvmfs.a
-set (LIBCVMFS_SOURCES
-  ${CVMFS_CLIENT_SOURCES}
-
-  libcvmfs.cc
-  libcvmfs_int.cc
-  libcvmfs_legacy.cc
-  libcvmfs_options.cc
-)
-
-set (TEST_LIBCVMFS_SOURCES
-  test_libcvmfs.cc
-)
 
 # /usr/lib/libcvmfs_cache.a
 set (LIBCVMFS_CACHE_SOURCES
@@ -720,21 +861,9 @@ endif(BUILD_RECEIVER)
 #
 # configure some compiler flags for proper build
 #
-
-set (CVMFS_FUSE_CFLAGS "-DCVMFS_CLIENT -DCVMFS_FUSE_MODULE -DCVMFS_USE_LIBFUSE=2 -D_FILE_OFFSET_BITS=64 -fexceptions")
-set (CVMFS_FUSE3_CFLAGS "-DCVMFS_CLIENT -DCVMFS_FUSE_MODULE -DCVMFS_USE_LIBFUSE=3 -D_FILE_OFFSET_BITS=64 -fexceptions")
-set (CVMFS_FUSE_DEBUG_CFLAGS "${CVMFS_FUSE_CFLAGS} -O0 -DDEBUGMSG")
-set (CVMFS_FUSE3_DEBUG_CFLAGS "${CVMFS_FUSE3_CFLAGS} -O0 -DDEBUGMSG")
-set (LIBCVMFS_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions -fPIC")
 set (LIBCVMFS_CACHE_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (CVMFS_SHRINKWRAP_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 set (CVMFS_SWISSKNIFE_CFLAGS "-DCVMFS_SWISSKNIFE")
-
-#
-# set some include and linking stuff
-#
-set (CVMFS_FUSE_LD_FLAGS "-ldl -lm")
-include_directories (cvmfs ${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 
 #
 # do the job!
@@ -744,61 +873,6 @@ include_directories (cvmfs ${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
 #
 
 if (BUILD_CVMFS)
-  add_library (cvmfs_fuse_debug SHARED ${CVMFS_FUSE_SOURCES})
-  add_library (cvmfs_fuse SHARED ${CVMFS_FUSE_SOURCES})
-  add_dependencies (cvmfs_fuse_debug cache.pb.generated)
-  add_dependencies (cvmfs_fuse cache.pb.generated)
-  if (FUSE3_FOUND)
-    add_library (cvmfs_fuse3_debug SHARED ${CVMFS_FUSE_SOURCES})
-    add_library (cvmfs_fuse3 SHARED ${CVMFS_FUSE_SOURCES})
-    add_dependencies (cvmfs_fuse3_debug cache.pb.generated)
-    add_dependencies (cvmfs_fuse3 cache.pb.generated)
-  endif()
-
-  set_target_properties (cvmfs_fuse_debug PROPERTIES
-                                          COMPILE_FLAGS "${CVMFS_FUSE_DEBUG_CFLAGS}"
-                                          LINK_FLAGS "${CVMFS_FUSE_DEBUG_LD_FLAGS}")
-  set_target_properties (cvmfs_fuse PROPERTIES COMPILE_FLAGS "${CVMFS_FUSE_CFLAGS}"
-                                               LINK_FLAGS "${CVMFS_FUSE_LD_FLAGS}")
-  if (FUSE3_FOUND)
-    set_target_properties (cvmfs_fuse3_debug PROPERTIES
-                                             COMPILE_FLAGS "${CVMFS_FUSE3_DEBUG_CFLAGS}"
-                                             LINK_FLAGS "${CVMFS_FUSE_DEBUG_LD_FLAGS}")
-    set_target_properties (cvmfs_fuse3 PROPERTIES COMPILE_FLAGS "${CVMFS_FUSE3_CFLAGS}"
-                                                  LINK_FLAGS "${CVMFS_FUSE_LD_FLAGS}")
-  endif()
-
-  set_target_properties (cvmfs_fuse PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
-  set_target_properties (cvmfs_fuse_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
-  if (FUSE3_FOUND)
-    set_target_properties (cvmfs_fuse3 PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
-    set_target_properties (cvmfs_fuse3_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
-  endif()
-
-  set (CVMFS_FUSE_LINK_LIBRARIES "")
-  list(APPEND CVMFS_FUSE_LINK_LIBRARIES ${CURL_LIBRARIES}
-                                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                                        ${OPENSSL_LIBRARIES}
-                                        ${PACPARSER_LIBRARIES}
-                                        ${SQLITE3_LIBRARY}
-                                        ${ZLIB_LIBRARIES}
-                                        ${SPARSEHASH_LIBRARIES}
-                                        ${LEVELDB_LIBRARIES}
-                                        ${SHA3_LIBRARIES}
-                                        ${SHA2_LIBRARIES}
-                                        ${PROTOBUF_LITE_LIBRARY}
-                                        ${VJSON_LIBRARIES}
-                                        ${RT_LIBRARY}
-                                        ${UUID_LIBRARIES})
-  list (APPEND CVMFS_FUSE_LINK_LIBRARIES pthread dl)
-
-  target_link_libraries (cvmfs_fuse_debug  ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES})
-  target_link_libraries (cvmfs_fuse        ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES})
-  if (FUSE3_FOUND)
-    target_link_libraries (cvmfs_fuse3_debug ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES})
-    target_link_libraries (cvmfs_fuse3       ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES})
-  endif()
-
   set (CVMFS_ALLOW_HELPER_SOURCES
     authz/helper_allow.cc
     authz/helper_log.cc
@@ -882,72 +956,6 @@ if (BUILD_LIBCVMFS_CACHE)
   add_dependencies(cvmfs_cache_posix libcvmfs_cache)
 endif (BUILD_LIBCVMFS_CACHE)
 
-
-if (BUILD_LIBCVMFS)
-  add_library (cvmfs_only STATIC ${LIBCVMFS_SOURCES})
-  add_dependencies (cvmfs_only cache.pb.generated)
-
-  set (LIBCVMFS_LIBS ${CARES_LIBRARIES} ${CURL_LIBRARIES}
-                     ${PACPARSER_LIBRARIES}
-                     ${SQLITE3_LIBRARY} ${ZLIB_LIBRARIES} ${SPARSEHASH_LIBRARIES}
-                     ${SHA3_LIBRARIES} ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
-                     ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a)
-
-  set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
-  target_link_libraries(cvmfs_only ${LIBCVMFS_LIBS})
-
-  # Note: it would be a good idea to try to unify the next block for macOS and Linux.
-  #       It may be possible to use libtool on both platforms, including the ability
-  #       to hide private symbols in the library - which is currently done by the
-  #       `combine_libs` script, on Linux only.
-  if (MACOSX)
-    add_custom_command(
-        OUTPUT libcvmfs.a
-        COMMAND libtool -static -o libcvmfs.a ${LIBCVMFS_LIBS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_LIBS}
-    )
-  else (MACOSX)
-    set (LIBCVMFS_PUBLIC_SYMS "-public" "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
-    add_custom_command(
-        OUTPUT libcvmfs.a
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_LIBS}
-    )
-  endif (MACOSX)
-
-  # dummy target to cause merged libcvmfs to be produced
-  add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
-  add_dependencies (libcvmfs cvmfs_only)
-
-  add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  add_dependencies(test_libcvmfs libcvmfs)
-
-  list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
-                                 ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES}
-                                 ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
-
-  target_link_libraries(test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${TEST_LIBCVMFS_LIBS})
-
-  if (BUILD_CVMFS_SHRINKWRAP)
-    add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
-    add_dependencies (cvmfs_shrinkwrap cache.pb.generated)
-    add_dependencies (cvmfs_shrinkwrap libcvmfs)
-
-    set (CVMFS_SHRINKWRAP_LIBS
-                          ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                          ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                          ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                          ${PROTOBUF_LITE_LIBRARY}
-                          ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl
-                          )
-
-    set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
-    target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
-  endif(BUILD_CVMFS_SHRINKWRAP)
-endif(BUILD_LIBCVMFS)
 
 if (BUILD_SHRINKWRAP)
   add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
