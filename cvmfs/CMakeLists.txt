@@ -876,6 +876,168 @@ endif (BUILD_SERVER)
 
 
 
+if (NOT BUILD_RECEIVER)
+  if (BUILD_RECEIVER_DEBUG)
+    message (FATAL_ERROR
+             "BUILD_RECEIVER needs to be on with BUILD_RECEIVER_DEBUG set. Exiting.")
+  endif ()
+endif ()
+
+if(BUILD_RECEIVER)
+  set (CVMFS_RECEIVER_SOURCES
+       receiver/commit_processor.cc
+       receiver/lease_path_util.cc
+       receiver/params.cc
+       receiver/payload_processor.cc
+       receiver/reactor.cc
+       receiver/receiver.cc
+       receiver/session_token.cc
+       backoff.cc
+       catalog.cc
+       catalog_rw.cc
+       catalog_counters.cc
+       catalog_sql.cc
+       catalog_mgr_ro.cc
+       catalog_mgr_rw.cc
+       compression.cc
+       directory_entry.cc
+       dns.cc
+       download.cc
+       encrypt.cc
+       gateway_util.cc
+       globals.cc
+       hash.cc
+       history_sql.cc
+       history_sqlite.cc
+       ingestion/chunk_detector.cc
+       ingestion/item.cc
+       ingestion/item_mem.cc
+       ingestion/pipeline.cc
+       ingestion/task_chunk.cc
+       ingestion/task_compress.cc
+       ingestion/task_hash.cc
+       ingestion/task_read.cc
+       ingestion/task_register.cc
+       ingestion/task_write.cc
+       json_document.cc
+       malloc_arena.cc
+       manifest.cc
+       manifest_fetch.cc
+       monitor.cc
+       options.cc
+       pack.cc
+       reflog.cc
+       reflog_sql.cc
+       repository_tag.cc
+       s3fanout.cc
+       sanitizer.cc
+       server_tool.cc
+       session_context.cc
+       signature.cc
+       signing_tool.cc
+       shortstring.cc
+       ssl.cc
+       statistics.cc
+       statistics_database.cc
+       swissknife.cc
+       swissknife_history.cc
+       swissknife_lease_curl.cc
+       sql.cc
+       sqlitemem.cc
+       sync_item.cc
+       upload.cc
+       upload_facility.cc
+       upload_gateway.cc
+       upload_local.cc
+       upload_s3.cc
+       upload_spooler_definition.cc
+       uuid.cc
+       whitelist.cc
+       xattr.cc
+  )  # CVMFS_RECEIVER_SOURCES
+  set (CVMFS_RECEIVER_CFLAGS "-D_FILE_OFFSET_BITS=64 \
+                              -DCVMFS_RAISE_EXCEPTIONS \
+                              -fexceptions"
+  )
+  set (CVMFS_RECEIVER_LINK_LIBRARIES "")
+  list (APPEND CVMFS_RECEIVER_LINK_LIBRARIES
+        ${CURL_LIBRARIES}
+        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        ${SHA3_LIBRARIES}
+        ${SQLITE3_LIBRARY}
+        ${VJSON_LIBRARIES}
+        ${OPENSSL_LIBRARIES}
+        ${UUID_LIBRARIES}
+        ${ZLIB_LIBRARIES}
+        ${RT_LIBRARY}
+        ${LibArchive_LIBRARY}
+        pthread
+        dl
+  )
+  add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
+  set_target_properties (cvmfs_receiver PROPERTIES
+    COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}"
+  )
+  target_link_libraries(cvmfs_receiver
+                        cvmfs_util
+                        ${CVMFS_RECEIVER_LINK_LIBRARIES}
+  )
+
+  if (BUILD_RECEIVER_DEBUG)
+    add_executable(cvmfs_receiver_debug ${CVMFS_RECEIVER_SOURCES})
+    set_target_properties (cvmfs_receiver_debug PROPERTIES
+      COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS} -O0 -DDEBUGMSG")
+    target_link_libraries(cvmfs_receiver_debug
+                          cvmfs_util_debug
+                          ${CVMFS_RECEIVER_LINK_LIBRARIES}
+    )
+  endif ()
+endif (BUILD_RECEIVER)
+
+#
+# configure some compiler flags for proper build
+#
+set (CVMFS_SHRINKWRAP_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
+
+
+set (CVMFS_SHRINKWRAP_SOURCES
+  hash.cc
+  monitor.cc
+  shrinkwrap/fs_traversal.cc
+  shrinkwrap/fs_traversal_libcvmfs.cc
+  shrinkwrap/posix/data_dir_mgmt.cc
+  shrinkwrap/posix/garbage_collector.cc
+  shrinkwrap/posix/helpers.cc
+  shrinkwrap/posix/interface.cc
+  shrinkwrap/shrinkwrap.cc
+  shrinkwrap/spec_tree.cc
+  shrinkwrap/util.cc
+  statistics.cc
+  util/concurrency.cc
+  util/exception.cc
+  util/logging.cc
+  util/posix.cc
+  util/string.cc
+  xattr.cc
+)
+
+
+if (BUILD_SHRINKWRAP)
+  add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
+  add_dependencies (cvmfs_shrinkwrap libcvmfs)
+
+  set (CVMFS_SHRINKWRAP_LIBS
+                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                        ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+                        ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
+                        ${PROTOBUF_LITE_LIBRARY}
+                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+
+  set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
+  target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
+endif(BUILD_SHRINKWRAP)
+
 
 set (CVMFS_PRELOADER_SOURCES
   backoff.cc
@@ -942,160 +1104,6 @@ set (CVMFS_PRELOADER_SOURCES
   whitelist.cc
   xattr.cc
 )
-
-if(NOT BUILD_RECEIVER)
-  if(BUILD_RECEIVER_DEBUG)
-    message( FATAL_ERROR "BUILD_RECEIVER needs to be on with BUILD_RECEIVER_DEBUG set. Exiting." )
-  endif(BUILD_RECEIVER_DEBUG)
-endif(NOT BUILD_RECEIVER)
-
-if(BUILD_RECEIVER)
-  set (CVMFS_RECEIVER_SOURCES
-    receiver/commit_processor.cc
-    receiver/lease_path_util.cc
-    receiver/params.cc
-    receiver/payload_processor.cc
-    receiver/reactor.cc
-    receiver/receiver.cc
-    receiver/session_token.cc
-    backoff.cc
-    catalog.cc
-    catalog_rw.cc
-    catalog_counters.cc
-    catalog_sql.cc
-    catalog_mgr_ro.cc
-    catalog_mgr_rw.cc
-    compression.cc
-    directory_entry.cc
-    dns.cc
-    download.cc
-    encrypt.cc
-    gateway_util.cc
-    globals.cc
-    hash.cc
-    history_sql.cc
-    history_sqlite.cc
-    ingestion/chunk_detector.cc
-    ingestion/item.cc
-    ingestion/item_mem.cc
-    ingestion/pipeline.cc
-    ingestion/task_chunk.cc
-    ingestion/task_compress.cc
-    ingestion/task_hash.cc
-    ingestion/task_read.cc
-    ingestion/task_register.cc
-    ingestion/task_write.cc
-    json_document.cc
-    malloc_arena.cc
-    manifest.cc
-    manifest_fetch.cc
-    monitor.cc
-    options.cc
-    pack.cc
-    reflog.cc
-    reflog_sql.cc
-    repository_tag.cc
-    s3fanout.cc
-    sanitizer.cc
-    server_tool.cc
-    session_context.cc
-    signature.cc
-    signing_tool.cc
-    shortstring.cc
-    ssl.cc
-    statistics.cc
-    statistics_database.cc
-    swissknife.cc
-    swissknife_history.cc
-    swissknife_lease_curl.cc
-    sql.cc
-    sqlitemem.cc
-    sync_item.cc
-    upload.cc
-    upload_facility.cc
-    upload_gateway.cc
-    upload_local.cc
-    upload_s3.cc
-    upload_spooler_definition.cc
-    util/exception.cc
-    util/file_backed_buffer.cc
-    util/logging.cc
-    util/mmap_file.cc
-    util/posix.cc
-    util/raii_temp_dir.cc
-    uuid.cc
-    whitelist.cc
-    xattr.cc
-    )
-
-  add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver cvmfs_util
-                        ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                        ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
-                        ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
-                        ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
-
-  set (CVMFS_RECEIVER_CFLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
-  set_target_properties (cvmfs_receiver PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}")
-
-  if(BUILD_RECEIVER_DEBUG)
-    add_executable(cvmfs_receiver_debug ${CVMFS_RECEIVER_SOURCES})
-    target_link_libraries(cvmfs_receiver_debug cvmfs_util_debug
-                          ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                          ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
-                          ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
-                          ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
-
-    set (CVMFS_RECEIVER_DEBUG_CFLAGS "${CVMFS_RECEIVER_CFLAGS} -DDEBUGMSG -g -O0")
-    set_target_properties (cvmfs_receiver_debug PROPERTIES COMPILE_FLAGS "${CVMFS_RECEIVER_DEBUG_CFLAGS}")
-  endif(BUILD_RECEIVER_DEBUG)
-endif(BUILD_RECEIVER)
-
-#
-# configure some compiler flags for proper build
-#
-set (CVMFS_SHRINKWRAP_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
-
-
-set (CVMFS_SHRINKWRAP_SOURCES
-  hash.cc
-  monitor.cc
-  shrinkwrap/fs_traversal.cc
-  shrinkwrap/fs_traversal_libcvmfs.cc
-  shrinkwrap/posix/data_dir_mgmt.cc
-  shrinkwrap/posix/garbage_collector.cc
-  shrinkwrap/posix/helpers.cc
-  shrinkwrap/posix/interface.cc
-  shrinkwrap/shrinkwrap.cc
-  shrinkwrap/spec_tree.cc
-  shrinkwrap/util.cc
-  statistics.cc
-  util/concurrency.cc
-  util/exception.cc
-  util/logging.cc
-  util/posix.cc
-  util/string.cc
-  xattr.cc
-)
-
-
-if (BUILD_SHRINKWRAP)
-  add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
-  add_dependencies (cvmfs_shrinkwrap libcvmfs)
-
-  set (CVMFS_SHRINKWRAP_LIBS
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                        ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                        ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                        ${PROTOBUF_LITE_LIBRARY}
-                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
-
-  set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
-  target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
-endif(BUILD_SHRINKWRAP)
-
-
 
 
 if (BUILD_PRELOADER)
