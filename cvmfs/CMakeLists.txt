@@ -513,54 +513,54 @@ if (BUILD_LIBCVMFS_CACHE)
   #
   # Cache plugins
   #
-  add_executable(cvmfs_cache_null cache_plugin/cvmfs_cache_null.cc)
-  add_dependencies(cvmfs_cache_null libcvmfs_cache)
-  target_link_libraries(cvmfs_cache_null
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
-                        ${OPENSSL_LIBRARIES}
-                        ${RT_LIBRARY}
-                        pthread
+  add_executable (cvmfs_cache_null cache_plugin/cvmfs_cache_null.cc)
+  add_dependencies (cvmfs_cache_null libcvmfs_cache)
+  target_link_libraries (cvmfs_cache_null
+                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                         ${OPENSSL_LIBRARIES}
+                         ${RT_LIBRARY}
+                         pthread
   )
 
-  add_executable(cvmfs_cache_ram
-                 cache_plugin/cvmfs_cache_ram.cc
-                 malloc_heap.cc
-                 statistics.cc
-                 util/concurrency.cc
-                 util/exception.cc
-                 util/logging.cc
-                 util/posix.cc
-                 util/string.cc
+  add_executable (cvmfs_cache_ram
+                  cache_plugin/cvmfs_cache_ram.cc
+                  malloc_heap.cc
+                  statistics.cc
+                  util/concurrency.cc
+                  util/exception.cc
+                  util/logging.cc
+                  util/posix.cc
+                  util/string.cc
   )
-  add_dependencies(cvmfs_cache_ram libcvmfs_cache)
+  add_dependencies (cvmfs_cache_ram libcvmfs_cache)
   set_target_properties (cvmfs_cache_ram PROPERTIES COMPILE_FLAGS "-DDEBUGMSG")
-  target_link_libraries(cvmfs_cache_ram
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
-                        ${OPENSSL_LIBRARIES}
-                        ${RT_LIBRARY}
-                        pthread)
+  target_link_libraries (cvmfs_cache_ram
+                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                         ${OPENSSL_LIBRARIES}
+                         ${RT_LIBRARY}
+                         pthread)
 
-  add_executable(cvmfs_cache_posix
-                 cache_plugin/cvmfs_cache_posix.cc
-                 cache.cc
-                 cache_posix.cc
-                 compression.cc
-                 hash.cc
-                 manifest.cc
-                 quota.cc
-                 util/exception.cc
-                 util/logging.cc
-                 util/posix.cc
-                 util/string.cc
+  add_executable (cvmfs_cache_posix
+                  cache_plugin/cvmfs_cache_posix.cc
+                  cache.cc
+                  cache_posix.cc
+                  compression.cc
+                  hash.cc
+                  manifest.cc
+                  quota.cc
+                  util/exception.cc
+                  util/logging.cc
+                  util/posix.cc
+                  util/string.cc
   )
-  add_dependencies(cvmfs_cache_posix libcvmfs_cache)
+  add_dependencies (cvmfs_cache_posix libcvmfs_cache)
   set_target_properties (cvmfs_cache_posix PROPERTIES COMPILE_FLAGS "-DDEBUGMSG")
-  target_link_libraries(cvmfs_cache_posix
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
-                        ${OPENSSL_LIBRARIES}
-                        ${SHA3_LIBRARIES}
-                        ${ZLIB_LIBRARIES}
-                        pthread
+  target_link_libraries (cvmfs_cache_posix
+                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+                         ${OPENSSL_LIBRARIES}
+                         ${SHA3_LIBRARIES}
+                         ${ZLIB_LIBRARIES}
+                         pthread
   )
 
 
