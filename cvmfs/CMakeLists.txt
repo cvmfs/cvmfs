@@ -563,6 +563,18 @@ if (BUILD_SERVER)
 
 
   #
+  #
+  # Generate the "cvmfs_server" script using "make_cvmfs_server.sh"
+  #
+  add_custom_target (
+    cvmfs_server_script
+    ALL
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./make_cvmfs_server.sh ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server
+    COMMENT "Generating the cvmfs_server script"
+  )
+
+
+  #
   # /usr/bin/cvmfs_swissknife[_debug]
   #
   set (CVMFS_SWISSKNIFE_SOURCES
@@ -994,132 +1006,138 @@ if(BUILD_RECEIVER)
   endif ()
 endif (BUILD_RECEIVER)
 
-#
-# configure some compiler flags for proper build
-#
-set (CVMFS_SHRINKWRAP_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 
-
-set (CVMFS_SHRINKWRAP_SOURCES
-  hash.cc
-  monitor.cc
-  shrinkwrap/fs_traversal.cc
-  shrinkwrap/fs_traversal_libcvmfs.cc
-  shrinkwrap/posix/data_dir_mgmt.cc
-  shrinkwrap/posix/garbage_collector.cc
-  shrinkwrap/posix/helpers.cc
-  shrinkwrap/posix/interface.cc
-  shrinkwrap/shrinkwrap.cc
-  shrinkwrap/spec_tree.cc
-  shrinkwrap/util.cc
-  statistics.cc
-  util/concurrency.cc
-  util/exception.cc
-  util/logging.cc
-  util/posix.cc
-  util/string.cc
-  xattr.cc
-)
 
 
 if (BUILD_SHRINKWRAP)
-  add_executable (cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_SOURCES})
+  add_executable (cvmfs_shrinkwrap
+                  hash.cc
+                  monitor.cc
+                  shrinkwrap/fs_traversal.cc
+                  shrinkwrap/fs_traversal_libcvmfs.cc
+                  shrinkwrap/posix/data_dir_mgmt.cc
+                  shrinkwrap/posix/garbage_collector.cc
+                  shrinkwrap/posix/helpers.cc
+                  shrinkwrap/posix/interface.cc
+                  shrinkwrap/shrinkwrap.cc
+                  shrinkwrap/spec_tree.cc
+                  shrinkwrap/util.cc
+                  statistics.cc
+                  util/concurrency.cc
+                  util/exception.cc
+                  util/logging.cc
+                  util/posix.cc
+                  util/string.cc
+                  xattr.cc
+  )
   add_dependencies (cvmfs_shrinkwrap libcvmfs)
-
-  set (CVMFS_SHRINKWRAP_LIBS
+  set_target_properties (cvmfs_shrinkwrap PROPERTIES
+    COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions"
+  )
+  target_link_libraries(cvmfs_shrinkwrap
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                        ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                        ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                        ${SHA3_LIBRARIES} ${VJSON_LIBRARIES}
-                        ${PROTOBUF_LITE_LIBRARY}
-                        ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
-
-  set_target_properties (cvmfs_shrinkwrap PROPERTIES COMPILE_FLAGS "${CVMFS_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_SHRINKWRAP_FLAGS}")
-  target_link_libraries(cvmfs_shrinkwrap ${CVMFS_SHRINKWRAP_LIBS})
+                        ${SQLITE3_LIBRARY}
+                        ${CURL_LIBRARIES}
+                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                        ${PACPARSER_LIBRARIES}
+                        ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES}
+                        ${SHA3_LIBRARIES}
+                        ${VJSON_LIBRARIES}
+                        ${RT_LIBRARY}
+                        ${UUID_LIBRARIES}
+                        pthread
+                        dl
+  )
 endif(BUILD_SHRINKWRAP)
 
 
-set (CVMFS_PRELOADER_SOURCES
-  backoff.cc
-  catalog.cc
-  catalog_sql.cc
-  compression.cc
-  dns.cc
-  download.cc
-  gateway_util.cc
-  globals.cc
-  hash.cc
-  history_sql.cc
-  history_sqlite.cc
-  ingestion/chunk_detector.cc
-  ingestion/item.cc
-  ingestion/item_mem.cc
-  ingestion/pipeline.cc
-  ingestion/task_chunk.cc
-  ingestion/task_compress.cc
-  ingestion/task_hash.cc
-  ingestion/task_read.cc
-  ingestion/task_register.cc
-  ingestion/task_write.cc
-  json_document.cc
-  malloc_arena.cc
-  manifest.cc
-  manifest_fetch.cc
-  options.cc
-  pack.cc
-  path_filters/dirtab.cc
-  path_filters/relaxed_path_filter.cc
-  pathspec/pathspec.cc
-  pathspec/pathspec_pattern.cc
-  preload.cc
-  reflog.cc
-  reflog_sql.cc
-  s3fanout.cc
-  sanitizer.cc
-  server_tool.cc
-  session_context.cc
-  signature.cc
-  sql.cc
-  sqlitemem.cc
-  ssl.cc
-  statistics.cc
-  swissknife.cc
-  swissknife_lease_curl.cc
-  swissknife_pull.cc
-  upload.cc
-  upload_facility.cc
-  upload_gateway.cc
-  upload_local.cc
-  upload_s3.cc
-  upload_spooler_definition.cc
-  util/algorithm.cc
-  util/concurrency.cc
-  util/exception.cc
-  util/file_backed_buffer.cc
-  util/logging.cc
-  util/mmap_file.cc
-  util/posix.cc
-  util/string.cc
-  uuid.cc
-  whitelist.cc
-  xattr.cc
-)
 
 
 if (BUILD_PRELOADER)
-  add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
+  add_executable (cvmfs_preload_bin
+                  backoff.cc
+                  catalog.cc
+                  catalog_sql.cc
+                  compression.cc
+                  dns.cc
+                  download.cc
+                  gateway_util.cc
+                  globals.cc
+                  hash.cc
+                  history_sql.cc
+                  history_sqlite.cc
+                  ingestion/chunk_detector.cc
+                  ingestion/item.cc
+                  ingestion/item_mem.cc
+                  ingestion/pipeline.cc
+                  ingestion/task_chunk.cc
+                  ingestion/task_compress.cc
+                  ingestion/task_hash.cc
+                  ingestion/task_read.cc
+                  ingestion/task_register.cc
+                  ingestion/task_write.cc
+                  json_document.cc
+                  malloc_arena.cc
+                  manifest.cc
+                  manifest_fetch.cc
+                  options.cc
+                  pack.cc
+                  path_filters/dirtab.cc
+                  path_filters/relaxed_path_filter.cc
+                  pathspec/pathspec.cc
+                  pathspec/pathspec_pattern.cc
+                  preload.cc
+                  reflog.cc
+                  reflog_sql.cc
+                  s3fanout.cc
+                  sanitizer.cc
+                  server_tool.cc
+                  session_context.cc
+                  signature.cc
+                  sql.cc
+                  sqlitemem.cc
+                  ssl.cc
+                  statistics.cc
+                  swissknife.cc
+                  swissknife_lease_curl.cc
+                  swissknife_pull.cc
+                  upload.cc
+                  upload_facility.cc
+                  upload_gateway.cc
+                  upload_local.cc
+                  upload_s3.cc
+                  upload_spooler_definition.cc
+                  util/algorithm.cc
+                  util/concurrency.cc
+                  util/exception.cc
+                  util/file_backed_buffer.cc
+                  util/logging.cc
+                  util/mmap_file.cc
+                  util/posix.cc
+                  util/string.cc
+                  uuid.cc
+                  whitelist.cc
+                  xattr.cc
+  )  # preloader sources
 
-  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
-                        ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES} ${CARES_LIBRARIS} ${RT_LIBRARY}
-                        ${UUID_LIBRARIES} ${VJSON_LIBRARIES} ${SHA3_LIBRARIES}
-                        pthread dl)
-endif (BUILD_PRELOADER)
+  target_link_libraries(cvmfs_preload_bin
+                        ${SQLITE3_LIBRARY}
+                        ${CURL_LIBRARIES}
+                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                        ${ZLIB_LIBRARIES}
+                        ${OPENSSL_LIBRARIES}
+                        ${RT_LIBRARY}
+                        ${UUID_LIBRARIES}
+                        ${VJSON_LIBRARIES}
+                        ${SHA3_LIBRARIES}
+                        pthread
+                        dl
+  )
 
-#
-# Generate a bash self-extracting script for the cvmfs_preload target
-#
-if (BUILD_PRELOADER)
+  #
+  # Generate a bash self-extracting script for the cvmfs_preload target
+  #
   add_custom_command (
     TARGET cvmfs_preload_bin POST_BUILD
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/cvmfs_preload_builder.sh ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
@@ -1128,15 +1146,6 @@ if (BUILD_PRELOADER)
 endif (BUILD_PRELOADER)
 
 
-#
-# Generate the "cvmfs_server" script using "make_cvmfs_server.sh"
-#
-add_custom_target (
-  cvmfs_server_script
-  ALL
-  COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./make_cvmfs_server.sh ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_server
-  COMMENT "Generating the cvmfs_server script"
-  )
 
 #
 # installation
