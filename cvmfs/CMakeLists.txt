@@ -326,11 +326,44 @@ if (BUILD_CVMFS)
   endif ()
 
 
+  #
+  # Installation: BUILD_CVMFS
+  #
   install (
     TARGETS      cvmfs2 cvmfs_fsck cvmfs_talk
     RUNTIME
     DESTINATION  bin
   )
+  install (
+    TARGETS      cvmfs_allow_helper cvmfs_deny_helper
+    RUNTIME
+    DESTINATION  ${CVMFS_LIBEXEC_DIR}/authz
+  )
+  install (
+    TARGETS      cvmfs_fuse_stub cvmfs_fuse cvmfs_fuse_debug
+    LIBRARY
+    DESTINATION  ${CMAKE_INSTALL_LIBDIR}
+  )
+  if (FUSE3_FOUND)
+    install (
+      TARGETS      cvmfs_fuse3_stub cvmfs_fuse3 cvmfs_fuse3_debug
+      LIBRARY
+      DESTINATION  ${CMAKE_INSTALL_LIBDIR}
+    )
+  endif ()
+  install (
+    FILES        cvmfs_config
+    DESTINATION  bin
+    PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+  if (INSTALL_BASH_COMPLETION)
+    install (
+        FILES         bash_completion/cvmfs.bash_completion
+        RENAME        cvmfs
+        DESTINATION   ${SYSCONF_INSTALL_DIR}/bash_completion.d
+        PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+  endif ()
 endif (BUILD_CVMFS)
 
 
@@ -404,6 +437,16 @@ if (BUILD_LIBCVMFS)
                         ${UUID_LIBRARIES}
                         pthread
                         dl)
+
+
+  install (
+    FILES        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+    DESTINATION  ${CMAKE_INSTALL_LIBDIR}
+  )
+  install (
+    FILES        libcvmfs.h
+    DESTINATION  include
+  )
 endif (BUILD_LIBCVMFS)
 
 
@@ -518,6 +561,26 @@ if (BUILD_LIBCVMFS_CACHE)
                         ${SHA3_LIBRARIES}
                         ${ZLIB_LIBRARIES}
                         pthread
+  )
+
+
+  install (
+    FILES        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+    DESTINATION  ${CMAKE_INSTALL_LIBDIR}
+  )
+  install (
+    FILES        cache_plugin/libcvmfs_cache.h
+    DESTINATION  include
+  )
+  install (
+    TARGETS      cvmfs_cache_ram
+    RUNTIME
+    DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
+  )
+  install (
+    TARGETS      cvmfs_cache_posix
+    RUNTIME
+    DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
   )
 endif (BUILD_LIBCVMFS_CACHE)
 
@@ -883,6 +946,113 @@ if (BUILD_SERVER)
     )
     target_link_libraries (cvmfs_publish_debug cvmfs_util_debug cvmfs_server_debug)
   endif ()
+
+
+  #
+  # BUILD_SERVER: install
+  #
+  install(
+    CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server)"
+  )
+  install (
+    FILES        ${${PROJECT_NAME}_BINARY_DIR}/cvmfs/cvmfs_server
+    DESTINATION  bin
+    PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+  install(
+    FILES        doc/README-spooler
+    DESTINATION  "/var/spool/cvmfs"
+    PERMISSIONS  OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    RENAME       README
+  )
+  install (
+    TARGETS      cvmfs_suid_helper
+    RUNTIME
+    DESTINATION  bin
+    PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID
+  )
+  install (
+    TARGETS      cvmfs_swissknife cvmfs_publish cvmfs_signing_helper
+    RUNTIME
+    DESTINATION  bin
+  )
+  install (
+    TARGETS      cvmfs_server
+    LIBRARY
+    DESTINATION  ${CMAKE_INSTALL_LIBDIR}
+  )
+  if (BUILD_SERVER_DEBUG)
+    install (
+      TARGETS      cvmfs_swissknife_debug cvmfs_publish_debug
+      RUNTIME
+      DESTINATION  bin
+    )
+    install (
+      TARGETS      cvmfs_server_debug
+      LIBRARY
+      DESTINATION  ${CMAKE_INSTALL_LIBDIR}
+    )
+  endif (BUILD_SERVER_DEBUG)
+
+  install(
+    FILES        cvmfs_server_hooks.sh.demo
+    DESTINATION  "${SYSCONF_INSTALL_DIR}/cvmfs"
+    PERMISSIONS  OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+  install (
+    FILES        cvmfs_rsync
+    DESTINATION  bin
+    PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+
+  install(
+    FILES        server/generate_stats_plots.C
+    DESTINATION  "/usr/share/cvmfs-server"
+    PERMISSIONS  OWNER_READ GROUP_READ WORLD_READ
+  )
+  install(
+    FILES        server/upload_stats_plots.sh
+    DESTINATION  "/usr/share/cvmfs-server"
+    PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+  install(
+    FILES        server/fix_stats_db.sh
+    DESTINATION  "/usr/share/cvmfs-server"
+    PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+  install(
+    FILES        server/stats_index.html.tpl
+    DESTINATION  "/usr/share/cvmfs-server"
+    PERMISSIONS  OWNER_READ GROUP_READ WORLD_READ
+  )
+
+  if (BUILD_GEOAPI)
+    install(
+      CODE "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
+    )
+
+    install(
+      FILES        webapi/cvmfs-api.wsgi
+      DESTINATION  "/var/www/wsgi-scripts/cvmfs-server"
+      PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+    install(
+      FILES        ${EXTERNALS_INSTALL_LOCATION}/ipaddress.py
+      DESTINATION  "/usr/share/cvmfs-server/webapi"
+      PERMISSIONS  OWNER_READ GROUP_READ WORLD_READ
+    )
+    install(
+      FILES        webapi/cvmfs_api.py webapi/cvmfs_geo.py
+      DESTINATION  "/usr/share/cvmfs-server/webapi"
+      PERMISSIONS  OWNER_READ GROUP_READ WORLD_READ
+    )
+    install(
+      DIRECTORY              ${EXTERNALS_INSTALL_LOCATION}/maxminddb
+      DESTINATION            "/usr/share/cvmfs-server/webapi"
+      FILE_PERMISSIONS       OWNER_READ GROUP_READ WORLD_READ
+      DIRECTORY_PERMISSIONS  OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+  endif (BUILD_GEOAPI)
 endif (BUILD_SERVER)
 
 
@@ -1004,6 +1174,20 @@ if(BUILD_RECEIVER)
                           ${CVMFS_RECEIVER_LINK_LIBRARIES}
     )
   endif ()
+
+
+  install (
+    TARGETS      cvmfs_receiver
+    RUNTIME
+    DESTINATION  bin
+  )
+  if (BUILD_RECEIVER_DEBUG)
+    install (
+      TARGETS      cvmfs_receiver_debug
+      RUNTIME
+      DESTINATION  bin
+    )
+  endif (BUILD_RECEIVER_DEBUG)
 endif (BUILD_RECEIVER)
 
 
@@ -1048,6 +1232,18 @@ if (BUILD_SHRINKWRAP)
                         ${UUID_LIBRARIES}
                         pthread
                         dl
+  )
+
+
+  install (
+    TARGETS      cvmfs_shrinkwrap
+    RUNTIME
+    DESTINATION  bin
+  )
+  install (
+    FILES        shrinkwrap/scripts/spec_builder.py
+    DESTINATION  ${CVMFS_LIBEXEC_DIR}/shrinkwrap
+    PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 endif(BUILD_SHRINKWRAP)
 
@@ -1143,246 +1339,11 @@ if (BUILD_PRELOADER)
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/cvmfs_preload_builder.sh ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generating the cvmfs_preload self-extracting script"
   )
-endif (BUILD_PRELOADER)
 
-
-
-#
-# installation
-#
-
-if (BUILD_CVMFS)
-  install (
-    TARGETS      cvmfs_allow_helper cvmfs_deny_helper
-    RUNTIME
-    DESTINATION  ${CVMFS_LIBEXEC_DIR}/authz
-  )
 
   install (
-    TARGETS      cvmfs_fuse_stub cvmfs_fuse cvmfs_fuse_debug
-    LIBRARY
-    DESTINATION    ${CMAKE_INSTALL_LIBDIR}
-  )
-  if (FUSE3_FOUND)
-    install (
-      TARGETS      cvmfs_fuse3_stub cvmfs_fuse3 cvmfs_fuse3_debug
-      LIBRARY
-      DESTINATION    ${CMAKE_INSTALL_LIBDIR}
-    )
-  endif ()
-
-  install (
-    FILES      cvmfs_config
-    DESTINATION    bin
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  )
-
-
-  if(INSTALL_BASH_COMPLETION)
-    install (
-        FILES         bash_completion/cvmfs.bash_completion
-        RENAME        cvmfs
-        DESTINATION   ${SYSCONF_INSTALL_DIR}/bash_completion.d
-        PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-    )
-  endif (INSTALL_BASH_COMPLETION)
-
-endif (BUILD_CVMFS)
-
-if (BUILD_LIBCVMFS)
-  install (
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-    DESTINATION    ${CMAKE_INSTALL_LIBDIR}
-  )
-  install (
-    FILES                   libcvmfs.h
-    DESTINATION             include
-  )
-endif (BUILD_LIBCVMFS)
-
-
-if (BUILD_SHRINKWRAP)
-  install (
-    TARGETS      cvmfs_shrinkwrap
-    RUNTIME
-    DESTINATION    bin
-  )
-
-  install (
-    FILES          shrinkwrap/scripts/spec_builder.py
-    DESTINATION    ${CVMFS_LIBEXEC_DIR}/shrinkwrap
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  )
-endif (BUILD_SHRINKWRAP)
-
-if (BUILD_LIBCVMFS_CACHE)
-  install (
-    FILES          ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
-    DESTINATION    ${CMAKE_INSTALL_LIBDIR}
-  )
-  install (
-    FILES                   cache_plugin/libcvmfs_cache.h
-    DESTINATION             include
-  )
-  install (
-    TARGETS      cvmfs_cache_ram
-    RUNTIME
-    DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
-  )
-  install (
-    TARGETS     cvmfs_cache_posix
-    RUNTIME
-    DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
-  )
-endif (BUILD_LIBCVMFS_CACHE)
-
-if (BUILD_RECEIVER)
-  install (
-    TARGETS cvmfs_receiver
-    RUNTIME
-    DESTINATION bin
-    )
-
-  if (BUILD_RECEIVER_DEBUG)
-    install (
-      TARGETS     cvmfs_receiver_debug
-      RUNTIME
-      DESTINATION   bin
-    )
-  endif (BUILD_RECEIVER_DEBUG)
-
-endif(BUILD_RECEIVER)
-
-if (BUILD_SERVER)
-  install (
-    TARGETS     cvmfs_swissknife cvmfs_publish cvmfs_signing_helper
-    RUNTIME
-    DESTINATION    bin
-  )
-
-  install (
-    TARGETS     cvmfs_server
-    LIBRARY
-    DESTINATION    ${CMAKE_INSTALL_LIBDIR}
-  )
-
-  install (
-    TARGETS     cvmfs_suid_helper
-    RUNTIME
-    DESTINATION    bin
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID
-  )
-
-  if (BUILD_SERVER_DEBUG)
-    install (
-      TARGETS     cvmfs_swissknife_debug
-      RUNTIME
-      DESTINATION   bin
-    )
-
-    install (
-      TARGETS     cvmfs_publish_debug
-      RUNTIME
-      DESTINATION   bin
-    )
-
-    install (
-      TARGETS     cvmfs_server_debug
-      LIBRARY
-      DESTINATION    ${CMAKE_INSTALL_LIBDIR}
-    )
-  endif (BUILD_SERVER_DEBUG)
-
-  install (
-    FILES      ${${PROJECT_NAME}_BINARY_DIR}/cvmfs/cvmfs_server
-    DESTINATION    bin
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  )
-
-  install(
-    FILES      cvmfs_server_hooks.sh.demo
-    DESTINATION    "${SYSCONF_INSTALL_DIR}/cvmfs"
-    PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  install (
-    FILES      cvmfs_rsync
-    DESTINATION    bin
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  )
-
-  install(
-    FILES      webapi/cvmfs-api.wsgi
-    DESTINATION    "/var/www/wsgi-scripts/cvmfs-server"
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  )
-
-  install(
-    FILES      server/generate_stats_plots.C
-    DESTINATION    "/usr/share/cvmfs-server"
-    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
-  )
-
-  install(
-    FILES      server/upload_stats_plots.sh
-    DESTINATION    "/usr/share/cvmfs-server"
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  )
-
-  install(
-    FILES      server/fix_stats_db.sh
-    DESTINATION    "/usr/share/cvmfs-server"
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  )
-
-  install(
-    FILES      server/stats_index.html.tpl
-    DESTINATION    "/usr/share/cvmfs-server"
-    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
-  )
-
-  install(
-    CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server)"
-  )
-
-  if (BUILD_GEOAPI)
-    install(
-      CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
-    )
-
-    install(
-      FILES          ${EXTERNALS_INSTALL_LOCATION}/ipaddress.py
-      DESTINATION    "/usr/share/cvmfs-server/webapi"
-      PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
-    )
-
-    install(
-      DIRECTORY      ${EXTERNALS_INSTALL_LOCATION}/maxminddb
-      DESTINATION    "/usr/share/cvmfs-server/webapi"
-      FILE_PERMISSIONS       OWNER_READ GROUP_READ WORLD_READ
-      DIRECTORY_PERMISSIONS  OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    )
-
-    install(
-      FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
-      DESTINATION    "/usr/share/cvmfs-server/webapi"
-      PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
-    )
-  endif (BUILD_GEOAPI)
-
-  install(
-    FILES          doc/README-spooler
-    DESTINATION    "/var/spool/cvmfs"
-    PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-    RENAME         README
-  )
-
-endif (BUILD_SERVER)
-
-if (BUILD_PRELOADER)
-  install(
-    FILES      ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_preload
-    DESTINATION    bin
-    PERMISSIONS    OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    FILES        ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_preload
+    DESTINATION  bin
+    PERMISSIONS  OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 endif (BUILD_PRELOADER)
