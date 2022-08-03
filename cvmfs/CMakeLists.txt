@@ -2,6 +2,8 @@
 # This file is part of the CernVM File System
 #
 
+include (util/CMakeLists.txt)
+
 # /usr/bin/cvmfs2
 set (CVMFS2_BINARY_SOURCES
   fuse_main.cc
@@ -278,7 +280,6 @@ set (CVMFS_PUBLISH_SOURCES
   util/exception.cc
   util/namespace.cc
   util/posix.cc
-  util/string.cc
   whitelist.cc
 )
 
@@ -360,7 +361,6 @@ set (LIBCVMFS_SERVER_SOURCES
   util/mmap_file.cc
   util/posix.cc
   util/raii_temp_dir.cc
-  util/string.cc
   whitelist.cc
   xattr.cc
 )
@@ -474,7 +474,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util/file_backed_buffer.cc
   util/mmap_file.cc
   util/posix.cc
-  util/string.cc
   util/raii_temp_dir.cc
   util_concurrency.cc
   whitelist.cc
@@ -489,7 +488,6 @@ set (CVMFS_SIGN_SOURCES
   signature.cc
   util/exception.cc
   util/posix.cc
-  util/string.cc
 )
 
 set (CVMFS_SUID_HELPER_SOURCES
@@ -643,7 +641,6 @@ if(BUILD_RECEIVER)
     util/file_backed_buffer.cc
     util/mmap_file.cc
     util/posix.cc
-    util/string.cc
     util/raii_temp_dir.cc
     util_concurrency.cc
     uuid.cc
@@ -652,7 +649,8 @@ if(BUILD_RECEIVER)
     )
 
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
-  target_link_libraries(cvmfs_receiver ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+  target_link_libraries(cvmfs_receiver cvmfs_util
+                        ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                         ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
                         ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
                         ${RT_LIBRARY} ${LibArchive_LIBRARY} pthread dl)
@@ -662,7 +660,7 @@ if(BUILD_RECEIVER)
 
   if(BUILD_RECEIVER_DEBUG)
     add_executable(cvmfs_receiver_debug ${CVMFS_RECEIVER_SOURCES})
-    target_link_libraries(cvmfs_receiver_debug
+    target_link_libraries(cvmfs_receiver_debug cvmfs_util_debug
                           ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                           ${SHA3_LIBRARIES} ${SQLITE3_LIBRARY} ${VJSON_LIBRARIES}
                           ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} ${ZLIB_LIBRARIES}
@@ -985,13 +983,15 @@ if (BUILD_SERVER)
   set_target_properties (cvmfs_signing_helper PROPERTIES
                            COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}")
   target_link_libraries (cvmfs_signing_helper
+                         cvmfs_util
                          ${SHA3_LIBRARIES}
                          ${OPENSSL_LIBRARIES}
                          pthread dl)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
-  list(APPEND LIBCVMFS_SERVER_LINK_LIBRARIES ${CURL_LIBRARIES}
+  list(APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
+                                             ${CURL_LIBRARIES}
                                              ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                                              ${OPENSSL_LIBRARIES}
                                              ${SQLITE3_LIBRARY}
@@ -1002,18 +1002,18 @@ if (BUILD_SERVER)
                                              ${LibArchive_LIBRARY}
                                              ${RT_LIBRARY}
                                              pthread dl)
-  target_link_libraries (cvmfs_swissknife
+  target_link_libraries (cvmfs_swissknife cvmfs_util
                          ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
                          ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${ZLIB_LIBRARIES}
                          ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
                          ${SHA3_LIBRARIES} ${CAP_LIBRARIES} ${LibArchive_LIBRARY}
                          pthread dl)
-  target_link_libraries (cvmfs_server ${LIBCVMFS_SERVER_LIBS} ${LIBCVMFS_SERVER_LINK_LIBRARIES})
-  target_link_libraries (cvmfs_publish cvmfs_server)
+  target_link_libraries (cvmfs_server cvmfs_util ${LIBCVMFS_SERVER_LIBS} ${LIBCVMFS_SERVER_LINK_LIBRARIES})
+  target_link_libraries (cvmfs_publish cvmfs_util cvmfs_server)
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_SOURCES})
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS} -DDEBUGMSG -g -O0" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
-    target_link_libraries (cvmfs_swissknife_debug
+    target_link_libraries (cvmfs_swissknife_debug cvmfs_util_debug
                            ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES}
                            ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${ZLIB_LIBRARIES}
                            ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${VJSON_LIBRARIES}
@@ -1024,13 +1024,14 @@ if (BUILD_SERVER)
     set_target_properties (cvmfs_server_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
       COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS} -DDEBUGMSG -g -O0")
-    target_link_libraries (cvmfs_server_debug ${LIBCVMFS_SERVER_LIBS} ${LIBCVMFS_SERVER_LINK_LIBRARIES})
+    target_link_libraries (cvmfs_server_debug cvmfs_util_debug
+                           ${LIBCVMFS_SERVER_LIBS} ${LIBCVMFS_SERVER_LINK_LIBRARIES})
 
     add_executable (cvmfs_publish_debug ${CVMFS_PUBLISH_SOURCES})
     set_target_properties (cvmfs_publish_debug
       PROPERTIES COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -DDEBUGMSG -g -O0"
       LINK_FLAGS "${CVMFS_PUBLISH_LD_FLAGS}")
-    target_link_libraries (cvmfs_publish_debug cvmfs_server_debug)
+    target_link_libraries (cvmfs_publish_debug cvmfs_util_debug cvmfs_server_debug)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 

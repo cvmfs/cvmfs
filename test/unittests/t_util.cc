@@ -1329,23 +1329,24 @@ TEST_F(T_Util, SplitString) {
   string str2 = "my::string:by:colons";
   vector<string> result;
 
-  result = SplitString(str1, ' ', 1u);
+  result = SplitStringBounded(1, str1, ' ');
   EXPECT_EQ(1u, result.size());
   EXPECT_EQ(str1, result[0]);
 
-  result = SplitString(str1, ' ', 2u);
+  result = SplitStringBounded(2, str1, ' ');
   EXPECT_EQ(2u, result.size());
   EXPECT_EQ("the", result[0]);
   EXPECT_EQ("string that will be cut in peaces", result[1]);
 
-  result = SplitString(str1, ';', 200u);
+  result = SplitStringBounded(200, str1, ';');
   EXPECT_EQ(1u, result.size());
   EXPECT_EQ(str1, result[0]);
 
-  result = SplitString(str2, ':', 200u);
+  result = SplitStringBounded(200, str2, ':');
   EXPECT_EQ(5u, result.size());
   EXPECT_EQ("", result[1]);
-  EXPECT_EQ(SplitString(str2, ':', 5u), SplitString(str2, ':', 5000u));
+  EXPECT_EQ(SplitStringBounded(5, str2, ':'),
+            SplitStringBounded(5000, str2, ':'));
 }
 
 TEST_F(T_Util, JoinStrings) {

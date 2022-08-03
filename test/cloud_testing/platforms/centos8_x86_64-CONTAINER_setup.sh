@@ -7,6 +7,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
+install_rpm $LIBS_PACKAGE
 install_rpm $CLIENT_PACKAGE
 
 [ "x$SERVICE_CONTAINER" != "x" ] || die "fail (service container missing)"

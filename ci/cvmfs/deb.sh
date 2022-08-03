@@ -99,7 +99,8 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
                        "$(basename $(find . -name 'cvmfs-shrinkwrap*.deb'))"\
                        ""                                                   \
                        "$(basename $(find . -name 'cvmfs-fuse3*.deb'))"     \
-                       "$(basename $(find . -name 'cvmfs-gateway*.deb'))"
+                       "$(basename $(find . -name 'cvmfs-gateway*.deb'))"   \
+                       "$(basename $(find . -name 'cvmfs-libs*.deb'))"
 fi
 
 # clean up the source tree
