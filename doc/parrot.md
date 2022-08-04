@@ -72,7 +72,7 @@ In order to share this directory among multiple users, the users have to belong 
 
 ## Bugs and Problems
 
-For feedback and bug reports, please write to either the [cctools mailing list](http://ccl.cse.nd.edu/software/help/) or to the [CernVM-FS support](https://github.com/cvmfs/cvmfs).
+For feedback and bug reports, please write to either the [cctools mailing list](http://ccl.cse.nd.edu/software/help/) or to the [CernVM-FS support](https://github.com/cvmfs/cvmfs/issues).
 
 
 ## Compiling from Sources
