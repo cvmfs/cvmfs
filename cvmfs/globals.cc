@@ -12,6 +12,7 @@ bool g_claim_ownership = false;
 bool g_raw_symlinks = false;
 uid_t g_uid = 0;
 gid_t g_gid = 0;
+bool g_world_readable = false;
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }
