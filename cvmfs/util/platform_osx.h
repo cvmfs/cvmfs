@@ -4,8 +4,8 @@
  * Mac OS X specific system/library calls.
  */
 
-#ifndef CVMFS_PLATFORM_OSX_H_
-#define CVMFS_PLATFORM_OSX_H_
+#ifndef CVMFS_UTIL_PLATFORM_OSX_H_
+#define CVMFS_UTIL_PLATFORM_OSX_H_
 
 #include <alloca.h>
 #include <dirent.h>
@@ -312,4 +312,4 @@ inline uint64_t platform_memsize() {
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_PLATFORM_OSX_H_
+#endif  // CVMFS_UTIL_PLATFORM_OSX_H_

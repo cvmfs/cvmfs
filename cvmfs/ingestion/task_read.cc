@@ -12,8 +12,8 @@
 
 #include "backoff.h"
 #include "util/exception.h"
-#include "util/platform.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 

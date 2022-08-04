@@ -4,8 +4,8 @@
  * Linux specific system/library calls.
  */
 
-#ifndef CVMFS_PLATFORM_LINUX_H_
-#define CVMFS_PLATFORM_LINUX_H_
+#ifndef CVMFS_UTIL_PLATFORM_LINUX_H_
+#define CVMFS_UTIL_PLATFORM_LINUX_H_
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
 #include <sys/xattr.h>
@@ -354,4 +354,4 @@ inline uint64_t platform_memsize() {
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_PLATFORM_LINUX_H_
+#endif  // CVMFS_UTIL_PLATFORM_LINUX_H_
