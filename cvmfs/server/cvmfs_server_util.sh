@@ -757,11 +757,11 @@ _os_etc_release_get_field() {
   _os_set_etc_release_filename
 
   local fieldname=$1
-  if [ "x${fieldname}" == "x" ]; then
+  if [ "x${fieldname}" = "x" ]; then
     die "Internal error: _os_etc_release_get_field expects a field name to search for!"
   fi
 
-  if [ "x${_CVMFS_OS_RELEASE_FILENAME}" == "x" ]; then
+  if [ "x${_CVMFS_OS_RELEASE_FILENAME}" = "x" ]; then
     # If we are unable to find a proper /etc/os-release file return nothing.
     :
   else
