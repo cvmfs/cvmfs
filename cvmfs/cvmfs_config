@@ -1481,7 +1481,7 @@ cvmfs_bugreport() {
    echo
    echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
    echo "Please attach this file to your problem description and send it as a"
-   echo "bug report to https://github.com/cvmfs/cvmfs"
+   echo "bug report to https://github.com/cvmfs/cvmfs/issues"
 }
 
 
