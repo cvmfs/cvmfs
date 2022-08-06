@@ -211,6 +211,7 @@ build_lib() {
       ;;
     protobuf)
       do_extract "protobuf"     "protobuf-${PROTOBUF_VERSION}.tar.bz2"
+      patch_external "protobuf" "fix-iterator-cxx17.patch"
       do_build "protobuf"
       ;;
     googlebench)
