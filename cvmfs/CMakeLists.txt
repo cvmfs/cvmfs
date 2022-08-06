@@ -137,6 +137,7 @@ set (CVMFS_FUSE_SOURCES
   notify/subscriber_supervisor.cc
   notify/subscriber_sse.cc
   quota_listener.cc
+  shortstring.cc
   supervisor.cc
   talk.cc
   url.cc
