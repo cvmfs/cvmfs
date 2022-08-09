@@ -24,12 +24,12 @@
 #include "download.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
-#include "logging.h"
 #include "manifest.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "shortstring.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 

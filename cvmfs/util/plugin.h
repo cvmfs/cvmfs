@@ -10,8 +10,8 @@
 #include <cassert>
 #include <vector>
 
-#include "atomic.h"
-#include "util_concurrency.h"
+#include "util/atomic.h"
+#include "util/concurrency.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

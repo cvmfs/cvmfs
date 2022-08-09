@@ -11,9 +11,9 @@
 
 #include <string>
 
-#include "atomic.h"
 #include "catalog_traversal.h"
 #include "sql.h"
+#include "util/atomic.h"
 
 using namespace std;  // NOLINT
 

@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include "smalloc.h"
 #include "util/file_backed_buffer.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

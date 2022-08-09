@@ -16,13 +16,13 @@
 
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
-#include "logging.h"
 #include "manifest.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "upload.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

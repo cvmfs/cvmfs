@@ -4,7 +4,7 @@
 
 #include "repository_tag.h"
 
-#include "platform.h"
+#include "util/platform.h"
 #include "util/string.h"
 
 RepositoryTag::RepositoryTag(const std::string& name,

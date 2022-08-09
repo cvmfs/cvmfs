@@ -19,7 +19,7 @@
 #include <string>
 
 #include "duplex_libarchive.h"
-#include "util_concurrency.h"
+#include "util/concurrency.h"
 
 namespace publish {
 
@@ -68,7 +68,7 @@ class SyncUnionTarball : public SyncUnion {
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
 
-  /** 
+  /**
    * directories where we found catalog marker, after the main traverse we
    * iterate through them and we add the catalog
    */

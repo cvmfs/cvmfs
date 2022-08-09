@@ -14,8 +14,8 @@
 #include "garbage_collection/hash_filter.h"
 #include "hash.h"
 #include "manifest.h"
-#include "prng.h"
 #include "testutil.h"
+#include "util/prng.h"
 
 using swissknife::CatalogTraversalParallel;
 using swissknife::CatalogTraversal;

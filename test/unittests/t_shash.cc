@@ -15,8 +15,8 @@
 
 #include "duplex_ssl.h"
 #include "hash.h"
-#include "prng.h"
-#include "smalloc.h"
+#include "util/prng.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

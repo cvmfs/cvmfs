@@ -18,8 +18,8 @@
 #include "cache_extern.h"
 #include "globals.h"
 #include "hash.h"
-#include "prng.h"
 #include "util/posix.h"
+#include "util/prng.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

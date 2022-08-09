@@ -15,7 +15,6 @@
 #include <cassert>
 #include <string>
 
-#include "atomic.h"
 #include "bigvector.h"
 #include "catalog_mgr.h"
 #include "file_chunk.h"
@@ -23,6 +22,7 @@
 #include "hash.h"
 #include "shortstring.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
 
 namespace compat {
 

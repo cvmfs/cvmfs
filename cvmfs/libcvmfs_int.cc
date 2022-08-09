@@ -46,7 +46,6 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
@@ -60,17 +59,18 @@
 #include "hash.h"
 #include "interrupt.h"
 #include "libcvmfs.h"
-#include "logging.h"
 #include "lru_md.h"
-#include "murmur.hxx"
-#include "platform.h"
 #include "quota.h"
 #include "shortstring.h"
 #include "signature.h"
-#include "smalloc.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
+#include "util/atomic.h"
+#include "util/logging.h"
+#include "util/murmur.hxx"
+#include "util/platform.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "xattr.h"
 

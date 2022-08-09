@@ -8,8 +8,8 @@
 #include <vector>
 
 #include "gateway_util.h"
-#include "logging.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 namespace upload {

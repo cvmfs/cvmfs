@@ -10,10 +10,10 @@
 #include <cstdio>
 
 #include "libcvmfs.h"
-#include "platform.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/posix/interface.h"
 #include "shrinkwrap/util.h"
+#include "util/platform.h"
 #include "util/posix.h"
 
 #include "testutil_shrinkwrap.h"

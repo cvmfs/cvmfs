@@ -47,7 +47,6 @@
 #include "google/protobuf/stubs/common.h"
 #include "history.h"
 #include "history_sqlite.h"
-#include "logging.h"
 #include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
@@ -57,7 +56,6 @@
 #include "nfs_maps_sqlite.h"
 #endif
 #include "options.h"
-#include "platform.h"
 #include "quota_posix.h"
 #include "resolv_conf_event_handler.h"
 #include "signature.h"
@@ -65,10 +63,12 @@
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "tracer.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 #include "uuid.h"
 #include "wpad.h"
 
@@ -1350,7 +1350,7 @@ bool MountPoint::CreateResolvConfWatcher() {
              "DNS roaming is enabled for this repository.");
     // Create a file watcher to update the DNS settings of the download
     // managers when there are changes to /etc/resolv.conf
-    resolv_conf_watcher_ = platform_file_watcher();
+    resolv_conf_watcher_ = file_watcher::FileWatcher::Create();
 
     if (resolv_conf_watcher_) {
       ResolvConfEventHandler *handler =

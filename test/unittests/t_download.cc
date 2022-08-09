@@ -15,11 +15,11 @@
 #include "download.h"
 #include "hash.h"
 #include "interrupt.h"
-#include "prng.h"
 #include "sink.h"
 #include "statistics.h"
 #include "util/file_guard.h"
 #include "util/posix.h"
+#include "util/prng.h"
 
 using namespace std;  // NOLINT
 

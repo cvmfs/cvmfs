@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 template <class CatalogTraversalT, class HashFilterT>

@@ -12,8 +12,8 @@
 #include "catalog_traversal_parallel.h"
 #include "hash.h"
 #include "manifest.h"
-#include "prng.h"
 #include "testutil.h"
+#include "util/prng.h"
 #include "util/string.h"
 
 using swissknife::CatalogTraversal;

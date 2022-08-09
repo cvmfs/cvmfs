@@ -12,11 +12,11 @@
 
 #include "compression.h"
 #include "download.h"
-#include "logging.h"
 #include "signature.h"
 #include "statistics.h"
 #include "swissknife.h"
 #include "swissknife_pull.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "uuid.h"

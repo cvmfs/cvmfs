@@ -7,7 +7,7 @@
 
 #include <cassert>
 
-#include "logging.h"
+#include "util/logging.h"
 
 void TaskRegister::Process(FileItem *file_item) {
   assert(file_item != NULL);

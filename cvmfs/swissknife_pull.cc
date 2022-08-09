@@ -23,26 +23,26 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "catalog.h"
 #include "compression.h"
 #include "download.h"
 #include "hash.h"
 #include "history_sqlite.h"
-#include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "object_fetcher.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
 #include "signature.h"
-#include "smalloc.h"
 #include "upload.h"
+#include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/shared_ptr.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

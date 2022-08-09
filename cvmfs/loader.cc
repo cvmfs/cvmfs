@@ -37,17 +37,17 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "duplex_fuse.h"
 #include "duplex_ssl.h"
 #include "fence.h"
 #include "fuse_main.h"
 #include "loader_talk.h"
-#include "logging.h"
 #include "options.h"
-#include "platform.h"
 #include "sanitizer.h"
+#include "util/atomic.h"
 #include "util/exception.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 

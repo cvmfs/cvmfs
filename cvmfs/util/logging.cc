@@ -11,7 +11,7 @@
  * If DEBUGMSG is undefined, pure debug messages are compiled into no-ops.
  */
 
-#include "logging_internal.h"  // NOLINT(build/include)
+#include "util/logging_internal.h"  // NOLINT(build/include)
 
 #include <errno.h>
 #include <fcntl.h>
@@ -27,11 +27,12 @@
 #include <ctime>
 #include <vector>
 
-#include "platform.h"
-#include "smalloc.h"
+#include "util/export.h"
 #include "util/mutex.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -418,6 +419,7 @@ void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
  * @param[in] mask Bit mask of log facilities
  * @param[in] format Format string followed by arguments like printf
  */
+CVMFS_EXPORT
 void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
   char *msg = NULL;
   va_list variadic_list;

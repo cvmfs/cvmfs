@@ -8,11 +8,11 @@
 #include <ctime>
 #include <string>
 
-#include "logging.h"
 #include "options.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
+#include "util/logging.h"
 #include "whitelist.h"
 
 namespace publish {

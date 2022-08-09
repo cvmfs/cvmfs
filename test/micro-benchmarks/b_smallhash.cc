@@ -12,10 +12,10 @@
 #include "bm_util.h"
 #include "directory_entry.h"
 #include "hash.h"
-#include "murmur.hxx"
-#include "prng.h"
 #include "shortstring.h"
 #include "smallhash.h"
+#include "util/murmur.hxx"
+#include "util/prng.h"
 
 class BM_SmallHash : public benchmark::Fixture {
  protected:

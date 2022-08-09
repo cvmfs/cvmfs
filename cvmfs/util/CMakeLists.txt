@@ -2,6 +2,15 @@ if (BUILD_CVMFS OR BUILD_SERVER OR BUILD_RECEIVER OR
     BUILD_SHRINKWRAP OR BUILD_PRELOADER OR BUILD_UNITTESTS)
 
 set (LIBCVMFS_UTIL_SOURCES
+  util/algorithm.cc
+  util/concurrency.cc
+  util/exception.cc
+  util/file_backed_buffer.cc
+  util/logging.cc
+  util/mmap_file.cc
+  util/namespace.cc
+  util/posix.cc
+  util/raii_temp_dir.cc
   util/string.cc
 )
 

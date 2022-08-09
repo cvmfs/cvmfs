@@ -11,12 +11,12 @@
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "directory_entry.h"
-#include "logging.h"
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 

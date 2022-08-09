@@ -14,12 +14,12 @@
 
 #include "commit_processor.h"
 #include "json_document_write.h"
-#include "logging.h"
 #include "payload_processor.h"
 #include "repository_tag.h"
 #include "session_token.h"
 #include "upload_facility.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"

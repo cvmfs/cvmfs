@@ -12,11 +12,11 @@
 #include "clientctx.h"
 #include "download.h"
 #include "interrupt.h"
-#include "logging.h"
 #include "quota.h"
 #include "statistics.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
 #include "util/posix.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

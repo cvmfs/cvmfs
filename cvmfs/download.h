@@ -18,15 +18,15 @@
 
 #include "gtest/gtest_prod.h"
 
-#include "atomic.h"
 #include "compression.h"
 #include "dns.h"
 #include "duplex_curl.h"
 #include "hash.h"
-#include "prng.h"
 #include "sink.h"
 #include "ssl.h"
 #include "statistics.h"
+#include "util/atomic.h"
+#include "util/prng.h"
 
 class InterruptCue;
 

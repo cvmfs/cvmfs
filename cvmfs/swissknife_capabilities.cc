@@ -10,7 +10,7 @@
 
 #include <cassert>
 
-#include "logging.h"
+#include "util/logging.h"
 
 namespace swissknife {
 

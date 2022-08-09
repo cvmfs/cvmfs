@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
-#include "murmur.hxx"
-// TODO(jblomer): should be also part of algorithm
-#include "platform.h"
-#include "prng.h"
+#include "util/atomic.h"
+#include "util/export.h"
+#include "util/murmur.hxx"
+#include "util/platform.h"
+#include "util/prng.h"
 #include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -23,7 +23,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 
-double DiffTimeSeconds(struct timeval start, struct timeval end);
+CVMFS_EXPORT double DiffTimeSeconds(struct timeval start, struct timeval end);
 
 // Bitfield manipulation for different integer types T
 template <typename T>
@@ -108,7 +108,7 @@ struct hash_murmur {
  * watch.Stop();
  * printf("%f", watch.GetTime());
  */
-class StopWatch : SingleCopy {
+class CVMFS_EXPORT StopWatch : SingleCopy {
  public:
   StopWatch() : running_(false) {}
 
@@ -137,7 +137,7 @@ class StopWatch : SingleCopy {
  * hist.PrintLog2Histogram();
  */
 
-class Log2Histogram {
+class CVMFS_EXPORT Log2Histogram {
 friend class UTLog2Histogram;
 
  public:
@@ -195,7 +195,7 @@ class UTLog2Histogram {
 };
 
 
-class HighPrecisionTimer : SingleCopy {
+class CVMFS_EXPORT HighPrecisionTimer : SingleCopy {
  public:
   static bool g_is_enabled;  // false by default
 

@@ -50,13 +50,13 @@
 #include <string>
 #include <vector>
 
-#include "fs_traversal.h"
-#include "logging.h"
-#include "platform.h"
 #include "util/algorithm.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/fs_traversal.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 //using namespace std;  // NOLINT
 
@@ -140,24 +140,6 @@ std::string GetParentPath(const std::string &path) {
 /**
  * Gets the file name part of a path.
  */
-PathString GetParentPath(const PathString &path) {
-  int length = static_cast<int>(path.GetLength());
-  if (length == 0)
-    return path;
-  const char *chars  = path.GetChars();
-
-  for (int i = length-1; i >= 0; --i) {
-    if (chars[i] == '/')
-      return PathString(chars, i);
-  }
-
-  return path;
-}
-
-
-/**
- * Gets the file name part of a path.
- */
 std::string GetFileName(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
   if (idx != std::string::npos) {
@@ -165,25 +147,6 @@ std::string GetFileName(const std::string &path) {
   } else {
     return path;
   }
-}
-
-
-NameString GetFileName(const PathString &path) {
-  NameString name;
-  int length = static_cast<int>(path.GetLength());
-  const char *chars  = path.GetChars();
-
-  int i;
-  for (i = length-1; i >= 0; --i) {
-    if (chars[i] == '/')
-      break;
-  }
-  i++;
-  if (i < length) {
-    name.Append(chars+i, length-i);
-  }
-
-  return name;
 }
 
 

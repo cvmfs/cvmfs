@@ -16,7 +16,6 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "catalog_mgr.h"
 #include "directory_entry.h"
 #include "hash.h"
@@ -24,6 +23,7 @@
 #include "history.h"
 #include "object_fetcher.h"
 #include "upload_facility.h"
+#include "util/atomic.h"
 
 pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);

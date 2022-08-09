@@ -5,7 +5,7 @@
 #ifndef CVMFS_UTIL_CONCURRENCY_IMPL_H_
 #define CVMFS_UTIL_CONCURRENCY_IMPL_H_
 
-#include "logging.h"
+#include "util/logging.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

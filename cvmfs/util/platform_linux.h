@@ -4,8 +4,8 @@
  * Linux specific system/library calls.
  */
 
-#ifndef CVMFS_PLATFORM_LINUX_H_
-#define CVMFS_PLATFORM_LINUX_H_
+#ifndef CVMFS_UTIL_PLATFORM_LINUX_H_
+#define CVMFS_UTIL_PLATFORM_LINUX_H_
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
 #include <sys/xattr.h>
@@ -32,12 +32,7 @@
 #include <string>
 #include <vector>
 
-#ifdef CVMFS_ENABLE_INOTIFY
-#include "file_watcher_inotify.h"
-#else  // CVMFS_ENABLE_INOTIFY
-#include "file_watcher.h"
-#endif  // CVMFS_ENABLE_INOTIFY
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -355,16 +350,8 @@ inline uint64_t platform_memsize() {
          static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
 }
 
-inline file_watcher::FileWatcher* platform_file_watcher() {
-#ifdef CVMFS_ENABLE_INOTIFY
-  return new file_watcher::FileWatcherInotify();
-#else  // CVMFS_ENABLE_INOTIFY
-  return NULL;
-#endif  // CVMFS_ENABLE_INOTIFY
-}
-
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_PLATFORM_LINUX_H_
+#endif  // CVMFS_UTIL_PLATFORM_LINUX_H_

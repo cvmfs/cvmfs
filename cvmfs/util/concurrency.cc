@@ -3,11 +3,13 @@
  */
 
 #include "cvmfs_config.h"
-#include "util_concurrency.h"
+#include "util/concurrency.h"
 
 #include <unistd.h>
 
 #include <cassert>
+
+#include "util/logging.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

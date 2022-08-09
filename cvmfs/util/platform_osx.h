@@ -4,8 +4,8 @@
  * Mac OS X specific system/library calls.
  */
 
-#ifndef CVMFS_PLATFORM_OSX_H_
-#define CVMFS_PLATFORM_OSX_H_
+#ifndef CVMFS_UTIL_PLATFORM_OSX_H_
+#define CVMFS_UTIL_PLATFORM_OSX_H_
 
 #include <alloca.h>
 #include <dirent.h>
@@ -37,8 +37,7 @@
 #include <string>
 #include <vector>
 
-#include "file_watcher_kqueue.h"
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -309,12 +308,8 @@ inline uint64_t platform_memsize() {
   return ramsize;
 }
 
-inline file_watcher::FileWatcher* platform_file_watcher() {
-  return new file_watcher::FileWatcherKqueue();
-}
-
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_PLATFORM_OSX_H_
+#endif  // CVMFS_UTIL_PLATFORM_OSX_H_

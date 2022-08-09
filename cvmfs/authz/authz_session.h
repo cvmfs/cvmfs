@@ -13,9 +13,9 @@
 
 #include "authz/authz.h"
 #include "gtest/gtest_prod.h"
-#include "murmur.hxx"
 #include "smallhash.h"
 #include "statistics.h"
+#include "util/murmur.hxx"
 #include "util/single_copy.h"
 
 class AuthzFetcher;

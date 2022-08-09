@@ -13,7 +13,7 @@
 #include <cstring>
 #include <string>
 
-#include "atomic.h"
+#include "util/atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -195,6 +195,11 @@ template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_overflows_ = 0;
 template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
+
+// See posix.cc for the std::string counterparts
+PathString GetParentPath(const PathString &path);
+NameString GetFileName(const PathString &path);
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

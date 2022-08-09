@@ -13,10 +13,10 @@
 #include <cstring>
 
 #include "hash.h"
-#include "logging.h"
-#include "smalloc.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 // TODO(jblomer): Check for possible starvation of plugin by dying clients
 // (blocking read).  Probably only relevant for TCP sockets.

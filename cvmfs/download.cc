@@ -50,21 +50,21 @@
 #include <set>
 #include <utility>
 
-#include "atomic.h"
 #include "compression.h"
 #include "duplex_curl.h"
 #include "hash.h"
 #include "interrupt.h"
-#include "logging.h"
-#include "prng.h"
 #include "sanitizer.h"
-#include "smalloc.h"
 #include "ssl.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/prng.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

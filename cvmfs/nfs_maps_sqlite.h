@@ -9,12 +9,12 @@
 
 #include <string>
 
-#include "atomic.h"
 #include "duplex_sqlite3.h"
 #include "hash.h"
 #include "nfs_maps.h"
-#include "prng.h"
 #include "shortstring.h"
+#include "util/atomic.h"
+#include "util/prng.h"
 
 namespace perf {
 class Counter;

@@ -16,12 +16,12 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "bigvector.h"
 #include "compression.h"
 #include "hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
+#include "util/atomic.h"
 #include "util/single_copy.h"
 
 /**

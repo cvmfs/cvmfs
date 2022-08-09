@@ -5,8 +5,8 @@
 #include <benchmark/benchmark.h>
 
 #include "bm_util.h"
-#include "platform.h"
 #include "util/algorithm.h"
+#include "util/platform.h"
 
 class BM_Utils : public benchmark::Fixture {
  protected:

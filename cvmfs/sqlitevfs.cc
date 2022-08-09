@@ -33,10 +33,10 @@
 
 #include "cache.h"
 #include "duplex_sqlite3.h"
-#include "logging.h"
-#include "platform.h"
-#include "smalloc.h"
 #include "statistics.h"
+#include "util/logging.h"
+#include "util/platform.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

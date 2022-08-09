@@ -13,10 +13,10 @@
 #include <vector>
 
 #include "compression.h"
-#include "logging.h"
 #include "options.h"
 #include "s3fanout.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

@@ -10,7 +10,7 @@
 
 #include "catalog.h"
 #include "globals.h"
-#include "logging.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "xattr.h"
 

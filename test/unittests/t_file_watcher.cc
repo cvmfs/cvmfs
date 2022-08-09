@@ -6,11 +6,11 @@
 
 #include <map>
 
-#include "logging.h"
-#include "platform.h"
+#include "file_watcher.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
-#include "util_concurrency.h"
 
 typedef std::map<file_watcher::Event, int> Counters;
 
@@ -66,7 +66,8 @@ TEST_F(T_FileWatcher, NoEventStop) {
       GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+  UniquePtr<file_watcher::FileWatcher> watcher(
+    file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
   TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
@@ -82,7 +83,8 @@ TEST_F(T_FileWatcher, ModifiedEvent) {
     GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+  UniquePtr<file_watcher::FileWatcher> watcher(
+    file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
   TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
@@ -109,7 +111,8 @@ TEST_F(T_FileWatcher, DeletedEvent) {
       GetCurrentWorkingDirectory() + "/file_watcher_test2.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+  UniquePtr<file_watcher::FileWatcher> watcher(
+    file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
   TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
@@ -136,7 +139,8 @@ TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
       GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(platform_file_watcher());
+  UniquePtr<file_watcher::FileWatcher> watcher(
+    file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
   TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));

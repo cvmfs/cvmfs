@@ -9,8 +9,8 @@
 
 #include <string>
 
-#include "atomic.h"
 #include "duplex_curl.h"
+#include "util/atomic.h"
 
 namespace notify {
 

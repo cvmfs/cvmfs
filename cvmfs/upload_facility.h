@@ -10,15 +10,15 @@
 
 #include <string>
 
-#include "atomic.h"
 #include "ingestion/ingestion_source.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "repository_tag.h"
 #include "statistics.h"
 #include "upload_spooler_definition.h"
+#include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/posix.h"
-#include "util_concurrency.h"
 
 namespace upload {
 

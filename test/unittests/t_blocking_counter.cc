@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "util_concurrency.h"
+#include "util/concurrency.h"
 
 class T_BlockingCounter : public ::testing::Test {
  protected:

@@ -17,17 +17,17 @@
 #include "catalog_virtual.h"
 #include "compression.h"
 #include "directory_entry.h"
-#include "fs_traversal.h"
 #include "hash.h"
 #include "json_document.h"
 #include "publish/repository.h"
-#include "smalloc.h"
 #include "sync_union.h"
 #include "upload.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/fs_traversal.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

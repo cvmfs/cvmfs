@@ -8,11 +8,11 @@
 #include <cstdio>
 #include <string>
 
-#include "logging.h"
 #include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"

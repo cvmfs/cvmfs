@@ -15,9 +15,9 @@
 #include "catalog_virtual.h"
 #include "compression.h"
 #include "hash.h"
-#include "logging.h"
 #include "swissknife_history.h"
-#include "util_concurrency.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
 
 using namespace std;  // NOLINT
 

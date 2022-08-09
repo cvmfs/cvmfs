@@ -8,11 +8,11 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#include "atomic.h"
 #include "bigvector.h"
 #include "duplex_fuse.h"
 #include "gtest/gtest_prod.h"
 #include "shortstring.h"
+#include "util/atomic.h"
 #include "util/single_copy.h"
 
 namespace glue {

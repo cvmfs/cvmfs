@@ -7,7 +7,7 @@
 #include <map>
 
 #include "fd_table.h"
-#include "prng.h"
+#include "util/prng.h"
 
 using namespace std;  // NOLINT
 

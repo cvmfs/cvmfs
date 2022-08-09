@@ -12,8 +12,8 @@
 #include "fs_traversal_interface.h"
 #include "fs_traversal_libcvmfs.h"
 #include "libcvmfs.h"
-#include "logging.h"
-#include "smalloc.h"
+#include "util/logging.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 #define MAX_INTEGER_DIGITS 20

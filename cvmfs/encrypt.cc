@@ -17,12 +17,12 @@
 
 #include "duplex_ssl.h"
 #include "hash.h"
-#include "platform.h"
-#include "smalloc.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/platform.h"
 #include "util/pointer.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 #include "uuid.h"
 
 using namespace std;  // NOLINT

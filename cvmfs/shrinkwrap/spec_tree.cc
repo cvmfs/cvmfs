@@ -10,11 +10,11 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
-#include "smalloc.h"
 #include "util.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 

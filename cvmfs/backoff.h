@@ -7,7 +7,7 @@
 
 #include <pthread.h>
 
-#include "prng.h"
+#include "util/prng.h"
 #include "util/single_copy.h"
 
 /**

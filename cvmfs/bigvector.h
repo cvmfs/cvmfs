@@ -10,7 +10,7 @@
 #include <cassert>
 #include <cstdlib>
 
-#include "smalloc.h"
+#include "util/smalloc.h"
 
 template<class Item>
 class BigVector {

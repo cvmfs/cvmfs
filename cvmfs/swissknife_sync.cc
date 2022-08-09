@@ -40,11 +40,9 @@
 #include "catalog_mgr_rw.h"
 #include "catalog_virtual.h"
 #include "download.h"
-#include "logging.h"
 #include "manifest.h"
 #include "monitor.h"
 #include "path_filters/dirtab.h"
-#include "platform.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "statistics.h"
@@ -54,6 +52,8 @@
 #include "sync_union.h"
 #include "sync_union_aufs.h"
 #include "sync_union_overlayfs.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

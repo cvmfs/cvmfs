@@ -34,10 +34,10 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "logging.h"
 #include "sanitizer.h"
-#include "smalloc.h"
 #include "util/exception.h"
+#include "util/logging.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

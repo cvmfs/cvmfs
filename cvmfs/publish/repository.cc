@@ -16,7 +16,6 @@
 #include "hash.h"
 #include "history_sqlite.h"
 #include "ingestion/ingestion_source.h"
-#include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "publish/except.h"
@@ -31,6 +30,7 @@
 #include "sync_union_tarball.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "whitelist.h"
 

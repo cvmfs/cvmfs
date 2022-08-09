@@ -10,8 +10,8 @@
 #include <vector>
 
 #include "malloc_arena.h"
-#include "prng.h"
 #include "util/algorithm.h"
+#include "util/prng.h"
 
 using namespace std;  // NOLINT
 

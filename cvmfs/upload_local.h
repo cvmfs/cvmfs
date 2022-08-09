@@ -10,9 +10,9 @@
 
 #include <string>
 
-#include "atomic.h"
 #include "upload_facility.h"
-#include "util_concurrency.h"
+#include "util/atomic.h"
+#include "util/concurrency.h"
 
 namespace upload {
 

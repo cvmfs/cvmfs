@@ -11,9 +11,9 @@
 
 #include <string>
 
-#include "atomic.h"
 #include "hash.h"
 #include "leveldb/env.h"
+#include "util/atomic.h"
 
 
 namespace leveldb {

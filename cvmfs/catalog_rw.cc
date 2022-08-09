@@ -10,9 +10,9 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "logging.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
-#include "util_concurrency.h"
+#include "util/logging.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT

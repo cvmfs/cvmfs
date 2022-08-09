@@ -18,14 +18,14 @@
 #include <limits>
 #include <vector>
 
-#include "atomic.h"
 #include "shortstring.h"
-#include "smalloc.h"
 #include "testutil.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
 #include "util/file_guard.h"
 #include "util/mmap_file.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

@@ -8,13 +8,13 @@
 
 
 #include "hash.h"
-#include "platform.h"
-#include "prng.h"
-#include "smalloc.h"
 #include "upload.h"
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"
+#include "util/platform.h"
 #include "util/posix.h"
+#include "util/prng.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std; // NOLINT

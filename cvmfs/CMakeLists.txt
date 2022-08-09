@@ -7,8 +7,8 @@ include (util/CMakeLists.txt)
 # /usr/bin/cvmfs2
 set (CVMFS2_BINARY_SOURCES
   fuse_main.cc
-  logging.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
 )
@@ -19,11 +19,11 @@ set (CVMFS_STUB_SOURCES
   hash.cc
   loader.cc
   loader_talk.cc
-  logging.cc
   options.cc
   sanitizer.cc
   statistics.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
 )
@@ -62,7 +62,6 @@ set (CVMFS_CLIENT_SOURCES
   history_sqlite.cc
   json_document.cc
   kvstore.cc
-  logging.cc
   magic_xattr.cc
   malloc_arena.cc
   malloc_heap.cc
@@ -84,10 +83,11 @@ set (CVMFS_CLIENT_SOURCES
   tracer.cc
   uuid.cc
   util/algorithm.cc
+  util/concurrency.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
-  util_concurrency.cc
   whitelist.cc
   wpad.cc
   xattr.cc
@@ -137,6 +137,7 @@ set (CVMFS_FUSE_SOURCES
   notify/subscriber_supervisor.cc
   notify/subscriber_sse.cc
   quota_listener.cc
+  shortstring.cc
   supervisor.cc
   talk.cc
   url.cc
@@ -164,14 +165,14 @@ set (LIBCVMFS_CACHE_SOURCES
   cache_plugin/channel.cc
   cache_transport.cc
   hash.cc
-  logging.cc
   monitor.cc
   options.cc
   sanitizer.cc
+  util/concurrency.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
-  util_concurrency.cc
 )
 
 set (CVMFS_CACHE_NULL_SOURCES
@@ -180,11 +181,11 @@ set (CVMFS_CACHE_NULL_SOURCES
 
 set (CVMFS_CACHE_RAM_SOURCES
   cache_plugin/cvmfs_cache_ram.cc
-  logging.cc
   malloc_heap.cc
   statistics.cc
-  util_concurrency.cc
+  util/concurrency.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
 )
@@ -195,10 +196,10 @@ set (CVMFS_CACHE_POSIX_SOURCES
   cache_posix.cc
   compression.cc
   hash.cc
-  logging.cc
   manifest.cc
   quota.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
 )
@@ -207,26 +208,25 @@ set (CVMFS_FSCK_SOURCES
   compression.cc
   cvmfs_fsck.cc
   hash.cc
-  logging.cc
   statistics.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
 )
 
 set (CVMFS_TALK_SOURCES
   cvmfs_talk.cc
-  logging.cc
   options.cc
   sanitizer.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
 )
 
 set (CVMFS_SHRINKWRAP_SOURCES
   hash.cc
-  logging.cc
   monitor.cc
   shrinkwrap/fs_traversal.cc
   shrinkwrap/fs_traversal_libcvmfs.cc
@@ -238,10 +238,11 @@ set (CVMFS_SHRINKWRAP_SOURCES
   shrinkwrap/spec_tree.cc
   shrinkwrap/util.cc
   statistics.cc
+  util/concurrency.cc
   util/exception.cc
+  util/logging.cc
   util/posix.cc
   util/string.cc
-  util_concurrency.cc
   xattr.cc
 )
 
@@ -253,7 +254,6 @@ set (CVMFS_PUBLISH_SOURCES
   dns.cc
   download.cc
   hash.cc
-  logging.cc
   manifest.cc
   options.cc
   publish/cmd_abort.cc
@@ -276,10 +276,6 @@ set (CVMFS_PUBLISH_SOURCES
   ssl.cc
   statistics.cc
   upload_spooler_definition.cc
-  util/algorithm.cc
-  util/exception.cc
-  util/namespace.cc
-  util/posix.cc
   whitelist.cc
 )
 
@@ -312,7 +308,6 @@ set (LIBCVMFS_SERVER_SOURCES
   ingestion/task_register.cc
   ingestion/task_write.cc
   json_document.cc
-  logging.cc
   manifest.cc
   manifest_fetch.cc
   malloc_arena.cc
@@ -335,6 +330,7 @@ set (LIBCVMFS_SERVER_SOURCES
   sanitizer.cc
   session_context.cc
   signature.cc
+  shortstring.cc
   sql.cc
   sqlitemem.cc
   ssl.cc
@@ -354,13 +350,6 @@ set (LIBCVMFS_SERVER_SOURCES
   upload_local.cc
   upload_s3.cc
   upload_spooler_definition.cc
-  util_concurrency.cc
-  util/algorithm.cc
-  util/exception.cc
-  util/file_backed_buffer.cc
-  util/mmap_file.cc
-  util/posix.cc
-  util/raii_temp_dir.cc
   whitelist.cc
   xattr.cc
 )
@@ -397,7 +386,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   ingestion/task_write.cc
   json_document.cc
   letter.cc
-  logging.cc
   malloc_arena.cc
   manifest.cc
   manifest_fetch.cc
@@ -424,6 +412,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   session_context.cc
   signature.cc
   signing_tool.cc
+  shortstring.cc
   sql.cc
   sqlitemem.cc
   ssl.cc
@@ -469,13 +458,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_s3.cc
   upload_spooler_definition.cc
   url.cc
-  util/algorithm.cc
-  util/exception.cc
-  util/file_backed_buffer.cc
-  util/mmap_file.cc
-  util/posix.cc
-  util/raii_temp_dir.cc
-  util_concurrency.cc
   whitelist.cc
   xattr.cc
 )
@@ -484,10 +466,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
 set (CVMFS_SIGN_SOURCES
   signature_offload.cc
   hash.cc
-  logging.cc
   signature.cc
-  util/exception.cc
-  util/posix.cc
 )
 
 set (CVMFS_SUID_HELPER_SOURCES
@@ -519,7 +498,6 @@ set (CVMFS_PRELOADER_SOURCES
   ingestion/task_register.cc
   ingestion/task_write.cc
   json_document.cc
-  logging.cc
   malloc_arena.cc
   manifest.cc
   manifest_fetch.cc
@@ -551,12 +529,13 @@ set (CVMFS_PRELOADER_SOURCES
   upload_s3.cc
   upload_spooler_definition.cc
   util/algorithm.cc
+  util/concurrency.cc
   util/exception.cc
   util/file_backed_buffer.cc
+  util/logging.cc
   util/mmap_file.cc
   util/posix.cc
   util/string.cc
-  util_concurrency.cc
   uuid.cc
   whitelist.cc
   xattr.cc
@@ -605,7 +584,6 @@ if(BUILD_RECEIVER)
     ingestion/task_register.cc
     ingestion/task_write.cc
     json_document.cc
-    logging.cc
     malloc_arena.cc
     manifest.cc
     manifest_fetch.cc
@@ -621,6 +599,7 @@ if(BUILD_RECEIVER)
     session_context.cc
     signature.cc
     signing_tool.cc
+    shortstring.cc
     ssl.cc
     statistics.cc
     statistics_database.cc
@@ -636,13 +615,12 @@ if(BUILD_RECEIVER)
     upload_local.cc
     upload_s3.cc
     upload_spooler_definition.cc
-    util/algorithm.cc
     util/exception.cc
     util/file_backed_buffer.cc
+    util/logging.cc
     util/mmap_file.cc
     util/posix.cc
     util/raii_temp_dir.cc
-    util_concurrency.cc
     uuid.cc
     whitelist.cc
     xattr.cc

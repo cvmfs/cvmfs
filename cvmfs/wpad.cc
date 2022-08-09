@@ -15,9 +15,9 @@
 #include <vector>
 
 #include "download.h"
-#include "logging.h"
 #include "pacparser.h"
 #include "statistics.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

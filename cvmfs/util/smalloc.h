@@ -4,8 +4,8 @@
  * Ensures that cvmfs aborts on out-of-memory errors.
  */
 
-#ifndef CVMFS_SMALLOC_H_
-#define CVMFS_SMALLOC_H_
+#ifndef CVMFS_UTIL_SMALLOC_H_
+#define CVMFS_UTIL_SMALLOC_H_
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -137,4 +137,4 @@ static inline void * __attribute__((used)) sxmmap_align(size_t size) {
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_SMALLOC_H_
+#endif  // CVMFS_UTIL_SMALLOC_H_

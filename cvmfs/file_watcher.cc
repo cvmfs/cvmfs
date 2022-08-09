@@ -9,7 +9,16 @@
 #include <cassert>
 
 #include "backoff.h"
-#include "logging.h"
+
+#ifdef __APPLE__
+#include "file_watcher_kqueue.h"
+#else
+#ifdef CVMFS_ENABLE_INOTIFY
+#include "file_watcher_inotify.h"
+#endif
+#endif
+
+#include "util/logging.h"
 #include "util/posix.h"
 
 namespace file_watcher {
@@ -30,6 +39,18 @@ FileWatcher::FileWatcher()
 
 FileWatcher::~FileWatcher() {
     Stop();
+}
+
+FileWatcher *FileWatcher::Create() {
+#ifdef __APPLE__
+  return new file_watcher::FileWatcherKqueue();
+#else
+#ifdef CVMFS_ENABLE_INOTIFY
+  return new file_watcher::FileWatcherInotify();
+#else
+  return NULL;
+#endif
+#endif
 }
 
 void FileWatcher::RegisterHandler(const std::string& file_path,
