@@ -54,14 +54,14 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration) 
 	router.POST(APIRoot+"/notifications/publish", tag(MakeNotificationsHandler(services)))
 	router.GET(APIRoot+"/notifications/subscribe", tag(MakeNotificationsHandler(services)))
 
-	// GC status query
-	router.GET(APIRoot+"/gc/:repo", mw(GetGCStateHandler(services)))
+	// GC routes
+	router.GET(APIRoot+"/gc/:repo", tag(GetGCStateHandler(services)))
+	router.POST(APIRoot+"/gc/:repo", tag(RunGCHandler(services)))
+	router.DELETE(APIRoot+"/gc/:repo", tag(StopGCHandler(services)))
 
 	// Admin routes
 	router.POST(APIRoot+"/repos/:name", amw(MakeAdminReposHandler(services)))
 	router.DELETE(APIRoot+"/leases-by-path/*path", amw(MakeAdminLeasesHandler(services)))
-	router.POST(APIRoot+"/gc/:repo", amw(RunGCHandler(services)))
-	router.DELETE(APIRoot+"/gc/:repo", amw(StopGCHandler(services)))
 
 	// Configure and start the HTTP server
 	srv := &http.Server{

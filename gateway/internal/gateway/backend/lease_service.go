@@ -139,6 +139,37 @@ func (s *Services) GetLeases(ctx context.Context) (map[string]LeaseDTO, error) {
 	return ret, nil
 }
 
+// GetLeases returns all active and valid leases
+func (s *Services) GetLeasesByRepository(ctx context.Context, repository string) (map[string]LeaseDTO, error) {
+	t0 := time.Now()
+
+	outcome := "success"
+	defer logAction(ctx, "get_leases_by_repository", &outcome, t0)
+
+	tx, err := s.DB.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	leases, err := FindAllActiveLeases(ctx, tx)
+	if err != nil {
+		outcome = err.Error()
+		return nil, err
+	}
+	ret := make(map[string]LeaseDTO)
+	for _, l := range leases {
+		leasePath := l.Repository + l.Path
+		ret[leasePath] = LeaseDTO{KeyID: l.KeyID, LeasePath: leasePath, Expires: l.Expiration.String()}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("could not commit transaction: %w", err)
+	}
+
+	return ret, nil
+}
+
 // GetLease returns the lease associated with a token
 func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error) {
 	t0 := time.Now()

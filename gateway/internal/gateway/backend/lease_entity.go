@@ -124,6 +124,32 @@ func FindAllActiveLeases(ctx context.Context, tx *sql.Tx) ([]Lease, error) {
 	return leases, nil
 }
 
+func FindAllActiveLeasesByRepository(ctx context.Context, tx *sql.Tx, repository string) ([]Lease, error) {
+	t0 := time.Now()
+
+	rows, err := tx.QueryContext(ctx, "select * from Lease where Repository = ? and Expiration >= ?;", repository, t0.UnixMilli())
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	leases := make([]Lease, 0)
+	for rows.Next() {
+		var lease Lease
+		if err := scanLease(rows, &lease); err != nil {
+			return nil, fmt.Errorf("scan failed: %w", err)
+		}
+		leases = append(leases, lease)
+	}
+
+	gw.LogC(ctx, "lease_entity", gw.LogDebug).
+		Str("operation", "find_all_active_by_repository").
+		Dur("task_dt", time.Since(t0)).
+		Msgf("found %v leases", len(leases))
+
+	return leases, nil
+}
+
 func FindAllLeasesByRepositoryAndOverlappingPath(ctx context.Context, tx *sql.Tx, repository, path string) ([]Lease, error) {
 	t0 := time.Now()
 
