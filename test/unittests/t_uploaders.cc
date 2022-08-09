@@ -321,48 +321,6 @@ class T_Uploaders : public FileSandbox {
 
   bool IsS3() const;
 
-
-  /**
-   * Get the field number "idx" (e.g. 2) from a string
-   * separated by given delimiter (e.g. ' '). The field numbering
-   * starts from zero and minus values refer from the end of the
-   * strings.
-   */
-  std::string GetField(std::string str, char delim, int idx) {
-    std::vector<std::string> str_vct = SplitString(str, delim);
-    unsigned int idxu = idx % str_vct.size();
-    return str_vct.at(idxu);
-  }
-
-
-  /**
-   * Get value of the param string from the body. The value of the param
-   * string is separated by delim1 and delim2. It starts with delim1 and ends
-   * with delim2.
-   * @param body Text body from where to search
-   * @param param String to be searched from the body
-   * @param delim1 param value is separated by this char
-   * @param delim2 param value ends with this char
-   * @return -1 if not found, otherwise value
-   */
-  int GetValue(std::string body, std::string param,
-               char delim1 = ':', char delim2 = ' ') {
-    for (unsigned int i = 0; body.size()-param.size() > i; i++) {
-      unsigned int j = 0;
-      for (j = 0; param.size() > j; j++) {
-        if (body.at(i+j) != param.at(j))
-          break;
-      }
-      if (j == param.size()) {
-        std::string l = GetField(body.substr(i), delim1, 1);
-        l.erase(l.begin(), std::find_if(l.begin(), l.end(),
-                std::not1(std::ptr_fun<int, int>(std::isspace))));
-        return atoi(GetField(l, delim2, 0).c_str());
-      }
-    }
-    return -1;
-  }
-
   static HTTPResponse S3MockupRequestHandler(const HTTPRequest &req,
                                              void *data) {
     // Number of 429 retries in a row, should be larger than the number of
