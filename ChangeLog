@@ -1,4 +1,5 @@
 2.10.0:
+  * Fix compile warnings for cxx17 (#3014)
   * Add cvmfs-libs package
   * [server] Work around openssl signature issues on EL9 (#2990)
   * [client] Diagnose errors due to changing file type (#2834)
