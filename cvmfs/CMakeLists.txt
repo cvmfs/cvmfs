@@ -7,6 +7,7 @@
 # Common libraries
 #
 include (util/CMakeLists.txt)
+include (crypto/CMakeLists.txt)
 
 
 
@@ -1064,7 +1065,6 @@ if(BUILD_RECEIVER)
        directory_entry.cc
        dns.cc
        download.cc
-       encrypt.cc
        gateway_util.cc
        globals.cc
        hash.cc
@@ -1137,6 +1137,7 @@ if(BUILD_RECEIVER)
     COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}"
   )
   target_link_libraries(cvmfs_receiver
+                        cvmfs_crypto
                         cvmfs_util
                         ${CVMFS_RECEIVER_LINK_LIBRARIES}
   )
@@ -1146,6 +1147,7 @@ if(BUILD_RECEIVER)
     set_target_properties (cvmfs_receiver_debug PROPERTIES
       COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS} -O0 -DDEBUGMSG")
     target_link_libraries(cvmfs_receiver_debug
+                          cvmfs_crypto_debug
                           cvmfs_util_debug
                           ${CVMFS_RECEIVER_LINK_LIBRARIES}
     )

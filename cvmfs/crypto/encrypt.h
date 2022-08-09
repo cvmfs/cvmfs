@@ -10,8 +10,8 @@
  * is constructed from the HMAC of the key and nonce.
  */
 
-#ifndef CVMFS_ENCRYPT_H_
-#define CVMFS_ENCRYPT_H_
+#ifndef CVMFS_CRYPTO_ENCRYPT_H_
+#define CVMFS_CRYPTO_ENCRYPT_H_
 
 #include <pthread.h>
 
@@ -20,6 +20,7 @@
 
 #include "gtest/gtest_prod.h"
 #include "hash.h"
+#include "util/export.h"
 #include "util/single_copy.h"
 
 namespace cipher {
@@ -34,7 +35,7 @@ enum Algorithms {
  * Encapsulates a small non-copyable piece of pinned memory.  Is actively set to
  * zero on destruction.
  */
-class Key : SingleCopy {
+class CVMFS_EXPORT Key : SingleCopy {
  public:
   static const unsigned kMaxSize = 64;
 
@@ -59,7 +60,7 @@ class Key : SingleCopy {
  * Allows to access keys by identifiers.  This might at some point move into a
  * separate compilation unit.
  */
-class AbstractKeyDatabase {
+class CVMFS_EXPORT AbstractKeyDatabase {
  public:
   virtual ~AbstractKeyDatabase() { }
   virtual bool StoreNew(const Key *key, std::string *id) = 0;
@@ -67,7 +68,7 @@ class AbstractKeyDatabase {
 };
 
 
-class MemoryKeyDatabase : SingleCopy, public AbstractKeyDatabase {
+class CVMFS_EXPORT MemoryKeyDatabase : SingleCopy, public AbstractKeyDatabase {
  public:
   MemoryKeyDatabase();
   virtual ~MemoryKeyDatabase();
@@ -85,7 +86,7 @@ class MemoryKeyDatabase : SingleCopy, public AbstractKeyDatabase {
  * byte prefix: the first 4 bits are the envelope version (currently 0), the
  * second 4 bits are the encryption algorithm and refers to Algorithms.
  */
-class Cipher {
+class CVMFS_EXPORT Cipher {
  public:
   static Cipher *Create(const Algorithms a);
   virtual ~Cipher() { }
@@ -113,7 +114,7 @@ class Cipher {
 /**
  * Uses OpenSSL EVP_... format.  The IV is created from the system time.
  */
-class CipherAes256Cbc : public Cipher {
+class CVMFS_EXPORT CipherAes256Cbc : public Cipher {
   FRIEND_TEST(T_Encrypt, Aes_256_Cbc_Iv);
 
  public:
@@ -141,7 +142,7 @@ class CipherAes256Cbc : public Cipher {
 /**
  * No encryption, plaintext and ciphertext are identical.  For testing.
  */
-class CipherNone : public Cipher {
+class CVMFS_EXPORT CipherNone : public Cipher {
  public:
   virtual ~CipherNone() { }
 
@@ -158,4 +159,4 @@ class CipherNone : public Cipher {
 
 }  // namespace cipher
 
-#endif  // CVMFS_ENCRYPT_H_
+#endif  // CVMFS_UTIL_ENCRYPT_H_

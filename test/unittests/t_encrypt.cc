@@ -11,7 +11,7 @@
 #include <cstring>
 #include <string>
 
-#include "encrypt.h"
+#include "crypto/encrypt.h"
 #include "hash.h"
 #include "testutil.h"
 

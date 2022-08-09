@@ -3,7 +3,7 @@
  */
 
 #include "cvmfs_config.h"
-#include "encrypt.h"
+#include "crypto/encrypt.h"
 
 #include <fcntl.h>
 #include <openssl/evp.h>
