@@ -199,10 +199,7 @@ if (BUILD_CVMFS)
        util/posix.cc
        util/string.cc
   )
-  set (CVMFS_STUB_CFLAGS "-DCVMFS_FUSE_MODULE \
-                          -DCVMFS_NAMESPACE_GUARD=loader \
-                          -D_FILE_OFFSET_BITS=64 \
-                          -fexceptions")
+  set (CVMFS_STUB_CFLAGS "-DCVMFS_FUSE_MODULE -DCVMFS_NAMESPACE_GUARD=loader -D_FILE_OFFSET_BITS=64 -fexceptions")
   set (CVMFS_STUB_LDFLAGS "-ldl -lm")
   set (CVMFS_STUB_LINK_LIBRARIES "")
   list (APPEND CVMFS_STUB_LINK_LIBRARIES
@@ -255,12 +252,9 @@ if (BUILD_CVMFS)
        talk.cc
        url.cc
   )
-  set (CVMFS_FUSE_CFLAGS "-DCVMFS_FUSE_MODULE \
-                          -D_FILE_OFFSET_BITS=64 \
-                          -fexceptions")
+  set (CVMFS_FUSE_CFLAGS "-DCVMFS_FUSE_MODULE -D_FILE_OFFSET_BITS=64 -fexceptions")
   if (CVMFS_ENABLE_FUSE3_CACHE_READDIR)
-    set (CVMFS_FUSE_CFLAGS "${CVMFS_FUSE_CFLAGS} \
-                            -DCVMFS_ENABLE_FUSE3_CACHE_READDIR")
+    set (CVMFS_FUSE_CFLAGS "${CVMFS_FUSE_CFLAGS} -DCVMFS_ENABLE_FUSE3_CACHE_READDIR")
   endif ()
   set (CVMFS_FUSE_LDFLAGS "-ldl -lm")
   set (CVMFS_FUSE_LINK_LIBRARIES "")
@@ -851,10 +845,7 @@ if (BUILD_SERVER)
        whitelist.cc
        xattr.cc
   )
-  set (LIBCVMFS_SERVER_CFLAGS "-D_FILE_OFFSET_BITS=64 \
-                               -DCVMFS_RAISE_EXCEPTIONS \
-                               -fexceptions"
-  )
+  set (LIBCVMFS_SERVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
   list (APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
         ${CURL_LIBRARIES}
@@ -925,10 +916,7 @@ if (BUILD_SERVER)
        upload_spooler_definition.cc
        whitelist.cc
   )  # CVMFS_PUBLISH_SOURCES
-  set (CVMFS_PUBLISH_CFLAGS "-D_FILE_OFFSET_BITS=64 \
-                             -DCVMFS_RAISE_EXCEPTIONS \
-                             -fexceptions"
-  )
+  set (CVMFS_PUBLISH_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   add_executable (cvmfs_publish ${CVMFS_PUBLISH_SOURCES})
   set_target_properties (cvmfs_publish PROPERTIES
     COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}"
@@ -1132,10 +1120,7 @@ if(BUILD_RECEIVER)
        whitelist.cc
        xattr.cc
   )  # CVMFS_RECEIVER_SOURCES
-  set (CVMFS_RECEIVER_CFLAGS "-D_FILE_OFFSET_BITS=64 \
-                              -DCVMFS_RAISE_EXCEPTIONS \
-                              -fexceptions"
-  )
+  set (CVMFS_RECEIVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (CVMFS_RECEIVER_LINK_LIBRARIES "")
   list (APPEND CVMFS_RECEIVER_LINK_LIBRARIES
         ${CURL_LIBRARIES}

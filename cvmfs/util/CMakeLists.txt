@@ -14,10 +14,7 @@ set (LIBCVMFS_UTIL_SOURCES
   util/string.cc
 )
 
-set (LIBCVMFS_UTIL_CFLAGS "-D_FILE_OFFSET_BITS=64 \
-                           -DCVMFS_LIBRARY \
-                           -DCVMFS_RAISE_EXCEPTIONS \
-                           -fexceptions")
+set (LIBCVMFS_UTIL_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
 set (LIBCVMFS_UTIL_LINK_LIBRARIES "")
 list (APPEND LIBCVMFS_UTIL_LINK_LIBRARIES
       ${RT_LIBRARY}
