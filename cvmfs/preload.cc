@@ -19,7 +19,7 @@
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "uuid.h"
+#include "util/uuid.h"
 
 
 using namespace std;  // NOLINT

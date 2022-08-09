@@ -111,7 +111,7 @@
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/smalloc.h"
-#include "uuid.h"
+#include "util/uuid.h"
 #include "wpad.h"
 #include "xattr.h"
 

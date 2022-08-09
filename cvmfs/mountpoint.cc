@@ -69,7 +69,7 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "uuid.h"
+#include "util/uuid.h"
 #include "wpad.h"
 
 using namespace std;  // NOLINT

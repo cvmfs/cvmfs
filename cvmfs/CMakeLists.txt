@@ -90,13 +90,13 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        ssl.cc
        statistics.cc
        tracer.cc
-       uuid.cc
        util/algorithm.cc
        util/concurrency.cc
        util/exception.cc
        util/logging.cc
        util/posix.cc
        util/string.cc
+       util/uuid.cc
        whitelist.cc
        wpad.cc
        xattr.cc
@@ -1112,7 +1112,6 @@ if(BUILD_RECEIVER)
        upload_local.cc
        upload_s3.cc
        upload_spooler_definition.cc
-       uuid.cc
        whitelist.cc
        xattr.cc
   )  # CVMFS_RECEIVER_SOURCES
@@ -1290,7 +1289,7 @@ if (BUILD_PRELOADER)
                   util/mmap_file.cc
                   util/posix.cc
                   util/string.cc
-                  uuid.cc
+                  util/uuid.cc
                   whitelist.cc
                   xattr.cc
   )  # preloader sources

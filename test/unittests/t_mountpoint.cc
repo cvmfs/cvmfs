@@ -27,7 +27,7 @@
 #include "upload_spooler_definition.h"
 #include "util/pointer.h"
 #include "util/posix.h"
-#include "uuid.h"
+#include "util/uuid.h"
 
 using namespace std;  // NOLINT
 

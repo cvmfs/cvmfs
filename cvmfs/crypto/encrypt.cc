@@ -23,7 +23,7 @@
 #include "util/pointer.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "uuid.h"
+#include "util/uuid.h"
 
 using namespace std;  // NOLINT
 

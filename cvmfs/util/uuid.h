@@ -2,13 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UUID_H_
-#define CVMFS_UUID_H_
+#ifndef CVMFS_UTIL_UUID_H_
+#define CVMFS_UTIL_UUID_H_
 
 #include <inttypes.h>
 #include <uuid/uuid.h>
 
 #include <string>
+
+#include "util/export.h"
 
 namespace cvmfs {
 
@@ -20,7 +22,7 @@ namespace cvmfs {
  * In order to create many UUIDs for short-lived objects, use the CreateOneTime
  * factory method.
  */
-class Uuid {
+class CVMFS_EXPORT Uuid {
  public:
   static Uuid *Create(const std::string &store_path);
   static std::string CreateOneTime();
@@ -50,4 +52,4 @@ class Uuid {
 
 }  // namespace cvmfs
 
-#endif  // CVMFS_UUID_H_
+#endif  // CVMFS_UTIL_UUID_H_
