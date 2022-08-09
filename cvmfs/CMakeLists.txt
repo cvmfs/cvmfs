@@ -573,12 +573,7 @@ if (BUILD_LIBCVMFS_CACHE)
     DESTINATION  include
   )
   install (
-    TARGETS      cvmfs_cache_ram
-    RUNTIME
-    DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
-  )
-  install (
-    TARGETS      cvmfs_cache_posix
+    TARGETS      cvmfs_cache_ram cvmfs_cache_posix
     RUNTIME
     DESTINATION  ${CVMFS_LIBEXEC_DIR}/cache
   )
