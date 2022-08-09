@@ -1,4 +1,5 @@
 2.10.0:
+  * Add cvmfs-libs package
   * [server] Work around openssl signature issues on EL9 (#2990)
   * [client] Diagnose errors due to changing file type (#2834)
   * [server] Catch unexpected errors in transaction command (#3004)
