@@ -153,7 +153,7 @@ bool CatalogCountersMagicXattr::PrepareValueFenced() {
 
 std::string CatalogCountersMagicXattr::GetValue() {
   std::string res;
-  res = "catalog_hash: " + hash_.ToString() + "\n"; // TODO
+  res = "catalog_hash: " + hash_.ToString() + "\n";
   res += "catalog_mountpoint: " + subcatalog_path_ + "\n";
   res += counters_.GetCsvMap();
   return res;
