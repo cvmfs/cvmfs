@@ -167,6 +167,7 @@ class AuthzMagicXattr : public BaseMagicXattr {
 
 class CatalogCountersMagicXattr : public BaseMagicXattr {
   std::string subcatalog_path_;
+  shash::Any hash_;
   catalog::Counters counters_;
 
   virtual bool PrepareValueFenced();
