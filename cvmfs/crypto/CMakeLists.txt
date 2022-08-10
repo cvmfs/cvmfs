@@ -4,7 +4,6 @@ if (BUILD_CVMFS OR BUILD_SERVER OR BUILD_RECEIVER OR
 set (LIBCVMFS_CRYPTO_SOURCES
      crypto/hash.cc
      crypto/encrypt.cc
-     crypto/signature_offload.cc
      crypto/signature.cc
 )
 

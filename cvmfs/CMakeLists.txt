@@ -596,18 +596,13 @@ if (BUILD_SERVER)
   # TODO(jblomer): remove me
   #
   add_executable (cvmfs_signing_helper
-                  crypto/hash.cc
                   crypto/signature_offload.cc
-                  crypto/signature.cc
   )
   set_target_properties (cvmfs_signing_helper PROPERTIES
     COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   target_link_libraries (cvmfs_signing_helper
+                         cvmfs_crypto
                          cvmfs_util
-                         ${SHA3_LIBRARIES}
-                         ${OPENSSL_LIBRARIES}
-                         pthread
-                         dl
   )
 
 
@@ -637,8 +632,6 @@ if (BUILD_SERVER)
        catalog_virtual.cc
        clientctx.cc
        compression.cc
-       crypto/hash.cc
-       crypto/signature.cc
        directory_entry.cc
        dns.cc
        download.cc
@@ -750,6 +743,7 @@ if (BUILD_SERVER)
   )
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   target_link_libraries (cvmfs_swissknife
+                         cvmfs_crypto
                          cvmfs_util
                          ${CVMFS_SWISSKNIFE_LINK_LIBRARIES}
   )
@@ -759,6 +753,7 @@ if (BUILD_SERVER)
       COMPILE_FLAGS "-O0 -DDEBUGMSG"
     )
     target_link_libraries (cvmfs_swissknife_debug
+                           cvmfs_crypto_debug
                            cvmfs_util_debug
                            ${CVMFS_SWISSKNIFE_LINK_LIBRARIES}
     )
@@ -778,8 +773,6 @@ if (BUILD_SERVER)
        catalog_mgr_rw.cc
        catalog_virtual.cc
        compression.cc
-       crypto/hash.cc
-       crypto/signature.cc
        directory_entry.cc
        dns.cc
        download.cc
@@ -863,6 +856,7 @@ if (BUILD_SERVER)
     VERSION ${CernVM-FS_VERSION_STRING}
     COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS}")
   target_link_libraries (cvmfs_server
+                         cvmfs_crypto
                          cvmfs_util
                          ${LIBCVMFS_SERVER_LINK_LIBRARIES}
   )
@@ -872,6 +866,7 @@ if (BUILD_SERVER)
       VERSION ${CernVM-FS_VERSION_STRING}
       COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS} -O0 -DDEBUGMSG")
     target_link_libraries (cvmfs_server_debug
+                           cvmfs_crypto_debug
                            cvmfs_util_debug
                            ${LIBCVMFS_SERVER_LINK_LIBRARIES}
     )
@@ -886,8 +881,6 @@ if (BUILD_SERVER)
        backoff.cc
        compression.cc
        directory_entry.cc
-       crypto/hash.cc
-       crypto/signature.cc
        dns.cc
        download.cc
        manifest.cc
@@ -918,13 +911,20 @@ if (BUILD_SERVER)
   set_target_properties (cvmfs_publish PROPERTIES
     COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}"
   )
-  target_link_libraries (cvmfs_publish cvmfs_util cvmfs_server)
+  target_link_libraries (cvmfs_publish 
+                         cvmfs_crypto 
+                         cvmfs_util 
+                         cvmfs_server
+  )
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_publish_debug ${CVMFS_PUBLISH_SOURCES})
     set_target_properties (cvmfs_publish_debug PROPERTIES
       COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -O0 -DDEBUGMSG"
     )
-    target_link_libraries (cvmfs_publish_debug cvmfs_util_debug cvmfs_server_debug)
+    target_link_libraries (cvmfs_publish_debug 
+                           cvmfs_crypto_debug
+                           cvmfs_util_debug 
+                           cvmfs_server_debug)
   endif ()
 
 
