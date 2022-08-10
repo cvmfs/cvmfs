@@ -1,0 +1,27 @@
+create_nested_repo() {
+  echo "*** CREATE a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/foo/bar
+  touch /cvmfs/$CVMFS_TEST_REPO/root1.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/root2.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/.cvmfscatalog
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/foo1.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/foo2.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/bar1.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/bar2.txt
+  publish_repo $CVMFS_TEST_REPO || return 2
+  echo "*** FINISHED creating a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+}
+
+teardown() {
+  echo "*** TEARDOWN of repository named $CVMFS_TEST_REPO of user $CVMFS_TEST_USER"
+
+  ## ERROR: THIS COMMAND DOES NOT WORK
+	# destroy_repo
+
+  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
+  echo "*** FINISHED teardown of repository named $CVMFS_TEST_REPO of user $CVMFS_TEST_USER"
+}
