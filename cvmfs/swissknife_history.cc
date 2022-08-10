@@ -10,8 +10,8 @@
 #include <ctime>
 
 #include "catalog_rw.h"
+#include "crypto/hash.h"
 #include "download.h"
-#include "hash.h"
 #include "manifest_fetch.h"
 #include "signature.h"
 #include "upload.h"

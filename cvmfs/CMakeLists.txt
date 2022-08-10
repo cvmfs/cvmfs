@@ -57,6 +57,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression.cc
+       crypto/hash.cc
        directory_entry.cc
        duplex_fuse.cc
        dns.cc
@@ -66,7 +67,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        file_watcher.cc
        globals.cc
        glue_buffer.cc
-       hash.cc
        history_sql.cc
        history_sqlite.cc
        json_document.cc
@@ -138,8 +138,8 @@ if (BUILD_CVMFS)
   #
   add_executable (cvmfs_fsck
                   compression.cc
+                  crypto/hash.cc
                   cvmfs_fsck.cc
-                  hash.cc
                   statistics.cc
                   util/exception.cc
                   util/logging.cc
@@ -188,8 +188,8 @@ if (BUILD_CVMFS)
   # /usr/lib/libcvmfs_fuse_stub[3]
   #
   set (CVMFS_STUB_SOURCES
+       crypto/hash.cc
        globals.cc
-       hash.cc
        loader.cc
        loader_talk.cc
        options.cc
@@ -453,7 +453,7 @@ if (BUILD_LIBCVMFS_CACHE)
                cache_plugin/libcvmfs_cache_options.cc
                cache_plugin/channel.cc
                cache_transport.cc
-               hash.cc
+               crypto/hash.cc
                monitor.cc
                options.cc
                sanitizer.cc
@@ -536,7 +536,7 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache.cc
                   cache_posix.cc
                   compression.cc
-                  hash.cc
+                  crypto/hash.cc
                   manifest.cc
                   quota.cc
                   util/exception.cc
@@ -596,8 +596,8 @@ if (BUILD_SERVER)
   # TODO(jblomer): remove me
   #
   add_executable (cvmfs_signing_helper
+                  crypto/hash.cc
                   signature_offload.cc
-                  hash.cc
                   signature.cc
   )
   set_target_properties (cvmfs_signing_helper PROPERTIES
@@ -637,13 +637,13 @@ if (BUILD_SERVER)
        catalog_virtual.cc
        clientctx.cc
        compression.cc
+       crypto/hash.cc
        directory_entry.cc
        dns.cc
        download.cc
        file_chunk.cc
        gateway_util.cc
        globals.cc
-       hash.cc
        history_sql.cc
        history_sqlite.cc
        ingestion/chunk_detector.cc
@@ -778,12 +778,12 @@ if (BUILD_SERVER)
        catalog_mgr_rw.cc
        catalog_virtual.cc
        compression.cc
+       crypto/hash.cc
        directory_entry.cc
        dns.cc
        download.cc
        gateway_util.cc
        globals.cc
-       hash.cc
        history_sql.cc
        history_sqlite.cc
        ingestion/chunk_detector.cc
@@ -886,9 +886,9 @@ if (BUILD_SERVER)
        backoff.cc
        compression.cc
        directory_entry.cc
+       crypto/hash.cc
        dns.cc
        download.cc
-       hash.cc
        manifest.cc
        options.cc
        publish/cmd_abort.cc
@@ -1067,7 +1067,6 @@ if(BUILD_RECEIVER)
        download.cc
        gateway_util.cc
        globals.cc
-       hash.cc
        history_sql.cc
        history_sqlite.cc
        ingestion/chunk_detector.cc
@@ -1120,11 +1119,9 @@ if(BUILD_RECEIVER)
   list (APPEND CVMFS_RECEIVER_LINK_LIBRARIES
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-        ${SHA3_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${VJSON_LIBRARIES}
         ${OPENSSL_LIBRARIES}
-        ${UUID_LIBRARIES}
         ${ZLIB_LIBRARIES}
         ${RT_LIBRARY}
         ${LibArchive_LIBRARY}
@@ -1172,7 +1169,7 @@ endif (BUILD_RECEIVER)
 
 if (BUILD_SHRINKWRAP)
   add_executable (cvmfs_shrinkwrap
-                  hash.cc
+                  crypto/hash.cc
                   monitor.cc
                   shrinkwrap/fs_traversal.cc
                   shrinkwrap/fs_traversal_libcvmfs.cc
@@ -1233,11 +1230,11 @@ if (BUILD_PRELOADER)
                   catalog.cc
                   catalog_sql.cc
                   compression.cc
+                  crypto/hash.cc
                   dns.cc
                   download.cc
                   gateway_util.cc
                   globals.cc
-                  hash.cc
                   history_sql.cc
                   history_sqlite.cc
                   ingestion/chunk_detector.cc

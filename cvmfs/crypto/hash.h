@@ -9,8 +9,8 @@
  * for the hashes.  Almost everything happens on the stack.
  */
 
-#ifndef CVMFS_HASH_H_
-#define CVMFS_HASH_H_
+#ifndef CVMFS_CRYPTO_HASH_H_
+#define CVMFS_CRYPTO_HASH_H_
 
 #include <arpa/inet.h>
 #include <stdint.h>
@@ -21,6 +21,7 @@
 #include <cstring>
 #include <string>
 
+#include "util/export.h"
 #include "util/logging.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
@@ -81,7 +82,7 @@ const unsigned kMaxContextSize = 256;
  * for backwards compatibility MD5 and SHA-1 have none.  Initialized in hash.cc
  * like const char *kAlgorithmIds[] = {"", "", "-rmd160", ...
  */
-extern const char *kAlgorithmIds[];
+CVMFS_EXPORT extern const char *kAlgorithmIds[];
 const unsigned kAlgorithmIdSizes[] =
   {0,   0,    7,       9,         0};
 // Md5  Sha1  -rmd160  -shake128  Any
@@ -99,13 +100,13 @@ const unsigned kBlockSizes[] =
  * Distinguishes between interpreting a string as hex hash and hashing over
  * the contents of a string.
  */
-struct HexPtr {
+struct CVMFS_EXPORT HexPtr {
   const std::string *str;
   explicit HexPtr(const std::string &s) { str = &s; }
   bool IsValid() const;
 };
 
-struct AsciiPtr {
+struct CVMFS_EXPORT AsciiPtr {
   const std::string *str;
   explicit AsciiPtr(const std::string &s) { str = &s; }
 };
@@ -119,7 +120,7 @@ typedef char Suffix;
  * This class is not used directly, but used as base clase of Md5, Sha1, ...
  */
 template<unsigned digest_size_, Algorithms algorithm_>
-struct Digest {
+struct CVMFS_EXPORT Digest {
   unsigned char digest[digest_size_];
   Algorithms    algorithm;
   Suffix        suffix;
@@ -441,7 +442,7 @@ struct Digest {
 };
 
 
-struct Md5 : public Digest<16, kMd5> {
+struct CVMFS_EXPORT Md5 : public Digest<16, kMd5> {
   Md5() : Digest<16, kMd5>() { }
   explicit Md5(const AsciiPtr ascii);
   explicit Md5(const HexPtr hex) : Digest<16, kMd5>(kMd5, hex) { }
@@ -454,16 +455,16 @@ struct Md5 : public Digest<16, kMd5> {
   void ToIntPair(uint64_t *lo, uint64_t *hi) const;
 };
 
-struct Sha1 : public Digest<20, kSha1> { };
-struct Rmd160 : public Digest<20, kRmd160> { };
-struct Shake128 : public Digest<20, kShake128> { };
+struct CVMFS_EXPORT Sha1 : public Digest<20, kSha1> { };
+struct CVMFS_EXPORT Rmd160 : public Digest<20, kRmd160> { };
+struct CVMFS_EXPORT Shake128 : public Digest<20, kShake128> { };
 
 /**
  * Any as such must not be used except for digest storage.
  * To do real work, the class has to be "blessed" to be a real hash by
  * setting the algorithm field accordingly.
  */
-struct Any : public Digest<kMaxDigestSize, kAny> {
+struct CVMFS_EXPORT Any : public Digest<kMaxDigestSize, kAny> {
   Any() : Digest<kMaxDigestSize, kAny>() { }
 
   explicit Any(const Algorithms a,
@@ -488,13 +489,13 @@ struct Any : public Digest<kMaxDigestSize, kAny> {
  * Actual operations on digests, like "hash a file", "hash a buffer", or
  * iterative operations.
  */
-unsigned GetContextSize(const Algorithms algorithm);
+CVMFS_EXPORT unsigned GetContextSize(const Algorithms algorithm);
 
 /**
  * Holds an OpenSSL context, only required for hash operations.  Allows to
  * deferr the storage allocation for the context to alloca.
  */
-class ContextPtr {
+class CVMFS_EXPORT ContextPtr {
  public:
   Algorithms  algorithm;
   void       *buffer;
@@ -508,18 +509,21 @@ class ContextPtr {
     algorithm(a), buffer(b), size(GetContextSize(a)) {}
 };
 
-void Init(ContextPtr context);
-void Update(const unsigned char *buffer, const unsigned buffer_size,
-            ContextPtr context);
-void Final(ContextPtr context, Any *any_digest);
-bool HashFile(const std::string &filename, Any *any_digest);
-bool HashFd(int fd, Any *any_digest);
-void HashMem(const unsigned char *buffer, const unsigned buffer_size,
-             Any *any_digest);
-void HashString(const std::string &content, Any *any_digest);
-void Hmac(const std::string &key,
-          const unsigned char *buffer, const unsigned buffer_size,
-          Any *any_digest);
+CVMFS_EXPORT void Init(ContextPtr context);
+CVMFS_EXPORT void Update(const unsigned char *buffer, 
+                         const unsigned buffer_size,
+                         ContextPtr context);
+CVMFS_EXPORT void Final(ContextPtr context, Any *any_digest);
+CVMFS_EXPORT bool HashFile(const std::string &filename, Any *any_digest);
+CVMFS_EXPORT bool HashFd(int fd, Any *any_digest);
+CVMFS_EXPORT void HashMem(const unsigned char *buffer, 
+                          const unsigned buffer_size,
+                          Any *any_digest);
+CVMFS_EXPORT void HashString(const std::string &content, Any *any_digest);
+CVMFS_EXPORT void Hmac(const std::string &key,
+                       const unsigned char *buffer, 
+                       const unsigned buffer_size,
+                       Any *any_digest);
 inline void HmacString(const std::string &key, const std::string &content,
                        Any *any_digest)
 {
@@ -536,15 +540,19 @@ inline void HmacString(const std::string &key, const std::string &content,
  * digets size to 32 bytes and require client data structure transformation
  * during hotpatch.
  */
-std::string Hmac256(const std::string &key, const std::string &content,
-                    bool raw_output = false);
-std::string Sha256File(const std::string &filename);
-std::string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size);
-std::string Sha256String(const std::string &content);
+CVMFS_EXPORT std::string Hmac256(const std::string &key, 
+                                 const std::string &content,
+                                 bool raw_output = false);
+CVMFS_EXPORT std::string Sha256File(const std::string &filename);
+CVMFS_EXPORT std::string Sha256Mem(const unsigned char *buffer, 
+                                   const unsigned buffer_size);
+CVMFS_EXPORT std::string Sha256String(const std::string &content);
 
+CVMFS_EXPORT 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
+CVMFS_EXPORT 
 Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);
-Any MkFromSuffixedHexPtr(const HexPtr hex);
+CVMFS_EXPORT Any MkFromSuffixedHexPtr(const HexPtr hex);
 
 }  // namespace shash
 
@@ -552,4 +560,4 @@ Any MkFromSuffixedHexPtr(const HexPtr hex);
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // CVMFS_HASH_H_
+#endif  // CVMFS_CRYPTO_HASH_H_

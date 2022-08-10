@@ -15,8 +15,8 @@
 #include <cstring>
 #include <ctime>
 
+#include "crypto/hash.h"
 #include "duplex_ssl.h"
-#include "hash.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/platform.h"

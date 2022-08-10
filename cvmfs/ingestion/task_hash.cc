@@ -7,7 +7,7 @@
 
 #include <cstdlib>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/exception.h"
 
 

@@ -15,7 +15,7 @@
 
 #include "cache.pb.h"
 #include "cache_transport.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "smallhash.h"
 #include "util/atomic.h"

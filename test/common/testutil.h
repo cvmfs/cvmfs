@@ -17,8 +17,8 @@
 #include <vector>
 
 #include "catalog_mgr.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
-#include "hash.h"
 #include "ingestion/ingestion_source.h"
 #include "history.h"
 #include "object_fetcher.h"

@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "sql.h"
 
 class ReflogDatabase : public sqlite::Database<ReflogDatabase> {

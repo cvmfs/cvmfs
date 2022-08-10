@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "catalog_traversal.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "smallhash.h"
 #include "swissknife.h"
 #include "util/pointer.h"

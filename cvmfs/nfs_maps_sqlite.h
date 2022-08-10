@@ -9,8 +9,8 @@
 
 #include <string>
 
+#include "crypto/hash.h"
 #include "duplex_sqlite3.h"
-#include "hash.h"
 #include "nfs_maps.h"
 #include "shortstring.h"
 #include "util/atomic.h"

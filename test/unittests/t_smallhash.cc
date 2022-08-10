@@ -9,7 +9,7 @@
 
 #include <limits>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "smallhash.h"
 #include "util/murmur.hxx"
 

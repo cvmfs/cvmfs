@@ -12,7 +12,7 @@
 #include <string>
 
 #include "crypto/encrypt.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

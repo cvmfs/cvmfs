@@ -12,8 +12,8 @@
 
 #include <cassert>
 
+#include "crypto/hash.h"
 #include "download.h"
-#include "hash.h"
 #include "letter.h"
 #include "signature.h"
 #include "util/string.h"

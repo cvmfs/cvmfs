@@ -11,9 +11,9 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
+#include "crypto/hash.h"
 #include "download.h"
 #include "gateway_util.h"
-#include "hash.h"
 #include "history_sqlite.h"
 #include "ingestion/ingestion_source.h"
 #include "manifest.h"

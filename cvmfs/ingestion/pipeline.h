@@ -8,7 +8,7 @@
 #include <string>
 
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/task.h"

@@ -17,8 +17,8 @@
 
 #include "directory_entry.h"
 #include "duplex_libarchive.h"
+#include "crypto/hash.h"
 #include "file_chunk.h"
-#include "hash.h"
 #include "util/platform.h"
 #include "util/shared_ptr.h"
 

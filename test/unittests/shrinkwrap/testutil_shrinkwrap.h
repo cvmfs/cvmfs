@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "xattr.h"
 
 void ExpectListHas(const char *query, char **dir_list, bool has_not = false);

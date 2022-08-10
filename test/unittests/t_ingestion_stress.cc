@@ -13,8 +13,8 @@
 
 #include "c_file_sandbox.h"
 #include "c_mock_uploader.h"
+#include "crypto/hash.h"
 #include "file_chunk.h"
-#include "hash.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
 #include "testutil.h"

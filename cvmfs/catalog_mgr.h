@@ -18,9 +18,9 @@
 #include <vector>
 
 #include "catalog.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
-#include "hash.h"
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/logging.h"

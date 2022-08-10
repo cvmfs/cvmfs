@@ -9,8 +9,8 @@
 #include <string>
 
 #include "catalog.h"
+#include "crypto/hash.h"
 #include "download.h"
-#include "hash.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"

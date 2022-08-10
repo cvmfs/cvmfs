@@ -8,7 +8,7 @@
 #include <string>
 
 #include "catalog.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "lease_path_util.h"
 #include "manifest.h"
 #include "options.h"

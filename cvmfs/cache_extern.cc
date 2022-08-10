@@ -23,7 +23,7 @@
 #include <string>
 
 #include "cache.pb.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/exception.h"

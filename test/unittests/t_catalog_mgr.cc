@@ -10,7 +10,7 @@
 #include "catalog.h"
 #include "catalog_balancer.h"
 #include "catalog_mgr.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "shortstring.h"
 #include "testutil.h"
 

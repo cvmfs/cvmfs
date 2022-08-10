@@ -10,8 +10,8 @@
 #include <cstdio>
 
 #include "bm_util.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
-#include "hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
 #include "util/murmur.hxx"

@@ -12,7 +12,7 @@
 #include <string>
 #include <utility>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/posix.h"
 #include "util/prng.h"
 

@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "reflog.h"

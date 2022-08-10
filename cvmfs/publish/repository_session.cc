@@ -13,10 +13,10 @@
 
 #include "backoff.h"
 #include "catalog_mgr_ro.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "duplex_curl.h"
 #include "gateway_util.h"
-#include "hash.h"
 #include "json_document.h"
 #include "publish/except.h"
 #include "upload.h"

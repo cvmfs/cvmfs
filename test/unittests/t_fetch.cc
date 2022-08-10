@@ -9,9 +9,9 @@
 
 #include "backoff.h"
 #include "cache_posix.h"
+#include "crypto/hash.h"
 #include "download.h"
 #include "fetch.h"
-#include "hash.h"
 #include "statistics.h"
 #include "testutil.h"
 #include "util/atomic.h"

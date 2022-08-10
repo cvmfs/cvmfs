@@ -12,7 +12,7 @@
 
 #include "c_mock_uploader.h"
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"

@@ -16,8 +16,8 @@
 
 #include "catalog_virtual.h"
 #include "compression.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
-#include "hash.h"
 #include "json_document.h"
 #include "publish/repository.h"
 #include "sync_union.h"

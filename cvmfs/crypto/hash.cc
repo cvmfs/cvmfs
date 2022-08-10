@@ -3,7 +3,7 @@
  */
 
 #include "cvmfs_config.h"
-#include "hash.h"
+#include "crypto/hash.h"
 
 #include <alloca.h>
 #include <errno.h>

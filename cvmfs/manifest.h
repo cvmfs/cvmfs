@@ -10,7 +10,7 @@
 #include <map>
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "history.h"
 
 namespace manifest {

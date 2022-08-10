@@ -25,8 +25,8 @@
 
 #include "catalog.h"
 #include "compression.h"
+#include "crypto/hash.h"
 #include "download.h"
-#include "hash.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"

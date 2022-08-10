@@ -14,8 +14,8 @@
 #include <stdint.h>
 
 #include "directory_entry.h"
+#include "crypto/hash.h"
 #include "duplex_fuse.h"
-#include "hash.h"
 #include "lru.h"
 #include "shortstring.h"
 #include "util/atomic.h"

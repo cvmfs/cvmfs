@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "testutil.h"
 
 struct MockStreamHandle : public upload::UploadStreamHandle {

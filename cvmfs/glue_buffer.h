@@ -21,7 +21,7 @@
 
 #include "bigqueue.h"
 #include "bigvector.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
 #include "util/atomic.h"

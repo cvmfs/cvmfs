@@ -15,7 +15,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "publish/except.h"
 #include "util/logging.h"
 

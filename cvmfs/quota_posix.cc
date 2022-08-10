@@ -45,8 +45,8 @@
 #include <string>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "duplex_sqlite3.h"
-#include "hash.h"
 #include "monitor.h"
 #include "statistics.h"
 #include "util/concurrency.h"

@@ -7,7 +7,7 @@
 #include <string>
 
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "upload.h"
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"

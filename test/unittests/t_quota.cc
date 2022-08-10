@@ -13,7 +13,7 @@
 
 #include "cache_posix.h"
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "quota_posix.h"
 #include "testutil.h"
 #include "util/algorithm.h"

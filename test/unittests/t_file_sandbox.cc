@@ -9,7 +9,7 @@
 #include <string>
 
 #include "c_file_sandbox.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/prng.h"
 
 

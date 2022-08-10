@@ -11,7 +11,7 @@
 
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "sync_mediator.h"
 #include "util/shared_ptr.h"
 

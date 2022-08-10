@@ -19,7 +19,7 @@
 #include <cassert>
 #include <cstring>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"

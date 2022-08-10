@@ -14,7 +14,7 @@
 #include "catalog_sql.h"
 #include "catalog_virtual.h"
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "swissknife_history.h"
 #include "util/concurrency.h"
 #include "util/logging.h"

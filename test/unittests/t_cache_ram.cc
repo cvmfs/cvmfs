@@ -10,7 +10,7 @@
 
 #include "cache.h"
 #include "cache_ram.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "statistics.h"
 #include "util/prng.h"
 

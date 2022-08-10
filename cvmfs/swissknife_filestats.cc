@@ -6,7 +6,7 @@
 
 #include <cassert>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"

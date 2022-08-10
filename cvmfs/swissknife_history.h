@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "history_sqlite.h"
 #include "swissknife.h"
 #include "util/concurrency.h"

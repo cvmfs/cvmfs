@@ -19,9 +19,9 @@
 #include "gtest/gtest_prod.h"
 
 #include "compression.h"
+#include "crypto/hash.h"
 #include "dns.h"
 #include "duplex_curl.h"
-#include "hash.h"
 #include "sink.h"
 #include "ssl.h"
 #include "statistics.h"
