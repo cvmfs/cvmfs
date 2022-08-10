@@ -10,8 +10,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var Version = "development"
-
 var Config *gw.Config
 
 var rootCmd = &cobra.Command{

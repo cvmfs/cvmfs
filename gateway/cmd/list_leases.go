@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var repository string
+var listLeaseRepository string
 
 var listLeasesCmd = &cobra.Command{
 	Use:   "list-leases",
@@ -33,12 +33,12 @@ var listLeasesCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(listLeasesCmd)
 	listLeasesCmd.Flags().StringVarP(
-		&repository,
+		&listLeaseRepository,
 		"repository",
 		"r",
 		"",
 		"retrieve leases for this repository; retrieve leases for all repositories if empty")
-	viper.BindPFlag("repository", listLeasesCmd.Flags().Lookup("repository"))
+	viper.BindPFlag("list-lease-repository", listLeasesCmd.Flags().Lookup("repository"))
 }
 
 func executeListLeases() error {
@@ -49,13 +49,13 @@ func executeListLeases() error {
 	defer services.Stop()
 
 	var leases map[string]be.LeaseDTO
-	if repository == "" {
+	if listLeaseRepository == "" {
 		leases, err = services.GetLeases(context.Background())
 		if err != nil {
 			return fmt.Errorf("could not retrieve leases: %w", err)
 		}
 	} else {
-		leases, err = services.GetLeasesByRepository(context.Background(), repository)
+		leases, err = services.GetLeasesByRepository(context.Background(), listLeaseRepository)
 		if err != nil {
 			return fmt.Errorf("could not retrieve leases: %w", err)
 		}
