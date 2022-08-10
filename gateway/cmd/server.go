@@ -25,7 +25,7 @@ var serverCmd = &cobra.Command{
 		gw.Log("cmd-server", gw.LogInfo).
 			Msg("starting CVMFS gateway server")
 
-		services, err := be.StartBackend(*Config)
+		services, err := be.StartBackend(*Config, true)
 		if err != nil {
 			gw.Log("cmd-server", gw.LogError).
 				Err(err).

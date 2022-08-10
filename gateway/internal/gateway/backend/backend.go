@@ -48,7 +48,7 @@ func (s *Services) GetKey(ctx context.Context, keyID string) *KeyConfig {
 }
 
 // StartBackend initializes the various backend services
-func StartBackend(cfg gw.Config) (*Services, error) {
+func StartBackend(cfg gw.Config, initialize bool) (*Services, error) {
 	ac, err := NewAccessConfig(cfg.AccessConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("loading repository access configuration failed: %w", err)
@@ -73,8 +73,10 @@ func StartBackend(cfg gw.Config) (*Services, error) {
 
 	services := Services{Config: cfg, Access: *ac, DB: db, Pool: pool, Notifications: ns, StatsMgr: smgr}
 
-	if err := PopulateRepositories(&services); err != nil {
-		return nil, fmt.Errorf("could not populate repository table: %w", err)
+	if initialize {
+		if err := PopulateRepositories(&services); err != nil {
+			return nil, fmt.Errorf("could not populate repository table: %w", err)
+		}
 	}
 
 	return &services, nil

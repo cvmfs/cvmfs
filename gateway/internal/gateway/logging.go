@@ -29,6 +29,10 @@ func InitLogging(sink io.Writer) {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 }
 
+func SetLogLevel(level LogLevel) {
+	zerolog.SetGlobalLevel(zerolog.Level(level))
+}
+
 // ConfigLogging updates the logging settings with values from a Config object
 // (Meant to be called after ReadConfig)
 func ConfigLogging(cfg *Config) {

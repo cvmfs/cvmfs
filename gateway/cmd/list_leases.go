@@ -29,6 +29,7 @@ var listLeasesCmd = &cobra.Command{
 	Short: "List current active leases",
 	Long:  "List current active leases",
 	Run: func(cmd *cobra.Command, args []string) {
+		gw.SetLogLevel(gw.LogError)
 		if err := executeListLeases(); err != nil {
 			gw.Log("cmd-list-leases", gw.LogError).
 				Err(err).
@@ -39,7 +40,7 @@ var listLeasesCmd = &cobra.Command{
 }
 
 func executeListLeases() error {
-	services, err := be.StartBackend(*Config)
+	services, err := be.StartBackend(*Config, false)
 	if err != nil {
 		return fmt.Errorf("could not start backend services: %w", err)
 	}
@@ -58,7 +59,12 @@ func executeListLeases() error {
 		}
 	}
 
-	jsonBytes, err := json.MarshalIndent(leases, "", "  ")
+	leasesArray := make([]be.LeaseDTO, 0)
+	for _, l := range leases {
+		leasesArray = append(leasesArray, l)
+	}
+
+	jsonBytes, err := json.MarshalIndent(leasesArray, "", "  ")
 	if err != nil {
 		return fmt.Errorf("could not format result: %w", err)
 	}
