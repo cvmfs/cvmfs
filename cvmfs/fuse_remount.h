@@ -9,8 +9,8 @@
 
 #include <ctime>
 
-#include "duplex_fuse.h"
 #include "crypto/hash.h"
+#include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_evict.h"
 #include "util/atomic.h"

@@ -18,8 +18,8 @@
 #include <map>
 #include <string>
 
-#include "gtest/gtest_prod.h"
 #include "crypto/hash.h"
+#include "gtest/gtest_prod.h"
 #include "util/export.h"
 #include "util/single_copy.h"
 
@@ -159,4 +159,4 @@ class CVMFS_EXPORT CipherNone : public Cipher {
 
 }  // namespace cipher
 
-#endif  // CVMFS_UTIL_ENCRYPT_H_
+#endif  // CVMFS_CRYPTO_ENCRYPT_H_

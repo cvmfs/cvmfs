@@ -510,18 +510,18 @@ class CVMFS_EXPORT ContextPtr {
 };
 
 CVMFS_EXPORT void Init(ContextPtr context);
-CVMFS_EXPORT void Update(const unsigned char *buffer, 
+CVMFS_EXPORT void Update(const unsigned char *buffer,
                          const unsigned buffer_size,
                          ContextPtr context);
 CVMFS_EXPORT void Final(ContextPtr context, Any *any_digest);
 CVMFS_EXPORT bool HashFile(const std::string &filename, Any *any_digest);
 CVMFS_EXPORT bool HashFd(int fd, Any *any_digest);
-CVMFS_EXPORT void HashMem(const unsigned char *buffer, 
+CVMFS_EXPORT void HashMem(const unsigned char *buffer,
                           const unsigned buffer_size,
                           Any *any_digest);
 CVMFS_EXPORT void HashString(const std::string &content, Any *any_digest);
 CVMFS_EXPORT void Hmac(const std::string &key,
-                       const unsigned char *buffer, 
+                       const unsigned char *buffer,
                        const unsigned buffer_size,
                        Any *any_digest);
 inline void HmacString(const std::string &key, const std::string &content,
@@ -540,17 +540,17 @@ inline void HmacString(const std::string &key, const std::string &content,
  * digets size to 32 bytes and require client data structure transformation
  * during hotpatch.
  */
-CVMFS_EXPORT std::string Hmac256(const std::string &key, 
+CVMFS_EXPORT std::string Hmac256(const std::string &key,
                                  const std::string &content,
                                  bool raw_output = false);
 CVMFS_EXPORT std::string Sha256File(const std::string &filename);
-CVMFS_EXPORT std::string Sha256Mem(const unsigned char *buffer, 
+CVMFS_EXPORT std::string Sha256Mem(const unsigned char *buffer,
                                    const unsigned buffer_size);
 CVMFS_EXPORT std::string Sha256String(const std::string &content);
 
-CVMFS_EXPORT 
+CVMFS_EXPORT
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
-CVMFS_EXPORT 
+CVMFS_EXPORT
 Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);
 CVMFS_EXPORT Any MkFromSuffixedHexPtr(const HexPtr hex);
 
