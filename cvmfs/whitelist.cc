@@ -10,8 +10,8 @@
 #include <cstring>
 #include <ctime>
 
+#include "crypto/signature.h"
 #include "download.h"
-#include "signature.h"
 #include "util/logging.h"
 #include "util/smalloc.h"
 #include "util/string.h"

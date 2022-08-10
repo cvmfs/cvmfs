@@ -58,6 +58,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        clientctx.cc
        compression.cc
        crypto/hash.cc
+       crypto/signature.cc
        directory_entry.cc
        duplex_fuse.cc
        dns.cc
@@ -83,7 +84,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        quota_posix.cc
        resolv_conf_event_handler.cc
        sanitizer.cc
-       signature.cc
        sql.cc
        sqlitemem.cc
        sqlitevfs.cc
@@ -597,8 +597,8 @@ if (BUILD_SERVER)
   #
   add_executable (cvmfs_signing_helper
                   crypto/hash.cc
-                  signature_offload.cc
-                  signature.cc
+                  crypto/signature_offload.cc
+                  crypto/signature.cc
   )
   set_target_properties (cvmfs_signing_helper PROPERTIES
     COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
@@ -638,6 +638,7 @@ if (BUILD_SERVER)
        clientctx.cc
        compression.cc
        crypto/hash.cc
+       crypto/signature.cc
        directory_entry.cc
        dns.cc
        download.cc
@@ -682,7 +683,6 @@ if (BUILD_SERVER)
        sanitizer.cc
        server_tool.cc
        session_context.cc
-       signature.cc
        signing_tool.cc
        shortstring.cc
        sql.cc
@@ -779,6 +779,7 @@ if (BUILD_SERVER)
        catalog_virtual.cc
        compression.cc
        crypto/hash.cc
+       crypto/signature.cc
        directory_entry.cc
        dns.cc
        download.cc
@@ -818,7 +819,6 @@ if (BUILD_SERVER)
        s3fanout.cc
        sanitizer.cc
        session_context.cc
-       signature.cc
        shortstring.cc
        sql.cc
        sqlitemem.cc
@@ -887,6 +887,7 @@ if (BUILD_SERVER)
        compression.cc
        directory_entry.cc
        crypto/hash.cc
+       crypto/signature.cc
        dns.cc
        download.cc
        manifest.cc
@@ -907,7 +908,6 @@ if (BUILD_SERVER)
        publish/main.cc
        publish/settings.cc
        sanitizer.cc
-       signature.cc
        ssl.cc
        statistics.cc
        upload_spooler_definition.cc
@@ -1093,7 +1093,6 @@ if(BUILD_RECEIVER)
        sanitizer.cc
        server_tool.cc
        session_context.cc
-       signature.cc
        signing_tool.cc
        shortstring.cc
        ssl.cc
@@ -1231,6 +1230,7 @@ if (BUILD_PRELOADER)
                   catalog_sql.cc
                   compression.cc
                   crypto/hash.cc
+                  crypto/signature.cc
                   dns.cc
                   download.cc
                   gateway_util.cc
@@ -1264,7 +1264,6 @@ if (BUILD_PRELOADER)
                   sanitizer.cc
                   server_tool.cc
                   session_context.cc
-                  signature.cc
                   sql.cc
                   sqlitemem.cc
                   ssl.cc

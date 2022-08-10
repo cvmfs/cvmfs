@@ -11,8 +11,8 @@
 #include <string>
 
 #include "compression.h"
+#include "crypto/signature.h"
 #include "download.h"
-#include "signature.h"
 #include "statistics.h"
 #include "swissknife.h"
 #include "swissknife_pull.h"

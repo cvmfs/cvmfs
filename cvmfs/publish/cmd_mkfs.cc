@@ -9,12 +9,12 @@
 
 #include <string>
 
+#include "crypto/signature.h"
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
 #include "sanitizer.h"
-#include "signature.h"
 #include "upload_spooler_definition.h"
 #include "util/pointer.h"
 #include "util/posix.h"

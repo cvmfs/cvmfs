@@ -12,7 +12,7 @@
  */
 
 #include "cvmfs_config.h"
-#include "signature.h"
+#include "crypto/signature.h"
 
 #include <openssl/bn.h>
 #include <openssl/evp.h>

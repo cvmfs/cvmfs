@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_SIGNATURE_H_
-#define CVMFS_SIGNATURE_H_
+#ifndef CVMFS_CRYPTO_SIGNATURE_H_
+#define CVMFS_CRYPTO_SIGNATURE_H_
 
 #include <pthread.h>
 
@@ -22,10 +22,11 @@
 #include <vector>
 
 #include "crypto/hash.h"
+#include "util/export.h"
 
 namespace signature {
 
-class SignatureManager {
+class CVMFS_EXPORT SignatureManager {
  public:
   enum ESignMethod { kSignManifest, kSignWhitelist };
 
@@ -116,4 +117,4 @@ class SignatureManager {
 
 }  // namespace signature
 
-#endif  // CVMFS_SIGNATURE_H_
+#endif  // CVMFS_CRYPTO_SIGNATURE_H_

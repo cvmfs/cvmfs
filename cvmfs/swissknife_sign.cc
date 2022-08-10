@@ -21,10 +21,10 @@
 
 #include "compression.h"
 #include "crypto/hash.h"
+#include "crypto/signature.h"
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "reflog.h"
-#include "signature.h"
 #include "signing_tool.h"
 #include "upload.h"
 #include "util/logging.h"

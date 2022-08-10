@@ -10,12 +10,12 @@
 #include <string>
 
 #include "catalog.h"
+#include "crypto/signature.h"
 #include "download.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "reflog.h"
-#include "signature.h"
 #include "util/posix.h"
 
 /**
