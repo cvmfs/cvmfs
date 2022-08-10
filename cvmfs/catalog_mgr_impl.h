@@ -627,7 +627,7 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
   const PathString &path,
   std::string *subcatalog_path,
   shash::Any *hash
-  ) 
+  )
 {
   EnforceSqliteMemLimit();
   bool result;
@@ -655,7 +655,7 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
     }
   }
 
-	*hash = catalog->hash();
+  *hash = catalog->hash();
   *subcatalog_path = catalog->mountpoint().ToString();
   catalog::Counters counters = catalog->GetCounters();
   Unlock();
