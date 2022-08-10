@@ -735,7 +735,6 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${RT_LIBRARY}
         ${VJSON_LIBRARIES}
-        ${SHA3_LIBRARIES}
         ${CAP_LIBRARIES}
         ${LibArchive_LIBRARY}
         pthread
@@ -843,7 +842,6 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${ZLIB_LIBRARIES}
-        ${SHA3_LIBRARIES}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
         ${LibArchive_LIBRARY}
@@ -911,9 +909,9 @@ if (BUILD_SERVER)
   set_target_properties (cvmfs_publish PROPERTIES
     COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}"
   )
-  target_link_libraries (cvmfs_publish 
-                         cvmfs_crypto 
-                         cvmfs_util 
+  target_link_libraries (cvmfs_publish
+                         cvmfs_crypto
+                         cvmfs_util
                          cvmfs_server
   )
   if (BUILD_SERVER_DEBUG)
@@ -921,9 +919,9 @@ if (BUILD_SERVER)
     set_target_properties (cvmfs_publish_debug PROPERTIES
       COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -O0 -DDEBUGMSG"
     )
-    target_link_libraries (cvmfs_publish_debug 
+    target_link_libraries (cvmfs_publish_debug
                            cvmfs_crypto_debug
-                           cvmfs_util_debug 
+                           cvmfs_util_debug
                            cvmfs_server_debug)
   endif ()
 
