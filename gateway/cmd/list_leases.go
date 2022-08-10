@@ -10,19 +10,10 @@ import (
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var repository string
-
-func init() {
-	listLeasesCmd.PersistentFlags().StringVarP(
-		&repository,
-		"repository",
-		"r",
-		"",
-		"retrieve leases for this repository; retrieve leases for all repositories if empty")
-	rootCmd.AddCommand(listLeasesCmd)
-}
 
 var listLeasesCmd = &cobra.Command{
 	Use:   "list-leases",
@@ -37,6 +28,17 @@ var listLeasesCmd = &cobra.Command{
 			os.Exit(1)
 		}
 	},
+}
+
+func init() {
+	rootCmd.AddCommand(listLeasesCmd)
+	listLeasesCmd.Flags().StringVarP(
+		&repository,
+		"repository",
+		"r",
+		"",
+		"retrieve leases for this repository; retrieve leases for all repositories if empty")
+	viper.BindPFlag("repository", listLeasesCmd.Flags().Lookup("repository"))
 }
 
 func executeListLeases() error {
@@ -59,12 +61,12 @@ func executeListLeases() error {
 		}
 	}
 
-	leasesArray := make([]be.LeaseDTO, 0)
+	leasesResult := make([]be.LeaseDTO, 0)
 	for _, l := range leases {
-		leasesArray = append(leasesArray, l)
+		leasesResult = append(leasesResult, l)
 	}
 
-	jsonBytes, err := json.MarshalIndent(leasesArray, "", "  ")
+	jsonBytes, err := json.MarshalIndent(leasesResult, "", "  ")
 	if err != nil {
 		return fmt.Errorf("could not format result: %w", err)
 	}

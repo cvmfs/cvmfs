@@ -30,23 +30,11 @@ type Config struct {
 	MockReceiver bool `mapstructure:"mock_receiver"`
 }
 
+var ConfigFile string
+
 // ReadConfig reads configuration files and commandline flags, and populates a Config object
 func ReadConfig() (*Config, error) {
-	var configFile string
-	pflag.StringVar(&configFile, "user_config_file", "/etc/cvmfs/gateway/user.json", "config file with user modifiable settings")
-	pflag.String("access_config_file", "/etc/cvmfs/gateway/repo.json", "repository access configuration file")
-	pflag.Int("port", 4929, "HTTP frontend port")
-	pflag.Int("max_lease_time", 7200, "maximum lease time in seconds")
-	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
-	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")
-	pflag.Int("num_receivers", 1, "number of parallel cvmfs_receiver processes to run")
-	pflag.String("receiver_path", "/usr/bin/cvmfs_receiver", "the path of the cvmfs_receiver executable")
-	pflag.String("work_dir", "/var/lib/cvmfs-gateway", "the working directory for database files")
-	pflag.Bool("mock_receiver", false, "enable the mocked implementation of the receiver process (for testing)")
-	pflag.Parse()
-
-	viper.SetConfigFile(configFile)
-	viper.BindPFlags(pflag.CommandLine)
+	viper.SetConfigFile(ConfigFile)
 	viper.ReadInConfig()
 
 	var conf Config
@@ -57,7 +45,7 @@ func ReadConfig() (*Config, error) {
 	// max_lease_time is given in seconds in the config file or at the command line
 	conf.MaxLeaseTime = conf.MaxLeaseTime * time.Second
 
-	// Manually handler legacy parameter names
+	// Manually handle legacy parameter names
 
 	if viper.InConfig("fe_tcp_port") {
 		conf.Port = viper.GetInt("fe_tcp_port")
@@ -71,7 +59,7 @@ func ReadConfig() (*Config, error) {
 		if err := v1.Unmarshal(&sc1); err != nil {
 			return nil, fmt.Errorf("could not load receiver config: %w", err)
 		}
-		if !pflag.CommandLine.Changed("num_receivers") {
+		if !viper.IsSet("num_receivers") {
 			conf.NumReceivers = sc1.Size
 		}
 	}
