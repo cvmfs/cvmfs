@@ -100,23 +100,16 @@ cvmfs_server_gc() {
   #       to run GC directly on the gateway
   # Check if the command is called on a repository gateway, and if so,
   # abort if there are any active leases
-  if [ -x "/usr/libexec/cvmfs-gateway/scripts/get_leases.sh" ]; then
+  if [ -x "/usr/bin/cvmfs_gateway" ]; then
     for name in $names; do
-      if [ x"$( /usr/libexec/cvmfs-gateway/scripts/get_leases.sh | grep $name )" != x"" ]; then
-        echo "Active lease found for repository: $name. Aborting"
-        return 1
-      fi
+      echo "Locking repository: $name"
+      /usr/bin/cvmfs_gateway set-repo-state $name locked
     done
-    # If cvmfs-gateway is running, turn it off for the duration of the GC
-    if [ "x$(sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status)" = "xpong" ]; then
-      echo "Turning off cvmfs-gateway"
-      if is_systemd; then
-        sudo systemctl stop cvmfs-gateway
-      else
-        sudo service cvmfs-gateway stop
-      fi
-      trap __restore_cvmfs_gateway EXIT HUP INT TERM
-    fi
+    for name in $names; do
+      echo "Flushing leases for repository: $name"
+      /usr/bin/cvmfs_gateway flush-leases $name
+    done
+    trap __restore_cvmfs_gateway EXIT HUP INT TERM
   fi
 
 
@@ -201,12 +194,10 @@ cvmfs_server_gc() {
 }
 
 __restore_cvmfs_gateway() {
-  echo "Restoring cvmfs-gateway"
-  if is_systemd; then
-    sudo systemctl start cvmfs-gateway
-  else
-    sudo service cvmfs-gateway start
-  fi
+  for name in $names; do
+    echo "Unlocking repository: $name"
+    /usr/bin/cvmfs_gateway set-repo-state $name enabled
+  done
 }
 
 # this is used when gc is invoked from the cvmfs_server command line
