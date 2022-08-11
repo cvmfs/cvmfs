@@ -13,7 +13,7 @@ import (
 const (
 	// latestSchemaVersion represents the most recent lease DB schema version
 	// known to the application
-	latestSchemaVersion = 2
+	latestSchemaVersion = 3
 )
 
 // DB stores active leases
@@ -93,13 +93,13 @@ create table if not exists Lease (
 	Expiration integer not null,
 	ProtocolVersion integer not null
 );
-create index lease_repository_path_idx ON Lease(Repository,Path);
 create table if not exists Repository (
 	Name string not null unique primary key,
 	Manifest string,
-	Enabled bool not null
-);
-`,
+	State int not null
+	);
+create index lease_repository_path_idx ON Lease(Repository,Path);
+	`,
 		latestSchemaVersion)
 	if _, err := db.Exec(statement); err != nil {
 		return fmt.Errorf("could not create table 'SchemaVersion': %w", err)

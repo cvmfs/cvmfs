@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 
@@ -20,7 +19,6 @@ var serverCmd = &cobra.Command{
 	Short: "Start the cvmfs-gateway server",
 	Long:  "Start the cvmfs-gateway server",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("CernVM-FS Gateway Server Version:\t", Version)
 		gw.Log("cmd-server", gw.LogInfo).
 			Msgf("current configuration: %+v", Config)
 

@@ -21,7 +21,7 @@ func (s *Services) NewRepo(ctx context.Context, name string, enabled bool) error
 	repo := Repository{
 		Name:     name,
 		Manifest: "",
-		Enabled:  true,
+		State:    RepoStateEnabled,
 	}
 
 	if err := CreateRepository(ctx, tx, repo); err != nil {
@@ -59,7 +59,8 @@ func (s *Services) GetRepo(ctx context.Context, repoName string) (*RepositoryCon
 
 	repoConfig := s.Access.GetRepo(repoName)
 	if repo != nil && repoConfig != nil {
-		repoConfig.Enabled = repo.Enabled
+		repoConfig.Enabled = (repo.State == RepoStateEnabled)
+		repoConfig.State = repo.State
 	}
 
 	return repoConfig, nil
@@ -86,7 +87,8 @@ func (s *Services) GetRepos(ctx context.Context) (map[string]RepositoryConfig, e
 	repoConfig := s.Access.GetRepos()
 	for _, repo := range repos {
 		cfg := repoConfig[repo.Name]
-		cfg.Enabled = repo.Enabled
+		cfg.Enabled = (repo.State == RepoStateEnabled)
+		cfg.State = repo.State
 		repoConfig[repo.Name] = cfg
 	}
 
@@ -99,11 +101,11 @@ func (s *Services) GetRepos(ctx context.Context) (map[string]RepositoryConfig, e
 
 // SetRepoEnabled enables or disables a repository. The change does not persist
 // across applications restarts
-func (s *Services) SetRepoEnabled(ctx context.Context, repoName string, enable bool) error {
+func (s *Services) SetRepoState(ctx context.Context, repoName string, state RepoState) error {
 	t0 := time.Now()
 
 	outcome := "success"
-	defer logAction(ctx, "set_repo_enabled", &outcome, t0)
+	defer logAction(ctx, "set_repo_state", &outcome, t0)
 
 	tx, err := s.DB.SQL.BeginTx(ctx, nil)
 	if err != nil {
@@ -116,7 +118,7 @@ func (s *Services) SetRepoEnabled(ctx context.Context, repoName string, enable b
 		return err
 	}
 
-	repo.Enabled = enable
+	repo.State = state
 
 	if err := UpdateRepository(ctx, tx, *repo); err != nil {
 		return err

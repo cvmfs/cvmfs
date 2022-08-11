@@ -41,7 +41,10 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 	if repoConfig == nil {
 		return "", fmt.Errorf("repository not found: %w", err)
 	}
-	if !repoConfig.Enabled {
+	switch repoConfig.State {
+	case RepoStateLocked:
+		return "", ErrRepoLocked
+	case RepoStateDisabled:
 		return "", ErrRepoDisabled
 	}
 

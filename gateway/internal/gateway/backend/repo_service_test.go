@@ -21,14 +21,14 @@ func TestRepoServiceToggleRepo(t *testing.T) {
 		t.Fatalf("Repository %v should be enabled by default", repoName)
 	}
 
-	backend.SetRepoEnabled(ctx, repoName, false)
+	backend.SetRepoState(ctx, repoName, RepoStateDisabled)
 
 	repos, _ = backend.GetRepos(ctx)
 	if repos[repoName].Enabled {
 		t.Fatalf("Repository %v should have been disabled", repoName)
 	}
 
-	backend.SetRepoEnabled(ctx, repoName, true)
+	backend.SetRepoState(ctx, repoName, RepoStateEnabled)
 
 	repos, _ = backend.GetRepos(ctx)
 	if !repos[repoName].Enabled {
