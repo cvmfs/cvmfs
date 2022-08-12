@@ -69,8 +69,8 @@ while [ $libs_missing -eq 1 ]; do
       # ldd may not find dependencies between cvmfs' own libraries in the
       # rootfs directory
       echo "[DEP] $f"
-      libs="$(LD_LIBRARY_PATH=$(dirname $f) ldd $f | grep -v "not found" | \
-              awk '{print $3}' | grep -v 0x | grep -v '^$' || true)"
+      libs="$(ldd $f | grep -v "not found" | awk '{print $3}' | grep -v 0x | \
+              grep -v '^$' || true)"
       echo "  --> $(echo $libs | tr \n ' ')"
     fi
     if [ -z "$libs" ]; then
