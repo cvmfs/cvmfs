@@ -67,7 +67,8 @@ while [ $libs_missing -eq 1 ]; do
     libs=
     if ldd $f >/dev/null 2>&1; then
       echo "[DEP] $f"
-      libs="$(ldd $f | awk '{print $3}' | grep -v 0x | grep -v '^$' || true)"
+      libs="$(LD_LIBRARY_PATH=$(dirname $f) ldd $f | \
+              awk '{print $3}' | grep -v 0x | grep -v '^$' || true)"
       echo "  --> $(echo $libs | tr \n ' ')"
     fi
     if [ -z "$libs" ]; then
@@ -75,11 +76,16 @@ while [ $libs_missing -eq 1 ]; do
       continue
     fi
     for l in $libs; do
-      if [ ! -f ${CVMFS_RESULT_LOCATION}/rootfs/$l ]; then
-        libs_missing=1
-        cp -v $l ${CVMFS_RESULT_LOCATION}/rootfs/$l
+      lname=$(basename $l)
+      if echo $lname | grep -q ^libcvmfs_; then
+        echo "skipping cvmfs internal library $l"
       else
-        echo "${CVMFS_RESULT_LOCATION}/rootfs/$l present, skipping"
+        if [ ! -f ${CVMFS_RESULT_LOCATION}/rootfs/$l ]; then
+          libs_missing=1
+          cp -v $l ${CVMFS_RESULT_LOCATION}/rootfs/$l
+        else
+          echo "${CVMFS_RESULT_LOCATION}/rootfs/$l present, skipping"
+        fi
       fi
     done
   done
