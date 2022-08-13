@@ -37,8 +37,8 @@
 #include <string>
 #include <vector>
 
+#include "crypto/openssl_version.h"
 #include "duplex_fuse.h"
-#include "duplex_ssl.h"
 #include "fence.h"
 #include "fuse_main.h"
 #include "loader_talk.h"

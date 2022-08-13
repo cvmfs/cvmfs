@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_DUPLEX_SSL_H_
-#define CVMFS_DUPLEX_SSL_H_
+#ifndef CVMFS_CRYPTO_OPENSSL_VERSION_H_
+#define CVMFS_CRYPTO_OPENSSL_VERSION_H_
 
 #include <openssl/opensslv.h>
 
@@ -18,4 +18,4 @@
   #define OPENSSL_API_INTERFACE_V10
 #endif
 
-#endif  // CVMFS_DUPLEX_SSL_H_
+#endif  // CVMFS_CRYPTO_OPENSSL_VERSION_H_
