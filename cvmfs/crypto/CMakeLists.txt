@@ -2,6 +2,7 @@ if (BUILD_CVMFS OR BUILD_SERVER OR BUILD_RECEIVER OR
     BUILD_SHRINKWRAP OR BUILD_PRELOADER OR BUILD_UNITTESTS)
 
 set (LIBCVMFS_CRYPTO_SOURCES
+     crypto/crypto_util.cc
      crypto/hash.cc
      crypto/encrypt.cc
      crypto/signature.cc

@@ -4,10 +4,9 @@
 
 #include <gtest/gtest.h>
 
-#include <openssl/rand.h>
-
 #include <cassert>
 
+#include "crypto/crypto_util.h"
 #include "env.h"
 #include "monitor.h"
 
@@ -21,7 +20,7 @@ int main(int argc, char **argv) {
   ::testing::AddGlobalTestEnvironment(env);
   // Open /dev/[u]random before starting the unit tests to make sure that the
   // counting of open file descriptors is accurate
-  RAND_poll();
+  crypto::InitRng();
   int result = RUN_ALL_TESTS();
   delete watchdog;
   return result;
