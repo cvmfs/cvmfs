@@ -395,7 +395,6 @@ Md5 Any::CastToMd5() {
   return result;
 }
 
-#ifndef OPENSSL_API_INTERFACE_V09
 static string HexFromSha256(unsigned char digest[SHA256_DIGEST_LENGTH]) {
   string result;
   result.reserve(2 * SHA256_DIGEST_LENGTH);
@@ -407,12 +406,8 @@ static string HexFromSha256(unsigned char digest[SHA256_DIGEST_LENGTH]) {
   }
   return result;
 }
-#endif
 
 string Sha256File(const string &filename) {
-#ifdef OPENSSL_API_INTERFACE_V09
-  PANIC(NULL);
-#else
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd < 0)
     return "";
@@ -436,17 +431,12 @@ string Sha256File(const string &filename) {
   unsigned char digest[SHA256_DIGEST_LENGTH];
   SHA256_Final(digest, &ctx);
   return HexFromSha256(digest);
-#endif
 }
 
 string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size) {
-#ifdef OPENSSL_API_INTERFACE_V09
-  PANIC(NULL);
-#else
   unsigned char digest[SHA256_DIGEST_LENGTH];
   SHA256(buffer, buffer_size, digest);
   return HexFromSha256(digest);
-#endif
 }
 
 string Sha256String(const string &content) {
@@ -460,9 +450,6 @@ std::string Hmac256(
   const std::string &content,
   bool raw_output)
 {
-#ifdef OPENSSL_API_INTERFACE_V09
-  PANIC(NULL);
-#else
   unsigned char digest[SHA256_DIGEST_LENGTH];
   const unsigned block_size = 64;
   const unsigned key_length = key.length();
@@ -499,7 +486,6 @@ std::string Hmac256(
   if (raw_output)
     return string(reinterpret_cast<const char *>(digest), SHA256_DIGEST_LENGTH);
   return HexFromSha256(digest);
-#endif
 }
 
 }  // namespace shash

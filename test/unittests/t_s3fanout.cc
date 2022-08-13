@@ -12,13 +12,6 @@
 
 using namespace std;  // NOLINT
 
-TEST(T_S3Fanout, Init) {
-#ifdef OPENSSL_API_INTERFACE_V09
-  printf("Skipping!\n");
-#else
-#endif
-}
-
 TEST(T_S3Fanout, DetectThrottleIndicator) {
   FileBackedBuffer *buf = FileBackedBuffer::Create(1024);
   s3fanout::JobInfo info("", NULL, buf);

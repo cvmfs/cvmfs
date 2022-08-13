@@ -94,9 +94,6 @@ void SignatureManager::InitX509Store() {
   unsigned long verify_flags =  // NOLINT(runtime/int)
     X509_V_FLAG_CRL_CHECK |
     X509_V_FLAG_CRL_CHECK_ALL;
-#ifdef OPENSSL_API_INTERFACE_V09
-  X509_STORE_set_flags(x509_store_, verify_flags);
-#else
   int retval;
   X509_VERIFY_PARAM *param = X509_VERIFY_PARAM_new();
   assert(param != NULL);
@@ -105,7 +102,6 @@ void SignatureManager::InitX509Store() {
   retval = X509_STORE_set1_param(x509_store_, param);
   assert(retval == 1);
   X509_VERIFY_PARAM_free(param);
-#endif
 
   x509_lookup_ = X509_STORE_add_lookup(x509_store_, X509_LOOKUP_hash_dir());
   assert(x509_lookup_ != NULL);
@@ -456,14 +452,9 @@ RSA *SignatureManager::GenerateRsaKeyPair() {
   BIGNUM *bn = BN_new();
   int retval = BN_set_word(bn, RSA_F4);
   assert(retval == 1);
-#ifdef OPENSSL_API_INTERFACE_V09
-  rsa = RSA_generate_key(2048, RSA_F4, NULL, NULL);
-  assert(rsa != NULL);
-#else
   rsa = RSA_new();
   retval = RSA_generate_key_ex(rsa, 2048, bn, NULL);
   assert(retval == 1);
-#endif
   BN_free(bn);
   return rsa;
 }
@@ -517,23 +508,12 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
     X509_get_notAfter(certificate_)), 3600 * 24 * 365);
 
   X509_NAME *name = X509_get_subject_name(certificate_);
-#ifdef OPENSSL_API_INTERFACE_V09
-  X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
-    const_cast<unsigned char *>(
-      reinterpret_cast<const unsigned char *>(cn.c_str())),
-    -1, -1, 0);
-#else
   X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
     reinterpret_cast<const unsigned char *>(cn.c_str()), -1, -1, 0);
-#endif
   retval = X509_set_issuer_name(certificate_, name);
   assert(retval == 1);
 
-#ifdef OPENSSL_API_INTERFACE_V09
-  retval = X509_sign(certificate_, pkey, EVP_sha1());
-#else
   retval = X509_sign(certificate_, pkey, EVP_sha256());
-#endif
   EVP_PKEY_free(pkey);
   assert(retval > 0);
 }
@@ -949,14 +929,7 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   EVP_PKEY *pubkey = X509_get_pubkey(certificate_);
   if (EVP_VerifyInit(ctx_ptr, EVP_sha1()) &&
       EVP_VerifyUpdate(ctx_ptr, buffer, buffer_size) &&
-#ifdef OPENSSL_API_INTERFACE_V09
-      EVP_VerifyFinal(ctx_ptr,
-                      const_cast<unsigned char *>(signature), signature_size,
-                      pubkey)
-#else
-      EVP_VerifyFinal(ctx_ptr, signature, signature_size, pubkey)
-#endif
-    )
+      EVP_VerifyFinal(ctx_ptr, signature, signature_size, pubkey))
   {
     result = true;
   }
