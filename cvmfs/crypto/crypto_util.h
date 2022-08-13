@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_CRYPTO_CRYPTO_H_
-#define CVMFS_CRYPTO_CRYPTO_H_
+#ifndef CVMFS_CRYPTO_CRYPTO_UTIL_H_
+#define CVMFS_CRYPTO_CRYPTO_UTIL_H_
 
 #include "util/export.h"
 
@@ -16,4 +16,4 @@ CVMFS_EXPORT void CleanupLibcryptoMt();
 
 }  // namespace crypto
 
-#endif  // CVMFS_CRYPTO_CRYPTO_H_
+#endif  // CVMFS_CRYPTO_CRYPTO_UTIL_H_

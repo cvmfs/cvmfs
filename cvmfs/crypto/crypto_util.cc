@@ -6,10 +6,10 @@
 
 #include <pthread.h>
 
-#include <cassert>
-
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+
+#include <cassert>
 
 #include "crypto/openssl_version.h"
 #include "util/platform.h"
