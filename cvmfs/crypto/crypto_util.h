@@ -11,6 +11,9 @@ namespace crypto {
 
 CVMFS_EXPORT void InitRng();
 
+CVMFS_EXPORT void SetupLibcryptoMt();
+CVMFS_EXPORT void CleanupLibcryptoMt();
+
 }  // namespace crypto
 
 #endif  // CVMFS_CRYPTO_CRYPTO_H_

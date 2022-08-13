@@ -57,6 +57,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression.cc
+       crypto/crypto_util.cc
        crypto/hash.cc
        crypto/signature.cc
        directory_entry.cc

@@ -18,7 +18,6 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <openssl/crypto.h>
 #include <sched.h>
 #include <signal.h>
 #include <stddef.h>
@@ -37,7 +36,7 @@
 #include <string>
 #include <vector>
 
-#include "crypto/openssl_version.h"
+#include "crypto/crypto_util.h"
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_main.h"
@@ -609,57 +608,6 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
 
 using namespace loader;  // NOLINT(build/namespaces)
 
-// Making OpenSSL (libcrypto) thread-safe
-#ifndef OPENSSL_API_INTERFACE_V11
-
-pthread_mutex_t *gLibcryptoLocks;
-
-static void CallbackLibcryptoLock(int mode, int type,
-                                  const char *file, int line) {
-  (void)file;
-  (void)line;
-
-  int retval;
-
-  if (mode & CRYPTO_LOCK) {
-    retval = pthread_mutex_lock(&(gLibcryptoLocks[type]));
-  } else {
-    retval = pthread_mutex_unlock(&(gLibcryptoLocks[type]));
-  }
-  assert(retval == 0);
-}
-
-static unsigned long CallbackLibcryptoThreadId() {  // NOLINT(runtime/int)
-  return platform_gettid();
-}
-
-#endif
-
-static void SetupLibcryptoMt() {
-#ifndef OPENSSL_API_INTERFACE_V11
-  gLibcryptoLocks = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
-    CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
-  for (int i = 0; i < CRYPTO_num_locks(); ++i) {
-    int retval = pthread_mutex_init(&(gLibcryptoLocks[i]), NULL);
-    assert(retval == 0);
-  }
-
-  CRYPTO_set_id_callback(CallbackLibcryptoThreadId);
-  CRYPTO_set_locking_callback(CallbackLibcryptoLock);
-#endif
-}
-
-static void CleanupLibcryptoMt(void) {
-#ifndef OPENSSL_API_INTERFACE_V11
-  CRYPTO_set_locking_callback(NULL);
-  for (int i = 0; i < CRYPTO_num_locks(); ++i)
-    pthread_mutex_destroy(&(gLibcryptoLocks[i]));
-
-  OPENSSL_free(gLibcryptoLocks);
-#endif
-}
-
-
 int FuseMain(int argc, char *argv[]) {
   // Set a decent umask for new files (no write access to group/everyone).
   // We want to allow group write access for the talk-socket.
@@ -730,7 +678,7 @@ int FuseMain(int argc, char *argv[]) {
     return cvmfs_exports_->fnAltProcessFlavor(argc, argv);
   }
 
-  SetupLibcryptoMt();
+  crypto::SetupLibcryptoMt();
 
   // Option parsing
   struct fuse_args *mount_options;
@@ -1124,7 +1072,7 @@ int FuseMain(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
 
-  CleanupLibcryptoMt();
+  crypto::CleanupLibcryptoMt();
 
   delete fence_reload_;
   delete loader_exports_;
