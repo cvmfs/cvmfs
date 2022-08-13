@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "options.h"
 #include "publish/except.h"
 #include "publish/repository.h"

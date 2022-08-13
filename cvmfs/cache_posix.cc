@@ -49,14 +49,14 @@
 #include <map>
 #include <vector>
 
+#include "crypto/hash.h"
+#include "crypto/signature.h"
 #include "directory_entry.h"
 #include "download.h"
-#include "hash.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "quota.h"
 #include "shortstring.h"
-#include "signature.h"
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/logging.h"

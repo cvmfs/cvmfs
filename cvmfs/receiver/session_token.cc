@@ -8,7 +8,7 @@
 
 #include <limits>
 
-#include "encrypt.h"
+#include "crypto/encrypt.h"
 #include "json.h"
 #include "json_document.h"
 #include "util/logging.h"

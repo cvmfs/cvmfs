@@ -11,7 +11,7 @@
 #include "options.h"
 #include "testutil.h"
 #include "util/posix.h"
-#include "uuid.h"
+#include "util/uuid.h"
 
 class T_MagicXattr : public ::testing::Test {
  protected:

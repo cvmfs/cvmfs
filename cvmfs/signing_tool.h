@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "server_tool.h"
 #include "util/concurrency.h"
 

@@ -13,7 +13,7 @@
 
 #include "catalog.h"
 #include "catalog_traversal.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "uid_map.h"

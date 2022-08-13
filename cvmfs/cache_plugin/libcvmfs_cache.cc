@@ -17,7 +17,7 @@
 
 #include "cache_plugin/channel.h"
 #include "cache_transport.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "monitor.h"
 #include "util/pointer.h"

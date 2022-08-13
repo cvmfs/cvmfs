@@ -166,12 +166,14 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/clientctx.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/crypto/encrypt.cc
+  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
+  ${CVMFS_SOURCE_DIR}/crypto/signature.cc
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc
-  ${CVMFS_SOURCE_DIR}/encrypt.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
   ${CVMFS_SOURCE_DIR}/file_watcher.cc
@@ -179,7 +181,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
-  ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
@@ -228,7 +229,6 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/server_tool.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
-  ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/signing_tool.cc
   ${CVMFS_SOURCE_DIR}/shortstring.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
@@ -266,7 +266,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
-  ${CVMFS_SOURCE_DIR}/uuid.cc
+  ${CVMFS_SOURCE_DIR}/util/uuid.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
@@ -316,7 +316,7 @@ set (CVMFS_TEST_CACHE_SOURCES
   ${CVMFS_SOURCE_DIR}/cache_extern.cc
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
-  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/util/concurrency.cc
@@ -346,6 +346,8 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/clientctx.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
+  ${CVMFS_SOURCE_DIR}/crypto/signature.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
@@ -355,7 +357,6 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/file_watcher.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
-  ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
@@ -372,20 +373,19 @@ set (CVMFS_CLIENT_SOURCES
   ${CVMFS_SOURCE_DIR}/quota_posix.cc
   ${CVMFS_SOURCE_DIR}/resolv_conf_event_handler.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
-  ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/ssl.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
   ${CVMFS_SOURCE_DIR}/tracer.cc
-  ${CVMFS_SOURCE_DIR}/uuid.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/concurrency.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/logging.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
+  ${CVMFS_SOURCE_DIR}/util/uuid.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
@@ -474,12 +474,13 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
+  ${CVMFS_SOURCE_DIR}/crypto/signature.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
-  ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
@@ -503,7 +504,6 @@ set (CVMFS_TEST_PUBLISH_SOURCES
   ${CVMFS_SOURCE_DIR}/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
-  ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/shortstring.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc

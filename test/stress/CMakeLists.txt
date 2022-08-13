@@ -2,9 +2,9 @@ set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 
 set (CVMFS_STRESS_SOURCES
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
-  ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc

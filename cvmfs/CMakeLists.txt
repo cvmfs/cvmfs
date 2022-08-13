@@ -7,6 +7,7 @@
 # Common libraries
 #
 include (util/CMakeLists.txt)
+include (crypto/CMakeLists.txt)
 
 
 
@@ -56,6 +57,8 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression.cc
+       crypto/hash.cc
+       crypto/signature.cc
        directory_entry.cc
        duplex_fuse.cc
        dns.cc
@@ -65,7 +68,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        file_watcher.cc
        globals.cc
        glue_buffer.cc
-       hash.cc
        history_sql.cc
        history_sqlite.cc
        json_document.cc
@@ -82,20 +84,19 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        quota_posix.cc
        resolv_conf_event_handler.cc
        sanitizer.cc
-       signature.cc
        sql.cc
        sqlitemem.cc
        sqlitevfs.cc
        ssl.cc
        statistics.cc
        tracer.cc
-       uuid.cc
        util/algorithm.cc
        util/concurrency.cc
        util/exception.cc
        util/logging.cc
        util/posix.cc
        util/string.cc
+       util/uuid.cc
        whitelist.cc
        wpad.cc
        xattr.cc
@@ -137,8 +138,8 @@ if (BUILD_CVMFS)
   #
   add_executable (cvmfs_fsck
                   compression.cc
+                  crypto/hash.cc
                   cvmfs_fsck.cc
-                  hash.cc
                   statistics.cc
                   util/exception.cc
                   util/logging.cc
@@ -187,8 +188,8 @@ if (BUILD_CVMFS)
   # /usr/lib/libcvmfs_fuse_stub[3]
   #
   set (CVMFS_STUB_SOURCES
+       crypto/hash.cc
        globals.cc
-       hash.cc
        loader.cc
        loader_talk.cc
        options.cc
@@ -415,10 +416,6 @@ if (BUILD_LIBCVMFS)
 
   add_executable (test_libcvmfs test_libcvmfs.cc)
   add_dependencies(test_libcvmfs libcvmfs)
-  list(APPEND TEST_LIBCVMFS_LIBS ${SQLITE3_LIBRARY} ${CURL_LIBRARIES}
-                                 ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES}
-                                 ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
-
   target_link_libraries(test_libcvmfs
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
                         ${SQLITE3_LIBRARY}
@@ -456,7 +453,7 @@ if (BUILD_LIBCVMFS_CACHE)
                cache_plugin/libcvmfs_cache_options.cc
                cache_plugin/channel.cc
                cache_transport.cc
-               hash.cc
+               crypto/hash.cc
                monitor.cc
                options.cc
                sanitizer.cc
@@ -539,7 +536,7 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache.cc
                   cache_posix.cc
                   compression.cc
-                  hash.cc
+                  crypto/hash.cc
                   manifest.cc
                   quota.cc
                   util/exception.cc
@@ -599,18 +596,13 @@ if (BUILD_SERVER)
   # TODO(jblomer): remove me
   #
   add_executable (cvmfs_signing_helper
-                  signature_offload.cc
-                  hash.cc
-                  signature.cc
+                  crypto/signature_offload.cc
   )
   set_target_properties (cvmfs_signing_helper PROPERTIES
     COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   target_link_libraries (cvmfs_signing_helper
+                         cvmfs_crypto
                          cvmfs_util
-                         ${SHA3_LIBRARIES}
-                         ${OPENSSL_LIBRARIES}
-                         pthread
-                         dl
   )
 
 
@@ -646,7 +638,6 @@ if (BUILD_SERVER)
        file_chunk.cc
        gateway_util.cc
        globals.cc
-       hash.cc
        history_sql.cc
        history_sqlite.cc
        ingestion/chunk_detector.cc
@@ -685,7 +676,6 @@ if (BUILD_SERVER)
        sanitizer.cc
        server_tool.cc
        session_context.cc
-       signature.cc
        signing_tool.cc
        shortstring.cc
        sql.cc
@@ -745,7 +735,6 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${RT_LIBRARY}
         ${VJSON_LIBRARIES}
-        ${SHA3_LIBRARIES}
         ${CAP_LIBRARIES}
         ${LibArchive_LIBRARY}
         pthread
@@ -753,6 +742,7 @@ if (BUILD_SERVER)
   )
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   target_link_libraries (cvmfs_swissknife
+                         cvmfs_crypto
                          cvmfs_util
                          ${CVMFS_SWISSKNIFE_LINK_LIBRARIES}
   )
@@ -762,6 +752,7 @@ if (BUILD_SERVER)
       COMPILE_FLAGS "-O0 -DDEBUGMSG"
     )
     target_link_libraries (cvmfs_swissknife_debug
+                           cvmfs_crypto_debug
                            cvmfs_util_debug
                            ${CVMFS_SWISSKNIFE_LINK_LIBRARIES}
     )
@@ -786,7 +777,6 @@ if (BUILD_SERVER)
        download.cc
        gateway_util.cc
        globals.cc
-       hash.cc
        history_sql.cc
        history_sqlite.cc
        ingestion/chunk_detector.cc
@@ -821,7 +811,6 @@ if (BUILD_SERVER)
        s3fanout.cc
        sanitizer.cc
        session_context.cc
-       signature.cc
        shortstring.cc
        sql.cc
        sqlitemem.cc
@@ -853,7 +842,6 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${ZLIB_LIBRARIES}
-        ${SHA3_LIBRARIES}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
         ${LibArchive_LIBRARY}
@@ -866,6 +854,7 @@ if (BUILD_SERVER)
     VERSION ${CernVM-FS_VERSION_STRING}
     COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS}")
   target_link_libraries (cvmfs_server
+                         cvmfs_crypto
                          cvmfs_util
                          ${LIBCVMFS_SERVER_LINK_LIBRARIES}
   )
@@ -875,6 +864,7 @@ if (BUILD_SERVER)
       VERSION ${CernVM-FS_VERSION_STRING}
       COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS} -O0 -DDEBUGMSG")
     target_link_libraries (cvmfs_server_debug
+                           cvmfs_crypto_debug
                            cvmfs_util_debug
                            ${LIBCVMFS_SERVER_LINK_LIBRARIES}
     )
@@ -891,7 +881,6 @@ if (BUILD_SERVER)
        directory_entry.cc
        dns.cc
        download.cc
-       hash.cc
        manifest.cc
        options.cc
        publish/cmd_abort.cc
@@ -910,7 +899,6 @@ if (BUILD_SERVER)
        publish/main.cc
        publish/settings.cc
        sanitizer.cc
-       signature.cc
        ssl.cc
        statistics.cc
        upload_spooler_definition.cc
@@ -921,13 +909,20 @@ if (BUILD_SERVER)
   set_target_properties (cvmfs_publish PROPERTIES
     COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS}"
   )
-  target_link_libraries (cvmfs_publish cvmfs_util cvmfs_server)
+  target_link_libraries (cvmfs_publish
+                         cvmfs_crypto
+                         cvmfs_util
+                         cvmfs_server
+  )
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_publish_debug ${CVMFS_PUBLISH_SOURCES})
     set_target_properties (cvmfs_publish_debug PROPERTIES
       COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -O0 -DDEBUGMSG"
     )
-    target_link_libraries (cvmfs_publish_debug cvmfs_util_debug cvmfs_server_debug)
+    target_link_libraries (cvmfs_publish_debug
+                           cvmfs_crypto_debug
+                           cvmfs_util_debug
+                           cvmfs_server_debug)
   endif ()
 
 
@@ -1068,10 +1063,8 @@ if(BUILD_RECEIVER)
        directory_entry.cc
        dns.cc
        download.cc
-       encrypt.cc
        gateway_util.cc
        globals.cc
-       hash.cc
        history_sql.cc
        history_sqlite.cc
        ingestion/chunk_detector.cc
@@ -1098,7 +1091,6 @@ if(BUILD_RECEIVER)
        sanitizer.cc
        server_tool.cc
        session_context.cc
-       signature.cc
        signing_tool.cc
        shortstring.cc
        ssl.cc
@@ -1116,7 +1108,6 @@ if(BUILD_RECEIVER)
        upload_local.cc
        upload_s3.cc
        upload_spooler_definition.cc
-       uuid.cc
        whitelist.cc
        xattr.cc
   )  # CVMFS_RECEIVER_SOURCES
@@ -1125,11 +1116,9 @@ if(BUILD_RECEIVER)
   list (APPEND CVMFS_RECEIVER_LINK_LIBRARIES
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-        ${SHA3_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${VJSON_LIBRARIES}
         ${OPENSSL_LIBRARIES}
-        ${UUID_LIBRARIES}
         ${ZLIB_LIBRARIES}
         ${RT_LIBRARY}
         ${LibArchive_LIBRARY}
@@ -1141,6 +1130,7 @@ if(BUILD_RECEIVER)
     COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}"
   )
   target_link_libraries(cvmfs_receiver
+                        cvmfs_crypto
                         cvmfs_util
                         ${CVMFS_RECEIVER_LINK_LIBRARIES}
   )
@@ -1150,6 +1140,7 @@ if(BUILD_RECEIVER)
     set_target_properties (cvmfs_receiver_debug PROPERTIES
       COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS} -O0 -DDEBUGMSG")
     target_link_libraries(cvmfs_receiver_debug
+                          cvmfs_crypto_debug
                           cvmfs_util_debug
                           ${CVMFS_RECEIVER_LINK_LIBRARIES}
     )
@@ -1175,7 +1166,7 @@ endif (BUILD_RECEIVER)
 
 if (BUILD_SHRINKWRAP)
   add_executable (cvmfs_shrinkwrap
-                  hash.cc
+                  crypto/hash.cc
                   monitor.cc
                   shrinkwrap/fs_traversal.cc
                   shrinkwrap/fs_traversal_libcvmfs.cc
@@ -1236,11 +1227,12 @@ if (BUILD_PRELOADER)
                   catalog.cc
                   catalog_sql.cc
                   compression.cc
+                  crypto/hash.cc
+                  crypto/signature.cc
                   dns.cc
                   download.cc
                   gateway_util.cc
                   globals.cc
-                  hash.cc
                   history_sql.cc
                   history_sqlite.cc
                   ingestion/chunk_detector.cc
@@ -1270,7 +1262,6 @@ if (BUILD_PRELOADER)
                   sanitizer.cc
                   server_tool.cc
                   session_context.cc
-                  signature.cc
                   sql.cc
                   sqlitemem.cc
                   ssl.cc
@@ -1292,7 +1283,7 @@ if (BUILD_PRELOADER)
                   util/mmap_file.cc
                   util/posix.cc
                   util/string.cc
-                  uuid.cc
+                  util/uuid.cc
                   whitelist.cc
                   xattr.cc
   )  # preloader sources

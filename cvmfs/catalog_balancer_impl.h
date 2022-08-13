@@ -15,8 +15,8 @@
 
 #include "catalog_mgr.h"
 #include "compression.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
-#include "hash.h"
 #include "util/logging.h"
 
 

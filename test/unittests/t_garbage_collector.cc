@@ -10,9 +10,9 @@
 
 #include "catalog_traversal.h"
 #include "catalog_traversal_parallel.h"
+#include "crypto/hash.h"
 #include "garbage_collection/garbage_collector.h"
 #include "garbage_collection/hash_filter.h"
-#include "hash.h"
 #include "manifest.h"
 #include "testutil.h"
 #include "util/prng.h"

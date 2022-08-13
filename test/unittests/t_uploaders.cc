@@ -12,7 +12,7 @@
 
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "testutil.h"
 #include "upload_facility.h"
 #include "upload_local.h"

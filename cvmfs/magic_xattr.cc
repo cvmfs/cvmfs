@@ -9,10 +9,10 @@
 #include <vector>
 
 #include "catalog_mgr_client.h"
+#include "crypto/signature.h"
 #include "fetch.h"
 #include "mountpoint.h"
 #include "quota.h"
-#include "signature.h"
 #include "util/logging.h"
 #include "util/string.h"
 

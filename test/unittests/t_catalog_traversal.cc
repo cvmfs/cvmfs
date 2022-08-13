@@ -10,7 +10,7 @@
 
 #include "catalog_traversal.h"
 #include "catalog_traversal_parallel.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "testutil.h"
 #include "util/prng.h"

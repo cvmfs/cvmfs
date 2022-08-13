@@ -16,8 +16,8 @@
 #include <string>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "garbage_collector.h"
-#include "hash.h"
 #include "helpers.h"
 #include "libcvmfs.h"
 #include "shrinkwrap/fs_traversal_interface.h"

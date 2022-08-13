@@ -12,11 +12,13 @@ set (LIBCVMFS_UTIL_SOURCES
   util/posix.cc
   util/raii_temp_dir.cc
   util/string.cc
+  util/uuid.cc
 )
 
 set (LIBCVMFS_UTIL_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
 set (LIBCVMFS_UTIL_LINK_LIBRARIES "")
 list (APPEND LIBCVMFS_UTIL_LINK_LIBRARIES
+      ${UUID_LIBRARIES}
       ${RT_LIBRARY}
       pthread
       dl)
@@ -30,14 +32,15 @@ target_link_libraries (cvmfs_util ${LIBCVMFS_UTIL_LINK_LIBRARIES})
 install (TARGETS cvmfs_util LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 
-if (BUILD_SERVER_DEBUG OR BUILD_RECEIVER_DEBUG OR BUILD_UNITTESTS_DEBUG)
+if (BUILD_CVMFS OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER_DEBUG OR
+    BUILD_UNITTESTS_DEBUG)
 
-add_library(cvmfs_util_debug SHARED ${LIBCVMFS_UTIL_SOURCES})
-set_target_properties (cvmfs_util_debug PROPERTIES
-    VERSION ${CernVM-FS_VERSION_STRING}
-    COMPILE_FLAGS "${LIBCVMFS_UTIL_CFLAGS} -DDEBUGMSG -g -O0")
-target_link_libraries (cvmfs_util_debug ${LIBCVMFS_UTIL_LINK_LIBRARIES})
-install (TARGETS cvmfs_util_debug LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  add_library(cvmfs_util_debug SHARED ${LIBCVMFS_UTIL_SOURCES})
+  set_target_properties (cvmfs_util_debug PROPERTIES
+      VERSION ${CernVM-FS_VERSION_STRING}
+      COMPILE_FLAGS "${LIBCVMFS_UTIL_CFLAGS} -DDEBUGMSG -g -O0")
+  target_link_libraries (cvmfs_util_debug ${LIBCVMFS_UTIL_LINK_LIBRARIES})
+  install (TARGETS cvmfs_util_debug LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 endif () # debug binaries
 

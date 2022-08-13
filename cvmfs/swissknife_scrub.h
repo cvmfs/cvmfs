@@ -10,7 +10,7 @@
 #include <cassert>
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "ingestion/pipeline.h"
 
 namespace swissknife {

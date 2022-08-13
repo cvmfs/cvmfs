@@ -13,7 +13,7 @@
 #include <string>
 
 #include "backoff.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
 

@@ -6,7 +6,7 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "uuid.h"
+#include "util/uuid.h"
 
 #include <cassert>
 #include <cstdio>

@@ -13,8 +13,8 @@
 #include <cstring>
 #include <string>
 
+#include "crypto/hash.h"
 #include "duplex_ssl.h"
-#include "hash.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
 #include "util/string.h"

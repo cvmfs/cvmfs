@@ -12,7 +12,7 @@
  */
 
 #include "cvmfs_config.h"
-#include "signature.h"
+#include "crypto/signature.h"
 
 #include <openssl/bn.h>
 #include <openssl/evp.h>
@@ -27,8 +27,8 @@
 #include <string>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "duplex_ssl.h"
-#include "hash.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"

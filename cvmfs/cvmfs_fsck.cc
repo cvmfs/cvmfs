@@ -24,7 +24,7 @@
 #include <string>
 
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/logging.h"

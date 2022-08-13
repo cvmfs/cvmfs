@@ -51,8 +51,8 @@
 #include <utility>
 
 #include "compression.h"
+#include "crypto/hash.h"
 #include "duplex_curl.h"
-#include "hash.h"
 #include "interrupt.h"
 #include "sanitizer.h"
 #include "ssl.h"

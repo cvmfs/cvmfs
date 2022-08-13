@@ -11,7 +11,7 @@
 
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "leveldb/env.h"
 #include "util/atomic.h"
 

@@ -13,7 +13,7 @@
 #include <cstdio>
 #include <vector>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/fs_traversal.h"
 #include "util/platform.h"
 #include "util/posix.h"

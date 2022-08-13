@@ -3,7 +3,7 @@
  */
 
 #include "cvmfs_config.h"
-#include "encrypt.h"
+#include "crypto/encrypt.h"
 
 #include <fcntl.h>
 #include <openssl/evp.h>
@@ -15,15 +15,15 @@
 #include <cstring>
 #include <ctime>
 
+#include "crypto/hash.h"
 #include "duplex_ssl.h"
-#include "hash.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/platform.h"
 #include "util/pointer.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "uuid.h"
+#include "util/uuid.h"
 
 using namespace std;  // NOLINT
 

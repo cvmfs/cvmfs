@@ -13,8 +13,8 @@
 #include <vector>
 
 #include "compression.h"
+#include "crypto/hash.h"
 #include "file_chunk.h"
-#include "hash.h"
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
 #include "util/atomic.h"

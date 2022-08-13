@@ -113,8 +113,8 @@
 #include <string>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "file_chunk.h"
-#include "hash.h"
 #include "ingestion/ingestion_source.h"
 #include "ingestion/pipeline.h"
 #include "repository_tag.h"

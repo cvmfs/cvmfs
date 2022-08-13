@@ -15,7 +15,7 @@
 #include <map>
 #include <sstream>  // TODO(jblomer): remove me
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "testutil.h"
 #include "util/fs_traversal.h"

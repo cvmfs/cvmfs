@@ -12,7 +12,7 @@
 #include <string>
 
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "sync_union.h"
 #include "upload_spooler_definition.h"
 

@@ -8,7 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "cache.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "kvstore.h"
 #include "statistics.h"
 

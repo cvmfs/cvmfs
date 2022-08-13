@@ -4,12 +4,12 @@
 
 #include "cmd_sub.h"
 
+#include "crypto/signature.h"
 #include "download.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "notify/messages.h"
 #include "options.h"
-#include "signature.h"
 #include "subscriber_sse.h"
 #include "subscriber_supervisor.h"
 #include "supervisor.h"

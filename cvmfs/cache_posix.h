@@ -15,11 +15,11 @@
 #include "backoff.h"
 #include "cache.h"
 #include "catalog_mgr.h"
+#include "crypto/signature.h"
 #include "file_chunk.h"
 #include "gtest/gtest_prod.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
-#include "signature.h"
 #include "statistics.h"
 #include "util/atomic.h"
 

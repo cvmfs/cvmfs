@@ -10,10 +10,10 @@
 #include <cassert>
 #include <cstring>
 
+#include "crypto/hash.h"
+#include "crypto/signature.h"
 #include "download.h"
-#include "hash.h"
 #include "manifest.h"
-#include "signature.h"
 #include "util/smalloc.h"
 #include "whitelist.h"
 

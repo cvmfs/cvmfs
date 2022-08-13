@@ -15,7 +15,7 @@
 
 #include <string>
 
-#include "signature.h"
+#include "crypto/signature.h"
 #include "util/posix.h"
 
 static std::string ReadString() {

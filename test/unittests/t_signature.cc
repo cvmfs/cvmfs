@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <string>
 
-#include "signature.h"
+#include "crypto/signature.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
