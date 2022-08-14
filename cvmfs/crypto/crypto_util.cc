@@ -14,6 +14,10 @@
 #include "crypto/openssl_version.h"
 #include "util/platform.h"
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 #ifndef OPENSSL_API_INTERFACE_V11
 namespace {
 
@@ -76,3 +80,7 @@ void crypto::CleanupLibcryptoMt() {
   gLibcryptoLocks = NULL;
 #endif
 }
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}  // namespace CVMFS_NAMESPACE_GUARD
+#endif

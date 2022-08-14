@@ -189,6 +189,7 @@ if (BUILD_CVMFS)
   # /usr/lib/libcvmfs_fuse_stub[3]
   #
   set (CVMFS_STUB_SOURCES
+       crypto/crypto_util.cc
        crypto/hash.cc
        globals.cc
        loader.cc
