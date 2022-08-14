@@ -3,6 +3,7 @@
 set -e
 
 SSL_VERSION=3.1.2
+CRYPTO_VERSION=3.1.2
 CARES_VERSION=1.18.1
 CURL_VERSION=7.71.1
 PACPARSER_VERSION=1.3.8
@@ -168,6 +169,10 @@ build_lib() {
       patch_external "libcurl" "reenable_poll_darwin.patch"
       do_build "libcurl"
       ;;
+    libcrypto)
+      do_extract "libcrypto" "libressl-${CRYPTO_VERSION}.tar.gz"
+      do_build "libcrypto"
+      ;;
     pacparser)
       do_extract "pacparser"     "pacparser-${PACPARSER_VERSION}.tar.gz"
       patch_external "pacparser" "fix_cflags.patch"
@@ -263,7 +268,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive go"
+missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive go"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi
