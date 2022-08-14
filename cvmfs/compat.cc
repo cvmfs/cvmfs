@@ -5,10 +5,10 @@
 #include "cvmfs_config.h"
 #include "compat.h"
 
-#include <openssl/md5.h>
-
 #include <cstdlib>
 #include <cstring>
+
+#include "crypto/hash.h"
 
 using namespace std;  // NOLINT
 
@@ -19,13 +19,10 @@ namespace shash_v1 {
 const char *kSuffixes[] = {"", "", "-rmd160", ""};
 
 Md5::Md5(const char *chars, const unsigned length) {
-  algorithm = kMd5;
+  ::shash::Md5 new_md5(chars, length);
 
-  MD5_CTX md5_state;
-  MD5_Init(&md5_state);
-  MD5_Update(&md5_state, reinterpret_cast<const unsigned char *>(chars),
-             length);
-  MD5_Final(digest, &md5_state);
+  algorithm = kMd5;
+  memcpy(new_md5.digest, digest, kDigestSizes[kMd5]);
 }
 
 void MigrateAny(const Any *old_hash, shash::Any *new_hash) {

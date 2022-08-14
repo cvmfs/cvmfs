@@ -6,18 +6,10 @@
 
 #include <cstdio>
 
-#include "duplex_ssl.h"
 #include "s3fanout.h"
 #include "util/file_backed_buffer.h"
 
 using namespace std;  // NOLINT
-
-TEST(T_S3Fanout, Init) {
-#ifdef OPENSSL_API_INTERFACE_V09
-  printf("Skipping!\n");
-#else
-#endif
-}
 
 TEST(T_S3Fanout, DetectThrottleIndicator) {
   FileBackedBuffer *buf = FileBackedBuffer::Create(1024);

@@ -16,7 +16,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <google/dense_hash_map>
-#include <openssl/crypto.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -51,6 +50,7 @@
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compression.h"
+#include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
@@ -68,7 +68,6 @@
 #include "util/atomic.h"
 #include "util/logging.h"
 #include "util/murmur.hxx"
-#include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -102,14 +101,7 @@ loader::Failures LibGlobals::Initialize(OptionsManager *options_mgr) {
   assert(instance_ != NULL);
 
   // Multi-threaded libcrypto (otherwise done by the loader)
-  instance_->libcrypto_locks_ = static_cast<pthread_mutex_t *>(
-    OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
-  for (int i = 0; i < CRYPTO_num_locks(); ++i) {
-    int retval = pthread_mutex_init(&(instance_->libcrypto_locks_[i]), NULL);
-    assert(retval == 0);
-  }
-  CRYPTO_set_id_callback(LibGlobals::CallbackLibcryptoThreadId);
-  CRYPTO_set_locking_callback(LibGlobals::CallbackLibcryptoLock);
+  crypto::SetupLibcryptoMt();
 
   FileSystem::FileSystemInfo fs_info;
   fs_info.name = "libcvmfs";
@@ -147,7 +139,6 @@ void LibGlobals::CleanupInstance() {
 LibGlobals::LibGlobals()
   : options_mgr_(NULL)
   , file_system_(NULL)
-  , libcrypto_locks_(NULL)
 { }
 
 
@@ -155,41 +146,7 @@ LibGlobals::~LibGlobals() {
   delete file_system_;
   delete options_mgr_;
 
-  if (libcrypto_locks_) {
-    CRYPTO_set_locking_callback(NULL);
-    for (int i = 0; i < CRYPTO_num_locks(); ++i)
-      pthread_mutex_destroy(&(libcrypto_locks_[i]));
-    OPENSSL_free(libcrypto_locks_);
-  }
-}
-
-
-void LibGlobals::CallbackLibcryptoLock(
-  int mode,
-  int type,
-  const char *file,
-  int line)
-{
-  (void)file;
-  (void)line;
-
-  int retval;
-  LibGlobals *globals = LibGlobals::GetInstance();
-  pthread_mutex_t *locks = globals->libcrypto_locks_;
-  pthread_mutex_t *lock = &(locks[type]);
-
-  if (mode & CRYPTO_LOCK) {
-    retval = pthread_mutex_lock(lock);
-  } else {
-    retval = pthread_mutex_unlock(lock);
-  }
-  assert(retval == 0);
-}
-
-
-// Type unsigned long required by libcrypto (openssl)
-unsigned long LibGlobals::CallbackLibcryptoThreadId() {  // NOLINT
-  return platform_gettid();
+  crypto::CleanupLibcryptoMt();
 }
 
 

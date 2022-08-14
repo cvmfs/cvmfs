@@ -28,7 +28,7 @@
 #include <vector>
 
 #include "crypto/hash.h"
-#include "duplex_ssl.h"
+#include "crypto/openssl_version.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"

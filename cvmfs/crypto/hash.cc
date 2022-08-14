@@ -17,7 +17,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "duplex_ssl.h"
+#include "crypto/openssl_version.h"
 #include "util/exception.h"
 #include "KeccakHash.h"
 

@@ -70,11 +70,6 @@ class LibGlobals : SingleCopy {
  private:
   LibGlobals();
   ~LibGlobals();
-  static void CallbackLibcryptoLock(int mode, int type,
-                                    const char *file, int line);
-  // unsigned long type required by libcrypto (openssl)
-  static unsigned long CallbackLibcryptoThreadId();  // NOLINT
-
   static LibGlobals *instance_;
 
   /**
@@ -83,8 +78,6 @@ class LibGlobals : SingleCopy {
    */
   OptionsManager *options_mgr_;
   FileSystem *file_system_;
-
-  pthread_mutex_t  *libcrypto_locks_;
 };
 
 

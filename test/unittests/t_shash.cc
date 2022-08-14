@@ -14,7 +14,7 @@
 #include <string>
 
 #include "crypto/hash.h"
-#include "duplex_ssl.h"
+#include "crypto/openssl_version.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
 #include "util/string.h"

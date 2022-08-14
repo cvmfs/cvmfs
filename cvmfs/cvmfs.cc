@@ -39,7 +39,6 @@
 #include <fcntl.h>
 #include <google/dense_hash_map>
 #include <inttypes.h>
-#include <openssl/crypto.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>

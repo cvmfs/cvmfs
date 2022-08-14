@@ -57,6 +57,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression.cc
+       crypto/crypto_util.cc
        crypto/hash.cc
        crypto/signature.cc
        directory_entry.cc
@@ -188,6 +189,7 @@ if (BUILD_CVMFS)
   # /usr/lib/libcvmfs_fuse_stub[3]
   #
   set (CVMFS_STUB_SOURCES
+       crypto/crypto_util.cc
        crypto/hash.cc
        globals.cc
        loader.cc
