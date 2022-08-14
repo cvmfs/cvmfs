@@ -335,6 +335,11 @@ endif ()
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
+find_package (Libcrypto REQUIRED)
+# We do not add the Libcrypto include directories to INCLUDE_DIRECTORIES
+# to avoid a clash with the system openssl. We only use it for libcvmfs_crypto
+message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
+
 find_package (GTest REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 

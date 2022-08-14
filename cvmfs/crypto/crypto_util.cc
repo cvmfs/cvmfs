@@ -7,6 +7,7 @@
 #include <pthread.h>
 
 #include <openssl/crypto.h>
+#include <openssl/opensslv.h>
 #include <openssl/rand.h>
 
 #include <cassert>
@@ -16,6 +17,14 @@
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
+// Safeguard when compiling libcvmfs_crypto: make sure we pick up the built-in
+// LibreSSL and not the system's OpenSSL
+#ifdef CVMFS_USE_LIBRESSL
+#ifndef LIBRESSL_VERSION_NUMBER
+#error "picking up OpenSSL includes instead of LibreSSL"
+#endif
 #endif
 
 #ifndef OPENSSL_API_INTERFACE_V11
