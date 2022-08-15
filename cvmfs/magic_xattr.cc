@@ -147,7 +147,8 @@ MagicXattrFlavor AuthzMagicXattr::GetXattrFlavor() {
 
 bool CatalogCountersMagicXattr::PrepareValueFenced() {
   counters_ =
-    mount_point_->catalog_mgr()->LookupCounters(path_, &subcatalog_path_, &hash_);
+    mount_point_->catalog_mgr()->
+        LookupCounters(path_, &subcatalog_path_, &hash_);
   return true;
 }
 

@@ -15,13 +15,3 @@ create_nested_repo() {
   publish_repo $CVMFS_TEST_REPO || return 2
   echo "*** FINISHED creating a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
 }
-
-teardown() {
-  echo "*** TEARDOWN of repository named $CVMFS_TEST_REPO of user $CVMFS_TEST_USER"
-
-  ## ERROR: THIS COMMAND DOES NOT WORK
-	# destroy_repo
-
-  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
-  echo "*** FINISHED teardown of repository named $CVMFS_TEST_REPO of user $CVMFS_TEST_USER"
-}
