@@ -651,6 +651,7 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
     if (!result) {
       Unlock();
       *subcatalog_path = "error: failed to load catalog!";
+      *hash = shash::Any();
       return catalog::Counters();
     }
   }

@@ -202,7 +202,7 @@ class AbstractCatalogManager : public SingleCopy {
 
   catalog::Counters LookupCounters(const PathString &path,
                                    std::string *subcatalog_path,
-                                   shash::Any* hash);
+                                   shash::Any *hash);
 
  protected:
   /**
