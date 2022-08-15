@@ -10,24 +10,24 @@ check_catalog_hashes() {
   local hash_root=$(echo "$list_catalogs" | grep '/$' | awk -F' ' '{print $1}')
   local hash_foo=$(echo "$list_catalogs" | grep '/foo$' | awk -F' ' '{print $1}')
   local hash_bar=$(echo "$list_catalogs" | grep '/bar$' | awk -F' ' '{print $1}')
- 
+
   echo "Retrieve catalog hashes for files"
-  local catalog_hash_root1=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/root1.txt | grep 'hash' | awk -F' ' '{print $2}' ) 
-  local catalog_hash_root2=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/root2.txt | grep 'hash' | awk -F' ' '{print $2}' ) 
+  local catalog_hash_root1=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/root1.txt | grep 'hash' | awk -F' ' '{print $2}' )
+  local catalog_hash_root2=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/root2.txt | grep 'hash' | awk -F' ' '{print $2}' )
 
   # because of limitations within overlayfs one need to access the root dir via
-  # the rdonly dir directly and not via /cvmfs/... 
-  local catalog_hash_root_dir=$(attr -g catalog_counters /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly | grep 'hash' | awk -F' ' '{print $2}' ) 
+  # the rdonly dir directly and not via /cvmfs/...
+  local catalog_hash_root_dir=$(attr -g catalog_counters /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly | grep 'hash' | awk -F' ' '{print $2}' )
 
-  local catalog_hash_foo1=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/foo1.txt | grep 'hash' | awk -F' ' '{print $2}' ) 
-  local catalog_hash_foo2=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/foo2.txt| grep 'hash' | awk -F' ' '{print $2}' ) 
-  local catalog_hash_foo_dir=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo | grep 'hash' | awk -F' ' '{print $2}' ) 
-  local catalog_hash_foo_cvmscatalog=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/.cvmfscatalog | grep 'hash' | awk -F' ' '{print $2}' ) 
+  local catalog_hash_foo1=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/foo1.txt | grep 'hash' | awk -F' ' '{print $2}' )
+  local catalog_hash_foo2=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/foo2.txt| grep 'hash' | awk -F' ' '{print $2}' )
+  local catalog_hash_foo_dir=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo | grep 'hash' | awk -F' ' '{print $2}' )
+  local catalog_hash_foo_cvmscatalog=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/.cvmfscatalog | grep 'hash' | awk -F' ' '{print $2}' )
 
-  local catalog_hash_bar1=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/bar/bar1.txt | grep 'hash' | awk -F' ' '{print $2}' ) 
-  local catalog_hash_bar2=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/bar/bar2.txt| grep 'hash' | awk -F' ' '{print $2}' ) 
-  local catalog_hash_bar_dir=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/bar | grep 'hash' | awk -F' ' '{print $2}' ) 
-  local catalog_hash_bar_cvmscatalog=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog | grep 'hash' | awk -F' ' '{print $2}' ) 
+  local catalog_hash_bar1=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/bar/bar1.txt | grep 'hash' | awk -F' ' '{print $2}' )
+  local catalog_hash_bar2=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/bar/bar2.txt| grep 'hash' | awk -F' ' '{print $2}' )
+  local catalog_hash_bar_dir=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/bar | grep 'hash' | awk -F' ' '{print $2}' )
+  local catalog_hash_bar_cvmscatalog=$(attr -g catalog_counters /cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog | grep 'hash' | awk -F' ' '{print $2}' )
 
   echo "*** CHECK catalog hashes"
   [ $catalog_hash_root_dir  = $hash_root ] || return 11
@@ -37,14 +37,14 @@ check_catalog_hashes() {
 
   [ $catalog_hash_foo1            = $hash_foo ] || return 21
   [ $catalog_hash_foo2            = $hash_foo ] || return 22
-  [ $catalog_hash_foo_dir         = $hash_foo ] || return 23 
-  [ $catalog_hash_foo_cvmscatalog = $hash_foo ] || return 24 
+  [ $catalog_hash_foo_dir         = $hash_foo ] || return 23
+  [ $catalog_hash_foo_cvmscatalog = $hash_foo ] || return 24
   echo "Hashes $CVMFS_TEST_REPO/foo OK"
 
   [ $catalog_hash_bar1            = $hash_bar ] || return 31
   [ $catalog_hash_bar2            = $hash_bar ] || return 32
-  [ $catalog_hash_bar_dir         = $hash_bar ] || return 33 
-  [ $catalog_hash_bar_cvmscatalog = $hash_bar ] || return 34 
+  [ $catalog_hash_bar_dir         = $hash_bar ] || return 33
+  [ $catalog_hash_bar_cvmscatalog = $hash_bar ] || return 34
   echo "Hashes $CVMFS_TEST_REPO/foo/bar OK"
 
   echo "*** FINISHED check catalog hashes"

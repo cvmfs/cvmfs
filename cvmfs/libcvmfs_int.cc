@@ -491,7 +491,7 @@ int LibContext::GetNestedCatalogAttr(
   shash::Any tmp_hash;
   std::map<std::string, uint64_t> counters =
     mount_point_->catalog_mgr()->
-			LookupCounters(p, &subcat_path, &tmp_hash).GetValues();
+      LookupCounters(p, &subcat_path, &tmp_hash).GetValues();
 
   // Set values of the passed structure
   nc_attr->mountpoint = strdup(mountpoint.ToString().c_str());
