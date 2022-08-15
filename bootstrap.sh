@@ -36,6 +36,7 @@ echo "Bootstrap - Externals build location: $EXTERNALS_BUILD_LOCATION"
 echo "Bootstrap - Externals install location: $EXTERNALS_INSTALL_LOCATION"
 echo "Bootstrap - Base CVMFS C flags: $CVMFS_BASE_C_FLAGS"
 echo "Bootstrap - Base CVMFS C++ flags: $CVMFS_BASE_CXX_FLAGS"
+echo "Bootstrap - 64bit: $IS_64_BIT"
 
 externals_lib_dir=$EXTERNALS_LIB_LOCATION
 externals_build_dir=$EXTERNALS_BUILD_LOCATION
