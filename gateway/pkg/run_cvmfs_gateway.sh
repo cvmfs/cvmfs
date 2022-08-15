@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -x
-
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 has_systemd=false
