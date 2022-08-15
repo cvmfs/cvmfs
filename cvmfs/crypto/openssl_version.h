@@ -7,6 +7,14 @@
 
 #include <openssl/opensslv.h>
 
+// Safeguard when compiling libcvmfs_crypto: make sure we pick up the built-in
+// LibreSSL and not the system's OpenSSL
+#ifdef CVMFS_LIBRARY
+#ifndef LIBRESSL_VERSION_NUMBER
+#error "picking up OpenSSL includes instead of LibreSSL"
+#endif
+#endif
+
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
   #define OPENSSL_API_INTERFACE_V11
   #if OPENSSL_VERSION_NUMBER >= 0x10101000L
