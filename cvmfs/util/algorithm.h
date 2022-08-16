@@ -143,7 +143,7 @@ friend class UTLog2Histogram;
  public:
   explicit Log2Histogram(unsigned int nbins);
 
-  void Add(unsigned int value) {
+  void Add(uint64_t value) {
     unsigned int i;
     const unsigned int n = this->bins_.size() - 1;
 
