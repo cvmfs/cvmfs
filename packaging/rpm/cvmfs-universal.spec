@@ -657,7 +657,6 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_publish_debug
 %{_bindir}/cvmfs_receiver
 %{_bindir}/cvmfs_receiver_debug
-%{_bindir}/cvmfs_signing_helper
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
