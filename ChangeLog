@@ -1,4 +1,5 @@
 2.10.0:
+  * Fix fuse callback latency measurement (#3025)
   * [server] Use libressl crypto on server
   * Bump libressl to version 3.5.3
   * Fix compile warnings for cxx17 (#3014)
