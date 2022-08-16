@@ -1,10 +1,78 @@
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+
+
+set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
+
+
+#
+# Protobuf generated sources
+#
+set_source_files_properties (cache.pb.h cache.pb.cc PROPERTIES GENERATED true)
+add_custom_command (OUTPUT cache.pb.h cache.pb.cc
+                    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
+                            ${CVMFS_SOURCE_DIR}/cache.proto
+                            -I${CVMFS_SOURCE_DIR}
+                    DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
+                            ${CVMFS_SOURCE_DIR}/cache.proto
+                    COMMENT "Generating protobuf sources")
+add_custom_target (cache.pb.generated-unittests DEPENDS cache.pb.h cache.pb.cc)
+
+
+
+#
+# cvmfs_test_cache
+#
+if (BUILD_LIBCVMFS_CACHE)
+  add_executable (cvmfs_test_cache
+                  cache.pb.cc cache.pb.h
+                  cache_plugin/main.cc
+                  cache_plugin/t_cache_plugin.cc
+
+                  ${CVMFS_SOURCE_DIR}/cache.cc
+                  ${CVMFS_SOURCE_DIR}/cache_extern.cc
+                  ${CVMFS_SOURCE_DIR}/cache_transport.cc
+                  ${CVMFS_SOURCE_DIR}/compression.cc
+                  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
+                  ${CVMFS_SOURCE_DIR}/manifest.cc
+                  ${CVMFS_SOURCE_DIR}/quota.cc
+                  ${CVMFS_SOURCE_DIR}/util/concurrency.cc
+                  ${CVMFS_SOURCE_DIR}/util/exception.cc
+                  ${CVMFS_SOURCE_DIR}/util/logging.cc
+                  ${CVMFS_SOURCE_DIR}/util/posix.cc
+                  ${CVMFS_SOURCE_DIR}/util/string.cc
+  )
+  add_dependencies (cvmfs_test_cache cache.pb.generated-unittests)
+  set_target_properties (cvmfs_test_cache PROPERTIES
+                         COMPILE_FLAGS "-DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -D_GLIBCXX_DEBUG -fexceptions"
+  )
+  target_link_libraries (cvmfs_test_cache
+                         ${GTEST_LIBRARIES}
+                         ${GMOCK_LIBRARIES}
+                         ${OPENSSL_LIBRARIES}
+                         ${ZLIB_LIBRARIES}
+                         ${RT_LIBRARY}
+                         ${SHA3_LIBRARIES}
+                         ${PROTOBUF_LITE_LIBRARY}
+                         pthread
+  )
+  if (INSTALL_UNITTESTS)
+    install (
+      TARGETS      cvmfs_test_cache
+      RUNTIME
+      DESTINATION  bin
+    )
+  endif ()
+endif (BUILD_LIBCVMFS_CACHE)
+
+
+endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+
 
 #
 # global test configuration
 #
 set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
-set (PROJECT_TEST_CACHE_NAME "cvmfs_test_cache")
 set (PROJECT_TEST_SHRINKWRAP_NAME "cvmfs_test_shrinkwrap")
 set (PROJECT_TEST_PUBLISH_NAME "cvmfs_test_publish")
 
@@ -138,7 +206,6 @@ set(CVMFS_UNITTEST_FILES
 #
 # unit test source files
 #
-set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_UNITTEST_FILES}
@@ -292,40 +359,6 @@ else (APPLE)
 endif(APPLE)
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
-
-set_source_files_properties(cache.pb.h cache.pb.cc
-                            PROPERTIES GENERATED true)
-
-add_custom_command(OUTPUT cache.pb.h cache.pb.cc
-                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --cpp_out=.
-                           ${CVMFS_SOURCE_DIR}/cache.proto
-                           -I${CVMFS_SOURCE_DIR}
-                   DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE}
-                           ${CVMFS_SOURCE_DIR}/cache.proto
-                   COMMENT "Generating protobuf sources")
-
-add_custom_target(cache.pb.generated-unittests
-                  DEPENDS cache.pb.h cache.pb.cc)
-
-
-set (CVMFS_TEST_CACHE_SOURCES
-  cache.pb.cc cache.pb.h
-  cache_plugin/main.cc
-  cache_plugin/t_cache_plugin.cc
-
-  ${CVMFS_SOURCE_DIR}/cache.cc
-  ${CVMFS_SOURCE_DIR}/cache_extern.cc
-  ${CVMFS_SOURCE_DIR}/cache_transport.cc
-  ${CVMFS_SOURCE_DIR}/compression.cc
-  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
-  ${CVMFS_SOURCE_DIR}/manifest.cc
-  ${CVMFS_SOURCE_DIR}/quota.cc
-  ${CVMFS_SOURCE_DIR}/util/concurrency.cc
-  ${CVMFS_SOURCE_DIR}/util/exception.cc
-  ${CVMFS_SOURCE_DIR}/util/logging.cc
-  ${CVMFS_SOURCE_DIR}/util/posix.cc
-  ${CVMFS_SOURCE_DIR}/util/string.cc
-)
 
 
 set (CVMFS_CLIENT_SOURCES
@@ -545,11 +578,9 @@ set (CVMFS_TEST_PUBLISH_SOURCES
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -D_GLIBCXX_DEBUG -fexceptions")
 set (CVMFS_TEST_SHRINKWRAP_CFLAGS "${CVMFS_UNITTESTS_CFLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
-set (CVMFS_TEST_CACHE_CFLAGS "${CVMFS_TEST_CACHE_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -D_GLIBCXX_DEBUG -fexceptions")
 set (CVMFS_TEST_PUBLISH_CFLAGS "${CVMFS_UNITTESTS_CFLAGS}")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-set (CVMFS_TEST_CACHE_LD_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
 set (CVMFS_TEST_SHRINKWRAP_LD_FLAGS "${CVMFS_TEST_SHRINKWRAP_LD_FLAGS}")
 set (CVMFS_TEST_PUBLISH_LD_FLAGS "${CVMFS_TEST_PUBLISH_LD_FLAGS}")
 
@@ -566,11 +597,6 @@ else (BUILD_UNITTESTS)
 endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
-  if (BUILD_LIBCVMFS_CACHE)
-    add_executable (${PROJECT_TEST_CACHE_NAME} ${CVMFS_TEST_CACHE_SOURCES})
-    add_dependencies (${PROJECT_TEST_CACHE_NAME} cache.pb.generated-unittests)
-  endif (BUILD_LIBCVMFS_CACHE)
-
   if (BUILD_SHRINKWRAP)
     add_executable (${PROJECT_TEST_SHRINKWRAP_NAME} ${CVMFS_TEST_SHRINKWRAP_SOURCES})
     add_dependencies (${PROJECT_TEST_SHRINKWRAP_NAME} cache.pb.generated-unittests)
@@ -598,9 +624,7 @@ if (BUILD_UNITTESTS_DEBUG)
   set_target_properties (${PROJECT_TEST_DEBUG_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
 endif (BUILD_UNITTESTS_DEBUG)
 
-if (BUILD_LIBCVMFS_CACHE)
-  set_target_properties (${PROJECT_TEST_CACHE_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_CACHE_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_CACHE_LD_FLAGS}")
-endif (BUILD_LIBCVMFS_CACHE)
+
 if (BUILD_SHRINKWRAP)
   set_target_properties (${PROJECT_TEST_SHRINKWRAP_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_TEST_SHRINKWRAP_CFLAGS}" LINK_FLAGS "${CVMFS_TEST_SHRINKWRAP_LD_FLAGS}")
 endif (BUILD_SHRINKWRAP)
@@ -628,13 +652,6 @@ if (BUILD_UNITTESTS_DEBUG)
   target_link_libraries (${PROJECT_TEST_DEBUG_NAME} ${UNITTEST_LINK_LIBRARIES})
 endif (BUILD_UNITTESTS_DEBUG)
 
-if (BUILD_LIBCVMFS_CACHE)
-  target_link_libraries (${PROJECT_TEST_CACHE_NAME}
-                         ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
-                         ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
-                         ${RT_LIBRARY} ${SHA3_LIBRARIES}
-                         ${PROTOBUF_LITE_LIBRARY} pthread)
-endif (BUILD_LIBCVMFS_CACHE)
 
 
 if (BUILD_SHRINKWRAP)
@@ -668,14 +685,6 @@ if (INSTALL_UNITTESTS)
     RUNTIME
     DESTINATION    bin
   )
-
-  if (BUILD_LIBCVMFS_CACHE)
-    install (
-      TARGETS        ${PROJECT_TEST_CACHE_NAME}
-      RUNTIME
-      DESTINATION    bin
-    )
-  endif (BUILD_LIBCVMFS_CACHE)
 
   if (BUILD_SHRINKWRAP)
     install (
