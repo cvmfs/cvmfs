@@ -1,4 +1,6 @@
 2.10.0:
+  * [server] Use libressl crypto on server
+  * Bump libressl to version 3.5.3
   * Fix compile warnings for cxx17 (#3014)
   * Add cvmfs-libs package containing libcvmfs_util, libcvmfs_crypto
   * [server] Work around openssl signature issues on EL9 (#2990)
