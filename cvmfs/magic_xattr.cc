@@ -147,13 +147,15 @@ MagicXattrFlavor AuthzMagicXattr::GetXattrFlavor() {
 
 bool CatalogCountersMagicXattr::PrepareValueFenced() {
   counters_ =
-    mount_point_->catalog_mgr()->LookupCounters(path_, &subcatalog_path_);
+    mount_point_->catalog_mgr()->
+      LookupCounters(path_, &subcatalog_path_, &hash_);
   return true;
 }
 
 std::string CatalogCountersMagicXattr::GetValue() {
   std::string res;
-  res = "catalog_mountpoint: " + subcatalog_path_ + "\n";
+  res = "catalog_hash: " + hash_.ToString() + "\n";
+  res += "catalog_mountpoint: " + subcatalog_path_ + "\n";
   res += counters_.GetCsvMap();
   return res;
 }
