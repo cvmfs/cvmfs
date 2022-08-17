@@ -2,7 +2,9 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
-set (CVMFS_UNITTEST_CFLAGS "-DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -D_GLIBCXX_DEBUG -fexceptions")
+set (CVMFS_UNITTEST_COMMON_CFLAGS "-DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -D_GLIBCXX_DEBUG -fexceptions")
+include_directories (${CMAKE_CURRENT_BINARY_DIR}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 
 
 #
@@ -44,7 +46,7 @@ if (BUILD_LIBCVMFS_CACHE)
   )
   add_dependencies (cvmfs_test_cache cache.pb.generated-unittests)
   set_target_properties (cvmfs_test_cache PROPERTIES
-                         COMPILE_FLAGS "${CVMFS_UNITTEST_CFLAGS}"
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
   )
   target_link_libraries (cvmfs_test_cache
                          ${GTEST_LIBRARIES}
@@ -177,7 +179,7 @@ if (BUILD_SHRINKWRAP)
   )
   add_dependencies (cvmfs_test_shrinkwrap cache.pb.generated-unittests)
   set_target_properties (cvmfs_test_shrinkwrap PROPERTIES
-                         COMPILE_FLAGS "${CVMFS_UNITTEST_CFLAGS}"
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
   )
   target_link_libraries (cvmfs_test_shrinkwrap
                          ${GTEST_LIBRARIES}
@@ -214,8 +216,6 @@ endif (BUILD_SHRINKWRAP)
 # cvmfs_test_publish
 #
 if (BUILD_SERVER)
-
-
   add_executable (cvmfs_test_publish
                   c_http_server.cc
                   publish/c_repository.cc
@@ -320,7 +320,7 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/xattr.cc
   )
   set_target_properties (cvmfs_test_publish PROPERTIES
-                         COMPILE_FLAGS "${CVMFS_UNITTEST_CFLAGS}"
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
   )
   target_link_libraries (cvmfs_test_publish
                          ${GTEST_LIBRARIES}
@@ -347,22 +347,13 @@ if (BUILD_SERVER)
   endif ()
 endif (BUILD_SERVER)
 
-endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 
-#
-# global test configuration
-#
-set (PROJECT_TEST_NAME "cvmfs_unittests")
-set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
-
-# Add the test/common directory to the include path
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
 
 #
 # unit test files
 #
-set(CVMFS_UNITTEST_FILES
+set(CVMFS_UNITTEST_SOURCES
   # test steering
   main.cc
 
@@ -481,16 +472,7 @@ set(CVMFS_UNITTEST_FILES
   t_whitelist.cc
   t_wpad.cc
   t_xattr.cc
-)
 
-#
-# unit test source files
-#
-set (CVMFS_UNITTEST_SOURCES
-
-  ${CVMFS_UNITTEST_FILES}
-
-  # test dependencies
   ${CVMFS_SOURCE_DIR}/authz/authz.cc
   ${CVMFS_SOURCE_DIR}/authz/authz_curl.cc
   ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc
@@ -623,105 +605,75 @@ set (CVMFS_UNITTEST_SOURCES
   c_http_server.cc
 )
 
-# Lower optimization level for this file. Xcode 9.3+ gives different results in Os and above
-if (CVMFS_BUGGY_XCODE)
-  set_property(SOURCE ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc PROPERTY COMPILE_FLAGS -O0)
-endif(CVMFS_BUGGY_XCODE)
-
 # The FileWatcher unit test only makes sense on macOS or on Linux versions which support inotify (inotify)
-if (APPLE)
-  list(APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc t_file_watcher.cc)
-else (APPLE)
+if (MACOSX)
+  list (APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc t_file_watcher.cc)
+else ()
   if (CVMFS_ENABLE_INOTIFY)
-    list(APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_inotify.cc t_file_watcher.cc)
-    add_definitions(-DCVMFS_ENABLE_INOTIFY)
-  endif(CVMFS_ENABLE_INOTIFY)
-endif(APPLE)
+    list (APPEND CVMFS_UNITTEST_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_inotify.cc t_file_watcher.cc)
+    add_definitions (-DCVMFS_ENABLE_INOTIFY)
+  endif ()
+endif ()
 
-set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
+set (CVMFS_UNITTESTS_LINK_LIBRARIES "")
+list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
+      ${GTEST_LIBRARIES}
+      ${GMOCK_LIBRARIES}
+      ${OPENSSL_LIBRARIES}
+      ${CURL_LIBRARIES}
+      ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+      ${OPENSSL_LIBRARIES}
+      ${SQLITE3_LIBRARY}
+      ${ZLIB_LIBRARIES}
+      ${UUID_LIBRARIES}
+      ${PACPARSER_LIBRARIES}
+      ${SHA3_LIBRARIES}
+      ${VJSON_LIBRARIES}
+      ${PROTOBUF_LITE_LIBRARY}
+      ${LibArchive_LIBRARY}
+      ${RT_LIBRARY}
+      pthread
+      dl
+)
 
+add_executable (cvmfs_unittests ${CVMFS_UNITTEST_SOURCES})
+add_dependencies (cvmfs_unittests cache.pb.generated-unittests)
+set_target_properties (cvmfs_unittests PROPERTIES
+                       COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
+)
+target_link_libraries (cvmfs_unittests ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
-
-
-
-#
-# Compiler and Linker Flags for unit tests
-#
-set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -D_GLIBCXX_DEBUG -fexceptions")
-set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
-set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-
-#
-# build CernVM-FS test cases
-#
-include_directories (${CMAKE_CURRENT_BINARY_DIR} ${INCLUDE_DIRECTORIES})
-
-if (BUILD_UNITTESTS)
-  add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
-  add_dependencies (${PROJECT_TEST_NAME} cache.pb.generated-unittests)
-else (BUILD_UNITTESTS)
-  add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
-endif (BUILD_UNITTESTS)
-
-
-add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
-add_dependencies (check ${PROJECT_TEST_NAME})
-
-if (BUILD_UNITTESTS_DEBUG)
-  add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
-  add_dependencies (${PROJECT_TEST_DEBUG_NAME} cache.pb.generated-unittests)
-endif (BUILD_UNITTESTS_DEBUG)
-
-#
-# set build flags
-#
-set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-
-if (BUILD_UNITTESTS_DEBUG)
-  set_target_properties (${PROJECT_TEST_DEBUG_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
-endif (BUILD_UNITTESTS_DEBUG)
-
-
-
-#
-# link the stuff (*_LIBRARIES are dynamic link libraries)
-#
-
-list (APPEND UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
-                                     ${OPENSSL_LIBRARIES}
-                                     ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                                     ${OPENSSL_LIBRARIES} ${SQLITE3_LIBRARY}
-                                     ${ZLIB_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                                     ${PACPARSER_LIBRARIES} ${SHA3_LIBRARIES}
-                                     ${VJSON_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
-                                     ${LibArchive_LIBRARY} pthread dl)
-
-target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
-
-if (BUILD_UNITTESTS_DEBUG)
-  target_link_libraries (${PROJECT_TEST_DEBUG_NAME} ${UNITTEST_LINK_LIBRARIES})
-endif (BUILD_UNITTESTS_DEBUG)
-
-
-
-
-#
-# Install the generated unit test binary
-#
 if (INSTALL_UNITTESTS)
   install (
-    TARGETS        ${PROJECT_TEST_NAME}
+    TARGETS      cvmfs_unittests
     RUNTIME
-    DESTINATION    bin
+    DESTINATION  bin
   )
+endif ()
 
-endif (INSTALL_UNITTESTS)
-
-if (INSTALL_UNITTESTS_DEBUG)
-  install (
-    TARGETS        ${PROJECT_TEST_DEBUG_NAME}
-    RUNTIME
-    DESTINATION    bin
+if (BUILD_UNITTESTS_DEBUG)
+  add_executable (cvmfs_unittests_debug ${CVMFS_UNITTEST_SOURCES})
+  add_dependencies (cvmfs_unittests_debug cache.pb.generated-unittests)
+  set_target_properties (cvmfs_unittests_debug PROPERTIES
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
   )
-endif (INSTALL_UNITTESTS_DEBUG)
+  target_link_libraries (cvmfs_unittests_debug ${CVMFS_UNITTESTS_LINK_LIBRARIES})
+
+  if (INSTALL_UNITTESTS)
+    install (
+      TARGETS      cvmfs_unittests_debug
+      RUNTIME
+      DESTINATION  bin
+    )
+  endif ()
+endif ()
+
+
+
+#
+# For `make check`
+#
+add_test (NAME cvmfs_unittests COMMAND cvmfs_unittests --gtest_filter=-*Slow)
+add_dependencies (check cvmfs_unittests)
+
+endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
