@@ -56,6 +56,7 @@
 #include "interrupt.h"
 #include "sanitizer.h"
 #include "ssl.h"
+#include "timers.h"
 #include "util/algorithm.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
@@ -302,9 +303,13 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   if (info->destination == kDestinationSink) {
     if (info->compressed) {
-      zlib::StreamStates retval =
-        zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                     &info->zstream, info->destination_sink);
+      TimerGuard timer_guard("Time in decompression",
+        DECOMPRESSION_TIMER, NULL);
+      zlib::StreamStates retval;
+      retval = zlib::DecompressZStream2Sink(ptr,
+        static_cast<int64_t>(num_bytes), &info->zstream,
+        info->destination_sink);
+
       if (retval == zlib::kStreamDataError) {
         LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
                  info->url->c_str());
@@ -496,6 +501,7 @@ int DownloadManager::CallbackCurlSocket(CURL * /* easy */,
  * Worker thread event loop.  Waits on new JobInfo structs on a pipe.
  */
 void *DownloadManager::MainDownload(void *data) {
+  TimerGuard timer_guard("MainDownload()", MAIN_DOWNLOAD_TIMER, NULL);
   LogCvmfs(kLogDownload, kLogDebug, "download I/O thread started");
   DownloadManager *download_mgr = static_cast<DownloadManager *>(data);
 
@@ -513,7 +519,7 @@ void *DownloadManager::MainDownload(void *data) {
   int still_running = 0;
   struct timeval timeval_start, timeval_stop;
   gettimeofday(&timeval_start, NULL);
-  while (true) {
+  while (true) { // NOLINT
     int timeout;
     if (still_running) {
       /* NOTE: The following might degrade the performance for many small files
@@ -533,6 +539,12 @@ void *DownloadManager::MainDownload(void *data) {
         1000 * DiffTimeSeconds(timeval_start, timeval_stop));
       perf::Xadd(download_mgr->counters_->sz_transfer_time, delta);
     }
+
+    TimerGuard *timer_guard2 =
+      new TimerGuard("Time blocked on network", NETWORK_TIMER, NULL);
+    bool timer_destroyed = false;
+    timer_guard2->ignore_result = true;
+
     int retval = poll(download_mgr->watch_fds_, download_mgr->watch_fds_inuse_,
                       timeout);
     if (retval < 0) {
@@ -541,6 +553,9 @@ void *DownloadManager::MainDownload(void *data) {
 
     // Handle timeout
     if (retval == 0) {
+      timer_guard2->ignore_result = false;
+      timer_guard2->~TimerGuard();
+      timer_destroyed = true;
       curl_multi_socket_action(download_mgr->curl_multi_,
                                CURL_SOCKET_TIMEOUT,
                                0,
@@ -580,6 +595,7 @@ void *DownloadManager::MainDownload(void *data) {
       }
       if (download_mgr->watch_fds_[i].revents) {
         int ev_bitmask = 0;
+
         if (download_mgr->watch_fds_[i].revents & (POLLIN | POLLPRI))
           ev_bitmask |= CURL_CSELECT_IN;
         if (download_mgr->watch_fds_[i].revents & (POLLOUT | POLLWRBAND))
@@ -591,12 +607,21 @@ void *DownloadManager::MainDownload(void *data) {
         }
         download_mgr->watch_fds_[i].revents = 0;
 
+        if (!timer_destroyed) {
+          timer_guard2->ignore_result = false;
+          timer_guard2->~TimerGuard();
+          timer_destroyed = true;
+        }
+
         curl_multi_socket_action(download_mgr->curl_multi_,
                                  download_mgr->watch_fds_[i].fd,
                                  ev_bitmask,
                                  &still_running);
       }
     }
+
+    if (!timer_destroyed)
+      timer_guard2->~TimerGuard();
 
     // Check if transfers are completed
     CURLMsg *curl_msg;
@@ -1722,7 +1747,6 @@ void DownloadManager::Spawn() {
 Failures DownloadManager::Fetch(JobInfo *info) {
   assert(info != NULL);
   assert(info->url != NULL);
-
   Failures result;
   result = PrepareDownloadDestination(info);
   if (result != kFailOk)
@@ -1758,7 +1782,11 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     //          info->wait_at[0], info->wait_at[1]);
     // NOLINTNEXTLINE(bugprone-sizeof-expression)
     WritePipe(pipe_jobs_[1], &info, sizeof(info));
-    ReadPipe(info->wait_at[0], &result, sizeof(result));
+    {
+      TimerGuard timer_guard("Waiting for MainDownload",
+        WAITING_DOWNLOAD_TIMER, NULL);
+      ReadPipe(info->wait_at[0], &result, sizeof(result));
+    }
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     MutexLockGuard l(lock_synchronous_mode_);
