@@ -237,10 +237,12 @@ void FileSystem::CreateStatistics() {
                                                   "Number of I/O errors"));
 
   string optarg;
+
+  TimerTree::getInstance();
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
       options_mgr_->IsOn(optarg))
   {
-    HighPrecisionTimer::g_is_enabled = true;
+    TimerTree::getInstance()->g_is_enabled = true;
   }
 
   hist_fs_lookup_ = new Log2Histogram(30);

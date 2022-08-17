@@ -1,0 +1,27 @@
+/**
+ * This file is part of the CernVM File System.
+ *
+ * List of timers id.
+ */
+
+#ifndef CVMFS_TIMERS_H_
+#define CVMFS_TIMERS_H_
+
+#define CVMFS_LOOKUP_TIMER 1
+#define CVMFS_FORGET_TIMER 2
+#define CVMFS_FORGET_MULTI_TIMER 3
+#define CVMFS_GETATTR_TIMER 4
+#define CVMFS_READLINK_TIMER 5
+#define CVMFS_OPENDIR_TIMER 6
+#define CVMFS_RELEASEDIR_TIMER 7
+#define CVMFS_READDIR_TIMER 8
+#define CVMFS_OPEN_TIMER 9
+#define CVMFS_READ_TIMER 10
+#define CVMFS_RELEASE_TIMER 11
+#define FETCH_TIMER 12
+#define WAITING_DOWNLOAD_TIMER 13
+#define DECOMPRESSION_TIMER 14
+#define MAIN_DOWNLOAD_TIMER 15
+#define NETWORK_TIMER 16
+
+#endif  // CVMFS_TIMERS_H_
