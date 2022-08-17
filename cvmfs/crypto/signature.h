@@ -63,7 +63,6 @@ class CVMFS_EXPORT SignatureManager {
 
   bool LoadTrustedCaCrl(const std::string &path_list);
 
-  void SetSignOffload() { offload_signing_ = true; }
   bool Sign(const unsigned char *buffer, const unsigned buffer_size,
             unsigned char **signature, unsigned *signature_size);
   bool SignRsa(const unsigned char *buffer, const unsigned buffer_size,
@@ -101,9 +100,6 @@ class CVMFS_EXPORT SignatureManager {
 
   void InitX509Store();
 
-  std::string SignOffload(ESignMethod method,
-                          unsigned buf_size, const unsigned char *buf);
-
   EVP_PKEY *private_key_;
   RSA *private_master_key_;
   X509 *certificate_;
@@ -112,7 +108,6 @@ class CVMFS_EXPORT SignatureManager {
   std::vector<std::string> blacklist_;
   X509_STORE *x509_store_;
   X509_LOOKUP *x509_lookup_;
-  bool offload_signing_;
 };  // class SignatureManager
 
 }  // namespace signature

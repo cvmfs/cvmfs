@@ -16,7 +16,6 @@ publish::Publisher *GetTestPublisher() {
   std::string keys_dir = base_dir + "/keys";
 
   publish::SettingsPublisher settings("test.cvmfs.io");
-  settings.SetOffloadSigning(false);
   settings.SetIsSilent(true);
   settings.SetOwner(GetUserName());
   settings.GetStorage()->MakeLocal(srv_dir);

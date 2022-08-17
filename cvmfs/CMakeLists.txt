@@ -593,20 +593,6 @@ if (BUILD_SERVER)
                   sanitizer.cc
   )
 
-  #
-  # /usr/bin/cvmfs_signing_helper
-  # TODO(jblomer): remove me
-  #
-  add_executable (cvmfs_signing_helper
-                  crypto/signature_offload.cc
-  )
-  set_target_properties (cvmfs_signing_helper PROPERTIES
-    COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
-  target_link_libraries (cvmfs_signing_helper
-                         cvmfs_crypto
-                         cvmfs_util
-  )
-
 
   #
   #
@@ -952,7 +938,7 @@ if (BUILD_SERVER)
     PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID
   )
   install (
-    TARGETS      cvmfs_swissknife cvmfs_publish cvmfs_signing_helper
+    TARGETS      cvmfs_swissknife cvmfs_publish
     RUNTIME
     DESTINATION  bin
   )

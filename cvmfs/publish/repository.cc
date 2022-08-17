@@ -648,8 +648,6 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
   if ((settings.storage().type() != upload::SpoolerDefinition::Gateway) &&
       !settings.transaction().in_enter_session())
   {
-    if (settings.offload_signing())
-      signature_mgr_->SetSignOffload();
     int rvb = signature_mgr_->LoadCertificatePath(
       settings.keychain().certificate_path());
     if (!rvb)
