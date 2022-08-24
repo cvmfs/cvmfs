@@ -502,13 +502,9 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 	}
 	if resp.StatusCode != 401 {
 		log.WithFields(log.Fields{
+			"url": url,
 			"status code": resp.StatusCode,
-		}).Info("Expected status code 401, print body anyway.")
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			l.LogE(err).Error("Error in reading the first http response")
-		}
-		fmt.Println(string(body))
+		}).Info("Expected status code 401.")
 		return "", err
 	}
 	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
@@ -534,7 +530,7 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 }
 
 func getLayerUrl(img *Image, layerDigest string) string {
-	return fmt.Sprintf("%s/blobs/%s", img.baseUrl(), layerDigest)
+	return fmt.Sprintf("%sblobs/%s", img.baseUrl(), layerDigest)
 }
 
 type downloadedLayer struct {
