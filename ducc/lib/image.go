@@ -75,8 +75,9 @@ func SetupRegistries() {
 		pass := os.Getenv(uPass)
 		proxy := os.Getenv(proxyEnv)
 
-		if user == "" || pass == "" || ident == "" {
-			log.Fatalf("missing either $%s, $%s or $%s for %s", uEnv, uPass, iEnv, r)
+		if ident == "" || ((user == "" || pass == "") && proxy == "") {
+			log.Fatalf("missing either $%s, ($%s or $%s) or %s for %s",
+			           iEnv, uEnv, uPass, proxyEnv, r)
 		}
 
 		inputRegistries = append(inputRegistries, RegistryConfig{
