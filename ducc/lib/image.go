@@ -46,6 +46,48 @@ type Image struct {
 	OCIImage    *image.Image
 }
 
+type Credentials struct {
+	username string
+	password string
+}
+
+type RegistryConfig struct {
+	baseUrl string
+	proxy   string
+	creds   Credentials
+}
+
+var inputRegistries []RegistryConfig
+
+func SetupRegistries() {
+	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
+	for _, r := range strings.Split(regs, ",") {
+		if r == "" {
+			continue
+		}
+
+		iEnv := "DUCC_" + r + "_IDENT"
+		uEnv := "DUCC_" + r + "_USER"
+		uPass := "DUCC_" + r + "_PASS"
+		proxyEnv := "DUCC_" + r + "_PROXY"
+		ident := os.Getenv(iEnv)
+		user := os.Getenv(uEnv)
+		pass := os.Getenv(uPass)
+		proxy := os.Getenv(proxyEnv)
+
+		if ident == "" || ((user == "" || pass == "") && proxy == "") {
+			log.Fatalf("missing either $%s, ($%s or $%s) or %s for %s",
+			           iEnv, uEnv, uPass, proxyEnv, r)
+		}
+
+		inputRegistries = append(inputRegistries, RegistryConfig{
+			ident,
+			proxy,
+			Credentials{user, pass},
+		})
+	}
+}
+
 func (i *Image) GetSimpleName() string {
 	name := fmt.Sprintf("%s/%s", i.Registry, i.Repository)
 	if i.Tag == "" {
@@ -66,9 +108,11 @@ func (i *Image) WholeName() string {
 	return root
 }
 
-func (i *Image) GetManifestUrl() string {
-	url := fmt.Sprintf("%s://%s/v2/%s/manifests/", i.Scheme, i.Registry, i.Repository)
-	if i.Digest != "" {
+func (i *Image) GetManifestUrl(reference string) string {
+	url := i.baseUrl() + "manifests/"
+	if reference != "" {
+		url = fmt.Sprintf("%s%s", url, reference)
+	} else if i.Digest != "" {
 		url = fmt.Sprintf("%s%s", url, i.Digest)
 	} else {
 		url = fmt.Sprintf("%s%s", url, i.Tag)
@@ -131,24 +175,87 @@ func (img *Image) PrintImage(machineFriendly, csv_header bool) {
 	}
 }
 
-func (img *Image) GetManifest() (da.Manifest, error) {
-	if img.Manifest != nil {
-		return *img.Manifest, nil
-	}
-	bytes, err := img.getByteManifest()
+func (img *Image) fetchManifest() (*da.Manifest, error) {
+	bytes, err := img.getByteManifest("")
 	if err != nil {
-		return da.Manifest{}, err
+		return nil, err
 	}
 	var manifest da.Manifest
 	err = json.Unmarshal(bytes, &manifest)
 	if err != nil {
-		return manifest, err
+		return nil, err
 	}
 	if reflect.DeepEqual(da.Manifest{}, manifest) {
-		return manifest, fmt.Errorf("Got empty manifest")
+		return nil, fmt.Errorf("got empty manifest")
 	}
+
 	img.Manifest = &manifest
-	return manifest, nil
+	return &manifest, nil
+}
+
+func (img *Image) fetchManifestList() (*da.Manifest, error) {
+	bytes1, err := img.getByteManifestList()
+	if err != nil {
+		return nil, err
+	}
+
+	var manifestList da.ManifestList
+	err = json.Unmarshal(bytes1, &manifestList)
+	if err != nil {
+		return nil, err
+	}
+	if reflect.DeepEqual(da.ManifestList{}, manifestList) {
+		return nil, fmt.Errorf("got empty manifest list")
+	}
+
+	var manifestReference string
+	if len(manifestList.Manifests) == 1 {
+		manifestReference = manifestList.Manifests[0].Digest
+	} else {
+		// TODO: In case of a manifest list with multiple architectures, default to amd64
+		// TODO: Support multi-arch images
+		for _, v := range manifestList.Manifests {
+			if v.Platform.Architecture == "amd64" {
+				manifestReference = v.Digest
+			}
+		}
+	}
+
+	bytes2, err := img.getByteManifest(manifestReference)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest da.Manifest
+	err = json.Unmarshal(bytes2, &manifest)
+	if err != nil {
+		return nil, err
+	}
+	if reflect.DeepEqual(da.Manifest{}, manifest) {
+		return nil, fmt.Errorf("got empty manifest")
+	}
+
+	img.Manifest = &manifest
+	return &manifest, nil
+}
+
+func (img *Image) GetManifest() (da.Manifest, error) {
+	if img.Manifest != nil {
+		return *img.Manifest, nil
+	}
+
+	// First try to fetch a simple manifest
+	manifest, err := img.fetchManifest()
+	if err != nil || manifest.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" {
+		// If the first fetch fails, try to fetch from a manifest list
+		manifest, err := img.fetchManifestList()
+		if err != nil {
+			return da.Manifest{}, fmt.Errorf("could not retrieve manifest")
+		}
+		return *manifest, nil
+	}
+
+	return *manifest, nil
 }
 
 func (img *Image) GetOCIImage() (config image.Image, err error) {
@@ -178,6 +285,10 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 
 	resp, err := client.Do(req)
+	if err != nil {
+		l.LogE(err).Warning("error making HTTP request")
+		return
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -218,7 +329,7 @@ func (img *Image) GetChanges() (changes []string, err error) {
 	cmd := config.Config.Cmd
 
 	if len(cmd) > 0 {
-		command := fmt.Sprintf("CMD")
+		command := "CMD"
 		for _, c := range cmd {
 			command = fmt.Sprintf("%s %s", command, c)
 		}
@@ -233,7 +344,7 @@ func (img *Image) GetSingularityLocation() string {
 }
 
 func (img *Image) GetTagListUrl() string {
-	return fmt.Sprintf("%s://%s/v2/%s/tags/list", img.Scheme, img.Registry, img.Repository)
+	return img.baseUrl() + "tags/list"
 }
 
 func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
@@ -259,7 +370,7 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	url := img.GetTagListUrl()
 	token, err := firstRequestForAuth(url)
 	if err != nil {
-		errF := fmt.Errorf("Error in authenticating for retrieving the tags: %s", err)
+		errF := fmt.Errorf("error in authenticating for retrieving the tags: %s", err)
 		l.LogE(err).Error(errF)
 		return r1, r2, errF
 	}
@@ -270,18 +381,18 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		errF := fmt.Errorf("Error in making the request for retrieving the tags: %s", err)
+		errF := fmt.Errorf("error making the request for retrieving the tags: %s", err)
 		l.LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
 		return r1, r2, errF
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		errF := fmt.Errorf("Got error status code (%d) trying to retrieve the tags", resp.StatusCode)
+		errF := fmt.Errorf("error status code (%d) trying to retrieve the tags", resp.StatusCode)
 		l.LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
 		return r1, r2, errF
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
-		errF := fmt.Errorf("Error in decoding the tags from the server: %s", err)
+		errF := fmt.Errorf("error in decoding the tags from the server: %s", err)
 		l.LogE(err).Error(errF)
 		return r1, r2, errF
 	}
@@ -354,67 +465,20 @@ func (i *Image) GetPublicSymlinkPath() string {
 	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
 
-func (img *Image) getByteManifest() ([]byte, error) {
-	url := img.GetManifestUrl()
-
-	token, err := firstRequestForAuth(url)
-	if err != nil {
-		l.LogE(err).Error("Error in getting the authentication token")
-		return nil, err
-	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		l.LogE(err).Error("Impossible to create a HTTP request")
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", token)
-	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		l.LogE(err).Error("Error in making the HTTP request")
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		l.LogE(err).Error("Error in reading the second http response")
-		return nil, err
-	}
-	return body, nil
+func (img *Image) getByteManifestList() ([]byte, error) {
+	url := img.GetManifestUrl("")
+	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.list.v2+json"})
 }
 
-type Credentials struct {
-	username string
-	password string
+func (img *Image) getByteManifest(reference string) ([]byte, error) {
+	url := img.GetManifestUrl(reference)
+	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.v2+json"})
 }
 
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
-	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
-	for _, r := range strings.Split(regs, ",") {
-		if r == "" {
-			continue
-		}
-
-		iEnv := "DUCC_" + r + "_IDENT"
-		uEnv := "DUCC_" + r + "_USER"
-		uPass := "DUCC_" + r + "_PASS"
-		ident := os.Getenv(iEnv)
-		user := os.Getenv(uEnv)
-		pass := os.Getenv(uPass)
-		if user == "" || pass == "" || ident == "" {
-			err = fmt.Errorf("missing either $%s or $%s or $%s", uEnv, uPass, iEnv)
-			return "", err;
-		}
-
-		if (!strings.Contains(url, ident)) {
-			continue
-		}
-
-		return firstRequestForAuth_internal(url, user, pass)
+	reg := getRegistry(url)
+	if reg != nil && reg.proxy == "" {
+		return firstRequestForAuth_internal(url, reg.creds.username, reg.creds.password)
 	}
 	return firstRequestForAuth_internal(url, "", "")
 }
@@ -439,13 +503,9 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 	}
 	if resp.StatusCode != 401 {
 		log.WithFields(log.Fields{
+			"url": url,
 			"status code": resp.StatusCode,
-		}).Info("Expected status code 401, print body anyway.")
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			l.LogE(err).Error("Error in reading the first http response")
-		}
-		fmt.Println(string(body))
+		}).Info("Expected status code 401.")
 		return "", err
 	}
 	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
@@ -471,8 +531,7 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 }
 
 func getLayerUrl(img *Image, layerDigest string) string {
-	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, layerDigest)
+	return fmt.Sprintf("%sblobs/%s", img.baseUrl(), layerDigest)
 }
 
 type downloadedLayer struct {
@@ -556,7 +615,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 		case <-killKiller:
 			return
 		case <-stopGettingLayers:
-			err := fmt.Errorf("Detect errors, stop getting layer")
+			err := fmt.Errorf("detect errors, stop getting layer")
 			errorChannel <- err
 			l.LogE(err).Error("Detect error, stop getting layers")
 			cancel()
@@ -656,7 +715,7 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			toSend = newDownloadedLayer(layer.Digest, path)
 			return toSend, nil
 		} else {
-			err = fmt.Errorf("Layer not received, status code: %d", resp.StatusCode)
+			err = fmt.Errorf("layer not received, status code: %d", resp.StatusCode)
 			l.LogE(err).Warning("Received status code ", resp.StatusCode)
 			if resp.StatusCode == 401 {
 				// try to get the token again
@@ -680,7 +739,7 @@ func parseBearerToken(token string) (realm string, options map[string]string, er
 	for _, kv := range keyValue {
 		splitted := strings.Split(kv, "=")
 		if len(splitted) != 2 {
-			err = fmt.Errorf("Wrong formatting of the token")
+			err = fmt.Errorf("wrong formatting of the token")
 			return
 		}
 		splitted[1] = strings.Trim(splitted[1], `"`)
@@ -716,13 +775,13 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		err = fmt.Errorf("Error in getting the token, http request failed %s", err)
+		err = fmt.Errorf("error in getting the token, http request failed %s", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		err = fmt.Errorf("Authorization error %s", resp.Status)
+		err = fmt.Errorf("authorization error %s", resp.Status)
 		return
 	}
 
@@ -735,7 +794,7 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	if ok {
 		authToken = "Bearer " + authTokenInterface.(string)
 	} else {
-		err = fmt.Errorf("Didn't get the token key from the server")
+		err = fmt.Errorf("didn't get the token key from the server")
 		return
 	}
 	return
@@ -945,4 +1004,63 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		}
 	}
 	return
+}
+
+func getRegistry(url string) *RegistryConfig {
+	for _, reg := range inputRegistries {
+		if strings.Contains(url, reg.baseUrl) {
+			return &reg
+		}
+	}
+	return nil
+}
+
+func (i *Image) baseUrl() string {
+	var url string
+	reg := getRegistry(i.Registry)
+	if reg != nil && reg.proxy != "" {
+		proxyHost, proxyPath, found := strings.Cut(reg.proxy, "/")
+		if found {
+			url = fmt.Sprintf("%s://%s/v2/%s/%s/", i.Scheme, proxyHost, proxyPath, i.Repository)
+		} else {
+			url = fmt.Sprintf("%s://%s/v2/%s/", i.Scheme, proxyHost, i.Repository)
+		}
+	} else {
+		url = fmt.Sprintf("%s://%s/v2/%s/", i.Scheme, i.Registry, i.Repository)
+	}
+	return url
+}
+
+func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
+	token, err := firstRequestForAuth(url)
+	if err != nil {
+		l.LogE(err).Error("Error in getting the authentication token")
+		return nil, err
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		l.LogE(err).Error("Impossible to create a HTTP request")
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", token)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		l.LogE(err).Error("Error in making the HTTP request")
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		l.LogE(err).Error("Error in reading the second http response")
+		return nil, err
+	}
+
+	return body, nil
 }
