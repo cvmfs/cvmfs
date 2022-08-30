@@ -997,7 +997,7 @@ class PageCacheTracker {
   OpenDirectives OpenDirect();
   void Close(uint64_t inode);
 
-  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash, struct stat *info = NULL)
+  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash, struct stat *info)
   {
     MutexLockGuard guard(lock_);
     Entry entry;

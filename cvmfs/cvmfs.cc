@@ -239,12 +239,17 @@ static bool FixupOpenInode(const PathString &path,
     return false;
 
   shash::Any hash_open;
+  struct stat info;
   bool is_open = mount_point_->page_cache_tracker()->GetInfoIfOpen(
-    dirent->inode(), &hash_open);
+    dirent->inode(), &hash_open, &info);
   if (!is_open)
     return false;
   // TODO(jblomer): fix for chunked files
   if (hash_open == dirent->checksum())
+    return false;
+  // For chunked files, we don't want to load the full list of chunk hashes
+  // so we only check the last modified timestamp
+  if (dirent->IsChunkedFile() && (info.st_mtime == dirent->mtime()))
     return false;
 
   // Overwrite dirent with inode from current generation
