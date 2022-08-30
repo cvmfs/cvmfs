@@ -244,7 +244,6 @@ static bool FixupOpenInode(const PathString &path,
     dirent->inode(), &hash_open, &info);
   if (!is_open)
     return false;
-  // TODO(jblomer): fix for chunked files
   if (hash_open == dirent->checksum())
     return false;
   // For chunked files, we don't want to load the full list of chunk hashes

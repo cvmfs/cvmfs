@@ -711,6 +711,9 @@ class InodeTracker {
     return inode;
   }
 
+  /**
+   * The new inode has reference counter 0
+   */
   void ReplaceInode(uint64_t old_inode, const InodeEx &new_inode) {
     shash::Md5 md5path;
     InodeEx old_inode_ex(old_inode, InodeEx::kUnknownType);
