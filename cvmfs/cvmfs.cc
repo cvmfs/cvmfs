@@ -259,6 +259,11 @@ static bool FixupOpenInode(const PathString &path,
   return true;
 }
 
+static bool MayBeInPageCacheTracker(const catalog::DirectoryEntry &dirent) {
+  return dirent.IsRegular() &&
+         (dirent.inode() < mount_point_->catalog_mgr()->GetRootInode());
+}
+
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
@@ -324,6 +329,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       // TODO(jblomer): we detect this issue but let it continue unhandled.
       // Fix me.
     }
+
     // Fix inodes
     dirent->set_inode(ino);
     mount_point_->inode_cache()->Insert(ino, *dirent);
@@ -681,18 +687,21 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   catalog::DirectoryEntry dirent;
   bool found = GetDirentForInode(ino, &dirent);
   TraceInode(Tracer::kEventGetAttr, ino, "getattr()");
-  if (!found && (dirent.inode() == ino)) {
-    // Serve retired inode from page cache tracker
+  if ((!found && (dirent.inode() == ino)) || MayBeInPageCacheTracker(dirent)) {
+    // Serve retired inode from page cache tracker; even if we find it in the
+    // catalog, we replace the dirent by the page cache tracker version to
+    // not confuse open file handles
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr %" PRIu64" "
+            "served from page cache tracker", ino);
     shash::Any hash;
     struct stat info;
-    found =
+    bool isInPageCacheTracker =
       mount_point_->page_cache_tracker()->GetInfoIfOpen(ino, &hash, &info);
-    if (found) {
+    if (isInPageCacheTracker) {
       fuse_remounter_->fence()->Leave();
       fuse_reply_attr(req, &info, GetKcacheTimeout());
       return;
     }
-    // LogCvmfs() strange place, may that happen?
   }
   fuse_remounter_->fence()->Leave();
 

@@ -56,11 +56,22 @@ int main(int argc, char **argv) {
     fprintf(stderr, "cannot open %s\n", path);
     return 1;
   }
+  struct stat info;
+  int rv = fstat(fd, &info);
+  if (rv < 0) {
+    fprintf(stderr, "cannot fstat %s\n", path);
+    return 1;
+  }
+  void *mapped = mmap(NULL, info.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (mapped == MAP_FAILED) {
+    fprintf(stderr, "cannot mmap %s\n", path);
+    return 1;
+  }
 
   int round = 0;
   while (!Exists("stop_topen")) {
     char xattr_revision[64];
-    int rv = getxattr(path, "user.revision", xattr_revision, 63);
+    rv = getxattr(path, "user.revision", xattr_revision, 63);
     int revision = -1;
     if (rv >= 0) {
       xattr_revision[rv] = '\0';
@@ -70,7 +81,6 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    struct stat info;
     rv = fstat(fd, &info);
     if (rv < 0) {
       fprintf(stderr, "cannot fstat %s\n", path);
@@ -96,23 +106,18 @@ int main(int argc, char **argv) {
     } while (rv == 4096);
     cksum_read = FinalizeChecksum(len, cksum_read);
 
-    void *mapped = mmap(NULL, info.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (mapped == MAP_FAILED) {
-      fprintf(stderr, "cannot mmap %s\n", path);
-      return 1;
-    }
     unsigned cksum_mmap = InitChecksum();
     cksum_mmap = UpdateChecksum(mapped, info.st_size, cksum_mmap);
     cksum_mmap = FinalizeChecksum(info.st_size, cksum_mmap);
-    munmap(mapped, info.st_size);
 
     printf("**** ROUND %d [%s]\n", round, path);
     printf("Revision: %d\n", revision);
     printf("Length: %lu\n", info.st_size);
     printf("Inode: %lu\n", info.st_ino);
-    printf("Len(read): %d\n", len);
-    printf("Cksum(read): %u\n", cksum_read);
-    printf("Cksum(mmap): %u\n", cksum_mmap);
+    printf("nToEOF: %d\n", len);
+    printf("Cksum-read: %u\n", cksum_read);
+    printf("Cksum-mmap: %u\n", cksum_mmap);
+    fflush(stdout);
 
     sleep(1);
     round++;
