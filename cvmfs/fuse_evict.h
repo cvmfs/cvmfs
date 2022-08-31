@@ -69,6 +69,8 @@ class FuseInvalidator : SingleCopy {
   void Spawn();
   void InvalidateInodes(Handle *handle);
 
+  void InvalidateDentry(uint64_t parent_ino, const NameString &name);
+
  private:
   /**
    * Add one second to the caller-provided timeout to be on the safe side.

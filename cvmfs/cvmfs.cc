@@ -220,6 +220,25 @@ static bool CheckVoms(const fuse_ctx &fctx) {
   return mount_point_->authz_session_mgr()->IsMemberOf(fctx.pid, mreq);
 }
 
+static bool MayBeInPageCacheTracker(const catalog::DirectoryEntry &dirent) {
+  return dirent.IsRegular() &&
+         (dirent.inode() < mount_point_->catalog_mgr()->GetRootInode());
+}
+
+static bool HasDifferentContent(
+  const catalog::DirectoryEntry &dirent,
+  const shash::Any &hash,
+  const struct stat &info)
+{
+  if (hash == dirent.checksum())
+    return false;
+  // For chunked files, we don't want to load the full list of chunk hashes
+  // so we only check the last modified timestamp
+  if (dirent.IsChunkedFile() && (info.st_mtime == dirent.mtime()))
+    return false;
+  return true;
+}
+
 /**
  * When we lookup an inode (cvmfs_lookup(), cvmfs_opendir()), we usually provide
  * the live inode, i.e. the one in the inode tracker.  However, if the inode
@@ -233,9 +252,7 @@ static bool CheckVoms(const fuse_ctx &fctx) {
 static bool FixupOpenInode(const PathString &path,
                            catalog::DirectoryEntry *dirent)
 {
-  if (!dirent->IsRegular())
-    return false;
-  if (dirent->inode() >= mount_point_->catalog_mgr()->GetRootInode())
+  if (!MayBeInPageCacheTracker(*dirent))
     return false;
 
   shash::Any hash_open;
@@ -244,12 +261,7 @@ static bool FixupOpenInode(const PathString &path,
     dirent->inode(), &hash_open, &info);
   if (!is_open)
     return false;
-  if (hash_open == dirent->checksum())
-    return false;
-  // For chunked files, we don't want to load the full list of chunk hashes
-  // so we only check the last modified timestamp
-  if (dirent->IsChunkedFile() && (info.st_mtime == dirent->mtime()))
-    return false;
+  if (!HasDifferentContent(*dirent, hash_open, info));
 
   // Overwrite dirent with inode from current generation
   bool found = mount_point_->catalog_mgr()->LookupPath(
@@ -257,11 +269,6 @@ static bool FixupOpenInode(const PathString &path,
   assert(found);
 
   return true;
-}
-
-static bool MayBeInPageCacheTracker(const catalog::DirectoryEntry &dirent) {
-  return dirent.IsRegular() &&
-         (dirent.inode() < mount_point_->catalog_mgr()->GetRootInode());
 }
 
 static bool GetDirentForInode(const fuse_ino_t ino,
@@ -695,10 +702,22 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
             "served from page cache tracker", ino);
     shash::Any hash;
     struct stat info;
-    bool isInPageCacheTracker =
+    bool is_open =
       mount_point_->page_cache_tracker()->GetInfoIfOpen(ino, &hash, &info);
-    if (isInPageCacheTracker) {
+    if (is_open) {
       fuse_remounter_->fence()->Leave();
+      if (found && HasDifferentContent(dirent, hash, info)) {
+        // We should from now on provide the new inode information instead
+        // of the stale one. To this end, we need to invalidate the dentry to
+        // trigger a fresh LOOKUP call
+        uint64_t parent_ino;
+        NameString name;
+        if (mount_point_->inode_tracker()->FindDentry(
+              dirent.inode(), &parent_ino, &name))
+        {
+          fuse_remounter_->InvalidateDentry(parent_ino, name);
+        }
+      }
       fuse_reply_attr(req, &info, GetKcacheTimeout());
       return;
     }

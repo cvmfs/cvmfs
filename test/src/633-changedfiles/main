@@ -204,10 +204,18 @@ cvmfs_run_test() {
 
   ##############################################################################
 
+  local inode_small03=$(get_inode ${mntpnt}/dir/small)
+  while [ $inode_small03 -eq $inode_small02 ]; do
+    inode_small03=$(get_inode ${mntpnt}/dir/small)
+    sleep 1
+  done
+  local inode_large03=$(get_inode ${mntpnt}/dir/large)
+  while [ $inode_large03 -eq $inode_large02 ]; do
+    inode_large03=$(get_inode ${mntpnt}/dir/large)
+    sleep 1
+  done
   local chksum_small03=$(get_checksum $small_file)
   local chksum_large03=$(get_checksum $large_file)
-  local inode_small03=$(get_inode ${mntpnt}/dir/small)
-  local inode_large03=$(get_inode ${mntpnt}/dir/large)
   local size_small03=$(get_size $small_file)
   local size_large03=$(get_size $large_file)
   echo "*** {3} Checksums: $chksum_small03 [small]     $chksum_large03 [large]"
@@ -282,10 +290,18 @@ cvmfs_run_test() {
   echo "*** {4} revision is now $revision04"
   [ $revision04 -gt $revision03 ] || return 23
 
+  local inode_small04=$(get_inode ${mntpnt}/dir/small)
+  while [ $inode_small04 -eq $inode_small03 ]; do
+    inode_small04=$(get_inode ${mntpnt}/dir/small)
+    sleep 1
+  done
+  local inode_large04=$(get_inode ${mntpnt}/dir/large)
+  while [ $inode_large04 -eq $inode_large03 ]; do
+    inode_large04=$(get_inode ${mntpnt}/dir/large)
+    sleep 1
+  done
   local chksum_small04=$(get_checksum $small_file)
   local chksum_large04=$(get_checksum $large_file)
-  local inode_small04=$(get_inode ${mntpnt}/dir/small)
-  local inode_large04=$(get_inode ${mntpnt}/dir/large)
   local size_small04=$(get_size $small_file)
   local size_large04=$(get_size $large_file)
   echo "*** {4} Checksums: $chksum_small04 [small]     $chksum_large04 [large]"

@@ -67,6 +67,10 @@ class FuseRemounter : SingleCopy {
   Fence *fence() { return fence_; }
   time_t catalogs_valid_until() { return catalogs_valid_until_; }
 
+  void InvalidateDentry(uint64_t parent_ino, const NameString &name) {
+    invalidator_->InvalidateDentry(parent_ino, name);
+  }
+
  private:
   static void *MainRemountTrigger(void *data);
 

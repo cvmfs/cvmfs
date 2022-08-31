@@ -711,6 +711,24 @@ class InodeTracker {
     return inode;
   }
 
+  bool FindDentry(uint64_t ino, uint64_t *parent_ino, NameString *name) {
+    PathString path;
+    InodeEx inodex(ino, InodeEx::kUnknownType);
+    shash::Md5 md5path;
+
+    Lock();
+    bool found = inode_ex_map_.LookupMd5Path(&inodex, &md5path);
+    if (found) {
+      found = path_map_.LookupPath(md5path, &path);
+      assert(found);
+      *name = GetFileName(path);
+      path = GetParentPath(path);
+      *parent_ino = path_map_.LookupInodeByPath(path);
+    }
+    Unlock();
+    return found;
+  }
+
   /**
    * The new inode has reference counter 0
    */
