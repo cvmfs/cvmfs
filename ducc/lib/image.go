@@ -628,6 +628,10 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	defer wg.Wait()
 	// at this point we iterate each layer and we download it.
 	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue;
+		}
+
 		wg.Add(1)
 		go func(ctx context.Context, layer da.Layer) {
 
@@ -823,6 +827,13 @@ func (ld *LayerDownloader) getToken() (token string, err error) {
 	}
 
 	firstLayer := manifest.Layers[0]
+	for _, l := range manifest.Layers {
+		if l.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue;
+		}
+		firstLayer = l
+		break
+	}
 	layerUrl := getLayerUrl(ld.image, firstLayer.Digest)
 	token, err = firstRequestForAuth(layerUrl)
 	if err != nil {
@@ -887,6 +898,9 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 
 	paths := []string{}
 	for _, chain := range chainIDs {
+		if (chain == "") {
+			continue
+		}
 		path := cvmfs.ChainPath(CVMFSRepo, chain.String())
 		dir := filepath.Dir(path)
 		if _, err := os.Stat(dir); err != nil {
@@ -940,7 +954,11 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 	n.AddField("action", "start_chains_ingestion").Send()
 
 	ld := NewLayerDownloader(img)
+	previous := ""
 	for i, chain := range chainIDs {
+		if (chain == "") {
+			continue
+		}
 		digest := chain.String()
 		lastChainId = digest
 
@@ -949,10 +967,6 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		if _, err := os.Stat(path); err == nil {
 			// the chain is present, we skip the loop
 			continue
-		}
-		previous := ""
-		if i != 0 {
-			previous = chainIDs[i-1].String()
 		}
 		layer := manifest.Layers[i]
 		downloadLayer := func() error {
@@ -1002,6 +1016,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 			l.LogE(err).Error("Error in creating the chain")
 			return err, lastChainId
 		}
+		previous = chainIDs[i].String()
 	}
 	return
 }
