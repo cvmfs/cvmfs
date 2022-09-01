@@ -96,16 +96,23 @@ func (m Manifest) GetSingularityPath() string {
 // striclty correct, since we would need the digest of the uncompressed
 // layer, that can be found in the Config file of the image.
 // For our purposes, however, this is good enough.
+// Foreign layers leave an empty string in the chain list
 func (m Manifest) GetChainIDs() []digest.Digest {
 	result := []digest.Digest{}
-	for i, l := range m.Layers {
-		if i == 0 {
+	iChain := 0
+	for _, l := range m.Layers {
+		if l.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			result = append(result, "")
+			continue;
+		}
+		if iChain == 0 {
 			d := digest.FromString(l.Digest)
 			result = append(result, d)
 			continue
 		}
-		digest := digest.FromString(result[i-1].String() + " " + l.Digest)
+		digest := digest.FromString(result[iChain-1].String() + " " + l.Digest)
 		result = append(result, digest)
+		iChain++;
 	}
 	return result
 }

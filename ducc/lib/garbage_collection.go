@@ -127,6 +127,9 @@ func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
 				return filepath.SkipDir
 			}
 			for _, layerStruct := range manifest.Layers {
+				if layerStruct.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+					continue;
+				}
 				layer := strings.Split(layerStruct.Digest, ":")[1]
 				layerPath := filepath.Join("/", "cvmfs", CVMFSRepo, ".layers", layer[0:2], layer)
 				result = append(result, layerPath)
