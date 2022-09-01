@@ -261,7 +261,8 @@ static bool FixupOpenInode(const PathString &path,
     dirent->inode(), &hash_open, &info);
   if (!is_open)
     return false;
-  if (!HasDifferentContent(*dirent, hash_open, info));
+  if (!HasDifferentContent(*dirent, hash_open, info))
+    return false;
 
   // Overwrite dirent with inode from current generation
   bool found = mount_point_->catalog_mgr()->LookupPath(

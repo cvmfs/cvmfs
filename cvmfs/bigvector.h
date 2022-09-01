@@ -101,7 +101,7 @@ class BigVector {
 
     if (size_ <= kNumInit)
       return;
-    if (float(size_) >= (0.25 * float(capacity_)))
+    if (static_cast<float>(size_) >= (0.25 * static_cast<float>(capacity_)))
       return;
 
     bool old_large_alloc = large_alloc_;
