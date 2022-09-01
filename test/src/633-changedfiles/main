@@ -71,7 +71,7 @@ cvmfs_run_test() {
   local scratch_dir=$(pwd)
 
   echo "*** compile helper utility"
-  gcc -Wall -o topen ${script_location}/topen.c || return 2
+  gcc -std=c99 -Wall -o topen ${script_location}/topen.c || return 2
 
   echo "*** set a trap for system directory cleanup"
   trap cleanup EXIT HUP INT TERM
