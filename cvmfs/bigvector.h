@@ -105,7 +105,7 @@ class BigVector {
       return;
 
     bool old_large_alloc = large_alloc_;
-    Item *new_buffer = Alloc(0.5 * float(capacity_));
+    Item *new_buffer = Alloc(0.5 * static_cast<float>(capacity_));
     for (size_t i = 0; i < size_; ++i)
       new (new_buffer + i) Item(buffer_[i]);
     FreeBuffer(buffer_, size_, old_large_alloc);
