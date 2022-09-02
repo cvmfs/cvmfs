@@ -464,7 +464,12 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   }
   // We do _not_ track (and evict) positive replies; among other things, test
   // 076 fails with the following line uncommented
-  // mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
+  //
+  // WARNING! ENABLING THIS BREAKS ANY TYPE OF MOUNTPOINT POINTING TO THIS INODE
+  if (mount_point_->cache_symlinks() && dirent.IsLink()) { 
+    mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
+  }
+
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
@@ -1636,16 +1641,19 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 
   if ( mount_point_->cache_symlinks() ) {
 #if FUSE_VERSION >= 310
-    if( (conn->capable & FUSE_CAP_CACHE_SYMLINK) == 0 ) {
-      PANIC(kLogDebug | kLogSyslogErr,
+    if( (conn->capable & FUSE_CAP_CACHE_SYMLINKS) == 0 ) {
+      mount_point_->DisableCacheSymlinks();
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
            "Symlink caching requested but missing fuse kernel support, "
-           "aborting");
+           "falling back to no caching");
     }
-    conn->want |= FUSE_CAP_CACHE_SYMLINK;
+    conn->want |= FUSE_CAP_CACHE_SYMLINKS;
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "enabling symlink caching");
 #else
-    PANIC(kLogDebug | kLogSyslogErr,
-           "Symlink caching requested but libfuse too old (>=3.10.0 required)" );
+    mount_point_->DisableCacheSymlinks();
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+           "Symlink caching requested but fuse version not >=3.10, "
+           "falling back to no caching");
 #endif
   }
 

@@ -467,6 +467,7 @@ class MountPoint : SingleCopy, public BootFactory {
   cvmfs::Uuid *uuid() { return uuid_; }
 
   bool ReloadBlacklists();
+  void DisableCacheSymlinks();
 
  private:
   /**

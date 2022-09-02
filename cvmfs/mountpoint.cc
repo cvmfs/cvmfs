@@ -1147,6 +1147,18 @@ bool MountPoint::ReloadBlacklists() {
   return result;
 }
 
+/**
+ * Disables kernel caching of symlinks. 
+ * Symlink caching requires fuse >= 3.10 (FUSE_CAP_CACHE_SYMLINKS) and
+ * linux kernel >= 4.2 
+ * 
+ * NOTE: This function should only be called before or within cvmfs_init().
+ * 
+ */
+void MountPoint::DisableCacheSymlinks() {
+  cache_symlinks_ = false;
+}
+
 
 /**
  * The option_mgr parameter can be NULL, in which case the global option manager
@@ -1762,7 +1774,6 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   MutexLockGuard lock_guard(lock_max_ttl_);
   max_ttl_sec_ = value_minutes * 60;
 }
-
 
 bool MountPoint::SetupBehavior() {
   string optarg;
