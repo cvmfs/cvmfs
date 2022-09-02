@@ -153,14 +153,19 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       if (inode == 0)
         inode = FUSE_ROOT_ID;
       // Can fail, e.g. the inode might be already evicted
+
+      int dbg_retval;
+
 #if CVMFS_USE_LIBFUSE == 2
-      fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_chan**>(
+      dbg_retval = fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_chan**>(
         invalidator->fuse_channel_or_session_), inode, 0, 0);
 #else
-      fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_session**>(
+      dbg_retval = fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_session**>(
         invalidator->fuse_channel_or_session_), inode, 0, 0);
 #endif
-      LogCvmfs(kLogCvmfs, kLogDebug, "evicting inode %" PRIu64, inode);
+      LogCvmfs(kLogCvmfs, kLogDebug, "evicting inode %" PRIu64 " with retval: %d", inode, dbg_retval);
+
+      (void) dbg_retval; //prevent compiler complaining
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (platform_monotonic_time() >= deadline) {
