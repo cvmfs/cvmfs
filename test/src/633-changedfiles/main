@@ -4,6 +4,7 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 TEST633_PRIVATE_MOUNT=
+TEST633_PIDS=
 
 private_mount() {
   local mntpnt="$1"
@@ -58,7 +59,9 @@ check_stable_value() {
 
 cleanup() {
   echo "running cleanup()..."
-  killall topen
+  if [ "x$TEST633_PIDS" != "x" ]; then
+    kill -9 $TEST633_PIDS
+  fi
   if [ "x$TEST633_PRIVATE_MOUNT" != "x" ]; then
     private_unmount
   fi
@@ -153,8 +156,10 @@ cvmfs_run_test() {
 
   ./topen ${mntpnt}/dir/small > topen02_small.stdout 2> topen02_small.stderr &
   local pid_small02=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_small02"
   ./topen ${mntpnt}/dir/large > topen02_large.stdout 2> topen02_large.stderr &
   local pid_large02=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_large02"
   echo "*** {2} topen process pids: $pid_small02, $pid_large02"
 
   while ! grep "ROUND 1" topen02_small.stdout; do
@@ -227,8 +232,10 @@ cvmfs_run_test() {
 
   ./topen ${mntpnt}/dir/small > topen03_small.stdout 2> topen03_small.stderr &
   local pid_small03=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_small03"
   ./topen ${mntpnt}/dir/large > topen03_large.stdout 2> topen03_large.stderr &
   local pid_large03=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_large03"
   echo "*** {3} topen process pids: $pid_small03, $pid_large03"
 
   while ! grep "ROUND 1" topen03_small.stdout; do
@@ -317,8 +324,10 @@ cvmfs_run_test() {
 
   ./topen ${mntpnt}/dir/small > topen04_small.stdout 2> topen04_small.stderr &
   local pid_small04=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_small04"
   ./topen ${mntpnt}/dir/large > topen04_large.stdout 2> topen04_large.stderr &
   local pid_large04=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_large04"
   echo "*** {4} topen process pids: $pid_small04, $pid_large04"
 
   while ! grep "ROUND 1" topen04_small.stdout; do
@@ -385,7 +394,8 @@ cvmfs_run_test() {
   check_stable_value 'nToEOF'     topen04_large.stdout $size_large04   || return 89
 
   touch stop_topen
-  wait $pid_small02 $pid_large02 $pid_small03 $pid_large03 $pid_small04 $pid_large04
+  wait $TEST633_PIDS
+  TEST633_PIDS=
 
   [ -s topen02_small.stderr ] && return 30
   [ -s topen02_large.stderr ] && return 31

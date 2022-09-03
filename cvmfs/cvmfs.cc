@@ -352,8 +352,10 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 
 /**
  * Returns 0 if the path does not exist
- *         1 if the life inode is returned
- *        >1 the live inode if it is stale (see FixupOpenInode)
+ *         1 if the live inode is returned
+ *        >1 the live inode, which is then stale and the inode in dirent
+ *           comes from the catalog in the current generation
+ *           (see FixupOpenInode)
  */
 static uint64_t GetDirentForPath(const PathString &path,
                                  catalog::DirectoryEntry *dirent)

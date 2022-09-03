@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <sys/xattr.h>  // NOLINT
 
 #include <fcntl.h>
