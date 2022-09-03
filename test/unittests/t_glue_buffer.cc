@@ -83,6 +83,11 @@ TEST_F(T_GlueBuffer, InodeTracker) {
   EXPECT_FALSE(inode_tracker_.NextEntry(&cursor, &inode_parent, &name));
   EXPECT_FALSE(inode_tracker_.NextInode(&cursor, &inode));
   inode_tracker_.EndEnumerate(&cursor);
+
+  EXPECT_FALSE(inode_tracker_.FindDentry(42, &inode_parent, &name));
+  EXPECT_TRUE(inode_tracker_.FindDentry(4, &inode_parent, &name));
+  EXPECT_STREQ("bar", name.c_str());
+  EXPECT_EQ(2U, inode_parent);
 }
 
 
