@@ -730,9 +730,10 @@ class InodeTracker {
   }
 
   /**
-   * The new inode has reference counter 0
+   * The new inode has reference counter 0. Returns true if the inode was
+   * found and replaced
    */
-  void ReplaceInode(uint64_t old_inode, const InodeEx &new_inode) {
+  bool ReplaceInode(uint64_t old_inode, const InodeEx &new_inode) {
     shash::Md5 md5path;
     InodeEx old_inode_ex(old_inode, InodeEx::kUnknownType);
     Lock();
@@ -744,6 +745,7 @@ class InodeTracker {
       inode_ex_map_.Insert(new_inode, md5path);
     }
     Unlock();
+    return found;
   }
 
   Cursor BeginEnumerate() {

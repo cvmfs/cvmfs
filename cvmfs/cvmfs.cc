@@ -539,8 +539,10 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
       assert(dirent.IsRegular());
       assert(dirent.inode() != live_inode);
       // The new inode is put in the tracker with refcounter == 0
-      mount_point_->inode_tracker()->ReplaceInode(
+      bool replaced = mount_point_->inode_tracker()->ReplaceInode(
         live_inode, glue::InodeEx(dirent.inode(), dirent.mode()));
+      if (replaced)
+        perf::Inc(file_system_->n_fs_inode_replace());
     }
     mount_point_->inode_tracker()->VfsGet(
       glue::InodeEx(dirent.inode(), dirent.mode()), path);
@@ -701,8 +703,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     // Serve retired inode from page cache tracker; even if we find it in the
     // catalog, we replace the dirent by the page cache tracker version to
     // not confuse open file handles
-    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr %" PRIu64" "
-            "served from page cache tracker", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr %" PRIu64 " "
+             "served from page cache tracker", ino);
     shash::Any hash;
     struct stat info;
     bool is_open =
@@ -720,6 +722,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
         {
           fuse_remounter_->InvalidateDentry(parent_ino, name);
         }
+        perf::Inc(file_system_->n_fs_stat_stale());
       }
       fuse_reply_attr(req, &info, GetKcacheTimeout());
       return;
@@ -1400,8 +1403,9 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
            uint64_t(ino));
   int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
-  if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd))
+  if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd)) {
     mount_point_->page_cache_tracker()->Close(ino);
+  }
   ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
 
   // do we have a chunked file?

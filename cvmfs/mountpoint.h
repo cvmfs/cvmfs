@@ -210,12 +210,14 @@ class FileSystem : SingleCopy, public BootFactory {
 
   perf::Counter *n_fs_dir_open() { return n_fs_dir_open_; }
   perf::Counter *n_fs_forget() { return n_fs_forget_; }
+  perf::Counter *n_fs_inode_replace() { return n_fs_inode_replace_; }
   perf::Counter *n_fs_lookup() { return n_fs_lookup_; }
   perf::Counter *n_fs_lookup_negative() { return n_fs_lookup_negative_; }
   perf::Counter *n_fs_open() { return n_fs_open_; }
   perf::Counter *n_fs_read() { return n_fs_read_; }
   perf::Counter *n_fs_readlink() { return n_fs_readlink_; }
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
+  perf::Counter *n_fs_stat_stale() { return n_fs_stat_stale_; }
   IoErrorInfo *io_error_info() { return &io_error_info_; }
   std::string name() { return name_; }
   NfsMaps *nfs_maps() { return nfs_maps_; }
@@ -309,9 +311,11 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_lookup_;
   perf::Counter *n_fs_lookup_negative_;
   perf::Counter *n_fs_stat_;
+  perf::Counter *n_fs_stat_stale_;
   perf::Counter *n_fs_read_;
   perf::Counter *n_fs_readlink_;
   perf::Counter *n_fs_forget_;
+  perf::Counter *n_fs_inode_replace_;
   perf::Counter *no_open_files_;
   perf::Counter *no_open_dirs_;
   IoErrorInfo io_error_info_;

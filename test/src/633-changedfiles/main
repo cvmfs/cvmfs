@@ -127,17 +127,20 @@ cvmfs_run_test() {
   echo "*** {1} revision is now $revision02"
   [ $revision02 -gt $revision01 ] || return 23
 
-  echo "*** {1} new open()s should flush the cache, the reuse it"
+  echo "*** {1} new open()s should flush the cache, then reuse it"
   cat ${mntpnt}/dir/small > /dev/null
   cat ${mntpnt}/dir/large > /dev/null
   cat ${mntpnt}/dir/small > /dev/null
   cat ${mntpnt}/dir/large > /dev/null
   nflush=$(get_internal_counter page_cache_tracker.n_open_flush)
   ncached=$(get_internal_counter page_cache_tracker.n_open_cached)
+  local ndirect=$(get_internal_counter page_cache_tracker.n_open_direct)
   echo "*** {1} number of flushed opens: $nflush"
   echo "*** {1} number of cached opens: $ncached"
+  echo "*** {1} number of direct opens: $ndirect"
   [ $nflush -eq 2 ]  || return 24
   [ $ncached -eq 6 ] || return 25
+  [ $ndirect -eq 0 ] || return 26
 
   ##############################################################################
 
@@ -151,6 +154,9 @@ cvmfs_run_test() {
   [ "x$chksum_small02" != "x$chksum_large02" ] || return 4
   echo "*** {2} inodes: $inode_small02 [small]    $inode_large02 [large]"
   echo "*** {2} sizes: $size_small02 [small]    $size_large02 [large]"
+
+  [ x"$(get_internal_counter cvmfs.n_fs_stat_stale)" = x"0" ] || return 30
+  [ x"$(get_internal_counter cvmfs.n_fs_inode_replace)" = x"0" ] || return 31
 
   rm -f stop_topen
 
@@ -393,9 +399,16 @@ cvmfs_run_test() {
   check_stable_value 'Length'     topen04_large.stdout $size_large04   || return 88
   check_stable_value 'nToEOF'     topen04_large.stdout $size_large04   || return 89
 
+  [ $(get_internal_counter cvmfs.n_fs_stat_stale) -gt 0 ] || return 32
+  [ $(get_internal_counter cvmfs.n_fs_inode_replace) -gt 0 ] || return 33
+
   touch stop_topen
   wait $TEST633_PIDS
   TEST633_PIDS=
+
+  [ x"$(get_checksum ${mntpnt}/dir/small)" = x"$chksum_small04" ] || return 91
+  [ x"$(get_checksum ${mntpnt}/dir/large)" = x"$chksum_large04" ] || return 92
+  purge_disk_cache
 
   [ -s topen02_small.stderr ] && return 30
   [ -s topen02_large.stderr ] && return 31
@@ -403,6 +416,9 @@ cvmfs_run_test() {
   [ -s topen03_large.stderr ] && return 33
   [ -s topen04_small.stderr ] && return 33
   [ -s topen04_large.stderr ] && return 34
+
+  [ x"$(get_checksum ${mntpnt}/dir/small)" = x"$chksum_small04" ] || return 93
+  [ x"$(get_checksum ${mntpnt}/dir/large)" = x"$chksum_large04" ] || return 94
 
   return 0
 }
