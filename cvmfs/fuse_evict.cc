@@ -157,15 +157,19 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       int dbg_retval;
 
 #if CVMFS_USE_LIBFUSE == 2
-      dbg_retval = fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_chan**>(
-        invalidator->fuse_channel_or_session_), inode, 0, 0);
+      dbg_retval = fuse_lowlevel_notify_inval_inode(
+                    *reinterpret_cast<struct fuse_chan**>(
+                    invalidator->fuse_channel_or_session_), inode, 0, 0);
 #else
-      dbg_retval = fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_session**>(
-        invalidator->fuse_channel_or_session_), inode, 0, 0);
+      dbg_retval = fuse_lowlevel_notify_inval_inode(
+                    *reinterpret_cast<struct fuse_session**>(
+                    invalidator->fuse_channel_or_session_), inode, 0, 0);
 #endif
-      LogCvmfs(kLogCvmfs, kLogDebug, "evicting inode %" PRIu64 " with retval: %d", inode, dbg_retval);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+                "evicting inode %" PRIu64 " with retval: %d",
+                inode, dbg_retval);
 
-      (void) dbg_retval; //prevent compiler complaining
+      (void) dbg_retval;  // prevent compiler complaining
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (platform_monotonic_time() >= deadline) {

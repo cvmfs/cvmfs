@@ -466,7 +466,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   // 076 fails with the following line uncommented
   //
   // WARNING! ENABLING THIS BREAKS ANY TYPE OF MOUNTPOINT POINTING TO THIS INODE
-  if (mount_point_->cache_symlinks() && dirent.IsLink()) { 
+  if (mount_point_->cache_symlinks() && dirent.IsLink()) {
     mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   }
 
@@ -1641,7 +1641,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 
   if ( mount_point_->cache_symlinks() ) {
 #if FUSE_VERSION >= 310
-    if( (conn->capable & FUSE_CAP_CACHE_SYMLINKS) == 0 ) {
+    if ((conn->capable & FUSE_CAP_CACHE_SYMLINKS) == 0) {
       mount_point_->DisableCacheSymlinks();
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
            "Symlink caching requested but missing fuse kernel support, "
@@ -1656,7 +1656,6 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
            "falling back to no caching");
 #endif
   }
-
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
