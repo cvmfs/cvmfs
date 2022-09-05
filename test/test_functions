@@ -2347,6 +2347,7 @@ __do_local_mount() {
   local repo_url="$4"
   local config_file="$5"
   local extra_option="$6"
+  local mount_options="$7"
 
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
@@ -2372,10 +2373,14 @@ EOF
   echo "  *** local mount config:"
   cat "$config"
 
+  if [[ ! -z $mount_options ]]; then
+    mount_options=$(echo ","$mount_options" ")
+  fi
+
   if [ x"$as_root" != x"" ]; then
-    sudo cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+    sudo cvmfs2 -d -o allow_other,config=$config$mount_options $repo_name $mountpoint >> $output 2>&1
   else
-    cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
+    cvmfs2 -d -o config=$config$mount_options $repo_name $mountpoint >> $output 2>&1
   fi
 }
 

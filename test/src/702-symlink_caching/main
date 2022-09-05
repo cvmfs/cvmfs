@@ -1,0 +1,165 @@
+cvmfs_test_name="Symlink caching: Proper eviction policy for kernel cache"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+TEST702_PRIVATE_MOUNT=
+TEST702_PIDS=
+
+
+
+source ./src/702-symlink_caching/setup_teardown
+
+private_mount() {
+  local mntpnt="$1"
+  local fuse_version="$2"
+  local config_file_path="$3"
+  TEST702_PRIVATE_MOUNT="$mntpnt"
+  do_local_mount "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_KCACHE_TIMEOUT=20
+CVMFS_CACHE_SYMLINKS=1" "libfuse=$fuse_version" || return 1
+  # sudo /usr/bin/cvmfs2 -o rw,system_mount,fsname=cvmfs2,allow_other,grab_mountpoint,uid=998,gid=997,libfuse=$fuse_version ${CVMFS_TEST_REPO} $mntpnt
+}
+
+private_unmount() {
+  sudo umount $TEST702_PRIVATE_MOUNT
+  TEST702_PRIVATE_MOUNT=
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST702_PIDS" != "x" ]; then
+    kill -9 $TEST702_PIDS
+  fi
+  if [ "x$TEST702_PRIVATE_MOUNT" != "x" ]; then
+    private_unmount
+  fi
+}
+
+# Returns 0 if readlink is cached in kernel cache
+# Otherwise 1
+check_readlink_is_cached() {
+  local mntpnt="$1"
+  local symlink_name="$2"
+
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  local old_counter=$(cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs | grep readlink)
+
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  local new_counter=$(cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs | grep readlink)
+
+  if [ "$old_counter" = "$new_counter" ] && [ "$old_counter" != "" ] ; then
+    echo "0"
+  elif [ "$old_counter" != "$new_counter" ] && [ "$old_counter" != "" ] && [ "$new_counter" != "" ] ; then
+    echo "1"
+  else
+    echo "2"
+  fi
+}
+
+replace_short_symlink_with_long() {
+  local short_name="$1"
+  local long_name="$2"
+  local symlink_name="$3"
+
+  echo "*** START Replace symlink from $short_name to $long_name"
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  ln -sf ${long_name} /cvmfs/${CVMFS_TEST_REPO}/${symlink_name}
+  publish_repo ${CVMFS_TEST_REPO} || return $?
+
+  #remount
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync
+
+  echo "*** FINISHED Replace symlink from $short_name to $long_name"
+}
+
+check_libfuse2() {
+  local mntpnt="$1"
+  local config_file_path="$2"
+  local symlink_name="$3"
+
+  
+  echo ""
+  echo "*** START Testing libfuse2"
+  echo "check_libfuse2: " ${mntpnt} ${symlink_name}
+
+  echo "libfuse=2" > ${config_file_path}
+
+  private_mount $mntpnt "2"|| return $?
+  
+  local res=$(check_readlink_is_cached $mntpnt $symlink_name)
+  private_unmount
+  echo "*** FINISHED Testing libfuse2"
+  echo "Return value $res"
+
+  [ $res = "1" ] || return 11
+}
+
+check_libfuse3() {
+  local mntpnt="$1"
+  local config_file_path="$2"
+  local short_name="$3"
+  local long_name="$4"
+  local symlink_name="$5"  
+
+  echo "libfuse=3" > ${config_file_path}
+
+  echo "*** START Testing libfuse3"
+  private_mount $mntpnt "3"
+  echo "Testing caching..."
+  # res_cached must be 0
+  local res_cached=$(check_readlink_is_cached $mntpnt $symlink_name)
+
+  echo "Test symlink short -> long replacement"
+  local old_symlink_pointer=$(readlink ${mntpnt}/${symlink_name})
+  replace_short_symlink_with_long $short_name $long_name $symlink_name
+  local new_symlink_pointer=$(readlink ${mntpnt}/${symlink_name})
+  # res_switch must be 0
+  if [ "$new_symlink_pointer" = "$long_name" ] && [ "$new_symlink_pointer" != "$short_name" ]; then
+    local res_switch="0"
+  else
+    local res_switch="1"
+  fi
+  private_unmount
+
+  echo ""
+  echo "res_cached" $res_cached
+  echo "res_switch" $res_switch
+  echo ""
+  
+
+  [ $res_cached = "0" ] || return 20
+  [ $res_switch = "0" ] || return 21
+
+  echo "*** FINISHED Testing libfuse3"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local scratch_dir=$(pwd)
+  local mntpnt="${scratch_dir}/private_mnt"
+  local config_file_path="${scratch_dir}/${CVMFS_TEST_REPO}.config.txt"
+  local short_name="test1.txt"
+  local long_name="thisismyverylongsecondfile_solongthatnoonebelieveshowlongitis_butneverthelessitislongerthananythingyouhaveeverseen_especiallybecausewehavetogetthe200charactersfull_andwearestillafewaway_butnotanymore.txt"
+  local symlink_name="symlink.txt"  
+
+  echo "*** set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+
+  create_symlink_repo ${short_name} ${long_name} ${symlink_name} || return $?
+
+  check_libfuse2 ${mntpnt} ${config_file_path} ${symlink_name} || return $?
+  echo "finished libfuse2"
+  check_libfuse3 ${mntpnt} ${config_file_path} ${short_name} ${long_name} ${symlink_name} || return $?
+
+
+  return 0
+}
