@@ -116,6 +116,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
   FuseInvalidator *invalidator = reinterpret_cast<FuseInvalidator *>(data);
   LogCvmfs(kLogCvmfs, kLogDebug, "starting dentry invalidator thread");
 
+  bool reported_missing_inval_support = false;
   char c;
   Handle *handle;
   while (true) {
@@ -131,6 +132,16 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       char *name = static_cast<char *>(smalloc(len + 1));
       ReadPipe(invalidator->pipe_ctrl_[0], name, len);
       name[len] = '\0';
+      if (invalidator->fuse_channel_or_session_ == NULL) {
+        if (!reported_missing_inval_support) {
+          LogCvmfs(kLogCvmfs, kLogSyslogWarn,
+                   "missing fuse support for dentry invalidation (%d/%s)",
+                   parent_ino, name);
+          reported_missing_inval_support = true;
+        }
+        free(name);
+        continue;
+      }
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting single dentry %" PRIu64 "/%s",
                parent_ino, name);
 #if CVMFS_USE_LIBFUSE == 2

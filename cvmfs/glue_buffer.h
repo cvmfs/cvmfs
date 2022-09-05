@@ -381,7 +381,9 @@ class PathStore {
 class StatStore {
  public:
   int32_t Add(const struct stat &info) {
-    int32_t index = store_.size();
+    // We don't support more that 2B open files
+    assert(store_.size() < (1LU << 31));
+    int32_t index = static_cast<int>(store_.size());
     store_.PushBack(info);
     return index;
   }

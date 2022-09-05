@@ -239,7 +239,7 @@ TEST_F(T_GlueBuffer, StatStore) {
   prng.InitLocaltime();
   std::set<uint64_t> inodes;
   for (int i = 0; i < 1000; ++i) {
-    int32_t index = prng.Next(1000 - i);
+    int32_t index = static_cast<int32_t>(prng.Next(1000 - i));
     info = store.Get(index);
     inodes.insert(info.st_ino);
 
