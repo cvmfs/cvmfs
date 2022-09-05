@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   void *mapped = mmap(NULL, info.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-  if (mapped == MAP_FAILED) {
+  if (mapped == MAP_FAILED) {  // NOLINT
     (void)fprintf(stderr, "cannot mmap %s\n", path);
     return 1;
   }
