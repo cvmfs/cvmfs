@@ -1,7 +1,8 @@
 2.10.0:
-  * [ducc] Add support for container registry proxies through 
+  * [client] Gracefully handle open, changing files (CVM-2001)
+  * [ducc] Add support for container registry proxies through
     DUCC_<REGISTRY_NAME>_PROXY (#2893)
-  * Add catalog hash to catalog_counters xattr (#2900) 
+  * Add catalog hash to catalog_counters xattr (#2900)
   * Fix fuse callback latency measurement (#3025)
   * [server] Use libressl crypto on server
   * Bump libressl to version 3.5.3
