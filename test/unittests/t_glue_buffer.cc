@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <set>
 #include <string>
 
 #include "glue_buffer.h"
@@ -11,6 +12,7 @@
 #include "smallhash.h"
 #include "util/platform.h"
 #include "util/posix.h"
+#include "util/prng.h"
 
 namespace glue {
 
@@ -81,6 +83,11 @@ TEST_F(T_GlueBuffer, InodeTracker) {
   EXPECT_FALSE(inode_tracker_.NextEntry(&cursor, &inode_parent, &name));
   EXPECT_FALSE(inode_tracker_.NextInode(&cursor, &inode));
   inode_tracker_.EndEnumerate(&cursor);
+
+  EXPECT_FALSE(inode_tracker_.FindDentry(42, &inode_parent, &name));
+  EXPECT_TRUE(inode_tracker_.FindDentry(4, &inode_parent, &name));
+  EXPECT_STREQ("bar", name.c_str());
+  EXPECT_EQ(2U, inode_parent);
 }
 
 
@@ -214,11 +221,47 @@ TEST_F(T_GlueBuffer, StringHeap) {
   }
 }
 
+TEST_F(T_GlueBuffer, StatStore) {
+  StatStore store;
+  struct stat info;
+  info.st_ino = 42;
+  EXPECT_EQ(0, store.Add(info));
+  EXPECT_EQ(42u, store.Erase(0));
+
+  std::vector<int32_t> indexes;
+  for (int i = 0; i < 1000; ++i) {
+    info.st_ino = i;
+    indexes.push_back(store.Add(info));
+    EXPECT_EQ(i, indexes.back());
+  }
+
+  Prng prng;
+  prng.InitLocaltime();
+  std::set<uint64_t> inodes;
+  for (int i = 0; i < 1000; ++i) {
+    int32_t index = static_cast<int32_t>(prng.Next(1000 - i));
+    info = store.Get(index);
+    inodes.insert(info.st_ino);
+
+    uint64_t inode = store.Erase(index);
+    EXPECT_LE(0U, inode);
+    EXPECT_LT(inode, 1000U);
+
+    if (index < (1000 - (i + 1))) {
+      info = store.Get(index);
+      EXPECT_EQ(inode, info.st_ino);
+    }
+  }
+  EXPECT_EQ(1000U, inodes.size());
+}
+
 TEST_F(T_GlueBuffer, PageCacheTrackerOff) {
   PageCacheTracker tracker;
   tracker.Disable();
+  struct stat info;
+  info.st_ino = 1;
   PageCacheTracker::OpenDirectives directives;
-  directives = tracker.Open(1, shash::Any());
+  directives = tracker.Open(1, shash::Any(), info);
   EXPECT_EQ(false, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
   // Don't crash on unknown inode
@@ -229,21 +272,23 @@ TEST_F(T_GlueBuffer, PageCacheTrackerOff) {
 TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   PageCacheTracker tracker;
   PageCacheTracker::OpenDirectives directives;
+  struct stat info;
+  info.st_ino = 1;
 
   shash::Any hashA(shash::kShake128);
   shash::Any hashB(shash::kShake128);
   shash::HashString("A", &hashA);
   shash::HashString("B", &hashB);
 
-  directives = tracker.Open(1, hashA);
+  directives = tracker.Open(1, hashA, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
-  directives = tracker.Open(1, hashA);
+  directives = tracker.Open(1, hashA, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
-  directives = tracker.Open(1, hashB);
+  directives = tracker.Open(1, hashB, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(true, directives.direct_io);
 
@@ -252,17 +297,17 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   tracker.Close(1);
   EXPECT_DEATH(tracker.Close(1), ".*");
 
-  directives = tracker.Open(1, hashB);
+  directives = tracker.Open(1, hashB, info);
   EXPECT_EQ(false, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
-  directives = tracker.Open(1, hashB);
+  directives = tracker.Open(1, hashB, info);
   EXPECT_EQ(false, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
   tracker.Close(1);
 
-  directives = tracker.Open(1, hashB);
+  directives = tracker.Open(1, hashB, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
 
@@ -270,9 +315,33 @@ TEST_F(T_GlueBuffer, PageCacheTrackerBasics) {
   tracker.Close(1);
 
   tracker.GetEvictRaii().Evict(1);
-  directives = tracker.Open(1, hashA);
+  directives = tracker.Open(1, hashA, info);
   EXPECT_EQ(true, directives.keep_cache);
   EXPECT_EQ(false, directives.direct_io);
+}
+
+TEST_F(T_GlueBuffer, PageCacheTrackerStat) {
+  PageCacheTracker tracker;
+  struct stat info;
+  info.st_ino = 42;
+
+  shash::Any hash(shash::kShake128);
+  shash::HashString("X", &hash);
+  struct stat ress;
+  shash::Any resh;
+
+  tracker.Open(42, hash, info);
+  EXPECT_TRUE(tracker.GetInfoIfOpen(42, &resh, &ress));
+  EXPECT_EQ(42U, ress.st_ino);
+  EXPECT_EQ(hash, resh);
+
+  tracker.Open(42, hash, info);
+  EXPECT_EQ(42U, ress.st_ino);
+  EXPECT_EQ(hash, resh);
+
+  tracker.Close(42);
+  tracker.Close(42);
+  EXPECT_FALSE(tracker.GetInfoIfOpen(42, &resh, &ress));
 }
 
 TEST_F(T_GlueBuffer, InodeEx) {

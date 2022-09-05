@@ -302,6 +302,7 @@ void PageCacheTracker::CopyFrom(const PageCacheTracker &other) {
 
   map_.Init(16, 0, hasher_inode);
   map_ = other.map_;
+  stat_store_ = other.stat_store_;
 }
 
 
@@ -313,8 +314,10 @@ void PageCacheTracker::InitLock() {
 }
 
 PageCacheTracker::OpenDirectives PageCacheTracker::Open(
-  uint64_t inode, const shash::Any &hash)
+  uint64_t inode, const shash::Any &hash, const struct stat &info)
 {
+  assert(inode == info.st_ino);
+
   OpenDirectives open_directives;
   // Old behavior: always flush page cache on open
   if (!is_active_)
@@ -330,8 +333,9 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
     statistics_.n_insert++;
     statistics_.n_open_cached++;
 
-    entry.hash = hash;
     entry.nopen = 1;
+    entry.idx_stat = stat_store_.Add(info);
+    entry.hash = hash;
     map_.Insert(inode, entry);
     return open_directives;
   }
@@ -349,7 +353,8 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
     } else {
       open_directives.keep_cache = true;
       statistics_.n_open_cached++;
-      entry.nopen++;
+      if (entry.nopen++ == 0)
+        entry.idx_stat = stat_store_.Add(info);
       map_.Insert(inode, entry);
       return open_directives;
     }
@@ -373,6 +378,7 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   open_directives.keep_cache = false;
   statistics_.n_open_flush++;
   entry.hash = hash;
+  entry.idx_stat = stat_store_.Add(info);
   entry.nopen = -1;
   map_.Insert(inode, entry);
   return open_directives;
@@ -405,6 +411,17 @@ void PageCacheTracker::Close(uint64_t inode) {
     entry.nopen = -entry.nopen;
   }
   entry.nopen--;
+  if (entry.nopen == 0) {
+    // File closed, remove struct stat information
+    assert(entry.idx_stat >= 0);
+    uint64_t inode_update = stat_store_.Erase(entry.idx_stat);
+    Entry entry_update;
+    retval = map_.Lookup(inode_update, &entry_update);
+    assert(retval);
+    entry_update.idx_stat = entry.idx_stat;
+    map_.Insert(inode_update, entry_update);
+    entry.idx_stat = -1;
+  }
   map_.Insert(inode, entry);
 }
 

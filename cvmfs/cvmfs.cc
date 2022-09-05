@@ -220,6 +220,58 @@ static bool CheckVoms(const fuse_ctx &fctx) {
   return mount_point_->authz_session_mgr()->IsMemberOf(fctx.pid, mreq);
 }
 
+static bool MayBeInPageCacheTracker(const catalog::DirectoryEntry &dirent) {
+  return dirent.IsRegular() &&
+         (dirent.inode() < mount_point_->catalog_mgr()->GetRootInode());
+}
+
+static bool HasDifferentContent(
+  const catalog::DirectoryEntry &dirent,
+  const shash::Any &hash,
+  const struct stat &info)
+{
+  if (hash == dirent.checksum())
+    return false;
+  // For chunked files, we don't want to load the full list of chunk hashes
+  // so we only check the last modified timestamp
+  if (dirent.IsChunkedFile() && (info.st_mtime == dirent.mtime()))
+    return false;
+  return true;
+}
+
+/**
+ * When we lookup an inode (cvmfs_lookup(), cvmfs_opendir()), we usually provide
+ * the live inode, i.e. the one in the inode tracker.  However, if the inode
+ * refers to an open file that has a different content then the one from the
+ * current catalogs, we will replace the live inode in the tracker by the one
+ * from the current generation.
+ *
+ * To still access the old inode, e.g. for fstat() on the open file, the stat
+ * structure connected to this inode is taken from the page cache tracker.
+ */
+static bool FixupOpenInode(const PathString &path,
+                           catalog::DirectoryEntry *dirent)
+{
+  if (!MayBeInPageCacheTracker(*dirent))
+    return false;
+
+  shash::Any hash_open;
+  struct stat info;
+  bool is_open = mount_point_->page_cache_tracker()->GetInfoIfOpen(
+    dirent->inode(), &hash_open, &info);
+  if (!is_open)
+    return false;
+  if (!HasDifferentContent(*dirent, hash_open, info))
+    return false;
+
+  // Overwrite dirent with inode from current generation
+  bool found = mount_point_->catalog_mgr()->LookupPath(
+      path, catalog::kLookupSole, dirent);
+  assert(found);
+
+  return true;
+}
+
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent)
 {
@@ -267,10 +319,14 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
   bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, &path);
   if (!retval) {
-    // Can this ever happen?
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+    // This may be a retired inode whose stat information is only available
+    // in the page cache tracker because there is still an open file
+    LogCvmfs(kLogCvmfs, kLogDebug,
              "GetDirentForInode inode lookup failure %" PRId64, ino);
     *dirent = dirent_negative;
+    // Indicate that the inode was not found in the tracker rather than not
+    // found in the catalog
+    dirent->set_inode(ino);
     return false;
   }
   if (catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent)) {
@@ -281,6 +337,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       // TODO(jblomer): we detect this issue but let it continue unhandled.
       // Fix me.
     }
+
     // Fix inodes
     dirent->set_inode(ino);
     mount_point_->inode_cache()->Insert(ino, *dirent);
@@ -293,8 +350,15 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 }
 
 
-static bool GetDirentForPath(const PathString &path,
-                             catalog::DirectoryEntry *dirent)
+/**
+ * Returns 0 if the path does not exist
+ *         1 if the live inode is returned
+ *        >1 the live inode, which is then stale and the inode in dirent
+ *           comes from the catalog in the current generation
+ *           (see FixupOpenInode)
+ */
+static uint64_t GetDirentForPath(const PathString &path,
+                                 catalog::DirectoryEntry *dirent)
 {
   uint64_t live_inode = 0;
   if (!file_system_->IsNfsSource())
@@ -304,9 +368,11 @@ static bool GetDirentForPath(const PathString &path,
   if (mount_point_->md5path_cache()->Lookup(md5path, dirent)) {
     if (dirent->GetSpecial() == catalog::kDirentNegative)
       return false;
+    // We may have initially stored the entry with an old inode in the
+    // md5path cache and now should update it with the new one.
     if (!file_system_->IsNfsSource() && (live_inode != 0))
       dirent->set_inode(live_inode);
-    return true;
+    return 1;
   }
 
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
@@ -316,14 +382,21 @@ static bool GetDirentForPath(const PathString &path,
   retval = catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent);
   if (retval) {
     if (file_system_->IsNfsSource()) {
-      // Fix inode
       dirent->set_inode(file_system_->nfs_maps()->GetInode(path));
-    } else {
-      if (live_inode != 0)
-        dirent->set_inode(live_inode);
+      mount_point_->md5path_cache()->Insert(md5path, *dirent);
+    } else if (live_inode != 0) {
+      dirent->set_inode(live_inode);
+      if (FixupOpenInode(path, dirent)) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+          "content of %s change, replacing inode %" PRIu64 " --> %" PRIu64,
+          path.c_str(), live_inode, dirent->inode());
+        return live_inode;
+        // Do not populate the md5path cache until the inode tracker is fixed
+      } else {
+        mount_point_->md5path_cache()->Insert(md5path, *dirent);
+      }
     }
-    mount_point_->md5path_cache()->Insert(md5path, *dirent);
-    return true;
+    return 1;
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForPath, no entry");
@@ -331,7 +404,7 @@ static bool GetDirentForPath(const PathString &path,
   // error loading nested catalogs
   if (dirent->GetSpecial() == catalog::kDirentNegative)
     mount_point_->md5path_cache()->InsertNegative(md5path);
-  return false;
+  return 0;
 }
 
 
@@ -408,6 +481,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
   PathString path;
   PathString parent_path;
+  uint64_t live_inode = 0;
   catalog::DirectoryEntry dirent;
   struct fuse_entry_param result;
 
@@ -429,7 +503,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
         }
         if (!GetPathForInode(parent, &parent_path))
           goto lookup_reply_negative;
-        if (GetDirentForPath(GetParentPath(parent_path), &dirent))
+        if (GetDirentForPath(GetParentPath(parent_path), &dirent) > 0)
           goto lookup_reply_positive;
       }
     }
@@ -450,7 +524,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   path.Append("/", 1);
   path.Append(name, strlen(name));
   mount_point_->tracer()->Trace(Tracer::kEventLookup, path, "lookup()");
-  if (!GetDirentForPath(path, &dirent)) {
+  live_inode = GetDirentForPath(path, &dirent);
+  if (live_inode == 0) {
     if (dirent.GetSpecial() == catalog::kDirentNegative)
       goto lookup_reply_negative;
     else
@@ -459,6 +534,16 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
  lookup_reply_positive:
   if (!file_system_->IsNfsSource()) {
+    if (live_inode > 1) {
+      // live inode is stale (open file), we replace it
+      assert(dirent.IsRegular());
+      assert(dirent.inode() != live_inode);
+      // The new inode is put in the tracker with refcounter == 0
+      bool replaced = mount_point_->inode_tracker()->ReplaceInode(
+        live_inode, glue::InodeEx(dirent.inode(), dirent.mode()));
+      if (replaced)
+        perf::Inc(file_system_->n_fs_inode_replace());
+    }
     mount_point_->inode_tracker()->VfsGet(
       glue::InodeEx(dirent.inode(), dirent.mode()), path);
   }
@@ -612,8 +697,37 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     return;
   }
   catalog::DirectoryEntry dirent;
-  const bool found = GetDirentForInode(ino, &dirent);
+  bool found = GetDirentForInode(ino, &dirent);
   TraceInode(Tracer::kEventGetAttr, ino, "getattr()");
+  if ((!found && (dirent.inode() == ino)) || MayBeInPageCacheTracker(dirent)) {
+    // Serve retired inode from page cache tracker; even if we find it in the
+    // catalog, we replace the dirent by the page cache tracker version to
+    // not confuse open file handles
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr %" PRIu64 " "
+             "served from page cache tracker", ino);
+    shash::Any hash;
+    struct stat info;
+    bool is_open =
+      mount_point_->page_cache_tracker()->GetInfoIfOpen(ino, &hash, &info);
+    if (is_open) {
+      fuse_remounter_->fence()->Leave();
+      if (found && HasDifferentContent(dirent, hash, info)) {
+        // We should from now on provide the new inode information instead
+        // of the stale one. To this end, we need to invalidate the dentry to
+        // trigger a fresh LOOKUP call
+        uint64_t parent_ino;
+        NameString name;
+        if (mount_point_->inode_tracker()->FindDentry(
+              dirent.inode(), &parent_ino, &name))
+        {
+          fuse_remounter_->InvalidateDentry(parent_ino, name);
+        }
+        perf::Inc(file_system_->n_fs_stat_stale());
+      }
+      fuse_reply_attr(req, &info, GetKcacheTimeout());
+      return;
+    }
+  }
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
@@ -746,7 +860,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // Add parent directory link
   catalog::DirectoryEntry p;
   if (d.inode() != catalog_mgr->GetRootInode() &&
-      GetDirentForPath(GetParentPath(path), &p))
+      (GetDirentForPath(GetParentPath(path), &p) > 0))
   {
     info = p.GetStatStructure();
     AddToDirListing(req, "..", &info, &fuse_listing);
@@ -975,7 +1089,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       open_directives = mount_point_->page_cache_tracker()->OpenDirect();
     } else {
       open_directives =
-        mount_point_->page_cache_tracker()->Open(ino, dirent.checksum());
+        mount_point_->page_cache_tracker()->Open(
+          ino, dirent.checksum(), dirent.GetStatStructure());
     }
     fuse_remounter_->fence()->Leave();
   } else {
@@ -994,6 +1109,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     }
 
     // Figure out unique inode from annotated catalog
+    // TODO(jblomer): we only need to lookup if the inode is not from the
+    // current generation
     catalog::DirectoryEntry dirent_origin;
     if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent_origin)) {
       fuse_remounter_->fence()->Leave();
@@ -1067,7 +1184,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       open_directives = mount_point_->page_cache_tracker()->OpenDirect();
     } else {
       open_directives = mount_point_->page_cache_tracker()->Open(
-        ino, chunk_reflist.HashChunkList());
+        ino, chunk_reflist.HashChunkList(), dirent.GetStatStructure());
     }
     FillOpenFlags(open_directives, fi);
     fi->fh = static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
@@ -1286,8 +1403,9 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
            uint64_t(ino));
   int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
-  if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd))
+  if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd)) {
     mount_point_->page_cache_tracker()->Close(ino);
+  }
   ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
 
   // do we have a chunked file?
@@ -1528,7 +1646,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 bool Evict(const string &path) {
   catalog::DirectoryEntry dirent;
   fuse_remounter_->fence()->Enter();
-  const bool found = GetDirentForPath(PathString(path), &dirent);
+  const bool found = (GetDirentForPath(PathString(path), &dirent) > 0);
   fuse_remounter_->fence()->Leave();
 
   if (!found || !dirent.IsRegular())
@@ -1541,7 +1659,7 @@ bool Evict(const string &path) {
 bool Pin(const string &path) {
   catalog::DirectoryEntry dirent;
   fuse_remounter_->fence()->Enter();
-  const bool found = GetDirentForPath(PathString(path), &dirent);
+  const bool found = (GetDirentForPath(PathString(path), &dirent) > 0);
   if (!found || !dirent.IsRegular()) {
     fuse_remounter_->fence()->Leave();
     return false;

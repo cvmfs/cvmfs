@@ -100,17 +100,60 @@ void FuseInvalidator::InvalidateInodes(Handle *handle) {
   WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
 }
 
+void FuseInvalidator::InvalidateDentry(
+  uint64_t parent_ino, const NameString &name)
+{
+  char c = 'D';
+  WritePipe(pipe_ctrl_[1], &c, 1);
+  WritePipe(pipe_ctrl_[1], &parent_ino, sizeof(parent_ino));
+  unsigned len = name.GetLength();
+  WritePipe(pipe_ctrl_[1], &len, sizeof(len));
+  WritePipe(pipe_ctrl_[1], name.GetChars(), len);
+}
+
 
 void *FuseInvalidator::MainInvalidator(void *data) {
   FuseInvalidator *invalidator = reinterpret_cast<FuseInvalidator *>(data);
   LogCvmfs(kLogCvmfs, kLogDebug, "starting dentry invalidator thread");
 
+  bool reported_missing_inval_support = false;
   char c;
   Handle *handle;
   while (true) {
     ReadPipe(invalidator->pipe_ctrl_[0], &c, 1);
     if (c == 'Q')
       break;
+
+    if (c == 'D') {
+      uint64_t parent_ino;
+      unsigned len;
+      ReadPipe(invalidator->pipe_ctrl_[0], &parent_ino, sizeof(parent_ino));
+      ReadPipe(invalidator->pipe_ctrl_[0], &len, sizeof(len));
+      char *name = static_cast<char *>(smalloc(len + 1));
+      ReadPipe(invalidator->pipe_ctrl_[0], name, len);
+      name[len] = '\0';
+      if (invalidator->fuse_channel_or_session_ == NULL) {
+        if (!reported_missing_inval_support) {
+          LogCvmfs(kLogCvmfs, kLogSyslogWarn,
+                   "missing fuse support for dentry invalidation (%d/%s)",
+                   parent_ino, name);
+          reported_missing_inval_support = true;
+        }
+        free(name);
+        continue;
+      }
+      LogCvmfs(kLogCvmfs, kLogDebug, "evicting single dentry %" PRIu64 "/%s",
+               parent_ino, name);
+#if CVMFS_USE_LIBFUSE == 2
+      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_chan**>(
+        invalidator->fuse_channel_or_session_), parent_ino, name, len);
+#else
+      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_session**>(
+        invalidator->fuse_channel_or_session_), parent_ino, name, len);
+#endif
+      free(name);
+      continue;
+    }
 
     assert(c == 'I');
     ReadPipe(invalidator->pipe_ctrl_[0], &handle, sizeof(handle));

@@ -25,6 +25,7 @@
 #include "shortstring.h"
 #include "smallhash.h"
 #include "util/atomic.h"
+#include "util/mutex.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
@@ -370,6 +371,42 @@ class PathStore {
 //------------------------------------------------------------------------------
 
 
+/**
+ * A vector of stat structs. When removing items, the empty slot is swapped
+ * with the last element so that there are no gaps in the vector.  The memory
+ * allocation of the vector grows and shrinks with the size.
+ * Removal of items returns the inode of the element swapped with the gap so
+ * that the page entry tracker can update its index.
+ */
+class StatStore {
+ public:
+  int32_t Add(const struct stat &info) {
+    // We don't support more that 2B open files
+    assert(store_.size() < (1LU << 31));
+    int32_t index = static_cast<int>(store_.size());
+    store_.PushBack(info);
+    return index;
+  }
+
+  // Note that that if the last element is removed, no swap has taken place
+  uint64_t Erase(int32_t index) {
+    struct stat info_back = store_.At(store_.size() - 1);
+    store_.Replace(index, info_back);
+    store_.SetSize(store_.size() - 1);
+    store_.ShrinkIfOversized();
+    return info_back.st_ino;
+  }
+
+  struct stat Get(int32_t index) const { return store_.At(index); }
+
+ private:
+  BigVector<struct stat> store_;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class PathMap {
  public:
   PathMap() {
@@ -411,6 +448,10 @@ class PathMap {
       path_store_.Erase(md5path);
       map_.Erase(md5path);
     }
+  }
+
+  void Replace(const shash::Md5 &md5path, uint64_t new_inode) {
+    map_.Insert(md5path, new_inode);
   }
 
   void Clear() {
@@ -489,7 +530,12 @@ class InodeReferences {
   bool Put(const uint64_t inode, const uint32_t by) {
     uint32_t refcounter;
     bool found = map_.Lookup(inode, &refcounter);
-    assert(found);
+    if (!found) {
+      // May happen if a retired inode is cleared, i.e. if a file with
+      // outdated content is closed
+      return false;
+    }
+
     assert(refcounter >= by);
     if (refcounter == by) {
       map_.Erase(inode);
@@ -498,6 +544,11 @@ class InodeReferences {
     refcounter -= by;
     map_.Insert(inode, refcounter);
     return false;
+  }
+
+  void Replace(const uint64_t old_inode, const uint64_t new_inode) {
+    map_.Erase(old_inode);
+    map_.Insert(new_inode, 0);
   }
 
   void Clear() {
@@ -660,6 +711,43 @@ class InodeTracker {
     Unlock();
     atomic_inc64(&statistics_.num_hits_inode);
     return inode;
+  }
+
+  bool FindDentry(uint64_t ino, uint64_t *parent_ino, NameString *name) {
+    PathString path;
+    InodeEx inodex(ino, InodeEx::kUnknownType);
+    shash::Md5 md5path;
+
+    Lock();
+    bool found = inode_ex_map_.LookupMd5Path(&inodex, &md5path);
+    if (found) {
+      found = path_map_.LookupPath(md5path, &path);
+      assert(found);
+      *name = GetFileName(path);
+      path = GetParentPath(path);
+      *parent_ino = path_map_.LookupInodeByPath(path);
+    }
+    Unlock();
+    return found;
+  }
+
+  /**
+   * The new inode has reference counter 0. Returns true if the inode was
+   * found and replaced
+   */
+  bool ReplaceInode(uint64_t old_inode, const InodeEx &new_inode) {
+    shash::Md5 md5path;
+    InodeEx old_inode_ex(old_inode, InodeEx::kUnknownType);
+    Lock();
+    bool found = inode_ex_map_.LookupMd5Path(&old_inode_ex, &md5path);
+    if (found) {
+      inode_references_.Replace(old_inode, new_inode.GetInode());
+      path_map_.Replace(md5path, new_inode.GetInode());
+      inode_ex_map_.Erase(old_inode);
+      inode_ex_map_.Insert(new_inode, md5path);
+    }
+    Unlock();
+    return found;
   }
 
   Cursor BeginEnumerate() {
@@ -833,14 +921,19 @@ class DentryTracker {
 class PageCacheTracker {
  private:
   struct Entry {
-    Entry() : nopen(0) {}
-    Entry(int32_t n, const shash::Any &h) : nopen(n), hash(h) {}
+    Entry() : nopen(0), idx_stat(-1) {}
+    Entry(int32_t n, int32_t i, const shash::Any &h)
+      : nopen(n), idx_stat(i), hash(h) {}
     /**
      * Reference counter for currently open files with a given inode. If the
      * sign bit is set, the entry is in the transition phase from one hash to
      * another. The sign will be cleared on Close() in this case.
      */
     int32_t nopen;
+    /**
+     * Points into the list of stat structs; >= 0 only for open files.
+     */
+    int32_t idx_stat;
     /**
      * The content hash of the data stored in the page cache. For chunked files,
      * hash contains an artificial hash over all the chunk hash values.
@@ -920,13 +1013,29 @@ class PageCacheTracker {
   PageCacheTracker &operator= (const PageCacheTracker &other);
   ~PageCacheTracker();
 
-  OpenDirectives Open(uint64_t inode, const shash::Any &hash);
+  OpenDirectives Open(uint64_t inode, const shash::Any &hash,
+                      const struct stat &info);
   /**
    * Forced direct I/O open. Used when the corresponding flag is set in the
    * file catalogs. In this case, we don't need to track the inode.
    */
   OpenDirectives OpenDirect();
   void Close(uint64_t inode);
+
+  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash, struct stat *info)
+  {
+    MutexLockGuard guard(lock_);
+    Entry entry;
+    bool retval = map_.Lookup(inode, &entry);
+    if (retval && (entry.nopen != 0)) {
+      assert(entry.idx_stat >= 0);
+      *hash = entry.hash;
+      if (info != NULL)
+        *info = stat_store_.Get(entry.idx_stat);
+      return true;
+    }
+    return false;
+  }
 
   EvictRaii GetEvictRaii() { return EvictRaii(this); }
 
@@ -950,6 +1059,7 @@ class PageCacheTracker {
   bool is_active_;
   Statistics statistics_;
   SmallHashDynamic<uint64_t, Entry> map_;
+  StatStore stat_store_;
 };
 
 

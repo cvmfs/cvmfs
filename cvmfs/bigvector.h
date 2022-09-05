@@ -16,14 +16,14 @@ template<class Item>
 class BigVector {
  public:
   BigVector() {
-    Alloc(kNumInit);
+    buffer_ = Alloc(kNumInit);
     size_ = 0;
     shared_buffer_ = false;
   }
 
   explicit BigVector(const size_t num_items) {
     assert(num_items > 0);
-    Alloc(num_items);
+    buffer_ = Alloc(num_items);
     size_ = 0;
     shared_buffer_ = false;
   }
@@ -64,13 +64,18 @@ class BigVector {
     size_++;
   }
 
+  void Replace(size_t index, const Item &item) {
+    assert(index < size_);
+    buffer_[index] = item;
+  }
+
   bool IsEmpty() const {
     return size_ == 0;
   }
 
   void Clear() {
     Dealloc();
-    Alloc(kNumInit);
+    buffer_ = Alloc(kNumInit);
   }
 
   void ShareBuffer(Item **duplicate, bool *large_alloc) {
@@ -84,11 +89,27 @@ class BigVector {
     bool old_large_alloc = large_alloc_;
 
     assert(capacity_ > 0);
-    Alloc(capacity_ * 2);
+    buffer_ = Alloc(capacity_ * 2);
     for (size_t i = 0; i < size_; ++i)
       new (buffer_ + i) Item(old_buffer[i]);
 
     FreeBuffer(old_buffer, size_, old_large_alloc);
+  }
+
+  void ShrinkIfOversized() {
+    assert(!shared_buffer_);
+
+    if (size_ <= kNumInit)
+      return;
+    if (static_cast<float>(size_) >= (0.25 * static_cast<float>(capacity_)))
+      return;
+
+    bool old_large_alloc = large_alloc_;
+    Item *new_buffer = Alloc(0.5 * static_cast<float>(capacity_));
+    for (size_t i = 0; i < size_; ++i)
+      new (new_buffer + i) Item(buffer_[i]);
+    FreeBuffer(buffer_, size_, old_large_alloc);
+    buffer_ = new_buffer;
   }
 
   // Careful!  Only for externally modified buffer.
@@ -104,16 +125,18 @@ class BigVector {
   static const size_t kNumInit = 16;
   static const size_t kMmapThreshold = 128*1024;
 
-  void Alloc(const size_t num_elements) {
+  Item *Alloc(const size_t num_elements) {
+    Item *result;
     size_t num_bytes = sizeof(Item) * num_elements;
     if (num_bytes >= kMmapThreshold) {
-      buffer_ = static_cast<Item *>(smmap(num_bytes));
+      result = static_cast<Item *>(smmap(num_bytes));
       large_alloc_ = true;
     } else {
-      buffer_ = static_cast<Item *>(smalloc(num_bytes));
+      result = static_cast<Item *>(smalloc(num_bytes));
       large_alloc_ = false;
     }
     capacity_ = num_elements;
+    return result;
   }
 
   void Dealloc() {
@@ -137,7 +160,7 @@ class BigVector {
   }
 
   void CopyFrom(const BigVector<Item> &other) {
-    Alloc(other.capacity_);
+    buffer_ = Alloc(other.capacity_);
     for (size_t i = 0; i < other.size_; ++i) {
       new (buffer_ + i) Item(*other.AtPtr(i));
     }

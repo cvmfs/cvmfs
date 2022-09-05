@@ -4,8 +4,7 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 TEST633_PRIVATE_MOUNT=
-TEST633_TAIL_SMALL=
-TEST633_TAIL_LARGE=
+TEST633_PIDS=
 
 private_mount() {
   local mntpnt="$1"
@@ -32,18 +31,39 @@ get_internal_counter() {
     cut -d \| -f2
 }
 
+get_inode() {
+  stat --format=%i $1
+}
+
+get_size() {
+  stat --format=%s $1
+}
+
+get_checksum() {
+  cksum $1 | awk '{print $1}'
+}
+
+check_stable_value() {
+  local val=$1
+  local log=$2
+  local exp=$3
+
+  grep $val $log | sort -u
+  local count=$(grep $val $log | sort -u | wc -l)
+  if [ $count -ne 1 ]; then
+    return 1
+  fi
+  local found=$(grep $val $log | sort -u | awk '{print $2}')
+  [ "x$found" = "x$exp" ]
+}
+
 cleanup() {
   echo "running cleanup()..."
-  if [ "x$TEST633_TAIL_SMALL" != "x" ]; then
-    /bin/kill -9 $TEST633_TAIL_SMALL
-  fi
-  if [ "x$TEST633_TAIL_LARGE" != "x" ]; then
-    /bin/kill -9 $TEST633_TAIL_LARGE
+  if [ "x$TEST633_PIDS" != "x" ]; then
+    kill -9 $TEST633_PIDS
   fi
   if [ "x$TEST633_PRIVATE_MOUNT" != "x" ]; then
-    sudo umount $TEST633_PRIVATE_MOUNT
-    sudo rmdir $TEST633_PRIVATE_MOUNT
-    sudo rm -rf "${TEST633_PRIVATE_MOUNT}c"
+    private_unmount
   fi
 }
 
@@ -53,134 +73,352 @@ cvmfs_run_test() {
   local script_location=$2
   local scratch_dir=$(pwd)
 
+  echo "*** compile helper utility"
+  gcc -std=c99 -Wall -o topen ${script_location}/topen.c || return 2
+
   echo "*** set a trap for system directory cleanup"
   trap cleanup EXIT HUP INT TERM
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  local md5_small_orig
-  local md5_large_orig
-  echo "*** put a small file and a large file into $CVMFS_TEST_REPO"
+  local small_file=/cvmfs/$CVMFS_TEST_REPO/dir/small
+  local large_file=/cvmfs/$CVMFS_TEST_REPO/dir/large
   start_transaction $CVMFS_TEST_REPO                              || return $?
   mkdir /cvmfs/$CVMFS_TEST_REPO/dir                               || return 3
-  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/dir/small          || return 3
-  md5_small_orig=$(md5sum /cvmfs/$CVMFS_TEST_REPO/dir/small \
-    | awk '{print $1}')                                           || return 3
-  yes | head -c $((32*1024*1024)) > \
-    /cvmfs/$CVMFS_TEST_REPO/dir/large                             || return 3
-  md5_large_orig=$(md5sum /cvmfs/$CVMFS_TEST_REPO/dir/large \
-     | awk '{print $1}')                                          || return 3
+  echo "Hello World" > $small_file                                || return 3
+  yes | head -c $((32*1024*1024)) > $large_file                   || return 3
   publish_repo $CVMFS_TEST_REPO -v                                || return $?
 
   local mntpnt="${scratch_dir}/private_mnt"
   echo "*** mount private mount point"
-  private_mount $mntpnt || return 20
+  private_mount $mntpnt || return 10
 
-  local revision_old=$(get_xattr revision ${mntpnt}) || return 25
-  echo "*** revision is $revision_old"
+  local revision01=$(get_xattr revision ${mntpnt}) || return 11
+  echo "*** revision is $revision01"
 
   echo "*** verify that large file is chunked"
-  local no_chunks=$(get_xattr chunks ${mntpnt}/dir/large) || return 21
-  [ $no_chunks -gt 1 ] || return 22
+  [ $(get_xattr chunks ${mntpnt}/dir/large) -gt 1 ] || return 12
 
-  echo "*** regular file opens (cached)"
+  ##############################################################################
+
+  echo "*** {1} regular file opens (cached)"
   cat ${mntpnt}/dir/small > /dev/null
   cat ${mntpnt}/dir/large > /dev/null
   cat ${mntpnt}/dir/small > /dev/null
   cat ${mntpnt}/dir/large > /dev/null
 
-  echo "*** check that those first opens were cached"
+  echo "*** {1} check that those first opens were cached"
   local ncached=$(get_internal_counter page_cache_tracker.n_open_cached)
-  echo "*** number of cached opens: $ncached"
-  [ $ncached -eq 4 ] || return 81
+  echo "*** {1} number of cached opens: $ncached"
+  [ $ncached -eq 4 ] || return 20
 
-  echo "*** add contents to files in repository (1st change)"
+  echo "*** {1} add contents to files in repository (1st change)"
   ls -lisa ${mntpnt}/dir/*
   start_transaction $CVMFS_TEST_REPO                      || return $?
-  echo "1st change" >> /cvmfs/$CVMFS_TEST_REPO/dir/small  || return 85
-  echo "1st change" >> /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 86
+  echo "1st change" >> $small_file                        || return 21
+  echo "1st change" >> $large_file                        || return 22
   publish_repo $CVMFS_TEST_REPO -v                        || return $?
   ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
 
-  echo "*** remount private mount point"
+  echo "*** {1} remount private mount point"
   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 87
-  local revision_2nd=$(get_xattr revision ${mntpnt}) || return 88
-  echo "revision is now $revision_2nd"
-  [ $revision_2nd -gt $revision_old ] || return 89
+  local revision02=$(get_xattr revision ${mntpnt}) || return 26
+  echo "*** {1} revision is now $revision02"
+  [ $revision02 -gt $revision01 ] || return 23
 
-  echo "*** new open()s should flush the cache, the reuse it"
+  echo "*** {1} new open()s should flush the cache, then reuse it"
   cat ${mntpnt}/dir/small > /dev/null
   cat ${mntpnt}/dir/large > /dev/null
   cat ${mntpnt}/dir/small > /dev/null
   cat ${mntpnt}/dir/large > /dev/null
   nflush=$(get_internal_counter page_cache_tracker.n_open_flush)
   ncached=$(get_internal_counter page_cache_tracker.n_open_cached)
-  echo "*** number of flushed opens: $nflush"
-  echo "*** number of cached opens: $ncached"
-  [ $nflush -eq 2 ]  || return 91
-  [ $ncached -eq 6 ] || return 90
+  local ndirect=$(get_internal_counter page_cache_tracker.n_open_direct)
+  echo "*** {1} number of flushed opens: $nflush"
+  echo "*** {1} number of cached opens: $ncached"
+  echo "*** {1} number of direct opens: $ndirect"
+  [ $nflush -eq 2 ]  || return 24
+  [ $ncached -eq 6 ] || return 25
+  [ $ndirect -eq 0 ] || return 26
 
-  echo "*** open file descriptors"
-  tail -f ${mntpnt}/dir/small > tail_small.log &
-  TEST633_TAIL_SMALL=$!
-  tail -f ${mntpnt}/dir/large > tail_large.log &
-  TEST633_TAIL_LARGE=$!
+  ##############################################################################
 
-  echo "*** add contents to files in repository (2nd change)"
+  local chksum_small02=$(get_checksum $small_file)
+  local chksum_large02=$(get_checksum $large_file)
+  local inode_small02=$(get_inode ${mntpnt}/dir/small)
+  local inode_large02=$(get_inode ${mntpnt}/dir/large)
+  local size_small02=$(get_size $small_file)
+  local size_large02=$(get_size $large_file)
+  echo "*** {2} Checksums: $chksum_small02 [small]     $chksum_large02 [large]"
+  [ "x$chksum_small02" != "x$chksum_large02" ] || return 4
+  echo "*** {2} inodes: $inode_small02 [small]    $inode_large02 [large]"
+  echo "*** {2} sizes: $size_small02 [small]    $size_large02 [large]"
+
+  [ x"$(get_internal_counter cvmfs.n_fs_stat_stale)" = x"0" ] || return 30
+  [ x"$(get_internal_counter cvmfs.n_fs_inode_replace)" = x"0" ] || return 31
+
+  rm -f stop_topen
+
+  ./topen ${mntpnt}/dir/small > topen02_small.stdout 2> topen02_small.stderr &
+  local pid_small02=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_small02"
+  ./topen ${mntpnt}/dir/large > topen02_large.stdout 2> topen02_large.stderr &
+  local pid_large02=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_large02"
+  echo "*** {2} topen process pids: $pid_small02, $pid_large02"
+
+  while ! grep "ROUND 1" topen02_small.stdout; do
+    sleep 1
+  done
+  echo "*** {2} $pid_small02 ready"
+  while ! grep "ROUND 1" topen02_large.stdout; do
+    sleep 1
+  done
+  echo "*** {2} $pid_large02 ready"
+
+  echo "*** {2} add contents to files in repository (1st change)"
   ls -lisa ${mntpnt}/dir/*
   start_transaction $CVMFS_TEST_REPO                      || return $?
-  echo "2nd change" >> /cvmfs/$CVMFS_TEST_REPO/dir/small  || return 30
-  echo "2nd change" >> /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 30
+  echo "2nd change" >> $small_file                        || return 21
+  echo "2nd change" >> $large_file                        || return 22
   publish_repo $CVMFS_TEST_REPO -v                        || return $?
   ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
 
-  echo "*** remount private mount point"
-  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 40
-  local revision_3rd=$(get_xattr revision ${mntpnt}) || return 41
-  echo "revision is now $revision_3rd"
-  [ $revision_3rd -gt $revision_2nd ] || return 42
+  echo "*** {2} remount private mount point"
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 87
+  local revision03=$(get_xattr revision ${mntpnt}) || return 26
+  echo "*** {2} revision is now $revision03"
+  [ $revision03 -gt $revision02 ] || return 23
 
-  echo "*** verify new content"
+  echo "*** {2} wait for one more round"
+  local linecount=$(cat topen02_small.stdout | grep ROUND | wc -l)
+  while [ $(cat topen02_small.stdout | grep ROUND | wc -l) -eq $linecount ]; do
+    sleep 1
+  done
+  linecount=$(cat topen02_large.stdout | grep ROUND | wc -l)
+  while [ $(cat topen02_large.stdout | grep ROUND | wc -l) -eq $linecount ]; do
+    sleep 1
+  done
+
+  echo "*** {2} verify checksums"
+  check_stable_value 'Cksum-read' topen02_small.stdout $chksum_small02 || return 40
+  check_stable_value 'Cksum-mmap' topen02_small.stdout $chksum_small02 || return 41
+  check_stable_value 'Inode' topen02_small.stdout $inode_small02 || return 42
+  check_stable_value 'Length' topen02_small.stdout $size_small02 || return 43
+  check_stable_value 'nToEOF' topen02_small.stdout $size_small02 || return 44
+  check_stable_value 'Cksum-read' topen02_large.stdout $chksum_large02 || return 45
+  check_stable_value 'Cksum-mmap' topen02_large.stdout $chksum_large02 || return 46
+  check_stable_value 'Inode' topen02_large.stdout $inode_large02 || return 47
+  check_stable_value 'Length' topen02_large.stdout $size_large02 || return 48
+  check_stable_value 'nToEOF' topen02_large.stdout $size_large02 || return 49
+
+  ##############################################################################
+
+  local inode_small03=$(get_inode ${mntpnt}/dir/small)
+  while [ $inode_small03 -eq $inode_small02 ]; do
+    inode_small03=$(get_inode ${mntpnt}/dir/small)
+    sleep 1
+  done
+  local inode_large03=$(get_inode ${mntpnt}/dir/large)
+  while [ $inode_large03 -eq $inode_large02 ]; do
+    inode_large03=$(get_inode ${mntpnt}/dir/large)
+    sleep 1
+  done
+  local chksum_small03=$(get_checksum $small_file)
+  local chksum_large03=$(get_checksum $large_file)
+  local size_small03=$(get_size $small_file)
+  local size_large03=$(get_size $large_file)
+  echo "*** {3} Checksums: $chksum_small03 [small]     $chksum_large03 [large]"
+  [ "x$chksum_small03" != "x$chksum_large03" ] || return 4
+  [ "x$chksum_small02" != "x$chksum_small03" ] || return 4
+  [ "x$chksum_large02" != "x$chksum_large03" ] || return 4
+  echo "*** {3} inodes: $inode_small03 [small]    $inode_large03 [large]"
+  echo "*** {3} sizes: $size_small03 [small]    $size_large03 [large]"
+
+  ./topen ${mntpnt}/dir/small > topen03_small.stdout 2> topen03_small.stderr &
+  local pid_small03=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_small03"
+  ./topen ${mntpnt}/dir/large > topen03_large.stdout 2> topen03_large.stderr &
+  local pid_large03=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_large03"
+  echo "*** {3} topen process pids: $pid_small03, $pid_large03"
+
+  while ! grep "ROUND 1" topen03_small.stdout; do
+    sleep 1
+  done
+  echo "*** {3} $pid_small03 ready"
+  while ! grep "ROUND 1" topen03_large.stdout; do
+    sleep 1
+  done
+  echo "*** {3} $pid_large03 ready"
+
+  echo "*** {3} wait for one more round in #2 topen"
+  linecount=$(cat topen02_small.stdout | grep ROUND | wc -l)
+  while [ $(cat topen02_small.stdout | grep ROUND | wc -l) -eq $linecount ]; do
+    sleep 1
+  done
+  linecount=$(cat topen02_large.stdout | grep ROUND | wc -l)
+  while [ $(cat topen02_large.stdout | grep ROUND | wc -l) -eq $linecount ]; do
+    sleep 1
+  done
+
+  echo "*** {3} verify #2 checksums"
+  check_stable_value 'Cksum-read' topen02_small.stdout $chksum_small02 || return 50
+  check_stable_value 'Cksum-mmap' topen02_small.stdout $chksum_small02 || return 51
+  check_stable_value 'Inode' topen02_small.stdout $inode_small02       || return 52
+  check_stable_value 'Length' topen02_small.stdout $size_small02       || return 53
+  check_stable_value 'nToEOF' topen02_small.stdout $size_small02       || return 54
+  check_stable_value 'Cksum-read' topen02_large.stdout $chksum_large02 || return 55
+  check_stable_value 'Cksum-mmap' topen02_large.stdout $chksum_large02 || return 56
+  check_stable_value 'Inode' topen02_large.stdout $inode_large02       || return 57
+  check_stable_value 'Length' topen02_large.stdout $size_large02       || return 58
+  check_stable_value 'nToEOF' topen02_large.stdout $size_large02       || return 59
+
+  echo "*** {3} verify #3 checksums"
+  check_stable_value 'Inode'      topen03_small.stdout $inode_small03  || return 92
+  check_stable_value 'Length'     topen03_small.stdout $size_small03   || return 93
+  check_stable_value 'nToEOF'     topen03_small.stdout $size_small03   || return 94
+  check_stable_value 'Cksum-read' topen03_small.stdout $chksum_small03 || return 90
+  check_stable_value 'Cksum-mmap' topen03_small.stdout $chksum_small03 || return 91
+  check_stable_value 'Inode'      topen03_large.stdout $inode_large03  || return 97
+  check_stable_value 'Length'     topen03_large.stdout $size_large03   || return 98
+  check_stable_value 'nToEOF'     topen03_large.stdout $size_large03   || return 99
+  check_stable_value 'Cksum-read' topen03_large.stdout $chksum_large03 || return 95
+  check_stable_value 'Cksum-mmap' topen03_large.stdout $chksum_large03 || return 96
+
+  ##############################################################################
+
+  echo "*** {4} modify file contents without changing the length"
   ls -lisa ${mntpnt}/dir/*
-  [ "x$(tail -n 1 ${mntpnt}/dir/small)" = "x2nd change" ] || return 50
-  [ "x$(tail -n 1 ${mntpnt}/dir/large)" = "x2nd change" ] || return 51
+  start_transaction $CVMFS_TEST_REPO                || return $?
+  echo -n X | dd conv=notrunc of=$small_file bs=1   || return 21
+  echo -n X | dd conv=notrunc of=$large_file bs=1   || return 22
+  publish_repo $CVMFS_TEST_REPO -v                  || return $?
+  ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
 
-  echo "*** check that these files where opened in direct I/O mode"
-  local ndirect=$(get_internal_counter page_cache_tracker.n_open_direct)
-  echo "*** number of direct i/o opens: $ndirect"
-  [ $ndirect -eq 2 ]  || return 52
+  echo "*** {4} remount private mount point"
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 87
+  local revision04=$(get_xattr revision ${mntpnt}) || return 26
+  echo "*** {4} revision is now $revision04"
+  [ $revision04 -gt $revision03 ] || return 23
 
-  echo "*** verify that our open tail processes did acutally run"
-  /bin/kill -TERM $TEST633_TAIL_SMALL || return 60
-  TEST633_TAIL_SMALL=
-  /bin/kill -TERM $TEST633_TAIL_LARGE || return 61
-  TEST633_TAIL_LARGE=
+  local inode_small04=$(get_inode ${mntpnt}/dir/small)
+  while [ $inode_small04 -eq $inode_small03 ]; do
+    inode_small04=$(get_inode ${mntpnt}/dir/small)
+    sleep 1
+  done
+  local inode_large04=$(get_inode ${mntpnt}/dir/large)
+  while [ $inode_large04 -eq $inode_large03 ]; do
+    inode_large04=$(get_inode ${mntpnt}/dir/large)
+    sleep 1
+  done
+  local chksum_small04=$(get_checksum $small_file)
+  local chksum_large04=$(get_checksum $large_file)
+  local size_small04=$(get_size $small_file)
+  local size_large04=$(get_size $large_file)
+  echo "*** {4} Checksums: $chksum_small04 [small]     $chksum_large04 [large]"
+  [ "x$chksum_small04" != "x$chksum_large04" ] || return 4
+  [ "x$chksum_small03" != "x$chksum_small04" ] || return 4
+  [ "x$chksum_small02" != "x$chksum_small04" ] || return 4
+  [ "x$chksum_large03" != "x$chksum_large04" ] || return 4
+  [ "x$chksum_large02" != "x$chksum_large04" ] || return 4
+  [ $size_small04 -eq $size_small03 ]          || return 4
+  [ $size_large04 -eq $size_large03 ]          || return 4
+  echo "*** {4} inodes: $inode_small04 [small]    $inode_large04 [large]"
+  echo "*** {4} sizes: $size_small04 [small]    $size_large04 [large]"
 
-  echo "*** Forced direct I/O"
+  ./topen ${mntpnt}/dir/small > topen04_small.stdout 2> topen04_small.stderr &
+  local pid_small04=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_small04"
+  ./topen ${mntpnt}/dir/large > topen04_large.stdout 2> topen04_large.stderr &
+  local pid_large04=$!
+  TEST633_PIDS="$TEST633_PIDS $pid_large04"
+  echo "*** {4} topen process pids: $pid_small04, $pid_large04"
 
-  local directio=$(get_xattr direct_io /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/dir/small)
-  echo "*** directio: $directio"
-  [ "x$directio" = "x0" ]                 || return 70
-  start_transaction $CVMFS_TEST_REPO      || return $?
-  touch /cvmfs/$CVMFS_TEST_REPO/dir/small || return 71
-  touch /cvmfs/$CVMFS_TEST_REPO/dir/large || return 71
-  publish_repo $CVMFS_TEST_REPO -d        || return 72
-  directio=$(get_xattr direct_io /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/dir/small)
-  echo "*** directio: $directio"
-  [ "x$directio" = "x1" ]                 || return 73
+  while ! grep "ROUND 1" topen04_small.stdout; do
+    sleep 1
+  done
+  echo "*** {4} $pid_small04 ready"
+  while ! grep "ROUND 1" topen04_large.stdout; do
+    sleep 1
+  done
+  echo "*** {4} $pid_large04 ready"
 
-  echo "*** remount private mount point"
-  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 74
-  local revision_4th=$(get_xattr revision ${mntpnt}) || return 75
-  echo "revision is now $revision_4th"
-  [ $revision_4th -gt $revision_3rd ] || return 76
+  echo "*** {4} wait for one more round in #2, #3 topen"
+  linecount=$(cat topen02_small.stdout | grep ROUND | wc -l)
+  while [ $(cat topen02_small.stdout | grep ROUND | wc -l) -eq $linecount ]; do
+    sleep 1
+  done
+  linecount=$(cat topen02_large.stdout | grep ROUND | wc -l)
+  while [ $(cat topen02_large.stdout | grep ROUND | wc -l) -eq $linecount ]; do
+    sleep 1
+  done
+  linecount=$(cat topen03_small.stdout | grep ROUND | wc -l)
+  while [ $(cat topen03_small.stdout | grep ROUND | wc -l) -eq $linecount ]; do
+    sleep 1
+  done
+  linecount=$(cat topen03_large.stdout | grep ROUND | wc -l)
+  while [ $(cat topen03_large.stdout | grep ROUND | wc -l) -eq $linecount ]; do
+    sleep 1
+  done
 
-  cat ${mntpnt}/dir/small > /dev/null
-  cat ${mntpnt}/dir/large > /dev/null
-  ndirect=$(get_internal_counter page_cache_tracker.n_open_direct)
-  echo "*** number of direct i/o opens: $ndirect"
-  [ $ndirect -eq 4 ]  || return 77
+  echo "*** {4} verify #2 checksums"
+  check_stable_value 'Cksum-read' topen02_small.stdout $chksum_small02 || return 60
+  check_stable_value 'Cksum-mmap' topen02_small.stdout $chksum_small02 || return 61
+  check_stable_value 'Inode' topen02_small.stdout $inode_small02       || return 62
+  check_stable_value 'Length' topen02_small.stdout $size_small02       || return 63
+  check_stable_value 'nToEOF' topen02_small.stdout $size_small02       || return 64
+  check_stable_value 'Cksum-read' topen02_large.stdout $chksum_large02 || return 65
+  check_stable_value 'Cksum-mmap' topen02_large.stdout $chksum_large02 || return 66
+  check_stable_value 'Inode' topen02_large.stdout $inode_large02       || return 67
+  check_stable_value 'Length' topen02_large.stdout $size_large02       || return 68
+  check_stable_value 'nToEOF' topen02_large.stdout $size_large02       || return 69
+
+  echo "*** {4} verify #3 checksums"
+  check_stable_value 'Cksum-read' topen03_small.stdout $chksum_small03 || return 70
+  check_stable_value 'Cksum-mmap' topen03_small.stdout $chksum_small03 || return 71
+  check_stable_value 'Inode'      topen03_small.stdout $inode_small03  || return 72
+  check_stable_value 'Length'     topen03_small.stdout $size_small03   || return 73
+  check_stable_value 'nToEOF'     topen03_small.stdout $size_small03   || return 74
+  check_stable_value 'Cksum-read' topen03_large.stdout $chksum_large03 || return 75
+  check_stable_value 'Cksum-mmap' topen03_large.stdout $chksum_large03 || return 76
+  check_stable_value 'Inode'      topen03_large.stdout $inode_large03  || return 77
+  check_stable_value 'Length'     topen03_large.stdout $size_large03   || return 78
+  check_stable_value 'nToEOF'     topen03_large.stdout $size_large03   || return 79
+
+  echo "*** {4} verify #4 checksums"
+  check_stable_value 'Cksum-read' topen04_small.stdout $chksum_small04 || return 80
+  check_stable_value 'Cksum-mmap' topen04_small.stdout $chksum_small04 || return 81
+  check_stable_value 'Inode'      topen04_small.stdout $inode_small04  || return 82
+  check_stable_value 'Length'     topen04_small.stdout $size_small04   || return 83
+  check_stable_value 'nToEOF'     topen04_small.stdout $size_small04   || return 84
+  check_stable_value 'Cksum-read' topen04_large.stdout $chksum_large04 || return 85
+  check_stable_value 'Cksum-mmap' topen04_large.stdout $chksum_large04 || return 86
+  check_stable_value 'Inode'      topen04_large.stdout $inode_large04  || return 87
+  check_stable_value 'Length'     topen04_large.stdout $size_large04   || return 88
+  check_stable_value 'nToEOF'     topen04_large.stdout $size_large04   || return 89
+
+  [ $(get_internal_counter cvmfs.n_fs_stat_stale) -gt 0 ] || return 32
+  [ $(get_internal_counter cvmfs.n_fs_inode_replace) -gt 0 ] || return 33
+
+  touch stop_topen
+  wait $TEST633_PIDS
+  TEST633_PIDS=
+
+  [ x"$(get_checksum ${mntpnt}/dir/small)" = x"$chksum_small04" ] || return 91
+  [ x"$(get_checksum ${mntpnt}/dir/large)" = x"$chksum_large04" ] || return 92
+  purge_disk_cache
+
+  [ -s topen02_small.stderr ] && return 30
+  [ -s topen02_large.stderr ] && return 31
+  [ -s topen03_small.stderr ] && return 32
+  [ -s topen03_large.stderr ] && return 33
+  [ -s topen04_small.stderr ] && return 33
+  [ -s topen04_large.stderr ] && return 34
+
+  [ x"$(get_checksum ${mntpnt}/dir/small)" = x"$chksum_small04" ] || return 93
+  [ x"$(get_checksum ${mntpnt}/dir/large)" = x"$chksum_large04" ] || return 94
 
   return 0
 }

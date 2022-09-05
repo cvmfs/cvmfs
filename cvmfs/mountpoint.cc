@@ -224,11 +224,15 @@ void FileSystem::CreateStatistics() {
   n_fs_lookup_negative_ = statistics_->Register("cvmfs.n_fs_lookup_negative",
                                                 "Number of negative lookups");
   n_fs_stat_ = statistics_->Register("cvmfs.n_fs_stat", "Number of stats");
+  n_fs_stat_stale_ = statistics_->Register("cvmfs.n_fs_stat_stale",
+    "Number of stats for stale (open, meanwhile changed) regular files");
   n_fs_read_ = statistics_->Register("cvmfs.n_fs_read", "Number of files read");
   n_fs_readlink_ = statistics_->Register("cvmfs.n_fs_readlink",
                                          "Number of links read");
   n_fs_forget_ = statistics_->Register("cvmfs.n_fs_forget",
                                        "Number of inode forgets");
+  n_fs_inode_replace_ = statistics_->Register("cvmfs.n_fs_inode_replace",
+    "Number of stale inodes that got replaced by an up-to-date version");
   no_open_files_ = statistics_->Register("cvmfs.no_open_files",
                                          "Number of currently opened files");
   no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
@@ -372,9 +376,11 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_fs_lookup_(NULL)
   , n_fs_lookup_negative_(NULL)
   , n_fs_stat_(NULL)
+  , n_fs_stat_stale_(NULL)
   , n_fs_read_(NULL)
   , n_fs_readlink_(NULL)
   , n_fs_forget_(NULL)
+  , n_fs_inode_replace_(NULL)
   , no_open_files_(NULL)
   , no_open_dirs_(NULL)
   , statistics_(NULL)
