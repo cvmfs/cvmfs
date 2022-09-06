@@ -2345,9 +2345,10 @@ __do_local_mount() {
   local mountpoint="$2"
   local repo_name="$3"
   local repo_url="$4"
-  local config_file="$5"
-  local extra_option="$6"
-  local mount_options="$7"
+  local config_file="$5"   # config file containing CVMFS client options,
+                           # if used the options listed below are not added
+  local extra_option="$6"  # CVMFS client options as str
+  local mount_options="$7" # comma separated mount options
 
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"

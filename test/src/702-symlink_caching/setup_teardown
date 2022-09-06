@@ -1,4 +1,5 @@
 create_symlink_repo() {
+  echo ""
   echo "*** CREATE a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
@@ -15,5 +16,34 @@ create_symlink_repo() {
 
   publish_repo $CVMFS_TEST_REPO || return 200
   echo "*** FINISHED creating a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo ""
 }
 
+
+private_mount() {
+  local mntpnt="$1"
+  local fuse_version="$2"
+  local config_file_path="$3"
+  TEST702_PRIVATE_MOUNT="$mntpnt"
+  do_local_mount "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_CACHE_SYMLINKS=1" \
+                 "libfuse=$fuse_version" || return 1
+}
+
+private_unmount() {
+  sudo umount $TEST702_PRIVATE_MOUNT
+  TEST702_PRIVATE_MOUNT=
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST702_PIDS" != "x" ]; then
+    kill -9 $TEST702_PIDS
+  fi
+  if [ "x$TEST702_PRIVATE_MOUNT" != "x" ]; then
+    private_unmount
+  fi
+}
