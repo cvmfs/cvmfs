@@ -235,10 +235,6 @@ build_lib() {
       patch_external "vjson"       "missing_include.patch"
       do_build "vjson"
       ;;
-    sha2)
-      do_copy "sha2"
-      do_build "sha2"
-      ;;
     sha3)
       do_copy "sha3"
       do_build "sha3"
@@ -269,7 +265,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive go"
+missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive go"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi
