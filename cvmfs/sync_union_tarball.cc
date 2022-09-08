@@ -146,6 +146,7 @@ void SyncUnionTarball::Traverse() {
 
       case ARCHIVE_EOF: {
         if (create_catalog_on_root_ && (base_directory_ != "/")) {
+          CreateDirectories(base_directory_);  // necessary for empty archives
           SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
               new SyncItemDummyCatalog(base_directory_, this));
           ProcessFile(catalog);
