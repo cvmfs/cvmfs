@@ -360,6 +360,7 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 		}
 		req.Header.Set("Authorization", token)
 		req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+		req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
 
 		resp, err := client.Do(req)
 		defer resp.Body.Close()

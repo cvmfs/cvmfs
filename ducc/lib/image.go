@@ -250,7 +250,7 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 		// If the first fetch fails, try to fetch from a manifest list
 		manifest, err := img.fetchManifestList()
 		if err != nil {
-			return da.Manifest{}, fmt.Errorf("could not retrieve manifest")
+			return da.Manifest{}, fmt.Errorf("could not retrieve manifest for %s", img.WholeName())
 		}
 		return *manifest, nil
 	}
@@ -283,6 +283,7 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 	}
 	req.Header.Set("Authorization", token)
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -472,7 +473,8 @@ func (img *Image) getByteManifestList() ([]byte, error) {
 
 func (img *Image) getByteManifest(reference string) ([]byte, error) {
 	url := img.GetManifestUrl(reference)
-	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.v2+json"})
+	return makeGetRequest(url, map[string]string{"Accept":
+		"application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"})
 }
 
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
