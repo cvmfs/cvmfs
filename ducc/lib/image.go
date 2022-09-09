@@ -268,8 +268,7 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 		l.LogE(err).Warning("Impossible to retrieve the manifest of the image, not changes set")
 		return
 	}
-	configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-		img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
+	configUrl := fmt.Sprintf("%sblobs/%s", img.GetBaseUrl(), manifest.Config.Digest)
 	token, err := firstRequestForAuth(configUrl)
 	if err != nil {
 		l.LogE(err).Warning("Impossible to retrieve the token for getting the changes from the repository, not changes set")
@@ -1046,6 +1045,10 @@ func (i *Image) baseUrl() string {
 		url = fmt.Sprintf("%s://%s/v2/%s/", i.Scheme, i.Registry, i.Repository)
 	}
 	return url
+}
+
+func (i *Image) GetBaseUrl() string {
+	return i.baseUrl()
 }
 
 func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
