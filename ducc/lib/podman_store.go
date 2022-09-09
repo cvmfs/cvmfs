@@ -343,8 +343,7 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 	imageID := strings.Split(manifest.Config.Digest, ":")[1]
 	configFilePath := filepath.Join(rootPath, imageMetadataDir, imageID, fname)
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
-		configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-			img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
+		configUrl := fmt.Sprintf("%sblobs/%s", img.GetBaseUrl(), manifest.Config.Digest)
 
 		token, err := firstRequestForAuth(configUrl)
 		if err != nil {
