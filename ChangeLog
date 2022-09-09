@@ -1,5 +1,6 @@
 2.10.0:
-  * [server] Fix ingestion (with catalog) of empty tarfile
+  * [ducc] Support images with OCI manifest (#2851)
+  * [server] Fix ingestion (with catalog) of empty tarfile (#3055)
   * [client] Gracefully handle open, changing files (CVM-2001)
   * [ducc] Add support for container registry proxies through
     DUCC_<REGISTRY_NAME>_PROXY (#2893)
