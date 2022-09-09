@@ -250,7 +250,7 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 		// If the first fetch fails, try to fetch from a manifest list
 		manifest, err := img.fetchManifestList()
 		if err != nil {
-			return da.Manifest{}, fmt.Errorf("could not retrieve manifest")
+			return da.Manifest{}, fmt.Errorf("could not retrieve manifest for %s", img.WholeName())
 		}
 		return *manifest, nil
 	}
