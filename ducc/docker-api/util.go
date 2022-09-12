@@ -108,6 +108,7 @@ func (m Manifest) GetChainIDs() []digest.Digest {
 		if iChain == 0 {
 			d := digest.FromString(l.Digest)
 			result = append(result, d)
+			iChain++
 			continue
 		}
 		digest := digest.FromString(result[iChain-1].String() + " " + l.Digest)
