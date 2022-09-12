@@ -973,6 +973,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		if _, err := os.Stat(path); err == nil {
 			// the chain is present, we skip the loop
 			l.Log().WithFields(log.Fields{"chain id": digest}).Info("skipping (already present)")
+			previous = chainIDs[i].String()
 			continue
 		}
 
