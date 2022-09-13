@@ -962,14 +962,21 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 		}
 		digest := chain.String()
 		lastChainId = digest
+		layer := manifest.Layers[i]
+
+		l.Log().WithFields(
+			log.Fields{"chain id": digest, "next layer": layer.Digest}).
+			Info("adding new chain")
 
 		path := cvmfs.ChainPath(CVMFSRepo, digest)
 
 		if _, err := os.Stat(path); err == nil {
 			// the chain is present, we skip the loop
+			l.Log().WithFields(log.Fields{"chain id": digest}).Info("skipping (already present)")
+			previous = chainIDs[i].String()
 			continue
 		}
-		layer := manifest.Layers[i]
+
 		downloadLayer := func() error {
 			// we need to get the layer tar reader here
 			layerStream, err := ld.DownloadLayer(layer)
