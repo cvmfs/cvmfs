@@ -14,6 +14,7 @@
 
 #include "backoff.h"
 #include "crypto/hash.h"
+#include "gtest/gtest_prod.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
 
@@ -47,6 +48,7 @@ namespace catalog {
  * be unpinned when the class is destructed.
  */
 class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
+  FRIEND_TEST(T_CatalogManagerClient, MountLatest);
   // Maintains certificate hit/miss counters
   friend class CachedManifestEnsemble;
 

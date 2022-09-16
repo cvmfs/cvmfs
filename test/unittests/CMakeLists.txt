@@ -302,6 +302,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_catalog_counters.cc
   t_catalog_merge_tool.cc
   t_catalog_mgr.cc
+  t_catalog_mgr_client.cc
   t_catalog_mgr_rw.cc
   t_catalog_sql.cc
   t_catalog_traversal.cc
