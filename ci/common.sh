@@ -81,25 +81,25 @@ create_cvmfs_source_tarball() {
   local tmpd=$(mktemp -d)
   mkdir ${tmpd}/${tar_name}
   cd $tmpd
-  cp -R ${source_directory}/AUTHORS            \
-        ${source_directory}/CMakeLists.txt     \
-        ${source_directory}/COPYING            \
-        ${source_directory}/ChangeLog          \
-        ${source_directory}/INSTALL            \
-        ${source_directory}/NEWS               \
-        ${source_directory}/README.md          \
-        ${source_directory}/add-ons            \
-        ${source_directory}/bootstrap.sh       \
-        ${source_directory}/cmake              \
-        ${source_directory}/config_cmake.h.in  \
-        ${source_directory}/cvmfs              \
-        ${source_directory}/doc                \
-        ${source_directory}/externals          \
-        ${source_directory}/gateway            \
-        ${source_directory}/mount              \
-        ${source_directory}/test               \
-        ${source_directory}/ducc               \
-        $tar_name
+  cp -R --dereference ${source_directory}/AUTHORS            \
+                      ${source_directory}/CMakeLists.txt     \
+                      ${source_directory}/COPYING            \
+                      ${source_directory}/ChangeLog          \
+                      ${source_directory}/INSTALL            \
+                      ${source_directory}/NEWS               \
+                      ${source_directory}/README.md          \
+                      ${source_directory}/add-ons            \
+                      ${source_directory}/bootstrap.sh       \
+                      ${source_directory}/cmake              \
+                      ${source_directory}/config_cmake.h.in  \
+                      ${source_directory}/cvmfs              \
+                      ${source_directory}/doc                \
+                      ${source_directory}/externals          \
+                      ${source_directory}/gateway            \
+                      ${source_directory}/mount              \
+                      ${source_directory}/test               \
+                      ${source_directory}/ducc               \
+                      $tar_name
   rm -r $tar_name/test/benchmarks
   tar czf $destination_path $tar_name || true
   local retval=$?
