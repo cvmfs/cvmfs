@@ -466,7 +466,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   // 076 fails with the following line uncommented
   //
   // WARNING! ENABLING THIS BREAKS ANY TYPE OF MOUNTPOINT POINTING TO THIS INODE
-  if (mount_point_->cache_symlinks() && dirent.IsLink()) {
+  if (mount_point_->cache_symlinks()) { // && dirent.IsLink()) {
+    LogCvmfs(kLogCache, kLogDebug, "Dentry to evict: %s", name);
     mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   }
 
@@ -1643,15 +1644,15 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 #if FUSE_VERSION >= 310
     if ((conn->capable & FUSE_CAP_CACHE_SYMLINKS) == 0) {
       mount_point_->DisableCacheSymlinks();
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+      LogCvmfs(kLogCvmfs, kLogDebug, //kLogDebug | kLogSyslogErr,
            "Symlink caching requested but missing fuse kernel support, "
            "falling back to no caching");
     }
     conn->want |= FUSE_CAP_CACHE_SYMLINKS;
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "enabling symlink caching");
+    LogCvmfs(kLogCvmfs, kLogDebug, "enabling symlink caching");
 #else
     mount_point_->DisableCacheSymlinks();
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogCvmfs, kLogDebug,
            "Symlink caching requested but fuse version not >=3.10, "
            "falling back to no caching");
 #endif
