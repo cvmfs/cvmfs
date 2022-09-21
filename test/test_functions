@@ -2375,13 +2375,13 @@ EOF
   cat "$config"
 
   if [[ ! -z $mount_options ]]; then
-    mount_options=$(echo ","$mount_options" ")
+    mount_options=$(echo $mount_options",")
   fi
 
   if [ x"$as_root" != x"" ]; then
-    sudo cvmfs2 -d -o allow_other,config=$config$mount_options $repo_name $mountpoint >> $output 2>&1
+    sudo cvmfs2 -d -o allow_other,${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
   else
-    cvmfs2 -d -o config=$config$mount_options $repo_name $mountpoint >> $output 2>&1
+    cvmfs2 -d -o ${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
   fi
 }
 

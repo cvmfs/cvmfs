@@ -4,6 +4,7 @@ cvmfs_test_suites="quick"
 
 TEST702_PRIVATE_MOUNT=
 TEST702_PIDS=
+CVMFS_TEST_702_OSXMOUNTPOINT=
 
 source ./src/702-symlink_caching/setup_teardown
 
@@ -17,12 +18,12 @@ check_readlink_is_cached() {
 
   readlink ${mntpnt}/${symlink_name} > /dev/null
   readlink ${mntpnt}/${symlink_name} > /dev/null
-  local old_counter=$(cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs | grep readlink)
+  local old_counter=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs | grep readlink)
 
   readlink ${mntpnt}/${symlink_name} > /dev/null
   readlink ${mntpnt}/${symlink_name} > /dev/null
   readlink ${mntpnt}/${symlink_name} > /dev/null
-  local new_counter=$(cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs | grep readlink)
+  local new_counter=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs | grep readlink)
 
   if [ "$old_counter" = "$new_counter" ] && [ "$old_counter" != "" ] ; then
     echo "0"
@@ -51,6 +52,45 @@ replace_short_symlink_with_long() {
   echo "  *** FINISHED Replace symlink from $short_name to $long_name"
 }
 
+cleanup_mount_on_top() {
+  echo "Cleaning up: umount mount-on-top"
+  sudo umount $TEST702_PRIVATE_MOUNT/testdir_mountpoint
+  if [ "x$CVMFS_TEST_702_OSXMOUNTPOINT" != "x" ]; then
+    sudo hdiutil detach $CVMFS_TEST_702_OSXMOUNTPOINT
+  fi
+}
+
+# should work both for libfuse2 and libfuse3 as
+# - libfuse2 does not evict dentries
+# - libfuse3 expires dentries instead of evicting
+mount_on_top() {
+  local mntpnt="$1"
+  echo $mntpnt
+
+
+  if running_on_osx; then
+    CVMFS_TEST_702_OSXMOUNTPOINT=$(sudo hdid -nomount ram://256000)
+    sudo newfs_hfs $CVMFS_TEST_702_OSXMOUNTPOINT || return 30
+    sudo mount -t hfs $CVMFS_TEST_702_OSXMOUNTPOINT $mntpnt/testdir_mountpoint || return 31
+    sudo mkdir $mntpnt/testdir_mountpoint/self || return 32
+  else
+    sudo mount -t proc none $mntpnt/testdir_mountpoint || return 33
+  fi
+  trap cleanup_mount_on_top EXIT HUP INT TERM
+
+  ls $mntpnt/testdir_mountpoint/self > /dev/null || return 34
+  diff $mntpnt/testdir_mountpoint/self/maps /proc/self/maps || return 35
+
+  # sudo cvmfs_config reload -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO || return 36
+  add_some_tmp_file_to_repo
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 36
+
+  ls $mntpnt/testdir_mountpoint/self > /dev/null || return 37
+  diff $mntpnt/testdir_mountpoint/self/maps /proc/self/maps  || return 38
+
+  cleanup_mount_on_top
+}
+
 # for fuse 2
 # checks that
 # 1) symlinks are not cached in kernel
@@ -62,11 +102,20 @@ check_libfuse2() {
   
   echo ""
   echo "*** START Testing libfuse2"
-  echo "Testing caching..."
   
+  echo "Mounting repo..."
   private_mount $mntpnt "2"|| return $?
   
+  echo ""
+  echo "Testing caching..."
   local res=$(check_readlink_is_cached $mntpnt $symlink_name)
+
+  echo ""
+  echo "Testing mount on top..."
+  mount_on_top $mntpnt || return $?
+
+  echo ""
+  echo "Unmount repo"
   private_unmount
   echo "*** FINISHED Testing libfuse2"
   echo ""
@@ -88,11 +137,16 @@ check_libfuse3() {
 
   echo ""
   echo "*** START Testing libfuse3"
+
+  echo "Mounting repo..."
   private_mount $mntpnt "3"
+
+  echo ""
   echo "Testing caching..."
   # res_cached must be 0
   local res_cached=$(check_readlink_is_cached $mntpnt $symlink_name)
 
+  echo ""
   echo "Test symlink short -> long replacement"
   local old_symlink_pointer=$(readlink ${mntpnt}/${symlink_name})
   replace_short_symlink_with_long $short_name $long_name $symlink_name
@@ -103,11 +157,19 @@ check_libfuse3() {
   else
     local res_switch="1"
   fi
+
+  echo ""
+  echo "Testing mount on top..."
+  mount_on_top $mntpnt || return $?
+
+  echo ""
+  echo "Unmount repo"
   private_unmount
 
   [ $res_cached = "0" ] || return 20
   [ $res_switch = "0" ] || return 21
 
+  echo ""
   echo "*** FINISHED Testing libfuse3"
   echo ""
 }
@@ -130,7 +192,7 @@ cvmfs_run_test() {
 
   check_libfuse2 ${mntpnt} ${config_file_path} ${symlink_name} || return $?
   check_libfuse3 ${mntpnt} ${config_file_path} ${short_name} ${long_name} ${symlink_name} || return $?
-
+  return -1
 
   return 0
 }
