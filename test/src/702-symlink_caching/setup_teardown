@@ -15,14 +15,13 @@ create_symlink_repo() {
 
   ln -s ${short_name} /cvmfs/$CVMFS_TEST_REPO/${symlink_name}
 
-  ls /cvmfs/$CVMFS_TEST_REPO/
-
   publish_repo $CVMFS_TEST_REPO || return 200
   echo "*** FINISHED creating a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   echo ""
 }
 
 add_some_tmp_file_to_repo() {
+  echo "Adding some random file to the repo $CVMFS_TEST_REPO"
   start_transaction $CVMFS_TEST_REPO || return $?
   local tmpfile="$(mktemp /cvmfs/$CVMFS_TEST_REPO/tmpfile.XXXXX)"
   publish_repo $CVMFS_TEST_REPO || return 200
@@ -33,12 +32,6 @@ private_mount() {
   local fuse_version="$2"
   local config_file_path="$3"
   TEST702_PRIVATE_MOUNT="$mntpnt"
-
-  # mkdir -p $mntpnt
-  # local output="$(mktemp ${mntpnt}.log.XXXXX)"
-  
-  
-  # sudo cvmfs2 -d -o rw,system_mount,fsname=cvmfs2,allow_other,grab_mountpoint,uid=998,gid=997,libfuse=$fuse_version $CVMFS_TEST_REPO $mntpnt >> $output 2>&1
 
   local mount_options="rw,system_mount,fsname=cvmfs2,libfuse=$fuse_version"
 
