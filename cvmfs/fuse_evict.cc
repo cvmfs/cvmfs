@@ -204,9 +204,11 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         entry_parent, entry_name.GetChars(), entry_name.GetLength());
 #else
 #ifdef FUSE_CAP_DENTRY_EXPIRE_ONLY
-      fuse_lowlevel_notify_expire_entry(*reinterpret_cast<struct fuse_session**>(
+      fuse_lowlevel_notify_expire_entry(
+        *reinterpret_cast<struct fuse_session**>(
         invalidator->fuse_channel_or_session_),
-        entry_parent, entry_name.GetChars(), entry_name.GetLength(), fuse_expire_flags::FUSE_LL_EXPIRE_ONLY);
+        entry_parent, entry_name.GetChars(), entry_name.GetLength(),
+        fuse_expire_flags::FUSE_LL_EXPIRE_ONLY);
 #else
       fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_session**>(
         invalidator->fuse_channel_or_session_),
