@@ -61,7 +61,16 @@ func MakeAdminReposHandler(services be.ActionController) httprouter.Handle {
 		repoName := ps.ByName("name")
 
 		msg := make(map[string]interface{})
-		if err := services.SetRepoEnabled(ctx, repoName, reqMsg.Enable); err != nil {
+
+		var state be.RepoState
+		switch reqMsg.Enable {
+		case true:
+			state = be.RepoStateEnabled
+		case false:
+			state = be.RepoStateDisabled
+		}
+
+		if err := services.SetRepoState(ctx, repoName, state); err != nil {
 			if _, ok := err.(be.RepoBusyError); ok {
 				msg["status"] = "repo_busy"
 			} else {

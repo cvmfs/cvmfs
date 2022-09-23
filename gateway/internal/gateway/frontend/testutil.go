@@ -44,7 +44,7 @@ func (b *mockBackend) GetRepos(ctx context.Context) (map[string]be.RepositoryCon
 	}, nil
 }
 
-func (b *mockBackend) SetRepoEnabled(ctx context.Context, repository string, enabled bool) error {
+func (b *mockBackend) SetRepoState(ctx context.Context, repository string, state be.RepoState) error {
 	return nil
 }
 
@@ -91,6 +91,14 @@ func (b *mockBackend) SubmitPayload(ctx context.Context, token string, payload i
 
 func (b *mockBackend) RunGC(ctx context.Context, options be.GCOptions) (string, error) {
 	return "", nil
+}
+
+func (s *mockBackend) StopGC(ctx context.Context) error {
+	return nil
+}
+
+func (s *mockBackend) GetGCState(ctx context.Context) (*be.GCStateDTO, error) {
+	return nil, nil
 }
 
 func (b *mockBackend) PublishManifest(ctx context.Context, repository string, message be.NotificationMessage) {

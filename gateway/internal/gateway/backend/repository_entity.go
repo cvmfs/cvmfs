@@ -12,19 +12,34 @@ import (
 // ErrRepoDisabled signals that a new lease cannot be acquired due to the repository
 // being disabled
 var ErrRepoDisabled = fmt.Errorf("repo_disabled")
+var ErrRepoLocked = fmt.Errorf("repo_locked")
+
+type RepoState int
+
+const (
+	RepoStateEnabled  RepoState = 0
+	RepoStateDisabled RepoState = 1
+	RepoStateLocked   RepoState = 2
+)
+
+var RepoStates = map[string]RepoState{
+	"enabled":  RepoStateEnabled,
+	"disabled": RepoStateDisabled,
+	"locked":   RepoStateLocked,
+}
 
 type Repository struct {
 	Name     string
 	Manifest string
-	Enabled  bool
+	State    RepoState
 }
 
 func CreateRepository(ctx context.Context, tx *sql.Tx, repo Repository) error {
 	t0 := time.Now()
 
 	res, err := tx.ExecContext(ctx,
-		"insert into Repository (Name, Manifest, Enabled) values (?, ?, ?);",
-		repo.Name, repo.Manifest, repo.Enabled)
+		"insert into Repository (Name, Manifest, State) values (?, ?, ?);",
+		repo.Name, repo.Manifest, repo.State)
 	if err != nil {
 		return fmt.Errorf("could not insert new repository: %w", err)
 	}
@@ -37,7 +52,7 @@ func CreateRepository(ctx context.Context, tx *sql.Tx, repo Repository) error {
 	gw.LogC(ctx, "repository_entity", gw.LogDebug).
 		Str("operation", "create").
 		Dur("task_dt", time.Since(t0)).
-		Msgf("name: %v, enabled: %v", repo.Name, repo.Enabled)
+		Msgf("name: %v, state: %v", repo.Name, repo.State)
 
 	return nil
 }
@@ -46,8 +61,8 @@ func UpdateRepository(ctx context.Context, tx *sql.Tx, repo Repository) error {
 	t0 := time.Now()
 
 	res, err := tx.ExecContext(ctx,
-		"update Repository set Manifest = ?, Enabled = ? where Name = ?;",
-		repo.Manifest, repo.Enabled, repo.Name)
+		"update Repository set Manifest = ?, State = ? where Name = ?;",
+		repo.Manifest, repo.State, repo.Name)
 	if err != nil {
 		return fmt.Errorf("could not update repository: %w", err)
 	}
@@ -60,7 +75,7 @@ func UpdateRepository(ctx context.Context, tx *sql.Tx, repo Repository) error {
 	gw.LogC(ctx, "repository_entity", gw.LogDebug).
 		Str("operation", "update").
 		Dur("task_dt", time.Since(t0)).
-		Msgf("name: %v, enabled: %v", repo.Name, repo.Enabled)
+		Msgf("name: %v, state: %v", repo.Name, repo.State)
 
 	return nil
 }
@@ -141,7 +156,7 @@ func scanRepository(rows *sql.Rows, repo *Repository) error {
 	if err := rows.Scan(
 		&repo.Name,
 		&repo.Manifest,
-		&repo.Enabled); err != nil {
+		&repo.State); err != nil {
 		return err
 	}
 

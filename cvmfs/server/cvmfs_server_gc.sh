@@ -22,6 +22,8 @@ cvmfs_server_gc() {
   local deletion_log=""
   local reconstruct_reflog="0"
 
+  local gateway_tool="/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh"
+
   # optional parameter handling
   OPTIND=1
   while getopts "ldr:t:faL:" option
@@ -100,26 +102,16 @@ cvmfs_server_gc() {
   #       to run GC directly on the gateway
   # Check if the command is called on a repository gateway, and if so,
   # abort if there are any active leases
-  if [ -x "/usr/libexec/cvmfs-gateway/scripts/get_leases.sh" ]; then
+  if [ -x $gateway_tool ] && [ "x$($gateway_tool status)" = "xrunning" ]; then
     for name in $names; do
-      if [ x"$( /usr/libexec/cvmfs-gateway/scripts/get_leases.sh | grep $name )" != x"" ]; then
-        echo "Active lease found for repository: $name. Aborting"
-        return 1
-      fi
+      echo "Locking repository: $name"
+      /usr/bin/cvmfs_gateway set-repo-state $name locked
     done
-    # If cvmfs-gateway is running, turn it off for the duration of the GC
-    if [ "x$(sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status)" = "xpong" ]; then
-      echo "Turning off cvmfs-gateway"
-      if is_systemd; then
-        sudo systemctl stop cvmfs-gateway
-      else
-        sudo service cvmfs-gateway stop
-      fi
-      trap __restore_cvmfs_gateway EXIT HUP INT TERM
-    fi
+    for name in $names; do
+      echo "Flushing leases for repository: $name"
+      /usr/bin/cvmfs_gateway flush-leases $name
+    done
   fi
-
-
 
   # sanity checks
   if [ $dry_run -ne 0 ] && [ $reconstruct_reflog -ne 0 ]; then
@@ -201,11 +193,11 @@ cvmfs_server_gc() {
 }
 
 __restore_cvmfs_gateway() {
-  echo "Restoring cvmfs-gateway"
-  if is_systemd; then
-    sudo systemctl start cvmfs-gateway
-  else
-    sudo service cvmfs-gateway start
+  if [ -x $gateway_tool ] && [ "x$($gateway_tool status)" = "xrunning" ]; then
+    for name in $names; do
+      echo "Unlocking repository: $name"
+      /usr/bin/cvmfs_gateway set-repo-state $name enabled
+    done
   fi
 }
 
@@ -298,6 +290,9 @@ __do_gc_cmd()
       eval $trapcmd
       trap - EXIT HUP INT TERM
     fi
+
+    # Unlock all the repositories if running on a gateway
+    __restore_cvmfs_gateway
 
     syncfs cautious
 }

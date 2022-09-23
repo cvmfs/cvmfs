@@ -15,8 +15,9 @@ type KeyPaths map[string]string
 // RepositoryConfig contains the access configuration (registered keys and
 // enabled status) for a repository
 type RepositoryConfig struct {
-	Keys    KeyPaths `json:"keys"`
-	Enabled bool     `json:"enabled"`
+	Keys    KeyPaths  `json:"keys"`
+	Enabled bool      `json:"enabled"`
+	State   RepoState `json:"state"`
 }
 
 // KeyConfig contains the secret part and the enabled status of a key

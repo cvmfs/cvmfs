@@ -26,7 +26,7 @@ type ActionController interface {
 	GetKey(ctx context.Context, keyID string) *KeyConfig
 	GetRepo(ctx context.Context, repoName string) (*RepositoryConfig, error)
 	GetRepos(ctx context.Context) (map[string]RepositoryConfig, error)
-	SetRepoEnabled(ctx context.Context, repository string, enabled bool) error
+	SetRepoState(ctx context.Context, repository string, state RepoState) error
 	NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error)
 	GetLeases(ctx context.Context) (map[string]LeaseDTO, error)
 	GetLease(ctx context.Context, tokenStr string) (*LeaseDTO, error)
@@ -35,6 +35,8 @@ type ActionController interface {
 	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 	RunGC(ctx context.Context, options GCOptions) (string, error)
+	StopGC(ctx context.Context) error
+	GetGCState(ctx context.Context) (*GCStateDTO, error)
 	PublishManifest(ctx context.Context, repository string, message NotificationMessage)
 	SubscribeToNotifications(ctx context.Context, repository string) SubscriberHandle
 	UnsubscribeFromNotifications(ctx context.Context, repository string, handle SubscriberHandle) error
@@ -46,7 +48,7 @@ func (s *Services) GetKey(ctx context.Context, keyID string) *KeyConfig {
 }
 
 // StartBackend initializes the various backend services
-func StartBackend(cfg gw.Config) (*Services, error) {
+func StartBackend(cfg gw.Config, initialize bool) (*Services, error) {
 	ac, err := NewAccessConfig(cfg.AccessConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("loading repository access configuration failed: %w", err)
@@ -71,8 +73,10 @@ func StartBackend(cfg gw.Config) (*Services, error) {
 
 	services := Services{Config: cfg, Access: *ac, DB: db, Pool: pool, Notifications: ns, StatsMgr: smgr}
 
-	if err := PopulateRepositories(&services); err != nil {
-		return nil, fmt.Errorf("could not populate repository table: %w", err)
+	if initialize {
+		if err := PopulateRepositories(&services); err != nil {
+			return nil, fmt.Errorf("could not populate repository table: %w", err)
+		}
 	}
 
 	return &services, nil

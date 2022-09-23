@@ -16,6 +16,12 @@ type GCOptions struct {
 	Verbose      bool      `json:"verbose"`
 }
 
+type GCStateDTO struct {
+	// KeyID     string `json:"key_id,omitempty"`
+	// LeasePath string `json:"path,omitempty"`
+	// Expires   string `json:"expires,omitempty"`
+}
+
 // RunGC triggers garbage collection on the specified repository
 func (s *Services) RunGC(ctx context.Context, options GCOptions) (string, error) {
 	t0 := time.Now()
@@ -53,4 +59,12 @@ func (s *Services) RunGC(ctx context.Context, options GCOptions) (string, error)
 	}
 
 	return output, nil
+}
+
+func (s *Services) StopGC(ctx context.Context) error {
+	return nil
+}
+
+func (s *Services) GetGCState(ctx context.Context) (*GCStateDTO, error) {
+	return nil, nil
 }
