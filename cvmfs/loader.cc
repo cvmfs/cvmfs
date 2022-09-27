@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <sstream>
 #include <vector>
 
 #include "crypto/crypto_util.h"
@@ -402,6 +403,18 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
 }
 
 
+static vector<int> splitToInts (const string &s, char delim) {
+    vector<int> result;
+    stringstream ss (s);
+    string item;
+
+    while (getline (ss, item, delim)) {
+        result.push_back ( stoi(item) );
+    }
+
+    return result;
+}
+
 static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   struct fuse_args *mount_options = new fuse_args();
   CvmfsOptions cvmfs_options;
@@ -735,6 +748,21 @@ int FuseMain(int argc, char *argv[]) {
     }
     fuse_opt_add_arg(mount_options, "-osuid");
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
+  }
+
+ if( options_manager->GetValue("CVMFS_CPU_AFFINITY", &parameter) ) {
+     cpu_set_t mask;
+     vector<int> cpus = splitToInts( parameter, ',' );
+     CPU_ZERO(&mask);
+     for( int i : cpus ) {
+        CPU_SET( i, &mask );
+     }
+
+     LogCvmfs(kLogCvmfs, kLogStdout, "Setting CPU Affinity to %s", parameter.c_str() );
+     int err = sched_setaffinity( 0, sizeof(mask), &mask );
+     if (err!=0 ) {
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr, "Setting CPU Affinity failed with error %d", err );
+     }
   }
   loader_exports_ = new LoaderExports();
   loader_exports_->loader_version = PACKAGE_VERSION;
