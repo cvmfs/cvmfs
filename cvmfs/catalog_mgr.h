@@ -33,18 +33,13 @@ const unsigned kSqliteMemPerThread = 1*1024*1024;
 
 
 /**
- * Lookup a directory entry including its parent entry or not.
+ * LookupOption for a directory entry (bitmask).
+ * kLookupDefault = Look solely at the given directory entry (parent is ignored)
+ * kLookupRawSymlink = Mangle symlink to which the directory entry points to 
  */
 typedef unsigned LookupOptions;
-const unsigned kLookupSole = 0b1;
+const unsigned kLookupDefault = 0b1;
 const unsigned kLookupRawSymlink = 0b10;
-
-// enum LookupOptions {
-//   kLookupSole        = 0x01,
-//   // kLookupFull        = 0x02  not used anymore
-//   kLookupRawSymlink  = 0x10,
-// };
-
 
 /**
  * Results upon loading a catalog file.
