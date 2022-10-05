@@ -1,5 +1,6 @@
 cvmfs_test_name="Create repository with a server-side proxy"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 cleanup() {
   echo "running cleanup"
