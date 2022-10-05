@@ -35,7 +35,7 @@ const unsigned kSqliteMemPerThread = 1*1024*1024;
 /**
  * LookupOption for a directory entry (bitmask).
  * kLookupDefault = Look solely at the given directory entry (parent is ignored)
- * kLookupRawSymlink = Mangle symlink to which the directory entry points to 
+ * kLookupRawSymlink = Don't resolve environment variables in symlink targets
  */
 typedef unsigned LookupOptions;
 const unsigned kLookupDefault = 0b1;
