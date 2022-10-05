@@ -82,7 +82,7 @@ EOF
   cvmfs_server checkout -t xzy -b X $CVMFS_TEST_REPO && return 30
   cvmfs_server checkout -t "v1 with spaces" $CVMFS_TEST_REPO && return 31
   cvmfs_server checkout -b "unknownbranch" $CVMFS_TEST_REPO && return 32
-  cvmfs_server checkout -t v1 -b b_fix_version1 $CVMFS_TEST_REPO && return 33
+  cvmfs_server checkout -t v1 -b b_fix_version1 $CVMFS_TEST_REPO && return 33  # branch already exists
   cvmfs_server checkout -t v1 -b "new branch with spaces" $CVMFS_TEST_REPO && return 34
   cvmfs_server checkout -t v1 -b "aZ-@1.0/foo_bar" $CVMFS_TEST_REPO || return 35
   cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" || return 36
@@ -165,11 +165,11 @@ EOF
   diff branches_printed branches_reference || return 99
 
   echo "*** (9) remove and recreate branch"
-  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f7 | grep '^b_fix_version1$' \
+  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f6 | grep '^b_fix_version1$' \
     || return 60
   cvmfs_server tag -r "v1-fix01 v1-fix01-coda01 v1-fix01-coda02" -f $CVMFS_TEST_REPO \
     || return 61
-  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f7 | grep '^b_fix_version1$' \
+  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f6 | grep '^b_fix_version1$' \
     && return 62
   cvmfs_server checkout -b b_fix_version1 -t init $CVMFS_TEST_REPO || return 63
   cvmfs_server list | grep $CVMFS_TEST_REPO | grep "checked out" || return 64
@@ -177,7 +177,7 @@ EOF
   touch /cvmfs/$CVMFS_TEST_REPO/init-fix01 || return 65
   publish_repo $CVMFS_TEST_REPO -a init-fix01 || return 66
   ls -lah /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots/init-fix01/init-fix01 || return 67
-  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f7 | grep '^b_fix_version1$' \
+  cvmfs_server tag -lx $CVMFS_TEST_REPO | cut -d" " -f6 | grep '^b_fix_version1$' \
     || return 68
   check_repository $CVMFS_TEST_REPO -i || return $?
   cvmfs_server tag -l $CVMFS_TEST_REPO
