@@ -26,8 +26,8 @@ cvmfs_run_test() {
   local apache_config_file="$(get_apache_config_filename mkfs_proxy)"
   create_apache_config_file $apache_config_file << 'EOF'
 # Created by test case 685.  Don't touch.
-Listen 127.0.0.1:8081
-<VirtualHost 127.0.0.1:8081>
+Listen 127.0.0.1:8008
+<VirtualHost 127.0.0.1:8008>
   ProxyRequests On
   <Proxy "*">
   </Proxy>
@@ -37,7 +37,7 @@ EOF
   apache_switch on  > /dev/null
 
   echo "create repository"
-  create_repo ${reponame} $(whoami) ${logfile} -x http://127.0.0.1:8081 || return 10
+  create_repo ${reponame} $(whoami) ${logfile} -x http://127.0.0.1:8008 || return 10
 
   echo "start transaction"
   cvmfs_server transaction ${reponame} || return 21
@@ -52,8 +52,8 @@ EOF
   echo "break proxy"
   create_apache_config_file $apache_config_file << 'EOF'
 # Created by test case 685.  Don't touch.
-Listen 127.0.0.1:8081
-<VirtualHost 127.0.0.1:8081>
+Listen 127.0.0.1:8008
+<VirtualHost 127.0.0.1:8008>
   ProxyRequests On
   <Proxy "*">
     Require all denied
