@@ -48,7 +48,6 @@ sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   ${curl_ssl_config} \
   --without-brotli \
   --without-winssl \
-  --without-darwinssl \
   --without-gnutls \
   --without-polarssl \
   --without-mbedtls \
@@ -60,7 +59,6 @@ sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --without-ca-path \
   --without-libpsl \
   --without-libssh2 \
-  --without-libmetalink \
   --without-libidn2 \
   --without-winidn \
   --without-librtmp \
