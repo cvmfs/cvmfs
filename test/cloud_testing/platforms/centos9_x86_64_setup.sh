@@ -42,6 +42,7 @@ install_from_repo gcc
 install_from_repo gcc-c++
 install_from_repo rubygems
 install_from_repo wget
+install_from_repo bc
 install_from_repo java-1.8.0-openjdk
 #install_from_repo redhat-lsb-core
 install_from_repo tree
