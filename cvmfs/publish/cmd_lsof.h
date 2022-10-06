@@ -30,4 +30,4 @@ class CmdLsof : public Command {
 
 }  // namespace publish
 
-#endif  // CVMFS_PUBLISH_CMD_ZPIPE_H_
+#endif  // CVMFS_PUBLISH_CMD_LSOF_H_

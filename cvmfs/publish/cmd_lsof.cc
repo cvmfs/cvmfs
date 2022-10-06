@@ -5,11 +5,11 @@
 #include "cvmfs_config.h"
 #include "cmd_lsof.h"
 
-#include "util/logging.h"
-#include "util/posix.h"
-
 #include <string>
 #include <vector>
+
+#include "util/logging.h"
+#include "util/posix.h"
 
 int publish::CmdLsof::Main(const Options &options) {
   std::string path = options.plain_args()[0].value_str;
