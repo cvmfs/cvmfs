@@ -2569,3 +2569,10 @@ EOF'
     /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
     /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
 }
+
+lockfile() {
+  if [ ! -x lockfile ]; then
+    gcc -Wall -o lockfile ${TEST_ROOT}/common/lockfile.c || return 10
+  fi
+  ./lockfile $1
+}
