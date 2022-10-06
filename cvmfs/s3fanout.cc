@@ -525,21 +525,6 @@ string S3FanoutManager::GetUriEncode(const string &val, bool encode_slash)
 }
 
 
-string S3FanoutManager::GetAwsV4SigningKey(const string &date) const
-{
-  if (last_signing_key_.first == date)
-    return last_signing_key_.second;
-
-  string date_key = shash::Hmac256("AWS4" + config_.secret_key, date, true);
-  string date_region_key = shash::Hmac256(date_key, config_.region, true);
-  string date_region_service_key = shash::Hmac256(date_region_key, "s3", true);
-  string signing_key =
-    shash::Hmac256(date_region_service_key, "aws4_request", true);
-  last_signing_key_.first = date;
-  last_signing_key_.second = signing_key;
-  return signing_key;
-}
-
 
 /**
  * The Amazon AWS4 authorization header according to
