@@ -257,7 +257,7 @@ class S3FanoutManager : SingleCopy {
   bool MkV2Authz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   bool MkV4Authz(const JobInfo &info,
-                 std::vector<std::string> *headers) const;
+                 std::vector<std::string> *headers, CURL *handle) const;
   bool MkAzureAuthz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &objkey) const {
