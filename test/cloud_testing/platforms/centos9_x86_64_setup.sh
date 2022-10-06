@@ -61,6 +61,9 @@ sudo pip3 install flask                      || die "fail (installing flask)"
 install_from_repo python3
 install_from_repo netcat
 
+# Install test dependency for 598
+install_from_repo patch
+
 # Install the test S3 provider
 install_test_s3
 
