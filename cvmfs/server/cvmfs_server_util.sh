@@ -289,7 +289,7 @@ count_wr_fds() {
   local path=$1
   local cnt=0
   for line in $(get_fd_modes $path); do
-    if echo "$line" | grep -qe '^\a[wu]$'; then cnt=$(( $cnt + 1 )); fi
+    if echo "$line" | grep -qe '^rw'; then cnt=$(( $cnt + 1 )); fi
   done
   echo $cnt
 }
@@ -745,7 +745,7 @@ _os_set_etc_release_filename() {
   fi
 }
 
-# Pick a specific field from the os-release file and return it. 
+# Pick a specific field from the os-release file and return it.
 # 1. _os_set_etc_release_filename is called on every check, this is probably overkill,
 #    but the question would be where to call this once and for all. In theory one could
 #    call it right after the declaration above?
@@ -839,7 +839,7 @@ If you go for production, backup your masterkey from /etc/cvmfs/keys/!"
 
 get_fd_modes() {
   local path=$1
-  $LSOF_BIN -Fan +f -- $path 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
+  cvmfs_publish lsof $path
 }
 
 # gets the number of open read-only file descriptors beneath a given path
@@ -850,7 +850,7 @@ count_rd_only_fds() {
   local path=$1
   local cnt=0
   for line in $(get_fd_modes $path); do
-    if echo "$line" | grep -qe '^\ar\?$';  then cnt=$(( $cnt + 1 )); fi
+    if echo "$line" | grep -qe '^ro';  then cnt=$(( $cnt + 1 )); fi
   done
   echo $cnt
 }
