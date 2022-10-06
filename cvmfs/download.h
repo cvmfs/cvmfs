@@ -454,6 +454,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void EnableRedirects();
   void UseSystemCertificatePath();
   void SetAWSCredentials(std::string &credentials);
+  void SetAWSRegion( std::string &region );
 
 
   unsigned num_hosts() {
@@ -638,6 +639,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   // AWS credentials
   std::string aws_credentials_;
+  std::string aws_region_;
   
 };  // DownloadManager
 

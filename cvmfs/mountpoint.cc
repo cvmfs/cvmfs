@@ -1348,6 +1348,9 @@ bool MountPoint::CreateDownloadManagers() {
   if( options_mgr_->GetValue("CVMFS_SERVER_URL_AWS_CREDENTIALS", &optarg)) {
     download_mgr_->SetAWSCredentials( optarg );
   }
+  if( options_mgr_->GetValue("CVMFS_SERVER_URL_AWS_REGION", &optarg)) {
+    download_mgr_->SetAWSRegion( optarg );
+  }
 
   return SetupExternalDownloadMgr(do_geosort);
 }
@@ -1937,6 +1940,10 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
 
   if( options_mgr_->GetValue("CVMFS_EXTERNAL_URL_AWS_CREDENTIALS", &optarg)) {
     external_download_mgr_->SetAWSCredentials( optarg );
+  }
+
+  if( options_mgr_->GetValue("CVMFS_EXTERNAL_URL_AWS_REGION", &optarg)) {
+    external_download_mgr_->SetAWSRegion( optarg );
   }
 
   return true;

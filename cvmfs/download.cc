@@ -898,7 +898,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
 
   if( aws_credentials_  != "" ) {
      header_lists_->AppendHeader( info->headers, "x-amz-content-sha256: UNSIGNED_PAYLOAD" );
-     curl_easy_setopt( handle, CURLOPT_AWS_SIGV4 , "aws:amz:auto:s3" );
+     curl_easy_setopt( handle, CURLOPT_AWS_SIGV4 , ("aws:amz:" + aws_region_ + ":s3").c_str() );
      curl_easy_setopt( handle, CURLOPT_USERPWD, aws_credentials_.c_str() );
   }
 }
@@ -1570,6 +1570,7 @@ DownloadManager::DownloadManager() {
 
   counters_ = NULL;
   aws_credentials_ = "";
+  aws_region_ = "us-east-1";
 }
 
 
