@@ -39,7 +39,6 @@ sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --enable-ipv6 \
   --disable-verbose \
   --disable-sspi \
-  --disable-crypto-auth \
   --disable-cookies \
   --enable-symbol-hiding \
   --disable-tls-srp \
