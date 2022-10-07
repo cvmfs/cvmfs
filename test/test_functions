@@ -81,6 +81,14 @@ else
   CVMFS_PYTHON2="python2"
 fi
 
+CVMFS_SYS_PYTHON="python"
+if ! $CVMFS_SYS_PYTHON -V; then
+  CVMFS_SYS_PYTHON="python3"
+  if ! $CVMFS_SYS_PYTHON -V; then
+    CVMFS_SYS_PYTHON="python2"
+  fi
+fi
+
 running_on_s3() {
   [ "x$CVMFS_TEST_S3_CONFIG" != "x" ]
 }
