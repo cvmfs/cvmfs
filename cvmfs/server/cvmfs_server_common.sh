@@ -233,7 +233,7 @@ get_tag_branch() {
     -f $repository_name                       \
     $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
-    -n "$tag" 2>/dev/null | cut -d" " -f7)
+    -n "$tag" 2>/dev/null | cut -d" " -f6)
   if [ "x$branch" = "x(default)" ]; then
     branch=
   fi
@@ -272,7 +272,7 @@ get_head_of() {
     -f $repository_name                       \
     $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
-    | cut -d" " -f1,2,7 | grep " $branch\$" | head -n 1
+    | cut -d" " -f1,2,6 | grep " $branch\$" | head -n 1
 }
 
 

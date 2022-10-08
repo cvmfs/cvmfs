@@ -89,8 +89,13 @@ class DiffReporter : public publish::DiffListener {
   {
     std::string operation = machine_readable_ ? "A" : "add";
     if (machine_readable_) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64, operation.c_str(),
-               PrintEntryType(entry).c_str(), path.c_str(), entry.size());
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s %s %s",
+               operation.c_str(), PrintEntryType(entry).c_str(), path.c_str());
+      if (!entry.IsDirectory()) {
+        LogCvmfs(kLogCvmfs, kLogStdout, " +%" PRIu64, entry.size());
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStdout, "");
+      }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes",
                path.c_str(), operation.c_str(),
@@ -104,8 +109,13 @@ class DiffReporter : public publish::DiffListener {
   {
     std::string operation = machine_readable_ ? "R" : "remove";
     if (machine_readable_) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64, operation.c_str(),
-               PrintEntryType(entry).c_str(), path.c_str(), entry.size());
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s %s %s",
+               operation.c_str(), PrintEntryType(entry).c_str(), path.c_str());
+      if (!entry.IsDirectory()) {
+        LogCvmfs(kLogCvmfs, kLogStdout, " -%" PRIu64, entry.size());
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStdout, "");
+      }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes",
                path.c_str(), operation.c_str(),
@@ -122,6 +132,11 @@ class DiffReporter : public publish::DiffListener {
       entry_from.CompareTo(entry_to);
     if (ignore_timediff_) {
       diff = diff & ~catalog::DirectoryEntryBase::Difference::kMtime;
+      if (diff == 0)
+        return;
+    }
+    if (entry_from.IsDirectory() || entry_to.IsDirectory()) {
+      diff = diff & ~catalog::DirectoryEntryBase::Difference::kSize;
       if (diff == 0)
         return;
     }

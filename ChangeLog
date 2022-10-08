@@ -1,4 +1,7 @@
 2.10.0:
+  * [server] Ignore size of directories in snapshot diff output
+  * [server] Remove partial support for "channels" from manifest (#2838)
+  * [server] Fix counting of open file descriptors
   * [ducc] Support images with OCI manifest (#2851)
   * [server] Fix ingestion (with catalog) of empty tarfile (#3055)
   * [client] Gracefully handle open, changing files (CVM-2001)
