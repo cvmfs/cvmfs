@@ -1316,7 +1316,11 @@ cvmfs_umount() {
       RETVAL=1
       if [ "x$silent" = "x" ]; then
         echo "Failed!"
-        $fuser -m -a -v $m
+        if [ "$sys_arch" = "Linux" ]; then
+          $fuser -m -a -v $m
+        else
+          $fuser -u -c $m
+        fi
       fi
     else
       [ "x$silent" != "x" ] || echo "OK"
