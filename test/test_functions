@@ -82,9 +82,9 @@ else
 fi
 
 CVMFS_SYS_PYTHON="python"
-if ! $CVMFS_SYS_PYTHON -V; then
+if ! $CVMFS_SYS_PYTHON -V 2>/dev/null; then
   CVMFS_SYS_PYTHON="python3"
-  if ! $CVMFS_SYS_PYTHON -V; then
+  if ! $CVMFS_SYS_PYTHON -V 2>/dev/null; then
     CVMFS_SYS_PYTHON="python2"
   fi
 fi
