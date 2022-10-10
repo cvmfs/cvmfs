@@ -7,14 +7,14 @@ It is possible to use S3 as storage backend for a CernVM-FS repo.
 If not done so far, install `s3cmd`
 
 ```py
-    s3cmd --configure #create a new bucket
+    s3cmd --configure # create a new bucket
 
     # following parameters should be set
     Access Key: <access key>
     Secret Key: <secret key> 
     Default Region [US]: EU
     S3 Endpoint [s3.amazonaws.com]: https://s3.cern.ch
-    #this here is the new bucket 
+    # this here is the new bucket
     DNS-style bucket+hostname:port template for accessing a bucket [my-test-bucket]: my-test-bucket.cern.ch 
 ```
 
