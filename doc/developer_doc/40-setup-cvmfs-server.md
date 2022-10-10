@@ -1,8 +1,8 @@
 # Setup of CernVM-FS Server
 
-### Prerequisits
+### Prerequisites
 - `cvmfs` is installed
-- `autofs` is diabled
+- `autofs` is disabled
 
 ### Goal
  - Create, modify and delete CernVM-FS repository called `local.test.repo` 
