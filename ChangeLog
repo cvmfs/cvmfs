@@ -1,3 +1,5 @@
+2.11.0:
+
 2.10.0:
   * [server] Ignore size of directories in snapshot diff output
   * [server] Remove partial support for "channels" from manifest (#2838)
