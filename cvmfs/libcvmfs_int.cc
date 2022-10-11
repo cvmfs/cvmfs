@@ -195,7 +195,7 @@ bool LibContext::GetDirentForPath(const PathString         &path,
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
   // TODO(jblomer): not twice md5 calculation
-  if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupSole,
+  if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupDefault,
                                               dirent))
   {
     mount_point_->md5path_cache()->Insert(md5path, *dirent);

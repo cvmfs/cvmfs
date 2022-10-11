@@ -266,7 +266,7 @@ static bool FixupOpenInode(const PathString &path,
 
   // Overwrite dirent with inode from current generation
   bool found = mount_point_->catalog_mgr()->LookupPath(
-      path, catalog::kLookupSole, dirent);
+      path, catalog::kLookupDefault, dirent);
   assert(found);
 
   return true;
@@ -296,7 +296,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       *dirent = dirent_negative;
       return false;
     }
-    if (catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent)) {
+    if (catalog_mgr->LookupPath(path, catalog::kLookupDefault, dirent)) {
       // Fix inodes
       dirent->set_inode(ino);
       mount_point_->inode_cache()->Insert(ino, *dirent);
@@ -309,7 +309,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   PathString path;
   if (ino == catalog_mgr->GetRootInode()) {
     bool retval =
-      catalog_mgr->LookupPath(PathString(), catalog::kLookupSole, dirent);
+      catalog_mgr->LookupPath(PathString(), catalog::kLookupDefault, dirent);
     assert(retval);
     dirent->set_inode(ino);
     mount_point_->inode_cache()->Insert(ino, *dirent);
@@ -329,7 +329,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     dirent->set_inode(ino);
     return false;
   }
-  if (catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent)) {
+  if (catalog_mgr->LookupPath(path, catalog::kLookupDefault, dirent)) {
     if (!inode_ex.IsCompatibleFileType(dirent->mode())) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "Warning: inode %" PRId64 " (%s) changed file type",
@@ -379,7 +379,7 @@ static uint64_t GetDirentForPath(const PathString &path,
 
   // Lookup inode in catalog TODO: not twice md5 calculation
   bool retval;
-  retval = catalog_mgr->LookupPath(path, catalog::kLookupSole, dirent);
+  retval = catalog_mgr->LookupPath(path, catalog::kLookupDefault, dirent);
   if (retval) {
     if (file_system_->IsNfsSource()) {
       dirent->set_inode(file_system_->nfs_maps()->GetInode(path));
@@ -1112,7 +1112,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     // TODO(jblomer): we only need to lookup if the inode is not from the
     // current generation
     catalog::DirectoryEntry dirent_origin;
-    if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent_origin)) {
+    if (!catalog_mgr->LookupPath(path, catalog::kLookupDefault,
+                                 &dirent_origin)) {
       fuse_remounter_->fence()->Leave();
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
                "chunked file %s vanished unexpectedly", path.c_str());
@@ -1544,7 +1545,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   assert(retval);
   if (d.IsLink()) {
     catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
-      catalog::kLookupSole | catalog::kLookupRawSymlink);
+      catalog::kLookupDefault | catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
     retval = catalog_mgr->LookupPath(path, lookup_options, &raw_symlink);
     assert(retval);

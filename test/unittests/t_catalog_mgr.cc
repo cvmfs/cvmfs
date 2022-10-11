@@ -186,14 +186,14 @@ TEST_F(T_CatalogManager, Lookup) {
   catalog::DirectoryEntry dirent;
   ASSERT_TRUE(catalog_mgr_.Init());
   AddTree();
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir", kLookupSole, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir", kLookupDefault, &dirent));
   EXPECT_TRUE(dirent.IsDirectory());
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir", kLookupSole, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir", kLookupDefault, &dirent));
   EXPECT_TRUE(dirent.IsDirectory());
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupSole, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupDefault, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // /dir/dir/dir/file4 belongs to a catalog that is not mounted yet
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupSole,
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupDefault,
                                       &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
@@ -204,17 +204,18 @@ TEST_F(T_CatalogManager, Lookup) {
 
   // load the next catalog
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
 
   // load the next catalog
   EXPECT_FALSE(catalog_mgr_.LookupPath("/nested_not_available",
-                                       kLookupSole, &dirent));
+                                       kLookupDefault, &dirent));
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/nested", kLookupSole, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/nested", kLookupDefault, &dirent));
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/nested/file6", kLookupSole, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/nested/file6", kLookupDefault,
+                                      &dirent));
   EXPECT_EQ(4, catalog_mgr_.GetNumCatalogs());
 }
 
@@ -223,7 +224,7 @@ TEST_F(T_CatalogManager, LongLookup) {
   ASSERT_TRUE(catalog_mgr_.Init());
   AddTree();
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // we should have mounted two catalogs
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
@@ -318,7 +319,7 @@ TEST_F(T_CatalogManager, Balance) {
 
   // load the other catalogs so that they can be removed
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
 }
 
 TEST_F(T_CatalogManager, Remount) {
