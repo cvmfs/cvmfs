@@ -506,6 +506,7 @@ void *TalkManager::MainResponder(void *data) {
 
       result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
 
+#ifdef DEBUGMSG
       // Manually setting the values of the ShortString counters
       mount_point->statistics()->Lookup("pathstring.n_instances")->
           Set(PathString::num_instances());
@@ -519,6 +520,7 @@ void *TalkManager::MainResponder(void *data) {
           Set(LinkString::num_instances());
       mount_point->statistics()->Lookup("linkstring.n_overflows")->
           Set(LinkString::num_overflows());
+#endif
 
       // Manually setting the inode tracker numbers
       glue::InodeTracker::Statistics inode_stats =

@@ -27,18 +27,26 @@ template<unsigned char StackSize, char Type>
 class ShortString {
  public:
   ShortString() : long_string_(NULL), length_(0) {
+#ifdef DEBUGMSG
     atomic_inc64(&num_instances_);
+#endif
   }
   ShortString(const ShortString &other) : long_string_(NULL) {
+#ifdef DEBUGMSG
     atomic_inc64(&num_instances_);
+#endif
     Assign(other);
   }
   ShortString(const char *chars, const unsigned length) : long_string_(NULL) {
+#ifdef DEBUGMSG
     atomic_inc64(&num_instances_);
+#endif
     Assign(chars, length);
   }
   explicit ShortString(const std::string &std_string) : long_string_(NULL) {
+#ifdef DEBUGMSG
     atomic_inc64(&num_instances_);
+#endif
     Assign(std_string.data(), std_string.length());
   }
 
@@ -55,7 +63,9 @@ class ShortString {
     long_string_ = NULL;
     this->length_ = length;
     if (length > StackSize) {
+#ifdef DEBUGMSG
       atomic_inc64(&num_overflows_);
+#endif
       long_string_ = new std::string(chars, length);
     } else {
       if (length)
@@ -75,7 +85,9 @@ class ShortString {
 
     const unsigned new_length = this->length_ + length;
     if (new_length > StackSize) {
+#ifdef DEBUGMSG
       atomic_inc64(&num_overflows_);
+#endif
       long_string_ = new std::string();
       long_string_->reserve(new_length);
       long_string_->assign(stack_, length_);
@@ -176,25 +188,31 @@ class ShortString {
     return ShortString(this->GetChars() + start_at, length-start_at);
   }
 
+#ifdef DEBUGMSG
   static uint64_t num_instances() { return atomic_read64(&num_instances_); }
   static uint64_t num_overflows() { return atomic_read64(&num_overflows_); }
+#endif
 
  private:
   std::string *long_string_;
   char stack_[StackSize+1];  // +1 to add a final '\0' if necessary
   unsigned char length_;
+#ifdef DEBUGMSG
   static atomic_int64 num_overflows_;
   static atomic_int64 num_instances_;
+#endif
 };  // class ShortString
 
 typedef ShortString<kDefaultMaxPath, 0> PathString;
 typedef ShortString<kDefaultMaxName, 1> NameString;
 typedef ShortString<kDefaultMaxLink, 2> LinkString;
 
+#ifdef DEBUGMSG
 template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_overflows_ = 0;
 template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
+#endif
 
 // See posix.cc for the std::string counterparts
 PathString GetParentPath(const PathString &path);
