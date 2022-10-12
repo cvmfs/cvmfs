@@ -1468,16 +1468,26 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
            uint64_t(ino));
 
   // If we return 0 it will cause the fs to be ignored in "df"
-  struct statvfs info;
-  memset(&info, 0, sizeof(info));
-
   TraceInode(Tracer::kEventStatFs, ino, "statfs()");
 
-  // Unmanaged cache
+  // Unmanaged cache (no lock needed - statfs is never modified)
   if (!file_system_->cache_mgr()->quota_mgr()->HasCapability(
        QuotaManager::kCapIntrospectSize))
   {
-    fuse_reply_statfs(req, &info);
+    fuse_reply_statfs(req, &(file_system_->cache_mgr()->
+                                           quota_mgr()->statfsInfo));
+    return;
+  }
+
+  MutexLockGuard m(file_system_->cache_mgr()->quota_mgr()->statfsLock);
+
+  const uint64_t deadline = file_system_->cache_mgr()->
+                                          quota_mgr()->statfsCachingDeadline;
+  struct statvfs *info = &file_system_->cache_mgr()->quota_mgr()->statfsInfo;
+
+  // cached version still valid
+  if ( platform_monotonic_time() < deadline ) {
+    fuse_reply_statfs(req, info);
     return;
   }
 
@@ -1485,28 +1495,31 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   uint64_t size = file_system_->cache_mgr()->quota_mgr()->GetSize();
   uint64_t capacity = file_system_->cache_mgr()->quota_mgr()->GetCapacity();
   // Fuse/OS X doesn't like values < 512
-  info.f_bsize = info.f_frsize = 512;
+  info->f_bsize = info->f_frsize = 512;
 
   if (capacity == (uint64_t)(-1)) {
     // Unknown capacity, set capacity = size
-    info.f_blocks = size / info.f_bsize;
+    info->f_blocks = size / info->f_bsize;
   } else {
     // Take values from LRU module
-    info.f_blocks = capacity / info.f_bsize;
+    info->f_blocks = capacity / info->f_bsize;
     available = capacity - size;
   }
 
-  info.f_bfree = info.f_bavail = available / info.f_bsize;
+  info->f_bfree = info->f_bavail = available / info->f_bsize;
 
   // Inodes / entries
   fuse_remounter_->fence()->Enter();
   uint64_t all_inodes = mount_point_->catalog_mgr()->all_inodes();
   uint64_t loaded_inode = mount_point_->catalog_mgr()->loaded_inodes();
-  info.f_files = all_inodes;
-  info.f_ffree = info.f_favail = all_inodes - loaded_inode;
+  info->f_files = all_inodes;
+  info->f_ffree = info->f_favail = all_inodes - loaded_inode;
   fuse_remounter_->fence()->Leave();
 
-  fuse_reply_statfs(req, &info);
+  file_system_->cache_mgr()->quota_mgr()->statfsCachingDeadline =
+    platform_monotonic_time() + mount_point_->statfs_time_cache_valid();
+
+  fuse_reply_statfs(req, info);
 }
 
 #ifdef __APPLE__

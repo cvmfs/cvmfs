@@ -7,11 +7,13 @@
 
 #include <pthread.h>
 #include <stdint.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include <map>
 #include <string>
 #include <vector>
+
 
 #include "crypto/hash.h"
 #include "util/single_copy.h"
@@ -43,6 +45,11 @@ class QuotaManager : SingleCopy {
    *  - add kCleanupRate command
    */
   static const uint32_t kProtocolRevision;
+
+  // for statfs
+  pthread_mutex_t statfsLock;
+  uint64_t statfsCachingDeadline;
+  struct statvfs statfsInfo;
 
   enum Capabilities {
     kCapIntrospectSize = 0,

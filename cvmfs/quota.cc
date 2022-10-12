@@ -52,6 +52,7 @@ void QuotaManager::BroadcastBackchannels(const string &message) {
 
 
 QuotaManager::QuotaManager() : protocol_revision_(0) {
+  memset(&statfsInfo, 0, sizeof(statfsInfo));
   lock_back_channels_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_back_channels_, NULL);
