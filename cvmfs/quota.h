@@ -46,11 +46,6 @@ class QuotaManager : SingleCopy {
    */
   static const uint32_t kProtocolRevision;
 
-  // for statfs
-  pthread_mutex_t statfsLock;
-  uint64_t statfsCachingDeadline;
-  struct statvfs statfsInfo;
-
   enum Capabilities {
     kCapIntrospectSize = 0,
     kCapIntrospectCleanupRate,
@@ -94,6 +89,11 @@ class QuotaManager : SingleCopy {
                                      const std::string &channel_id) = 0;
   void BroadcastBackchannels(const std::string &message);
 
+  uint64_t *statfsCachingDeadline() { return &statfsCachingDeadline_; }
+  struct statvfs *statfsInfo() { return &statfsInfo_; }
+  pthread_mutex_t *statfsLock() { return statfsLock_; }
+
+
  protected:
   /**
    * Hashes over the channel identifier mapped to writing ends of pipes.
@@ -114,6 +114,12 @@ class QuotaManager : SingleCopy {
    * and set during initialization of concrete instances.
    */
   uint32_t protocol_revision_;
+
+ private:
+  // for statfs
+  pthread_mutex_t *statfsLock_;
+  uint64_t statfsCachingDeadline_;
+  struct statvfs statfsInfo_;
 };
 
 
