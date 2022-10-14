@@ -7,13 +7,11 @@
 
 #include <pthread.h>
 #include <stdint.h>
-#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include <map>
 #include <string>
 #include <vector>
-
 
 #include "crypto/hash.h"
 #include "util/single_copy.h"
@@ -89,11 +87,6 @@ class QuotaManager : SingleCopy {
                                      const std::string &channel_id) = 0;
   void BroadcastBackchannels(const std::string &message);
 
-  uint64_t *statfsCachingDeadline() { return &statfsCachingDeadline_; }
-  struct statvfs *statfsInfo() { return &statfsInfo_; }
-  pthread_mutex_t *statfsLock() { return statfsLock_; }
-
-
  protected:
   /**
    * Hashes over the channel identifier mapped to writing ends of pipes.
@@ -114,12 +107,6 @@ class QuotaManager : SingleCopy {
    * and set during initialization of concrete instances.
    */
   uint32_t protocol_revision_;
-
- private:
-  // for statfs
-  pthread_mutex_t *statfsLock_;
-  uint64_t statfsCachingDeadline_;
-  struct statvfs statfsInfo_;
 };
 
 
