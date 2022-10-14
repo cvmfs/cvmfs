@@ -1694,6 +1694,7 @@ MountPoint::MountPoint(
   , inode_tracker_(NULL)
   , dentry_tracker_(NULL)
   , page_cache_tracker_(NULL)
+  , statfs_cache_(NULL)
   , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
@@ -1750,6 +1751,8 @@ MountPoint::~MountPoint() {
   delete authz_fetcher_;
   delete statistics_;
   delete uuid_;
+
+  delete statfs_cache_;
 }
 
 
@@ -1783,14 +1786,18 @@ bool MountPoint::SetupBehavior() {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
 
+  uint64_t statfs_time_cache_valid = 0;
   if (options_mgr_->GetValue("CVMFS_STATFS_CACHE_TIMEOUT", &optarg)) {
     // 0ul does not work because of ubuntu 18
-    statfs_time_cache_valid_ =
+    if ( optarg.size() > 0 ) {
+    statfs_time_cache_valid =
       std::max(static_cast<uint64_t>(0),
                static_cast<uint64_t>(String2Uint64(optarg)));
+    }
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "statfs cache expires after %d seconds",
-           static_cast<int>(statfs_time_cache_valid_));
+           static_cast<int>(statfs_time_cache_valid));
+  statfs_cache_ = new StatfsCache(statfs_time_cache_valid);
 
   MagicXattrManager::EVisibility xattr_visibility =
     MagicXattrManager::kVisibilityRootOnly;

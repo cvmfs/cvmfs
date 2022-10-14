@@ -1475,17 +1475,15 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
        QuotaManager::kCapIntrospectSize))
   {
     LogCvmfs(kLogCvmfs, kLogDebug, "QuotaManager does not support statfs");
-    fuse_reply_statfs(req, (file_system_->cache_mgr()->
-                                           quota_mgr()->statfsInfo()));
+    fuse_reply_statfs(req, (mount_point_->statfs_cache()->info()));
     return;
   }
 
   {
-  MutexLockGuard m(file_system_->cache_mgr()->quota_mgr()->statfsLock());
+  MutexLockGuard m(mount_point_->statfs_cache()->lock());
 
-  const uint64_t deadline = *file_system_->cache_mgr()->
-                                          quota_mgr()->statfsCachingDeadline();
-  struct statvfs *info = file_system_->cache_mgr()->quota_mgr()->statfsInfo();
+  const uint64_t deadline = *mount_point_->statfs_cache()->cachingDeadline();
+  struct statvfs *info = mount_point_->statfs_cache()->info();
 
   // cached version still valid
   if ( platform_monotonic_time() < deadline ) {
@@ -1518,8 +1516,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info->f_ffree = info->f_favail = all_inodes - loaded_inode;
   fuse_remounter_->fence()->Leave();
 
-  *file_system_->cache_mgr()->quota_mgr()->statfsCachingDeadline() =
-    platform_monotonic_time() + mount_point_->statfs_time_cache_valid();
+  *mount_point_->statfs_cache()->cachingDeadline() =
+    platform_monotonic_time() + mount_point_->statfs_cache()->timeCacheValid();
 
   fuse_reply_statfs(req, info);
   }

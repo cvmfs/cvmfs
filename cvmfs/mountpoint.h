@@ -9,6 +9,7 @@
 
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/statvfs.h>
 
 #include <ctime>
 #include <set>
@@ -399,6 +400,31 @@ class FileSystem : SingleCopy, public BootFactory {
   bool has_custom_sqlitevfs_;
 };
 
+class StatfsCache {
+public:
+  StatfsCache(uint64_t cacheValid) : cachingDeadline_(0), 
+                                     time_cache_valid_(cacheValid) {
+    memset(&info_, 0, sizeof(info_));
+    lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+    int retval = pthread_mutex_init(lock_, NULL);
+    assert(retval == 0);
+  }
+  ~StatfsCache() {
+    pthread_mutex_destroy(lock_);
+    free(lock_);
+  }
+  uint64_t *cachingDeadline() { return &cachingDeadline_; }
+  const uint64_t timeCacheValid() { return time_cache_valid_; }
+  struct statvfs *info() { return &info_; }
+  pthread_mutex_t *lock() { return lock_; }    
+
+ private:
+  pthread_mutex_t *lock_;
+  uint64_t cachingDeadline_;
+  uint64_t time_cache_valid_;
+  struct statvfs info_;
+};
 
 /**
  * A MountPoint provides a clip around all the different *Manager objects that
@@ -454,7 +480,6 @@ class MountPoint : SingleCopy, public BootFactory {
   glue::InodeTracker *inode_tracker() { return inode_tracker_; }
   lru::InodeCache *inode_cache() { return inode_cache_; }
   double kcache_timeout_sec() { return kcache_timeout_sec_; }
-  uint64_t statfs_time_cache_valid() { return statfs_time_cache_valid_; }
   lru::Md5PathCache *md5path_cache() { return md5path_cache_; }
   std::string membership_req() { return membership_req_; }
   glue::DentryTracker *dentry_tracker() { return dentry_tracker_; }
@@ -469,6 +494,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string talk_socket_path() { return talk_socket_path_; }
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
+  StatfsCache *statfs_cache() { return statfs_cache_; };
 
   bool ReloadBlacklists();
 
@@ -574,13 +600,13 @@ class MountPoint : SingleCopy, public BootFactory {
   glue::DentryTracker *dentry_tracker_;
   glue::PageCacheTracker *page_cache_tracker_;
   MagicXattrManager *magic_xattr_mgr_;
+  StatfsCache *statfs_cache_;
 
   file_watcher::FileWatcher* resolv_conf_watcher_;
 
   unsigned max_ttl_sec_;
   pthread_mutex_t lock_max_ttl_;
   double kcache_timeout_sec_;
-  uint64_t statfs_time_cache_valid_;
   bool fixed_catalog_;
   bool enforce_acls_;
   std::string repository_tag_;
