@@ -1,4 +1,5 @@
 2.11.0:
+  * [S3] Gracefully handle HTTP 500 return codes during upload (#2912)
 
 2.10.0:
   * [server] Ignore size of directories in snapshot diff output
