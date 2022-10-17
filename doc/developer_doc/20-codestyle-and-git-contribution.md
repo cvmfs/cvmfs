@@ -31,7 +31,7 @@ It might be useful to add the issue number as a postfix to the branch name, e.g.
 |Fix|`fix-`|
 |Feature|`feature-`|
 |JIRA Ticket| `CVM-`|
-
+|GitHub-Issue| `gh-<Number>`|
 
 ### Issues and pull requests
 
