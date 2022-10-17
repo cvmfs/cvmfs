@@ -23,7 +23,7 @@ It is useful to have the forked `devel` branch to track the upstream `cvmfs/deve
 
 ### Branch naming policy
 
-The name of the branch should be self-exanatory with a prefix (listed below) that describes the general nature of the work done within the branch, e.g. `fix-openssl3-workaround`.
+The name of the branch should be self-explanatory with a prefix (listed below) that describes the general nature of the work done within the branch, e.g. `fix-openssl3-workaround`.
 It might be useful to add the issue number as a postfix to the branch name, e.g. `fix-catalogXattr#2900`.
 
 |Type|Prefix|
@@ -44,14 +44,14 @@ Please **do NOT squash commits** as it prevents the tracking of changes might du
 
 ### Useful git commands
 
-- Graphical representation of `git log`. Helpful to see weird divergents in git commits.
+- Graphical representation of `git log`. Helpful to see weird divergences in git commits.
 
 ```
   git log --graph --oneline --abbrev-commit --decorate --relative-date --all
   git log --graph --oneline --abbrev-commit --decorate --relative-date <branch1> <branch2>
 ```
 
-- In case of messy git commit history, consider making a new branch basend on up-to-date `devel` and cherry pick the specific commits from the broken branch
+- In case of messy git commit history, consider making a new branch based on up-to-date `devel` and cherry-pick the specific commits from the broken branch
 
 ```
   git log  #to get commit hash for the specific commits
@@ -68,7 +68,7 @@ Important code style rules to know are:
 - Tab indent: 2
 - Max characters per line: 80
 
-In case of a necessary linebreak, the following style should be followed
+In case of a necessary line break, the following style should be followed
 ```c++
   // preferred
   foo()-> 

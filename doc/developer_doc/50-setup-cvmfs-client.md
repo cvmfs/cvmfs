@@ -1,6 +1,6 @@
 # Setup of CernVM-FS Client
 
-### Prerequisits
+### Prerequisites
 
 - `cvmfs` installed
 - `local.test.repo` exist as CernVM-FS repository

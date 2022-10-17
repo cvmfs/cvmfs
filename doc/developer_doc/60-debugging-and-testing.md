@@ -21,11 +21,20 @@ The `uid` and `gid` are the `user id` and `group id` of the `cvmfs` user.
 This will be different on every system.
 They can be retrieved by executing `id cvmfs`.
 
+### Useful commands
 
-### Delete local kernel caches
-```bash
-  sudo echo 3 > /proc/sys/vm/drop_caches
-```
+All commands require `sudo`
+
+| Command | Description |
+|--|--|
+| Destructive Operations | |
+|`echo 3 > /proc/sys/vm/drop_caches` | Delete local kernel caches|
+|`cvmfs_config wipecache`| Wipe CVMFS caches, reload client config|
+|`cvmfs_config killall`| Helpful if `autofs` gets stuck or other reason to reset everything related to `cvmfs` |
+| Informative Operations |
+|`cvmfs_talk -i <repo> internal affairs` | List all internal counters of cvmfs |
+|`cvmfs_talk -i <repo> parameters` | List all parameters the client uses |
+
 
 ## Integration Tests
 
@@ -69,7 +78,7 @@ Writing your own integration tests is done the following:
 - Your test can be executed like all the other tests. No compilation of the `cmvfs` source code needed.
 
 
-**Tipps**
+**Tips**
 - `return` values must be handed up to the parent function `my_sub_func || return $?`
 - For readability it might be nice to split the test routines in multiple files
     - Use the line `source ./src/701-xattr-catalog_counters/setup_teardown` to include another file in the file `main`. It should be positioned after the `cvmfs_test_suites` parameter
@@ -85,7 +94,7 @@ When configuring to include the unit tests with `cmake -D BUILD_UNITTESTS=ON`, t
 
 ### Running Unit Tests
 
-Normally only a subset of unittests need to be run. 
+Normally only a subset of unit tests need to be run. 
 This can be done by using the argument `--gtest_filter=` which accepts `*` as wildcard.
 
 ```
@@ -94,11 +103,11 @@ This can be done by using the argument `--gtest_filter=` which accepts `*` as wi
 
 ### Writing your own unit test
 
-- Each time you change something in your unit test `cvmfs` needs to be rebuild (e.g. by running `ninja`)
+- Each time you change something in your unit test `cvmfs` needs to be rebuilt (e.g. by running `ninja`)
   - `sudo ninja install` is not necessary
 
 **In C++**
-- Unittest belong in `/cvmfs/test/unittests/` 
+- Unit test belong in `/cvmfs/test/unittests/` 
 - They have a file name `t_<name-of-file-to-test>.cc`
 - Test functions are defined by `TEST_F(<testClassName>, <funcName>)`
 - New test classes must be registered in `cvmfs/test/unittests/CMakeLists.txt`

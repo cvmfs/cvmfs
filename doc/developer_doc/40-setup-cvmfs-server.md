@@ -1,8 +1,8 @@
 # Setup of CernVM-FS Server
 
-### Prerequisits
+### Prerequisites
 - `cvmfs` is installed
-- `autofs` is diabled
+- `autofs` is disabled
 
 ### Goal
  - Create, modify and delete CernVM-FS repository called `local.test.repo` 
@@ -27,7 +27,10 @@
     sudo rm /cvmfs/local.test.repo/testfile2.txt
 
     # Finalize transaction
-    sudo cvmfs_server publish 
+    sudo cvmfs_server publish local.test.repo
+
+    # Abort transaction and discard all changes
+    sudo cvmfs_server abort local.test.repo
 
     ####################################################
     # END MODIFY files - this is done in a transaction

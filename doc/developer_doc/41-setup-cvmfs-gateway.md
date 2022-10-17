@@ -10,7 +10,7 @@ This allows multiple publishers to modify data in the same repository but at dif
 Setting up a CernVM-FS gateway consists of 3 steps
 
 1. Create repository 
-2. Create Gateway key that publisher will use for authentification
+2. Create Gateway key that publisher will use for authentication
 3. Make repository accessible via Gateway
 
 
@@ -109,9 +109,9 @@ The publisher is set up like a normal `cvmfs_server` but with 2 changes
 - Create repository on publisher that is linked to the gateway repository
 
   ```py
-    # w = URL of repo on gateway
-    # u =
-    # k = temporary dir with keys
+    # w = URL to storage location
+    # u = URL to transaction and gateway server
+    # k = temporary directory with keys
     # o = repo owner
 
     cvmfs_server mkfs \
@@ -120,6 +120,16 @@ The publisher is set up like a normal `cvmfs_server` but with 2 changes
     -k /home/myuser/tmpKeys \
     -o root \
     test.gw.rep
+
+    # for repo "s3.test.repo" with S3 storage backend
+    # you need to change -w and add -s the s3 config from the gateway
+    cvmfs_server mkfs \
+        -s /etc/cvmfs/cvmfs_s3.cfg \ 
+        -w http://<URL to S3 bucket> \
+        -u gw,/srv/cvmfs/s3.test.repo/data/txn,http://<URL to gateway>:4929/api/v1 \
+        -k /home/myuser/tmpKeys  \
+        -o `whoami` \
+        s3.test.repo
   ```
 
 4. **Test access**

@@ -13,7 +13,7 @@
 
 ## Replace `make` with `ninja`
 
-`ninja` has the advantge of running parallelized by default and only incrementally rebuilding resources that are affected by (code) changes.
+`ninja` has the advantage of running parallelized by default and only incrementally rebuilding resources that are affected by (code) changes.
 
 ```bash
   # be in directory cvmfs/build
