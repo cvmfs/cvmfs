@@ -1470,6 +1470,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   // If we return 0 it will cause the fs to be ignored in "df"
   TraceInode(Tracer::kEventStatFs, ino, "statfs()");
 
+  perf::Inc(file_system_->n_fs_statfs());
+
   // Unmanaged cache (no lock needed - statfs is never modified)
   if (!file_system_->cache_mgr()->quota_mgr()->HasCapability(
        QuotaManager::kCapIntrospectSize))
@@ -1482,11 +1484,12 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   {
   MutexLockGuard m(mount_point_->statfs_cache()->lock());
 
-  const uint64_t deadline = *mount_point_->statfs_cache()->cachingDeadline();
+  const uint64_t deadline = *mount_point_->statfs_cache()->caching_deadline();
   struct statvfs *info = mount_point_->statfs_cache()->info();
 
   // cached version still valid
   if ( platform_monotonic_time() < deadline ) {
+    perf::Inc(file_system_->n_fs_statfs_cached());
     fuse_reply_statfs(req, info);
     return;
   }
@@ -1516,8 +1519,9 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info->f_ffree = info->f_favail = all_inodes - loaded_inode;
   fuse_remounter_->fence()->Leave();
 
-  *mount_point_->statfs_cache()->cachingDeadline() =
-    platform_monotonic_time() + mount_point_->statfs_cache()->timeCacheValid();
+  *mount_point_->statfs_cache()->caching_deadline() =
+      platform_monotonic_time()
+    + mount_point_->statfs_cache()->time_cache_valid();
 
   fuse_reply_statfs(req, info);
   }

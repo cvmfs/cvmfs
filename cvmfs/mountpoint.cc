@@ -226,6 +226,10 @@ void FileSystem::CreateStatistics() {
   n_fs_stat_ = statistics_->Register("cvmfs.n_fs_stat", "Number of stats");
   n_fs_stat_stale_ = statistics_->Register("cvmfs.n_fs_stat_stale",
     "Number of stats for stale (open, meanwhile changed) regular files");
+  n_fs_statfs_ = statistics_->Register("cvmfs.n_fs_statfs",
+                                       "Overall number of statsfs calls");
+  n_fs_statfs_cached_ = statistics_->Register("cvmfs.n_fs_statfs_cached",
+                "Number of statsfs calls that accessed the cached statfs info");
   n_fs_read_ = statistics_->Register("cvmfs.n_fs_read", "Number of files read");
   n_fs_readlink_ = statistics_->Register("cvmfs.n_fs_readlink",
                                          "Number of links read");
@@ -377,6 +381,8 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_fs_lookup_negative_(NULL)
   , n_fs_stat_(NULL)
   , n_fs_stat_stale_(NULL)
+  , n_fs_statfs_(NULL)
+  , n_fs_statfs_cached_(NULL)
   , n_fs_read_(NULL)
   , n_fs_readlink_(NULL)
   , n_fs_forget_(NULL)

@@ -8,8 +8,8 @@
 #define CVMFS_MOUNTPOINT_H_
 
 #include <pthread.h>
-#include <unistd.h>
 #include <sys/statvfs.h>
+#include <unistd.h>
 
 #include <ctime>
 #include <set>
@@ -219,6 +219,8 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_readlink() { return n_fs_readlink_; }
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
   perf::Counter *n_fs_stat_stale() { return n_fs_stat_stale_; }
+  perf::Counter *n_fs_statfs() { return n_fs_statfs_; }
+  perf::Counter *n_fs_statfs_cached() { return n_fs_statfs_cached_; }
   IoErrorInfo *io_error_info() { return &io_error_info_; }
   std::string name() { return name_; }
   NfsMaps *nfs_maps() { return nfs_maps_; }
@@ -313,6 +315,8 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_lookup_negative_;
   perf::Counter *n_fs_stat_;
   perf::Counter *n_fs_stat_stale_;
+  perf::Counter *n_fs_statfs_;
+  perf::Counter *n_fs_statfs_cached_;
   perf::Counter *n_fs_read_;
   perf::Counter *n_fs_readlink_;
   perf::Counter *n_fs_forget_;
@@ -400,13 +404,19 @@ class FileSystem : SingleCopy, public BootFactory {
   bool has_custom_sqlitevfs_;
 };
 
+/**
+ * The StatfsCache class is a class purely designed as "struct" (= holding
+ * object for all its parameters). 
+ * All its logic, including the locking mechanism, is implemented in the 
+ * function cvmfs_statfs in cvmfs.cc
+ */
 class StatfsCache {
-public:
-  StatfsCache(uint64_t cacheValid) : cachingDeadline_(0), 
+ public:
+  explicit StatfsCache(uint64_t cacheValid) : caching_deadline_(0),
                                      time_cache_valid_(cacheValid) {
     memset(&info_, 0, sizeof(info_));
     lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
     int retval = pthread_mutex_init(lock_, NULL);
     assert(retval == 0);
   }
@@ -414,14 +424,16 @@ public:
     pthread_mutex_destroy(lock_);
     free(lock_);
   }
-  uint64_t *cachingDeadline() { return &cachingDeadline_; }
-  const uint64_t timeCacheValid() { return time_cache_valid_; }
+  uint64_t *caching_deadline() { return &caching_deadline_; }
+  const uint64_t time_cache_valid() { return time_cache_valid_; }
   struct statvfs *info() { return &info_; }
-  pthread_mutex_t *lock() { return lock_; }    
+  pthread_mutex_t *lock() { return lock_; }
 
  private:
   pthread_mutex_t *lock_;
-  uint64_t cachingDeadline_;
+  // Timestamp/deadline when the currently cached statvfs info_ becomes invalid
+  uint64_t caching_deadline_;
+  // Time in seconds how long statvfs info_ should be cached
   uint64_t time_cache_valid_;
   struct statvfs info_;
 };
@@ -494,7 +506,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string talk_socket_path() { return talk_socket_path_; }
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
-  StatfsCache *statfs_cache() { return statfs_cache_; };
+  StatfsCache *statfs_cache() { return statfs_cache_; }
 
   bool ReloadBlacklists();
 
