@@ -7,7 +7,7 @@ This allows multiple publishers to modify data in the same repository but at dif
 
 ## Setup Gateway
 
-Setting up a CernVM-FS gateway consists of 3 steps
+Setting up a CernVM-FS gateway consists of 3 steps:
 
 1. Create repository 
 2. Create Gateway key that publisher will use for authentication

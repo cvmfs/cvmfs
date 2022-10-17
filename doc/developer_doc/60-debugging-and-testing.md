@@ -66,7 +66,7 @@ Go to `cvmfs/test` and execute the following
 
 ### Writing your own integration tests
 
-Writing your own integration tests is done the following:
+Writing your own integration tests is done the following way:
 
 - Decide what type of test you need: client or server test
 - Create a new subfolder in `cvmfs/test/src/` with the appropriate number and name

@@ -19,7 +19,7 @@
   # be in directory cvmfs/build
   cmake -G Ninja -D BUILD_UNITTESTS=ON -D BUILD_GATEWAY=ON ../
   ninja
-  sudo ninja Install
+  sudo ninja install
 ```
 
 ## Useful build parameters

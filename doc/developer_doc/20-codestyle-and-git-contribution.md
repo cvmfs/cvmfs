@@ -39,7 +39,7 @@ For each pull requests (PR) there should be an issue assigned to it.
 Linking between PR and issue can be done by adding in the comment `#<issueNumber>`.
 For cross-project linking, e.g. between `cvmfs/cvmfs` and `cvmfs/doc-cvmfs` one can use the full URL of the issue.
 
-Please **do NOT squash commits** as it prevents the tracking of changes might due to, e.g. suggestions made in the issue.
+Please **do NOT squash commits** if it obscures the git history and tracking of changes made due to, e.g. suggestions made during review.
 
 
 ### Useful git commands
