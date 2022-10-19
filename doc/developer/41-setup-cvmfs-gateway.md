@@ -1,9 +1,11 @@
 # Setup of CernVM-FS Gateway
 
-The idea behind the gateway is that only the gateway has access to CernVM-FS storage and administrates transactions via leases.
+The idea behind the gateway is that only the gateway has access to CernVM-FS storage and that it coordinates all concurrent transactions via leases.
 This allows multiple publishers to modify data in the same repository but at different data locations within the repository.
 
-**Note**: At the moment, the gateway does not support container publishing via *publishers*.
+**Note**: 
+- At the moment, the gateway does not support container publishing via *remote publishers*.
+- Transaction executed directly on the gateway are NOT protected by leases. **DO NOT DO THIS** unless you manually took a lease to protect the integrity of the gateway and prevent access from the publisher nodes (e.g. useful for garbage collection).
 
 ## Setup Gateway
 
@@ -20,8 +22,8 @@ Setting up a CernVM-FS gateway consists of 3 steps:
 
 1. **Create repository**
 
-```py
-  # General setup
+```bash
+  # General setup (if you also want to run the client)
   cvmfs_config setup
   cvmfs_config chksetup
 
@@ -59,7 +61,7 @@ Setting up a CernVM-FS gateway consists of 3 steps:
 
 - Open Port 80 and 4929 (default gateway port) in the firewall, e.g. for `firewall-cmd`
 
-  ```py
+  ```bash
     firewall-cmd --add-port=4929/tcp
     firewall-cmd --add-port=80/tcp
 
@@ -84,8 +86,8 @@ The publisher is set up like a normal `cvmfs_server` but with 2 changes
 
 1. **General setup**
 
-  ```py
-    # General setup
+  ```bash
+    # General setup (if you also want to run the client)
     cvmfs_config setup
     cvmfs_config chksetup
 
@@ -108,7 +110,7 @@ The publisher is set up like a normal `cvmfs_server` but with 2 changes
 
 - Create repository on publisher that is linked to the gateway repository
 
-  ```py
+  ```bash
     # w = URL to storage location
     # u = URL to transaction and gateway server
     # k = temporary directory with keys
@@ -159,7 +161,7 @@ The publisher is set up like a normal `cvmfs_server` but with 2 changes
 
 - Execute a `cvmfs transaction` on the publisher
 
-  ``` py
+  ```bash
     cvmfs_server transaction test.gw.repo
     echo "hello" >> /cvmfs/test.gw.repo/msg.txt
     cvmfs_server publish test.gw.repo

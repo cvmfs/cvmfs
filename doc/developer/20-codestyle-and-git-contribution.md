@@ -17,7 +17,7 @@ It is useful to have the forked `devel` branch to track the upstream `cvmfs/deve
   git remote add upstream git@github.com:cvmfs/cvmfs.git
   git fetch upstream
   git checkout devel
-  git push -u upstream/devel devel
+  git branch -u upstream/devel devel
 ```
 
 
@@ -79,3 +79,8 @@ In case of a necessary line break, the following style should be followed
     ->bar()
 ```
 
+### Code style checker for C++
+- Currently needs `python2`
+- Go in main repo `/cvmfs`
+- Call `python cpplint.py <myCppFileToCheck>`
+  - e.g. `python cpplint.py cvmfs/cvmfs.cc`

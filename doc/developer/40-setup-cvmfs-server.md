@@ -9,7 +9,7 @@
 
 **NOTE**: If you do not disable `autofs` before any of the CernVM-FS server manipulation commands you can get in a broken state which can only be resolved by restarting the entire machine! (Independent of if you later on disable `autofs`)
 
-```py
+```bash
     ####################################################
     # CREATE repo
     ####################################################
@@ -27,9 +27,10 @@
     sudo rm /cvmfs/local.test.repo/testfile2.txt
 
     # Finalize transaction
+    ## 1) Publish results
     sudo cvmfs_server publish local.test.repo
 
-    # Abort transaction and discard all changes
+    ## Or 2) Abort transaction and discard all changes
     sudo cvmfs_server abort local.test.repo
 
     ####################################################

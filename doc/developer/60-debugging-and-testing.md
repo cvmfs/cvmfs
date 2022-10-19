@@ -75,7 +75,7 @@ Writing your own integration tests is done the following way:
 - Create a `main` script
     - It is a `bash`-script.
     - It has NO file ending
-- Your test can be executed like all the other tests. No compilation of the `cmvfs` source code needed.
+- Your test can be executed like all the other tests. No compilation of the `cvmfs` source code needed.
 
 
 **Tips**
@@ -89,8 +89,9 @@ Writing your own integration tests is done the following way:
 
 ## Unit Tests
 
-Unit tests use the [GoogleTest Framework](https://github.com/google/googletest).
-When configuring to include the unit tests with `cmake -D BUILD_UNITTESTS=ON`, the executable for it can be found in `cvmfs/build/test/unittests`.
+- Unit tests use the [GoogleTest Framework](https://github.com/google/googletest).
+- When configuring to include the unit tests with `cmake -D BUILD_UNITTESTS=ON`, the executable for it can be found in `cvmfs/build/test/unittests`.
+- Using `-DBUILD_UNITTESTS_DEBUG=on` during the configuration process of `cmake` allows to properly debug the unittests using e.g. `gdb`.
 
 ### Running Unit Tests
 

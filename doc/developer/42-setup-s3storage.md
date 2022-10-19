@@ -6,7 +6,7 @@ It is possible to use S3 as storage backend for a CernVM-FS repo.
 
 If not done so far, install `s3cmd`
 
-```py
+```bash
     s3cmd --configure # create a new bucket
 
     # following parameters should be set
@@ -41,13 +41,9 @@ As for all `cvmfs_server` commands: `sudo systemctl stop autofs`
           CVMFS_S3_USE_HTTPS=YES
         ```
 
-    - Additional parameters that could be interesting
-      -  E.g. for multiple buckets `CVMFS_S3_BUCKETS_PER_ACCOUNT=20`
-
-
 ### Create repo `s3.test.repo` that uses S3 as storage backend
 
-```py
+```bash
   cvmfs_server mkfs   -s /etc/cvmfs/s3config/s3.test.repo.cfg \
                       -w http://my-test-bucket.s3.cern.ch \
                       s3.test.repo

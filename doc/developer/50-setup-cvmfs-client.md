@@ -14,8 +14,8 @@
 ## Client configuration
 
 - General client configuration, repository-independent is located in `/etc/cvmfs/default.conf`
-- Repository-specific client Configuration is found in `/etc/cvmfs/conf.d/<myrepo>`
-- Configuration files in `/etc/cvmfs/conf.d/<myrepo>` overwrites `/etc/cvmfs/default.conf`
+- Repository-specific client configuration is found in `/etc/cvmfs/conf.d/<myrepo>.[conf,local]`
+- Configuration files in `/etc/cvmfs/conf.d/<myrepo>.[conf,local]` overwrites `/etc/cvmfs/default.conf`
 - Configuration file ending on `.local` overwrites `.conf`
 
 
@@ -50,12 +50,12 @@ First time setup
 Example: Mount repository `sft.cern.ch`
 
 - Create `/etc/cvmfs/config.d/sft.cern.ch.local` with the following input
-  ```py
+  ```bash
     CVMFS_HTTP_PROXY='http://ca-proxy-sft.cern.ch:3128;http://ca-proxy.cern.ch:3128'
   ```
 
 - Access the repository via automount function of `autofs`
-  ```py
+  ```bash
     sudo systemctl start autofs # if autofs is not running
 
     ls /cvmfs/lhcb.cern.ch/
@@ -66,7 +66,7 @@ Example: Mount repository `sft.cern.ch`
 ### Mounting local CernVM-FS repository (special)
 *(this method is of course also possible for remote repositories)*
 
-DO NOT use `autofs` if you also want to manipulate the server part via `cmvfs_server`. 
+DO NOT use `autofs` if you also want to manipulate the server part via `cvmfs_server`. 
 The reason is that `overlayfs` used by `cvmfs_server` mounts to the same point as `autofs` and *that is a really bad idea*.
 
 <u>**Instead mount the local cvmfs client to a different location (not /cvmfs).**</u>
@@ -74,7 +74,7 @@ The reason is that `overlayfs` used by `cvmfs_server` mounts to the same point a
 **Example: Mount local repository `local.test.repo`**
 
 - Create `/etc/cvmfs/config.d/local.test.repo.local` with the following input
-  ```py
+  ```bash
     CVMFS_SERVER_URL=http://localhost/cvmfs/symlink.test.repo
     CVMFS_HTTP_PROXY=DIRECT
   ```
