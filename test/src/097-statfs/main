@@ -5,69 +5,74 @@ cvmfs_test_suites="quick"
 source ./src/097-statfs/setup_teardown
 
 TEST097_REPO=lhcb.cern.ch
-TEST097_PRIVATE_MOUNT=/cvmfs/lhcb.cern.ch
+TEST097_MOUNTPOINT=/cvmfs/lhcb.cern.ch
 
 fillCache() {
-  echo "   fill cache for $TEST097_PRIVATE_MOUNT"
-  cat $TEST097_PRIVATE_MOUNT/lib/*.sh > /dev/null
+  echo "   fill cache for $TEST097_MOUNTPOINT"
+  cat $TEST097_MOUNTPOINT/lib/*.sh > /dev/null
 }
 
 get_cachesize() {
-  #echo `strace -e statfs df $TEST097_PRIVATE_MOUNT 2>&1 | grep statfs | awk -F", " '{print $5}' | awk -F"=" '{print $2}'`
+  #echo `strace -e statfs df $TEST097_MOUNTPOINT 2>&1 | grep statfs | awk -F", " '{print $5}' | awk -F"=" '{print $2}'`
 
   # no statfs on integration test machine
-  echo `df | grep "$TEST097_PRIVATE_MOUNT" | awk -F" " '{print $3}'`
+  echo `df | grep "$TEST097_MOUNTPOINT" | awk -F" " '{print $3}'`
 }
 
 check_no_parameter_set() {
   echo "*** Testing: Parameter CVMFS_STATFS_CACHE_TIMEOUT not set"
   echo "    wipe cache"
-  test097_mount $TEST097_PRIVATE_MOUNT $TEST097_REPO ""
+  test097_mount $TEST097_REPO ""
   sudo cvmfs_config wipecache > /dev/null
   echo "   found in config file: `sudo cvmfs_talk parameters | grep "STATFS"`"
-  sleep 1
   local origSize=$(get_cachesize)
   fillCache
-  sleep 1
   local newSize=$(get_cachesize)
-  test097_unmount
+  
 
   echo "   should not be equal: $origSize and $newSize"
 
   [ "$origSize" -ne "$newSize" ] || return 11
 
+  local cachedCounter=$(sudo cvmfs_talk -i $TEST097_REPO internal affairs | grep "statfs_cached" | awk -F"|" '{print $2}')
+
+  [ "$cachedCounter" -eq "0" ] || return 12
+
+  test097_unmount $TEST097_REPO
   echo "   ... Success"
 }
 
 check_parameter_0sec() {
   echo "*** Testing: Parameter CVMFS_STATFS_CACHE_TIMEOUT=0"
   echo "    wipe cache"
-  test097_mount $TEST097_PRIVATE_MOUNT $TEST097_REPO "CVMFS_STATFS_CACHE_TIMEOUT=0"
+  test097_mount $TEST097_REPO "CVMFS_STATFS_CACHE_TIMEOUT=0"
   sudo cvmfs_config wipecache > /dev/null
   echo "   found in config file: `sudo cvmfs_talk parameters | grep "STATFS"`"
-  sleep 10
   local origSize=$(get_cachesize)
   fillCache
-  sleep 1
   local newSize=$(get_cachesize)
-  test097_unmount
+  
 
   echo "   should not be equal: $origSize and $newSize"
 
   [ $origSize -ne $newSize ] || return 31
+
+  local cachedCounter=$(sudo cvmfs_talk -i $TEST097_REPO internal affairs | grep "statfs_cached" | awk -F"|" '{print $2}')
+
+  [ "$cachedCounter" -eq "0" ] || return 32
+
+  test097_unmount $TEST097_REPO
   echo "   ... Success"
 }
 
 check_parameter_10sec() {
   echo "*** Testing: Parameter CVMFS_STATFS_CACHE_TIMEOUT=10"
   echo "    wipe cache"
-  test097_mount $TEST097_PRIVATE_MOUNT $TEST097_REPO "CVMFS_STATFS_CACHE_TIMEOUT=10"
+  test097_mount $TEST097_REPO "CVMFS_STATFS_CACHE_TIMEOUT=10"
   sudo cvmfs_config wipecache > /dev/null
   echo "   found in config file: `sudo cvmfs_talk parameters | grep "STATFS"`"
-  sleep 1
   local origSize=$(get_cachesize)
   fillCache
-  sleep 1
   local newSize=$(get_cachesize)
 
   echo "   should be equal: $origSize and $newSize"
@@ -81,33 +86,28 @@ check_parameter_10sec() {
 
   [ $origSize -eq $newSize1 ] || return 22
 
+  local cachedCounter=$(sudo cvmfs_talk -i $TEST097_REPO internal affairs | grep "statfs_cached" | awk -F"|" '{print $2}')
+
+  [ "$cachedCounter" -ne "0" ] || return 23
+
   sleep 8
   local newSize2=$(get_cachesize)
-  test097_unmount
-
+  
 
   echo "   should not be equal: $origSize and $newSize2"
 
-  [ $origSize -ne $newSize2 ] || return 23
+  [ $origSize -ne $newSize2 ] || return 24
 
+  test097_unmount $TEST097_REPO
   echo "   ... Success"
 }
 
 cvmfs_run_test() {
   logfile=$1
 
-  # local scratch_dir=$(pwd)
-  # TEST097_PRIVATE_MOUNT="${scratch_dir}/private_mnt"
-  # mkdir $TEST097_PRIVATE_MOUNT
-  # TEST097_CONFIG_FILE="$(mktemp ${TEST097_PRIVATE_MOUNT}.conf.XXXXX)"
-
-  # echo "*** Set a trap for system directory cleanup"
-  # trap cleanup EXIT HUP INT TERM
-
   check_no_parameter_set || return $?
   check_parameter_10sec || return $?
   check_parameter_0sec || return $?
   
-
   return 0
 }

@@ -1,21 +1,12 @@
 test097_mount() {
-  local test097_mount=$1
-  local repo=$2
-  local params=$3
+  local repo=$1
+  local params=$2
 
   cvmfs_mount $repo $params
 }
 
 test097_unmount() {
-  cvmfs_umount $repo $params
-}
+  local repo=$1
 
-cleanup() {
-  echo "running cleanup()..."
-  if [ "x$TEST097_PIDS" != "x" ]; then
-    sudo kill -9 $TEST097_PIDS
-  fi
-  if [ "x$TEST097_PRIVATE_MOUNT" != "x" ]; then
-    test097_unmount
-  fi
+  cvmfs_umount $repo
 }
