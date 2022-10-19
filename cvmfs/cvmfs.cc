@@ -1461,13 +1461,18 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   fuse_reply_err(req, 0);
 }
 
-
+/**
+ * Returns information about a mounted filesystem. In this case it returns
+ * information about the local cache occupancy of cvmfs.
+ * 
+ * Note: If the elements of the struct statvfs *info are set to 0, it will cause
+ *       it to be ignored in commandline tool "df".
+ */
 static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %" PRIu64,
            uint64_t(ino));
 
-  // If we return 0 it will cause the fs to be ignored in "df"
   TraceInode(Tracer::kEventStatFs, ino, "statfs()");
 
   perf::Inc(file_system_->n_fs_statfs());
@@ -1481,10 +1486,9 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
     return;
   }
 
-  {
   MutexLockGuard m(mount_point_->statfs_cache()->lock());
 
-  const uint64_t deadline = *mount_point_->statfs_cache()->caching_deadline();
+  const uint64_t deadline = *mount_point_->statfs_cache()->expiry_deadline();
   struct statvfs *info = mount_point_->statfs_cache()->info();
 
   // cached version still valid
@@ -1519,12 +1523,11 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   info->f_ffree = info->f_favail = all_inodes - loaded_inode;
   fuse_remounter_->fence()->Leave();
 
-  *mount_point_->statfs_cache()->caching_deadline() =
+  *mount_point_->statfs_cache()->expiry_deadline() =
       platform_monotonic_time()
-    + mount_point_->statfs_cache()->time_cache_valid();
+    + mount_point_->statfs_cache()->cache_timeout();
 
   fuse_reply_statfs(req, info);
-  }
 }
 
 #ifdef __APPLE__

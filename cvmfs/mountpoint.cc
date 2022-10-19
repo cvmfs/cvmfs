@@ -1794,12 +1794,7 @@ bool MountPoint::SetupBehavior() {
 
   uint64_t statfs_time_cache_valid = 0;
   if (options_mgr_->GetValue("CVMFS_STATFS_CACHE_TIMEOUT", &optarg)) {
-    // 0ul does not work because of ubuntu 18
-    if ( optarg.size() > 0 ) {
-    statfs_time_cache_valid =
-      std::max(static_cast<uint64_t>(0),
-               static_cast<uint64_t>(String2Uint64(optarg)));
-    }
+    statfs_time_cache_valid = static_cast<uint64_t>(String2Uint64(optarg));
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "statfs cache expires after %d seconds",
            static_cast<int>(statfs_time_cache_valid));

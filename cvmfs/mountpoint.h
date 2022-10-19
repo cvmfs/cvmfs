@@ -410,10 +410,10 @@ class FileSystem : SingleCopy, public BootFactory {
  * All its logic, including the locking mechanism, is implemented in the 
  * function cvmfs_statfs in cvmfs.cc
  */
-class StatfsCache {
+class StatfsCache : SingleCopy {
  public:
-  explicit StatfsCache(uint64_t cacheValid) : caching_deadline_(0),
-                                     time_cache_valid_(cacheValid) {
+  explicit StatfsCache(uint64_t cacheValid) : expiry_deadline_(0),
+                                     cache_timeout_(cacheValid) {
     memset(&info_, 0, sizeof(info_));
     lock_ =
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -424,17 +424,17 @@ class StatfsCache {
     pthread_mutex_destroy(lock_);
     free(lock_);
   }
-  uint64_t *caching_deadline() { return &caching_deadline_; }
-  const uint64_t time_cache_valid() { return time_cache_valid_; }
+  uint64_t *expiry_deadline() { return &expiry_deadline_; }
+  const uint64_t cache_timeout() { return cache_timeout_; }
   struct statvfs *info() { return &info_; }
   pthread_mutex_t *lock() { return lock_; }
 
  private:
   pthread_mutex_t *lock_;
   // Timestamp/deadline when the currently cached statvfs info_ becomes invalid
-  uint64_t caching_deadline_;
+  uint64_t expiry_deadline_;
   // Time in seconds how long statvfs info_ should be cached
-  uint64_t time_cache_valid_;
+  uint64_t cache_timeout_;
   struct statvfs info_;
 };
 
