@@ -29,6 +29,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/084-premounted                           \
                                  src/089-external_cache_plugin                \
                                  src/094-attachmount                          \
+                                 src/097-statfs                               \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1

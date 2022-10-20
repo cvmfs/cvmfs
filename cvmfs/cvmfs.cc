@@ -1461,23 +1461,40 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   fuse_reply_err(req, 0);
 }
 
-
+/**
+ * Returns information about a mounted filesystem. In this case it returns
+ * information about the local cache occupancy of cvmfs.
+ * 
+ * Note: If the elements of the struct statvfs *info are set to 0, it will cause
+ *       it to be ignored in commandline tool "df".
+ */
 static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_statfs on inode: %" PRIu64,
            uint64_t(ino));
 
-  // If we return 0 it will cause the fs to be ignored in "df"
-  struct statvfs info;
-  memset(&info, 0, sizeof(info));
-
   TraceInode(Tracer::kEventStatFs, ino, "statfs()");
 
-  // Unmanaged cache
+  perf::Inc(file_system_->n_fs_statfs());
+
+  // Unmanaged cache (no lock needed - statfs is never modified)
   if (!file_system_->cache_mgr()->quota_mgr()->HasCapability(
        QuotaManager::kCapIntrospectSize))
   {
-    fuse_reply_statfs(req, &info);
+    LogCvmfs(kLogCvmfs, kLogDebug, "QuotaManager does not support statfs");
+    fuse_reply_statfs(req, (mount_point_->statfs_cache()->info()));
+    return;
+  }
+
+  MutexLockGuard m(mount_point_->statfs_cache()->lock());
+
+  const uint64_t deadline = *mount_point_->statfs_cache()->expiry_deadline();
+  struct statvfs *info = mount_point_->statfs_cache()->info();
+
+  // cached version still valid
+  if ( platform_monotonic_time() < deadline ) {
+    perf::Inc(file_system_->n_fs_statfs_cached());
+    fuse_reply_statfs(req, info);
     return;
   }
 
@@ -1485,28 +1502,32 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   uint64_t size = file_system_->cache_mgr()->quota_mgr()->GetSize();
   uint64_t capacity = file_system_->cache_mgr()->quota_mgr()->GetCapacity();
   // Fuse/OS X doesn't like values < 512
-  info.f_bsize = info.f_frsize = 512;
+  info->f_bsize = info->f_frsize = 512;
 
   if (capacity == (uint64_t)(-1)) {
     // Unknown capacity, set capacity = size
-    info.f_blocks = size / info.f_bsize;
+    info->f_blocks = size / info->f_bsize;
   } else {
     // Take values from LRU module
-    info.f_blocks = capacity / info.f_bsize;
+    info->f_blocks = capacity / info->f_bsize;
     available = capacity - size;
   }
 
-  info.f_bfree = info.f_bavail = available / info.f_bsize;
+  info->f_bfree = info->f_bavail = available / info->f_bsize;
 
   // Inodes / entries
   fuse_remounter_->fence()->Enter();
   uint64_t all_inodes = mount_point_->catalog_mgr()->all_inodes();
   uint64_t loaded_inode = mount_point_->catalog_mgr()->loaded_inodes();
-  info.f_files = all_inodes;
-  info.f_ffree = info.f_favail = all_inodes - loaded_inode;
+  info->f_files = all_inodes;
+  info->f_ffree = info->f_favail = all_inodes - loaded_inode;
   fuse_remounter_->fence()->Leave();
 
-  fuse_reply_statfs(req, &info);
+  *mount_point_->statfs_cache()->expiry_deadline() =
+      platform_monotonic_time()
+    + mount_point_->statfs_cache()->cache_timeout();
+
+  fuse_reply_statfs(req, info);
 }
 
 #ifdef __APPLE__
