@@ -26,8 +26,6 @@ check_no_parameter_set() {
   sudo cvmfs_config wipecache > /dev/null
   echo "   found in config file: `sudo cvmfs_talk parameters | grep "STATFS"`"
   local origSize=$(get_cachesize)
-  # sleep to prevent some machines to get already the size of the filled cache
-  sleep 3
   fillCache
   local newSize=$(get_cachesize)
   
@@ -51,8 +49,6 @@ check_parameter_0sec() {
   sudo cvmfs_config wipecache > /dev/null
   echo "   found in config file: `sudo cvmfs_talk parameters | grep "STATFS"`"
   local origSize=$(get_cachesize)
-  # sleep to prevent some machines to get already the size of the filled cache
-  sleep 3
   fillCache
   local newSize=$(get_cachesize)
   
@@ -76,8 +72,6 @@ check_parameter_10sec() {
   sudo cvmfs_config wipecache > /dev/null
   echo "   found in config file: `sudo cvmfs_talk parameters | grep "STATFS"`"
   local origSize=$(get_cachesize)
-  # sleep to prevent some machines to get already the size of the filled cache
-  sleep 3
   fillCache
   local newSize=$(get_cachesize)
 
