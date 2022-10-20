@@ -188,31 +188,25 @@ class ShortString {
     return ShortString(this->GetChars() + start_at, length-start_at);
   }
 
-#ifdef DEBUGMSG
   static uint64_t num_instances() { return atomic_read64(&num_instances_); }
   static uint64_t num_overflows() { return atomic_read64(&num_overflows_); }
-#endif
 
  private:
   std::string *long_string_;
   char stack_[StackSize+1];  // +1 to add a final '\0' if necessary
   unsigned char length_;
-#ifdef DEBUGMSG
   static atomic_int64 num_overflows_;
   static atomic_int64 num_instances_;
-#endif
 };  // class ShortString
 
 typedef ShortString<kDefaultMaxPath, 0> PathString;
 typedef ShortString<kDefaultMaxName, 1> NameString;
 typedef ShortString<kDefaultMaxLink, 2> LinkString;
 
-#ifdef DEBUGMSG
 template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_overflows_ = 0;
 template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
-#endif
 
 // See posix.cc for the std::string counterparts
 PathString GetParentPath(const PathString &path);
