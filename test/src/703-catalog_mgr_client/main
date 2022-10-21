@@ -1,0 +1,155 @@
+cvmfs_test_name="Catalog_mgr_client: LoadCatalog tests"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+source ./src/703-catalog_mgr_client/setup_teardown
+
+TEST703_PRIVATE_MOUNT=
+TEST703_PIDS=
+CVMFS_TEST_703_OSXMOUNTPOINT=
+
+
+get_root_hash() {
+  attr -g catalog_counters ${mntpnt}/ | grep catalog_hash | awk -F" " '{print $2}'
+}
+
+load_new_root_catalog() {
+  echo "   *** load_new_root_catalog"
+  local mntpnt="$1"
+
+  private_mount $mntpnt
+
+  oldRoot=$(get_root_hash)
+  add_some_tmp_file_to_repo
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync
+  newRoot=$(get_root_hash)
+
+  private_unmount
+
+  echo "   $oldRoot should not be equal $newRoot"
+
+  [ $oldRoot != $newRoot ] || return 10
+
+  echo "   ... success"
+}
+
+check_if_new_root_catalog() {
+  echo "   *** load_new_root_catalog"
+  local mntpnt="$1"
+
+  private_mount $mntpnt
+
+  add_some_tmp_file_to_repo
+  local updateStatus=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount)
+
+  private_unmount
+
+  echo "   '$updateStatus' should be 'New revision applied'"
+
+  [ "$updateStatus" = "New revision applied" ] || return 20
+
+  echo "   ... success"
+}
+
+cache_evict_files_for_catalog() {
+  echo "   *** cache_evict_files_for_catalog"
+  
+  # fill cache
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal01 bs=1024 count=5240
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal02 bs=1024 count=3441
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal03 bs=1024 count=2441
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal04 bs=1024 count=1441
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal05 bs=1024 count=1391
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal06 bs=1024 count=1291
+  # dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal07 bs=1024 count=580
+  
+  for i in `seq 30`
+  do
+    dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/file$i.txt bs=256 count=200
+  done
+
+    for i in `seq 100`
+  do
+    touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/file$i.txt
+  done
+
+
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local mntpnt="$1"
+
+  private_mount $mntpnt
+
+  cat $mntpnt/normal01 > /dev/null
+  cat $mntpnt/normal02 > /dev/null
+  cat $mntpnt/normal03 > /dev/null
+  cat $mntpnt/normal04 > /dev/null
+  cat $mntpnt/normal05 > /dev/null
+  cat $mntpnt/normal06 > /dev/null
+  
+  cat $mntpnt/file1.txt > /dev/null
+  # ls $mntpnt
+
+  # for i in `seq 3`
+  # do
+  #   echo "$mntpnt/file$i.txt"
+  #   cat $mntpnt/file$i.txt > /dev/null
+  # done 
+  # cat $mntpnt/normal07 > /dev/null
+
+  local oldCacheCatalog=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list catalogs)
+  local oldCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list)
+
+
+  echo ""
+  echo "oldCache"
+  echo "$oldCache"
+  echo "$oldCacheCatalog"
+
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache size
+
+
+  ls $mntpnt/foo/bar > /dev/null
+  cat $mntpnt/foo/bar/bar2.txt > /dev/null
+
+  local newCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list)
+  local newCacheCatalog=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list catalogs)
+
+  echo ""
+  echo "newCache"
+  echo "$newCache"
+  echo "$newCacheCatalog"
+
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache size
+  
+  ## TODO get line count to compare!
+
+
+  echo "   ... success"
+
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local scratch_dir=$(pwd)
+  local mntpnt="${scratch_dir}/private_mnt"
+  local config_file_path="${scratch_dir}/${CVMFS_TEST_REPO}.config.txt"
+ 
+
+  echo "*** Set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  # see test 674
+  # load_new_root_catalog_aliencache ${mntpnt} || return $?
+
+  create_nested_repo
+
+  # load_new_root_catalog ${mntpnt} || return $?
+  # check_if_new_root_catalog ${mntpnt} || return $?
+
+  cache_evict_files_for_catalog ${mntpnt} || return $?
+
+  return 0
+}
