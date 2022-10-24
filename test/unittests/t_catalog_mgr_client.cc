@@ -231,7 +231,7 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
   shash::Any catalog_hash = shash::Any();
   const PathString rootMntpnt("");
   const auto& rootHash = mp->catalog_mgr()->GetRootHash();
-  EXPECT_EQ(catalog::kLoadNew,
+  EXPECT_EQ(catalog::kLoadUp2Date,
     mp->catalog_mgr()->LoadCatalog(
     rootMntpnt, rootHash, &catalog_path, &catalog_hash));
   EXPECT_EQ(rootHash.ToString(), catalog_hash.ToString());
@@ -275,7 +275,7 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
   shash::Any catalog_hash = shash::Any();
   const PathString rootMntpnt("");
   const auto& rootHash = mp->catalog_mgr()->GetRootHash();
-  EXPECT_EQ(catalog::kLoadNew,
+  EXPECT_EQ(catalog::kLoadUp2Date,
     mp->catalog_mgr()->LoadCatalog(
     rootMntpnt, rootHash, &catalog_path, &catalog_hash));
   EXPECT_EQ(rootHash.ToString(), catalog_hash.ToString());
@@ -311,7 +311,7 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
                                       GetNestedCatalogHash(nestedMntpntNoDwnld);
 
   // try to load from cache
-  EXPECT_EQ(catalog::kLoadNew,
+  EXPECT_EQ(catalog::kLoadUp2Date,
     mp->catalog_mgr()->LoadCatalog(
     rootMntpnt, rootHash, &catalog_path, &catalog_hash));
   EXPECT_EQ(rootHash.ToString(), catalog_hash.ToString());

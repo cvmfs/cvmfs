@@ -13,6 +13,23 @@
 using namespace std;  // NOLINT
 
 namespace catalog {
+  LoadReturn SimpleCatalogManager::GetNewRootCatalogInfo(RootCatalogInfo *result) {
+    result->hash = base_hash_;
+    result->location = kServer;
+    // result->timestamp = 
+    // TODO
+    return kLoadFail;
+  }
+
+  LoadReturn SimpleCatalogManager::LoadCatalogByHash(const PathString &mountpoint, 
+                                      const shash::Any &hash_to_load,
+                                      RootCatalogInfo *rootInfo, 
+                                      std::string *catalog_path,
+                                      shash::Any *catalog_hash) {
+    // TODO
+    return kLoadFail;
+  }
+
 
 /**
  * Loads a catalog via HTTP from Statum 0 into a temporary file.

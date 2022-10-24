@@ -37,6 +37,7 @@ void ClientCatalogManager::ActivateCatalog(Catalog *catalog) {
 
 ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
   : AbstractCatalogManager<Catalog>(mountpoint->statistics())
+  , last_root_catalog_timestamp_(0)
   , repo_name_(mountpoint->fqrn())
   , fetcher_(mountpoint->fetcher())
   , signature_mgr_(mountpoint->signature_mgr())
@@ -106,156 +107,175 @@ bool ClientCatalogManager::InitFixed(
   return attached;
 }
 
-
-LoadError ClientCatalogManager::LoadCatalog(
-  const PathString  &mountpoint,
-  const shash::Any  &hash,
-  std::string *catalog_path,
-  shash::Any *catalog_hash)
-{
-  string cvmfs_path = repo_name_ + ":" +
-    (mountpoint.IsEmpty() ?
-      "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
-
-  // send the catalog hash to a blind memory position if it zero (save some ifs)
-  shash::Any blind_hash;
-  if (catalog_hash == NULL) {
-    catalog_hash = &blind_hash;
-  }
-
-  // Load a particular catalog
-  if (!hash.IsNull()) {
-    cvmfs_path += " (" + hash.ToString() + ")";
-    string alt_catalog_path = "";
-    if (mountpoint.IsEmpty() && fixed_alt_root_catalog_)
-      alt_catalog_path = hash.MakeAlternativePath();
-    LoadError load_error =
-      LoadCatalogCas(hash, cvmfs_path, alt_catalog_path, catalog_path);
-    if (load_error == catalog::kLoadNew)
-      loaded_catalogs_[mountpoint] = hash;
-    *catalog_hash = hash;
-    return load_error;
-  }
+LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(RootCatalogInfo *result) {
+  // 1) Get local (alien) cache root catalog
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
-  shash::Any cache_hash(shash::kSha1, shash::kSuffixCatalog);
-  uint64_t cache_last_modified = 0;
+  shash::Any breadcrumb_hash(shash::kSha1, shash::kSuffixCatalog);
+  uint64_t breadcrumb_timestamp = 0;
 
   manifest::Breadcrumb breadcrumb =
     fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
   if (breadcrumb.IsValid()) {
-    cache_hash = breadcrumb.catalog_hash;
-    cache_last_modified = breadcrumb.timestamp;
+    breadcrumb_hash = breadcrumb.catalog_hash;
+    breadcrumb_timestamp = breadcrumb.timestamp;
     LogCvmfs(kLogCache, kLogDebug, "cached copy publish date %s (hash %s)",
-             StringifyTime(cache_last_modified, true).c_str(),
-             cache_hash.ToString().c_str());
+             StringifyTime(breadcrumb_timestamp, true).c_str(),
+             breadcrumb_hash.ToString().c_str());
   } else {
     LogCvmfs(kLogCache, kLogDebug, "unable to read local checksum");
   }
 
-  // Load and verify remote checksum
+  // 2) Select local newest catalog
+  
+  shash::Any local_newest_hash = breadcrumb_hash;
+  uint64_t local_newest_timestamp = breadcrumb_timestamp;
+  result->location = RootCatalogLocation::kBreadcrumb;
+  LoadReturn success_code = catalog::kLoadNew;
+
+  // We only fetch currently loaded catalog if the timestamp is newer then
+  // the breadcrumb timestamp. As such the assumption that the root catalog
+  // is already loaded will always be true.
+  if (last_root_catalog_timestamp_ != 0 
+      && breadcrumb_timestamp <= last_root_catalog_timestamp_) {
+    auto curr_hash_itr = mounted_catalogs_.find(PathString("", 0));
+    local_newest_hash = curr_hash_itr->second;
+    local_newest_timestamp = last_root_catalog_timestamp_;
+    result->location = RootCatalogLocation::kMounted;
+    success_code = catalog::kLoadUp2Date;
+  } 
+
+  // 3) Get remote root catalog (fails if remote catalog is older)
   manifest::Failures manifest_failure;
   CachedManifestEnsemble ensemble(fetcher_->cache_mgr(), this);
-  manifest_failure = manifest::Fetch("", repo_name_, cache_last_modified,
-                                     &cache_hash, signature_mgr_,
+  manifest_failure = manifest::Fetch("", repo_name_, local_newest_timestamp,
+                                     &local_newest_hash, signature_mgr_,
                                      fetcher_->download_mgr(),
                                      &ensemble);
-  if (manifest_failure != manifest::kFailOk) {
-    LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
+  if (manifest_failure == manifest::kFailOk 
+      && ensemble.manifest->publish_timestamp() > local_newest_timestamp) {
+    result->hash = ensemble.manifest->catalog_hash();
+    result->timestamp = ensemble.manifest->publish_timestamp();
+    result->location = RootCatalogLocation::kServer;
+    offline_mode_ = false;
+
+    return catalog::kLoadNew;
+  }
+  LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest from server (%d - %s)",
              manifest_failure, manifest::Code2Ascii(manifest_failure));
 
-    LoadError success_code = catalog::kLoadUp2Date;
 
-    // Network unavailable but cached copy updated externally?
-    std::map<PathString, shash::Any>::const_iterator iter =
-      mounted_catalogs_.find(mountpoint);
-    if (iter != mounted_catalogs_.end()) {
-      if (breadcrumb.IsValid() && (iter->second != cache_hash)) {
-        success_code = catalog::kLoadNew;
-      }
-    }
+  offline_mode_ = true;
+  result->hash = local_newest_hash;
+  result->timestamp = local_newest_timestamp;
 
-    if (catalog_path) {
-      LoadError success_code =
-        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
-      if (success_code != catalog::kLoadNew)
-        return success_code;
-      loaded_catalogs_[mountpoint] = cache_hash;
-    }
-
-    *catalog_hash = cache_hash;
-    offline_mode_ = true;
-    return success_code;
-  }
-
-  manifest_ = new manifest::Manifest(*ensemble.manifest);
-
-  offline_mode_ = false;
-  cvmfs_path += " (" + ensemble.manifest->catalog_hash().ToString() + ")";
-  LogCvmfs(kLogCache, kLogDebug, "remote checksum is %s",
-           ensemble.manifest->catalog_hash().ToString().c_str());
-
-  // Short way out, use cached copy
-  if (ensemble.manifest->catalog_hash() == cache_hash) {
-    LoadError success_code = catalog::kLoadUp2Date;
-
-    // Has the breadcrumb been updated externally?
-    std::map<PathString, shash::Any>::const_iterator iter =
-      mounted_catalogs_.find(mountpoint);
-    if (iter != mounted_catalogs_.end()) {
-      if (iter->second != cache_hash) {
-        LogCvmfs(kLogCache, kLogDebug, "updating from %s to alien cache copy",
-                 iter->second.ToString().c_str());
-        success_code = catalog::kLoadNew;
-      }
-    }
-
-    if (catalog_path) {
-      LoadError error =
-        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
-      if (error == catalog::kLoadNew) {
-        loaded_catalogs_[mountpoint] = cache_hash;
-        *catalog_hash = cache_hash;
-        return success_code;
-      }
-      LogCvmfs(kLogCache, kLogDebug,
-               "unable to open catalog from local checksum, downloading");
-    } else {
-      *catalog_hash = cache_hash;
-      return success_code;
-    }
-  }
-  if (!catalog_path)
-    return catalog::kLoadNew;
-
-  // Load new catalog
-  catalog::LoadError load_retval =
-    LoadCatalogCas(ensemble.manifest->catalog_hash(),
-                   cvmfs_path,
-                   ensemble.manifest->has_alt_catalog_path() ?
-                     ensemble.manifest->MakeCatalogPath() : "",
-                   catalog_path);
-  if (load_retval != catalog::kLoadNew)
-    return load_retval;
-  loaded_catalogs_[mountpoint] = ensemble.manifest->catalog_hash();
-  *catalog_hash = ensemble.manifest->catalog_hash();
-
-  // Store new manifest and certificate
-  CacheManager::Label label;
-  label.path = repo_name_;
-  label.flags |= CacheManager::kLabelCertificate;
-  fetcher_->cache_mgr()->CommitFromMem(
-    CacheManager::LabeledObject(ensemble.manifest->certificate(), label),
-    ensemble.cert_buf, ensemble.cert_size);
-  fetcher_->cache_mgr()->StoreBreadcrumb(*ensemble.manifest);
-  return catalog::kLoadNew;
+  return success_code;
 }
 
+LoadReturn ClientCatalogManager::LoadCatalogByHash(const PathString  &mountpoint, 
+                                                  const shash::Any  &hash_to_load,
+                                                  RootCatalogInfo   *rootInfo,  // only of interest for root catalog
+                                                  std::string *sql_catalog_handle, // output
+                                                  shash::Any *catalog_hash) { //output
+  string catalog_descr = "file catalog at " + repo_name_ + ":" +
+    (mountpoint.IsEmpty() ?
+      "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
 
-LoadError ClientCatalogManager::LoadCatalogCas(
+  catalog_descr += " (" + hash_to_load.ToString() + ")";
+  string alt_root_catalog_path = "";
+
+  // root catalog needs special handling because of alt_root_catalog_path
+  CachedManifestEnsemble ensemble(fetcher_->cache_mgr(), this);
+  if (mountpoint.IsEmpty()) {
+    if ( fixed_alt_root_catalog_) {
+      alt_root_catalog_path = hash_to_load.MakeAlternativePath();
+    }
+
+    // get manifest from server and double check if we have newest hash
+    if (rootInfo->location == RootCatalogLocation::kServer) {
+      manifest::Failures manifest_failure;
+      manifest_failure = manifest::Fetch("", repo_name_, rootInfo->timestamp-1, //-1 necessary?
+                                        &rootInfo->hash, signature_mgr_,
+                                        fetcher_->download_mgr(),
+                                        &ensemble);
+      if (manifest_failure != manifest::kFailOk) {
+        LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
+                manifest_failure, manifest::Code2Ascii(manifest_failure));
+        return kLoadFail;
+      }
+
+      rootInfo->hash = ensemble.manifest->catalog_hash();
+      rootInfo->timestamp = ensemble.manifest->publish_timestamp();
+    }
+  }
+  
+  // TODO fetch should return if fetch from cache or from remote 
+  // would save us the if in L223
+  LoadReturn load_ret = FetchCatalogByHash(hash_to_load, catalog_descr, alt_root_catalog_path, sql_catalog_handle);
+  *catalog_hash = hash_to_load;
+  if (load_ret == catalog::kLoadNew) {
+    loaded_catalogs_[mountpoint] = hash_to_load;
+
+    if (mountpoint.IsEmpty()) { // root catalog
+      if(rootInfo->location == RootCatalogLocation::kMounted) {
+        return LoadReturn::kLoadUp2Date;
+      }
+      // set timestamp
+      last_root_catalog_timestamp_ = rootInfo->timestamp;
+
+      // if coming from server: update breadcrumb
+      if (rootInfo->location == RootCatalogLocation::kServer) {
+          // Store new manifest and certificate
+          CacheManager::Label label;
+          label.path = repo_name_;
+          label.flags |= CacheManager::kLabelCertificate;
+          fetcher_->cache_mgr()->CommitFromMem(
+                  CacheManager::LabeledObject(ensemble.manifest->certificate(),
+                                              label),
+                  ensemble.cert_buf, ensemble.cert_size);
+          fetcher_->cache_mgr()->StoreBreadcrumb(*ensemble.manifest);
+
+      }
+    }
+  }
+  
+  return load_ret;  
+}
+
+LoadError ClientCatalogManager::LoadCatalog(  const PathString  &mountpoint,
+                                              const shash::Any  &hash,
+                                              std::string *catalog_path,
+                                              shash::Any *catalog_hash) {
+  if (mountpoint.IsEmpty()) {
+    RootCatalogInfo rootInfo;
+
+    auto ret = GetNewRootCatalogInfo(&rootInfo);
+
+    if (!catalog_path) {
+      return ret;
+    }
+
+    ret = LoadCatalogByHash(mountpoint, 
+                      rootInfo.hash,
+                      &rootInfo,  // only of interest for root catalog
+                      catalog_path, // output
+                      catalog_hash);
+
+    return ret;
+
+  } else {
+    return LoadCatalogByHash(mountpoint, 
+                      hash,
+                      NULL,  // only of interest for root catalog
+                      catalog_path, // output
+                      catalog_hash);
+  }
+}
+
+LoadError ClientCatalogManager::FetchCatalogByHash(
   const shash::Any &hash,
   const string &name,
-  const std::string &alt_catalog_path,
+  const std::string &alt_root_catalog_path,
   string *catalog_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
@@ -263,7 +283,7 @@ LoadError ClientCatalogManager::LoadCatalogCas(
   label.path = name;
   label.flags = CacheManager::kLabelCatalog;
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
-                           alt_catalog_path);
+                           alt_root_catalog_path);
   if (fd >= 0) {
     if (root_fd_ < 0) {
       root_fd_ = fd;

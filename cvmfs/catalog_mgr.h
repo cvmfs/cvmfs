@@ -44,7 +44,7 @@ const unsigned kLookupRawSymlink = 0b10;
 /**
  * Results upon loading a catalog file.
  */
-enum LoadError {
+enum LoadReturn {
   kLoadNew = 0,
   kLoadUp2Date,
   kLoadNoSpace,
@@ -52,6 +52,28 @@ enum LoadError {
 
   kLoadNumEntries
 };
+
+typedef LoadReturn LoadError;
+
+/**
+ * struct used as part of loading the catalog
+ */ 
+struct RootCatalogInfo {
+    shash::Any hash;
+    uint64_t timestamp;
+    uint32_t location;
+  };
+
+  /**
+   * Location of the most recent root catalog.
+   * Used as part of loading the catalog.
+  */
+  enum RootCatalogLocation {
+    kDefault = 0, // unknown
+    kMounted, // already loaded in mounted_catalogs_
+    kServer,
+    kBreadcrumb
+  };
 
 inline const char *Code2Ascii(const LoadError error) {
   const char *texts[kLoadNumEntries + 1];
@@ -213,6 +235,12 @@ class AbstractCatalogManager : public SingleCopy {
    * class can decide if it wants to use the hash or the path.
    * Both the input as well as the output hash can be 0.
    */
+  virtual LoadReturn GetNewRootCatalogInfo(RootCatalogInfo *result) = 0;
+  virtual LoadReturn LoadCatalogByHash(const PathString &mountpoint, 
+                                      const shash::Any &hash_to_load,
+                                      RootCatalogInfo *rootInfo, 
+                                      std::string *catalog_path,
+                                      shash::Any *catalog_hash) = 0;
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
                                 std::string  *catalog_path,

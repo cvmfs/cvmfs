@@ -569,6 +569,14 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
 
   virtual ~MockCatalogManager() { delete spooler_; }
 
+  // TODO 
+  virtual LoadReturn GetNewRootCatalogInfo(RootCatalogInfo *result) { return kLoadFail; };
+  // TODO
+  virtual LoadReturn LoadCatalogByHash(const PathString  &mountpoint, 
+                              const shash::Any  &hash_to_load,
+                              RootCatalogInfo   *rootInfo, //only for loading root catalog
+                              std::string *catalog_path,
+                              shash::Any *catalog_hash) { return kLoadFail; };
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
                                 std::string  *catalog_path,

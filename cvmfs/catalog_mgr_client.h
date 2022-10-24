@@ -49,6 +49,10 @@ namespace catalog {
  */
 class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   FRIEND_TEST(T_CatalogManagerClient, MountLatest);
+  FRIEND_TEST(T_CatalogManagerClient, LoadByHash);
+  FRIEND_TEST(T_CatalogManagerClient, LoadByHashNetworkFailure);
+  FRIEND_TEST(T_CatalogManagerClient, LoadRootCatalog);
+
   // Maintains certificate hit/miss counters
   friend class CachedManifestEnsemble;
 
@@ -70,6 +74,14 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   int root_fd() const { return root_fd_; }
 
  protected:
+  //////////////////////////////////////////////////////////////
+  LoadReturn GetNewRootCatalogInfo(RootCatalogInfo *result);
+  LoadReturn LoadCatalogByHash(const PathString  &mountpoint, 
+                              const shash::Any  &hash_to_load,
+                              RootCatalogInfo   *rootInfo, //only for loading root catalog
+                              std::string *catalog_path,
+                              shash::Any *catalog_hash);
+  //////////////////////////////////////////////////////////////
   LoadError LoadCatalog(const PathString  &mountpoint,
                         const shash::Any  &hash,
                         std::string       *catalog_path,
@@ -81,7 +93,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   void ActivateCatalog(catalog::Catalog *catalog);
 
  private:
-  LoadError LoadCatalogCas(const shash::Any &hash,
+  LoadError FetchCatalogByHash(const shash::Any &hash,
                            const std::string &name,
                            const std::string &alt_catalog_path,
                            std::string *catalog_path);
@@ -91,6 +103,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
    */
   std::map<PathString, shash::Any> loaded_catalogs_;
   std::map<PathString, shash::Any> mounted_catalogs_;
+  uint64_t last_root_catalog_timestamp_;
 
   UniquePtr<manifest::Manifest> manifest_;
 
