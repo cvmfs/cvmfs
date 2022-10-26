@@ -47,6 +47,15 @@ First time setup
 
 ### Mounting remote CernVM-FS repository (default)
 
+The recommended setup for regular users:
+- Add `CVMFS_CLIENT_PROFILE=single` to `/etc/cvmfs/default.local` 
+  - This allows for proxy auto-discovery of all repositories that are made available by `/cvmfs/cvmfs-config.cern.ch` 
+  - As such `/cvmfs/cvmfs-config.cern.ch` **must be mounted first**
+
+For any other repository `CVMFS_HTTP_PROXY` must be set manually.
+
+**Inside CERN: Mounting Repositories of Experiments**
+
 Example: Mount repository `sft.cern.ch`
 
 - Create `/etc/cvmfs/config.d/sft.cern.ch.local` with the following input
@@ -58,9 +67,10 @@ Example: Mount repository `sft.cern.ch`
   ```bash
     sudo systemctl start autofs # if autofs is not running
 
-    ls /cvmfs/lhcb.cern.ch/
+    ls /cvmfs/sft.cern.ch/
   ```
 
+All repositories and their proxies are listed under [ClientSetupCERN < CvmFS < TWiki](https://twiki.cern.ch/twiki/bin/view/CvmFS/ClientSetupCERN)
 
 
 ### Mounting local CernVM-FS repository (special)

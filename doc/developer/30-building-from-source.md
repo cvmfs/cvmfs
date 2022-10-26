@@ -33,6 +33,7 @@ A non-exhaustive list of useful parameters is listed in the table below.
 | Parameter | Function|
 |---|---|
 |`BUILD_UNITTESTS` | Build test suite|
+|`BUILD_UNITTESTS_DEBUG` | Build test suite in debug mode|
 |`BUILD_GATEWAY`   | Build gateway/publisher functionality|
 
 Usage
