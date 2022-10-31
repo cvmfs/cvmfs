@@ -118,25 +118,29 @@ template <class CatalogT>
 LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remounting repositories (dry run %d)", dry_run);
-  if (dry_run)
-    return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
+  CatalogInfo ctlg_info;
+  const LoadReturn ret = GetNewRootCatalogInfo(&ctlg_info);
 
+  if (dry_run) {
+    return ret;
+  }
+    
   WriteLock();
 
-  string     catalog_path;
-  shash::Any catalog_hash;
-  const LoadError load_error = LoadCatalog(PathString("", 0),
-                                           shash::Any(),
-                                           &catalog_path,
-                                           &catalog_hash);
+  const LoadError load_error = LoadCatalogByHash(&ctlg_info);
+
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
-    CatalogT *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
+    CatalogT *new_root = CreateCatalog(PathString("", 0), ctlg_info.hash, NULL);
     assert(new_root);
-    bool retval = AttachCatalog(catalog_path, new_root);
+    LogCvmfs(kLogCatalog, kLogDebug,
+           "AbstractCatalogManager<CatalogT>::Remount sql_catalog_handle %s", ctlg_info.sql_catalog_handle.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug,
+           "AbstractCatalogManager<CatalogT>::Remount inode_gauge_ %d", inode_gauge_);
+    bool retval = AttachCatalog(ctlg_info.sql_catalog_handle, new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -161,20 +165,21 @@ LoadError AbstractCatalogManager<CatalogT>::ChangeRoot(
 
   WriteLock();
 
-  string     catalog_path;
-  shash::Any catalog_hash;
-  const LoadError load_error = LoadCatalog(PathString("", 0),
-                                           root_hash,
-                                           &catalog_path,
-                                           &catalog_hash);
-  if (load_error == kLoadNew) {
+  CatalogInfo ctlg_info;
+  ctlg_info.mountpoint = PathString("", 0);
+  ctlg_info.hash = root_hash;
+  ctlg_info.root_ctlg_location = kMounted;
+  ctlg_info.root_ctlg_timestamp = platform_monotonic_time();
+
+  const LoadError load_error = LoadCatalogByHash(&ctlg_info);
+  if (load_error == kLoadNew || load_error == kLoadUp2Date) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
-    CatalogT *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
+    CatalogT *new_root = CreateCatalog(PathString("", 0), ctlg_info.hash, NULL);
     assert(new_root);
-    bool retval = AttachCatalog(catalog_path, new_root);
+    bool retval = AttachCatalog(ctlg_info.sql_catalog_handle, new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -729,9 +734,14 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchy() const {
  */
 template <class CatalogT>
 InodeRange AbstractCatalogManager<CatalogT>::AcquireInodes(uint64_t size) {
+  LogCvmfs(kLogCatalog, kLogDebug,
+           "AbstractCatalogManager<CatalogT>::AcquireInodes size %d", size);
   InodeRange result;
   result.offset = inode_gauge_;
   result.size = size;
+
+  LogCvmfs(kLogCatalog, kLogDebug,
+           "AbstractCatalogManager<CatalogT>::AcquireInodes inode_gauge_ %d", inode_gauge_);
 
   inode_gauge_ += size;
   LogCvmfs(kLogCatalog, kLogDebug, "allocating inodes from %d to %d.",
@@ -882,20 +892,39 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
   if (IsAttached(mountpoint, &attached_catalog))
     return attached_catalog;
 
-  string     catalog_path;
-  shash::Any catalog_hash;
-  const LoadError retval =
-    LoadCatalog(mountpoint, hash, &catalog_path, &catalog_hash);
+  CatalogInfo ctlg_info;
+  ctlg_info.hash = hash;
+  ctlg_info.mountpoint = mountpoint;
+  ctlg_info.root_ctlg_location = RootCatalogLocation::kMounted;
+
+  // // TODO CLEANUP WITH NEW CATALOG INFO STRUCT
+  if (ctlg_info.mountpoint.IsEmpty() && hash.IsNull()) {
+    GetNewRootCatalogInfo(&ctlg_info);
+  }
+
+  // TODO
+  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' hash %s",
+             mountpoint.c_str(), hash.ToString().c_str());
+  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' rootInfo hash %s",
+             mountpoint.c_str(), ctlg_info.hash.ToString().c_str());
+  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' rootInfo location %d",
+             mountpoint.c_str(), ctlg_info.root_ctlg_location);
+
+  const LoadReturn retval = LoadCatalogByHash(&ctlg_info);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
              mountpoint.c_str(), retval, Code2Ascii(retval));
     return NULL;
   }
 
-  attached_catalog = CreateCatalog(mountpoint, catalog_hash, parent_catalog);
+  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' after LoadCatalogByHash", mountpoint.c_str());
+  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' after LoadCatalogByHash hash %s",
+            mountpoint.c_str(), ctlg_info.hash .ToString().c_str());
+
+  attached_catalog = CreateCatalog(ctlg_info.mountpoint, ctlg_info.hash, parent_catalog);
 
   // Attach loaded catalog
-  if (!AttachCatalog(catalog_path, attached_catalog)) {
+  if (!AttachCatalog(ctlg_info.sql_catalog_handle, attached_catalog)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach catalog '%s'",
              mountpoint.c_str());
     UnloadCatalog(attached_catalog);
@@ -919,15 +948,27 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
                                             const PathString     &mountpoint,
                                             const shash::Any     &hash)
 {
-  string new_path;
-  shash::Any check_hash;
-  const LoadError load_error = LoadCatalog(mountpoint, hash, &new_path,
-                                           &check_hash);
-  if (load_error != kLoadNew)
+  CatalogInfo ctlg_info;
+  ctlg_info.hash = hash;
+  ctlg_info.mountpoint = mountpoint;
+  ctlg_info.root_ctlg_location = kMounted;
+
+  // do i need this here?
+  if (mountpoint.IsEmpty()) {
+    GetNewRootCatalogInfo(&ctlg_info);
+  }
+
+  const LoadReturn load_ret = LoadCatalogByHash(&ctlg_info);
+
+  // TODO: correct if statement?
+  if (load_ret != kLoadNew && load_ret != kLoadUp2Date) {
     return NULL;
-  assert(hash == check_hash);
+  }
+
+  assert(hash == ctlg_info.hash); // why? 
   CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
-                                             new_path, hash);
+                                             ctlg_info.sql_catalog_handle,
+                                             ctlg_info.hash);
   catalog->TakeDatabaseFileOwnership();
   return catalog;
 }

@@ -325,8 +325,11 @@ TEST_F(T_CatalogManager, Balance) {
 TEST_F(T_CatalogManager, Remount) {
   EXPECT_TRUE(catalog_mgr_.Init());
   LoadError le;
-  EXPECT_EQ(kLoadNew, le = catalog_mgr_.Remount(true));
-  EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
+  // EXPECT_EQ(kLoadNew, le = catalog_mgr_.Remount(true));
+  // EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
+
+  EXPECT_EQ(kLoadUp2Date, le = catalog_mgr_.Remount(true));
+  EXPECT_EQ(kLoadUp2Date, catalog_mgr_.Remount(false));
 }
 
 TEST_F(T_CatalogManager, Watermark) {

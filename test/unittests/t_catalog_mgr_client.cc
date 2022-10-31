@@ -217,41 +217,48 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
   UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
 
-  string root_hash;
-  EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash));
+  string root_hash_str;
+  EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
   UniquePtr<MountPoint> mp(MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.weak_ref(), &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
-  EXPECT_EQ(root_hash, mp->catalog_mgr()->GetRootHash().ToString());
+  EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
 
   // load root catalog by its hash
-  std::string catalog_path = "";
-  shash::Any catalog_hash = shash::Any();
   const PathString rootMntpnt("");
   const auto& rootHash = mp->catalog_mgr()->GetRootHash();
+
+  CatalogInfo root_info;
+  // mp->catalog_mgr()->GetNewRootCatalogInfo(&root_info); << this we dont do
+
+  // root catalog is already mounted
+  root_info.hash = rootHash;
+  root_info.mountpoint = rootMntpnt;
+  root_info.root_ctlg_location = kMounted;
+
+  // this would create problems if we update the repo, but here we dont care
+  root_info.root_ctlg_timestamp = 5; 
+
   EXPECT_EQ(catalog::kLoadUp2Date,
-    mp->catalog_mgr()->LoadCatalog(
-    rootMntpnt, rootHash, &catalog_path, &catalog_hash));
-  EXPECT_EQ(rootHash.ToString(), catalog_hash.ToString());
+            mp->catalog_mgr()->LoadCatalogByHash(&root_info));
+  EXPECT_EQ(root_hash_str, root_info.hash.ToString());
 
   // load nested catalog
-  catalog_path = "";
-  catalog_hash = shash::Any();
   const PathString nestedMntpnt("/dir/dir2");
-  const auto& ncatalogHash = mp->catalog_mgr()->GetNestedCatalogHash(nestedMntpnt);
+  const auto& ncatalogHash = mp->catalog_mgr()->
+                              GetNestedCatalogHash(nestedMntpnt);
+  CatalogInfo nctlg_info;
+  nctlg_info.hash = ncatalogHash;
+  nctlg_info.mountpoint = nestedMntpnt;
 
   EXPECT_EQ(catalog::kLoadNew,
-    mp->catalog_mgr()->LoadCatalog(
-    nestedMntpnt, ncatalogHash, &catalog_path, &catalog_hash));
-  EXPECT_EQ(ncatalogHash.ToString(), catalog_hash.ToString());
+    mp->catalog_mgr()->LoadCatalogByHash(&nctlg_info));
 
   // also chached should return the same answer
   EXPECT_EQ(catalog::kLoadNew,
-    mp->catalog_mgr()->LoadCatalog(
-    nestedMntpnt, ncatalogHash, &catalog_path, &catalog_hash));
-  EXPECT_EQ(ncatalogHash.ToString(), catalog_hash.ToString());  
+    mp->catalog_mgr()->LoadCatalogByHash(&nctlg_info));
 }
 
 
@@ -261,43 +268,32 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
   UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
 
-  string root_hash;
-  EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash));
+  string root_hash_str;
+  EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
   UniquePtr<MountPoint> mp(MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.weak_ref(), &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
-  EXPECT_EQ(root_hash, mp->catalog_mgr()->GetRootHash().ToString());
+  EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
 
-  // load root catalog by its hash
-  std::string catalog_path = "";
-  shash::Any catalog_hash = shash::Any();
-  const PathString rootMntpnt("");
-  const auto& rootHash = mp->catalog_mgr()->GetRootHash();
-  EXPECT_EQ(catalog::kLoadUp2Date,
-    mp->catalog_mgr()->LoadCatalog(
-    rootMntpnt, rootHash, &catalog_path, &catalog_hash));
-  EXPECT_EQ(rootHash.ToString(), catalog_hash.ToString());
+  CatalogInfo ctlg_info;
 
   // load nested catalog
-  catalog_path = "";
-  catalog_hash = shash::Any();
   const PathString nestedMntpnt("/dir/dir2");
   const auto& ncatalogHash = mp->catalog_mgr()->GetNestedCatalogHash(nestedMntpnt);
 
-  EXPECT_EQ(catalog::kLoadNew,
-    mp->catalog_mgr()->LoadCatalog(
-    nestedMntpnt, ncatalogHash, &catalog_path, &catalog_hash));
-  EXPECT_EQ(ncatalogHash.ToString(), catalog_hash.ToString());
+  ctlg_info.hash = ncatalogHash;
+  ctlg_info.mountpoint = nestedMntpnt;
+
+  EXPECT_EQ(catalog::kLoadNew, 
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
 
   // also chached should return the same answer
-  EXPECT_EQ(catalog::kLoadNew,
-    mp->catalog_mgr()->LoadCatalog(
-    nestedMntpnt, ncatalogHash, &catalog_path, &catalog_hash));
-  EXPECT_EQ(ncatalogHash.ToString(), catalog_hash.ToString());  
+  EXPECT_EQ(catalog::kLoadNew, 
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info)); 
 
-  // break URL to repo // TODO fixme
+  // break URL to repo
   mp->download_mgr()->SetProxyChain("file://noValidURL", "",
    download::DownloadManager::ProxySetModes::kSetProxyBoth);
   mp->download_mgr()->RebalanceProxies();
@@ -311,20 +307,22 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
                                       GetNestedCatalogHash(nestedMntpntNoDwnld);
 
   // try to load from cache
+  CatalogInfo root_info;
+  mp->catalog_mgr()->GetNewRootCatalogInfo(&root_info);
+
   EXPECT_EQ(catalog::kLoadUp2Date,
-    mp->catalog_mgr()->LoadCatalog(
-    rootMntpnt, rootHash, &catalog_path, &catalog_hash));
-  EXPECT_EQ(rootHash.ToString(), catalog_hash.ToString());
+            mp->catalog_mgr()->LoadCatalogByHash(&root_info));
+  EXPECT_EQ(root_info.hash.ToString(), root_hash_str);
 
   EXPECT_EQ(catalog::kLoadNew,
-    mp->catalog_mgr()->LoadCatalog(
-    nestedMntpnt, ncatalogHash, &catalog_path, &catalog_hash));
-  EXPECT_EQ(ncatalogHash.ToString(), catalog_hash.ToString());  
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
 
   // fail to load new unloaded nested catalog
+  CatalogInfo ctlg_info_failed;
+  ctlg_info_failed.hash = ncatalogHashNoDwnld;
+  ctlg_info_failed.mountpoint = nestedMntpntNoDwnld;
   EXPECT_EQ(catalog::kLoadFail,
-    mp->catalog_mgr()->LoadCatalog(
-    nestedMntpntNoDwnld, ncatalogHashNoDwnld, &catalog_path, &catalog_hash));
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info_failed));
 }
 
 TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
@@ -333,22 +331,22 @@ TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
   UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
 
-  string root_hash;
-  EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash));
+  string root_hash_str;
+  EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
   UniquePtr<MountPoint> mp(MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.weak_ref(), &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
-  EXPECT_EQ(root_hash, mp->catalog_mgr()->GetRootHash().ToString());
+  EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
   // load new root catalog without providing the hash
   // this will perform a check vs storage loaction which has the most recent one
-  std::string catalog_path = "";
-  shash::Any catalog_hash = shash::Any();
+  CatalogInfo root_info;
+
   EXPECT_EQ(catalog::kLoadUp2Date,
-    mp->catalog_mgr()->LoadCatalog(
-    PathString("", 0), shash::Any(), &catalog_path, &catalog_hash));
-  EXPECT_EQ(root_hash, catalog_hash.ToString());
+    mp->catalog_mgr()->GetNewRootCatalogInfo(&root_info));
+  EXPECT_EQ(catalog::kMounted, root_info.root_ctlg_location);
+  EXPECT_EQ(root_hash_str, root_info.hash.ToString());
 }
 
 }

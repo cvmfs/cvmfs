@@ -506,21 +506,35 @@ MockCatalog* catalog::MockCatalogManager::CreateCatalog(
                          0, is_root, parent_catalog, NULL);
 }
 
-catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
-                                                  const PathString &mountpoint,
-                                                  const shash::Any &hash,
-                                                  string  *catalog_path,
-                                                  shash::Any *catalog_hash)
-{
-  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
-  if (it != catalog_map_.end() && catalog_hash != NULL) {
+  // TODO 
+catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogInfo(
+                                          CatalogInfo *result) {
+  LogCvmfs(kLogCache, kLogDebug, "catalog::MockCatalogManager::GetNewRootCatalogInfo");
+  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(PathString("",0));
+  if (it != catalog_map_.end()) {
     MockCatalog *catalog = it->second;
-    *catalog_hash = catalog->hash();
+    result->hash = catalog->hash();
+    result->root_ctlg_timestamp = 1;
+    result->root_ctlg_location = kMounted;
+    result->mountpoint = PathString("", 0);
+    result->sql_catalog_handle = "";
+    return kLoadUp2Date; 
+  }
+  return kLoadFail;
+}
+// TODO
+catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
+                            CatalogInfo *ctlg_info) {
+  LogCvmfs(kLogCache, kLogDebug, "catalog::MockCatalogManager::LoadCatalogByHash");
+  map<PathString, MockCatalog*>::iterator it = 
+                                      catalog_map_.find(ctlg_info->mountpoint);
+  if (it != catalog_map_.end() && !ctlg_info->hash.IsNull()) {
+    return kLoadUp2Date;
   } else {
-    MockCatalog *catalog = new MockCatalog(mountpoint.ToString(),
-                                           hash, 4096, 1, 0,
+    MockCatalog *catalog = new MockCatalog(ctlg_info->mountpoint.ToString(),
+                                           ctlg_info->hash, 4096, 1, 0,
                                            true, NULL, NULL);
-    catalog_map_[mountpoint] = catalog;
+    catalog_map_[ctlg_info->mountpoint] = catalog;
   }
   return kLoadNew;
 }

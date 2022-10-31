@@ -107,7 +107,7 @@ bool ClientCatalogManager::InitFixed(
   return attached;
 }
 
-LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(RootCatalogInfo *result) {
+LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
   // 1) Get local (alien) cache root catalog
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
@@ -130,7 +130,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(RootCatalogInfo *result) 
   
   shash::Any local_newest_hash = breadcrumb_hash;
   uint64_t local_newest_timestamp = breadcrumb_timestamp;
-  result->location = RootCatalogLocation::kBreadcrumb;
+  result->root_ctlg_location = RootCatalogLocation::kBreadcrumb;
   LoadReturn success_code = catalog::kLoadNew;
 
   // We only fetch currently loaded catalog if the timestamp is newer then
@@ -141,7 +141,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(RootCatalogInfo *result) 
     auto curr_hash_itr = mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
     local_newest_timestamp = last_root_catalog_timestamp_;
-    result->location = RootCatalogLocation::kMounted;
+    result->root_ctlg_location = RootCatalogLocation::kMounted;
     success_code = catalog::kLoadUp2Date;
   } 
 
@@ -155,8 +155,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(RootCatalogInfo *result) 
   if (manifest_failure == manifest::kFailOk 
       && ensemble.manifest->publish_timestamp() > local_newest_timestamp) {
     result->hash = ensemble.manifest->catalog_hash();
-    result->timestamp = ensemble.manifest->publish_timestamp();
-    result->location = RootCatalogLocation::kServer;
+    result->root_ctlg_timestamp = ensemble.manifest->publish_timestamp();
+    result->root_ctlg_location = RootCatalogLocation::kServer;
     offline_mode_ = false;
 
     return catalog::kLoadNew;
@@ -167,35 +167,38 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(RootCatalogInfo *result) 
 
   offline_mode_ = true;
   result->hash = local_newest_hash;
-  result->timestamp = local_newest_timestamp;
+  result->root_ctlg_timestamp = local_newest_timestamp;
 
   return success_code;
 }
 
-LoadReturn ClientCatalogManager::LoadCatalogByHash(const PathString  &mountpoint, 
-                                                  const shash::Any  &hash_to_load,
-                                                  RootCatalogInfo   *rootInfo,  // only of interest for root catalog
-                                                  std::string *sql_catalog_handle, // output
-                                                  shash::Any *catalog_hash) { //output
-  string catalog_descr = "file catalog at " + repo_name_ + ":" +
-    (mountpoint.IsEmpty() ?
-      "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
+LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) { //output
+ LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash start");
 
-  catalog_descr += " (" + hash_to_load.ToString() + ")";
+  string catalog_descr = "file catalog at " + repo_name_ + ":" +
+    (ctlg_info->mountpoint.IsEmpty() ?
+      "/" : string(ctlg_info->mountpoint.GetChars(),
+                   ctlg_info->mountpoint.GetLength()));
+
+  catalog_descr += " (" + ctlg_info->hash.ToString() + ")";
   string alt_root_catalog_path = "";
 
   // root catalog needs special handling because of alt_root_catalog_path
   CachedManifestEnsemble ensemble(fetcher_->cache_mgr(), this);
-  if (mountpoint.IsEmpty()) {
+  if (ctlg_info->mountpoint.IsEmpty()) {
+    LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash root mountpoint");
     if ( fixed_alt_root_catalog_) {
-      alt_root_catalog_path = hash_to_load.MakeAlternativePath();
+      alt_root_catalog_path = ctlg_info->hash.MakeAlternativePath();
     }
 
     // get manifest from server and double check if we have newest hash
-    if (rootInfo->location == RootCatalogLocation::kServer) {
+    if (ctlg_info->root_ctlg_location == RootCatalogLocation::kServer) {
+      LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash root from server");
       manifest::Failures manifest_failure;
-      manifest_failure = manifest::Fetch("", repo_name_, rootInfo->timestamp-1, //-1 necessary?
-                                        &rootInfo->hash, signature_mgr_,
+      manifest_failure = manifest::Fetch("", repo_name_, 
+                                        ctlg_info->root_ctlg_timestamp,
+                                        &ctlg_info->hash,
+                                        signature_mgr_,
                                         fetcher_->download_mgr(),
                                         &ensemble);
       if (manifest_failure != manifest::kFailOk) {
@@ -204,28 +207,35 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(const PathString  &mountpoint
         return kLoadFail;
       }
 
-      rootInfo->hash = ensemble.manifest->catalog_hash();
-      rootInfo->timestamp = ensemble.manifest->publish_timestamp();
+      ctlg_info->hash = ensemble.manifest->catalog_hash();
+      ctlg_info->root_ctlg_timestamp = ensemble.manifest->publish_timestamp();
     }
   }
+
+  LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash Server (%s)",
+                ctlg_info->hash.ToString().c_str());
   
   // TODO fetch should return if fetch from cache or from remote 
   // would save us the if in L223
-  LoadReturn load_ret = FetchCatalogByHash(hash_to_load, catalog_descr, alt_root_catalog_path, sql_catalog_handle);
-  *catalog_hash = hash_to_load;
+  LoadReturn load_ret = FetchCatalogByHash( ctlg_info->hash, catalog_descr,
+                                            alt_root_catalog_path, 
+                                            &ctlg_info->sql_catalog_handle);
+  // *catalog_hash = ctlg_info->hash;
   if (load_ret == catalog::kLoadNew) {
-    loaded_catalogs_[mountpoint] = hash_to_load;
+    loaded_catalogs_[ctlg_info->mountpoint] = ctlg_info->hash;
 
-    if (mountpoint.IsEmpty()) { // root catalog
-      if(rootInfo->location == RootCatalogLocation::kMounted) {
+    if (ctlg_info->mountpoint.IsEmpty()) { // root catalog
+    LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash set root catalog variables");
+      if(ctlg_info->root_ctlg_location == RootCatalogLocation::kMounted) {
         return LoadReturn::kLoadUp2Date;
       }
       // set timestamp
-      last_root_catalog_timestamp_ = rootInfo->timestamp;
+      last_root_catalog_timestamp_ = ctlg_info->root_ctlg_timestamp;
 
       // if coming from server: update breadcrumb
-      if (rootInfo->location == RootCatalogLocation::kServer) {
+      if (ctlg_info->root_ctlg_location == RootCatalogLocation::kServer) {
           // Store new manifest and certificate
+          LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash write manifest");
           CacheManager::Label label;
           label.path = repo_name_;
           label.flags |= CacheManager::kLabelCertificate;
@@ -242,42 +252,14 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(const PathString  &mountpoint
   return load_ret;  
 }
 
-LoadError ClientCatalogManager::LoadCatalog(  const PathString  &mountpoint,
-                                              const shash::Any  &hash,
-                                              std::string *catalog_path,
-                                              shash::Any *catalog_hash) {
-  if (mountpoint.IsEmpty()) {
-    RootCatalogInfo rootInfo;
-
-    auto ret = GetNewRootCatalogInfo(&rootInfo);
-
-    if (!catalog_path) {
-      return ret;
-    }
-
-    ret = LoadCatalogByHash(mountpoint, 
-                      rootInfo.hash,
-                      &rootInfo,  // only of interest for root catalog
-                      catalog_path, // output
-                      catalog_hash);
-
-    return ret;
-
-  } else {
-    return LoadCatalogByHash(mountpoint, 
-                      hash,
-                      NULL,  // only of interest for root catalog
-                      catalog_path, // output
-                      catalog_hash);
-  }
-}
 
 LoadError ClientCatalogManager::FetchCatalogByHash(
   const shash::Any &hash,
   const string &name,
   const std::string &alt_root_catalog_path,
-  string *catalog_path)
+  std::string *sql_catalog_handle)
 {
+  LogCvmfs(kLogCatalog, kLogDebug, "FetchCatalogByHash");
   assert(hash.suffix == shash::kSuffixCatalog);
   CacheManager::Label label;
   label.path = name;
@@ -288,7 +270,11 @@ LoadError ClientCatalogManager::FetchCatalogByHash(
     if (root_fd_ < 0) {
       root_fd_ = fd;
     }
-    *catalog_path = "@" + StringifyInt(fd);
+
+    LogCvmfs(kLogCatalog, kLogDebug,
+           "FetchCatalogByHash filedescriptor %d", fd);
+    // sql_catalog_handle->assign("@" + StringifyInt(fd));
+    *sql_catalog_handle = "@" + StringifyInt(fd);
     return kLoadNew;
   }
 

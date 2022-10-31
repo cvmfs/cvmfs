@@ -56,24 +56,25 @@ enum LoadReturn {
 typedef LoadReturn LoadError;
 
 /**
- * struct used as part of loading the catalog
- */ 
-struct RootCatalogInfo {
-    shash::Any hash;
-    uint64_t timestamp;
-    uint32_t location;
-  };
+ * Location of the most recent root catalog.
+ * Used as part of loading the catalog.
+ */
+enum RootCatalogLocation {
+  kDefault = 0, // unknown
+  kMounted, // already loaded in mounted_catalogs_
+  kServer,
+  kBreadcrumb
+};
 
-  /**
-   * Location of the most recent root catalog.
-   * Used as part of loading the catalog.
-  */
-  enum RootCatalogLocation {
-    kDefault = 0, // unknown
-    kMounted, // already loaded in mounted_catalogs_
-    kServer,
-    kBreadcrumb
-  };
+
+// TODO catalog INFO
+struct CatalogInfo {
+  shash::Any hash;
+  PathString mountpoint;
+  std::string sql_catalog_handle; // out parameter
+  uint64_t root_ctlg_timestamp; // root catalog specific elements
+  enum RootCatalogLocation root_ctlg_location; // root catalog specific elements
+};
 
 inline const char *Code2Ascii(const LoadError error) {
   const char *texts[kLoadNumEntries + 1];
@@ -235,16 +236,8 @@ class AbstractCatalogManager : public SingleCopy {
    * class can decide if it wants to use the hash or the path.
    * Both the input as well as the output hash can be 0.
    */
-  virtual LoadReturn GetNewRootCatalogInfo(RootCatalogInfo *result) = 0;
-  virtual LoadReturn LoadCatalogByHash(const PathString &mountpoint, 
-                                      const shash::Any &hash_to_load,
-                                      RootCatalogInfo *rootInfo, 
-                                      std::string *catalog_path,
-                                      shash::Any *catalog_hash) = 0;
-  virtual LoadError LoadCatalog(const PathString &mountpoint,
-                                const shash::Any &hash,
-                                std::string  *catalog_path,
-                                shash::Any   *catalog_hash) = 0;
+  virtual LoadReturn GetNewRootCatalogInfo(CatalogInfo *catalog_info) = 0;
+  virtual LoadReturn LoadCatalogByHash(CatalogInfo *catalog_info) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }

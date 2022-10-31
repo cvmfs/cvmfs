@@ -74,18 +74,8 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   int root_fd() const { return root_fd_; }
 
  protected:
-  //////////////////////////////////////////////////////////////
-  LoadReturn GetNewRootCatalogInfo(RootCatalogInfo *result);
-  LoadReturn LoadCatalogByHash(const PathString  &mountpoint, 
-                              const shash::Any  &hash_to_load,
-                              RootCatalogInfo   *rootInfo, //only for loading root catalog
-                              std::string *catalog_path,
-                              shash::Any *catalog_hash);
-  //////////////////////////////////////////////////////////////
-  LoadError LoadCatalog(const PathString  &mountpoint,
-                        const shash::Any  &hash,
-                        std::string       *catalog_path,
-                        shash::Any        *catalog_hash);
+  LoadReturn GetNewRootCatalogInfo(CatalogInfo *result);
+  LoadReturn LoadCatalogByHash(CatalogInfo* ctlg_info);
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   const shash::Any  &catalog_hash,
