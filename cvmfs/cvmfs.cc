@@ -2096,7 +2096,7 @@ static void Spawn() {
   cvmfs::pid_ = getpid();
   if (cvmfs::watchdog_) {
     cvmfs::watchdog_->RegisterOnCrash(auto_umount::UmountOnCrash);
-    cvmfs::watchdog_->Spawn();
+    cvmfs::watchdog_->Spawn( cvmfs::mount_point_ );
   }
 
   cvmfs::fuse_remounter_->Spawn();

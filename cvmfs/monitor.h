@@ -15,6 +15,10 @@
 
 #include "util/platform.h"
 
+#if defined(CVMFS_FUSE_MODULE)
+#include "mountpoint.h"
+#endif
+
 struct Pipe;
 
 /**
@@ -27,7 +31,11 @@ class Watchdog {
   static Watchdog *Create(const std::string &crash_dump_path);
   static pid_t GetPid();
   ~Watchdog();
+#if defined(CVMFS_FUSE_MODULE)
+  void Spawn( MountPoint *mountpoint_ );
+#else
   void Spawn();
+#endif
   void RegisterOnCrash(void (*CleanupOnCrash)(void));
 
   static void *MainWatchdogListener(void *data);

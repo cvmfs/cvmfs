@@ -39,6 +39,7 @@
 
 #if defined(CVMFS_FUSE_MODULE)
 #include "cvmfs.h"
+#include "mountpoint.h"
 #endif
 #include "util/exception.h"
 #include "util/logging.h"
@@ -384,7 +385,12 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 /**
  * Fork the watchdog process.
  */
+
+#if defined(CVMFS_FUSE_MODULE)
+void Watchdog::Spawn( MountPoint *mountpoint_) {
+#else
 void Watchdog::Spawn() {
+#endif
   Pipe pipe_pid;
   pipe_watchdog_ = new Pipe();
   pipe_listener_ = new Pipe();
@@ -402,6 +408,9 @@ void Watchdog::Spawn() {
         case 0: {
           close(pipe_watchdog_->write_end);
           Daemonize();
+#if defined(CVMFS_FUSE_MODULE)
+          if(mountpoint_!=NULL) {delete mountpoint_; }
+#endif
           // send the watchdog PID to cvmfs
           pid_t watchdog_pid = getpid();
           pipe_pid.Write(watchdog_pid);

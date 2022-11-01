@@ -983,7 +983,11 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
 
   UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
   assert(watchdog.IsValid());
+#if defined(CVMFS_FUSE_MODULE)
+  watchdog->Spawn(NULL);
+#else
   watchdog->Spawn();
+#endif
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo =
