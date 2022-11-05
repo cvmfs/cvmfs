@@ -22,7 +22,6 @@ sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --enable-static \
   --enable-http \
   --enable-proxy \
-  --enable-websockets \
   --enable-file \
   --enable-ipv6 \
   --enable-openssl-auto-load-config \
@@ -62,6 +61,7 @@ sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --disable-alt-svc \
   --disable-headers-api \
   --disable-hsts \
+  --disable-websockets \
   ${curl_ssl_config} \
   --without-hyper \
   --without-brotli \
