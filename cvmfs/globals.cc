@@ -15,5 +15,5 @@ gid_t g_gid = 0;
 bool g_world_readable = false;
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
