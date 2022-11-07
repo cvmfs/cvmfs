@@ -816,7 +816,6 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
   assert(path.StartsWith(parent->mountpoint()));
 
   unsigned path_len = path.GetLength();
-  unsigned mountpoint_len;
 
   // Try to find path as a super string of nested catalog mount points
   perf::Inc(statistics_.n_nested_listing);
@@ -828,13 +827,10 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
   {
     // Next nesting level
     if (path.StartsWith(i->mountpoint)) {
-      // in this case the path doesn't start with 
+      // in this case the path doesn't start with
       // the mountpoint in a file path sense
       // (e.g. path is /a/bc and mountpoint is /a/b), and will be ignored
-      //
-      // checking it this way allows us to avoid the 
-      // overhead of constructing more PathString
-      mountpoint_len = i->mountpoint.GetLength();
+      unsigned mountpoint_len = i->mountpoint.GetLength();
       if (path_len > mountpoint_len && path.GetChars()[mountpoint_len] != '/')
         continue;
 
