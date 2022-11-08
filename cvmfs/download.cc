@@ -1324,6 +1324,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_WRITE_ERROR:
       // Error set by callback
       break;
+    case CURLE_SEND_ERROR:
+      // The curl error CURLE_SEND_ERROR can be seen when a cache is misbehaving
+      // and closing connections before the http request send is completed.
+      // Handle this error, treating it as a short transfer error.
+      info->error_code = (info->proxy == "DIRECT") ?
+        kFailHostShortTransfer : kFailProxyShortTransfer;
+      break;
     default:
       LogCvmfs(kLogDownload, kLogSyslogErr, "unexpected curl error (%d) while "
                "trying to fetch %s", curl_error, info->url->c_str());
