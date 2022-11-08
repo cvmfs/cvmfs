@@ -11,16 +11,15 @@ Mounting with `cvmfs2` allows also to set a few parameters, e.g. `libfuse=` to s
 Example mounting with `Fuse3`
 ```bash
   export CVMFS_REPO=symlink.test.repo
-  sudo /usr/bin/cvmfs2    -d -f \
-                          -o rw,system_mount,fsname=cvmfs2,allow_other,grab_mountpoint,uid=998,gid=997,libfuse=3 \
-                          $CVMFS_REPO \
-                          /mnt/test
+  sudo /usr/bin/cvmfs2  -d -f \
+                        -o rw,system_mount,fsname=cvmfs2,allow_other,grab_mountpoint,uid=`id -u cvmfs`,gid=`id -g cvmfs`,libfuse=3 \
+                        $CVMFS_REPO \
+                        /mnt/test
 ```
+
 **Note**:
 The `uid` and `gid` are the `user id` and `group id` of the `cvmfs` user.
-This will be different on every system.
-They can be retrieved by executing `id cvmfs`.
-
+They will be different on every system but the here provided code discovers them automatically.
 ### Useful commands
 
 All commands require `sudo`

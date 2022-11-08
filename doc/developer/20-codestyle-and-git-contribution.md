@@ -58,6 +58,11 @@ Please **do NOT squash commits** if it obscures the git history and tracking of 
   git cherry-pick <commit hash>
 ```
 
+- Before creating a new PR, integrate the latest changes from `devel`. The git history will be modified in such a way that your changes will be on top/the latest.
+
+```
+  git rebase upstream/devel
+```
 
 ## Codestyle
 
