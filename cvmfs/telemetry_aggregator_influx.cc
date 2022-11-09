@@ -143,7 +143,7 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
 
   ret += " ";
 
-  std::string tok = ",";
+  std::string tok = "";
   for (std::map<std::string, Statistics::CounterInfo>::iterator it
       = counters_.begin(), iEnd = counters_.end(); it != iEnd; it++) {
     int64_t value = it->second.counter.Get();
@@ -219,7 +219,7 @@ void TelemetryAggregatorInflux::PushMetrics() {
   std::string delta_payload = "";
   if (old_counters_.size() > 0) {
     delta_payload = MakeDeltaPayload();
-    payload += "\n" + delta_payload;
+    payload = payload + "\n" + delta_payload;
   }
 
   // send to influx
