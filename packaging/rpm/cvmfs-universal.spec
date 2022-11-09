@@ -43,19 +43,12 @@
 %define build_fuse3 1
 %endif
 
-%define cvmfs_python python
-%define cvmfs_python_devel python-devel
-%define cvmfs_python_setuptools python-setuptools
-%if 0%{?el8} || 0%{?fedora} >= 31
-%define cvmfs_python python2
-%define cvmfs_python_devel python2-devel
-%define cvmfs_python_setuptools python2-setuptools
-%endif
-# On SLES15, we need the python2 interpreter but python3 devel and setuptools
-# TODO(jblomer): upgrade all python components to Python3
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
 %define cvmfs_python_devel python3-devel
 %define cvmfs_python_setuptools python3-setuptools
+%else
+%define cvmfs_python_devel python-devel
+%define cvmfs_python_setuptools python-setuptools
 %endif
 
 %define cvmfs_go golang

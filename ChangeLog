@@ -5,6 +5,9 @@
   * Restrict ShortString overflow counters to debug mode (#3081)
   * [S3] Gracefully handle HTTP 500 return codes during upload (#2912)
 
+2.10.1:
+  * [rpm] Fix python build requirements (#2986)
+
 2.10.0:
   * [server] Ignore size of directories in snapshot diff output
   * [server] Remove partial support for "channels" from manifest (#2838)
