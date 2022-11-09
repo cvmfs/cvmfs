@@ -1,4 +1,5 @@
 2.11.0:
+  * Bump libcurl to version 7.86.0 (#3093)
   * Gracefully handle CURLE_SEND_ERROR in download manager (#2925)
   * Add CVMFS_STATFS_CACHE_TIMEOUT parameter to cache statfs results (#3015)
   * Restrict ShortString overflow counters to debug mode (#3081)
