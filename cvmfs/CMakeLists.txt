@@ -87,6 +87,8 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        sqlitevfs.cc
        ssl.cc
        statistics.cc
+       telemetry_aggregator.cc
+       telemetry_aggregator_influx.cc
        tracer.cc
        whitelist.cc
        wpad.cc

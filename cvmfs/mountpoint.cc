@@ -62,6 +62,8 @@
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
+#include "telemetry_aggregator.h"
+#include "telemetry_aggregator_influx.h"
 #include "tracer.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
@@ -1746,6 +1748,7 @@ MountPoint::MountPoint(
   , file_system_(file_system)
   , options_mgr_(options_mgr)
   , statistics_(NULL)
+  , telemetry_aggr_(NULL)
   , authz_fetcher_(NULL)
   , authz_session_mgr_(NULL)
   , authz_attachment_(NULL)
@@ -1823,6 +1826,7 @@ MountPoint::~MountPoint() {
   delete authz_attachment_;
   delete authz_session_mgr_;
   delete authz_fetcher_;
+  delete telemetry_aggr_;
   delete statistics_;
   delete uuid_;
 
@@ -1945,6 +1949,25 @@ bool MountPoint::SetupBehavior() {
       boot_error_ = "unknown owner of cvmfs_talk socket: " + optarg;
       boot_status_ = loader::kFailOptions;
       return false;
+    }
+  }
+
+  // this can be later be changed to switch through different
+  // telemetryAggregators
+  if (options_mgr_->GetValue("CVMFS_TELEMETRY_SEND", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    uint64_t telemetry_send_rate = 0;
+    if (options_mgr_->GetValue("CVMFS_TELEMETRY_RATE", &optarg)) {
+      telemetry_send_rate = static_cast<uint64_t>(String2Uint64(optarg));
+
+      telemetry_aggr_ = (perf::TelemetryAggregator*)
+                         perf::TelemetryAggregatorInflux::Create(statistics_,
+                                                    telemetry_send_rate,
+                                                    options_mgr_,
+                                                    fqrn_);
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "TELEMETRY: Enable telemetry to report every %d seconds",
+               telemetry_send_rate);
     }
   }
 

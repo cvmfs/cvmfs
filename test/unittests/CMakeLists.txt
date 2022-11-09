@@ -464,6 +464,8 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sync_mediator.cc
   ${CVMFS_SOURCE_DIR}/sync_union.cc
   ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
+  ${CVMFS_SOURCE_DIR}/telemetry_aggregator.cc
+  ${CVMFS_SOURCE_DIR}/telemetry_aggregator_influx.cc
   ${CVMFS_SOURCE_DIR}/tracer.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
