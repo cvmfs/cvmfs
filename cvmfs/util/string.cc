@@ -227,8 +227,10 @@ int64_t String2Int64(const string &value) {
 
 uint64_t String2Uint64(const string &value) {
   uint64_t result;
-  sscanf(value.c_str(), "%" PRIu64, &result);
-  return result;
+  if (sscanf(value.c_str(), "%" PRIu64, &result) == 1) {
+    return result;
+  }
+  return 0;
 }
 
 /**

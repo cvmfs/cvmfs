@@ -88,7 +88,8 @@ void Publisher::TransactionImpl() {
       "/" + settings_.transaction().lease_path());
     catalog::SimpleCatalogManager *catalog_mgr = GetSimpleCatalogManager();
     catalog::DirectoryEntry dirent;
-    bool retval = catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent);
+    bool retval = catalog_mgr->LookupPath(path, catalog::kLookupDefault,
+                                          &dirent);
     if (!retval) {
       throw EPublish("cannot open transaction on non-existing path " + path,
                      EPublish::kFailLeaseNoEntry);

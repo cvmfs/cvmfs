@@ -877,6 +877,7 @@ if (BUILD_SERVER)
        publish/cmd_hash.cc
        publish/cmd_help.cc
        publish/cmd_info.cc
+       publish/cmd_lsof.cc
        publish/cmd_mkfs.cc
        publish/cmd_transaction.cc
        publish/cmd_util.cc

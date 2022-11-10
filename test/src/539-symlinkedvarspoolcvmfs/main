@@ -13,6 +13,9 @@ produce_files_in() {
 
 desaster_cleanup() {
   sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
+  if has_selinux; then
+    sudo setenforce 1
+  fi
 }
 
 cvmfs_run_test() {
@@ -40,6 +43,11 @@ cvmfs_run_test() {
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+  # Required, e.g., on EL9
+  if has_selinux; then
+    sudo setenforce 0
+  fi
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || { desaster_cleanup; return 6; }
 
@@ -53,7 +61,7 @@ cvmfs_run_test() {
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "starting transaction to edit repository"
-  start_transaction $CVMFS_TEST_REPO || { desaster_cleanup; return 10; } 
+  start_transaction $CVMFS_TEST_REPO || { desaster_cleanup; return 10; }
 
   echo "putting some stuff in the new repository"
   produce_files_in $repo_dir || { desaster_cleanup; return 11; }

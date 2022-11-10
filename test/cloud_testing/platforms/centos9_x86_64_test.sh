@@ -30,9 +30,14 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
+                                 src/017-dnstimeout                           \
+                                 src/019-httptimeout                          \
+                                 src/020-emptyrepofailover                    \
+                                 src/030-missingrootcatalog                   \
                                  src/056-lowspeedlimit                        \
+                                 src/065-http-400                             \
                                  src/084-premounted                           \
-                                 src/094-attachmount                          \
+                                 src/096-cancelreq                            \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
@@ -43,7 +48,13 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 CVMFS_TEST_UNIONFS=overlayfs                                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
+                                 src/525-bigrepo                              \
+                                 src/572-proxyfailover                        \
                                  src/600-securecvmfs                          \
+                                 src/607-noapache                             \
+                                 src/615-externaldata                         \
+                                 src/620-pullmixedrepo                        \
+                                 src/624-chunkedexternalgraft                 \
                                  src/628-pythonwrappedcvmfsserver             \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
