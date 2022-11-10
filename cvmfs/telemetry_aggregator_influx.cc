@@ -150,7 +150,7 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
     int64_t old_value = old_counters_.at(it->first).counter.Get();
     if (value != 0) {
       snprintf(buf, sizeof(buf), "%ld", value - old_value);
-      ret += tok + it->first + "_delta=" + std::string(buf);
+      ret += tok + it->first + "=" + std::string(buf);
       tok = ",";
     }
   }

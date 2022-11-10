@@ -60,7 +60,6 @@ void TelemetryAggregator::Spawn() {
 void *TelemetryAggregator::MainTelemetry(void *data) {
   TelemetryAggregator *telemetry = reinterpret_cast<TelemetryAggregator*>(data);
   Statistics *statistics = telemetry->statistics_;
-  OptionsManager *option_mgr = telemetry->options_mgr_;
 
   struct pollfd watch_term;
   watch_term.fd = telemetry->pipe_terminate_[0];
@@ -72,7 +71,7 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
     watch_term.revents = 0;
     int retval = poll(&watch_term, 1, timeout_ms);
     if (retval < 0) {
-      if (errno == EINTR) {  // external interrupt occured
+      if (errno == EINTR) {  // external interrupt occured - no error for us
         if (timeout_ms >= 0) {
           uint64_t now = platform_monotonic_time();
           timeout_ms = (now > deadline) ? 0 : (deadline - now) * 1000;

@@ -147,7 +147,7 @@ void Statistics::SnapshotCounters(
                         std::map<std::string, CounterInfo> *counters,
                         uint64_t *monotonic_clock) {
   MutexLockGuard lock_guard(lock_);
-  *monotonic_clock = platform_monotonic_time_ns();
+  *monotonic_clock = platform_realtime_ns();
   for (map<string, AtomicCounterInfo *>::const_iterator i = counters_.begin(),
        iEnd = counters_.end(); i != iEnd; ++i)
   {
