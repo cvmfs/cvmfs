@@ -466,7 +466,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   // 076 fails with the following line uncommented
   //
   // WARNING! ENABLING THIS BREAKS ANY TYPE OF MOUNTPOINT POINTING TO THIS INODE
-  // 
+  //
   // only safe if fuse_expire_entry is available
   if (mount_point_->fuse_expire_entry()
       || (mount_point_->cache_symlinks() && dirent.IsLink())) {
@@ -1660,7 +1660,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
           "FUSE: Symlink caching requested but missing libfuse support, "
           "falling back to no caching");
-#endif 
+#endif
   }
 
 #ifdef FUSE_CAP_EXPIRE_ONLY
