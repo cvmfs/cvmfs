@@ -2842,4 +2842,8 @@ void DownloadManager::SetAWSCredentials( std::string &credentials) {
   aws_credentials_ = std::string(credentials);
 }
 
+void DownloadManager::SetAWSRegion( std::string &region) {
+  aws_region_ = std::string(credentials);
+}
+
 }  // namespace download
