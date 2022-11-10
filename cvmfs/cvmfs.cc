@@ -466,7 +466,10 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   // 076 fails with the following line uncommented
   //
   // WARNING! ENABLING THIS BREAKS ANY TYPE OF MOUNTPOINT POINTING TO THIS INODE
-  if (mount_point_->cache_symlinks()) {  //  && dirent.IsLink()) {
+  // 
+  // only safe if fuse_expire_entry is available
+  if (mount_point_->fuse_expire_entry()
+      || (mount_point_->cache_symlinks() && dirent.IsLink())) {
     LogCvmfs(kLogCache, kLogDebug, "Dentry to evict: %s", name);
     mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   }
@@ -1641,22 +1644,32 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   }
 
   if ( mount_point_->cache_symlinks() ) {
-#if FUSE_VERSION >= 310
-    if ((conn->capable & FUSE_CAP_CACHE_SYMLINKS) == 0) {
+#ifdef FUSE_CAP_CACHE_SYMLINKS
+    if ((conn->capable & FUSE_CAP_CACHE_SYMLINKS) == FUSE_CAP_CACHE_SYMLINKS) {
+      conn->want |= FUSE_CAP_CACHE_SYMLINKS;
+      LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
+                                    "Enable symlink caching");
+    } else {
       mount_point_->DisableCacheSymlinks();
-      LogCvmfs(kLogCvmfs, kLogDebug,  // kLogDebug | kLogSyslogErr,
-           "Symlink caching requested but missing fuse kernel support, "
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+           "FUSE: Symlink caching requested but missing fuse kernel support, "
            "falling back to no caching");
     }
-    conn->want |= FUSE_CAP_CACHE_SYMLINKS;
-    LogCvmfs(kLogCvmfs, kLogDebug, "enabling symlink caching");
 #else
     mount_point_->DisableCacheSymlinks();
-    LogCvmfs(kLogCvmfs, kLogDebug,
-           "Symlink caching requested but fuse version not >=3.10, "
-           "falling back to no caching");
-#endif
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+          "FUSE: Symlink caching requested but missing libfuse support, "
+          "falling back to no caching");
+#endif 
   }
+
+#ifdef FUSE_CAP_EXPIRE_ONLY
+  if ((conn->capable & FUSE_CAP_EXPIRE_ONLY) == FUSE_CAP_EXPIRE_ONLY) {
+    mount_point_->EnableFuseExpireEntry();
+    LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
+                                   "Enable fuse_expire_entry");
+  }
+#endif
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {

@@ -1150,13 +1150,21 @@ bool MountPoint::ReloadBlacklists() {
 /**
  * Disables kernel caching of symlinks. 
  * Symlink caching requires fuse >= 3.10 (FUSE_CAP_CACHE_SYMLINKS) and
- * linux kernel >= 4.2 
+ * linux kernel >= 4.2. Some OS might backport it.
  * 
  * NOTE: This function should only be called before or within cvmfs_init().
  * 
  */
 void MountPoint::DisableCacheSymlinks() {
   cache_symlinks_ = false;
+}
+
+/**
+ * Instead of invalidate dentries, they should be expired. 
+ * Fixes issues with mount-on-top mounts and symlink caching.
+ */
+void MountPoint::EnableFuseExpireEntry() {
+  fuse_expire_entry_ = true;
 }
 
 
@@ -1706,6 +1714,7 @@ MountPoint::MountPoint(
   , fixed_catalog_(false)
   , enforce_acls_(false)
   , cache_symlinks_(false)
+  , fuse_expire_entry_(false)
   , has_membership_req_(false)
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
   , talk_socket_uid_(0)
