@@ -1,0 +1,80 @@
+create_world_readable_repo() {
+  echo ""
+  echo "*** CREATE a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  local short_name="$1"
+  local long_name="$2"
+  local symlink_name="$3"  
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  touch /cvmfs/$CVMFS_TEST_REPO/test1.txt
+  mkdir /cvmfs/$CVMFS_TEST_REPO/testdir
+  touch /cvmfs/$CVMFS_TEST_REPO/testdir/test2.txt
+
+  chmod 0400 /cvmfs/$CVMFS_TEST_REPO/test1.txt
+  chmod 0400 /cvmfs/$CVMFS_TEST_REPO/testdir/test2.txt
+  chmod 0500 /cvmfs/$CVMFS_TEST_REPO/testdir
+
+  publish_repo $CVMFS_TEST_REPO || return 200
+  echo "*** FINISHED creating a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo ""
+}
+
+# add_some_tmp_file_to_repo() {
+#   echo "Adding some random file to the repo $CVMFS_TEST_REPO"
+#   start_transaction $CVMFS_TEST_REPO || return $?
+#   local tmpfile="$(mktemp /cvmfs/$CVMFS_TEST_REPO/tmpfile.XXXXX)"
+#   publish_repo $CVMFS_TEST_REPO || return 200
+# }
+
+private_mount_world_readable() {
+  local mntpnt="$1"
+  local fuse_version="$2"
+  local config_file_path="$3"
+  TEST704_PRIVATE_MOUNT="$mntpnt"
+
+  local mount_options="rw,system_mount,fsname=cvmfs2"
+
+  do_local_mount_as_root "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_WORLD_READABLE=ON
+CVMFS_SYSLOG_LEVEL=2" \
+                 "$mount_options" || return 1
+}
+
+private_mount_not_world_readable() {
+  local mntpnt="$1"
+  local fuse_version="$2"
+  local config_file_path="$3"
+  TEST704_PRIVATE_MOUNT="$mntpnt"
+
+  local mount_options="rw,system_mount,fsname=cvmfs2"
+
+  do_local_mount_as_root "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_WORLD_READABLE=OFF
+CVMFS_SYSLOG_LEVEL=2" \
+                 "$mount_options" || return 1
+}
+
+
+private_unmount() {
+  sudo umount $TEST704_PRIVATE_MOUNT
+  TEST704_PRIVATE_MOUNT=
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST704_PIDS" != "x" ]; then
+    sudo kill -9 $TEST704_PIDS
+  fi
+  if [ "x$TEST704_PRIVATE_MOUNT" != "x" ]; then
+    private_unmount
+  fi
+}
