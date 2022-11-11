@@ -62,8 +62,11 @@ class T_MagicXattr : public ::testing::Test {
 };
 
 TEST_F(T_MagicXattr, TestFqrn) {
+  std::set<std::string> protected_xattrs;
+  std::set<unsigned long> protected_xattr_gids;
   MagicXattrManager *mgr =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways);
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways,
+                        protected_xattrs, protected_xattr_gids);
 
   catalog::DirectoryEntry dirent =
     catalog::DirectoryEntryTestFactory::ExternalFile();
@@ -75,20 +78,24 @@ TEST_F(T_MagicXattr, TestFqrn) {
 }
 
 TEST_F(T_MagicXattr, HideAttributes) {
+  std::set<std::string> protected_xattrs;
+  std::set<unsigned long> protected_xattr_gids;
   catalog::DirectoryEntry dirent_name =
     catalog::DirectoryEntryTestFactory::RegularFile("name", 42, shash::Any());
   catalog::DirectoryEntry dirent_root =
     catalog::DirectoryEntryTestFactory::Directory();
 
   MagicXattrManager *mgr_never =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityNever);
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityNever,
+    protected_xattrs, protected_xattr_gids);
   std::string list = mgr_never->GetListString(&dirent_name);
   EXPECT_EQ(0U, list.length());
   list = mgr_never->GetListString(&dirent_root);
   EXPECT_EQ(0U, list.length());
 
   MagicXattrManager *mgr_rootonly =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityRootOnly);
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityRootOnly,
+                          protected_xattrs, protected_xattr_gids);
   list = mgr_rootonly->GetListString(&dirent_name);
   EXPECT_EQ(0U, list.length());
   list = mgr_rootonly->GetListString(&dirent_root);

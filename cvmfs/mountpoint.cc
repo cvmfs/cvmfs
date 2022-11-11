@@ -1831,7 +1831,31 @@ bool MountPoint::SetupBehavior() {
                optarg.c_str());
     }
   }
-  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility);
+
+  std::set<unsigned long> protected_xattr_gids;
+  if (options_mgr_->GetValue("CVMFS_PRIVILEGED_XATTR_GIDS", &optarg)) {
+    std::vector<string> tmp = SplitString(optarg, ',');
+
+    for (size_t i = 0; i < tmp.size(); i++) {
+      protected_xattr_gids.insert(String2Uint64(tmp[i]));
+    }
+
+    protected_xattr_gids.insert(0);  // root is always permitted
+  }
+  std::set<std::string> protected_xattrs;
+  if (options_mgr_->GetValue("CVMFS_PRIVILEGED_XATTRS", &optarg)) {
+    std::vector<string> tmp = SplitString(optarg, ',');
+
+    for (size_t i = 0; i < tmp.size(); i++) {
+      protected_xattrs.insert(tmp[i]);
+    }
+
+    // only CVMFS_PRIVILEGED_XATTRS given but not CVMFS_PRIVILEGED_XATTR_GIDS
+    // --> expect that only root can access them
+    protected_xattr_gids.insert(0);
+  }
+  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility,
+                                    protected_xattrs, protected_xattr_gids);
 
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)

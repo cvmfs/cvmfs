@@ -6,6 +6,7 @@
 #define CVMFS_MAGIC_XATTR_H_
 
 #include <map>
+#include <set>
 #include <string>
 
 #include "backoff.h"
@@ -41,10 +42,26 @@ class BaseMagicXattr {
   friend class MagicXattrManager;
 
  public:
-  BaseMagicXattr() {
+  BaseMagicXattr() : is_protected_(false) {
     int retval = pthread_mutex_init(&access_mutex_, NULL);
     assert(retval == 0);
   }
+
+  /**
+   * Mark a Xattr protected so that only certain users with the correct gid
+   * can access it.
+  */
+  void MarkProtected() {
+    is_protected_ = true;
+  }
+
+
+  // TODO(hereThereBeDragons) from C++11 should be marked final
+  /**
+   * Access right check before normal fence
+  */
+  bool PrepareValueFencedProtected(uid_t uid, gid_t gid, pid_t pid);
+
   /**
   * This function is used to obtain the necessary information while
   * inside FuseRemounter::fence(), which should prevent data races.
@@ -79,6 +96,7 @@ class BaseMagicXattr {
   catalog::DirectoryEntry *dirent_;
 
   pthread_mutex_t access_mutex_;
+  bool is_protected_;
 };
 
 /**
@@ -143,7 +161,9 @@ class MagicXattrManager : public SingleCopy {
  public:
   enum EVisibility { kVisibilityAlways, kVisibilityNever, kVisibilityRootOnly };
 
-  MagicXattrManager(MountPoint *mountpoint, EVisibility visibility);
+  MagicXattrManager(MountPoint *mountpoint, EVisibility visibility,
+                    std::set<std::string> protected_xattrs,
+                    std::set<unsigned long> protected_xattr_gids);
   /// The returned BaseMagicXattr* is supposed to be wrapped by a
   /// MagicXattrRAIIWrapper
   BaseMagicXattr* GetLocked(const std::string &name, PathString path,
@@ -152,11 +172,22 @@ class MagicXattrManager : public SingleCopy {
   void Register(const std::string &name, BaseMagicXattr *magic_xattr);
 
   EVisibility visibility() { return visibility_; }
+  std::set<unsigned long> protected_xattr_gids()
+                                { return protected_xattr_gids_; }
 
  protected:
   std::map<std::string, BaseMagicXattr *> xattr_list_;
   MountPoint *mount_point_;
   EVisibility visibility_;
+  std::set<std::string> protected_xattrs_;
+  std::set<unsigned long> protected_xattr_gids_;
+
+ private:
+ /**
+   * If Xattr name is in set protected_xattrs_ mark it protected so that only
+   * certain users with the correct gid can access it.
+  */
+  void MarkProtected();
 };
 
 class AuthzMagicXattr : public BaseMagicXattr {

@@ -17,9 +17,13 @@
 #include "util/string.h"
 
 MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
-                                     EVisibility visibility)
+                                  EVisibility visibility,
+                                  std::set<std::string> protected_xattrs,
+                                  std::set<unsigned long> protected_xattr_gids)
   : mount_point_(mountpoint),
-    visibility_(visibility)
+    visibility_(visibility),
+    protected_xattrs_(protected_xattrs),
+    protected_xattr_gids_(protected_xattr_gids)
 {
   Register("user.catalog_counters", new CatalogCountersMagicXattr());
   Register("user.external_host", new ExternalHostMagicXattr());
@@ -122,6 +126,19 @@ BaseMagicXattr* MagicXattrManager::GetLocked(const std::string &name,
   return result;
 }
 
+/**
+ * Mark Xattr protected so that only certain fuse_gids' can access it.
+ * If Xattr with registered "name" is part of *protected_xattrs
+*/
+void MagicXattrManager::MarkProtected() {
+  std::map<std::string, BaseMagicXattr *>::iterator iter;
+  for (iter = xattr_list_.begin(); iter != xattr_list_.end(); iter++) {
+    if (protected_xattrs_.count(iter->first) > 0) {
+      iter->second->MarkProtected();
+    }
+  }
+}
+
 void MagicXattrManager::Register(const std::string &name,
                                  BaseMagicXattr *magic_xattr)
 {
@@ -132,6 +149,19 @@ void MagicXattrManager::Register(const std::string &name,
   }
   magic_xattr->mount_point_ = mount_point_;
   xattr_list_[name] = magic_xattr;
+
+  MarkProtected();
+}
+
+bool BaseMagicXattr::PrepareValueFencedProtected(
+                                            uid_t uid, gid_t gid, pid_t pid) {
+    if (is_protected_ &&
+        mount_point_->magic_xattr_mgr()->protected_xattr_gids().count(gid)
+                                                                        == 0) {
+      return false;
+    }
+
+    return PrepareValueFenced();
 }
 
 bool AuthzMagicXattr::PrepareValueFenced() {

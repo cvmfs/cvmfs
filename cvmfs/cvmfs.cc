@@ -1582,7 +1582,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   MagicXattrRAIIWrapper magic_xattr(mount_point_->magic_xattr_mgr()->GetLocked(
     attr, path, &d));
   if (!magic_xattr.IsNull()) {
-    magic_xattr_success = magic_xattr->PrepareValueFenced();
+    magic_xattr_success = magic_xattr->PrepareValueFencedProtected(
+      fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   }
 
   fuse_remounter_->fence()->Leave();
