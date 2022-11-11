@@ -2841,11 +2841,11 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->UpdateProxiesUnlocked("cloned");
 }
 
-void DownloadManager::SetAWSCredentials(std::string &credentials) {
+void DownloadManager::SetAWSCredentials(const std::string &credentials) {
   aws_credentials_ = std::string(credentials);
 }
 
-void DownloadManager::SetAWSRegion(std::string &region) {
+void DownloadManager::SetAWSRegion(const std::string &region) {
   aws_region_ = std::string(region);
 }
 

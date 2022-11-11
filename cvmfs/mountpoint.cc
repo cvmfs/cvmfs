@@ -1955,7 +1955,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   external_download_mgr_->SetProxyChain(
     proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
 
-  if (ptions_mgr_->GetValue("CVMFS_EXTERNAL_URL_AWS_CREDENTIALS", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL_AWS_CREDENTIALS", &optarg)) {
     external_download_mgr_->SetAWSCredentials(optarg);
   }
 
