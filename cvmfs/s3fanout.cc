@@ -531,7 +531,8 @@ string S3FanoutManager::GetUriEncode(const string &val, bool encode_slash)
  * The Amazon AWS4 authorization header according to
  * http://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
  */
-bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers, CURL *handle)
+bool S3FanoutManager::MkV4Authz(const JobInfo &info,
+     vector<string> *headers, CURL *handle)
   const
 {
   string payload_hash;
@@ -540,9 +541,11 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers, CU
     return false;
 
   CURLcode retval;
-  retval = curl_easy_setopt( handle, CURLOPT_AWS_SIGV4 , ("aws:amz:" + config_.region +":s3").c_str() );
+  retval = curl_easy_setopt(handle, CURLOPT_AWS_SIGV4,
+        ("aws:amz:" + config_.region +":s3").c_str());
   assert(retval == CURLE_OK);
-  retval = curl_easy_setopt( handle, CURLOPT_USERPWD, (config_.access_key + ":" + config_.secret_key).c_str() );
+  retval = curl_easy_setopt(handle, CURLOPT_USERPWD,
+        (config_.access_key + ":" + config_.secret_key).c_str());
   assert(retval == CURLE_OK);
 
   return true;
