@@ -67,5 +67,19 @@ cvmfs_run_test() {
   get_xattr logbuffer /cvmfs/grid.cern.ch/
   [ "x$logbuffer" != "x" ] || return 20
 
+  echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx"
+  echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx"
+  echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx"
+  list_xattrs /cvmfs/grid.cern.ch
+  echo "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"
+
+  cvmfs_umount grid.cern.ch || return 2
+
+  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no
+CVMFS_PRIVILEGED_XATTR_GIDS=0
+CVMFS_PRIVILEGED_XATTRS=user.fqrn" || return 3
+
+  list_xattrs /cvmfs/grid.cern.ch
+
   return 0
 }
