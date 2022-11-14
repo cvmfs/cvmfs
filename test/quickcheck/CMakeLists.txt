@@ -39,6 +39,8 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
+  ${CVMFS_SOURCE_DIR}/crypto/signature.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
@@ -55,11 +57,9 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/gateway_util.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
-  ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/json_document.cc
-  ${CVMFS_SOURCE_DIR}/logging.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
@@ -77,7 +77,6 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/server_tool.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
-  ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
@@ -86,21 +85,17 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/concurrency.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
+  ${CVMFS_SOURCE_DIR}/util/logging.cc
   ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
   ${CVMFS_SOURCE_DIR}/util/posix.cc
   ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
   ${CVMFS_SOURCE_DIR}/util/string.cc
-  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
   cache.pb.cc cache.pb.h
 )
-
-# Lower optimization level for this file. Xcode 9.3+ gives different results in Os and above
-if (CVMFS_BUGGY_XCODE)
-  set_property(SOURCE ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc PROPERTY COMPILE_FLAGS -O0)
-endif(CVMFS_BUGGY_XCODE)
 
 # First .h then .cc is important to avoid races during the build process
 set_source_files_properties(cache.pb.h cache.pb.cc

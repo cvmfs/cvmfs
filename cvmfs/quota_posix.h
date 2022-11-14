@@ -14,9 +14,9 @@
 #include <string>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "duplex_sqlite3.h"
 #include "gtest/gtest_prod.h"
-#include "hash.h"
 #include "quota.h"
 #include "statistics.h"
 #include "util/single_copy.h"

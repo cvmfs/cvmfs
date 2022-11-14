@@ -12,12 +12,12 @@
 #include <string>
 
 #include "compression.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "download.h"
-#include "hash.h"
 #include "quota.h"
-#include "smalloc.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

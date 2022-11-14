@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <string>
 
-#include "signature.h"
+#include "crypto/signature.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -81,6 +81,32 @@ TEST_F(T_Signature, Export) {
   unsigned signature_size;
   ASSERT_TRUE(sign_mgr_.SignRsa(buffer, 3, &signature, &signature_size));
   EXPECT_TRUE(sign_mgr_.VerifyRsa(buffer, 3, signature, signature_size));
+  free(signature);
+}
+
+TEST_F(T_Signature, GetSetKeys) {
+  sign_mgr_.GenerateMasterKeyPair();
+  sign_mgr_.GenerateCertificate("test.cvmfs.io");
+  EXPECT_TRUE(sign_mgr_.KeysMatch());
+
+  const unsigned char *buffer = reinterpret_cast<const unsigned char *>("abc");
+  unsigned char *signature;
+  unsigned signature_size;
+  EXPECT_TRUE(sign_mgr_.SignRsa(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.VerifyRsa(buffer, 3, signature, signature_size));
+  free(signature);
+  EXPECT_TRUE(sign_mgr_.Sign(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.Verify(buffer, 3, signature, signature_size));
+  free(signature);
+
+  EXPECT_TRUE(
+    sign_mgr_.LoadPrivateMasterKeyMem(sign_mgr_.GetPrivateMasterKey()));
+  EXPECT_TRUE(sign_mgr_.LoadPrivateKeyMem(sign_mgr_.GetPrivateKey()));
+  EXPECT_TRUE(sign_mgr_.SignRsa(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.VerifyRsa(buffer, 3, signature, signature_size));
+  free(signature);
+  EXPECT_TRUE(sign_mgr_.Sign(buffer, 3, &signature, &signature_size));
+  EXPECT_TRUE(sign_mgr_.Verify(buffer, 3, signature, signature_size));
   free(signature);
 }
 

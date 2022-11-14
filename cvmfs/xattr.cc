@@ -11,9 +11,9 @@
 #include <cassert>
 #include <cstring>
 
-#include "platform.h"
-#include "smalloc.h"
+#include "util/platform.h"
 #include "util/pointer.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

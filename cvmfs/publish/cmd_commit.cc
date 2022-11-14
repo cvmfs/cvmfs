@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "whitelist.h"
@@ -29,7 +29,7 @@ int CmdCommit::Main(const Options &options) {
 
   if (!options.plain_args().empty()) {
     std::vector<std::string> tokens =
-      SplitString(options.plain_args()[0].value_str, '/', 2);
+      SplitStringBounded(2, options.plain_args()[0].value_str, '/');
     fqrn = tokens[0];
   }
 

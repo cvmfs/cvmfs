@@ -13,6 +13,8 @@
 #endif
 #include <sys/wait.h>
 
+#include <cstring>
+
 #include "util/posix.h"
 #include "util/string.h"
 

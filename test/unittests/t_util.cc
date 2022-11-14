@@ -18,14 +18,14 @@
 #include <limits>
 #include <vector>
 
-#include "atomic.h"
 #include "shortstring.h"
-#include "smalloc.h"
 #include "testutil.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
 #include "util/file_guard.h"
 #include "util/mmap_file.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -1329,23 +1329,24 @@ TEST_F(T_Util, SplitString) {
   string str2 = "my::string:by:colons";
   vector<string> result;
 
-  result = SplitString(str1, ' ', 1u);
+  result = SplitStringBounded(1, str1, ' ');
   EXPECT_EQ(1u, result.size());
   EXPECT_EQ(str1, result[0]);
 
-  result = SplitString(str1, ' ', 2u);
+  result = SplitStringBounded(2, str1, ' ');
   EXPECT_EQ(2u, result.size());
   EXPECT_EQ("the", result[0]);
   EXPECT_EQ("string that will be cut in peaces", result[1]);
 
-  result = SplitString(str1, ';', 200u);
+  result = SplitStringBounded(200, str1, ';');
   EXPECT_EQ(1u, result.size());
   EXPECT_EQ(str1, result[0]);
 
-  result = SplitString(str2, ':', 200u);
+  result = SplitStringBounded(200, str2, ':');
   EXPECT_EQ(5u, result.size());
   EXPECT_EQ("", result[1]);
-  EXPECT_EQ(SplitString(str2, ':', 5u), SplitString(str2, ':', 5000u));
+  EXPECT_EQ(SplitStringBounded(5, str2, ':'),
+            SplitStringBounded(5000, str2, ':'));
 }
 
 TEST_F(T_Util, JoinStrings) {
@@ -1934,7 +1935,7 @@ TEST_F(T_Util, MemoryMappedFile) {
 
 
 TEST_F(T_Util, SetLimitNoFile) {
-  EXPECT_EQ(-1, SetLimitNoFile(100000000));
+  EXPECT_EQ(-1, SetLimitNoFile(3000000000U));
 
   struct rlimit rpl;
   memset(&rpl, 0, sizeof(rpl));
@@ -1949,7 +1950,7 @@ TEST_F(T_Util, GetLimitNoFile) {
   GetLimitNoFile(&soft_limit, &hard_limit);
   EXPECT_LT(0U, soft_limit);
   EXPECT_LE(soft_limit, hard_limit);
-  EXPECT_LT(hard_limit, 10000000U);
+  EXPECT_LT(hard_limit, 3000000000U);
 }
 
 
@@ -2015,6 +2016,35 @@ TEST_F(T_Util, DiffTree) {
   EXPECT_TRUE(DiffTree(".", "."));
   EXPECT_TRUE(DiffTree("./.", "."));
   EXPECT_FALSE(DiffTree(".", "/"));
+}
+
+TEST_F(T_Util, Bitfields) {
+  int field = 0;
+
+  SetBit(0, &field);
+  EXPECT_EQ(1, field);
+  EXPECT_TRUE(TestBit(0, field));
+  ClearBit(0, &field);
+  EXPECT_EQ(0, field);
+  EXPECT_FALSE(TestBit(0, field));
+
+  SetBit(1, &field);
+  SetBit(2, &field);
+  EXPECT_EQ(6, field);
+  EXPECT_TRUE(TestBit(2, field));
+  EXPECT_FALSE(TestBit(3, field));
+  ClearBit(3, &field);
+  EXPECT_EQ(6, field);
+  ClearBit(1, &field);
+  EXPECT_EQ(4, field);
+
+  int64_t long_field = 0;
+  SetBit(63, &long_field);
+  EXPECT_LT(long_field, static_cast<int64_t>(0));
+  EXPECT_TRUE(TestBit(63, long_field));
+  EXPECT_FALSE(TestBit(62, long_field));
+  ClearBit(63, &long_field);
+  EXPECT_EQ(0, long_field);
 }
 
 TEST(Log2Histogram, 2BinEmpty) {

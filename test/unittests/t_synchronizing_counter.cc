@@ -9,7 +9,7 @@
 
 #include <cassert>
 
-#include "util_concurrency.h"
+#include "util/concurrency.h"
 
 
 struct thread_args {
@@ -52,16 +52,8 @@ class T_SynchronizingCounter : public ::testing::Test {
 
   void JoinThreads() {
     for (unsigned int i = 0; i < n_threads_; ++i) {
-      const int killed = pthread_kill(threads_[i], 0);
-      EXPECT_EQ(ESRCH, killed) << "Thread did not exit properly";
-      if (killed != ESRCH) {
-        pthread_cancel(threads_[i]);
-      } else {
-        pthread_join(threads_[i], NULL);
-      }
+      pthread_join(threads_[i], NULL);
     }
-
-    Clear();
   }
 
   void Clear() {
@@ -179,19 +171,12 @@ TEST_F(T_SynchronizingCounter, WaitForAssignment) {
   counter = 1;
 
   StartThreads(5, &counter, thread_wait_for_assignment);
-  sleep(1);
-
-  CheckStateValues(1, "Thread didn't start properly");
-  EXPECT_EQ(1, counter.Get());
 
   counter = 0;
-  EXPECT_EQ(0, counter.Get());
-  sleep(1);
+  JoinThreads();
 
   CheckStateValues(2, "Thread didn't continue properly");
-  EXPECT_EQ(0, counter.Get());
-
-  JoinThreads();
+  Clear();
 }
 
 
@@ -257,6 +242,7 @@ TEST_F(T_SynchronizingCounter, WaitForDecrementSlow) {
   CheckStateValues(4, "Threads didn't continue properly on Decrement()");
 
   JoinThreads();
+  Clear();
 }
 
 
@@ -326,6 +312,7 @@ TEST_F(T_SynchronizingCounter, WaitForIncrementSlow) {
   CheckStateValues(4, "Threads didn't continue properly on Increment()");
 
   JoinThreads();
+  Clear();
 }
 
 

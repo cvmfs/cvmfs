@@ -11,8 +11,8 @@
 #include <unistd.h>
 
 #include "libcvmfs.h"
-#include "platform.h"
 #include "statistics.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "xattr.h"
 
@@ -640,8 +640,9 @@ TEST_P(T_FsInterface, TransferPosixToPosix) {
 
   EXPECT_TRUE(shrinkwrap::SyncFull(src, dest, statistics,
                                    platform_monotonic_time()));
-  EXPECT_TRUE(DiffTree(repo_name + "/" + dest_name,
-                       repo_name + "/" + src_name));
+  std::string srcdir = repo_name + "/" + src_name;
+  std::string destdir = repo_name + "/" + dest_name;
+  EXPECT_TRUE(DiffTree(srcdir, destdir));
 
   src->finalize(src->context_);
   dest->finalize(dest->context_);

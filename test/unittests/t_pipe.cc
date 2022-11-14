@@ -91,10 +91,10 @@ TEST_F(T_Pipe, ReadTemplate) {
   Foo              res_foobar;
   TestEnum::MyEnum res_optional;
 
-  retval = pipe.Read(&res_integer);   EXPECT_TRUE(retval);
-  retval = pipe.Read(&res_character); EXPECT_TRUE(retval);
-  retval = pipe.Read(&res_foobar);    EXPECT_TRUE(retval);
-  retval = pipe.Read(&res_optional);  EXPECT_TRUE(retval);
+  retval = pipe.TryRead(&res_integer);   EXPECT_TRUE(retval);
+  retval = pipe.TryRead(&res_character); EXPECT_TRUE(retval);
+  retval = pipe.TryRead(&res_foobar);    EXPECT_TRUE(retval);
+  retval = pipe.TryRead(&res_optional);  EXPECT_TRUE(retval);
 
   EXPECT_EQ(res_integer, integer)     << "Failed to retrieve integer";
   EXPECT_EQ(res_character, character) << "Failed to retrieve character";

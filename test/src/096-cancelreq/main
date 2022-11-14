@@ -1,0 +1,76 @@
+
+cvmfs_test_name="Cancel file system request"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_096_SILENT_PID=
+cleanup() {
+  echo "*** running cleanup()"
+  [ -z $CVMFS_TEST_096_SILENT_PID ] || sudo kill $CVMFS_TEST_096_SILENT_PID
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  local http_port=8019
+
+  echo "*** install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** mount repository"
+  cvmfs_mount cvmfs-config.cern.ch \
+    "CVMFS_TIMEOUT=5" \
+    "CVMFS_TIMEOUT_DIRECT=5" \
+    "CVMFS_MAX_RETRIES=0" || return 2
+
+  get_xattr logbuffer /cvmfs/cvmfs-config.cern.ch | grep "request canceled" && return 40
+
+  echo "*** run a silent HTTP server"
+  CVMFS_TEST_096_SILENT_PID=$(open_silent_port TCP $http_port $logfile)
+  [ $? -eq 0 ] || return 3
+  echo "silent server started with PID $CVMFS_TEST_096_SILENT_PID"
+
+  echo "*** prefix host list with unresponsive server"
+  sudo cvmfs_talk -i cvmfs-config.cern.ch proxy set DIRECT
+  sudo cvmfs_talk -i cvmfs-config.cern.ch host set \
+    "http://127.0.0.1:${http_port}/cvmfs/@fqrn@;http://cvmfs-stratum-one.cern.ch/fqrn/@fqrn@" || retval=10
+  sudo cvmfs_talk -i cvmfs-config.cern.ch proxy info
+  sudo cvmfs_talk -i cvmfs-config.cern.ch host info
+
+  local afile=$(find /cvmfs/cvmfs-config.cern.ch -type f | head -n1)
+  echo "*** read $afile, should block"
+  local nchunks=$(get_xattr chunks $afile)
+  [ $nchunks -eq 1 ] || return 5
+  local nfsopen_before=$(sudo cvmfs_talk -i cvmfs-config.cern.ch internal affairs \
+    | grep "^cvmfs.n_fs_open" | cut -d\| -f2)
+  echo "*** Number of file system open calls before opening $afile: $nfsopen_before"
+  local nioerr_before=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+  echo "*** Number of I/O errors before opening $afile: $nioerr_before"
+  cat $afile > /dev/null &
+  local pid=$!
+
+  echo "*** wait for the open call to reach cvmfs"
+  local nfsopen_after=$nfsopen_before
+  while [ $nfsopen_after -eq $nfsopen_before ]; do
+    local nfsopen_after=$(sudo cvmfs_talk -i cvmfs-config.cern.ch internal affairs \
+    | grep "^cvmfs.n_fs_open" | cut -d\| -f2)
+    sleep 1
+  done
+  echo "*** Number of file system open calls before opening $afile: $nfsopen_after"
+
+  echo "*** Killing $pid"
+  kill $pid
+
+  echo "*** wait for error to be registered"
+  local nioerr_after=$nioerr_before
+  while [ $nioerr_after -eq $nioerr_before ]; do
+    local nioerr_after=$(get_xattr nioerr /cvmfs/cvmfs-config.cern.ch)
+    sleep 1
+  done
+  echo "*** Number of I/O errors after opening $afile: $nioerr_after"
+
+  get_xattr logbuffer /cvmfs/cvmfs-config.cern.ch | grep "request canceled" || return 20
+
+  return 0
+}
+

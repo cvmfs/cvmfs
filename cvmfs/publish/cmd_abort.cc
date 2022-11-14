@@ -8,15 +8,26 @@
 #include <cstdio>
 #include <string>
 
-#include "logging.h"
 #include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "whitelist.h"
+
+namespace {
+  std::string StripTrailingPath(const std::string& repo_and_path) {
+    if (!repo_and_path.empty()) {
+      std::vector<std::string> tokens = SplitString(repo_and_path, '/');
+      return tokens[0];
+    }
+
+    return "";
+  }
+}
 
 namespace publish {
 
@@ -30,9 +41,13 @@ int CmdAbort::Main(const Options &options) {
 
   UniquePtr<SettingsPublisher> settings;
   try {
+    // Legacy behaviour is that trailing paths after the repository name should
+    // be ignored, e.g. cvmfs_server abort repo.cern.ch/some/path is equivalent
+    // to cvmfs_server abort repo.cern.ch
+    std::string repository_ident = StripTrailingPath(
+      options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
     settings = builder.CreateSettingsPublisher(
-      options.plain_args().empty() ? "" : options.plain_args()[0].value_str,
-      true /* needs_managed */);
+      repository_ident, true /* needs_managed */);
   } catch (const EPublish &e) {
     if ((e.failure() == EPublish::kFailRepositoryNotFound) ||
         (e.failure() == EPublish::kFailRepositoryType))

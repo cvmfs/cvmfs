@@ -6,8 +6,8 @@
 
 #include "json_document.h"
 #include "json_document_write.h"
-#include "platform.h"
 #include "statistics.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 
 using namespace std;  // NOLINT

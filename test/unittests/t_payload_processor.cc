@@ -6,8 +6,8 @@
 
 #include "pack.h"
 #include "receiver/payload_processor.h"
+#include "util/concurrency.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace receiver;  // NOLINT
 

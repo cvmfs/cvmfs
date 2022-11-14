@@ -8,8 +8,8 @@
 #include <cstdlib>
 
 #include "compression.h"
-#include "logging.h"
-#include "smalloc.h"
+#include "util/logging.h"
+#include "util/smalloc.h"
 
 
 /**

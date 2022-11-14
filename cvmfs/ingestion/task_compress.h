@@ -9,8 +9,8 @@
 
 #include "ingestion/item.h"
 #include "ingestion/task.h"
-#include "murmur.hxx"
 #include "smallhash.h"
+#include "util/murmur.hxx"
 #include "util/posix.h"
 
 class ItemAllocator;

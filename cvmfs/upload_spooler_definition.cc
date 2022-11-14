@@ -6,7 +6,7 @@
 
 #include <vector>
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 namespace upload {

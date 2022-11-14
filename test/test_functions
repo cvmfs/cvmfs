@@ -81,6 +81,14 @@ else
   CVMFS_PYTHON2="python2"
 fi
 
+CVMFS_SYS_PYTHON="python"
+if ! $CVMFS_SYS_PYTHON -V >/dev/null 2>&1; then
+  CVMFS_SYS_PYTHON="python3"
+  if ! $CVMFS_SYS_PYTHON -V >/dev/null 2>&1; then
+    CVMFS_SYS_PYTHON="python2"
+  fi
+fi
+
 running_on_s3() {
   [ "x$CVMFS_TEST_S3_CONFIG" != "x" ]
 }
@@ -1086,6 +1094,7 @@ open_silent_port() {
   local mock
 
   mock="${CVMFS_PYTHON2} ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
+  echo "Calling $mock" >> $logfile
 
   # Do similar fifo-trick as in run_background_service() to get the PID of the
   # actual silent_socket.py process rather than just the `sudo` around it.
@@ -2567,4 +2576,11 @@ EOF'
     /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
     /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
     /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
+}
+
+lockfile() {
+  if [ ! -x lockfile ]; then
+    gcc -Wall -o lockfile ${TEST_ROOT}/common/lockfile.c || return 10
+  fi
+  ./lockfile $1
 }

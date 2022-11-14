@@ -19,15 +19,16 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "bigqueue.h"
 #include "bigvector.h"
-#include "hash.h"
-#include "platform.h"
+#include "crypto/hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
-#include "smalloc.h"
+#include "util/atomic.h"
+#include "util/mutex.h"
+#include "util/platform.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_
@@ -35,14 +36,72 @@
 
 namespace glue {
 
+/**
+ * Inode + file type. Stores the file type in the 4 most significant bits
+ * of the 64 bit unsigned integer representing the inode.  That makes the class
+ * compatible with a pure 64bit inode used in previous cvmfs versions in the
+ * inode tracker.  The file type is stored using the POSIX representation in
+ * the inode's mode field.
+ * Note that InodeEx, used as a hash table key, hashes only over the inode part.
+ */
+class InodeEx {
+ private:
+  // Extracts the file type bits from the POSIX mode field and shifts them to
+  // the right so that they align with EFileType constants.
+  static inline uint64_t ShiftMode(unsigned mode) { return (mode >> 12) & 017; }
+
+ public:
+  enum EFileType {
+    kUnknownType = 0,
+    kRegular     = 010,
+    kSymlink     = 012,
+    kDirectory   = 004,
+    kFifo        = 001,
+    kSocket      = 014,
+    kCharDev     = 002,
+    kBulkDev     = 006,
+  };
+
+  InodeEx() : inode_ex_(0) { }
+  InodeEx(uint64_t inode, EFileType type)
+    : inode_ex_(inode | (static_cast<uint64_t>(type) << 60))
+  { }
+  InodeEx(uint64_t inode, unsigned mode)
+    : inode_ex_(inode | (ShiftMode(mode) << 60))
+  { }
+
+  inline uint64_t GetInode() const { return inode_ex_ & ~(uint64_t(15) << 60); }
+  inline EFileType GetFileType() const {
+    return static_cast<EFileType>(inode_ex_ >> 60);
+  }
+
+  inline bool operator==(const InodeEx &other) const {
+    return GetInode() == other.GetInode();
+  }
+  inline bool operator!=(const InodeEx &other) const {
+    return GetInode() != other.GetInode();
+  }
+
+  inline bool IsCompatibleFileType(unsigned mode) const {
+    return (static_cast<uint64_t>(GetFileType()) == ShiftMode(mode)) ||
+           (GetFileType() == kUnknownType);
+  }
+
+ private:
+  uint64_t inode_ex_;
+};
+
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
   return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
-
 static inline uint32_t hasher_inode(const uint64_t &inode) {
   return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
+}
+
+static inline uint32_t hasher_inode_ex(const InodeEx &inode_ex) {
+  return hasher_inode(inode_ex.GetInode());
 }
 
 
@@ -312,6 +371,42 @@ class PathStore {
 //------------------------------------------------------------------------------
 
 
+/**
+ * A vector of stat structs. When removing items, the empty slot is swapped
+ * with the last element so that there are no gaps in the vector.  The memory
+ * allocation of the vector grows and shrinks with the size.
+ * Removal of items returns the inode of the element swapped with the gap so
+ * that the page entry tracker can update its index.
+ */
+class StatStore {
+ public:
+  int32_t Add(const struct stat &info) {
+    // We don't support more that 2B open files
+    assert(store_.size() < (1LU << 31));
+    int32_t index = static_cast<int>(store_.size());
+    store_.PushBack(info);
+    return index;
+  }
+
+  // Note that that if the last element is removed, no swap has taken place
+  uint64_t Erase(int32_t index) {
+    struct stat info_back = store_.At(store_.size() - 1);
+    store_.Replace(index, info_back);
+    store_.SetSize(store_.size() - 1);
+    store_.ShrinkIfOversized();
+    return info_back.st_ino;
+  }
+
+  struct stat Get(int32_t index) const { return store_.At(index); }
+
+ private:
+  BigVector<struct stat> store_;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class PathMap {
  public:
   PathMap() {
@@ -355,6 +450,10 @@ class PathMap {
     }
   }
 
+  void Replace(const shash::Md5 &md5path, uint64_t new_inode) {
+    map_.Insert(md5path, new_inode);
+  }
+
   void Clear() {
     map_.Clear();
     path_store_.Clear();
@@ -372,29 +471,33 @@ class PathMap {
 //------------------------------------------------------------------------------
 
 
-class InodeMap {
+/**
+ * This class has the same memory layout than the previous "InodeMap" class,
+ * therefore there is no data structure migration during reload required.
+ */
+class InodeExMap {
  public:
-  InodeMap() {
-    map_.Init(16, 0, hasher_inode);
+  InodeExMap() {
+    map_.Init(16, InodeEx(), hasher_inode_ex);
   }
 
-  bool LookupMd5Path(const uint64_t inode, shash::Md5 *md5path) {
-    bool found = map_.Lookup(inode, md5path);
+  bool LookupMd5Path(InodeEx *inode_ex, shash::Md5 *md5path) {
+    bool found = map_.LookupEx(inode_ex, md5path);
     return found;
   }
 
-  void Insert(const uint64_t inode, const shash::Md5 &md5path) {
-    map_.Insert(inode, md5path);
+  void Insert(const InodeEx inode_ex, const shash::Md5 &md5path) {
+    map_.Insert(inode_ex, md5path);
   }
 
   void Erase(const uint64_t inode) {
-    map_.Erase(inode);
+    map_.Erase(InodeEx(inode, InodeEx::kUnknownType));
   }
 
   void Clear() { map_.Clear(); }
 
  private:
-  SmallHashDynamic<uint64_t, shash::Md5> map_;
+  SmallHashDynamic<InodeEx, shash::Md5> map_;
 };
 
 
@@ -427,7 +530,12 @@ class InodeReferences {
   bool Put(const uint64_t inode, const uint32_t by) {
     uint32_t refcounter;
     bool found = map_.Lookup(inode, &refcounter);
-    assert(found);
+    if (!found) {
+      // May happen if a retired inode is cleared, i.e. if a file with
+      // outdated content is closed
+      return false;
+    }
+
     assert(refcounter >= by);
     if (refcounter == by) {
       map_.Erase(inode);
@@ -436,6 +544,11 @@ class InodeReferences {
     refcounter -= by;
     map_.Insert(inode, refcounter);
     return false;
+  }
+
+  void Replace(const uint64_t old_inode, const uint64_t new_inode) {
+    map_.Erase(old_inode);
+    map_.Insert(new_inode, 0);
   }
 
   void Clear() {
@@ -487,6 +600,39 @@ class InodeTracker {
     InodeReferences::Cursor csr_inos;
   };
 
+  /**
+   * To avoid taking the InodeTracker mutex multiple times, the fuse
+   * forget_multi callback releases inodes references through this RAII object.
+   * Copy and assign operator should be deleted but that would require
+   * all compilers to use RVO. TODO(jblomer): fix with C++11
+   */
+  class VfsPutRaii {
+   public:
+    explicit VfsPutRaii(InodeTracker *t) : tracker_(t) {
+      tracker_->Lock();
+    }
+    ~VfsPutRaii() { tracker_->Unlock(); }
+
+    bool VfsPut(const uint64_t inode, const uint32_t by) {
+      bool removed = tracker_->inode_references_.Put(inode, by);
+      if (removed) {
+        // TODO(jblomer): pop operation (Lookup+Erase)
+        shash::Md5 md5path;
+        InodeEx inode_ex(inode, InodeEx::kUnknownType);
+        bool found = tracker_->inode_ex_map_.LookupMd5Path(&inode_ex, &md5path);
+        assert(found);
+        tracker_->inode_ex_map_.Erase(inode);
+        tracker_->path_map_.Erase(md5path);
+        atomic_inc64(&tracker_->statistics_.num_removes);
+      }
+      atomic_xadd64(&tracker_->statistics_.num_references, -int32_t(by));
+      return removed;
+    }
+
+   private:
+    InodeTracker *tracker_;
+  };
+
   // Cannot be moved to the statistics manager because it has to survive
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
@@ -521,42 +667,30 @@ class InodeTracker {
   InodeTracker &operator= (const InodeTracker &other);
   ~InodeTracker();
 
-  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
+  void VfsGetBy(const InodeEx inode_ex, const uint32_t by,
+                const PathString &path)
   {
+    uint64_t inode = inode_ex.GetInode();
     Lock();
-    bool new_inode = inode_references_.Get(inode, by);
+    bool is_new_inode = inode_references_.Get(inode, by);
     shash::Md5 md5path = path_map_.Insert(path, inode);
-    inode_map_.Insert(inode, md5path);
+    inode_ex_map_.Insert(inode_ex, md5path);
     Unlock();
 
     atomic_xadd64(&statistics_.num_references, by);
-    if (new_inode) atomic_inc64(&statistics_.num_inserts);
+    if (is_new_inode) atomic_inc64(&statistics_.num_inserts);
   }
 
-  void VfsGet(const uint64_t inode, const PathString &path) {
-    VfsGetBy(inode, 1, path);
+  void VfsGet(const InodeEx inode_ex, const PathString &path) {
+    VfsGetBy(inode_ex, 1, path);
   }
 
-  void VfsPut(const uint64_t inode, const uint32_t by) {
-    Lock();
-    bool removed = inode_references_.Put(inode, by);
-    if (removed) {
-      // TODO(jblomer): pop operation (Lookup+Erase)
-      shash::Md5 md5path;
-      bool found = inode_map_.LookupMd5Path(inode, &md5path);
-      assert(found);
-      inode_map_.Erase(inode);
-      path_map_.Erase(md5path);
-      atomic_inc64(&statistics_.num_removes);
-    }
-    Unlock();
-    atomic_xadd64(&statistics_.num_references, -int32_t(by));
-  }
+  VfsPutRaii GetVfsPutRaii() { return VfsPutRaii(this); }
 
-  bool FindPath(const uint64_t inode, PathString *path) {
+  bool FindPath(InodeEx *inode_ex, PathString *path) {
     Lock();
     shash::Md5 md5path;
-    bool found = inode_map_.LookupMd5Path(inode, &md5path);
+    bool found = inode_ex_map_.LookupMd5Path(inode_ex, &md5path);
     if (found) {
       found = path_map_.LookupPath(md5path, path);
       assert(found);
@@ -577,6 +711,43 @@ class InodeTracker {
     Unlock();
     atomic_inc64(&statistics_.num_hits_inode);
     return inode;
+  }
+
+  bool FindDentry(uint64_t ino, uint64_t *parent_ino, NameString *name) {
+    PathString path;
+    InodeEx inodex(ino, InodeEx::kUnknownType);
+    shash::Md5 md5path;
+
+    Lock();
+    bool found = inode_ex_map_.LookupMd5Path(&inodex, &md5path);
+    if (found) {
+      found = path_map_.LookupPath(md5path, &path);
+      assert(found);
+      *name = GetFileName(path);
+      path = GetParentPath(path);
+      *parent_ino = path_map_.LookupInodeByPath(path);
+    }
+    Unlock();
+    return found;
+  }
+
+  /**
+   * The new inode has reference counter 0. Returns true if the inode was
+   * found and replaced
+   */
+  bool ReplaceInode(uint64_t old_inode, const InodeEx &new_inode) {
+    shash::Md5 md5path;
+    InodeEx old_inode_ex(old_inode, InodeEx::kUnknownType);
+    Lock();
+    bool found = inode_ex_map_.LookupMd5Path(&old_inode_ex, &md5path);
+    if (found) {
+      inode_references_.Replace(old_inode, new_inode.GetInode());
+      path_map_.Replace(md5path, new_inode.GetInode());
+      inode_ex_map_.Erase(old_inode);
+      inode_ex_map_.Insert(new_inode, md5path);
+    }
+    Unlock();
+    return found;
   }
 
   Cursor BeginEnumerate() {
@@ -625,17 +796,18 @@ class InodeTracker {
   unsigned version_;
   pthread_mutex_t *lock_;
   PathMap path_map_;
-  InodeMap inode_map_;
+  InodeExMap inode_ex_map_;
   InodeReferences inode_references_;
   Statistics statistics_;
 };  // class InodeTracker
 
 
 /**
- * Tracks fuse negative cache replies for active cache eviction
+ * Tracks fuse name lookup replies for active cache eviction.
+ * Class renamed from previous name NentryTracker
  */
-class NentryTracker {
-  FRIEND_TEST(T_GlueBuffer, NentryTracker);
+class DentryTracker {
+  FRIEND_TEST(T_GlueBuffer, DentryTracker);
 
  private:
   struct Entry {
@@ -661,23 +833,23 @@ class NentryTracker {
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics() : num_insert(0), num_remove(0), num_prune(0) {}
-    uint64_t num_insert;
-    uint64_t num_remove;
-    uint64_t num_prune;
+    int64_t num_insert;
+    int64_t num_remove;
+    int64_t num_prune;
   };
   Statistics GetStatistics() { return statistics_; }
 
   static void *MainCleaner(void *data);
 
-  NentryTracker();
-  explicit NentryTracker(const NentryTracker &other);
-  NentryTracker &operator= (const NentryTracker &other);
-  ~NentryTracker();
+  DentryTracker();
+  DentryTracker(const DentryTracker &other);
+  DentryTracker &operator= (const DentryTracker &other);
+  ~DentryTracker();
 
   /**
    * Lock object during copy
    */
-  NentryTracker *Move();
+  DentryTracker *Move();
 
   void Add(const uint64_t inode_parent, const char *name, uint64_t timeout_s) {
     if (!is_active_) return;
@@ -708,7 +880,7 @@ class NentryTracker {
  private:
   static const unsigned kVersion = 0;
 
-  void CopyFrom(const NentryTracker &other);
+  void CopyFrom(const DentryTracker &other);
 
   void InitLock();
   inline void Lock() const {
@@ -740,7 +912,155 @@ class NentryTracker {
   int pipe_terminate_[2];
   int cleaning_interval_ms_;
   pthread_t thread_cleaner_;
-};  // class NentryTracker
+};  // class DentryTracker
+
+/**
+ * Tracks the content hash associated to inodes of regular files whose content
+ * may be in the page cache. It is used in cvmfs_open() and cvmfs_close().
+ */
+class PageCacheTracker {
+ private:
+  struct Entry {
+    Entry() : nopen(0), idx_stat(-1) {}
+    Entry(int32_t n, int32_t i, const shash::Any &h)
+      : nopen(n), idx_stat(i), hash(h) {}
+    /**
+     * Reference counter for currently open files with a given inode. If the
+     * sign bit is set, the entry is in the transition phase from one hash to
+     * another. The sign will be cleared on Close() in this case.
+     */
+    int32_t nopen;
+    /**
+     * Points into the list of stat structs; >= 0 only for open files.
+     */
+    int32_t idx_stat;
+    /**
+     * The content hash of the data stored in the page cache. For chunked files,
+     * hash contains an artificial hash over all the chunk hash values.
+     */
+    shash::Any hash;
+  };
+
+ public:
+  /**
+   * In the fuse file handle, use bit 62 to indicate that the file was opened
+   * with a direct I/O setting and cvmfs_release() should not call Close().
+   * Note that the sign bit (bit 63) indicates chunked files.
+   */
+  static const unsigned int kBitDirectIo = 62;
+
+  /**
+   * Instruct cvmfs_open() on how to handle the page cache.
+   */
+  struct OpenDirectives {
+    /**
+     * Flush the page cache; logically, the flush takes place some time between
+     * cvmfs_open() and cvmfs_close().  That's important in case we have two
+     * open() calls on stale page cache data.
+     */
+    bool keep_cache;
+    /**
+     * Don't use the page cache at all (neither write nor read). If this is set
+     * on cvmfs_open(), don't call Close() on cvmfs_close().
+     * Direct I/O prevents shared mmap on the file. Private mmap, however,
+     * which includes loading binaries, still works.
+     */
+    bool direct_io;
+
+    // Defaults to the old (pre v2.10) behavior: always flush the cache, never
+    // use direct I/O.
+    OpenDirectives() : keep_cache(false), direct_io(false) {}
+
+    OpenDirectives(bool k, bool d) : keep_cache(k), direct_io(d) {}
+  };
+
+  /**
+   * To avoid taking the PageCacheTracker mutex multiple times, the
+   * fuse forget_multi callback evicts inodes through this RAII object.
+   * Copy and assign operator should be deleted but that would require
+   * all compilers to use RVO. TODO(jblomer): fix with C++11
+   */
+  class EvictRaii {
+   public:
+    explicit EvictRaii(PageCacheTracker *t);
+    ~EvictRaii();
+    void Evict(uint64_t inode);
+
+   private:
+    PageCacheTracker *tracker_;
+  };
+
+  // Cannot be moved to the statistics manager because it has to survive
+  // reloads.  Added manually in the fuse module initialization and in talk.cc.
+  struct Statistics {
+    Statistics()
+      : n_insert(0)
+      , n_remove(0)
+      , n_open_direct(0)
+      , n_open_flush(0)
+      , n_open_cached(0)
+    {}
+    uint64_t n_insert;
+    uint64_t n_remove;
+    uint64_t n_open_direct;
+    uint64_t n_open_flush;
+    uint64_t n_open_cached;
+  };
+  Statistics GetStatistics() { return statistics_; }
+
+  PageCacheTracker();
+  explicit PageCacheTracker(const PageCacheTracker &other);
+  PageCacheTracker &operator= (const PageCacheTracker &other);
+  ~PageCacheTracker();
+
+  OpenDirectives Open(uint64_t inode, const shash::Any &hash,
+                      const struct stat &info);
+  /**
+   * Forced direct I/O open. Used when the corresponding flag is set in the
+   * file catalogs. In this case, we don't need to track the inode.
+   */
+  OpenDirectives OpenDirect();
+  void Close(uint64_t inode);
+
+  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash, struct stat *info)
+  {
+    MutexLockGuard guard(lock_);
+    Entry entry;
+    bool retval = map_.Lookup(inode, &entry);
+    if (retval && (entry.nopen != 0)) {
+      assert(entry.idx_stat >= 0);
+      *hash = entry.hash;
+      if (info != NULL)
+        *info = stat_store_.Get(entry.idx_stat);
+      return true;
+    }
+    return false;
+  }
+
+  EvictRaii GetEvictRaii() { return EvictRaii(this); }
+
+  // Used in RestoreState to prevent using the page cache tracker from a
+  // previous version after hotpatch
+  void Disable() { is_active_ = false; }
+
+ private:
+  static const unsigned kVersion = 0;
+
+  void InitLock();
+  void CopyFrom(const PageCacheTracker &other);
+
+  pthread_mutex_t *lock_;
+  unsigned version_;
+  /**
+   * The page cache tracker only works correctly if it is used from the start
+   * of the mount. If the instance is hot-patched from a previous version, the
+   * page cache tracker remains turned off.
+   */
+  bool is_active_;
+  Statistics statistics_;
+  SmallHashDynamic<uint64_t, Entry> map_;
+  StatStore stat_store_;
+};
 
 
 }  // namespace glue

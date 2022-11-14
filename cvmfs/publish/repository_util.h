@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/single_copy.h"
 
 namespace publish {

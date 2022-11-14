@@ -9,7 +9,7 @@
 
 #include "util.h"
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "libcvmfs.h"
 #include "xattr.h"
 

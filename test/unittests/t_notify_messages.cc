@@ -6,7 +6,7 @@
 
 #include "notify/messages.h"
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 class T_Messages : public ::testing::Test {};

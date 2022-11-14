@@ -10,11 +10,11 @@
 #include <string>
 #include <vector>
 
+#include "crypto/signature.h"
 #include "download.h"
 #include "manifest_fetch.h"
 #include "reflog.h"
 #include "server_tool.h"
-#include "signature.h"
 #include "statistics.h"
 #include "util/shared_ptr.h"
 

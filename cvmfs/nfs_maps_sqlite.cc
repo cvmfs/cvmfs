@@ -22,15 +22,15 @@
 #include <cstddef>
 #include <cstdlib>
 
-#include "logging.h"
-#include "prng.h"
-#include "smalloc.h"
 #include "statistics.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/prng.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

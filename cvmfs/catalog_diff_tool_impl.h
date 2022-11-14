@@ -9,10 +9,10 @@
 #include <string>
 
 #include "catalog.h"
+#include "crypto/hash.h"
 #include "download.h"
-#include "hash.h"
-#include "logging.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 const uint64_t kLastInode = uint64_t(-1);

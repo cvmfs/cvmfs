@@ -18,10 +18,19 @@ Homepage: http://cernvm.cern.ch
 Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
 
+Package: cvmfs-libs
+Architecture: i386 amd64 armhf arm64
+#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
+Depends: ${misc:Depends}
+#Multi-Arch: same   (preparation for multiarch support)
+Homepage: http://cernvm.cern.ch
+Description: CernVM-FS common libraries
+ Common utility libraries for CernVM-FS packages.
+
 Package: cvmfs-server
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: psmisc, curl, attr, openssl, libcap2, libcap2-bin, lsof, rsync, jq, usbutils, sqlite3, ${misc:Depends}
+Depends: psmisc, curl, attr, openssl, libcap2, libcap2-bin, lsof, rsync, jq, usbutils, sqlite3, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
 Recommends: apache2
 Conflicts: cvmfs-server (<< 2.1)
 #Multi-Arch: same   (preparation for multiarch support)

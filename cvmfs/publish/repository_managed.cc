@@ -7,7 +7,7 @@
 
 #include <cstdio>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"

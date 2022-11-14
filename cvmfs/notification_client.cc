@@ -7,14 +7,14 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
+#include "crypto/signature.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "notify/messages.h"
 #include "notify/subscriber_sse.h"
 #include "notify/subscriber_supervisor.h"
-#include "signature.h"
 #include "supervisor.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 namespace {

@@ -6,10 +6,10 @@
 
 #include "cvmfs_config.h"
 
+#include "crypto/hash.h"
 #include "gateway_util.h"
-#include "hash.h"
 #include "json_document.h"
-#include "logging.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/string.h"
 

@@ -15,11 +15,11 @@
 #include <map>
 #include <string>
 
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "duplex_libarchive.h"
 #include "file_chunk.h"
-#include "hash.h"
-#include "platform.h"
+#include "util/platform.h"
 #include "util/shared_ptr.h"
 
 class IngestionSource;

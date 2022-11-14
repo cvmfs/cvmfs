@@ -18,9 +18,12 @@ get_chunk_count() {
 }
 
 CVMFS_TEST_615_HTTP_PID=
+CVMFS_TEST_615_REPLICA_NAME=
 cleanup() {
   echo "running cleanup()"
   [ -z $CVMFS_TEST_615_HTTP_PID ] || sudo kill $CVMFS_TEST_615_HTTP_PID
+  [ -z $CVMFS_TEST_615_REPLICA_NAME ] || \
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_615_REPLICA_NAME > /dev/null 2>&1
 }
 
 cvmfs_run_test() {
@@ -201,6 +204,19 @@ cvmfs_run_test() {
     echo "External file ${repo_dir}/external/file appears to be using internal data."
     return 57
   fi
+
+  ##############################################################################
+
+  echo "*** Create snapshot of repository with external data"
+  CVMFS_TEST_615_REPLICA_NAME="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  create_stratum1 $CVMFS_TEST_615_REPLICA_NAME          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 110
+  sudo cvmfs_server snapshot $CVMFS_TEST_615_REPLICA_NAME || return 111
+  echo "*** Check integrity of replica"
+  check_repository $CVMFS_TEST_615_REPLICA_NAME -i || return 112
+
 
   ##############################################################################
 

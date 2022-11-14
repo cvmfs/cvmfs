@@ -11,12 +11,12 @@
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "directory_entry.h"
-#include "logging.h"
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 
@@ -88,7 +88,8 @@ void Publisher::TransactionImpl() {
       "/" + settings_.transaction().lease_path());
     catalog::SimpleCatalogManager *catalog_mgr = GetSimpleCatalogManager();
     catalog::DirectoryEntry dirent;
-    bool retval = catalog_mgr->LookupPath(path, catalog::kLookupSole, &dirent);
+    bool retval = catalog_mgr->LookupPath(path, catalog::kLookupDefault,
+                                          &dirent);
     if (!retval) {
       throw EPublish("cannot open transaction on non-existing path " + path,
                      EPublish::kFailLeaseNoEntry);

@@ -50,13 +50,13 @@
 #include <string>
 #include <vector>
 
-#include "fs_traversal.h"
-#include "logging.h"
-#include "platform.h"
 #include "util/algorithm.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/fs_traversal.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 //using namespace std;  // NOLINT
 
@@ -140,24 +140,6 @@ std::string GetParentPath(const std::string &path) {
 /**
  * Gets the file name part of a path.
  */
-PathString GetParentPath(const PathString &path) {
-  int length = static_cast<int>(path.GetLength());
-  if (length == 0)
-    return path;
-  const char *chars  = path.GetChars();
-
-  for (int i = length-1; i >= 0; --i) {
-    if (chars[i] == '/')
-      return PathString(chars, i);
-  }
-
-  return path;
-}
-
-
-/**
- * Gets the file name part of a path.
- */
 std::string GetFileName(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
   if (idx != std::string::npos) {
@@ -165,25 +147,6 @@ std::string GetFileName(const std::string &path) {
   } else {
     return path;
   }
-}
-
-
-NameString GetFileName(const PathString &path) {
-  NameString name;
-  int length = static_cast<int>(path.GetLength());
-  const char *chars  = path.GetChars();
-
-  int i;
-  for (i = length-1; i >= 0; --i) {
-    if (chars[i] == '/')
-      break;
-  }
-  i++;
-  if (i < length) {
-    name.Append(chars+i, length-i);
-  }
-
-  return name;
 }
 
 
@@ -646,7 +609,7 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
     if ((info_a.st_mode != info_b.st_mode) ||
         (info_a.st_uid != info_b.st_uid) ||
         (info_a.st_gid != info_b.st_gid) ||
-        (info_a.st_size != info_b.st_size))
+        ((info_a.st_size != info_b.st_size) && !S_ISDIR(info_a.st_mode)))
     {
       return false;
     }
@@ -1898,8 +1861,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
   // read the PID of the spawned process if requested
   // (the actual read needs to be done in any case!)
   pid_t buf_child_pid = 0;
-  retcode = pipe_fork.Read(&buf_child_pid);
-  assert(retcode);
+  pipe_fork.Read(&buf_child_pid);
   if (child_pid != NULL)
     *child_pid = buf_child_pid;
   close(pipe_fork.read_end);

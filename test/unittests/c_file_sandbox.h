@@ -12,9 +12,9 @@
 #include <string>
 #include <utility>
 
-#include "hash.h"
-#include "prng.h"
+#include "crypto/hash.h"
 #include "util/posix.h"
+#include "util/prng.h"
 
 class FileSandbox : public ::testing::Test {
  public:

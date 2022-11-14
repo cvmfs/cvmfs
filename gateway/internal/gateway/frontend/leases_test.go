@@ -84,7 +84,6 @@ func TestLeaseHandlerCommitLease(t *testing.T) {
 		"old_root_hash":   "abcdef",
 		"new_root_hash":   "defabc",
 		"tag_name":        "tag1",
-		"tag_channel":     "main",
 		"tag_description": "this is a tag",
 	})
 

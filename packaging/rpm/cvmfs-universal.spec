@@ -43,19 +43,12 @@
 %define build_fuse3 1
 %endif
 
-%define cvmfs_python python
-%define cvmfs_python_devel python-devel
-%define cvmfs_python_setuptools python-setuptools
-%if 0%{?el8} || 0%{?fedora} >= 31
-%define cvmfs_python python2
-%define cvmfs_python_devel python2-devel
-%define cvmfs_python_setuptools python2-setuptools
-%endif
-# On SLES15, we need the python2 interpreter but python3 devel and setuptools
-# TODO(jblomer): upgrade all python components to Python3
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
 %define cvmfs_python_devel python3-devel
 %define cvmfs_python_setuptools python3-setuptools
+%else
+%define cvmfs_python_devel python-devel
+%define cvmfs_python_setuptools python-setuptools
 %endif
 
 %define cvmfs_go golang
@@ -64,7 +57,7 @@
 %endif
 
 %define hardlink /usr/sbin/hardlink
-%if 0%{?fedora} >= 31
+%if 0%{?fedora} >= 31 || 0%{?rhel} >= 9
 %define hardlink /usr/bin/hardlink
 %endif
 
@@ -76,7 +69,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.10.0
+Version: 2.11.0
 Release: 1%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
@@ -148,7 +141,9 @@ Requires: sysvinit
 Requires: sysvinit-tools
   %endif
 %else
+%if 0%{?el7}%{?el8}%{?suse_version}
 Requires: chkconfig
+%endif
 Requires: fuse-libs
 Requires: glibc-common
 Requires: which
@@ -188,6 +183,11 @@ Requires(postun):       /usr/sbin/semodule
 HTTP File System for Distributing Software to CernVM.
 See http://cernvm.cern.ch
 Copyright (c) CERN
+
+%package libs
+Summary: CernVM-FS common libraries
+%description libs
+Common utility libraries for CernVM-FS packages
 
 %if 0%{?build_fuse3}
 %package fuse3
@@ -249,6 +249,7 @@ Requires: jq
 Requires(post): /usr/sbin/semanage
 Requires(postun): /usr/sbin/semanage
 %endif
+Requires: cvmfs-libs = %{version}
 
 Conflicts: cvmfs-server < 2.1
 
@@ -407,6 +408,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
 mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
 mkdir -p $RPM_BUILD_ROOT/usr/share/cvmfs-server
+mkdir -p $RPM_BUILD_ROOT/var/log/cvmfs
 
 # Keys and configs are in cvmfs-config
 rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
@@ -485,6 +487,9 @@ if [ -d /var/run/cvmfs ]; then
 fi
 :
 
+%post libs
+/sbin/ldconfig
+
 %if 0%{?build_fuse3}
 %post fuse3
 /sbin/ldconfig
@@ -495,6 +500,7 @@ fi
 %if 0%{?selinux_cvmfs_server}
 # Port 8000 is also assigned to soundd (CVM-1308)
 /usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
+restorecon -R /var/log/cvmfs
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
@@ -560,6 +566,9 @@ fi
 %endif
 /sbin/ldconfig
 
+%postun libs
+/sbin/ldconfig
+
 %if 0%{?build_gateway}
 %postun gateway
 systemctl daemon-reload
@@ -603,6 +612,18 @@ systemctl daemon-reload
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
 
+%files libs
+%defattr(-,root,root)
+%{_libdir}/libcvmfs_crypto.so
+%{_libdir}/libcvmfs_crypto.so.%{version}
+%{_libdir}/libcvmfs_crypto_debug.so
+%{_libdir}/libcvmfs_crypto_debug.so.%{version}
+%{_libdir}/libcvmfs_util.so
+%{_libdir}/libcvmfs_util.so.%{version}
+%{_libdir}/libcvmfs_util_debug.so
+%{_libdir}/libcvmfs_util_debug.so.%{version}
+%doc COPYING AUTHORS README.md ChangeLog
+
 %if 0%{?build_fuse3}
 %files fuse3
 %defattr(-,root,root)
@@ -640,6 +661,7 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_server_debug.so.%{version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
+%dir /var/log/cvmfs
 /var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
 /var/lib/cvmfs-server/
@@ -679,6 +701,8 @@ systemctl daemon-reload
 %endif
 
 %changelog
+* Mon May 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.10.0
+- Add /var/log/cvmfs to cvmfs-server package, set its SElinux label
 * Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
 - Remove version requirement from selinux-policy dependency
 * Wed Sep 29 2021 Andrea Valenzuela <andrea.valenzuela.ramirez@cern.ch> - 2.9.0

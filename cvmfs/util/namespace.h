@@ -12,6 +12,8 @@
 
 #include <string>
 
+#include "util/export.h"
+
 const int kNsFeatureMount         = 0x01;
 const int kNsFeaturePid           = 0x02;
 const int kNsFeatureUserAvailable = 0x04;
@@ -29,13 +31,14 @@ enum NamespaceFailures {
   kFailNsMapGidWrite,
 };
 
-int CheckNamespaceFeatures();
+CVMFS_EXPORT int CheckNamespaceFeatures();
 
+CVMFS_EXPORT
 NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to);
-bool CreateMountNamespace();
-bool CreatePidNamespace(int *fd_parent);
+CVMFS_EXPORT bool CreateMountNamespace();
+CVMFS_EXPORT bool CreatePidNamespace(int *fd_parent);
 
-bool BindMount(const std::string &from, const std::string &to);
-bool ProcMount(const std::string &to);
+CVMFS_EXPORT bool BindMount(const std::string &from, const std::string &to);
+CVMFS_EXPORT bool ProcMount(const std::string &to);
 
 #endif  // CVMFS_UTIL_NAMESPACE_H_

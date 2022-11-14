@@ -11,9 +11,9 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "logging.h"
 #include "publish/except.h"
-#include "smalloc.h"
+#include "util/logging.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

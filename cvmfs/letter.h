@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 
 namespace signature {
 class SignatureManager;

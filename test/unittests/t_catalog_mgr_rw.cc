@@ -122,12 +122,12 @@ TEST_F(T_CatalogMgrRw, CloneTree) {
 
   DirectoryEntry dirent;
   EXPECT_TRUE(catalog_mgr->LookupPath("/clone/dir/dir/dir/file1",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_STREQ(g_hashes[0], dirent.checksum().ToString().c_str());
   EXPECT_EQ(g_file_size, dirent.size());
 
   EXPECT_TRUE(catalog_mgr->LookupPath("/clone/dir/dir",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_TRUE(dirent.IsNestedCatalogRoot());
 }
 
@@ -157,7 +157,7 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalog) {
   catalog_mgr->DetachNested();
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size);
   EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file1",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_STREQ(g_hashes[6], dirent.checksum().ToString().c_str());
 
   // Swap sub1 and sub2
@@ -165,10 +165,10 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalog) {
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1", sub2_hash, sub2_size);
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub2", sub1_hash, sub1_size);
   EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file2",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_STREQ(g_hashes[7], dirent.checksum().ToString().c_str());
   EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub2/file1",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_STREQ(g_hashes[6], dirent.checksum().ToString().c_str());
 }
 
@@ -211,12 +211,13 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalogFailSlow) {
                                               sub1_hash, sub1_size),
                "not found in parent");
 
-  // Fail for nested catalog that is already attached
+  // Fail for nested catalog that is already attached and modified
   EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
                                         &path, &sub1_hash, &sub1_size));
+  catalog_mgr->RemoveFile("dir/dir/dir/sub1/file1");
   EXPECT_DEATH(catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1",
                                               sub1_hash, sub1_size),
-               "already attached");
+               "already modified");
 
   // Fail for non-existent catalog
   catalog_mgr->DetachNested();

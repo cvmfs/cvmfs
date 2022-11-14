@@ -7,8 +7,8 @@
 
 #include <vector>
 
+#include "util/concurrency.h"
 #include "util/shared_ptr.h"
-#include "util_concurrency.h"
 
 namespace upload {
 

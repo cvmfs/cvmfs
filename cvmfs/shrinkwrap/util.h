@@ -4,7 +4,7 @@
 #ifndef CVMFS_SHRINKWRAP_UTIL_H_
 #define CVMFS_SHRINKWRAP_UTIL_H_
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "libcvmfs.h"
 
 shash::Any HashMeta(const struct cvmfs_attr *stat_info);

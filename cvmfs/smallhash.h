@@ -20,10 +20,10 @@
 #include <cstdlib>
 #include <new>
 
-#include "atomic.h"
-#include "murmur.hxx"
-#include "prng.h"
-#include "smalloc.h"
+#include "util/atomic.h"
+#include "util/murmur.hxx"
+#include "util/prng.h"
+#include "util/smalloc.h"
 
 /**
  * Hash table with linear probing as collision resolution.  Works only for
@@ -79,6 +79,26 @@ class SmallHashBase {
     return found;
   }
 
+  /**
+   * Returns both the key and the value. That is useful if Key's equality
+   * operator implements an equivalence relation on Key. In this case, LookupEx
+   * returns the key representing the equivalance class that has been used
+   * during Insert().
+   * Used to return a glue::InodeEx element when looking for an inode.
+   */
+  bool LookupEx(Key *key, Value *value) const {
+    uint32_t bucket = ScaleHash(*key);
+    while (!(keys_[bucket] == empty_key_)) {
+      if (keys_[bucket] == *key) {
+        *key = keys_[bucket];
+        *value = values_[bucket];
+        return true;
+      }
+      bucket = (bucket + 1) % capacity_;
+    }
+    return false;
+  }
+
   bool Contains(const Key &key) const {
     uint32_t bucket;
     uint32_t collisions;
@@ -92,7 +112,7 @@ class SmallHashBase {
     size_ += !overwritten;  // size + 1 if the key was not yet in the map
   }
 
-  void Erase(const Key &key) {
+  bool Erase(const Key &key) {
     uint32_t bucket;
     uint32_t collisions;
     const bool found = DoLookup(key, &bucket, &collisions);
@@ -108,6 +128,7 @@ class SmallHashBase {
       }
       static_cast<Derived *>(this)->Shrink();  // No-op if fixed-size
     }
+    return found;
   }
 
   void Clear() {

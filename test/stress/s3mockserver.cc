@@ -11,9 +11,9 @@
 #include <set>
 #include <string>
 
+#include "crypto/hash.h"
 #include "duplex_curl.h"
-#include "hash.h"
-#include "logging.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

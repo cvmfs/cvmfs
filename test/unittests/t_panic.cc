@@ -6,8 +6,8 @@
 
 #include <unistd.h>
 
-#include "logging.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 static void LogPanic(const LogSource source, const int mask, const char *msg)

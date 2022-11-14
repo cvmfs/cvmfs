@@ -25,9 +25,9 @@
 #include <string>
 
 #include "compression.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
-#include "hash.h"
 #include "shortstring.h"
 #include "sql.h"
 

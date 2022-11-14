@@ -24,13 +24,13 @@
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
 #include "leveldb/filter_policy.h"
-#include "logging.h"
-#include "smalloc.h"
 #include "statistics.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
-#include "util_concurrency.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

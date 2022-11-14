@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <string>
 
+#include "util/export.h"
 #include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -20,7 +21,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  *
  * Note: You need to call Map() to actually map the provided file path to memory
  */
-class MemoryMappedFile : SingleCopy {
+class CVMFS_EXPORT MemoryMappedFile : SingleCopy {
  public:
   explicit MemoryMappedFile(const std::string &file_path);
   ~MemoryMappedFile();

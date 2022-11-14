@@ -7,7 +7,7 @@
 #include "util/pointer.h"
 #include "util/raii_temp_dir.h"
 
-#include "platform.h"
+#include "util/platform.h"
 #include "util/posix.h"
 
 static bool DirExists(const std::string& dir) {

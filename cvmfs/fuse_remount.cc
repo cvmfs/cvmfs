@@ -16,12 +16,12 @@
 #include "backoff.h"
 #include "catalog_mgr_client.h"
 #include "fuse_inode_gen.h"
-#include "logging.h"
 #include "lru_md.h"
 #include "mountpoint.h"
-#include "platform.h"
 #include "statistics.h"
 #include "util/exception.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -166,7 +166,7 @@ FuseRemounter::FuseRemounter(MountPoint *mountpoint,
     : mountpoint_(mountpoint),
       inode_generation_info_(inode_generation_info),
       invalidator_(new FuseInvalidator(mountpoint->inode_tracker(),
-                                       mountpoint->nentry_tracker(),
+                                       mountpoint->dentry_tracker(),
                                        fuse_channel_or_session,
                                        fuse_notify_invalidation)),
       invalidator_handle_(static_cast<int>(mountpoint->kcache_timeout_sec())),

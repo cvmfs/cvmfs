@@ -10,8 +10,8 @@
 #include <cassert>
 #include <vector>
 
-#include "atomic.h"
 #include "malloc_arena.h"
+#include "util/atomic.h"
 
 /**
  * To avoid memory fragmentation, allocate the data buffer inside the BlockItem

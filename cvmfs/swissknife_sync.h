@@ -280,8 +280,6 @@ class CommandSync : public Command {
     r.push_back(
         Parameter::Optional('D', "tag name (only used when upstream is GW)"));
     r.push_back(Parameter::Optional(
-        'G', "tag channel (only used when upstream is GW)"));
-    r.push_back(Parameter::Optional(
         'J', "tag description (only used when upstream is GW)"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('Z',

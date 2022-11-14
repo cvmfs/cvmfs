@@ -6,15 +6,13 @@ import (
 	"io"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // LoadKey from the specified file; returns the key id, key secret and optional error
 func LoadKey(keyFile string) (string, string, error) {
 	f, err := os.Open(keyFile)
 	if err != nil {
-		return "", "", errors.Wrap(err, "could not open key file for reading")
+		return "", "", fmt.Errorf("could not open key file for reading: %w", err)
 	}
 	defer f.Close()
 	return loadKeyFromReader(f)

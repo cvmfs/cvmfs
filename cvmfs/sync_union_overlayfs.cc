@@ -11,9 +11,9 @@
 #include <string>
 #include <vector>
 
-#include "fs_traversal.h"
 #include "sync_mediator.h"
 #include "util/exception.h"
+#include "util/fs_traversal.h"
 #include "util/shared_ptr.h"
 
 namespace publish {

@@ -14,7 +14,6 @@
 #include "catalog_mgr_rw.h"
 #include "compression.h"
 #include "download.h"
-#include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "params.h"
@@ -24,6 +23,7 @@
 #include "swissknife.h"
 #include "swissknife_history.h"
 #include "util/algorithm.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
@@ -57,7 +57,6 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
   args['f'].Reset(new std::string(repo_name));
   args['e'].Reset(new std::string(params.hash_alg_str));
   args['a'].Reset(new std::string(repo_tag.name()));
-  args['c'].Reset(new std::string(repo_tag.channel()));
   args['D'].Reset(new std::string(repo_tag.description()));
   args['x'].Reset(new std::string());
   args['@'].Reset(new std::string(proxy));
@@ -111,10 +110,10 @@ CommitProcessor::Result CommitProcessor::Process(
 
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s, "
-           "tag_name: %s, tag_channel: %s, tag_description: %s",
+           "tag_name: %s, tag_description: %s",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
            new_root_hash.ToString(true).c_str(), final_tag.name().c_str(),
-           final_tag.channel().c_str(), final_tag.description().c_str());
+           final_tag.description().c_str());
 
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');

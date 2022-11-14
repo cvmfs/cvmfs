@@ -24,12 +24,12 @@
 #include "download.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
-#include "logging.h"
 #include "manifest.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "shortstring.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 
@@ -564,7 +564,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         aggregated_file_size += this_chunk.size();
 
         // are all data chunks in the data store?
-        if (check_chunks_) {
+        if (check_chunks_ && !entries[i].IsExternalFile()) {
           const shash::Any &chunk_hash = this_chunk.content_hash();
           const string chunk_path = "data/" + chunk_hash.MakePath();
           if (!Exists(chunk_path)) {
@@ -696,8 +696,7 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
   typedef vector<string> Tokens;
   const Tokens path_tokens = SplitString(subtree_path, '/');
 
-  string      current_path = "";
-  bool        found        = false;
+  string current_path = "";
 
   Tokens::const_iterator i    = path_tokens.begin();
   Tokens::const_iterator iend = path_tokens.end();
@@ -718,12 +717,11 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
           break;
         }
       } else {
-        found = true;
+        return true;
       }
     }
   }
-
-  return found;
+  return false;
 }
 
 

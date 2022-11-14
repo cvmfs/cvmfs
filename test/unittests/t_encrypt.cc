@@ -11,8 +11,8 @@
 #include <cstring>
 #include <string>
 
-#include "encrypt.h"
-#include "hash.h"
+#include "crypto/encrypt.h"
+#include "crypto/hash.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT

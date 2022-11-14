@@ -227,8 +227,10 @@ int64_t String2Int64(const string &value) {
 
 uint64_t String2Uint64(const string &value) {
   uint64_t result;
-  sscanf(value.c_str(), "%" PRIu64, &result);
-  return result;
+  if (sscanf(value.c_str(), "%" PRIu64, &result) == 1) {
+    return result;
+  }
+  return 0;
 }
 
 /**
@@ -285,8 +287,13 @@ bool HasSuffix(const std::string &str, const std::string &suffix,
              : std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
 }
 
-vector<string> SplitString(const string &str, const char delim,
-                           const unsigned max_chunks) {
+vector<string> SplitString(const string &str, char delim) {
+  return SplitStringBounded(0, str, delim);
+}
+
+vector<string> SplitStringBounded(
+  unsigned max_chunks, const string &str, char delim)
+{
   vector<string> result;
 
   // edge case... one chunk is always the whole string
