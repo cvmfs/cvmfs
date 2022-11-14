@@ -458,7 +458,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
  lookup_reply_error:
   fuse_remounter_->fence()->Leave();
 
-  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "EIO (01) on %s", name );
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "EIO (01) on %s", name);
   perf::Inc(file_system_->n_eio_total());
   perf::Inc(file_system_->n_eio_01());
 
@@ -554,9 +554,10 @@ static void ReplyNegative(const catalog::DirectoryEntry &dirent,
     const char * name = dirent.name().c_str();
     const char * link = dirent.symlink().c_str();
 
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "EIO (02) name=%s symlink=%s", 
-       name ? name: "<unset>", 
-       link ? link: "<unset>" );
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+       "EIO (02) name=%s symlink=%s",
+       name ? name: "<unset>",
+       link ? link: "<unset>");
 
     perf::Inc(file_system_->n_eio_total());
     perf::Inc(file_system_->n_eio_02());
@@ -735,7 +736,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_remounter_->fence()->Leave();
     fuse_listing.Clear();  // Buffer is shared, empty manually
 
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "EIO (03) on %s", path.c_str() );
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+         "EIO (03) on %s", path.c_str());
     perf::Inc(file_system_->n_eio_total());
     perf::Inc(file_system_->n_eio_03());
     fuse_reply_err(req, EIO);
@@ -977,8 +979,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           chunks->IsEmpty())
       {
         fuse_remounter_->fence()->Leave();
-        LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "EIO (04) file %s is marked as "
-                 "'chunked', but no chunks found.", path.c_str());
+        LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr,
+           "EIO (04) file %s is marked as 'chunked', but no chunks found.",
+           path.c_str());
         perf::Inc(file_system_->n_eio_total());
         perf::Inc(file_system_->n_eio_04());
         fuse_reply_err(req, EIO);
@@ -1073,8 +1076,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   mount_point_->backoff_throttle()->Throttle();
 
   mount_point_->file_system()->io_error_info()->AddIoError();
-  if (EIO == errno  || EIO == -fd ) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "EIO (06) on %s", path.c_str() );
+  if (EIO == errno  || EIO == -fd) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+        "EIO (06) on %s", path.c_str() );
     perf::Inc(file_system_->n_eio_total());
     perf::Inc(file_system_->n_eio_06());
   }
@@ -1169,7 +1173,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
           chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
           chunk_tables->Unlock();
 
-          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, 
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
               "EIO (05) on %s", chunks.path.ToString().c_str() );
           perf::Inc(file_system_->n_eio_total());
           perf::Inc(file_system_->n_eio_05());
@@ -1199,11 +1203,11 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         chunk_tables->Lock();
         chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
         chunk_tables->Unlock();
-        if ( EIO == errno || EIO == -bytes_fetched ) { 
-          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, 
+        if ( EIO == errno || EIO == -bytes_fetched ) {
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "EIO (07) on %s", chunks.path.ToString().c_str() );
           perf::Inc(file_system_->n_eio_total());
-          perf::Inc(file_system_->n_eio_07()); 
+          perf::Inc(file_system_->n_eio_07());
         }
         fuse_reply_err(req, -bytes_fetched);
         return;
@@ -1229,15 +1233,15 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       if ( EIO == errno || EIO == -nbytes ) {
         PathString path;
         bool found = GetPathForInode(ino, &path);
-        if( found ) {
-          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, 
+        if ( found ) {
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "EIO (08) on %s", path.ToString().c_str() );
         } else {
-          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, 
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "EIO (08) on <unknown inode>");
         }
         perf::Inc(file_system_->n_eio_total());
-        perf::Inc(file_system_->n_eio_08()); 
+        perf::Inc(file_system_->n_eio_08());
       }
       fuse_reply_err(req, -nbytes);
       return;

@@ -235,15 +235,24 @@ void FileSystem::CreateStatistics() {
                   "Number of currently opened directories");
   io_error_info_.SetCounter(statistics_->Register("cvmfs.n_io_error",
                                                   "Number of I/O errors"));
-  n_eio_total_ =  statistics_->Register("eio.total", "EIO returned to calling process. Sum of individual eio counters");
-  n_eio_01_ =  statistics_->Register("eio.01", "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
-  n_eio_02_ =  statistics_->Register("eio.02", "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
-  n_eio_03_ =  statistics_->Register("eio.03", "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
-  n_eio_04_ =  statistics_->Register("eio.04", "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
-  n_eio_05_ =  statistics_->Register("eio.05", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
-  n_eio_06_ =  statistics_->Register("eio.06", "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
-  n_eio_07_ =  statistics_->Register("eio.07", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
-  n_eio_08_ =  statistics_->Register("eio.08", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_total_ =  statistics_->Register("eio.total",
+     "EIO returned to calling process. Sum of individual eio counters");
+  n_eio_01_ =  statistics_->Register("eio.01",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
+  n_eio_02_ =  statistics_->Register("eio.02",
+     "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
+  n_eio_03_ =  statistics_->Register("eio.03",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
+  n_eio_04_ =  statistics_->Register("eio.04",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_05_ =  statistics_->Register("eio.05",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_06_ =  statistics_->Register("eio.06",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_07_ =  statistics_->Register("eio.07",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_08_ =  statistics_->Register("eio.08",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
