@@ -139,15 +139,12 @@ if (BUILD_CVMFS)
   #
   add_executable (cvmfs_fsck
                   compression.cc
-                  crypto/hash.cc
                   cvmfs_fsck.cc
                   statistics.cc
-                  util/exception.cc
-                  util/logging.cc
-                  util/posix.cc
-                  util/string.cc
   )
   target_link_libraries (cvmfs_fsck
+                         cvmfs_crypto
+                         cvmfs_util
                          ${ZLIB_LIBRARIES}
                          ${OPENSSL_LIBRARIES}
                          ${SHA3_LIBRARIES}
@@ -162,12 +159,8 @@ if (BUILD_CVMFS)
                   cvmfs_talk.cc
                   options.cc
                   sanitizer.cc
-                  util/exception.cc
-                  util/logging.cc
-                  util/posix.cc
-                  util/string.cc
   )
-  target_link_libraries (cvmfs_talk ${RT_LIBRARY} pthread)
+  target_link_libraries (cvmfs_talk cvmfs_util ${RT_LIBRARY} pthread)
 
   #
   # /usr/bin/cvmfs2
