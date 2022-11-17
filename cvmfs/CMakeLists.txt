@@ -57,9 +57,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression.cc
-       crypto/crypto_util.cc
-       crypto/hash.cc
-       crypto/signature.cc
        directory_entry.cc
        duplex_fuse.cc
        dns.cc
@@ -91,13 +88,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        ssl.cc
        statistics.cc
        tracer.cc
-       util/algorithm.cc
-       util/concurrency.cc
-       util/exception.cc
-       util/logging.cc
-       util/posix.cc
-       util/string.cc
-       util/uuid.cc
        whitelist.cc
        wpad.cc
        xattr.cc
@@ -111,6 +101,22 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
       add_definitions (-DCVMFS_ENABLE_INOTIFY)
     endif ()
   endif ()
+
+  #
+  # For /usr/lib/libcvmfs.a which is not linked against cvmfs-libs
+  #
+  set (CVMFS_COMMON_CLIENT_UTILITY_SOURCES
+    crypto/crypto_util.cc
+    crypto/hash.cc
+    crypto/signature.cc
+    util/algorithm.cc
+    util/concurrency.cc
+    util/exception.cc
+    util/logging.cc
+    util/posix.cc
+    util/string.cc
+    util/uuid.cc
+  ) # CVMFS_COMMON_CLIENT_UTILITY_SOURCES
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
 
 
@@ -261,7 +267,6 @@ if (BUILD_CVMFS)
        ${ZLIB_LIBRARIES}
        ${SPARSEHASH_LIBRARIES}
        ${LEVELDB_LIBRARIES}
-       ${SHA3_LIBRARIES}
        ${PROTOBUF_LITE_LIBRARY}
        ${VJSON_LIBRARIES}
        ${RT_LIBRARY}
@@ -284,9 +289,13 @@ if (BUILD_CVMFS)
     LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
   )
   target_link_libraries (cvmfs_fuse
+                         cvmfs_crypto
+                         cvmfs_util
                          ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
   )
   target_link_libraries (cvmfs_fuse_debug
+                         cvmfs_crypto_debug
+                         cvmfs_util_debug
                          ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
   )
   if (FUSE3_FOUND)
@@ -305,9 +314,13 @@ if (BUILD_CVMFS)
       LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
     )
     target_link_libraries (cvmfs_fuse3
+                           cvmfs_crypto
+                           cvmfs_util
                            ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
     target_link_libraries (cvmfs_fuse3_debug
+                           cvmfs_crypto_debug
+                           cvmfs_util_debug
                            ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
   endif ()
@@ -359,6 +372,7 @@ endif (BUILD_CVMFS)
 if (BUILD_LIBCVMFS)
   add_library (cvmfs_only STATIC
                ${CVMFS_COMMON_CLIENT_SOURCES}
+               ${CVMFS_COMMON_CLIENT_UTILITY_SOURCES}
                libcvmfs.cc
                libcvmfs_int.cc
                libcvmfs_legacy.cc
