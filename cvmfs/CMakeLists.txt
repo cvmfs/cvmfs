@@ -1159,7 +1159,6 @@ endif (BUILD_RECEIVER)
 
 if (BUILD_SHRINKWRAP)
   add_executable (cvmfs_shrinkwrap
-                  crypto/hash.cc
                   monitor.cc
                   shrinkwrap/fs_traversal.cc
                   shrinkwrap/fs_traversal_libcvmfs.cc
@@ -1171,11 +1170,6 @@ if (BUILD_SHRINKWRAP)
                   shrinkwrap/spec_tree.cc
                   shrinkwrap/util.cc
                   statistics.cc
-                  util/concurrency.cc
-                  util/exception.cc
-                  util/logging.cc
-                  util/posix.cc
-                  util/string.cc
                   xattr.cc
   )
   add_dependencies (cvmfs_shrinkwrap libcvmfs)
@@ -1183,6 +1177,8 @@ if (BUILD_SHRINKWRAP)
     COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions"
   )
   target_link_libraries(cvmfs_shrinkwrap
+                        cvmfs_crypto
+                        cvmfs_util
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
                         ${SQLITE3_LIBRARY}
                         ${CURL_LIBRARIES}
@@ -1190,7 +1186,6 @@ if (BUILD_SHRINKWRAP)
                         ${PACPARSER_LIBRARIES}
                         ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES}
-                        ${SHA3_LIBRARIES}
                         ${VJSON_LIBRARIES}
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
