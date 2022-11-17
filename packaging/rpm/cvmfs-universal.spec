@@ -165,6 +165,7 @@ Requires: util-linux
   %endif
 %endif
 Requires: cvmfs-config
+Requires: cvmfs-libs = %{version}
 
 # SELinux integration
 # These are needed to build the selinux policy module.
@@ -701,6 +702,8 @@ systemctl daemon-reload
 %endif
 
 %changelog
+* Wed Nov 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.11.0
+- Make cvmfs-libs a dependency of the cvmfs package
 * Mon May 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.10.0
 - Add /var/log/cvmfs to cvmfs-server package, set its SElinux label
 * Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0
